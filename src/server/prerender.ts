@@ -26,9 +26,9 @@ import { readsOf } from './page-reads'
 import { pageSetting } from './page-settings'
 import { matchedParams } from './params'
 import { listedIn, listedParams, pageEtag, pageToken, pathOf, storedHeaders } from './prerendered'
-import { keptStop } from './pure-page'
+import { keptScan } from './pure-page'
 import { renderPage } from './render'
-import { scanEndpoints } from './routes'
+import { scanEndpoints, slashedPath } from './routes'
 import { serverIslandModes } from './server-islands'
 import { setupPages } from './setup'
 import { STAMP_HOLE } from './stamp'
@@ -101,7 +101,7 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
 
   // `auto` is a page nothing marks, which the build keeps because it provably reads nothing from its request: it is skipped, never failed, as soon as one render shows otherwise.
   // Gives what writes the route, once every locale of it has rendered, so a route given up on leaves nothing behind.
-  async function prerenderRoute(route: Route, file: string, marked: boolean, auto = false, keep = false): Promise<(() => Promise<void> | void)[]> {
+  async function prerenderRoute(route: Route, file: string, marked: boolean, auto = false, keep = false, readsPathname = false): Promise<(() => Promise<void> | void)[]> {
     const pending: (() => Promise<void> | void)[] = []
     // Nothing is written for a page given up on, whose reason is kept for the build to show.
     const skip = (why: string) => {
@@ -139,7 +139,9 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
 
       // One page per locale, each rendered in it.
       for (const copy of localeCopies(i18n?.settings, path).filter(copy => listedIn(params, copy.locale, i18n?.settings))) {
-        const request = new Request(`${copy.host === undefined ? 'http://localhost' : `https://${copy.host}`}${copy.path}`)
+        // Rendered at the path the server answers it at, which `trailingSlash` spells.
+        const served = slashedPath(copy.path, config.trailingSlash)
+        const request = new Request(`${copy.host === undefined ? 'http://localhost' : `https://${copy.host}`}${served}`)
         // Guards run when the page is served, for whoever asks; the build renders what they let through.
         const reads = standInReads()
         // onError is the app's for requests it answers; the build logs what a prerendered page throws.
@@ -229,7 +231,7 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
           options.others?.push({ file: route.file, html })
         }
 
-        const stored: PrerenderedPage = { pattern: route.pattern, locale: copy.locale ?? locales.settings.defaultLocale, file: name, status: response.status, headers: storedHeaders(response.headers), etag: pageEtag(html), renderedAt: Date.now(), revalidate, ...islands.length > 0 ? { islands } : {}, ...stamps ? { stamps } : {}, ...readsSite ? { readsSite } : {}, ...auto ? { kept: true } : {}, ...dataRead.length > 0 ? { reads: dataRead } : {}, ...token === pageToken(copy.key) ? {} : { token } }
+        const stored: PrerenderedPage = { pattern: route.pattern, locale: copy.locale ?? locales.settings.defaultLocale, file: name, status: response.status, headers: storedHeaders(response.headers), etag: pageEtag(html), renderedAt: Date.now(), revalidate, ...islands.length > 0 ? { islands } : {}, ...stamps ? { stamps } : {}, ...readsSite ? { readsSite } : {}, ...auto ? { kept: true } : {}, ...auto && readsPathname ? { pathname: served } : {}, ...dataRead.length > 0 ? { reads: dataRead } : {}, ...token === pageToken(copy.key) ? {} : { token } }
 
         pending.push(() => {
           pages[copy.key] = stored
@@ -260,7 +262,7 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
       continue
     }
 
-    const stop = asked ? undefined : await stopOf(route, scans)
+    const { stop, pathname } = asked ? { stop: undefined, pathname: false } : await stopOf(route, scans)
     const auto = !asked && stop === undefined
 
     if (!asked && !auto) {
@@ -276,7 +278,7 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
     let writes: Awaited<ReturnType<typeof prerenderRoute>>
 
     try {
-      writes = await prerenderRoute(route, file, marked, auto, keep)
+      writes = await prerenderRoute(route, file, marked, auto, keep, pathname)
     }
     catch (error) {
       // A page kept on the strength of its source alone is rendered per request when it will not render here.
@@ -382,11 +384,12 @@ function firstLine(text: string): string {
 }
 
 // What keeps the page from being kept: what its files read, or that it takes params, which `prerender` lists.
-async function stopOf(route: Route, scans: Map<string, Promise<Scan>>): Promise<Stop | undefined> {
+// Gives too whether it reads the pathname, which a kept copy is served for only at the path it was rendered at.
+async function stopOf(route: Route, scans: Map<string, Promise<Scan>>): Promise<{ stop?: Stop | undefined, pathname: boolean }> {
   if (route.params.length > 0)
-    return { file: route.file, line: 0, why: 'takes params, so `prerender` lists the pages to render' }
+    return { stop: { file: route.file, line: 0, why: 'takes params, so `prerender` lists the pages to render' }, pathname: false }
 
-  return keptStop(route, scans)
+  return keptScan(route, scans)
 }
 
 // What a page module says of its own prerendering, read off its source once: the text of its `prerender` and whether it says `keep: true`.

@@ -80,7 +80,7 @@ const KEPT: Record<string, string> = {
 }
 // Each page here depends on its request or the moment in a way its source shows or hides.
 const READING: Record<string, string> = {
-  'src/routes/ctx.kay': 'p {ctx.url.pathname}\n',
+  'src/routes/ctx.kay': 'p {ctx.url.search}\n',
   'src/routes/query.kay': '--- server\nimport { s } from \'kay\'\n\nexport const page = { query: s.Object({ page: s.Optional(s.Number()) }) }\n---\np Query\n',
   'src/routes/date.kay': 'p {new Date().getFullYear()}\n',
   'src/routes/random.kay': 'p {Math.random()}\n',
@@ -123,7 +123,7 @@ describe('a page that reads nothing from its request', () => {
   }, 60_000)
 
   it('is told from the source alone, layouts and components included', async () => {
-    const root = await project({ ...KEPT, 'src/routes/_layout.kay': 'slot\n', 'src/routes/reading/_layout.kay': 'p {ctx.url.pathname}\nslot\n', 'src/routes/reading/index.kay': 'p Page\n' })
+    const root = await project({ ...KEPT, 'src/routes/_layout.kay': 'slot\n', 'src/routes/reading/_layout.kay': 'p {ctx.request.url}\nslot\n', 'src/routes/reading/index.kay': 'p Page\n' })
 
     try {
       const route = (file: string, ...layouts: string[]) => ({ file: join(root, file), layouts: layouts.map(layout => join(root, layout)) })
@@ -861,7 +861,7 @@ describe('what kay exports to a page that is kept', () => {
     const root = await project({
       'src/routes/index.kay': '--- server\nimport { posts } from \'../content.config\'\n\nconst all = await posts.all()\n---\nul\n  for post of all\n    li {post.data.title}\n',
       'src/routes/loaded.kay': '--- server\nimport { rows } from \'../rows\'\n\nconst all = await rows.all()\n---\np {all.length}\n',
-      'src/routes/about.kay': '--- server\nimport { posts } from \'../content.config\'\n\nconst all = await posts.all()\nconst path = ctx.url.pathname\n---\np {all.length}{path}\n',
+      'src/routes/about.kay': '--- server\nimport { posts } from \'../content.config\'\n\nconst all = await posts.all()\nconst path = ctx.url.search\n---\np {all.length}{path}\n',
       'src/content.config.ts': 'import { s } from \'kay\'\nimport { collection } from \'kay/content\'\n\nexport const posts = collection(\'content/posts\', { schema: s.Object({ title: s.String() }) })\n',
       'src/rows.ts': 'import { s } from \'kay\'\nimport { collection } from \'kay/content\'\n\nexport const rows = collection({ name: \'rows\', load: () => [{ slug: \'a\', data: { title: \'A\' } }] }, { schema: s.Object({ title: s.String() }) })\n',
       'src/content/posts/one.json': '{ "title": "One" }\n',
@@ -874,7 +874,7 @@ describe('what kay exports to a page that is kept', () => {
 
   it('names what a page really reads beside an export that reads nothing', async () => {
     const root = await project({
-      'src/routes/both.kay': '--- server\nimport { s } from \'kay\'\n\nconst shape = s.String()\n---\np {ctx.url.pathname}\n',
+      'src/routes/both.kay': '--- server\nimport { s } from \'kay\'\n\nconst shape = s.String()\n---\np {ctx.url.search}\n',
       'src/routes/bound.kay': '---\nimport { s, queryParam } from \'kay\'\n\nconst page = queryParam(\'page\')\n---\np {page()}\n',
       'src/routes/unknown.kay': '---\nimport { somethingNew } from \'kay\'\n---\np Hi\n',
     })
@@ -900,5 +900,183 @@ describe('what kay exports to a page that is kept', () => {
     roots.push(root)
 
     expect(await built(root)).toEqual(['/', '/local'])
+  }, 60_000)
+})
+
+describe('a page reading only what its path fixes', () => {
+  const roots: string[] = []
+  const AT_PATH = '--- server\nconst here = ctx.url.pathname\n---\np At {here}\n'
+
+  afterAll(async () => {
+    await Promise.all(roots.map(async root => rm(root, { recursive: true, force: true })))
+  })
+
+  // One page per spelling, each a server fence reading `ctx` the way its name says.
+  const KEPT_READS: Record<string, string> = {
+    'direct': 'p {ctx.url.pathname}\n',
+    'split': '--- server\nconst parts = ctx.url.pathname.split(\'/\').filter(Boolean)\n---\np {parts[0]}\n',
+    'optional chain': '--- server\nconst path = ctx?.url?.pathname\n---\np {path}\n',
+    'compared': '--- server\nconst home = ctx.url.pathname === \'/\'\n---\np {home}\n',
+    'destructured': '--- server\nconst { url: { pathname } } = ctx\n---\np {pathname}\n',
+    'aliased': '--- server\nconst { url: { pathname: here = \'/\' } } = ctx\n---\np {here}\n',
+    'params': '--- server\nconst slug = ctx.params.slug\n---\np {slug}\n',
+    'params destructured': '--- server\nconst { params, url: { pathname } } = ctx\n---\np {pathname}{params.slug}\n',
+  }
+  const STOPPED_READS: Record<string, string> = {
+    'search': 'p {ctx.url.search}\n',
+    'search params': 'p {ctx.url.searchParams.get(\'q\')}\n',
+    'indexed': 'p {ctx.url[\'search\']}\n',
+    'url whole': '--- server\nconst url = ctx.url\n---\np {url.pathname}\n',
+    'url destructured': '--- server\nconst { url } = ctx\n---\np {url.pathname}\n',
+    'url search destructured': '--- server\nconst { url: { search } } = ctx\n---\np {search}\n',
+    'url with a rest': '--- server\nconst { url: { pathname, ...rest } } = ctx\n---\np {pathname}\n',
+    'rest of ctx': '--- server\nconst { params, ...rest } = ctx\n---\np {rest.request.url}\n',
+    'request': 'p {ctx.request.url}\n',
+    'cookies': 'p {ctx.cookies.get(\'a\')}\n',
+    'headers': 'p {ctx.request.headers.get(\'a\')}\n',
+    'locals': 'p {ctx.locals}\n',
+    'query': 'p {ctx.query}\n',
+    'passed on': '--- server\nimport { describe } from \'../../describe\'\n---\np {describe(ctx)}\n',
+    'url passed on': '--- server\nimport { describe } from \'../../describe\'\n---\np {describe(ctx.url)}\n',
+    'aliased ctx': '--- server\nconst here = ctx\n---\np {here.url.pathname}\n',
+    'assigned': '--- server\nctx.url.pathname = \'/other\'\n---\np Hi\n',
+    'incremented': '--- server\nctx.url.pathname += \'/more\'\n---\np Hi\n',
+    'a pathname read after a search': '--- server\nconst here = ctx.url.pathname\nconst found = ctx.url.search\n---\np {here}{found}\n',
+  }
+  const fileOf = (name: string) => name.replaceAll(' ', '-')
+
+  it('is told apart from a page reading anything else of ctx, in a page, a layout and a component', async () => {
+    const root = await project({
+      ...Object.fromEntries(Object.entries(KEPT_READS).map(([name, source]) => [`src/routes/${fileOf(name)}.kay`, source])),
+      ...Object.fromEntries(Object.entries(STOPPED_READS).map(([name, source]) => [`src/routes/stopped/${fileOf(name)}.kay`, source])),
+      'src/describe.ts': 'export function describe(value: unknown): string {\n  return String(value)\n}\n',
+      'src/layout-reading/_layout.kay': '--- server\nconst current = ctx.url.pathname\n---\np {current}\nslot\n',
+      'src/layout-reading/index.kay': 'p Page\n',
+      'src/nav.kay': '--- server\nconst { url: { pathname } } = ctx\n---\nnav {pathname}\n',
+      'src/nav-search.kay': '--- server\nconst found = ctx.url.search\n---\nnav {found}\n',
+      'src/routes/with-nav.kay': '---\nimport Nav from \'../nav.kay\'\n---\nNav\n',
+      'src/routes/with-nav-search.kay': '---\nimport Nav from \'../nav-search.kay\'\n---\nNav\n',
+      'src/helper.ts': 'export function here(ctx: { url: URL }): string {\n  return ctx.url.pathname\n}\n',
+      'src/routes/with-helper.kay': '--- server\nimport { here } from \'../helper\'\n---\np {here(ctx)}\n',
+      'src/routes/foreign.kay': '--- server\nconst widget = { ctx: { url: 1 } }\nconst found = widget.ctx.url\n---\np {found}\n',
+    })
+
+    roots.push(root)
+
+    const stopOf = async (file: string, ...layouts: string[]) => keptStop({ file: join(root, file), layouts: layouts.map(layout => join(root, layout)) })
+
+    for (const name of Object.keys(KEPT_READS))
+      expect(await stopOf(`src/routes/${fileOf(name)}.kay`), name).toBeUndefined()
+
+    for (const name of Object.keys(STOPPED_READS))
+      expect(await stopOf(`src/routes/stopped/${fileOf(name)}.kay`), name).toMatchObject({ why: 'reads `ctx`' })
+
+    expect(await stopOf('src/layout-reading/index.kay', 'src/layout-reading/_layout.kay')).toBeUndefined()
+    expect(await stopOf('src/routes/with-nav.kay')).toBeUndefined()
+    expect(await stopOf('src/routes/with-nav-search.kay')).toMatchObject({ file: join(root, 'src/nav-search.kay'), why: 'reads `ctx`' })
+    expect(await stopOf('src/routes/with-helper.kay')).toMatchObject({ why: 'reads `ctx`' })
+    expect(await stopOf('src/routes/foreign.kay')).toMatchObject({ why: 'reads `ctx`' })
+  })
+
+  it('keeps every page of a site whose layout reads the pathname, and not the one reading more', async () => {
+    const root = await project({
+      'src/routes/_layout.kay': '--- server\nconst parts = ctx.url.pathname.split(\'/\').filter(Boolean)\n---\nheader {parts[0] ?? \'home\'}\nslot\n',
+      'src/routes/index.kay': 'h1 Home\n',
+      'src/routes/about.kay': 'h1 About\n',
+      'src/routes/contact.kay': '--- server\nconst sent = ctx.url.searchParams.has(\'sent\')\n---\nh1 Contact {String(sent)}\n',
+      'src/routes/[slug].kay': '--- server\nconst slug = ctx.params.slug\n---\nh1 {slug}\n',
+    })
+
+    roots.push(root)
+
+    expect(await built(root)).toEqual(['/', '/about'])
+
+    const [about, contact] = await served(root, [{ path: '/about' }, { path: '/contact?sent=1' }])
+
+    expect(about!.etag).not.toBeNull()
+    expect(about!.text).toContain('<header>about</header>')
+    expect(contact!.etag).toBeNull()
+    expect(contact!.text).toContain('Contact true')
+  }, 60_000)
+
+  it('is served at the path it was rendered at, whichever way trailingSlash spells it', async () => {
+    const files = { 'src/routes/about.kay': AT_PATH, 'src/routes/index.kay': AT_PATH }
+
+    for (const trailingSlash of ['never', 'always', 'ignore']) {
+      const root = await project({ ...files, 'kay.config.ts': `import { defineConfig } from 'kay/server'\n\nexport default defineConfig({ log: false, trailingSlash: '${trailingSlash}' })\n` })
+
+      roots.push(root)
+      expect(await built(root), trailingSlash).toEqual(['/', '/about'])
+
+      const [bare, slashed, home] = await served(root, [{ path: '/about' }, { path: '/about/' }, { path: '/' }])
+
+      // A page is served at the spelling `trailingSlash` allows, kept when it is the one rendered, rendered per request when it is the other.
+      if (trailingSlash === 'never') {
+        expect(bare!.text).toContain('At /about<')
+        expect(bare!.etag).not.toBeNull()
+        expect(slashed!.status).toBe(308)
+      }
+      else if (trailingSlash === 'always') {
+        expect(bare!.status).toBe(308)
+        expect(slashed!.text).toContain('At /about/<')
+        expect(slashed!.etag).not.toBeNull()
+      }
+      else {
+        expect(bare!.text).toContain('At /about<')
+        expect(bare!.etag).not.toBeNull()
+        expect(slashed!.text).toContain('At /about/<')
+        expect(slashed!.etag).toBeNull()
+      }
+
+      expect(home!.text).toContain('At /<')
+    }
+  }, 120_000)
+
+  it('keeps a page whose path needs percent-encoding, at the spelling a browser sends', async () => {
+    const root = await project({ 'src/routes/café.kay': AT_PATH })
+
+    roots.push(root)
+    expect(await built(root)).toEqual(['/caf%C3%A9'])
+
+    const [encoded, decoded] = await served(root, [{ path: '/caf%C3%A9' }, { path: '/café' }])
+
+    expect(encoded!.etag).not.toBeNull()
+    expect(encoded!.text).toContain('At /caf%C3%A9<')
+    expect(decoded!.text).toContain('At /caf%C3%A9<')
+  }, 60_000)
+
+  it('is kept once per locale prefix and under a base, the pathname being the one the router sees', async () => {
+    const root = await project({
+      'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ log: false, base: \'/app\', i18n: { locales: [\'fr\', \'en\'], defaultLocale: \'fr\', messages: \'src/messages\' } })\n',
+      'src/messages/fr.ts': MESSAGES.fr,
+      'src/messages/en.ts': MESSAGES.en,
+      'src/routes/_layout.kay': '--- server\nimport { t } from \'kay/i18n\'\n\nconst here = ctx.url.pathname\n---\nheader {t(\'hello\')} {here}\nslot\n',
+      'src/routes/about.kay': 'p About\n',
+    })
+
+    roots.push(root)
+    expect((await built(root)).sort()).toEqual(['/about', '/en/about'])
+
+    const [fr, en] = await served(root, [{ path: '/about' }, { path: '/en/about' }])
+
+    expect(fr!.etag).not.toBeNull()
+    expect(fr!.text).toContain('<header>Bonjour /about</header>')
+    expect(en!.etag).not.toBeNull()
+    expect(en!.text).toContain('<header>Hello /en/about</header>')
+  }, 60_000)
+
+  it('is also kept by a static build, rendered at the path the host answers it at', async () => {
+    const root = await project({
+      'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ log: false, trailingSlash: \'always\' })\n',
+      'src/routes/about.kay': AT_PATH,
+    })
+
+    roots.push(root)
+
+    const child = Bun.spawn([process.execPath, CLI, 'build', root, '--static', '--no-check'], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, NODE_ENV: 'production' } })
+    const [out, err, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+
+    expect(code, `${out}${err}`).toBe(0)
+    expect(await Bun.file(join(outputDir(root), 'pages/about.html')).text()).toContain('At /about/<')
   }, 60_000)
 })

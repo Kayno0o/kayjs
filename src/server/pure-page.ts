@@ -91,14 +91,22 @@ const PURE_I18N_NAMES = new Set(['t', 'T', 'locale', 'locales', 'localeName', 'l
 const CODE_FILE = /\.(?:kay|[cm]?[jt]sx?)$/
 // What a file imported for its bytes holds the same on every render; a database, a native module or a wasm file does not.
 const STATIC_FILE = /\.(?:png|jpe?g|gif|webp|avif|svg|ico|woff2?|ttf|otf|json|css|txt|md|html|toml|ya?ml|csv)$/i
-// Every way a file reads the request or the moment: `ctx`, a clock, a random number, the environment, the file system through Bun, a network fetch, a dynamic import, or a `query` schema, which has the page read the URL's search params.
-const READS_REQUEST = /\b(?:ctx|Date|Intl|Temporal|crypto|process|Bun|performance|fetch|globalThis|require|eval)\b|\bMath\b(?!\s*\??\.\s*(?!random\b)\w)|\bimport\s*\(|\bimport\.meta\b|\bquery\s*:/
+// Every way a file reads the request or the moment besides `ctx`, which `ctxRead` judges: a clock, a random number, the environment, the file system through Bun, a network fetch, a dynamic import, or a `query` schema, which has the page read the URL's search params.
+const READS_REQUEST = /\b(?:Date|Intl|Temporal|crypto|process|Bun|performance|fetch|globalThis|require|eval)\b|\bMath\b(?!\s*\??\.\s*(?!random\b)\w)|\bimport\s*\(|\bimport\.meta\b|\bquery\s*:/
 // The names of exports read as written, not run.
 const SETTING_NAMES = new Set<string>([PAGE, ...PAGE_SETTINGS])
 // For a server fence the compiler cannot parse, the part of the rule left: it declares state only when it exports something besides a type or a page setting, which may read it.
 const MODULE_EXPORT = new RegExp(`^export (?!(?:type|interface) )(?!(?:async )?(?:const|let|var|function) (?:${[...SETTING_NAMES].join('|')})\\b)`, 'm')
 
 const WHITESPACE = /\s+/g
+const CTX = /\bctx\b/g
+const CTX_PATHNAME = /^\s*\??\.\s*url\s*\??\.\s*pathname(?![\w$])(?![ \t]*(?:\+\+|--))(?!\s*(?:=(?!=)|[-+*/%&|^]=|<<=|>>>?=|\*\*=|&&=|\|\|=|\?\?=))/
+const CTX_PARAMS = /^\s*\??\.\s*params(?![\w$])/
+const CTX_ENDS = /^\s*(?:[;,)\n]|$)/
+const DECLARATION = /(?:^|[^\w$.])(?:const|let|var)$/
+const PARAMS_ENTRY = /^params\s*(?::|=|$)/
+const URL_ENTRY = /^url\s*:\s*(\{[\s\S]*\})$/
+const PATHNAME_ENTRY = /^pathname\s*(?::\s*[\w$]+\s*)?(?:=[\s\S]*)?$/
 // What may be a state declaration anywhere on a line, to spare the compiler's view to a file that has none.
 const MAYBE_STATE = /\b(?:let|var|export)\b|=\s*(?:\[\s*\]|\{\s*\}|new\b)/
 
@@ -291,11 +299,97 @@ export interface Scan {
   stop?: Stop | undefined
   // The files it imports that are code, for the same rules to reach.
   code: string[]
+  // It reads `ctx.url.pathname`, so a copy of the page is right only for the pathname it was rendered at.
+  pathname?: boolean | undefined
 }
 
 // A stop as it reads in a report, its file relative to the project: `src/routes/index.kay:3 reads Date`.
 export function describeStop(stop: Stop, root: string): string {
   return `${relative(root, stop.file).replaceAll('\\', '/')}${stop.line > 0 ? `:${stop.line}` : ''} ${stop.why}`
+}
+
+// Whether a destructuring pattern `{ ... }` of `ctx` takes only what its own path fixes: `params`, and `url` narrowed to `pathname`.
+// Gives whether it takes the pathname, or undefined when it takes anything else, the whole `url` and a rest element included.
+function destructuredPath(pattern: string): boolean | undefined {
+  const entries = splitLevel(pattern.slice(1))?.map(part => part.trim()).filter(part => part !== '')
+
+  if (entries === undefined)
+    return undefined
+
+  let pathname = false
+
+  for (const entry of entries) {
+    if (PARAMS_ENTRY.test(entry))
+      continue
+
+    const url = URL_ENTRY.exec(entry)?.[1]
+    const inner = url === undefined ? undefined : splitLevel(url.slice(1))?.map(part => part.trim()).filter(part => part !== '')
+
+    if (inner === undefined || !inner.every(part => PATHNAME_ENTRY.test(part)))
+      return undefined
+
+    pathname ||= inner.length > 0
+  }
+
+  return pathname
+}
+
+// The `{ ... }` pattern a `const`, `let` or `var` binds to `ctx`, when the text before this `ctx` is `const { ... } = `.
+function patternBefore(before: string): string | undefined {
+  const head = before.trimEnd()
+
+  if (!head.endsWith('=') || head.endsWith('=='))
+    return undefined
+
+  const end = head.slice(0, -1).trimEnd()
+
+  if (!end.endsWith('}'))
+    return undefined
+
+  let depth = 0
+
+  for (let at = end.length - 1; at >= 0; at--) {
+    if (end[at] === '}')
+      depth++
+    else if (end[at] === '{' && --depth === 0)
+      return DECLARATION.test(end.slice(0, at).trimEnd()) ? end.slice(at) : undefined
+  }
+
+  return undefined
+}
+
+// What a file does with `ctx`: the offset of the first use that reads more than its path fixes, and whether it reads the pathname.
+// Only `ctx.url.pathname`, `ctx.params` and a `const { params, url: { pathname } } = ctx` are followed; any other use, `ctx` passed on, aliased, or read at `url`, `search`, `request`, `cookies` or `headers`, is a read of the request.
+// A kept copy is served for the one pathname it was rendered at, and a page has no params to read, so neither is a request read.
+function ctxRead(source: string): { stop?: number | undefined, pathname: boolean } {
+  let pathname = false
+
+  for (const { index } of source.matchAll(CTX)) {
+    const before = source.slice(0, index)
+    const after = source.slice(index + 3)
+
+    if (before.trimEnd().endsWith('.'))
+      return { stop: index, pathname }
+
+    if (CTX_PATHNAME.test(after)) {
+      pathname = true
+
+      continue
+    }
+
+    if (CTX_PARAMS.test(after))
+      continue
+
+    const pattern = CTX_ENDS.test(after) ? patternBefore(before) : undefined
+    const taken = pattern === undefined ? undefined : destructuredPath(pattern)
+
+    if (taken === undefined)
+      return { stop: index, pathname }
+
+    pathname ||= taken
+  }
+
+  return { pathname }
 }
 
 function lineAt(source: string, offset: number): number {
@@ -316,8 +410,14 @@ export async function readsNothing(route: { layouts: string[], file: string }, s
 
 // What stops the page from being kept, the first file of it and its layouts, or of what they import, that reads something a request or the moment changes.
 export async function keptStop(route: { layouts: string[], file: string }, scans = new Map<string, Promise<Scan>>()): Promise<Stop | undefined> {
+  return (await keptScan(route, scans)).stop
+}
+
+// The same, with whether the page, its layouts or what they import read the pathname: the page is then right only at the path it is rendered at.
+export async function keptScan(route: { layouts: string[], file: string }, scans = new Map<string, Promise<Scan>>()): Promise<{ stop?: Stop | undefined, pathname: boolean }> {
   const seen = new Set<string>()
   const queue = [...routeChain(route).files]
+  let pathname = false
 
   for (let file = queue.pop(); file !== undefined; file = queue.pop()) {
     if (seen.has(file))
@@ -330,15 +430,16 @@ export async function keptStop(route: { layouts: string[], file: string }, scans
     if (scan === undefined)
       scans.set(file, scan = scanned(file))
 
-    const { stop, code } = await scan
+    const { stop, code, pathname: reads } = await scan
 
     if (stop !== undefined)
-      return stop
+      return { stop, pathname }
 
+    pathname ||= reads === true
     queue.push(...code)
   }
 
-  return undefined
+  return { pathname }
 }
 
 async function scanned(file: string): Promise<Scan> {
@@ -346,9 +447,13 @@ async function scanned(file: string): Promise<Scan> {
   const code: string[] = []
 
   const reads = READS_REQUEST.exec(source)
+  const context = ctxRead(source)
 
-  if (reads !== null)
+  if (reads !== null && (context.stop === undefined || reads.index < context.stop))
     return { stop: { file, line: lineAt(source, reads.index), why: `reads \`${reads[0].replace(WHITESPACE, '')}\`` }, code }
+
+  if (context.stop !== undefined)
+    return { stop: { file, line: lineAt(source, context.stop), why: 'reads `ctx`' }, code }
 
   const state = moduleStateAt(file, source)
 
@@ -425,5 +530,5 @@ async function scanned(file: string): Promise<Scan> {
       return stop(`imports \`${specifier}\`, which is neither code nor a data file`)
   }
 
-  return { code }
+  return { code, pathname: context.pathname }
 }

@@ -78,7 +78,7 @@ export async function loadPrerendered(client: ClientBuild): Promise<Map<string, 
     if (!paths)
       byRoute.set(page.pattern, paths = new Map<string, ServedPage>())
 
-    paths.set(path, { status: page.status, etag: page.etag, headers: Object.entries(page.headers), renderedAt: page.renderedAt, revalidate: page.revalidate, islands: page.islands, stamps: page.stamps, readsSite: page.readsSite, kept: page.kept, reads: page.reads, token: page.token, ...loaded[index]! })
+    paths.set(path, { status: page.status, etag: page.etag, headers: Object.entries(page.headers), renderedAt: page.renderedAt, revalidate: page.revalidate, islands: page.islands, stamps: page.stamps, readsSite: page.readsSite, kept: page.kept, pathname: page.pathname, reads: page.reads, token: page.token, ...loaded[index]! })
   }
 
   return byRoute
@@ -117,7 +117,7 @@ export function pageResponder({ client, renderOptions, prerendered, settings, tr
     const key = prerenderKey(settings, localeState()?.locale, canonicalPath(withoutSlash(url.pathname)))
     const page = copies.get(key)
 
-    if (!page)
+    if (!page || (page.pathname !== undefined && page.pathname !== url.pathname))
       return render()
 
     // How a form post went is for the visitor who sent it.

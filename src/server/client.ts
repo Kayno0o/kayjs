@@ -54,6 +54,8 @@ export interface PrerenderedPage {
   readsSite?: boolean | undefined
   // The build kept it on its own, as nothing marked it: the server checks it again after a request that can write.
   kept?: boolean | undefined
+  // The path it was rendered at, for a kept page whose files read `ctx.url.pathname`: it is served at that path alone, and rendered per request at any other spelling of it, such as `/books/` under `trailingSlash: 'ignore'`.
+  pathname?: string | undefined
   // The cache keys and collections its render read, which `invalidate` and `collection.invalidate()` refresh it for.
   reads?: string[] | undefined
   // The token its ids were drawn from, when a collision with another page gave it more than the hash's usual digits.
