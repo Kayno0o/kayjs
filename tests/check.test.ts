@@ -1052,11 +1052,11 @@ describe.concurrent('kay check, edge cases', () => {
     const named = await scratchProject({ ...files, 'src/routes/bad.kay': '--- server\nimport { alternate } from \'kay/i18n\'\n\nconst link = alternate(\'de\')\n---\np {link}\n' })
 
     try {
-      expect((await check(bare)).filter(d => d.code.startsWith('TS'))).toEqual([])
+      expect((await check(bare)).filter(d => d.code?.startsWith('TS'))).toEqual([])
 
       const typed = await check(named, { i18n: { locales: ['fr', 'en'], defaultLocale: 'fr' } })
 
-      expect(typed.filter(d => d.code.startsWith('TS')).map(d => d.file.slice(d.file.lastIndexOf('/') + 1))).toEqual(['bad.kay'])
+      expect(typed.filter(d => d.code?.startsWith('TS')).map(d => d.file.slice(d.file.lastIndexOf('/') + 1))).toEqual(['bad.kay'])
     }
     finally {
       await rm(bare, { recursive: true, force: true })
