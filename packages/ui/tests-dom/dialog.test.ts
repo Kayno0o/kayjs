@@ -93,21 +93,6 @@ describe('ConfirmDelete', () => {
     expect(dialog().open).toBe(false)
   })
 
-  test('toasts a failed delete and stays open for another try', async () => {
-    const root = await dialogs(async () => Promise.reject(new Error('refused')))
-
-    click(root.querySelector('.kui-icon-btn[aria-label="Delete"]'))
-    await settle()
-    click(root.querySelectorAll('dialog')[1]!.querySelector('.kui-btn-danger'))
-    await settle()
-
-    const dialog = root.querySelectorAll<HTMLDialogElement>('dialog')[1]!
-
-    expect(dialog.open).toBe(true)
-    expect([...dialog.querySelectorAll('button')].map(button => button.disabled)).toEqual([false, false])
-    expect(root.querySelector('.kui-toast-message')?.textContent).toBe('Could not delete')
-  })
-
   test('toasts what the handler refused with, through `refused`', async () => {
     const root = await dialogs()
 
@@ -119,49 +104,31 @@ describe('ConfirmDelete', () => {
     expect([[...root.querySelectorAll('.kui-toast-message')].at(-1)?.textContent, root.querySelectorAll('dialog')[2]!.open]).toEqual(['Still referenced', true])
   })
 
-  test('takes a labelled danger button as its trigger, for a delete known by another name', async () => {
+  // A trigger of each kind, the dialog it opens (by its place among the page's) and the confirm button it carries.
+  const TRIGGERS = [
+    { name: 'a labelled danger button, for a delete known by another name', trigger: '.revoke', dialog: 3, shown: ['BUTTON', 'kui-btn kui-btn-danger revoke', 'Revoke link'], title: 'Confirm Deletion', confirm: ['kui-btn kui-btn-danger', 'Delete'] },
+    { name: 'a plain text link, its dialog a title and confirm labels of its own', trigger: '.rotate', dialog: 4, shown: ['BUTTON', 'kui-confirm-delete-link rotate', 'Rotate link'], title: 'Rotate link', confirm: ['kui-btn kui-btn-danger', 'Rotate'] },
+    { name: 'a confirm that is not a deletion, which reads neutrally and toasts its success once', trigger: '.save', dialog: 5, shown: ['BUTTON', 'kui-btn kui-btn-accent save', 'Save'], title: 'Save', confirm: ['kui-btn kui-btn-accent', 'Save'], toast: 'Saved' },
+  ]
+
+  test.each(TRIGGERS)('takes $name as its trigger', async ({ trigger, dialog: place, shown, title, confirm, toast }) => {
     const root = await dialogs()
-    const trigger = root.querySelector('.revoke')!
+    const opener = root.querySelector(trigger)!
 
-    expect([trigger.tagName, trigger.className, trigger.textContent]).toEqual(['BUTTON', 'kui-btn kui-btn-danger revoke', 'Revoke link'])
+    expect([opener.tagName, opener.className, opener.textContent]).toEqual(shown)
 
-    click(trigger)
+    click(opener)
     await settle()
 
-    expect(root.querySelectorAll<HTMLDialogElement>('dialog')[3]?.open).toBe(true)
-  })
+    const dialog = root.querySelectorAll<HTMLDialogElement>('dialog')[place]!
+    const button = dialog.querySelector<HTMLButtonElement>('.kui-dialog-footer button:last-child')!
 
-  test('takes a plain text link as its trigger, and its dialog a title and confirm labels of its own', async () => {
-    const root = await dialogs()
-    const trigger = root.querySelector('.rotate')!
+    expect([dialog.open, dialog.querySelector('.kui-dialog-title')?.textContent, button.className, button.textContent]).toEqual([true, title, ...confirm])
 
-    expect([trigger.tagName, trigger.className, trigger.textContent]).toEqual(['BUTTON', 'kui-confirm-delete-link rotate', 'Rotate link'])
-
-    click(trigger)
+    click(button)
     await settle()
 
-    const dialog = root.querySelectorAll<HTMLDialogElement>('dialog')[4]!
-
-    expect([dialog.open, dialog.querySelector('.kui-dialog-title')?.textContent, dialog.querySelector('.kui-btn-danger')?.textContent]).toEqual([true, 'Rotate link', 'Rotate'])
-  })
-
-  test('reads neutrally for a confirm that is not a deletion, worded by its label, and toasts its success once through', async () => {
-    const root = await dialogs()
-    const trigger = root.querySelector('.save')!
-
-    expect([trigger.className, trigger.textContent]).toEqual(['kui-btn kui-btn-accent save', 'Save'])
-
-    click(trigger)
-    await settle()
-
-    const dialog = root.querySelectorAll<HTMLDialogElement>('dialog')[5]!
-
-    expect([dialog.querySelector('.kui-dialog-title')?.textContent, dialog.querySelector('.kui-btn-accent')?.textContent, dialog.querySelector('.kui-btn-danger')]).toEqual(['Save', 'Save', null])
-
-    click(dialog.querySelector('.kui-btn-accent'))
-    await settle()
-
-    expect([dialog.open, root.querySelector('.kui-toast-message')?.textContent]).toEqual([false, 'Saved'])
+    expect([dialog.open, root.querySelector('.kui-toast-message')?.textContent]).toEqual([false, toast])
   })
 
   test('asks inline when told to: armed by a click, it deletes or cancels in place, and hands the focus back', async () => {
@@ -197,15 +164,22 @@ describe('ConfirmDelete', () => {
     expect([trigger.hidden, armed()]).toEqual([false, null])
   })
 
-  test('asked inline, toasts a failed delete and stays armed for another try', async () => {
+  // A delete the handler rejects toasts, and leaves the confirmation open and enabled for another try, asked in a dialog or inline.
+  test.each([
+    { how: 'in a dialog', focused: undefined, trigger: '.kui-icon-btn[aria-label="Delete"]', confirmation: (root: Element) => root.querySelectorAll('dialog')[1]!, toast: 'Could not delete' },
+    { how: 'inline', trigger: '.kui-icon-btn[aria-label="Remove"]', confirmation: (root: Element) => root.querySelector('.kui-confirm-delete-armed')!, toast: 'Could not remove', focused: 'Delete' },
+  ])('asked $how, toasts a failed delete and stays open for another try', async ({ trigger, confirmation, toast, focused }) => {
     const root = await dialogs(async () => Promise.reject(new Error('refused')))
 
-    click(root.querySelector('.kui-icon-btn[aria-label="Remove"]'))
+    click(root.querySelector(trigger))
     await settle()
-    click(root.querySelector('.kui-confirm-delete-armed .kui-btn-danger'))
+    click(confirmation(root).querySelector('.kui-btn-danger'))
     await settle()
 
-    expect([root.querySelector('.kui-confirm-delete-armed .kui-btn-danger')?.hasAttribute('disabled'), root.querySelector('.kui-toast-message')?.textContent, document.activeElement?.textContent]).toEqual([false, 'Could not remove', 'Delete'])
+    expect([confirmation(root).querySelector('.kui-btn-danger')?.hasAttribute('disabled'), root.querySelector('.kui-toast-message')?.textContent, confirmation(root).closest('dialog')?.open ?? true]).toEqual([false, toast, true])
+
+    if (focused !== undefined)
+      expect(document.activeElement?.textContent).toBe(focused)
   })
 
   test('asked inline, hides a labelled button or a text link as it hides the icon', async () => {
