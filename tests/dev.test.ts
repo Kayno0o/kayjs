@@ -536,7 +536,7 @@ describe.concurrent('kay dev', () => {
       expect(childrenRunning(real, 'builder.ts')).toHaveLength(0)
       await first()
 
-      await Bun.write(join(root, '.kay/dev/manifest.json'), '{}')
+      await Bun.write(join(root, `.kay/dev${testWorker()}/manifest.json`), '{}')
 
       const lines: string[] = []
       const second = await dev(root, { log: line => lines.push(line) })
@@ -544,7 +544,7 @@ describe.concurrent('kay dev', () => {
       running.push(second)
 
       // The builder clears the placeholder as it builds, however late the host runs it; the project cannot resolve kay here, so the build fails and leaves none.
-      await until(() => statSync(join(root, '.kay/dev/manifest.json'), { throwIfNoEntry: false })?.size !== 2, 20_000)
+      await until(() => statSync(join(root, `.kay/dev${testWorker()}/manifest.json`), { throwIfNoEntry: false })?.size !== 2, 20_000)
       expect(childrenRunning(real, 'builder.ts')).toHaveLength(1)
       expect(lines.filter(line => line.includes('process building the client exited'))).toEqual([])
       await second()
@@ -591,7 +591,7 @@ describe.concurrent('kay dev', () => {
 
     await Bun.write(join(root, 'src/server.ts'), 'setInterval(() => undefined, 1000)\n')
     await Bun.write(join(root, 'src/routes/index.kay'), 'p Home\n')
-    await Bun.write(join(root, '.kay/dev/manifest.json'), '{}')
+    await Bun.write(join(root, `.kay/dev${testWorker()}/manifest.json`), '{}')
     // Loads in every process but the builder, as a build plugin throwing as it loads would.
     await Bun.write(join(root, 'kay.config.ts'), 'if (process.argv.some(arg => arg.endsWith(\'builder.ts\')))\n  throw new Error(\'builder boom\')\n\nexport default {}\n')
 
