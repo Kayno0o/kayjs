@@ -55,6 +55,11 @@ export function configSeoLints(config: SiteSeo, file: string, sources: Iterable<
   if (config.seo?.description === undefined)
     report('missing-description', { ...at, message: 'The site has no description', note: 'a page setting none of its own goes without', help: 'set `seo.description` to a sentence saying what the site is' })
 
+  const description = config.seo?.description
+
+  if (description !== undefined && description.length > DESCRIPTION_LENGTH)
+    report('long-description', { ...at, message: `The site description \`seo.description\` runs ${description.length} characters`, note: `search results cut it after about ${DESCRIPTION_LENGTH}, on every page that sets none of its own`, help: 'shorten it to a sentence or two' })
+
   if (config.seo?.image === undefined && ![...sources].some(source => source.includes('og:image')))
     report('missing-share-image', { ...at, message: 'No page has a share image', note: 'a link shared to a social network shows no picture', help: 'set `seo.image`, or an `og:image` per page with `shareCard()` from `kay/image`' })
 
@@ -89,7 +94,8 @@ export function pageSeoLints(config: SiteSeo, pages: RenderedPage[], exported = 
 
     if (head.description === undefined)
       report('undescribed-page', { ...at, message: `\`${page.path}\` has no description`, help: 'set `meta(name="description" content="...")` in a `head` block, or `seo.description` for every page' })
-    else if (head.description.length > DESCRIPTION_LENGTH)
+    // The site's own description is told once, in kay.config.ts, not at every page that inherits it.
+    else if (head.description.length > DESCRIPTION_LENGTH && head.description !== config.seo?.description)
       report('long-description', { ...at, message: `The description of \`${page.path}\` runs ${head.description.length} characters`, note: `search results cut it after about ${DESCRIPTION_LENGTH}`, help: 'shorten it to a sentence or two' })
 
     if (head.image !== undefined && !head.imageWidth)

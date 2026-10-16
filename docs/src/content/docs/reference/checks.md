@@ -76,7 +76,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `untitled-page` | warn | seo | A page with no title |
 | `undescribed-page` | warn | seo | A page with no description |
 | `duplicate-title` | warn | seo | Two pages with one title |
-| `long-description` | warn | seo | A description over 160 characters |
+| `long-description` | warn | seo | A description over 160 characters: `seo.description` in kay.config.ts, or a page's own, which only `kay build` reads |
 | `unsized-share-image` | warn | seo | A share image of unknown size |
 | `noindex-in-sitemap` | warn | seo | A `noindex` page the sitemap lists |
 

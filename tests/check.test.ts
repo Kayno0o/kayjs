@@ -1,4 +1,5 @@
 import type { CheckOptions } from '../src/check'
+import type { RenderedPage } from '../src/check/seo'
 import { chmod, mkdir, mkdtemp, readdir, rm, symlink, utimes } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, join, relative, resolve } from 'node:path'
@@ -8,6 +9,7 @@ import { findKayFiles } from '../src/build/files'
 import { applySafeFixes, check as checkProject } from '../src/check'
 import { islandOnlyComponents } from '../src/check/island-only'
 import { probe } from '../src/check/project'
+import { DESCRIPTION_LENGTH, pageSeoLints } from '../src/check/seo'
 import { compileShadow, shadowPath, shadowSource } from '../src/check/shadow'
 import { warnOtherKay } from '../src/commands/command'
 import { compileKay } from '../src/compiler'
@@ -1766,6 +1768,32 @@ describe.concurrent('kay check, unused code', () => {
       // A group's level reaches its lints, a lint's own wins, and a site that is not public gets the ones `lints` sets.
       expect(await seoLints({ site: 'https://example.com', favicon: false, lints: { 'seo': 'deny', 'missing-share-image': 'allow' }, launch: true })).toEqual([['kay.config.ts', 'missing-description', 'error']])
       expect(await seoLints({ lints: { 'missing-description': 'warn' } })).toEqual([['kay.config.ts', 'missing-description', 'warning']])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('reports a site description over the length search results show in kay.config.ts, where seo.description is set, once whichever pages inherit it', async () => {
+    const root = await scratchProject({ 'src/routes/index.kay': 'p a\n' })
+    const long = 'a'.repeat(DESCRIPTION_LENGTH + 1)
+    const seo = { site: 'https://example.com', favicon: false as const, seo: { description: long, image: '/og.png' } }
+
+    try {
+      expect((await check(root, seo)).map(d => [basename(d.file), d.code, d.severity, d.line])).toEqual([['kay.config.ts', 'long-description', 'warning', 1]])
+      expect((await check(root, { ...seo, seo: { ...seo.seo, description: 'a'.repeat(DESCRIPTION_LENGTH) } })).map(d => d.code)).toEqual([])
+      expect((await check(root, { ...seo, lints: { 'long-description': 'allow' } })).map(d => d.code)).toEqual([])
+      expect((await check(root, { ...seo, lints: { seo: 'deny' } })).map(d => d.severity)).toEqual(['error'])
+      // A site that is not public is told nothing of it.
+      expect((await check(root, { seo: undefined })).map(d => d.code)).toEqual([])
+
+      const page = (html: string): RenderedPage => ({ path: '/', file: join(root, 'src/routes/index.kay'), html, noindex: false, sitemap: false, search: false })
+      const head = (description: string) => `<head><title>Home</title><meta name="description" content="${description}"></head>`
+
+      // The page inheriting the site's description is not told again, one setting its own is, at its own file.
+      expect(pageSeoLints(seo, [page(head(long))]).map(d => d.code)).toEqual([])
+      expect(pageSeoLints(seo, [page(head(`${long}b`))]).map(d => [basename(d.file), d.code])).toEqual([['index.kay', 'long-description']])
+      expect(pageSeoLints({ ...seo, seo: undefined, site: 'https://example.com' }, [page(head(long))]).map(d => [basename(d.file), d.code])).toEqual([['index.kay', 'long-description']])
     }
     finally {
       await rm(root, { recursive: true, force: true })

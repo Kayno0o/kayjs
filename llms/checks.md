@@ -222,7 +222,7 @@ kay lint --cache
 | `untitled-page` | warn | seo | A prerendered page with no `title`. |
 | `undescribed-page` | warn | seo | A prerendered page with no description, its own or `seo.description`. |
 | `duplicate-title` | warn | seo | A prerendered page with the title of another of the same locale. |
-| `long-description` | warn | seo | A prerendered page whose description runs over 160 characters, which search results cut. |
+| `long-description` | warn | seo | A description over 160 characters, which search results cut: `seo.description`, reported in kay.config.ts by `kay check` and `kay build`, or a prerendered page's own, reported at the page by `kay build`. |
 | `unsized-share-image` | warn | seo | A prerendered page whose `og:image` has no `og:image:width`, kay reading no size off it. |
 | `noindex-in-sitemap` | warn | seo | A prerendered page whose head says `noindex` while the sitemap lists it; `noindex: true` in `page` does both. |
 
@@ -236,7 +236,7 @@ kay lint --cache
 - They point at kay.config.ts.
 - `missing-share-image` and `default-favicon` name what a site lacks until it goes public, as a fresh project from `kay new` does, so only `kay build` and `kay check --only seo` report them, never a plain `kay check`.
 - `missing-site` is reported by `kay build --static` alone: a server may read `SITE_URL` when it boots, and one with `seo` set and no site warns then.
-- `kay build` reads the head of every page it prerenders once the check passed: `untitled-page`, `undescribed-page`, `duplicate-title`, `long-description`, `unsized-share-image`, `noindex-in-sitemap`.
+- `kay build` reads the head of every page it prerenders once the check passed: `untitled-page`, `undescribed-page`, `duplicate-title`, `long-description` (a page's own description; the site's is `kay check`'s too), `unsized-share-image`, `noindex-in-sitemap`.
 - They point at the page's module and name the path; a page rendered per request is not read.
 - One at `deny` fails the build and leaves the last one in place, as a failing check does; `--no-check` reads none.
 
