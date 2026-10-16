@@ -25,7 +25,7 @@ import type { AuthStore, LinkType, SessionRecord, UserRecord } from './store'
 import type { Proof, ProofFailure, TwoFactorResult, TwoFactorSetup } from './twoFactor'
 import type { Level, PolicyContext, Predicate, Requirement } from './types'
 import { Elysia } from 'elysia'
-import { READ_METHODS, stoppers } from 'kay/library'
+import { READ_METHODS, stoppers, underKayDev } from 'kay/library'
 import { clientAddress, crossSiteRefused, crossSiteResponse, rateKey } from 'kay/server'
 import { changePassword, changeUsername, deleteAccount, unlink } from './account'
 import { actingAdmin, adminAuditLog, banUser, changeRole, deleteUser, getUser, isAdmin, listUsers, unbanUser } from './admin'
@@ -992,6 +992,9 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   }
 }
 
+// Where `kay dev` answers the dev tool's Auth tab with the session's user.
+const DEV_PATH = '/_kay/auth'
+
 // Auth for a kay app or a plain Elysia one, on the app's kay session.
 export function createAuth<Data extends AuthSessionData, Role extends string = string, Prefix extends string = '/auth', const Scope extends string = never, OrgRole extends string = never>(options: AuthOptions<Data, Role, Prefix, Scope, OrgRole>) {
   const core = createCore(options)
@@ -1075,6 +1078,18 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
 
       return redirect(`${core.prefix}/${params.provider}/callback?${query}`, 303)
     })
+
+  // Under `kay dev` alone: the dev tool's Auth tab reads the session here, and signs out at the sign-out route.
+  if (underKayDev()) {
+    (plugin as unknown as Elysia).get(DEV_PATH, async (ctx) => {
+      const { auth } = ctx as unknown as { auth: Auth }
+      const [user, via] = await Promise.all([auth.user(), auth.via()])
+
+      ctx.set.headers['cache-control'] = 'no-store'
+
+      return { user, via, signOut: `${core.prefix}/sign-out` }
+    })
+  }
 
   const evaluate = async (user: User, requirement: AuthRequirement<Role>, ctx: PolicyContext): Promise<boolean> => meetsRequirement(user, requirement, ctx, (grant) => {
     if (typeof grant === 'string')

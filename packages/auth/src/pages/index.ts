@@ -85,6 +85,9 @@ export interface AuthFeatures {
 
 const DEFAULT_PREFIX = '/auth'
 
+// The dev tool's Auth tab, which kay loads on dev pages.
+const DEV_TOOL = { module: `${import.meta.dir}/../devTool.ts` }
+
 function captchaFeature(captcha: Core['captcha']): AuthFeatures['captcha'] {
   if (!captcha)
     return null
@@ -141,7 +144,7 @@ async function pluginIn<Module extends AuthModule>(load: () => Promise<Module>):
 
 // kayjs-auth for `extensions` in kay.config.ts, as the whole declaration: `authExtension(() => import('./src/auth'))` for the module making `auth` with `createAuth`, exported as `auth` or by default. The module loads as the server starts, never as the config is read, so the config stays off the app's database, and `kay check` types `ctx.locals.auth` and links to kayjs-auth's routes off it.
 export function authExtension<Module extends AuthModule>(load: () => Promise<Module>): KayExtension<PluginOf<Module>> {
-  return { name: 'auth', server: async () => pluginIn(load) }
+  return { name: 'auth', server: async () => pluginIn(load), devTool: DEV_TOOL }
 }
 
 // The sign-in, register, mailed-link and account pages, for `extensions` in kay.config.ts. Give `createAuth` the same `prefix` and `home` as `pages`, or `pages: true` for the defaults.
@@ -153,6 +156,7 @@ export function authPages(options: AuthPagesOptions & { auth?: (() => Promise<Au
     name: '@kaynooo/kayjs-auth',
     server: options.auth ? async () => pluginIn(options.auth!) : options.server,
     routes: { dir: `${import.meta.dir}/routes`, prefix: options.prefix ?? DEFAULT_PREFIX },
+    devTool: DEV_TOOL,
     messages: `${import.meta.dir}/messages`,
     prefix: options.prefix ?? DEFAULT_PREFIX,
     home: options.home ?? '/',

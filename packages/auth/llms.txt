@@ -455,3 +455,7 @@ The prebuilt pages' actions import as `@kaynooo/kayjs-auth/pages/<page>.kay`, su
 A test needing a signed-in request without going through a form takes `await auth.sessionCookie(userId)`, the `Cookie` header of a new session signed in as that user, as `signIn` makes it, against the app's own auth, to send by hand: `app.handle(new Request(url, { headers: { cookie } }))`.
 
 Each `testSite` keeps its own cookies, one browser each. `memoryStore()` keeps each test's users apart, and a mailer pushing into an array hands the test the links it would have mailed, `url` included; with kayjs-mail, its `outbox` holds what was sent.
+
+## Dev tool
+
+- Under `kay dev`, the dev tool every dev page carries has an Auth tab, brought by `authPages` and `authExtension` with nothing to add in the app: the session's user (id, email, roles, how they signed in, password, two-factor) with a Sign out button that posts to the pages' `/auth/sign-out`. It reads `/_kay/auth`, a route mounted under `kay dev` alone.
