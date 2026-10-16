@@ -138,7 +138,8 @@ export const posts = collection('content/posts', {
 A collection takes a `load` function in place of a folder, and a webhook refreshes it through an API route, `src/api/cms.ts`:
 
 ```ts
-import { api, invalidatePage } from 'kay/server'
+import { invalidatePage } from 'kay/cache'
+import { api } from 'kay/server'
 import { news } from '../content.config'
 
 export default api().post('/', ({ headers, status }) => {
@@ -361,7 +362,8 @@ export const news = collection({
 ```ts
 // src/api/cms.ts
 import { createHash, timingSafeEqual } from 'node:crypto'
-import { api, invalidatePage } from 'kay/server'
+import { invalidatePage } from 'kay/cache'
+import { api } from 'kay/server'
 import { news } from '../content.config'
 
 const digest = (text: string) => createHash('sha256').update(text).digest()

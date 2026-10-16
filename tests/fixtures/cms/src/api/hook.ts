@@ -1,4 +1,5 @@
-import { api, invalidatePage } from 'kay/server'
+import { invalidatePage } from 'kay/cache'
+import { api } from 'kay/server'
 import { news } from '../content.config'
 
 // What a CMS calls once an entry changed.

@@ -10,7 +10,7 @@ description: Store uploads on disk or in an S3 bucket, link and resize them from
 
 ```kay
 --- server
-import { action, s } from 'kay'
+import { s } from 'kay'
 import { files } from 'kay/server'
 import { photos } from '../photos'
 

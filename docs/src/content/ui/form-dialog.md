@@ -7,7 +7,6 @@ FormDialog needs an action exported by a page, so it is shown here as code. `src
 ```kay
 --- server
 import { t } from 'elysia'
-import { action } from 'kay'
 
 const renaming = t.Object({
   id: t.String({ maxLength: 64 }),

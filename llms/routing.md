@@ -100,7 +100,7 @@ h1 {post.title}
 
 ### Keep a prerendered page fresh
 
-`revalidate` renders it again in the background once it is older than that, and `invalidatePage` from `kay/server` makes the next request wait for a fresh render:
+`revalidate` renders it again in the background once it is older than that, and `invalidatePage` from `kay/cache` makes the next request wait for a fresh render:
 
 ```kay
 --- server
@@ -110,7 +110,7 @@ h1 Blog
 ```
 
 ```ts
-import { invalidatePage } from 'kay/server'
+import { invalidatePage } from 'kay/cache'
 
 invalidatePage('/blog/hello')
 invalidatePage(path => path.startsWith('/blog/'))
@@ -397,10 +397,10 @@ h1 {post.title}
 
 #### Invalidating
 
-An action or an API route that changed what a prerendered page shows calls `invalidatePage` from `kay/server`, and the next request for it waits for a fresh render rather than getting it as it was, whether or not the page has a `revalidate` period:
+An action or an API route that changed what a prerendered page shows calls `invalidatePage` from `kay/cache`, and the next request for it waits for a fresh render rather than getting it as it was, whether or not the page has a `revalidate` period:
 
 ```ts
-import { invalidatePage } from 'kay/server'
+import { invalidatePage } from 'kay/cache'
 
 invalidatePage('/blog/hello')
 invalidatePage(path => path.startsWith('/blog/'))

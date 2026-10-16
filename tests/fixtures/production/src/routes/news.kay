@@ -1,6 +1,6 @@
 --- server
 import { s } from 'kay'
-import { invalidatePage } from 'kay/server'
+import { invalidatePage } from 'kay/cache'
 import { news } from '../news'
 
 export const page = {

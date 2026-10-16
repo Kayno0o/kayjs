@@ -180,6 +180,59 @@ export function deprecatedSchemaNames(fence: ParsedFence, renamable = true, stri
   return diagnostics
 }
 
+// Names that changed entry point: kay's own entries each hold one kind of name (`kay` what browser code may run, `kay/server` what only the server does, a topic's entry its topic), and these were elsewhere.
+const MOVED_IMPORTS = [{ name: 'invalidatePage', from: 'kay/server', to: 'kay/cache' }]
+const MOVED_NAME = new RegExp(`\\b(?:${MOVED_IMPORTS.map(({ name }) => name).join('|')})\\b`)
+
+// A name imported from the entry it left. The fix points the whole import at the new entry when the name is alone in it, else takes the name out and adds an import after it.
+export function deprecatedImports(fence: ParsedFence): Diagnostic[] {
+  if (!MOVED_NAME.test(fence.code))
+    return []
+
+  const span = fence.shift
+  const diagnostics: Diagnostic[] = []
+
+  for (const node of fence.ast.program.body) {
+    if (node.type !== 'ImportDeclaration')
+      continue
+
+    for (const [index, specifier] of node.specifiers.entries()) {
+      const imported = specifier.type === 'ImportSpecifier' && specifier.imported.type === 'Identifier' ? specifier.imported.name : undefined
+      const moved = MOVED_IMPORTS.find(({ name, from }) => name === imported && from === node.source.value)
+
+      if (!moved)
+        continue
+
+      const written = fence.code.slice(specifier.start!, specifier.end!)
+      const kind = node.importKind === 'type' ? 'type ' : ''
+      let edits: { start: number, end: number, text: string }[]
+
+      if (node.specifiers.length === 1) {
+        edits = [{ ...span(node.source), text: `'${moved.to}'` }]
+      }
+      else {
+        const next = node.specifiers[index + 1]
+        const previous = node.specifiers[index - 1]
+        const removed = next ? { start: specifier.start!, end: next.start! } : { start: previous!.end!, end: specifier.end! }
+
+        edits = [{ ...span(removed as t.Node), text: '' }, { ...span({ start: node.end!, end: node.end! } as t.Node), text: `\nimport ${kind}{ ${written} } from '${moved.to}'` }]
+      }
+
+      diagnostics.push({
+        ...span(specifier),
+        code: 'deprecated-import',
+        message: `\`${moved.name}\` is imported from '${moved.to}' now, not '${moved.from}'`,
+        note: `'${moved.to}' holds the helpers of the same job, \`invalidate\` beside it`,
+        help: `import it from '${moved.to}'`,
+        fixes: [{ title: `Import it from '${moved.to}'`, edits, safe: true }],
+        checkOnly: true,
+      })
+    }
+  }
+
+  return diagnostics
+}
+
 const CSS_BINDING = /\bimport\b[^;'"]+from\s*['"][^'"\n]+\.css['"]/
 
 // A stylesheet imported for a value with no `with { type: 'text' }`: kay types it as the text it gives with the attribute, which Bun gives only with it.
@@ -230,7 +283,7 @@ function propertyKey(property: t.ObjectProperty | t.ObjectMethod): string | unde
 
 // The checks a plain module takes, parsed only when one of them may find something.
 export function moduleChecks(source: string): Diagnostic[] {
-  if (!KAY_SCHEMA_T.test(source) && !CSS_BINDING.test(source))
+  if (!KAY_SCHEMA_T.test(source) && !CSS_BINDING.test(source) && !MOVED_NAME.test(source))
     return []
 
   const whole = { start: 0, end: source.length }
@@ -239,11 +292,11 @@ export function moduleChecks(source: string): Diagnostic[] {
   // Babel's own recovery keeps every statement for the checks; a module it cannot read, or whose scopes it cannot build, is read again with its broken statements blanked.
   try {
     if (recovered)
-      return [...deprecatedSchemaNames(recovered, true, true), ...cssImportsWithoutText(recovered)]
+      return [...deprecatedSchemaNames(recovered, true, true), ...deprecatedImports(recovered), ...cssImportsWithoutText(recovered)]
   }
   catch {}
 
   const module = parseFence(source, whole, [])
 
-  return module ? [...deprecatedSchemaNames(module), ...cssImportsWithoutText(module)] : []
+  return module ? [...deprecatedSchemaNames(module), ...deprecatedImports(module), ...cssImportsWithoutText(module)] : []
 }

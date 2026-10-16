@@ -3,7 +3,7 @@ title: Modules
 order: 3
 description: What each public kay entry point exports.
 ---
-Import from the entry point that matches where the code runs. `kay` works in pages, components and islands, `kay/server` only on the server.
+Import from the entry point that matches where the code runs. `kay` works in pages, components and islands, `kay/server` only on the server, and a topic's own entry holds that topic's helpers, whichever side runs them.
 
 ```ts
 import { action, s, signal } from 'kay'
@@ -11,7 +11,7 @@ import { defineConfig, pages, session } from 'kay/server'
 import { collection } from 'kay/content'
 ```
 
-`signal`, `memo`, `effect`, `onMount`, `onCleanup`, `props`, a server fence's `action` and the translation `t` from `kay/i18n` need no import inside a `.kay` file.
+`signal`, `memo`, `effect`, `onMount`, `onCleanup`, `props`, a server fence's `action` and the translation `t` need no import inside a `.kay` file: they are what a component is written with. Everything else is imported: from `kay` when browser code may run it, from `kay/server` when only the server does, from the entry of its topic otherwise, `kay/i18n`, `kay/cache` or `kay/content`. Components, such as `T`, are always imported.
 
 ## kay
 
@@ -61,7 +61,6 @@ Types include `Component`, `Signal`, `Guard`, `Duration`, `PageContext`, `Endpoi
 | `schedule`, `background` | Jobs on a cron or every so long, and background work, in the server's process |
 | `queue`, `memoryJobs`, `sqliteJobs` | Durable jobs with retries |
 | `rooms`, `memoryRooms`, `sqliteRooms` | Websocket rooms |
-| `invalidatePage` | Rebuilds a prerendered page |
 | `enterPreview`, `exitPreview`, `previewUrl` | Preview mode for drafts, edit mode with `{ edit: true }` |
 | `editRequested` | Whether a request is in edit mode |
 | `renderToString` | Renders a component to a string, for mails and feeds |
@@ -82,7 +81,7 @@ Types include `BrowserError` and `CspViolation`, the browser errors and CSP viol
 | `kay/seo` | `siteUrl`, `siteOrigin`, `jsonLd`, `breadcrumbList`. See [Head and SEO](/essentials/head-and-seo) |
 | `kay/i18n` | `t`, `locale`, `localize`, `alternate`, `formatNumber`, `formatDate`, `formatRelativeTime`, `relativeTime`, `formatList`, `direction`, `defineMessages`. See [Internationalization](/guides/i18n) |
 | `kay/params` | The route matchers `integer`, `uuid` and `slug` |
-| `kay/cache` | `cached`, `invalidate`, `sqliteCache`. See [Caching and streaming](/guides/caching-and-streaming) |
+| `kay/cache` | `cached`, `invalidate`, `invalidatePage`, `sqliteCache`. See [Caching and streaming](/guides/caching-and-streaming) |
 | `kay/image` | `image`, `shareImage`, `shareCard` |
 | `kay/icons` | `iconProps`, `iconNames`, for icons known only at runtime |
 | `kay/test` | `testSite`, `mount`, `browse`, `browserPath`, `settle`, `readPersisted`, `writePersisted`, `cookieJar`, `solveWork`, `scratchDir`. See [Testing](/guides/testing) |

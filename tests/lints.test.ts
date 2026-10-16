@@ -161,6 +161,24 @@ describe('deprecated-schema-name', () => {
   })
 })
 
+describe('deprecated-import', () => {
+  it('moves invalidatePage from kay/server to kay/cache, rewriting the module alone when it is the only name, else adding an import', () => {
+    const only = '--- server\nimport { invalidatePage } from \'kay/server\'\n\nexport const save = action(s.Object({}), async () => invalidatePage(\'/\'))\n---\np x'
+    const shared = '--- server\nimport { api, invalidatePage, pages } from \'kay/server\'\n\ninvalidatePage(\'/\')\n---\np x'
+    const last = '--- server\nimport { api, invalidatePage as refresh } from \'kay/server\'\n\nrefresh(\'/\')\n---\np x'
+
+    expect(lints(only)).toEqual([{ code: 'deprecated-import', severity: 'warning', at: 'invalidatePage' }])
+    expect(fixed(only)).toEqual([only.replace('kay/server', 'kay/cache')])
+    expect(fixed(shared)).toEqual([shared.replace('{ api, invalidatePage, pages } from \'kay/server\'', '{ api, pages } from \'kay/server\'\nimport { invalidatePage } from \'kay/cache\'')])
+    expect(fixed(last)).toEqual([last.replace('{ api, invalidatePage as refresh } from \'kay/server\'', '{ api } from \'kay/server\'\nimport { invalidatePage as refresh } from \'kay/cache\'')])
+  })
+
+  it('leaves the names of other modules and kay/cache alone, and finds the import in a plain module too', () => {
+    expect(lints('--- server\nimport { invalidatePage } from \'./mine\'\nimport { invalidate } from \'kay/cache\'\n---\np x')).toEqual([])
+    expect(moduleChecks('import { invalidatePage } from \'kay/server\'\n').map(d => d.code)).toEqual(['deprecated-import'])
+  })
+})
+
 describe('page settings', () => {
   it('refuses a setting exported under its own name, its fix moving every one into page at once, a value over several lines one level deeper', () => {
     const one = '--- server\nexport const prerender = true\n---\np x'

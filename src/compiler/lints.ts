@@ -235,6 +235,14 @@ export const LINTS = {
     wrong: '--- server\nimport { t } from \'kay\'\n\nexport const page = { query: t.Object({ page: t.Integer({ minimum: 1 }) }) }\n---\np Page',
     right: '--- server\nimport { s } from \'kay\'\n\nexport const page = { query: s.Object({ page: s.Integer({ minimum: 1 }) }) }\n---\np Page',
   },
+  'deprecated-import': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.46',
+    summary: 'A name imported from the entry point it left: `invalidatePage`, once in `kay/server`, now in `kay/cache` beside `invalidate`. `kay check --fix` rewrites the import, in `.kay` fences and `.ts` modules alike.',
+    wrong: '--- server\nimport { invalidatePage } from \'kay/server\'\n\nexport const save = action(s.Object({}), async () => invalidatePage(\'/news\'))\n---\np Saved',
+    right: '--- server\nimport { invalidatePage } from \'kay/cache\'\n\nexport const save = action(s.Object({}), async () => invalidatePage(\'/news\'))\n---\np Saved',
+  },
   'css-import-without-text': {
     level: 'deny',
     group: 'code',

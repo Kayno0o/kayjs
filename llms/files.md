@@ -12,7 +12,7 @@ Images are resized as imported ones are, and private files go only to a link kay
 
 ```kay
 --- server
-import { action, s } from 'kay'
+import { s } from 'kay'
 import { files } from 'kay/server'
 import { photos } from '../photos'
 

@@ -205,7 +205,8 @@ export default defineConfig({ extensions: [authPages()] })
 
 - `props`, `signal`, `memo`, `effect`, `onMount` and `onCleanup` need no import in a script, nor `action` in a server fence: the compiler imports them from `kay` when the file uses them without declaring or importing a name of its own.
 - The translation `t` of `kay/i18n` needs no import either, in a template or any fence.
-- The rest of `kay`, such as `persisted`, `context` or `navigate`, is imported.
+- That is the rule: a name needs no import when it is what a component is written with, `props`, the reactive primitives, a server fence's `action` and `t`; everything else is imported, from `kay` when browser code may run it, from `kay/server` when only the server does, from its topic's entry otherwise (`kay/i18n`, `kay/cache`, `kay/content`), components such as `T` included, so `persisted`, `context`, `navigate`, `s`, `guard` and `localPath` come from `kay`, and `defineEnv` from `kay/server`.
+- In a `.ts` module nothing is added, so `action` is imported there.
 
 ### Props
 

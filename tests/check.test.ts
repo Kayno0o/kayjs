@@ -384,6 +384,25 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 
+  it('reports invalidatePage imported from kay/server, which --fix points at kay/cache', async () => {
+    const root = await scratchProject({
+      'src/routes/index.kay': 'p Home\n',
+      'src/refresh.ts': 'import { invalidatePage } from \'kay/server\'\n\nexport const refresh = () => invalidatePage(\'/\')\n',
+    })
+
+    try {
+      const diagnostics = await check(root)
+
+      expect(diagnostics.map(d => [d.file.slice(root.length + 1), d.line, d.code])).toEqual([['src/refresh.ts', 1, 'TS2305'], ['src/refresh.ts', 1, 'deprecated-import']])
+      expect(await applySafeFixes(root, diagnostics)).toBe(1)
+      expect(await Bun.file(join(root, 'src/refresh.ts')).text()).toBe('import { invalidatePage } from \'kay/cache\'\n\nexport const refresh = () => invalidatePage(\'/\')\n')
+      expect(await check(root)).toEqual([])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('reports the schema builder a script imports as t, which --fix renames', async () => {
     const root = await scratchProject({
       'src/routes/index.kay': 'p Home\n',

@@ -22,6 +22,9 @@ A context you build by hand, such as a mock in a test, now needs `request`, `url
 A guard's `redirect` answers 302 to a GET or HEAD on an API route, an endpoint, or an image source's `resolve` and `guard`, where it answered 303. A post still gets 303.
 
 An endpoint that reads `ctx.cookies` goes out with `Cache-Control: private, no-cache` and `Vary: cookie`, unless it sets its own `cache-control`.
+### `invalidatePage` is imported from `kay/cache`
+
+It sits beside `invalidate` now, and `kay/server` no longer exports it. Write `import { invalidatePage } from 'kay/cache'`. `kay upgrade` rewrites the import.
 
 ### `deprecated-schema-name` is in the `deprecated` group
 
