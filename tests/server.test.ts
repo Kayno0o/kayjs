@@ -18,6 +18,7 @@ import { projectPaths, resolveProject } from '../src/project'
 import { ActionError } from '../src/runtime'
 import { currentPage } from '../src/runtime/html'
 import { inlineScriptHashes, pages } from '../src/server'
+import { crossSiteResponse } from '../src/server/actions'
 import { chooseInlineStyles, INLINE_LIMIT, readClient, readInlineStyles, readManifest } from '../src/server/client'
 import { compressFiles, preferredEncoding } from '../src/server/compress'
 import { requestCookies } from '../src/server/cookies'
@@ -503,6 +504,19 @@ describe('pages', () => {
     expect(long).not.toMatch(/\p{Cc}/u)
     expect(long.length).toBeLessThan(400)
     expect(long).toContain('...')
+    // A header Request refuses to hold can still reach the function from a server that decodes it as UTF-8.
+    const refusedWith = async (headers: Record<string, string>) => {
+      const sent = new Map(Object.entries(headers))
+      const request = { url: 'http://localhost/', headers: { get: (name: string) => sent.get(name) ?? null } } as unknown as Request
+
+      return crossSiteResponse(request, 'action').text()
+    }
+    const emoji = await refusedWith({ origin: `https://${'a'.repeat(91)}\u{1F600}tail` })
+
+    expect(emoji.isWellFormed()).toBe(true)
+    expect(emoji).toContain('a...')
+    expect(await refusedWith({ origin: 'https://evil\u202Eexample.com\u2066' })).toContain('Origin https://evilexample.com is not this site')
+    expect(await (await post({ 'sec-fetch-site': '' })).text()).toBe('Cross-site action refused: the request sent an empty Sec-Fetch-Site and no Origin, not same-origin or none')
   })
 
   it('refuses actions posted from another site and never redirects to one', async () => {

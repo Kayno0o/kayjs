@@ -210,7 +210,7 @@ An action refuses a post that another site sends, as its `Origin` or `Sec-Fetch-
 Cross-site action refused: Origin http://localhost:4701 is not this site (http://127.0.0.1:4701; set or fix site in kay.config.ts if a proxy changes the host)
 ```
 
-The `Origin` must have the host of the request or of `site` in kay.config.ts, whatever the scheme. So open the site by the address it is served on, or, behind a proxy that does not pass the browser's `Host` on (nginx leaves it out unless told `proxy_set_header Host $host`), set `site` to the public address. A refusal for `Sec-Fetch-Site` says `Sec-Fetch-Site is cross-site and the request has no Origin, not same-origin or none`. An api route refuses the same way, saying `request` where this says `action`.
+The `Origin` must have the host of the request or of `site` in kay.config.ts, whatever the scheme. So open the site by the address it is served on, or, behind a proxy that does not pass the browser's `Host` on (nginx leaves it out unless told `proxy_set_header Host $host`), set `site` to the public address. A refusal for `Sec-Fetch-Site` says `Sec-Fetch-Site is cross-site and the request has no Origin, not same-origin or none`. An empty `Sec-Fetch-Site` with no `Origin` reads `the request sent an empty Sec-Fetch-Site and no Origin, not same-origin or none`. An api route refuses the same way, saying `request` where this says `action`.
 
 ## Rate limit, honeypot, minimum time and proof-of-work
 

@@ -417,14 +417,20 @@ function crossSiteRefusal(request: Request): Response {
   return crossSiteResponse(request, 'action')
 }
 
-const UNPRINTABLE = /[\p{Cc}\p{Zl}\p{Zp}]/gu
+const UNPRINTABLE = /[\p{Cc}\p{Zl}\p{Zp}\u202A-\u202E\u2066-\u2069]/gu
 const SHOWN_MOST = 100
 
 // What a refused request sent, which a visitor controls, so cut to a line of printable text.
 function shown(value: string): string {
   const text = value.replace(UNPRINTABLE, '')
 
-  return text.length > SHOWN_MOST ? `${text.slice(0, SHOWN_MOST)}...` : text
+  if (text.length <= SHOWN_MOST)
+    return text
+
+  const last = text.charCodeAt(SHOWN_MOST - 1)
+  const cut = last >= 0xD800 && last <= 0xDBFF ? SHOWN_MOST - 1 : SHOWN_MOST
+
+  return `${text.slice(0, cut)}...`
 }
 
 // The 403 for a request `isCrossSite` refused, saying what it sent and what kay took for the site, so a proxy changing the host is fixed in one step.
@@ -442,7 +448,9 @@ export function crossSiteResponse(request: Request, what: 'action' | 'request', 
   else {
     const seen = shown(fetchSite ?? '')
 
-    reason = `Sec-Fetch-Site is ${seen === '' ? 'empty' : seen}${origin === null ? ' and the request has no Origin' : ''}, not same-origin or none`
+    reason = seen === '' && origin === null
+      ? 'the request sent an empty Sec-Fetch-Site and no Origin, not same-origin or none'
+      : `Sec-Fetch-Site is ${seen === '' ? 'empty' : seen}${origin === null ? ' and the request has no Origin' : ''}, not same-origin or none`
   }
 
   return new Response(`${head}: ${reason}`, { status: 403, headers: { 'content-type': TEXT } })
