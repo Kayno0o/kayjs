@@ -16,8 +16,10 @@ export { componentClass, merge, omit, spreadAttributes } from './values'
 
 // Several sibling nodes rendered as one: a block or a component returning more than one node. Its first and last nodes stay in place while what sits between changes.
 export class Range {
-  // The nodes it was made of when it was taken out, as they are detached or leaving by then and a walk from `first` could not find them.
+  // The nodes it was made of when it was taken out while some of them leave, as a walk from `first` could not find them once they are gone.
   nodes?: Node[] | undefined
+  // What holds it while it is out with no node to play a leave phase: its nodes stay siblings, so a part inside it goes on updating.
+  held?: DocumentFragment | undefined
 
   constructor(readonly first: Node, readonly last: Node) {}
 }
@@ -344,11 +346,12 @@ function insertUnit(parent: Node, unit: Unit, before: Node | null): void {
   }
 
   unit.nodes = undefined
+  unit.held = undefined
 }
 
 // Whether some nodes of a unit are not in the document, a unit taken out and not placed again.
 function isStale(unit: Unit): boolean {
-  return unit instanceof Range && unit.nodes !== undefined
+  return unit instanceof Range && (unit.nodes !== undefined || unit.held !== undefined)
 }
 
 // The nodes a unit is made of, in order.
@@ -371,10 +374,17 @@ function nodesOf(unit: Unit): Node[] {
 function removeUnit(unit: Unit): void {
   const nodes = nodesOf(unit)
 
+  if (unit instanceof Range && !(transitions && nodes.some(transitions.has))) {
+    unit.held = document.createDocumentFragment()
+    unit.held.append(...nodes)
+
+    return
+  }
+
   for (const node of nodes)
     transitions ? transitions.leave(node) : node.parentNode?.removeChild(node)
 
-  // Kept for any range, as nodes removed at once are detached from each other and a walk from `first` would find only it.
+  // Kept for a range, as its nodes leave apart and a walk from `first` would not find those already gone.
   if (unit instanceof Range)
     unit.nodes = nodes
 }

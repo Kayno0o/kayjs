@@ -1137,6 +1137,33 @@ describe('transitions', () => {
     }
   })
 
+  it('updates a part inside a range taken out, which shows the new content when it comes back', async () => {
+    const { insert, Range } = await import('../src/runtime/dom')
+    const { createSignal } = await import('../src/runtime/reactive')
+    const parent = document.createElement('div')
+    const first = document.createElement('p')
+    const start = document.createComment('[')
+    const end = document.createComment(']')
+    const last = document.createElement('b')
+    const range = new Range(first, last)
+    const [part, setPart] = createSignal<unknown>('old')
+
+    parent.append(first, start, end, last)
+    insert(null, start, end, part)
+
+    const [list, setList] = createSignal<unknown[]>([range])
+
+    insert(parent, null, null, list)
+    setList([])
+    await settle()
+    setPart(document.createElement('i'))
+    await settle()
+    expect(parent.textContent).toBe('')
+    setList([range])
+    await settle()
+    expect([...parent.childNodes].map(node => node.nodeType === 3 ? node.textContent : node.nodeName)).toEqual(['P', '#comment', 'I', '#comment', 'B'])
+  })
+
   it('does work linear in the kept units with transitions when one is appended or the order changes', async () => {
     const { insert, playTransitions, Range } = await import('../src/runtime/dom')
     const { createSignal } = await import('../src/runtime/reactive')
