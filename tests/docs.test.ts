@@ -8,7 +8,9 @@ import { loadReference } from '../docs/src/reference'
 import { partOf } from '../docs/src/sections'
 import { palette, pickTheme, scheme, THEME_SCRIPT, THEMES } from '../docs/src/theme'
 import { check } from '../src/check'
+import { compileKay, formatDiagnostic } from '../src/compiler'
 import { renderMarkdown } from '../src/content/markdown'
+import { formatKay } from '../src/format'
 import { sendValue } from '../src/runtime/send'
 
 const root = join(import.meta.dir, '..')
@@ -22,6 +24,9 @@ const LISTED = /^- \[[^\]]+\]\(llms\/([\w-]+\.md)\): \S/gm
 const SITE_LINK = /(?:\]\(|href=")(\/[\w/-]*?)\/?(?:#[\w-]*)?[)"]/g
 // Code blocks and spans, whose links are examples rather than links of the site.
 const CODE = /```[\s\S]*?```|`[^`\n]*`/g
+const KAY_BLOCK = /```kay\n([\s\S]*?)```/g
+const pagesDir = join(root, 'docs/src/content/docs')
+const pageBlocks = (await Promise.all([...new Bun.Glob('**/*.md').scanSync(pagesDir)].toSorted().map(async file => [...(await Bun.file(join(pagesDir, file)).text()).matchAll(KAY_BLOCK)].map((match, index) => [`${file} #${index + 1}`, match[1]!] as const)))).flat()
 const LINK = /\]\(((?:llms\/)?[\w-]+\.md)?(#[\w-]+)?\)/g
 const CARD_LINK = /ModuleCard\([^)]*\bhref="([^"]+)"/g
 const FRONTMATTER_PATH = /^path: (.+)$/m
@@ -55,6 +60,16 @@ describe('llms.txt', () => {
     }
 
     expect(broken).toEqual([])
+  })
+})
+
+describe('the documentation site\'s pages', () => {
+  it.each(pageBlocks)('%s compiles cleanly and is formatted', (_name, source) => {
+    const filename = source.startsWith('--- server') ? 'src/routes/example.kay' : 'src/example.kay'
+    const { diagnostics } = compileKay(source, filename)
+
+    expect(diagnostics.map(diagnostic => formatDiagnostic(source, filename, diagnostic))).toEqual([])
+    expect(formatKay(source).code).toBe(source)
   })
 })
 

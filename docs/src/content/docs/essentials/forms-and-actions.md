@@ -35,10 +35,14 @@ Text reaches the schema trimmed, and an optional field left blank counts as left
 An action that takes nothing, such as a sign-out, leaves the schema out and gives its handler alone. The handler gets the context.
 
 ```kay
+--- server
 export const signOut = action(async (ctx) => {
   await ctx.locals.session.destroy()
   ctx.redirect('/')
 })
+---
+form(action={signOut})
+  button Sign out
 ```
 
 `form(action={signOut})` posts it, and an island calls `signOut()`. Options such as a rate limit go second, as they do with a schema.
@@ -85,12 +89,17 @@ While the post is refused, `error title` renders `p.error` with the message, and
 A handler refuses a post with `ctx.fail(status, data)`, and the page reads `data` with `add.failed()?.data`.
 
 ```kay
+--- server
+import { addTodo, exists } from '../data'
+import { schema } from '../schema'
+
 export const add = action(schema, async ({ title }, ctx) => {
   if (await exists(title))
     return ctx.fail(409, { message: 'Already on the list' })
 
   await addTodo(title)
 })
+---
 ```
 
 ```kay
@@ -105,11 +114,16 @@ A handler that throws is logged, and the form shows `Something went wrong on our
 `ctx.redirect()` in the handler sends the browser elsewhere. Write it as `return ctx.redirect()`, as in a guard. Without a redirect the post goes back to the page, where `add.succeeded()` holds what the handler returned for that one render. The handler's `ctx` also has `url`, `notFound()` and `deny()`, as a page's does.
 
 ```kay
+--- server
+import { createUser } from '../data'
+import { schema } from '../schema'
+
 export const signUp = action(schema, async (input, ctx) => {
   const user = await createUser(input)
 
   return ctx.redirect(`/welcome/${user.id}`)
 })
+---
 ```
 
 ## Route params
@@ -217,12 +231,17 @@ The `Origin` must have the host of the request or of `site` in kay.config.ts, wh
 The third argument of `action` protects it from scripts. `rateLimit` answers 429 past `max` posts per `window`, `honeypot` names a hidden field that kay renders for you and bots fill in, and `minTime` refuses a form posted sooner than that after its page rendered. For spam that still gets through, `proofOfWork: true` makes each post cost the sender CPU, with no third-party script, and needs JavaScript in the browser. `minTime: { after: '3s', plain: true }` checks only forms posted without JavaScript, and `workChallenge` and `verifyWork` from `kay/server` put proof of work in a form field your own code checks.
 
 ```kay
+--- server
+import { send } from '../mail'
+import { schema } from '../schema'
+
 export const contact = action(schema, send, {
   rateLimit: { max: 5, window: '1m' },
   honeypot: 'website',
   minTime: '3s',
   bodyLimit: 5 * 1024 * 1024,
 })
+---
 ```
 
 `minTime` stamps are signed. An app with no `session()` gives the signing key as `secret` in `kay.config.ts`, or as `KAY_SECRET`, at least 32 random characters. Without one a production server signs with a key of its own process, which a restart changes and other replicas do not share, and says so once in its log.
