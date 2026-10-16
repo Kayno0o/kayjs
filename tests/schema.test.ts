@@ -2,7 +2,7 @@ import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { t as elysiaSchema } from 'elysia'
-import { s, t } from 'kay'
+import { s } from 'kay'
 import { scratchDir } from './scratch'
 
 let dir: string
@@ -28,9 +28,8 @@ async function browserBundle(source: string): Promise<string> {
 }
 
 describe('s from kay', () => {
-  it('is Elysia\'s own schema builder on the server, and so is its deprecated name t', () => {
+  it('is Elysia\'s own schema builder on the server', () => {
     expect(s).toBe(elysiaSchema)
-    expect(t).toBe(elysiaSchema)
     expect(s.Object({ title: s.String() }).type).toBe('object')
   })
 

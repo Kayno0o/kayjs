@@ -3,13 +3,13 @@ import type { ErrorName } from './errors'
 import type { LintLevels } from './lints'
 import type { ImportedSignals, SignalKind } from './module-signals'
 import type { NameFindings } from './rewrite'
-import type { ParsedFence, ScriptAnalysis, ServerAnalysis } from './script'
+import type { ScriptAnalysis, ServerAnalysis } from './script'
 import { basename, relative } from 'node:path'
 import process from 'node:process'
 import { drawIcons, templateFacts, visitNodes } from './ast'
 import { browserReads } from './browser'
 import { generate, isInteractive, islandCause, islandMessages, promotionCause } from './codegen'
-import { cssImportsWithoutText, deprecatedImports, deprecatedSchemaNames, separatePageSettings, unboundedFields } from './fence-checks'
+import { cssImportsWithoutText, deprecatedImports, separatePageSettings, unboundedFields } from './fence-checks'
 import { applyLints, templateLints } from './lints'
 import { SourceMap } from './mapping'
 import { SELF } from './names'
@@ -73,8 +73,6 @@ export interface CompileResult {
 const WORD = /[a-z0-9]+/gi
 const LEADING_DIGIT = /^\d/
 const KAY_EXTENSION = /\.kay$/
-// A read of a member of `t`, which a schema builder named so gets: `t.Object(...)`.
-const MEMBER_OF_T = /(?<![\w$.])t\s*\.(?!\.)/
 const ERROR_PAGE = '_error.kay'
 const LAYOUT = '_layout.kay'
 // Rendered by the server around or instead of a page, never inside an island.
@@ -145,7 +143,7 @@ export function compileKay(source: string, filename: string, options: CompileOpt
   const broken = diagnostics.some(diagnostic => !diagnostic.checkOnly)
 
   if (options.check)
-    diagnostics.push(...unboundedFields(server), ...[script.fence, server?.fence].flatMap(fence => fence ? [...fenceSchemaNames(source, fence), ...deprecatedImports(fence), ...cssImportsWithoutText(fence)] : []), ...broken ? [] : [...unreadNames(source, file.template, script, server, found.findings), ...constantSignals(source, file.script, found.findings)], ...templateLints(file))
+    diagnostics.push(...unboundedFields(server), ...[script.fence, server?.fence].flatMap(fence => fence ? [...deprecatedImports(fence), ...cssImportsWithoutText(fence)] : []), ...broken ? [] : [...unreadNames(source, file.template, script, server, found.findings), ...constantSignals(source, file.script, found.findings)], ...templateLints(file))
 
   if (file.client && routeFile)
     diagnostics.push({ ...file.client, code: 'client-route-fence', message: 'A page, layout or special page cannot be `--- client`', note: 'it renders on the server', help: 'move what needs the browser to a component it renders, and make that one `--- client`' })
@@ -173,11 +171,6 @@ function coded(diagnostics: Diagnostic[], code: ErrorName): Diagnostic[] {
 }
 
 // Props and server data nothing reads: a prop beside a `...rest` is left out of it on purpose, and a name starting with `_` is unused on purpose, as TypeScript takes it.
-// A fence's `t` from 'kay' is renamed in it alone, so a `t.` read anywhere else in the file keeps the name.
-function fenceSchemaNames(source: string, fence: ParsedFence): Diagnostic[] {
-  return deprecatedSchemaNames(fence, !MEMBER_OF_T.test(`${source.slice(0, fence.offset)} ${source.slice(fence.offset + fence.code.length)}`))
-}
-
 function unreadNames(source: string, template: Node[], script: ScriptAnalysis, server: ServerAnalysis | undefined, found: NameFindings): Diagnostic[] {
   const unread: Diagnostic[] = []
   const unused = (span: Span) => found.unread.has(span.start) && !source.startsWith('_', span.start)

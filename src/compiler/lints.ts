@@ -227,14 +227,6 @@ export const LINTS = {
     wrong: '--- server\nimport { action, s } from \'kay\'\n\nexport const add = action(s.Object({ title: s.String() }), async ({ title }) => create(title))\n---\nform(action={add})\n  input(name="title")',
     right: '--- server\nimport { action, s } from \'kay\'\n\nexport const add = action(s.Object({ title: s.String({ maxLength: 200 }) }), async ({ title }) => create(title))\n---\nform(action={add})\n  input(name="title")',
   },
-  'deprecated-schema-name': {
-    level: 'warn',
-    group: 'deprecated',
-    since: '1.28',
-    summary: 'The schema builder imported from `kay` as `t`, its name before `s`, which leaves `t` to translations. `kay check --fix` renames it, in `.kay` fences and `.ts` modules alike.',
-    wrong: '--- server\nimport { t } from \'kay\'\n\nexport const page = { query: t.Object({ page: t.Integer({ minimum: 1 }) }) }\n---\np Page',
-    right: '--- server\nimport { s } from \'kay\'\n\nexport const page = { query: s.Object({ page: s.Integer({ minimum: 1 }) }) }\n---\np Page',
-  },
   'deprecated-import': {
     level: 'warn',
     group: 'deprecated',

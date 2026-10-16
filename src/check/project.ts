@@ -82,7 +82,7 @@ export function lintConfigTypeError(root: string, lints: Record<string, string> 
   return Object.entries(lints).some(([name, level]) => !isLint(name) && !isLintGroup(name) ? diagnostic.message.includes(`'${name}'`) : !LEVELS.has(level) && diagnostic.message.includes(`"${level}"`))
 }
 
-// The lints the compiler finds in fences, in the project's own scripts: the schema builder imported as `t`, and a stylesheet imported for a value with no text attribute.
+// The lints the compiler finds in fences, in the project's own scripts: a name imported from the entry point it left, and a stylesheet imported for a value with no text attribute.
 async function moduleLints(root: string, levels: LintLevels | undefined): Promise<CheckDiagnostic[]> {
   const files = (await findProjectFiles(root, SCRIPT_MODULE, { project: true, ownKayOnly: true })).filter(file => !DECLARATION_FILE.test(file))
   const found = await Promise.all(files.map(async (file) => {

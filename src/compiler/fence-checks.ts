@@ -1,12 +1,10 @@
 // The checks a fence takes once parsed, beside what analyzing it reports: a schema field with no bound, a renamed import, a stylesheet imported for its text without asking, a page setting outside `page`.
 
-import type { NodePath } from '@babel/traverse'
 import type * as t from '@babel/types'
 import type { Diagnostic, Fix } from './ast'
 import type { PageSettings, ParsedFence, SeparateSetting, ServerAnalysis } from './script'
 import { isSecret } from '../runtime/form'
 import { PAGE } from './page-settings'
-import { loadTraverse } from './rewrite'
 import { eachNode, parseFence } from './script'
 
 // A line break before a line with text: a blank line moving into `page` stays blank.
@@ -125,57 +123,6 @@ export function unboundedFields(server: ServerAnalysis | undefined): Diagnostic[
       })
     })
   })
-
-  return diagnostics
-}
-
-const KAY_SCHEMA_T = /\{[^}]*\bt\b[^}]*\}\s*from\s*['"]kay['"]/
-
-// `t` imported from 'kay', the schema builder's name before `s`.
-// The fix renames it throughout the fence, or imports `s as t` where `s` is taken or `t` is read where the fix cannot reach, such as a template (`renamable` false).
-// A fence Babel gives no scopes (a name declared twice) gives none, or throws with `strict`.
-export function deprecatedSchemaNames(fence: ParsedFence, renamable = true, strict = false): Diagnostic[] {
-  if (!KAY_SCHEMA_T.test(fence.code))
-    return []
-
-  const diagnostics: Diagnostic[] = []
-  const span = fence.shift
-
-  // Babel gives no scopes to a fence declaring a name twice, which the type check reports already.
-  try {
-    loadTraverse()(fence.ast, {
-      ImportSpecifier(path: NodePath<t.ImportSpecifier>) {
-        const { imported, local } = path.node
-        const declaration = path.parent as t.ImportDeclaration
-
-        if (declaration.source.value !== 'kay' || imported.type !== 'Identifier' || imported.name !== 't')
-          return
-
-        const references = local.name === 't' ? path.scope.getBinding('t')?.referencePaths ?? [] : []
-        const rename = renamable && local.name === 't' && !path.scope.hasBinding('s') && references.every(reference => !reference.scope.hasBinding('s'))
-        let edits = [{ ...span(imported), text: 's' }]
-
-        if (local.name === 't')
-          edits = rename ? [path.node, ...references.map(reference => reference.node)].map(node => ({ ...span(node), text: 's' })) : [{ ...span(path.node), text: 's as t' }]
-
-        diagnostics.push({
-          ...span(imported),
-          code: 'deprecated-schema-name',
-          message: '`t` from \'kay\' is `s` now',
-          note: '`t` is left to translations, which every template reads without an import',
-          help: 'import `s` and build schemas with `s.Object(...)`',
-          fixes: [{ title: rename ? 'Rename it `s`' : 'Import `s`', edits, safe: true }],
-          checkOnly: true,
-        })
-      },
-    })
-  }
-  catch (error) {
-    if (strict)
-      throw error
-
-    return []
-  }
 
   return diagnostics
 }
@@ -391,7 +338,7 @@ function propertyKey(property: t.ObjectProperty | t.ObjectMethod): string | unde
 
 // The checks a plain module takes, parsed only when one of them may find something.
 export function moduleChecks(source: string): Diagnostic[] {
-  if (!KAY_SCHEMA_T.test(source) && !CSS_BINDING.test(source) && !MOVED_NAME.test(source))
+  if (!CSS_BINDING.test(source) && !MOVED_NAME.test(source))
     return []
 
   const whole = { start: 0, end: source.length }
@@ -400,11 +347,11 @@ export function moduleChecks(source: string): Diagnostic[] {
   // Babel's own recovery keeps every statement for the checks; a module it cannot read, or whose scopes it cannot build, is read again with its broken statements blanked.
   try {
     if (recovered)
-      return [...deprecatedSchemaNames(recovered, true, true), ...deprecatedImports(recovered), ...cssImportsWithoutText(recovered)]
+      return [...deprecatedImports(recovered), ...cssImportsWithoutText(recovered)]
   }
   catch {}
 
   const module = parseFence(source, whole, [])
 
-  return module ? [...deprecatedSchemaNames(module), ...deprecatedImports(module), ...cssImportsWithoutText(module)] : []
+  return module ? [...deprecatedImports(module), ...cssImportsWithoutText(module)] : []
 }

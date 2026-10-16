@@ -433,25 +433,6 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 
-  it('reports the schema builder a script imports as t, which --fix renames', async () => {
-    const root = await scratchProject({
-      'src/routes/index.kay': 'p Home\n',
-      'src/schemas.ts': 'import { t } from \'kay\'\n\nexport const page = t.Integer({ minimum: 1 })\n',
-    })
-
-    try {
-      const diagnostics = await check(root)
-
-      expect(diagnostics.map(d => [d.file.slice(root.length + 1), d.line, d.code, d.severity])).toEqual([['src/schemas.ts', 1, 'deprecated-schema-name', 'warning']])
-      expect(await applySafeFixes(root, diagnostics)).toBe(1)
-      expect(await Bun.file(join(root, 'src/schemas.ts')).text()).toBe('import { s } from \'kay\'\n\nexport const page = s.Integer({ minimum: 1 })\n')
-      expect(await check(root)).toEqual([])
-    }
-    finally {
-      await rm(root, { recursive: true, force: true })
-    }
-  })
-
   it('refuses a stylesheet a module imports for a value without the text attribute', async () => {
     const root = await scratchProject({
       'src/routes/index.kay': 'p Home\n',

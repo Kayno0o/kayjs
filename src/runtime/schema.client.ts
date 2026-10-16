@@ -7,6 +7,3 @@ export const s = /* @__PURE__ */ new Proxy({}, {
     throw new Error(`kay: s.${String(name)}() builds a schema on the server, and kay's \`s\` is not in the browser; keep schemas in a module only the server imports`)
   },
 }) as typeof schema
-
-/** @deprecated `t` from 'kay' is `s` now, leaving `t` to translations. */
-export const t: typeof schema = s

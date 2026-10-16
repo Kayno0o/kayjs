@@ -183,7 +183,7 @@ describe('kay upgrade', () => {
     const root = await project(MANIFEST.replace('~1.40.1', '~1.20.0'), {
       'tsconfig.json': await Bun.file(join(import.meta.dir, '../tsconfig.json')).text(),
       'src/routes/index.kay': 'p Home\n',
-      'src/schemas.ts': 'import { t } from \'kay\'\n\nexport const page = t.Integer({ minimum: 1 })\n',
+      'src/refresh.ts': 'import { invalidatePage } from \'kay/server\'\n\nexport const refresh = () => invalidatePage(\'/\')\n',
     })
     const run = (args: string[], capture: boolean) => Bun.spawn([process.execPath, CLI, ...args], { cwd: root, stdout: capture ? 'pipe' : 'ignore', stderr: 'ignore' })
     const { deps } = fakes({ '@kaynooo/kayjs': '1.46.0', '@kaynooo/kayjs-ui': '1.46.0' })
@@ -197,7 +197,7 @@ describe('kay upgrade', () => {
 
     try {
       await quietly(async () => upgradeProject(root, deps))
-      expect(await Bun.file(join(root, 'src/schemas.ts')).text()).toBe('import { s } from \'kay\'\n\nexport const page = s.Integer({ minimum: 1 })\n')
+      expect(await Bun.file(join(root, 'src/refresh.ts')).text()).toBe('import { invalidatePage } from \'kay/cache\'\n\nexport const refresh = () => invalidatePage(\'/\')\n')
     }
     finally {
       await rm(root, { recursive: true, force: true })
@@ -359,15 +359,15 @@ describe('kay check --since', () => {
     const root = await project(MANIFEST, {
       'tsconfig.json': await Bun.file(join(import.meta.dir, '../tsconfig.json')).text(),
       'src/routes/index.kay': 'p Home\n',
-      'src/schemas.ts': 'import { t } from \'kay\'\n\nexport const page = t.Integer({ minimum: 1 })\n',
+      'src/refresh.ts': 'import { invalidatePage } from \'kay/server\'\n\nexport const refresh = () => invalidatePage(\'/\')\n',
     })
     const run = async (since: string) => Bun.spawn([process.execPath, CLI, 'check', '--fix', '--since', since], { cwd: root, stdout: 'ignore', stderr: 'ignore' }).exited
 
     try {
-      await run('1.29')
-      expect(await Bun.file(join(root, 'src/schemas.ts')).text()).toContain('{ t }')
-      await run('1.28')
-      expect(await Bun.file(join(root, 'src/schemas.ts')).text()).toContain('{ s }')
+      await run('1.47')
+      expect(await Bun.file(join(root, 'src/refresh.ts')).text()).toContain('kay/server')
+      await run('1.46')
+      expect(await Bun.file(join(root, 'src/refresh.ts')).text()).toContain('kay/cache')
     }
     finally {
       await rm(root, { recursive: true, force: true })
@@ -382,8 +382,8 @@ describe('kay check --since', () => {
       return { code, stderr }
     }
 
-    expect(await run('--since', '1.28.0')).toEqual({ code: 1, stderr: 'kay check: --since takes a minor, as `1.46`, not `1.28.0`\n' })
-    expect(await run('--since', '1.28', '--only', 'code')).toEqual({ code: 1, stderr: 'kay check: --since reports the deprecations of one minor, so it does not go with --only\n' })
+    expect(await run('--since', '1.46.0')).toEqual({ code: 1, stderr: 'kay check: --since takes a minor, as `1.46`, not `1.46.0`\n' })
+    expect(await run('--since', '1.46', '--only', 'code')).toEqual({ code: 1, stderr: 'kay check: --since reports the deprecations of one minor, so it does not go with --only\n' })
   })
 })
 
@@ -398,7 +398,7 @@ describe('the deprecations', () => {
     const { version } = (await Bun.file(join(import.meta.dir, '../package.json')).json()) as { version: string }
     const [major, minor] = minorOf(version)!
     // Past their three minors, kept until the old form they recognise goes: when one does, its line goes from this list and its lint from LINTS.
-    const overdue = new Set(['deprecated-schema-name'])
+    const overdue = new Set<string>()
     const past = Object.entries(LINTS).filter(([, lint]) => 'since' in lint && lint.since !== undefined && (minorOf(lint.since)![0] < major || minorOf(lint.since)![1] + 3 < minor)).map(([name]) => name)
 
     expect(past.sort()).toEqual([...overdue])

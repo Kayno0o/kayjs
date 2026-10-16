@@ -40,8 +40,9 @@ A test or a script that reads a page's `link rel="stylesheet"` to fetch the file
 The account pages sign out with a post to `/auth/sign-out`, under the `prefix` of `createAuth`. A test or a page importing `signOut` from `@kaynooo/kayjs-auth/pages/account/_layout.kay` now fails `kay check`, as an import of something that is gone. Post to the route instead, with `site.fetch('/auth/sign-out', { method: 'POST' })` in a test, or give your own page a form posting there. No lint finds it, as the import already fails the check. The plugin also serves `POST /auth/sign-out` itself now, ahead of your routes, so a route of your own at that path is shadowed: rename it. See [kayjs-auth](/libraries/kayjs-auth#the-signed-in-user).
 
 ### `deprecated-schema-name` is in the `deprecated` group
+### The schema builder's old name `t` is gone
 
-`lints: { code: ... }` in `kay.config.ts` no longer sets it, and `kay check --only code` no longer lists it. Set `deprecated`, or the lint by name. `kay upgrade` rewrites it, and every deprecation after it, as it moves your app. See [Deprecations](/reference/checks#deprecations).
+`import { t } from 'kay'` is gone, with its `deprecated-schema-name` lint. The schema builder is `s`: import it with `import { s } from 'kay'`, or use it with no import in a server fence, and write `s.Object(...)` where you wrote `t.Object(...)`. `kay check --fix` of 1.45 renames it. Otherwise rename it by hand, or import Elysia's own `t` from `elysia`.
 
 ## 1.45.0
 

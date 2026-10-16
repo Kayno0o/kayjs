@@ -19,8 +19,8 @@ const DEFINED = 'NODE_ENV'
 // Part of the message of the browser's stand-in for kay's `s`, which survives minifying: a chunk holding it builds a schema where Elysia is not.
 const BROWSER_T = 'builds a schema on the server, and kay'
 const KAY_IMPORT = /import\s*\{([^}]*)\}\s*from\s*['"]kay['"]/g
-// `s`, or the `t` it was called before.
-const SCHEMA_SPECIFIER = /^[st](?:\s+as\s+\w+)?$/
+// `s`, as imported or aliased.
+const SCHEMA_SPECIFIER = /^s(?:\s+as\s+\w+)?$/
 // Bun's refusal of a builtin in a browser build, which names the module importing it and not the island that reached it.
 const BUILTIN_REFUSAL = /^Browser build cannot import (?:Node\.js|Bun) builtin/
 const PACKAGE_PATH = /node_modules\/((?:@[^/]+\/)?[^/]+)/
@@ -335,7 +335,7 @@ function scanKey(): string {
   return scannerKey
 }
 
-// Whether a module imports `s` (or `t`) itself from 'kay', not as a type.
+// Whether a module imports `s` itself from 'kay', not as a type.
 function importsKaySchema(source: string): boolean {
   for (const [, specifiers] of source.matchAll(KAY_IMPORT)) {
     if (specifiers!.split(',').some(specifier => SCHEMA_SPECIFIER.test(specifier.trim())))

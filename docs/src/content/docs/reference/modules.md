@@ -94,7 +94,7 @@ Types include `BrowserError` and `CspViolation`, the browser errors and CSP viol
 
 <Callout type="note">
 
-`kay/i18n` has its own `t` for messages, which `.kay` files read with no import; the schema builder is `kay`'s `s`, its old name `t` deprecated.
+`kay/i18n` has its own `t` for messages, which `.kay` files read with no import; the schema builder is `kay`'s `s`.
 
 </Callout>
 

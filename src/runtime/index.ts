@@ -408,7 +408,7 @@ export type QueryOf<Schema> = Schema extends TSchema ? Static<Schema> : never
 // What a page's template reads: every name its `--- server` fence declares.
 export type PageData<Load extends (...args: never[]) => unknown> = Awaited<ReturnType<Load>>
 
-export { s, t } from '#schema'
+export { s } from '#schema'
 export type { Action, ActionContext, ActionProtection, ActionRateLimit, CallOptions, CallResult, Failure, FailureData, FailureOf, FieldName, FormFailure, FormSuccess, HoneypotOptions, MinTimeOptions, MinTimeRefusal, NoInputAction, ProofOfWorkOptions, ProofOfWorkRefusal, ProtectionMessages, RateLimit, RateStore, RateWindow, ServerAction, Success, SuccessOf, TrackedCall } from './action'
 export { action, ActionError, ActionRedirect } from './action'
 export { localPath, withBase } from './base'

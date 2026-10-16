@@ -27,8 +27,9 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 - The account pages sign out with a post to `/auth/sign-out` (under the `prefix` of `createAuth`), so `import { signOut } from '@kaynooo/kayjs-auth/pages/account/_layout.kay'` in a test or a page fails `kay check`: post to the route instead, `site.fetch('/auth/sign-out', { method: 'POST' })`, or put the button in your own page as a form posting there. No lint can find it: the import already fails `kay check` as a missing export. The plugin now serves `POST ${prefix}/sign-out` itself, ahead of the app's routes, so an app route of its own at that path is shadowed: rename it. [kayjs-auth](../packages/auth/llms.txt)
 
 ### `deprecated-schema-name` is in the `deprecated` group
+### The schema builder's old name `t` is gone
 
-- `lints: { code: ... }` in `kay.config.ts` no longer sets it, and `kay check --only code` no longer lists it: set `deprecated` or the lint by name. `kay upgrade` rewrites it and every later deprecation, see [Checks](checks.md#apply-the-quick-fixes).
+- `kay` no longer exports the schema builder as `t`, gone with its `deprecated-schema-name` lint: the schema builder is `s`, `import { s } from 'kay'` or no import in a server fence, and `s.Object(...)` in place of `t.Object(...)`. `kay check --fix` of 1.45 renames it, or rename it by hand, or import Elysia's own `t` from `elysia`.
 
 ## 1.45.0
 
