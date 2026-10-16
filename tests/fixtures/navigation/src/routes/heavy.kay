@@ -1,0 +1,7 @@
+---
+import './heavy.css'
+---
+head
+  title Heavy
+h1 Heavy
+a.to-below(href="/below") Below

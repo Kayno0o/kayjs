@@ -902,6 +902,34 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     await fresh.close()
   })
 
+  it('swaps from a page linking its stylesheet to one inlining its own, and back', async () => {
+    const fresh = await browser.newPage()
+    const state = async () => fresh.evaluate(() => ({
+      linked: document.head.querySelectorAll('link[rel="stylesheet"]').length,
+      inlined: [...document.head.querySelectorAll('style')].filter(style => style.textContent.includes('.bar')).length,
+    }))
+
+    await fresh.goto(`${origin}/heavy`)
+    await fresh.evaluate(() => {
+      (window as { kayAlive?: boolean }).kayAlive = true
+    })
+
+    const before = await state()
+
+    expect(before.linked).toBeGreaterThan(0)
+    expect(before.inlined).toBe(0)
+    await fresh.click('a.to-below')
+    await fresh.locator('h1', { hasText: 'Below' }).waitFor()
+    expect((await state()).inlined).toBe(1)
+    expect(await fresh.evaluate(() => getComputedStyle(document.querySelector('.bar')!).position)).toBe('fixed')
+    await fresh.goBack()
+    await fresh.locator('h1', { hasText: 'Heavy' }).waitFor()
+
+    expect(await state()).toEqual(before)
+    expect(await fresh.evaluate(() => (window as { kayAlive?: boolean }).kayAlive)).toBe(true)
+    await fresh.close()
+  })
+
   it('swaps in the page a post redirects to, another one taking a history entry', async () => {
     const fresh = await browser.newPage()
     const alive = async () => fresh.evaluate(() => (window as { kayAlive?: boolean }).kayAlive === true)

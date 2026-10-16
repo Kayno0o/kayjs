@@ -220,6 +220,61 @@ describe('pages', () => {
     }
   })
 
+  it('inlines the stylesheets of a page that compress to exactly the limit together, and links them one byte over', async () => {
+    const scratch = await scratchBuild()
+    // Base 36 digits of an LCG's high bits, which gzip cannot shrink much below their entropy; the length is searched until the gzip lands on the target exactly.
+    const padding = (base: string, target: number): string => {
+      for (let seed = 1; seed < 200; seed++) {
+        let state = seed
+        const noise = Array.from({ length: 40_000 }, () => ((state = Math.imul(state, 1664525) + 1013904223 | 0) >>> 16) % 36).map(digit => digit.toString(36)).join('')
+        const sized = (length: number) => Bun.gzipSync(`${base}/*${noise.slice(0, length)}*/`).length
+        let low = 0
+        let high = noise.length
+
+        while (low < high) {
+          const middle = Math.floor((low + high) / 2)
+
+          if (sized(middle) < target)
+            low = middle + 1
+          else
+            high = middle
+        }
+
+        for (let length = Math.max(0, low - 4); length <= low + 4; length++) {
+          if (sized(length) === target)
+            return `/*${noise.slice(0, length)}*/`
+        }
+      }
+
+      throw new Error(`no padding gzips to ${target}`)
+    }
+
+    try {
+      const client = await scratch.client()
+      const home = client.styles.get(resolve('tests/fixtures/site/src/routes/index.kay'))!
+      const file = join(scratch.dir, 'dist', ...home.slice('/_kay/'.length).split('/'))
+      const original = await Bun.file(file).text()
+      const layout = Bun.gzipSync((await readInlineStyles(client, '')).get(client.styles.get(resolve('tests/fixtures/site/src/routes/_layout.kay'))!)!).length
+
+      for (const [extra, inlined] of [[0, true], [1, false]] as const) {
+        await Bun.write(file, `${original}\n${padding(`${original}\n`, INLINE_LIMIT - layout + extra)}`)
+
+        const sheets = await readInlineStyles(client, '')
+
+        expect(Bun.gzipSync(sheets.get(home)!).length + layout).toBe(INLINE_LIMIT + extra)
+
+        const served = await scratch.serve({ routes: 'tests/fixtures/site/src/routes', publicDir: 'tests/fixtures/site/public', compress: false })
+        const html = await (await served.handle(new Request('http://localhost/'))).text()
+
+        expect(html.includes('<style>'), `${INLINE_LIMIT + extra} bytes together`).toBe(inlined)
+        expect(html.includes('rel="stylesheet"')).toBe(!inlined)
+      }
+    }
+    finally {
+      await scratch.remove()
+    }
+  })
+
   it('weighs the stylesheets of a page together: each under the limit alone, their sum past it', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'kay-inline-'))
 

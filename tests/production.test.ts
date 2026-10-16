@@ -1803,7 +1803,10 @@ describe('compression', () => {
     const { compressResponse, fixedTexts, wholeResponse } = await import('../src/server/compress')
     const a = `<style>.a{color:red}${'.x{margin:0}'.repeat(40)}</style>`
     const b = `<style>.b{color:blue}${'.y{padding:0}'.repeat(40)}</style>`
-    const fixed = fixedTexts([a, b, a])
+    const short = '<style>.s{margin:0}</style>'
+    // The same first bytes as `a` and another end, which is no copy of it.
+    const lookalike = a.replace('</style>', '.z{top:0}</style>')
+    const fixed = fixedTexts([a, b, a, short])
     const send = async (body: string, accept: string, type = 'text/html') => (await compressResponse(new Request('http://localhost/', { headers: { 'accept-encoding': accept } }), wholeResponse(body, { headers: { 'content-type': type } }), fixed))!
     const decoded = async (response: Response) => {
       const bytes = new Uint8Array(await response.arrayBuffer())
@@ -1812,17 +1815,17 @@ describe('compression', () => {
     }
     const text = `<p>${'café '.repeat(80)}</p>`
 
-    expect(fixed).toHaveLength(2)
+    expect(fixed).toHaveLength(3)
 
     // Side by side, leading, trailing, alone, twice, in another order than given, and around more than deflates on the main thread.
-    for (const page of [`<head>${a}${b}</head>${text}`, `${a}${text}`, `${text}${b}`, a, `${a}${text}${a}`, `${b}${a}`, `${a}${text.repeat(200)}${b}`]) {
+    for (const page of [`<head>${a}${b}</head>${text}`, `${a}${text}`, `${text}${b}`, a, `${a}${text}${a}`, `${b}${a}`, `${a}${text.repeat(200)}${b}`, `${short}${text}${lookalike}${a}`, `<style>${text}${short}`]) {
       const response = await send(page, 'gzip, deflate, br, zstd')
 
       expect(response.headers.get('content-encoding')).toBe('gzip')
       expect(await decoded(response)).toBe(page)
     }
 
-    for (const [page, accept, type, encoding] of [[`${a}${text}`, 'br, gzip;q=0', 'text/html', 'br'], [text, 'br, gzip', 'text/html', 'gzip'], [`{"css":${JSON.stringify(a)}}`, 'br', 'application/json', 'br']] as const) {
+    for (const [page, accept, type, encoding] of [[`${a}${text}`, 'br, gzip;q=0', 'text/html', 'br'], [`${lookalike}${text}`, 'br, gzip;q=0', 'text/html', 'br'], [text, 'br, gzip', 'text/html', 'gzip'], [`{"css":${JSON.stringify(a)}}`, 'br', 'application/json', 'br']] as const) {
       const response = await send(page, accept, type)
 
       expect(response.headers.get('content-encoding')).toBe(encoding)

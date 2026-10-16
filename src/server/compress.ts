@@ -20,7 +20,7 @@ const ONCE_OR_STREAMED: ReadonlySet<StoredEncoding> = new Set(STORED)
 const GZIP_ONLY: ReadonlySet<Encoding> = new Set(['gzip'])
 // A gzip member's header: deflate, no name or time, from an unknown system.
 const GZIP_HEADER = new Uint8Array([0x1F, 0x8B, 8, 0, 0, 0, 0, 0, 0, 0xFF])
-// Enough of a fixed text to find it by, past the `<style>` every stylesheet starts with: looking for one whole costs about 100 µs on a 110 KB page.
+// Enough of a fixed text to tell it from the others at a `<style>` tag, past that tag every stylesheet starts with.
 const HEAD_BYTES = 72
 const HTML_TYPE = /^text\/html/i
 // Text the build writes; images, fonts and media come compressed already.
@@ -253,33 +253,89 @@ async function compressWhole(bytes: Uint8Array<ArrayBuffer>, encoding: Encoding)
   return { copy, late }
 }
 
-// Text a page carries whole every time it carries it, as an inlined stylesheet.
+// Text a page carries whole every time it carries it, as an inlined stylesheet: it starts with `<style>`.
 export interface FixedText {
   bytes: Buffer
   head: Buffer
-  // Ends on a full flush, which empties the window, so it sits between two other deflate runs of a gzip member without either reaching into it.
-  deflated: Buffer
+  // Ends on a full flush, which empties the window, so it sits between two other deflate runs of a gzip member without either reaching into it. Deflated the first time a page carries the text, at the strongest level.
+  readonly deflated: Buffer
 }
 
-// Each text deflated once, at the strongest level.
 export function fixedTexts(texts: string[]): FixedText[] {
   return [...new Set(texts)].map(fixedText)
 }
 
 export function fixedText(text: string): FixedText {
-  const { constants, deflateRawSync } = nodeZlib()
   const bytes = Buffer.from(text)
+  const fixed: FixedText = {
+    bytes,
+    head: bytes.subarray(0, HEAD_BYTES),
+    get deflated() {
+      const { constants, deflateRawSync } = nodeZlib()
+      const deflated = deflateRawSync(bytes, { level: 9, finishFlush: constants.Z_FULL_FLUSH })
 
-  return { bytes, head: bytes.subarray(0, HEAD_BYTES), deflated: deflateRawSync(bytes, { level: 9, finishFlush: constants.Z_FULL_FLUSH }) }
-}
+      Object.defineProperty(fixed, 'deflated', { value: deflated })
 
-function offsetOf(body: Buffer, text: FixedText): number {
-  for (let at = body.indexOf(text.head); at >= 0; at = body.indexOf(text.head, at + 1)) {
-    if (body.subarray(at, at + text.bytes.length).equals(text.bytes))
-      return at
+      return deflated
+    },
   }
 
-  return -1
+  return fixed
+}
+
+const STYLE_OPEN = Buffer.from('<style>')
+
+// The fixed texts by their head, and the lengths a head has: a response is searched at its `<style>` tags alone, not once per text.
+interface FixedIndex {
+  byHead: Map<string, FixedText[]>
+  lengths: number[]
+}
+
+const indexes = new WeakMap<FixedText[], FixedIndex>()
+
+function indexOfFixed(fixed: FixedText[]): FixedIndex {
+  let index = indexes.get(fixed)
+
+  if (!index) {
+    const byHead = new Map<string, FixedText[]>()
+
+    for (const text of fixed) {
+      const key = text.head.toString('latin1')
+
+      byHead.set(key, [...byHead.get(key) ?? [], text])
+    }
+
+    index = { byHead, lengths: [...new Set(fixed.map(text => text.head.length))] }
+    indexes.set(fixed, index)
+  }
+
+  return index
+}
+
+// Every fixed text the body holds, in body order.
+function findFixed(body: Buffer, fixed: FixedText[]): Found[] {
+  const { byHead, lengths } = indexOfFixed(fixed)
+  const found: Found[] = []
+  let end = 0
+
+  for (let at = body.indexOf(STYLE_OPEN); at >= 0; at = body.indexOf(STYLE_OPEN, at + 1)) {
+    // A text overlapping the one before is left to the deflate.
+    if (at < end)
+      continue
+
+    for (const length of lengths) {
+      const text = byHead.get(body.toString('latin1', at, at + length))?.find(one => body.subarray(at, at + one.bytes.length).equals(one.bytes))
+
+      if (text) {
+        found.push({ text, at })
+        end = at + text.bytes.length
+
+        break
+      }
+    }
+  }
+
+  return found
 }
 
 type Deflate = (bytes: Uint8Array, last: boolean) => Buffer | Promise<Buffer>
@@ -303,16 +359,7 @@ interface Found { text: FixedText, at: number }
 // A gzip of the body that deflates only what lies around the fixed texts it holds, theirs deflated once already, and whether it waited on a zlib callback; undefined when it holds none.
 async function splicedGzip(bytes: Uint8Array<ArrayBuffer>, fixed: FixedText[]): Promise<{ gzip: Uint8Array<ArrayBuffer>, late: boolean } | undefined> {
   const body = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.length)
-  const found: Found[] = []
-  let end = 0
-
-  // In body order, a text overlapping the one before left to the deflate.
-  for (const one of fixed.map(text => ({ text, at: offsetOf(body, text) })).filter(({ at }) => at >= 0).sort((a, b) => a.at - b.at)) {
-    if (one.at >= end) {
-      found.push(one)
-      end = one.at + one.text.bytes.length
-    }
-  }
+  const found = findFixed(body, fixed)
 
   return found.length === 0 ? undefined : gzipFound(body, found)
 }
