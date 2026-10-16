@@ -1,0 +1,9 @@
+---
+import Flaky from '../components/flaky.kay'
+---
+h1 Shared
+Flaky(label="Healthy")
+try
+  Flaky(fail={true})
+catch
+  p.fallback Fallback

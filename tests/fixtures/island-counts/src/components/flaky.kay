@@ -1,0 +1,12 @@
+---
+const { label = 'Flaky', fail = false } = props<{ label?: string, fail?: boolean }>()
+const count = signal(0)
+
+function shown(): string {
+  if (fail)
+    throw new Error('failed to render')
+
+  return label
+}
+---
+button(onClick={() => count.set(count() + 1)}) {shown()} {count()}

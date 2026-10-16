@@ -1,0 +1,10 @@
+---
+import Flaky from './flaky.kay'
+
+const open = signal(true)
+---
+button.toggle(onClick={() => open.set(!open())}) Toggle
+try
+  Flaky(fail={true})
+catch
+  p.fallback Fallback

@@ -1,0 +1,10 @@
+---
+import Flaky from '../components/flaky.kay'
+import Labelled from '../components/labelled.kay'
+---
+h1 Messages
+Flaky(label="Healthy")
+try
+  Labelled
+catch
+  p.fallback Fallback

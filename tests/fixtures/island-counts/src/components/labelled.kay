@@ -1,0 +1,11 @@
+---
+import { t } from 'kay/i18n'
+
+const count = signal(0)
+
+function explode(): string {
+  throw new Error('failed to render')
+}
+---
+button(onClick={() => count.set(count() + 1)}) {t('counter.label')} {count()}
+p {explode()}
