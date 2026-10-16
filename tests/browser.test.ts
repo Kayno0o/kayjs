@@ -901,13 +901,15 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
 
   it('does not let the island of a page left set the title of the next', async () => {
     const view = await titles.open('/')
+    const flip = async () => view.evaluate(() => (window as { kayFlip?: () => void }).kayFlip?.())
 
-    await view.evaluate(() => {
-      (window as { kayRename?: HTMLElement | null }).kayRename = document.querySelector('button.rename')
-    })
+    await flip()
+
+    expect(await title(view)).toBe('Stale | Site')
+
     await view.click('a.other')
     await view.waitFor('h1', { text: 'Other' })
-    await view.evaluate(() => (window as { kayRename?: HTMLElement | null }).kayRename?.click())
+    await flip()
 
     expect(await title(view)).toBe('Other | Site')
   })

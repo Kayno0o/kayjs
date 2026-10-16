@@ -27,12 +27,14 @@ An island can have a `head` block too, holding a `title` and no other tag. The t
 const { room } = props<{ room: () => { name: string } | undefined }>()
 ---
 head
-  title {room()?.name}
+  title {room()?.name ?? ''}
 ```
 
 The server renders the first title, so a search engine and the first paint see it. The browser then updates it whenever the signal changes, wrapped in `seo.titleTemplate` as the server wraps it. `title(raw)` skips the template, and a title that reads empty shows the site's `seo.name`.
 
-Following a link to another page shows that page's own title, and going back shows the island's again once it hydrates. If two islands on a page both set a title, the one that set it last shows, which is the one mounted last until another changes.
+Following a link to another page shows that page's own title, and going back shows the island's again once it hydrates. A title is the text as written, so a missing value needs `?? ''`. An island rendered in the browser alone (`hydrate="client"`) sets its title as written, with no template. An island kept across pages with `persist` shows the next page's title at a swap and sets its own again when a signal it reads changes.
+
+If two islands on a page both set a title, the one that set it last shows, which is the one mounted last until another changes.
 
 ## Attributes on `<html>`
 

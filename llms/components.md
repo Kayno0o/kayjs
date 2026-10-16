@@ -70,7 +70,7 @@ if open()
 const query = signal('')
 
 effect(() => {
-  document.title = query() === '' ? 'Search' : `Search: ${query()}`
+  localStorage.setItem('query', query())
 })
 ---
 input(bind:value={query} aria-label="Search")

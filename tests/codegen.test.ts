@@ -429,6 +429,8 @@ describe('head', () => {
     expect(dom).toContain('import { pageTitle as KayPageTitle } from \'kay/internal/title\'')
     expect(html).toContain('KayHead([{ tag: "title", props: { "island": true, "children": "" + (name()) + " | Room" } }, ]);')
     expect(compileKay(source.replace('title {', 'title(raw) {'), 'room.kay', { output: 'dom' }).tsx).toContain('| Room", true);')
+    expect(compileKay(source.replace('title {', 'title(raw={name() === "b"}) {'), 'room.kay', { output: 'dom' }).tsx).toContain('| Room", Boolean(name() === "b"));')
+    expect(compileKay(source.replace('  title {name()} | Room', '  title first\n  title {name()} | Room'), 'room.kay', { output: 'dom' }).tsx).toContain('KayPageTitle(() => "" + (name())')
     expect(compileKay('head\n  title {x} here\np y', 'page.kay', { output: 'html' }).tsx).not.toContain('"island"')
   })
 

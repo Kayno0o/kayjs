@@ -27,7 +27,7 @@ An island's `head` block holds a `title` and nothing else, and the title follows
 const { room } = props<{ room: () => { name: string } | undefined }>()
 ---
 head
-  title {room()?.name}
+  title {room()?.name ?? ''}
 ```
 
 The server renders the first title, so a crawler and the first paint see it; the browser then updates it whenever the signal changes.
@@ -201,6 +201,9 @@ h1 {todo.title}
 - An island's `head` holds a `title` only, any other tag being the page's to set, and `title(raw)` skips `seo.titleTemplate` there too.
 - While an island's title reads empty, the page shows `seo.name` as the server does.
 - Two islands on a page both setting a title: the one that set it last shows, which is the one mounted last until another changes.
+- A title reads `undefined` for a missing value, so write `?? ''` where it may be missing.
+- An island rendered in the browser alone (`hydrate="client"`) has no server render to take the template from, so it sets its title as written.
+- An island kept across navigation (`persist`) shows the next page's title at a swap, as its layout's would, and sets its own again when a signal it reads changes.
 - Navigating to another page shows that page's own title, and coming back shows the island's again once it hydrates; a page with no island title is as the server served it.
 - Only a site with such an island ships the code for it, a few hundred bytes.
 - A page swap changes only what the server sets differently for the next page, and only where a script left it as the server set it, so a theme a toggle changed stays.

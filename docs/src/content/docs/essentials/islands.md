@@ -26,7 +26,7 @@ const query = signal('')
 const matches = memo(() => names.filter(n => n.includes(query())))
 
 effect(() => {
-  document.title = `${matches().length} results`
+  localStorage.setItem('matches', String(matches().length))
 })
 ---
 input(bind:value={query} aria-label="Search")

@@ -654,11 +654,20 @@ class ModuleShell {
 
     b.add(`${helperName('pageTitle')}(() => `)
     b.wrap(title, () => this.emitHeadText(title))
-    b.add(`, ${title.attributes.some(attribute => attribute.kind !== 'spread' && this.text(attribute.name) === 'raw')});\n`)
+    const raw = title.attributes.find(attribute => attribute.kind !== 'spread' && this.text(attribute.name) === 'raw')
+
+    b.add(', ')
+
+    if (raw?.kind === 'expression')
+      b.add('Boolean(').addSource(raw.expression).add(')')
+    else
+      b.add(String(raw !== undefined))
+
+    b.add(');\n')
   }
 
   private titleTag(head: ElementNode | undefined): ElementNode | undefined {
-    return head?.children.find((child): child is ElementNode => child.kind === 'element' && child.name === 'title' && headTagProblem(child) === undefined)
+    return head?.children.findLast((child): child is ElementNode => child.kind === 'element' && child.name === 'title' && headTagProblem(child) === undefined)
   }
 
   // The tag `head()` takes: `{ tag: 'meta', props: { name: 'description', content: (description) } }`.

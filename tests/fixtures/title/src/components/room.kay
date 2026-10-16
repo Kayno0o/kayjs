@@ -1,6 +1,11 @@
 ---
 const { label = 'Room' } = props<{ label?: string }>()
 const name = signal(label)
+
+onMount(() => {
+  // Lets a test change the title from outside the island, as a socket message would, after the island's page is left.
+  ;(window as { kayFlip?: () => void }).kayFlip = () => name.set('Stale')
+})
 ---
 head
   title {name()}
