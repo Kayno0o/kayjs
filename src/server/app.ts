@@ -313,13 +313,14 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
     : undefined
 
   // On a site requiring guards, the document and the tool list are refused unless a guard covers every module not setting `guards: false`, or every module is open with no guard of its own, a library's guarded one counting as guarded.
-  const guards = document ? requiredGuards(await Promise.all(sharedGuards(apiModules).map(async file => loadGuard({ file, special: {} }))), { file: paths.api, open: apiModules.every(module => module.open === true && module.guards.length === 0) ? true : undefined }, {}, options.requireGuards) : []
+  // With no module at all the document stays refused, while the tool list, which holds the actions too, is open: there is no directory to put a guard in.
+  const covering = async (empty: boolean) => requiredGuards(await Promise.all(sharedGuards(apiModules).map(async file => loadGuard({ file, special: {} }))), { file: paths.api, open: (apiModules.length > 0 || empty) && apiModules.every(module => module.open === true && module.guards.length === 0) ? true : undefined }, {}, options.requireGuards)
 
   if (servesOpenApi && document && openapi !== undefined)
-    serveOpenApi(app, document, openapi, guards, actionOptions)
+    serveOpenApi(app, document, openapi, await covering(false), actionOptions)
 
   if (options.mcp === true && document)
-    serveMcp(app, document, { title: (document.info as { title: string }).title, version: (document.info as { version: string }).version, base, guards, actions: actionOptions })
+    serveMcp(app, document, { title: (document.info as { title: string }).title, version: (document.info as { version: string }).version, base, guards: await covering(true), actions: actionOptions })
 
   serveErrorReports(app, options.onError)
   serveLive(app)
