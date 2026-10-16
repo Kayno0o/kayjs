@@ -67,7 +67,7 @@ export async function configHead(root: string, config: KayConfig, clientDir: str
 }
 
 // The pixel size of a card image named by its path: an imported image's, a public file's, read once here, and a share card's 1200x630.
-async function cardImageSizes(publicDir: string): Promise<(path: string) => ImageSize | undefined> {
+export async function cardImageSizes(publicDir: string): Promise<(path: string) => ImageSize | undefined> {
   const sizes = new Map<string, ImageSize>()
 
   await Promise.all((await publicFiles(publicDir)).filter(file => RESIZABLE.test(file.path)).map(async ({ path, url }) => {

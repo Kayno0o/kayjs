@@ -21,6 +21,7 @@ import { routeMounts, scanEndpoints, scanRoutes } from '../server/routes'
 import { siteOrigin } from '../server/seo'
 import { ServedPaths } from '../server/served-paths'
 import { serverFacts } from './layout-facts'
+import { pageHeadLints } from './page-heads'
 import { queryClashes } from './queries'
 
 // What the server refuses when it boots, found by the functions it calls then, so `kay check` and the boot cannot disagree; the collections' feeds come from the process that read them.
@@ -102,6 +103,8 @@ export async function bootProblems(root: string, options: CheckOptions, feeds: C
   diagnostics.push(...await actionClashes(root, [...new Set(routes.flatMap(route => [...route.layouts, ...route.actionModules ?? [], route.file]))]))
 
   diagnostics.push(...await queryClashes(routes))
+
+  diagnostics.push(...await pageHeadLints(options, routes, routesDir, publicDir))
 
   return diagnostics
 }

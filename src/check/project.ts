@@ -86,9 +86,11 @@ export function lintConfigTypeError(root: string, lints: Record<string, string> 
 async function moduleLints(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
   const levels = options.lints
   const files = (await findProjectFiles(root, SCRIPT_MODULE, { project: true, ownKayOnly: true })).filter(file => !DECLARATION_FILE.test(file))
-  const inBrowser = await browserModules(root, projectPaths(root, options).routes)
+  const texts = new Map(await Promise.all(files.map(async (file) => [file, await Bun.file(file).text()] as const)))
+  // Following the imports of every component is worth it only when some module names the entry.
+  const inBrowser = [...texts.values()].some(text => text.includes('kay/cache')) ? await browserModules(root, projectPaths(root, options).routes) : new Set<string>()
   const found = await Promise.all(files.map(async (file) => {
-    const source = await Bun.file(file).text()
+    const source = texts.get(file)!
     const levelAt = lintLevels(source, levels)
 
     return moduleChecks(source, inBrowser.has(realpathSync(file))).flatMap((diagnostic) => {

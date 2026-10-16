@@ -1,10 +1,10 @@
 import type { CheckOptions } from '../src/check'
 import type { RenderedPage } from '../src/check/seo'
+import { describe, expect, it, setDefaultTimeout, spyOn } from 'bun:test'
 import { chmod, mkdir, mkdtemp, readdir, rm, symlink, utimes } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, join, relative, resolve } from 'node:path'
 import process from 'node:process'
-import { describe, expect, it, setDefaultTimeout, spyOn } from 'bun:test'
 import { findKayFiles } from '../src/build/files'
 import { applySafeFixes, check as checkProject } from '../src/check'
 import { islandOnlyComponents } from '../src/check/island-only'
@@ -1920,6 +1920,39 @@ describe.concurrent('kay check, unused code', () => {
     }
   })
 
+  it('reports the head lints of the prerendered pages at their files, without rendering them', async () => {
+    const long = 'a'.repeat(DESCRIPTION_LENGTH + 1)
+    const head = (lines: string[]) => `--- server\nexport const page = { prerender: true }\n---\nhead\n${lines.map(line => `  ${line}`).join('\n')}\nh1 Hi\n`
+    const root = await scratchProject({
+      'src/routes/index.kay': head(['title Home', 'meta(name="description" content="Fine")']),
+      'src/routes/bare.kay': head(['meta(name="description" content="Fine")']),
+      'src/routes/same.kay': head(['title Home', 'meta(name="description" content="Fine")']),
+      'src/routes/mute.kay': head(['title Mute']),
+      'src/routes/long.kay': head(['title Long', `meta(name="description" content="${long}")`]),
+      'src/routes/image.kay': head(['title Image', 'meta(name="description" content="Fine")', 'meta(property="og:image" content="https://example.com/a.png")']),
+      'src/routes/hidden.kay': head(['title Hidden', 'meta(name="description" content="Fine")', 'meta(name="robots" content="noindex")']),
+      'src/routes/dynamic.kay': head(['title {name}', 'meta(name="description" content={name})']).replace('---\nhead', 'const name = "x"\n---\nhead'),
+      'src/routes/later.kay': '--- server\nexport const page = {}\n---\nh1 Not prerendered\n',
+    })
+
+    try {
+      const found = (await check(root, { site: 'https://example.com', favicon: false })).filter(d => d.code !== undefined && d.code !== 'missing-description')
+
+      expect(found.map(d => [basename(d.file), d.code])).toEqual([
+        ['bare.kay', 'untitled-page'],
+        ['hidden.kay', 'noindex-in-sitemap'],
+        ['image.kay', 'unsized-share-image'],
+        ['long.kay', 'long-description'],
+        ['mute.kay', 'undescribed-page'],
+        ['same.kay', 'duplicate-title'],
+      ])
+      expect(await check(root, { site: 'https://example.com', favicon: false, seo: { image: '/og.png' }, lints: { seo: 'allow' } })).toEqual([])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('warns of an island\'s for over objects with no id and no key, and of no other list', async () => {
     const list = '---\nconst posts = signal([{ slug: \'a\', title: \'A\' }])\nconst todos = signal([{ id: 1, title: \'T\' }])\nconst tags = signal([\'x\'])\n---\nul\n  for post of posts()\n    li {post.title}\n  // kay-allow identity-key\n  for post of posts()\n    li {post.slug}\n  for todo of todos()\n    li {todo.title}\n  for tag of tags()\n    li {tag}\n  for post of posts() key={post.slug}\n    li {post.title}\nbutton(onClick={() => { posts.set([]); todos.set([]); tags.set([]) }}) Clear\n'
     const root = await scratchProject({
@@ -1965,7 +1998,7 @@ describe.concurrent('kay check, unused code', () => {
         ['kay.config.ts', 'missing-share-image', 'warning'],
         ['kay.config.ts', 'default-favicon', 'warning'],
       ])
-      expect(await seoLints({ seo: { name: 'Example', description: 'What it is', image: '/og.png' }, favicon: false, launch: true, exported: true })).toEqual([['kay.config.ts', 'missing-site', 'warning']])
+      expect(await seoLints({ seo: { name: 'Example', description: 'What it is', image: '/og.png' }, favicon: false, launch: true, exported: true })).toEqual([['kay.config.ts', 'missing-site', 'warning'], ['index.kay', 'unsized-share-image', 'warning']])
       expect(await seoLints({ site: 'https://example.com', seo: { description: 'What it is', image: '/og.png' }, favicon: false })).toEqual([])
       // A group's level reaches its lints, a lint's own wins, and a site that is not public gets the ones `lints` sets.
       expect(await seoLints({ site: 'https://example.com', favicon: false, lints: { 'seo': 'deny', 'missing-share-image': 'allow' }, launch: true })).toEqual([['kay.config.ts', 'missing-description', 'error']])

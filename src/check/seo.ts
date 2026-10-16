@@ -9,7 +9,8 @@ import { localizedTexts } from '../runtime/localized'
 export const DESCRIPTION_LENGTH = 160
 const ENTITY = /&(?:amp|lt|gt|quot|#39|#x27);/g
 const ENTITIES: Record<string, string> = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': '\'', '&#x27;': '\'' }
-const NOINDEX = /(?:^|,)\s*noindex\s*(?:,|$)/i
+
+export const NOINDEX = /(?:^|,)\s*noindex\s*(?:,|$)/i
 
 export interface SiteSeo {
   site?: string | undefined
@@ -127,7 +128,7 @@ export function unkeptPageLints(config: Pick<SiteSeo, 'lints'>, stops: (Stop & {
 }
 
 // Pushes a lint at the level the config gives it, the `seo` lints allowed on a site that is not public.
-function lintReporter(config: SiteSeo, exported: boolean, found: CheckDiagnostic[]): (name: LintName, problem: Omit<CheckDiagnostic, 'code' | 'severity'>) => void {
+export function lintReporter(config: SiteSeo, exported: boolean, found: CheckDiagnostic[]): (name: LintName, problem: Omit<CheckDiagnostic, 'code' | 'severity'>) => void {
   const fallback = isPublicSite(config, exported) ? undefined : 'allow'
 
   return (name, problem) => {
@@ -168,6 +169,6 @@ function readHead(html: string): Head {
   return head
 }
 
-function decode(text: string): string {
+export function decode(text: string): string {
   return text.replace(ENTITY, entity => ENTITIES[entity]!)
 }
