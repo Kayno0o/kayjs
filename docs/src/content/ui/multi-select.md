@@ -15,3 +15,9 @@ Past eight options, or with `search`, the panel opens on a search box filtering 
 ## Keyboard
 
 The trigger opens the panel on its search box, or its first checkbox. ArrowDown reaches the options, where the arrows, Home and End move between them and Space ticks one. Tab walks the search box and the All and None buttons, and closes the panel once it moves past them; Escape closes it with focus back on the trigger.
+
+## Props and labels
+
+`disabled` stops the trigger opening. `placement` is where the panel opens, `bottom-start` by default, and `id` is the panel's id, unique on the page. kay draws one when you give none.
+
+`searchLabel` is the search box's placeholder, and with `label` after it, its name for screen readers. `allLabel` and `noneLabel` word the buttons picking every option shown and none of them. `emptyLabel` is what a search matching none says. They read `Search`, `All`, `None` and `No match` by default.

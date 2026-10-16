@@ -11,3 +11,7 @@ description: A value drawn as a QR code, an SVG image rendered where the page re
 `options` takes the drawing options of `qrCodeSvg` from `@kaynooo/utils`, such as `ecc`, `moduleShape`, `foreground` and `eyeColor`. Colors are written out, since the image cannot read the page's CSS.
 
 <Demo name="qr-code/styled" />
+
+## Inline
+
+Set `inline` to draw the SVG in the page rather than as an image. `foreground`, `eyeColor` and `background` may then be CSS colors, such as `currentColor` or `var(--color-accent)`.

@@ -4,7 +4,7 @@ description: Frames a form control with its label, hint and error message.
 
 <Demo name="form-field/basic" />
 
-The control goes inside as the child. `label` names it, `hint` explains it below, and `required` marks the label with a `*`. Pass `name` to match the field's name in an action, and `group` for a control made of several inputs, which becomes a labelled `fieldset`.
+The control goes inside as the child. `label` names it, `hint` explains it below, and `required` marks the label with a `*`. Pass `name` to match the field's name in an action. Pass `group` for a control made of several inputs, which becomes a labelled `fieldset`.
 
 ## In a filter bar
 
@@ -22,4 +22,10 @@ The control goes inside as the child. `label` names it, `hint` explains it below
 
 ## Screen readers
 
-The control is described by the hint and, while one shows, by its messages, beside the ids its own `aria-describedby` holds: on a static page the server writes the link, and inside an island, as in a FormDialog, the browser keeps it as messages come and go, marking the control `aria-invalid` while one shows. A FormDialog refusing a field focuses the first one marked so, which reads its message with it. Inside an island, a `group` with a message marks every input, select and textarea inside it the same way, so kay's `focusInvalid` shows the tab holding the group and focuses its first field. On a static page, kay marks the fields of a refused plain form post `aria-invalid` itself.
+The control is described by the hint and, while one shows, by its messages. They sit beside the ids its own `aria-describedby` holds.
+
+On a static page the server writes the link. Inside an island, as in a FormDialog, the browser keeps it as messages come and go, and marks the control `aria-invalid` while one shows. A FormDialog refusing a field focuses the first one marked so, which reads its message with it.
+
+Inside an island, a `group` with a message marks every input, select and textarea inside it the same way. So kay's `focusInvalid` shows the tab holding the group and focuses its first field.
+
+On a static page, kay marks the fields of a refused plain form post `aria-invalid` itself.

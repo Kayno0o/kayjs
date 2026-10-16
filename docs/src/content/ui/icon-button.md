@@ -23,3 +23,7 @@ description: A button showing only an icon, named by a label that doubles as its
 `icon` also takes an imported icon from any set kay imports, `~icons/<prefix>/<name>`.
 
 <Demo name="icon-button/custom" />
+
+## Type
+
+`type` is `button` by default, so an IconButton in a form does not submit it. Set `type="submit"` or `"reset"` for the form's own buttons.

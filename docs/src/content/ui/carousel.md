@@ -17,3 +17,11 @@ description: One image at a time sliding in, with arrows and dots, for a marketi
 Set `label` to name the carousel for screen readers.
 
 </Callout>
+
+## Controlled slide
+
+`index` is the slide shown first, 0 by default. A carousel whose parent passes another follows it, and `onIndexChange` hears each turn.
+
+## Labels
+
+`previousLabel` and `nextLabel` name the arrows, `Previous slide` and `Next slide` by default. `slideLabel` names a slide, `Slide {n} of {count}`, and `dotLabel` a dot, `Go to slide {n}`. `{n}` stands for the slide's number and `{count}` for how many there are.

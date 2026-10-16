@@ -9,3 +9,7 @@ description: A row of chips to pick several options from, drawn over real checkb
 ## Async change
 
 Return a promise from `onChange` to hold the group busy until it settles. If the promise rejects or resolves to `false`, the previous pick is put back, so a refused change never shows as made.
+
+## Label
+
+`label` is required. It names the group for screen readers.

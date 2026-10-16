@@ -21,3 +21,7 @@ An error page or a 404 is often an empty state alone. `level={1}` makes the titl
 ```kay
 EmptyState(title="Page not found" description="The link may be out of date." level={1})
 ```
+
+## Actions
+
+`actions` is drawn below the description. Put a button or a link there that leads out of the empty list, such as the one that adds the first item.

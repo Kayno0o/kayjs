@@ -19,3 +19,7 @@ A point has a `key`, a `label`, `x` and `y`, and a `weight` its dot's area follo
 `onSelect(point)` makes each dot a button handing back its point, from an island.
 
 <Demo name="scatter-chart/select" />
+
+## Empty
+
+`empty` is what the chart reads with no points, `No data yet.` by default.

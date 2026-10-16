@@ -13,3 +13,7 @@ The `@trigger(attributes)` block renders the button, which spreads the `attribut
 `open` shows or hides the panel from the page, and `onToggle(open)` runs however it changed. A page driving `open` sets its own value back there.
 
 <Demo name="popover/controlled" />
+
+## Id
+
+`id` is the panel's id, unique on the page. kay draws one when you give none.

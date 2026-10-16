@@ -31,3 +31,11 @@ If `onConfirm` throws, the dialog stays open and `failure` is toasted.
 `ask="inline"` asks in place instead of in a dialog, for a row of a list: a click arms the trigger into a danger button that deletes and one that cancels, and moves the focus onto the first. `message` names the pair for screen readers and shows as the danger button's tooltip. Escape or the cancel button puts the trigger back, focused.
 
 <Demo name="confirm-delete/inline" />
+
+## Refusals of the handler
+
+A handler refusing with `ctx.fail(400, { error: 'Still in use' })` is a failure of `onConfirm`. Give `refused` a function from that data to a message, and it is toasted in place of `failure`. `failure` stays for an answer of `undefined` and for any other error.
+
+## Look and cancel label
+
+`size` is `xs`, `sm`, `md` or `lg` for the icon trigger, and sizes the cancel button too when asking inline. `variant` is `danger`, `inline`, `solid` or `ghost`. `cancelLabel` words the cancel button, `Cancel` by default.

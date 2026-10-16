@@ -11,3 +11,7 @@ description: A button that copies a text to the clipboard and confirms it.
 `html` is copied alongside `text`, which is what rich editors paste.
 
 <Demo name="copy-button/html" />
+
+## Variant
+
+`variant` is `default`, `accent` or `danger`, `default` by default.

@@ -17,3 +17,15 @@ description: Links to the pages of a list through the URL's query, rendered on t
 `param` renames the query parameter, `page` by default, and `siblings` is how many pages show on each side of the current one.
 
 <Demo name="pagination/options" />
+
+## A list of unknown length
+
+Give `page` and `more` instead of `pages`, with `url`. Only Previous and Next are drawn, and Next shows while `more` is true. Use it when counting the rows costs too much.
+
+## By offset
+
+Give `offset`, `limit`, `more` and `url` to page by row. Each link sets `?offset=40`, a page holding `limit` rows, and `param` renames the parameter from `offset`.
+
+## Labels
+
+`label` names the navigation for screen readers, `Pagination` by default. `previousLabel` and `nextLabel` word the two links, `Previous` and `Next` by default.

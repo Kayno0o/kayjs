@@ -17,3 +17,7 @@ This page already renders the `Toaster`. `toast` only shows in the browser: the 
 Call `toast` once what the user started has finished, with the outcome as its type. Here the button fails every other time.
 
 <Demo name="toaster/action" />
+
+## Dismiss label
+
+`dismissLabel` names each toast's close button for screen readers, `Dismiss notification` by default.

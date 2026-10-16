@@ -21,3 +21,7 @@ description: Tiles of any height placed in the shortest of several lanes.
 Tiles are placed absolutely inside the Masonry's box, so put padding on a wrapper, never on the Masonry itself.
 
 </Callout>
+
+## Props
+
+`items` is the list to place, and `key` is required: it returns a string or a number for each item. `style` is added to the Masonry's own box.

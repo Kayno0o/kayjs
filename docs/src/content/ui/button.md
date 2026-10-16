@@ -29,3 +29,9 @@ Pass `busy` yourself to decide instead: it has the last word, and it only shows 
 Given an `href`, the button renders an `a` that looks like one, for an action that goes to another page.
 
 <Demo name="button/link" />
+
+## Type and disclosure
+
+`type` is `button` by default, so a button in a form does not submit it. Set `type="submit"` or `"reset"` for the form's own buttons.
+
+`expanded` says whether the disclosure the button opens is showing, for a popover or a panel it toggles.

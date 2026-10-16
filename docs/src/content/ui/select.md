@@ -17,3 +17,7 @@ Select(value={kind()} options={KINDS} onChange={kind.set} emptyOption="Any kind"
 When the options come from a request, set `loading` to show a disabled row in their place, and `loadingLabel` to word it. The chosen `value` stays selected once the options arrive.
 
 <Demo name="select/loading" />
+
+## Submitting on pick
+
+Set `submit` on a Select inside a form to submit that form once an option is picked, after `onChange`. A GET filter form then needs no ref to itself.

@@ -11,3 +11,9 @@ The `@list` and `@detail` blocks fill the two panes. Below the `md` breakpoint o
 `resizableList` adds a handle on the list's right edge, dragged or moved with the arrow keys. `listWidthKey` keeps the width in `localStorage` from one visit to the next.
 
 <Demo name="split-layout/resizable" />
+
+## Narrow screens
+
+Below `md`, `sidebarOpen` says whether the sidebar covers the layout. Its back button calls `onSidebarClose`, for the parent to set it back to false. `sidebarTitle` heads it.
+
+`resizeLabel` names the list's handle and `backLabel` the back button, `Resize list` and `Back` by default. `style` is added to the layout's own box.

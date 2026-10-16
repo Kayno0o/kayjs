@@ -4,7 +4,13 @@ description: Nested nodes, such as folders, with branches that open and close an
 
 <Demo name="tree-view/basic" />
 
-`nodes` holds the tree: each node has an `id`, a `label`, an optional `icon`, and `children` when it is a branch, even an empty one. Ids are strings, or numbers in a `TreeNode<number>[]`. `selected` marks a node, drawn with the branches holding it open from the server's HTML on, and a tree whose parent passes another follows it, opening those branches. `expanded` lists the branches open to start with. `onSelect` runs on a click on a row, or Enter or Space on the focused one; the chevron opens or closes its branch alone.
+`nodes` holds the tree. Each node has an `id`, a `label`, an optional `icon`, and `children` when it is a branch, even an empty one. Ids are strings, or numbers in a `TreeNode<number>[]`.
+
+## Selection
+
+`selected` marks a node. The branches holding it are drawn open from the server's HTML on. A tree whose parent passes another follows it, opening those branches.
+
+`expanded` lists the branches open to start with. `onSelect` runs on a click on a row, or Enter or Space on the focused one. The chevron opens or closes its branch alone.
 
 ## Keyboard
 

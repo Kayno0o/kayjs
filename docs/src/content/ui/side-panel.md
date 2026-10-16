@@ -13,3 +13,7 @@ description: A modal panel along the edge of the screen, with a head, a body and
 `@actions` adds controls to the head line, before the close button, such as previous and next.
 
 <Demo name="side-panel/actions" />
+
+## Title and close label
+
+`title` is required and heads the panel. `closeLabel` names the close button for screen readers, `Close` by default.

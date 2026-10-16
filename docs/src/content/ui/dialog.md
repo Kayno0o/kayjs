@@ -6,7 +6,9 @@ description: A modal dialog driven by an open flag, with a title and a footer.
 
 ## Open and close
 
-`open` shows the dialog as a modal. The parent owns it: set it to true to open, and back to false in `onClose`, which runs however the dialog closed, Escape and a click outside included. The `@footer` block holds the buttons. The content renders only while the dialog is open.
+`open` shows the dialog as a modal. The parent owns it: set it to true to open, and back to false in `onClose`. `onClose` runs however the dialog closed, Escape and a click outside included.
+
+The `@footer` block holds the buttons. The content renders only while the dialog is open.
 
 ## Typed work is kept
 
@@ -18,10 +20,10 @@ Typing inside marks the dialog as edited, so a click outside or Escape no longer
 
 Set `dirty` for other work the dialog must not drop, such as a request in flight.
 
+<Demo name="dialog/dirty" />
+
 ## Heading level
 
-The title is an `h2`, as the dialog opens over the page's own `h1`; `level` sets another.
-
-<Demo name="dialog/dirty" />
+The title is an `h2`, as the dialog opens over the page's own `h1`. `level` sets another.
 
 <ReadMore href="/ui/form-dialog">FormDialog wraps a Dialog around a form that calls a page's action.</ReadMore>

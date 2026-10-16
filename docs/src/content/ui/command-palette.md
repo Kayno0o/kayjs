@@ -16,7 +16,11 @@ description: A searchable list of actions and links, opened from the keyboard.
 
 ## Searching the pages
 
-With `search: true` in `kay.config.ts`, `siteSearch` searches the text of your pages too: a query lists the sections it finds after the entries it matches, under `siteSearchLabel` (`In the pages`), each with the line it was found in. `siteSearch={{ limit: 40 }}` lists more of them than the 20 it lists by default, and a section an entry already links to is left out. If the index fails to load, as under `kay dev`, which writes none, the palette says so with `siteSearchError`. This site's search, behind Ctrl K, is one.
+With `search: true` in `kay.config.ts`, `siteSearch` searches the text of your pages too. A query lists the sections it finds after the entries it matches, under `siteSearchLabel` (`In the pages`), each with the line it was found in.
+
+`siteSearch={{ limit: 40 }}` lists more of them than the 20 it lists by default. A section an entry already links to is left out.
+
+If the index fails to load, as under `kay dev`, which writes none, the palette says so with `siteSearchError`. This site's search, behind Ctrl K, is one.
 
 ## Opening it
 
@@ -29,3 +33,7 @@ Cmd on macOS and Ctrl elsewhere with `hotkey` (`k` by default) opens and closes 
 `recent` lists the links followed lately on top while the query is empty, and `onRecentChange` hands the new list over. Keep it wherever your app keeps its state. Open a link below, then open the palette again.
 
 <Demo name="command-palette/recent" />
+
+## Texts
+
+`placeholder` fills the search box, `Search` by default, and `emptyLabel` is what the list says when nothing matches, `No results`.

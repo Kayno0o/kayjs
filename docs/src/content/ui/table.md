@@ -21,3 +21,17 @@ With a `@cell(row, column)` block, every column is drawn by it, except one marke
 The `@bulk(keys, clear)` block draws the page's bulk actions beside the count while something is picked, and `clear()` empties the selection. `selectAllLabel`, `selectedLabel(count)` and `selectRowLabel(row)` replace the texts, for another language.
 
 <Demo name="table/selection" />
+
+## Row key
+
+`rowKey` is required. It returns a string or a number that names a row across updates, and a selection is kept by it.
+
+## Filtering
+
+A `filter` adds a search box. `filterLabel` names it, `Filter` by default, and `filterPlaceholder` fills it. `filterParam` keeps the typed text in the page's URL under that query parameter, so a reload or a shared link filters the same. Without it the text stays on the page.
+
+`countLabel(count)` words how many rows the filter keeps, as screen readers hear it. `noMatch` is shown in place of the rows when the filter hides every one, and `empty` otherwise.
+
+## Narrow screens
+
+Below 30rem of width, `narrow` is `stack` by default: rows stack as cards labelled by their headers. Set `narrow="scroll"` to scroll the table sideways instead.

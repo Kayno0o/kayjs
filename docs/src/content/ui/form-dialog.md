@@ -108,3 +108,7 @@ FormDialog(
 ```
 
 `row()` and `draft()` read undefined while the other is open, and both while it is closed. Leave the draft's type out, `editing<Friend>()`, and `create()` takes nothing.
+
+## Labels
+
+`savingLabel` is what the submit button says while the action runs, `Saving…` by default. `cancelLabel` words the cancel button, `Cancel` by default.

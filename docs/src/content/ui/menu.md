@@ -13,3 +13,7 @@ description: An icon button opening a menu of actions.
 A menu fits at the end of a row. `disabled` greys an entry out, and the arrows, Home and End move between the enabled ones, an accent bar marking the one the keyboard is on.
 
 <Demo name="menu/rows" />
+
+## Trigger and placement
+
+`size` is `xs` to `lg`, `md` by default, and `variant` is `danger`, `inline`, `solid` or `ghost`, `ghost` by default. `placement` is where the menu opens from the trigger, `bottom-end` by default. `id` is the menu's id, unique on the page, and kay draws one when you give none.

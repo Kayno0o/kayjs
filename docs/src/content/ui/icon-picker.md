@@ -21,3 +21,7 @@ description: A search box over a grid of icons, for picking one by name.
 The picker takes a function, so it renders inside an island.
 
 </Callout>
+
+## Labels
+
+`searchLabel` names the search box and `placeholder` fills it, `Search icons` and `Search icons…` by default. `gridLabel` names the grid, `Icons`. `searchingLabel`, `emptyLabel`, `clearLabel` and `moreLabel` word the searching state, the empty result, the clear button and the Show more button. Set them to translate the picker.

@@ -12,7 +12,7 @@ description: Stars filled to a value, part of a star included.
 
 ## Another scale
 
-`max` is 5 by default. `label` replaces the text screen readers read, `4 out of 5` by default, which is worth setting when the scale is not 5.
+`max` is 5 by default. `label` replaces the text screen readers read. It is `{value} out of {max}` by default, such as `4 out of 5`. Set it when the scale needs other words.
 
 <Demo name="rating/scale" />
 

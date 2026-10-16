@@ -31,3 +31,7 @@ A dropped file is a `File`, so `URL.createObjectURL` turns it into an image sour
 `paste` also takes files pasted anywhere on the page, unless the paste lands in a text field.
 
 <Demo name="file-drop/paste" />
+
+## Disabled
+
+`disabled` stops the zone taking files, dropped, picked or pasted. It is false by default.
