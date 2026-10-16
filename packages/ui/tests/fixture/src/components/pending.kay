@@ -1,0 +1,43 @@
+---
+import { signal } from 'kay'
+import Checkbox from '@kaynooo/kayjs-ui/checkbox.kay'
+import ChipGroup from '@kaynooo/kayjs-ui/chip-group.kay'
+import Segmented from '@kaynooo/kayjs-ui/segmented.kay'
+import Toggle from '@kaynooo/kayjs-ui/toggle.kay'
+
+// `onChange` stands for the action behind each control, told which one changed and answering once the test settles it.
+// With `mirror`, the page keeps each value as its own state, set before the change is saved.
+const { onChange, mirror = false } = props<{ onChange: (control: string, value: unknown) => unknown, mirror?: boolean }>()
+
+const agreed = signal(false)
+const decks = signal<string[]>(['films'])
+const published = signal(false)
+const sharing = signal<'private' | 'link' | 'public'>('private')
+// The parent's indeterminate state for a box over a partly ticked set, and a group it holds no option for, as while what shows matches none.
+const mixed = signal(true)
+const zoom = signal<'day' | 'week' | null>(null)
+
+const options = [{ value: 'films', label: 'Films' }, { value: 'games', label: 'Games', icon: 'star' }, { value: 'books', label: 'Books' }, { value: 'music', label: 'Music', disabled: true }] as const
+const ranges = [{ value: 'day', label: 'Day' }, { value: 'week', label: 'Week' }] as const
+const shares = [{ value: 'private', label: 'Private' }, { value: 'link', label: 'Link' }, { value: 'public', label: 'Public' }] as const
+
+// The change a control reports, kept as the page's value first when it mirrors.
+function told<Value>(control: string, keep: (value: Value) => void) {
+  return (value: Value) => {
+    if (mirror)
+      keep(value)
+
+    return onChange(control, value)
+  }
+}
+---
+form#form
+  Checkbox(name="agree" label="I agree" hint="v2" checked={agreed()} onChange={told('checkbox', agreed.set)})
+  ChipGroup#decks(label="Decks" name="decks" options={options} value={decks()} onChange={told('chips', decks.set)})
+  Toggle(name="published" label="Published" checked={published()} onChange={told('toggle', published.set)})
+  Segmented#sharing(label="Sharing" name="sharing" options={shares} value={sharing()} onChange={told('segmented', sharing.set)})
+  Checkbox#all(label="Select all" indeterminate={mixed()} onChange={() => mixed.set(false)})
+  button#mix(type="button" onClick={() => mixed.set(true)}) Mix
+  Checkbox#kept(label="Some" indeterminate)
+Segmented#zoom(label="Zoom" name="zoom" options={ranges} value={zoom()} onChange={zoom.set})
+button#unzoom(type="button" onClick={() => zoom.set(null)}) Unzoom

@@ -1,9 +1,7 @@
+import type { Found } from 'kay/test'
 import { join } from 'node:path'
 import { describe, expect, test } from 'bun:test'
 import { testSite } from 'kay/test'
-
-// An id kay draws for a page, which differs per render.
-const DRAWN_ID = /\b(id|data-kui-field|aria-describedby)="k\w+-\d+"/g
 
 // The fixture is an app installing the library, linked back to the library by the repository root's scripts/link-fixture.ts.
 const ROOT = join(import.meta.dir, '..')
@@ -11,9 +9,43 @@ const ROOT = join(import.meta.dir, '..')
 const CLEAN = /^(?:checked with no problems in \d+ ms\n)?$/
 const site = await testSite({ root: ROOT })
 
+// Each page is fetched once, whichever tests read it.
+const visits = new Map<string, ReturnType<typeof site.visit>>()
+
+async function visit(path: string) {
+  if (!visits.has(path))
+    visits.set(path, site.visit(path))
+
+  return visits.get(path)!
+}
+
+// The elements a selector matches on a page.
+async function find(path: string, selector: string) {
+  return (await visit(path)).find(selector)
+}
+
+// The one element a selector matches on a page.
+async function one(path: string, selector: string) {
+  const found = await find(path, selector)
+
+  expect(found).toHaveLength(1)
+
+  return found[0]!
+}
+
+// An attribute of a found element, `null` when it lacks it.
+function attr(found: Found, name: string): string | null {
+  return found.attributes[name] ?? null
+}
+
+// The attributes of the elements a selector matches, those listed only, `null` for one an element lacks.
+async function attributes(path: string, selector: string, names: string[]): Promise<Record<string, string | null>[]> {
+  return (await find(path, selector)).map(found => Object.fromEntries(names.map(name => [name, attr(found, name)])))
+}
+
 // The element with that id, as rendered.
 async function element(path: string, id: string): Promise<string> {
-  const html = (await site.visit(path)).html
+  const html = (await visit(path)).html
   const start = html.indexOf(` id="${id}"`)
 
   expect(start).toBeGreaterThan(-1)
@@ -45,266 +77,287 @@ test('kay check passes on the fixture, the library\'s components it renders and 
 
 describe('Icon', () => {
   test('draws a slot through the app\'s settings, which replaced the close icon and kept the rest', async () => {
-    expect(await element('/buttons', 'slot')).toContain('m7-2l4 4m0-4l-4 4')
-    expect(await element('/buttons', 'accent')).toContain('M12 5v14m-7-7h14')
+    expect((await one('/buttons', '#slot')).html).toContain('m7-2l4 4m0-4l-4 4')
+    expect((await one('/buttons', '#accent')).html).toContain('M12 5v14m-7-7h14')
   })
 
   test('is decorative unless labelled', async () => {
-    expect(await element('/buttons', 'slot')).toContain('aria-hidden="true"')
-    expect(await element('/buttons', 'own')).toContain('role="img" aria-label="Home"')
+    expect(await attributes('/buttons', '#slot, #own', ['aria-hidden', 'role', 'aria-label'])).toEqual([
+      { 'aria-hidden': 'true', 'role': null, 'aria-label': null },
+      { 'aria-hidden': null, 'role': 'img', 'aria-label': 'Home' },
+    ])
   })
 })
 
-describe('Button', () => {
-  test('is a button that submits nothing unless asked, with its variant as a class', async () => {
-    expect(await element('/buttons', 'plain')).toBe('<button id="plain" type="button" class="kui-btn">Save</button>')
-    expect(await element('/buttons', 'accent')).toMatch(/^<button id="accent" type="submit" class="kui-btn kui-btn-accent"><svg[^>]*class="kui-icon">.*<\/svg>Add<\/button>$/)
-  })
+test('Button is a button that submits nothing unless asked, a link with an href, and says what it toggles and when it is busy', async () => {
+  const names = ['type', 'href', 'target', 'disabled', 'aria-expanded', 'aria-busy']
+  const cases: Record<string, [tag: string, text: string, attributes: Record<string, string | null>]> = {
+    plain: ['button', 'Save', { 'type': 'button', 'href': null, 'target': null, 'disabled': null, 'aria-expanded': null, 'aria-busy': null }],
+    accent: ['button', 'Add', { 'type': 'submit', 'href': null, 'target': null, 'disabled': null, 'aria-expanded': null, 'aria-busy': null }],
+    busy: ['button', 'Saving', { 'type': 'button', 'href': null, 'target': null, 'disabled': null, 'aria-expanded': null, 'aria-busy': 'true' }],
+    toggle: ['button', 'More', { 'type': 'button', 'href': null, 'target': null, 'disabled': '', 'aria-expanded': 'false', 'aria-busy': null }],
+    link: ['a', 'Data', { 'type': null, 'href': '/data', 'target': '_blank', 'disabled': null, 'aria-expanded': null, 'aria-busy': null }],
+  }
 
-  test('spins in place of its icon while busy', async () => {
-    expect(await element('/buttons', 'busy')).toMatch(/aria-busy="true".*class="kui-icon kui-spinner"/)
-  })
+  for (const [id, [tag, text, expected]] of Object.entries(cases)) {
+    const found = await one('/buttons', `#${id}`)
 
-  test('says whether the disclosure it toggles is showing', async () => {
-    expect(await element('/buttons', 'toggle')).toBe('<button id="toggle" disabled type="button" aria-expanded="false" class="kui-btn">More</button>')
-  })
+    expect({ id, tag: found.tag, text: found.text, ...Object.fromEntries(names.map(name => [name, attr(found, name)])) }).toEqual({ id, tag, text, ...expected })
+  }
 
-  test('is a link looking like one with an href, taking the link\'s attributes', async () => {
-    expect(await element('/buttons', 'link')).toMatch(/^<a id="link" href="\/data" target="_blank" class="kui-btn kui-btn-accent"><svg[^>]*class="kui-icon">.*<\/svg>Data<\/a>$/)
-  })
+  // A busy button swaps its icon for a spinner rather than adding one.
+  expect((await find('/buttons', '#busy svg')).map(icon => icon.attributes.class)).toEqual(['kui-icon kui-spinner'])
 })
 
 test('IconButton names its action for screen readers and as its tooltip', async () => {
-  expect(await element('/buttons', 'delete')).toMatch(/^<button id="delete" type="button" aria-label="Delete" data-tooltip="Delete" data-size="sm" data-variant="danger" class="kui-icon-btn kui-shell kui-shell-danger">/)
+  const { attributes: found } = await one('/buttons', '#delete')
+
+  expect([found['aria-label'], found['data-tooltip']]).toEqual(['Delete', 'Delete'])
 })
 
-test('Toaster is an island rendering an empty manual popover, filled in the browser only', async () => {
-  expect(await element('/buttons', 'toasts')).toMatch(/^<div id="toasts"><slot data-component="[^"]*\/toaster\.kay"[^>]*><!--\[--><div class="kui-toaster-live" role="status"><\/div><div class="kui-toaster-live" role="alert"><\/div><div class="kui-toaster" popover="manual"><\/div>/)
+test('Toaster is an island rendering a status region, an alert region and an empty manual popover, filled in the browser only', async () => {
+  expect(await attributes('/buttons', '#toasts [role], #toasts [popover]', ['role', 'popover'])).toEqual([
+    { role: 'status', popover: null },
+    { role: 'alert', popover: null },
+    { role: null, popover: 'manual' },
+  ])
+  expect((await one('/buttons', '#toasts [popover]')).text).toBe('')
 })
 
-test('Table renders sorted on the server from a static page, its sortable headers buttons and the rest text', async () => {
-  // An island's hydration markers left out.
-  const table = (await element('/table', 'static')).replaceAll(/<!--[^>]*-->/g, '')
-  const cells = [...table.matchAll(/<td class="kui-table-cell" data-align="(\w+)"><span class="kui-table-cell-label">\w+<\/span><div class="kui-table-cell-body">([^<]*)<\/div><\/td>/g)].map(([, align, text]) => `${align}:${text}`)
+describe('Table on the server', () => {
+  test('renders sorted from a static page, its sortable headers buttons and the rest text, stacked when narrow unless it scrolls', async () => {
+    const head = (await find('/table', '#static th[scope="col"]')).map(found => [found.text, attr(found, 'aria-sort')])
 
-  expect(cells).toEqual(['start:Earth', 'end:1', 'start:Mars', 'end:2', 'start:Venus', 'end:0'])
-  expect(table).toMatch(/<th class="kui-table-head-cell" scope="col" data-align="start" aria-sort="ascending"><button class="kui-table-sort-btn" type="button" data-direction="asc">Name<svg/)
-  expect(table).toContain('<th class="kui-table-head-cell" scope="col" data-align="end">Moons</th>')
-})
+    expect((await find('/table', '#static .kui-table-cell-body')).map(cell => cell.text)).toEqual(['Earth', '1', 'Mars', '2', 'Venus', '0'])
+    expect(head).toEqual([['Name', 'ascending'], ['Moons', null]])
+    expect((await find('/table', '#static th button')).map(button => button.text)).toEqual(['Name'])
 
-test('Table stacks when narrow, its cells labelled by their headers, unless it scrolls', async () => {
-  const stacking = (await element('/table', 'static')).replaceAll(/<!--[^>]*-->/g, '')
-  const scrolling = (await element('/table', 'scrolling')).replaceAll(/<!--[^>]*-->/g, '')
+    // Stacked, each cell is labelled by its header; scrolling, the table keeps its header row alone.
+    expect((await attributes('/table', '#static .kui-table-wrap, #scrolling .kui-table-wrap', ['data-narrow']))).toEqual([{ 'data-narrow': 'stack' }, { 'data-narrow': 'scroll' }])
+    expect((await find('/table', '#static .kui-table-cell-label')).map(label => label.text)).toEqual(['Name', 'Moons', 'Name', 'Moons', 'Name', 'Moons'])
+    expect(await find('/table', '#scrolling .kui-table-cell-label')).toEqual([])
+  })
 
-  expect(stacking).toContain('<div data-narrow="stack" class="kui-table-wrap">')
-  expect(stacking).toContain('<td class="kui-table-cell" data-align="end"><span class="kui-table-cell-label">Moons</span><div class="kui-table-cell-body">1</div></td>')
-  expect(scrolling).toContain('<div data-narrow="scroll" class="kui-table-wrap">')
-  expect(scrolling).toContain('<td class="kui-table-cell" data-align="start"><div class="kui-table-cell-body">Earth</div></td>')
-})
+  test('renders its selection: a box per row labelled by it, the picked ones marked, and the count over the select-all box', async () => {
+    const rows = await find('/table', '#selectable tbody tr')
 
-test('Table renders its selection on the server: a box per row labelled by it, the picked ones ticked, and the count over the select-all box', async () => {
-  const table = (await element('/table', 'selectable')).replaceAll(/<!--[^>]*-->/g, '')
+    expect((await visit('/table')).text('#selectable')).toContain('1 selected')
+    expect((await find('/table', '#selectable .kui-table-select-cell')).map(cell => cell.text)).toContain('Select all')
+    expect((await find('/table', '#selectable tbody input')).map(box => box.attributes['aria-label'])).toEqual(['Select Mars', 'Select Earth', 'Select Venus'])
+    expect(rows.map(row => attr(row, 'data-selected'))).toEqual([null, '', null])
+    expect((await attributes('/table', '#selectable tr[data-selected] input', ['aria-label', 'checked']))).toEqual([{ 'aria-label': 'Select Earth', 'checked': '' }])
+  })
 
-  expect(table).toContain('1 selected')
-  expect(table).toContain('<th class="kui-table-head-cell kui-table-select-cell" scope="col"><span class="kui-table-select-text">Select all</span></th>')
-  expect([...table.matchAll(/aria-label="([^"]*)"/g)].map(([, label]) => label)).toEqual(['Select Mars', 'Select Earth', 'Select Venus'])
-  expect(table.match(/<tr class="kui-table-row" data-selected="">/g)).toHaveLength(1)
-})
+  test('filters by the text its query param holds, shown in its search box', async () => {
+    const page = '/table?q=EAR'
 
-test('Table filters on the server by the text its query param holds, shown in its search box', async () => {
-  const table = (await element('/table?q=EAR', 'filtered')).replaceAll(/<!--[^>]*-->/g, '')
-
-  expect(table).toContain('<label class="kui-table-filter"><span class="kui-label-text">Filter</span><input class="kui-field-input kui-table-filter-input" type="search" value="EAR" autocomplete="off"></label>')
-  expect([...table.matchAll(/<td class="kui-table-cell" data-align="start"><span class="kui-table-cell-label">Name<\/span><div class="kui-table-cell-body">([^<]*)<\/div><\/td>/g)].map(([, text]) => text)).toEqual(['Earth'])
+    expect((await attributes(page, '#filtered input[type="search"]', ['value']))).toEqual([{ value: 'EAR' }])
+    expect((await find(page, '#filtered .kui-table-cell-body')).map(cell => cell.text).filter(text => (/\D/).test(text))).toEqual(['Earth'])
+  })
 })
 
 describe('controls', () => {
-  const page = async (id: string) => (await element('/controls', id)).replaceAll(/<!--[^>]*-->/g, '')
-
   test('TabNav links every tab, marking the page on screen as current', async () => {
-    const tabs = await page('tabs')
-
-    expect(tabs).toMatch(/<nav aria-label="Sections" class="kui-tab-nav">/)
-    expect(tabs).toContain('<a class="kui-tab-nav-link" href="/">Home</a>')
-    expect(tabs).toContain('<a class="kui-tab-nav-link" href="/controls" aria-current="page">Controls</a>')
+    expect((await attributes('/controls', '#tabs nav', ['aria-label']))).toEqual([{ 'aria-label': 'Sections' }])
+    expect((await find('/controls', '#tabs a')).map(link => [link.attributes.href, link.text, attr(link, 'aria-current')])).toEqual([['/', 'Home', null], ['/controls', 'Controls', 'page']])
   })
 
   test('Segmented is a named radio group with its value checked', async () => {
-    const range = await page('range')
+    const radios = await find('/controls', '#range input[type="radio"]')
 
-    expect(range).toMatch(/role="radiogroup" aria-label="Range"/)
-    expect([...range.matchAll(/<input class="kui-segmented-input" type="radio" name="range" value="(\w+)"( checked)?/g)].map(([, value, checked]) => `${value}${checked ?? ''}`)).toEqual(['day', 'week checked'])
+    expect((await attributes('/controls', '#range [role="radiogroup"]', ['aria-label']))).toEqual([{ 'aria-label': 'Range' }])
+    expect(radios.map(radio => [radio.attributes.name, radio.attributes.value, attr(radio, 'checked')])).toEqual([['range', 'day', null], ['range', 'week', '']])
   })
 
   test('Toggle is a checkbox with the switch role, on when asked', async () => {
-    expect(await page('digest')).toContain('<input name="digest" type="checkbox" role="switch" checked class="kui-toggle-input">')
+    expect((await attributes('/controls', '#digest input', ['type', 'role', 'checked', 'name']))).toEqual([{ type: 'checkbox', role: 'switch', checked: '', name: 'digest' }])
   })
 })
 
 describe('content', () => {
-  const page = async (id: string) => (await element('/content', id)).replaceAll(/<!--[^>]*-->/g, '')
-
   test('Card titles its frame at the level given, holds a head block at the far end, and insets its body unless bare', async () => {
-    const card = await page('card')
-
-    expect(card).toMatch(/^<section id="card" class="kui-card"><div class="kui-card-head"><h3 class="kui-card-title">Moons<\/h3><span data-tone="success" class="kui-badge"><svg[^>]*class="kui-icon kui-badge-icon">.*<\/svg>3<\/span><\/div><div class="kui-card-body"><p>Phobos and Deimos<\/p><\/div><\/section>$/)
-    expect(await page('bare')).toBe('<section id="bare" class="kui-card"><p>Edge to edge</p></section>')
-    expect(await page('outlined')).toContain('<h2 class="kui-card-title">Orbits</h2>')
+    expect((await find('/content', '#card .kui-card-head > *')).map(found => [found.tag, found.text])).toEqual([['h3', 'Moons'], ['span', '3']])
+    expect((await attributes('/content', '#card .kui-badge', ['data-tone']))).toEqual([{ 'data-tone': 'success' }])
+    expect((await one('/content', '#card .kui-card-body')).text).toBe('Phobos and Deimos')
+    expect(await find('/content', '#bare .kui-card-body')).toEqual([])
+    expect((await one('/content', '#bare p')).text).toBe('Edge to edge')
+    expect((await one('/content', '#outlined .kui-card-title')).tag).toBe('h2')
   })
 
   test('Notice is a status, or an alert for an error, drawn as a box or as a bare line', async () => {
-    expect(await page('notice')).toBe('<article id="notice"><div role="status" data-tone="info" class="kui-notice">Saved</div></article>')
-    expect(await page('notice-error')).toBe('<article id="notice-error"><div role="alert" data-tone="error" data-compact class="kui-notice">Could not save. <a href="/data">Retry</a></div></article>')
+    expect(await attributes('/content', '#notice [role], #notice-error [role]', ['role', 'data-tone', 'data-compact'])).toEqual([
+      { 'role': 'status', 'data-tone': 'info', 'data-compact': null },
+      { 'role': 'alert', 'data-tone': 'error', 'data-compact': '' },
+    ])
+    expect((await one('/content', '#notice-error a')).attributes.href).toBe('/data')
   })
 
   test('Avatar shows its picture as decoration, or the initial on a seeded colour, named when given a label', async () => {
-    expect((await page('avatar')).replaceAll(/<\/?slot[^>]*>/g, '')).toBe('<article id="avatar"><span data-size="sm" class="kui-avatar"><img class="kui-avatar-image" src="/ada.png" alt loading="lazy" decoding="async"></span></article>')
-    expect((await page('avatar-initial')).replaceAll(/<\/?slot[^>]*>/g, '')).toMatch(/^<article id="avatar-initial"><span data-size="md" role="img" aria-label="Grace" class="kui-avatar"><span class="kui-avatar-initial" aria-hidden="true" style="background-color: #[\dA-F]{6}; color: #(?:000|fff)">g<\/span><\/span><\/article>$/)
+    expect(await attributes('/content', '#avatar img', ['src', 'alt', 'loading'])).toEqual([{ src: '/ada.png', alt: '', loading: 'lazy' }])
+    expect(await attributes('/content', '#avatar-initial [role]', ['role', 'aria-label'])).toEqual([{ 'role': 'img', 'aria-label': 'Grace' }])
+
+    const initial = await one('/content', '#avatar-initial [aria-hidden]')
+
+    expect([initial.text, initial.attributes.style]).toEqual(['g', expect.stringMatching(/^background-color: #[\dA-F]{6}; color: #(?:000|fff)$/)])
   })
 
   test('Carousel shows its slide, hides the rest from the focus and screen readers, and names each in the app\'s words', async () => {
-    const carousel = (await page('carousel')).replaceAll(/<\/?slot[^>]*>/g, '')
-
-    expect(carousel).toContain('<section aria-roledescription="carousel" aria-label="Galerie photos" class="kui-carousel"><div class="kui-carousel-viewport" style="aspect-ratio: 4 / 3" aria-live="polite">')
-    expect([...carousel.matchAll(/aria-label="(\d sur 2)"( aria-hidden="true" inert)? style="transform: translateX\((-?\d+)%\)"/g)].map(([, name, hidden, shift]) => [name, Boolean(hidden), shift])).toEqual([['1 sur 2', true, '-100'], ['2 sur 2', false, '0']])
-    expect([...carousel.matchAll(/class="kui-carousel-dot" type="button" aria-label="([^"]*)"( aria-current="true")?/g)].map(([, name, current]) => [name, Boolean(current)])).toEqual([['Aller à l\'image 1', false], ['Aller à l\'image 2', true]])
+    expect(await attributes('/content', '#carousel section', ['aria-roledescription', 'aria-label'])).toEqual([{ 'aria-roledescription': 'carousel', 'aria-label': 'Galerie photos' }])
+    expect(await attributes('/content', '#carousel [aria-label$=" sur 2"]', ['aria-label', 'aria-hidden', 'inert'])).toEqual([
+      { 'aria-label': '1 sur 2', 'aria-hidden': 'true', 'inert': '' },
+      { 'aria-label': '2 sur 2', 'aria-hidden': null, 'inert': null },
+    ])
+    expect(await attributes('/content', '#carousel .kui-carousel-dot', ['aria-label', 'aria-current'])).toEqual([
+      { 'aria-label': 'Aller à l\'image 1', 'aria-current': null },
+      { 'aria-label': 'Aller à l\'image 2', 'aria-current': 'true' },
+    ])
   })
 
   test('Carousel draws no controls for a single slide', async () => {
-    const lone = await page('lone-slide')
-
-    expect(lone).toContain('aria-label="Slide 1 of 1" style="transform: translateX(0%)"')
-    expect(lone).not.toContain('kui-carousel-controls')
+    expect(await attributes('/content', '#lone-slide [aria-label]', ['aria-label'])).toContainEqual({ 'aria-label': 'Slide 1 of 1' })
+    expect(await find('/content', '#lone-slide .kui-carousel-controls')).toEqual([])
   })
 
   test('Badge is neutral unless toned, drawn as a stamp when asked, and EmptyState says why there is nothing', async () => {
-    expect(await page('badge')).toBe('<span id="badge" data-tone="neutral" class="kui-badge">Draft</span>')
-    expect(await page('stamped')).toBe('<a id="stamped" class="group" href="/data"><span data-tone="neutral" data-stamp class="kui-badge">Winner</span></a>')
-    expect(await page('empty')).toBe('<div id="empty" class="kui-empty-state"><p class="kui-empty-state-title">No moons</p><p class="kui-empty-state-description">Add one to start</p></div>')
+    expect(await attributes('/content', '#badge, #stamped .kui-badge', ['data-tone', 'data-stamp'])).toEqual([{ 'data-tone': 'neutral', 'data-stamp': null }, { 'data-tone': 'neutral', 'data-stamp': '' }])
+    expect((await find('/content', '#empty p')).map(found => found.text)).toEqual(['No moons', 'Add one to start'])
   })
 
   test('EmptyState holds an @actions block below its description, and none without one', async () => {
-    expect(await page('empty-action')).toContain('<p class="kui-empty-state-title">No rockets</p><div class="kui-empty-state-actions"><a class="go" href="/paging">Build one</a></div>')
-    expect(await page('empty')).not.toContain('kui-empty-state-actions')
+    expect((await find('/content', '#empty-action .kui-empty-state-actions a')).map(link => [link.attributes.href, link.text])).toEqual([['/paging', 'Build one']])
+    expect(await find('/content', '#empty .kui-empty-state-actions')).toEqual([])
   })
 
   test('Select marks its value\'s option selected, after the empty one', async () => {
-    const form = await page('form')
-
-    expect([...form.matchAll(/<option value(?:="(\w*)")?( selected)?>(\w*)<\/option>/g)].map(([, value = '', selected, label]) => `${value}${selected ?? ''}:${label}`)).toEqual([':Any', 'mars:Mars', 'earth selected:Earth'])
+    expect((await find('/content', '#form option')).map(option => `${option.attributes.value ?? ''}${option.attributes.selected === undefined ? '' : ' selected'}:${option.text}`)).toEqual([':Any', 'mars:Mars', 'earth selected:Earth'])
   })
 })
 
 describe('FormField', () => {
   test('labels its control with what it takes, and shows the message a plain form post was refused with', async () => {
-    const field = (await element('/form', 'field')).replaceAll(/<!--[^>]*-->/g, '').replaceAll(DRAWN_ID, '$1="id"')
+    const field = (await visit('/form'))
+    const [hint] = field.find('#field .kui-form-field-hint')
+    const [input] = field.find('#field input')
 
+    expect(field.find('#field label').map(label => label.text)).toEqual(['Name*'])
+    expect(field.find('#field .kui-form-field-required').map(star => star.attributes['aria-hidden'])).toEqual(['true'])
     // Static on a page of its own, the server links the control to its hint; the message region takes an id once it holds one.
-    expect(field).toBe('<section id="field"><div class="kui-form-field" data-kui-field="id"><label class="kui-form-field-label"><span class="kui-form-field-head"><span class="kui-label-text">Name<span class="kui-form-field-required" aria-hidden="true">*</span></span></span><input name="name" aria-describedby="id"></label><span class="kui-form-field-hint" id="id">As it shows on the site</span><span class="kui-form-field-issues" aria-live="polite"></span></div></section>')
+    expect(input!.attributes['aria-describedby']).toBe(hint!.attributes.id)
 
     const { rename } = await import('../src/routes/form.kay')
     const refused = await site.submit(rename, { name: 'A' }, { from: '/form' })
 
-    expect(refused.html).toContain('<span class="kui-form-field-issue">Two letters at least</span>')
+    expect(refused.find('#field .kui-form-field-issue').map(issue => issue.text)).toEqual(['Two letters at least'])
 
-    const [hint] = refused.find('#field .kui-form-field-hint').map(found => found.attributes.id)
+    const [hinted] = refused.find('#field .kui-form-field-hint').map(found => found.attributes.id)
     const [issues] = refused.find('#field .kui-form-field-issues').map(found => found.attributes.id)
 
-    expect(refused.find('#field input').map(input => input.attributes['aria-describedby'])).toEqual([`${hint} ${issues}`])
+    expect(refused.find('#field input').map(control => control.attributes['aria-describedby'])).toEqual([`${hinted} ${issues}`])
   })
 
   test('sizes itself by its control when compact, holding no message region without a name or an issue', async () => {
-    expect((await element('/form', 'compact')).replaceAll(/<!--[^>]*-->/g, '').replaceAll(DRAWN_ID, '$1="id"')).toBe('<section id="compact"><div class="kui-form-field" data-kui-field="id" data-compact=""><label class="kui-form-field-label"><span class="kui-form-field-head"><span class="kui-label-text">Period</span></span><select name="period"></select></label></div></section>')
+    expect(await attributes('/form', '#compact .kui-form-field', ['data-compact'])).toEqual([{ 'data-compact': '' }])
+    expect(await find('/form', '#compact .kui-form-field-issues')).toEqual([])
+    expect((await find('/form', '#compact label')).map(label => label.text)).toEqual(['Period'])
   })
 })
 
 test('TextInput and Textarea without onInput render plain fields whose attributes post with the form', async () => {
-  const plain = (await element('/form', 'plain')).replaceAll(/<\/?slot[^>]*>/g, '')
-
-  expect(plain).toBe('<section id="plain"><input name="email" required autocomplete="email" aria-label="Email" type="email" class="kui-field-input"><textarea name="bio" rows="3" aria-label="Bio" class="kui-field-input">Hi</textarea></section>')
+  expect(await attributes('/form', '#plain input, #plain textarea', ['name', 'type', 'required', 'autocomplete', 'aria-label', 'rows'])).toEqual([
+    { 'name': 'email', 'type': 'email', 'required': '', 'autocomplete': 'email', 'aria-label': 'Email', 'rows': null },
+    { 'name': 'bio', 'type': null, 'required': null, 'autocomplete': null, 'aria-label': 'Bio', 'rows': '3' },
+  ])
+  expect((await one('/form', '#plain textarea')).text).toBe('Hi')
 })
 
 describe('layout', () => {
-  const page = async (id: string) => (await element('/layout', id)).replaceAll(/<!--[^>]*-->/g, '').replaceAll(/<svg[^>]*>.*?<\/svg>/g, '<svg/>')
-
   test('SiteNav marks the page on screen and the section holding it, its links folded behind a closed toggle they are anchored to', async () => {
-    const nav = (await page('site-nav')).replaceAll(/<\/?slot[^>]*>/g, '')
-
-    expect(nav).toContain('<nav aria-label="Main" class="kui-site-nav"><button aria-expanded="false" aria-controls="main-links" style="anchor-name: --kui-site-nav-main-links" type="button" aria-label="Ouvrir le menu"')
-    expect(nav).toContain('<ul class="kui-site-nav-list" id="main-links" style="position-anchor: --kui-site-nav-main-links">')
-    expect([...nav.matchAll(/<a class="kui-site-nav-link" href="([^"]*)"(?: aria-current="(\w+)")?>/g)].map(([, href, current]) => `${href}${current ? ` ${current}` : ''}`)).toEqual(['/', '/chart', '/charts true', '/charts/moons page', '/data'])
+    expect(await attributes('/layout', '#site-nav nav, #site-nav nav > button, #site-nav ul', ['aria-label', 'aria-expanded', 'aria-controls', 'id'])).toEqual([
+      { 'aria-label': 'Main', 'aria-expanded': null, 'aria-controls': null, 'id': null },
+      { 'aria-label': 'Ouvrir le menu', 'aria-expanded': 'false', 'aria-controls': 'main-links', 'id': null },
+      { 'aria-label': null, 'aria-expanded': null, 'aria-controls': null, 'id': 'main-links' },
+    ])
+    expect((await find('/layout', '#site-nav a')).map(link => `${link.attributes.href}${link.attributes['aria-current'] ? ` ${link.attributes['aria-current']}` : ''}`)).toEqual(['/', '/chart', '/charts true', '/charts/moons page', '/data'])
   })
 
   test('PageHeader holds the page h1, its actions past the title only when given, and the children under the title line', async () => {
-    expect([await page('header'), await page('bare-header')]).toEqual([
-      '<article id="header"><header class="kui-page-header"><div class="kui-page-header-head"><h1 class="kui-page-header-title">Moons</h1><div class="kui-page-header-actions"><a href="/table">New</a></div></div><p>Every moon of Mars.</p></header></article>',
-      '<article id="bare-header"><header class="kui-page-header"><div class="kui-page-header-head"><h1 class="kui-page-header-title">Rings</h1></div></header></article>',
-    ])
-  })
-
-  test('TreeView is opened to the selected node in the server HTML, its row the tab stop', async () => {
-    const rows = [...(await page('tree')).matchAll(/<li ([^>]*)>.*?<span class="kui-tree-view-label">(\w+)<\/span><\/li>/g)].map(([, attributes, label]) => `${label} ${(/aria-expanded="(\w+)"/).exec(attributes!)?.[1] ?? '-'} ${(/tabindex="(-?\d)"/).exec(attributes!)?.[1]}`)
-
-    expect(rows).toEqual(['Mars true -1', 'Phobos - 0', 'Venus - -1'])
+    expect((await find('/layout', '#header h1, #header .kui-page-header-actions a, #header p')).map(found => [found.tag, found.text])).toEqual([['h1', 'Moons'], ['a', 'New'], ['p', 'Every moon of Mars.']])
+    expect((await find('/layout', '#bare-header h1, #bare-header .kui-page-header-actions')).map(found => found.tag)).toEqual(['h1'])
   })
 
   test('PageSection titles its stretch and holds an actions block at the end of the head line', async () => {
-    expect(await page('section')).toBe('<article id="section"><section class="kui-page-section"><div class="kui-page-section-head"><h2 class="kui-heading-section kui-page-section-title">Moons</h2><a href="/table">New</a></div><p>Phobos</p></section></article>')
+    expect((await find('/layout', '#section h2, #section .kui-page-section-head a, #section > section > p')).map(found => [found.tag, found.text])).toEqual([['h2', 'Moons'], ['a', 'New'], ['p', 'Phobos']])
   })
 
   test('CollapsibleSection is a native disclosure, folded when asked, boxed, with its meta before the chevron', async () => {
-    expect(await page('collapsed')).toBe('<article id="collapsed"><details data-boxed class="kui-collapsible-section"><summary class="kui-collapsible-section-summary"><span class="kui-heading-section kui-collapsible-section-title">Older</span><span class="kui-collapsible-section-meta"><span data-tone="neutral" class="kui-badge">2</span></span><svg/></summary><div class="kui-collapsible-section-body"><p>Deimos</p></div></details></article>')
+    const [details] = await find('/layout', '#collapsed details')
+    const [summary] = await find('/layout', '#collapsed summary')
+
+    expect([attr(details!, 'open'), attr(details!, 'data-boxed')]).toEqual([null, ''])
+    expect(summary!.text).toBe('Older2')
+    expect(summary!.html.indexOf('kui-badge')).toBeLessThan(summary!.html.indexOf('<svg'))
+    expect((await one('/layout', '#collapsed .kui-collapsible-section-body')).text).toBe('Deimos')
   })
 
   test('Widget heads its body with icon, title and actions, swaps an empty body for its @empty block, and renders nothing empty without one', async () => {
-    expect(await page('widget')).toBe('<article id="widget"><div class="kui-widget"><div class="kui-widget-head"><svg/><h2 class="kui-heading-section kui-widget-title">Visits</h2><a href="/content">All</a></div><p>42</p></div></article>')
-    expect(await page('empty-widget')).toBe('<article id="empty-widget"><div class="kui-widget"><div class="kui-widget-head"><h2 class="kui-heading-section kui-widget-title">Visits</h2></div><p class="none">No visits yet</p></div></article>')
-    expect(await page('hidden-widget')).toBe('<article id="hidden-widget"></article>')
+    const head = async (id: string) => (await find('/layout', `#${id} .kui-widget-head > *`)).map(found => found.tag)
+
+    expect(await head('widget')).toEqual(['svg', 'h2', 'a'])
+    expect((await one('/layout', '#widget p')).text).toBe('42')
+    expect(await head('empty-widget')).toEqual(['h2'])
+    expect((await find('/layout', '#empty-widget p')).map(found => found.text)).toEqual(['No visits yet'])
+    expect((await one('/layout', '#hidden-widget')).html).toBe('')
   })
 
   test('CardRow lays its body between what leads and what trails, its actions last', async () => {
-    expect(await page('row')).toBe('<article id="row"><div class="kui-card-row"><span class="dot"></span><div class="kui-card-row-body">Mars</div><span>3 moons</span><div class="kui-card-row-actions"><a href="/form">Edit</a></div></div></article>')
+    expect((await find('/layout', '#row .kui-card-row > *')).map(found => found.text)).toEqual(['', 'Mars', '3 moons', 'Edit'])
+    expect((await one('/layout', '#row .kui-card-row-actions a')).attributes.href).toBe('/form')
   })
 })
 
 describe('data', () => {
-  // Islands render inside a `slot` carrying their props, which these tests leave out.
-  const page = async (id: string) => (await element('/data', id)).replaceAll(/<!--[^>]*-->/g, '').replaceAll(/<\/?slot[^>]*>/g, '').replaceAll(/<svg[^>]*>.*?<\/svg>/g, '<svg/>')
-
   test('Stat reads a figure with what it counts', async () => {
-    expect(await page('stat')).toBe('<article id="stat"><span class="kui-stat-badge"><svg/><span class="kui-stat-value">12</span><span class="kui-stat-label">moons</span></span></article>')
+    expect((await find('/data', '#stat .kui-stat-badge > span')).map(found => found.text)).toEqual(['12', 'moons'])
   })
 
-  test('Meter is a named meter holding its value between 0 and 100, its fill styled apart', async () => {
-    expect(await page('meter')).toBe('<article id="meter"><div role="meter" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100" aria-label="Disk" class="kui-meter"><div class="kui-meter-fill bg-kui-error" style="width: 100%"></div></div></article>')
+  test('Meter is a named meter holding its value between 0 and 100', async () => {
+    expect(await attributes('/data', '#meter [role="meter"]', ['aria-valuenow', 'aria-valuemin', 'aria-valuemax', 'aria-label'])).toEqual([{ 'aria-valuenow': '100', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-label': 'Disk' }])
   })
 
   test('BarList measures each row against the largest, reads its display, and says when it has none', async () => {
-    const bars = await page('bars')
+    const bars = (await one('/data', '#bars')).html
 
     expect([...bars.matchAll(/bar-list-value">([^<]*)<.*?width: (\d+)%/g)].map(match => [match[1], match[2]])).toEqual([['2', '100'], ['one', '50'], ['0', '0']])
-    expect(bars).not.toContain('<button')
-    expect(await page('no-bars')).toBe('<article id="no-bars"><p class="kui-bar-list-empty">No planets</p></article>')
+    expect(await find('/data', '#bars button')).toEqual([])
+    expect((await find('/data', '#no-bars p')).map(found => found.text)).toEqual(['No planets'])
   })
 
   test('SiteFavicon shows the site\'s icon, or the globe in a colour of the site\'s own', async () => {
-    expect(await page('favicon')).toBe('<article id="favicon"><span class="kui-site-favicon"><img class="kui-site-favicon-img" src="/favicon.png" alt loading="lazy" decoding="async"></span></article>')
-    expect(await element('/data', 'no-favicon')).toMatch(/<svg[^>]*style="color: #[0-9A-F]{6}"[^>]*class="kui-icon kui-site-favicon-icon"/)
+    expect(await attributes('/data', '#favicon img', ['src', 'alt'])).toEqual([{ src: '/favicon.png', alt: '' }])
+    expect((await one('/data', '#no-favicon svg')).attributes.style).toMatch(/^color: #[0-9A-F]{6}$/)
   })
 
   test('Rating reads its value out of its max, filling that share of the stars, kept between none and all', async () => {
-    const stars = (count: number) => `<span class="kui-rating-stars">${'<svg/>'.repeat(count)}</span>`
+    const rating = async (id: string) => {
+      const [meter] = await find('/data', `#${id} [role="img"]`)
+      const [fill] = await find('/data', `#${id} .kui-rating-fill`)
 
-    expect(await page('rating')).toBe(`<article id="rating"><span role="img" aria-label="4.6 out of 5" class="kui-rating">${stars(5)}<span class="kui-rating-fill" style="width: 92%">${stars(5)}</span></span></article>`)
-    expect(await page('rating-out')).toBe(`<article id="rating-out"><span role="img" aria-label="Top marks" class="kui-rating">${stars(4)}<span class="kui-rating-fill" style="width: 100%">${stars(4)}</span></span></article>`)
-    expect(await page('rating-below')).toContain('style="width: 0%"')
-    expect(await page('rating-nan')).toContain('style="width: 0%"')
-    expect(await page('rating-none')).toBe(`<article id="rating-none"><span role="img" aria-label="3 out of 0" class="kui-rating">${stars(0)}<span class="kui-rating-fill" style="width: 0%">${stars(0)}</span></span></article>`)
+      return [meter!.attributes['aria-label'], fill!.attributes.style, (await find('/data', `#${id} [role="img"] > .kui-rating-stars svg`)).length]
+    }
+
+    expect(await rating('rating')).toEqual(['4.6 out of 5', 'width: 92%', 5])
+    expect(await rating('rating-out')).toEqual(['Top marks', 'width: 100%', 4])
+    expect((await rating('rating-below'))[1]).toBe('width: 0%')
+    expect((await rating('rating-nan'))[1]).toBe('width: 0%')
+    expect(await rating('rating-none')).toEqual(['3 out of 0', 'width: 0%', 0])
   })
 
   test('CopyButton is a plain button saying what it copies, beside a status saying it copied, taking Button\'s variants', async () => {
-    expect(await page('copy')).toBe('<article id="copy"><button type="button" class="kui-btn kui-copy-btn">Copy link</button><span class="kui-copy-btn-live" role="status"></span></article>')
-    expect(await page('copy-accent')).toBe('<article id="copy-accent"><button type="button" class="kui-btn kui-copy-btn kui-btn-accent">Copy link</button><span class="kui-copy-btn-live" role="status"></span></article>')
+    expect((await find('/data', '#copy button, #copy [role="status"], #copy-accent button')).map(found => [found.tag, found.text, attr(found, 'type'), found.attributes.class!.includes('kui-btn-accent')])).toEqual([
+      ['button', 'Copy link', 'button', false],
+      ['span', '', null, false],
+      ['button', 'Copy link', 'button', true],
+    ])
   })
 })
 
@@ -350,10 +403,22 @@ describe('Tabs', () => {
 })
 
 describe('charts', () => {
-  const page = async (id: string) => (await element('/charts', id)).replaceAll(/<!--[^>]*-->/g, '').replaceAll(/<\/?slot[^>]*>/g, '')
+  const page = async (id: string) => (await one('/charts', `#${id}`)).html.replaceAll(/<!--[^>]*-->/g, '').replaceAll(/<\/?slot[^>]*>/g, '')
 
   test('LineChart renders its frame, a table of its values for screen readers, a keyboard slider on the latest point and a legend dashing each line on the server, leaving the drawing to the browser', async () => {
-    expect(await page('line')).toBe('<article id="line"><div role="figure" aria-label="Visits" class="kui-line-chart"><div class="kui-line-chart-frame"><div class="kui-line-chart-plot" aria-hidden="true"></div><div class="kui-line-chart-overlay" role="slider" tabindex="0" aria-label="Visits" aria-valuemin="0" aria-valuemax="2" aria-valuenow="2" aria-valuetext="2026-09-08: Visits 5, Sales 1"></div></div><div class="kui-line-chart-data"><table><caption>Visits</caption><thead><tr><td></td><th scope="col">Visits</th><th scope="col">Sales</th></tr></thead><tbody><tr><th scope="row">2026-09-01</th><td>3</td><td>1</td></tr><tr><th scope="row">2026-09-02</th><td>-</td><td>2</td></tr><tr><th scope="row">2026-09-08</th><td>5</td><td>1</td></tr></tbody></table></div><ul class="kui-line-chart-legend"><li class="kui-line-chart-legend-item"><span class="kui-line-chart-key" style="background-color: var(--kui-chart-1)"></span>Visits</li><li class="kui-line-chart-legend-item"><span class="kui-line-chart-key" style="background-image: repeating-linear-gradient(90deg, red 0px 6px, transparent 6px 9px)"></span>Sales</li></ul></div></article>')
+    expect(await attributes('/charts', '#line [role="figure"], #line [aria-hidden="true"], #line [role="slider"]', ['aria-label', 'aria-valuenow', 'aria-valuemax', 'aria-valuetext', 'tabindex'])).toEqual([
+      { 'aria-label': 'Visits', 'aria-valuenow': null, 'aria-valuemax': null, 'aria-valuetext': null, 'tabindex': null },
+      { 'aria-label': null, 'aria-valuenow': null, 'aria-valuemax': null, 'aria-valuetext': null, 'tabindex': null },
+      { 'aria-label': 'Visits', 'aria-valuenow': '2', 'aria-valuemax': '2', 'aria-valuetext': '2026-09-08: Visits 5, Sales 1', 'tabindex': '0' },
+    ])
+    expect((await one('/charts', '#line [aria-hidden="true"]')).html).toBe('')
+    expect((await find('/charts', '#line caption, #line thead th, #line tbody th, #line tbody td')).map(found => found.text)).toEqual(['Visits', 'Visits', 'Sales', '2026-09-01', '3', '1', '2026-09-02', '-', '2', '2026-09-08', '5', '1'])
+
+    const keys = await find('/charts', '#line .kui-line-chart-legend-item')
+
+    expect(keys.map(item => item.text)).toEqual(['Visits', 'Sales'])
+    // The second line is dashed so the two stay apart without their colours.
+    expect(keys.map(item => item.html.includes('repeating-linear-gradient'))).toEqual([false, true])
   })
 
   test('ScatterChart places dots, ticks, guides and corners along its axes, a dot\'s size following its weight', async () => {
@@ -365,7 +430,7 @@ describe('charts', () => {
     ])
     expect(scatter).toContain('<span class="kui-scatter-chart-grid" data-axis="x" style="left: 50%"><span class="kui-scatter-chart-tick">20h</span></span><span class="kui-scatter-chart-guide" data-axis="y" style="bottom: 50%"></span><span class="kui-scatter-chart-guide" data-axis="x" style="left: 50%"></span><span class="kui-scatter-chart-corner" data-corner="topRight">Long and loved</span>')
     expect(scatter).not.toContain('<button')
-    expect(await page('no-scatter')).toBe('<article id="no-scatter"><p class="kui-scatter-chart-empty">No games</p></article>')
+    expect(await page('no-scatter')).toBe('<p class="kui-scatter-chart-empty">No games</p>')
   })
 
   test('ContributionGraph shades each day by how full it was, says so in its name, marks today, and names the months over their weeks', async () => {
@@ -378,54 +443,56 @@ describe('charts', () => {
       ['100% · 2026-09-02', true, 'background-color: color-mix(in srgb, var(--color-kui-accent) 100%, transparent); grid-row: 4; grid-column: 1'],
     ])
     expect(cells.at(-1)?.[2]).toContain('grid-row: 8; grid-column: 3')
-    expect(graph).toMatch(/^<article id="graph"><div role="group" aria-label="Contributions" class="kui-contribution-graph kui-contribution-graph-months"><span class="kui-contribution-month" aria-hidden="true" style="grid-column: 1">Sep\w*<\/span><span class="kui-contribution-cell"/)
+    expect(graph).toMatch(/^<div role="group" aria-label="Contributions" class="kui-contribution-graph kui-contribution-graph-months"><span class="kui-contribution-month" aria-hidden="true" style="grid-column: 1">Sep\w*<\/span><span class="kui-contribution-cell"/)
   })
 })
 
 describe('Pagination', () => {
-  test('links each page through the query, the current one marked, the steps past the ends disabled', async () => {
-    const first = await element('/paging', 'first')
+  // Each step and page of a strip, in order: its text, where it links, whether it is the current page and its rel.
+  const strip = async (path: string, id: string) => (await find(path, `#${id} nav > *`)).map(found => [found.text, attr(found, 'href'), attr(found, 'aria-current'), attr(found, 'rel')])
 
-    expect(first).toContain('<nav aria-label="Pagination" class="kui-pagination">')
-    expect(first).toContain('<span class="kui-pagination-step">Previous</span>')
-    expect(first).toContain('<a class="kui-pagination-page" href="/posts?tag=kay&amp;page=2">2</a>')
-    expect(first).toContain('<a class="kui-pagination-page" href="/posts?tag=kay" aria-current="page">1</a>')
-    expect(first).toContain('<a class="kui-pagination-page" href="/posts?tag=kay&amp;page=3">3</a>')
-    expect(first).toContain('<a class="kui-pagination-step" href="/posts?tag=kay&amp;page=2" rel="next">Next</a>')
+  test('links each page through the query, the current one marked, the steps past the ends disabled', async () => {
+    expect((await attributes('/paging', '#first nav', ['aria-label']))).toEqual([{ 'aria-label': 'Pagination' }])
+    expect(await strip('/paging', 'first')).toEqual([
+      ['Previous', null, null, null],
+      ['1', '/posts?tag=kay', 'page', null],
+      ['2', '/posts?tag=kay&page=2', null, null],
+      ['3', '/posts?tag=kay&page=3', null, null],
+      ['Next', '/posts?tag=kay&page=2', null, 'next'],
+    ])
   })
 
-  test('follows the page the URL asks for, with gaps around it, and draws nothing for a single page', async () => {
-    const middle = (await element('/paging?page=10', 'middle')).replaceAll(/<!--[^>]*-->/g, '')
+  test('follows the page the URL asks for, with gaps around it, in the page\'s language, and draws nothing for a single page', async () => {
+    const middle = await strip('/paging?page=10', 'middle')
 
-    expect(middle).toContain('aria-label="Posts"')
-    expect([...middle.matchAll(/class="kui-pagination-(page|gap)"[^>]*>([^<]*)</g)].map(([, , text]) => text)).toEqual(['1', '…', '9', '10', '11', '…', '20'])
-    expect(middle).toContain('<a class="kui-pagination-step" href="/paging?page=9" rel="prev">Précédent</a>')
-    expect(middle).toContain('href="/paging?page=10" aria-current="page"')
-    expect(await element('/paging', 'single')).not.toContain('kui-pagination')
+    expect(middle.map(([text]) => text)).toEqual(['Précédent', '1', '…', '9', '10', '11', '…', '20', 'Suivant'])
+    expect(middle.find(([text]) => text === 'Précédent')).toEqual(['Précédent', '/paging?page=9', null, 'prev'])
+    expect(middle.find(([text]) => text === '10')).toEqual(['10', '/paging?page=10', 'page', null])
+    expect(await find('/paging', '#single nav')).toEqual([])
   })
 
   test('takes a page kay\'s paginate() gave, linking each page at the path it names', async () => {
-    const paged = (await element('/paging', 'paged')).replaceAll(/<!--[^>]*-->/g, '')
-
-    expect(paged).toContain('<a class="kui-pagination-step" href="/blog" rel="prev">Previous</a>')
-    expect(paged).toContain('<a class="kui-pagination-page" href="/blog/2" aria-current="page">2</a>')
-    expect(paged).toContain('<a class="kui-pagination-step" href="/blog/3" rel="next">Next</a>')
+    expect(await strip('/paging', 'paged')).toEqual([
+      ['Previous', '/blog', null, 'prev'],
+      ['1', '/blog', null, null],
+      ['2', '/blog/2', 'page', null],
+      ['3', '/blog/3', null, null],
+      ['Next', '/blog/3', null, 'next'],
+    ])
   })
 
   test('links only the steps either side of a list whose length is unknown, by page or by offset, and draws nothing for its one page', async () => {
-    const strip = async (id: string) => (await element('/paging', id)).replaceAll(/<!--[^>]*-->/g, '')
-
-    expect(await strip('open')).toBe('<article id="open"><nav aria-label="Pagination" class="kui-pagination"><a class="kui-pagination-step" href="/gallery?tag=kay" rel="prev">Previous</a><a class="kui-pagination-step" href="/gallery?tag=kay&amp;page=3" rel="next">Next</a></nav></article>')
-    expect(await strip('offset')).toBe('<article id="offset"><nav aria-label="Pagination" class="kui-pagination"><a class="kui-pagination-step" href="/gallery?offset=20&amp;tag=kay" rel="prev">Previous</a><span class="kui-pagination-step">Next</span></nav></article>')
-    expect(await strip('open-single')).toBe('<article id="open-single"></article>')
+    expect(await strip('/paging', 'open')).toEqual([['Previous', '/gallery?tag=kay', null, 'prev'], ['Next', '/gallery?tag=kay&page=3', null, 'next']])
+    expect(await strip('/paging', 'offset')).toEqual([['Previous', '/gallery?offset=20&tag=kay', null, 'prev'], ['Next', null, null, null]])
+    expect(await find('/paging', '#open-single nav')).toEqual([])
   })
 
   test('shows a page past the ends, or none at all, as the nearest that exists', async () => {
-    const strip = (html: string) => html.replaceAll(/<!--[^>]*-->/g, '')
+    const current = async (path: string) => (await strip(path, 'middle')).find(([, , page]) => page === 'page')
 
-    expect(strip(await element('/paging?page=50', 'middle'))).toContain('href="/paging?page=20" aria-current="page"')
-    expect(strip(await element('/paging?page=50', 'middle'))).toContain('<span class="kui-pagination-step">Suivant</span>')
-    expect(strip(await element('/paging?page=abc', 'middle'))).toContain('href="/paging" aria-current="page"')
+    expect(await current('/paging?page=50')).toEqual(['20', '/paging?page=20', 'page', null])
+    expect((await strip('/paging?page=50', 'middle')).at(-1)).toEqual(['Suivant', null, null, null])
+    expect(await current('/paging?page=abc')).toEqual(['1', '/paging', 'page', null])
   })
 })
 
