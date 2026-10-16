@@ -260,6 +260,43 @@ section({...rest['a']})
   })
 })
 
+describe('kay/eslint over a template slot\'s parameters', () => {
+  const tsParser = import('@typescript-eslint/parser')
+  const stylistic = import('@stylistic/eslint-plugin')
+
+  async function lint(slot: string, rules: Record<string, unknown>) {
+    const { default: parser } = await tsParser
+    const { default: plugin } = await stylistic
+    const { ESLint } = await import('eslint')
+    const overrideConfig = [
+      { files: ['**/*.kay'], processor },
+      { files: ['**/*.kay/*.tsx'], languageOptions: { parser }, plugins: { style: plugin }, rules },
+    ] as never
+    const text = `---\nconst { list } = props<{ list: number[] }>()\n---\nT(key="a")\n  ${slot}\n    span {text}\n`
+    const [result] = await new ESLint({ cwd: join(import.meta.dir, 'fixtures', 'lint'), overrideConfigFile: true, overrideConfig }).lintText(text, { filePath: FILE })
+
+    return result!.messages.map(message => [message.ruleId, message.line, message.column])
+  }
+
+  const ARROW = { 'style/arrow-parens': ['error', 'as-needed'] }
+
+  it('reports no rule on the parentheses kay writes around a slot\'s one parameter', async () => {
+    expect(await lint('@about(text)', ARROW)).toEqual([])
+  })
+
+  it('reports nothing for a slot with several parameters, none, a destructured one or one with a default', async () => {
+    expect(await lint('@about(text, index)', ARROW)).toEqual([])
+    expect(await lint('@about', ARROW)).toEqual([])
+    expect(await lint('@about({ text })', ARROW)).toEqual([])
+    expect(await lint('@about(text = \'a\')', ARROW)).toEqual([])
+  })
+
+  it('still reports the code the author wrote in a parameter, at its .kay column', async () => {
+    expect(await lint('@about(text = list["length"])', { 'dot-notation': 'error', ...ARROW })).toEqual([['dot-notation', 5, 22]])
+    expect(await lint('@about({ text = list["length"] })', { 'dot-notation': 'error' })).toEqual([['dot-notation', 5, 24]])
+  })
+})
+
 describe('kay/eslint over template classes', () => {
   const TEMPLATE = `---
 const { n } = props<{ n: number }>()

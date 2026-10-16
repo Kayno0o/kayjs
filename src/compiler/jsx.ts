@@ -29,6 +29,7 @@ const MARKUP_ATTRIBUTES = new Set(['innerHTML', 'srcdoc'])
 const WRITTEN_URLS = new Map([['img', 'src'], ['link', 'href'], ['form', 'action']])
 const WHITESPACE = /\s+/
 const EVENT_HANDLER = /^on[A-Z]/
+const PLAIN_PARAMETER = /^[\p{ID_Start}$_][\p{ID_Continue}$\u200C\u200D]*$/u
 
 // A template as JSX: what the analysis pass reads for scope, and `kay check` type-checks.
 export class JsxTemplate {
@@ -420,7 +421,10 @@ export class JsxTemplate {
 
         b.add(' ').addSource(slot.name).add('={')
 
-        if (slot.params)
+        // One plain name is written bare, so a rule about the parentheses around it, which kay would otherwise be the one to write, has none to report.
+        if (slot.params && PLAIN_PARAMETER.test(this.src.slice(slot.params.start, slot.params.end)))
+          b.addSource(slot.params).add(' => ')
+        else if (slot.params)
           b.add('(').addSource(slot.params).add(') => ')
 
         this.emitRoot(slot.children)
