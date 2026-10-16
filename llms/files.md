@@ -122,7 +122,7 @@ if upload.progress() !== undefined
 
 - `files.put(file, { private: true })` gives a key starting `private/`, which `/_kay/files/` serves only to a link `files.url(key)` signed: the page rendering it is what decides who gets the file, behind its guard.
 - The link stays valid an hour, `files.url(key, { expires: '1d' })` longer, rounded up to the next ten minutes so a page rendered again soon gives the same link, which the browser keeps cached.
-- It is signed with a key derived from the session's secret, else from `secret` in kay.config.ts or `KAY_SECRET`, else from the preview secret, else a key of the process, which a restart changes, which several processes do not share, and which a production server warns of once.
+- It is signed with a key derived from the session's secret, else from `secret` in kay.config.ts or `KAY_SECRET`, else from the preview secret, else a key of the process, which a restart changes, which several processes do not share, and which a production server warns of once. A script signing one with no server reads `KAY_SECRET`, and `secret` in the kay.config.ts beside it once it has used the store (`files.put`, `files.get`).
 - A private image is resized through its signed link, its variants kept by no shared cache.
 - A route of the app's own that decides by itself who gets a file answers with `files.response(key, request)`: the file, its range included, kept by no cache.
 

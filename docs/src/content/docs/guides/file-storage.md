@@ -33,7 +33,7 @@ A JPEG, PNG or WebP is stored without the metadata a camera or phone writes in i
 
 ## Private files
 
-`files.put(file, { private: true })` stores a file only a signed link reaches. `files.url(key)` signs one valid an hour, with the app's `secret` or `KAY_SECRET` (see [Config](/reference/config)), `files.url(key, { expires: '1d' })` longer, so the page rendering it, behind its guard, decides who gets the file. A route of your own can answer with `files.response(key, request)` instead.
+`files.put(file, { private: true })` stores a file only a signed link reaches. `files.url(key)` signs one valid an hour, with the app's `secret` or `KAY_SECRET` (see [Config](/reference/config)), which a script outside the server reads too, `secret` once it has used the store, `files.url(key, { expires: '1d' })` longer, so the page rendering it, behind its guard, decides who gets the file. A route of your own can answer with `files.response(key, request)` instead.
 
 ## Where files go
 

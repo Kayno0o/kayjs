@@ -11,7 +11,7 @@ import { imageHeader } from './image-format'
 import { holdsImageMetadata, stripImageMetadata } from './image-metadata'
 import { requestUrl } from './request-url'
 import { headerCopies, ownedHeaders, ownHeaders, setSecurityHeaders } from './security'
-import { signedText, signText } from './stamp'
+import { setupStampSecret, signedText, signText } from './stamp'
 
 // Where files are kept: `diskFiles`, `s3Files` and `memoryFiles` make one, an app may write its own. Keys are never written twice, so a store needs no locking.
 export interface FileStore {
@@ -201,9 +201,23 @@ async function activeStore(): Promise<FileStore> {
   if (current.store)
     return current.store
 
-  const configured = process.env.NODE_ENV === 'test' ? undefined : (await (await import('../config')).loadConfig(process.cwd())).storage
+  const config = process.env.NODE_ENV === 'test' ? undefined : await (await import('../config')).loadConfig(process.cwd())
 
-  return current.store ??= configured ?? defaultFileStore()
+  // The key a private link is signed with is read where the store is, as a server's setup does.
+  if (config !== undefined)
+    setupStampSecret(config.secret)
+
+  return current.store ??= config?.storage ?? defaultFileStore()
+}
+
+// A script that signs a link before it read the config still has `KAY_SECRET`; `secret` in the config is read with the store.
+let scriptSecretRead = false
+
+function readScriptSecret(): void {
+  if (!scriptSecretRead && current.store === undefined) {
+    scriptSecretRead = true
+    setupStampSecret(undefined)
+  }
 }
 
 // Stores, reads and links the files of the store `storage` in kay.config.ts names: `const key = await files.put(input.avatar)` in an action, then `img(src={files.url(key)})` in a page.
@@ -305,6 +319,8 @@ export const files = {
 
     if (!PRIVATE_SEGMENT.test(key))
       return `${FILES_ROUTE}${key}`
+
+    readScriptSecret()
 
     const seconds = durationSeconds(options.expires ?? DEFAULT_EXPIRES, 'files.url()\'s expires')
     const step = Math.min(EXPIRY_STEP, seconds)

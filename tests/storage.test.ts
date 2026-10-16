@@ -2,7 +2,7 @@ import type { FileStore } from '../src/server'
 import { existsSync } from 'node:fs'
 import { chmod, mkdir, mkdtemp, readdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, it, setSystemTime } from 'bun:test'
 import { chromium } from 'playwright-core'
@@ -521,4 +521,41 @@ describe.skipIf(browser === undefined && (process.env.CI ?? '') === '')('upload 
       await site.close()
     }
   }, 60_000)
+})
+
+describe('a script signing a private link', () => {
+  const SECRET = 'a'.repeat(40)
+  const OTHER = 'b'.repeat(40)
+  const SERVER = resolve('src/server/index.ts')
+  // Time stands still, so the same secret gives the same link.
+  const url = (put: boolean) => `Date.now = () => 1.8e12\nimport { files } from ${JSON.stringify(SERVER)}\n${put ? 'await files.put(new File([\'x\'], \'a.txt\'))\n' : ''}console.log(files.url('private/${'0'.repeat(20)}.txt'))\n`
+
+  async function run(script: string, env: Record<string, string>, cwd = process.cwd()): Promise<string> {
+    const child = Bun.spawn([process.execPath, '-e', script], { cwd, env: { ...process.env, NODE_ENV: 'production', KAY_SECRET: '', ...env }, stdout: 'pipe', stderr: 'pipe' })
+    const [out, err] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text()])
+
+    if (await child.exited !== 0)
+      throw new Error(err)
+
+    return out.trim()
+  }
+
+  it('signs with KAY_SECRET, as a server does, so another process holding it agrees', async () => {
+    const [first, second, other] = await Promise.all([run(url(false), { KAY_SECRET: SECRET }), run(url(false), { KAY_SECRET: SECRET }), run(url(false), { KAY_SECRET: OTHER })])
+
+    expect(first).toBe(second)
+    expect(first).not.toBe(other)
+  })
+
+  it('signs with `secret` in the kay.config.ts beside it once the script reads its store', async () => {
+    const root = await scratchDir('storage-script-')
+
+    await Bun.write(join(root, 'kay.config.ts'), `import { memoryFiles } from ${JSON.stringify(SERVER)}\nexport default { secret: ${JSON.stringify(SECRET)}, storage: memoryFiles() }\n`)
+
+    expect(await run(url(true), {}, root)).toBe(await run(url(false), { KAY_SECRET: SECRET }))
+  })
+
+  it('refuses a KAY_SECRET too short, as a server does', async () => {
+    await expect(run(url(false), { KAY_SECRET: 'short' })).rejects.toThrow('KAY_SECRET is 5 characters long')
+  })
 })
