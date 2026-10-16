@@ -17,6 +17,7 @@ export interface StyleUses {
 const COARSE = /[\s'"`{}=;<>$]+/
 const SPLITTING = /[\s'"`{}=;<>$]/
 const PIECES = /[.,()]/
+const HAS_LETTER = /[a-z]/i
 const PUNCTUATION_ONLY = /^[-_:]+$/
 const ENDS_OPEN = /[-_:]$/
 const STARTS_OPEN = /^[-_:]/
@@ -36,7 +37,8 @@ function readWords(text: string, into: Set<string>, fragments: Set<string>): voi
     }
 
     for (const piece of [token, ...token.split(PIECES)]) {
-      if (piece.length >= 2 && !PUNCTUATION_ONLY.test(piece) && (ENDS_OPEN.test(piece) || STARTS_OPEN.test(piece)))
+      // A piece with no letter is a number as often as part of a name (`-1` of `!== -1`), and would take in every class ending in it.
+      if (piece.length >= 2 && HAS_LETTER.test(piece) && !PUNCTUATION_ONLY.test(piece) && (ENDS_OPEN.test(piece) || STARTS_OPEN.test(piece)))
         fragments.add(piece)
     }
   }

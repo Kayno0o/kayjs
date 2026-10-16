@@ -214,6 +214,7 @@ function pageStyles(client: ClientBuild, base: string, texts: Map<string, string
   const { classes, entries } = client.styleUses!
   const found = new Map<string, PageStyles>()
   const parsed = new Map<string, Node[]>()
+  const made = new Map<string, { inline: string[], rest: string[], size: number }>()
 
   for (const files of chains) {
     const key = files.join('\n')
@@ -233,29 +234,40 @@ function pageStyles(client: ClientBuild, base: string, texts: Map<string, string
         used.add(index)
     }
 
-    const unused = new Set(classes.filter((_name, index) => !used.has(index)))
-    const inline: string[] = []
-    const rest: string[] = []
-    let size = 0
+    // Chains naming the same classes of the same stylesheets get the same rules, pruned, printed and gzipped once.
+    const shared = `${urls.join('\n')}\n${[...used].sort((a, b) => a - b).join(',')}`
+    let written = made.get(shared)
 
-    for (const url of urls) {
-      const css = texts.get(url)!
-      let nodes = parsed.get(url)
+    if (written === undefined) {
+      const unused = new Set(classes.filter((_name, index) => !used.has(index)))
+      const own: string[] = []
+      const left: string[] = []
+      let weight = 0
 
-      if (nodes === undefined)
-        parsed.set(url, nodes = parse(css))
+      for (const url of urls) {
+        const css = texts.get(url)!
+        let nodes = parsed.get(url)
 
-      const own = print(pruneUnescaped(nodes, unused))
+        if (nodes === undefined)
+          parsed.set(url, nodes = parse(css))
 
-      if (own.length !== css.length)
-        rest.push(url)
+        const pruned = print(pruneUnescaped(nodes, unused))
 
-      if (own.trim() === '')
-        continue
+        if (pruned.length !== css.length)
+          left.push(url)
 
-      inline.push(own)
-      size += Bun.gzipSync(own).length
+        if (pruned.trim() === '')
+          continue
+
+        own.push(pruned)
+        weight += Bun.gzipSync(pruned).length
+      }
+
+      written = { inline: own, rest: left, size: weight }
+      made.set(shared, written)
     }
+
+    const { inline, rest, size } = written
 
     if (size > INLINE_LIMIT)
       continue

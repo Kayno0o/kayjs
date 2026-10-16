@@ -373,15 +373,15 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('the page sw
 
     // Both pages carry the same noscript, as a layout's would.
     await page.route(`${origin}/**`, async (route) => {
-      const response = await route.fetch()
+      try {
+        const response = await route.fetch()
+        const html = (response.headers()['content-type'] ?? '').includes('text/html')
 
-      if (!(response.headers()['content-type'] ?? '').includes('text/html')) {
-        await route.fulfill({ response })
-
-        return
+        await route.fulfill(html ? { response, body: (await response.text()).replace('</head>', '<noscript><link rel="stylesheet" href="/amp.css?a=1&b=2"></noscript></head>') } : { response })
       }
-
-      await route.fulfill({ response, body: (await response.text()).replace('</head>', '<noscript><link rel="stylesheet" href="/amp.css?a=1&b=2"></noscript></head>') })
+      catch {
+        // The page closed with this request on its way.
+      }
     })
     await page.goto(`${origin}/`)
     await page.evaluate(() => {
@@ -391,6 +391,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('the page sw
     await page.click('a.about')
     await page.locator('h1', { hasText: 'About' }).waitFor()
     expect(await page.evaluate(() => [...document.head.querySelectorAll('noscript')].includes((window as { kept?: HTMLElement | undefined }).kept!))).toBe(true)
+    await page.unrouteAll({ behavior: 'ignoreErrors' })
     await page.close()
   })
 
