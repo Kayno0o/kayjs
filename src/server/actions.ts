@@ -171,7 +171,7 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], m
           }
 
           if (code === 'VALIDATION')
-            return refused(value, error, request, server, back)
+            return inLocale(request, options, async () => refused(value, error, request, server, back))
 
           // Elysia checks a top-level `s.File({ type })` against the file's bytes once the schema passed.
           if (code === 'INVALID_FILE_TYPE') {
@@ -717,13 +717,14 @@ function encodeOrExplain(value: unknown, what: string): string {
   }
 }
 
-// Input the schema refused: a message per field, the schema's own `error` when it has one.
+// Input the schema refused: a message per field, the schema's own `error` when it has one, or what its `localizedError` function words in the request's locale (Elysia would call a function `error` outside it).
 async function refused(action: ServerAction<TSchema, unknown>, error: Readonly<ValidationError>, request: Request, server: Server | null, back: Back): Promise<Response> {
   const errors: Record<string, string> = {}
 
   for (const issue of error.all) {
     const field = 'path' in issue ? FIELD.exec(issue.path)?.[1] ?? '' : ''
-    const custom = 'schema' in issue ? (issue.schema as { error?: unknown }).error : undefined
+    const schema = 'schema' in issue ? issue.schema as { error?: unknown, localizedError?: unknown } : undefined
+    const custom = typeof schema?.localizedError === 'function' ? (schema.localizedError as () => unknown)() : schema?.error
 
     errors[field] ??= typeof custom === 'string' ? custom : issue.summary ?? 'Invalid value'
   }

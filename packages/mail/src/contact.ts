@@ -23,7 +23,9 @@ const ONE_LINE = '^[^\\r\\n]*\\S[^\\r\\n]*$'
 const LINK = /https?:\/\//gi
 const WORDS = /[-_]+/g
 const RESERVED = ['name', 'email', 'message', 'website']
+// The English text stays as `error`; `localizedError` words it in the page's language when kay refuses the field.
 const DEFAULT_ERRORS = { name: 'Please write your name, on one line.', email: 'Please write a valid email address.', message: 'Please write your message.' }
+const LOCALIZED_ERRORS = { name: () => t('mail.contact.errors.name'), email: () => t('mail.contact.errors.email'), message: () => t('mail.contact.errors.message') }
 
 export interface ContactOptions<Extra extends Record<string, TSchema> = Record<never, TSchema>> {
   // The fields beyond `name`, `email` and `message`, as schemas: `{ phone: s.Optional(s.String({ maxLength: 30 })), topic: s.UnionEnum(['quote', 'other']) }`. They go in the mail, after the email, in this order.
@@ -42,8 +44,8 @@ export interface ContactOptions<Extra extends Record<string, TSchema> = Record<n
   maxLinks?: number | undefined
   // The longest message, 5000 characters by default.
   maxLength?: number | undefined
-  // The messages the schema refuses a field with, in English by default; the other refusals read the `mail.contact` messages in the page's language.
-  errors?: Partial<typeof DEFAULT_ERRORS> | undefined
+  // The messages the schema refuses a field with, a text or a function of the page's language; by default, like the other refusals, the `mail.contact` messages in the page's language.
+  errors?: Partial<Record<keyof typeof DEFAULT_ERRORS, string | (() => string)>> | undefined
   // Replaces the defaults of the protection, `rateLimit` 30 posts every 10 minutes and 5 that went through, `minTime` of 3 seconds; the honeypot is the `website` field.
   protection?: Omit<ActionProtection<'website'>, 'honeypot' | 'messages'> | undefined
 }
@@ -60,7 +62,14 @@ export function contactForm<const Extra extends Record<string, TSchema> = Record
   protection: ActionProtection<'website'>,
 ] {
   const { fields = {} as Extra, labels = {}, reach, maxLinks = 3, maxLength = 5000 } = options
-  const errors = { ...DEFAULT_ERRORS, ...options.errors }
+  const refusal = (key: keyof typeof DEFAULT_ERRORS) => {
+    const given = options.errors?.[key]
+
+    if (typeof given === 'string')
+      return { error: given }
+
+    return { error: DEFAULT_ERRORS[key], localizedError: given ?? LOCALIZED_ERRORS[key] }
+  }
   const reserved = RESERVED.filter(key => key in fields)
 
   if (reserved.length > 0)
@@ -69,10 +78,10 @@ export function contactForm<const Extra extends Record<string, TSchema> = Record
   const words = { reach: reach ?? '' }
 
   const schema = s.Object({
-    name: s.String({ pattern: ONE_LINE, maxLength: 100, error: errors.name }),
-    email: s.String({ format: 'email', maxLength: 254, error: errors.email }),
+    name: s.String({ pattern: ONE_LINE, maxLength: 100, ...refusal('name') }),
+    email: s.String({ format: 'email', maxLength: 254, ...refusal('email') }),
     ...fields,
-    message: s.String({ pattern: '\\S', maxLength, error: errors.message }),
+    message: s.String({ pattern: '\\S', maxLength, ...refusal('message') }),
   }) as unknown as ContactSchema<Extra>
 
   const handler = async (input: ContactInput<Extra>, ctx: ActionContext): Promise<Failure<string> | undefined> => {
@@ -112,6 +121,8 @@ export function contactForm<const Extra extends Record<string, TSchema> = Record
 
         return ctx.fail(503, reach === undefined ? t('mail.contact.notConfigured') : t('mail.contact.notConfiguredReach', words))
       }
+
+      log.error(`the contact mail could not be sent: ${error instanceof Error ? error.message : String(error)}`)
 
       return ctx.fail(502, reach === undefined ? t('mail.contact.sendFailed') : t('mail.contact.sendFailedReach', words))
     }

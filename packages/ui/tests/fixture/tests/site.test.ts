@@ -463,6 +463,23 @@ describe('ContactForm', () => {
     expect(html).not.toContain('Thank you')
   })
 
+  test('words its labels and the refused fields in the page\'s language with no props', async () => {
+    const { contact } = await import('../src/routes/contact-words.kay')
+
+    expect((await site.visit('/contact-words')).html).toContain('>Send<')
+    expect((await site.visit('/contact-words')).html).toContain('Name')
+
+    const french = (await site.visit('/fr/contact-words')).html
+
+    expect(french).toContain('Envoyer')
+    expect(french).toContain('Nom')
+    expect(french).not.toContain('>Send<')
+
+    const refused = await site.submit(contact, { name: 'Ada', email: 'nope', message: 'Bonjour' }, { from: '/fr/contact-words' })
+
+    expect(refused.html).toContain('<span class="kui-form-field-issue">Merci d\'écrire une adresse e-mail valide.</span>')
+  })
+
   test('shows each refused field\'s message under it and the thanks once a post goes through', async () => {
     const { contact } = await import('../src/routes/contact.kay')
     const refused = await site.submit(contact, { name: 'A', email: 'nope', topic: 'quote', message: 'Hi' }, { from: '/contact' })

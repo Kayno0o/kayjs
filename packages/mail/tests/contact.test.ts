@@ -100,4 +100,12 @@ describe('contactForm', () => {
     expect(refused.status).toBe(429)
     expect(refused.errors['']).toBe('Too many messages sent from here in a short time: try again in a few minutes, or write to hello@fixture.test.')
   })
+
+  it('words the schema\'s refusals in the page\'s language, and an errors option replaces them', async () => {
+    const { refusal } = await site()
+    const bad = { ...fields, email: 'nope' }
+
+    expect((await refusal(contact, bad)).errors.email).toBe('Please write a valid email address.')
+    expect((await refusal(contact, bad, { from: '/fr/contact' })).errors.email).toBe('Merci d\'écrire une adresse e-mail valide.')
+  })
 })

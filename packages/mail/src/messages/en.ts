@@ -4,6 +4,18 @@ import { defineMessages } from 'kay/i18n'
 export default defineMessages({
   mail: {
     contact: {
+      errors: {
+        name: 'Please write your name, on one line.',
+        email: 'Please write a valid email address.',
+        message: 'Please write your message.',
+      },
+      form: {
+        name: 'Name',
+        email: 'Email',
+        message: 'Message',
+        submit: 'Send',
+        sent: 'Thank you, your message has been sent.',
+      },
       subject: 'Message from {name}',
       footer: 'Sent from the contact form of {origin}. Replying to this mail writes to {name}.',
       empty: 'not given',

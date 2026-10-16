@@ -1,0 +1,10 @@
+--- server
+import { contactForm } from '@kaynooo/kayjs-mail'
+
+export const contact = action(...contactForm({ send: async () => undefined as never }))
+---
+---
+import ContactForm from '@kaynooo/kayjs-ui/contact-form.kay'
+---
+main
+  ContactForm(action={contact})
