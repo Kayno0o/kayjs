@@ -272,6 +272,45 @@ describe('cached with a store', () => {
     expect(await cached('broken', 60, () => 'loaded', { store })).toBe('loaded')
   })
 
+  it('drops a stored value built from a key, found without reading any row of the store, for rows the process holds nowhere', async () => {
+    const path = await storePath()
+    const first = sqliteCache(path)
+
+    first.set('page:1', '#deps ["post:1"]\n["one"]', Date.now() + 60_000)
+    first.set('page:2', '#deps ["post:2"]\n["two"]', Date.now() + 60_000)
+    first.set('plain', '["plain"]', Date.now() + 60_000)
+
+    // Another process's store, opened afresh, with nothing in memory.
+    const store = sqliteCache(path)
+    const read = spyOn(store, 'get')
+
+    invalidate(key => key === 'post:1')
+    expect(store.keys().sort()).toEqual(['page:2', 'plain'])
+    expect(read).not.toHaveBeenCalled()
+    expect(store.dependencies!().get('page:1')).toBeUndefined()
+
+    store.set('page:2', '["rewritten"]', Date.now() + 60_000)
+    invalidate(key => key === 'post:2')
+    expect(store.keys()).toEqual(['page:2', 'plain'])
+    expect(read).not.toHaveBeenCalled()
+  })
+
+  it('reads the keys a row written before they had a table of their own was built from', async () => {
+    const path = await storePath()
+    const old = new Database(path, { create: true })
+
+    old.run('CREATE TABLE kay_cache (key TEXT PRIMARY KEY, value TEXT NOT NULL, fresh_until INTEGER NOT NULL)')
+    old.run('INSERT INTO kay_cache VALUES (\'page:1\', \'#deps ["post:1"]\n["one"]\', ?)', [Date.now() + 60_000])
+    old.run('INSERT INTO kay_cache VALUES (\'plain\', \'["plain"]\', ?)', [Date.now() + 60_000])
+    old.close()
+
+    const store = sqliteCache(path)
+
+    expect([...store.dependencies!()]).toEqual([['page:1', ['post:1']]])
+    invalidate('post:1')
+    expect(store.keys()).toEqual(['plain'])
+  })
+
   it('refuses a value the store cannot hold, keeping nothing', async () => {
     const store = sqliteCache(await storePath())
 

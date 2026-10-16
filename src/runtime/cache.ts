@@ -12,6 +12,8 @@ export interface CacheStore {
   set: (key: string, text: string, freshUntil: number) => void
   delete: (key: string) => void
   keys: () => string[]
+  // What each stored value built from other keys was built from, by key, read without the values: `invalidate` asks it once per store instead of calling `get` for every row no process holds in memory. Optional: without it `get` is called for each.
+  dependencies?: () => Map<string, string[]>
   // Tells the other processes sharing the store what this one invalidated, and hears what they did, so no process keeps serving a copy another one dropped. Optional: without them an invalidation stays in its process.
   publish?: (message: string) => void
   subscribe?: (listener: (message: string) => void) => void
@@ -170,8 +172,20 @@ export function invalidate(key: string | ((key: string) => boolean)): void {
     dropped.add(name)
 
   for (const store of stores) {
+    // Read once, and only if a row no process holds in memory is left to look at.
+    let known: Map<string, string[]> | undefined
+
+    const builtFrom = (name: string) => {
+      if (!store.dependencies)
+        return storedReads(store, name)
+
+      known ??= store.dependencies()
+
+      return known.get(name) ?? []
+    }
+
     for (const name of store.keys()) {
-      if (matches(name) || dropped.has(name) || (!entries.has(name) && storedReads(store, name).some(read => read === ALL_READS || matches(read)))) {
+      if (matches(name) || dropped.has(name) || (!entries.has(name) && builtFrom(name).some(read => read === ALL_READS || matches(read)))) {
         store.delete(name)
         dropped.add(name)
       }
@@ -326,6 +340,11 @@ function storedReads(store: CacheStore, key: string): string[] {
   const kept = store.get(key)
 
   return kept ? splitDeps(kept.text).deps ?? [] : []
+}
+
+// The keys a stored text was built from, none for a value that was built from no other.
+export function depsOfText(stored: string): string[] | undefined {
+  return splitDeps(stored).deps
 }
 
 function splitDeps(stored: string): { deps?: string[], text: string } {
