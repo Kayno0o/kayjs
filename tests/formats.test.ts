@@ -131,6 +131,14 @@ describe('kay build --format json', () => {
     expect(await Bun.file(join(outputDir(broken), 'executable')).exists()).toBe(false)
     expect(await Bun.file(join(outputDir(working), 'executable')).exists()).toBe(true)
 
+    await Bun.write(join(working, 'src/server.ts'), `${serving}\nthrow new Error('boom at startup')\n`)
+
+    const rebuilt = await kay(['build', working, '--no-check', '--compile', join(working, 'server'), '--verify'])
+
+    expect(rebuilt.code).toBe(1)
+    expect(await Bun.file(join(outputDir(working), 'executable')).exists()).toBe(false)
+    await Bun.write(join(working, 'src/server.ts'), serving)
+
     const alone = await kay(['build', working, '--no-check', '--verify'])
 
     expect(alone.code).toBe(1)
@@ -161,7 +169,7 @@ describe('kay build --format json', () => {
     it('fails when the executable never answers within the time it has', async () => {
       const silent = await executable('#!/bin/sh\necho starting\nexec sleep 30\n')
 
-      await expect(verifyExecutable(silent.file, silent.root, undefined, 600)).rejects.toThrow(/did not answer within 0.6 s\nstarting/)
+      await expect(verifyExecutable(silent.file, silent.root, undefined, 1500)).rejects.toThrow(/did not answer within 1.5 s\nstarting/)
     }, 30_000)
 
     it('reports a startup failure though a grandchild still holds its output open', async () => {
@@ -172,10 +180,17 @@ describe('kay build --format json', () => {
       expect(performance.now() - started).toBeLessThan(4000)
     }, 30_000)
 
-    it('fails when another process answers on the port and the executable exits', async () => {
-      const taken = await executable(`#!/bin/sh\n[ "$1" = "--health" ] && exit 0\nbun -e 'Bun.serve({ hostname: "127.0.0.1", port: Number(process.env.PORT), fetch: () => new Response("other") }); setTimeout(() => process.exit(0), 3000)' >/dev/null 2>&1 &\nsleep 0.1\necho "address in use" >&2\nexit 1\n`)
+    it('fails when another process answers on the port and the executable exits once it did', async () => {
+      const wait = 'for (;;) { try { await fetch(`http://127.0.0.1:${process.env.PORT}/`); break } catch { await Bun.sleep(10) } } await Bun.sleep(50)'
+      const taken = await executable(`#!/bin/sh\n[ "$1" = "--health" ] && exit 0\nbun -e 'Bun.serve({ hostname: "127.0.0.1", port: Number(process.env.PORT), fetch: () => new Response("other") }); setTimeout(() => process.exit(0), 2000)' >/dev/null 2>&1 &\nbun -e '${wait}'\necho "address in use" >&2\nexit 1\n`)
 
       await expect(verifyExecutable(taken.file, taken.root, undefined)).rejects.toThrow(/exited with code 1[\s\S]*address in use/)
+    }, 30_000)
+
+    it('names the signal that killed a server which had answered', async () => {
+      const killed = await executable(`#!/bin/sh\n[ "$1" = "--health" ] && exit 0\nbun -e 'Bun.serve({ hostname: "127.0.0.1", port: Number(process.env.PORT), fetch: () => new Response("") }); await Bun.sleep(100); process.kill(process.ppid, "SIGKILL")' &\nwait\n`)
+
+      await expect(verifyExecutable(killed.file, killed.root, undefined)).rejects.toThrow(/killed by SIGKILL/)
     }, 30_000)
   })
 

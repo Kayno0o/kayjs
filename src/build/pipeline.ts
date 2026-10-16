@@ -247,6 +247,9 @@ async function runBuild(root: string, config: KayConfig, options: BuildOptions):
 
     report({ step: 'compiling' })
 
+    // Gone before the executable is overwritten, so a build stopped half way leaves no record of a binary it replaced.
+    await rm(join(output, EXECUTABLE_RECORD), { force: true })
+
     try {
       const executable = await compileServer(project, { outfile: resolve(root, options.compile.outfile), entry: options.compile.entry === undefined ? undefined : resolve(root, options.compile.entry), packages: shippedPackages(project, client) })
 

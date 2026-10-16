@@ -12,19 +12,20 @@ const SETTLE_MS = 250
 
 // Starts the executable on a free port as a deploy would, waits until its health route answers 200, runs it again as `--health` the way a container's health check does, then stops it.
 // A server that exits before it answers fails with its own output, one that never answers within 30 s with what it printed so far.
-// An answer only counts when the server is still running a moment later, as another process that took the port between picking it and the server binding it would answer for a server that then exits.
+// An answer only counts when the server is still running a moment later, as another process that took the port between picking it and the server binding it would answer for a server that then exits: a best-effort check, which a server that binds late, after other work, can still slip past.
 export async function verifyExecutable(executable: string, root: string, health: HealthConfig | false | undefined, startTimeoutMs = START_TIMEOUT_MS): Promise<number> {
   const started = performance.now()
   const port = String(await freePort())
   const env = { ...process.env, NODE_ENV: 'production', PORT: port }
   const server = Bun.spawn([executable], { cwd: root, env, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' })
   const printed = capture(server)
+  const running = () => server.exitCode === null && server.signalCode === null
 
   try {
     const url = `http://127.0.0.1:${port}${health === false ? '/' : health?.path ?? HEALTH_PATH}`
     let ready = false
 
-    while (!ready && server.exitCode === null && performance.now() - started < startTimeoutMs) {
+    while (!ready && running() && performance.now() - started < startTimeoutMs) {
       ready = await answers(url, health === false)
 
       if (!ready)
@@ -33,16 +34,16 @@ export async function verifyExecutable(executable: string, root: string, health:
 
     if (ready) {
       await Bun.sleep(SETTLE_MS)
-      ready = server.exitCode === null
+      ready = running()
     }
 
     if (!ready) {
-      const reason = server.exitCode !== null ? `exited with code ${server.exitCode} before it kept answering` : `did not answer within ${startTimeoutMs / 1000} s`
+      const reason = running() ? `did not answer within ${startTimeoutMs / 1000} s` : `${server.signalCode === null ? `exited with code ${server.exitCode}` : `was killed by ${server.signalCode}`} before it kept answering`
 
-      if (server.exitCode === null)
+      if (running())
         await stop(server)
 
-      throw new KayError('executable-failed', `kay: the executable ${reason}\n${tail(await printed())}`.trimEnd())
+      throw new KayError('executable-failed', `kay: the executable ${reason}\n${tail(await printed.text())}`.trimEnd())
     }
 
     if (health !== false) {
@@ -55,13 +56,14 @@ export async function verifyExecutable(executable: string, root: string, health:
   }
   finally {
     await stop(server)
+    await printed.close()
   }
 
   return performance.now() - started
 }
 
 // What the server prints, which a grandchild it left running may keep the pipes open on after it exits: the reader gives up OUTPUT_GRACE_MS after the server is gone, with what it got.
-function capture(server: Bun.Subprocess<'ignore', 'pipe', 'pipe'>): () => Promise<string> {
+function capture(server: Bun.Subprocess<'ignore', 'pipe', 'pipe'>): { text: () => Promise<string>, close: () => Promise<void> } {
   const chunks: string[] = []
   const readers = [server.stdout, server.stderr].map(stream => stream.getReader())
   const pumps = readers.map(async (reader) => {
@@ -71,18 +73,24 @@ function capture(server: Bun.Subprocess<'ignore', 'pipe', 'pipe'>): () => Promis
       chunks.push(decoder.decode(read.value, { stream: true }))
   })
 
-  return async () => {
-    await server.exited
-    await Promise.race([Promise.all(pumps), Bun.sleep(OUTPUT_GRACE_MS)])
-
+  const close = async () => {
     await Promise.all(readers.map(async (reader) => {
       try {
         await reader.cancel()
       }
       catch {}
     }))
+  }
 
-    return chunks.join('').trim()
+  return {
+    text: async () => {
+      await server.exited
+      await Promise.race([Promise.all(pumps), Bun.sleep(OUTPUT_GRACE_MS)])
+      await close()
+
+      return chunks.join('').trim()
+    },
+    close,
   }
 }
 
@@ -99,7 +107,7 @@ async function answers(url: string, anything: boolean): Promise<boolean> {
 }
 
 async function stop(server: Bun.Subprocess): Promise<void> {
-  if (server.exitCode !== null)
+  if (server.exitCode !== null || server.signalCode !== null)
     return
 
   server.kill('SIGTERM')
