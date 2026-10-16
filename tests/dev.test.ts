@@ -14,6 +14,7 @@ import { loadConfig } from '../src/config'
 import { ConfigRefused, dev, networkAddress, watchProject } from '../src/dev'
 import { startClientBuilder } from '../src/dev/client'
 import { InspectorAddressInUse, inspectorProxy } from '../src/dev/inspector'
+import { TypesProcess } from '../src/dev/types-process'
 import { bootFailure, hotSwap } from '../src/server/dev'
 import { editorCommand } from '../src/server/editor'
 
@@ -335,38 +336,84 @@ describe.concurrent('kay dev', () => {
     }
   }, 60_000)
 
-  it('keeps writing types through one process across edits of sources, and reads the config again once it or a module changes', async () => {
+  it('writes types through one process across edits of sources, whatever the config prints, and boots another once something else changes or the process went', async () => {
     const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
-    const children: Subprocess[] = []
+    const loads = join(root, 'loads')
     const shadow = join(root, '.kay/types/src/routes/index.kay.tsx')
+    const config = (dir: string) => `import { appendFileSync } from 'node:fs'\n\nappendFileSync(${JSON.stringify(loads)}, 'x')\nprocess.stdout.write('printed by the config')\n\nexport default { publicDir: '${dir}' }\n`
 
-    await Bun.write(join(root, 'src/server.ts'), 'setInterval(() => undefined, 1000)\n')
     await Bun.write(join(root, 'src/routes/index.kay'), 'p Home\n')
-    await Bun.write(join(root, 'kay.config.ts'), 'export default { publicDir: \'one\' }\n')
-    const stop = await dev(root, { onRestart: child => children.push(child) })
-
-    const restarted = async (edit: () => Promise<unknown>) => {
-      const count = children.length
-
-      await edit()
-      await until(() => children.length === count + 1, 20_000)
-    }
+    await Bun.write(join(root, 'kay.config.ts'), config('one'))
+    const types = new TypesProcess(root, undefined)
+    const count = () => existsSync(loads) ? readFileSync(loads, 'utf8').length : 0
 
     try {
-      await until(() => existsSync(shadow), 20_000)
+      expect(await types.write(false, '')).toBe(0)
       expect(readShadowSettings(root).publicDir).toBe(join(root, 'one'))
 
       for (const text of ['p Second\n', 'p Third\n']) {
-        await restarted(async () => Bun.write(join(root, 'src/routes/index.kay'), text))
-        await until(() => readFileSync(shadow, 'utf8').includes(text.slice(2, -1)), 20_000)
+        await Bun.write(join(root, 'src/routes/index.kay'), text)
+        expect(await types.write(false, '')).toBe(0)
+        expect(readFileSync(shadow, 'utf8')).toContain(text.slice(2, -1))
       }
 
+      expect(count()).toBe(1)
+      await Bun.write(join(root, 'kay.config.ts'), config('two'))
+      expect(await types.write(false, '')).toBe(0)
       expect(readShadowSettings(root).publicDir).toBe(join(root, 'one'))
-      await restarted(async () => Bun.write(join(root, 'kay.config.ts'), 'export default { publicDir: \'two\' }\n'))
-      await until(() => readShadowSettings(root).publicDir === join(root, 'two'), 20_000)
+      expect(await types.write(true, '')).toBe(0)
+      expect(readShadowSettings(root).publicDir).toBe(join(root, 'two'))
+      expect(count()).toBe(2)
     }
     finally {
-      await stop()
+      types.close()
+      await rm(root, { recursive: true, force: true })
+    }
+  }, 60_000)
+
+  it.serial('boots a new types process when r is pressed, as the config or a module it imports may have changed', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
+    const keys = new PassThrough()
+    const tty = process.stdout.isTTY
+    const noColor = process.env.NO_COLOR
+    const lines: string[] = []
+    const printed = spyOn(console, 'log').mockImplementation((line: string) => void lines.push(line))
+    const written = spyOn(process.stdout, 'write').mockImplementation(() => true)
+    let stop: (() => Promise<void>) | undefined
+    const helper = `${root}-helper.ts`
+
+    const free = Bun.serve({ port: 0, fetch: () => new Response() })
+    const port = free.port!
+
+    await free.stop()
+    await Bun.write(join(root, 'src/server.ts'), `Bun.serve({ port: ${port}, fetch: () => new Response() })\n`)
+    await Bun.write(join(root, 'src/routes/index.kay'), 'p Home\n')
+    await Bun.write(helper, 'export const dir = \'one\'\n')
+    await Bun.write(join(root, 'kay.config.ts'), `import { dir } from ${JSON.stringify(helper)}\n\nexport default { publicDir: dir }\n`)
+    process.stdout.isTTY = true
+    process.env.NO_COLOR = '1'
+
+    try {
+      stop = await dev(root, { keys })
+      await until(() => existsSync(join(root, '.kay/types/kay-shadow.json')), 20_000)
+      expect(readShadowSettings(root).publicDir).toBe(join(root, 'one'))
+      await Bun.write(helper, 'export const dir = \'second\'\n')
+      await until(() => lines.some(line => line.includes('press o')), 20_000)
+      keys.write('r')
+      await until(() => readShadowSettings(root).publicDir === join(root, 'second'), 20_000)
+    }
+    finally {
+      await stop?.()
+      await rm(helper, { force: true })
+      process.stdout.isTTY = tty
+      printed.mockRestore()
+      written.mockRestore()
+
+      if (noColor === undefined)
+        delete process.env.NO_COLOR
+      else
+        process.env.NO_COLOR = noColor
+
       await rm(root, { recursive: true, force: true })
     }
   }, 60_000)

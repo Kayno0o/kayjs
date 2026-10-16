@@ -468,7 +468,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
       typesConfig = await reloadConfig(root, typesConfig)
 
     if (typesRead(files)) {
-      typesFresh ||= files.some(file => !file.endsWith('.kay'))
+      typesFresh ||= files.length === 0 || files.some(file => !file.endsWith('.kay'))
       void writeTypes()
     }
   }
@@ -596,7 +596,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
 
     // A types process stuck importing the config is killed rather than waited for.
     if (typesWriting !== undefined) {
-      const grace = setTimeout(() => typesProcess.stop(), TYPES_GRACE_MS)
+      const grace = setTimeout(() => typesProcess.close(), TYPES_GRACE_MS)
 
       try {
         await typesWriting
@@ -606,7 +606,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
       }
     }
 
-    typesProcess.stop()
+    typesProcess.close()
     await Promise.all([child?.exited, spare?.exited, builder?.stop()])
     await inspector?.stop()
   }

@@ -2,7 +2,7 @@ import type { KayConfig } from '../config'
 import process from 'node:process'
 import { configCheckOptions, writeShadowTypes } from '../check'
 import { loadConfig } from '../config'
-import { CONFIG_REFUSED, REFUSE } from './refuse'
+import { ANSWER, CONFIG_REFUSED, REFUSE } from './refuse'
 
 // Writes the shadow tree of the project for `kay dev` from the config as it is now, in a process of its own so `kay dev` holds no checker and every module the config imports is read again.
 // It stays up between writes: each line `kay dev` sends writes the tree once more with the config this process loaded, and the line it answers with is the exit code that write would have had.
@@ -44,5 +44,5 @@ async function write(): Promise<number> {
 
 for await (const line of console) {
   if (line !== '')
-    process.stdout.write(`${await write()}\n`)
+    process.stdout.write(`\n${ANSWER}${await write()}\n`)
 }

@@ -1,6 +1,7 @@
 import type { Subprocess } from 'bun'
 import { join } from 'node:path'
 import process from 'node:process'
+import { ANSWER } from './refuse'
 
 const TYPES = join(import.meta.dir, 'types.ts')
 // How long the process writing the types waits for the next edit before it exits, so a project left alone holds no memory for it.
@@ -8,18 +9,50 @@ const IDLE_MS = 10_000
 
 // The process writing the shadow tree of `kay dev`, kept between writes so an edit costs a write rather than a boot and the config's imports read again.
 export class TypesProcess {
-  child: Subprocess<'pipe', 'pipe', 'inherit'> | undefined
+  private child: Subprocess<'pipe', 'pipe', 'inherit'> | undefined
   private lines: AsyncIterator<string> | undefined
   private idle: ReturnType<typeof setTimeout> | undefined
+  private closed = false
 
   constructor(private root: string, private entry: string | undefined) {}
 
   // Writes the tree and answers the exit code of the write. `fresh` boots a new process first, as the config or a module it imports may have changed.
+  // A kept process that went since the last write is replaced and the write sent again, so no write is lost.
   async write(fresh: boolean, refuse: string): Promise<number> {
     clearTimeout(this.idle)
 
     if (fresh)
-      this.stop()
+      this.kill()
+
+    const kept = this.child !== undefined
+    const answer = await this.ask(refuse)
+
+    if (answer !== undefined) {
+      this.idle = setTimeout(() => this.kill(), IDLE_MS)
+      this.idle.unref()
+
+      return answer
+    }
+
+    return kept && !this.closed ? this.write(true, refuse) : 1
+  }
+
+  // Ends it for good: a write waiting on it answers at once, and none starts another.
+  close() {
+    this.closed = true
+    this.kill()
+  }
+
+  private kill() {
+    clearTimeout(this.idle)
+    this.child?.kill()
+    this.child = undefined
+  }
+
+  // The exit code the process answered, or undefined once it went before it did.
+  private async ask(refuse: string): Promise<number | undefined> {
+    if (this.closed)
+      return undefined
 
     const child = this.child ?? this.spawn(refuse)
 
@@ -27,27 +60,24 @@ export class TypesProcess {
       await child.stdin.write('write\n')
       await child.stdin.flush()
 
-      const answer = await this.lines!.next()
+      for (;;) {
+        const line = await this.lines!.next()
 
-      if (answer.done !== true) {
-        this.idle = setTimeout(() => this.stop(), IDLE_MS)
-        this.idle.unref()
+        if (line.done === true)
+          break
 
-        return Number(answer.value)
+        // Whatever else the config or a module it imports prints is not an answer.
+        if (line.value.startsWith(ANSWER))
+          return Number(line.value.slice(ANSWER.length))
       }
     }
-    catch {}
+    catch (error) {
+      console.error(error)
+    }
 
-    // The process went before it answered: its own exit code says why.
-    this.child = undefined
+    this.kill()
 
-    return await child.exited || 1
-  }
-
-  stop() {
-    clearTimeout(this.idle)
-    this.child?.kill()
-    this.child = undefined
+    return undefined
   }
 
   private spawn(refuse: string) {
