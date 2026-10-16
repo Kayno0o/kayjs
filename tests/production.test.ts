@@ -672,6 +672,38 @@ console.log(JSON.stringify({ warnings, shared: sharedKey('x')?.toString('hex') }
     expect((await stamps('setupStampSecret(undefined)', { KAY_SECRET: 'short' })).err).toContain('KAY_SECRET is 5 characters long')
   })
 
+  it('reaches the stamp secret from the config\'s secret and from KAY_SECRET through pages(), warning of neither', async () => {
+    const long = 'a configured secret of enough length for kay'
+    const script = (options: string) => `import { setLogSink } from ${JSON.stringify(join(import.meta.dir, '../src/runtime/log.ts'))}
+import { pages } from ${JSON.stringify(join(import.meta.dir, '../src/server/index.ts'))}
+import { sharedKey, signStamp } from ${JSON.stringify(join(import.meta.dir, '../src/server/stamp.ts'))}
+const warnings = []
+setLogSink((level, message) => warnings.push(level + ' ' + message))
+process.env.NODE_ENV = 'production'
+await pages({ routes: ${JSON.stringify(join(import.meta.dir, '../', ROUTES))}, prebuilt: false${options} })
+signStamp('a', 1)
+console.log(JSON.stringify({ warnings, shared: sharedKey('x')?.toString('hex') }))
+process.exit(0)
+`
+    const run = async (source: string, env: Record<string, string>) => {
+      const child = Bun.spawn([process.execPath, '-e', source], { env: { ...process.env, KAY_SECRET: '', ...env }, stdout: 'pipe', stderr: 'pipe' })
+      const [out, err] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text()])
+
+      expect({ code: await child.exited, err }).toEqual({ code: 0, err: '' })
+
+      return JSON.parse(out) as { warnings: string[], shared: string | undefined }
+    }
+    const config = await run(script(`, secret: ${JSON.stringify(long)}`), {})
+    const env = await run(script(''), { KAY_SECRET: long })
+    // An empty `secret: process.env.KAY_SECRET` is none.
+    const empty = await run(script(', secret: \'\''), { KAY_SECRET: long })
+
+    expect(config.warnings).toEqual([])
+    expect(config.shared).toBeDefined()
+    expect(env).toEqual(config)
+    expect(empty).toEqual(config)
+  })
+
   it('says nothing of the key of the process under bun test, and names where the secret goes elsewhere', async () => {
     const script = (env: string) => `import { setLogSink } from ${JSON.stringify(join(import.meta.dir, '../src/runtime/log.ts'))}
 import { pages } from ${JSON.stringify(join(import.meta.dir, '../src/server/index.ts'))}

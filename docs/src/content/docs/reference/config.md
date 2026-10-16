@@ -63,7 +63,6 @@ Every option is optional. The ones below are the common ones, the rest are in th
 | --- | --- |
 | `content` | The module exporting the collections, `src/content.config.ts` by default. See [Content](/guides/content) |
 | `preview` | Lets an editor see drafts on the live site, with a `secret` |
-| `secret` | What signs form stamps, links to private files and the flash cookie when the app has no `session()`: at least 32 random characters, `KAY_SECRET` when left out. A `session()` secret takes its place |
 | `storage` | Where `files` keeps uploads: `diskFiles()` by default, or `s3Files()`. See [File storage](/guides/file-storage) |
 | `i18n` | `locales`, `defaultLocale`, and optionally `prefixDefault` or per-locale `domains`, and `paths` translating a page's path per locale. See [Internationalization](/guides/i18n) |
 
@@ -87,6 +86,7 @@ Every option is optional. The ones below are the common ones, the rest are in th
 | `security` | The CSP and security headers every response carries, or `false` for none; `X-Frame-Options` follows the policy's `frame-ancestors`. See [Deployment](/guides/deployment) |
 | `proxy` | The proxies in front of the server and the public ranges they reach it from (`trusted`), for the client address rate limits count |
 | `compress` | zstd, brotli and gzip for pages rendered per request, on in production; `false` when a proxy does it |
+| `secret` | What signs form stamps, links to private files and the flash cookie when the app has no `session()`: at least 32 random characters, `KAY_SECRET` when left out. A `session()` secret takes its place |
 | `health` | The route a load balancer polls, `/_kay/health` by default |
 | `log` | One line per request, and kay's own messages: as text, `'json'`, a function receiving each `LogEntry`, or `false` for no request lines |
 | `bodyLimit` | The most bytes an action or API request may send, 1 MB by default |

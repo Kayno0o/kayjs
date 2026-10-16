@@ -22,11 +22,11 @@ export function useStampSecret(value: string, from: Exclude<StampSource, 'proces
     secret = { key: new Uint8Array(nodeCrypto().hkdfSync('sha256', value, '', 'kay stamps', KEY_BYTES)), from }
 }
 
-// The app's own secret: `secret` in the config, else `KAY_SECRET`, an empty one counting as none. A short one is refused, as the session's is.
+// The app's own secret: `secret` in the config, else `KAY_SECRET`, an empty one counting as none in both. A short one is refused, as the session's is.
 export function setupStampSecret(configured: string | undefined): void {
-  const value = configured ?? (process.env.KAY_SECRET === '' ? undefined : process.env.KAY_SECRET)
+  const value = configured === undefined || configured === '' ? process.env.KAY_SECRET : configured
 
-  if (value === undefined)
+  if (value === undefined || value === '')
     return
 
   if (value.length < MIN_SECRET_LENGTH)
@@ -49,7 +49,7 @@ function stampKey(): Uint8Array {
   return secret.key
 }
 
-// A key for `use` derived from the session's or the preview's secret, which every replica shares, or undefined while neither is set.
+// A key for `use` derived from the session's, the app's or the preview's secret, which every replica shares, or undefined while none is set.
 export function sharedKey(use: string): Buffer | undefined {
   return secret.from === 'process' ? undefined : nodeCrypto().createHmac('sha256', secret.key).update(`kay-key\0${use}`).digest()
 }
