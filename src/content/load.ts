@@ -5,7 +5,8 @@ import { mkdir, readdir, rm, stat } from 'node:fs/promises'
 import { join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { pruneCache, touchCacheFile } from '../build/cache'
-import { writeAtomically } from '../build/files'
+import { resolveFrom, writeAtomically } from '../build/files'
+import { importsOf } from '../build/libraries'
 import { KayError } from '../compiler/errors'
 import { modeOf, cacheDir as projectCache } from '../project'
 import { projectSource } from '../server/source'
@@ -31,6 +32,7 @@ export interface RawEntry {
 // Under `.kay/client`, beside the build's other output, and embedded with it in an executable.
 const CONTENT_DIR = 'content'
 const READ_BATCH = 64
+const SCRIPT_MODULE = /\.[cm]?[jt]sx?$/
 const ENTRY_FILES = new Bun.Glob('**/*.{md,json,yaml,yml}')
 const EXTENSION = /\.(?:md|json|ya?ml)$/
 const INDEX = /(?:^|\/)index$/
@@ -55,11 +57,11 @@ const sweptCaches = new Set<string>()
 // The cache directories a collection was compiled into in this process, which a full build may prune.
 const compiledInto = new Set<string>()
 
-let place: { root: string, base: string } | undefined
+let place: { root: string, base: string, config?: string | undefined } | undefined
 
-// The project root, whose `.kay` holds the cache and the build, and the directory collections are read relative to: the content config's.
-export function setContentPlace(root: string, base: string): void {
-  place = { root, base }
+// The project root, whose `.kay` holds the cache and the build, the directory collections are read relative to (the content config's), and the config file, whose imports a highlighter may use.
+export function setContentPlace(root: string, base: string, config?: string): void {
+  place = { root, base, config }
 }
 
 let mode: ContentMode | undefined
@@ -135,8 +137,9 @@ async function compileDirectory(dir: string, highlight?: Highlighter): Promise<R
   const root = rootOf()
   const absolute = resolve(baseOf(), dir)
   const cacheDir = projectCache(root, 'content')
-  // Bun's Markdown output and the highlighter's source are part of every key; a highlighter whose output changes with no change to its source, such as a new theme passed in, needs the cache cleared.
-  const salt = Bun.hash(`${CACHE_VERSION}:${Bun.version}:${highlight?.toString() ?? ''}`).toString(36)
+  // Bun's Markdown output, the highlighter's source and the modules the content config imports are part of every key; a highlighter whose output changes with none of them, such as a new theme passed in, needs the cache cleared.
+  const imported = highlight === undefined ? '' : await importedSource(root, place?.config)
+  const salt = Bun.hash(`${CACHE_VERSION}:${Bun.version}:${highlight?.toString() ?? ''}:${imported}`).toString(36)
   const files = await entryFiles(absolute)
   const problems: ContentProblem[] = []
   const entries: RawEntry[] = []
@@ -250,6 +253,39 @@ export function parseEntry(name: string, source: string): { data: unknown, body?
   const { frontmatter, body, bodyLine } = splitFrontmatter(source)
 
   return { data: frontmatter === undefined ? {} : parseYaml(frontmatter, 2), body, bodyLine, ...frontmatter !== undefined && { frontmatter } }
+}
+
+// A hash of the TypeScript and JavaScript modules of the project the content config imports, however deep, and the config itself: a highlighter imports what it draws on from them, and its own source shows none of it.
+async function importedSource(root: string, config: string | undefined): Promise<string> {
+  if (config === undefined)
+    return ''
+
+  const project = root + sep
+  const hashes = new Map<string, string>()
+  const queue = [config]
+
+  for (const file of queue) {
+    if (hashes.has(file))
+      continue
+
+    try {
+      const source = await Bun.file(file).text()
+
+      hashes.set(file, Bun.hash(source).toString(36))
+
+      for (const specifier of await importsOf(file, source)) {
+        const target = resolveFrom(specifier, file)
+
+        if (target !== undefined && target.startsWith(project) && !target.includes(`${sep}node_modules${sep}`) && SCRIPT_MODULE.test(target))
+          queue.push(target)
+      }
+    }
+    catch {
+      hashes.set(file, '')
+    }
+  }
+
+  return Bun.hash([...hashes].sort(([a], [b]) => a.localeCompare(b)).map(([file, hash]) => `${relative(root, file)}:${hash}`).join('\n')).toString(36)
 }
 
 async function compileEntry(name: string, file: string, source: string, highlight?: Highlighter): Promise<RawEntry> {

@@ -7,6 +7,7 @@ This page lists what each release adds, newest first, with a link to where each 
 
 ## Unreleased
 
+- **Highlighter helpers in the content cache**: a collection with a `highlight` recompiles its entries when a module the content config imports changes, so a helper the highlighter calls never leaves entries highlighted by its old code. [Content](/guides/content)
 - **happy-dom 21 for `mount`**: `kay/test/dom` works with `@happy-dom/global-registrator` 20.14.6 or 21.0.3 and later, so an app on either needs no change. [Testing](/guides/testing)
 
 ## 1.47.0

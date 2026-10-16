@@ -43,7 +43,7 @@ export async function projectCollections(root: string, config?: string): Promise
 async function namedCollections(root: string, config?: string): Promise<[string, Collection<unknown>][]> {
   const file = projectPaths(root, { content: config }).content
 
-  setContentPlace(root, dirname(file))
+  setContentPlace(root, dirname(file), file)
 
   const source = projectSource()
 

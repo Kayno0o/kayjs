@@ -491,4 +491,28 @@ describe('Markdown outside collections', () => {
       expect(large / small).toBeLessThan(24)
     }
   })
+
+  it('recompiles the entries when a module the content config imports changes, though the highlighter reads the same', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kay-content-'))
+    let mark = 'old'
+    // The highlighter's source is the same in both runs, standing for one that calls a helper the config imports.
+    const highlight = (code: string) => `<pre data-by="${mark}">${code}</pre>`
+    const loaded = async () => (await loadEntries('posts', highlight, true)).flatMap(entry => entry.segments ?? []).join()
+
+    try {
+      setContentPlace(dir, dir, join(dir, 'content.config.ts'))
+      await Bun.write(join(dir, 'content.config.ts'), 'import \'./helper\'\n')
+      await Bun.write(join(dir, 'helper.ts'), 'export const theme = \'old\'\n')
+      await Bun.write(join(dir, 'posts/a.md'), '```\na\n```\n')
+      expect(await loaded()).toContain('data-by="old"')
+
+      mark = 'new'
+      await Bun.write(join(dir, 'helper.ts'), 'export const theme = \'new\'\n')
+      expect(await loaded()).toContain('data-by="new"')
+    }
+    finally {
+      setContentPlace(process.cwd(), join(process.cwd(), FIXTURE, 'src'))
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
 })
