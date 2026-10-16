@@ -1,7 +1,7 @@
 import type { Direction, Locale, Localize, MessageValue, RelativeTimeOptions, RichText, Translate } from './i18n'
 import type { JSX } from './jsx'
 import type { LocaleState } from './locale-state'
-import { formatDate as formatDateIn, formatList as formatListIn, formatNumber as formatNumberIn, formatRelativeTime as formatRelativeTimeIn, localePath, richMessage, textDirection, translate } from './i18n'
+import { formatDate as formatDateIn, formatList as formatListIn, formatNumber as formatNumberIn, formatRelativeTime as formatRelativeTimeIn, localeName as localeNameIn, localePath, richMessage, textDirection, translate } from './i18n'
 import { insideIsland, noteMessage } from './island.server'
 import { localeState } from './locale-state'
 import { PART_END, PART_START } from './markers'
@@ -58,6 +58,16 @@ export function alternate(target: Locale): string {
   const state = current('alternate()')
 
   return state.implicit ? state.path : localePath(state.settings, state.path, target, state.host)
+}
+
+// Every locale the site is served in, the default one first as `i18n` lists it, for a language switcher: `for code of locales()` with `alternate(code)` and `localeName(code)`.
+export function locales(): Locale[] {
+  return current('locales()').settings.locales as Locale[]
+}
+
+// A locale named in its own language, `Français` for `fr`, whichever locale the page is in.
+export function localeName(target: Locale): string {
+  return localeNameIn(target)
 }
 
 export function formatNumber(value: number, options?: Intl.NumberFormatOptions): string {

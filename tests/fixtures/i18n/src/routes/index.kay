@@ -1,5 +1,5 @@
 --- server
-import { direction, formatList, formatNumber, formatRelativeTime, T, t } from 'kay/i18n'
+import { direction, formatList, formatNumber, formatRelativeTime, localeName, locales, T, t } from 'kay/i18n'
 import Counter from '../components/counter.kay'
 
 export const page = { prerender: true }
@@ -14,6 +14,7 @@ const now = Date.UTC(2026, 9, 4, 12)
 const ago = [formatRelativeTime(now - 3 * 86_400_000, { now }), formatRelativeTime(now - 86_400_000, { now }), formatRelativeTime(now + 90 * 60_000, { now }), formatRelativeTime(2, 'week')].join(' / ')
 const listed = formatList(['Ada', 'Grace', 'Linus'])
 const written = `${direction()} ${direction('ar')}`
+const switcher = locales().map(code => `${code}=${localeName(code)}`).join(' ')
 const { locale } = ctx
 ---
 h1 {greeting}
@@ -24,6 +25,7 @@ p.locale {locale}
 p.ago {ago}
 p.listed {listed}
 p.direction {written}
+p.switcher {switcher}
 p.intro
   T(key="intro" name="<Ada>")
     @about(text)

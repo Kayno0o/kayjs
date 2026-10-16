@@ -13,7 +13,7 @@ import { compileKay } from '../src/compiler'
 import { islandMessages } from '../src/compiler/codegen'
 import { collection } from '../src/content'
 import { ContentError } from '../src/content/validate'
-import { flattenMessages, localePath, localizedLink, textDirection, translate, untranslatedPath } from '../src/runtime/i18n'
+import { flattenMessages, localeName, localePath, localizedLink, textDirection, translate, untranslatedPath } from '../src/runtime/i18n'
 import { relativeTime } from '../src/runtime/i18n.server'
 import { runInLocale } from '../src/runtime/locale-state'
 import { pages } from '../src/server'
@@ -96,6 +96,14 @@ describe('locale prefixes', () => {
     expect(french.html).toContain('<p class="listed">Ada, Grace et Linus</p>')
     expect(english.html).toContain('<p class="listed">Ada, Grace, and Linus</p>')
     expect(english.html).toContain('<p class="direction">ltr rtl</p>')
+  })
+
+  it('list the configured locales, each named in its own language whichever one the page is in', async () => {
+    expect((await get('/')).html).toContain('<p class="switcher">fr=Français en=English</p>')
+    expect((await get('/en')).html).toContain('<p class="switcher">fr=Français en=English</p>')
+    expect(localeName('ja')).toBe('日本語')
+    expect(localeName('pt-BR')).toBe('Português (Brasil)')
+    expect(localeName('xx-not a locale')).toBe('xx-not a locale')
   })
 
   it('render a message\'s tags through T\'s blocks, its placeholders filled and escaped inside a tag and out', async () => {
@@ -618,7 +626,7 @@ describe('in the browser', () => {
     GlobalRegistrator.register({ url: 'http://localhost/en/about-us' })
 
     try {
-      const { alternate, formatNumber, localize, localizedHref, t } = await import('../src/runtime/i18n.client')
+      const { alternate, formatNumber, localeName: nameOf, locales, localize, localizedHref, t } = await import('../src/runtime/i18n.client')
       const payload = { locale: 'en', settings: localeSettings({ ...i18n, paths: { '/about': { fr: '/a-propos', en: '/about-us' } } }), messages: { 'counter.label': 'Counter' } }
 
       document.head.innerHTML = `<script type="application/json" data-kay-i18n>${JSON.stringify(payload)}</script>`
@@ -628,6 +636,8 @@ describe('in the browser', () => {
       expect(localize('/')).toBe('/en')
       expect(alternate('fr')).toBe('/a-propos')
       expect(formatNumber(1234)).toBe('1,234')
+      expect(locales()).toEqual(['fr', 'en'])
+      expect(nameOf('fr')).toBe('Français')
 
       // Once read on a parsed page, a known message, the locale and the settings search the page no more, as a list row each calling them would.
       const searched = spyOn(document, 'querySelectorAll')

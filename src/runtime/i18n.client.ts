@@ -1,7 +1,7 @@
 import type { Direction, Locale, LocaleSettings, Localize, Message, MessageValue, RelativeTimeOptions, RichText, Translate } from './i18n'
 import { withBase, withoutBase } from './base'
 import { fragment, insert, localizeLinks, markers } from './dom'
-import { formatDate as formatDateIn, formatList as formatListIn, formatNumber as formatNumberIn, formatRelativeTime as formatRelativeTimeIn, localePath, localizedLink, richMessage, splitLocale, textDirection, translate, untranslatedPath } from './i18n'
+import { formatDate as formatDateIn, formatList as formatListIn, formatNumber as formatNumberIn, formatRelativeTime as formatRelativeTimeIn, localeName as localeNameIn, localePath, localizedLink, richMessage, splitLocale, textDirection, translate, untranslatedPath } from './i18n'
 import { pageData } from './page-data'
 import { createSignal, effect, memo, onCleanup } from './reactive'
 import { tabVisible } from './visibility'
@@ -103,6 +103,15 @@ export function alternate(target: Locale): string {
   const { locale, path: own } = splitLocale(settings, path)
 
   return withBase(localePath(settings, untranslatedPath(settings, own, locale ?? current), target, location.host))
+}
+
+export function locales(): Locale[] {
+  // Without the settings, as on a site with no `i18n`, the page's one locale.
+  return (settings?.locales ?? [translations().locale]) as Locale[]
+}
+
+export function localeName(target: Locale): string {
+  return localeNameIn(target)
 }
 
 export function formatNumber(value: number, options?: Intl.NumberFormatOptions): string {

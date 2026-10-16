@@ -97,6 +97,17 @@ a(href={alternate('fr')} hreflang="fr") Français
 a(href={alternate('en')} hreflang="en") English
 ```
 
+`locales()` lists every locale of `i18n`, typed as the app's `Locale`, and `localeName(code)` names one in its own language, so a switcher hard-codes neither:
+
+```kay
+--- server
+import { alternate, localeName, locales } from 'kay/i18n'
+---
+nav
+  for code of locales()
+    a(href={alternate(code)} hreflang={code}) {localeName(code)}
+```
+
 ### Format a number, a date or a list
 
 These format through `Intl` for the request's locale:
@@ -185,7 +196,7 @@ export default defineMessages({
 
 ### Helpers
 
-- `t`, `locale`, `direction`, `localize`, `alternate`, `formatNumber`, `formatDate`, `formatRelativeTime`, `relativeTime` and `formatList` come from `kay/i18n`, which works anywhere a request is served from: loads, templates, components, islands, actions and guards, and in `renderToString` outside one, in the site's default locale or the one its `locale` option names (see rendering).
+- `t`, `locale`, `locales`, `localeName`, `direction`, `localize`, `alternate`, `formatNumber`, `formatDate`, `formatRelativeTime`, `relativeTime` and `formatList` come from `kay/i18n`, which works anywhere a request is served from: loads, templates, components, islands, actions and guards, and in `renderToString` outside one, in the site's default locale or the one its `locale` option names (see rendering).
 - `t('greeting', { name })`, which a template, a fence or an island reads with no import unless the file names its own `t`, gives a message in the request's locale, its key and placeholders typed from the default locale's file.
 - A number fills a placeholder formatted for the locale, `1 234` in French, and a date with `dateStyle: 'medium'`.
 - An object of plural forms is picked by `count` through `Intl.PluralRules`, `zero` taking 0 whenever it is given.
@@ -196,6 +207,7 @@ export default defineMessages({
 - `T` renders a message holding markup, such as a link mid-sentence: see [Messages holding markup](#messages-holding-markup).
 - `formatNumber(value, options)` and `formatDate(value, options)` format through `Intl` for the request's locale, and so do `formatRelativeTime(date)`, a date relative to now in the largest unit it reaches, `3 days ago`, `yesterday` or `in 2 hours`, `formatRelativeTime(2, 'week')` in the unit given, and `formatList(['Ada', 'Grace'])`, `Ada and Grace`.
 - In an island, give `formatRelativeTime` the moment it is relative to, `{ now }`, from the server, so the browser renders what the server did, or use `relativeTime`.
+- `locales()` is the configured locales in `i18n`'s order, only the page's own without `i18n`; `localeName('fr')` is `Français`, `localeName('pt-BR')` is `Português (Brasil)`, each in its own language through `Intl.DisplayNames`, first letter capitalized, a code `Intl` cannot read as written.
 - `direction()` is `rtl` or `ltr`, for the request's locale or the one given.
 - `locale()` names it, as do `ctx.locale` in pages, guards, endpoints and actions, the site's `lang` (English by default) without `i18n`.
 - A link written as the default locale names a page, `a(href="/about")`, goes to the page's locale's copy as it renders: `/en/about` on an English page, translated by `paths`, on the locale's host with `domains`.

@@ -5,6 +5,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 ## Unreleased
 
 - `kay check` now type-checks the pages of an extension the app reaches through a workspace link, as it does an installed one, so an app linking a library may see new diagnostics; kayjs-mail's `authWords` throws for a mail kind kayjs-auth does not send ([Components](components.md#add-pages-to-the-app-from-a-library)).
+- `locales()` and `localeName(code)` from `kay/i18n` list the configured locales and name each in its own language, so a language switcher hard-codes neither ([Locales](locales.md#switch-language)).
 - A Markdown entry has `words`, counted from its rendered text, and `readingTime`, the minutes at 230 words a minute ([Content](content.md#reading-entries)).
 - Writing a signal is one rule: assigning works wherever the compiler sees a signal made, and a property or a `let` set from a function is written with `.set`, which `kay check` reports when assigned ([Components](components.md#signals)).
 - `proxy: true` is one proxy in front and `proxy: 2` two; `mailExtension('./src/mail')` names the module exporting the mailer, and any extension names its server plugin with `serverModule: { path, export }`, which kay imports as the server starts and `kay build --compile` bakes in; a Fontsource font entry takes `preload` ([Production](production.md#behind-a-proxy), [Components](components.md#extensions), [Head](head.md)).

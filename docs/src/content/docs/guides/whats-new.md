@@ -8,6 +8,7 @@ This page lists what each release adds, newest first, with a link to where each 
 ## Unreleased
 
 - **Linked libraries are checked**: `kay check` now type-checks the pages of an extension the app reaches through a workspace link, as it does an installed one, so an app linking a library may see new diagnostics. kayjs-mail's `authWords` throws for a mail kind kayjs-auth does not send.
+- **A language switcher without hard-coded languages**: `locales()` and `localeName(code)` from `kay/i18n` list your locales and name each in its own language. [Internationalization](/guides/i18n#links-and-a-language-switcher)
 - **Word count and reading time**: a Markdown entry has `words` and `readingTime`, counted from its rendered text. [Content](/guides/content)
 - **One rule for writing a signal**: assign a signal held in a `const`, an import or a prop, and use `.set` for one held in a property ([Components](/essentials/components)).
 - **Shorter config**: `proxy: true` is one proxy in front and `proxy: 2` two, `mailExtension('./src/mail')` names the module exporting the mailer, and an extension names its server plugin with `serverModule: { path, export }`. A Fontsource font entry takes `preload`. [Deployment](/guides/deployment#behind-a-proxy), [kayjs-mail](/libraries/kayjs-mail).

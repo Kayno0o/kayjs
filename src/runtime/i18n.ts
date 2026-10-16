@@ -85,6 +85,7 @@ const pluralRules = new Map<string, Intl.PluralRules>()
 const relativeFormats = new Map<string, Intl.RelativeTimeFormat>()
 const listFormats = new Map<string, Intl.ListFormat>()
 const directions = new Map<string, Direction>()
+const localeNames = new Map<string, string>()
 // Scripts written right to left: Arabic, Hebrew, Thaana, Syriac, N'Ko, Adlam, Hanifi Rohingya, Mandaic and Samaritan.
 const RTL_SCRIPTS: ReadonlySet<string> = new Set(['Arab', 'Hebr', 'Thaa', 'Syrc', 'Nkoo', 'Adlm', 'Rohg', 'Mand', 'Samr'])
 // Where a link's path ends and its query or fragment starts.
@@ -241,6 +242,20 @@ export function formatRelativeTime(locale: string, value: Date | number, unitOrO
 // Items joined as the locale writes a list, `a, b and c`.
 export function formatList(locale: string, items: Iterable<string>, options?: Intl.ListFormatOptions): string {
   return cached(listFormats, `${locale}\n${options === undefined ? '' : JSON.stringify(options)}`, () => new Intl.ListFormat(locale, options)).format(items)
+}
+
+// A locale named in its own language, `Français` for `fr`, its first letter capitalized as a menu lists it; a code `Intl` cannot read comes back as written.
+export function localeName(locale: string): string {
+  return cached(localeNames, locale, () => {
+    try {
+      const name = new Intl.DisplayNames(locale, { type: 'language' }).of(locale) ?? locale
+
+      return name.charAt(0).toLocaleUpperCase(locale) + name.slice(1)
+    }
+    catch {
+      return locale
+    }
+  })
 }
 
 // Which way a locale's script runs, `rtl` for Arabic, Hebrew, Persian or Urdu, read off the script the locale is most likely written in.
