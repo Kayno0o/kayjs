@@ -40,16 +40,16 @@ async function reaches(address: string, port: number): Promise<boolean> {
   }
 }
 
-// Runs `entry` with PORT and HOST as given, once it answers on `ready`, then the addresses it answers on among `addresses`.
-async function answersOn(entry: string, cwd: string, host: string | undefined, addresses: string[], ready: string): Promise<string[]> {
+// Runs `entry` with PORT and HOST as given, once it answers on one of `ready`, then the addresses it answers on among `addresses`.
+async function answersOn(entry: string, cwd: string, host: string | undefined, addresses: string[], ready: string[]): Promise<string[]> {
   const port = freePort()
   const env: Record<string, string | undefined> = { ...process.env, PORT: String(port), HOST: host, NODE_ENV: 'production' }
   const child: Subprocess = Bun.spawn([process.execPath, entry], { cwd, env, stdout: 'ignore', stderr: 'inherit' })
 
   try {
-    for (let tried = 0; !(await reaches(ready, port)); tried++) {
+    for (let tried = 0; !(await Promise.all(ready.map(async address => reaches(address, port)))).includes(true); tried++) {
       if (tried === 100)
-        throw new Error(`${entry} never answered on ${ready}`)
+        throw new Error(`${entry} never answered on ${ready.join(' or ')}`)
 
       await Bun.sleep(100)
     }
@@ -77,7 +77,6 @@ const CASES = [
   ['0.0.0.0', ['127.0.0.1', OTHER]],
   ['127.0.0.1', ['127.0.0.1']],
   [OTHER, [OTHER]],
-  ['localhost', ['127.0.0.1']],
 ] as const
 
 const itIpv6 = binds('::1') ? it : it.skip
@@ -86,20 +85,34 @@ describe('HOST', () => {
   it.each(CASES)('kay\'s own server for an app with no entry listens on HOST=%p', async (host, expected) => {
     const cwd = await fixtureCopy('bare')
 
-    expect(await answersOn(join(repo, 'src/dev/pages.ts'), cwd, host, ['127.0.0.1', OTHER], expected[0])).toEqual([...expected])
+    expect(await answersOn(join(repo, 'src/dev/pages.ts'), cwd, host, ['127.0.0.1', OTHER], [expected[0]])).toEqual([...expected])
   }, 30_000)
 
   it.each(CASES)('the server entry of a new project listens on HOST=%p', async (host, expected) => {
     const cwd = join(await scratchDir('host-'), 'app')
 
     await createProject(cwd, { kay: '^1.0.0', features: PRESETS.server.features.filter(feature => feature === 'server') })
-    expect(await answersOn('src/server.ts', cwd, host, ['127.0.0.1', OTHER], expected[0])).toEqual([...expected])
+    expect(await answersOn('src/server.ts', cwd, host, ['127.0.0.1', OTHER], [expected[0]])).toEqual([...expected])
+  }, 30_000)
+
+  // Bun binds localhost to one family, ::1 in CI's Alpine container, so one loopback answers and no other address.
+  it('listens on one loopback when HOST=localhost', async () => {
+    const loopbacks = binds('::1') ? ['127.0.0.1', '[::1]'] : ['127.0.0.1']
+    const project = join(await scratchDir('host-'), 'app')
+
+    await createProject(project, { kay: '^1.0.0', features: PRESETS.server.features.filter(feature => feature === 'server') })
+
+    for (const [entry, cwd] of [[join(repo, 'src/dev/pages.ts'), await fixtureCopy('bare')], ['src/server.ts', project]] as const) {
+      const found = await answersOn(entry, cwd, 'localhost', [...loopbacks, OTHER], loopbacks)
+
+      expect(loopbacks.map(address => [address])).toContainEqual(found)
+    }
   }, 30_000)
 
   itIpv6('listens on ::1 when HOST names it', async () => {
     const cwd = await fixtureCopy('bare')
 
-    expect(await answersOn(join(repo, 'src/dev/pages.ts'), cwd, '::1', ['[::1]', '127.0.0.1'], '[::1]')).toEqual(['[::1]'])
+    expect(await answersOn(join(repo, 'src/dev/pages.ts'), cwd, '::1', ['[::1]', '127.0.0.1'], ['[::1]'])).toEqual(['[::1]'])
   }, 30_000)
 
   it('the full starter reads HOST as an optional variable and listens on it', async () => {
