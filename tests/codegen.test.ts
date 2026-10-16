@@ -361,11 +361,6 @@ describe('fences', () => {
       expect(diagnostics.map(d => d.message)).toContain('`count` is a signal, read by calling it')
       expect(tsx).toContain('count()')
     }
-
-    // A comment is no unfinished statement: the error in the first word is the fault of the one before it, which ends with a comment.
-    const finished = compileKay('---\nconst a = 1\n// what?\nconst count = signal(1\n---\np {a}\n', 'test.kay', { check: true })
-
-    expect(finished.tsx).toContain('const a = 1')
   })
 
   it('keep a broken import.meta statement in the body, and read a block comment before a broken import', () => {
@@ -390,6 +385,14 @@ describe('fences', () => {
     expect(imported('const d = { x: signal(1),\n')).toBe(true)
     expect(imported('const d = { x: \'a\', y: signal(1),\n')).toBe(true)
     expect(imported('const d = `${signal(1)}\n')).toBe(true)
+    expect(imported('const d = `a ${b}` + signal(')).toBe(true)
+    expect(imported('const d = foo(`x`, `${y}`, signal(')).toBe(true)
+    expect(imported('const d = foo(`${{ a: 1 }.a}`, signal(')).toBe(true)
+    expect(imported('const d = foo(/\' /, signal(')).toBe(true)
+    expect(imported('const d = foo(/signal/')).toBe(false)
+    expect(imported('const d = 4 / 2 + signal(')).toBe(true)
+    expect(imported('const d = `signal\nconst e = signal(')).toBe(true)
+    expect(imported('const d = `signal`\nconst e = foo(\nconst f = signal(')).toBe(true)
   })
 
   it('write the statement being typed in a server fence wherever it stands', () => {

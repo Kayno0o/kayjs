@@ -69,7 +69,7 @@ const CTX_REFERENCE = /\bctx\b/
 const IMPORT_COMMA_AFTER = /^\s*,\s*/
 const IMPORT_COMMA_BEFORE = /,\s*$/
 // The specifier of an import that did not parse, quoted and closed or not.
-const BROKEN_SPECIFIER = /^((?:\s*(?:\/\/.*\n|\/\*[\s\S]*?\*\/))*\s*import\b(?:[^'"]*[^\w$'"]from)?\s*)((['"])[^'";\s]*\3?)/
+const BROKEN_SPECIFIER = /^((?:\s*(?:\/\/.*\n|\/\*(?:[^*]|\*(?!\/))*\*\/))*\s*import\b(?:[^'"]*[^\w$'"]from)?\s*)((['"])[^'";\s]*\3?)/
 // `kay build` renders the page once when it is `true`.
 const PRERENDER: PageSettingName = 'prerender'
 // The page's query schema, which types and validates `ctx.query`.

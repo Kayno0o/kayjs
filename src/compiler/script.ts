@@ -13,7 +13,7 @@ import { loadTraverse, POSITION_SUFFIX } from './rewrite'
 // The keys of a Babel node that say where it is written, or hold its comments, rather than its children.
 const NOT_CHILDREN = new Set(['loc', 'start', 'end', 'extra', 'leadingComments', 'trailingComments', 'innerComments'])
 // A broken module whose first statement, comments aside, is a static import.
-const STATIC_IMPORT_START = /^(?:\s*(?:\/\/.*\n|\/\*[\s\S]*?\*\/))*\s*import\b(?!\s*[.(])/
+const STATIC_IMPORT_START = /^(?:\s*(?:\/\/.*\n|\/\*(?:[^*]|\*(?!\/))*\*\/))*\s*import\b(?!\s*[.(])/
 const WHITESPACE = /\s/
 const FIRST_TOKEN = /^[\w$]*/
 const STATIC_EXPORTS = new Set(['uid', 'describeField', 'sanitizeHtml', 'trustHtml', 'defer'])
@@ -196,7 +196,7 @@ function splitFence(source: string, fence: Span, globals: string[], names: strin
       analysis.broken.push(span)
   }
 
-  analysis.implicit = undeclared(ast, parsed.code, globals, codeOf(parsed.broken.map(text => source.slice(text.start, text.end)).join('\n')))
+  analysis.implicit = undeclared(ast, parsed.code, globals, parsed.broken.map(text => codeOf(source.slice(text.start, text.end))).join('\n'))
 
   for (const statement of ast.program.body) {
     const span = withLeadingComments(statement, shift)
@@ -812,12 +812,89 @@ function findJsx(node: t.Node): t.Node | undefined {
   return jsx
 }
 
-// What a statement being typed mentions as code: its comments, strings and object keys are no read of a name.
-const NOT_CODE = /\/\/[^\n]*|\/\*[\s\S]*?(?:\*\/|$)|'(?:[^'\\\n]|\\.)*'?|"(?:[^"\\\n]|\\.)*"?|`(?:[^`\\$]|\\.|\$(?!\{))*(?:`|\$\{|$)/g
+// What a statement being typed mentions as code: its comments, strings, regular expressions and object keys are no read of a name.
 const OBJECT_KEY = /([{,]\s*)[\w$]+(?=\s*:)/g
+// What a regular expression literal follows, where a slash is not a division.
+const BEFORE_REGEX = /(?:^|[(,=:[!&|?{};])\s*$/
+const REGEX_LITERAL = /^\/(?:[^/\\\n[]|\\.|\[(?:[^\]\\\n]|\\.)*\])+\//
 
 function codeOf(text: string): string {
-  return text.replaceAll(NOT_CODE, ' ').replaceAll(OBJECT_KEY, '$1')
+  let code = ''
+  // The open interpolations of template literals, each counting the braces opened inside it.
+  const interpolations: number[] = []
+  let i = 0
+
+  // The end of the template text from `from`: after its closing backtick, or after the `${` opening an interpolation.
+  const templateText = (from: number): number => {
+    let at = from
+
+    while (at < text.length) {
+      if (text[at] === '\\') {
+        at++
+      }
+      else if (text[at] === '`') {
+        return at + 1
+      }
+      else if (text[at] === '$' && text[at + 1] === '{') {
+        interpolations.push(0)
+
+        return at + 2
+      }
+
+      at++
+    }
+
+    return text.length
+  }
+
+  while (i < text.length) {
+    const char = text[i]!
+    const regex = char === '/' && BEFORE_REGEX.test(text.slice(Math.max(0, i - 40), i)) ? REGEX_LITERAL.exec(text.slice(i)) : null
+    let skipped = true
+
+    if (char === '/' && text[i + 1] === '/') {
+      const end = text.indexOf('\n', i)
+
+      i = end < 0 ? text.length : end
+    }
+    else if (char === '/' && text[i + 1] === '*') {
+      const end = text.indexOf('*/', i + 2)
+
+      i = end < 0 ? text.length : end + 2
+    }
+    else if (char === '\'' || char === '"') {
+      i++
+
+      while (i < text.length && text[i] !== char && text[i] !== '\n')
+        i += text[i] === '\\' ? 2 : 1
+
+      i += text[i] === char ? 1 : 0
+    }
+    else if (char === '`') {
+      i = templateText(i + 1)
+    }
+    else if (regex) {
+      i += regex[0].length
+    }
+    else if (char === '}' && interpolations.at(-1) === 0) {
+      interpolations.pop()
+      i = templateText(i + 1)
+    }
+    else {
+      if (interpolations.length > 0 && (char === '{' || char === '}'))
+        interpolations[interpolations.length - 1]! += char === '{' ? 1 : -1
+
+      code += char
+      skipped = false
+      i++
+    }
+
+    // A skipped token leaves a space, so the code around it does not join.
+    if (skipped)
+      code += ' '
+  }
+
+  return code.replaceAll(OBJECT_KEY, '$1')
 }
 
 // Which of `names` the fence reads with nothing in it declaring or importing them, `typed` being the code of the statements that did not parse, where a mention counts as a read.
