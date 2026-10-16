@@ -191,6 +191,7 @@ it('shows why a todo was refused', async () => {
 - `site.call` resolves with the action's result, throws `ActionError` when it fails and `ActionRedirect` with `location` when it redirects.
 - `site.refusal(action, input)` makes the same call expecting it refused: it resolves with the `ActionError`, `data` typed from the handler, and fails the test when the call went through.
 - `await site.refusal(add, { title: '' })` reads `{ status: 422, errors: { title: 'Write a title' } }`.
+- `site.mcp.tools()` lists the tools of an app with `mcp: true`, each `{ name, description, inputSchema }`, and `site.mcp.call('add_note', { title: 'Milk' })` calls one as an agent does, through the cookies of the site so far and the `headers` given, `{ headers: { authorization: 'Bearer token' } }`: it resolves with `{ isError, text, data, status }`, `isError` set when the app refused the call, `data` the answer when it is an object, `status` 401 when a guard asks for a sign-in; a protocol error, such as an unknown tool, throws.
 
 ### Reading a page
 

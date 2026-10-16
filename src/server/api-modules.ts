@@ -30,6 +30,8 @@ export interface ApiGuard {
 export const API_PREFIX = '/api'
 export const OPENAPI_PATH = `${API_PREFIX}/openapi.json`
 export const REFERENCE_PATH = `${API_PREFIX}/reference`
+// Where `mcp` serves the app's tools.
+export const MCP_PATH = '/mcp'
 const GUARD = '_guard.ts'
 const API_OPTIONS = /\bapi\s*\(\s*\{/
 // Tests, declarations, and files or directories starting with `_`, guards and helpers, are no modules.

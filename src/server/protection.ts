@@ -195,6 +195,13 @@ function waitFor(window: { count: number, resetAt: number }, max: number): numbe
   return window.count > max ? Math.ceil((window.resetAt - Date.now()) / 1000) : undefined
 }
 
+// The requests the MCP endpoint dispatched to an action for an agent, which no form was filled in for.
+const agentCalls = new WeakSet<Request>()
+
+export function markAgentCall(request: Request): void {
+  agentCalls.add(request)
+}
+
 // Why a post must not reach the handler, `PRETEND` for a bot to answer as if it went through, or undefined when it may.
 // `plain` is a post the browser sent itself, which a form posting to the action always sends with its stamp; a call from kay's script may come from an island's form, which renders none.
 export async function protectionRefusal(action: ServerAction<TSchema, unknown>, request: Request, body: unknown, form: boolean, server: Server<unknown> | null | undefined, plain = form): Promise<ProtectionRefusal | typeof PRETEND | undefined> {
@@ -232,8 +239,8 @@ export async function protectionRefusal(action: ServerAction<TSchema, unknown>, 
 
   const work = proofOfWork(action)
 
-  // A form posted without kay's script sends no solution, refused unless `minTime` let it through above, which then checks it alone.
-  if (work && !(plain && minTime && (request.headers.get(WORK_HEADER) ?? '') === '')) {
+  // A form posted without kay's script sends no solution, refused unless `minTime` let it through above, which then checks it alone; an agent's call has no script to solve one.
+  if (work && !agentCalls.has(request) && !(plain && minTime && (request.headers.get(WORK_HEADER) ?? '') === '')) {
     const reason = await workRefusal(action.url, request.headers.get(WORK_HEADER), work.store ?? memoryOf(`${action.url}#work`))
 
     if (reason === 'wrong' && work.pretend)

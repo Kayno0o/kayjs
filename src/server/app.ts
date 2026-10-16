@@ -24,7 +24,7 @@ import { kayLog } from '../runtime/log'
 import { DRAFT_ROUTE } from '../runtime/swap'
 import { registerActionRoutes } from './actions'
 import { serveApi } from './api'
-import { sharedGuards } from './api-modules'
+import { MCP_PATH, sharedGuards } from './api-modules'
 import { rebaseCss, rebaseRedirects } from './base'
 import { DEFAULT_BODY_LIMIT, limitBodies } from './body'
 import { serveBuildFiles } from './build-files'
@@ -44,6 +44,7 @@ import { avifQuality, serveImages } from './image'
 import { countWrites } from './kept-pages'
 import { HEALTH_PATH, serveHealth, stopOnSignal } from './lifecycle'
 import { announceStart, logRequests, pathOf, useLogger } from './log'
+import { mcpBodyLimit, serveMcp } from './mcp'
 import { serveServiceWorker } from './offline'
 import { claimApi, openApiDocument, openApiSettings, serveOpenApi } from './openapi'
 import { withPageHeaders } from './page-headers'
@@ -267,7 +268,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
     filePaths.add(path)
 
   const actionOptions = { dev: mode.dev, onError: options.onError, i18n: locales, base, requireGuards: options.requireGuards }
-  const [actionLimits, apiModules, files] = await Promise.all([registerActionRoutes(app, routes, routeMatch(table, matchers, options.trailingSlash), actionOptions), source.api(root, options), publicFiles(paths.public)])
+  const [{ limits: actionLimits, tools: toolActions }, apiModules, files] = await Promise.all([registerActionRoutes(app, routes, routeMatch(table, matchers, options.trailingSlash), actionOptions), source.api(root, options), publicFiles(paths.public)])
   const publicServed = claimPublic(served, files)
   const api = await serveApi(app, apiModules, actionOptions)
   const endpoints = await source.endpoints(paths.routes, mounts)
@@ -295,14 +296,25 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   claimRedirects(served, redirects)
   claimApi(served, api.mounted, servesOpenApi ? openapi : undefined)
 
-  limitBodies(app, options.bodyLimit ?? DEFAULT_BODY_LIMIT, options.preview ? new Map([...actionLimits, [DRAFT_ROUTE, DRAFT_BODY_LIMIT]]) : actionLimits, api.limits)
+  if (options.mcp === true)
+    served.claim({ path: MCP_PATH, owner: '`mcp`', kind: 'kay', method: 'ALL' })
 
-  if (servesOpenApi) {
+  limitBodies(app, options.bodyLimit ?? DEFAULT_BODY_LIMIT, new Map([...actionLimits, ...options.preview ? [[DRAFT_ROUTE, DRAFT_BODY_LIMIT] as const] : [], ...options.mcp === true ? [[MCP_PATH, mcpBodyLimit] as const] : []]), api.limits)
+
+  // The actions that opted in to being tools are in the document beside the routes, and the MCP endpoint reads its tools from it.
+  const document = servesOpenApi || options.mcp === true
+    ? openApiDocument(api.mounted, { title: openapi?.title ?? localizedText(options.seo?.name, undefined, locales.settings.defaultLocale) ?? 'API', version: openapi?.version ?? '1.0.0', base, root }, toolActions)
+    : undefined
+
+  if (servesOpenApi && document) {
     // On a site requiring guards, the document is refused unless a guard covers every module not setting `guards: false`, or every module is open with no guard of its own, a library's guarded one counting as guarded.
     const guards = requiredGuards(await Promise.all(sharedGuards(apiModules).map(async file => loadGuard({ file, special: {} }))), { file: paths.api, open: apiModules.length > 0 && apiModules.every(module => module.open === true && module.guards.length === 0) ? true : undefined }, {}, options.requireGuards)
 
-    serveOpenApi(app, openApiDocument(api.mounted, { title: openapi.title ?? localizedText(options.seo?.name, undefined, locales.settings.defaultLocale) ?? 'API', version: openapi.version ?? '1.0.0', base }), openapi, guards, actionOptions)
+    serveOpenApi(app, document, openapi, guards, actionOptions)
   }
+
+  if (options.mcp === true && document)
+    serveMcp(app, document, { title: (document.info as { title: string }).title, version: (document.info as { version: string }).version, base })
 
   serveErrorReports(app, options.onError)
 

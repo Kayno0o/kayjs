@@ -55,7 +55,40 @@ The module's `cors` is the only place that grants. If a route sets `Access-Contr
 
 ## OpenAPI
 
-`openapi: true` in kay.config.ts publishes an OpenAPI 3.1 document of every module's routes at `/api/openapi.json`, read from the schemas they already declare. Give a route a `detail: { summary, tags }` to describe it, or `detail: { hide: true }` to leave it out. `openapi: { reference: true }` adds a page listing the routes at `/api/reference`, and `openapi: { dev: true }` keeps both to `kay dev`. The document sits behind `src/api/_guard.ts` when there is one, which reads the session as it does for any module, and lists the guards each route runs. Its title is `openapi.title`, else the site's `seo.name`, the default locale's when that takes one text per locale, as the document is one for every locale.
+`openapi: true` in kay.config.ts publishes an OpenAPI 3.1 document of every module's routes at `/api/openapi.json`, read from the schemas they already declare. Give a route a `detail: { summary, tags }` to describe it, or `detail: { hide: true }` to leave it out. `openapi: { reference: true }` adds a page listing the routes at `/api/reference`, and `openapi: { dev: true }` keeps both to `kay dev`. The document sits behind `src/api/_guard.ts` when there is one, which reads the session as it does for any module, and lists the guards each route runs. Its title is `openapi.title`, else the site's `seo.name`, the default locale's when that takes one text per locale, as the document is one for every locale. Each operation has an `operationId`. The actions that set `tool` are listed too, as `POST` operations.
+
+## Letting an agent call the app
+
+`mcp: true` in kay.config.ts lets an AI agent use your app. Kay serves an MCP endpoint at `/mcp`, and an agent that is pointed at it can list and call your tools. You write no MCP server.
+
+Every API route in the OpenAPI document becomes a tool. A route called `GET /api/notes/{id}` is the tool `get_notes_id`, described by its `detail.summary`. Its input is built from the schemas the route already declares. Set `detail: { operationId: 'read_note' }` to name it yourself, or `detail: { hide: true }` to keep it out.
+
+An action is a tool only when you say so, with `tool` in its third argument. This way, setting `mcp` never hands an agent an action such as "delete account".
+
+```kay
+--- server
+import { s } from 'kay'
+
+export const addNote = action(
+  s.Object({ title: s.String({ minLength: 3, maxLength: 80 }) }),
+  async ({ title }) => ({ title }),
+  { tool: 'Create a note' },
+)
+---
+h1 Notes
+```
+
+Here `addNote` is the tool `add_note`, and its description is the text you gave. `tool: true` uses the export name alone, and `tool: { name, description }` sets both.
+
+A call goes through the whole app, just as a fetch from a browser would. Guards still guard, rate limits still count the caller, and `ctx.locals` holds what your session code puts there. The caller's `Authorization` header is passed on, so a guard that reads a bearer token sees it. When a guard answers 401, the endpoint answers 401 too, with a `WWW-Authenticate` header that points a client to your sign-in metadata.
+
+A call that is refused is not an error of the protocol. The agent gets the reason as the tool's result, with the field errors of a schema, and can fix its input and call again.
+
+An agent fills in no form, so `honeypot`, `minTime` and `proofOfWork` do not apply to its calls. `kay check` warns when a tool action has one of them and no guard, because anyone could then call it. Add a guard, or use a `rateLimit` instead.
+
+Routes with a file in their body, and actions with a file in their schema, are not offered, as an agent sends JSON.
+
+In a test, `site.mcp.tools()` lists the tools and `site.mcp.call('add_note', { title: 'Milk' })` calls one. See [Testing](/guides/testing).
 
 ## Calling it from an island
 

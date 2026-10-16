@@ -3,6 +3,7 @@ import type { ActionOptions } from './actions'
 import type { ApiGuard } from './api-modules'
 import type { LoadedGuard } from './guards'
 import type { ServedPaths } from './served-paths'
+import { basename, relative } from 'node:path'
 import { NON_ROOT_TRAILING_SLASH } from '../runtime/base'
 import { escape } from '../runtime/escape'
 import { inLocale, passGuards } from './actions'
@@ -30,7 +31,20 @@ export interface MountedApi {
 
 type Schema = Record<string, unknown>
 
-interface Operation {
+// A tool action as the document lists it.
+export interface DocumentedAction {
+  // The name it is exported under, `addNote`.
+  name: string
+  url: string
+  schema: unknown
+  // What `tool` on the action sets, by itself or beside its description.
+  tool: { name?: string | undefined, description?: string | undefined }
+  // The files of the guards covering it, shown relative to `root`.
+  guards: string[]
+}
+
+export interface Operation {
+  'operationId'?: string
   'tags': string[]
   'summary'?: string
   'description'?: string
@@ -39,6 +53,8 @@ interface Operation {
   'requestBody'?: Schema
   'responses': Record<string, Schema>
   'x-kay-guards'?: string[]
+  // Called as kay's `action()` calls are, which an MCP tool does, rather than as a plain JSON `POST`.
+  'x-kay-action'?: true
 }
 
 export function openApiSettings(value: boolean | OpenApiConfig | undefined): OpenApiConfig | undefined {
@@ -96,14 +112,43 @@ export function claimApi(served: ServedPaths, modules: MountedApi[], config: Ope
   }
 }
 
-// An OpenAPI 3.1 document of every route the modules serve, read from the schemas their routes declare; a route behind a guard names it, as `x-kay-guards`.
-export function openApiDocument(modules: MountedApi[], options: { title: string, version: string, base: string }): Schema {
+const TOOL_NAME = /\W+/g
+const EDGE_UNDERSCORES = /^_+|_+$/g
+const WORD_BREAK = /([a-z\d])([A-Z])/g
+const API_ROOT = new RegExp(`^${API_PREFIX}`)
+// The most characters an MCP client takes in a tool's name.
+const MAX_NAME = 64
+
+// `base` made safe as a name, and `taken` kept free of it: a second one gets `_2`, a third `_3`.
+function uniqueName(base: string, taken: Set<string>): string {
+  const name = base.replace(TOOL_NAME, '_').replace(EDGE_UNDERSCORES, '') || 'tool'
+  let candidate = name.slice(0, MAX_NAME)
+
+  for (let count = 2; taken.has(candidate); count++)
+    candidate = `${name.slice(0, MAX_NAME - String(count).length - 1)}_${count}`
+
+  taken.add(candidate)
+
+  return candidate
+}
+
+// An export's name as a tool is named: `addNote` is `add_note`.
+function snakeCase(name: string): string {
+  return name.replace(WORD_BREAK, '$1_$2').toLowerCase()
+}
+
+// An OpenAPI 3.1 document of every route the modules serve, read from the schemas their routes declare, and of the actions that opted in to being tools; a route behind a guard names it, as `x-kay-guards`.
+// Each operation has an `operationId`, the route's own `detail.operationId` or its method and path: `get_items_id` for `GET /api/items/{id}`. These are the names of the MCP tools.
+export function openApiDocument(modules: MountedApi[], options: { title: string, version: string, base: string, root?: string }, actions: DocumentedAction[] = []): Schema {
   const paths: Record<string, Record<string, Operation>> = {}
+  // Routes for every method, which give way to a route for one method wherever it was declared.
+  const anyMethod: { path: string, operation: Operation }[] = []
+  const wanted = new Map<Operation, string>()
 
   for (const module of modules) {
     for (const route of module.instance.routes) {
       const method = route.method.toUpperCase()
-      const hooks = route.hooks as Record<string, unknown> & { detail?: { summary?: string, description?: string, tags?: string[], deprecated?: boolean, hide?: boolean } }
+      const hooks = route.hooks as Record<string, unknown> & { detail?: { summary?: string, description?: string, tags?: string[], deprecated?: boolean, hide?: boolean, operationId?: string } }
 
       if ((!METHODS.has(method) && method !== 'ALL') || hooks.detail?.hide === true)
         continue
@@ -119,17 +164,52 @@ export function openApiDocument(modules: MountedApi[], options: { title: string,
           responses: responses(hooks.response),
           ...module.guards.length > 0 && { 'x-kay-guards': module.guards.map(guard => guard.path) },
         }
-        const methods = paths[path] ??= {}
 
-        // A route for one method answers it whatever order `.all()` was declared in.
-        if (method === 'ALL') {
-          for (const each of ANY_METHOD)
-            methods[each.toLowerCase()] ??= operation
-        }
-        else {
-          methods[method.toLowerCase()] = operation
-        }
+        if (hooks.detail?.operationId !== undefined)
+          wanted.set(operation, hooks.detail.operationId)
+
+        if (method === 'ALL')
+          anyMethod.push({ path, operation })
+        else
+          (paths[path] ??= {})[method.toLowerCase()] = operation
       }
+    }
+  }
+
+  for (const { path, operation } of anyMethod) {
+    const methods = paths[path] ??= {}
+
+    for (const each of ANY_METHOD)
+      methods[each.toLowerCase()] ??= { ...operation }
+  }
+
+  const named = new Set<string>()
+
+  for (const [operation, name] of wanted)
+    operation.operationId = uniqueName(name, named)
+
+  for (const [path, methods] of Object.entries(paths)) {
+    for (const [method, operation] of Object.entries(methods))
+      operation.operationId ??= uniqueName(`${method}/${path.replace(API_ROOT, '')}`, named)
+  }
+
+  for (const action of actions) {
+    // Files do not go as arguments.
+    if (holdsFile(action.schema))
+      continue
+
+    const guards = action.guards.map(file => options.root === undefined ? basename(file) : relative(options.root, file))
+
+    paths[action.url] = {
+      post: {
+        'operationId': uniqueName(action.tool.name ?? snakeCase(action.name), named),
+        'tags': ['actions'],
+        ...action.tool.description !== undefined && { summary: action.tool.description },
+        'requestBody': { required: true, content: content(action.schema, 'application/json') },
+        'responses': { 200: { description: 'OK' } },
+        ...guards.length > 0 && { 'x-kay-guards': guards },
+        'x-kay-action': true,
+      },
     }
   }
 

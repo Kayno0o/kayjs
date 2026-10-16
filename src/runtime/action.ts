@@ -101,7 +101,17 @@ export interface ProofOfWorkOptions {
 // `missing` for a post without a solution, `expired` for one to a challenge past `maxAge` or signed before a restart, `wrong` for a number that does not solve it or a solution used before.
 export type ProofOfWorkRefusal = 'missing' | 'expired' | 'wrong'
 
+// How an action is offered to an agent as an MCP tool.
+export interface ActionTool {
+  // Its name, in place of the export's in snake case: `addNote` is `add_note`.
+  name?: string | undefined
+  // What the agent reads of it to choose it.
+  description?: string | undefined
+}
+
 export interface ActionProtection<Field extends string = never> {
+  // Offers the action to agents as an MCP tool when `mcp` is set in kay.config.ts: `true`, its description, or `{ name, description }`. An action without it is never offered. A call runs the action as a form post would, its guards and rate limits included, except that `honeypot`, `minTime` and `proofOfWork` are skipped, as they only make sense for a form a person filled in.
+  tool?: boolean | string | ActionTool | undefined
   // At most `max` posts from one client every `window`, seconds or a string such as '1m'; past that a post fails with 429 without reaching the handler. `store` shares the count between processes.
   // Several limits all apply, such as one on every attempt and a tighter one on the posts that went through.
   rateLimit?: ActionRateLimit | ActionRateLimit[] | undefined

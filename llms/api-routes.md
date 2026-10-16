@@ -84,6 +84,30 @@ export default defineConfig({
 })
 ```
 
+### Let an agent call the app
+
+`mcp: true` in `kay.config.ts` serves an MCP endpoint at `/mcp`, a tool per API route of the OpenAPI document and per action that sets `tool`:
+
+```ts
+// kay.config.ts
+export default defineConfig({ mcp: true })
+```
+
+```kay
+--- server
+import { s } from 'kay'
+
+export const addNote = action(
+  s.Object({ title: s.String({ minLength: 3, maxLength: 80 }) }),
+  async ({ title }) => ({ title }),
+  { tool: 'Create a note' },
+)
+---
+h1 Notes
+```
+
+Point an MCP client at `https://example.com/mcp`. `addNote` is the tool `add_note`; a route is named by its `operationId`, `get_notes_id` for `GET /api/notes/{id}`.
+
 ### Read a route's answer in an island
 
 `resource(module, path, options)` reads a GET route, reactively when its options are a function:
@@ -254,6 +278,28 @@ export default api()
 - Schemas are read as TypeBox writes them: a model's name or another library's validator documents nothing.
 - An optional param lists the path with and without it, and a wildcard is `{wildcard}`.
 - A module serving `/api/openapi.json`, or `/api/reference` with the page on, stops the server.
+- Every operation has an `operationId`: the route's `detail.operationId`, else its method and path, `get_notes_id`; a clash gets `_2`.
+- An action that sets `tool` is a `POST` operation at its URL under the tag `actions`, `x-kay-action` set, its guards in `x-kay-guards`, as the document and the MCP tools say the same. It is called as `action()` calls are, its input encoded as kay writes it, not as a plain JSON body.
+
+### MCP
+
+- `mcp: true` serves Streamable HTTP at `/mcp`: one JSON-RPC message per `POST`, answered with JSON, `initialize`, `ping`, `tools/list` and `tools/call` only, no resources or prompts. `GET` and `DELETE` answer 405, a notification 202.
+- A message that is no JSON-RPC request answers 400, a body over `bodyLimit` 413, a request from another site (`Origin`, `Sec-Fetch-Site`) 403.
+- A tool per operation of the OpenAPI document, even with `openapi` off, named by its `operationId`, described by its `summary` and `description`, its input one JSON Schema of the path params, query and JSON body, merged by name.
+- Left out: `detail: { hide: true }` routes, websockets, a route whose body is files, text or bytes, and an action holding a file.
+- A route answering every method, `.all()`, is a tool per method.
+- An action is a tool only when its third argument sets `tool`: `true`, a description, or `{ name, description }`; its name is the export in snake case, `addNote` is `add_note`, a clash `add_note_2`, and its input schema is the action's.
+- A name is made of letters, digits and `_`, at most 64 characters.
+- A call is dispatched through the whole app as a fetch to the route's or action's URL would be, so its guards, `rateLimit`, body limit, schema validation and `ctx.locals` are the web path's; `ctx.params` and `ctx.url` of an action are read as for a script's post from no page.
+- It carries the caller's `Authorization`, `Cookie`, `Accept-Language` and `User-Agent`, and rate limits count the caller's address as `proxy` reads it, not the server's.
+- `honeypot`, `minTime` and `proofOfWork` are skipped, as only a form a person filled in can pass them; a marker only the endpoint sets, a per-process secret no request can send, says so, and `rateLimit` still counts.
+- A path param is one segment: it is percent-encoded and an empty one, `.` or `..` is refused, so no value reaches another route.
+- A refused call is a result with `isError`: the schema's field errors, the `ctx.fail` data and status as `{ status, errors, data }` JSON, a route's own refusal text, a redirect naming where it leads. The agent corrects and calls again.
+- A guard answering 401 makes the endpoint answer 401 with `WWW-Authenticate: Bearer resource_metadata="<site>/.well-known/oauth-protected-resource"`, how a client learns to sign in; any other refusal, 403 included, is a result.
+- An action's result is JSON as its text, and `structuredContent` when an object; a route's JSON or text answer likewise, any other type read as its size.
+- `/mcp` is claimed like a route: a page, endpoint or file serving it stops the boot, and `kay check` reports it.
+- `unguarded-tool` warns, with `mcp`, of a tool action with a `honeypot`, `minTime` or `proofOfWork` that no guard covers: an agent calls it without the form those protections ask of a person.
+- `site.mcp.tools()` and `site.mcp.call(name, args)` in `kay/test`.
 
 ### Calling modules from an island
 

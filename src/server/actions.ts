@@ -3,13 +3,14 @@ import type { Elysia, TSchema, ValidationError } from 'elysia'
 import type { Server } from 'elysia/universal'
 import type { KayConfig } from '../config'
 import type { GuardContext, Locals, RouteParams } from '../runtime'
-import type { ActionContext, ServerAction } from '../runtime/action'
+import type { ActionContext, ActionProtection, ServerAction } from '../runtime/action'
 import type { Locale } from '../runtime/i18n'
 import type { BodyLimit } from './body'
 import type { CookieJar } from './cookies'
 import type { Flash } from './flash'
 import type { LoadedGuard, ServedRoute } from './guards'
 import type { I18n } from './i18n'
+import type { DocumentedAction } from './openapi'
 import { decodeCall, failure, FORM_CALL, isAction, isFailure, PAYLOAD_PARAM } from '../runtime/action'
 import { escapeAttribute } from '../runtime/escape'
 import { formInput } from '../runtime/form'
@@ -103,16 +104,28 @@ export interface RouteMatch {
 // Renders the page a refused plain form post came from, with how it failed, through the app the post reached.
 type Back = (request: Request, headers: Headers, flash: Flash, server: Server | null) => Promise<Response>
 
-// Registers every action the pages and layouts export as a POST route whose body Elysia validates against the action's schema, giving back the body limit of each by its path.
-export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], match: RouteMatch, options: ActionOptions): Promise<Map<string, BodyLimit>> {
+// What `tool` on an action sets, undefined for an action that is none.
+function toolSettings(tool: ActionProtection['tool']): DocumentedAction['tool'] | undefined {
+  if (tool === undefined || tool === false)
+    return undefined
+
+  if (tool === true)
+    return {}
+
+  return typeof tool === 'string' ? { description: tool } : tool
+}
+
+// Registers every action the pages and layouts export as a POST route whose body Elysia validates against the action's schema, giving back the body limit of each by its path and the actions that opted in to being MCP tools.
+export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], match: RouteMatch, options: ActionOptions): Promise<{ limits: Map<string, BodyLimit>, tools: DocumentedAction[] }> {
   const back: Back = async (request, headers, flash, server) => renderBack(app, options.base ?? '', request, headers, flash, server)
   const served = new Map<string, { file: string, action: ServerAction<TSchema, unknown> }>()
   const limits = new Map<string, BodyLimit>()
+  const tools: DocumentedAction[] = []
 
   for (const [file, { guards, ...page }] of actionFiles(routes, options.requireGuards)) {
     const module = await importModule<Record<string, unknown>>(file)
 
-    for (const value of Object.values(module)) {
+    for (const [name, value] of Object.entries(module)) {
       if (!isAction(value))
         continue
 
@@ -126,6 +139,12 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], m
         throw actionClash(taken.file, file, value.url)
 
       served.set(value.url, { file, action: value })
+
+      const tool = toolSettings(value.protection?.tool)
+
+      if (tool)
+        tools.push({ name, url: value.url, schema: value.schema, tool, guards: guards.filter(guard => guard.check !== unguarded).map(guard => guard.file) })
+
       limits.set(value.url, { bytes: value.protection?.bodyLimit, refuse: async (request, bytes, server) => tooLarge(value, request, bytes, server, back) })
       // A span per call, the handler's own spans and the page it renders back nested in it.
       app.post(value.url, async context => traced(`POST ${value.url}`, () => ({ kind: SERVER_SPAN, attributes: { 'http.request.method': 'POST', 'http.route': value.url, 'url.path': value.url, 'kay.request.id': requestId(context.request) } }), async (span) => {
@@ -198,7 +217,7 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], m
     }
   }
 
-  return limits
+  return { limits, tools }
 }
 
 // A post over the action's body limit, answered as a refused one is, with a message for the whole form; another site's is refused as such.

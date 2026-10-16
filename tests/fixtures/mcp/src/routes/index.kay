@@ -1,0 +1,39 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+export const addNote = action(t.Object({
+  title: t.String({ minLength: 3, error: 'Too short' }),
+  pinned: t.Optional(t.Boolean()),
+}), ({ title }) => ({ id: 1, title, at: new Date(0) }), { tool: 'Create a note' })
+
+export const hidden = action(t.Object({}), () => 'not a tool')
+
+export const named = action(() => 'named', { tool: { name: 'Say-Hello', description: 'Says hello' } })
+
+export const bare = action(() => 'bare', { tool: true })
+
+export const refuses = action(t.Object({}), (_input, ctx) => ctx.fail(409, { reason: 'full' }), { tool: true })
+
+export const sendsAway = action(t.Object({}), (_input, ctx) => ctx.redirect('/done'), { tool: true })
+
+export const breaks = action(t.Object({}), () => {
+  throw new Error('boom')
+}, { tool: true })
+
+export const language = action(t.Object({}), (_input, ctx) => ({ locale: ctx.locale }), { tool: true })
+
+export const upload = action(t.Object({ photo: t.File() }), () => 'stored', { tool: true })
+
+export const signup = action(t.Object({ email: t.String(), website: t.Optional(t.String()) }), ({ email }) => ({ email }), {
+  tool: 'Sign up',
+  honeypot: 'website',
+  minTime: '1h',
+  rateLimit: { max: 2, window: '1m' },
+})
+
+export const solve = action(t.Object({}), () => 'solved', { tool: true, proofOfWork: true })
+
+export const long = action(t.Object({}), () => 'long', { tool: { name: 'a'.repeat(100) } })
+---
+h1 Notes

@@ -22,6 +22,7 @@ import { openSocket, readEvents, routeUrl, streamRequest } from '../runtime/live
 import { effect, root as reactiveRoot } from '../runtime/reactive'
 import { PAGE_HEADER, WORK_HEADER, WORK_SCRIPT } from '../runtime/swap'
 import { solveWork } from '../runtime/work'
+import { MCP_PATH } from '../server/api-modules'
 import { servePages } from '../server/app'
 import { shutdown } from '../server/lifecycle'
 import { loaderRoot } from '../server/loader'
@@ -89,6 +90,13 @@ export interface TestSite {
   call: <Target extends Action<never, unknown>>(action: Target, ...call: CallArguments<Target>) => Promise<Success<ResultOf<Target>>>
   // A call expected to be refused, as `call` makes it: the `ActionError` with its status, errors and typed data; one that went through fails the test, and any other error is thrown.
   refusal: <Target extends Action<never, unknown>>(action: Target, input: InputOf<Target> | FormData, init?: VisitInit & { from?: string }) => Promise<ActionError<FailureData<ResultOf<Target>>>>
+  // The site's MCP endpoint, as an agent calls it: `mcp: true` serves it. Calls carry the cookies so far and the headers given, such as an `Authorization` bearer token.
+  mcp: {
+    // The tools `tools/list` gives.
+    tools: (init?: VisitInit) => Promise<McpTool[]>
+    // A call to the tool named `name`, which a model would make: its result, with `isError` set when the app refused it, and the HTTP `status` of the answer, 401 when a guard asked for a sign-in. A request the endpoint answers with a protocol error, such as an unknown tool, is thrown.
+    call: (name: string, args?: object, init?: VisitInit) => Promise<McpCall>
+  }
   // A request to any route, an API module's included, with the cookies so far; the response as it is, redirects not followed.
   fetch: (path: string, init?: Omit<RequestInit, 'headers'> & VisitInit) => Promise<Response>
   // A websocket route of a module under `src/api`, opened as an island opens it, over a server the site starts on a free port the first time; `close()` stops it.
@@ -105,6 +113,21 @@ export interface TestSite {
   handle: (request: Request) => Promise<Response>
   // Closes the pages `open()` opened and stops the server it or `socket()` started, if any.
   close: () => Promise<void>
+}
+
+export interface McpTool {
+  name: string
+  description: string
+  inputSchema: Record<string, unknown>
+}
+
+export interface McpCall {
+  isError: boolean
+  // The text a model reads, which is the answer's JSON for an action or an API route that returns some.
+  text: string
+  // The answer parsed, when it is an object.
+  data: Record<string, unknown> | undefined
+  status: number
 }
 
 type Received<Client> = Client extends { on: (listener: (value: infer Value) => void) => unknown } ? Value : never
@@ -308,9 +331,31 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
     return readActionResponse<Success<ResultOf<typeof action>>>(await send(action.url, { method: 'POST', headers: { ...sent, ...workHeaders(action), ...init.headers }, body }), action.url)
   }
 
+  interface RpcResult { tools?: McpTool[], isError?: boolean, content?: { text: string }[], structuredContent?: Record<string, unknown> }
+
+  let rpcId = 0
+
+  const rpc = async (method: string, params: object, init: VisitInit = {}): Promise<{ status: number, result: RpcResult }> => {
+    const response = await send(MCP_PATH, { method: 'POST', headers: { 'content-type': 'application/json', 'accept': 'application/json, text/event-stream', ...init.headers }, body: JSON.stringify({ jsonrpc: '2.0', id: ++rpcId, method, params }) })
+    const reply = await withNatives(async () => response.json() as Promise<unknown>) as { result?: RpcResult, error?: { message: string } }
+
+    if (reply.error)
+      throw new Error(`kay: ${method} was refused: ${reply.error.message}`)
+
+    return { status: response.status, result: reply.result! }
+  }
+
   return {
     cookies: jar.cookies,
     handle,
+    mcp: {
+      tools: async init => (await rpc('tools/list', {}, init)).result.tools ?? [],
+      call: async (name, args = {}, init) => {
+        const { status, result } = await rpc('tools/call', { name, arguments: args }, init)
+
+        return { isError: result.isError === true, text: (result.content ?? []).map(part => part.text).join(''), data: result.structuredContent, status }
+      },
+    },
     runJobs: drainQueues,
     sitemap: async (path = SITEMAP) => {
       const response = await send(path, {})

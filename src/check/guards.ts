@@ -56,3 +56,39 @@ export async function unguardedRoutes(options: CheckOptions, { routes, endpoints
 
   return found
 }
+
+// With `mcp`, each action that is a tool, has a honeypot, a minimum time or a proof of work, and sits under no guard: an agent skips what those ask of a person.
+export async function unguardedTools(options: CheckOptions, { routes }: ServedProject): Promise<CheckDiagnostic[]> {
+  const level = lintLevel('unguarded-tool', options.lints)
+
+  if (options.mcp !== true || level === 'allow')
+    return []
+
+  const guarded = new Map<string, boolean>()
+
+  for (const route of routes) {
+    guarded.set(route.file, route.guards.length > 0)
+
+    for (const [index, layout] of route.layouts.entries())
+      guarded.set(layout, (route.layoutAccess?.[index]?.guards.length ?? 0) > 0)
+
+    for (const [index, module] of (route.actionModules ?? []).entries())
+      guarded.set(module, (route.actionAccess?.[index]?.guards.length ?? 0) > 0)
+  }
+
+  const found: CheckDiagnostic[] = []
+
+  for (const [file, covered] of guarded) {
+    if (covered)
+      continue
+
+    const source = await Bun.file(file).text()
+
+    for (const { name, botProtected } of analyzeServer(source, parseKay(source).server)?.toolActions ?? []) {
+      if (botProtected)
+        found.push({ file, line: 1, column: 1, message: `The tool action \`${name}\` has bot protection and no guard covers it, so an agent calls it without the form that protection asks of a person`, help: `${HELP} in its \`page\`, or drop the protection for a \`rateLimit\``, code: 'unguarded-tool', severity: level === 'warn' ? 'warning' : 'error' })
+    }
+  }
+
+  return found
+}

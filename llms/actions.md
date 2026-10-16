@@ -425,6 +425,12 @@ button(onClick={save} disabled={add.pending()}) Add
 - `minTime: { after: '3s', plain: true }` checks only a form the browser posts itself, without kay's script: the page swap's post and an island's call go through, for a form whose script already proves something, such as a `data-kay-work` field below: the header marking the swap's post proves nothing, so a script sending it skips `minTime`.
 - `site.submit` from a `Visit` sends its form's stamp, and `setSystemTime` from `bun:test` moves the clock past `minTime`.
 
+#### Offering an action to agents
+
+- `tool` on the third argument offers the action as an MCP tool when `mcp: true` is set in kay.config.ts: `tool: true`, `tool: 'Create a note'` (its description) or `tool: { name: 'create_note', description: 'Create a note' }`. Without it an action is never offered.
+- The tool takes the action's schema as its input and runs the action as a call would, its guards, `rateLimit`, body limit and `ctx.locals` included; `honeypot`, `minTime` and `proofOfWork` are skipped. An action with a file in its schema is not offered.
+- `kay check` warns (`unguarded-tool`) of such an action with one of those three and no guard; a guard or a `rateLimit` keeps it in hand. See [API routes](api-routes.md#mcp).
+
 #### Refusal messages
 
 - The refusals of these limits, and the one for a post over `bodyLimit`, read in English unless `messages` gives the site's own, as a schema's `error` does for a field: `` messages: { honeypot: 'Laissez ce champ vide', minTime: reason => reason === 'early' ? 'Un instant, puis renvoyez-le' : 'Ce formulaire a expiré, renvoyez-le', rateLimit: wait => `Réessayez dans ${wait} s`, bodyLimit: bytes => `${bytes} octets au plus` } ``.

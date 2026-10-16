@@ -218,6 +218,7 @@ kay lint --cache
 | `unkept-page` | warn | code | A page saying `keep: true` that `kay build` does not keep prerendered, as it reads the request or the clock, imports a package, holds module state or renders differently each time: reported by `kay build` at the file and line that decided it, never by `kay check`, and no `// kay-allow` comment reaches it. |
 | `uncaught-await` | warn | code | An `await` block with no `catch` block: once its value rejects, the pending block goes with nothing in its place and the error only reaches the log. A `try` around it does not catch it, a streamed block settling after the page has rendered. |
 | `unguarded-route` | deny | security | With `requireGuards`, a page, a layout with actions, an endpoint or an API module of the app no guard covers and not setting `guards: false`, which the server refuses. |
+| `unguarded-tool` | warn | security | With `mcp`, an action that sets `tool` and a `honeypot`, `minTime` or `proofOfWork` with no guard covering it: an agent skips what those ask of a person, so anonymous callers can spam it. |
 | `missing-site` | warn | seo | `seo` set with no `site`, in kay.config.ts or `SITE_URL`, on a `kay build --static` export: no canonical links, `og:url`, sitemap or robots.txt. A server warns at boot instead. |
 | `missing-description` | warn | seo | A public site with no `seo.description`. |
 | `missing-share-image` | warn | seo | A public site with no `seo.image`, and no `.kay` file of the project setting an `og:image`. |

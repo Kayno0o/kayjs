@@ -33,6 +33,21 @@ export interface Resource {
   read: () => Promise<string>
 }
 
+// What one message is answered with, as JSON-RPC writes it.
+export interface Reply {
+  jsonrpc: '2.0'
+  id: string | number | null
+  result?: object
+  error?: { code: number, message: string, data?: object }
+}
+
+// What names the server to its client, and what it tells a model about it.
+export interface ServerOptions {
+  serverInfo?: { name: string, title: string, version: string }
+  // None for a server with nothing to say beyond its tools.
+  instructions?: string | undefined
+}
+
 // A request the server answers with a JSON-RPC error rather than a result.
 export class RpcError extends Error {
   override name = 'RpcError'
@@ -46,7 +61,7 @@ export const INVALID_REQUEST = -32600
 export const METHOD_NOT_FOUND = -32601
 export const INVALID_PARAMS = -32602
 export const INTERNAL_ERROR = -32603
-const PARSE_ERROR = -32700
+export const PARSE_ERROR = -32700
 const UNSUPPORTED_PROTOCOL_VERSION = -32022
 
 // The revision without a handshake, which a request names in its `_meta`, and the ones that open with `initialize`, newest first; the few messages used are the same in all.
@@ -71,7 +86,7 @@ function readableId(message: unknown): string | number | null {
 // Speaks MCP over newline-delimited JSON-RPC: both the revision that opens with `initialize` and the one carrying its version in every request's `_meta`, serving `tools` and `resources`.
 export class McpServer {
   // `closing` runs when the client closes its input, as the calls still running are waited for.
-  constructor(private readonly tools: Tool[], private readonly resources: Resource[], private readonly closing?: () => void) {}
+  constructor(private readonly tools: Tool[], private readonly resources: Resource[], private readonly closing?: () => void, private readonly options: ServerOptions = { instructions: INSTRUCTIONS }) {}
 
   // Reads `input` line by line until it closes, answering each message through `write`.
   async serve(input: ReadableStream<Uint8Array>, write: (line: string) => void): Promise<void> {
@@ -127,43 +142,43 @@ export class McpServer {
   }
 
   private async receive(line: string, output: (line: string) => void): Promise<void> {
+    const reply = await this.answer(line)
+
     // A client that has gone leaves no one to answer.
-    const write = (reply: string) => {
-      try {
-        output(reply)
-      }
-      catch {}
+    try {
+      if (reply)
+        output(JSON.stringify(reply))
     }
+    catch {}
+  }
+
+  // Answers one message, undefined for a notification or a response, which take none.
+  async answer(line: string): Promise<Reply | undefined> {
     let message: Request
 
     try {
       message = JSON.parse(line) as Request
     }
     catch {
-      write(JSON.stringify({ jsonrpc: '2.0', id: null, error: { code: PARSE_ERROR, message: 'Parse error' } }))
-
-      return
+      return { jsonrpc: '2.0', id: null, error: { code: PARSE_ERROR, message: 'Parse error' } }
     }
 
     if (typeof message !== 'object' || message === null || Array.isArray(message) || typeof message.method !== 'string') {
       // A response or a batch: this server sends no requests, and the revisions it speaks have no batches.
       if (typeof message !== 'object' || message === null || !('result' in message || 'error' in message))
-        write(JSON.stringify({ jsonrpc: '2.0', id: readableId(message), error: { code: INVALID_REQUEST, message: 'Invalid request' } }))
+        return { jsonrpc: '2.0', id: readableId(message), error: { code: INVALID_REQUEST, message: 'Invalid request' } }
 
-      return
+      return undefined
     }
 
     // A notification, `notifications/initialized` and `notifications/cancelled` among them, takes no answer.
     if (message.id === undefined || message.id === null)
-      return
+      return undefined
 
     const { id } = message
 
-    if (typeof id !== 'string' && typeof id !== 'number') {
-      write(JSON.stringify({ jsonrpc: '2.0', id: null, error: { code: INVALID_REQUEST, message: 'A request id is a string or a number' } }))
-
-      return
-    }
+    if (typeof id !== 'string' && typeof id !== 'number')
+      return { jsonrpc: '2.0', id: null, error: { code: INVALID_REQUEST, message: 'A request id is a string or a number' } }
 
     try {
       const params = message.params === undefined ? {} : message.params
@@ -171,15 +186,17 @@ export class McpServer {
       if (typeof params !== 'object' || params === null || Array.isArray(params))
         throw new RpcError(INVALID_PARAMS, 'Params are an object')
 
-      const result = await this.handle(message.method, params as Record<string, unknown>)
-
-      write(JSON.stringify({ jsonrpc: '2.0', id, result }))
+      return { jsonrpc: '2.0', id, result: await this.handle(message.method, params as Record<string, unknown>) }
     }
     catch (error) {
       const rpc = error instanceof RpcError ? error : new RpcError(INTERNAL_ERROR, error instanceof Error ? error.message : String(error))
 
-      write(JSON.stringify({ jsonrpc: '2.0', id, error: { code: rpc.code, message: rpc.message, ...rpc.data && { data: rpc.data } } }))
+      return { jsonrpc: '2.0', id, error: { code: rpc.code, message: rpc.message, ...rpc.data && { data: rpc.data } } }
     }
+  }
+
+  private capabilities(): object {
+    return this.resources.length > 0 ? { tools: {}, resources: {} } : { tools: {} }
   }
 
   private async handle(method: string, params: Record<string, unknown>): Promise<object> {
@@ -188,9 +205,9 @@ export class McpServer {
 
       return {
         protocolVersion: typeof requested === 'string' && LEGACY_VERSIONS.includes(requested) ? requested : LEGACY_VERSIONS[0],
-        capabilities: { tools: {}, resources: {} },
-        serverInfo: SERVER_INFO,
-        instructions: INSTRUCTIONS,
+        capabilities: this.capabilities(),
+        serverInfo: this.options.serverInfo ?? SERVER_INFO,
+        ...this.options.instructions !== undefined && { instructions: this.options.instructions },
       }
     }
 
@@ -204,7 +221,7 @@ export class McpServer {
     const result = await this.dispatch(method, params)
 
     // Only the revision without a handshake asks for the result's kind and the server's identity.
-    return requested === MODERN_VERSION ? { resultType: 'complete', ...result, _meta: { [SERVER_INFO_META]: SERVER_INFO } } : result
+    return requested === MODERN_VERSION ? { resultType: 'complete', ...result, _meta: { [SERVER_INFO_META]: this.options.serverInfo ?? SERVER_INFO } } : result
   }
 
   private async dispatch(method: string, params: Record<string, unknown>): Promise<object> {
@@ -212,7 +229,7 @@ export class McpServer {
       case 'ping':
         return {}
       case 'server/discover':
-        return { supportedVersions: [MODERN_VERSION], capabilities: { tools: {}, resources: {} }, instructions: INSTRUCTIONS }
+        return { supportedVersions: [MODERN_VERSION], capabilities: this.capabilities(), ...this.options.instructions !== undefined && { instructions: this.options.instructions } }
       case 'tools/list':
         return { tools: this.tools.map(({ run: _run, ...tool }) => tool) }
       case 'tools/call':

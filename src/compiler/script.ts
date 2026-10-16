@@ -286,6 +286,8 @@ export interface ServerAnalysis {
   exportNames: string[]
   // The exports declared as `action(...)` calls, the ones `kay check` compares URLs of.
   actionNames: string[]
+  // The actions among them that set `tool`, with whether they also set `honeypot`, `minTime` or `proofOfWork`.
+  toolActions: { name: string, botProtected: boolean }[]
   page?: PageSettings | undefined
   // Statements that run per request, inside `load(ctx)`.
   body: Span[]
@@ -307,7 +309,7 @@ export function analyzeServer(source: string, server: Span | undefined): ServerA
   if (!server)
     return undefined
 
-  const analysis: ServerAnalysis = { hoisted: [], imports: [], specifiers: [], exports: [], exportNames: [], actionNames: [], body: [], broken: [], brokenModule: [], implicit: [], data: [], separate: [], diagnostics: [] }
+  const analysis: ServerAnalysis = { hoisted: [], imports: [], specifiers: [], exports: [], exportNames: [], actionNames: [], toolActions: [], body: [], broken: [], brokenModule: [], implicit: [], data: [], separate: [], diagnostics: [] }
   const split = splitFence(source, server, SERVER_GLOBALS, [], analysis)
 
   if (!split)
@@ -332,8 +334,14 @@ export function analyzeServer(source: string, server: Span | undefined): ServerA
 
       if (statement.declaration.type === 'VariableDeclaration') {
         for (const declarator of statement.declaration.declarations) {
-          if (declarator.id.type === 'Identifier' && declarator.init?.type === 'CallExpression' && declarator.init.callee.type === 'Identifier' && declarator.init.callee.name === 'action')
+          if (declarator.id.type === 'Identifier' && declarator.init?.type === 'CallExpression' && declarator.init.callee.type === 'Identifier' && declarator.init.callee.name === 'action') {
             analysis.actionNames.push(declarator.id.name)
+
+            const tool = toolOptions(declarator.init.arguments)
+
+            if (tool)
+              analysis.toolActions.push({ name: declarator.id.name, botProtected: tool.botProtected })
+          }
         }
 
         pageSettings(ast, statement, statement.declaration, span, shift, text, analysis)
@@ -453,6 +461,24 @@ function readsItself(ast: ParseResult<t.File>, declaration: t.FunctionDeclaratio
   catch {}
 
   return found
+}
+
+const BOT_PROTECTIONS = new Set(['honeypot', 'minTime', 'proofOfWork'])
+
+// What an `action(...)` call's options say, when one of its arguments is an object literal setting `tool`.
+function toolOptions(args: t.CallExpression['arguments']): { botProtected: boolean } | undefined {
+  for (const arg of args.slice(1)) {
+    if (arg.type !== 'ObjectExpression')
+      continue
+
+    const keys = new Map(arg.properties.flatMap(property => property.type === 'ObjectProperty' && !property.computed ? [[keyName(property.key), property.value] as const] : []))
+    const tool = keys.get('tool')
+
+    if (tool !== undefined && !(tool.type === 'BooleanLiteral' && !tool.value))
+      return { botProtected: [...keys.keys()].some(key => key !== undefined && BOT_PROTECTIONS.has(key)) }
+  }
+
+  return undefined
 }
 
 function keyName(key: t.Node): string | undefined {

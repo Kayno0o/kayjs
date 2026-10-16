@@ -66,6 +66,8 @@ export interface CheckOptions {
   publicEnv?: EnvSchema | undefined
   // Reports each route of the app no guard covers, which the server refuses.
   requireGuards?: boolean | undefined
+  // Reports the actions offered as tools that bot protection alone stands before.
+  mcp?: boolean | undefined
   // Whether to report the lints of what a site lacks before it goes public, as `kay build` and `kay check --only seo` do.
   launch?: boolean | undefined
   // Set by `kay build --static`: a static host reads no `SITE_URL` once built, so a missing site is reported.
@@ -85,9 +87,9 @@ export interface CheckDiagnostic extends Pick<Diagnostic, 'label' | 'related' | 
 }
 
 export function configCheckOptions(config: KayConfig): CheckOptions {
-  const { routes, publicDir, api, content, redirects, i18n, lang, settings, base, site, shutdownTimeout, lints, extensions, seo, favicon, manifest, images, publicEnv, requireGuards } = config
+  const { routes, publicDir, api, content, redirects, i18n, lang, settings, base, site, shutdownTimeout, lints, extensions, seo, favicon, manifest, images, publicEnv, requireGuards, mcp } = config
 
-  return { routes, publicDir, api, content, redirects, i18n, lang, settings, base, site, shutdownTimeout, lints, extensions, seo, favicon, manifest, images, publicEnv, requireGuards }
+  return { routes, publicDir, api, content, redirects, i18n, lang, settings, base, site, shutdownTimeout, lints, extensions, seo, favicon, manifest, images, publicEnv, requireGuards, mcp }
 }
 
 // Type-checks a project, .kay components included, and reports every error at the line and column the user wrote.
