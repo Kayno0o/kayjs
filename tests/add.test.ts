@@ -431,7 +431,7 @@ it('reads export prefixed and quoted values of .env', async () => {
 it('writes the workflow of the host the project remote or folder names, not the first one found', async () => {
   const features = PRESETS.site.features.filter(feature => feature !== 'ci')
 
-  for (const [remote, folder, expected] of [['git@git.kevyn.fr:a/b.git', '.github', '.forgejo'], ['git@github.com:a/b.git', '.forgejo', '.github'], ['', '.forgejo', '.forgejo'], ['', '.github', '.github']] as const) {
+  for (const [remote, folder, expected] of [['git@git.kaynooo.fr:a/b.git', '.github', '.forgejo'], ['git@github.com:a/b.git', '.forgejo', '.github'], ['', '.forgejo', '.forgejo'], ['', '.github', '.github']] as const) {
     const root = await mkdtemp(join(tmpdir(), 'kay-add-'))
 
     try {
