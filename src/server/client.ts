@@ -52,6 +52,8 @@ export interface PrerenderedPage {
   readsSite?: boolean | undefined
   // The build kept it on its own, as nothing marked it: the server checks it again after a request that can write.
   kept?: boolean | undefined
+  // The token its ids were drawn from, when a collision with another page gave it more than the hash's usual digits.
+  token?: string | undefined
 }
 
 export interface ClientBuild extends Omit<ClientManifest, 'styles' | 'pages'> {

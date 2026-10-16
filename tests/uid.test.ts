@@ -82,6 +82,41 @@ describe('uid', () => {
     expect([...ids(about!)].filter(id => ids(perRequest).has(id))).toEqual([])
   })
 
+  it('gives two page keys whose short tokens match tokens apart, the same on every build', () => {
+    const seen = new Map<string, string>()
+    let pair: [string, string] | undefined
+
+    for (let index = 0; !pair; index++) {
+      const key = `/page-${index}`
+      const token = pageToken(key)
+      const other = seen.get(token)
+
+      if (other === undefined)
+        seen.set(token, key)
+      else
+        pair = [other, key]
+    }
+
+    const build = () => {
+      const taken = new Set<string>()
+
+      return pair.map((key) => {
+        const token = pageToken(key, taken)
+
+        taken.add(token)
+
+        return token
+      })
+    }
+    const [first, second] = build()
+
+    expect(first).toBe(pageToken(pair[0]))
+    expect(second).not.toBe(first)
+    expect(second).toEndWith(pageToken(pair[1]).slice(1))
+    expect(second!.length).toBe(first!.length + 1)
+    expect(build()).toEqual([first!, second!])
+  })
+
   it('draws the same ids on every render of a page under one token', async () => {
     const first = await withPageToken('kfixed', async () => render().result)
     const second = await withPageToken('kfixed', async () => render().result)

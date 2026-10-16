@@ -28,8 +28,15 @@ export function pageEtag(html: string): string {
 }
 
 // The ids a prerendered page draws, the same on every render of it, so two builds and a live check agree byte for byte; the last digits, as the first of a hash are not spread over all of them.
-export function pageToken(key: string): string {
-  return `k${Bun.hash(key).toString(36).slice(-6)}`
+// A token another page of the build already holds takes one more digit of its hash at a time, so only a collision costs bytes and the result is still the same on every build.
+export function pageToken(key: string, taken?: ReadonlySet<string>): string {
+  const digits = Bun.hash(key).toString(36)
+  let length = 6
+
+  while (length < digits.length && taken?.has(`k${digits.slice(-length)}`))
+    length++
+
+  return `k${digits.slice(-length)}`
 }
 
 // The paths a page export such as `prerender` lists: `true` for a route without params; a list of params, a function returning one, a content collection, or a `paginate()` list, for a route with some.

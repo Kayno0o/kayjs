@@ -42,7 +42,7 @@ async function check(copies: Map<string, ServedPage>, key: string, page: ServedP
   let same: boolean | undefined
 
   try {
-    const rendered = await withPageToken(pageToken(key), async () => {
+    const rendered = await withPageToken(page.token ?? pageToken(key), async () => {
       const response = await render()
 
       return { status: response.status, html: await response.text() }

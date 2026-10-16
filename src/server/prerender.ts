@@ -80,6 +80,8 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
 
   const pages: Record<string, PrerenderedPage> = {}
   const paths = new Map<string, string>()
+  // The tokens the pages so far draw their ids from.
+  const tokens = new Set<string>()
   // The files of pages kept without being asked for, which a page that was asked for takes the place of.
   const kept = new Set<string>()
   // What each file read, for the next route to reach it again.
@@ -126,7 +128,9 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
         const render = async () => renderPage({ ...route, guards: [] }, { request }, matched, client, { ...renderOptions, onError: undefined, prerendering: true })
         const inLocale = async () => runInLocale(stateFor(locales, copy.locale ?? locales.settings.defaultLocale, path, request), render)
         // The ids a page draws keep apart from those of the page it is swapped for, so each page has a token of its own, the same on every render and build; the body is read within it, as a stream draws its ids as it is read.
-        const token = pageToken(copy.key)
+        const token = pageToken(copy.key, tokens)
+
+        tokens.add(token)
         const read = async () => {
           const rendered = await inLocale()
 
@@ -207,7 +211,7 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
           options.others?.push({ file: route.file, html })
         }
 
-        const stored: PrerenderedPage = { pattern: route.pattern, file: name, status: response.status, headers: storedHeaders(response.headers), etag: pageEtag(html), renderedAt: Date.now(), revalidate, ...islands.length > 0 ? { islands } : {}, ...stamps ? { stamps } : {}, ...readsSite ? { readsSite } : {}, ...auto ? { kept: true } : {} }
+        const stored: PrerenderedPage = { pattern: route.pattern, file: name, status: response.status, headers: storedHeaders(response.headers), etag: pageEtag(html), renderedAt: Date.now(), revalidate, ...islands.length > 0 ? { islands } : {}, ...stamps ? { stamps } : {}, ...readsSite ? { readsSite } : {}, ...auto ? { kept: true } : {}, ...token === pageToken(copy.key) ? {} : { token } }
 
         pending.push(() => {
           pages[copy.key] = stored
