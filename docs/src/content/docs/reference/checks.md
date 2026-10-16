@@ -25,7 +25,7 @@ The name in brackets is a lint. `kay build` runs the same check and `kay dev` li
 - Island props can be serialized, and no component reads a browser global while it renders.
 - Accessibility basics: `alt`, labels, headings, keyboard access.
 - Config the server would refuse at boot, such as two pages serving one path.
-- On a public site, what search engines and social networks read: a `site`, a description, a share image, a favicon. `kay check` reads the head blocks of the pages that prerender, and `kay build` the head of every page it renders.
+- On a public site, what search engines and social networks read: a `site`, a description, a share image, a favicon. `kay check` reads the head blocks of the pages that prerender as written, so a tag whose value is an expression, or that sits under an `if` or `for`, is judged by its presence alone, and `kay build` the head of every page it renders, which may report a lint `kay check` did not.
 
 ## Errors and warnings
 

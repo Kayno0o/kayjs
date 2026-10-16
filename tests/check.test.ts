@@ -422,6 +422,23 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 
+  it('follows a barrel module an island imports through export * and export { x } from', async () => {
+    const root = await scratchProject({
+      'src/routes/index.kay': '---\nimport Counter from \'../components/counter.kay\'\n---\nCounter\n',
+      'src/components/counter.kay': '---\nimport { signal } from \'kay\'\nimport { refresh, again } from \'../lib\'\n\nconst count = signal(0)\n---\nbutton(onClick={() => { count++; refresh(); again() }}) {count()}\n',
+      'src/lib/index.ts': 'export * from \'./star\'\nexport { again } from \'./named\'\n',
+      'src/lib/star.ts': 'import { invalidatePage } from \'kay/cache\'\n\nexport const refresh = () => invalidatePage(\'/\')\n',
+      'src/lib/named.ts': 'import { sqliteCache } from \'kay/cache\'\n\nexport const again = () => sqliteCache(\'a.sqlite\')\n',
+    })
+
+    try {
+      expect((await check(root)).filter(d => d.code === 'server-only-import').map(d => d.file.slice(root.length + 1)).sort()).toEqual(['src/lib/named.ts', 'src/lib/star.ts'])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('reports a server-only name in a component the build promotes to an island, and in none it never promotes', async () => {
     const component = (child: string) => `---\nimport Child from './${child}.kay'\nimport { sqliteCache } from 'kay/cache'\n\nconst disk = sqliteCache('a.sqlite')\nfunction pick() {}\n---\nChild(format={pick})\np {disk}\n`
     const root = await scratchProject({

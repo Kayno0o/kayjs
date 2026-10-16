@@ -684,6 +684,26 @@ describe('what stops a page from being kept', () => {
     expect(stops['/a']).toBe('src/routes/a.kay would share its prerendered file a.html with /a')
   }, 120_000)
 
+  it('names the rest of what stops a page found while it renders: a status, renders that differ and a server island', async () => {
+    const root = await project({
+      'src/routes/missing.kay': '--- server\nthrow new Error(\'broken\')\n---\np Missing\n',
+      'src/routes/counter.kay': '--- server\nimport { next } from \'../next\'\n---\np {next()}\n',
+      'src/next.ts': 'const box = { n: 0 }\n\nexport const next = () => ++box.n\n',
+      'src/routes/under/_layout.kay': '---\nimport Aside from \'../../components/aside.kay\'\n---\nAside(server)\nslot\n',
+      'src/routes/under/index.kay': 'p Under\n',
+      'src/components/aside.kay': 'aside Aside\n',
+    })
+
+    roots.push(root)
+
+    const { document } = await reported(root)
+    const stops = Object.fromEntries(document.built.routes.map(route => [route.route, route.stop]))
+
+    expect(stops['/missing']).toBe('src/routes/missing.kay answers 500 when rendered without a request')
+    expect(stops['/counter']).toBe('src/routes/counter.kay renders differently each time, as it draws on something its source does not show')
+    expect(stops['/under']).toBe('src/routes/under/index.kay holds a server island')
+  }, 120_000)
+
   it('reports a page saying keep: true that is not kept at the level unkept-page has, and under --static a page the export renders', async () => {
     const files = { 'src/routes/random.kay': '--- server\nexport const page = { keep: true }\n---\np {Math.random()}\n' }
     const config = (lints: string) => `import { defineConfig } from 'kay/server'\n\nexport default defineConfig({ log: false, lints: { 'unkept-page': '${lints}' } })\n`
