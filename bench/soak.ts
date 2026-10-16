@@ -1,7 +1,7 @@
 import type { Part, Readings } from './soak-verdict'
 import { openSync } from 'node:fs'
 import { mkdir, rm } from 'node:fs/promises'
-import { join, resolve } from 'node:path'
+import { basename, join, resolve } from 'node:path'
 import { parseArgs } from 'node:util'
 import { anonOf, compiled, cpuOf, hammer, loadNow, started, treeCpuOf, treeOf } from './shared/process'
 import { growth, verdict } from './soak-verdict'
@@ -42,12 +42,17 @@ const LIMITS = { server: { heap: 2, anon: 8 }, dev: { heap: 2, anon: 16 } }
 
 const { values, positionals } = parseArgs({ args: Bun.argv.slice(2), allowPositionals: true, options: { wait: { type: 'string', default: '0' }, requests: { type: 'string', default: '50000' }, edits: { type: 'string', default: '180' } } })
 const checkouts = positionals.map(path => resolve(path))
-const requests = Number(values.requests)
-const edits = Number(values.edits)
+const [wait, requests, edits] = [values.wait, values.requests, values.edits].map(Number) as [number, number, number]
+// A tenth of the edits warms up, the rest split evenly between the samples, so the run stays within the count asked.
+const warmEdits = Math.floor(edits / SAMPLES)
+const editsBetween = Math.floor((edits - warmEdits) / SAMPLES)
 const loads: number[] = []
 
 if (checkouts.length === 0 || checkouts.length > 2)
   throw new Error('Expected a kay checkout, and a baseline checkout to compare its CPU with')
+
+if (![wait, requests, edits].every(value => Number.isFinite(value) && value >= 0) || editsBetween === 0)
+  throw new Error(`Expected --wait, --requests and --edits as numbers, --edits ${SAMPLES * 2} or more`)
 
 async function until(condition: () => Promise<boolean>, timeout: number, what: string): Promise<void> {
   for (const start = Date.now(); !await condition(); await Bun.sleep(25)) {
@@ -160,16 +165,13 @@ async function soakDev(checkout: string): Promise<Readings> {
   try {
     await until(async () => (await text(origin)).includes('Edit 0'), 120_000, `kay dev to serve, see ${root}/dev.log`)
 
-    const warm = Math.ceil(edits / SAMPLES)
-    const between = Math.ceil((edits - warm) / SAMPLES)
-
-    for (let at = 0; at < warm; at++)
+    for (let at = 0; at < warmEdits; at++)
       await nextEdit()
 
     for (let sample = 0; sample < SAMPLES; sample++) {
       const before = await treeCpuOf(session.pid)
 
-      for (let at = 0; at < between; at++)
+      for (let at = 0; at < editsBetween; at++)
         await nextEdit()
 
       readings.cpu += await treeCpuOf(session.pid) - before
@@ -181,7 +183,7 @@ async function soakDev(checkout: string): Promise<Readings> {
       pids.add(pid)
     }
 
-    readings.cpu /= between * SAMPLES
+    readings.cpu /= editsBetween * SAMPLES
     readings.processes = pids.size
 
     return readings
@@ -202,31 +204,50 @@ async function soakDev(checkout: string): Promise<Readings> {
   }
 }
 
-const waited = await waitQuiet(Number(values.wait))
+const waited = await waitQuiet(wait)
 const startLoad = await loadNow()
-const servers = []
-const devs = []
+const problems: string[] = []
+
+// The checkout's soak failing ends the run; the baseline's only drops the comparison, so memory is still judged.
+async function soaked(index: number, what: string, soak: () => Promise<Readings>): Promise<Readings | undefined> {
+  if (index === 0)
+    return soak()
+
+  try {
+    return await soak()
+  }
+  catch (error) {
+    problems.push(`the baseline's ${what} did not run, CPU not compared: ${error instanceof Error ? error.message : String(error)}`)
+
+    return undefined
+  }
+}
+
+const servers: (Readings | undefined)[] = []
+const devs: (Readings | undefined)[] = []
 
 for (const [index, checkout] of checkouts.entries())
-  servers.push(await soakServer(checkout, index))
+  servers.push(await soaked(index, 'compiled server', async () => soakServer(checkout, index)))
 
-for (const checkout of checkouts)
-  devs.push(await soakDev(checkout))
+for (const [index, checkout] of checkouts.entries())
+  devs.push(await soaked(index, 'kay dev', async () => soakDev(checkout)))
 
 const quiet = waited && [startLoad, ...loads].every(load => load < QUIET_LOAD)
 const parts: Part[] = [
   { name: 'compiled server', unit: 'request (µs)', limits: LIMITS.server, current: servers[0]!, baseline: servers[1] },
   { name: 'kay dev', unit: 'edit (ms)', limits: LIMITS.dev, current: devs[0]!, baseline: devs[1] },
 ]
-const names = await Promise.all(checkouts.map(async checkout => (await Bun.$`git -C ${checkout} describe --tags --always`.text()).trim()))
+const names = await Promise.all(checkouts.map(async checkout => (await Bun.$`git -C ${checkout} describe --tags --always`.nothrow().quiet().text()).trim() || basename(checkout)))
 const { failures, notes } = verdict(parts, quiet)
 
-console.log(`${requests} requests to the compiled bench app, ${edits} edits in kay dev; load ${startLoad} at the start, at most ${Math.max(startLoad, ...loads)} during the run on ${CORES} cores: ${quiet ? 'quiet' : 'busy'}\n`)
+const waitedOut = waited ? '' : `, the load staying over ${START_LOAD} through the ${wait}-minute wait`
+
+console.log(`${requests} requests to the compiled bench app, ${warmEdits + editsBetween * SAMPLES} edits in kay dev; load ${startLoad} at the start, at most ${Math.max(startLoad, ...loads)} during the run on ${CORES} cores: ${quiet ? 'quiet' : 'busy'}${waitedOut}\n`)
 console.log(`| metric | ${names.join(' | ')} |`)
 console.log(`|---|${names.map(() => '---').join('|')}|`)
 
 for (const [{ name, unit }, of] of [[parts[0]!, servers], [parts[1]!, devs]] as const) {
-  const row = (metric: string, value: (readings: Readings) => number) => console.log(`| ${name}: ${metric} | ${of.map(readings => value(readings).toFixed(1)).join(' | ')} |`)
+  const row = (metric: string, value: (readings: Readings) => number) => console.log(`| ${name}: ${metric} | ${of.map(readings => readings === undefined ? '-' : value(readings).toFixed(1)).join(' | ')} |`)
 
   row(`CPU per ${unit}`, readings => readings.cpu)
   row('heap growth, second half (MiB)', readings => growth(readings.heap))
@@ -235,7 +256,7 @@ for (const [{ name, unit }, of] of [[parts[0]!, servers], [parts[1]!, devs]] as 
   row('anon at the end (MiB)', readings => readings.anon.at(-1)!)
 }
 
-for (const line of [...notes, ...failures.map(failure => `FAILED ${failure}`)])
+for (const line of [...problems, ...notes, ...failures.map(failure => `FAILED ${failure}`)])
   console.log(`\n${line}`)
 
 process.exit(failures.length > 0 ? 1 : 0)

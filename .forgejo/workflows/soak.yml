@@ -43,16 +43,23 @@ jobs:
       - name: Install dependencies
         run: bun install --silent --frozen-lockfile
 
-      # The release before this commit, the commit itself being one when a release was pushed.
+      # The release before this commit, the commit itself being one when a release was pushed. One that cannot be set up only drops the CPU comparison.
       - name: Check out the last release beside it
         run: |
-          base=$(git describe --tags --abbrev=0 HEAD~1)
-          echo "Comparing with $base"
-          git worktree add --detach ../kay-base "$base"
-          bun install --cwd ../kay-base --silent --frozen-lockfile
+          if base=$(git describe --tags --abbrev=0 HEAD~1) && git worktree add --detach ../kay-base "$base" && bun install --cwd ../kay-base --silent --frozen-lockfile; then
+            echo "Comparing with $base"
+          else
+            echo "No last release to compare with, memory alone is judged"
+            rm -rf ../kay-base
+          fi
 
       # The runner shares its host with the sessions working on kay, so CPU is only judged when the load lets it mean something; memory is judged whatever the load.
       - name: Soak
-        run: bun bench/soak.ts --wait "$WAIT" . ../kay-base
+        run: |
+          if [ -d ../kay-base ]; then
+            bun bench/soak.ts --wait "$WAIT" . ../kay-base
+          else
+            bun bench/soak.ts --wait "$WAIT" .
+          fi
         env:
           WAIT: ${{ inputs.wait || '30' }}
