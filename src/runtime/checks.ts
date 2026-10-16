@@ -155,6 +155,7 @@ export interface UnresolvedParameter { kayUnresolved: true }
 
 // A signal or memo the template hands on whole lands in a parameter typed `unknown` or `any`, which takes the signal itself, so a string or JSON of it is the function's source. `kay check` reports it as the `uncalled-signal` lint.
 // A parameter typed `Signal<T>`, `Memo<T>`, a function type, or a generic `T` the call infers from the signal stays silent.
+// `KayHanded` returns the signal in a conditional that is always true, which only lets TypeScript infer `Parameter` from the type the call expects there.
 export type HandedSignal<Parameter> = 0 extends 1 & Parameter ? { kayLint: 'uncalled-signal' } : [Parameter] extends [UnresolvedParameter] ? unknown : unknown extends Parameter ? { kayLint: 'uncalled-signal' } : unknown
 
 // A literal schedule has five fields or is a nickname, and comes some day; a computed one, or a field this does not read, is checked when the server starts.
