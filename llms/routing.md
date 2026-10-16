@@ -136,7 +136,7 @@ Pages live in `src/routes/`:
 - That holds over a listening server as through `app.handle()`, and the same goes for every route ending in `*`, a redirect's, an API module's or the app's own, against a page of params.
 - An app that passes `.use()` a promise, as `.use(import('./admin'))`, gets that once Elysia loaded it, so a request in the moment after `listen()` may still reach the page of params.
 - A page URL ending in a slash redirects with 308 to the one without, query kept: `/about/` to `/about`.
-- `trailingSlash` in kay.config.ts changes that: `'always'` redirects `/about` to `/about/` instead, `'ignore'` serves both.
+- `trailingSlash` in kay.config.ts, `'never'` by default, changes that: `'always'` redirects `/about` to `/about/` instead, `'ignore'` serves both.
 
 #### Matchers
 

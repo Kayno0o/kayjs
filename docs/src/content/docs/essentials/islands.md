@@ -13,7 +13,7 @@ const count = signal(0)
 button(onClick={() => count++}) Clicked {count()} times
 ```
 
-A component is an island when it has an `on*` handler, a `bind:` or a `ref`, or when its script uses a value from `kay`, such as `signal`. The helpers `uid`, `sanitizeHtml` and `trustHtml` do not count: a component using only them stays static.
+A component is an island when it has an `on*` handler, a `bind:` or a `ref`, or when its script uses a value from `kay`, such as `signal`. The helpers `uid`, `describeField`, `sanitizeHtml` and `trustHtml` do not count: a component using only them stays static.
 
 An island is for what reacts to the user in the browser. A greeting or a stock count that only differs per request needs no JavaScript. Make it a [server island](/essentials/routing#server-islands) instead.
 
