@@ -2,6 +2,12 @@
 
 What each minor release breaks, and what an app changes to move to it. kay and its libraries share one version, so one section covers them all; a patch breaks nothing, and a minor missing here broke nothing.
 
+## 1.49.0
+
+### A prerendered page reads the pathname `trailingSlash` serves
+
+- `kay build` now renders every prerendered page at the spelling `trailingSlash` serves, so a `prerender: true` page reading `ctx.url.pathname` sees `/about/` under `always`, where it saw `/about`. Under `ignore` such a page is still one copy served for both spellings, so it reads `/about` at `/about/` too. Compare a stripped path (`pathname.replace(/\/$/, '')`) where both matter. No deprecated lint is possible, as the pathname is a run-time value.
+
 ## 1.47.0
 
 ### `auth.saveProfile` throws without `pages.profile`

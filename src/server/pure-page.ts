@@ -99,12 +99,15 @@ const SETTING_NAMES = new Set<string>([PAGE, ...PAGE_SETTINGS])
 const MODULE_EXPORT = new RegExp(`^export (?!(?:type|interface) )(?!(?:async )?(?:const|let|var|function) (?:${[...SETTING_NAMES].join('|')})\\b)`, 'm')
 
 const WHITESPACE = /\s+/g
+const SPACE = /\s/
 const CTX = /\bctx\b/g
-const CTX_PATHNAME = /^\s*\??\.\s*url\s*\??\.\s*pathname(?![\w$])(?![ \t]*(?:\+\+|--))(?!\s*(?:=(?!=)|[-+*/%&|^]=|<<=|>>>?=|\*\*=|&&=|\|\|=|\?\?=))/
-const CTX_PARAMS = /^\s*\??\.\s*params(?![\w$])/
+const CTX_PATHNAME = /\s*\??\.\s*url\s*\??\.\s*pathname(?![\w$])(?![ \t]*(?:\+\+|--))(?!\s*(?:=(?!=)|[-+*/%&|^]=|<<=|>>>?=|\*\*=|&&=|\|\|=|\?\?=))/y
+const CTX_PARAMS = /\s*\??\.\s*params(?![\w$])/y
 // A statement ends at `;`, `,`, `)`, the end of the source, or a line break before a token that cannot continue the expression (`ctx` then `.cookies` on the next line is `ctx.cookies`); `---` closes a .kay fence.
-const CTX_ENDS = /^[ \t]*(?:[;,)]|$|\r?\n(?!\s*(?:[.?[(`+*/%&|^<>=!:]|-(?!--)|(?:in|instanceof|as|satisfies)(?![\w$]))))/
+const CTX_ENDS = /[ \t]*(?:[;,)]|$|\r?\n(?!\s*(?:[.?[(`+*/%&|^<>=!:]|-(?!--)|(?:in|instanceof|as|satisfies)(?![\w$]))))/y
 const DECLARATION = /(?:^|[^\w$.])(?:const|let|var)$/
+// One more than the longest of them.
+const DECLARATION_LOOKBACK = 6
 const PARAMS_ENTRY = /^params\s*(?::|=|$)/
 const URL_ENTRY = /^url\s*:\s*(\{[\s\S]*\})$/
 const PATHNAME_ENTRY = /^pathname\s*(?::\s*[\w$]+\s*)?(?:=[\s\S]*)?$/
@@ -408,25 +411,39 @@ function destructuredPath(pattern: string): boolean | undefined {
   return pathname
 }
 
-// The `{ ... }` pattern a `const`, `let` or `var` binds to `ctx`, when the text before this `ctx` is `const { ... } = `.
-function patternBefore(before: string): string | undefined {
-  const head = before.trimEnd()
+// The offset just after the last non-space character before `end`.
+function trimmedEnd(source: string, end: number): number {
+  let at = end
 
-  if (!head.endsWith('=') || head.endsWith('=='))
+  while (at > 0 && SPACE.test(source[at - 1]!))
+    at--
+
+  return at
+}
+
+// The `{ ... }` pattern a `const`, `let` or `var` binds to `ctx`, when the text before the `ctx` at `index` is `const { ... } = `.
+function patternBefore(source: string, index: number): string | undefined {
+  const head = trimmedEnd(source, index)
+
+  if (source[head - 1] !== '=' || source[head - 2] === '=')
     return undefined
 
-  const end = head.slice(0, -1).trimEnd()
+  const end = trimmedEnd(source, head - 1)
 
-  if (!end.endsWith('}'))
+  if (source[end - 1] !== '}')
     return undefined
 
   let depth = 0
 
-  for (let at = end.length - 1; at >= 0; at--) {
-    if (end[at] === '}')
+  for (let at = end - 1; at >= 0; at--) {
+    if (source[at] === '}') {
       depth++
-    else if (end[at] === '{' && --depth === 0)
-      return DECLARATION.test(end.slice(0, at).trimEnd()) ? end.slice(at) : undefined
+    }
+    else if (source[at] === '{' && --depth === 0) {
+      const declared = trimmedEnd(source, at)
+
+      return DECLARATION.test(source.slice(Math.max(0, declared - DECLARATION_LOOKBACK), declared)) ? source.slice(at, end) : undefined
+    }
   }
 
   return undefined
@@ -438,23 +455,28 @@ function patternBefore(before: string): string | undefined {
 function ctxRead(source: string): { stop?: number | undefined, pathname: boolean } {
   let pathname = false
 
-  for (const { index } of source.matchAll(CTX)) {
-    const before = source.slice(0, index)
-    const after = source.slice(index + 3)
+  const follows = (pattern: RegExp, from: number): boolean => {
+    pattern.lastIndex = from
 
-    if (before.trimEnd().endsWith('.'))
+    return pattern.test(source)
+  }
+
+  for (const { index } of source.matchAll(CTX)) {
+    const after = index + 3
+
+    if (source[trimmedEnd(source, index) - 1] === '.')
       return { stop: index, pathname }
 
-    if (CTX_PATHNAME.test(after)) {
+    if (follows(CTX_PATHNAME, after)) {
       pathname = true
 
       continue
     }
 
-    if (CTX_PARAMS.test(after))
+    if (follows(CTX_PARAMS, after))
       continue
 
-    const pattern = CTX_ENDS.test(after) ? patternBefore(before) : undefined
+    const pattern = follows(CTX_ENDS, after) ? patternBefore(source, index) : undefined
     const taken = pattern === undefined ? undefined : destructuredPath(pattern)
 
     if (taken === undefined)
@@ -475,19 +497,10 @@ function lineAt(source: string, offset: number): number {
   return line
 }
 
-// Whether the page, its layouts and everything they import provably read nothing a request or the moment changes, so one render serves every visitor.
+// Whether the page, its layouts and everything they import provably read nothing a request or the moment changes, so one render serves every visitor, and whether any of them read the pathname: the page is then right only at the path it is rendered at.
 // Whatever cannot be shown to is left to render per request: a package, any `kay` export `KAY_EXPORTS` does not class as free, a `ctx`, a clock, a `query` schema, module state.
+// `stop` is the first file of the page and its layouts, or of what they import, that reads something a request or the moment changes.
 // `scans` keeps what each file holds across the routes of one build.
-export async function readsNothing(route: { layouts: string[], file: string }, scans = new Map<string, Promise<Scan>>()): Promise<boolean> {
-  return await keptStop(route, scans) === undefined
-}
-
-// What stops the page from being kept, the first file of it and its layouts, or of what they import, that reads something a request or the moment changes.
-export async function keptStop(route: { layouts: string[], file: string }, scans = new Map<string, Promise<Scan>>()): Promise<Stop | undefined> {
-  return (await keptScan(route, scans)).stop
-}
-
-// The same, with whether the page, its layouts or what they import read the pathname: the page is then right only at the path it is rendered at.
 export async function keptScan(route: { layouts: string[], file: string }, scans = new Map<string, Promise<Scan>>()): Promise<{ stop?: Stop | undefined, pathname: boolean }> {
   const seen = new Set<string>()
   const queue = [...routeChain(route).files]

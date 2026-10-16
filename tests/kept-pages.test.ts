@@ -5,8 +5,13 @@ import { afterAll, describe, expect, it } from 'bun:test'
 import { outputDir } from '../src/build/assets'
 import { formatRouteTable } from '../src/build/report'
 import { compileKay } from '../src/compiler'
-import { CONTENT_EXPORTS, KAY_EXPORTS, keptScan, keptStop, readsNothing } from '../src/server/pure-page'
+import { CONTENT_EXPORTS, KAY_EXPORTS, keptScan } from '../src/server/pure-page'
 import { scratchDir } from './scratch'
+
+type Route = Parameters<typeof keptScan>[0]
+
+const keptStop = async (route: Route) => (await keptScan(route)).stop
+const readsNothing = async (route: Route) => await keptStop(route) === undefined
 
 const CLI = join(import.meta.dir, '../src/cli.ts')
 const CONFIG = 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ log: false })\n'
@@ -934,7 +939,7 @@ describe('a page reading only what its path fixes', () => {
     'destructured': '--- server\nconst { url: { pathname } } = ctx\n---\np {pathname}\n',
     'aliased': '--- server\nconst { url: { pathname: here = \'/\' } } = ctx\n---\np {here}\n',
     'params': '--- server\nconst slug = ctx.params.slug\n---\np {slug}\n',
-    'on its own line': '--- server\nconst { url: { pathname } } = ctx\nconst parts = pathname.split(\'/\')\n---\np {parts.length}\n',
+    'a newline before a statement that does not continue': '--- server\nconst { url: { pathname } } = ctx\nconst parts = pathname.split(\'/\')\n---\np {parts.length}\n',
     'params destructured': '--- server\nconst { params, url: { pathname } } = ctx\n---\np {pathname}{params.slug}\n',
   }
   const STOPPED_READS: Record<string, string> = {
@@ -1084,7 +1089,10 @@ describe('a page reading only what its path fixes', () => {
     expect(slashed!.etag).toBeNull()
     expect(slashed!.text).toContain('<header>/about/</header>')
     expect(hostile!.etag).toBeNull()
-    expect(hostile!.status === 200 ? hostile!.text : '').not.toContain('<header>/about</header>')
+    expect([200, 404]).toContain(hostile!.status)
+
+    if (hostile!.status === 200)
+      expect(hostile!.text).not.toContain('<header>/about</header>')
   }, 60_000)
 
   it('keeps a page whose path needs percent-encoding, at the spelling a browser sends', async () => {

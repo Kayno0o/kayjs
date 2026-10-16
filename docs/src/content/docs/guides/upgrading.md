@@ -9,6 +9,12 @@ kay and its libraries share one version number, so one section covers them all. 
 
 `kay upgrade` moves your app to the latest version and rewrites what it can, one minor at a time. Read the sections here for what it cannot.
 
+## 1.49.0
+
+### A prerendered page reads the pathname `trailingSlash` serves
+
+`kay build` now renders every prerendered page at the spelling `trailingSlash` serves. A `prerender: true` page reading `ctx.url.pathname` sees `/about/` under `always`, where it saw `/about`. Under `ignore` such a page is still one copy served for both spellings, so it reads `/about` at `/about/` too. Compare a path with its trailing slash stripped (`pathname.replace(/\/$/, '')`) where both matter.
+
 ## 1.47.0
 
 ### `auth.saveProfile` throws without `pages.profile`
