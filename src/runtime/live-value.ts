@@ -52,9 +52,8 @@ export interface LiveRequest {
 
 export const LIVE_ROUTE = '/_kay/live'
 export const LIVE_SCRIPT = 'script[data-kay-live]'
-// How long the server takes a page's proof, and so how long a page may watch on it before asking for another.
 const RENEW_RETRY_MS = 60_000
-
+// How long the server takes a page's proof, and so how long a page may watch on it before asking for another.
 export const PROOF_LIFETIME_MS = 60 * 60_000
 
 // Another copy of this module, such as a workspace's second install or a dev reload, shares the one registry.
