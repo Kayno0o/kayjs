@@ -79,6 +79,8 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `unkept-page` | warn | code | A page saying `keep: true` that `kay build` does not keep |
 | `unguarded-route` | deny | security | With `requireGuards`, a route no guard covers that does not set `guards: false` |
 | `unguarded-tool` | warn | security | With `mcp`, a tool action with bot protection that no guard covers |
+| `deprecated-api-tool` | warn | deprecated | With `mcp`, an API route that sets neither `detail.tool` nor `hide`: it was a tool before 1.51 and is none now |
+| `hidden-tool` | warn | code | With `mcp`, an API route that sets `hide` and `tool` |
 | `missing-site` | warn | seo | `seo` with no `site`, on a static export |
 | `missing-description` | warn | seo | No `seo.description` |
 | `missing-share-image` | warn | seo | No share image on any page |

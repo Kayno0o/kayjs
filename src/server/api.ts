@@ -1,5 +1,6 @@
 import type { Context } from 'elysia'
 import type { Locals } from '../runtime'
+import type { ActionTool } from '../runtime/action'
 import type { EventStream } from '../runtime/live'
 import type { ActionOptions } from './actions'
 import type { ApiModule } from './api-modules'
@@ -359,6 +360,13 @@ async function admit(guards: LoadedGuard[], context: { request: Request, params?
     headers['set-cookie'] = [...[headers['set-cookie'] ?? []].flat(), ...cookies.getSetCookie()]
 
   return undefined
+}
+
+declare module 'elysia' {
+  interface DocumentDecoration {
+    // Offers the route to agents as an MCP tool when `mcp` is set in kay.config.ts: `true`, its description, or `{ name, description }`, as an action's `tool` is. A route without it is in the OpenAPI document and never offered.
+    tool?: boolean | string | ActionTool | undefined
+  }
 }
 
 // Mapped, so the locals read as the record Elysia's context takes, nothing registered included.

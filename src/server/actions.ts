@@ -3,7 +3,7 @@ import type { Elysia, TSchema, ValidationError } from 'elysia'
 import type { Server } from 'elysia/universal'
 import type { KayConfig } from '../config'
 import type { GuardContext, Locals, RouteParams } from '../runtime'
-import type { ActionContext, ActionProtection, ServerAction } from '../runtime/action'
+import type { ActionContext, ServerAction } from '../runtime/action'
 import type { Locale } from '../runtime/i18n'
 import type { BodyLimit } from './body'
 import type { CookieJar } from './cookies'
@@ -37,6 +37,7 @@ import { guardUrl } from './routes'
 import { readPersonally } from './scope'
 import { carryContext } from './security'
 import { Denied, NotFound, Redirect, stoppers } from './signals'
+import { toolSettings } from './tool-settings'
 import { answered, SERVER_SPAN, traced } from './trace'
 import { visitAs } from './visit'
 
@@ -103,17 +104,6 @@ export interface RouteMatch {
 
 // Renders the page a refused plain form post came from, with how it failed, through the app the post reached.
 type Back = (request: Request, headers: Headers, flash: Flash, server: Server | null) => Promise<Response>
-
-// What `tool` on an action sets, undefined for an action that is none.
-function toolSettings(tool: ActionProtection['tool']): DocumentedAction['tool'] | undefined {
-  if (tool === undefined || tool === false)
-    return undefined
-
-  if (tool === true)
-    return {}
-
-  return typeof tool === 'string' ? { description: tool } : tool
-}
 
 // Registers every action the pages and layouts export as a POST route whose body Elysia validates against the action's schema, giving back the body limit of each by its path and the actions that opted in to being MCP tools.
 export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], match: RouteMatch, options: ActionOptions): Promise<{ limits: Map<string, BodyLimit>, tools: DocumentedAction[] }> {

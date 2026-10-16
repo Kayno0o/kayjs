@@ -77,7 +77,7 @@ describe('testSite under base', () => {
   it('serves the mcp endpoint under the base', async () => {
     const mcp = await testSite({ routes, api, base: '/blog', mcp: true, islands: false })
 
-    expect((await mcp.mcp.tools()).length).toBeGreaterThan(0)
+    expect((await mcp.mcp.tools()).map(tool => tool.name)).toEqual(['get_cookies_read'])
     await mcp.close()
   })
 

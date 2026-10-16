@@ -1,4 +1,5 @@
 import type { Elysia } from 'elysia'
+import type { ActionTool } from '../runtime/action'
 import type { ActionOptions } from './actions'
 import type { ApiGuard } from './api-modules'
 import type { LoadedGuard } from './guards'
@@ -10,6 +11,7 @@ import { inLocale, passGuards } from './actions'
 import { API_PREFIX, OPENAPI_PATH, REFERENCE_PATH } from './api-modules'
 import { sharedContext } from './render'
 import { apiRoutePath } from './routes'
+import { toolSettings } from './tool-settings'
 
 export interface OpenApiConfig {
   // The document's `info`, the site's `seo.name` and `1.0.0` by default.
@@ -65,6 +67,8 @@ export interface Operation {
   'requestBody'?: RequestBody
   'responses': Record<string, Schema>
   'x-kay-guards'?: string[]
+  // Set on a route that opted in to being an MCP tool, with what its `detail.tool` sets: the name and description the tool takes in place of the operation's.
+  'x-kay-tool'?: { name?: string | undefined, description?: string | undefined }
   // Called as kay's `action()` calls are, which an MCP tool does, rather than as a plain JSON `POST`.
   'x-kay-action'?: true
 }
@@ -176,12 +180,13 @@ export function openApiDocument(modules: MountedApi[], options: { title: string,
   for (const module of modules) {
     for (const route of module.instance.routes) {
       const method = route.method.toUpperCase()
-      const hooks = route.hooks as Record<string, unknown> & { detail?: { summary?: string, description?: string, tags?: string[], deprecated?: boolean, hide?: boolean, operationId?: string } }
+      const hooks = route.hooks as Record<string, unknown> & { detail?: { summary?: string, description?: string, tags?: string[], deprecated?: boolean, hide?: boolean, operationId?: string, tool?: boolean | string | ActionTool } }
 
       if ((!METHODS.has(method) && method !== 'ALL') || hooks.detail?.hide === true)
         continue
 
       for (const path of routePaths(module, route)) {
+        const tool = toolSettings(hooks.detail?.tool)
         const operation: Operation = {
           tags: hooks.detail?.tags ?? [module.mount.slice(API_PREFIX.length + 1) || 'api'],
           ...hooks.detail?.summary !== undefined && { summary: hooks.detail.summary },
@@ -191,10 +196,14 @@ export function openApiDocument(modules: MountedApi[], options: { title: string,
           ...hooks.body !== undefined && { requestBody: { required: true, content: content(hooks.body, holdsFile(hooks.body) ? 'multipart/form-data' : 'application/json') } },
           responses: responses(hooks.response),
           ...module.guards.length > 0 && { 'x-kay-guards': module.guards.map(guard => guard.path) },
+          ...tool && { 'x-kay-tool': tool },
         }
 
-        if (hooks.detail?.operationId !== undefined && hooks.detail.operationId !== '')
-          wanted.set(operation, hooks.detail.operationId)
+        // A route that sets no id takes its tool's name, as an action's id is.
+        const chosen = hooks.detail?.operationId !== undefined && hooks.detail.operationId !== '' ? hooks.detail.operationId : tool?.name
+
+        if (chosen !== undefined && chosen !== '')
+          wanted.set(operation, chosen)
 
         if (method === 'ALL')
           anyMethod.push({ path, operation })
@@ -218,7 +227,10 @@ export function openApiDocument(modules: MountedApi[], options: { title: string,
       if (methods[method] !== undefined)
         continue
 
-      methods[method] = { ...operation }
+      const tool = operation['x-kay-tool']
+
+      // Each method is a tool of its own, so a chosen name takes the method too.
+      methods[method] = { ...operation, ...tool?.name !== undefined && { 'x-kay-tool': { ...tool, name: `${tool.name}_${method}` } } }
 
       if (id !== undefined)
         wanted.set(methods[method], `${id}_${method}`)
@@ -232,6 +244,16 @@ export function openApiDocument(modules: MountedApi[], options: { title: string,
   for (const [operation, name] of wanted) {
     operation.operationId = operationName(name, named)
     tools.add(safeName(operation.operationId).slice(0, MAX_NAME))
+  }
+
+  // A name a route chose for its tool is taken too, whatever its id is.
+  for (const methods of Object.values(paths)) {
+    for (const operation of Object.values(methods)) {
+      const chosen = operation['x-kay-tool']?.name
+
+      if (chosen !== undefined)
+        tools.add(safeName(chosen).slice(0, MAX_NAME))
+    }
   }
 
   for (const [path, methods] of Object.entries(paths)) {

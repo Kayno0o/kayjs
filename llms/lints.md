@@ -121,6 +121,8 @@ kay check --only seo
 | `uncaught-await` | warn | code | An `await` block with no `catch` block: once its value rejects, the pending block goes with nothing in its place and the error only reaches the log. A `try` around it does not catch it, a streamed block settling after the page has rendered. |
 | `unguarded-route` | deny | security | With `requireGuards`, a page, a layout with actions, an endpoint or an API module of the app no guard covers and not setting `guards: false`, which the server refuses. |
 | `unguarded-tool` | warn | security | With `mcp`, an action that sets `tool` and a `honeypot`, `minTime` or `proofOfWork` with no guard covering it: an agent skips what those ask of a person, so anonymous callers can spam it. A `...spread` in the options counts as a `honeypot`, `minTime` or `proofOfWork`; options that are not an object literal are not read. |
+| `deprecated-api-tool` | warn | deprecated | With `mcp`, an API route with an inline handler whose `detail` sets neither `tool` nor `hide`: it was an MCP tool before 1.51 and is none now. The fix adds `detail: { tool: true }` and is not applied by `--fix`, as it would offer every route. |
+| `hidden-tool` | warn | code | With `mcp`, an API route whose `detail` sets `hide: true` and `tool`: a hidden route is no tool. |
 | `missing-site` | warn | seo | `seo` set with no `site`, in kay.config.ts, `SITE_URL` or `ORIGIN`, on a `kay build --static` export: no canonical links, `og:url`, sitemap or robots.txt. A server warns at boot instead. |
 | `missing-description` | warn | seo | A public site with no `seo.description`. |
 | `missing-share-image` | warn | seo | A public site with no `seo.image`, and no `.kay` file of the project setting an `og:image`. |

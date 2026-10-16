@@ -1,9 +1,11 @@
 import { join, relative } from 'node:path'
 import { afterAll, describe, expect, it } from 'bun:test'
+import { Elysia } from 'elysia'
 import { writeShadowTypes } from '../src/check'
 import { bootProblems } from '../src/check/boot'
 import { configuredSite, setSite } from '../src/runtime/site'
 import { encodeValue } from '../src/runtime/wire'
+import { toolCall } from '../src/server'
 import { testSite } from '../src/test'
 import { fixtureCopy } from './scratch'
 
@@ -140,7 +142,7 @@ describe('the endpoint', () => {
 })
 
 describe('the tools', () => {
-  it('lists the actions that set tool and the routes of the OpenAPI document, nothing else', async () => {
+  it('lists the actions and the routes that set tool, nothing else', async () => {
     const tools = await site.mcp.tools()
     const names = tools.map(tool => tool.name)
 
@@ -154,8 +156,10 @@ describe('the tools', () => {
       'create_note',
       'delete_notes_id',
       'get_notes_binary',
+      'get_notes_described',
       'get_notes_id',
       'get_notes_search',
+      'get_notes_who',
       'get_notes_words',
       'get_private',
       'language',
@@ -163,6 +167,7 @@ describe('the tools', () => {
       'sends_away',
       'signup',
       'solve',
+      'tagged_note',
       'wipe',
     ].sort())
     expect(names).not.toContain('hidden')
@@ -658,5 +663,188 @@ describe('kay check', () => {
     const problems = await bootProblems(dir, { routes: 'src/routes', mcp: true })
 
     expect(problems.some(problem => problem.message.includes('`mcp` both serve /mcp'))).toBe(true)
+  })
+})
+
+describe('routes opt in to being tools', () => {
+  const LEFT_OUT = ['get_notes_internal', 'get_notes_hidden', 'get_notes_both', 'get_items_internal']
+
+  it('lists a route that sets tool and none that does not, the hidden one included even with tool', async () => {
+    const names = (await site.mcp.tools()).map(tool => tool.name)
+
+    expect(names).toContain('get_notes_words')
+
+    for (const left of LEFT_OUT)
+      expect(names).not.toContain(left)
+  })
+
+  it('refuses a call naming a route that did not opt in as an unknown tool, as a name nothing has', async () => {
+    const unknown = await rpc(site, 'tools/call', { name: 'get_notes_internal' }, BEARER)
+    const missing = await rpc(site, 'tools/call', { name: 'no_such_tool' }, BEARER)
+
+    expect(unknown.response.status).toBe(missing.response.status)
+    expect(unknown.body.error).toEqual({ code: missing.body.error!.code, message: 'Unknown tool: get_notes_internal' })
+  })
+
+  it('keeps the route in the OpenAPI document, tool or not, and a hidden route out of it', async () => {
+    const document = await (await openapi.fetch('/api/openapi.json', { headers: BEARER })).json() as { paths: Record<string, Record<string, { 'operationId': string, 'x-kay-tool'?: unknown }>> }
+
+    expect(document.paths['/api/notes/internal']!.get!.operationId).toBe('get_notes_internal')
+    expect(document.paths['/api/notes/internal']!.get!['x-kay-tool']).toBeUndefined()
+    expect(document.paths['/api/notes/words']!.get!['x-kay-tool']).toEqual({})
+    expect(document.paths['/api/notes/hidden']).toBeUndefined()
+    expect(document.paths['/api/notes/both']).toBeUndefined()
+  })
+
+  it('takes the name and the description a route sets, as an action does', async () => {
+    const tools = await site.mcp.tools()
+    const named = tools.find(tool => tool.name === 'tagged_note')!
+    const described = tools.find(tool => tool.name === 'get_notes_described')!
+
+    expect(named.description).toBe('A note by its tag')
+    expect(described.description).toBe('What an agent reads')
+    expect((await site.mcp.call('tagged_note', {})).text).toBe('tagged')
+  })
+
+  it('names the operation after the tool when it sets no id, and keeps an id it sets', async () => {
+    const document = await (await openapi.fetch('/api/openapi.json', { headers: BEARER })).json() as { paths: Record<string, Record<string, { operationId: string }>> }
+
+    expect(document.paths['/api/notes/tagged']!.get!.operationId).toBe('tagged_note')
+    expect(document.paths['/api/notes/described']!.get!.operationId).toBe('get_notes_described')
+  })
+
+  it('serves the same tools under a base and a trailing slash, and refuses a route that did not opt in there too', async () => {
+    expect((await mounted.mcp.tools()).map(tool => tool.name)).not.toContain('get_notes_internal')
+    expect((await mounted.mcp.call('get_notes_words')).text).toBe('plain words')
+    expect((await rpc(mounted, 'tools/call', { name: 'get_notes_internal' })).body.error?.message).toBe('Unknown tool: get_notes_internal')
+  })
+
+  it('lists the same tools in a localized site', async () => {
+    expect((await localized.mcp.tools()).map(tool => tool.name)).not.toContain('get_notes_internal')
+  })
+
+  it('offers an .all() route that sets tool once per method, and one that does not never', async () => {
+    const names = (await guarded.mcp.tools({ headers: BEARER })).map(tool => tool.name)
+
+    expect(names).toContain('echo_any_get')
+    expect(names).not.toContain('get_items_internal')
+  })
+
+  it('keeps the directory guard on a route that opted in', async () => {
+    expect((await rpc(guarded, 'tools/call', { name: 'get_items_cookie' })).response.status).toBe(401)
+    expect((await guarded.mcp.call('get_items_cookie', {}, { headers: BEARER })).isError).toBe(false)
+  })
+
+  it('names each method of an .all() route after the tool name it sets', async () => {
+    const all = await testSite({ routes: 'tests/fixtures/mcp-names/src/routes', api: 'tests/fixtures/mcp-names/src/api', mcp: true, islands: false })
+
+    expect((await all.mcp.tools()).map(tool => tool.name).sort()).toEqual(['a_b', 'a_b_2'])
+    await all.close()
+  })
+})
+
+describe('a tool call an app can tell', () => {
+  const calls: (ReturnType<typeof toolCall>)[] = []
+  const seen = new Elysia().onRequest(({ request }) => {
+    if (new URL(request.url).pathname !== '/mcp')
+      calls.push(toolCall(request))
+  })
+  const front = testSite({ routes: 'tests/fixtures/mcp-seen/src/routes', api: 'tests/fixtures/mcp-seen/src/api', mcp: true, islands: false, use: [seen] })
+  const KEY = { authorization: 'Bearer key' }
+  const ACTION = '/_kay/action/tests/fixtures/mcp-seen/src/routes/index.kay/ping'
+
+  afterAll(async () => (await front).close())
+
+  it('is seen from a hook registered before pages(), for an action and for a route, with the tool each calls', async () => {
+    const site = await front
+
+    calls.length = 0
+    await site.mcp.call('ping', {}, { headers: KEY })
+    await site.mcp.call('get_seen', {}, { headers: KEY })
+    expect(calls.map(call => call?.tool)).toEqual(['ping', 'get_seen'])
+    expect(calls.every(call => typeof call?.client === 'string')).toBe(true)
+  })
+
+  it('is seen from a kay guard, so a bearer key reaches the tools and nothing else', async () => {
+    const site = await front
+
+    expect((await site.mcp.call('ping', {}, { headers: KEY })).isError).toBe(false)
+    expect((await site.mcp.call('get_seen', {}, { headers: KEY })).data).toEqual({ tool: 'get_seen' })
+    expect((await site.fetch('/api/seen', { headers: KEY })).status).toBe(403)
+    expect((await site.fetch(ACTION, { method: 'POST', headers: { ...KEY, 'content-type': 'application/json', 'x-kay-action': '1', 'origin': 'http://localhost' }, body: encodeValue({}) })).status).toBe(403)
+    expect((await site.fetch('/', { headers: KEY })).status).toBe(403)
+  })
+
+  it('is no tool call for a client sending the marker headers itself, a guessed value or the header names', async () => {
+    const site = await front
+
+    calls.length = 0
+
+    const forged = await site.fetch('/api/seen', { headers: { ...KEY, 'x-kay-agent': 'guess', 'x-kay-agent-tool': 'get_seen', 'x-kay-agent-client': '1.2.3.4' } })
+
+    expect(forged.status).toBe(403)
+    expect(calls).toEqual([undefined])
+  })
+
+  it('is told from the handler too, after the markers are dropped from the request', async () => {
+    const result = await site.mcp.call('get_notes_who', {}, { headers: BEARER })
+
+    expect(result.data).toEqual({ tool: 'get_notes_who' })
+    expect((await (await site.fetch('/api/notes/who', { headers: { ...BEARER, 'x-kay-agent': 'guess', 'x-kay-agent-tool': 'x' } })).json())).toEqual({ tool: null })
+  })
+
+  it('is seen through the app.handle fallback of a site without a server too', async () => {
+    const result = await mounted.mcp.call('get_notes_who')
+
+    expect(result.data).toEqual({ tool: 'get_notes_who' })
+  })
+})
+
+describe('kay check on routes that opt in', () => {
+  const codes = async (dir: string, mcp = true, lints?: object) => (await writeShadowTypes(dir, { routes: 'src/routes', api: 'src/api', mcp, lints })).problems.filter(found => found.code === 'deprecated-api-tool' || found.code === 'hidden-tool').map(found => [found.code, found.message.match(/`([A-Z]+ [^`]+)`/)![1]])
+
+  it('reports a route relying on the old default, and the one that hides and opts in, and nothing else', async () => {
+    const dir = await fixtureCopy('mcp')
+
+    expect((await codes(dir)).sort()).toEqual([
+      ['deprecated-api-tool', 'GET /internal'],
+      ['hidden-tool', 'GET /both'],
+    ])
+  })
+
+  it('offers a fix that opts the route in, which is none for kay check --fix to apply', async () => {
+    const dir = await fixtureCopy('mcp')
+    const found = (await writeShadowTypes(dir, { routes: 'src/routes', api: 'src/api', mcp: true })).problems.find(problem => problem.code === 'deprecated-api-tool')!
+
+    expect(found.fixes?.[0]?.safe).toBeUndefined()
+    expect(found.fixes?.[0]?.edits[0]?.text).toBe(', { detail: { tool: true } }')
+  })
+
+  it('reads a route with no options, a detail without tool, and leaves out what it cannot read', async () => {
+    const dir = await fixtureCopy('mcp')
+
+    await Bun.write(join(dir, 'src/api/more.ts'), [
+      'import { api } from \'kay/server\'',
+      'const options = { detail: { hide: true } }',
+      'export default api()',
+      '  .post(\'/bare\', () => 1)',
+      '  .put(\'/summary\', () => 1, { detail: { summary: \'x\' } })',
+      '  .get(\'/held\', () => 1, options)',
+      '  .patch(\'/off\', () => 1, { detail: { tool: false } })',
+      '  .delete(\'/hidden\', () => 1, { detail: { hide: true } })',
+      '  .get(\'/spread\', () => 1, { ...options })',
+      '',
+    ].join('\n'))
+
+    const found = (await codes(dir)).filter(([, route]) => !route!.endsWith('/internal') && !route!.endsWith('/both'))
+
+    expect(found.sort()).toEqual([['deprecated-api-tool', 'PATCH /off'], ['deprecated-api-tool', 'POST /bare'], ['deprecated-api-tool', 'PUT /summary']])
+  })
+
+  it('says nothing without mcp, or when the lints are allowed', async () => {
+    const dir = await fixtureCopy('mcp')
+
+    expect(await codes(dir, false)).toEqual([])
+    expect(await codes(dir, true, { 'deprecated-api-tool': 'allow', 'hidden-tool': 'allow' })).toEqual([])
   })
 })

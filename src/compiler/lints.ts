@@ -308,6 +308,23 @@ export const LINTS = {
     wrong: '// kay.config.ts sets mcp: true\nexport const subscribe = action(s.Object({ email: s.String() }), save, { tool: true, honeypot: \'website\' })',
     right: '// src/routes/_guard.ts covers it, or the action keeps tool and drops the honeypot\nexport const subscribe = action(s.Object({ email: s.String() }), save, { tool: true, rateLimit: { max: 5, window: \'1m\' } })',
   },
+  'deprecated-api-tool': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.51',
+    site: true,
+    summary: 'With `mcp`, an API route with an inline handler whose `detail` sets neither `tool` nor `hide`. Before 1.51 every API route was an MCP tool unless hidden, and an API route is one only when it sets `detail: { tool: true }` now, as an action sets `tool`: the route stays in the OpenAPI document and an agent no longer finds it. Add `tool` to the routes an agent should call. No fix is safe, as adding it to every route offers the ones the app never meant to.',
+    wrong: '// kay.config.ts sets mcp: true\nexport default api().get(\'/:id\', ({ params }) => find(params.id))',
+    right: 'export default api().get(\'/:id\', ({ params }) => find(params.id), { detail: { tool: \'Read a note by its id\' } })',
+  },
+  'hidden-tool': {
+    level: 'warn',
+    group: 'code',
+    site: true,
+    summary: 'With `mcp`, an API route with an inline handler whose `detail` sets `tool` and `hide: true`. A hidden route is left out of the OpenAPI document and offered as no tool, so `tool` does nothing there.',
+    wrong: 'export default api().get(\'/gate\', () => ok(), { detail: { hide: true, tool: true } })',
+    right: 'export default api().get(\'/gate\', () => ok(), { detail: { hide: true } })',
+  },
   'missing-site': {
     level: 'warn',
     group: 'seo',

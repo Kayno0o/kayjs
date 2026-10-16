@@ -110,9 +110,22 @@ Actions that set `tool` are listed too, as `POST` operations.
 
 Set `mcp: true` in kay.config.ts to let an AI agent use your app. Kay serves an MCP endpoint at `/mcp`, and an agent pointed at it can list and call your tools. You write no MCP server.
 
-Every API route in the OpenAPI document becomes a tool. `GET /api/notes/{id}` is the tool `get_notes_id`, described by its `detail.summary`. Its input is built from the schemas the route already declares.
+### Routes as tools
 
-Set `detail: { operationId: 'read_note' }` to name it yourself. The tool name is that id with anything but letters, digits and `_` made `_`. Set `detail: { hide: true }` to keep a route out.
+An API route is a tool only when you say so, with `tool` in its `detail`. The route stays in the OpenAPI document either way, so an internal route, such as a check for your proxy, never reaches an agent by accident.
+
+```ts
+export default api()
+  .get('/:id', ({ params }) => find(params.id), {
+    detail: { tool: 'Read a note by its id' },
+  })
+```
+
+Here `GET /api/notes/{id}` is the tool `get_notes_id`. Its input is built from the schemas the route already declares.
+
+Just like an action, `tool: true` keeps the route's own summary as the description, and `tool: { name, description }` sets both. Without a name, the tool takes the route's `detail.operationId`, or its method and path. Anything but letters, digits and `_` in the name becomes `_`.
+
+A route that answers every method with `.all()` becomes one tool per method. A route with `hide: true` is never a tool, and `kay check` warns when it sets `tool` too.
 
 ### Actions as tools
 
@@ -146,6 +159,24 @@ Set `requireGuards` to refuse the list unless the guards cover every API module.
 A call that is refused is not a protocol error. The agent gets the reason as the tool's result, with the field errors of a schema, and can fix its input and call again.
 
 An agent fills in no form, so `honeypot`, `minTime` and `proofOfWork` do not apply to its calls. `kay check` warns when a tool action has one of them and no guard, because anyone could then call it. Add a guard, or use a `rateLimit`.
+
+### Telling a tool call apart
+
+A tool call reaches your app as a request, with the caller's `Authorization` header. A front guard that only lets a local agent's key through can tell the two apart with `toolCall` from `kay/server`.
+
+```ts
+import { guard } from 'kay'
+import { toolCall } from 'kay/server'
+
+export default guard(({ request, deny }) => {
+  const key = request.headers.get('authorization') === `Bearer ${process.env.AGENT_KEY}`
+
+  if (key && !toolCall(request))
+    deny(403, 'This key opens tools only')
+})
+```
+
+`toolCall(request)` gives `{ tool, client }` for a call that `/mcp` passed on, and nothing for any other request. A client cannot fake it, so the key still opens nothing else. It works the same in a hook you register before `pages()`. Let the key reach `/mcp` itself in that hook or guard.
 
 ### Signing in
 

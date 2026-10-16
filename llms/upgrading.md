@@ -2,6 +2,13 @@
 
 What each minor release breaks, and what an app changes to move to it. kay and its libraries share one version, so one section covers them all; a patch breaks nothing, and a minor missing here broke nothing.
 
+## 1.51.0
+
+### An API route is an MCP tool only when it sets `detail.tool`
+
+- With `mcp: true`, every API route not hidden was a tool; it is now one only when its `detail` says `tool: true`, a description, or `{ name, description }`, as an action's `tool` does. A route that does not opt in stays in the OpenAPI document and is absent from `tools/list`; a call naming it is refused as an unknown tool.
+- `kay check` reports a route still relying on the old default with `deprecated-api-tool`, and `kay upgrade` lists them; its fix adds `detail: { tool: true }` and is not applied by `--fix`, since it would offer every route, the ones an agent should not call included. It reads routes written with an inline handler and an object literal of options.
+
 ## 1.50.0
 
 ### `pgStore` apps add the OAuth server's tables and columns: `db.sync()` or a migration

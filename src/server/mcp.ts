@@ -37,6 +37,7 @@ interface AppTool extends Omit<Tool, 'run'> {
 // Marks a request the endpoint dispatched, so only it skips what a form needs; one value per process, so no client can send it.
 const AGENT = 'x-kay-agent'
 const CLIENT = 'x-kay-agent-client'
+const TOOL = 'x-kay-agent-tool'
 const TOKEN = crypto.randomUUID()
 // What the caller's request carries on to the action or route it calls: who it is, how it is worded and which scheme it came by.
 const FORWARDED = ['authorization', 'cookie', 'accept-language', 'user-agent', 'x-forwarded-proto', 'x-forwarded-host']
@@ -52,7 +53,7 @@ const NO_BODY = new Set(['get', 'delete'])
 // The headers every answer of the endpoint carries.
 const ANSWER = { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }
 
-// A tool per operation of the document that a JSON call can make: an action that opted in, or an API route whose body, if any, is a JSON object.
+// A tool per operation of the document that opted in and that a JSON call can make: an action that set `tool`, or an API route that did and whose body, if any, is a JSON object.
 export function documentedTools(document: Schema, fallback: Handle): AppTool[] {
   const tools: AppTool[] = []
 
@@ -61,7 +62,7 @@ export function documentedTools(document: Schema, fallback: Handle): AppTool[] {
 
   for (const [path, methods] of Object.entries(document.paths as Record<string, Record<string, Operation>>)) {
     for (const [method, operation] of Object.entries(methods)) {
-      const tool = HTTP_METHODS.has(method) && operation.operationId !== undefined ? toolOf(path, method, operation, operation.operationId, fallback, taken) : undefined
+      const tool = HTTP_METHODS.has(method) && operation.operationId !== undefined && isTool(operation) ? toolOf(path, method, operation, operation.operationId, fallback, taken) : undefined
 
       if (tool)
         tools.push(tool)
@@ -71,8 +72,14 @@ export function documentedTools(document: Schema, fallback: Handle): AppTool[] {
   return tools
 }
 
+// An action that opted in, or an API route that set `tool`: the others are in the document and never offered.
+function isTool(operation: Operation): boolean {
+  return operation['x-kay-action'] === true || operation['x-kay-tool'] !== undefined
+}
+
 function toolOf(path: string, method: string, operation: Operation, id: string, fallback: Handle, taken: Set<string>): AppTool | undefined {
-  const description = [operation.summary, operation.description].filter(text => text !== undefined).join('\n\n') || `${method.toUpperCase()} ${path}`
+  const tool = operation['x-kay-tool']
+  const description = tool?.description ?? ([operation.summary, operation.description].filter(text => text !== undefined).join('\n\n') || `${method.toUpperCase()} ${path}`)
   const body = operation.requestBody?.content['application/json']?.schema as Schema | undefined
   const action = operation['x-kay-action'] === true
 
@@ -103,7 +110,7 @@ function toolOf(path: string, method: string, operation: Operation, id: string, 
   const get = method === 'get'
   const inputSchema = { type: 'object', properties, ...required.size > 0 && { required: [...required] } }
 
-  const name = toolName(id, taken)
+  const name = toolName(tool?.name ?? id, taken)
 
   return {
     name,
@@ -128,7 +135,7 @@ function toolOf(path: string, method: string, operation: Operation, id: string, 
         init.body = JSON.stringify(Object.fromEntries(Object.entries(args).filter(([name]) => places.get(name)?.has('body'))))
       }
 
-      return dispatch(context, url, init, action, fallback)
+      return dispatch(context, url, init, action, fallback, name)
     },
   }
 }
@@ -170,7 +177,7 @@ function refusal(text: string): ToolResult {
 }
 
 // Sends the call through the whole app as a fetch would, so its guards, rate limits and `ctx.locals` are the web path's, and words what came back for the agent.
-async function dispatch(context: CallContext, url: string, init: RequestInit, action: boolean, fallback: Handle): Promise<ToolResult> {
+async function dispatch(context: CallContext, url: string, init: RequestInit, action: boolean, fallback: Handle, tool: string): Promise<ToolResult> {
   const { request, server } = context
   const headers = new Headers(init.headers)
 
@@ -183,6 +190,7 @@ async function dispatch(context: CallContext, url: string, init: RequestInit, ac
 
   headers.set(AGENT, TOKEN)
   headers.set(CLIENT, clientAddress(request, server))
+  headers.set(TOOL, tool)
   headers.set('x-request-id', requestId(request))
 
   const visit = new Request(new URL(url, request.url), { ...init, headers, redirect: 'manual' })
@@ -279,20 +287,43 @@ export interface McpOptions {
   metadataPaths: string[]
 }
 
+// A tool call the endpoint dispatched: which tool it calls, and the address of the client that asked for it.
+export interface ToolCall {
+  tool: string
+  client: string
+}
+
+const toolCalls = new WeakMap<Request, ToolCall>()
+
+// Whether `request` is a tool call the MCP endpoint dispatched, and which: from a hook registered before `pages()` and from a guard alike.
+// Only the endpoint holds the per-process marker, so a header a client sends makes no call a tool call.
+export function toolCall(request: Request): ToolCall | undefined {
+  const read = toolCalls.get(request)
+
+  if (read !== undefined)
+    return read
+
+  const tool = request.headers.get(TOOL)
+
+  return request.headers.get(AGENT) === TOKEN && tool !== null ? { tool, client: request.headers.get(CLIENT) ?? '' } : undefined
+}
+
 // Counts a request the endpoint dispatched as the client it came from and drops the marker, so the app never reads it.
 function receiveDispatched(app: Elysia): void {
   app.onRequest(({ request }) => {
-    const marked = request.headers.get(AGENT)
+    const marked = toolCall(request)
     const address = request.headers.get(CLIENT)
     const id = request.headers.get('x-request-id')
 
     request.headers.delete(AGENT)
     request.headers.delete(CLIENT)
+    request.headers.delete(TOOL)
 
     // A header an outside client sent is dropped with the rest, and counts for nothing.
-    if (marked !== TOKEN)
+    if (marked === undefined)
       return
 
+    toolCalls.set(request, marked)
     markAgentCall(request)
 
     if (address !== null)
