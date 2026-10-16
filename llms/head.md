@@ -200,7 +200,7 @@ h1 {todo.title}
 - `lang` and `dir` are kay's, from `lang` in kay.config.ts or the locale.
 - An island's `head` holds a `title` only, any other tag being the page's to set, and `title(raw)` skips `seo.titleTemplate` there too.
 - While an island's title reads empty, the page shows `seo.name` as the server does.
-- Two islands on a page both setting a title: the one last in the page among those mounted shows, as the server renders it, whichever hydrated last; a change in the others leaves it.
+- Two islands on a page both setting a title: the one last in the page among those mounted shows, as the server renders it, whichever hydrated last; a change in the others leaves it. An island not hydrated yet, or rendered in the browser alone, is not counted.
 - A title reads `undefined` for a missing value, so write `?? ''` where it may be missing.
 - An island rendered in the browser alone (`hydrate="client"`) has no server render to take the template from, so it sets its title as written.
 - An island kept across navigation (`persist`) shows the next page's title at a swap, as its layout's would, and sets its own again when a signal it reads changes.

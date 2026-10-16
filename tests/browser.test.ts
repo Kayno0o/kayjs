@@ -941,6 +941,10 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
     await view.click('button.rename')
 
     expect(await title(view)).toBe('Second | Site')
+
+    await view.evaluate(() => document.querySelectorAll<HTMLElement>('button.rename')[1]?.click())
+
+    expect(await title(view)).toBe('Beta | Site')
   })
 
   it('shows the title of the island last in the page after a swap to a page with two', async () => {
