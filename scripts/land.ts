@@ -107,13 +107,15 @@ async function verify(): Promise<string> {
     fail(`the branch conflicts with main in ${conflicts}: rebase it by hand, then land again`, EXIT.conflict)
   }
 
-  const changed = (await $`git diff --name-only origin/main HEAD`.text()).split('\n').filter(Boolean)
+  // The commit the branch now stands on: origin/main is shared by every worktree, so another landing's fetch moves it while this one verifies.
+  const base = (await $`git merge-base origin/main HEAD`.text()).trim()
+  const changed = (await $`git diff --name-only ${base} HEAD`.text()).split('\n').filter(Boolean)
 
   if (changed.length === 0)
     fail('nothing to land: the branch is main', EXIT.unlandable)
 
   // A rebase resolved by hand can leave a conflict marker in a file no check reads.
-  const markers = addedMarkers(await $`git diff --unified=0 --no-color origin/main HEAD`.text())
+  const markers = addedMarkers(await $`git diff --unified=0 --no-color ${base} HEAD`.text())
 
   if (markers.length > 0)
     fail(`the branch adds merge markers: ${markers.map(({ file, line, text }) => `${file}:${line} (${text})`).join(', ')}`, EXIT.unlandable)
@@ -138,7 +140,7 @@ async function verify(): Promise<string> {
     await step('tests, the whole suite', $`bun run test ${WORKERS} 2>&1`)
   }
   else {
-    await step('tests the changes reach', $`bun run test --changed=origin/main ${WORKERS} 2>&1`)
+    await step('tests the changes reach', $`bun run test --changed=${base} ${WORKERS} 2>&1`)
 
     const readers = new Set(READERS.flatMap(([folder, tests]) => changed.some(path => folder.test(path)) ? tests : []))
     const fixtures = [...new Set(changed.map(path => FIXTURE.exec(path)?.[1]).filter(name => name !== undefined))]
@@ -163,7 +165,7 @@ async function verify(): Promise<string> {
     await step(`packages/${name} tests`, $`bun run test 2>&1`.cwd(`packages/${name}`))
   }
 
-  return (await $`git rev-parse origin/main`.text()).trim()
+  return base
 }
 
 let verified = await verify()

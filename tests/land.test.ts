@@ -191,6 +191,26 @@ describe('landing', () => {
     expect(await tree()).toEqual(expect.arrayContaining(['a.txt', 'b.txt']))
   }, 90_000)
 
+  it('verifies again when main moved, even after another worktree fetched it while this landing verified', async () => {
+    const { clones, dir, land, ran, tree } = await landings('a', 'b')
+    const gate = join(dir, 'gate')
+    const first = land('a', { LAND_GATE: gate })
+
+    await until(async () => await ran('a') === 1)
+    expect((await land('b').done()).code).toBe(0)
+
+    // A worktree shares its remote refs with every other one, so another landing's fetch moves origin/main under this one.
+    await git(clones.a!, 'fetch', '-q', 'origin', 'main')
+    await Bun.write(gate, '')
+
+    const { code, out } = await first.done()
+
+    expect(code).toBe(0)
+    expect(out).toContain('main moved while verifying: rebasing and verifying again')
+    expect(await ran('a')).toBe(2)
+    expect(await tree()).toEqual(expect.arrayContaining(['a.txt', 'b.txt']))
+  }, 90_000)
+
   it('waits for the landing lock only to push, saying so', async () => {
     const { clones, land, tree } = await landings('a')
     const holder = Bun.spawn(['flock', join(clones.a!, '.git/kay-land.lock'), 'sh', '-c', 'echo held; cat >/dev/null'], { stdin: 'pipe', stdout: 'pipe' })
