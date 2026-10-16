@@ -369,7 +369,8 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('kay dev in 
   }, 60_000)
 
   it('keeps a live value, and the page following it, across an edit of its module', async () => {
-    const bump = async () => page.evaluate(async () => ((await (await fetch('/api/bump', { method: 'POST' })).json()) as { visitors: number }).visitors)
+    // Bumped from the test rather than the page, which reloads after the edit and would lose an evaluate in flight.
+    const bump = async () => ((await (await fetch(`${await origin()}/api/bump`, { method: 'POST' })).json()) as { visitors: number }).visitors
 
     await page.goto(`${await origin()}/live`)
     await page.locator('p.online', { hasText: '0 online' }).waitFor()
