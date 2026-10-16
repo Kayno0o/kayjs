@@ -70,6 +70,24 @@ async function served(files: Record<string, string>) {
     write: async (path: string, content: string) => Bun.write(join(root, path), content),
     // The page at `path` once it says `expected`.
     sees: async (expected: string, path = '/') => until(async () => (await text(path)).includes(expected)),
+    // No new process for a moment, so what a write starts next is told from one a late event of the last still starts.
+    quiet: async () => {
+      for (let since = Date.now(), seen = children.length; Date.now() - since < 300; await Bun.sleep(20)) {
+        if (children.length !== seen) {
+          seen = children.length
+          since = Date.now()
+        }
+      }
+    },
+    // A new process started past the `count` there were, which a late second event of one write may have followed with another: counting to the exact number would miss the one waited for once the next began, so a timeout names what kay dev did.
+    startedPast: async (count: number) => {
+      try {
+        await until(() => children.length > count)
+      }
+      catch (error) {
+        throw new Error(`${(error as Error).message}: ${children.length} processes (exit codes ${children.map(child => child.exitCode).join(', ')}), kay dev said ${JSON.stringify(lines)}`)
+      }
+    },
     ran: () => existsSync(log) ? readFileSync(log, 'utf8').split('\n').filter(Boolean) : [],
     cleanup: async () => {
       await stop()
@@ -157,16 +175,24 @@ describe.concurrent('kay dev reloading', () => {
       expect(project.children).toHaveLength(1)
 
       await project.write('kay.config.ts', 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ lang: \'fr\' })\n')
-      await until(() => project.children.length === 2)
+      await project.startedPast(1)
       await project.sees('lang="fr"')
       expect(project.children[0]!.killed).toBe(true)
 
+      await project.quiet()
+
+      const before = project.children.length
+
       await project.write('src/server.ts', `${ENTRY(project.log)}// changed\n`)
-      await until(() => project.children.length === 3)
+      await project.startedPast(before)
       await project.sees('second')
 
+      await project.quiet()
+
+      const beforeEnv = project.children.length
+
       await project.write('.env', 'KAY_EXAMPLE=1\n')
-      await until(() => project.children.length === 4)
+      await project.startedPast(beforeEnv)
       await project.sees('second')
     }
     finally {
