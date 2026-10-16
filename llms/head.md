@@ -18,6 +18,20 @@ head
 h1 {todo.title}
 ```
 
+### Follow live state in the page title
+
+An island's `head` block holds a `title` and nothing else, and the title follows what it reads, wrapped in `seo.titleTemplate` as on the server:
+
+```kay
+---
+const { room } = props<{ room: () => { name: string } | undefined }>()
+---
+head
+  title {room()?.name}
+```
+
+The server renders the first title, so a crawler and the first paint see it; the browser then updates it whenever the signal changes.
+
 ### Give every page a title template and a social card
 
 `site` and `seo` in `kay.config.ts` start every page's head, and a tag a layout or the page sets replaces them:
@@ -171,7 +185,7 @@ head
 h1 {todo.title}
 ```
 
-- One `head` block per template, at its top level, in a page, a layout or a static component; an island has none.
+- One `head` block per template, at its top level, in a page, a layout or a component.
 - The page wins over its layouts: one `title`, and one `meta` per `name`, `property` or `http-equiv`.
 - A `link` is one per `rel` and `href`.
 - Head elements hold text only.
@@ -184,6 +198,11 @@ h1 {todo.title}
 - `html.dark` in a layout and `html.wide` in its page give `class="dark wide"`, and a page cannot take off a layout's class.
 - No event handler is attached to `html`.
 - `lang` and `dir` are kay's, from `lang` in kay.config.ts or the locale.
+- An island's `head` holds a `title` only, any other tag being the page's to set, and `title(raw)` skips `seo.titleTemplate` there too.
+- While an island's title reads empty, the page shows `seo.name` as the server does.
+- Two islands on a page both setting a title: the one that set it last shows, which is the one mounted last until another changes.
+- Navigating to another page shows that page's own title, and coming back shows the island's again once it hydrates; a page with no island title is as the server served it.
+- Only a site with such an island ships the code for it, a few hundred bytes.
 - A page swap changes only what the server sets differently for the next page, and only where a script left it as the server set it, so a theme a toggle changed stays.
 - A `class` changes token by token on a page swap, a token the server set being the server's.
 - The head opens with the charset and viewport, then the stylesheets and `style` elements of `head` blocks and of `fonts`, then the stylesheets of the components, which win a tie with them, then everything else, so the first paint waits on no other tag.

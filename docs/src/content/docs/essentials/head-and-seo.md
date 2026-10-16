@@ -18,6 +18,22 @@ head
 h1 {post.title}
 ```
 
+## A title that follows live state
+
+An island can have a `head` block too, holding a `title` and no other tag. The title follows what the island reads, so a page named after a room, a game or a count in progress shows it:
+
+```kay
+---
+const { room } = props<{ room: () => { name: string } | undefined }>()
+---
+head
+  title {room()?.name}
+```
+
+The server renders the first title, so a search engine and the first paint see it. The browser then updates it whenever the signal changes, wrapped in `seo.titleTemplate` as the server wraps it. `title(raw)` skips the template, and a title that reads empty shows the site's `seo.name`.
+
+Following a link to another page shows that page's own title, and going back shows the island's again once it hydrates. If two islands on a page both set a title, the one that set it last shows, which is the one mounted last until another changes.
+
 ## Attributes on `<html>`
 
 An `html` tag in the `head` block sets attributes on `<html>`, such as a theme, from static values or server data. The page's attributes win over its layouts', and `false` or `null` removes one. A `class` adds up instead: a page's `html.wide` under a layout's `html.dark` gives `class="dark wide"`.

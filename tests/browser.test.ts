@@ -832,3 +832,115 @@ async function printed(child: { stdout: ReadableStream<Uint8Array>, stderr: Read
 
   return [stdout + stderr, code]
 }
+
+describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island setting the page title', () => {
+  let titles: TestSite
+
+  beforeAll(async () => {
+    titles = await testSite({ routes: 'tests/fixtures/title/src/routes', seo: { name: 'Site', titleTemplate: '%s | Site' }, browser: { path } })
+  }, 60_000)
+
+  afterAll(async () => titles?.close())
+
+  const title = async (view: TestPage) => view.evaluate(() => document.title)
+
+  it('serves the title the island starts with, templated, and follows what it reads in the browser', async () => {
+    expect((await titles.visit('/')).title()).toBe('Room | Site')
+
+    const view = await titles.open('/')
+
+    expect(await title(view)).toBe('Room | Site')
+
+    await view.click('button.rename')
+
+    expect(await title(view)).toBe('Beta | Site')
+    expect(view.errors).toEqual([])
+  })
+
+  it('shows the site title while the island\'s reads empty, and a raw one as it is', async () => {
+    const view = await titles.open('/')
+
+    await view.click('button.clear')
+
+    expect(await title(view)).toBe('Site')
+
+    const raw = await titles.open('/rawed')
+
+    expect(await title(raw)).toBe('Raw room')
+
+    await raw.click('button.rename')
+
+    expect(await title(raw)).toBe('Raw beta')
+  })
+
+  it('leaves a page with no island title as it was served, the next page showing its own and going back showing the island\'s again', async () => {
+    const view = await titles.open('/')
+
+    await view.click('button.rename')
+    await view.click('a.other')
+    await view.waitFor('h1', { text: 'Other' })
+
+    expect(await title(view)).toBe('Other | Site')
+
+    await view.click('a.home')
+    await view.waitFor('h1', { text: 'Home' })
+
+    expect(await title(view)).toBe('Room | Site')
+
+    await view.click('a.other')
+    await view.waitFor('h1', { text: 'Other' })
+    await view.back()
+    await view.waitFor('h1', { text: 'Home' })
+
+    expect(await title(view)).toBe('Room | Site')
+
+    await view.goto('/untitled')
+
+    expect(await title(view)).toBe('Site')
+  })
+
+  it('does not let the island of a page left set the title of the next', async () => {
+    const view = await titles.open('/')
+
+    await view.evaluate(() => {
+      (window as { kayRename?: HTMLElement | null }).kayRename = document.querySelector('button.rename')
+    })
+    await view.click('a.other')
+    await view.waitFor('h1', { text: 'Other' })
+    await view.evaluate(() => (window as { kayRename?: HTMLElement | null }).kayRename?.click())
+
+    expect(await title(view)).toBe('Other | Site')
+  })
+
+  it('takes the title of the island mounted last when a page has two', async () => {
+    const view = await titles.open('/two')
+
+    expect(await title(view)).toBe('Second | Site')
+
+    await view.click('button.rename')
+
+    expect(await title(view)).toBe('Beta | Site')
+  })
+})
+
+describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island setting the page title under kay dev', () => {
+  it('follows what it reads, templated, and gives way to the next page', async () => {
+    const dev = await testSite({ routes: 'tests/fixtures/title/src/routes', seo: { name: 'Site', titleTemplate: '%s | Site' }, browser: { path }, dev: true })
+
+    try {
+      const view = await dev.open('/')
+
+      await view.click('button.rename')
+
+      expect(await view.evaluate(() => document.title)).toBe('Beta | Site')
+
+      await view.click('a.other')
+      await view.waitFor('h1', { text: 'Other' })
+
+      expect(await view.evaluate(() => document.title)).toBe('Other | Site')
+    }
+    finally {
+      await dev.close()
+    }
+  }, 60_000)
+})

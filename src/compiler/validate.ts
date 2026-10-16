@@ -121,7 +121,7 @@ class Validator {
       this.error(script.props.statement, 'A page declares no props', { note: 'a page gets its data from `--- server`', help: 'read the server names directly' })
 
     const tags = head?.children.filter((child) => {
-      const problem = headTagProblem(child)
+      const problem = headTagProblem(child) ?? this.islandHeadProblem(child)
 
       if (problem)
         this.error(...problem)
@@ -150,6 +150,14 @@ class Validator {
     }
   }
 
+  // An island renders in the browser too, where it keeps the title alone in step with what it reads.
+  private islandHeadProblem(node: Node): [at: Span, message: string] | undefined {
+    if (this.options.island !== undefined && node.kind === 'element' && node.name !== 'title')
+      return [node.tag, `An island's \`head\` block sets the title only, not \`${node.name}\``]
+
+    return undefined
+  }
+
   // The template's one top-level `head` block.
   private head(nodes: Node[]): ElementNode | undefined {
     let head: ElementNode | undefined
@@ -160,8 +168,6 @@ class Validator {
 
       if (head)
         this.error(node.tag, 'A template has one `head` block', { related: [{ ...head.tag, label: 'the first one' }] })
-      else if (this.options.island !== undefined)
-        this.error(node.tag, 'An island cannot set the document head', { note: 'an island also renders in the browser', help: 'move the `head` block to its page' })
       else if (node.attributes.length > 0 || node.classes.length > 0 || node.id)
         this.error(node, 'A `head` block takes no attributes')
 

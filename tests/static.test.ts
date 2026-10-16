@@ -187,6 +187,43 @@ describe('kay build --static', () => {
     expect(total, `${total} bytes of gzipped JS load up front, over the ${EAGER_JS_BUDGET} budget: ${[...loaded].map(([url, size]) => `${url} ${size}`).join(', ')}`).toBeLessThanOrEqual(EAGER_JS_BUDGET)
   })
 
+  it('ships the island title code to the page setting one alone, with the template it wraps the title in', async () => {
+    const fixture = await fixtureCopy('static')
+    const elsewhere = await mkdtemp(join(tmpdir(), 'kay-static-'))
+    const config = join(fixture, 'kay.config.ts')
+
+    try {
+      await Bun.write(config, (await Bun.file(config).text()).replace('  site: ', '  seo: { name: \'Repo\', titleTemplate: \'%s | Repo\' },\n  site: '))
+      await Bun.write(join(fixture, 'src/routes/titled.kay'), '---\nconst room = signal(\'Lobby\')\n---\nhead\n  title {room()}\nh1 Titled\nbutton(onClick={() => room.set(\'Next\')}) Rename\n')
+
+      const { code, errors } = await exportSite(elsewhere, fixture)
+
+      expect(errors).toBe('')
+      expect(code).toBe(0)
+
+      const scripts = async (page: string) => {
+        const html = await Bun.file(join(elsewhere, page)).text()
+        const urls = [...html.matchAll(SCRIPT_URL)].map(match => match[1]!.slice(BASE.length))
+
+        return { html, code: await Promise.all(urls.map(async url => Bun.file(join(elsewhere, url)).text())) }
+      }
+      const titled = await scripts('titled.html')
+      const home = await scripts('index.html')
+
+      expect(titled.html).toContain('<title>Lobby | Repo</title>')
+      expect(titled.html).toContain('<meta name="kay-title" content="{&quot;template&quot;:&quot;%s | Repo&quot;,&quot;fallback&quot;:&quot;Repo&quot;}">')
+      expect(titled.code.some(text => text.includes('kay-title'))).toBe(true)
+      expect(home.html).not.toContain('kay-title')
+      expect(home.code.join('').length).toBeGreaterThan(0)
+      expect(home.code.filter(text => text.includes('kay-title'))).toEqual([])
+      expect((await Array.fromAsync(new Bun.Glob('_kay/*.js').scan(elsewhere))).length).toBeGreaterThan(0)
+    }
+    finally {
+      await rm(fixture, { recursive: true, force: true })
+      await rm(elsewhere, { recursive: true, force: true })
+    }
+  })
+
   it('builds the same JS every time, so the budget above measures the source and not the run', async () => {
     const again = await mkdtemp(join(tmpdir(), 'kay-static-'))
 

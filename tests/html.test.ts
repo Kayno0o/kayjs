@@ -108,6 +108,17 @@ describe('head', () => {
     expect(rendered).toEqual({ prelude: '', styles: '<link rel="stylesheet" href="/a.css">', html: '<meta name="description" content="page"><title>Page &amp; co</title>', root: '', charset: false, viewport: false })
   })
 
+  it('hands the browser the template and the site title an island\'s title goes on setting, and nothing when no island sets it', () => {
+    const options = { defaults: [{ tag: 'title', props: { children: 'Site' } }], titleTemplate: '%s | Site' }
+    const island = collectHead(() => head([{ tag: 'title', props: { island: true, children: 'Room' } }]), options).head
+    const plain = collectHead(() => head([{ tag: 'title', props: { children: 'Room' } }]), options).head
+    const bare = collectHead(() => head([{ tag: 'title', props: { island: true, children: 'Room' } }])).head
+
+    expect(island.html).toBe('<meta name="kay-title" content="{&quot;template&quot;:&quot;%s | Site&quot;,&quot;fallback&quot;:&quot;Site&quot;}"><title>Room | Site</title>')
+    expect(plain.html).toBe('<title>Room | Site</title>')
+    expect(bare.html).toBe('<title>Room</title>')
+  })
+
   it('gathers the stylesheets and inline styles apart, for the component stylesheets to follow them', () => {
     const { head: rendered } = collectHead(() => head([{ tag: 'link', props: { rel: 'preload', href: '/a.woff2', as: 'font' } }, { tag: 'style', props: { children: 'p{color:red}' } }, { tag: 'link', props: { rel: 'stylesheet', href: '/reset.css' } }]))
 

@@ -55,6 +55,8 @@ const JSON_TYPE = /json/i
 const DATA_SCRIPT = /json|^(?:importmap|speculationrules)$/i
 const ABSOLUTE_PATH = /^\/(?!\/)/
 const STYLE_END = /<\/(style)/gi
+// The meta page-title.ts reads, which stays a copy of its own so the island code is not reachable from the entry.
+const TITLE_SETTINGS = 'kay-title'
 const VIEWPORT = 'meta:name:viewport'
 const OG_IMAGE = 'meta:property:og:image'
 const IMAGE_DETAILS = ['meta:property:og:image:width', 'meta:property:og:image:height', 'meta:property:og:image:alt', 'meta:name:twitter:image:alt']
@@ -190,6 +192,17 @@ function renderHead(collected: HeadTag[][], options: HeadOptions): RenderedHead 
       else
         others += tagMarkup(tag)
     }
+  }
+
+  // An island goes on setting the title in the browser, which wraps it as the server does.
+  if (titleTag?.props.island === true) {
+    const settings = {
+      ...options.titleTemplate !== undefined && options.titleTemplate !== '' ? { template: options.titleTemplate } : {},
+      ...defaultTitle !== undefined ? { fallback: text(defaultTitle) } : {},
+    }
+
+    if (Object.keys(settings).length > 0)
+      metas += tagMarkup({ tag: 'meta', props: { name: TITLE_SETTINGS, content: JSON.stringify(settings) } })
   }
 
   const rootAttributes = rooted ? attributesOf(root) : NO_ATTRIBUTES

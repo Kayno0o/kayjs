@@ -118,6 +118,10 @@
       "types": "./types/runtime/internal.d.ts",
       "default": "./src/runtime/internal.ts"
     },
+    "./internal/title": {
+      "types": "./types/runtime/page-title.d.ts",
+      "default": "./src/runtime/page-title.ts"
+    },
     "./internal/server": {
       "types": "./types/server/internal.d.ts",
       "default": "./src/server/internal.ts"

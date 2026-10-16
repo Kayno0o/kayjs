@@ -1,0 +1,8 @@
+---
+import Room from '../components/room.kay'
+---
+h1 Home
+Room
+a.other(href="/other") Other
+a.two(href="/two") Two
+a.rawed(href="/rawed") Raw

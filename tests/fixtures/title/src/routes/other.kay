@@ -1,0 +1,4 @@
+head
+  title Other
+h1 Other
+a.home(href="/") Home

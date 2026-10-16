@@ -420,6 +420,18 @@ describe('head', () => {
     expect(code).toContain('KayUseHead([{ tag: "title", props: { "children": "" + (__props.name) + " | Docs" } }, { tag: "meta", props: { "name": "description", "content": (__props.name), "data-x": true,  } }, ]);\n\nreturn <h1>{__props.name}</h1>')
   })
 
+  it('keeps an island\'s title in step with what it reads in the browser, and marks the one its server render sets', () => {
+    const source = '---\nconst name = signal("a")\n---\nhead\n  title {name()} | Room\nbutton(onClick={() => name.set("b")}) x'
+    const dom = compileKay(source, 'room.kay', { output: 'dom' }).tsx
+    const html = compileKay(source, 'room.kay', { output: 'html' }).tsx
+
+    expect(dom).toContain('KayPageTitle(() => "" + (name()) + " | Room", false);')
+    expect(dom).toContain('import { pageTitle as KayPageTitle } from \'kay/internal/title\'')
+    expect(html).toContain('KayHead([{ tag: "title", props: { "island": true, "children": "" + (name()) + " | Room" } }, ]);')
+    expect(compileKay(source.replace('title {', 'title(raw) {'), 'room.kay', { output: 'dom' }).tsx).toContain('| Room", true);')
+    expect(compileKay('head\n  title {x} here\np y', 'page.kay', { output: 'html' }).tsx).not.toContain('"island"')
+  })
+
   it('types the head tags as elements when checking', () => {
     const checked = compileKay('head\n  link(rel="icon" href={icon})\np x', 'test.kay', { check: true }).tsx
 
@@ -446,7 +458,8 @@ describe('head', () => {
   })
 
   it('rejects head blocks an island, a nested element or a second block holds, and content the head cannot', () => {
-    expect(errors('---\nimport { signal } from "kay"\n---\nhead\n  title x\np')).toEqual(['An island cannot set the document head'])
+    expect(errors('---\nimport { signal } from "kay"\n---\nhead\n  title x\np')).toEqual([])
+    expect(errors('---\nconst n = signal(0)\n---\nhead\n  title x\n  meta(name="a" content="b")\nbutton(onClick={() => n.set(1)}) x')).toEqual(['An island\'s `head` block sets the title only, not `meta`'])
     expect(reports('head\n  title a\nhead\n  title b')).toEqual([{ message: 'A template has one `head` block', at: 'head', related: [['head', 'the first one']] }])
     expect(errors('div\n  head\n    title a')).toEqual(['A `head` block sits at the top level of a template'])
     expect(errors('head\n  div x\n  if a\n    title a')).toEqual([expect.stringContaining('holds `title`'), expect.stringContaining('holds `title`')])

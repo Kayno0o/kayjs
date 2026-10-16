@@ -1,0 +1,6 @@
+---
+import Room from '../components/room.kay'
+---
+h1 Two
+Room(label="First")
+Room(label="Second")

@@ -148,7 +148,7 @@ class ModuleShell {
     const { head, hoisted, template } = this.splitHead(this.file.template)
     const errors = this.runs ? errorMessages(template, this.src) : undefined
 
-    this.imports(head !== undefined, errors)
+    this.imports(head !== undefined, errors, this.titleTag(head) !== undefined)
 
     if (this.fence)
       this.emitLoad(this.fence)
@@ -162,9 +162,11 @@ class ModuleShell {
     for (const node of hoisted)
       this.emitHoistedConst(node)
 
-    // An island sets no head, and a static component rendering inside one leaves it to the server.
+    // An island follows its title in the browser alone, and a static component rendering inside one leaves its head to the server.
     if (head && this.mode !== 'dom')
       this.emitHead(head)
+    else if (head && this.kind === 'island')
+      this.emitIslandTitle(head)
 
     this.b.add('\nreturn ')
     this.template(template, errors)
@@ -173,7 +175,7 @@ class ModuleShell {
     return { builder: this.b, sites: this.sites }
   }
 
-  private imports(head: boolean, errors: ErrorMessages | undefined): void {
+  private imports(head: boolean, errors: ErrorMessages | undefined, titled: boolean): void {
     const { b, script, server, fence, facts, mode } = this
     // What the fences use from `kay` unimported, as they use `props<T>()`; a name the other fence of the same module imports needs no import.
     const imported = new Set([...script.imports, ...fence?.imports ?? []].map(binding => binding.local))
@@ -244,6 +246,10 @@ class ModuleShell {
 
     if (mode === 'dom')
       b.add(domHelperImport())
+
+    // Apart from the DOM helpers, which the entry shares with every page, so only a site using it ships its code.
+    if (mode === 'dom' && this.kind === 'island' && titled)
+      b.add(`import { pageTitle as ${helperName('pageTitle')} } from 'kay/internal/title'\n`)
 
     // Code that only gets read, by the type checker and the analysis pass, declares the helpers of its control flow rather than import a runtime of them.
     const declared: [name: string, helper: DeclaredHelper][] = runs ? [] : used.filter(helper => helper !== 'For').map(helper => [helperName(helper), helper])
@@ -638,12 +644,33 @@ class ModuleShell {
     b.add(']);\n')
   }
 
+  // An island's title, kept in step with what it reads; the other tags of its head are the server's.
+  private emitIslandTitle(head: ElementNode) {
+    const { b } = this
+    const title = this.titleTag(head)
+
+    if (!title)
+      return
+
+    b.add(`${helperName('pageTitle')}(() => `)
+    b.wrap(title, () => this.emitHeadText(title))
+    b.add(`, ${title.attributes.some(attribute => attribute.kind !== 'spread' && this.text(attribute.name) === 'raw')});\n`)
+  }
+
+  private titleTag(head: ElementNode | undefined): ElementNode | undefined {
+    return head?.children.find((child): child is ElementNode => child.kind === 'element' && child.name === 'title' && headTagProblem(child) === undefined)
+  }
+
   // The tag `head()` takes: `{ tag: 'meta', props: { name: 'description', content: (description) } }`.
   private emitHeadTag(element: ElementNode) {
     const { b } = this
 
     b.wrap(element, () => {
       b.add(`{ tag: ${JSON.stringify(element.name)}, props: { `)
+
+      // The server tells the browser how to wrap the title this island goes on setting.
+      if (element.name === 'title' && this.kind === 'island')
+        b.add('"island": true, ')
 
       if (element.classes.length > 0)
         b.add(`"class": ${JSON.stringify(element.classes.map(span => this.text(span)).join(' '))}, `)
@@ -670,25 +697,32 @@ class ModuleShell {
         b.add(', ')
       }
 
-      const lines = element.children.filter(child => child.kind === 'text')
-
-      if (lines.length > 0) {
-        b.add('"children": ""')
-        for (const [index, line] of lines.entries()) {
-          if (index > 0)
-            b.add(' + "\\n"')
-
-          for (const part of line.parts) {
-            if (part.kind === 'expression')
-              b.add(' + (').addSource(part.expression).add(')')
-            else if (part.kind === 'chunk')
-              b.add(` + ${JSON.stringify(part.text)}`)
-          }
-        }
+      if (element.children.some(child => child.kind === 'text')) {
+        b.add('"children": ')
+        this.emitHeadText(element)
       }
 
       b.add(' } }')
     })
+  }
+
+  // The text lines of a head tag as one string expression.
+  private emitHeadText(element: ElementNode) {
+    const { b } = this
+    const lines = element.children.filter(child => child.kind === 'text')
+
+    b.add('""')
+    for (const [index, line] of lines.entries()) {
+      if (index > 0)
+        b.add(' + "\\n"')
+
+      for (const part of line.parts) {
+        if (part.kind === 'expression')
+          b.add(' + (').addSource(part.expression).add(')')
+        else if (part.kind === 'chunk')
+          b.add(` + ${JSON.stringify(part.text)}`)
+      }
+    }
   }
 
   private text(span: Span): string {

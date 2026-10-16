@@ -1,0 +1,6 @@
+---
+import RawRoom from '../components/raw-room.kay'
+---
+h1 Rawed
+RawRoom
+a.home(href="/") Home

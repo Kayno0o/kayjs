@@ -1,0 +1,8 @@
+---
+const { label = 'Room' } = props<{ label?: string }>()
+const name = signal(label)
+---
+head
+  title {name()}
+button.rename(onClick={() => name.set('Beta')}) Rename
+button.clear(onClick={() => name.set('')}) Clear
