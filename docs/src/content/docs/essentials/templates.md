@@ -31,7 +31,9 @@ A line is `tag.class#id(attributes) text`, every part optional. A line starting 
   input(type="text" disabled)
 ```
 
-Attributes sit in one pair of parentheses, separated by spaces. A value is a quoted string or `{expression}`, and a bare name is a boolean attribute. `tag: child` nests one element on the same line:
+Attributes sit in one pair of parentheses, separated by spaces. A value is a quoted string or `{expression}`. A bare name is a boolean attribute.
+
+`tag: child` nests one element on the same line.
 
 ```kay
 li: a(href="/") Home
@@ -45,14 +47,14 @@ Every dynamic value sits in braces: `a(href={url})`, never `a(href=url)`. A stat
 
 ## Text and expressions
 
-Text follows the tag after one space. `{}` holds any expression, escaped for HTML. A `|` line is a text line, for a lone expression or for text on its own:
+Text follows the tag after one space. `{}` holds any expression, escaped for HTML. A `|` line is a text line of its own.
 
 ```kay
 p Hello {user.name}, you have {messages.length} messages
 | {summary}
 ```
 
-`#[tag text]` puts an element inside text:
+`#[tag text]` puts an element inside text.
 
 ```kay
 p Read #[a(href="/terms") the terms] first
@@ -75,7 +77,7 @@ ul
     li No posts yet
 ```
 
-`match` renders the block of the first `when` that lists the value, else the `else` block:
+`match` renders the block of the first `when` that lists the value, else the `else` block.
 
 ```kay
 match post.status
@@ -91,9 +93,11 @@ match post.status
 
 A `for` tracks its rows by `item.id`. When your items have no `id`, name a key: `for post of posts key={post.slug}`.
 
-Rows of plain objects with no `id`, edited immutably (`rows.set(rows().filter(...))`, `{ ...row, text }`), need no key either: a copy no key matches takes the unmatched row left in its place between the rows around it, so an edit, a removal or an insertion keeps every other row's nodes, fields and focus. Avoid `key={index}` for such rows, which matches by position and hands a removed row's place to the next one. A removal and an edit in the same gap pair the first unmatched row with the copy, and a list of fresh objects reuses the rows by position, so give such rows an `id` when each must start afresh.
+Rows of plain objects with no `id`, edited immutably, need no key. Avoid `key={index}` for them, because it matches rows by position.
 
-A `const` line names a value for the lines after it, computed once per row:
+<ReadMore href="/llms/templates">How rows are matched without a key, and when to give them an `id`.</ReadMore>
+
+A `const` line names a value for the lines after it, computed once per row.
 
 ```kay
 for product of products
@@ -124,17 +128,21 @@ button(onClick={() => name.set('')}) Clear
 
 ## Markup in a spread
 
-A spread sets `innerHTML` only from markup that `sanitizeHtml`, `trustHtml` or an icon import vouched for, and drops any other value, with a warning in development. An icon keeps drawing, `svg({...Home})`, while a record's plain-string `innerHTML` is dropped.
+A spread sets `innerHTML` only from markup that `sanitizeHtml`, `trustHtml` or an icon import vouched for. It drops any other value, with a warning in development.
 
-The vouching travels with the value from the server to the browser in island props, action results and event streams, and from nowhere else: a request's input, a cookie and `localStorage` bring plain strings. A string derived from a vouched one, such as `markup + '<b>'`, is plain again.
+An icon keeps drawing, `svg({...Home})`, while a record's plain-string `innerHTML` is dropped.
 
-The server keeps what was vouched for in one registry for every user, and only the markup most recently vouched for. Call `trustHtml` where the markup is used rather than once for a constant kept for hours; a dropped value is logged once in production, and each time in development.
+A string built from a vouched one, such as `markup + '<b>'`, is plain again.
 
-To render a string as markup, pass it through `sanitizeHtml(text)` for markup a user wrote, or `trustHtml(text)` for markup the app made, before it reaches the spread.
+To render a string as markup, pass it through one of two helpers first. `sanitizeHtml(text)` is for markup a user wrote. `trustHtml(text)` is for markup the app made.
+
+Call `trustHtml` where the markup is used, not once for a constant kept for hours.
+
+<ReadMore href="/llms/templates">How the vouching travels from the server to the browser, what the server remembers, and what a dropped value logs.</ReadMore>
 
 ## Comments and slots
 
-`// note` is a comment. `slot` is where a layout or wrapper component renders its children:
+`// note` is a comment. `slot` is where a layout or wrapper component renders its children.
 
 ```kay
 // not rendered
@@ -144,4 +152,4 @@ main
 
 See [Components](/essentials/components) for named slots.
 
-<ReadMore href="/llms/templates">The full template reference covers `match` narrowing, `if ... as` casts, `class` merging, `ref`, `innerHTML` and `sanitizeHtml`, `await` and `try` blocks and transitions.</ReadMore>
+<ReadMore href="/llms/templates">`match` narrowing, `if ... as` casts, `class` merging, `ref`, `innerHTML` and `sanitizeHtml`, `await` and `try` blocks, and transitions.</ReadMore>
