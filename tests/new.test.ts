@@ -1,6 +1,6 @@
 import type { Subprocess } from 'bun'
 import type { Feature } from '../src/new'
-import { cp, mkdir, mkdtemp, readdir, rm, stat, symlink } from 'node:fs/promises'
+import { chmod, cp, mkdir, mkdtemp, readdir, rm, stat, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, join, posix } from 'node:path'
 import process from 'node:process'
@@ -264,6 +264,22 @@ describe('kay command line', () => {
     }
     finally {
       await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('runs the keslint a workspace root hoists, found from a project nested under it', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'kay-cli-'))
+    const project = join(root, 'apps', 'site')
+
+    try {
+      await mkdir(join(root, 'node_modules/.bin'), { recursive: true })
+      await mkdir(project, { recursive: true })
+      await Bun.write(join(root, 'node_modules/.bin/keslint'), '#!/bin/sh\necho "keslint $@"\n')
+      await chmod(join(root, 'node_modules/.bin/keslint'), 0o755)
+      expect(await kay(['lint', '--fix'], project)).toEqual({ stdout: 'keslint --fix\n', stderr: '', code: 0 })
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
     }
   })
 

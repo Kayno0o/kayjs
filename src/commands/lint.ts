@@ -1,6 +1,6 @@
 import type { Command } from './command'
 import { existsSync } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { configCheckOptions, writeShadowTypes } from '../check'
 import { loadConfig } from '../config'
 import { buildingWithoutEnv } from '../server/env-state'
@@ -20,10 +20,9 @@ export const lint: Command = {
     if (root === undefined)
       return 1
 
-    // Only the project's own, as kay resolves its other dependencies.
-    const keslint = join(root, 'node_modules/.bin/keslint')
+    const keslint = installedBin(root)
 
-    if (!existsSync(keslint)) {
+    if (keslint === undefined) {
       printFailure('lint', 'the project has no `keslint`: add `@kaynooo/eslint`', 'text')
 
       return 1
@@ -42,4 +41,17 @@ export const lint: Command = {
 
     return Bun.spawn([keslint, ...positionals], { stdio: ['inherit', 'inherit', 'inherit'] }).exited
   },
+}
+
+// The first `node_modules/.bin/keslint` from the project up, as a package manager resolves a dependency: a workspace member's bins are hoisted to the workspace root.
+function installedBin(from: string): string | undefined {
+  for (let dir = from; ; dir = dirname(dir)) {
+    const bin = join(dir, 'node_modules/.bin/keslint')
+
+    if (existsSync(bin))
+      return bin
+
+    if (dirname(dir) === dir)
+      return undefined
+  }
 }
