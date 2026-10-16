@@ -128,7 +128,7 @@ export async function refreshForEdit(): Promise<void> {
   await reload(true)
 }
 
-async function reload(typed?: true): Promise<void> {
+async function reload(typed = false): Promise<void> {
   if (typeof document === 'undefined')
     return
 
@@ -140,7 +140,7 @@ async function reload(typed?: true): Promise<void> {
   }
 
   prefetched.clear()
-  await follow(new URL(location.href), { intent: 'refresh', focused: document.activeElement, ...typed && { typed } })
+  await follow(new URL(location.href), { intent: 'refresh', focused: document.activeElement, typed })
 }
 
 async function loadSwap(): Promise<typeof import('./page-swap')> {

@@ -179,11 +179,14 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('kay dev in 
       }))
 
       // A template edit: `gone` leaves the page and `old` is renamed in place.
-      await Bun.write(join(root, 'src/routes/form.kay'), form('two', FORM_FIELDS.filter(line => !line.includes('.gone')).map(line => line.replace('name="old"', 'name="renamed"'))))
+      await Bun.write(join(root, 'src/routes/form.kay'), form('two', FORM_FIELDS.filter(line => !line.includes('.gone')).map(line => line.replace('name="old"', 'name="renamed"').replace('name="pick"', 'name="picked"'))))
       await typed.locator('h1.title', { hasText: 'two' }).waitFor({ timeout: 30_000 })
 
-      expect(await values()).toEqual({ alive: true, who: 'Ada', old: '', gone: null, bio: 'Hello', agree: true, pick: 'b', inner: 'in an island' })
+      expect(await values()).toEqual({ alive: true, who: 'Ada', old: '', gone: null, bio: 'Hello', agree: true, pick: 'a', inner: 'in an island' })
       expect(await typed.textContent('button.tap')).toBe('Taps 1')
+
+      // The select was renamed, so it shows the page's choice; typed into again, it is kept from here on.
+      await typed.selectOption('select.pick', 'b')
 
       // A server code edit, which restarts the server.
       await Bun.write(join(root, 'src/form-title.ts'), 'export const formTitle = \'Changed\'\n')
@@ -192,7 +195,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('kay dev in 
       expect(await values()).toEqual({ alive: true, who: 'Ada', old: '', gone: null, bio: 'Hello', agree: true, pick: 'b', inner: 'in an island' })
 
       // A field whose rendered value the edit changes shows the new one, as a page loaded afresh does.
-      await Bun.write(join(root, 'src/routes/form.kay'), form('three', FORM_FIELDS.filter(line => !line.includes('.gone')).map(line => line.replace('name="old"', 'name="renamed"').replace('input.who(name="who")', 'input.who(name="who" value="Grace")'))))
+      await Bun.write(join(root, 'src/routes/form.kay'), form('three', FORM_FIELDS.filter(line => !line.includes('.gone')).map(line => line.replace('name="old"', 'name="renamed"').replace('name="pick"', 'name="picked"').replace('input.who(name="who")', 'input.who(name="who" value="Grace")'))))
       await typed.locator('h1.title', { hasText: 'three' }).waitFor({ timeout: 30_000 })
 
       expect((await values()).who).toBe('Grace')

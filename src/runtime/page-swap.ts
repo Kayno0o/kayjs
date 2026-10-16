@@ -28,7 +28,7 @@ interface Policy {
 // Whether the swap in progress keeps what was typed into the fields the next page renders as they were, which `kay dev` asks of a refresh for an edit.
 let typing = false
 // The selects the swap in progress found renamed, whose options show what the next page renders.
-const renamed = new WeakSet<Element>()
+const renamed = new Set<Element>()
 
 const POLICIES: Record<Intent, Policy> = {
   visit: { history: 'push', scroll: 'top', focus: 'page', islands: 'persist', transition: true },
@@ -261,13 +261,14 @@ export async function show(page: FetchedPage, hash: string, swap: Swap, isCurren
     document.title = next.title
     root()
     head.commit()
-    typing = swap.typed === true
+    typing = process.env.NODE_ENV !== 'production' && swap.typed === true
 
     try {
       swapBody(next, policy)
     }
     finally {
       typing = false
+      renamed.clear()
     }
 
     forgetPageData()
@@ -651,7 +652,7 @@ function alike(live: Node, next: Node): boolean {
 
 // Whether a field keeps what was typed into it: it is the same field and the edit left what the server renders in it as it was, so only a visitor changed it.
 function typedKept(live: Element, other: Element): boolean {
-  if (!typing)
+  if (process.env.NODE_ENV === 'production' || !typing)
     return false
 
   if (live instanceof HTMLInputElement && other instanceof HTMLInputElement)
@@ -679,7 +680,7 @@ function morph(live: Node, next: Node): void {
   // Read before the attributes and the children become the next page's, which the defaults come from.
   const typed = typedKept(live, other)
 
-  if (typing && live instanceof HTMLSelectElement && live.name !== (other as HTMLSelectElement).name)
+  if (process.env.NODE_ENV !== 'production' && typing && live instanceof HTMLSelectElement && live.name !== (other as HTMLSelectElement).name)
     renamed.add(live)
 
   // An element's open state is closed through it, as the attribute alone would leave a modal dialog blocking the page.

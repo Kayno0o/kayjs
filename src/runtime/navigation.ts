@@ -32,7 +32,7 @@ export interface Swap {
   // A form the server refused a post of, and the control focused in it, by their index among the page's forms and the form's controls.
   refused?: { form: number, control: number }
   // Development: `kay dev` refreshing the page for an edit, where a field the edit leaves as it was keeps what was typed into it, rather than showing what the next page renders.
-  typed?: true
+  typed?: boolean
 }
 
 // A guard `guardLeave` registers, which a leave asks once it holds unsaved changes.
