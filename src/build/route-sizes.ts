@@ -86,7 +86,7 @@ export async function routeSizes(root: string, client: ClientBuild, routes: Rout
     const pages = pagesOf.get(route.file) ?? []
     const kept = keptPages.get(route.pattern) ?? 0
     const stop = stops.get(route.pattern)
-    const why = stop === undefined ? undefined : describeStop(stop)
+    const why = stop === undefined ? undefined : describeStop(stop, root)
     const css = await total(new Set([...route.layouts, route.file].flatMap(file => client.styles.get(file) ?? [])))
 
     if (pages.length > 0) {

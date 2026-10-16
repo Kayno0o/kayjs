@@ -17,20 +17,21 @@ const TRAILING = ',=+-*/%&|^<>?:.(['
 const REGEX_AFTER = '(,=:[!&|?{};+-*%<>~^'
 const LEADING = '.?:,+-*/%&|=<>'
 
-export function declaresState(source: string, settings: ReadonlySet<string>): boolean {
+// Where the first statement declaring state starts, or undefined when none does.
+export function stateAt(source: string, settings: ReadonlySet<string>): number | undefined {
   let at = skipTrivia(source, 0)
 
   while (at < source.length) {
     const end = statementEnd(source, at)
 
     if (statementDeclaresState(source, at, end, settings))
-      return true
+      return at
 
     // A stray closer ends a statement without being part of it.
     at = skipTrivia(source, Math.max(end, at + 1))
   }
 
-  return false
+  return undefined
 }
 
 // The index after the whitespace and comments from `at`.

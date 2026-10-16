@@ -55,6 +55,10 @@ export class ExportError extends Error {
 // What keeps a page that nothing marks from being kept; `keep` when the page said it should be.
 export interface KeptStop extends Stop {
   keep: boolean
+  // The page it stopped, by route pattern: a layout or a module it imports may be what stopped many.
+  route: string
+  // What to do about it, when `drop what it reads` is not it.
+  fix?: string | undefined
 }
 
 export interface PrerenderOptions {
@@ -100,7 +104,7 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
     const pending: (() => Promise<void> | void)[] = []
     // Nothing is written for a page given up on, whose reason is kept for the build to show.
     const skip = (why: string) => {
-      options.stops?.set(route.pattern, { file: route.file, line: 0, why, keep })
+      options.stops?.set(route.pattern, { file: route.file, line: 0, why, keep, route: route.pattern })
 
       return []
     }
@@ -250,7 +254,9 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
     const auto = !asked && stop === undefined
 
     if (!asked && !auto) {
-      options.stops?.set(route.pattern, { ...stop!, keep })
+      // A route taking params and lists none is not a page the build looked at, so it gets a stop only when it says it is to be kept.
+      if (route.params.length === 0 || keep)
+        options.stops?.set(route.pattern, { ...stop!, keep, route: route.pattern, ...route.params.length > 0 && { fix: 'list the pages to keep in `prerender`, or remove `keep`' } })
 
       continue
     }
@@ -265,7 +271,7 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
     catch (error) {
       // A page kept on the strength of its source alone is rendered per request when it will not render here.
       if (auto) {
-        options.stops?.set(route.pattern, { file: route.file, line: 0, why: `does not render at build: ${firstLine(error instanceof Error ? error.message : String(error))}`, keep })
+        options.stops?.set(route.pattern, { file: route.file, line: 0, why: `does not render at build: ${firstLine(error instanceof Error ? error.message : String(error))}`, keep, route: route.pattern })
 
         continue
       }

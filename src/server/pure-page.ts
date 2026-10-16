@@ -1,10 +1,9 @@
 import { relative } from 'node:path'
-import process from 'node:process'
 import { resolveFrom } from '../build/files'
 import { PAGE, PAGE_SETTINGS } from '../compiler/page-settings'
 import { parseKay } from '../compiler/parser'
 import { analyzeServer } from '../compiler/script'
-import { declaresState } from './module-state'
+import { stateAt } from './module-state'
 import { routeChain } from './routes'
 
 // What a page may take from `kay` and stay the same for every visitor and every moment: the reactive core and ids, none of which reads a request, a cookie, the environment or a clock.
@@ -21,28 +20,36 @@ const SETTING_NAMES = new Set<string>([PAGE, ...PAGE_SETTINGS])
 // For a server fence the compiler cannot parse, the part of the rule left: it declares state only when it exports something besides a type or a page setting, which may read it.
 const MODULE_EXPORT = new RegExp(`^export (?!(?:type|interface) )(?!(?:async )?(?:const|let|var|function) (?:${[...SETTING_NAMES].join('|')})\\b)`, 'm')
 
-// What may be a state declaration anywhere on a line, to spare the compiler's view to a file that has none.
 const WHITESPACE = /\s+/g
+// What may be a state declaration anywhere on a line, to spare the compiler's view to a file that has none.
 const MAYBE_STATE = /\b(?:let|var|export)\b|=\s*(?:\[\s*\]|\{\s*\}|new\b)/
 
 // A `.kay` file runs its scripts and server fence for each render, so a `let` or an empty container there is state only when the compiler moves its statement to module level, as it does one an export of the server fence reads.
-function holdsModuleState(file: string, source: string): boolean {
+// The offset of the module state in a file, if it holds any.
+function moduleStateAt(file: string, source: string): number | undefined {
   if (!file.endsWith('.kay'))
-    return declaresState(source, SETTING_NAMES)
+    return stateAt(source, SETTING_NAMES)
 
   if (!MAYBE_STATE.test(source))
-    return false
+    return undefined
 
   const server = analyzeServer(source, parseKay(source).server)
 
   if (server === undefined)
-    return false
+    return undefined
 
   // A fence being typed, whose statements the compiler cannot place, is judged by the file as before.
   if (server.unparsed !== undefined || server.broken.length > 0)
-    return MODULE_EXPORT.test(source)
+    return MODULE_EXPORT.exec(source)?.index
 
-  return server.exports.some(({ start, end }) => declaresState(source.slice(start, end), SETTING_NAMES))
+  for (const { start, end } of server.exports) {
+    const at = stateAt(source.slice(start, end), SETTING_NAMES)
+
+    if (at !== undefined)
+      return start + at
+  }
+
+  return undefined
 }
 
 // An import or a re-export with what it takes, then one for its effect alone.
@@ -67,9 +74,9 @@ export interface Scan {
   code: string[]
 }
 
-// A stop as it reads in a report: `src/routes/index.kay:3 reads Date`.
-export function describeStop(stop: Stop): string {
-  return `${relative(process.cwd(), stop.file).replaceAll('\\', '/')}${stop.line > 0 ? `:${stop.line}` : ''} ${stop.why}`
+// A stop as it reads in a report, its file relative to the project: `src/routes/index.kay:3 reads Date`.
+export function describeStop(stop: Stop, root: string): string {
+  return `${relative(root, stop.file).replaceAll('\\', '/')}${stop.line > 0 ? `:${stop.line}` : ''} ${stop.why}`
 }
 
 function lineAt(source: string, offset: number): number {
@@ -124,13 +131,18 @@ async function scanned(file: string): Promise<Scan> {
   if (reads !== null)
     return { stop: { file, line: lineAt(source, reads.index), why: `reads \`${reads[0].replace(WHITESPACE, '')}\`` }, code }
 
-  if (holdsModuleState(file, source))
-    return { stop: { file, line: lineAt(source, MAYBE_STATE.exec(source)?.index ?? 0), why: 'declares module state, a `let`, an empty container it fills or an export another module can change' }, code }
+  const state = moduleStateAt(file, source)
+
+  if (state !== undefined)
+    return { stop: { file, line: lineAt(source, state), why: 'declares module state, a `let`, an empty container it fills or an export another module can change' }, code }
 
   const imports = [...source.matchAll(FROM)].map(match => ({ clause: match[1]!, specifier: match[2]!, index: match.index }))
 
   for (const match of source.matchAll(FOR_EFFECT))
     imports.push({ clause: '', specifier: match[1]!, index: match.index })
+
+  // The first stop in the file is the one named.
+  imports.sort((a, b) => a.index - b.index)
 
   for (const { clause, specifier, index } of imports) {
     if (TYPE_IMPORT.test(clause))
@@ -141,8 +153,11 @@ async function scanned(file: string): Promise<Scan> {
     if (specifier === 'kay' || specifier === 'kay/i18n') {
       const imported = (BRACES.exec(clause)?.[1] ?? '').split(',').map(name => name.trim()).filter(name => name !== '' && !TYPE_NAME.test(name))
 
-      if (imported.length === 0 || !imported.every(name => (specifier === 'kay' ? PURE_KAY_NAMES : PURE_I18N_NAMES).has(name.replace(AS_NAME, ''))))
-        return stop(`imports ${imported.length === 0 ? 'the whole module' : imported.map(name => `\`${name}\``).join(', ')} from \`${specifier}\`, which a request or the clock can change`)
+      const pure = specifier === 'kay' ? PURE_KAY_NAMES : PURE_I18N_NAMES
+      const impure = imported.filter(name => !pure.has(name.replace(AS_NAME, '')))
+
+      if (imported.length === 0 || impure.length > 0)
+        return stop(`imports ${imported.length === 0 ? 'the whole module' : impure.map(name => `\`${name}\``).join(', ')} from \`${specifier}\`, which a request or the clock can change`)
 
       continue
     }

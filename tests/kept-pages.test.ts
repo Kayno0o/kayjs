@@ -610,6 +610,9 @@ describe('what stops a page from being kept', () => {
       'src/routes/clock.kay': '--- server\nconst now = Date.now()\n---\np {now}\n',
       'src/routes/package.kay': '---\n\nimport { format } from \'dayjs\'\n---\np Hi\n',
       'src/routes/state.kay': '--- server\nconst seen = []\n\nexport const add = action(s.Object({}), async () => {\n  seen.push(1)\n})\n---\np {seen.length}\n',
+      'src/routes/early.kay': '--- server\nexport const page = { keep: true }\n\nlet title = \'x\'\nexport const seen: string[] = []\n---\np {title}\n',
+      'src/routes/imports.kay': '---\nimport \'../data.db\'\nimport { format } from \'dayjs\'\n---\np Hi\n',
+      'src/data.db': '',
       'src/routes/fine.kay': 'p Fine\n',
     })
 
@@ -619,7 +622,9 @@ describe('what stops a page from being kept', () => {
 
     expect(await at('src/routes/clock.kay')).toEqual({ file: join(root, 'src/routes/clock.kay'), line: 2, why: 'reads `Date`' })
     expect(await at('src/routes/package.kay')).toEqual({ file: join(root, 'src/routes/package.kay'), line: 3, why: 'imports the package `dayjs`' })
-    expect((await at('src/routes/state.kay'))?.why).toContain('module state')
+    expect(await at('src/routes/state.kay')).toMatchObject({ line: 2, why: expect.stringContaining('module state') })
+    expect(await at('src/routes/early.kay')).toMatchObject({ line: 5 })
+    expect(await at('src/routes/imports.kay')).toMatchObject({ line: 2, why: 'imports `../data.db`, which is neither code nor a data file' })
     expect(await at('src/routes/fine.kay')).toBeUndefined()
   })
 
@@ -628,6 +633,8 @@ describe('what stops a page from being kept', () => {
       'src/routes/index.kay': 'p Home\n',
       'src/routes/clock.kay': '--- server\nconst now = Date.now()\n---\np {now}\n',
       'src/routes/random.kay': '--- server\nexport const page = { keep: true }\n---\np {Math.random()}\n',
+      'src/routes/[id].kay': '--- server\nexport const page = { keep: true }\n---\np Item\n',
+      'src/routes/other/[id].kay': 'p Other\n',
     })
 
     roots.push(root)
@@ -640,7 +647,14 @@ describe('what stops a page from being kept', () => {
     expect(routes['/']).toMatchObject({ kept: 1, pages: 0 })
     expect(routes['/']!.stop).toBeUndefined()
     expect(routes['/clock']).toMatchObject({ kept: 0 })
-    expect(routes['/clock']!.stop).toMatch(/clock\.kay:2 reads `Date`$/)
-    expect(document.problems.filter(problem => problem.code === 'unkept-page').map(problem => problem.line)).toEqual([4])
+    // A route taking params and listing none was not looked at, unless it said it is to be kept.
+    expect(routes['/other/:id']!.stop).toBeUndefined()
+    expect(routes['/:id']!.stop).toContain('takes params')
+
+    const unkept = document.problems.filter(problem => problem.code === 'unkept-page')
+
+    expect(unkept.map(problem => problem.line).sort()).toEqual([1, 4])
+    expect(unkept.map(problem => problem.message).join('\n')).toContain('`/random`')
+    expect(routes['/clock']!.stop).toMatch(/^src\/routes\/clock\.kay:2 reads `Date`$/)
   }, 120_000)
 })

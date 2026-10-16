@@ -269,7 +269,7 @@ export function formatRouteTable(routes: RouteSize[], { width = Infinity, previo
   const hidden = ordered.length - shown.length
 
   return [
-    shorten('Routes, gzip (~: scripts it can load, no page prerendered):', width),
+    shorten('Routes, gzip (~: scripts it can load, no page rendered at build):', width),
     ...[header, ...rows].flatMap((row, index) => [
       `  ${shorten(row[0], name).padEnd(name)}  ${row[1].padEnd(widths[1]!)}  ${row[2].padStart(widths[2]!)}  ${row[3].padStart(widths[3]!)}`,
       ...index > 0 && shown[index - 1]!.stop !== undefined ? [`      ${shorten(`not kept: ${shown[index - 1]!.stop}`, Math.max(20, width - 8))}`] : [],
