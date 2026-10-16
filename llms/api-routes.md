@@ -286,7 +286,7 @@ export default api()
 - `mcp: true` serves Streamable HTTP at `/mcp`: one JSON-RPC message per `POST`, answered with JSON, `initialize`, `ping`, `tools/list` and `tools/call` only, no resources or prompts. `GET` and `DELETE` answer 405, a notification 202.
 - A message that is no JSON-RPC request answers 400, a body over `bodyLimit` 413, a request from another site (`Origin`, `Sec-Fetch-Site`) 403.
 - A tool per operation of the OpenAPI document, even with `openapi` off, named by its `operationId`, described by its `summary` and `description`, its input one JSON Schema of the path params, query and JSON body, merged by name.
-- Left out: `detail: { hide: true }` routes, websockets, a route whose body is files, text or bytes, and an action holding a file.
+- Left out: `detail: { hide: true }` routes, websockets, a route whose body is files, text or bytes, an action holding a file, an action in a file whose pages have route params (a post from no page cannot name one), and `in: header` parameters. `tools/list` names every tool to any caller, guards or not, as the guards run on a call.
 - A route answering every method, `.all()`, is a tool per method.
 - An action is a tool only when its third argument sets `tool`: `true`, a description, or `{ name, description }`; its name is the export in snake case, `addNote` is `add_note`, a clash `add_note_2`, and its input schema is the action's.
 - A name is made of letters, digits and `_`, at most 64 characters.

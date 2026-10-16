@@ -142,7 +142,7 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], m
 
       const tool = toolSettings(value.protection?.tool)
 
-      if (tool)
+      if (tool && page.params.length === 0)
         tools.push({ name, url: value.url, schema: value.schema, tool, guards: guards.filter(guard => guard.check !== unguarded).map(guard => guard.file) })
 
       limits.set(value.url, { bytes: value.protection?.bodyLimit, refuse: async (request, bytes, server) => tooLarge(value, request, bytes, server, back) })

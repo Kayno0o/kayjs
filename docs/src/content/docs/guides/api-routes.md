@@ -65,6 +65,8 @@ Every API route in the OpenAPI document becomes a tool. A route called `GET /api
 
 An action is a tool only when you say so, with `tool` in its third argument. This way, setting `mcp` never hands an agent an action such as "delete account".
 
+An action in a file whose pages have route params, such as `/notes/[id]`, is not a tool, because a call names no page to read the params from. Guards run when a tool is called, but the list of tools is the same for everyone, so keep a route out with `detail: { hide: true }` when its name should stay private.
+
 ```kay
 --- server
 import { s } from 'kay'

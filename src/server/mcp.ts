@@ -199,11 +199,11 @@ async function result(context: CallContext, response: Response, action: boolean)
     return refusal(`The call ended in a redirect to ${location}, where a page would carry on`)
 
   if (!action && response.ok && response.body && type !== '' && !TEXT_TYPE.test(type))
-    return { content: [{ type: 'text', text: `${type || 'Binary data'}, ${(await response.arrayBuffer()).byteLength} bytes` }] }
+    return { content: [{ type: 'text', text: `${type}, ${(await response.arrayBuffer()).byteLength} bytes` }] }
 
   const text = await response.text()
 
-  if (response.status === 401) {
+  if (response.status === 401 && !response.headers.has(FAILURE_HEADER)) {
     context.challenged = true
 
     return refusal(text || 'Sign in to continue')
@@ -272,9 +272,6 @@ function receiveDispatched(app: Elysia): void {
     const marked = request.headers.get(AGENT)
     const address = request.headers.get(CLIENT)
     const id = request.headers.get('x-request-id')
-
-    if (marked === null)
-      return
 
     request.headers.delete(AGENT)
     request.headers.delete(CLIENT)

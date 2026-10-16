@@ -86,7 +86,7 @@ export async function unguardedTools(options: CheckOptions, { routes }: ServedPr
 
     for (const { name, botProtected } of analyzeServer(source, parseKay(source).server)?.toolActions ?? []) {
       if (botProtected)
-        found.push({ file, line: 1, column: 1, message: `The tool action \`${name}\` has bot protection and no guard covers it, so an agent calls it without the form that protection asks of a person`, help: `${HELP} in its \`page\`, or drop the protection for a \`rateLimit\``, code: 'unguarded-tool', severity: level === 'warn' ? 'warning' : 'error' })
+        found.push({ file, line: 1, column: 1, message: `The tool action \`${name}\` has bot protection and no guard covers it, so an agent calls it without the form that protection asks of a person`, help: 'add a `_guard.ts` to its directory or one above it, or drop the protection for a `rateLimit`', code: 'unguarded-tool', severity: level === 'warn' ? 'warning' : 'error' })
     }
   }
 

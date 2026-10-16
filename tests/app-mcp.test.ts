@@ -166,6 +166,7 @@ describe('the tools', () => {
 
   it('serves the same tools under a base and a trailing slash', async () => {
     expect((await mounted.mcp.tools()).length).toBe((await site.mcp.tools()).length)
+    expect((await mounted.mcp.call('get_notes_id', { id: 'a' })).data).toEqual({ id: 'a', fields: null, tags: [] })
     expect((await mounted.mcp.call('add_note', { title: 'Milk' })).data).toEqual({ id: 1, title: 'Milk', at: '1970-01-01T00:00:00.000Z' })
   })
 })
@@ -279,6 +280,10 @@ describe('protection', () => {
     expect(calls.map(call => call.isError)).toEqual([false, false, true])
     expect((JSON.parse(calls[2]!.text) as { status: number }).status).toBe(429)
     expect((JSON.parse(calls[2]!.text) as { errors: Record<string, string> }).errors['']).toContain('Too many attempts')
+  })
+
+  it('counts the next test\'s client afresh, as each caller has its own limit', async () => {
+    expect((await site.mcp.call('signup', { email: 'a@b.example' })).isError).toBe(false)
   })
 
   it('skips the honeypot, the minimum time and the proof of work, which only a form a person filled in can pass', async () => {
