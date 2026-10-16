@@ -19,7 +19,7 @@ In an action, a guard on an action and a guard on an API route it was an empty s
 
 A context you build by hand, such as a mock in a test, now needs `request`, `url`, `locale`, `params`, `cookies`, `locals`, `headers`, `redirect`, `notFound` and `deny`. Take the type from `RequestContext`.
 
-A guard's `redirect` answers 302 to a GET or HEAD on an API route or an endpoint, where it answered 303. A post still gets 303.
+A guard's `redirect` answers 302 to a GET or HEAD on an API route, an endpoint, or an image source's `resolve` and `guard`, where it answered 303. A post still gets 303.
 
 An endpoint that reads `ctx.cookies` goes out with `Cache-Control: private, no-cache` and `Vary: cookie`, unless it sets its own `cache-control`.
 

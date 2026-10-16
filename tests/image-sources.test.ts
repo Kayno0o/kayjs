@@ -241,7 +241,7 @@ describe('images.resolve and images.guard', () => {
   it('answers the redirect resolve throws', async () => {
     const moved = await get('/media/moved', 'w=320', signedIn)
 
-    expect(moved.status).toBe(303)
+    expect(moved.status).toBe(302)
     expect(moved.headers.get('location')).toBe('/media/7')
   })
 

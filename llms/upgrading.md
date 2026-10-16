@@ -11,7 +11,7 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 ### `GuardContext`, `EndpointContext` and `ActionContext` share `RequestContext`
 
 - A hand-built context, a test's mock for a guard or a handler, now needs `request`, `url`, `locale`, `params`, `cookies`, `locals`, `headers`, `redirect`, `notFound` and `deny`; take it from `RequestContext` or cast it.
-- A guard's `redirect` answers 302 to a GET or HEAD, on an API route or an endpoint too, where it answered 303; a post still gets 303.
+- A guard's `redirect` answers 302 to a GET or HEAD, on an API route, an endpoint or an image source's `resolve` and `guard` too, where it answered 303; a post still gets 303.
 - An endpoint that reads `ctx.cookies` goes out `Cache-Control: private, no-cache` with `Vary: cookie`, unless it sets its own `cache-control`.
 
 ### `deprecated-schema-name` is in the `deprecated` group
