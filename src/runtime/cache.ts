@@ -96,6 +96,11 @@ export function trackStore(store: CacheStore): void {
   store.subscribe?.(heard)
 }
 
+// Lets go of a store that was closed, which `invalidate` then leaves be.
+export function untrackStore(store: CacheStore): void {
+  stores.delete(store)
+}
+
 // Drops `key`, or every key the function matches, so the next call loads afresh: for an action that changed what they hold.
 // Every process sharing a store that broadcasts, a `sqliteCache`, drops the same keys: a string key always, a function's keys as far as this process and the store know them.
 export function invalidate(key: string | ((key: string) => boolean)): void {

@@ -1,5 +1,6 @@
 import type { CacheStore } from './cache'
-import { trackStore } from './cache'
+import { onReload } from '../server/reload'
+import { trackStore, untrackStore } from './cache'
 import { kayLog } from './log'
 import { openSqlite } from './sqlite.server'
 
@@ -15,6 +16,7 @@ export { cached, invalidate } from './cache'
 // Values kept in a SQLite file: they survive restarts and deploys, and the processes on one machine share them. Each process keeps its own copy in memory, and hears within about half a second what another one's `invalidate` or `invalidatePage` dropped.
 export function sqliteCache(path: string): CacheStore {
   const db = openSqlite(path)
+  const polls: ReturnType<typeof setInterval>[] = []
 
   db.run('CREATE TABLE IF NOT EXISTS kay_cache (key TEXT PRIMARY KEY, value TEXT NOT NULL, fresh_until INTEGER NOT NULL)')
   db.run('CREATE TABLE IF NOT EXISTS kay_events (id INTEGER PRIMARY KEY AUTOINCREMENT, origin TEXT NOT NULL, message TEXT NOT NULL, at INTEGER NOT NULL)')
@@ -51,7 +53,7 @@ export function sqliteCache(path: string): CacheStore {
       // What was published before this process opened the store is in what it reads from the store already.
       let seen = lastEvent.get()?.id ?? 0
 
-      setInterval(() => {
+      const poll = setInterval(() => {
         try {
           for (const event of eventsAfter.all(seen, PROCESS)) {
             seen = event.id
@@ -61,11 +63,22 @@ export function sqliteCache(path: string): CacheStore {
         catch (error) {
           kayLog('error', 'reading what the other processes invalidated failed; trying again', error)
         }
-      }, POLL_MS).unref()
+      }, POLL_MS)
+
+      poll.unref()
+      polls.push(poll)
     },
   }
 
   trackStore(store)
+  // A reload runs the module that opened the store again, which opens its own.
+  onReload(() => {
+    for (const poll of polls)
+      clearInterval(poll)
+
+    untrackStore(store)
+    db.close()
+  })
 
   return store
 }

@@ -11,6 +11,7 @@ import { kayLog } from '../runtime/log'
 import { openSqlite } from '../runtime/sqlite.server'
 import { NAVIGATE_HEADER, WORK_HEADER } from '../runtime/swap'
 import { nodeNet } from './builtins'
+import { onReload } from './reload'
 import { rewrittenAddress } from './rewrite'
 import { sharedKey, stampTime } from './stamp'
 import { proofOfWork, signWork, workRefusal } from './work'
@@ -138,6 +139,9 @@ export function sqliteRates(path: string): RateStore {
   const peek = db.query<{ count: number, reset_at: number }, [string, number]>('SELECT count, reset_at FROM kay_rates WHERE key = ? AND reset_at > ?')
   const sweep = db.query('DELETE FROM kay_rates WHERE reset_at <= ?')
   let swept = 0
+
+  // A reload runs the module that opened the store again, which opens its own.
+  onReload(() => db.close())
 
   return {
     hit(key, windowMs) {
