@@ -90,6 +90,8 @@ const english: AuditWording = {
   'member-joined': naming(roles => `Joined an organization as ${roles}`, 'Joined an organization', orgRoles),
   'member-left': 'Left an organization',
   'member-removed': 'Removed from an organization',
+  'oauth-client-approved': naming(detail => `${detail} was given access`, 'An app was given access'),
+  'oauth-client-revoked': naming(detail => `${detail} lost access`, 'An app lost access'),
   'member-roles-changed': naming(roles => `Organization roles changed to ${roles}`, 'Organization roles changed', orgRoles),
 }
 
@@ -122,6 +124,8 @@ const french: AuditWording = {
   'member-joined': naming(roles => `Organisation rejointe en tant que ${roles}`, 'Organisation rejointe', orgRoles),
   'member-left': 'Organisation quittée',
   'member-removed': 'Retiré d’une organisation',
+  'oauth-client-approved': naming(detail => `${detail} a reçu un accès`, 'Une application a reçu un accès'),
+  'oauth-client-revoked': naming(detail => `${detail} a perdu son accès`, 'Une application a perdu son accès'),
   'member-roles-changed': naming(roles => `Rôles dans l’organisation changés pour ${roles}`, 'Rôles dans l’organisation changés', orgRoles),
 }
 

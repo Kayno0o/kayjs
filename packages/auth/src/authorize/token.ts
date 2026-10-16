@@ -1,0 +1,147 @@
+import type { Core } from '../core'
+import type { OAuthGrantRecord } from '../store'
+import { createHash, timingSafeEqual } from 'node:crypto'
+import { banned } from '../core'
+import { digest, randomToken } from '../keys'
+import { spend } from '../limits'
+import { covers, sameSite } from './request'
+
+// Seconds an access token works for, and a refresh token.
+export const ACCESS_LIFETIME = 60 * 60
+export const REFRESH_LIFETIME = 30 * 24 * 60 * 60
+const VERIFIER = /^[\w.~-]{43,128}$/
+const WHITESPACE = /\s+/
+
+export interface TokenReply {
+  status: number
+  body: Record<string, unknown>
+}
+
+function refused(error: string, description: string, status = 400): TokenReply {
+  return { status, body: { error, error_description: description } }
+}
+
+function matches(verifier: string, challenge: string): boolean {
+  const computed = Buffer.from(createHash('sha256').update(verifier).digest('base64url'))
+  const expected = Buffer.from(challenge)
+
+  return computed.length === expected.length && timingSafeEqual(computed, expected)
+}
+
+// A bearer token and a refresh token of one family for the grant, which is how `user()`, `via()` and `requireUser({ scope })` see the client.
+async function issue(core: Core, grant: OAuthGrantRecord, scopes: string[] | null, family: string): Promise<TokenReply> {
+  const oauth = core.store.oauth!
+  const now = new Date()
+  const access = randomToken()
+  const refresh = randomToken()
+
+  await core.store.bearerTokens.create({
+    id: crypto.randomUUID(),
+    userId: grant.userId,
+    label: grant.clientName,
+    digest: digest(access),
+    scopes,
+    createdAt: now,
+    lastUsedAt: null,
+    expiresAt: new Date(now.getTime() + ACCESS_LIFETIME * 1000),
+    oauth: { clientId: grant.clientId, family },
+  })
+  await oauth.refresh.create({ digest: digest(refresh), userId: grant.userId, clientId: grant.clientId, scopes, family, createdAt: now, expiresAt: new Date(now.getTime() + REFRESH_LIFETIME * 1000), usedAt: null })
+  await oauth.grants.touch(grant.userId, grant.clientId, now)
+
+  return {
+    status: 200,
+    body: { access_token: access, token_type: 'Bearer', expires_in: ACCESS_LIFETIME, refresh_token: refresh, ...scopes !== null && { scope: scopes.join(' ') } },
+  }
+}
+
+// The grant the tokens are issued under, while its user can sign in and has not revoked the client.
+async function liveGrant(core: Core, userId: string, clientId: string): Promise<OAuthGrantRecord | undefined> {
+  const [grant, record] = await Promise.all([core.store.oauth!.grants.get(userId, clientId), core.store.users.get(userId)])
+
+  return grant && record && !banned(record) ? grant : undefined
+}
+
+async function exchangeCode(core: Core, form: URLSearchParams, root: string): Promise<TokenReply> {
+  const code = form.get('code')
+  const verifier = form.get('code_verifier')
+  const clientId = form.get('client_id')
+
+  if (code === null || verifier === null || clientId === null)
+    return refused('invalid_request', 'code, code_verifier and client_id are required')
+
+  const spent = await core.store.oauth!.codes.use(digest(code), new Date())
+
+  if (!spent)
+    return refused('invalid_grant', 'The code is not valid')
+
+  if (spent.reused) {
+    await core.store.oauth!.refresh.revokeFamily(spent.code.userId, spent.code.family)
+
+    return refused('invalid_grant', 'The code was used already')
+  }
+
+  const issued = spent.code
+
+  if (issued.expiresAt <= new Date() || issued.clientId !== clientId || issued.redirectUri !== form.get('redirect_uri'))
+    return refused('invalid_grant', 'The code does not match this request')
+
+  if (!VERIFIER.test(verifier) || !matches(verifier, issued.challenge))
+    return refused('invalid_grant', 'The code_verifier does not match the code_challenge')
+
+  const resource = form.get('resource')
+
+  if (resource !== null && !sameSite(resource, root))
+    return refused('invalid_target', 'The resource is not one of this server')
+
+  const grant = await liveGrant(core, issued.userId, issued.clientId)
+
+  return grant ? issue(core, grant, issued.scopes, issued.family) : refused('invalid_grant', 'The client is not approved')
+}
+
+async function rotate(core: Core, form: URLSearchParams): Promise<TokenReply> {
+  const presented = form.get('refresh_token')
+  const clientId = form.get('client_id')
+
+  if (presented === null || clientId === null)
+    return refused('invalid_request', 'refresh_token and client_id are required')
+
+  const spent = await core.store.oauth!.refresh.use(digest(presented), new Date())
+
+  if (!spent)
+    return refused('invalid_grant', 'The refresh token is not valid')
+
+  const held = spent.token
+
+  if (spent.reused) {
+    await core.store.oauth!.refresh.revokeFamily(held.userId, held.family)
+
+    return refused('invalid_grant', 'The refresh token was used already')
+  }
+
+  if (held.expiresAt <= new Date() || held.clientId !== clientId)
+    return refused('invalid_grant', 'The refresh token does not match this request')
+
+  const asked = form.get('scope')
+  const scopes = asked === null ? held.scopes : asked.split(WHITESPACE).filter(Boolean)
+
+  if (asked !== null && !covers(held.scopes, scopes))
+    return refused('invalid_scope', 'A refresh cannot add scopes')
+
+  const grant = await liveGrant(core, held.userId, held.clientId)
+
+  return grant ? issue(core, grant, scopes, held.family) : refused('invalid_grant', 'The client is not approved')
+}
+
+// The token endpoint: the authorization code grant with PKCE, and refresh tokens that rotate, a token used twice ending its family.
+export async function tokenEndpoint(core: Core, address: string, form: URLSearchParams, root: string): Promise<TokenReply> {
+  if (await spend(core.store, `oauth-token:${address}`, core.limits.oauthToken))
+    return refused('invalid_request', 'Too many requests', 429)
+
+  const type = form.get('grant_type')
+
+  if (type === 'authorization_code')
+    return exchangeCode(core, form, root)
+
+  return type === 'refresh_token' ? rotate(core, form) : refused('unsupported_grant_type', 'Only authorization_code and refresh_token are supported')
+}

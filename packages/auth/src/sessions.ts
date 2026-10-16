@@ -140,6 +140,8 @@ export async function endOtherSessions(state: RequestState, record: UserRecord, 
 export async function revokeBearerTokens(core: Core, userId: string): Promise<void> {
   const { bearerTokens } = core.store
 
+  await core.store.oauth?.refresh.deleteForUser(userId)
+
   if (bearerTokens.deleteForUser)
     return bearerTokens.deleteForUser(userId)
 

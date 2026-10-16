@@ -3,6 +3,8 @@ export type { AdminChangeFailure, AdminFailure, BanResult, DeleteResult, Managed
 export { auditWording, describeAuditEntry } from './auditWording'
 export type { AuditPhrase, AuditWording } from './auditWording'
 export * from './auth'
+export type { ApprovedClient } from './authorize/grants'
+export type { AuthorizeOutcome, AuthorizeParams, ConsentFields } from './authorize/request'
 export type { BearerToken, CreateTokenResult, IssueTokenResult, TokenOptions } from './bearer'
 export { pwnedPassword } from './breached'
 export { hcaptcha, hcaptchaWidget, proofOfWork, turnstile, turnstileWidget } from './captcha'

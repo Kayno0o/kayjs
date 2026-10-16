@@ -114,7 +114,7 @@ export function documentFetcher(custom: ((url: string) => Promise<Response>) | u
   }
 }
 
-function plainName(value: unknown): string | undefined {
+export function plainName(value: unknown): string | undefined {
   if (typeof value !== 'string')
     return undefined
 

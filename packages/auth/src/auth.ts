@@ -4,6 +4,8 @@ import type { Guard } from 'kay'
 import type { KayConfig, Session } from 'kay/server'
 import type { ChangeUsernameResult } from './account'
 import type { AdminFailure, BanResult, DeleteResult, ManagedUser, RoleResult, UnbanResult } from './admin'
+import type { ApprovedClient } from './authorize/grants'
+import type { AuthorizeOutcome, AuthorizeParams } from './authorize/request'
 import type { BearerToken, CreateTokenResult, IssueTokenResult, TokenOptions } from './bearer'
 import type { CaptchaAction, CaptchaOptions } from './captcha'
 import type { AuthSessionData, Core, OAuthApp, Profile, SignedIn, User } from './core'
@@ -30,7 +32,9 @@ import { clientAddress, crossSiteRefused, crossSiteResponse, rateKey } from 'kay
 import { changePassword, changeUsername, deleteAccount, unlink } from './account'
 import { actingAdmin, adminAuditLog, banUser, changeRole, deleteUser, getUser, isAdmin, listUsers, unbanUser } from './admin'
 import { documentFetcher } from './authorize/clients'
+import { approvedClients, revokeClient } from './authorize/grants'
 import { protectedResourceMetadata, siteRoot } from './authorize/metadata'
+import { authorize, decide } from './authorize/request'
 import { serveOAuthServer } from './authorize/routes'
 import { bearerRequest, bearerUser, createToken, issueToken, listTokens, revokeToken, tokenUser } from './bearer'
 import { pwnedPassword } from './breached'
@@ -523,6 +527,26 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   // What the config enables, for a page to show only what works: the providers, mail, passkeys, scopes and the prebuilt pages.
   features(): AuthFeatures {
     return featuresOf(this.core)
+  }
+
+  // What the authorization endpoint does with an MCP client's request: send the visitor to sign in, show the consent page, or go back to the client with a code once they approved it for these scopes.
+  async oauthAuthorize(params: AuthorizeParams): Promise<AuthorizeOutcome> {
+    return this.core.oauthServer ? authorize(this[STATE], params, siteRoot(this.core, this.request)) : { kind: 'error', error: 'client' }
+  }
+
+  // The user's answer on the consent page, checked again as the request is: where the browser goes next.
+  async oauthDecide(fields: AuthorizeParams, allow: boolean): Promise<Awaited<ReturnType<typeof decide>>> {
+    return this.core.oauthServer ? decide(this[STATE], fields, allow, siteRoot(this.core, this.request)) : { ok: false, error: 'client' }
+  }
+
+  // The apps the signed-in user approved to act as them.
+  async oauthClients(): Promise<ApprovedClient[]> {
+    return approvedClients(this[STATE])
+  }
+
+  // Takes an app's approval back with every token it was given; false when there was none.
+  async revokeOAuthClient(clientId: string): Promise<boolean> {
+    return revokeClient(this[STATE], clientId)
   }
 
   // The RFC 9728 metadata of the protected resource `name` served at `path`, which kay's MCP endpoint asks for; null while the OAuth server is off. It points MCP clients at the app's own authorization server.
@@ -1095,7 +1119,7 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
     })
 
   if (core.oauthServer)
-    serveOAuthServer(plugin as unknown as Elysia, core)
+    serveOAuthServer(plugin as unknown as Elysia, core, ctx => (ctx as { auth: Auth }).auth[STATE])
 
   // Under `kay dev` alone: the dev tool's Auth tab reads the session here, and signs out at the sign-out route.
   if (underKayDev()) {

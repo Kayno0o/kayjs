@@ -117,7 +117,7 @@ export async function issueToken(core: Core, userId: string, label: string, opti
 export async function listTokens(state: RequestState): Promise<BearerToken[]> {
   const record = await state.current()
 
-  return record ? (await state.core.store.bearerTokens.listByUser(record.id)).map(publicToken) : []
+  return record ? (await state.core.store.bearerTokens.listByUser(record.id)).filter(token => !token.oauth).map(publicToken) : []
 }
 
 export async function revokeToken(state: RequestState, id: string): Promise<boolean> {
