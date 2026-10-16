@@ -5,7 +5,7 @@ import type { ModuleSize, RouteSize, SizeReport } from './report'
 import { KayError } from '../compiler/errors'
 import { lintLevel } from '../compiler/lints'
 
-// A size in bytes, or a string with its unit: `'20kb'`, `'1.5mb'`, `'800b'`; decimals are fine, zero, a negative number or an exponent is refused when the config is read, which the type cannot say.
+// A size in bytes, or a string with its unit: `'20kb'`, `'1.5mb'`, `'800b'`; decimals are fine, zero, a negative number or an exponent is refused when the build starts and by `kay check`, which the type cannot say.
 export type ByteSize = number | `${number}${'b' | 'kb' | 'mb'}`
 
 // The most a page may load, compressed as a host serves it; a key left out sets no limit.
