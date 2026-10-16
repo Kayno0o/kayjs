@@ -3,6 +3,7 @@ import { mkdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
+import { alive } from './alive'
 import { scratchDir } from './scratch'
 
 const cli = join(import.meta.dir, '..', 'src', 'cli.ts')
@@ -152,7 +153,7 @@ p Late
         await Bun.sleep(100)
 
       expect(processesIn(own)).toEqual([])
-      expect(() => process.kill(server, 0)).toThrow()
+      expect(alive(server)).toBe(false)
     }
     finally {
       await rm(own, { recursive: true, force: true })

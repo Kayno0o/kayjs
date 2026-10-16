@@ -14,6 +14,7 @@ import { compileKay } from '../src/compiler'
 import { isErrorCode } from '../src/compiler/errors'
 import { SHADOW_DIR } from '../src/project'
 import { limiter } from '../src/server/limit'
+import { alive } from './alive'
 import { fixtureCopy, scratchDir } from './scratch'
 
 const fixtures = join(import.meta.dir, 'fixtures')
@@ -2125,14 +2126,6 @@ describe('kay check --watch, stopped by a signal', () => {
     const root = await scratchProject({ 'kay.config.ts': config })
     const watch = watchChecks(root)
     const pid = join(root, 'pid')
-    const alive = (id: number) => {
-      try {
-        return process.kill(id, 0)
-      }
-      catch {
-        return false
-      }
-    }
 
     try {
       while (!await Bun.file(pid).exists())

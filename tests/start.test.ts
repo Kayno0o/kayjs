@@ -5,6 +5,7 @@ import { join, relative } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { outputDir } from '../src/build/assets'
+import { alive } from './alive'
 import { scratchDir } from './scratch'
 
 const cli = join(import.meta.dir, '..', 'src', 'cli.ts')
@@ -342,21 +343,13 @@ describe('kay start', () => {
     }
 
     const pid = Number((/pid (\d+)/).exec(output)![1])
-    const alive = () => {
-      try {
-        return process.kill(pid, 0)
-      }
-      catch {
-        return false
-      }
-    }
 
     process.kill(-booting.pid, 'SIGKILL')
     await Bun.write(gate, '')
 
-    await until(() => !alive())
+    await until(() => !alive(pid))
 
-    expect(alive()).toBe(false)
+    expect(alive(pid)).toBe(false)
   }, 30_000)
 
   it('runs the executable `kay build --compile` made, from wherever the project moved', async () => {

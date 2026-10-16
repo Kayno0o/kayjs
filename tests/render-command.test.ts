@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
 import { beforeAll, describe, expect, it } from 'bun:test'
+import { alive } from './alive'
 import { fixtureCopy } from './scratch'
 
 const cli = join(import.meta.dir, '..', 'src', 'cli.ts')
@@ -42,15 +43,6 @@ async function killedRender(dir: string, url: string, printed: (err: string) => 
   void reader.cancel()
 
   return { err, pid: Number((/pid (\d+)/).exec(err)![1]), render: child.pid }
-}
-
-function alive(pid: number): boolean {
-  try {
-    return process.kill(pid, 0)
-  }
-  catch {
-    return false
-  }
 }
 
 // The bare fixture, with this config, and an entry of its own when given one.
