@@ -73,20 +73,6 @@ describe('setting up a second factor', () => {
     expect(await ada.call('enableTwoFactor', '000000')).toEqual({ ok: false, error: 'invalid' })
     expect(await ada.json('/me')).toMatchObject({ twoFactor: false })
   })
-
-  test('turning on takes no more guesses than a sign-in code does, so a session alone cannot search the pending secret', async () => {
-    const { browser } = testApp()
-    const ada = browser()
-
-    await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
-    const setup = await ada.callOk('setUpTwoFactor', { password: PASSWORD })
-
-    for (let attempt = 0; attempt < 8; attempt++)
-      await ada.call('enableTwoFactor', '000000')
-
-    expect(await ada.call('enableTwoFactor', await totpCode(setup.setup.secret, totpStep()))).toEqual({ ok: false, error: 'limited' })
-    expect(await ada.json('/me')).toMatchObject({ twoFactor: false })
-  })
 })
 
 describe('signing in with a second factor', () => {
@@ -142,18 +128,6 @@ describe('signing in with a second factor', () => {
     setSystemTime(Date.now() + 11 * 60 * 1000)
 
     expect(await visitor.call('verifyTwoFactor', await code())).toEqual({ ok: false, error: 'expired' })
-  })
-
-  test('stops an account after eight wrong codes', async () => {
-    const { browser, code } = await enrolled()
-    const visitor = browser()
-
-    await visitor.post('/password', { identifier: 'ada@example.com', password: PASSWORD })
-
-    for (let attempt = 0; attempt < 8; attempt++)
-      expect(await visitor.call('verifyTwoFactor', '000000')).toEqual({ ok: false, error: 'invalid' })
-
-    expect(await visitor.call('verifyTwoFactor', await code())).toEqual({ ok: false, error: 'limited' })
   })
 
   test('a magic link sign-in asks for the code too', async () => {

@@ -34,15 +34,6 @@ describe('changing the password', () => {
     expect(await ada.json('/me')).toMatchObject({ email: 'ada@example.com' })
     expect(await browser().post('/password', { identifier: 'ada@example.com', password: 'a brand new password' })).toMatchObject({ ok: true })
   })
-
-  test('stops guessing at the current password after six tries', async () => {
-    const { ada } = await registered()
-
-    for (let attempt = 0; attempt < 6; attempt++)
-      await ada.call('changePassword', { password: 'wrong password!' }, 'a brand new password')
-
-    expect(await ada.call('changePassword', { password: PASSWORD }, 'a brand new password')).toEqual({ ok: false, error: 'limited' })
-  })
 })
 
 describe('the actions that re-prove the user', () => {

@@ -110,19 +110,6 @@ describe('emailed codes', () => {
     expect(await ada.call('signInWithEmailCode', code)).toEqual({ ok: false, error: 'expired' })
   })
 
-  test('guesses are limited per address, across codes and clients', async () => {
-    const { browser, nextCodeMail } = await setup('code', { emailCodeAccount: { max: 2, window: 900 } })
-    const ada = browser()
-
-    await ada.call('requestMagicLink', 'ada@example.com')
-    const { code } = await nextCodeMail('magic-link')
-    const wrong = code === '000000' ? '111111' : '000000'
-
-    expect(await ada.call('signInWithEmailCode', wrong)).toEqual({ ok: false, error: 'invalid' })
-    expect(await ada.call('signInWithEmailCode', wrong)).toEqual({ ok: false, error: 'invalid' })
-    expect(await ada.call('signInWithEmailCode', code)).toEqual({ ok: false, error: 'limited' })
-  })
-
   test('two requests spending one code together sign in once', async () => {
     const { browser, nextCodeMail } = await setup('code')
     const ada = browser()

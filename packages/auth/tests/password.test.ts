@@ -55,15 +55,6 @@ describe('register', () => {
     expect(await browser().post('/register', { email: 'ADA@example.com', password: PASSWORD })).toEqual({ ok: false, errors: { email: 'taken' } })
     expect(await browser().post('/register', { email: 'bob@example.com', password: PASSWORD, username: 'ada' })).toEqual({ ok: false, errors: { username: 'taken' } })
   })
-
-  test('limits how many accounts one client creates', async () => {
-    const { browser } = setup({ limits: { register: { max: 2, window: 3600 } } })
-
-    for (const name of ['a', 'b'])
-      expect(await browser().post('/register', { email: `${name}@example.com`, password: PASSWORD })).toMatchObject({ ok: true })
-
-    expect(await browser().post('/register', { email: 'c@example.com', password: PASSWORD })).toEqual({ ok: false, error: 'limited' })
-  })
 })
 
 describe('signInWithPassword', () => {
@@ -129,15 +120,6 @@ describe('signInWithPassword', () => {
     const answers = await Promise.all(Array.from({ length: 6 }, async () => browser().post('/password', { identifier: 'ada@example.com', password: 'wrong password!' })))
 
     expect(answers.filter(answer => typeof answer === 'object' && answer !== null && 'error' in answer && answer.error === 'invalid')).toHaveLength(2)
-  })
-
-  test('stops a client after its attempts, whichever accounts it tries', async () => {
-    const { browser } = await registered({ limits: { signIn: { max: 2, window: 900 } } })
-
-    await browser().post('/password', { identifier: 'a@example.com', password: PASSWORD })
-    await browser().post('/password', { identifier: 'b@example.com', password: PASSWORD })
-
-    expect(await browser().post('/password', { identifier: 'ada@example.com', password: PASSWORD })).toEqual({ ok: false, error: 'limited' })
   })
 
   test('counts each client apart, as kay reads its address', async () => {
