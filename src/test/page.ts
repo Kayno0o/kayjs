@@ -110,7 +110,9 @@ function matches(html: string, selector: string, visible = false, markup = false
   if (markup) {
     for (const [index, match] of found.entries()) {
       const start = output.indexOf(mark('open', index))
-      const inside = start === -1 ? '' : output.slice(start + mark('open', index).length, output.indexOf(mark('close', index), start))
+      const end = output.indexOf(mark('close', index), start)
+      // An element left open, as a `p` closed by the next one or the end of the page, has no end tag to mark.
+      const inside = start === -1 ? '' : output.slice(start + mark('open', index).length, end === -1 ? undefined : end)
 
       match.html = inside.replace(MARKS, '')
     }

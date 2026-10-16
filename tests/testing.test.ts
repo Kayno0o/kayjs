@@ -447,6 +447,8 @@ describe('reading a page', () => {
     // A selector matching nested elements gives each its own.
     expect(page.find('ul').map(({ html }) => html)).toEqual(['<li><ul><li>deep</li></ul></li>', '<li>deep</li>'])
     expect(page.find('li').map(({ html }) => html)).toEqual(['<ul><li>deep</li></ul>', 'deep'])
+    // An element the page never closes holds the rest of it, as the parser sees no end tag to stop at.
+    expect(readPage('<p>one<div>x</div>').find('p')[0]!.html).toBe('one<div>x</div>')
   })
 
   it('decodes entities and squashes whitespace in the text it gives', async () => {
