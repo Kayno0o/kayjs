@@ -143,7 +143,7 @@ export const env = defineEnv(s.Object({
 
 Import `env` from server code. An island never sees it.
 
-A secret that development and tests can do without, and production must have, takes `requiredInProduction: true`. Under `NODE_ENV=production` a missing value stops the boot, whatever the default; anywhere else the default applies, or the variable is left out when its field is `s.Optional`.
+A secret that development and tests can do without, and production must have, takes `requiredInProduction: true`. Under `NODE_ENV=production` a missing value stops the boot, whatever the default; anywhere else the default applies, or the variable is left out when its field is `s.Optional`. `NODE_ENV=production kay build` counts as production too, so a prerendered page reading such a variable needs it set for the build.
 
 ```ts
 export const env = defineEnv(s.Object({
@@ -154,7 +154,7 @@ export const env = defineEnv(s.Object({
 
 ### List the variables
 
-`kay env` lists every variable the project declares, for a deploy script to compare with a compose file or an env file. It reads the `defineEnv` schemas in the modules under `src`, `publicEnv`, the environment each library lists in `extensions` declares (kayjs-mail's SMTP variables, with nothing wired in the app) and kay's own `PORT`, `HOST` and `SITE_URL`, without the server's environment and without running the server entry.
+`kay env` lists every variable the project declares, for a deploy script to compare with a compose file or an env file. It reads the `defineEnv` schemas in the modules under `src`, `publicEnv`, the environment each library lists in `extensions` declares (kayjs-mail's SMTP variables, with nothing wired in the app) and kay's own `PORT`, `HOST` and `SITE_URL`, without the server's environment and without running the server entry, whose own schema it leaves out. A schema built inside a function is not seen.
 
 ```sh
 kay env

@@ -356,6 +356,7 @@ export function authPages({ prefix = '/auth' } = {}): KayExtension {
 - The library types it `KayExtension<typeof plugin>` so its locals reach the app; typed a bare `KayExtension`, its plugin adds no locals and no routes to the check, and the app's own stay typed. A static export leaves it out.
 - `kay dev` watches the app's files, not `node_modules`: after editing a linked library's pages, restart it.
 - `messages` names a directory of catalogs, `<locale>.ts` each, laid under the app's `src/messages` key by key, with or without `i18n`: see [Locales](locales.md).
+- `env` is a `defineEnv`-shaped schema of the variables the library reads, which `kay env` lists with the app's own, so a deploy script knows them with nothing wired in the app; it is not enforced at boot, and a field with `requiredInProduction: true` marks what production needs.
 - `transformPage` rewrites each prerendered page before it is written: see [Page hooks](routing.md#page-hooks).
 - `editor` names a `.kay` island, `${import.meta.dir}/editor.kay`, that every page renders last in edit mode but the pages its own `routes` serve, its stylesheets linked after the page's, and carried by `kay build --compile`: see [A CMS editing on the page](content.md#preview-mode).
 - `devTool: { module }` names a browser module, `${import.meta.dir}/devTool.ts`, that adds a tab to the dev tool every dev page carries, with no declaration in the app: see [A tab for a library](#a-tab-for-a-library).

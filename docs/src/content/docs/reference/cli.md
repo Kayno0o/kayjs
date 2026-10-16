@@ -348,7 +348,7 @@ An app already on the latest version is left alone. If the install fails, `packa
 kay env
 ```
 
-It lists the environment variables the project declares, without the server's environment and without running the server entry: the `defineEnv` schemas in the modules under `src`, `publicEnv`, the environment each library in `extensions` declares and kay's own `PORT`, `HOST` and `SITE_URL`. Each has its source, its type, whether it is required (`always`, `production` for a field with `requiredInProduction: true`, or `optional`) and its default. A module that does not load is named as not read. The modules under `src` are imported, so their top-level code runs, and what it prints goes to stderr under `--format json`. See [Environment variables](/essentials/data-loading#environment-variables).
+It lists the environment variables the project declares, without the server's environment and without running the server entry, whose own `defineEnv` calls it leaves out: the `defineEnv` schemas in the modules under `src`, `publicEnv`, the environment each library in `extensions` declares and kay's own `PORT`, `HOST` and `SITE_URL`. A schema built inside a function is not seen. Each has its source, its type, whether it is required (`always`, `production` for a field with `requiredInProduction: true`, or `optional`) and its default. A module that does not load is named as not read. The modules under `src` are imported, so their top-level code runs, and what it prints goes to stderr under `--format json`. See [Environment variables](/essentials/data-loading#environment-variables).
 
 ## kay routes
 

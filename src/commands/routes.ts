@@ -15,7 +15,6 @@ import { projectPaths } from '../project'
 import { actionUrl } from '../runtime/action'
 import { CARD_ROUTE, FILES_ROUTE, IMAGE_ROUTE } from '../runtime/image'
 import { MCP_PATH, OPENAPI_PATH, projectApi, REFERENCE_PATH } from '../server/api-modules'
-import { importModule } from '../server/bundle'
 import { buildingWithoutEnv, PUBLIC_ENV_PATH } from '../server/env-state'
 import { ERROR_REPORTS } from '../server/errors'
 import { FAVICON_PATHS, faviconSource, localeManifests } from '../server/favicon'
@@ -29,6 +28,7 @@ import { apiRoutePath, endpointPath, ROUTE_METHODS, routeMounts, scanEndpoints, 
 import { ROBOTS, SITEMAP } from '../server/site-paths'
 import { CSP_REPORTS } from '../server/violations'
 import { formatOption, printDocument, printFailure, projectRoot, withStdoutOnStderr } from './command'
+import { importApi } from './import-module'
 import { USAGES } from './usages'
 
 // One line of the listing, and the chains printed under it.
@@ -160,22 +160,6 @@ async function apiRoutes(root: string, config: KayConfig): Promise<Listed[]> {
   }
 
   return listed
-}
-
-// An API module runs as it is imported: what it writes to stdout goes to stderr, off the listing, and its `process.exit()` fails it alone.
-export async function importApi(file: string): Promise<{ default?: unknown }> {
-  const exit: unknown = Reflect.get(process, 'exit')
-
-  process.exit = (code?: number) => {
-    throw new Error(`it calls process.exit(${code ?? ''})`)
-  }
-
-  try {
-    return await withStdoutOnStderr(async () => importModule<{ default?: unknown }>(file))
-  }
-  finally {
-    Reflect.set(process, 'exit', exit)
-  }
 }
 
 // The routes of the server plugins extensions give as an Elysia instance; one given as a function or a module is built only as the server starts.

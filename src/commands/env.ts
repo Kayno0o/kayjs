@@ -4,11 +4,12 @@ import type { Command } from './command'
 import { readFile } from 'node:fs/promises'
 import { join, relative, resolve } from 'node:path'
 import { loadConfig } from '../config'
+import { projectPaths } from '../project'
 import { describeEnv } from '../server/env'
 import { buildingWithoutEnv, listingEnv } from '../server/env-state'
 import { registerLoader } from '../server/loader'
 import { formatOption, printDocument, printFailure, projectRoot, withStdoutOnStderr } from './command'
-import { importApi } from './routes'
+import { importApi } from './import-module'
 import { USAGES } from './usages'
 
 // A variable with the place that declares it.
@@ -70,7 +71,9 @@ async function listEnv(root: string): Promise<{ variables: Listed[], unread: { f
   const declared = listingEnv()
   const shown = (file: string) => relative(root, file)
   const unread: { file: string, error: string }[] = []
-  const files = [...new Bun.Glob('src/**/*.{ts,kay}').scanSync({ cwd: root })].sort().filter(file => !TEST_FILE.test(file))
+  // The server entry listens as it is imported, so its own schema is left out.
+  const entry = relative(root, projectPaths(root, config).entry)
+  const files = [...new Bun.Glob('src/**/*.{ts,kay}').scanSync({ cwd: root })].sort().filter(file => !TEST_FILE.test(file) && file !== entry)
 
   await registerLoader(root, config.settings ?? {})
 
@@ -89,7 +92,7 @@ async function listEnv(root: string): Promise<{ variables: Listed[], unread: { f
   const variables: Listed[] = [
     ...declared.flatMap(({ schema, file }) => described(schema, file === undefined ? 'src' : shown(file))),
     ...config.publicEnv ? described(config.publicEnv, 'publicEnv in kay.config.ts') : [],
-    ...(config.extensions ?? []).flatMap(extension => extension.env === undefined ? [] : described(extension.env as EnvSchemaRecord, `the extension ${extension.name}`)),
+    ...(config.extensions ?? []).flatMap(extension => extension.env === undefined ? [] : described(extension.env, `the extension ${extension.name}`)),
     ...KAY_VARIABLES.map(variable => ({ ...variable, source: 'kay' })),
   ]
 
@@ -101,8 +104,8 @@ function described(schema: EnvSchemaRecord, source: string): Listed[] {
 }
 
 function formatListing(variables: Listed[]): string {
-  const rows = variables.map(variable => [variable.name, variable.source, variable.type, variable.required === false ? 'optional' : variable.required, variable.default === undefined ? '' : JSON.stringify(variable.default)])
-  const widths = [0, 1, 2, 3].map(column => Math.max(...rows.map(row => row[column]!.length)))
+  const rows = variables.map(variable => [variable.name, variable.source, variable.type, variable.required === false ? 'optional' : variable.required, variable.default === undefined ? '' : JSON.stringify(variable.default), variable.description === undefined ? '' : `# ${variable.description}`])
+  const widths = [0, 1, 2, 3, 4].map(column => Math.max(...rows.map(row => row[column]!.length)))
 
-  return rows.map(row => row.map((cell, column) => column === 4 ? cell : cell.padEnd(widths[column]!)).join('  ').trimEnd()).join('\n')
+  return rows.map(row => row.map((cell, column) => column === 5 ? cell : cell.padEnd(widths[column]!)).join('  ').trimEnd()).join('\n')
 }
