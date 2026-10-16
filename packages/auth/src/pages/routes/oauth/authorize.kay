@@ -1,0 +1,64 @@
+--- server
+import { t } from 'kay/i18n'
+import Message from '../../components/message.kay'
+import Panel from '../../components/panel.kay'
+import { schemas } from '../../forms'
+import Button from '@kaynooo/kayjs-ui/button.kay'
+
+// Visitors reach this page before signing in, so none of the app's guards run here, whatever they check: one asking for a session would keep an MCP client out.
+export const page = { guards: false }
+
+const FIELDS = ['client_id', 'redirect_uri', 'response_type', 'code_challenge', 'code_challenge_method', 'scope', 'state', 'resource', 'prompt'] as const
+
+// The answer is checked again as the request is, so a form edited by hand gets no more than the request could.
+export const decide = action(schemas.oauthConsent, async ({ decision, ...fields }, ctx) => {
+  const result = await ctx.locals.auth.oauthDecide({ ...fields, scope: fields.scope === '' ? undefined : fields.scope, state: fields.state === '' ? undefined : fields.state, resource: fields.resource === '' ? undefined : fields.resource }, decision === 'allow')
+
+  return result.ok ? ctx.redirect(result.redirect) : ctx.fail(400, { error: result.error })
+})
+
+const auth = ctx.locals.auth
+const refused = ctx.failed(decide)?.data?.error
+const request: Partial<Record<typeof FIELDS[number], string>> = {}
+
+for (const field of FIELDS) {
+  const value = ctx.url.searchParams.get(field)
+
+  if (value !== null)
+    request[field] = value
+}
+
+const outcome = refused ? undefined : await auth.oauthAuthorize(request)
+
+if (outcome?.kind === 'sign-in')
+  ctx.redirect(auth.signInUrl())
+
+if (outcome?.kind === 'redirect')
+  ctx.redirect(outcome.url)
+
+const problem = refused ?? (outcome?.kind === 'error' ? outcome.error : undefined)
+const words = { 'client': 'client', 'redirect_uri': 'redirectUri', 'signed-out': 'signedOut' } as const
+---
+head
+  title {t('auth.consent.title')}
+  meta(name="robots" content="noindex")
+Panel(title={t('auth.consent.title')})
+  if problem
+    Message(text={t(`auth.consent.${words[problem]}`)})
+  else if outcome?.kind === 'consent'
+    p {t('auth.consent.intro', { client: outcome.client.name })}
+    if outcome.client.host
+      p.text-kui-muted {t('auth.consent.from', { host: outcome.client.host })}
+    p {t('auth.consent.scopes')}
+    ul.list-disc.pl-5
+      if outcome.scopes === null
+        li {t('auth.consent.everything')}
+      else
+        for scope of outcome.scopes key={scope}
+          li
+            code {scope}
+    form.flex.flex-wrap.gap-3(action={decide})
+      for field of Object.entries(outcome.fields) key={field[0]}
+        input(type="hidden" name={field[0]} value={field[1]})
+      Button(type="submit" name="decision" value="allow" variant="accent" label={t('auth.consent.allow')})
+      Button(type="submit" name="decision" value="deny" label={t('auth.consent.deny')})

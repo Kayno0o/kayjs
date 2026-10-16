@@ -17,7 +17,7 @@ const WHITESPACE = /\s+/
 const IMPLIED_SCOPES = new Set(['offline_access'])
 
 // What the authorization endpoint reads off the request, as the client sent it.
-export type AuthorizeParams = Partial<Record<'client_id' | 'redirect_uri' | 'response_type' | 'code_challenge' | 'code_challenge_method' | 'scope' | 'state' | 'resource' | 'prompt', string>>
+export type AuthorizeParams = Partial<Record<'client_id' | 'redirect_uri' | 'response_type' | 'code_challenge' | 'code_challenge_method' | 'scope' | 'state' | 'resource' | 'prompt', string | undefined>>
 
 // What the consent form posts back to be checked again.
 export interface ConsentFields {

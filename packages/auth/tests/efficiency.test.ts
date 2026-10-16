@@ -17,6 +17,10 @@ afterEach(() => {
 function recorded(store: AuthStore = memoryStore()) {
   const calls: { name: string, args: unknown[] }[] = []
   const wrapped = Object.fromEntries(Object.entries(store).map(([group, value]) => {
+    // The OAuth server's members nest a level deeper than this wraps, and no test here counts them.
+    if (group === 'oauth')
+      return [group, value]
+
     if (typeof value === 'function') {
       return [group, (...args: unknown[]) => {
         calls.push({ name: group, args })

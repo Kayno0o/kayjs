@@ -58,6 +58,18 @@ export default defineMessages({
       resent: 'A new link is on its way.',
       unverified: 'Your address {email} is not verified yet.',
     },
+    consent: {
+      title: 'Allow access',
+      intro: '{client} wants to use your account.',
+      from: 'This app lives at {host}. Only continue if you started this sign-in.',
+      scopes: 'It will be allowed to',
+      everything: 'Do everything you can do',
+      allow: 'Allow',
+      deny: 'Deny',
+      client: 'This app is not known to this site, so nothing was shared with it.',
+      redirectUri: 'This app asked to come back to an address it did not register, so nothing was shared with it.',
+      signedOut: 'You are signed out: start again from the app.',
+    },
     magic: {
       title: 'Sign in',
       intro: 'Press the button to finish signing in.',
@@ -76,7 +88,7 @@ export default defineMessages({
     },
     account: {
       title: 'Your account',
-      nav: { label: 'Account', profile: 'Profile', security: 'Security', sessions: 'Sessions', connections: 'Connections', tokens: 'Tokens', data: 'Your data' },
+      nav: { label: 'Account', profile: 'Profile', security: 'Security', sessions: 'Sessions', connections: 'Connections', tokens: 'Tokens', clients: 'Apps', data: 'Your data' },
       signOut: 'Sign out',
       profile: {
         title: 'Profile',
@@ -150,6 +162,16 @@ export default defineMessages({
         connect: 'Connect',
         disconnect: 'Disconnect',
         none: 'No provider is set up.',
+      },
+      clients: {
+        title: 'Connected apps',
+        intro: 'These apps signed in to your account. Revoking one ends its access at once.',
+        none: 'No app is connected.',
+        revoke: 'Revoke',
+        allScopes: 'Everything',
+        lastUsed: 'Last used {date}',
+        neverUsed: 'Never used',
+        approved: 'Approved {date}',
       },
       tokens: {
         title: 'Access tokens',

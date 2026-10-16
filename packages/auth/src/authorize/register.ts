@@ -23,7 +23,7 @@ export async function registerClient(core: Core, address: string, document: unkn
   const uris = given.redirect_uris
 
   if (!Array.isArray(uris) || uris.length === 0 || uris.length > REDIRECT_URIS_MAX || !uris.every(validRedirectUri))
-    return invalid('invalid_redirect_uri', 'redirect_uris must be 1 to 10 https URLs, loopback http URLs or app scheme URLs')
+    return invalid('invalid_redirect_uri', 'redirect_uris must be 1 to 10 https URLs or loopback http URLs')
 
   if (given.token_endpoint_auth_method !== undefined && given.token_endpoint_auth_method !== 'none')
     return invalid('invalid_client_metadata', 'Only public clients (token_endpoint_auth_method none) are supported')

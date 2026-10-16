@@ -77,6 +77,8 @@ export interface AuthFeatures {
   scopes: string[]
   // Where kayjs-auth's own routes live: `${prefix}/github` starts a GitHub sign-in.
   prefix: string
+  // Whether MCP clients sign in to this app through its own OAuth server, which the account page then lists the approved ones of.
+  oauthServer: boolean
   // Where a sign-in that failed goes, and where a guard sends an anonymous visitor once the prebuilt pages are on.
   signInPage: string
   // The prebuilt pages' prefix and home; null without them.
@@ -106,6 +108,7 @@ export function featuresOf(core: Core): AuthFeatures {
     captcha: captchaFeature(core.captcha),
     scopes: [...core.scopes],
     prefix: core.prefix,
+    oauthServer: core.oauthServer !== undefined,
     signInPage: core.signInPage,
     pages: core.pages ? { prefix: core.pages.prefix, home: core.pages.home } : null,
   }

@@ -58,6 +58,18 @@ export default defineMessages({
       resent: 'Un nouveau lien est en route.',
       unverified: 'Votre adresse {email} n’est pas encore vérifiée.',
     },
+    consent: {
+      title: 'Autoriser l’accès',
+      intro: '{client} souhaite utiliser votre compte.',
+      from: 'Cette application se trouve sur {host}. Ne continuez que si vous avez lancé cette connexion.',
+      scopes: 'Elle sera autorisée à',
+      everything: 'Faire tout ce que vous pouvez faire',
+      allow: 'Autoriser',
+      deny: 'Refuser',
+      client: 'Cette application est inconnue de ce site : rien ne lui a été transmis.',
+      redirectUri: 'Cette application a demandé à revenir à une adresse qu’elle n’a pas déclarée : rien ne lui a été transmis.',
+      signedOut: 'Vous êtes déconnecté : recommencez depuis l’application.',
+    },
     magic: {
       title: 'Connexion',
       intro: 'Appuyez sur le bouton pour terminer la connexion.',
@@ -76,7 +88,7 @@ export default defineMessages({
     },
     account: {
       title: 'Votre compte',
-      nav: { label: 'Compte', profile: 'Profil', security: 'Sécurité', sessions: 'Sessions', connections: 'Comptes liés', tokens: 'Jetons', data: 'Vos données' },
+      nav: { label: 'Compte', profile: 'Profil', security: 'Sécurité', sessions: 'Sessions', connections: 'Comptes liés', tokens: 'Jetons', clients: 'Applications', data: 'Vos données' },
       signOut: 'Se déconnecter',
       profile: {
         title: 'Profil',
@@ -150,6 +162,16 @@ export default defineMessages({
         connect: 'Lier',
         disconnect: 'Délier',
         none: 'Aucun fournisseur n’est configuré.',
+      },
+      clients: {
+        title: 'Applications connectées',
+        intro: 'Ces applications se sont connectées à votre compte. En révoquer une met fin à son accès immédiatement.',
+        none: 'Aucune application connectée.',
+        revoke: 'Révoquer',
+        allScopes: 'Tout',
+        lastUsed: 'Utilisée le {date}',
+        neverUsed: 'Jamais utilisée',
+        approved: 'Approuvée le {date}',
       },
       tokens: {
         title: 'Jetons d’accès',

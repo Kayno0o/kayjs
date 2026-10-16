@@ -48,6 +48,7 @@ describe('features', () => {
       captcha: null,
       scopes: ['posts:read'],
       prefix: '/auth',
+      oauthServer: false,
       signInPage: '/',
       pages: null,
     })

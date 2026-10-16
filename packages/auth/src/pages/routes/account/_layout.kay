@@ -13,6 +13,7 @@ const links = [
   { href: `${base}/sessions`, label: t('auth.account.nav.sessions') },
   ...features.providers.length > 0 ? [{ href: `${base}/connections`, label: t('auth.account.nav.connections') }] : [],
   { href: `${base}/tokens`, label: t('auth.account.nav.tokens') },
+  ...features.oauthServer ? [{ href: `${base}/clients`, label: t('auth.account.nav.clients') }] : [],
   { href: `${base}/data`, label: t('auth.account.nav.data') },
 ]
 ---
