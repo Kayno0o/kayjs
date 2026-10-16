@@ -806,11 +806,11 @@ describe('localized seo defaults', () => {
     seo: { name: { fr: 'Le site', en: 'The site' }, titleTemplate: { fr: '%s | Le site', en: '%s | The site' }, description: { fr: 'Ce que fait le site', en: 'What the site does' }, image: { fr: '/fr.png', en: '/en.png' }, imageAlt: { fr: 'Le logo', en: 'The logo' }, locale: { fr: 'fr_FR' } },
   }))
 
-  // One app for every request, as the head of each locale is built once and kept.
-  const shared = seoApp()
+  // One app for every request, as the head of each locale is built once and kept; built by the first test, as a build started while the file loads runs beside the other tests' builds into the same client folder.
+  const shared = once(seoApp)
 
   async function head(path: string): Promise<string> {
-    return (await (await shared).handle(new Request(`http://localhost${path}`))).text()
+    return (await (await shared()).handle(new Request(`http://localhost${path}`))).text()
   }
 
   it('gives each locale its own name, description and title template, a locale the record lacks reading the default\'s', async () => {
@@ -847,7 +847,7 @@ describe('localized seo defaults', () => {
   })
 
   it('links the manifest of the page\'s locale, the default locale\'s at the usual path and each other locale\'s beside it', async () => {
-    const server = await shared
+    const server = await shared()
     const manifest = async (path: string) => (await server.handle(new Request(`http://localhost${path}`))).json() as Promise<{ name: string, description: string }>
 
     expect(await head('/')).toContain('<link rel="manifest" href="/manifest.webmanifest">')
