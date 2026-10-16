@@ -252,7 +252,7 @@ function relay(options: MailerOptions): Relay {
   }
 }
 
-// Lists the mailer in `kay.config.ts`'s `extensions`, so `pages()` uses it and the server needs no `.use(mail)`, and brings the `mail.auth` messages `authMailer` writes in.
+// Lists the mailer in `kay.config.ts`'s `extensions`, so `pages()` uses it and the server needs no `.use(mail)`, and brings the `mail.auth` messages `authMailer` writes in and the `mail.contact` ones of `contactForm`.
 // It is loaded only as `pages()` builds the app: a `.kay` mail the module imports while the config loads would come before kay compiles any.
 // Given the path of the module that exports the mailer as `mail`, kay imports it then and bakes it into an executable; given a function, that function loads it.
 export function mailExtension(from: string | (() => Promise<Mailer>)): KayExtension<Mailer> {

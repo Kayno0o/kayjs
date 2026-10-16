@@ -117,8 +117,8 @@ The page shows it with [ContactForm](/ui/contact-form) from kayjs-ui, or with it
 
 - The action checks a one-line `name`, an `email` and a `message` of at most 5000 characters, then the `fields` you add, whose schemas are yours. It mails them to `to`, or `MAIL_TO` when left out, with the visitor in `replyTo` and the message quoted. `labels` renames a field in the mail, `subject` and `view` replace the subject and the mail's component, which gets `ContactMailProps`.
 - A message with more than `maxLinks` links (3 by default) is refused. `rateLimit` allows 30 posts and 5 that went through every 10 minutes, `honeypot` is the `website` field, answered as if it worked, and `minTime` is 3 seconds. `protection` replaces the limits.
-- A mailer that is `optional` and not set up answers 503, a mail that fails to send answers 502, each with a worded refusal the form shows; `reach` adds how else to reach the site, `hello@example.com` or a phone number. The refusals read the `mail.contact` messages in the page's language, in English and French, which your own `src/messages` override key by key.
-- The schema's own messages are in English; `errors: { name, email, message }` words them.
+- A mailer that is `optional` and not set up answers 503, a mail that fails to send answers 502, each with a worded refusal the form shows; `reach` adds how else to reach the site, `hello@example.com` or a phone number. The refusals read the `mail.contact` messages in the page's language, in English and French, which your own `src/messages` override key by key. They come with `mailExtension`, so a mailer used with `.use(mail)` alone has none. The mail itself is written in the page's language, not the recipient's.
+- The schema's own messages are in English; `errors: { name, email, message }` words them, and ContactForm's labels are props, so a site in French passes both.
 
 ## Previewing
 

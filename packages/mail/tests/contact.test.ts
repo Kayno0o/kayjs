@@ -1,6 +1,8 @@
 import type { Action } from 'kay'
 import { beforeEach, describe, expect, it } from 'bun:test'
+import { s } from 'kay'
 import { testSite } from 'kay/test'
+import { contactForm } from '../src/contact'
 import { outbox } from '../src/outbox'
 
 interface Answers { name: string, email: string, phone?: string, topic: 'quote' | 'other', message: string }
@@ -65,5 +67,37 @@ describe('contactForm', () => {
     expect(refused.errors.name).toBe('Please write your name, on one line.')
     expect(refused.errors.topic).toBeDefined()
     expect(outbox.last()).toBeUndefined()
+  })
+
+  it('trims the name and the message before mailing them', async () => {
+    const { call } = await site()
+
+    await call(contact, { ...fields, name: '  Ada  ', message: '  Hello  ' })
+
+    expect(outbox.last()!.replyTo).toEqual({ name: 'Ada', address: 'ada@example.com' })
+  })
+
+  it('refuses an extra field named like one the form has', () => {
+    const send = async () => Promise.reject(new Error('unused'))
+
+    expect(() => contactForm({ send } as never, { fields: { email: s.String() } })).toThrow('already has the field email')
+  })
+
+  it('renders the honeypot, and limits the posts that went through, naming how else to reach the site', async () => {
+    const { call, refusal, visit } = await site()
+
+    expect((await visit('/contact')).html).toContain('name="website"')
+
+    for (let sent = 0; sent < 5; sent++) {
+      try {
+        await call(contact, fields)
+      }
+      catch {}
+    }
+
+    const refused = await refusal(contact, fields)
+
+    expect(refused.status).toBe(429)
+    expect(refused.errors['']).toBe('Too many messages sent from here in a short time: try again in a few minutes, or write to hello@fixture.test.')
   })
 })

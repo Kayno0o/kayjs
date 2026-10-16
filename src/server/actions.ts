@@ -146,7 +146,8 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], m
           const call = isCall(context.request)
           // A call may send a form's fields, read as a plain form post's are.
           const asForm = !call || isFormCall(context.request)
-          const refusal = await protectionRefusal(value, context.request, context.body, asForm, context.server, !call)
+          // In the request's locale, so a refusal worded by a function can read `t()`.
+          const refusal = await inLocale(context.request, options, async () => protectionRefusal(value, context.request, context.body, asForm, context.server, !call))
 
           if (refusal === PRETEND)
             throw new Refusal(pretended(value, context.request))

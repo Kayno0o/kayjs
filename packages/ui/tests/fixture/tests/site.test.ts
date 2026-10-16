@@ -451,7 +451,6 @@ test('QrCode with inline draws the SVG in the page, so CSS colours resolve, and 
   expect(await element('/paging', 'qr-decor-inline')).not.toContain('role=')
 })
 
-// A script a page loads.
 describe('ContactForm', () => {
   test('posts to the action with its fields, the honeypot and the extra field between the email and the message', async () => {
     const { html } = await site.visit('/contact')
@@ -475,9 +474,15 @@ describe('ContactForm', () => {
     const sent = await site.submit(contact, { name: 'Ada', email: 'ada@example.com', topic: 'quote', message: 'Hello there' }, { from: '/contact' })
 
     expect(sent.html).toContain('Thank you, your message has been sent.')
+
+    const failed = await site.submit(contact, { name: 'Ada', email: 'ada@example.com', topic: 'quote', message: 'Please fail' }, { from: '/contact' })
+
+    expect(failed.html).toContain('Could not send it')
+    expect(failed.html).not.toContain('Thank you')
   })
 })
 
+// A script a page loads.
 const SCRIPT_PATH = /src="(\/[^"]+\.js)"/g
 // A script a module imports, statically or through `import()`.
 const STATIC_IMPORT = /(?:from|import)\s*["'](\.\/[^"']+\.js)["']/g

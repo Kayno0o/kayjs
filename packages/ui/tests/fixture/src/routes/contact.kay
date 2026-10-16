@@ -6,7 +6,7 @@ export const contact = action(s.Object({
   email: s.String({ format: 'email', maxLength: 254, error: 'Not an email address' }),
   topic: s.UnionEnum(['quote', 'other']),
   message: s.String({ minLength: 5, maxLength: 2000, error: 'A few words at least' }),
-}), async () => undefined, { honeypot: 'website', minTime: '3s' })
+}), async ({ message }, ctx) => message === 'Please fail' ? ctx.fail(502, 'Could not send it') : undefined, { honeypot: 'website', minTime: '3s' })
 ---
 ---
 import ContactForm from '@kaynooo/kayjs-ui/contact-form.kay'

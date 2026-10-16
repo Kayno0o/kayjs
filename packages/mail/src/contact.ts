@@ -22,6 +22,7 @@ export interface ContactMailProps {
 const ONE_LINE = '^[^\\r\\n]*\\S[^\\r\\n]*$'
 const LINK = /https?:\/\//gi
 const WORDS = /[-_]+/g
+const RESERVED = ['name', 'email', 'message', 'website']
 const DEFAULT_ERRORS = { name: 'Please write your name, on one line.', email: 'Please write a valid email address.', message: 'Please write your message.' }
 
 export interface ContactOptions<Extra extends Record<string, TSchema> = Record<never, TSchema>> {
@@ -60,6 +61,11 @@ export function contactForm<const Extra extends Record<string, TSchema> = Record
 ] {
   const { fields = {} as Extra, labels = {}, reach, maxLinks = 3, maxLength = 5000 } = options
   const errors = { ...DEFAULT_ERRORS, ...options.errors }
+  const reserved = RESERVED.filter(key => key in fields)
+
+  if (reserved.length > 0)
+    throw new Error(`kayjs-mail: contactForm already has the field ${reserved.join(', ')}, which \`fields\` cannot replace`)
+
   const words = { reach: reach ?? '' }
 
   const schema = s.Object({
@@ -70,7 +76,9 @@ export function contactForm<const Extra extends Record<string, TSchema> = Record
   }) as unknown as ContactSchema<Extra>
 
   const handler = async (input: ContactInput<Extra>, ctx: ActionContext): Promise<Failure<string> | undefined> => {
-    const { name, email, message } = input
+    const name = input.name.trim()
+    const message = input.message.trim()
+    const { email } = input
 
     if ((message.match(LINK)?.length ?? 0) > maxLinks)
       return ctx.fail(422, t('mail.contact.tooManyLinks', { max: maxLinks }))
@@ -98,7 +106,7 @@ export function contactForm<const Extra extends Record<string, TSchema> = Record
       })
     }
     catch (error) {
-      // The mailer has logged a failed send itself.
+      // The mailer logs a failed send itself.
       if (error instanceof MailNotConfigured) {
         log.error(error.message)
 
