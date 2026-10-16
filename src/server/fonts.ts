@@ -1,9 +1,10 @@
 import type { FontConfig, FontsourceConfig } from '../config'
 import type { HeadTag } from '../runtime/head'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, statSync } from 'node:fs'
 import { dirname, extname, isAbsolute, join, resolve } from 'node:path'
 import { writeAsset } from '../build/assets'
 import { KayError } from '../compiler/errors'
+import { fallbackDescriptors, FALLBACKS, fontMetrics } from './font-metrics'
 
 // What every page carries for the fonts: their `@font-face` rules and the files to preload.
 export interface FontAssets {
@@ -55,11 +56,100 @@ export async function prepareFonts(root: string, fonts: (FontConfig | Fontsource
       preload.push({ href: url, type: `font/${PRELOAD_EXTENSIONS.get(format) ?? format}` })
   }
 
-  const assets = { css: rules.join(''), preload, faces }
+  const assets = { css: rules.join('') + [...fontFallbacks(root, fonts).values()].map(({ rule }) => rule).join(''), preload, faces }
 
   await Bun.write(join(dir, FONTS_FILE), JSON.stringify(assets))
 
   return assets
+}
+
+// The system font drawn in a family's place until its files arrive, fitted to take the room the family will.
+export interface FontFallback {
+  // The `@font-face` rule declaring it.
+  rule: string
+  // The family name the rule declares, which a font stack lists right after the family.
+  name: string
+}
+
+// A file's metrics, read again only once the file changes.
+const METRICS = new Map<string, { stamp: number, metrics: ReturnType<typeof fontMetrics> }>()
+// Under this share of English letters the file is a subset without them, and no fallback fits it.
+const MIN_COVERAGE = 0.9
+const FIRST_NUMBER = /\d+/
+const FONT_STACK = /((?:^|[;{\s])(?:font-family|--[\w-]*font[\w-]*)\s*:\s*)([^\s;}!][^;}!]*)/g
+const QUOTED = /^(["'])(.*)\1$/
+
+function metricsOf(file: string) {
+  const stamp = statSync(file).mtimeMs
+  const cached = METRICS.get(file)
+
+  if (cached?.stamp === stamp)
+    return cached.metrics
+
+  const metrics = fontMetrics(readFileSync(file))
+
+  METRICS.set(file, { stamp, metrics })
+
+  return metrics
+}
+
+// A fallback per family, fitted to its face nearest a regular weight that holds the Latin letters; a family none fits, such as a symbol or a non-Latin font, has none.
+export function fontFallbacks(root: string, fonts: (FontConfig | FontsourceConfig)[]): Map<string, FontFallback> {
+  const families = new Map<string, FontConfig[]>()
+
+  for (const font of fonts.flatMap(font => 'fontsource' in font ? fontsourceFaces(root, font) : [font]))
+    families.set(font.family, [...families.get(font.family) ?? [], font])
+
+  const fallbacks = new Map<string, FontFallback>()
+  const distance = (font: FontConfig) => Math.abs(Number(FIRST_NUMBER.exec(String(font.weight ?? 400))?.[0] ?? 400) - 400) + (font.style === 'italic' ? 1000 : 0)
+
+  for (const [family, faces] of families) {
+    for (const face of faces.toSorted((a, b) => distance(a) - distance(b))) {
+      const metrics = metricsOf(fontFile(root, face.src))
+
+      if (metrics === undefined || metrics.coverage < MIN_COVERAGE)
+        continue
+
+      const name = `${family} Fallback`
+      const sources = FALLBACKS[metrics.kind].names.map(local => `local("${local}")`).join(',')
+
+      fallbacks.set(family, { name, rule: `@font-face{font-family:"${name.replace(QUOTE, '\\$&')}";src:${sources};${fallbackDescriptors(metrics)}}` })
+
+      break
+    }
+  }
+
+  return fallbacks
+}
+
+function unquoted(item: string): string {
+  const trimmed = item.trim()
+
+  return QUOTED.exec(trimmed)?.[2] ?? trimmed
+}
+
+// Lists each family's fallback right after the family in the font stacks of a stylesheet, `font-family` and the custom properties named for a font, so the text is drawn in it until the family's files arrive.
+export function withFontFallbacks(css: string, fallbacks: Map<string, FontFallback>): string {
+  if (fallbacks.size === 0)
+    return css
+
+  return css.replace(FONT_STACK, (match, property: string, stack: string) => {
+    const items = stack.split(',')
+    const listed = new Set(items.map(item => unquoted(item)))
+    let changed = false
+    const stacked = items.flatMap((item) => {
+      const fallback = fallbacks.get(unquoted(item))
+
+      if (fallback === undefined || listed.has(fallback.name))
+        return [item]
+
+      changed = true
+
+      return [item, `"${fallback.name}"`]
+    })
+
+    return changed ? `${property}${stacked.join(',')}` : match
+  })
 }
 
 // The file of every face, for the notices file to credit the packages they come from.

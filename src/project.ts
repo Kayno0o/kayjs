@@ -92,7 +92,7 @@ export function cacheDir(root: string, ...names: string[]): string {
   return join(projectPaths(root).cache, ...names)
 }
 
-type ClientConfig = Pick<KayConfig, 'minify' | 'plugins' | 'routes' | 'extensions' | 'api' | 'navigation' | 'i18n' | 'base' | 'settings' | 'publicEnv' | 'lints'>
+type ClientConfig = Pick<KayConfig, 'minify' | 'plugins' | 'routes' | 'extensions' | 'api' | 'navigation' | 'i18n' | 'base' | 'settings' | 'publicEnv' | 'lints' | 'fonts'>
 
 // How a server runs. In development it shows errors with their stack and maps and swaps islands; prebuilt, it serves the browser build `kay build` wrote rather than bundling one; under `kay dev`, each element carries its source for the inspector.
 export interface Mode {
@@ -147,6 +147,7 @@ export function clientOptionsOf(config: ClientConfig, mode: Pick<Mode, 'dev' | '
     settings: config.settings,
     publicEnv: config.publicEnv !== undefined,
     lints: config.lints,
+    fonts: config.fonts,
     sourcemap: mode.dev,
     hot: mode.dev,
     inspect: mode.underKayDev,

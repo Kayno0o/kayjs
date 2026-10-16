@@ -1,7 +1,8 @@
 import type { BunPlugin } from 'bun'
 import type { LintLevels } from '../compiler/lints'
-import type { KayExtension } from '../config'
+import type { KayConfig, KayExtension } from '../config'
 import type { ClientBuild, ClientManifest } from '../server/client'
+import type { FontFallback } from '../server/fonts'
 import type { ImportGraph, KayLibrary } from './libraries'
 import type { ChunkInputs, IslandWhy } from './report'
 import type { FileDiagnostic } from './transform'
@@ -16,6 +17,7 @@ import { apiStubs, apiTrees } from '../server/api-modules'
 import { rebaseCss } from '../server/base'
 import { fromManifest, MANIFEST, PRERENDERED_DIR, writeManifest } from '../server/client'
 import { PUBLIC_ENV_PATH } from '../server/env-state'
+import { fontFallbacks, withFontFallbacks } from '../server/fonts'
 import { extensionEditor, routeMounts } from '../server/routes'
 import { ASSET_PREFIX, clientDir, outputDir } from './assets'
 import { CSS_FILE, findKayFiles, readSource, writeIfChanged } from './files'
@@ -58,6 +60,8 @@ export interface ClientOptions {
   inspect?: boolean | undefined
   // The config declares `publicEnv`: the entry imports its values from the server before any island hydrates.
   publicEnv?: boolean | undefined
+  // The self-hosted fonts: each family is followed by a metric-matched fallback in the stylesheets' font stacks.
+  fonts?: KayConfig['fonts'] | undefined
   // The level of each lint the dev tool shows in development.
   lints?: LintLevels | undefined
   // `kay build --static`: no server takes the errors the browser meets, so none are sent.
@@ -426,10 +430,15 @@ export async function bundleStyles(root: string, { pages, libraries, classes }: 
   // The code the entries shrank to is only a vehicle for their stylesheets.
   await Promise.all(build.outputs.filter(output => output.kind === 'entry-point' && JS_OUTPUT.test(output.path)).map(async output => rm(output.path)))
 
-  if (options.base !== undefined && options.base !== '') {
-    const base = options.base
+  const fallbacks = options.fonts === undefined ? new Map<string, FontFallback>() : fontFallbacks(root, options.fonts)
+  const base = options.base ?? ''
 
-    await Promise.all(build.outputs.filter(output => CSS_FILE.test(output.path)).map(async output => Bun.write(output.path, rebaseCss(await Bun.file(output.path).text(), base))))
+  if (base !== '' || fallbacks.size > 0) {
+    await Promise.all(build.outputs.filter(output => CSS_FILE.test(output.path)).map(async (output) => {
+      const css = withFontFallbacks(await Bun.file(output.path).text(), fallbacks)
+
+      await Bun.write(output.path, base === '' ? css : rebaseCss(css, base))
+    }))
   }
 
   return { styles, inputs: Object.keys(build.metafile!.inputs).map(input => resolve(input)), followed: [...shrunk], unused }

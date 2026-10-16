@@ -155,6 +155,8 @@ export default defineConfig({
 
 Then use the family as usual: `font-family: Inter, system-ui, sans-serif`, or with Tailwind `@theme { --font-sans: Inter, system-ui, sans-serif; }`.
 
+While a font loads, kay shows the text in a stand-in sized like it. It reads the font's metrics, declares a fallback such as `"Inter Fallback"` (Arial, Times New Roman or Courier New, resized) and adds it right after the family in your stylesheets' `font-family` and `--font-*` values, so the page barely moves when the font arrives. A stack in an inline `style` attribute is left as you wrote it.
+
 <Callout type="note">
 
 Faces load once the page uses them. `preload: true` fetches one with the page, on a Fontsource entry too, but can hold back the first paint on a slow phone.
