@@ -118,15 +118,20 @@ describe('favicon', () => {
     await expect(faviconFiles({ image: SOURCE, maskable: wide })).rejects.toThrow(`kay: the maskable icon ${wide} is 512x256; it has to be square`)
   })
 
-  it('puts the manifest\'s pages under the site\'s mount point, and refuses one that is no path of the site', () => {
+  it('puts the manifest\'s pages under the site\'s mount point', () => {
     const manifest = JSON.parse(manifestJson('Kay site', undefined, { startUrl: '/notes', scope: '/', shortcuts: [{ name: 'New', url: '/notes/new' }] }, '/docs')) as Record<string, unknown>
 
     expect(manifest).toMatchObject({ start_url: '/docs/notes', scope: '/docs/', shortcuts: [{ name: 'New', url: '/docs/notes/new' }] })
-    expect(() => manifestJson('Kay site', undefined, { startUrl: 'notes' })).toThrow('kay: the manifest\'s startUrl is a path of the site')
-    expect(() => manifestJson('Kay site', undefined, { shortcuts: [{ name: 'Out', url: '//example.com' }] })).toThrow('kay: the manifest\'s shortcuts[0].url is a path of the site')
-    expect(() => manifestJson('Kay site', undefined, { startUrl: '/\\evil.example' })).toThrow('startUrl is a path of the site')
-    expect(() => manifestJson('Kay site', undefined, { scope: '/app/', startUrl: '/' })).toThrow('kay: the manifest\'s startUrl, /, lies outside its scope /app/')
-    expect(() => manifestJson('Kay site', undefined, { scope: '/app/', shortcuts: [{ name: 'Out', url: '/admin' }] })).toThrow('shortcuts[0].url, /admin, lies outside its scope /app/')
+  })
+
+  it.each([
+    ['a start URL that is no path', { startUrl: 'notes' }, 'kay: the manifest\'s startUrl is a path of the site'],
+    ['a protocol-relative shortcut', { shortcuts: [{ name: 'Out', url: '//example.com' }] }, 'kay: the manifest\'s shortcuts[0].url is a path of the site'],
+    ['a backslash start URL', { startUrl: '/\\evil.example' }, 'startUrl is a path of the site'],
+    ['a start URL outside the scope', { scope: '/app/', startUrl: '/' }, 'kay: the manifest\'s startUrl, /, lies outside its scope /app/'],
+    ['a shortcut outside the scope', { scope: '/app/', shortcuts: [{ name: 'Out', url: '/admin' }] }, 'shortcuts[0].url, /admin, lies outside its scope /app/'],
+  ])('refuses a manifest with %s', (_name, manifest, message) => {
+    expect(() => manifestJson('Kay site', undefined, manifest)).toThrow(message)
   })
 
   it('stops the server as it boots on a manifest path that is no path of the site', async () => {

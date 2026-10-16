@@ -218,10 +218,8 @@ describe('sessions', () => {
     expect(forged.headers.getSetCookie()[0]).toMatch(/; Domain=example\.com;.*Max-Age=0/i)
   })
 
-  it('takes a domain as a host name in any case or with a leading dot, and refuses anything else as it is built', async () => {
+  it('takes a domain as a host name in any case or with a leading dot', async () => {
     expect((await browser(counter({ domain: ' .Example.COM ' }))('/count')).set).toMatch(/; Domain=example\.com;/i)
-    expect(() => counter({ domain: 'https://example.com' })).toThrow('kay: the session domain is "https://example.com", which is no host name such as example.com')
-    expect(() => counter({ domain: 'example.com; path=/' })).toThrow('no host name')
   })
 
   it('forgets a session unused for maxAge, and extends one used past half of it', async () => {
@@ -363,7 +361,7 @@ describe('sessions', () => {
     expect(await peek(legacy(now - 60))).toBe('none')
   })
 
-  it('caps a browser session\'s lifetime in the store too, and refuses an absoluteMaxAge it cannot read', async () => {
+  it('caps a browser session\'s lifetime in the store too', async () => {
     const lifetimes: number[] = []
     const memory = memoryStore()
     const visit = browser(counter({ absoluteMaxAge: 30, browserMaxAge: 50, store: { ...memory, async set(id, data, maxAge) {
@@ -374,7 +372,6 @@ describe('sessions', () => {
     await visit('/count')
     await visit('/remember/browser')
     expect(lifetimes).toEqual([30, 30])
-    expect(() => counter({ absoluteMaxAge: 'forever' as never })).toThrow('the session absoluteMaxAge is \'forever\'; it takes a positive duration')
   })
 
   it('leaves a cookie name the app prefixed itself as it is over https', async () => {
@@ -432,9 +429,19 @@ describe('sessions', () => {
     expect(await (await app.handle(new Request('http://localhost/'))).text()).toBe('kay: a session lifetime is \'forever\'; it takes a positive duration, seconds or a string such as \'5m\', \'12h\' or \'30d\'')
   })
 
-  it('takes a maxAge with its unit, refusing one it cannot read', async () => {
+  it('takes a maxAge with its unit', async () => {
     expect((await browser(counter({ maxAge: '2m' }))('/count')).set).toMatch(/Max-Age=120;/)
-    expect(() => counter({ maxAge: '2 minutes' as never })).toThrow('the session maxAge is \'2 minutes\'; it takes a positive duration')
+  })
+
+  it.each([
+    ['a domain that is a URL', () => counter({ domain: 'https://example.com' }), 'kay: the session domain is "https://example.com", which is no host name such as example.com'],
+    ['a domain carrying an attribute', () => counter({ domain: 'example.com; path=/' }), 'no host name'],
+    ['an absoluteMaxAge it cannot read', () => counter({ absoluteMaxAge: 'forever' as never }), 'the session absoluteMaxAge is \'forever\'; it takes a positive duration'],
+    ['a maxAge it cannot read', () => counter({ maxAge: '2 minutes' as never }), 'the session maxAge is \'2 minutes\'; it takes a positive duration'],
+    ['a short secret', () => session({ secret: 'short' }), 'at least 32 characters'],
+    ['a published secret', () => session({ secret: 'at-least-32-characters-kept-out-of-the-repository' }), 'which anyone can read'],
+  ])('refuses %s as it is built', (_name, build, message) => {
+    expect(build).toThrow(message)
   })
 
   it('moves the data to a new id on regenerate, the old id worth nothing', async () => {
@@ -568,7 +575,7 @@ describe('sessions', () => {
     }
   })
 
-  it('takes a store of the app\'s own, and refuses a short or published secret or a cookie too big to keep', async () => {
+  it('takes a store of the app\'s own, and refuses a cookie too big to keep', async () => {
     const saved = new Map<string, unknown>()
     const store: SessionStore = {
       get: async id => saved.get(id) as Record<string, unknown> | undefined,
@@ -579,8 +586,6 @@ describe('sessions', () => {
 
     await visit('/count')
     expect([...saved.values()]).toEqual([{ count: 1 }])
-    expect(() => session({ secret: 'short' })).toThrow('at least 32 characters')
-    expect(() => session({ secret: 'at-least-32-characters-kept-out-of-the-repository' })).toThrow('which anyone can read')
 
     const big = new Elysia().use(session<{ text: string }>({ secret: SECRET })).get('/', async ({ session }) => {
       await session.set('text', 'x'.repeat(4000))

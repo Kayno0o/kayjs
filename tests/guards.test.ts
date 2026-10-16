@@ -300,21 +300,19 @@ describe('the OpenAPI document on a site requiring guards', () => {
 })
 
 describe('falseKeys', () => {
-  it('reads the keys of the page object set to false, quoted or not, and none nested in a value or a comment', () => {
-    expect(falseKeys('export const page = {\n  \'layouts\': false, guards: false,\n  sitemap: { guards: false },\n  // noindex: false\n}\n')).toEqual(new Set(['layouts', 'guards']))
-    expect(falseKeys('export const page = { guards: falsey }\n')).toEqual(new Set())
-    expect(falseKeys('const other = { guards: false }\n')).toEqual(new Set())
-    expect(falseKeys('export default api({ cors: { origins: [] }, guards: false })\n', /\bapi\s*\(\s*\{/)).toEqual(new Set(['guards']))
-  })
+  const API_OBJECT = /\bapi\s*\(\s*\{/
 
-  it('reads only a literal false, not an expression starting with it, past any comment between', () => {
-    expect(falseKeys('export const page = { guards: false || open, layouts: false ? 1 : 2, noindex: false // why\n, sitemap: false }\n')).toEqual(new Set(['noindex', 'sitemap']))
-    expect(falseKeys('export const page = { guards: false /* x */ || open, layouts: false // note\n && open, sitemap: False, noindex: false /* last */ }\n')).toEqual(new Set(['noindex']))
-  })
-
-  it('skips a page object written in a comment, a string or a template literal', () => {
-    expect(falseKeys('/*\nexport const page = { guards: false }\n*/\nexport const page = { layouts: false }\n')).toEqual(new Set(['layouts']))
-    expect(falseKeys('const doc = `\nexport const page = { guards: false }\n${`\n`}`\n')).toEqual(new Set())
-    expect(falseKeys('const doc = `${"`"}\nexport const page = { guards: false }\n`\nexport const page = { sitemap: false }\n')).toEqual(new Set(['sitemap']))
+  it.each([
+    ['the keys of the page object set to false, quoted or not, none nested in a value or a comment', 'export const page = {\n  \'layouts\': false, guards: false,\n  sitemap: { guards: false },\n  // noindex: false\n}\n', undefined, ['layouts', 'guards']],
+    ['no key set to an expression starting like false', 'export const page = { guards: falsey }\n', undefined, []],
+    ['no key of an object that is not the page', 'const other = { guards: false }\n', undefined, []],
+    ['the keys of an api object', 'export default api({ cors: { origins: [] }, guards: false })\n', API_OBJECT, ['guards']],
+    ['only a literal false, not an expression starting with it', 'export const page = { guards: false || open, layouts: false ? 1 : 2, noindex: false // why\n, sitemap: false }\n', undefined, ['noindex', 'sitemap']],
+    ['only a literal false past any comment between', 'export const page = { guards: false /* x */ || open, layouts: false // note\n && open, sitemap: False, noindex: false /* last */ }\n', undefined, ['noindex']],
+    ['a page object past one written in a comment', '/*\nexport const page = { guards: false }\n*/\nexport const page = { layouts: false }\n', undefined, ['layouts']],
+    ['no page object written in a template literal', 'const doc = `\nexport const page = { guards: false }\n${`\n`}`\n', undefined, []],
+    ['a page object past a template literal holding a quote', 'const doc = `${"`"}\nexport const page = { guards: false }\n`\nexport const page = { sitemap: false }\n', undefined, ['sitemap']],
+  ])('reads %s', (_name, source, object, keys) => {
+    expect(falseKeys(source, object)).toEqual(new Set(keys))
   })
 })

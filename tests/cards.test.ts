@@ -106,10 +106,12 @@ describe('font faces', () => {
     }
   })
 
-  it('refuses CFF outlines and files that are no font', () => {
-    expect(() => readFace(new Uint8Array([0x4F, 0x54, 0x54, 0x4F, 0, 0, 0, 0]))).toThrow('CFF outlines')
-    expect(() => readFace(new Uint8Array([0x77, 0x4F, 0x46, 0x32, 0x4F, 0x54, 0x54, 0x4F]))).toThrow('CFF outlines')
-    expect(() => readFace(new TextEncoder().encode('not a font at all'))).toThrow('no single TrueType font')
+  it.each([
+    ['CFF outlines in an OpenType file', new Uint8Array([0x4F, 0x54, 0x54, 0x4F, 0, 0, 0, 0]), 'CFF outlines'],
+    ['CFF outlines in a WOFF2 file', new Uint8Array([0x77, 0x4F, 0x46, 0x32, 0x4F, 0x54, 0x54, 0x4F]), 'CFF outlines'],
+    ['a file that is no font', new TextEncoder().encode('not a font at all'), 'no single TrueType font'],
+  ])('refuses %s', (_name, bytes, message) => {
+    expect(() => readFace(bytes)).toThrow(message)
   })
 })
 
@@ -245,10 +247,12 @@ describe('share cards', () => {
     expect(near(blue(128, 128), [0, 0, 255])).toBe(true)
   })
 
-  it('refuses a logo that is missing, not square or no image', async () => {
-    await expect(pages({ ...config, images: { card: { logo: 'tests/fixtures/cards/src/none.svg' } } })).rejects.toThrow(`images.card.logo names ${join(FIXTURE, 'src/none.svg')}, which does not exist`)
-    await expect(pages({ ...config, images: { card: { logo: 'tests/fixtures/cards/src/hero.png' } } })).rejects.toThrow('is 1000x600; it has to be square')
-    await expect(pages({ ...config, images: { card: { logo: 'tests/fixtures/cards/src/fonts/archivo-black-latin-400-normal.woff' } } })).rejects.toThrow('which is no SVG, PNG, JPEG or WebP kay can draw')
+  it.each([
+    ['missing', 'none.svg', `images.card.logo names ${join(FIXTURE, 'src/none.svg')}, which does not exist`],
+    ['not square', 'hero.png', 'is 1000x600; it has to be square'],
+    ['no image', 'fonts/archivo-black-latin-400-normal.woff', 'which is no SVG, PNG, JPEG or WebP kay can draw'],
+  ])('refuses a logo that is %s', async (_name, file, message) => {
+    await expect(pages({ ...config, images: { card: { logo: `tests/fixtures/cards/src/${file}` } } })).rejects.toThrow(message)
   })
 
   it('reports in kay check a logo the boot refuses, and warns of one with text, which it draws as nothing', async () => {

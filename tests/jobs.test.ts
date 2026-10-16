@@ -94,11 +94,13 @@ describe('schedule', () => {
     }
   })
 
-  it('refuses a computed schedule it cannot read, or one that never comes, at boot', () => {
-    const computed = (cron: string) => cron
+  it.each([
+    ['one it cannot read', 'every hour', 'Invalid cron expression'],
+    ['one that never comes', '0 0 30 2 *', 'the schedule 0 0 30 2 * never comes'],
+  ])('refuses a computed schedule at boot: %s', (_name, cron, message) => {
+    const computed = (text: string) => text
 
-    expect(() => schedule(computed('every hour'), () => undefined)).toThrow('Invalid cron expression')
-    expect(() => schedule(computed('0 0 30 2 *'), () => undefined)).toThrow('the schedule 0 0 30 2 * never comes')
+    expect(() => schedule(computed(cron), () => undefined)).toThrow(message)
   })
 
   // `bun run check` fails on an `@ts-expect-error` with no error under it, so the type check is what these assert.
@@ -232,11 +234,13 @@ describe('schedule', () => {
     }
   })
 
-  it('refuses a job that is no function when the schedule is built, in a list or a table', () => {
-    expect(() => schedule({ '@hourly': ['purge'] as unknown as (() => void)[] })).toThrow('the job scheduled @hourly is no function')
-    expect(() => schedule('@hourly', ['purge'] as unknown as (() => void)[])).toThrow('the job scheduled @hourly is no function')
-    expect(() => schedule({ '@hourly': 'purge' as unknown as () => void })).toThrow('the job scheduled @hourly is no function')
-    expect(() => schedule({ '@hourly': () => undefined, '30s': 'purge' as unknown as () => void })).toThrow('the job scheduled 30s is no function')
+  it.each([
+    ['a list in a table', () => schedule({ '@hourly': ['purge'] as unknown as (() => void)[] }), '@hourly'],
+    ['a list', () => schedule('@hourly', ['purge'] as unknown as (() => void)[]), '@hourly'],
+    ['a string in a table', () => schedule({ '@hourly': 'purge' as unknown as () => void }), '@hourly'],
+    ['a string beside a function in a table', () => schedule({ '@hourly': () => undefined, '30s': 'purge' as unknown as () => void }), '30s'],
+  ])('refuses a job that is no function when the schedule is built: %s', (_name, build, scheduled) => {
+    expect(build).toThrow(`the job scheduled ${scheduled} is no function`)
   })
 
   it('names the lock of each job of a list, a table and a boot run', async () => {
@@ -820,16 +824,18 @@ describe('queue', () => {
     }
   })
 
-  it('refuses attempts or a concurrency that is no whole number of at least 1', () => {
-    expect(() => queue('x', () => undefined, { attempts: 0 })).toThrow('attempts is 0')
-    expect(() => queue('x', () => undefined, { concurrency: 1.5 })).toThrow('concurrency is 1.5')
-    expect(() => queue('x', () => undefined, { backoff: '0s' })).toThrow('backoff')
+  it.each([
+    ['attempts that is no whole number of at least 1', { attempts: 0 }, 'attempts is 0'],
+    ['a concurrency that is no whole number of at least 1', { concurrency: 1.5 }, 'concurrency is 1.5'],
+    ['a backoff that is no positive duration', { backoff: '0s' as never }, 'backoff'],
+    ['an idlePoll of 0', { idlePoll: 0 }, 'idlePoll'],
+    ['an idlePoll in milliseconds', { idlePoll: '500ms' as never }, 'idlePoll'],
+    ['an idlePoll shorter than the 1 s poll', { idlePoll: 0.5 }, 'idlePoll is 0.5; it takes a duration of at least 1 second'],
+  ])('refuses %s', (_name, options, message) => {
+    expect(() => queue('x', () => undefined, options)).toThrow(message)
   })
 
-  it('refuses an idlePoll that is no positive duration or shorter than the 1 s poll', () => {
-    expect(() => queue('x', () => undefined, { idlePoll: 0 })).toThrow('idlePoll')
-    expect(() => queue('x', () => undefined, { idlePoll: '500ms' as never })).toThrow('idlePoll')
-    expect(() => queue('x', () => undefined, { idlePoll: 0.5 })).toThrow('idlePoll is 0.5; it takes a duration of at least 1 second')
+  it('takes an idlePoll of the 1 s poll', () => {
     expect(() => queue('x', () => undefined, { idlePoll: '1s' })).not.toThrow()
   })
 

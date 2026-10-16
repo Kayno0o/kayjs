@@ -52,17 +52,23 @@ const VALUES: unknown[] = [
   Object.assign(Object.create(null) as object, { a: 1, b: { c: 2 } }),
 ]
 
-describe('kay decodes devalue text', () => {
-  it('reads back every value an island prop may hold', () => {
-    for (const value of VALUES) {
-      const decoded = roundTrip(value)
+describe('a value round trips', () => {
+  // Written by devalue as the server does, or by kay's own writer as the browser does; read by kay's decoder and by devalue's parse.
+  it.each(VALUES.map(value => [value]))('through both writers and both readers: %p', (value) => {
+    const decoded = roundTrip(value)
 
-      expect(decoded).toStrictEqual(value)
-      // Written again, it must come out as devalue's own parse would have rebuilt it.
-      expect(stringify(decoded)).toBe(stringify(parse(stringify(value))))
-    }
+    expect(decoded).toStrictEqual(value)
+    // Written again, it must come out as devalue's own parse would have rebuilt it.
+    expect(stringify(decoded)).toBe(stringify(parse(stringify(value))))
+
+    const sent = sendValue(value)
+
+    expect(decodeValue(sent)).toStrictEqual(value)
+    expect(parse(sent)).toStrictEqual(value)
   })
+})
 
+describe('kay decodes devalue text', () => {
   // Apart from the others, since Bun's toStrictEqual never finds two Invalid Dates or two URLSearchParams equal.
   it('reads back an invalid Date and URLSearchParams', () => {
     const date = roundTrip(new Date(Number.NaN))
@@ -150,15 +156,6 @@ describe('kay decodes devalue text', () => {
 })
 
 describe('the browser writes devalue text itself', () => {
-  it('writes every value kay sends so that kay and devalue read it back alike', () => {
-    for (const value of VALUES) {
-      const text = sendValue(value)
-
-      expect(decodeValue(text)).toStrictEqual(value)
-      expect(parse(text)).toStrictEqual(value)
-    }
-  })
-
   it('writes a Date, an invalid one, URLSearchParams and -0', () => {
     const [date, invalid, search, zero] = decodeValue(sendValue([new Date('2026-10-06'), new Date(Number.NaN), new URLSearchParams('a=1&a=2'), -0])) as [Date, Date, URLSearchParams, number]
 

@@ -106,34 +106,18 @@ describe('formatKay', () => {
     expect(format(source)).toBe(source)
   })
 
-  it('keeps the trailing whitespace of text, which renders, and trims only blank lines', () => {
-    expect(format('p Hello \n  b world\n  \n| tail  \n')).toBe('p Hello \n  b world\n\n| tail  \n')
-    expect(format('p {\n  a\n} x  \n')).toBe('p {\n  a\n} x  \n')
-  })
-
-  it('keeps the parameters of a slot as written, shifting the lines they span', () => {
-    expect(format('List\n    @row({ id }, i)\n        li {id}\n')).toBe('List\n  @row({ id }, i)\n    li {id}\n')
-    expect(format('List\n    @row(\n      todo,\n    )\n        li x\n')).toBe('List\n  @row(\n    todo,\n  )\n    li x\n')
-  })
-
-  it('keeps a named slot, its arguments and the lines under it, and a line made of an expression', () => {
-    expect(format('ul\n    slot row(\n      item,\n    )\n        li x\n    {label}\n    slot\n')).toBe('ul\n  slot row(\n    item,\n  )\n    li x\n  {label}\n  slot\n')
-  })
-
-  it('re-indents an error line with its block', () => {
-    expect(format('form\n    error.text-sm title\n    error\n')).toBe('form\n  error.text-sm title\n  error\n')
-  })
-
-  it('indents a match, its when lines and their blocks like any block, a subject running over several lines moving along with it', () => {
-    expect(format('div\n    match pick({\n      a: 1,\n    })\n        when 1,   2\n            p a\n        else\n            p b\n')).toBe('div\n  match pick({\n    a: 1,\n  })\n    when 1,   2\n      p a\n    else\n      p b\n')
-  })
-
-  it('indents a try and its catch block like any block', () => {
-    expect(format('try\n    p {\n      a\n    }\ncatch error\n      p b\n')).toBe('try\n  p {\n    a\n  }\ncatch error\n  p b\n')
-  })
-
-  it('keeps the braces of a multi-line key with the for, so children stay under it', () => {
-    expect(format('ul\n  for todo of todos key={todo.id\n\n}\n    li x\n')).toBe('ul\n  for todo of todos key={todo.id\n\n}\n    li x\n')
+  it.each([
+    ['trailing whitespace of text, which renders, trimming only blank lines', 'p Hello \n  b world\n  \n| tail  \n', 'p Hello \n  b world\n\n| tail  \n'],
+    ['trailing whitespace after a multi-line expression', 'p {\n  a\n} x  \n', 'p {\n  a\n} x  \n'],
+    ['the parameters of a slot as written, shifting the lines they span', 'List\n    @row({ id }, i)\n        li {id}\n', 'List\n  @row({ id }, i)\n    li {id}\n'],
+    ['the parameters of a slot spanning lines', 'List\n    @row(\n      todo,\n    )\n        li x\n', 'List\n  @row(\n    todo,\n  )\n    li x\n'],
+    ['a named slot, its arguments, the lines under it and a line made of an expression', 'ul\n    slot row(\n      item,\n    )\n        li x\n    {label}\n    slot\n', 'ul\n  slot row(\n    item,\n  )\n    li x\n  {label}\n  slot\n'],
+    ['an error line with its block', 'form\n    error.text-sm title\n    error\n', 'form\n  error.text-sm title\n  error\n'],
+    ['a match, its when lines and their blocks, a subject over several lines moving along', 'div\n    match pick({\n      a: 1,\n    })\n        when 1,   2\n            p a\n        else\n            p b\n', 'div\n  match pick({\n    a: 1,\n  })\n    when 1,   2\n      p a\n    else\n      p b\n'],
+    ['a try and its catch block', 'try\n    p {\n      a\n    }\ncatch error\n      p b\n', 'try\n  p {\n    a\n  }\ncatch error\n  p b\n'],
+    ['the braces of a multi-line key with the for, so children stay under it', 'ul\n  for todo of todos key={todo.id\n\n}\n    li x\n', 'ul\n  for todo of todos key={todo.id\n\n}\n    li x\n'],
+  ])('keeps %s', (_name, source, expected) => {
+    expect(format(source)).toBe(expected)
   })
 
   it('leaves a file whose attribute string spans lines as an error rather than mangling it', () => {

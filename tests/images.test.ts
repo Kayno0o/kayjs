@@ -289,7 +289,7 @@ describe('image route', () => {
     expect((await get(`/_kay/image?src=${encodeURIComponent('/uploads/huge.png')}&w=320`)).status).toBe(413)
   })
 
-  it('answers an AVIF to a browser whose Accept names it and a WebP otherwise, both varying on Accept', async () => {
+  it('answers an AVIF to a browser whose Accept names it, varying on Accept', async () => {
     const avif = await get(heroAt(640), { accept: 'image/avif,image/webp,*/*;q=0.8' })
     const decoded = (await decodeAvif((await avif.bytes()).buffer))!
 
@@ -298,13 +298,17 @@ describe('image route', () => {
     expect(avif.headers.get('cache-control')).toBe('public, max-age=31536000, immutable')
     expect([decoded.width, decoded.height]).toEqual([640, 384])
     expect(meanDifference(decoded.data, decodePng(await new Bun.Image(HERO).resize(640).png().bytes()).pixels)).toBeLessThan(4)
+  })
 
-    for (const accept of ['image/webp,*/*', 'image/avif;q=0, image/webp', 'image/avifx']) {
-      const webp = await get(heroAt(640), { accept })
+  it.each([
+    ['names only WebP', 'image/webp,*/*'],
+    ['refuses AVIF with q=0', 'image/avif;q=0, image/webp'],
+    ['names a type that only starts like AVIF', 'image/avifx'],
+  ])('answers a WebP to a browser whose Accept %s, varying on Accept', async (_name, accept) => {
+    const webp = await get(heroAt(640), { accept })
 
-      expect(webp.headers.get('content-type')).toBe('image/webp')
-      expect(webp.headers.get('vary')).toBe('accept')
-    }
+    expect(webp.headers.get('content-type')).toBe('image/webp')
+    expect(webp.headers.get('vary')).toBe('accept')
   })
 
   it('encodes a runtime image\'s AVIF on request, under an ETag of its own', async () => {

@@ -874,27 +874,31 @@ console.log(JSON.stringify([keys.has(plain('before')), keys.has(plain('after')),
     expect(() => action(t.Object({}), () => 1, { rateLimit: [{ max: 1, window: '1m' }, { max: 1, window: '1m', count: 'succeeded', store: { hit: () => ({ count: 1, resetAt: 0 }) } }] })).toThrow('needs a peek(key) method')
   })
 
-  it('counts an IPv6 client by its /64, so rotating addresses inside it buys nothing', () => {
-    expect(rateKey('2001:db8:0:1:aaaa::1')).toBe('2001:db8:0:1::/64')
-    expect(rateKey('2001:0db8:0000:0001:ffff:ffff:ffff:ffff')).toBe('2001:db8:0:1::/64')
-    expect(rateKey('203.0.113.7')).toBe('203.0.113.7')
-    expect(rateKey('::ffff:203.0.113.7')).toBe('::ffff:203.0.113.7')
+  it.each([
+    ['2001:db8:0:1:aaaa::1', '2001:db8:0:1::/64'],
+    ['2001:0db8:0000:0001:ffff:ffff:ffff:ffff', '2001:db8:0:1::/64'],
+    ['203.0.113.7', '203.0.113.7'],
+    ['::ffff:203.0.113.7', '::ffff:203.0.113.7'],
+  ])('counts the client %s as %s, an IPv6 one by its /64 so rotating addresses inside it buys nothing', (address, key) => {
+    expect(rateKey(address)).toBe(key)
   })
 
-  it('takes the address the trusted proxies passed on, never one the client wrote before them', () => {
-    const behind = new Request('http://localhost/', { headers: { 'x-forwarded-for': '1.1.1.1, 203.0.113.7, 172.70.1.1', 'cf-connecting-ip': '203.0.113.7' } })
-    const skipped = new Request('http://localhost/', { headers: { 'x-forwarded-for': '203.0.113.8' } })
+  const behind = new Request('http://localhost/', { headers: { 'x-forwarded-for': '1.1.1.1, 203.0.113.7, 172.70.1.1', 'cf-connecting-ip': '203.0.113.7' } })
+  const skipped = new Request('http://localhost/', { headers: { 'x-forwarded-for': '203.0.113.8' } })
 
-    expect(clientAddress(behind, socket('127.0.0.1'), { hops: 1 })).toBe('172.70.1.1')
-    expect(clientAddress(behind, socket('::ffff:172.18.0.1'), { hops: 2 })).toBe('203.0.113.7')
-    expect(clientAddress(behind, socket('100.101.1.1'), { header: 'cf-connecting-ip' })).toBe('203.0.113.7')
+  it.each([
+    ['one hop', behind, '127.0.0.1', { hops: 1 }, '172.70.1.1'],
+    ['two hops, the peer written as IPv6', behind, '::ffff:172.18.0.1', { hops: 2 }, '203.0.113.7'],
+    ['a header', behind, '100.101.1.1', { header: 'cf-connecting-ip' }, '203.0.113.7'],
     // A request that skipped the outer proxy carries what the inner one appended, who reached it.
-    expect(clientAddress(skipped, socket('10.0.0.2'), { hops: 2 })).toBe('203.0.113.8')
+    ['two hops over a request that skipped the outer proxy', skipped, '10.0.0.2', { hops: 2 }, '203.0.113.8'],
     // `true` is one proxy and a number that many.
-    expect(clientAddress(behind, socket('127.0.0.1'), true)).toBe('172.70.1.1')
-    expect(clientAddress(behind, socket('127.0.0.1'), 2)).toBe('203.0.113.7')
+    ['true', behind, '127.0.0.1', true as const, '172.70.1.1'],
+    ['a number', behind, '127.0.0.1', 2, '203.0.113.7'],
     // A client reaching the server itself forges nothing, whatever the setting.
-    expect(clientAddress(behind, socket('198.51.100.9'), { hops: 2 })).toBe('198.51.100.9')
+    ['a client reaching the server itself', behind, '198.51.100.9', { hops: 2 }, '198.51.100.9'],
+  ])('takes the address the trusted proxies passed on, never one the client wrote before them: %s', (_name, request, peer, proxy, address) => {
+    expect(clientAddress(request, socket(peer), proxy)).toBe(address)
   })
 
   it('trusts a CDN reaching the server from the public ranges proxy.trusted lists, warning once when a header arrives from a public peer outside them', () => {

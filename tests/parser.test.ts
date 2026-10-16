@@ -6,6 +6,10 @@ function parse(source: string): KayFile {
   return parseKay(source)
 }
 
+function diagnosticsAt(source: string, messageLength?: number): [string, string][] {
+  return parseKay(source).diagnostics.map(d => [source.slice(d.start, d.end), d.message.slice(0, messageLength)])
+}
+
 function text(file: KayFile, span: Span | undefined): string | undefined {
   return span && file.source.slice(span.start, span.end)
 }
@@ -108,9 +112,11 @@ describe('fence', () => {
     expect(parse('---\nconst a = 1\n').diagnostics[0]?.message).toContain('never closed')
   })
 
-  it('names a fence kind spelled with capitals or without a space as unknown', () => {
-    expect(parse('--- Server\nconst a = 1\n---\np hi').diagnostics[0]?.message).toContain('Unknown fence `--- Server`')
-    expect(parse('---server\nconst a = 1\n---\np hi').diagnostics[0]?.message).toContain('Unknown fence `---server`')
+  it.each([
+    ['--- Server', 'Unknown fence `--- Server`'],
+    ['---server', 'Unknown fence `---server`'],
+  ])('names the fence kind %s as unknown', (opening, message) => {
+    expect(parse(`${opening}\nconst a = 1\n---\np hi`).diagnostics[0]?.message).toContain(message)
   })
 
   it('reads `--- client` as the script fence of a component rendering in the browser only, generic ones included', () => {
@@ -187,23 +193,29 @@ describe('elements', () => {
     expect(parse('p.x=oops').diagnostics.length).toBeGreaterThan(0)
   })
 
-  it('reports a control line after `tag: ` rather than reading it as an element', () => {
-    const at = (source: string) => parse(source).diagnostics.map(d => [source.slice(d.start, d.end), d.message.slice(0, 30)])
-
-    expect(at('li: if a\n  p x')).toEqual([['if', '`if` starts a line of its own']])
-    expect(parse('li: if a\n  p x').diagnostics[0]?.help).toBe('put it on the next line, indented under <li>')
-    expect(at('ul: for x of xs key={x}\n  li x')).toEqual([['for', '`for` starts a line of its own']])
-    expect(at('div: await p then v')).toEqual([['await', '`await` starts a line of its o']])
+  it.each([
+    ['li: if a\n  p x', 'if'],
+    ['ul: for x of xs key={x}\n  li x', 'for'],
+    ['div: await p then v', 'await'],
+  ])('reports a control line after `tag: ` rather than reading it as an element: %p', (source, keyword) => {
+    expect(diagnosticsAt(source, 30)).toEqual([[keyword, `\`${keyword}\` starts a line of its own`.slice(0, 30)]])
   })
 
-  it('reports the pug lines kay has no counterpart for, with their indented block', () => {
-    const at = (source: string) => parse(source).diagnostics.map(d => [source.slice(d.start, d.end), d.message.slice(0, 40)])
+  it('points a control line after `tag: ` at the next line', () => {
+    expect(parse('li: if a\n  p x').diagnostics[0]?.help).toBe('put it on the next line, indented under <li>')
+  })
 
-    expect(at('each x in xs\n  p {x}')).toEqual([['each', '`each` is pug syntax kay does not have']])
+  it.each([
+    ['each x in xs\n  p {x}', 'each'],
+    ['doctype html\np', 'doctype'],
+    ['div\n  include a.pug', 'include'],
+  ])('reports the pug line kay has no counterpart for, with its indented block: %p', (source, keyword) => {
+    expect(diagnosticsAt(source, 40)).toEqual([[keyword, `\`${keyword}\` is pug syntax kay does not have`.slice(0, 40)]])
+  })
+
+  it('leaves pug words inside text alone and points `each` at `for`', () => {
     expect(parse('each x in xs\n  p {x}').diagnostics[0]?.help).toBe('kay loops with `for item of list`')
-    expect(at('doctype html\np')).toEqual([['doctype', '`doctype` is pug syntax kay does not hav']])
-    expect(at('div\n  include a.pug')).toEqual([['include', '`include` is pug syntax kay does not hav']])
-    expect(at('blockquote each one\np while\n')).toEqual([])
+    expect(diagnosticsAt('blockquote each one\np while\n')).toEqual([])
   })
 })
 
@@ -215,11 +227,14 @@ describe('error', () => {
     expect(outline(file)).toEqual([{ tag: 'form', children: [{ error: '' }, { error: 'title' }, { error: 'first name', classes: ['text-sm', 'mt-1'] }, { error: 'x-y' }] }])
   })
 
-  it('rejects a second word and children, leaving an element named error-like alone', () => {
-    const at = (source: string) => parse(source).diagnostics.map(d => [source.slice(d.start, d.end), d.message])
+  it.each([
+    ['error title body', 'body', 'An `error` line names one field'],
+    ['error title\n  p x', 'p x', 'An `error` line has no children: it shows the message the action gives'],
+  ])('rejects an error line with a second word or children: %p', (source, at, message) => {
+    expect(diagnosticsAt(source)).toEqual([[at, message]])
+  })
 
-    expect(at('error title body')).toEqual([['body', 'An `error` line names one field']])
-    expect(at('error title\n  p x')).toEqual([['p x', 'An `error` line has no children: it shows the message the action gives']])
+  it('leaves an element named error-like alone', () => {
     expect(outline(parse('errors x'))).toEqual([{ tag: 'errors', children: [['x']] }])
   })
 })
@@ -237,14 +252,17 @@ describe('const', () => {
     ] }])
   })
 
-  it('rejects let, a malformed const, children under one, and pug\'s code lines, pointing at const', () => {
-    const at = (source: string) => parse(source).diagnostics.map(d => [source.slice(d.start, d.end), d.message])
+  it.each([
+    ['let n = 1', 'let', 'A template declares names with `const`, not `let`'],
+    ['const = 1', 'const = 1', 'Malformed `const`'],
+    ['const n =', 'const n =', 'A `const` needs a value'],
+    ['const n = 1\n  p x', 'p x', 'A `const` line has no children: the lines after it at its indentation read its name'],
+    ['- const n = 1', '-', '`- code` is pug syntax kay does not have'],
+  ])('rejects a bad const declaration: %p', (source, at, message) => {
+    expect(diagnosticsAt(source)).toEqual([[at, message]])
+  })
 
-    expect(at('let n = 1')).toEqual([['let', 'A template declares names with `const`, not `let`']])
-    expect(at('const = 1')).toEqual([['const = 1', 'Malformed `const`']])
-    expect(at('const n =')).toEqual([['const n =', 'A `const` needs a value']])
-    expect(at('const n = 1\n  p x')).toEqual([['p x', 'A `const` line has no children: the lines after it at its indentation read its name']])
-    expect(at('- const n = 1')).toEqual([['-', '`- code` is pug syntax kay does not have']])
+  it('points pug\'s code lines at const', () => {
     expect(parse('- const n = 1').diagnostics[0]?.help).toBe('a template names a value with `const name = value`; other code goes in the script')
   })
 

@@ -11,7 +11,7 @@ import { tmpdir } from 'node:os'
 import { basename, dirname, join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import tailwind from 'bun-plugin-tailwind'
-import { describe, expect, it, spyOn } from 'bun:test'
+import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { Elysia } from 'elysia'
 import { ASSET_FILE, clientDir, outputDir, writeAsset } from '../src/build/assets'
 import { writeCacheEntry } from '../src/build/cache'
@@ -36,12 +36,20 @@ import { fixtureCopy, scratchDir } from './scratch'
 
 const root = join(import.meta.dir, 'fixtures/islands')
 
-// Under the checkout's node_modules, so the pages it serves resolve their dependencies.
+const scratchProjects: string[] = []
+
+afterEach(async () => {
+  await Promise.all(scratchProjects.splice(0).map(async dir => rm(dir, { recursive: true, force: true })))
+})
+
+// Under the checkout's node_modules, so the pages it serves resolve their dependencies, and removed after the test.
 async function scratchProject(files: Record<string, string>): Promise<string> {
   const base = join(import.meta.dir, '../node_modules/.cache')
 
   await mkdir(base, { recursive: true })
   const root = await mkdtemp(join(base, 'config-'))
+
+  scratchProjects.push(root)
 
   await Promise.all(Object.entries(files).map(async ([path, content]) => Bun.write(join(root, path), content)))
 
@@ -57,37 +65,55 @@ function settle(...files: string[]): void {
 }
 
 describe('kay build', () => {
-  it('refuses a client build whose chunk reads a server-only global, naming the module it came from', async () => {
-    const root = await scratchProject({
-      // What every app has: one module holding the settings, read from the environment as it loads.
-      'src/settings.ts': 'export const siteName = process.env.SITE_NAME || \'site\'\n',
-      'src/counter.kay': '---\nimport { signal } from \'kay\'\nimport { siteName } from \'./settings\'\n\nconst n = signal(0)\n---\nbutton(type="button" onClick={() => n.set(n() + 1)}) {siteName} {n()}\n',
-      'src/routes/index.kay': '---\nimport Counter from \'../counter.kay\'\n---\nCounter\n',
-    })
+  const ISLAND_PAGE = '---\nimport Counter from \'../counter.kay\'\n---\nCounter\n'
 
-    try {
-      await expect(buildClient(root)).rejects.toThrow(/`process` in counter-[a-z0-9]+\.js, read by src\/settings\.ts/)
-    }
-    finally {
-      await rm(root, { recursive: true, force: true })
-    }
-  })
+  // An island holding a signal, importing `imports`, with `setup` in its fence and `body` as the button's text.
+  function counter(imports: string, body: string, setup = ''): string {
+    return `---\nimport { signal } from 'kay'\n${imports}\nconst n = signal(0)\n${setup}---\nbutton(type="button" onClick={() => n.set(n() + 1)}) ${body}\n`
+  }
 
-  it('refuses a client build whose island reaches a builtin a browser lacks, naming the imports leading there', async () => {
-    const root = await scratchProject({
-      'src/db.ts': 'import { Database } from \'bun:sqlite\'\n\nexport const db = new Database(\':memory:\')\n',
-      // A helper the island needs, beside a query it does not: the module opens the database as it loads all the same.
-      'src/links.ts': 'import { db } from \'./db\'\n\nexport const link = (id: number) => `/items/${id}`\nexport const count = () => db.query(\'select 1\').get()\n',
-      'src/counter.kay': '---\nimport { signal } from \'kay\'\nimport { link } from \'./links\'\n\nconst n = signal(0)\n---\na(href={link(n())} onClick={() => n.set(n() + 1)}) {n()}\n',
-      'src/routes/index.kay': '---\nimport Counter from \'../counter.kay\'\n---\nCounter\n',
-    })
+  it.each([
+    {
+      name: 'a chunk reading a server-only global, naming the module it came from',
+      files: {
+        // What every app has: one module holding the settings, read from the environment as it loads.
+        'src/settings.ts': 'export const siteName = process.env.SITE_NAME || \'site\'\n',
+        'src/counter.kay': counter('import { siteName } from \'./settings\'\n', '{siteName} {n()}'),
+      },
+      options: {},
+      message: /`process` in counter-[a-z0-9]+\.js, read by src\/settings\.ts/,
+    },
+    {
+      name: 'an island reaching a builtin a browser lacks, naming the imports leading there',
+      files: {
+        'src/db.ts': 'import { Database } from \'bun:sqlite\'\n\nexport const db = new Database(\':memory:\')\n',
+        // A helper the island needs, beside a query it does not: the module opens the database as it loads all the same.
+        'src/links.ts': 'import { db } from \'./db\'\n\nexport const link = (id: number) => `/items/${id}`\nexport const count = () => db.query(\'select 1\').get()\n',
+        'src/counter.kay': counter('import { link } from \'./links\'\n', '{link(n())} {n()}'),
+      },
+      options: {},
+      message: 'src/counter.kay -> src/links.ts -> src/db.ts -> bun:sqlite',
+    },
+    {
+      name: 'an island building a schema with kay\'s t, naming the module taking it from kay',
+      files: {
+        // A schema module shared by an action and an island's own check.
+        'src/schemas.ts': 'import { s } from \'kay\'\n\nexport const title = s.String({ minLength: 1 })\nexport const longest = 200\n',
+        'src/counter.kay': counter('import { longest, title } from \'./schemas\'\n', '{longest} {String(title)} {n()}'),
+      },
+      options: { minify: true },
+      message: 'an island imports src/schemas.ts, which takes it from \'kay\'',
+    },
+    {
+      name: 'a server-only global read in the island\'s own fence, minifying as the build does',
+      files: { 'src/counter.kay': counter('', '{own} {n()}', 'const own = process.env.OWN\n') },
+      options: { minify: true },
+      message: /`process` in counter-[a-z0-9]+\.js, read by src\/counter\.kay/,
+    },
+  ])('refuses a client build with $name', async ({ files, options, message }) => {
+    const root = await scratchProject({ ...files, 'src/routes/index.kay': ISLAND_PAGE })
 
-    try {
-      await expect(buildClient(root)).rejects.toThrow('src/counter.kay -> src/links.ts -> src/db.ts -> bun:sqlite')
-    }
-    finally {
-      await rm(root, { recursive: true, force: true })
-    }
+    await expect(buildClient(root, options)).rejects.toThrow(message)
   })
 
   it('gives a static component that may render as an island a chunk once it reaches one, directly, through a barrel, a library or a glob, under a linked root too', async () => {
@@ -134,29 +160,8 @@ describe('kay build', () => {
       'examples/chat/src/live.kay': island('./api/live'),
     })
 
-    try {
-      expect(Object.keys((await buildClient(root)).islands)).toEqual(['src/counter.kay'])
-      expect(Object.keys((await buildClient(join(root, 'examples/chat'))).islands)).toEqual(['src/live.kay'])
-    }
-    finally {
-      await rm(root, { recursive: true, force: true })
-    }
-  })
-
-  it('refuses a client build where an island builds a schema with kay\'s t, naming the module taking it from kay', async () => {
-    const root = await scratchProject({
-      // A schema module shared by an action and an island's own check.
-      'src/schemas.ts': 'import { s } from \'kay\'\n\nexport const title = s.String({ minLength: 1 })\nexport const longest = 200\n',
-      'src/counter.kay': '---\nimport { signal } from \'kay\'\nimport { longest, title } from \'./schemas\'\n\nconst n = signal(0)\n---\nbutton(type="button" onClick={() => n.set(n() + 1)}) {longest} {String(title)} {n()}\n',
-      'src/routes/index.kay': '---\nimport Counter from \'../counter.kay\'\n---\nCounter\n',
-    })
-
-    try {
-      await expect(buildClient(root, { minify: true })).rejects.toThrow('an island imports src/schemas.ts, which takes it from \'kay\'')
-    }
-    finally {
-      await rm(root, { recursive: true, force: true })
-    }
+    expect(Object.keys((await buildClient(root)).islands)).toEqual(['src/counter.kay'])
+    expect(Object.keys((await buildClient(join(root, 'examples/chat'))).islands)).toEqual(['src/live.kay'])
   })
 
   it('builds an island whose modules take t from kay as a type, the page building its schema in its server fence', async () => {
@@ -166,26 +171,7 @@ describe('kay build', () => {
       'src/routes/index.kay': '--- server\nimport { s } from \'kay\'\n\nexport const add = action(s.Object({ title: s.String({ maxLength: 20 }) }), () => 1)\n---\n---\nimport Counter from \'../counter.kay\'\n---\nCounter\n',
     })
 
-    try {
-      await buildClient(root, { minify: true })
-    }
-    finally {
-      await rm(root, { recursive: true, force: true })
-    }
-  })
-
-  it('names the island\'s own fence when the read is there, and minifies as the build does', async () => {
-    const root = await scratchProject({
-      'src/counter.kay': '---\nimport { signal } from \'kay\'\n\nconst own = process.env.OWN\nconst n = signal(0)\n---\nbutton(type="button" onClick={() => n.set(n() + 1)}) {own} {n()}\n',
-      'src/routes/index.kay': '---\nimport Counter from \'../counter.kay\'\n---\nCounter\n',
-    })
-
-    try {
-      await expect(buildClient(root, { minify: true })).rejects.toThrow(/`process` in counter-[a-z0-9]+\.js, read by src\/counter\.kay/)
-    }
-    finally {
-      await rm(root, { recursive: true, force: true })
-    }
+    await buildClient(root, { minify: true })
   })
 
   it('builds an island reading a server-only global behind a `typeof`, as a module written for both sides does', async () => {
@@ -195,12 +181,7 @@ describe('kay build', () => {
       'src/routes/index.kay': '---\nimport Counter from \'../counter.kay\'\n---\nCounter\n',
     })
 
-    try {
-      expect((await buildClient(root)).islands).toBeDefined()
-    }
-    finally {
-      await rm(root, { recursive: true, force: true })
-    }
+    expect((await buildClient(root)).islands).toBeDefined()
   })
 
   it('lets Tailwind see the classes written in the .class shorthand', async () => {
@@ -676,25 +657,15 @@ describe('kay.config.ts', () => {
   it('refuses a config without a default export with a message naming the fix', async () => {
     const root = await scratchProject({ 'kay.config.ts': 'export const routes = \'pages\'\n' })
 
-    try {
-      await expect(loadConfig(root)).rejects.toThrow('kay.config.ts must export its config by default')
-    }
-    finally {
-      await rm(root, { recursive: true, force: true })
-    }
+    await expect(loadConfig(root)).rejects.toThrow('kay.config.ts must export its config by default')
   })
 
   it('lets options given in code win over the config, except those given as undefined', async () => {
     const root = await scratchProject({ 'kay.config.ts': 'export default { routes: \'pages\', lang: \'en\' }\n' })
 
-    try {
-      const config: KayConfig = await withConfig(root, { routes: undefined, lang: 'fr' })
+    const config: KayConfig = await withConfig(root, { routes: undefined, lang: 'fr' })
 
-      expect(config).toEqual({ routes: 'pages', lang: 'fr' })
-    }
-    finally {
-      await rm(root, { recursive: true, force: true })
-    }
+    expect(config).toEqual({ routes: 'pages', lang: 'fr' })
   })
 
   it('keeps the config\'s value for an option pages() is given as undefined', async () => {
@@ -702,16 +673,11 @@ describe('kay.config.ts', () => {
     const serve = 'import { Elysia } from \'elysia\'\nimport { pages } from \'kay/server\'\n\nconst app = new Elysia().use(await pages({ root: import.meta.dir, dev: true, routes: undefined }))\nconst response = await app.handle(new Request(\'http://localhost/\'))\n\nconsole.log(response.status, (await response.text()).includes(\'Home\'))\nprocess.exit(0)\n'
     const root = await scratchProject({ 'kay.config.ts': 'export default { routes: \'pages\' }\n', 'pages/index.kay': 'p Home\n', 'serve.ts': serve })
 
-    try {
-      const child = Bun.spawn([process.execPath, 'serve.ts'], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
-      const [output, code] = await Promise.all([new Response(child.stdout).text(), child.exited])
+    const child = Bun.spawn([process.execPath, 'serve.ts'], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
+    const [output, code] = await Promise.all([new Response(child.stdout).text(), child.exited])
 
-      expect(output).toBe('200 true\n')
-      expect(code).toBe(0)
-    }
-    finally {
-      await rm(root, { recursive: true, force: true })
-    }
+    expect(output).toBe('200 true\n')
+    expect(code).toBe(0)
   })
 
   it('leaves the build plugins out of the config a compiled server loads, with what only they imported', () => {
@@ -801,21 +767,16 @@ describe('kay.config.ts', () => {
       return Promise.all(['index', 'about'].map(async name => Bun.file(join(root, `dist/${name}.html`)).text()))
     }
 
-    try {
-      const first = await build()
-      const second = await build()
-      const drawn = first.map(html => [...html.matchAll(/\bid="([^"]+)"/g)].map(match => match[1]!))
-      const ids = drawn.map(found => new Set(found))
+    const first = await build()
+    const second = await build()
+    const drawn = first.map(html => [...html.matchAll(/\bid="([^"]+)"/g)].map(match => match[1]!))
+    const ids = drawn.map(found => new Set(found))
 
-      expect(second).toEqual(first)
-      // Three fields, the last in a streamed block, each with an id of its own.
-      expect(drawn.map(found => found.length)).toEqual([3, 3])
-      expect(ids.map(found => found.size)).toEqual([3, 3])
-      expect([...ids[0]!].filter(id => ids[1]!.has(id))).toEqual([])
-    }
-    finally {
-      await rm(root, { recursive: true, force: true })
-    }
+    expect(second).toEqual(first)
+    // Three fields, the last in a streamed block, each with an id of its own.
+    expect(drawn.map(found => found.length)).toEqual([3, 3])
+    expect(ids.map(found => found.size)).toEqual([3, 3])
+    expect([...ids[0]!].filter(id => ids[1]!.has(id))).toEqual([])
   }, 60_000)
 
   it('strips the config Bun loads through a symlinked project', async () => {
@@ -857,21 +818,16 @@ describe('kay build without the server environment', () => {
       return { report, code }
     }
 
-    try {
-      const built = await build()
+    const built = await build()
 
-      expect(built.report).toContain('1 prerendered page')
-      expect(built.code).toBe(0)
+    expect(built.report).toContain('1 prerendered page')
+    expect(built.code).toBe(0)
 
-      await Bun.write(join(root, 'src/routes/mail.kay'), '--- server\nimport { env } from \'../env\'\n\nexport const page = { prerender: true }\n\nconst to = env.MAIL_TO\n---\np {to}\n')
-      const refused = await build()
+    await Bun.write(join(root, 'src/routes/mail.kay'), '--- server\nimport { env } from \'../env\'\n\nexport const page = { prerender: true }\n\nconst to = env.MAIL_TO\n---\np {to}\n')
+    const refused = await build()
 
-      expect(refused.report).toContain('kay: MAIL_TO does not match the environment\'s schema')
-      expect(refused.code).toBe(1)
-    }
-    finally {
-      await rm(root, { recursive: true, force: true })
-    }
+    expect(refused.report).toContain('kay: MAIL_TO does not match the environment\'s schema')
+    expect(refused.code).toBe(1)
   }, 60_000)
 })
 
@@ -897,27 +853,22 @@ describe('kay build checks the project first', () => {
       'src/routes/about.kay': '--- server\nexport const page = { prerender: true }\n---\nhead\n  title Home\n  meta(name="description" content="Who we are")\np About\n',
     })
 
-    try {
-      const warned = await build(root)
+    const warned = await build(root)
 
-      expect(warned.report.match(/^\w+\[[\w-]+\]: .*/gm)).toEqual([
-        'warning[duplicate-title]: `/` has the title of `/about`, "Home"',
-        'warning[undescribed-page]: `/` has no description',
-        'warning[noindex-in-sitemap]: `/` is in the sitemap, though its head says `noindex`',
-      ])
-      expect(warned.code).toBe(0)
-      expect((await build(root, '--no-check')).report).not.toContain('warning[')
+    expect(warned.report.match(/^\w+\[[\w-]+\]: .*/gm)).toEqual([
+      'warning[duplicate-title]: `/` has the title of `/about`, "Home"',
+      'warning[undescribed-page]: `/` has no description',
+      'warning[noindex-in-sitemap]: `/` is in the sitemap, though its head says `noindex`',
+    ])
+    expect(warned.code).toBe(0)
+    expect((await build(root, '--no-check')).report).not.toContain('warning[')
 
-      await Bun.write(join(root, 'kay.config.ts'), config('{ seo: \'allow\', \'duplicate-title\': \'deny\' }'))
-      const refused = await build(root)
+    await Bun.write(join(root, 'kay.config.ts'), config('{ seo: \'allow\', \'duplicate-title\': \'deny\' }'))
+    const refused = await build(root)
 
-      expect(refused.report.match(/^\w+\[[\w-]+\]/gm)).toEqual(['error[duplicate-title]'])
-      expect(refused.report).toContain('kay build: nothing built, as the prerendered pages break the lints above; --no-check builds anyway')
-      expect(refused.code).toBe(1)
-    }
-    finally {
-      await rm(root, { recursive: true, force: true })
-    }
+    expect(refused.report.match(/^\w+\[[\w-]+\]/gm)).toEqual(['error[duplicate-title]'])
+    expect(refused.report).toContain('kay build: nothing built, as the prerendered pages break the lints above; --no-check builds anyway')
+    expect(refused.code).toBe(1)
   }, 60_000)
 
   it('prints what the check found before what the prerendered pages log, and though their code ends the process', async () => {
@@ -926,16 +877,11 @@ describe('kay build checks the project first', () => {
       'src/routes/index.kay': '--- server\nimport process from \'node:process\'\n\nexport const page = { prerender: true }\nconsole.error(\'prerendering\')\nprocess.exit(3)\n---\nh1 Home\nh3 Skipped\n',
     })
 
-    try {
-      const { report, code } = await build(root)
+    const { report, code } = await build(root)
 
-      expect(code).toBe(3)
-      expect(report).toContain('warning[skipped-heading]')
-      expect(report.indexOf('warning[skipped-heading]')).toBeLessThan(report.indexOf('prerendering'))
-    }
-    finally {
-      await rm(root, { recursive: true, force: true })
-    }
+    expect(code).toBe(3)
+    expect(report).toContain('warning[skipped-heading]')
+    expect(report.indexOf('warning[skipped-heading]')).toBeLessThan(report.indexOf('prerendering'))
   }, 60_000)
 
   describe('--format json and github', () => {
@@ -1058,22 +1004,17 @@ describe('kay build checks the project first', () => {
   it('builds nothing from a project kay check refuses, and builds it with --no-check', async () => {
     const root = await scratchProject({ 'tsconfig.json': tsconfig, 'src/routes/index.kay': 'a(href="/nowhere") Lost\n' })
 
-    try {
-      const refused = await build(root)
+    const refused = await build(root)
 
-      expect(refused.report).toContain('/nowhere')
-      expect(refused.report).toContain('kay build: nothing built, as kay check found the problems above; --no-check builds anyway')
-      expect(refused.code).toBe(1)
-      expect(await Bun.file(join(outputDir(root), 'manifest.json')).exists()).toBe(false)
+    expect(refused.report).toContain('/nowhere')
+    expect(refused.report).toContain('kay build: nothing built, as kay check found the problems above; --no-check builds anyway')
+    expect(refused.code).toBe(1)
+    expect(await Bun.file(join(outputDir(root), 'manifest.json')).exists()).toBe(false)
 
-      const built = await build(root, '--no-check')
+    const built = await build(root, '--no-check')
 
-      expect(built.report).toStartWith('built 0 islands')
-      expect(built.code).toBe(0)
-    }
-    finally {
-      await rm(root, { recursive: true, force: true })
-    }
+    expect(built.report).toStartWith('built 0 islands')
+    expect(built.code).toBe(0)
   }, 60_000)
 
   it('keeps the last build when the check or the build fails, runs no page while the check fails, and recovers from an interrupted run', async () => {
@@ -1085,47 +1026,42 @@ describe('kay build checks the project first', () => {
     const output = outputDir(root)
     const previous = `${outputDir(root)}-previous`
 
-    try {
-      await page('First')
-      expect((await build(root)).code).toBe(0)
-      expect(await Bun.file(prerendered).text()).toContain('First')
+    await page('First')
+    expect((await build(root)).code).toBe(0)
+    expect(await Bun.file(prerendered).text()).toContain('First')
 
-      // The page changes as a broken one comes along, which the check refuses.
-      await page('Second')
-      await Bun.write(join(root, 'src/routes/lost.kay'), 'a(href="/nowhere") Lost\n')
+    // The page changes as a broken one comes along, which the check refuses.
+    await page('Second')
+    await Bun.write(join(root, 'src/routes/lost.kay'), 'a(href="/nowhere") Lost\n')
 
-      expect((await build(root)).code).toBe(1)
-      expect(await Bun.file(prerendered).text()).toContain('First')
-      expect(await Bun.file(ran).text()).toBe('First')
-      expect(existsSync(previous)).toBe(false)
+    expect((await build(root)).code).toBe(1)
+    expect(await Bun.file(prerendered).text()).toContain('First')
+    expect(await Bun.file(ran).text()).toBe('First')
+    expect(existsSync(previous)).toBe(false)
 
-      // A run interrupted mid-build leaves the last build aside and a partial one in its place.
-      await rename(output, previous)
-      await Bun.write(join(output, 'partial'), '')
+    // A run interrupted mid-build leaves the last build aside and a partial one in its place.
+    await rename(output, previous)
+    await Bun.write(join(output, 'partial'), '')
 
-      expect((await build(root)).code).toBe(1)
-      expect(await Bun.file(prerendered).text()).toContain('First')
-      expect(existsSync(join(output, 'partial'))).toBe(false)
+    expect((await build(root)).code).toBe(1)
+    expect(await Bun.file(prerendered).text()).toContain('First')
+    expect(existsSync(join(output, 'partial'))).toBe(false)
 
-      await Bun.write(join(root, 'src/routes/lost.kay'), 'a(href="/") Found\n')
+    await Bun.write(join(root, 'src/routes/lost.kay'), 'a(href="/") Found\n')
 
-      expect((await build(root)).code).toBe(0)
-      expect(await Bun.file(prerendered).text()).toContain('Second')
-      expect(existsSync(previous)).toBe(false)
+    expect((await build(root)).code).toBe(0)
+    expect(await Bun.file(prerendered).text()).toContain('Second')
+    expect(existsSync(previous)).toBe(false)
 
-      // The check passes and the build fails, as the page throws once it renders.
-      await page('Third', 'if (Date.now() > 0)\n  throw new Error(\'Feed down\')\n')
+    // The check passes and the build fails, as the page throws once it renders.
+    await page('Third', 'if (Date.now() > 0)\n  throw new Error(\'Feed down\')\n')
 
-      const failed = await build(root)
+    const failed = await build(root)
 
-      expect(failed.report).toContain('Feed down')
-      expect(failed.code).toBe(1)
-      expect(await Bun.file(prerendered).text()).toContain('Second')
-      expect(existsSync(previous)).toBe(false)
-    }
-    finally {
-      await rm(root, { recursive: true, force: true })
-    }
+    expect(failed.report).toContain('Feed down')
+    expect(failed.code).toBe(1)
+    expect(await Bun.file(prerendered).text()).toContain('Second')
+    expect(existsSync(previous)).toBe(false)
   }, 60_000)
 
   it('answers what each stage of the build found and made, called without the command line', async () => {
@@ -1141,42 +1077,37 @@ describe('kay build checks the project first', () => {
       return JSON.parse(output.trim().split('\n').at(-1)!) as BuildResult
     }
 
-    try {
-      const refused = await buildProject()
+    const refused = await buildProject()
 
-      expect(refused.failed).toEqual({ stage: 'check' })
-      expect(refused.checked.map(diagnostic => diagnostic.message)).toEqual([expect.stringContaining('/nowhere')])
-      expect(refused.built).toBeUndefined()
-      expect(existsSync(outputDir(root))).toBe(false)
+    expect(refused.failed).toEqual({ stage: 'check' })
+    expect(refused.checked.map(diagnostic => diagnostic.message)).toEqual([expect.stringContaining('/nowhere')])
+    expect(refused.built).toBeUndefined()
+    expect(existsSync(outputDir(root))).toBe(false)
 
-      await Bun.write(join(root, 'src/routes/index.kay'), '--- server\nexport const page = { prerender: true }\n---\na(href="/") Home\n')
+    await Bun.write(join(root, 'src/routes/index.kay'), '--- server\nexport const page = { prerender: true }\n---\na(href="/") Home\n')
 
-      const built = await buildProject({ exportTo: 'dist' })
+    const built = await buildProject({ exportTo: 'dist' })
 
-      // The heads' lints only warn, which fails no stage.
-      expect(built).toMatchObject({ checked: [], linted: [{ code: 'untitled-page', severity: 'warning' }, { code: 'undescribed-page', severity: 'warning' }], built: { islands: 0, stylesheets: 0, prerendered: 1, entries: 0 }, exported: { pages: 1, dir: join(root, 'dist') } })
-      expect(built.failed).toBeUndefined()
-      expect(await Bun.file(join(root, 'dist/index.html')).text()).toContain('>Home</a>')
+    // The heads' lints only warn, which fails no stage.
+    expect(built).toMatchObject({ checked: [], linted: [{ code: 'untitled-page', severity: 'warning' }, { code: 'undescribed-page', severity: 'warning' }], built: { islands: 0, stylesheets: 0, prerendered: 1, entries: 0 }, exported: { pages: 1, dir: join(root, 'dist') } })
+    expect(built.failed).toBeUndefined()
+    expect(await Bun.file(join(root, 'dist/index.html')).text()).toContain('>Home</a>')
 
-      // A plain build drops the record of an executable an earlier build compiled, so `kay start` runs the entry of this one.
-      const record = join(outputDir(root), 'executable')
+    // A plain build drops the record of an executable an earlier build compiled, so `kay start` runs the entry of this one.
+    const record = join(outputDir(root), 'executable')
 
-      await Bun.write(record, 'bin/server')
-      expect(await buildProject({ check: false })).toMatchObject({ built: { prerendered: 1 } })
-      expect(existsSync(record)).toBe(false)
+    await Bun.write(record, 'bin/server')
+    expect(await buildProject({ check: false })).toMatchObject({ built: { prerendered: 1 } })
+    expect(existsSync(record)).toBe(false)
 
-      // A callback that throws once the output is written puts the last build back.
-      await Bun.write(join(root, 'src/routes/index.kay'), '--- server\nexport const page = { prerender: true }\n---\na(href="/") Away\n')
-      const script = `import { buildProject } from ${JSON.stringify(join(import.meta.dir, '../src/build/pipeline'))}\n\ntry {\n  await buildProject(${JSON.stringify(root)}, {}, { onStage: (stage) => { if (stage === 'output') throw new Error('printer down') } })\n}\ncatch (error) {\n  console.log(error.message)\n}\n`
-      const child = Bun.spawn([process.execPath, '-e', script], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
+    // A callback that throws once the output is written puts the last build back.
+    await Bun.write(join(root, 'src/routes/index.kay'), '--- server\nexport const page = { prerender: true }\n---\na(href="/") Away\n')
+    const script = `import { buildProject } from ${JSON.stringify(join(import.meta.dir, '../src/build/pipeline'))}\n\ntry {\n  await buildProject(${JSON.stringify(root)}, {}, { onStage: (stage) => { if (stage === 'output') throw new Error('printer down') } })\n}\ncatch (error) {\n  console.log(error.message)\n}\n`
+    const child = Bun.spawn([process.execPath, '-e', script], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
 
-      expect(await new Response(child.stdout).text()).toBe('printer down\n')
-      expect(await Bun.file(join(outputDir(root), 'pages/index.html')).text()).toContain('>Home</a>')
-      expect(existsSync(`${outputDir(root)}-previous`)).toBe(false)
-    }
-    finally {
-      await rm(root, { recursive: true, force: true })
-    }
+    expect(await new Response(child.stdout).text()).toBe('printer down\n')
+    expect(await Bun.file(join(outputDir(root), 'pages/index.html')).text()).toContain('>Home</a>')
+    expect(existsSync(`${outputDir(root)}-previous`)).toBe(false)
   }, 60_000)
 
   it('warns once of an SVG favicon\'s text, as the check when it runs, as the drawing when it does not', async () => {
@@ -1196,32 +1127,22 @@ describe('kay build checks the project first', () => {
       return [...JSON.parse(output.trim().split('\n').at(-1)!) as string[], ...errors.split('\n')].filter(line => line.includes('has text, which kay draws without fonts'))
     }
 
-    try {
-      expect(await warnings({})).toHaveLength(1)
-      expect(await warnings({ check: false })).toHaveLength(1)
-    }
-    finally {
-      await rm(root, { recursive: true, force: true })
-    }
+    expect(await warnings({})).toHaveLength(1)
+    expect(await warnings({ check: false })).toHaveLength(1)
   }, 60_000)
 
   it('checks with the tsconfig -p names, which --no-check does not take', async () => {
     const root = await scratchProject({ 'tsconfig.app.json': tsconfig, 'src/routes/index.kay': 'p Home\n' })
 
-    try {
-      const built = await build(root, '-p', 'tsconfig.app.json')
+    const built = await build(root, '-p', 'tsconfig.app.json')
 
-      expect(built.report).toStartWith('built 0 islands')
-      expect(built.code).toBe(0)
+    expect(built.report).toStartWith('built 0 islands')
+    expect(built.code).toBe(0)
 
-      const refused = await build(root, '-p', 'tsconfig.app.json', '--no-check')
+    const refused = await build(root, '-p', 'tsconfig.app.json', '--no-check')
 
-      expect(refused.report).toContain('kay: -p names the tsconfig the build checks with, so it does not go with --no-check')
-      expect(refused.code).toBe(1)
-    }
-    finally {
-      await rm(root, { recursive: true, force: true })
-    }
+    expect(refused.report).toContain('kay: -p names the tsconfig the build checks with, so it does not go with --no-check')
+    expect(refused.code).toBe(1)
   }, 60_000)
 })
 
@@ -1412,22 +1333,17 @@ describe('what a build keeps in memory', () => {
       return Bun.file(join(clientDir(project), basename(islands['src/total.kay']![0]!))).text()
     }
 
-    try {
-      expect((await build(null)).failed).toBe(false)
-      // A signal the template names without calling is read as one.
-      expect(await island()).toContain('() => total()')
+    expect((await build(null)).failed).toBe(false)
+    // A signal the template names without calling is read as one.
+    expect(await island()).toContain('() => total()')
 
-      await Bun.write(join(project, 'src/state.ts'), 'export const total = 0\n')
-      expect((await build(['src/state.ts'])).failed).toBe(false)
-      expect(await island()).not.toContain('total()')
+    await Bun.write(join(project, 'src/state.ts'), 'export const total = 0\n')
+    expect((await build(['src/state.ts'])).failed).toBe(false)
+    expect(await island()).not.toContain('total()')
 
-      await Bun.write(join(project, 'src/state.ts'), 'import { signal } from \'kay\'\n\nexport const total = signal(0)\n')
-      expect((await build(['src/state.ts'])).failed).toBe(false)
-      expect(await island()).toContain('() => total()')
-    }
-    finally {
-      await rm(project, { recursive: true, force: true })
-    }
+    await Bun.write(join(project, 'src/state.ts'), 'import { signal } from \'kay\'\n\nexport const total = signal(0)\n')
+    expect((await build(['src/state.ts'])).failed).toBe(false)
+    expect(await island()).toContain('() => total()')
   })
 
   it('reads a source file again once it was edited, replaced, retargeted or deleted, with nothing telling the cache', async () => {
@@ -1537,23 +1453,18 @@ describe('what a build keeps in memory', () => {
     const graph = new Map()
     const classes = async () => [...(await readClientSources(project, {}, graph)).classes]
 
-    try {
-      expect(await classes()).toEqual(expect.arrayContaining(['chip-a', 'text-red-500']))
+    expect(await classes()).toEqual(expect.arrayContaining(['chip-a', 'text-red-500']))
 
-      await Bun.write(join(project, 'node_modules/lib/chip.kay'), '---\nimport \'./colors\'\n---\np.chip-b x\n')
-      expect(await classes()).toEqual(expect.arrayContaining(['chip-b']))
-      expect(await classes()).not.toContain('chip-a')
+    await Bun.write(join(project, 'node_modules/lib/chip.kay'), '---\nimport \'./colors\'\n---\np.chip-b x\n')
+    expect(await classes()).toEqual(expect.arrayContaining(['chip-b']))
+    expect(await classes()).not.toContain('chip-a')
 
-      await Bun.write(join(project, 'node_modules/lib/colors.ts'), 'export const color = \'text-blue-500\'\n')
-      await Bun.write(join(project, 'src/routes/index.kay'), '---\nimport Chip from \'lib/chip.kay\'\n---\nChip\np.own-class y\n')
-      const after = await classes()
+    await Bun.write(join(project, 'node_modules/lib/colors.ts'), 'export const color = \'text-blue-500\'\n')
+    await Bun.write(join(project, 'src/routes/index.kay'), '---\nimport Chip from \'lib/chip.kay\'\n---\nChip\np.own-class y\n')
+    const after = await classes()
 
-      expect(after).toEqual(expect.arrayContaining(['text-blue-500', 'chip-b', 'own-class']))
-      expect(after).not.toContain('text-red-500')
-    }
-    finally {
-      await rm(project, { recursive: true, force: true })
-    }
+    expect(after).toEqual(expect.arrayContaining(['text-blue-500', 'chip-b', 'own-class']))
+    expect(after).not.toContain('text-red-500')
   })
 
   it('finds the runtime chunk once while the modules it was found in, and what the key says, stay as they were', async () => {
@@ -1751,27 +1662,22 @@ describe('the size report', () => {
       'src/routes/index.kay': '---\nimport Big from \'../big.kay\'\nimport Small from \'../small.kay\'\n---\nBig\nSmall\n',
     })
 
-    try {
-      const { report, dir, entry, entryImports } = await buildClient(root, { minify: true, report: 'modules' })
-      const gzip = async (url: string) => Bun.gzipSync(await Bun.file(join(dir, url.replace('/_kay/', ''))).bytes(), { level: 9 }).length
-      const entryGzip = (await Promise.all([entry!, ...entryImports].map(gzip))).reduce((sum, size) => sum + size, 0)
+    const { report, dir, entry, entryImports } = await buildClient(root, { minify: true, report: 'modules' })
+    const gzip = async (url: string) => Bun.gzipSync(await Bun.file(join(dir, url.replace('/_kay/', ''))).bytes(), { level: 9 }).length
+    const entryGzip = (await Promise.all([entry!, ...entryImports].map(gzip))).reduce((sum, size) => sum + size, 0)
 
-      expect(report!.entry!.size.gzip).toBe(entryGzip)
-      expect(report!.entry!.modules!.map(module => module.name)).toContain('kay/src/runtime/dom.ts')
-      expect(report!.islands.map(island => island.file)).toEqual(['src/big.kay', 'src/small.kay'])
-      expect(report!.islands[0]!.size.gzip).toBeGreaterThan(report!.islands[1]!.size.gzip)
-      expect(report!.islands[0]!.modules![0]).toEqual({ name: 'src/data.ts', bytes: expect.any(Number) })
+    expect(report!.entry!.size.gzip).toBe(entryGzip)
+    expect(report!.entry!.modules!.map(module => module.name)).toContain('kay/src/runtime/dom.ts')
+    expect(report!.islands.map(island => island.file)).toEqual(['src/big.kay', 'src/small.kay'])
+    expect(report!.islands[0]!.size.gzip).toBeGreaterThan(report!.islands[1]!.size.gzip)
+    expect(report!.islands[0]!.modules![0]).toEqual({ name: 'src/data.ts', bytes: expect.any(Number) })
 
-      const printed = formatSizeReport(report!)
+    const printed = formatSizeReport(report!)
 
-      expect(printed).toMatch(/^ {2}entry, loaded by every page with an island {2}\d+\.\d KB \(\d+\.\d KB\)$/m)
-      expect(printed).toMatch(/^ {2}src\/big\.kay +\+\d+\.\d KB \(\d+\.\d KB\)\n {6}an island because of `onClick`, line 7\n {6}src\/data\.ts {2}\d+\.\d KB$/m)
-      // An island holding only itself is not broken down.
-      expect(printed.split('\n').at(-1)).toBe('      an island because of `onClick`, line 6')
-    }
-    finally {
-      await rm(root, { recursive: true, force: true })
-    }
+    expect(printed).toMatch(/^ {2}entry, loaded by every page with an island {2}\d+\.\d KB \(\d+\.\d KB\)$/m)
+    expect(printed).toMatch(/^ {2}src\/big\.kay +\+\d+\.\d KB \(\d+\.\d KB\)\n {6}an island because of `onClick`, line 7\n {6}src\/data\.ts {2}\d+\.\d KB$/m)
+    // An island holding only itself is not broken down.
+    expect(printed.split('\n').at(-1)).toBe('      an island because of `onClick`, line 6')
   })
 
   it('says what makes each component an island, and what may make a static one', async () => {
@@ -1786,25 +1692,20 @@ describe('the size report', () => {
       'src/routes/index.kay': '---\nimport Clicks from \'../clicks.kay\'\nimport Field from \'../field.kay\'\nimport State from \'../state.kay\'\nimport Client from \'../client.kay\'\nimport Wrap from \'../wrap.kay\'\nimport Handle from \'../handle.kay\'\nimport Ago from \'../ago.kay\'\n---\nClicks\nField\nState\nClient\nWrap\nHandle\nAgo\n',
     })
 
-    try {
-      const { report } = await buildClient(root, { minify: true, report: 'sizes' })
-      const why = Object.fromEntries(report!.islands.map(island => [island.file, island.why]))
+    const { report } = await buildClient(root, { minify: true, report: 'sizes' })
+    const why = Object.fromEntries(report!.islands.map(island => [island.file, island.why]))
 
-      expect(why).toEqual({
-        'src/clicks.kay': '`onClick`, line 1',
-        'src/field.kay': '`bind:value`, line 4',
-        'src/state.kay': '`signal` from kay',
-        'src/client.kay': 'a `--- client` fence',
-        'src/handle.kay': '`ref`, line 4',
-        'src/ago.kay': '`relativeTime` from kay/i18n',
-        'src/wrap.kay': '`format` passed to Clicks, line 7',
-      })
-      expect(report!.islands.filter(island => island.promoted).map(island => island.file)).toEqual(['src/wrap.kay'])
-      expect(formatSizeReport(report!)).toContain('static unless it passes an island what only an island sends: `format` passed to Clicks, line 7')
-    }
-    finally {
-      await rm(root, { recursive: true, force: true })
-    }
+    expect(why).toEqual({
+      'src/clicks.kay': '`onClick`, line 1',
+      'src/field.kay': '`bind:value`, line 4',
+      'src/state.kay': '`signal` from kay',
+      'src/client.kay': 'a `--- client` fence',
+      'src/handle.kay': '`ref`, line 4',
+      'src/ago.kay': '`relativeTime` from kay/i18n',
+      'src/wrap.kay': '`format` passed to Clicks, line 7',
+    })
+    expect(report!.islands.filter(island => island.promoted).map(island => island.file)).toEqual(['src/wrap.kay'])
+    expect(formatSizeReport(report!)).toContain('static unless it passes an island what only an island sends: `format` passed to Clicks, line 7')
   })
 
   it('reports no JavaScript bundle for a site with no island', () => {
@@ -1992,58 +1893,53 @@ describe('the build report', () => {
     }
     const stored = projectPaths(root).report
 
-    try {
-      const firstResult = await build()
-      const first = firstResult.built!
-      const byRoute = Object.fromEntries(first.summary.routes.map(each => [each.route, each]))
+    const firstResult = await build()
+    const first = firstResult.built!
+    const byRoute = Object.fromEntries(first.summary.routes.map(each => [each.route, each]))
 
-      expect(first.previous).toBeUndefined()
-      expect(byRoute['/']).toMatchObject({ pages: 1, estimated: false })
-      expect(byRoute['/']!.js).toBeGreaterThan(0)
-      expect(byRoute['/']!.css).toBeGreaterThan(0)
-      expect(byRoute['/plain']).toMatchObject({ pages: 1, js: 0, css: 0 })
-      // Not prerendered, so the scripts are what its components can load: the entry and the island.
-      expect(byRoute['/live']).toMatchObject({ pages: 0, estimated: true })
-      expect(byRoute['/live']!.js).toBe(byRoute['/']!.js)
-      expect(first.summary.stages.map(stage => stage.name)).toEqual(['check', 'bundle', 'prerender', 'route sizes', 'images and cards', 'favicons', 'page hooks', 'compress'])
-      expect(first.summary.stages.every(stage => stage.ms >= 0)).toBe(true)
-      expect(first.summary.caches.find(cache => cache.name === 'components')).toBeDefined()
-      expect(first.summary.caches.find(cache => cache.name === 'components')!.made).toBeGreaterThan(0)
-      expect(existsSync(stored)).toBe(true)
+    expect(first.previous).toBeUndefined()
+    expect(byRoute['/']).toMatchObject({ pages: 1, estimated: false })
+    expect(byRoute['/']!.js).toBeGreaterThan(0)
+    expect(byRoute['/']!.css).toBeGreaterThan(0)
+    expect(byRoute['/plain']).toMatchObject({ pages: 1, js: 0, css: 0 })
+    // Not prerendered, so the scripts are what its components can load: the entry and the island.
+    expect(byRoute['/live']).toMatchObject({ pages: 0, estimated: true })
+    expect(byRoute['/live']!.js).toBe(byRoute['/']!.js)
+    expect(first.summary.stages.map(stage => stage.name)).toEqual(['check', 'bundle', 'prerender', 'route sizes', 'images and cards', 'favicons', 'page hooks', 'compress'])
+    expect(first.summary.stages.every(stage => stage.ms >= 0)).toBe(true)
+    expect(first.summary.caches.find(cache => cache.name === 'components')).toBeDefined()
+    expect(first.summary.caches.find(cache => cache.name === 'components')!.made).toBeGreaterThan(0)
+    expect(existsSync(stored)).toBe(true)
 
-      // Built again with nothing edited, everything compiled comes from the cache and the sizes are the same.
-      const second = (await build()).built!
-      const components = second.summary.caches.find(cache => cache.name === 'components')!
+    // Built again with nothing edited, everything compiled comes from the cache and the sizes are the same.
+    const second = (await build()).built!
+    const components = second.summary.caches.find(cache => cache.name === 'components')!
 
-      expect(components.cached).toBeGreaterThan(0)
-      expect(components.made).toBe(0)
-      expect(second.previous!.routes['/']).toEqual({ js: byRoute['/']!.js, css: byRoute['/']!.css, estimated: false })
-      expect(formatBuildReport(second.report, second.summary, { previous: second.previous })).not.toContain('[')
+    expect(components.cached).toBeGreaterThan(0)
+    expect(components.made).toBe(0)
+    expect(second.previous!.routes['/']).toEqual({ js: byRoute['/']!.js, css: byRoute['/']!.css, estimated: false })
+    expect(formatBuildReport(second.report, second.summary, { previous: second.previous })).not.toContain('[')
 
-      // A failed build, the check refusing it, leaves the sizes of the last good one for the next to compare to.
-      const kept = await Bun.file(stored).text()
+    // A failed build, the check refusing it, leaves the sizes of the last good one for the next to compare to.
+    const kept = await Bun.file(stored).text()
 
-      await Bun.write(join(root, 'src/routes/plain.kay'), '--- server\nexport const page = { prerender: true }\n---\na(href="/nowhere") Lost\n')
-      expect((await build()).failed).toEqual({ stage: 'check' })
-      expect(await Bun.file(stored).text()).toBe(kept)
+    await Bun.write(join(root, 'src/routes/plain.kay'), '--- server\nexport const page = { prerender: true }\n---\na(href="/nowhere") Lost\n')
+    expect((await build()).failed).toEqual({ stage: 'check' })
+    expect(await Bun.file(stored).text()).toBe(kept)
 
-      await Bun.write(join(root, 'src/routes/plain.kay'), '--- server\nexport const page = { prerender: true }\n---\nhead\n  title Plain\n  meta(name="description" content="Plain")\np Plain\n')
-      await Bun.write(join(root, 'src/routes/extra.kay'), '--- server\nexport const page = { prerender: true }\n---\nhead\n  title Extra\n  meta(name="description" content="Extra")\np Extra\n')
+    await Bun.write(join(root, 'src/routes/plain.kay'), '--- server\nexport const page = { prerender: true }\n---\nhead\n  title Plain\n  meta(name="description" content="Plain")\np Plain\n')
+    await Bun.write(join(root, 'src/routes/extra.kay'), '--- server\nexport const page = { prerender: true }\n---\nhead\n  title Extra\n  meta(name="description" content="Extra")\np Extra\n')
 
-      const third = (await build()).built!
+    const third = (await build()).built!
 
-      expect(third.previous!.routes['/extra']).toBeUndefined()
-      expect(formatBuildReport(third.report, third.summary, { previous: third.previous })).toMatch(/^ {2}\/extra +prerendered +0\.0 KB \[new\] +0\.0 KB \[new\]$/m)
+    expect(third.previous!.routes['/extra']).toBeUndefined()
+    expect(formatBuildReport(third.report, third.summary, { previous: third.previous })).toMatch(/^ {2}\/extra +prerendered +0\.0 KB \[new\] +0\.0 KB \[new\]$/m)
 
-      // A static export weighs differently, so it is not compared to a server build.
-      expect((await build({ exportTo: 'dist' })).built!.previous).toBeUndefined()
-      expect((await build({ exportTo: 'dist' })).built!.previous).toBeDefined()
-      // And each kind keeps its own, so switching between them loses neither.
-      expect((await build()).built!.previous).toBeDefined()
-    }
-    finally {
-      await rm(root, { recursive: true, force: true })
-    }
+    // A static export weighs differently, so it is not compared to a server build.
+    expect((await build({ exportTo: 'dist' })).built!.previous).toBeUndefined()
+    expect((await build({ exportTo: 'dist' })).built!.previous).toBeDefined()
+    // And each kind keeps its own, so switching between them loses neither.
+    expect((await build()).built!.previous).toBeDefined()
   }, 120_000)
 })
 
@@ -2194,13 +2090,8 @@ describe('the files a build writes', () => {
       })
     } }
 
-    try {
-      await expect(buildClient(root, { plugins: [plugin] })).rejects.toThrow('no islands')
-      expect(styled).toBe(true)
-    }
-    finally {
-      await rm(root, { recursive: true, force: true })
-    }
+    await expect(buildClient(root, { plugins: [plugin] })).rejects.toThrow('no islands')
+    expect(styled).toBe(true)
   })
 
   it('says an error\'s message when its stack starts with the name alone, in logs and on the page of a server failing to boot', () => {
@@ -2235,23 +2126,18 @@ describe('a compiled server\'s images', () => {
 
     await Bun.write(join(root, 'src/hero.png'), encodePng(new Uint8Array(96 * 64 * 4).map((_, at) => at % 4 === 3 ? 255 : (at * 37) % 251), 96, 64))
 
-    try {
-      const [report, code] = await printed(Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', root, '--compile', join(root, 'server')], { stdout: 'pipe', stderr: 'pipe' }))
+    const [report, code] = await printed(Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', root, '--compile', join(root, 'server')], { stdout: 'pipe', stderr: 'pipe' }))
 
-      expect(report).not.toContain('error')
-      expect(code).toBe(0)
-      // The coders' wasm is embedded zstd-compressed, and no other wasm is in this executable.
-      expect(Buffer.from(await Bun.file(join(root, 'server')).arrayBuffer()).includes(Buffer.from([0, 0x61, 0x73, 0x6D, 1, 0, 0, 0]))).toBe(false)
+    expect(report).not.toContain('error')
+    expect(code).toBe(0)
+    // The coders' wasm is embedded zstd-compressed, and no other wasm is in this executable.
+    expect(Buffer.from(await Bun.file(join(root, 'server')).arrayBuffer()).includes(Buffer.from([0, 0x61, 0x73, 0x6D, 1, 0, 0, 0]))).toBe(false)
 
-      const child = Bun.spawn([join(root, 'server')], { cwd: root, env: { ...process.env, NODE_ENV: 'production' }, stdout: 'pipe', stderr: 'pipe' })
-      const [output, errors, exit] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+    const child = Bun.spawn([join(root, 'server')], { cwd: root, env: { ...process.env, NODE_ENV: 'production' }, stdout: 'pipe', stderr: 'pipe' })
+    const [output, errors, exit] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
 
-      expect({ exit, errors }).toEqual({ exit: 0, errors: expect.any(String) })
-      expect(JSON.parse(output.trim().split('\n').at(-1)!)).toEqual({ status: 200, type: 'image/avif', brand: 'avif', decoded: 200 })
-    }
-    finally {
-      await rm(root, { recursive: true, force: true })
-    }
+    expect({ exit, errors }).toEqual({ exit: 0, errors: expect.any(String) })
+    expect(JSON.parse(output.trim().split('\n').at(-1)!)).toEqual({ status: 200, type: 'image/avif', brand: 'avif', decoded: 200 })
   }, 60_000)
 })
 
@@ -2285,33 +2171,28 @@ describe('a stylesheet imported as text', () => {
       return JSON.parse(output.trim().split('\n').at(-1)!) as { theme: string, later: string, shared: string, page: string, other: string }
     }
 
-    try {
-      const built = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', root, '--compile', join(root, 'server')], { stdout: 'pipe', stderr: 'pipe' })
-      const [report, code] = await printed(built)
+    const built = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', root, '--compile', join(root, 'server')], { stdout: 'pipe', stderr: 'pipe' })
+    const [report, code] = await printed(built)
 
-      expect(report).not.toContain('error')
-      expect(code).toBe(0)
-      const expected = { theme, later: '.later { color: green }\n', shared: '.shared { color: plum }\n', page: String(theme.length), other: String('.other { color: olive }\n'.length) }
+    expect(report).not.toContain('error')
+    expect(code).toBe(0)
+    const expected = { theme, later: '.later { color: green }\n', shared: '.shared { color: plum }\n', page: String(theme.length), other: String('.other { color: olive }\n'.length) }
 
-      expect(await read([join(root, 'server')])).toEqual(expected)
-      expect(await read([process.execPath, 'src/server.ts'])).toEqual(expected)
-      // A stylesheet imported for its effect leaves no text behind in the code.
-      expect((await Bun.file(join(root, 'server')).text()).includes('.app { color')).toBe(false)
+    expect(await read([join(root, 'server')])).toEqual(expected)
+    expect(await read([process.execPath, 'src/server.ts'])).toEqual(expected)
+    // A stylesheet imported for its effect leaves no text behind in the code.
+    expect((await Bun.file(join(root, 'server')).text()).includes('.app { color')).toBe(false)
 
-      const files = await readdir(clientDir(root), { recursive: true })
-      const joined = async (extension: string) => (await Promise.all(files.filter(name => name.endsWith(extension)).map(async name => Bun.file(join(clientDir(root), name)).text()))).join('')
-      const [styles, scripts] = await Promise.all([joined('.css'), joined('.js')])
+    const files = await readdir(clientDir(root), { recursive: true })
+    const joined = async (extension: string) => (await Promise.all(files.filter(name => name.endsWith(extension)).map(async name => Bun.file(join(clientDir(root), name)).text()))).join('')
+    const [styles, scripts] = await Promise.all([joined('.css'), joined('.js')])
 
-      expect(styles).toContain('.app')
-      expect(styles).not.toContain('themed')
-      expect(styles).not.toContain('badge-text')
-      expect(scripts).toContain('.badge-text { color: gold }')
-      expect(scripts).toContain('.tag-text { color: navy }')
-      expect(scripts).not.toContain('.app { color')
-    }
-    finally {
-      await rm(root, { recursive: true, force: true })
-    }
+    expect(styles).toContain('.app')
+    expect(styles).not.toContain('themed')
+    expect(styles).not.toContain('badge-text')
+    expect(scripts).toContain('.badge-text { color: gold }')
+    expect(scripts).toContain('.tag-text { color: navy }')
+    expect(scripts).not.toContain('.app { color')
   }, 60_000)
 })
 
@@ -2359,54 +2240,49 @@ process.exit(0)
 `,
     })
 
-    try {
-      const [report, code] = await printed(Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', root, '--no-check', '--compile', join(root, 'server')], { stdout: 'pipe', stderr: 'pipe' }))
+    const [report, code] = await printed(Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', root, '--no-check', '--compile', join(root, 'server')], { stdout: 'pipe', stderr: 'pipe' }))
 
-      expect(report).not.toContain('error')
-      expect(code).toBe(0)
+    expect(report).not.toContain('error')
+    expect(code).toBe(0)
 
-      const client = await Bun.file(join(clientDir(root), 'THIRD-PARTY-LICENSES.txt')).text()
+    const client = await Bun.file(join(clientDir(root), 'THIRD-PARTY-LICENSES.txt')).text()
 
-      expect(client).toContain('\ndevalue ')
-      expect(client).toContain('@fontsource/inter ')
-      expect(client).toContain('SIL Open Font License')
-      expect(client).toContain('@iconify-json/tabler ')
-      expect(client).toContain('Tabler Icons by Paweł Kuna')
-      // The server's own packages are no business of the browser's.
-      expect(client).not.toContain('\nelysia ')
+    expect(client).toContain('\ndevalue ')
+    expect(client).toContain('@fontsource/inter ')
+    expect(client).toContain('SIL Open Font License')
+    expect(client).toContain('@iconify-json/tabler ')
+    expect(client).toContain('Tabler Icons by Paweł Kuna')
+    // The server's own packages are no business of the browser's.
+    expect(client).not.toContain('\nelysia ')
 
-      const served = new Elysia()
+    const served = new Elysia()
 
-      await serveBuildFiles(served, { dir: clientDir(root) } as ClientBuild, { dev: false, security: undefined })
+    await serveBuildFiles(served, { dir: clientDir(root) } as ClientBuild, { dev: false, security: undefined })
 
-      const response = await served.handle(new Request('http://localhost/_kay/THIRD-PARTY-LICENSES.txt'))
+    const response = await served.handle(new Request('http://localhost/_kay/THIRD-PARTY-LICENSES.txt'))
 
-      expect(response.status).toBe(200)
-      // Named the same from one build to the next, so it is asked for again each time.
-      expect(response.headers.get('cache-control')).toBe('no-cache')
-      expect(await response.text()).toBe(client)
+    expect(response.status).toBe(200)
+    // Named the same from one build to the next, so it is asked for again each time.
+    expect(response.headers.get('cache-control')).toBe('no-cache')
+    expect(await response.text()).toBe(client)
 
-      const executable = Bun.spawn([join(root, 'server'), '--licenses'], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
-      const [printedNotices, exitCode] = await Promise.all([new Response(executable.stdout).text(), executable.exited])
+    const executable = Bun.spawn([join(root, 'server'), '--licenses'], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
+    const [printedNotices, exitCode] = await Promise.all([new Response(executable.stdout).text(), executable.exited])
 
-      expect(exitCode).toBe(0)
-      expect(printedNotices).toContain('\nelysia ')
-      expect(printedNotices).toContain('\ndevalue ')
-      expect(printedNotices).toContain('@fontsource/inter ')
+    expect(exitCode).toBe(0)
+    expect(printedNotices).toContain('\nelysia ')
+    expect(printedNotices).toContain('\ndevalue ')
+    expect(printedNotices).toContain('@fontsource/inter ')
 
-      // The executable reads nothing from the sources, the layouts' settings and the favicon included.
-      await rename(join(root, 'src'), join(root, 'moved'))
-      await rename(join(root, 'lib'), join(root, 'moved-lib'))
-      const child = Bun.spawn([join(root, 'server')], { cwd: root, env: { ...process.env, NODE_ENV: 'production' }, stdout: 'pipe', stderr: 'pipe' })
-      const [output, errors, exited] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+    // The executable reads nothing from the sources, the layouts' settings and the favicon included.
+    await rename(join(root, 'src'), join(root, 'moved'))
+    await rename(join(root, 'lib'), join(root, 'moved-lib'))
+    const child = Bun.spawn([join(root, 'server')], { cwd: root, env: { ...process.env, NODE_ENV: 'production' }, stdout: 'pipe', stderr: 'pipe' })
+    const [output, errors, exited] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
 
-      expect({ exited, errors }).toEqual({ exited: 0, errors: expect.any(String) })
-      expect(JSON.parse(output.trim().split('\n').at(-1)!)).toEqual({ home: 200, leave: 200, promote: 403, admin: 200, demote: 403, demoted: 200, locked: 403, unlocked: 200, track: 403, tracked: 200, editor: true, sheet: true, icons: [200, 200, 200], card: [200, 'image/jpeg'] })
-      expect((await Bun.file(join(root, 'server')).text()).includes('resvg-js')).toBe(false)
-    }
-    finally {
-      await rm(root, { recursive: true, force: true })
-    }
+    expect({ exited, errors }).toEqual({ exited: 0, errors: expect.any(String) })
+    expect(JSON.parse(output.trim().split('\n').at(-1)!)).toEqual({ home: 200, leave: 200, promote: 403, admin: 200, demote: 403, demoted: 200, locked: 403, unlocked: 200, track: 403, tracked: 200, editor: true, sheet: true, icons: [200, 200, 200], card: [200, 'image/jpeg'] })
+    expect((await Bun.file(join(root, 'server')).text()).includes('resvg-js')).toBe(false)
   }, 60_000)
 })
 
