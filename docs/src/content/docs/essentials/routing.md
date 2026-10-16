@@ -94,7 +94,7 @@ export function GET({ params }: EndpointContext<{ slug: string }>) {
 }
 ```
 
-`GET` gets the `request`, `url`, `params` and `locals`, and returns a string, a `Blob` or a `Response`. A string goes out as the type its extension names, `text/plain` for `llms.txt`. The guards above it run first, as they do for a page, and `kay build --static` writes it to a file.
+`GET` gets the same `ctx` a page does, minus what only a page has: `request`, `url`, `locale`, `params`, `cookies`, `locals`, `headers`, `redirect`, `notFound` and `deny`. Cookies and headers it sets go out with its answer. It returns a string, a `Blob` or a `Response`. A string goes out as the type its extension names, `text/plain` for `llms.txt`. The guards above it run first, as they do for a page, and `kay build --static` writes it to a file.
 
 ## Not found and errors
 

@@ -11,6 +11,10 @@ kay and its libraries share one version number, so one section covers them all. 
 
 ## 1.46.0
 
+### `ctx.locale` is the site's language in actions and guards without `i18n`
+
+In an action, a guard on an action and a guard on an API route it was an empty string, and in a page the site's `lang`, English by default. It is the site's `lang` everywhere now. A check such as `if (!ctx.locale)` in an action or a guard never holds any more.
+
 ### `deprecated-schema-name` is in the `deprecated` group
 
 `lints: { code: ... }` in `kay.config.ts` no longer sets it, and `kay check --only code` no longer lists it. Set `deprecated`, or the lint by name. `kay upgrade` rewrites it, and every deprecation after it, as it moves your app. See [Deprecations](/reference/checks#deprecations).

@@ -4,6 +4,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ## 1.46.0
 
+### `ctx.locale` is the site's language in actions, guards on actions and API routes without `i18n`
+
+- It was an empty string there and the site's `lang` (English by default) in a page; all of them read the site's `lang` now, so an `if (!ctx.locale)` in an action or a guard never holds: test `ctx.locale === lang`, or drop it.
+
 ### `deprecated-schema-name` is in the `deprecated` group
 
 - `lints: { code: ... }` in `kay.config.ts` no longer sets it, and `kay check --only code` no longer lists it: set `deprecated` or the lint by name. `kay upgrade` rewrites it and every later deprecation, see [Checks](checks.md#apply-the-quick-fixes).

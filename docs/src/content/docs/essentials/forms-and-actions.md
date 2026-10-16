@@ -77,7 +77,7 @@ A handler that throws is logged, and the form shows `Something went wrong on our
 
 ## Redirecting after success
 
-`ctx.redirect()` in the handler sends the browser elsewhere. Without it the post goes back to the page, where `add.succeeded()` holds what the handler returned for that one render.
+`ctx.redirect()` in the handler sends the browser elsewhere. It throws, so write it as a statement, with no `return`. The handler's `ctx` also has `url`, `notFound()` and `deny()`, as a page's does. Without it the post goes back to the page, where `add.succeeded()` holds what the handler returned for that one render.
 
 ```kay
 export const signUp = action(schema, async (input, ctx) => {

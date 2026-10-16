@@ -166,7 +166,7 @@ import { guard } from 'kay'
 
 export default guard(({ locals, redirect, deny }) => {
   if (locals.user === undefined)
-    return redirect('/login')
+    redirect('/login')
 
   if (!locals.user.admin)
     deny(403, 'Admins only')
@@ -262,7 +262,7 @@ export default defineConfig({ requireGuards: true })
 
 - A `_guard.ts` in a routes directory runs before every page and every action in that directory and below, outermost first.
 - It lets the request through unless it redirects or denies.
-- Its `ctx` has `request`, `url`, `locale`, `params`, `cookies`, `locals`, `headers`, `redirect` and `deny`; cookies and headers it sets reach the response either way.
+- Its `ctx` is the request context every kind of route shares (see routing, "The request context"): `request`, `url`, `locale`, `params`, `cookies`, `locals`, `headers`, `redirect`, `notFound` and `deny`; cookies and headers it sets reach the response either way.
 - Its `url` is spelled one way whatever the request sent: each segment decoded, then written as `new URL` writes it, leading slashes collapsed, so `/%61dmin/x` and `//admin/x` read as `/admin/x`, as `ctx.params` reads them, while `/@admin` stays `/@admin`; a segment with a malformed escape stays as sent, and so does the page's own URL.
 - A page or an action has its trailing slash as `trailingSlash` writes it; an API route, an endpoint or an image keeps the one sent.
 - `ctx.params` holds the params of the page asked for, each matcher's value in place of its text: `src/routes/orgs/[org]/_guard.ts` reads `params.org`.

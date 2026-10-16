@@ -197,7 +197,7 @@ export default defineMessages({
 - `formatNumber(value, options)` and `formatDate(value, options)` format through `Intl` for the request's locale, and so do `formatRelativeTime(date)`, a date relative to now in the largest unit it reaches, `3 days ago`, `yesterday` or `in 2 hours`, `formatRelativeTime(2, 'week')` in the unit given, and `formatList(['Ada', 'Grace'])`, `Ada and Grace`.
 - In an island, give `formatRelativeTime` the moment it is relative to, `{ now }`, from the server, so the browser renders what the server did, or use `relativeTime`.
 - `direction()` is `rtl` or `ltr`, for the request's locale or the one given.
-- `locale()` names it, as do `ctx.locale` in pages and guards and an action's `ctx.locale`.
+- `locale()` names it, as do `ctx.locale` in pages, guards, endpoints and actions, the site's `lang` (English by default) without `i18n`.
 - A link written as the default locale names a page, `a(href="/about")`, goes to the page's locale's copy as it renders: `/en/about` on an English page, translated by `paths`, on the locale's host with `domains`.
 - So do links to a localized collection's feed, the links of Markdown entries, and those an island renders in the browser, so converting a site needs no change to its links.
 - A link carrying `hreflang` stays as written, as a language switcher's must: `a(href={alternate('fr')} hreflang="fr")`.

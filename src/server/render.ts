@@ -54,7 +54,7 @@ import { chainQuery, queryRules, queryScript, readQuery, readQueryLeniently } fr
 import { reportServerError } from './report'
 import { guardUrl, routeChain } from './routes'
 import { inServerScope, readPersonally, wasReadPersonally, withOutcome } from './scope'
-import { Denied, NotFound, Redirect } from './signals'
+import { Denied, NotFound, Redirect, stoppers } from './signals'
 import { speculationRules } from './speculation'
 import { renderStatic, settle, streamDocument } from './stream'
 import { traced } from './trace'
@@ -601,15 +601,7 @@ function createRendering(context: RequestContext, params: Record<string, unknown
         rendering.status = code
       },
       headers,
-      redirect: (location, code = 302) => {
-        throw new Redirect(location, code)
-      },
-      notFound: () => {
-        throw new NotFound()
-      },
-      deny: (code = 403, message) => {
-        throw new Denied(code, message)
-      },
+      ...stoppers(request),
       failed: (action) => {
         const read = asked()
 

@@ -276,25 +276,32 @@ export function selection<Key extends string | number>(initial?: Key): Selection
   return Object.assign(read, { set, is })
 }
 
-export interface PageContext<Params extends Record<string, unknown> = Record<string, string>, Query = Readonly<Record<string, unknown>>> {
+// What every request kay answers reads and does the same way, in a page, a layout, a guard, an endpoint and an action: who asks, where, in which locale, and how to stop with a redirect, a denial or a 404.
+export interface RequestContext<Params extends Record<string, unknown> = Record<string, string>> {
   request: Request
   url: URL
-  // The locale the page is served in, as `i18n` in kay.config.ts gives it; the site's `lang` without.
+  // The locale the request is served in, as `i18n` in kay.config.ts gives it; the site's `lang` without.
   locale: Locale
   params: Params
-  // The search params, read against the `query` of the page and its layouts, `export const page = { query: s.Object(...) }`, merged; a query it refuses answers 400. Their raw text is `url.searchParams`.
-  query: Query
-  // Read on demand; what a page sets or deletes goes out as Set-Cookie headers, redirects included.
+  // Read on demand; what is set or deleted goes out as Set-Cookie headers, redirects included.
   cookies: CookieMap
   // What the app's Elysia `derive`, `resolve` and `decorate` add, typed through `Register`.
   locals: Locals
-  // Response status and headers of the page being rendered.
-  status: (code: number) => void
+  // Added to the response, whichever way the request ends.
   headers: Headers
+  // Stops with a redirect, 302 for a read and 303 for a post unless given; it throws, so what follows does not run.
   redirect: Redirect
+  // Stops with a 404, rendering the nearest `_error.kay` for a page.
   notFound: () => never
-  // Ends with that status, 403 unless given, rendering the nearest `_error.kay` with `message`.
+  // Ends with that status, 403 unless given, rendering the nearest `_error.kay` with `message` for a page.
   deny: (status?: number, message?: string) => never
+}
+
+export interface PageContext<Params extends Record<string, unknown> = Record<string, string>, Query = Readonly<Record<string, unknown>>> extends RequestContext<Params> {
+  // The search params, read against the `query` of the page and its layouts, `export const page = { query: s.Object(...) }`, merged; a query it refuses answers 400. Their raw text is `url.searchParams`.
+  query: Query
+  // The response status of the page being rendered.
+  status: (code: number) => void
   // Why the plain form post to `action` this page answers was refused, when it was.
   failed: <Target extends Action<never, unknown>>(action: Target) => FailureOf<Target> | undefined
   // What the last plain form post to `action` returned, when it succeeded; read once, on the page the browser went back to.
@@ -328,12 +335,12 @@ export interface ErrorPageContext<Params extends Record<string, unknown> = Recor
 
 // What a `_guard.ts` decides from: who is asking, and the params of the page asked for, each matcher's value in place of its text.
 // For an action, `url` is the action's and `params` those of the page it was posted from; for an API route, its own as Elysia hands them to the handler.
-export type GuardContext = Pick<PageContext<RouteParams>, 'request' | 'url' | 'locale' | 'params' | 'cookies' | 'locals' | 'headers' | 'redirect' | 'deny'>
+export type GuardContext = RequestContext<RouteParams>
 
 export type Guard = (ctx: GuardContext) => void | Promise<void>
 
 // What the `GET` of an endpoint file reads: `src/routes/feeds/[slug].json.ts` gets `{ slug }`, the extension left out.
-export type EndpointContext<Params extends Record<string, unknown> = Record<string, string>> = Pick<PageContext<Params>, 'request' | 'url' | 'params' | 'locals'>
+export type EndpointContext<Params extends Record<string, unknown> = Record<string, string>> = RequestContext<Params>
 // A string or a Blob it returns is served with the type its file's extension names; a Response goes out as it is.
 export type EndpointBody = string | Blob | Response
 

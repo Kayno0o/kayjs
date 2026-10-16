@@ -19,7 +19,7 @@ export const password = action(schemas.signIn, async (input, ctx) => {
   if (!result.ok)
     return ctx.fail(400, { error: result.error === 'invalid' ? 'credentials' : refusedFor(result.error, input) })
 
-  return ctx.redirect(result.redirect)
+  ctx.redirect(result.redirect)
 }, guarded)
 
 export const magicLink = action(schemas.magicLink, async (input, ctx) => {
@@ -34,7 +34,7 @@ export const emailCode = action(schemas.emailCode, async ({ code }, ctx) => {
   if (!result.ok)
     return ctx.fail(400, { error: result.error === 'invalid' ? 'code' : result.error })
 
-  return ctx.redirect(result.redirect)
+  ctx.redirect(result.redirect)
 })
 
 export const passkeyOptions = action(async (ctx) => ctx.locals.auth.passkeySignInOptions())

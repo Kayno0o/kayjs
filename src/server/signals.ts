@@ -1,3 +1,4 @@
+import type { RequestContext } from '../runtime'
 import { nodeHttp } from './builtins'
 
 // Thrown by `ctx.redirect()`, `ctx.notFound()` and `ctx.deny()` to end a guard, page or action early; the server turns them into responses.
@@ -30,5 +31,22 @@ export class Denied {
 
   constructor(readonly status: number, message?: string) {
     this.message = message ?? nodeHttp().STATUS_CODES[status] ?? 'Denied'
+  }
+}
+
+// What `ctx.redirect`, `ctx.notFound` and `ctx.deny` do in every kind of context: a read is redirected with 302, a post with 303.
+export function stoppers(request: Request): Pick<RequestContext, 'redirect' | 'notFound' | 'deny'> {
+  const status = request.method === 'GET' || request.method === 'HEAD' ? 302 : 303
+
+  return {
+    redirect: (location, code = status) => {
+      throw new Redirect(location, code)
+    },
+    notFound: () => {
+      throw new NotFound()
+    },
+    deny: (code = 403, message) => {
+      throw new Denied(code, message)
+    },
   }
 }

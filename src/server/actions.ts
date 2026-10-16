@@ -25,7 +25,7 @@ import { importModule } from './bundle'
 import { cookieJar } from './cookies'
 import { handOver, submittedValues, writeSuccess } from './flash'
 import { requiredGuards, runGuards, unguarded } from './guards'
-import { requestLocale, stateFor } from './i18n'
+import { DEFAULT_LANG, requestLocale, stateFor } from './i18n'
 import { answeringRequest } from './log'
 import { countSucceeded, PRETEND, protectionRefusal, requestId } from './protection'
 import { sharedContext } from './render'
@@ -33,7 +33,7 @@ import { reportServerError } from './report'
 import { requestUrl } from './request-url'
 import { guardUrl } from './routes'
 import { carryContext } from './security'
-import { Denied, Redirect } from './signals'
+import { Denied, NotFound, Redirect, stoppers } from './signals'
 import { answered, SERVER_SPAN, traced } from './trace'
 import { visitAs } from './visit'
 
@@ -84,8 +84,9 @@ export interface ActionOptions {
   // Shows a failed action's message instead of a generic one.
   dev?: boolean | undefined
   onError?: KayConfig['onError'] | undefined
-  // An action runs in the locale of the page it was sent from, or the site's one language without `i18n`.
+  // An action runs in the locale of the page it was sent from, or the site's one language, `lang` or English, without `i18n`.
   i18n: I18n
+  lang?: string | undefined
   // Where the site is mounted, which the page a refused form post came from is served under.
   base?: string | undefined
   requireGuards?: boolean | undefined
@@ -127,7 +128,7 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], m
       limits.set(value.url, { bytes: value.protection?.bodyLimit, refuse: async (request, bytes, server) => tooLarge(value, request, bytes, server, back) })
       // A span per call, the handler's own spans and the page it renders back nested in it.
       app.post(value.url, async context => traced(`POST ${value.url}`, () => ({ kind: SERVER_SPAN, attributes: { 'http.request.method': 'POST', 'http.route': value.url, 'url.path': value.url, 'kay.request.id': requestId(context.request) } }), async (span) => {
-        const response = await answeringRequest(context.request, async () => inLocale(context.request, options, async () => runAction(value, sharedContext(context.request, () => ({ ...context })), options, back, () => readPage(context.request, page, match, options))))
+        const response = await answeringRequest(context.request, async () => inLocale(context.request, options, async () => runAction(value, sharedContext(context.request, () => ({ ...context })), options, back, { params: () => readPage(context.request, page, match, options), url: () => pageUrls.get(context.request) ?? guardedPage(context.request, page, match, options) })))
 
         if (span)
           answered(span, response.status)
@@ -434,9 +435,9 @@ export function inLocale<T>(request: Request, options: ActionOptions, run: () =>
 }
 
 // What `ctx.locale` reads: the request's locale, or the site's single language.
-function contextLocale(): Locale {
+export function contextLocale({ lang = DEFAULT_LANG }: Pick<ActionOptions, 'lang'>): Locale {
   // eslint-disable-next-line ts/no-unnecessary-type-assertion -- Locale is a string in kay itself and an app's own locales once its Register names them
-  return (localeState()?.locale ?? '') as Locale
+  return (localeState()?.locale ?? lang) as Locale
 }
 
 // The guards of the action's page, answering for it when one stops the request.
@@ -466,19 +467,14 @@ export async function passGuards(guards: LoadedGuard[], context: { request: Requ
   const ctx: GuardContext = {
     request,
     url,
-    locale: contextLocale(),
+    locale: contextLocale(options),
     params,
     get cookies() {
       return state.jar.cookies
     },
     locals: context as unknown as Locals,
     headers: state.headers,
-    redirect: (location, code = 303) => {
-      throw new Redirect(location, code)
-    },
-    deny: (code = 403, message) => {
-      throw new Denied(code, message)
-    },
+    ...stoppers(request),
   }
   const refusal = await runGuards(guards, ctx)
 
@@ -554,18 +550,22 @@ function backTo(request: Request): string {
 }
 
 // The Elysia context, with what the app derives and resolves, is the action's `ctx.locals`.
-async function runAction(action: ServerAction<TSchema, unknown>, context: { body: unknown, request: Request, server: Server | null }, options: ActionOptions, back: Back, readParams: () => void): Promise<Response> {
+async function runAction(action: ServerAction<TSchema, unknown>, context: { body: unknown, request: Request, server: Server | null }, options: ActionOptions, back: Back, read: { params: () => void, url: () => URL }): Promise<Response> {
   const { request } = context
   const state = guarded.get(request) ?? { jar: cookieJar(request), headers: new Headers() }
   const { jar, headers } = state
   let status = 200
   const ctx: ActionContext = {
     request,
-    locale: contextLocale(),
+    // The page's, as its guards read it, worked out on first use as the params are.
+    get url() {
+      return read.url()
+    },
+    locale: contextLocale(options),
     // Read on first use, so an action that never reads them runs from any page.
     get params() {
       if (!pageParams.has(request))
-        readParams()
+        read.params()
 
       return pageParams.get(request) ?? {}
     },
@@ -578,9 +578,7 @@ async function runAction(action: ServerAction<TSchema, unknown>, context: { body
     status: (code) => {
       status = code
     },
-    redirect: (location, code = 303) => {
-      throw new Redirect(location, code)
-    },
+    ...stoppers(request),
     fail: <Data>(code: number, data?: Data) => failure(code, data as Data),
   }
 
@@ -600,7 +598,7 @@ async function runAction(action: ServerAction<TSchema, unknown>, context: { body
     if (error instanceof Redirect)
       await countGoneThrough(action, request, context.server, options)
 
-    if (error instanceof Redirect || error instanceof Denied)
+    if (error instanceof Redirect || error instanceof Denied || error instanceof NotFound)
       return stopped(error, request, state, options)
 
     // The handler read `ctx.params` of a post from no page of its route.
@@ -649,7 +647,7 @@ function pretended(action: ServerAction<TSchema, unknown>, request: Request): Re
 }
 
 // A redirect or a denial goes out with the cookies set so far; anything else was a mistake, answered with a generic 500 since Elysia would send its message.
-function stopped(error: unknown, request: Request, { jar, headers }: GuardedRequest, { dev, onError }: ActionOptions): Response {
+export function stopped(error: unknown, request: Request, { jar, headers }: GuardedRequest, { dev, onError }: ActionOptions): Response {
   if (error instanceof Redirect) {
     headers.set(redirectHeader(request), error.location)
     jar.writeTo(headers)
@@ -657,11 +655,11 @@ function stopped(error: unknown, request: Request, { jar, headers }: GuardedRequ
     return new Response(null, { status: error.status, headers })
   }
 
-  if (error instanceof Denied) {
+  if (error instanceof Denied || error instanceof NotFound) {
     headers.set('content-type', TEXT)
     jar.writeTo(headers)
 
-    return new Response(error.message, { status: error.status, headers })
+    return error instanceof Denied ? new Response(error.message, { status: error.status, headers }) : new Response('Not Found', { status: 404, headers })
   }
 
   reportServerError(error, request, onError)

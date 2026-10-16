@@ -1,8 +1,8 @@
-import type { CookieMap } from 'bun'
+
 import type { Static, t, TSchema } from 'elysia'
-import type { ErrorStatus, Locals, Redirect, RouteParams } from './checks'
+import type { ErrorStatus, RouteParams } from './checks'
 import type { Duration } from './duration'
-import type { Locale } from './i18n'
+import type { RequestContext } from './index'
 import { withBase } from './base'
 import { durationSeconds } from './duration'
 import { escapeAttribute } from './escape'
@@ -132,19 +132,11 @@ export interface ProtectionMessages {
   serverError?: string | undefined
 }
 
-export interface ActionContext {
-  request: Request
-  // The locale of the page the action was sent from, as `i18n` in kay.config.ts serves it; empty without.
-  locale: Locale
-  // The params of the page the action was posted from, matched against the action's own route as its guards read them: scope what it touches by them, since the input is the visitor's to choose.
-  // A layout's action gets those every page it wraps names.
-  params: RouteParams
-  cookies: CookieMap
-  locals: Locals
-  // Response status and headers, for a fetch call or the redirect after a plain form post.
+// The context every request has, `params` those of the page the action was posted from, matched against the action's own route as its guards read them: scope what it touches by them, since the input is the visitor's to choose, and a layout's action gets those every page it wraps names.
+// Its `url` is the action's own, its `locale` the page's it was sent from, and `redirect` answers 303 unless given.
+export interface ActionContext extends RequestContext<RouteParams> {
+  // Response status, for a fetch call or the redirect after a plain form post.
   status: (code: number) => void
-  headers: Headers
-  redirect: Redirect
   // `return ctx.fail(409, { message: 'Taken' })`: a plain form post gets its page rendered again, which reads it through `ctx.failed(action)`; a call throws an `ActionError` carrying `data`. A string is also the form's message, under `errors['']`.
   fail: <const Data = undefined, const Status extends number = number>(status: Status & ErrorStatus<Status>, data?: Data) => Failure<Data>
 }

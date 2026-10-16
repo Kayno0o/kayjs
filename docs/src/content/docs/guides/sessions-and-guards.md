@@ -82,7 +82,7 @@ import { guard } from 'kay'
 
 export default guard(({ locals, redirect, deny }) => {
   if (locals.user === undefined)
-    return redirect('/login')
+    redirect('/login')
 
   if (!locals.user.admin)
     deny(403, 'Admins only')

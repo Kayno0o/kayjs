@@ -270,7 +270,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   for (const path of await serveBuildFiles(app, client, { dev: mode.dev, security }))
     filePaths.add(path)
 
-  const actionOptions = { dev: mode.dev, onError: options.onError, i18n: locales, base, requireGuards: options.requireGuards }
+  const actionOptions = { dev: mode.dev, onError: options.onError, i18n: locales, lang: options.lang, base, requireGuards: options.requireGuards }
   const [actionLimits, apiModules, files] = await Promise.all([registerActionRoutes(app, routes, routeMatch(table, matchers, options.trailingSlash), actionOptions), source.api(root, options), publicFiles(paths.public)])
   const publicServed = claimPublic(served, files)
   const api = await serveApi(app, apiModules, actionOptions)

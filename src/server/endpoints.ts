@@ -6,7 +6,7 @@ import type { LoadedGuard } from './guards'
 import type { Endpoint } from './routes'
 import { basename, relative } from 'node:path'
 import { exportProblem, KayError } from '../compiler/errors'
-import { passGuards } from './actions'
+import { contextLocale, passGuards, stopped } from './actions'
 import { importModule } from './bundle'
 import { loadGuard, requiredGuards } from './guards'
 import { answeringRequest } from './log'
@@ -15,6 +15,7 @@ import { listedParams, pathOf } from './prerendered'
 import { sharedContext } from './render'
 import { reportServerError } from './report'
 import { routerKey } from './routes'
+import { Denied, NotFound, Redirect, stoppers } from './signals'
 
 type Handler = (ctx: EndpointContext) => unknown
 
@@ -69,33 +70,47 @@ async function loadEndpoint(endpoint: Endpoint, required: boolean | undefined): 
   return { ...endpoint, get: get as Handler, guards: requiredGuards(await Promise.all(endpoint.guards.map(loadGuard)), endpoint, {}, required), type: Bun.file(`file${endpoint.suffix ?? basename(endpoint.pattern).slice(basename(endpoint.pattern).indexOf('.'))}`).type }
 }
 
-// Guards first, as for a page; what they set goes out with the endpoint's answer.
+// Guards first, as for a page; what they set, and what the endpoint sets through its `cookies` and `headers`, goes out with its answer, a redirect, a denial or a 404 it throws included.
 async function answer(endpoint: ServedEndpoint, context: { request: Request }, params: Record<string, string>, options: ActionOptions): Promise<Response> {
   const { request } = context
-  const passed = endpoint.guards.length > 0 ? await passGuards(endpoint.guards, context, params, options) : undefined
+  const passed = await passGuards(endpoint.guards, context, params, options)
 
   if (passed instanceof Response)
     return passed
 
+  const { jar, headers } = passed
+  const ctx: EndpointContext = {
+    request,
+    url: new URL(request.url),
+    params,
+    locale: contextLocale(options),
+    get cookies() {
+      return jar.cookies
+    },
+    locals: context as unknown as Locals,
+    headers,
+    ...stoppers(request),
+  }
   let response: Response
 
   try {
-    response = responseOf(endpoint, await endpoint.get({ request, url: new URL(request.url), params, locals: context as unknown as Locals }))
+    response = responseOf(endpoint, await endpoint.get(ctx))
   }
   catch (error) {
+    if (error instanceof Redirect || error instanceof Denied || error instanceof NotFound)
+      return stopped(error, request, passed, options)
+
     reportServerError(error, request, options.onError)
 
     return new Response('Internal Server Error', { status: 500, headers: { 'content-type': TEXT } })
   }
 
-  if (passed) {
-    response = new Response(response.body, response)
+  response = new Response(response.body, response)
 
-    for (const [name, value] of passed.headers)
-      response.headers.set(name, value)
+  for (const [name, value] of headers)
+    response.headers.set(name, value)
 
-    passed.jar.writeTo(response.headers)
-  }
+  jar.writeTo(response.headers)
 
   return response
 }

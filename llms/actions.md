@@ -74,7 +74,7 @@ import { s } from 'kay'
 
 export const create = action(s.Object({ title: s.String({ maxLength: 200 }) }), async ({ title }, ctx) => {
   const id = crypto.randomUUID()
-  return ctx.redirect(`/posts/${id}`)
+  ctx.redirect(`/posts/${id}`)
 })
 ---
 form(action={create})
@@ -226,7 +226,9 @@ form(action={add})
 - The browser has none, nor Elysia's, which reads `Bun`: schemas live in modules only the server imports, and what an island needs of one, a length or a list of choices, in another module both import.
 - A client build, `kay dev`'s and `kay test`'s included, refuses an island reaching kay's `s`, naming the modules taking it from `kay`.
 - `t` from `kay` is the same builder, deprecated: `kay check` reports it and `--fix` renames it `s`.
-- The handler's second argument has `request`, `cookies`, `locals`, `status(code)`, `headers`, `redirect(location)` and `fail(status, data)`, whose status is an error status, 400 to 599.
+- The handler's second argument is the request context every route shares (see routing, "The request context"), `request`, `url`, `locale`, `params`, `cookies`, `locals`, `headers`, `redirect`, `notFound` and `deny`, with `status(code)` and `fail(status, data)`, whose status is an error status, 400 to 599.
+- `ctx.redirect`, `ctx.notFound()` and `ctx.deny()` throw, as in a page, so a handler writes `ctx.redirect(...)` as a statement, with no `return`; a call or a form post is answered with the redirect, a 404 or the denial as plain text, `redirect` with 303 unless given.
+- Its `url` is the page's the post came from, as its guards read it, and its `locale` that page's, or the site's `lang` without `i18n`.
 - A location outside ASCII, such as `/blog/日本語`, goes out percent-encoded, from pages and guards too.
 - A location holding a control character, or a scheme other than `http:` and `https:`, such as `javascript:`, throws.
 

@@ -17,7 +17,7 @@ export const verify = action(schemas.twoFactor, async ({ code }, ctx) => {
   if (!result.ok)
     return ctx.fail(400, { error: result.error === 'invalid' ? 'code' : result.error })
 
-  return ctx.redirect(result.redirect)
+  ctx.redirect(result.redirect)
 })
 
 export const passkeyOptions = action(async (ctx) => {
@@ -32,7 +32,7 @@ export const passkey = action(schemas.passkey, async (input, ctx) => {
   if (!result.ok)
     return ctx.fail(400, { error: result.error === 'invalid' ? 'code' : result.error })
 
-  return ctx.redirect(result.redirect)
+  ctx.redirect(result.redirect)
 })
 
 const auth = ctx.locals.auth
