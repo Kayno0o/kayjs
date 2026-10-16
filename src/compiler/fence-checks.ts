@@ -1,10 +1,12 @@
 // The checks a fence takes once parsed, beside what analyzing it reports: a schema field with no bound, a renamed import, a stylesheet imported for its text without asking, a page setting outside `page`.
 
+import type { NodePath } from '@babel/traverse'
 import type * as t from '@babel/types'
 import type { Diagnostic, Fix } from './ast'
 import type { PageSettings, ParsedFence, SeparateSetting, ServerAnalysis } from './script'
 import { isSecret } from '../runtime/form'
 import { PAGE } from './page-settings'
+import { loadTraverse } from './rewrite'
 import { eachNode, parseFence } from './script'
 
 // A line break before a line with text: a blank line moving into `page` stays blank.
@@ -178,6 +180,11 @@ function removeSpecifier(code: string, specifiers: t.Node[], index: number): Edi
   return [own]
 }
 
+// The comments written between two offsets of the fence, as written.
+function commentsIn(fence: ParsedFence, start: number, end: number): string[] {
+  return (fence.ast.comments ?? []).filter(comment => comment.start! >= start && comment.end! <= end).map(comment => fence.code.slice(comment.start, comment.end))
+}
+
 function isNamed(specifier: t.Node): specifier is NamedSpecifier {
   return specifier.type === 'ImportSpecifier' || specifier.type === 'ExportSpecifier'
 }
@@ -186,7 +193,67 @@ function kindOf(node: Moving): string | null | undefined {
   return node.type === 'ImportDeclaration' ? node.importKind : node.exportKind
 }
 
-// A name imported, re-exported or read off a namespace from the entry it left. The fix points the whole statement at the new entry when the name is alone in it, merges the name into the statement already naming that entry, else takes it out and adds a statement after it; a namespace read is reported with no fix, as none renames it safely.
+// The name a property key writes: an identifier read as written unless computed, or a string literal.
+function memberName(key: t.Node, computed: boolean): string | undefined {
+  if (key.type === 'StringLiteral')
+    return key.value
+
+  return key.type === 'Identifier' && !computed ? key.name : undefined
+}
+
+type Moved = (typeof MOVED_IMPORTS)[number]
+
+// The names a namespace import hands out that moved, read off it (`server.invalidatePage`, `server['invalidatePage']`) or destructured from it (`const { invalidatePage } = server`), as the node writing the name.
+// Babel's scopes tell the namespace from an inner binding of the same name; a fence giving it none, a name declared twice, is read by name alone.
+function namespaceReads(fence: ParsedFence, namespaces: Map<t.ImportNamespaceSpecifier, Moved[]>): { key: t.Node, moved: Moved }[] {
+  if (namespaces.size === 0)
+    return []
+
+  const found: { key: t.Node, moved: Moved }[] = []
+  const movedBy = (object: t.Node | null | undefined, name: string | undefined, scope: NodePath['scope'] | undefined): Moved | undefined => {
+    if (object?.type !== 'Identifier')
+      return undefined
+
+    const bound = scope?.getBinding(object.name)?.path.node
+    const specifier = [...namespaces.keys()].find(entry => scope ? entry === bound : entry.local.name === object.name)
+
+    return specifier && namespaces.get(specifier)?.find(entry => entry.name === name)
+  }
+  const visit = (node: t.Node, scope: NodePath['scope'] | undefined): void => {
+    if (node.type === 'MemberExpression' || node.type === 'OptionalMemberExpression') {
+      const { property } = node
+      const moved = movedBy(node.object, memberName(property, node.computed), scope)
+
+      if (moved)
+        found.push({ key: property, moved })
+    }
+    else if (node.type === 'VariableDeclarator' && node.id.type === 'ObjectPattern') {
+      for (const property of node.id.properties) {
+        if (property.type !== 'ObjectProperty')
+          continue
+
+        const moved = movedBy(node.init, memberName(property.key, property.computed), scope)
+
+        if (moved)
+          found.push({ key: property.key, moved })
+      }
+    }
+  }
+
+  try {
+    loadTraverse()(fence.ast, { enter: (path: NodePath) => visit(path.node, path.scope) })
+  }
+  catch {
+    found.length = 0
+
+    for (const statement of fence.ast.program.body)
+      eachNode(statement, (node) => { visit(node, undefined) })
+  }
+
+  return found
+}
+
+// A name imported, re-exported, read off a namespace or destructured from one from the entry it left. The fix points the whole statement at the new entry when the name is alone in it, merges the name into the statement already naming that entry, else takes it out and adds a statement after it; a namespace read is reported with no fix, as none renames it safely, and only where the namespace binding is the one in scope.
 export function deprecatedImports(fence: ParsedFence): Diagnostic[] {
   if (!MOVED_NAME.test(fence.code))
     return []
@@ -195,7 +262,7 @@ export function deprecatedImports(fence: ParsedFence): Diagnostic[] {
   const code = fence.code
   const body = fence.ast.program.body
   const diagnostics: Diagnostic[] = []
-  const namespaces = new Map<string, typeof MOVED_IMPORTS>()
+  const namespaces = new Map<t.ImportNamespaceSpecifier, typeof MOVED_IMPORTS>()
 
   for (const node of body) {
     if (node.type !== 'ImportDeclaration' && !(node.type === 'ExportNamedDeclaration' && node.source))
@@ -209,7 +276,7 @@ export function deprecatedImports(fence: ParsedFence): Diagnostic[] {
     if (node.type === 'ImportDeclaration' && node.importKind !== 'type') {
       for (const specifier of node.specifiers) {
         if (specifier.type === 'ImportNamespaceSpecifier')
-          namespaces.set(specifier.local.name, MOVED_IMPORTS.filter(({ from }) => from === source))
+          namespaces.set(specifier, MOVED_IMPORTS.filter(({ from }) => from === source))
       }
     }
 
@@ -229,15 +296,22 @@ export function deprecatedImports(fence: ParsedFence): Diagnostic[] {
       const whole = named.length === 1 && others === 0
       let edits: Edit[]
 
-      if (whole && !target)
+      if (whole && !target) {
         edits = [{ ...span(node.source!), text: `'${moved.to}'` }]
-      else if (whole)
-        edits = [{ ...span({ start: node.start!, end: node.end! + (code[node.end!] === '\n' ? 1 : 0) } as t.Node), text: '' }]
-      else if (named.length === 1)
-        // A default import stays, and the braces go with the only name in them.
-        edits = [{ ...span({ start: node.specifiers.find(entry => !isNamed(entry))!.end!, end: code.lastIndexOf('}', node.source!.start!) + 1 } as t.Node), text: '' }]
-      else
+      }
+      else if (whole) {
+        // The comments written inside the statement stay, ahead of the import the name went into.
+        edits = [{ ...span({ start: node.start!, end: node.end! + (code[node.end!] === '\n' ? 1 : 0) } as t.Node), text: commentsIn(fence, node.start!, node.end!).map(comment => `${comment}\n`).join('') }]
+      }
+      else if (named.length === 1) {
+        // A default import stays, and the braces go with the only name in them, their comments with them.
+        const braces = { start: node.specifiers.find(entry => !isNamed(entry))!.end!, end: code.lastIndexOf('}', node.source!.start!) + 1 }
+
+        edits = [{ ...span(braces as t.Node), text: commentsIn(fence, braces.start, braces.end).map(comment => comment.startsWith('//') ? ` ${comment}\n` : ` ${comment}`).join('') }]
+      }
+      else {
         edits = removeSpecifier(code, named, index).map(edit => ({ ...span(edit as unknown as t.Node), text: '' }))
+      }
 
       const already = target?.specifiers.filter(isNamed).some(entry => code.slice(entry.start!, entry.end!) === written)
 
@@ -258,30 +332,14 @@ export function deprecatedImports(fence: ParsedFence): Diagnostic[] {
     }
   }
 
-  for (const statement of body) {
-    if (namespaces.size === 0)
-      break
-
-    eachNode(statement, (node) => {
-      if (node.type !== 'MemberExpression' && node.type !== 'OptionalMemberExpression')
-        return
-
-      const property = node.property
-      const key = property.type === 'Identifier' && !node.computed ? property.name : undefined
-      const quoted = property.type === 'StringLiteral' && node.computed ? property.value : undefined
-      const moved = node.object.type === 'Identifier' ? namespaces.get(node.object.name)?.find(({ name }) => name === (key ?? quoted)) : undefined
-
-      if (!moved)
-        return
-
-      diagnostics.push({
-        ...span(property),
-        code: 'deprecated-import',
-        message: `\`${moved.name}\` is imported from '${moved.to}' now, not '${moved.from}'`,
-        note: `'${moved.to}' holds the helpers of the same job, \`invalidate\` beside it`,
-        help: `import it from '${moved.to}' by name`,
-        checkOnly: true,
-      })
+  for (const { key, moved } of namespaceReads(fence, namespaces)) {
+    diagnostics.push({
+      ...span(key),
+      code: 'deprecated-import',
+      message: `\`${moved.name}\` is imported from '${moved.to}' now, not '${moved.from}'`,
+      note: `'${moved.to}' holds the helpers of the same job, \`invalidate\` beside it`,
+      help: `import it from '${moved.to}' by name`,
+      checkOnly: true,
     })
   }
 
