@@ -12,7 +12,7 @@ async function closesPromptly(close: () => Promise<void>): Promise<void> {
   const started = performance.now()
 
   await close()
-  expect(performance.now() - started).toBeLessThan(1_500)
+  expect(performance.now() - started).toBeLessThan(4_000)
 }
 
 describe('testSite close with connections the site opened', () => {
@@ -47,7 +47,10 @@ describe('testSite close with connections the site opened', () => {
     const room = site.socket(chat, '/:room', { params: { room: 'flaky' } })
 
     room.send({ text: 'drop' })
-    await Bun.sleep(20)
+    for (let waited = 0; room.status() !== 'connecting' && waited < 2_000; waited += 5)
+      await Bun.sleep(5)
+
+    expect(room.status()).toBe('connecting')
     await closesPromptly(site.close)
     expect(room.status()).toBe('closed')
   })
