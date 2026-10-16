@@ -1,6 +1,6 @@
 import process from 'node:process'
 import { $, Glob } from 'bun'
-import { stampUnreleased, WHATS_NEW } from './whats-new'
+import { archiveOldest, ARCHIVES, stampUnreleased, WHATS_NEW } from './whats-new'
 
 // `bun scripts/version.ts patch|minor|major`: kay and every library under packages/ move to one version, committed as `v<version>` and tagged, as `bun pm version` does for one package.
 const LEVELS = ['major', 'minor', 'patch'] as const
@@ -43,9 +43,16 @@ try {
   await Promise.all(texts.map(async ({ path, text }) => Bun.write(path, text.replace(VERSION, () => `"version": "${version}"`).replace(KAY_PEER, (_, head: string) => `${head}"${peer}"`))))
   // What the release adds goes under its version, where the release notes read it.
   await Promise.all(WHATS_NEW.map(async path => Bun.write(path, stampUnreleased(await Bun.file(path).text(), version))))
+  // The pages an agent reads whole stay short: their oldest releases move to the archive beside them.
+  await Promise.all(ARCHIVES.map(async ([page, archive]) => {
+    const moved = archiveOldest(await Bun.file(page).text(), await Bun.file(archive).text())
+
+    await Bun.write(page, moved.page)
+    await Bun.write(archive, moved.archive)
+  }))
   // bun.lock records each workspace's version and ranges, which the CI's frozen install compares against.
   await $`bun install`.quiet()
-  await $`git add bun.lock ${manifests} ${WHATS_NEW}`
+  await $`git add bun.lock ${manifests} ${ARCHIVES.flat()}`
   await $`git commit -q -m ${tag}`
   await $`git tag ${tag}`
 }

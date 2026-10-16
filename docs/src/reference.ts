@@ -17,10 +17,13 @@ const QUOTED = /^> /gm
 // The reference docs the guides serve as pages of their own, so a release edits one file: `/guides/whats-new` and `/guides/upgrading`, each with the archive of its older releases.
 export const LLMS_GUIDES = [
   { slug: 'guides/whats-new', topic: 'whats-new', order: 10.5, description: 'What each release of kay and its libraries adds, with a link to where each feature is documented.' },
-  { slug: 'guides/whats-new-archive', topic: 'whats-new-archive', order: 10.6, description: 'What the releases before 1.46 added, with a link to where each feature is documented.' },
+  { slug: 'guides/whats-new-archive', topic: 'whats-new-archive', order: 10.6, listed: false, description: 'What the releases before 1.46 added, with a link to where each feature is documented.' },
   { slug: 'guides/upgrading', topic: 'upgrading', order: 11, description: 'What each minor release breaks, and what to change in your app.' },
-  { slug: 'guides/upgrading-archive', topic: 'upgrading-archive', order: 11.1, description: 'What the minor releases before 1.45 broke, and what to change in your app.' },
+  { slug: 'guides/upgrading-archive', topic: 'upgrading-archive', order: 11.1, listed: false, description: 'What the minor releases before 1.45 broke, and what to change in your app.' },
 ] as const
+
+// The guides left out of the sidebar and the pagers, served and linked from the page they continue.
+export const isUnlisted = (slug: string) => (LLMS_GUIDES as readonly { slug: string, listed?: boolean }[]).some(guide => guide.slug === slug && guide.listed === false)
 
 const GUIDE_OF = new Map<string, string>(LLMS_GUIDES.map(guide => [guide.topic, `/${guide.slug}`]))
 

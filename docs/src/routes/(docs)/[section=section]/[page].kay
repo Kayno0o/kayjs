@@ -3,7 +3,7 @@ import { shareCard } from 'kay/image'
 import { docs, reference } from '../../../content.config'
 import { FORGE } from '../../../forge'
 import { docPages, neighbours } from '../../../pages'
-import { LLMS_GUIDES } from '../../../reference'
+import { isUnlisted, LLMS_GUIDES } from '../../../reference'
 import { sectionOf } from '../../../sections'
 
 export const page = {
@@ -28,7 +28,7 @@ const source = guide ? `${FORGE}/llms/${guide.topic}.md` : `${FORGE}/docs/src/co
 const sections = entry.headings.filter(heading => heading.depth === 2 || heading.depth === 3)
 // The pager stays in the page's part: the Structure pages lead to each other, the other sections to theirs.
 const structure = (slug: string) => sectionOf(slug)?.slug === 'structure'
-const { previous, next } = neighbours((await docPages()).filter(one => structure(one.slug) === structure(slug)), slug, href => `/${href}`)
+const { previous, next } = neighbours((await docPages()).filter(one => structure(one.slug) === structure(slug) && (one.slug === slug || !isUnlisted(one.slug))), slug, href => `/${href}`)
 --- script
 import Pager from '../../../components/pager.kay'
 import Toc from '../../../components/toc.kay'

@@ -1,6 +1,6 @@
 import { Glob } from 'bun'
 import { describe, expect, it } from 'bun:test'
-import { stampUnreleased } from '../scripts/whats-new'
+import { archiveOldest, stampUnreleased } from '../scripts/whats-new'
 
 interface Manifest {
   name: string
@@ -52,5 +52,20 @@ describe('what\'s new', () => {
   it('names the Unreleased section after the version, and leaves a page without one as it is', () => {
     expect(stampUnreleased('# What\'s new\n\n## Unreleased\n\n- a\n\n## 1.43.0\n\n- b\n', '1.44.0')).toBe('# What\'s new\n\n## 1.44.0\n\n- a\n\n## 1.43.0\n\n- b\n')
     expect(stampUnreleased('# What\'s new\n\nNothing is ## Unreleased here.\n\n### Unreleased\n\n## 1.43.0\n', '1.44.0')).toBe('# What\'s new\n\nNothing is ## Unreleased here.\n\n### Unreleased\n\n## 1.43.0\n')
+  })
+
+  it('moves the oldest releases to the archive while the page is over its limit, and the "before" version with them', () => {
+    const page = '# New\n\nIntro.\n\n## 1.46.0\n\n- c\n\n## 1.45.0\n\n- bb\n\n## 1.44.0\n\n- aaaaaaaaaa\n\nReleases before 1.44 are in [Old](old.md).\n'
+    const archive = '# Old\n\nWhat each release before 1.44 added.\n\n## 1.43.0\n\n- z\n'
+
+    expect(archiveOldest(page, archive, 1000)).toEqual({ page, archive })
+    expect(archiveOldest(page, archive, 100)).toEqual({
+      page: '# New\n\nIntro.\n\n## 1.46.0\n\n- c\n\n## 1.45.0\n\n- bb\n\nReleases before 1.45 are in [Old](old.md).\n',
+      archive: '# Old\n\nWhat each release before 1.45 added.\n\n## 1.44.0\n\n- aaaaaaaaaa\n\n## 1.43.0\n\n- z\n',
+    })
+    // The newest release stays whatever the limit, and a page without the "before" line is left as it is.
+    expect(archiveOldest(page, archive, 1).page).toContain('## 1.46.0')
+    expect(archiveOldest(page, archive, 1).page).not.toContain('## 1.45.0')
+    expect(archiveOldest(page.replace(/Releases before.*\n/, ''), archive, 1)).toEqual({ page: page.replace(/Releases before.*\n/, ''), archive })
   })
 })
