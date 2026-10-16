@@ -195,6 +195,20 @@ export interface CallOptions {
   signal?: AbortSignal | undefined
 }
 
+// How a tracked call went: what the handler returned, or the refusal the server answered.
+export type CallResult<Data, Failed>
+  = | { ok: true, data: Data }
+    | { ok: false, status: number, errors: Record<string, string>, data: Failed | undefined }
+
+// An action seen through the calls one island makes, so a row's button reads its own `pending()`.
+export interface TrackedCall<Input, Result> {
+  // Resolves with how the call went, a refusal included; a failure that is no refusal of this action, such as a network error, an abort or a redirect, still throws.
+  (input: Input, options?: CallOptions): Promise<Result>
+  (form: FormData, options?: CallOptions): Promise<Result>
+  // Whether a call made through this handle is still in flight, read reactively.
+  readonly pending: () => boolean
+}
+
 // Called from the browser it posts its input and resolves with the handler's result; `form(action={...})` posts to `url`.
 export interface Action<Input, Output, Honeypot extends string = never> {
   (input: Input, options?: CallOptions): Promise<Success<Output>>
@@ -202,6 +216,9 @@ export interface Action<Input, Output, Honeypot extends string = never> {
   (form: FormData, options?: CallOptions): Promise<Success<Output>>
   // Whether a call this page made is still in flight, read reactively: `button(disabled={add.pending()})`.
   readonly pending: () => boolean
+  // A handle for the calls of one island, one row or one button: `const save = add.track()`, then `await save(input)` resolves with `{ ok, data }` or the refusal, and `save.pending()` reads only its own calls.
+  // eslint-disable-next-line ts/method-signature-style
+  track(): TrackedCall<Input, CallResult<Success<Output>, FailureData<Output>>>
   // How much of the last call carrying files the browser sent, from 0 to 1, while it uploads; undefined otherwise: `progress(value={upload.progress()})`.
   readonly progress: () => number | undefined
   // How the form post the page renders for went, refused, as `ctx.failed` reads it; in an island, how its last call went, read reactively.
@@ -515,58 +532,60 @@ function callable(url: () => string): { call: (input: never, options?: CallOptio
   }
   const read = (value: unknown) => ({ value, enumerable: true })
 
-  return {
-    call: async (input: unknown, options?: CallOptions) => {
-      // The page the call was made on, whose outcome it is even once the visitor went elsewhere.
-      const page = navigation.page
-      const visits = navigation.visits
-      const left = () => navigation.visits !== visits
+  const call = async (input: unknown, options?: CallOptions) => {
+    // The page the call was made on, whose outcome it is even once the visitor went elsewhere.
+    const page = navigation.page
+    const visits = navigation.visits
+    const left = () => navigation.visits !== visits
 
-      shift(1)
-      called(page, null)
+    shift(1)
+    called(page, null)
 
-      let undo: (() => void) | undefined
-      let posted = false
-      let sent = false
-      // Started before the caller goes on, so a navigation it starts next supersedes the refresh rather than the other way round; a site with `navigation: false` shows a call's effects itself.
-      const refreshPage = () => {
-        if (options?.refresh !== false && !left())
-          void navigation.refresh?.()
-      }
+    let undo: (() => void) | undefined
+    let posted = false
+    let sent = false
+    // Started before the caller goes on, so a navigation it starts next supersedes the refresh rather than the other way round; a site with `navigation: false` shows a call's effects itself.
+    const refreshPage = () => {
+      if (options?.refresh !== false && !left())
+        void navigation.refresh?.()
+    }
 
-      try {
-        undo = options?.optimistic ? undoable(options.optimistic) : undefined
+    try {
+      undo = options?.optimistic ? undoable(options.optimistic) : undefined
 
-        const data = await post(url(), input, setProgress, options?.signal, () => {
-          sent = true
-        }, left)
+      const data = await post(url(), input, setProgress, options?.signal, () => {
+        sent = true
+      }, left)
 
-        posted = true
+      posted = true
 
-        called(page, { action: url(), succeeded: true, data })
+      called(page, { action: url(), succeeded: true, data })
+      refreshPage()
+
+      return data
+    }
+    catch (error) {
+      // A redirect leaves the page as it is until the next one shows.
+      if (!posted && !(error instanceof ActionRedirect))
+        undo?.()
+
+      // The server may have run a call aborted once it was sent, which the page then shows as it stands.
+      if (sent && options?.signal?.aborted === true)
         refreshPage()
 
-        return data
-      }
-      catch (error) {
-        // A redirect leaves the page as it is until the next one shows.
-        if (!posted && !(error instanceof ActionRedirect))
-          undo?.()
+      if (error instanceof ActionError && !(error instanceof ActionRedirect))
+        called(page, { action: url(), status: error.status, values: {}, errors: error.errors, data: error.data })
 
-        // The server may have run a call aborted once it was sent, which the page then shows as it stands.
-        if (sent && options?.signal?.aborted === true)
-          refreshPage()
+      throw error
+    }
+    finally {
+      shift(-1)
+      setProgress(undefined)
+    }
+  }
 
-        if (error instanceof ActionError && !(error instanceof ActionRedirect))
-          called(page, { action: url(), status: error.status, values: {}, errors: error.errors, data: error.data })
-
-        throw error
-      }
-      finally {
-        shift(-1)
-        setProgress(undefined)
-      }
-    },
+  return {
+    call,
     reads: {
       pending: read(() => inFlight() > 0),
       progress: read(progress),
@@ -578,8 +597,34 @@ function callable(url: () => string): { call: (input: never, options?: CallOptio
       }),
       error: read((field = '') => failed()?.errors[field]),
       refused: read((error: unknown) => error instanceof ActionError && refusedAt.get(error) === url()),
+      track: read(() => tracked(call, url)),
     },
   }
+}
+
+// A handle with a pending count of its own over `call`, whose refusals of this action it answers as results.
+function tracked(call: (input: never, options?: CallOptions) => Promise<unknown>, url: () => string): TrackedCall<never, unknown> {
+  const [inFlight, setInFlight] = ownSignal(0)
+  const shift = (by: number) => setInFlight(untrack(inFlight) + by)
+
+  const run = async (input: unknown, options?: CallOptions) => {
+    shift(1)
+
+    try {
+      return { ok: true, data: await call(input as never, options) }
+    }
+    catch (error) {
+      if (!(error instanceof ActionError) || error instanceof ActionRedirect || refusedAt.get(error) !== url())
+        throw error
+
+      return { ok: false, status: error.status, errors: error.errors, data: error.data }
+    }
+    finally {
+      shift(-1)
+    }
+  }
+
+  return Object.assign(run, { pending: () => inFlight() > 0 })
 }
 
 async function post<Output>(url: string, input: unknown, onProgress: (sent: number) => void, signal: AbortSignal | undefined, onSent: () => void, left: () => boolean): Promise<Output> {

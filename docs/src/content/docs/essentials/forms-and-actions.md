@@ -128,6 +128,32 @@ form(action={add} onSubmit={submit})
 
 In a `catch`, `add.refused(error)` tells a refusal from `ctx.fail` apart from any other error and types `error.data`. `focusInvalid()` from `kay` moves focus to the first field marked `aria-invalid`.
 
+## Reading one call's outcome
+
+`add.pending()` is true while any call the page made to `add` is running, so a row of buttons calling one action would all spin together. `add.track()` gives a handle for one component: its `pending()` reads only the calls made through it, and a call resolves with how it went instead of throwing on a refusal.
+
+```kay
+---
+import { remove } from '../routes/index.kay'
+
+const { id } = props<{ id: string }>()
+const removing = remove.track()
+const problem = signal('')
+
+async function onRemove() {
+  const result = await removing({ id })
+
+  if (!result.ok)
+    problem.set(result.data?.message ?? 'Could not remove it')
+}
+---
+button(disabled={removing.pending()} onClick={onRemove}) Remove
+if problem() !== ''
+  p.error {problem()}
+```
+
+A refused call gives `{ ok: false, status, errors, data }`, with `errors` per field and `data` typed as the handler passes it to `ctx.fail`. A success gives `{ ok: true, data }`. A failure that is not a refusal, such as a lost connection, still throws.
+
 While an island's `onSubmit` returns a promise, the form and its submit buttons are `aria-busy`.
 
 Once a call goes through, the page's loads run again, so the list it shows is up to date. `add({ title }, { refresh: false })` leaves the page as it is.

@@ -328,6 +328,8 @@ form(action={add})
 - `{ signal }` aborts a call: it rejects with the signal's reason, what `optimistic` showed goes back, and the action records no outcome.
 - The server may still have run a call aborted once sent, so the page refreshes then as after one that went through, unless `refresh: false`.
 - The call is typed, `ctx.fail` results excluded, and throws `ActionError` from `kay` with `status`, `errors` and `data` when it fails.
+- `const save = add.track()` is a handle for one component, row or button: `save.pending()` reads, reactively, only the calls made through it, where `add.pending()` reads every call of the page.
+- `await save(input, options)` takes what `add` does and resolves with `{ ok: true, data }` or, for a refusal of `add`, `{ ok: false, status, errors, data }`, `errors` per field and `data` typed as `add.refused` types it, so no `try` or `ActionError` check is needed; a failure that is no refusal of `add`, a network error, an abort or a redirect, still throws, `pending()` clearing either way.
 - `add.refused(error)` tells a refusal of a call to `add` from any other error, a redirect's included, and types its `data` as the handler passes it to `ctx.fail`, with no cast: `if (add.refused(error)) shown = error.data?.message`.
 - `data` is undefined for a call refused before the handler ran, by the schema or a limit.
 - Its input, its result and that `data` cross as island props do, Dates, Maps, Sets and bigints included; a result holding a function or a class instance answers 500, logging where it sits.

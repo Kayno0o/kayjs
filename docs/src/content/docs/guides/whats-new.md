@@ -8,6 +8,7 @@ This page lists what each release adds, newest first, with a link to where each 
 ## Unreleased
 
 - **Jobs in one call, and no server entry**: `schedule` takes a list of jobs or a table of schedules, and `boot: true` runs them once at start. `kay build --compile` serves the pages of a project with no `src/server.ts`. [Background jobs](/guides/background-jobs)
+- **One call's own pending state and outcome**: `add.track()` gives a component a handle on an action whose `pending()` reads only its own calls, and a call through it resolves with `{ ok, data }` or the refusal's status, field errors and data, with no `try`. [Forms and actions](/essentials/forms-and-actions#reading-one-calls-outcome)
 - **CI for GitHub**: `kay new --host github` writes a GitHub Actions workflow instead of a Forgejo one, and picks it alone when the `origin` remote is on github.com. [kay new](/reference/cli#kay-new)
 - **Line chart scroll**: a `LineChart` with many labels no longer makes the page scroll past its content. Its data table for screen readers now sits in a visually hidden block, which a bare table box ignored.
 - **One request context**: a page, a layout, a guard, an endpoint and an action all get `request`, `url`, `locale`, `params`, `cookies`, `locals`, `headers`, `redirect`, `notFound` and `deny`. An endpoint gets the ones it lacked, an action gets `url`, `notFound` and `deny`, a guard gets `notFound`, and a redirect is a statement everywhere. See [Endpoint files](/essentials/routing#endpoint-files) and [Guards](/structure/guard).

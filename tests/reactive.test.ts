@@ -1,4 +1,4 @@
-import type { Action } from '../src/runtime'
+import type { Action, Failure } from '../src/runtime'
 import { describe, expect, it, jest, spyOn } from 'bun:test'
 import { stringify } from 'devalue'
 import { batch, debounced, effect, every, flush, linked, listen, memo, onCleanup, onMount, root, selection, signal, untrack, watch } from '../src/runtime'
@@ -834,6 +834,110 @@ describe('optimistic changes', () => {
       expect(at()).toBe(0)
       expect(await move({ to: 2 }, { optimistic: () => at.set(2) })).toBe(2)
       expect(at()).toBe(2)
+    }
+    finally {
+      fetched.mockRestore()
+    }
+  })
+})
+
+describe('a tracked action call', () => {
+  const fail = (status: number, body: unknown) => new Response(stringify(body), { status, headers: { 'x-kay-failure': '1' } })
+  const saved = actionStub('/_kay/action/test/saved') as unknown as Action<{ id: number }, Failure<{ reason: string }> | string>
+  const answering = (answer: (request: number) => Response | Promise<Response>) => {
+    let count = 0
+
+    return spyOn(globalThis, 'fetch').mockImplementation((async () => answer(count++)) as unknown as typeof fetch)
+  }
+
+  it('reads pending for its own calls alone, while the action reads every call the page made', async () => {
+    const releases: ((response: Response) => void)[] = []
+    const fetched = answering(async () => new Promise<Response>(resolve => releases.push(resolve)))
+
+    try {
+      const [one, two] = [saved.track(), saved.track()]
+      const calling = one({ id: 1 })
+
+      expect([one.pending(), two.pending(), saved.pending()]).toEqual([true, false, true])
+
+      const other = two({ id: 2 })
+
+      expect([one.pending(), two.pending()]).toEqual([true, true])
+      releases[0]!(new Response(stringify('a')))
+      expect(await calling).toEqual({ ok: true, data: 'a' })
+      expect([one.pending(), two.pending(), saved.pending()]).toEqual([false, true, true])
+      releases[1]!(new Response(stringify('b')))
+      await other
+      expect([two.pending(), saved.pending()]).toEqual([false, false])
+    }
+    finally {
+      fetched.mockRestore()
+    }
+  })
+
+  it('answers a refusal as a result, with its status, field errors and the data ctx.fail passed, and does not throw', async () => {
+    const fetched = answering(request => request === 0 ? fail(409, { errors: { id: 'Taken' }, data: { reason: 'locked' } }) : fail(422, { errors: { id: 'Bad id' } }))
+
+    try {
+      const call = saved.track()
+
+      const refused = await call({ id: 1 })
+
+      // The refusal's data is typed as the handler passes it to ctx.fail.
+      expect(refused.ok ? undefined : refused.data?.reason).toBe('locked')
+      expect(refused).toEqual({ ok: false, status: 409, errors: { id: 'Taken' }, data: { reason: 'locked' } })
+      expect(await call({ id: 2 })).toEqual({ ok: false, status: 422, errors: { id: 'Bad id' }, data: undefined })
+      expect(call.pending()).toBe(false)
+      // The action's own reading of its last call stays as it was.
+      expect(saved.error('id')).toBe('Bad id')
+    }
+    finally {
+      fetched.mockRestore()
+    }
+  })
+
+  it('throws what is no refusal of this action, clearing pending: a network failure, an abort, a redirect', async () => {
+    const aborted = new AbortController()
+    const fetched = answering(async (request) => {
+      if (request === 0)
+        throw new TypeError('offline')
+
+      if (request === 2)
+        throw aborted.signal.reason
+
+      return fail(500, { errors: { '': 'Something went wrong' } })
+    })
+
+    try {
+      const call = saved.track()
+      const other = actionStub('/_kay/action/test/other') as unknown as Action<{ id: number }, string>
+
+      await expect(call({ id: 1 })).rejects.toThrow('offline')
+      expect(call.pending()).toBe(false)
+      // A 500 is a refusal the server answered, so it comes back as one.
+      expect(await call({ id: 1 })).toMatchObject({ ok: false, status: 500 })
+      aborted.abort(new Error('left'))
+      await expect(call({ id: 1 }, { signal: aborted.signal })).rejects.toThrow('left')
+      expect(call.pending()).toBe(false)
+      // A handle follows its own action's refusals only.
+      expect(other.track().pending()).toBe(false)
+    }
+    finally {
+      fetched.mockRestore()
+    }
+  })
+
+  it('passes the call options on, and a form\'s fields', async () => {
+    const fetched = answering(() => new Response(stringify('ok')))
+
+    try {
+      const call = saved.track()
+      const form = new FormData()
+
+      form.set('id', '3')
+      expect(await call(form)).toEqual({ ok: true, data: 'ok' })
+      expect(new Headers(fetched.mock.calls[0]![1]!.headers).get('x-kay-action')).toBe('form')
+      expect(await call({ id: 3 }, { refresh: false })).toEqual({ ok: true, data: 'ok' })
     }
     finally {
       fetched.mockRestore()
