@@ -2,6 +2,7 @@ import { join, relative } from 'node:path'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { writeShadowTypes } from '../src/check'
 import { bootProblems } from '../src/check/boot'
+import { setSite } from '../src/runtime/site'
 import { encodeValue } from '../src/runtime/wire'
 import { testSite } from '../src/test'
 import { fixtureCopy } from './scratch'
@@ -289,6 +290,34 @@ describe('sign-in metadata', () => {
     expect(asked).toEqual([['/mcp', expect.any(String)], ['/mcp', expect.any(String)]])
     expect((await oauth.fetch('/.well-known/oauth-protected-resource', { method: 'OPTIONS' })).status).toBe(204)
     await oauth.close()
+  })
+})
+
+describe('sign-in metadata of an app with no site set', () => {
+  it('is kept by no shared cache, and the 401 points to the origin the auth library serves its documents at', async () => {
+    const auth = (fixed: boolean) => ({ oauthResource: (path: string) => ({ resource: `https://app.example${path}`, authorization_servers: ['https://app.example'] }), oauthOrigin: () => 'https://app.example', oauthFixed: () => fixed })
+    const withAuth = async (fixed: boolean) => testSite({ routes, api, mcp: true, islands: false, locals: request => ({ ...locals(request), auth: auth(fixed) }) })
+    const [open, fixed] = await Promise.all([withAuth(false), withAuth(true)])
+
+    try {
+      const withSite = await open.fetch('/.well-known/oauth-protected-resource')
+
+      expect(withSite.headers.get('cache-control')).toBe('public, max-age=300')
+      setSite(undefined)
+
+      const noSite = await open.fetch('/.well-known/oauth-protected-resource')
+      const pointed = await rpc(open, 'tools/call', { name: 'wipe', arguments: { confirm: true } })
+
+      expect(noSite.headers.get('cache-control')).toBe('private, max-age=300')
+      expect(pointed.response.status).toBe(401)
+      expect(pointed.response.headers.get('www-authenticate')).toBe('Bearer resource_metadata="https://app.example/.well-known/oauth-protected-resource"')
+      // An origin the auth library fixes does not come from the Host header.
+      expect((await fixed.fetch('/.well-known/oauth-protected-resource')).headers.get('cache-control')).toBe('public, max-age=300')
+    }
+    finally {
+      setSite('http://localhost')
+      await Promise.all([open.close(), fixed.close()])
+    }
   })
 })
 
