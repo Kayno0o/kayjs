@@ -236,11 +236,13 @@ export function fontMetrics(bytes: Uint8Array): FontMetrics | undefined {
       covered += FREQUENCIES[index]!
     }
 
-    if (covered === 0)
+    const unitsPerEm = head.getUint16(18)
+
+    if (covered === 0 || unitsPerEm === 0 || sum === 0)
       return undefined
 
     return {
-      unitsPerEm: head.getUint16(18),
+      unitsPerEm,
       ascent: hhea.getInt16(4),
       descent: -hhea.getInt16(6),
       lineGap: hhea.getInt16(8),

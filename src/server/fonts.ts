@@ -1,5 +1,6 @@
 import type { FontConfig, FontsourceConfig } from '../config'
 import type { HeadTag } from '../runtime/head'
+import type { FontMetrics } from './font-metrics'
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { dirname, extname, isAbsolute, join, resolve } from 'node:path'
 import { writeAsset } from '../build/assets'
@@ -72,21 +73,37 @@ export interface FontFallback {
 }
 
 // A file's metrics, read again only once the file changes.
-const METRICS = new Map<string, { stamp: number, metrics: ReturnType<typeof fontMetrics> }>()
+const METRICS = new Map<string, { stamp: number, metrics: FontMetrics | undefined }>()
 // Under this share of English letters the file is a subset without them, and no fallback fits it.
 const MIN_COVERAGE = 0.9
 const FIRST_NUMBER = /\d+/
-const FONT_STACK = /((?:^|[;{\s])(?:font-family|--[\w-]*font[\w-]*)\s*:\s*)([^\s;}!][^;}!]*)/g
+// A `@font-face` block, whose `font-family` names one family and is left alone, or a font stack: the property with what precedes it, and the list.
+const FONT_STACK = /@font-face\s*\{[^}]*\}|((?:^|[;{\s])(?:font-family|--[\w-]*font[\w-]*)\s*:\s*)([^\s;}!][^;}!]*)/g
 const QUOTED = /^(["'])(.*)\1$/
 
-function metricsOf(file: string) {
-  const stamp = statSync(file).mtimeMs
+function metricsOf(file: string): FontMetrics | undefined {
+  let stamp: number
+  let bytes: Buffer
+
+  try {
+    const found = statSync(file, { throwIfNoEntry: false })
+
+    if (found === undefined)
+      return undefined
+
+    stamp = found.mtimeMs
+    bytes = readFileSync(file)
+  }
+  catch {
+    return undefined
+  }
+
   const cached = METRICS.get(file)
 
   if (cached?.stamp === stamp)
     return cached.metrics
 
-  const metrics = fontMetrics(readFileSync(file))
+  const metrics = fontMetrics(bytes)
 
   METRICS.set(file, { stamp, metrics })
 
@@ -133,14 +150,20 @@ export function withFontFallbacks(css: string, fallbacks: Map<string, FontFallba
   if (fallbacks.size === 0)
     return css
 
-  return css.replace(FONT_STACK, (match, property: string, stack: string) => {
+  // Family names are case-insensitive.
+  const byName = new Map([...fallbacks].map(([family, fallback]) => [family.toLowerCase(), fallback]))
+
+  return css.replace(FONT_STACK, (match, property: string | undefined, stack: string | undefined) => {
+    if (property === undefined || stack === undefined)
+      return match
+
     const items = stack.split(',')
-    const listed = new Set(items.map(item => unquoted(item)))
+    const listed = new Set(items.map(item => unquoted(item).toLowerCase()))
     let changed = false
     const stacked = items.flatMap((item) => {
-      const fallback = fallbacks.get(unquoted(item))
+      const fallback = byName.get(unquoted(item).toLowerCase())
 
-      if (fallback === undefined || listed.has(fallback.name))
+      if (fallback === undefined || listed.has(fallback.name.toLowerCase()))
         return [item]
 
       changed = true

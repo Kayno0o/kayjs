@@ -1,6 +1,10 @@
+import { rm } from 'node:fs/promises'
+import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'bun:test'
+import { buildClient } from '../src/build/client'
 import { fallbackDescriptors, fontMetrics } from '../src/server/font-metrics'
-import { fontFallbacks, withFontFallbacks } from '../src/server/fonts'
+import { fontFallbacks, prepareFonts, withFontFallbacks } from '../src/server/fonts'
+import { fixtureCopy } from './scratch'
 
 const ROOT = process.cwd()
 const WOFF2 = 'tests/fixtures/cards/src/fonts/archivo-black-latin-400-normal.woff2'
@@ -46,5 +50,44 @@ describe('metric-matched font fallbacks', () => {
     expect(css).toContain('--font-display:Archivo Black,"Archivo Black Fallback", serif')
     expect(css).toContain('h1{font-family:Other}')
     expect(withFontFallbacks(css, fallbacks)).toBe(css)
+  })
+
+  it('leaves a @font-face block and a font the stack names in another case as they are', () => {
+    const fallbacks = fontFallbacks(ROOT, [{ family: 'Archivo Black', src: WOFF2 }])
+    const css = withFontFallbacks('@font-face{font-family:"Archivo Black";src:url(a.woff2)}p{font-family:archivo black}', fallbacks)
+
+    expect(css).toBe('@font-face{font-family:"Archivo Black";src:url(a.woff2)}p{font-family:archivo black,"Archivo Black Fallback"}')
+  })
+
+  it('gives a missing file or a font that is no font no fallback', () => {
+    expect(fontFallbacks(ROOT, [{ family: 'Gone', src: './tests/fixtures/cards/src/fonts/gone.woff2' }]).size).toBe(0)
+    expect(fontFallbacks(ROOT, [{ family: 'Logo', src: 'tests/fixtures/cards/src/logo.svg' }]).size).toBe(0)
+  })
+
+  it('writes the fallback rule beside the font faces and into the built stylesheets, under a base too', async () => {
+    const dir = resolve(await fixtureCopy('cards'))
+    const fonts = [{ family: 'Archivo Black', src: 'src/fonts/archivo-black-latin-400-normal.woff2' }]
+
+    try {
+      await Bun.write(join(dir, 'src/routes/index.kay'), '---\nimport \'./hello.css\'\n---\nh1 Hello\n')
+      await Bun.write(join(dir, 'src/routes/hello.css'), 'h1 { font-family: "Archivo Black", sans-serif; background: url(/bg.png) }\n')
+
+      const { css } = await prepareFonts(dir, fonts, join(dir, '.kay'))
+
+      expect(css).toContain('@font-face{font-family:"Archivo Black Fallback";src:local("Arial")')
+
+      for (const base of [undefined, '/docs']) {
+        const client = await buildClient(dir, { fonts, base })
+        const sheet = [...client.styles.values()].find(url => url.includes('index'))!
+        const built = await Bun.file(join(client.dir, sheet.slice('/_kay/'.length))).text()
+
+        expect(built).toMatch(/font-family: Archivo Black, ?"Archivo Black Fallback", sans-serif/)
+        expect(built).toContain(base === undefined ? 'url("/bg.png")' : 'url("/docs/bg.png")')
+        expect(built).not.toContain('Fallback","Archivo')
+      }
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
   })
 })
