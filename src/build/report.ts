@@ -275,6 +275,8 @@ export function formatRouteTable(routes: RouteSize[], { width = Infinity, previo
       ...index > 0 && shown[index - 1]!.stop !== undefined ? [`      ${shorten(`not kept: ${shown[index - 1]!.stop}`, Math.max(20, width - 8))}`] : [],
     ]),
     ...hidden > 0 ? [`  and ${hidden} more route${hidden === 1 ? '' : 's'}, lighter than these`] : [],
+    // A route past the cap keeps the reason it was not kept, which is what the build is to tell.
+    ...ordered.slice(shown.length).filter(route => route.stop !== undefined).map(route => `      ${shorten(`not kept: ${route.route}: ${route.stop}`, Math.max(20, width - 8))}`),
   ].join('\n')
 }
 

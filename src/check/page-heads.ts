@@ -34,7 +34,8 @@ interface Chain {
 export async function pageHeadLints(options: CheckOptions, routes: Route[], routesDir: string, publicDir: string): Promise<CheckDiagnostic[]> {
   const exported = options.exported === true
 
-  if (!isPublicSite(options, exported) && options.lints === undefined)
+  // `kay build` sets `launch` and reads the rendered heads itself.
+  if (options.launch === true || (!isPublicSite(options, exported) && options.lints === undefined))
     return []
 
   const found: CheckDiagnostic[] = []

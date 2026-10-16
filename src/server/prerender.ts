@@ -249,8 +249,17 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
     // Read off the source first: a page that prerenders nothing, and is not shown to read nothing, is never imported, nor anything it imports.
     const marked = route.params.length === 0 && await reachesServerIsland(route.file)
 
-    const asked = marked || options.exportAll === true || await exportsPrerender(route.file)
-    const keep = !asked && await keepsPage(route.file)
+    const settings = await pageFlags(route.file)
+    const asked = marked || options.exportAll === true || settings.prerender !== undefined
+    const keep = !asked && settings.keep
+
+    // `keep` asks the build to prerender the page, which `prerender: false` forbids.
+    if (settings.keep && settings.prerender === 'false' && !options.exportAll) {
+      options.stops?.set(route.pattern, { file: route.file, line: 0, why: '`prerender: false` contradicts `keep: true`', keep: true, route: route.pattern, fix: 'remove one of the two' })
+
+      continue
+    }
+
     const stop = asked ? undefined : await stopOf(route, scans)
     const auto = !asked && stop === undefined
 
@@ -380,18 +389,15 @@ async function stopOf(route: Route, scans: Map<string, Promise<Scan>>): Promise<
   return keptStop(route, scans)
 }
 
-// Whether the page says `keep: true`: the build is to keep it prerendered, and reports what stops it.
-async function keepsPage(file: string): Promise<boolean> {
+// What a page module says of its own prerendering, read off its source once: the text of its `prerender` and whether it says `keep: true`.
+async function pageFlags(file: string): Promise<{ prerender: string | undefined, keep: boolean }> {
   const source = await Bun.file(file).text()
-  const setting = analyzeServer(source, parseKay(source).server)?.page?.settings.get('keep')
+  const settings = analyzeServer(source, parseKay(source).server)?.page?.settings
+  const text = (name: string) => {
+    const value = settings?.get(name)?.value
 
-  return setting !== undefined && source.slice(setting.value.start, setting.value.end) === 'true'
-}
+    return value === undefined ? undefined : source.slice(value.start, value.end)
+  }
 
-async function exportsPrerender(file: string): Promise<boolean> {
-  const source = await Bun.file(file).text()
-
-  const server = analyzeServer(source, parseKay(source).server)
-
-  return server?.page?.settings.has('prerender') === true
+  return { prerender: settings?.has('prerender') === true ? text('prerender') ?? '' : undefined, keep: text('keep') === 'true' }
 }

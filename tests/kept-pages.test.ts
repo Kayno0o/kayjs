@@ -3,6 +3,8 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { outputDir } from '../src/build/assets'
+import { formatRouteTable } from '../src/build/report'
+import { compileKay } from '../src/compiler'
 import { keptStop, readsNothing } from '../src/server/pure-page'
 import { scratchDir } from './scratch'
 
@@ -657,4 +659,65 @@ describe('what stops a page from being kept', () => {
     expect(unkept.map(problem => problem.message).join('\n')).toContain('`/random`')
     expect(routes['/clock']!.stop).toMatch(/^src\/routes\/clock\.kay:2 reads `Date`$/)
   }, 120_000)
+
+  // The build's report, as `kay build --format json` gives it.
+  async function reported(root: string, args: string[] = []) {
+    const child = Bun.spawn([process.execPath, CLI, 'build', root, '--format', 'json', ...args], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, NODE_ENV: 'production' } })
+    const [out, err, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+
+    return { code, err, document: JSON.parse(out) as { built: { routes: { route: string, kept: number, stop?: string }[] }, problems: { code: string, message: string, line: number, severity?: string }[] } }
+  }
+
+  it('names what stops a page found while it renders: a stale copy and a path two pages share', async () => {
+    const root = await project({
+      'src/routes/revalidated.kay': '--- server\nexport const page = { revalidate: \'1h\' }\n---\np Revalidated\n',
+      'src/routes/a.kay': 'p A\n',
+      'src/routes/[id].kay': '--- server\nexport const page = { prerender: [{ id: \'a\' }] }\n---\np Item\n',
+    })
+
+    roots.push(root)
+
+    const { document } = await reported(root)
+    const stops = Object.fromEntries(document.built.routes.map(route => [route.route, route.stop]))
+
+    expect(stops['/revalidated']).toBe('src/routes/revalidated.kay sets `revalidate`, which has a stale copy render again for every visitor')
+    expect(stops['/a']).toBe('src/routes/a.kay would share its prerendered file a.html with /a')
+  }, 120_000)
+
+  it('reports a page saying keep: true that is not kept at the level unkept-page has, and under --static a page the export renders', async () => {
+    const files = { 'src/routes/random.kay': '--- server\nexport const page = { keep: true }\n---\np {Math.random()}\n' }
+    const config = (lints: string) => `import { defineConfig } from 'kay/server'\n\nexport default defineConfig({ log: false, lints: { 'unkept-page': '${lints}' } })\n`
+    const levels = async (lints: string, args: string[] = []) => {
+      const root = await project({ ...files, 'kay.config.ts': config(lints) })
+
+      roots.push(root)
+
+      return (await reported(root, args)).document.problems.filter(problem => problem.code === 'unkept-page').map(problem => problem.severity)
+    }
+
+    expect(await levels('deny')).toEqual(['error'])
+    expect(await levels('warn')).toEqual(['warning'])
+    expect(await levels('allow')).toEqual([])
+    expect(await levels('deny', ['--static'])).toEqual([])
+  }, 120_000)
+
+  it('reports a page saying keep: true beside prerender: false as a contradiction, and refuses keep exported on its own', async () => {
+    const root = await project({
+      'src/routes/both.kay': '--- server\nexport const page = { prerender: false, keep: true }\n---\np Both\n',
+    })
+
+    roots.push(root)
+
+    const { document } = await reported(root)
+
+    expect(document.built.routes.find(route => route.route === '/both')?.stop).toBe('src/routes/both.kay `prerender: false` contradicts `keep: true`')
+    expect(document.problems.filter(problem => problem.code === 'unkept-page').map(problem => problem.message)).toEqual([expect.stringContaining('`prerender: false` contradicts `keep: true`')])
+    expect(compileKay('--- server\nexport const keep = true\n---\np x\n', 'a.kay').diagnostics.map(diagnostic => diagnostic.message)).toEqual(['`keep` is a setting of `page`, not an export of its own'])
+  }, 120_000)
+
+  it('shows the reason of a route stopped past the 25 rows of the route table', async () => {
+    const rows = Array.from({ length: 26 }, (_, index) => ({ route: `/r${String(index).padStart(2, '0')}`, pages: 0, kept: 0, islands: [] as string[], estimated: false, js: 0, css: 0, stop: index === 25 ? 'reads `Date`' : undefined }))
+
+    expect(formatRouteTable(rows)).toContain('not kept: /r25: reads `Date`')
+  })
 })

@@ -1998,7 +1998,7 @@ describe.concurrent('kay check, unused code', () => {
         ['kay.config.ts', 'missing-share-image', 'warning'],
         ['kay.config.ts', 'default-favicon', 'warning'],
       ])
-      expect(await seoLints({ seo: { name: 'Example', description: 'What it is', image: '/og.png' }, favicon: false, launch: true, exported: true })).toEqual([['kay.config.ts', 'missing-site', 'warning'], ['index.kay', 'unsized-share-image', 'warning']])
+      expect(await seoLints({ seo: { name: 'Example', description: 'What it is', image: '/og.png' }, favicon: false, launch: true, exported: true })).toEqual([['kay.config.ts', 'missing-site', 'warning']])
       expect(await seoLints({ site: 'https://example.com', seo: { description: 'What it is', image: '/og.png' }, favicon: false })).toEqual([])
       // A group's level reaches its lints, a lint's own wins, and a site that is not public gets the ones `lints` sets.
       expect(await seoLints({ site: 'https://example.com', favicon: false, lints: { 'seo': 'deny', 'missing-share-image': 'allow' }, launch: true })).toEqual([['kay.config.ts', 'missing-description', 'error']])
