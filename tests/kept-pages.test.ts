@@ -349,3 +349,135 @@ describe('a kept page after a request that can write', () => {
     expect(again!.text).toContain('Hello first,m1')
   }, 120_000)
 })
+
+describe('a kept page and the state a script declares', () => {
+  const roots: string[] = []
+  const route = (root: string, file: string) => ({ file: join(root, file), layouts: [] })
+
+  async function scratch(files: Record<string, string>): Promise<string> {
+    const root = await project(files)
+
+    roots.push(root)
+
+    return root
+  }
+
+  afterAll(async () => {
+    await Promise.all(roots.map(async root => rm(root, { recursive: true, force: true })))
+  })
+
+  it('keeps a page whose component script declares a let or an empty container per render', async () => {
+    const root = await scratch({
+      'src/routes/index.kay': '---\nlet title = \'Home\'\nconst items = []\nconst options = {}\nconst seen = new Map<string, number>()\n---\nh1 {title}\n',
+    })
+
+    expect(await readsNothing(route(root, 'src/routes/index.kay'))).toBe(true)
+  })
+
+  it('keeps a page whose server fence declares a let or an empty container per request', async () => {
+    const root = await scratch({
+      'src/routes/index.kay': '--- server\nlet title = \'Home\'\nconst items: string[] = []\nconst options = {}\n---\nh1 {title}\n',
+    })
+
+    expect(await readsNothing(route(root, 'src/routes/index.kay'))).toBe(true)
+  })
+
+  it('keeps a page importing a component whose script declares them', async () => {
+    const root = await scratch({
+      'src/routes/index.kay': '---\nimport Card from \'../card.kay\'\n---\nCard\n',
+      'src/card.kay': '---\nlet label = \'Card\'\nconst parts = []\n---\np {label}\n',
+    })
+
+    expect(await readsNothing(route(root, 'src/routes/index.kay'))).toBe(true)
+  })
+
+  it('keeps refusing a page whose server fence shares a let or an empty container with an export', async () => {
+    const root = await scratch({
+      'src/routes/let.kay': '--- server\nlet count = 0\n\nexport const bump = action(s.Object({}), async () => {\n  count++\n})\n---\np {count}\n',
+      'src/routes/list.kay': '--- server\nconst seen = []\n\nexport const add = action(s.Object({}), async () => {\n  seen.push(1)\n})\n---\np {seen.length}\n',
+      'src/routes/exported.kay': '--- server\nexport const seen: string[] = []\n---\np {seen.length}\n',
+    })
+
+    expect(await readsNothing(route(root, 'src/routes/let.kay'))).toBe(false)
+    expect(await readsNothing(route(root, 'src/routes/list.kay'))).toBe(false)
+    expect(await readsNothing(route(root, 'src/routes/exported.kay'))).toBe(false)
+  })
+
+  it('keeps refusing a page importing a .ts module with a module-level let or empty container', async () => {
+    const root = await scratch({
+      'src/routes/let.kay': '---\nimport { next } from \'../counted\'\n---\np {next()}\n',
+      'src/routes/array.kay': '---\nimport { push } from \'../listed\'\n---\np {push()}\n',
+      'src/routes/object.kay': '---\nimport { put } from \'../mapped\'\n---\np {put()}\n',
+      'src/counted.ts': 'let count = 0\n\nexport function next(): number {\n  return ++count\n}\n',
+      'src/listed.ts': 'const seen: number[] = []\n\nexport function push(): number {\n  return seen.push(1)\n}\n',
+      'src/mapped.ts': 'const seen = {}\n\nexport function put(): number {\n  return Object.keys(seen).length\n}\n',
+    })
+
+    expect(await readsNothing(route(root, 'src/routes/let.kay'))).toBe(false)
+    expect(await readsNothing(route(root, 'src/routes/array.kay'))).toBe(false)
+    expect(await readsNothing(route(root, 'src/routes/object.kay'))).toBe(false)
+  })
+
+  it('keeps refusing a page that reads Math.random through a destructuring or an alias', async () => {
+    const root = await scratch({
+      'src/routes/direct.kay': 'p {Math.random()}\n',
+      'src/routes/destructured.kay': '---\nconst { random } = Math\n---\np {random()}\n',
+      'src/routes/aliased.kay': '---\nconst m = Math\n---\np {m.random()}\n',
+      'src/routes/computed.kay': 'p {Math[\'random\']()}\n',
+      'src/routes/floor.kay': 'p {Math.floor(1.5)}\n',
+    })
+
+    expect(await readsNothing(route(root, 'src/routes/direct.kay'))).toBe(false)
+    expect(await readsNothing(route(root, 'src/routes/destructured.kay'))).toBe(false)
+    expect(await readsNothing(route(root, 'src/routes/aliased.kay'))).toBe(false)
+    expect(await readsNothing(route(root, 'src/routes/computed.kay'))).toBe(false)
+    expect(await readsNothing(route(root, 'src/routes/floor.kay'))).toBe(true)
+  })
+
+  it('builds the page with the per-render script kept, and serves it', async () => {
+    const root = await scratch({
+      'src/routes/index.kay': '---\nlet title = \'Home\'\nconst items = []\n---\nh1 {title}\n',
+    })
+
+    expect(await built(root)).toEqual(['/'])
+
+    const [home] = await served(root, [{ path: '/' }])
+
+    expect(home!.etag).not.toBeNull()
+    expect(home!.text).toContain('Home')
+  }, 60_000)
+
+  it('gives a path to the page that was asked for, over a kept one, whichever is met first', async () => {
+    const asked = '--- server\nconst slug = ctx.params.slug\n\nexport const page = { prerender: [{ slug: \'index\' }] }\n---\np Asked {slug}\n'
+    const first = await scratch({ 'src/routes/index.kay': 'p Kept home\n', 'src/routes/[slug].kay': asked })
+    const second = await scratch({ 'src/routes/index.kay': 'p Kept home\n', 'src/routes/index/index.kay': '--- server\nexport const page = { prerender: true }\n---\np Asked index\n' })
+
+    for (const root of [first, second]) {
+      expect(await built(root)).toEqual(['/index'])
+
+      const [index, home] = await served(root, [{ path: '/index' }, { path: '/' }])
+
+      expect(index!.text).toContain('Asked index')
+      expect(index!.etag).not.toBeNull()
+      expect(home!.text).toContain('Kept home')
+      expect(home!.etag).toBeNull()
+    }
+  }, 120_000)
+
+  it('leaves no file for a kept page that gave way or drifted, and keeps it out of the pages it lists', async () => {
+    const root = await scratch({
+      'src/routes/index.kay': 'p Kept home\n',
+      'src/routes/about.kay': 'p About\n',
+      'src/routes/[slug].kay': '--- server\nconst slug = ctx.params.slug\n\nexport const page = { prerender: [{ slug: \'index\' }] }\n---\np Asked {slug}\n',
+      'src/routes/drifting.kay': '---\nimport { drift } from \'../drift\'\n---\np {drift()}\n',
+      'src/drift.ts': 'const state = { n: 0 }\n\nexport function drift(): number {\n  return state.n++\n}\n',
+    })
+
+    expect(await built(root)).toEqual(['/about', '/index'])
+
+    const files = await Array.fromAsync(new Bun.Glob('**/*.html').scan({ cwd: join(outputDir(root), 'pages') }))
+
+    expect(files.sort()).toEqual(['about.html', 'index.html'])
+    expect(await Bun.file(join(outputDir(root), 'pages', 'index.html')).text()).toContain('Asked index')
+  }, 120_000)
+})

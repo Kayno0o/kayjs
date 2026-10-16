@@ -9,9 +9,12 @@ const CODE_FILE = /\.(?:kay|[cm]?[jt]sx?)$/
 // What a file imported for its bytes holds the same on every render; a database, a native module or a wasm file does not.
 const STATIC_FILE = /\.(?:png|jpe?g|gif|webp|avif|svg|ico|woff2?|ttf|otf|json|css|txt|md|html|toml|ya?ml|csv)$/i
 // Every way a file reads the request or the moment: `ctx`, a clock, a random number, the environment, the file system through Bun, a network fetch, a dynamic import, or a `query` schema, which has the page read the URL's search params.
-const READS_REQUEST = /\b(?:ctx|Date|Intl|Temporal|crypto|process|Bun|performance|fetch|globalThis|require|eval)\b|\bMath\s*(?:\??\.|\[)\s*['"]?random|\bimport\s*\(|\bimport\.meta\b|\bquery\s*:/
+const READS_REQUEST = /\b(?:ctx|Date|Intl|Temporal|crypto|process|Bun|performance|fetch|globalThis|require|eval)\b|\bMath\b(?!\s*\??\.\s*(?!random\b)\w)|\bimport\s*\(|\bimport\.meta\b|\bquery\s*:/
 // State a module keeps from one render to the next, which a second render could show differently: a top-level `let` or `var`, an empty container a cache fills, and a literal or a container another module imports and changes.
-const MODULE_STATES = [/^(?:export )?(?:let|var) /m, /^(?:export )?const [^=\n]*= *(?:\[ *\]|\{ *\}|new (?:Map|Set|WeakMap|WeakSet|Array|Object)\b)/m, /^export const (?!page\b)[^=\n]*= *(?:[[{]|new )/m]
+const MODULE_STATES = [/^(?:export )?(?:let|var) /m, /^(?:export )?const [^=\n]*= *(?:\[ *\]|\{ *\}|new (?:Map|Set|WeakMap|WeakSet|Array|Object)\b)/m]
+const EXPORTED_STATE = /^export const (?!page\b)[^=\n]*= *(?:[[{]|new )/m
+// A `.kay` file runs its scripts and server fence for each render, so what they declare is state only when an export of the server fence reads it and moves it to module level; one with no export other than a page setting has none.
+const MODULE_EXPORT = /^export (?:async )?(?:const|let|var|function|class) (?!(?:page|prerender|revalidate|layouts|query|sitemap|noindex)\b)/m
 // An import or a re-export with what it takes, then one for its effect alone.
 const FROM = /\b(?:import|export)\b([^'";(=]*)\sfrom\s*['"]([^'"]+)['"]/g
 const FOR_EFFECT = /\bimport\s*['"]([^'"]+)['"]/g
@@ -60,7 +63,7 @@ async function scanned(file: string): Promise<Scan> {
   const source = await Bun.file(file).text()
   const code: string[] = []
 
-  if (READS_REQUEST.test(source) || MODULE_STATES.some(state => state.test(source)))
+  if (READS_REQUEST.test(source) || EXPORTED_STATE.test(source) || ((!file.endsWith('.kay') || MODULE_EXPORT.test(source)) && MODULE_STATES.some(state => state.test(source))))
     return { clean: false, code }
 
   const imports = [...source.matchAll(FROM)].map(([, clause, specifier]) => ({ clause: clause!, specifier: specifier! }))
