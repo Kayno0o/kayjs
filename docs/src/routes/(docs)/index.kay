@@ -176,7 +176,11 @@ head
         ModuleCard(title="API routes" use="kay/server" href="/guides/api-routes")
           @icon
             Api
-          | Elysia modules in src/api, mounted at their path, with server-sent events and websockets.
+          | Elysia modules in src/api, mounted at their path, with CORS, OpenAPI and MCP tools for agents.
+        ModuleCard(title="Live data and realtime" use="kay" href="/guides/live-and-realtime")
+          @icon
+            Bolt
+          | Values the server changes that every open page follows, plus server-sent events, websockets and rooms.
         ModuleCard(title="Navigation" use="kay" href="/essentials/islands#page-navigation")
           @icon
             Route
