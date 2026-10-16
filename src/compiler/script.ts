@@ -748,7 +748,7 @@ function brokenStatement(code: string, pos: number): { start: number, end: numbe
   let probe = Math.min(pos, code.length)
   const row = Math.max(0, starts.findLastIndex(start => start <= probe))
   const firstToken = FIRST_TOKEN.exec(lines[row]!)![0].length
-  const inFirstToken = STATEMENT_START.test(lines[row]!) && probe <= starts[row]! + firstToken
+  const inFirstToken = firstToken > 0 && STATEMENT_START.test(lines[row]!) && probe <= starts[row]! + firstToken
   let before = inFirstToken ? starts[row]! : probe
 
   before = endOfCode(code, starts, before)

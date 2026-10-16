@@ -363,6 +363,14 @@ describe('fences', () => {
     }
   })
 
+  it('blame the last statement of a fence that ends unfinished, whatever it ends with', () => {
+    for (const body of ['const a = 1\nconst e = signal(1', 'const d = foo(\n// c\nconst e = signal(1', 'const a = 1\n\nconst e = signal(1\n\n', 'const e = signal(1']) {
+      const { tsx } = compileKay(`---\n${body}\n---\np x\n`, 'test.kay', { check: true })
+
+      expect(tsx).toContain('import { signal }')
+    }
+  })
+
   it('keep a broken import.meta statement in the body, and read a block comment before a broken import', () => {
     const meta = compileKay('---\nimport.meta.hot.\nconst count = signal(1)\n---\np {count()}\n', 'test.kay', { check: true }).tsx
     const block = compileKay('---\n/* c */ import { a } from \'x\nconst count = signal(1)\n---\np {count()}\n', 'test.kay', { check: true }).tsx
