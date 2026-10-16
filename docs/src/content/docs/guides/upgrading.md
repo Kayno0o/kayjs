@@ -9,6 +9,12 @@ kay and its libraries share one version number, so one section covers them all. 
 
 `kay upgrade` moves your app to the latest version and rewrites what it can, one minor at a time. Read the sections here for what it cannot.
 
+## 1.50.0
+
+### Postgres and SQLite apps with kayjs-auth run `db.sync()`
+
+`pgStore` adds four tables for the OAuth server, `auth_oauth_client`, `auth_oauth_grant`, `auth_oauth_code` and `auth_oauth_refresh`, and two columns on `auth_bearer_token`, `oauth_client` and `oauth_family`. Creating a bearer token writes those columns, so it fails until `db.sync()` has run. If you write your own migrations, add them there. A custom store needs nothing: without an `oauth` member the OAuth server stays off. `kay check` cannot see your database schema, so no lint warns about this.
+
 ## 1.49.0
 
 ### A prerendered page reads the pathname `trailingSlash` serves

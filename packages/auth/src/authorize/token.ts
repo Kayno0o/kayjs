@@ -1,9 +1,11 @@
 import type { Core } from '../core'
 import type { OAuthGrantRecord } from '../store'
+import type { TokenReply } from './reply'
 import { createHash, timingSafeEqual } from 'node:crypto'
 import { banned } from '../core'
 import { digest, randomToken } from '../keys'
 import { spend } from '../limits'
+import { refused } from './reply'
 import { covers, sameSite } from './request'
 
 // Seconds an access token works for, and a refresh token.
@@ -11,15 +13,6 @@ export const ACCESS_LIFETIME = 60 * 60
 export const REFRESH_LIFETIME = 30 * 24 * 60 * 60
 const VERIFIER = /^[\w.~-]{43,128}$/
 const WHITESPACE = /\s+/
-
-export interface TokenReply {
-  status: number
-  body: Record<string, unknown>
-}
-
-function refused(error: string, description: string, status = 400): TokenReply {
-  return { status, body: { error, error_description: description } }
-}
 
 function matches(verifier: string, challenge: string): boolean {
   const computed = Buffer.from(createHash('sha256').update(verifier).digest('base64url'))

@@ -36,7 +36,7 @@ export type AuthorizeOutcome
     | { kind: 'redirect', url: string }
   // The visitor signs in first.
     | { kind: 'sign-in' }
-    | { kind: 'consent', client: { id: string, name: string, host: string | null }, scopes: string[] | null, fields: ConsentFields }
+    | { kind: 'consent', client: { id: string, name: string, host: string | null }, redirectHost: string, scopes: string[] | null, fields: ConsentFields }
 
 interface Checked {
   client: OAuthClient
@@ -170,17 +170,26 @@ export async function authorize(state: RequestState, params: AuthorizeParams, ro
 
   const record = await approver(state)
 
-  if (!record)
-    return await impersonatorOf(state) === undefined ? { kind: 'sign-in' } : failure(checked, root, 'access_denied', 'Not while acting as a user')
+  const prompt = oneOf(params.prompt)?.split(WHITESPACE) ?? []
+
+  if (!record) {
+    if (await impersonatorOf(state) !== undefined)
+      return failure(checked, root, 'access_denied', 'Not while acting as a user')
+
+    return prompt.includes('none') ? failure(checked, root, 'login_required', 'The user is signed out') : { kind: 'sign-in' }
+  }
 
   const held = await state.core.store.oauth!.grants.get(record.id, checked.client.id)
-  const prompt = oneOf(params.prompt)?.split(WHITESPACE) ?? []
 
   if (held && covers(held.scopes, checked.scopes) && !prompt.includes('consent'))
     return { kind: 'redirect', url: await approve(state, record, checked, root) }
 
+  if (prompt.includes('none'))
+    return failure(checked, root, 'consent_required', 'The user has not approved this client for these scopes')
+
   return {
     kind: 'consent',
+    redirectHost: new URL(checked.redirectUri).host,
     client: { id: checked.client.id, name: checked.client.name, host: checked.client.host },
     scopes: checked.scopes,
     fields: { client_id: checked.client.id, redirect_uri: checked.redirectUri, code_challenge: checked.challenge, scope: oneOf(params.scope) ?? '', state: oneOf(params.state) ?? '', resource: oneOf(params.resource) ?? '' },

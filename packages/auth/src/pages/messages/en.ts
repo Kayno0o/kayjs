@@ -62,6 +62,7 @@ export default defineMessages({
       title: 'Allow access',
       intro: '{client} wants to use your account.',
       from: 'This app lives at {host}. Only continue if you started this sign-in.',
+      returnsTo: 'After you decide, you go back to {host}.',
       scopes: 'It will be allowed to',
       everything: 'Do everything you can do',
       allow: 'Allow',

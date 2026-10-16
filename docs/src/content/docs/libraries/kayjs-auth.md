@@ -242,12 +242,12 @@ Nothing is set up: the documents an agent reads, `/.well-known/oauth-authorizati
 ```ts
 createAuth({
   // ...
-  // Turn it off with oauthServer: false
   scopes: ['notes:read', 'notes:write'],
+  // oauthServer: false turns it off.
 })
 ```
 
-Pass `oauthServer: false` to turn it off. The new tables are created by `db.sync()` if you use Postgres or SQLite.
+The agents can only ask for the scopes you declare. The new tables are created by `db.sync()` if you use Postgres or SQLite.
 
 ## In the dev tool
 

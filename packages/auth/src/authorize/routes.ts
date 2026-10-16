@@ -1,12 +1,13 @@
 import type { Elysia } from 'elysia'
 import type { Core } from '../core'
 import type { RequestState } from '../state'
-import { AUTHORIZATION_SERVER_PATH, authorizationServerMetadata, OPEN_HEADERS, OPENID_CONFIGURATION_PATH, siteRoot } from './metadata'
+import { AUTHORIZATION_SERVER_PATH, authorizationServerMetadata, OPEN_HEADERS, OPENID_CONFIGURATION_PATH, rootIsFixed, siteRoot } from './metadata'
 import { registerClient } from './register'
+import { refused } from './reply'
 import { tokenEndpoint } from './token'
 
 const BODY_MAX_LENGTH = 16 * 1024
-const DOCUMENT_HEADERS = { ...OPEN_HEADERS, 'content-type': 'application/json; charset=utf-8', 'cache-control': 'public, max-age=300' }
+const DOCUMENT_HEADERS = { ...OPEN_HEADERS, 'content-type': 'application/json; charset=utf-8' }
 
 function preflight(): Response {
   return new Response(null, { status: 204, headers: { ...OPEN_HEADERS, 'access-control-max-age': '86400' } })
@@ -16,17 +17,33 @@ function preflight(): Response {
 export function serveOAuthServer(plugin: Elysia, core: Core, stateOf: (ctx: unknown) => RequestState): void {
   for (const path of [AUTHORIZATION_SERVER_PATH, OPENID_CONFIGURATION_PATH]) {
     plugin
-      .get(path, ({ request }) => new Response(JSON.stringify(authorizationServerMetadata(core, siteRoot(core, request))), { headers: DOCUMENT_HEADERS }))
+      .get(path, ({ request }) => new Response(JSON.stringify(authorizationServerMetadata(core, siteRoot(core, request))), { headers: { ...DOCUMENT_HEADERS, 'cache-control': rootIsFixed(core) ? 'public, max-age=300' : 'private, max-age=300' } }))
       .options(path, preflight)
   }
 
   const reply = (result: { status: number, body: Record<string, unknown> }): Response => new Response(JSON.stringify(result.body), { status: result.status, headers: { ...OPEN_HEADERS, 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'pragma': 'no-cache' } })
 
-  // The body is read here, not by Elysia, so it is capped before it is parsed whatever its content type says.
+  // The body is read here, not by Elysia, and stopped at the cap whatever the request claims to hold.
   const read = async (request: Request): Promise<string | undefined> => {
-    const text = await request.text()
+    if (!request.body)
+      return ''
 
-    return text.length > BODY_MAX_LENGTH ? undefined : text
+    if (Number(request.headers.get('content-length')) > BODY_MAX_LENGTH)
+      return undefined
+
+    const chunks: Uint8Array[] = []
+    let size = 0
+
+    for await (const chunk of request.body as unknown as AsyncIterable<Uint8Array>) {
+      size += chunk.byteLength
+
+      if (size > BODY_MAX_LENGTH)
+        return undefined
+
+      chunks.push(chunk)
+    }
+
+    return Buffer.concat(chunks).toString('utf8')
   }
 
   plugin
@@ -35,7 +52,7 @@ export function serveOAuthServer(plugin: Elysia, core: Core, stateOf: (ctx: unkn
       const text = await read(ctx.request)
 
       if (text === undefined)
-        return reply({ status: 400, body: { error: 'invalid_request', error_description: 'The request is too large' } })
+        return reply(refused('invalid_request', 'The request is too large'))
 
       return reply(await tokenEndpoint(core, state.client, new URLSearchParams(text), siteRoot(core, ctx.request)))
     }, { parse: 'none' })

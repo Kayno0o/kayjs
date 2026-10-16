@@ -104,7 +104,7 @@ export async function bootProblems(root: string, options: CheckOptions, feeds: C
     refused(config, () => served.claim({ path: MCP_PATH, owner: '`mcp`', kind: 'kay', method: 'ALL' }))
 
     for (const path of [RESOURCE_METADATA, `${RESOURCE_METADATA}${MCP_PATH}`])
-      refused(config, () => served.claim({ path, owner: '`mcp`', kind: 'kay', method: 'ALL' }))
+      served.offer({ path, owner: '`mcp`', kind: 'kay', method: 'ALL' })
   }
 
   // API modules' routes are left to the boot, which `kay build` runs: listing them takes running the modules, which may need what only the server has.

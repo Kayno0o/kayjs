@@ -275,6 +275,8 @@ export interface McpOptions {
   // The guards of the API directory, which `tools/list` runs as the OpenAPI document does.
   guards: LoadedGuard[]
   actions: ActionOptions
+  // The sign-in metadata paths kay serves: one the app serves itself is left out.
+  metadataPaths: string[]
 }
 
 // Counts a request the endpoint dispatched as the client it came from and drops the marker, so the app never reads it.
@@ -319,7 +321,7 @@ const OWN_HEADERS = new Set(['content-type', 'content-length', 'content-encoding
 
 // What a guard's refusal is as a JSON-RPC error: a sign-in request with the pointer when it is a 401 or a redirect, else the refusal's own status; the guard's headers go with it, `Retry-After` of a 429 among them.
 // A sign-in request to a call is worded as a guarded tool's is, a result that is an error, so the answer does not tell which names are tools.
-async function declined(denied: Response, id: string | number | null, request: Request, base: string, call: boolean): Promise<Response> {
+async function declined(denied: Response, id: string | number | null, request: Request, base: string, call: boolean, owner: string | undefined): Promise<Response> {
   const challenge = denied.status === 401 || (denied.status >= 300 && denied.status < 400)
   const headers = new Headers(ANSWER)
 
@@ -329,7 +331,7 @@ async function declined(denied: Response, id: string | number | null, request: R
   }
 
   if (challenge)
-    headers.set('www-authenticate', `Bearer resource_metadata="${resourceMetadata(request, base)}"`)
+    headers.set('www-authenticate', `Bearer resource_metadata="${resourceMetadata(request, base, owner)}"`)
 
   const message = challenge && denied.status !== 401 ? '' : await denied.text()
 
@@ -340,8 +342,13 @@ async function declined(denied: Response, id: string | number | null, request: R
 }
 
 // Where a client that was refused for want of a sign-in finds how to get one.
-function resourceMetadata(request: Request, base: string): string {
-  return new URL(joinBase(base, RESOURCE_METADATA), configuredSite()?.origin ?? requestUrl(request).origin).href
+function resourceMetadata(request: Request, base: string, origin: string | undefined): string {
+  return new URL(joinBase(base, RESOURCE_METADATA), configuredSite()?.origin ?? origin ?? requestUrl(request).origin).href
+}
+
+// The origin the auth library serves its documents at, which the pointer to them must agree with.
+function originOf(served: unknown): string | undefined {
+  return (served as { auth?: ResourceOwner }).auth?.oauthOrigin?.()
 }
 
 export const mcpBodyLimit: BodyLimit = {
@@ -352,17 +359,22 @@ export const mcpBodyLimit: BodyLimit = {
 // What an auth library with an OAuth server of its own, kayjs-auth, tells of it through the `auth` of the context.
 interface ResourceOwner {
   oauthResource?: (path: string, name: string) => Record<string, unknown> | null
+  oauthOrigin?: () => string | undefined
+  oauthFixed?: () => boolean
 }
 
 // The OAuth 2.0 protected resource metadata (RFC 9728) a client finds from the 401's pointer, or at the well-known path of the endpoint: the auth library's answer, which names its authorization server, else a 404 for an app that signs no one in by OAuth.
-function serveResourceMetadata(app: Elysia, name: string): void {
-  const headers = { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'public, max-age=300', 'access-control-allow-origin': '*' }
+function serveResourceMetadata(app: Elysia, name: string, paths: string[]): void {
+  const headers = { 'content-type': 'application/json; charset=utf-8', 'access-control-allow-origin': '*' }
 
-  for (const route of [RESOURCE_METADATA, `${RESOURCE_METADATA}${MCP_PATH}`]) {
+  for (const route of paths) {
     app.get(route, (served) => {
-      const document = (served as unknown as { auth?: ResourceOwner }).auth?.oauthResource?.(MCP_PATH, name)
+      const owner = (served as unknown as { auth?: ResourceOwner }).auth
+      const document = owner?.oauthResource?.(MCP_PATH, name)
+      // An origin taken from the request is whatever its Host header said, so no shared cache keeps the document.
+      const cache = configuredSite() !== undefined || owner?.oauthFixed?.() === true ? 'public, max-age=300' : 'private, max-age=300'
 
-      return document ? new Response(JSON.stringify(document), { headers }) : new Response(null, { status: 404 })
+      return document ? new Response(JSON.stringify(document), { headers: { ...headers, 'cache-control': cache } }) : new Response(null, { status: 404 })
     })
     app.options(route, () => new Response(null, { status: 204, headers: { 'access-control-allow-origin': '*', 'access-control-allow-methods': 'GET, OPTIONS', 'access-control-allow-headers': 'content-type, mcp-protocol-version', 'access-control-max-age': '86400' } }))
   }
@@ -394,7 +406,7 @@ export function serveMcp(app: Elysia, document: Schema, options: McpOptions): vo
       const refusal = await guardRefusal(options.guards, served, options.actions)
 
       if (refusal)
-        return declined(refusal, guarded.id, request, options.base, guarded.call)
+        return declined(refusal, guarded.id, request, options.base, guarded.call, originOf(served))
     }
 
     const context: CallContext = { request, server, challenged: false }
@@ -407,7 +419,7 @@ export function serveMcp(app: Elysia, document: Schema, options: McpOptions): vo
     const headers = new Headers(ANSWER)
 
     if (context.challenged)
-      headers.set('www-authenticate', `Bearer resource_metadata="${resourceMetadata(request, options.base)}"`)
+      headers.set('www-authenticate', `Bearer resource_metadata="${resourceMetadata(request, options.base, originOf(served))}"`)
 
     // A message that is no request at all is the client's mistake, answered as such.
     const unreadable = reply.error?.code === PARSE_ERROR || reply.error?.code === INVALID_REQUEST
@@ -421,5 +433,5 @@ export function serveMcp(app: Elysia, document: Schema, options: McpOptions): vo
   }, { parse: 'none' })
   app.get(MCP_PATH, notAllowed)
   app.delete(MCP_PATH, notAllowed)
-  serveResourceMetadata(app, options.title)
+  serveResourceMetadata(app, options.title, options.metadataPaths)
 }

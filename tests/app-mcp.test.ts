@@ -292,6 +292,18 @@ describe('sign-in metadata', () => {
   })
 })
 
+describe('sign-in metadata an app serves itself', () => {
+  it('gives way to the app\'s own route at that path instead of stopping the boot', async () => {
+    const own = await testSite({ routes, api, mcp: true, islands: false, redirects: { '/.well-known/oauth-protected-resource': '/elsewhere' } })
+    const response = await own.fetch('/.well-known/oauth-protected-resource')
+
+    expect(response.status).toBe(308)
+    expect(response.headers.get('location')).toBe('/elsewhere')
+    expect((await own.fetch('/.well-known/oauth-protected-resource/mcp')).status).toBe(404)
+    await own.close()
+  })
+})
+
 describe('guards', () => {
   it('asks for a sign-in with 401 and a pointer to the resource metadata when a guard refuses', async () => {
     const response = await rpc(site, 'tools/call', { name: 'wipe', arguments: { confirm: true } })

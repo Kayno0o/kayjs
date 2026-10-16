@@ -3,17 +3,17 @@ import { Buffer } from 'node:buffer'
 import { lookup } from 'node:dns/promises'
 import { isIP } from 'node:net'
 import { spend } from '../limits'
-import { validRedirectUri } from './uris'
+import { validRedirectUris } from './uris'
 
 const DOCUMENT_MAX_BYTES = 10 * 1024
 const DOCUMENT_TIMEOUT_MS = 5000
 const CACHE_MS = 5 * 60 * 1000
 const CACHE_MAX = 500
 const NAME_MAX_LENGTH = 100
-const REDIRECT_URIS_MAX = 10
 // eslint-disable-next-line no-control-regex -- control characters are what it finds
 const CONTROL = /[\0-\x1F\x7F]/g
-const MAPPED_V4 = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/
+// Characters that reorder the text around them, which could make a name read as another.
+const BIDI = /[\u202A-\u202E\u2066-\u2069]/g
 const JSON_TYPE = /\bjson\b/
 
 // A client as the authorization endpoint knows it.
@@ -28,6 +28,32 @@ export interface OAuthClient {
 // Reads a client's metadata document: its parsed JSON, or why not.
 export type DocumentFetcher = (url: string) => Promise<unknown>
 
+// The 16 bytes of an IPv6 address, an embedded dotted IPv4 tail included.
+function v6Bytes(address: string): number[] | undefined {
+  let text = address.toLowerCase()
+  const zone = text.indexOf('%')
+
+  if (zone !== -1)
+    text = text.slice(0, zone)
+
+  const dotted = !text.includes('.') ? undefined : text.slice(text.lastIndexOf(':') + 1).split('.').map(Number)
+
+  if (dotted)
+    text = `${text.slice(0, text.lastIndexOf(':') + 1)}${((dotted[0]! << 8) | dotted[1]!).toString(16)}:${((dotted[2]! << 8) | dotted[3]!).toString(16)}`
+
+  const halves = text.split('::')
+
+  if (halves.length > 2)
+    return undefined
+
+  const groups = (part: string) => part === '' ? [] : part.split(':').map(group => Number.parseInt(group, 16))
+  const head = groups(halves[0]!)
+  const tail = halves.length === 2 ? groups(halves[1]!) : []
+  const all = halves.length === 2 ? [...head, ...Array.from<number>({ length: Math.max(0, 8 - head.length - tail.length) }).fill(0), ...tail] : head
+
+  return all.length === 8 && all.every(group => Number.isInteger(group) && group >= 0 && group <= 0xFFFF) ? all.flatMap(group => [group >> 8, group & 0xFF]) : undefined
+}
+
 // Whether an address is one a client's document must not be read from: this machine, a private network, or anything else not on the public internet.
 export function privateAddress(address: string): boolean {
   const family = isIP(address)
@@ -35,20 +61,25 @@ export function privateAddress(address: string): boolean {
   if (family === 4)
     return privateV4(address.split('.').map(Number))
 
-  if (family !== 6)
+  const bytes = family === 6 ? v6Bytes(address) : undefined
+
+  if (!bytes)
     return true
 
-  const lower = address.toLowerCase()
-  const mapped = MAPPED_V4.exec(lower)
+  const zeros = (from: number, to: number) => bytes.slice(from, to).every(byte => byte === 0)
 
-  if (mapped)
-    return privateV4(mapped[1]!.split('.').map(Number))
+  // IPv4 inside IPv6: ::/96 (compatible), ::ffff:0:0/96 (mapped) and ::ffff:0:0:0/96 (translated) are the IPv4 host's own.
+  const mapped = zeros(0, 10) && bytes[10] === 0xFF && bytes[11] === 0xFF
+  const translated = zeros(0, 8) && bytes[8] === 0xFF && bytes[9] === 0xFF && bytes[10] === 0 && bytes[11] === 0
 
-  const group = lower.slice(0, lower.indexOf(':'))
-  const first = group === '' ? 0 : Number.parseInt(group, 16)
+  if (mapped || zeros(0, 12) || translated)
+    return privateV4(bytes.slice(12))
 
-  // ::, ::1, unique local fc00::/7, link-local fe80::/10, multicast ff00::/8, and the translation prefixes that reach IPv4 hosts.
-  return lower === '::' || lower === '::1' || (first & 0xFE00) === 0xFC00 || (first & 0xFFC0) === 0xFE80 || (first & 0xFF00) === 0xFF00 || lower.startsWith('64:ff9b:') || lower.startsWith('2002:')
+  const first = (bytes[0]! << 8) | bytes[1]!
+  const second = (bytes[2]! << 8) | bytes[3]!
+
+  // Only global unicast 2000::/3 is public, minus Teredo 2001::/32, documentation 2001:db8::/32 and 6to4 2002::/16.
+  return (first & 0xE000) !== 0x2000 || (first === 0x2001 && (second === 0 || second === 0x0DB8)) || first === 0x2002
 }
 
 function privateV4([a = 0, b = 0, c = 0]: number[]): boolean {
@@ -63,6 +94,10 @@ export function documentUrl(clientId: string): URL | undefined {
   try {
     const url = new URL(clientId)
 
+    // An address as the host has no name to hold to account, and its notations are many.
+    if (isIP(url.hostname.startsWith('[') ? url.hostname.slice(1, -1) : url.hostname) !== 0)
+      return undefined
+
     return url.pathname !== '/' && url.hash === '' && !clientId.includes('#') && url.username === '' && url.password === '' && url.href === clientId ? url : undefined
   }
   catch {
@@ -71,12 +106,13 @@ export function documentUrl(clientId: string): URL | undefined {
 }
 
 // Reads a document over the public internet: https only, from an address that is not on a private network, with no redirect followed, a short time and a small size.
-async function fetchPublicDocument(url: string): Promise<unknown> {
+// `refuses` tells the addresses not to connect to, which only a test replaces.
+export async function fetchPublicDocument(url: string, refuses: (address: string) => boolean = privateAddress): Promise<unknown> {
   const { hostname } = new URL(url)
   const host = hostname.startsWith('[') ? hostname.slice(1, -1) : hostname
   const addresses = isIP(host) === 0 ? await lookup(host, { all: true }) : [{ address: host }]
 
-  if (addresses.length === 0 || addresses.some(({ address }) => privateAddress(address)))
+  if (addresses.length === 0 || addresses.some(({ address }) => refuses(address)))
     throw new Error('the document is not on the public internet')
 
   const response = await fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(DOCUMENT_TIMEOUT_MS), headers: { accept: 'application/json' } })
@@ -118,7 +154,7 @@ export function plainName(value: unknown): string | undefined {
   if (typeof value !== 'string')
     return undefined
 
-  const name = value.replaceAll(CONTROL, ' ').trim().slice(0, NAME_MAX_LENGTH)
+  const name = value.replaceAll(CONTROL, ' ').replaceAll(BIDI, '').trim().slice(0, NAME_MAX_LENGTH)
 
   return name === '' ? undefined : name
 }
@@ -134,7 +170,7 @@ function clientOf(url: URL, document: unknown): OAuthClient | undefined {
 
   const uris = document.redirect_uris
 
-  if (!Array.isArray(uris) || uris.length === 0 || uris.length > REDIRECT_URIS_MAX || !uris.every(validRedirectUri))
+  if (!validRedirectUris(uris))
     return undefined
 
   // A client holding a secret signs its token requests, which this server does not read.

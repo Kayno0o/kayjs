@@ -33,7 +33,7 @@ import { changePassword, changeUsername, deleteAccount, unlink } from './account
 import { actingAdmin, adminAuditLog, banUser, changeRole, deleteUser, getUser, isAdmin, listUsers, unbanUser } from './admin'
 import { documentFetcher } from './authorize/clients'
 import { approvedClients, revokeClient } from './authorize/grants'
-import { protectedResourceMetadata, siteRoot } from './authorize/metadata'
+import { protectedResourceMetadata, rootIsFixed, siteRoot } from './authorize/metadata'
 import { authorize, decide } from './authorize/request'
 import { serveOAuthServer } from './authorize/routes'
 import { bearerRequest, bearerUser, createToken, issueToken, listTokens, revokeToken, tokenUser } from './bearer'
@@ -557,6 +557,16 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     const root = siteRoot(this.core, this.request)
 
     return protectedResourceMetadata(this.core, root, `${root}${path}`, name)
+  }
+
+  // The origin the OAuth documents are served at, which kay's 401 pointer to them names; undefined while the OAuth server is off.
+  oauthOrigin(): string | undefined {
+    return this.core.oauthServer ? new URL(siteRoot(this.core, this.request)).origin : undefined
+  }
+
+  // Whether that origin is configured, so the documents may be cached for everyone; else it is the request's own.
+  oauthFixed(): boolean {
+    return rootIsFixed(this.core)
   }
 
   // The providers the signed-in user has linked.

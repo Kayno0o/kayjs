@@ -25,6 +25,15 @@ export function validRedirectUri(value: unknown): value is string {
   return url.protocol === 'https:' ? url.hostname !== '' : loopback(url)
 }
 
+const REDIRECT_URIS_MAX = 10
+// All the URIs of one client together, which every request naming it is checked against.
+const REDIRECT_URIS_TOTAL = 2048
+
+// A list of 1 to 10 redirect URIs a client may be registered with, 2048 characters in all.
+export function validRedirectUris(value: unknown): value is string[] {
+  return Array.isArray(value) && value.length > 0 && value.length <= REDIRECT_URIS_MAX && value.every(validRedirectUri) && value.reduce((total: number, uri: string) => total + uri.length, 0) <= REDIRECT_URIS_TOTAL
+}
+
 // Whether `given` is one of the registered URIs: the same text, or for a listener on the machine itself the same URI whatever its port, as a native app picks a free one.
 export function redirectUriRegistered(registered: readonly string[], given: string): boolean {
   if (registered.includes(given))

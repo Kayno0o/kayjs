@@ -62,6 +62,7 @@ export default defineMessages({
       title: 'Autoriser l’accès',
       intro: '{client} souhaite utiliser votre compte.',
       from: 'Cette application se trouve sur {host}. Ne continuez que si vous avez lancé cette connexion.',
+      returnsTo: 'Une fois votre choix fait, vous revenez sur {host}.',
       scopes: 'Elle sera autorisée à',
       everything: 'Faire tout ce que vous pouvez faire',
       allow: 'Autoriser',

@@ -52,3 +52,8 @@ export function protectedResourceMetadata(core: Core, root: string, resource: st
     ...core.scopes.size > 0 && { scopes_supported: [...core.scopes] },
   }
 }
+
+// Whether the site's origin is configured, else it is the request's own, which anyone sending a Host header names.
+export function rootIsFixed(core: Core): boolean {
+  return (configuredSite()?.origin ?? core.url) !== undefined
+}

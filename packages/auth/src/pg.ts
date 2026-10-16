@@ -183,7 +183,7 @@ export const authTables = [AuthUsers, AuthIdentities, AuthTokens, AuthRecoveryCo
 type UserRow = InferEntity<typeof AuthUsers>
 
 // A client that registered itself and that nobody approved is dropped after this long.
-const UNUSED_CLIENT_MS = 30 * 24 * 60 * 60 * 1000
+const UNUSED_CLIENT_MS = 24 * 60 * 60 * 1000
 
 // kayjs-auth's data in the app's Postgres or SQLite database, through pg-orm: list `authTables` in the database's tables.
 export function pgStore(db: Database): AuthStore {

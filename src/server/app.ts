@@ -307,11 +307,16 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   claimRedirects(served, redirects)
   claimApi(served, api.mounted, servesOpenApi ? openapi : undefined)
 
+  const metadataPaths: string[] = []
+
   if (options.mcp === true) {
     served.claim({ path: MCP_PATH, owner: '`mcp`', kind: 'kay', method: 'ALL' })
 
-    for (const path of [RESOURCE_METADATA, `${RESOURCE_METADATA}${MCP_PATH}`])
-      served.claim({ path, owner: '`mcp`', kind: 'kay', method: 'ALL' })
+    // Offered, not claimed: an app serving its own protected resource metadata keeps it, as it keeps the authorization server one.
+    for (const path of [RESOURCE_METADATA, `${RESOURCE_METADATA}${MCP_PATH}`]) {
+      if (served.offer({ path, owner: '`mcp`', kind: 'kay', method: 'ALL' }))
+        metadataPaths.push(path)
+    }
   }
 
   limitBodies(app, options.bodyLimit ?? DEFAULT_BODY_LIMIT, new Map([...actionLimits, ...options.preview ? [[DRAFT_ROUTE, DRAFT_BODY_LIMIT] as const] : [], ...options.mcp === true ? [[MCP_PATH, mcpBodyLimit] as const] : []]), api.limits)
@@ -329,7 +334,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
     serveOpenApi(app, document, openapi, await covering(false), actionOptions)
 
   if (options.mcp === true && document)
-    serveMcp(app, document, { title: (document.info as { title: string }).title, version: (document.info as { version: string }).version, base, guards: await covering(true), actions: actionOptions })
+    serveMcp(app, document, { title: (document.info as { title: string }).title, version: (document.info as { version: string }).version, base, guards: await covering(true), actions: actionOptions, metadataPaths })
 
   serveErrorReports(app, options.onError)
   serveLive(app)

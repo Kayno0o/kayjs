@@ -40,6 +40,8 @@ export const DEFAULT_LIMITS = {
   export: { max: 6, window: HOUR },
   // Registering a client writes a row for anyone who asks, and reading a client's metadata document makes a request for them.
   oauthRegister: { max: 20, window: HOUR },
+  // Every client registered and never approved is a row kept for a day, so all addresses together are bounded too.
+  oauthRegisterAll: { max: 500, window: DAY },
   oauthDocument: { max: 30, window: 15 * MINUTE },
   // Loose, as a client refreshes its token for every user behind one address; a wrong code or refresh token is hopeless to guess.
   oauthToken: { max: 300, window: 15 * MINUTE },

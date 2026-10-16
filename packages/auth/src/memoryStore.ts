@@ -2,7 +2,7 @@ import type { AuditRecord, AuthStore, BearerTokenRecord, IdentityRecord, Invitat
 
 const SWEEP_EVERY = 1000
 // A client that registered itself and was never approved by anyone is dropped after this long.
-const UNUSED_CLIENT_MS = 30 * 24 * 60 * 60 * 1000
+const UNUSED_CLIENT_MS = 24 * 60 * 60 * 1000
 
 // Everything in this process's memory, gone on restart: for tests, and for trying kayjs-auth before a database is wired.
 export function memoryStore(): AuthStore {

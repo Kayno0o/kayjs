@@ -49,6 +49,7 @@ Panel(title={t('auth.consent.title')})
     p {t('auth.consent.intro', { client: outcome.client.name })}
     if outcome.client.host
       p.text-kui-muted {t('auth.consent.from', { host: outcome.client.host })}
+    p.text-kui-muted {t('auth.consent.returnsTo', { host: outcome.redirectHost })}
     p {t('auth.consent.scopes')}
     ul.list-disc.pl-5
       if outcome.scopes === null

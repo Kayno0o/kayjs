@@ -2,6 +2,12 @@
 
 What each minor release breaks, and what an app changes to move to it. kay and its libraries share one version, so one section covers them all; a patch breaks nothing, and a minor missing here broke nothing.
 
+## 1.50.0
+
+### `pgStore` apps run `db.sync()` for the OAuth server's tables and columns
+
+- `pgStore` adds the tables `auth_oauth_client`, `auth_oauth_grant`, `auth_oauth_code` and `auth_oauth_refresh`, and the columns `oauth_client` and `oauth_family` (with indexes) on `auth_bearer_token`. Minting a bearer token writes those columns, so every token creation fails until `db.sync()` has run; an app writing its own migrations adds them. A custom `AuthStore` needs nothing: its `oauth` member is optional, and without it the OAuth server stays off. `kay check` cannot see a database schema, so no `deprecated` lint can catch this.
+
 ## 1.49.0
 
 ### A prerendered page reads the pathname `trailingSlash` serves
