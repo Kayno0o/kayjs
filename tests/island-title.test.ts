@@ -64,4 +64,15 @@ describe('an island that fails to render', () => {
     expect(html).toContain('Fallback')
     expect(html).not.toContain('From a failed block')
   })
+
+  it('ships no client entry and preloads no chunk for the island it did not render', async () => {
+    const shipped = async (path: string) => (await (await app.handle(new Request(`http://localhost${path}`))).text()).match(/modulepreload|type="module"/g)?.length ?? 0
+
+    expect(await shipped('/failedalone')).toBe(await shipped('/untitled'))
+
+    const html = await (await app.handle(new Request('http://localhost/failed'))).text()
+
+    expect(html).toContain('href="/_kay/room-')
+    expect(html).not.toContain('/_kay/failing-')
+  })
 })

@@ -12,6 +12,7 @@ import { nativeConstraints } from './form'
 import { headCheckpoint, restoreHead } from './head'
 import { localizedLink } from './i18n'
 import { imageSource } from './image'
+import { islandCheckpoint } from './island.server'
 import { localeState } from './locale-state'
 import { kayLog } from './log'
 import { FAILED } from './markers'
@@ -351,13 +352,15 @@ export function serverIsland<P>(fn: (props: P) => unknown, props: P, mode: Serve
 export function attempt(render: () => string, fallback?: (error: unknown) => string): string {
   const mark = idMark()
   const checkpoint = headCheckpoint()
+  const restoreIslands = islandCheckpoint()
 
   try {
     return render()
   }
   catch (error) {
-    // What the block set in the head goes with it: its islands are not in the page.
+    // What the block set in the head and listed of islands goes with it: its islands are not in the page.
     restoreHead(checkpoint)
+    restoreIslands?.()
     const server = currentServerScope()
 
     if (server)

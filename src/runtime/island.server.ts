@@ -24,6 +24,30 @@ export interface RenderedIslands {
   messages: Set<string>
 }
 
+// Gives the page's island list back to where it stands now, for a block that failed: the islands it rendered are not in the page.
+export function islandCheckpoint(): (() => void) | undefined {
+  const islands = rendered
+
+  if (!islands)
+    return undefined
+
+  const { count } = islands
+  const eager = islands.eager.size
+  const messages = islands.messages.size
+
+  return () => {
+    islands.count = count
+    trim(islands.eager, eager)
+    trim(islands.messages, messages)
+  }
+}
+
+// A set keeps the order it was filled in, so what came after the first `size` entries is what to drop.
+function trim(set: Set<string>, size: number): void {
+  for (const value of [...set].slice(size))
+    set.delete(value)
+}
+
 // Runs a synchronous page render and lists the islands it rendered.
 export function collectIslands<T>(render: () => T, salt?: string): { result: T, islands: RenderedIslands } {
   const islands: RenderedIslands = { eager: new Set(), count: 0, messages: new Set() }
@@ -115,7 +139,7 @@ export function promote<P extends object>(id: string, render: (props: P) => JSX.
     if (depth > 0)
       return hydrated(props)
 
-    const before = rendered && { count: rendered.count, eager: [...rendered.eager] }
+    const restore = islandCheckpoint()
 
     try {
       return render(props)
@@ -125,10 +149,7 @@ export function promote<P extends object>(id: string, render: (props: P) => JSX.
         throw error
 
       // The islands it rendered before render inside it now.
-      if (rendered && before) {
-        rendered.count = before.count
-        rendered.eager = new Set(before.eager)
-      }
+      restore?.()
 
       return asIsland(props)
     }
