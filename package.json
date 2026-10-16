@@ -187,8 +187,8 @@
     "bench:check:apps": "tsgo --noEmit -p bench/apps/solid && tsgo --noEmit -p bench/apps/svelte && tsgo --noEmit -p bench/apps/next && $npm_execpath --cwd=bench/apps/nuxt --bun run check && $npm_execpath --cwd=bench/apps/astro --bun run check"
   },
   "peerDependencies": {
-    "@happy-dom/global-registrator": "^20.14.5",
-    "@types/bun": "^1.4.2"
+    "@happy-dom/global-registrator": "^20.14.6",
+    "@types/bun": "^1.4.3"
   },
   "peerDependenciesMeta": {
     "@happy-dom/global-registrator": {
@@ -197,21 +197,21 @@
   },
   "dependencies": {
     "@babel/parser": "^7.29.7",
-    "@babel/traverse": "^7.29.7",
+    "@babel/traverse": "^7.29.10",
     "@babel/types": "^7.29.7",
     "@jsquash/avif": "2.1.1",
     "@kaynooo/utils": "^2.29.0",
     "@resvg/resvg-js": "^2.6.2",
     "@typescript/native-preview": "^7.0.0-dev.20260707.2",
     "axe-core": "^4.14.0",
-    "devalue": "^6.0.2",
+    "devalue": "^6.0.3",
     "elysia": "^1.4.30",
-    "marked": "~18.1.0"
+    "marked": "~18.1.1"
   },
   "devDependencies": {
     "@fontsource/inter": "^5.3.0",
-    "@happy-dom/global-registrator": "^20.14.5",
-    "@iconify-json/tabler": "^1.2.41",
+    "@happy-dom/global-registrator": "^20.14.6",
+    "@iconify-json/tabler": "^1.2.42",
     "@kaynooo/eslint": "^7.0.4",
     "@kaynooo/kayjs-auth": "workspace:*",
     "@kaynooo/kayjs-cms": "workspace:*",
@@ -219,11 +219,11 @@
     "@kaynooo/kayjs-ui": "workspace:*",
     "@kaynooo/pg-orm": "^7.0.4",
     "@types/babel__traverse": "^7.28.0",
-    "@types/bun": "^1.4.2",
+    "@types/bun": "^1.4.3",
     "bun-plugin-tailwind": "^0.1.2",
     "kay": "link:.",
     "mitata": "1.0.34",
-    "playwright-core": "1.62.0",
+    "playwright-core": "1.64.1",
     "shiki": "^4.5.0",
     "tailwindcss": "^4.3.3",
     "typescript": "^6.0.3"

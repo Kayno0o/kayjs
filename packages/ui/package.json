@@ -46,7 +46,7 @@
     "test:dom": "bun --config=tests-dom/bunfig.toml test"
   },
   "peerDependencies": {
-    "@iconify-json/tabler": "^1.2.41",
+    "@iconify-json/tabler": "^1.2.42",
     "chartist": "^1.5.0",
     "hls.js": "^1.7.0",
     "kay": "~1.46.0",
@@ -64,10 +64,10 @@
     "@kaynooo/utils": "^2.30.1"
   },
   "devDependencies": {
-    "@happy-dom/global-registrator": "^20.14.5",
-    "@iconify-json/tabler": "^1.2.41",
+    "@happy-dom/global-registrator": "^20.14.6",
+    "@iconify-json/tabler": "^1.2.42",
     "@kaynooo/eslint": "^7.0.4",
-    "@types/bun": "^1.4.2",
+    "@types/bun": "^1.4.3",
     "chartist": "^1.5.0",
     "elysia": "^1.4.30",
     "hls.js": "^1.7.0",

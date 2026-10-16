@@ -70,7 +70,7 @@ const SAVE_BACKUPS = ['~', '___jb_old___', '___jb_tmp___']
 const MAX_CHANGED_FILES = 200
 // The address of a server listening on the root path, as kay's do, reads better without its slash.
 const ROOT_PATH = /(?<=\/\/[^/]+)\/$/
-const STOP_SIGNALS = new Set(['SIGINT', 'SIGTERM', 'SIGHUP'])
+const STOP_SIGNALS = new Set<Subprocess['signalCode']>(['SIGINT', 'SIGTERM', 'SIGHUP'])
 const WS_SCHEME = /^ws:\/\//
 // A server listening on every address is reached on this machine as localhost.
 const ANY_ADDRESS = /(?<=\/\/)(?:0\.0\.0\.0|\[::\])(?=:)/
@@ -283,7 +283,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     // A server dying with a config that does not load is the refusal's to report, once the first types say so.
     await verified.promise
 
-    if (server === child && !stopping && !STOP_SIGNALS.has(server.signalCode ?? '')) {
+    if (server === child && !stopping && !STOP_SIGNALS.has(server.signalCode)) {
       reloadAnswer?.('exited')
       say('exit', { code }, `${stamp()} the server exited with code ${code}, waiting for a change`)
     }

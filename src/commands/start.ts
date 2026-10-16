@@ -70,7 +70,10 @@ export const start: Command = {
     if (signalCode === null)
       return code
 
-    // As a shell reports a process a signal ended.
+    // As a shell reports a process a signal ended, one with no name coming as its number.
+    if (typeof signalCode === 'number')
+      return 128 + signalCode
+
     return STOPS.has(signalCode) && forwarded.has(signalCode) ? 0 : 128 + constants.signals[signalCode]
   },
 }
