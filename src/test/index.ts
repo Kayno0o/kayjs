@@ -8,7 +8,8 @@ import type { ClientBuild } from '../server/client'
 import type { BrowserOptions, TestPage } from './browser'
 import type { PageReading } from './page'
 import { existsSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { relative, resolve } from 'node:path'
+import process from 'node:process'
 import { beforeEach } from 'bun:test'
 import { Elysia } from 'elysia'
 import { clientDir, inOutput, testWorker } from '../build/assets'
@@ -23,6 +24,7 @@ import { PAGE_HEADER, WORK_HEADER, WORK_SCRIPT } from '../runtime/swap'
 import { solveWork } from '../runtime/work'
 import { servePages } from '../server/app'
 import { shutdown } from '../server/lifecycle'
+import { loaderRoot } from '../server/loader'
 import { drainQueues } from '../server/queue'
 import { sendFrom } from '../server/rewrite'
 import { SITEMAP } from '../server/site-paths'
@@ -209,6 +211,12 @@ async function islandsBuilt(root: string, options: ClientOptions, inBrowser: boo
 // The project's pages and actions without a server, their islands built for the browser as a check: pages then render their islands' markup and no scripts.
 export async function testSite(options: TestOptions = {}): Promise<TestSite> {
   const root = testRoot(options.root)
+  const serving = loaderRoot()
+
+  // The .kay loader and the site are the process's own, so a second project fails here with the way out rather than deep in a page import.
+  if (serving !== undefined && serving !== root)
+    throw new Error(`kay: this test process already serves ${serving}, and a process serves one project; test ${root} in a process of its own: \`bun test --parallel\` runs each file apart, or run its tests on their own as \`KAY_ROOT=${relative(process.cwd(), root) || '.'} bun test <its test files>\``)
+
   const loaded = await withConfig(root, options)
   // A site setting none is served where the visits go, so pages reading siteUrl() or siteOrigin() render as in production; files go to memory, fresh for each site, rather than to the store kay.config.ts names.
   const config = { ...loaded, site: loaded.site ?? ORIGIN, storage: options.storage ?? memoryFiles() }

@@ -82,6 +82,10 @@ it('opens its panel on a click', async () => {
 })
 ```
 
+## Several projects
+
+One test process serves one project. When test files call `testSite({ root })` on different folders, run them with `bun test --parallel`, which gives each file a process of its own, or run each folder's tests on their own with `KAY_ROOT=<folder> bun test <files>`. A second root in the same process throws an error that says this.
+
 ## Smaller helpers
 
 A test that drives an Elysia app of its own, rather than `testSite`, keeps a browser's cookies with `cookieJar()`. `jar.send(handle, request)` sends the cookies kept so far and keeps the ones the response sets. `solveWork(challenge)` solves a proof-of-work challenge as kay's script does. `scratchDir(prefix)` makes a fresh directory under the project's `.kay/scratch`, which no build or check reads.

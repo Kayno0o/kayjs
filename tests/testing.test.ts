@@ -133,6 +133,10 @@ describe('kay/test', () => {
     }
   })
 
+  it('says how to test a second project, which a process already serving one cannot', async () => {
+    await expect(testSite({ root: 'tests/fixtures/islands' })).rejects.toThrow('`bun test --parallel` runs each file apart, or run its tests on their own as `KAY_ROOT=tests/fixtures/islands bun test <its test files>`')
+  })
+
   it('stops at a redirect to another site', async () => {
     const bare = await testSite({ routes: 'tests/fixtures/bare/src/routes' })
     const away = await bare.visit(`/?next=${encodeURIComponent('https://example.com/about')}`)

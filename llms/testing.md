@@ -268,6 +268,7 @@ expect(jar.cookies.has('session')).toBe(true)
 - `bun test` loads the project's `.env` as well as `.env.test` and `.env.test.local`, whatever `NODE_ENV` says.
 - The preload drops every variable only `.env` sets, so a test never reaches the mail server or database a developer's `.env` names: tests see the shell's and the CI's variables and the test files', and `.env.test` need not blank what `.env` holds.
 - The preload serves the project in the working directory, or the one `KAY_ROOT` names when it is nested, such as a library's fixture app run as `KAY_ROOT=tests/fixture bun test`, which `testSite()` then serves too.
+- One test process serves one project: `testSite({ root })` on a second root throws, saying how to run it apart, as `bun test --parallel` (each file in a process of its own) or a `KAY_ROOT=<root> bun test <files>` run of its own.
 
 ### Browser tests
 
