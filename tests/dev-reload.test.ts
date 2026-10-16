@@ -1,6 +1,6 @@
 import type { Subprocess } from 'bun'
 import { existsSync, readFileSync, realpathSync } from 'node:fs'
-import { rm } from 'node:fs/promises'
+import { rename, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 import { dev } from '../src/dev'
@@ -68,6 +68,11 @@ async function served(files: Record<string, string>) {
     url,
     text,
     write: async (path: string, content: string) => Bun.write(join(root, path), content),
+    // The file at once, as an editor saves it: written beside it and renamed over it, one change for kay dev where a write in place may be two events a debounce apart under load, which restart a process twice.
+    replace: async (path: string, content: string) => {
+      await Bun.write(join(root, `${path}.tmp`), content)
+      await rename(join(root, `${path}.tmp`), join(root, path))
+    },
     // The page at `path` once it says `expected`.
     sees: async (expected: string, path = '/') => until(async () => (await text(path)).includes(expected)),
     // No new process for a moment, so what a write starts next is told from one a late event of the last still starts.
@@ -98,7 +103,7 @@ async function served(files: Record<string, string>) {
 
 // The entry with `extra` after the server it starts, which restarts the process once.
 async function entryWith(project: Awaited<ReturnType<typeof served>>, extra: string) {
-  await project.write('src/server.ts', `${ENTRY(project.log)}\n${extra}`)
+  await project.replace('src/server.ts', `${ENTRY(project.log)}\n${extra}`)
   await until(() => project.children.length === 2)
   await project.sees('Edit 0')
 }
@@ -153,7 +158,8 @@ describe.concurrent('kay dev reloading', () => {
       // The entry ran again for each edit, and the app it replaced stopped before: its hooks end what it started.
       await until(() => project.ran().filter(line => line === 'run').length === 4)
       expect(project.ran().filter(line => line === 'stop')).toHaveLength(3)
-      expect(project.lines.filter(line => line.includes('reloaded in'))).toHaveLength(3)
+      // Said once the reload answered, after the entry ran again.
+      await until(() => project.lines.filter(line => line.includes('reloaded in')).length === 3)
     }
     finally {
       await project.cleanup()
