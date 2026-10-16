@@ -230,7 +230,7 @@ describe('pages', () => {
       await Bun.write(join(dir, 'a.css'), `/* ${noise(3000)} */`)
       await Bun.write(join(dir, 'b.css'), `/* ${noise(3000)} */`)
       await Bun.write(join(dir, 'c.css'), `/* ${noise(9000)} */`)
-      const client = { dir: join(dir), styles: new Map([['/a.kay', '/_kay/a.css'], ['/b.kay', '/_kay/b.css'], ['/c.kay', '/_kay/c.css']]) } as ClientBuild
+      const client = { dir, styles: new Map([['/a.kay', '/_kay/a.css'], ['/b.kay', '/_kay/b.css'], ['/c.kay', '/_kay/c.css']]) } as ClientBuild
 
       await chooseInlineStyles(client, '', undefined)
       expect([...client.inlineStyles!.keys()]).toEqual(['/_kay/a.css', '/_kay/b.css'])

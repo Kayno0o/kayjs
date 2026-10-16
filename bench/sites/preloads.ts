@@ -14,6 +14,7 @@ const RUNS = Number(process.env.RUNS ?? 7)
 const FONT_PRELOAD = /<link rel="preload"[^>]*as="font"[^>]*>/g
 const MODULE_PRELOAD = /<link rel="modulepreload"[^>]*>/g
 const FONTS_STYLESHEET = /<link rel="stylesheet" href="\/_kay\/assets\/(fonts-[^"]+\.css)">/
+// Matches linked stylesheets only: build the site with `INLINE_STYLES=false` for the `css first` rewrites to have any.
 const PAGE_STYLESHEET = /<link rel="stylesheet" href="\/_kay\/(?!assets\/)[^"]+">/g
 const VIEWPORT = /<meta name="viewport"[^>]*>/
 

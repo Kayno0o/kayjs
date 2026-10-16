@@ -349,7 +349,7 @@ export default defineConfig({
 - `csp` merges directives over kay's, one given `false` left out.
 - `'wasm-unsafe-eval'` and `worker-src 'self' blob:` join kay's directives and the app's when the islands need them, unless the app sets that directive to `false` or `'none'` (see [Wasm and workers](styles-and-assets.md#wasm-and-workers)).
 - `script-src`, and `script-src-elem` when the app sets one, keep kay's hashes whatever they list.
-- With `fonts`, a `style-src` or `style-src-elem` without `'unsafe-inline'` gets the hash of their inline `@font-face` rules, one with it none, since a hash would switch it off.
+- With `fonts`, a `style-src` or `style-src-elem` without `'unsafe-inline'` gets the hash of their inline `@font-face` rules, and with stylesheets a page may inline (see [Styles](styles-and-assets.md#styles)) the hash of each of them, one with `'unsafe-inline'` none, since a hash would switch it off.
 - `'script-src': false` leaves kay's inline scripts to `default-src`, which blocks them, islands and streamed blocks with them.
 - `csp: false` sends no policy, and `security: false` none of these headers.
 - `X-Frame-Options`, for browsers that predate `frame-ancestors`, follows the policy's, a page's own sources included: `DENY` for `'none'` or no source, `SAMEORIGIN` for `'self'` alone, and none for any other source, or without the directive.
@@ -380,7 +380,7 @@ export default defineConfig({
 ### Compression
 
 - With NODE_ENV production, kay compresses responses itself unless kay.config.ts sets `compress: false`, as behind a proxy or CDN that compresses already (`compress: true` turns it on elsewhere): pages rendered per request, action results, and any `Response` the app's routes registered after `.use(await pages())` return go out with zstd, brotli or gzip, whichever the browser's `Accept-Encoding` prefers (zstd, then gzip, then brotli on a tie), and `Vary: Accept-Encoding`.
-- A response whose body is whole within a tick, as a rendered page is, is compressed in one go at zstd 3, brotli 4 or gzip 6, within its request's tick up to 128 KB and at most four at once off the main thread past it, the copy of a body rendered alike a second time kept (2 MB in all) so later ones are not compressed again, and a streamed body or a reply compressed once (sitemap, worker) as brotli or gzip, except a page carrying stylesheets `inlineStyles` wrote, which goes as gzip to a browser taking it, whatever weight it gives zstd or brotli, only what lies around them compressed (see [Styles](styles-and-assets.md#styles)).
+- A response whose body is whole within a tick, as a rendered page is, is compressed in one go at zstd 3, brotli 4 or gzip 6, within its request's tick up to 128 KB and at most four at once off the main thread past it, the copy of a body rendered alike a second time kept (2 MB in all) so later ones are not compressed again, and a streamed body or a reply compressed once (sitemap, worker) as brotli or gzip, except a page carrying inlined stylesheets, which goes as gzip to a browser taking it, whatever weight it gives zstd or brotli, only what lies around them compressed (see [Styles](styles-and-assets.md#styles)).
 - A streamed page is flushed chunk by chunk, so what it sends early still arrives early.
 - A strong ETag becomes weak.
 - Left alone: a response encoded already, such as the build's copies, one under 256 bytes, its length known or not, one with `Cache-Control: no-transform`, and anything but text, JSON, JavaScript, XML and SVG.
