@@ -1,4 +1,5 @@
 import { appendFile } from 'node:fs/promises'
+import os from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import process from 'node:process'
 import { $, Glob } from 'bun'
@@ -27,6 +28,29 @@ const READERS: [RegExp, string[]][] = [
 ]
 // Half the host's cores, as CI runs them, so a landing leaves the machine to the rest.
 const WORKERS = '--parallel=6'
+// How long a step may run before it counts as hung and is killed with every process it started: the whole suite takes minutes, a test stuck on a killed browser or child took hours.
+const STEP_LIMIT_MS = Number(process.env.KAY_LAND_STEP_LIMIT_MS) || 30 * 60_000
+// How long the output of a step that ended may stay open, as a process it started outside its group can hold it.
+const DRAIN_MS = 5000
+// The step running, whose process group goes with a landing stopped by a signal.
+let running: number | undefined
+
+for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) {
+  process.on(signal, () => {
+    killGroup(running)
+    process.exit(128 + os.constants.signals[signal])
+  })
+}
+
+function killGroup(pid: number | undefined) {
+  try {
+    if (pid !== undefined)
+      process.kill(-pid, 'SIGKILL')
+  }
+  catch {
+    // Already gone.
+  }
+}
 
 function fail(message: string, code: number): never {
   console.error(`land failed: ${message}`)
@@ -64,31 +88,56 @@ async function takeLock() {
   return (await holder(lock, true)).release
 }
 
-// Runs one step with its output in the log, failing the landing on its failed tests and last lines.
-async function step(label: string, command: $.ShellPromise) {
+// Runs one step in a process group of its own, its output going to the log as it comes, and fails the landing on its failed tests and last lines, or on where it stood once it ran past STEP_LIMIT_MS.
+async function step(label: string, argv: string[], cwd = '.') {
   const started = performance.now()
 
   process.stdout.write(`${label}: `)
+  await appendFile(LOG, `$ ${label}\n`)
 
-  const { exitCode, stdout } = await command.nothrow().quiet()
-  const output = stdout.toString()
+  const child = Bun.spawn(argv, { cwd, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe', detached: true })
+  let output = ''
+  let hung = false
+  const limit = setTimeout(() => {
+    hung = true
+    killGroup(child.pid)
+  }, STEP_LIMIT_MS)
+  const drain = async (stream: ReadableStream<Uint8Array>) => {
+    const decoder = new TextDecoder()
+
+    for await (const chunk of stream) {
+      const text = decoder.decode(chunk, { stream: true })
+
+      output += text
+      await appendFile(LOG, text)
+    }
+  }
+  const drained = Promise.all([drain(child.stdout), drain(child.stderr)])
+
+  running = child.pid
+
+  const exitCode = await child.exited
+
+  running = undefined
+  clearTimeout(limit)
+  await Promise.race([drained, Bun.sleep(DRAIN_MS)])
+  await appendFile(LOG, '\n')
+
   const seconds = Math.round((performance.now() - started) / 1000)
 
-  await appendFile(LOG, `$ ${label}\n${output}\n`)
-
-  if (exitCode === 0) {
+  if (exitCode === 0 && !hung) {
     console.log(`ok, ${seconds} s`)
 
     return
   }
 
-  console.log(`exit ${exitCode}, ${seconds} s`)
+  console.log(hung ? `killed after ${seconds} s` : `exit ${exitCode}, ${seconds} s`)
   const lines = output.trimEnd().split('\n')
 
   const failures = failedTests(lines)
 
   console.error([...failures, lines.slice(failures.length > 0 ? -SUMMARY : -TAIL).join('\n')].join('\n\n'))
-  fail(`${label} exited with ${exitCode}: its whole output is in ${LOG}`, EXIT.step)
+  fail(hung ? `${label} ran past ${Math.round(STEP_LIMIT_MS / 1000)} s, so it was killed with what it started: its output up to then is in ${LOG}` : `${label} exited with ${exitCode}: its whole output is in ${LOG}`, EXIT.step)
 }
 
 if ((await $`git status --porcelain`.text()).trim() !== '')
@@ -121,26 +170,26 @@ async function verify(): Promise<string> {
     fail(`the branch adds merge markers: ${markers.map(({ file, line, text }) => `${file}:${line} (${text})`).join(', ')}`, EXIT.unlandable)
 
   // Main may have moved the lockfile under this branch.
-  await step('bun install', $`bun install --silent --frozen-lockfile 2>&1`)
-  await step('lint', $`bun run lint 2>&1`)
-  await step('check', $`bun run check 2>&1`)
+  await step('bun install', ['bun', 'install', '--silent', '--frozen-lockfile'])
+  await step('lint', ['bun', 'run', 'lint'])
+  await step('check', ['bun', 'run', 'check'])
 
   if (changed.some(path => path.startsWith('bench/') || path === 'bun.lock')) {
-    await step('bench:check', $`bun run bench:check 2>&1`)
-    await step('bench hydration markers', $`bun test ./bench -t ${'leave hydration markers'} 2>&1`)
+    await step('bench:check', ['bun', 'run', 'bench:check'])
+    await step('bench hydration markers', ['bun', 'test', './bench', '-t', 'leave hydration markers'])
   }
   else if (changed.some(path => path.startsWith('src/'))) {
-    await step('bench:check:kay', $`bun run bench:check:kay 2>&1`)
+    await step('bench:check:kay', ['bun', 'run', 'bench:check:kay'])
   }
 
   if (changed.some(path => path.startsWith('.forgejo/')))
-    await step('lint-actions', $`just lint-actions 2>&1`)
+    await step('lint-actions', ['just', 'lint-actions'])
 
   if (changed.some(path => WHOLE_SUITE.test(path))) {
-    await step('tests, the whole suite', $`bun run test ${WORKERS} 2>&1`)
+    await step('tests, the whole suite', ['bun', 'run', 'test', WORKERS])
   }
   else {
-    await step('tests the changes reach', $`bun run test --changed=${base} ${WORKERS} 2>&1`)
+    await step('tests the changes reach', ['bun', 'run', 'test', `--changed=${base}`, WORKERS])
 
     const readers = new Set(READERS.flatMap(([folder, tests]) => changed.some(path => folder.test(path)) ? tests : []))
     const fixtures = [...new Set(changed.map(path => FIXTURE.exec(path)?.[1]).filter(name => name !== undefined))]
@@ -157,12 +206,12 @@ async function verify(): Promise<string> {
     }
 
     if (readers.size > 0)
-      await step('tests reading the changed files', $`bun run test ${[...readers]} ${WORKERS} 2>&1`)
+      await step('tests reading the changed files', ['bun', 'run', 'test', ...readers, WORKERS])
   }
 
   for (const name of new Set(changed.map(path => PACKAGE.exec(path)?.[1]).filter(name => name !== undefined))) {
-    await step(`packages/${name} check`, $`bun run check 2>&1`.cwd(`packages/${name}`))
-    await step(`packages/${name} tests`, $`bun run test 2>&1`.cwd(`packages/${name}`))
+    await step(`packages/${name} check`, ['bun', 'run', 'check'], `packages/${name}`)
+    await step(`packages/${name} tests`, ['bun', 'run', 'test'], `packages/${name}`)
   }
 
   return base

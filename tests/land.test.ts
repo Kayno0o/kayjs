@@ -1,3 +1,4 @@
+import { readdirSync, readlinkSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
@@ -225,6 +226,27 @@ describe('landing', () => {
     expect(code).toBe(0)
     expect(out).toContain('waiting for another landing to finish')
     expect(await tree()).toContain('a.txt')
+  }, 60_000)
+
+  it('kills a step that runs past its limit with what it started, exiting 4 on it with its output up to then', async () => {
+    const { clones, dir, land, ran, tree } = await landings('a')
+    const started = Date.now()
+    // The gate never opens, so lint waits as a hung test would.
+    const { code, err } = await land('a', { LAND_GATE: join(dir, 'gate'), KAY_LAND_STEP_LIMIT_MS: '1500' }).done()
+    const cwds = readdirSync('/proc').flatMap((name) => {
+      try {
+        return [readlinkSync(`/proc/${name}/cwd`)]
+      }
+      catch {
+        return []
+      }
+    })
+
+    expect({ code, killed: err.includes('lint ran past 2 s, so it was killed'), fast: Date.now() - started < 20_000 }).toEqual({ code: 4, killed: true, fast: true })
+    expect(await ran('a')).toBe(1)
+    // Lint's `bun run` and the script it ran are gone with it.
+    expect(cwds).not.toContain(clones.a)
+    expect(await tree()).not.toContain('a.txt')
   }, 60_000)
 
   it('keeps its exit codes: 2 for nothing to land or changes, 3 for a conflict, 4 for a failed step, 5 for a refused push', async () => {

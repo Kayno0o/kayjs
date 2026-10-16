@@ -90,6 +90,8 @@ const TIMEOUT_MS = 5000
 const POLL_MS = 25
 // What `within` resolves with when the page did not answer in time.
 const TIMED_OUT = Symbol('timed out')
+// What a call of the page resolves with once its renderer crashed, after which Chrome answers none.
+const CRASHED = Symbol('crashed')
 // The files the page failed to load, such as the scripts that would hydrate its islands: refused, or a script answered as another type, which the browser does not run.
 const FAILED_FILES = `performance.getEntriesByType('resource').flatMap(entry => { const path = new URL(entry.name).pathname; return entry.responseStatus >= 400 ? [path + ' answered ' + entry.responseStatus] : (path.endsWith('.js') || path.endsWith('.mjs')) && entry.contentType && !entry.contentType.includes('javascript') ? [path + ' answered as ' + entry.contentType] : [] })`
 const FAILED_WAIT_MS = 1000
@@ -190,6 +192,24 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
 
   let closed = false
   let origin = new URL(url).origin
+  // Settles once the page's renderer is gone, killed or out of memory: every call pending or made after it would wait forever.
+  const { promise: crash, resolve: crashed } = Promise.withResolvers<typeof CRASHED>()
+  let gone = false
+
+  view.addEventListener('Inspector.targetCrashed', () => {
+    gone = true
+    crashed(CRASHED)
+  })
+
+  // A call of the view, failing at once when the renderer crashed rather than at the test's timeout.
+  const live = async <T>(call: Promise<T>): Promise<T> => {
+    const answer = await Promise.race([call, crash])
+
+    if (answer === CRASHED)
+      throw new Error('kay: the page crashed, its renderer killed or out of memory, so the browser answers nothing more of it')
+
+    return answer
+  }
   // A view runs one `inView()` at a time, so the page's calls queue rather than fail when a test runs two at once.
   let queue = Promise.resolve()
   // The view's last `inView()`, which a wait that timed out leaves running: the next waits for it, up to the page's timeout, rather than fail as already pending.
@@ -200,7 +220,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
     const call = (async () => {
       await within(previous, timeout)
 
-      return view.evaluate<T>(expression)
+      return live(view.evaluate<T>(expression))
     })()
 
     evaluating = ended(call)
@@ -259,6 +279,9 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
         }
       }
       catch (error) {
+        if (gone)
+          throw error
+
         trying = undefined
         failure = error
       }
@@ -305,7 +328,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
       const target = new URL(path, origin)
 
       origin = target.origin
-      await view.navigate(target.href)
+      await live(view.navigate(target.href))
       await settle(SETTLED, `${target.pathname} to load and hydrate its islands`)
     }),
     path: async () => serial(async () => inView<string>('location.pathname + location.search')),
@@ -321,7 +344,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
 
         return element !== null
       }, [selector]), selector, budget)
-      await view.click(selector, { timeout: Math.max(until - Date.now(), 1) })
+      await live(view.click(selector, { timeout: Math.max(until - Date.now(), 1) }))
     }),
     fill: async (selector, text) => serial(async () => {
       await poll(`!!document.querySelector(${JSON.stringify(selector)})`, selector)
@@ -332,13 +355,10 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
         field.select()
       }, [selector]))
 
-      if (text === '')
-        await view.press('Delete')
-      else
-        await view.type(text)
+      await live(text === '' ? view.press('Delete') : view.type(text))
     }),
-    type: async text => serial(async () => view.type(text)),
-    press: async (key, keyOptions) => serial(async () => view.press(key, keyOptions)),
+    type: async text => serial(async () => live(view.type(text))),
+    press: async (key, keyOptions) => serial(async () => live(view.press(key, keyOptions))),
     text: async selector => serial(async () => inView<string | null>(script((css: string) => document.querySelector(css)?.textContent ?? null, [selector]))),
     value: async selector => serial(async () => inView<string | null>(script((css: string) => document.querySelector<HTMLInputElement>(css)?.value ?? null, [selector]))),
     count: async selector => serial(async () => inView<number>(script((css: string) => document.querySelectorAll(css).length, [selector]))),
@@ -351,7 +371,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
     a11y: async selector => serial(async () => {
       // Injected again after each navigation, which drops it; through DevTools, which the page's CSP does not hold back.
       if (!await inView<boolean>('!!window.axe')) {
-        const { exceptionDetails } = await view.cdp<{ exceptionDetails?: { text: string, exception?: { description?: string } } }>('Runtime.evaluate', { expression: await axeSource() })
+        const { exceptionDetails } = await live(view.cdp<{ exceptionDetails?: { text: string, exception?: { description?: string } } }>('Runtime.evaluate', { expression: await axeSource() }))
 
         if (exceptionDetails)
           throw new Error(`kay: axe-core did not load in the page: ${exceptionDetails.exception?.description ?? exceptionDetails.text}`)
@@ -382,7 +402,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
     back: async () => serial(async () => traverse('history.back()')),
     forward: async () => serial(async () => traverse('history.forward()')),
     reload: async () => serial(async () => {
-      await view.reload()
+      await live(view.reload())
       await settle(SETTLED, 'the page to reload and hydrate its islands')
     }),
     close: () => {
@@ -400,19 +420,20 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
   // Once open, a page is the caller's to close; one that failed to open is closed here.
   try {
     // A blank page first: the DevTools session the next calls use starts with a navigation.
-    await view.navigate('about:blank')
+    await live(view.navigate('about:blank'))
 
     if (first)
       await noteBunProfile(view, dir)
 
-    await view.cdp('Runtime.enable')
+    await live(view.cdp('Runtime.enable'))
+    await live(view.cdp('Inspector.enable'))
     view.addEventListener('Runtime.exceptionThrown', (event) => {
       const { exceptionDetails } = (event as MessageEvent<{ exceptionDetails: { text: string, exception?: { description?: string } } }>).data
 
       errors.push(exceptionDetails.exception?.description ?? exceptionDetails.text)
     })
     // Pages share one browser, whose cookies and storage outlive a page. Named one by one, as `all` takes Chrome 2 to 5 s a page, the rest under a millisecond.
-    await view.cdp('Storage.clearDataForOrigin', { origin, storageTypes: STORAGE_TYPES })
+    await live(view.cdp('Storage.clearDataForOrigin', { origin, storageTypes: STORAGE_TYPES }))
     await page.goto(url)
   }
   catch (error) {
@@ -480,8 +501,9 @@ function closeBrowser() {
   // Closing the views leaves Chrome running, and would leave it writing to the profile.
   attempt(() => Bun.WebView.closeAll())
   killed = pid === undefined ? undefined : Number(pid)
-  // Some Chrome's processes outlive it, Alpine's among them, and would write the profile again once removed.
+  // Some Chrome's processes outlive it, Alpine's among them, and would write the profile again once removed; so would one Chrome started after the tree was read, which names the profile too.
   killAll(tree)
+  killAll(naming(join(dir, 'profile')))
   attempt(() => removeProfile(dir))
   removeFetcherDirs()
 }
@@ -526,6 +548,13 @@ export function chromeTree(pid: number, profile: string): number[] {
     tree.push(...children.get(member) ?? [])
 
   return tree
+}
+
+// The processes running on the profile, read from /proc: Chrome passes its profile to every process it starts.
+function naming(profile: string): number[] {
+  const flag = `--user-data-dir=${profile}`
+
+  return (attempt(() => readdirSync('/proc')) ?? []).filter(name => attempt(() => readFileSync(`/proc/${name}/cmdline`, 'utf8'))?.split('\0').includes(flag) === true).map(Number)
 }
 
 // Kills the processes, waiting a moment for them to be gone.

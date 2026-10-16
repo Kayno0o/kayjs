@@ -8,6 +8,7 @@ This page lists what each release adds, newest first, with a link to where each 
 ## Unreleased
 
 - **A failed `try` leaves no head behind**: a `try` block that throws on the server takes back the `head` tags and island titles its components set, so a page never serves a title from an island it did not render. [Head and SEO](/essentials/head-and-seo)
+- **A crashed test page fails at once**: a `kay/test` page whose renderer was killed or ran out of memory fails its next call saying so, instead of waiting for the test to time out. [Testing guide](/guides/testing#in-a-browser)
 - **Tailwind rules reach template classes**: with `tailwind` on in `@kaynooo/eslint`, `kay/eslint` reports the shorthand classes and static `class` values of a template at their place in the `.kay` file, and fixes those in a `class="..."` of an element with no shorthand. [Checks reference](/reference/checks#eslint)
 - **ESLint reaches template expressions**: `kay/eslint` lints attribute values, `{...}` in text and the heads of `if`, `match`, `for`, `await`, `const` and `slot`, reporting at their `.kay` line and column and fixing them in the file. [Checks reference](/reference/checks#eslint)
 - **Workers bundled once per `kay dev` session**: a worker (kay's own proof-of-work worker included) is bundled again only when a file it read changes, instead of by a process of its own on every island edit, so an edit spends about 13% less CPU. [CLI reference](/reference/cli)

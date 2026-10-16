@@ -29,6 +29,16 @@ function read(path: string): string | undefined {
   }
 }
 
+// A run that ended but that nobody reaped yet, which a signal still reaches: it holds the lock no more than one gone.
+function zombie(pid: number): boolean {
+  try {
+    return AFTER_NAME.exec(readFileSync(`/proc/${pid}/stat`, 'utf8'))?.[1]?.startsWith('Z') === true
+  }
+  catch {
+    return false
+  }
+}
+
 // Every identity holds a space, after the pid.
 function pidOf(held: string): string {
   return held.slice(0, held.indexOf(' '))
@@ -47,7 +57,7 @@ function running(held: string): boolean {
     return false
   }
 
-  return identity(pid) === held
+  return identity(pid) === held && !zombie(pid)
 }
 
 // Written whole under another name and linked into place, so the lock never exists without its holder in it.

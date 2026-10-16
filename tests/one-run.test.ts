@@ -1,3 +1,4 @@
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -82,6 +83,42 @@ describe('the test run lock', () => {
       expect(await Bun.file(join(root, 'runs.log')).text()).toBe('start c\nend c\n')
     }
     finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it.skipIf(!existsSync('/proc'))('takes a lock whose holder ended but was not reaped yet, as a signal still reaches it', async () => {
+    const root = await checkout()
+    // `sleep` reaps nothing, so the shell's background child it replaced stays a zombie.
+    const parent = Bun.spawn(['sh', '-c', 'sleep 0 & exec sleep 30'])
+    const stat = (pid: string) => {
+      try {
+        const text = readFileSync(`/proc/${pid}/stat`, 'utf8')
+
+        return text.slice(text.lastIndexOf(')') + 2).split(' ')
+      }
+      catch {
+        return []
+      }
+    }
+    let zombie: string | undefined
+
+    try {
+      await until(() => {
+        zombie = readdirSync('/proc').find(pid => stat(pid)[1] === String(parent.pid) && stat(pid)[0] === 'Z')
+
+        return zombie !== undefined
+      })
+      await Bun.write(join(root, '.kay/test-run.lock'), `${zombie} ${stat(zombie!)[19]}`)
+      await Bun.write(join(root, 'gate'), '')
+
+      const next = run(root, 'a')
+      const [waited, code] = await Promise.all([new Response(next.stderr).text(), next.exited])
+
+      expect({ code, waited: waited.includes('kay tests: waiting') }).toEqual({ code: 0, waited: false })
+    }
+    finally {
+      parent.kill('SIGKILL')
       await rm(root, { recursive: true, force: true })
     }
   })

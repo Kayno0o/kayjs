@@ -117,7 +117,7 @@ it('counts the clicks', async () => {
 
 <Callout type="note">
 
-A page that does not settle in time fails `open()`, naming the files it could not load, such as an island's chunk answering 404.
+A page that does not settle in time fails `open()`, naming the files it could not load, such as an island's chunk answering 404. A page whose renderer crashes, because it was killed or ran out of memory, fails its next call at once, not at the test's timeout.
 
 The browser is `Bun.WebView` on Chrome. kay finds Chrome on the `PATH`, or reads `BUN_CHROME_PATH`. `describe.skipIf(!browserPath())` skips a suite when there is none. Chrome's profile lives in the temp directory only while the browser runs: kay closes it a second after the last page closes, and once the tests ran, `kay/test/preload` closing it after the run. Closing it also closes a `Bun.WebView` the test made itself, and kills every process Chrome started, which Alpine's Chromium leaves running otherwise.
 

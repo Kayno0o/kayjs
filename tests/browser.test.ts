@@ -740,7 +740,65 @@ it('opens a page and never closes it', async () => {
       const [out, code] = await printed(child)
 
       expect({ code, out }).toMatchObject({ code: 0 })
-      expect(kinds(await readdir(temp))).toEqual([])
+      // By name, so a directory left behind says what made it.
+      expect((await readdir(temp)).filter(name => name !== LOCKED)).toEqual([])
+    }
+    finally {
+      await rm(temp, { recursive: true, force: true })
+    }
+  }, 60_000)
+})
+
+describe.skipIf((path === undefined && (process.env.CI ?? '') === '') || !existsSync('/proc'))('a page whose renderer crashes', () => {
+  it('fails its pending and next calls at once, rather than at the test\'s timeout', async () => {
+    const temp = await mkdtemp(join(tmpdir(), 'kt-'))
+    const script = join(await scratchDir('crash-'), 'run.ts')
+
+    // In a process of its own, so the renderers it kills are its own browser's.
+    await Bun.write(script, `import { readdirSync, readFileSync } from 'node:fs'
+import process from 'node:process'
+import { browse } from ${JSON.stringify(resolve('src/test/browser.ts'))}
+
+const server = Bun.serve({ port: 0, fetch: () => new Response('<p>Hi</p>', { headers: { 'content-type': 'text/html' } }) })
+const page = await browse(\`http://localhost:\${server.port}/\`, { path: process.argv[2], timeout: 20_000 })
+const renderers = readdirSync('/proc').filter(name => readCmdline(name).includes(\`kay-chrome-\${process.pid}-\`) && readCmdline(name).includes('--type=renderer'))
+const outcome = async (call: Promise<unknown>) => {
+  const started = Date.now()
+
+  try {
+    await call
+    return 'answered'
+  }
+  catch (error) {
+    return \`\${(error as Error).message.includes('crashed') ? 'crashed' : (error as Error).message} in \${Date.now() - started < 5000 ? 'time' : 'too long'}\`
+  }
+}
+
+function readCmdline(name: string): string {
+  try {
+    return readFileSync(\`/proc/\${name}/cmdline\`, 'utf8')
+  }
+  catch {
+    return ''
+  }
+}
+
+const pending = outcome(page.waitFor('p.never'))
+
+for (const pid of renderers)
+  process.kill(Number(pid), 'SIGKILL')
+
+console.log(JSON.stringify({ renderers: renderers.length > 0, pending: await pending, next: await outcome(page.goto('/')) }))
+page.close()
+await server.stop()
+process.exit(0)
+`)
+
+    try {
+      const child = Bun.spawn([process.execPath, script, path!], { env: { ...process.env, TMPDIR: temp }, stdout: 'pipe', stderr: 'pipe' })
+      const [out, code] = await printed(child)
+
+      expect({ code, result: JSON.parse(out.slice(0, out.indexOf('\n'))) as unknown }).toEqual({ code: 0, result: { renderers: true, pending: 'crashed in time', next: 'crashed in time' } })
     }
     finally {
       await rm(temp, { recursive: true, force: true })

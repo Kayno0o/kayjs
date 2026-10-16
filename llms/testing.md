@@ -290,6 +290,7 @@ expect(jar.cookies.has('session')).toBe(true)
 - `path()` reads where the page is.
 - `errors` holds the page's console errors and uncaught exceptions.
 - Once `errors` logs a problem kay recovers from in production, such as an island that did not match its server markup or had no client chunk, or a message no locale has, the page's next call fails naming it, unless `strict: false` was given to `open` or `browse`, which leaves it in `errors`.
+- Once the page's renderer crashes, killed or out of memory, the call waiting on it and every later one fail at once saying so, rather than at the test's timeout.
 - `view` is the `Bun.WebView` behind it, for a `screenshot()` or a raw `cdp()` call.
 - Each page opened starts with no cookie or storage for the site, and pages opened at once share them, the browser's own rather than `site.cookies`.
 - `site.close()` closes the pages it opened.
