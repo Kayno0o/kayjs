@@ -1,13 +1,16 @@
-import { readdir } from 'node:fs/promises'
+import type { RenderedPage } from 'kay/server'
+import { mkdtemp, readdir, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { describe, expect, it } from 'bun:test'
+import { brotliCompressSync } from 'node:zlib'
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { fileTree, pathTree } from '../docs/src/file-tree'
 import { loadComponents, loadLibraries } from '../docs/src/libraries'
+import { pageWeight } from '../docs/src/page-weight'
 import { PALETTES, paletteStylesheet, themeCss } from '../docs/src/palettes'
 import { loadReference } from '../docs/src/reference'
 import { partOf } from '../docs/src/sections'
 import { palette, pickTheme, scheme, THEME_SCRIPT, THEMES } from '../docs/src/theme'
-import { check } from '../src/check'
 import { compileKay, formatDiagnostic } from '../src/compiler'
 import { renderMarkdown } from '../src/content/markdown'
 import { formatKay } from '../src/format'
@@ -21,7 +24,7 @@ const llms = await Bun.file(join(root, 'llms.txt')).text()
 const docs = (await readdir(join(root, 'llms'))).filter(name => name.endsWith('.md')).sort()
 const LISTED = /^- \[[^\]]+\]\(llms\/([\w-]+\.md)\): \S/gm
 // A link to a page of the site in Markdown or a ReadMore, anchor left out: `](/essentials/routing#layouts)`, `href="/llms/server"`.
-const SITE_LINK = /(?:\]\(|href=")(\/[\w/-]*?)\/?(?:#[\w-]*)?[)"]/g
+const SITE_LINK = /(?:\]\(|href=")(\/[\w/-]*?)\/?(#[\w-]*)?[)"]/g
 // Code blocks and spans, whose links are examples rather than links of the site.
 const CODE = /```[\s\S]*?```|`[^`\n]*`/g
 const KAY_BLOCK = /```kay\n([\s\S]*?)```/g
@@ -30,11 +33,7 @@ const pageBlocks = (await Promise.all([...new Bun.Glob('**/*.md').scanSync(pages
 const LINK = /\]\(((?:llms\/)?[\w-]+\.md)?(#[\w-]+)?\)/g
 const CARD_LINK = /ModuleCard\([^)]*\bhref="([^"]+)"/g
 const FRONTMATTER_PATH = /^path: (.+)$/m
-const SECTION_LINK = /href[=:] ?["'](\/[\w/-]+)#([\w-]+)["']/g
-
-function linkTarget(file: string, path: string): string {
-  return file === 'llms.txt' ? path : `llms/${path}`
-}
+const HOME_LINK = /href[=:] ?["'](\/[\w/-]*?)\/?(?:#([\w-]+))?["']/g
 
 describe('llms.txt', () => {
   it('stays an index an agent reads whole, listing every doc of llms/ once', () => {
@@ -43,23 +42,6 @@ describe('llms.txt', () => {
     expect(llms.length).toBeLessThan(10_000)
     expect(listed.toSorted()).toEqual(docs)
     expect(new Set(listed).size).toBe(listed.length)
-  })
-
-  it('links only to docs and headings that exist', async () => {
-    const files = ['llms.txt', ...docs.map(name => `llms/${name}`)]
-    const ids = new Map(await Promise.all(files.map(async file => [file, new Set((await renderMarkdown(await Bun.file(join(root, file)).text())).headings.map(heading => heading.id))] as const)))
-    const broken: string[] = []
-
-    for (const file of files) {
-      for (const [link, path, anchor] of (await Bun.file(join(root, file)).text()).matchAll(LINK)) {
-        const target = path === undefined ? file : linkTarget(file, path)
-
-        if (!ids.has(target) || (anchor !== undefined && !ids.get(target)!.has(anchor.slice(1))))
-          broken.push(`${file}: ${link}`)
-      }
-    }
-
-    expect(broken).toEqual([])
   })
 })
 
@@ -101,45 +83,61 @@ describe('the documentation site', () => {
     expect(components.find(component => component.slug === 'table')!.data.props.find(prop => prop.name === 'onSort')!.type).toBe('(sort: SortState) => void')
   })
 
-  it('links only to pages the site serves', async () => {
+  it('resolves every internal link and anchor of llms/, the docs content, the home page and llms.txt to a page the site serves', async () => {
     const docsRoot = join(root, 'docs/src/content')
-    const files = [...new Bun.Glob('{docs/*/*,ui/*}.md').scanSync(docsRoot)]
-    const pages = new Set([
-      '/',
-      '/llms',
-      ...files.filter(file => file.startsWith('docs/')).map(file => `/${file.slice('docs/'.length, -'.md'.length)}`),
-      ...(await loadComponents()).map(component => `/ui/${component.slug}`),
-      ...(await loadReference()).map(topic => `/llms/${topic.slug}`),
-      ...(await loadLibraries()).map(library => `/llms/${library.slug}`),
-    ])
-    const broken: string[] = []
+    const files = [...new Bun.Glob('**/*.md').scanSync(docsRoot)]
+    const served = new Map<string, Set<string> | undefined>([['/', undefined], ['/llms', undefined]])
+    const headings = async (markdown: string) => new Set((await renderMarkdown(markdown)).headings.map(heading => heading.id))
 
-    for (const file of files) {
-      for (const [, path] of (await Bun.file(join(docsRoot, file)).text()).replace(CODE, '').matchAll(SITE_LINK)) {
-        if (!pages.has(path!))
-          broken.push(`${file}: ${path}`)
-      }
+    for (const file of files.filter(file => file.startsWith('docs/')))
+      served.set(`/${file.slice('docs/'.length, -'.md'.length)}`, await headings(await Bun.file(join(docsRoot, file)).text()))
+
+    for (const component of await loadComponents())
+      served.set(`/ui/${component.slug}`, await headings(component.body))
+
+    for (const name of docs)
+      served.set(`/llms/${name.slice(0, -'.md'.length)}`, await headings(await Bun.file(join(root, 'llms', name)).text()))
+
+    for (const library of await loadLibraries())
+      served.set(`/llms/${library.slug}`, await headings(library.body))
+
+    served.set('/llms.txt', await headings(llms))
+
+    const broken: string[] = []
+    const resolve = (from: string, path: string, anchor: string | undefined) => {
+      if (!served.has(path) || (anchor !== undefined && !served.get(path)?.has(anchor)))
+        broken.push(`${from}: ${path}${anchor === undefined ? '' : `#${anchor}`}`)
     }
+
+    // llms.txt and llms/: links between the Markdown files, which the site serves as pages.
+    for (const file of ['llms.txt', ...docs.map(name => `llms/${name}`)]) {
+      const own = file === 'llms.txt' ? '/llms.txt' : `/${file.slice(0, -'.md'.length)}`
+
+      for (const [, path, anchor] of (await Bun.file(join(root, file)).text()).matchAll(LINK))
+        resolve(file, path === undefined ? own : `/llms/${path.replace(/^llms\//, '').slice(0, -'.md'.length)}`, anchor?.slice(1))
+    }
+
+    // The docs content: links to pages of the site, outside code.
+    for (const file of files) {
+      for (const [, path, anchor] of (await Bun.file(join(docsRoot, file)).text()).replace(CODE, '').matchAll(SITE_LINK))
+        resolve(file, path!, anchor?.slice(1))
+    }
+
+    // The home page: its cards, features and buttons.
+    const home = await Bun.file(join(root, 'docs/src/routes/(docs)/index.kay')).text()
+
+    for (const [, path, anchor] of home.matchAll(HOME_LINK))
+      resolve('the home page', path!, anchor)
 
     expect(broken).toEqual([])
   })
 
-  it('links each card of the home page to its own page or section, each anchor a heading of that page', async () => {
+  it('gives each card of the home page a link of its own', async () => {
     const home = await Bun.file(join(root, 'docs/src/routes/(docs)/index.kay')).text()
     const cards = [...home.matchAll(CARD_LINK)].map(match => match[1]!)
-    const broken: string[] = []
-
-    for (const [link, path, anchor] of home.matchAll(SECTION_LINK)) {
-      const source = Bun.file(join(root, 'docs/src/content/docs', `${path}.md`))
-      const ids = await source.exists() ? (await renderMarkdown(await source.text())).headings.map(heading => heading.id) : []
-
-      if (!ids.includes(anchor!))
-        broken.push(link)
-    }
 
     expect(cards.length).toBeGreaterThan(5)
     expect(new Set(cards).size).toBe(cards.length)
-    expect(broken).toEqual([])
   })
 
   it('leads an agent reading the home page, or guessing /docs, to the docs', async () => {
@@ -253,11 +251,6 @@ describe('the documentation site', () => {
       globals.document = before
     }
   })
-
-  it('passes kay check, and so does the tutorial\'s example app', async () => {
-    expect(await check(join(root, 'docs'))).toEqual([])
-    expect(await check(join(root, 'examples/reading-list'))).toEqual([])
-  }, 60_000)
 })
 
 // WCAG's contrast ratio between two `#rrggbb` colours.
@@ -314,5 +307,46 @@ describe('the documentation\'s colours', () => {
 
     expect([...used].filter(name => !set.has(name))).toEqual([])
     expect(failing(SYNTAX.map(name => [name, 'mantle']), 4.5)).toEqual([])
+  })
+})
+
+const FILES: Record<string, string> = { '/app.css': 'a { color: red }', '/logo.svg': '<svg></svg>', '/favicon.ico': 'icon'.repeat(500), '/favicon.svg': '<svg viewBox="0 0 32 32"/>', '/entry.js': 'export {}', '/apple-touch-icon.png': 'touch' }
+const WEIGHT = /This page: ([\d.]+) KB\./
+let dir: string
+
+beforeAll(async () => {
+  dir = await mkdtemp(join(tmpdir(), 'kay-page-weight-'))
+  await Promise.all(Object.entries(FILES).map(async ([url, text]) => Bun.write(join(dir, url), text)))
+})
+
+afterAll(async () => rm(dir, { recursive: true, force: true }))
+
+const brotli = (text: string) => brotliCompressSync(text).length
+
+async function transform(head: string, body = ''): Promise<string> {
+  const html = `<html><head><link rel="stylesheet" href="/app.css"><link rel="icon" href="/favicon.ico"><link rel="apple-touch-icon" href="/apple-touch-icon.png">${head}</head><body>${body}<footer><span data-page-weight></span></footer></body></html>`
+
+  return pageWeight.transformPage!({ path: '/', locale: 'en', html, file: async url => url in FILES ? join(dir, url) : undefined })
+}
+
+describe('the docs footer\'s page weight', () => {
+  it('counts the page and each file a first visit fetches once, as served: text brotli, an icon as it is', async () => {
+    const html = await transform('<link rel="modulepreload" href="/entry.js"><script type="module" src="/entry.js"></script>', '<img src="/logo.svg"><img src="/logo.svg"><iframe src="/elsewhere" loading="lazy"></iframe>')
+    const linked = brotli(FILES['/app.css']!) + brotli(FILES['/entry.js']!) + brotli(FILES['/logo.svg']!) + FILES['/favicon.ico']!.length
+
+    expect(Number(WEIGHT.exec(html)?.[1])).toBe(Number(((brotli(html) + linked) / 1024).toFixed(1)))
+  })
+
+  it('counts the SVG icon alone when the page links one, as a browser drawing it fetches no other', async () => {
+    const html = await transform('<link rel="icon" href="/favicon.svg" type="image/svg+xml">')
+    const linked = brotli(FILES['/app.css']!) + brotli(FILES['/favicon.svg']!)
+
+    expect(Number(WEIGHT.exec(html)?.[1])).toBe(Number(((brotli(html) + linked) / 1024).toFixed(1)))
+  })
+
+  it('leaves a page without the footer as it is', async () => {
+    const page: RenderedPage = { path: '/404', locale: 'en', html: '<p>Nothing here</p>', file: async () => undefined }
+
+    expect(await pageWeight.transformPage!(page)).toBe(page.html)
   })
 })

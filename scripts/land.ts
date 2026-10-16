@@ -21,9 +21,9 @@ const WHOLE_SUITE = /^(?:package\.json|bun\.lock|bunfig\.toml|tsconfig[^/]*\.jso
 // Tests reading these folders as files, which an import graph does not show.
 const READERS: [RegExp, string[]][] = [
   [/^(?:llms\/|llms\.txt$)/, ['tests/llms.test.ts', 'tests/docs.test.ts']],
-  [/^docs\//, ['tests/docs.test.ts', 'tests/docs-page-weight.test.ts']],
+  [/^docs\//, ['tests/docs.test.ts']],
   [/^examples\//, ['tests/examples.test.ts', 'tests/new.test.ts', 'tests/docs.test.ts']],
-  [/^packages\//, ['tests/packages.test.ts', 'tests/docs.test.ts', 'tests/docs-page-weight.test.ts', 'tests/examples.test.ts', 'tests/library.test.ts', 'tests/new.test.ts']],
+  [/^packages\//, ['tests/packages.test.ts', 'tests/docs.test.ts', 'tests/examples.test.ts', 'tests/library.test.ts', 'tests/new.test.ts']],
   [/^tests\/fixtures\//, ['tests/format.test.ts']],
 ]
 // Half the host's cores, as CI runs them, so a landing leaves the machine to the rest.

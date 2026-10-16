@@ -9,6 +9,7 @@ import { joinBase } from '../src/runtime/base'
 import { pages } from '../src/server'
 import { rebaseHtml } from '../src/server/base'
 import { IMAGE_LINK } from '../src/server/prerender'
+import { expectEagerJsWithin } from './eager-js'
 import { fixtureCopy } from './scratch'
 
 const FIXTURE = resolve('tests/fixtures/static')
@@ -17,7 +18,6 @@ const BASE = '/repo'
 // The gzipped JS a page with one small island loads before anything is clicked, a few bytes above what it measures: a change growing it pays for its bytes with a cut elsewhere in the eager runtime, or, when none is clean and it buys speed or reliability in the browser, raises this.
 const EAGER_JS_BUDGET = 8_490
 const SCRIPT_URL = /<(?:script type="module" src|link rel="modulepreload" href)="([^"]+)"/g
-const STATIC_IMPORT = /(?:from|import)\s*"([^"]+\.js)"/g
 
 let out: string
 let server: ReturnType<typeof Bun.serve>
@@ -168,23 +168,7 @@ describe('kay build --static', () => {
   })
 
   it('keeps the JS a page loads up front within its budget', async () => {
-    const pending = [...(await get('/')).text.matchAll(SCRIPT_URL)].map(match => match[1]!)
-    const loaded = new Map<string, number>()
-
-    // What the page links, and what those import statically; a dynamic `import()` waits for a visitor to need it.
-    for (let url = pending.pop(); url !== undefined; url = pending.pop()) {
-      if (loaded.has(url))
-        continue
-
-      const code = await Bun.file(join(out, url.slice(BASE.length))).text()
-
-      loaded.set(url, Bun.gzipSync(code).length)
-      pending.push(...[...code.matchAll(STATIC_IMPORT)].map(match => new URL(match[1]!, `http://x${url}`).pathname))
-    }
-
-    const total = loaded.values().reduce((sum, size) => sum + size, 0)
-
-    expect(total, `${total} bytes of gzipped JS load up front, over the ${EAGER_JS_BUDGET} budget: ${[...loaded].map(([url, size]) => `${url} ${size}`).join(', ')}`).toBeLessThanOrEqual(EAGER_JS_BUDGET)
+    await expectEagerJsWithin(EAGER_JS_BUDGET, (await get('/')).text, async url => Bun.file(join(out, url.slice(BASE.length))).text())
   })
 
   it('ships the island title code to the page setting one alone, with the template it wraps the title in', async () => {
