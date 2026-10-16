@@ -139,6 +139,7 @@ const AS_NAME = /\s+as\s+(?:\S.*)?$/
 const TYPE_NAME = /^type\s/
 const TYPE_IMPORT = /^\s*type\b/
 const LOCAL_STORAGE = /^storage\s*:\s*(['"])local\1$/
+const NOT_NEWLINE = /[^\n]/g
 const FOLDER_LITERAL = /^(?:'[^'\\\n]*'|"[^"\\\n]*"|`[^`\\$]*`)$/
 const STORAGE_PROPERTY = /^storage\b/
 const CALL_OPENING = /^\s*(?:<[^()]*>\s*)?\(/
@@ -221,9 +222,47 @@ function startsWithFolder(args: string): boolean {
   return first !== undefined && FOLDER_LITERAL.test(first)
 }
 
+// The source with its comments blanked out, strings kept, so a word in a comment is no use of a name and a comment inside a call's arguments hides nothing.
+function withoutComments(source: string): string {
+  let result = ''
+
+  for (let at = 0; at < source.length; at++) {
+    const char = source[at]!
+    const next = source[at + 1]
+
+    if (char === '"' || char === '\'' || char === '`') {
+      let end = at + 1
+
+      for (; end < source.length && source[end] !== char; end++) {
+        if (source[end] === '\\')
+          end++
+      }
+
+      result += source.slice(at, end + 1)
+      at = end
+    }
+    else if (char === '/' && (next === '/' || next === '*')) {
+      const line = next === '/'
+      const found = line ? source.indexOf('\n', at) : source.indexOf('*/', at + 2)
+      let end = source.length
+
+      if (found !== -1)
+        end = line ? found : found + 2
+
+      result += source.slice(at, end).replace(NOT_NEWLINE, ' ')
+      at = end - 1
+    }
+    else {
+      result += char
+    }
+  }
+
+  return result
+}
+
 // Whether every use of `name` in `source`, the import itself cut out, is a call whose arguments `accepts`.
 function onlyCalls(source: string, name: string, importAt: number, importLength: number, accepts: (args: string) => boolean): boolean {
-  const rest = source.slice(0, importAt) + source.slice(importAt + importLength)
+  const rest = withoutComments(source.slice(0, importAt) + source.slice(importAt + importLength))
   const uses = rest.matchAll(new RegExp(`(?<![\\w$.])${name.replace(REGEX_CHARS, '\\$&')}(?![\\w$])`, 'g'))
   let found = false
 
@@ -365,7 +404,7 @@ async function scanned(file: string): Promise<Scan> {
         const loader = impure.length > 0 && impure.every(name => name.replace(AS_NAME, '') === 'collection')
 
         return stop(loader
-          ? 'calls `collection` with something other than a folder written as a string, a loader that may read a database or refresh on a `ttl` no rebuild or invalidation tells the page of'
+          ? 'calls `collection` with something other than a folder written as a string, a loader that may read a database or refresh on a `ttl`, which no rebuild tells the page of'
           : `imports ${imported.length === 0 ? 'the whole module' : impure.map(name => `\`${name}\``).join(', ')} from \`kay/content\`, which a request or the clock can change`)
       }
 

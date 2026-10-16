@@ -823,6 +823,10 @@ describe('what kay exports to a page that is kept', () => {
       'src/routes/whole.kay': '---\nimport * as content from \'kay/content\'\n---\np {typeof content}\n',
       'src/routes/aliased.kay': '---\nimport { collection as make } from \'kay/content\'\nimport { s } from \'kay\'\n\nconst posts = make(\'content/posts\', { schema: s.Object({ title: s.String() }) })\n---\np {typeof posts}\n',
       'src/routes/passed.kay': '---\nimport { collection } from \'kay/content\'\n\nconst make = collection\nconst posts = make(\'content/posts\', {})\n---\np {typeof posts}\n',
+      'src/routes/commented.ts': 'import { collection } from \'kay/content\'\n\n// The collection of posts, which a loader may fill\nexport const posts = collection(/* the folder */ \'content/posts\', {}) // a collection\n',
+      'src/routes/multiline.ts': 'import { collection } from \'kay/content\'\n\nexport const posts = collection(\n  \'content/posts\',\n  {},\n)\n',
+      'src/routes/mixed.ts': 'import { collection } from \'kay/content\'\n\nexport const a = collection(\'content/a\', {})\nexport const b = collection({ name: \'b\', load: () => [] }, {})\n',
+      'src/routes/interpolated.ts': 'import { collection } from \'kay/content\'\n\nconst lang = \'fr\'\n\nexport const posts = collection(`content/${lang}`, {})\n',
       'src/posts.ts': 'import { s } from \'kay\'\nimport { collection } from \'kay/content\'\n\nexport const posts = collection<{ title: string }>("content/posts", { schema: s.Object({ title: s.String() }) })\n',
       'src/barrel.ts': 'export * from \'./posts\'\n',
       'src/content.config.ts': 'import { s } from \'kay\'\nimport { collection } from \'kay/content\'\n\nexport const posts = collection(`content/posts`, { schema: s.Object({ title: s.String() }), sort: (a, b) => a.data.title.localeCompare(b.data.title) })\n',
@@ -843,6 +847,10 @@ describe('what kay exports to a page that is kept', () => {
       expect(await at(`src/routes/${page}.kay`)).toMatchObject({ file: join(root, 'src/rows.ts'), ...loader })
 
     expect(await at('src/routes/passed.kay')).toMatchObject(loader)
+    expect(await at('src/routes/commented.ts')).toBeUndefined()
+    expect(await at('src/routes/multiline.ts')).toBeUndefined()
+    expect(await at('src/routes/mixed.ts')).toMatchObject(loader)
+    expect(await at('src/routes/interpolated.ts')).toMatchObject(loader)
     expect(await at('src/routes/aliased.kay')).toBeUndefined()
     expect(await at('src/routes/edits.kay')).toMatchObject({ why: 'imports `collection`, `saveEntry` from `kay/content`, which a request or the clock can change' })
     expect(await at('src/routes/unknown.kay')).toMatchObject({ why: 'imports `somethingNew` from `kay/content`, which a request or the clock can change' })
