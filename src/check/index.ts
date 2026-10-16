@@ -7,7 +7,8 @@ import type { EnvSchema } from '../server/env'
 import type { Redirects } from '../server/redirects'
 import type { TypeScope } from './diagnose'
 import type { ShadowFile } from './shadow'
-import { relative, resolve } from 'node:path'
+import type { ExtensionProgram } from './shadow-types'
+import { relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { formatReport } from '../compiler/frame'
 import { lintLevels } from '../compiler/lints'
@@ -93,14 +94,17 @@ export function configCheckOptions(config: KayConfig): CheckOptions {
 export async function check(root: string, options: CheckOptions = {}): Promise<CheckDiagnostic[]> {
   const tsconfig = options.tsconfig ?? 'tsconfig.json'
   const types = await writeShadowTypes(root, options)
-  const { files, diagnostics, unreached, libraries, mounts, locales } = types
+  const { files, diagnostics, unreached, libraries, mounts, locales, programs } = types
   // The props entries give their components are typed with the rest, so the collections are read first.
   const content = await contentChecks(root, options)
   const shown = await resolvedConfig(root, tsconfig)
   const projectUnused = unusedCodesOf(shown)
-  const [{ output, errors, code }, problems] = await Promise.all([typecheck(root, tsconfig, shown), projectProblems(root, options, content)])
+  // An extension whose options differ from the app's is checked apart, so its pages are typed as it is written for.
+  const [{ output, errors, code }, problems, ...apart] = await Promise.all([typecheck(root, tsconfig, shown), projectProblems(root, options, content), ...programs.map(async (program, index) => runProgram(root, program, index))])
   const config = resolve(root, tsconfig)
-  const reported = parseTscOutput(output, config, root)
+  const inProgram = (file: string) => programs.some(({ dir }) => file.startsWith(dir + sep))
+  const printed = parseTscOutput(output, config, root)
+  const reported = printed.filter(diagnostic => !inProgram(diagnostic.file))
   const scope: TypeScope = { root, broken: new Set(diagnostics.filter(diagnostic => !diagnostic.checkOnly).map(diagnostic => diagnostic.file)), unreached, libraries }
   const levels = new Map<ShadowFile, ReturnType<typeof lintLevels>>()
   const levelsOf = (shadow: ShadowFile) => {
@@ -115,6 +119,17 @@ export async function check(root: string, options: CheckOptions = {}): Promise<C
 
   if (errors.trim() !== '')
     diagnostics.push({ file: config, line: 1, column: 1, message: errors.trim() })
+
+  for (const program of apart) {
+    if (program.errors.trim() !== '')
+      diagnostics.push({ file: program.tsconfig, line: 1, column: 1, message: program.errors.trim() })
+
+    // The app's own files and the packages' modules are checked in the app's program, what a program reads of them only for its types.
+    reported.push(...parseTscOutput(program.output, program.tsconfig, root).filter(diagnostic => diagnostic.file.startsWith(program.dir + sep)))
+
+    if (program.code !== 0 && program.output.trim() === '' && program.errors.trim() === '')
+      diagnostics.push({ file: program.tsconfig, line: 1, column: 1, message: `tsgo exited with code ${program.code} and no diagnostics` })
+  }
 
   for (const diagnostic of reported) {
     if (lintConfigTypeError(root, options.lints, diagnostic))
@@ -140,10 +155,17 @@ export async function check(root: string, options: CheckOptions = {}): Promise<C
   diagnostics.push(...problems)
 
   // A failing run that reported nothing must not pass for a clean one.
-  if (code !== 0 && reported.length === 0 && errors.trim() === '')
+  if (code !== 0 && printed.length === 0 && errors.trim() === '')
     diagnostics.push({ file: config, line: 1, column: 1, message: `tsgo exited with code ${code} and no diagnostics` })
 
   return diagnostics
+}
+
+// One extension program's tsgo run, state kept apart from the app's and the other programs'.
+async function runProgram(root: string, { dir, tsconfig }: ExtensionProgram, index: number) {
+  const { output, errors, code } = await typecheck(root, tsconfig, await resolvedConfig(root, tsconfig), `extension-${index}`)
+
+  return { dir, tsconfig, output, errors, code }
 }
 
 // With a code frame when the file's source is given.

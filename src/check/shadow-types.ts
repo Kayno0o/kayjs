@@ -32,9 +32,20 @@ import { CONTENT_CHECK, EXPORTS_CHECK, exportsCheck, SETTINGS_CHECK, settingsChe
 import { unguardedRoutes } from './guards'
 import { islandOnlyComponents } from './island-only'
 import { compileShadow, layoutQueries, matcherSource, pageRoute, serializeShadowSettings, SHADOW_SETTINGS, shadowPath } from './shadow'
+import { typingOptions } from './tsgo'
 
 // Imports each page of the extensions kay check reports as the app's own, so TypeScript checks them.
 const EXTENSION_PAGES = 'kay-extension-pages.ts'
+const PACKAGE_TSCONFIG = 'tsconfig.json'
+// What the app's declarations are in the shadow tree: the routes, files, messages and locals its libraries' pages are typed against.
+const APP_TYPES = ['kay-env.d.ts', 'kay-assets.d.ts', 'kay-icons.d.ts', 'kay-packages.d.ts']
+
+// A linked extension's package checked as a program of its own, as its tsconfig sets the options its pages are written for: the shadow tree holds a tsconfig for it, which the editor finds as tsgo does the nearest one.
+export interface ExtensionProgram {
+  // The package's shadow folder and the tsconfig kay writes there.
+  dir: string
+  tsconfig: string
+}
 
 export interface ShadowTypes {
   files: Map<string, ShadowFile>
@@ -46,6 +57,8 @@ export interface ShadowTypes {
   unreached: Set<string>
   // The kay libraries, and the packages of the linked extensions, whose own modules are theirs to check.
   libraries: KayLibrary[]
+  // The linked extensions whose own options differ from the app's, checked apart.
+  programs: ExtensionProgram[]
   // The app's settings module each line of the settings check stands for, with the library it sets.
   settings: Map<number, { file: string, library: string }>
   // The guard, API module or matcher each line of the exports check reads the default export of, with what it must be.
@@ -110,7 +123,7 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
   // `contentChecks` writes the props check once it read the collections.
   await tree.removeStale([CONTENT_CHECK])
 
-  return { files: tree.shadows, diagnostics: [...own.diagnostics, ...libraries.diagnostics], problems, unreached: libraries.unreached, libraries: libraries.followed, settings: replaced.lines, exports: exported.lines, islandOnly: own.islandOnly, mounts, locales: served.settings ? localePrefixes(served.settings) : [] }
+  return { files: tree.shadows, diagnostics: [...own.diagnostics, ...libraries.diagnostics], problems, unreached: libraries.unreached, libraries: libraries.followed, programs: libraries.programs, settings: replaced.lines, exports: exported.lines, islandOnly: own.islandOnly, mounts, locales: served.settings ? localePrefixes(served.settings) : [] }
 }
 
 function shadowTree(dir: string): ShadowTree {
@@ -178,7 +191,7 @@ async function ownShadows(root: string, options: CheckOptions, tree: ShadowTree,
 
 // A library's components compile against the app's types, and the ones it reaches are reported as its own: `kay build` compiles those.
 // So are the pages and the editor of an extension not installed from the registry, as a library's own example or fixture app lists it, and what they reach of its package: its own modules stay its own to check, as a library's do.
-async function libraryShadows(root: string, options: CheckOptions, own: string[], tree: ShadowTree, mounts: RouteMount[]): Promise<{ libraries: KayLibrary[], followed: KayLibrary[], pages: string[], diagnostics: CheckDiagnostic[], unreached: Set<string> }> {
+async function libraryShadows(root: string, options: CheckOptions, own: string[], tree: ShadowTree, mounts: RouteMount[]): Promise<{ libraries: KayLibrary[], followed: KayLibrary[], programs: ExtensionProgram[], pages: string[], diagnostics: CheckDiagnostic[], unreached: Set<string> }> {
   const { routes: routesDir, cache: cacheDir } = projectPaths(root, options)
   const libraries = await findKayLibraries(root)
   // The app's own directories are checked already; a linked library has its real path outside any `node_modules`, an installed one inside.
@@ -189,6 +202,9 @@ async function libraryShadows(root: string, options: CheckOptions, own: string[]
   const localEditor = editor !== undefined && linked(editor) ? editor : undefined
   const followed = [...libraries, ...await extensionPackages(root, libraries, [...local.map(mount => mount.dir), ...localEditor === undefined ? [] : [dirname(localEditor)]])]
   const files = [...new Set(followed.flatMap(library => library.files))]
+  const programs = await extensionPrograms(root, options, followed.filter(library => library.extension), tree)
+  // The editor finds a package's tsconfig for the files beside the app but not under a `node_modules`, where tsgo takes them as the app's imports: those stay imported, and the editor types them as the app's.
+  const apart = (file: string) => !relative(projectPaths(root).types, shadowPath(root, file)).split(sep).includes('node_modules') && programs.some(({ dir }) => shadowPath(root, file).startsWith(dir + sep))
   const pages = files.filter(file => file === localEditor || local.some(mount => file.startsWith(mount.dir + sep)))
   const reached = new Set([...pages, ...(await reachableLibraryFiles(root, followed, [...own, ...pages])).components.map((file) => {
     const library = libraryOf(followed, file)
@@ -221,7 +237,42 @@ async function libraryShadows(root: string, options: CheckOptions, own: string[]
       diagnostics.push(fromCompile(file, source, diagnostic))
   }))
 
-  return { libraries, followed, pages, diagnostics, unreached }
+  return { libraries, followed, programs, pages: pages.filter(file => !apart(file)), diagnostics, unreached }
+}
+
+// The programs of the linked extensions whose tsconfig types a file other than the app's does, each with the tsconfig kay writes in its shadow folder: it extends the package's and lays the app's declarations over it, so the app's catalogs, locals and matchers stay in scope.
+async function extensionPrograms(root: string, options: CheckOptions, extensions: KayLibrary[], tree: ShadowTree): Promise<ExtensionProgram[]> {
+  const own = extensions.map(library => ({ library, tsconfig: join(library.realDir, PACKAGE_TSCONFIG) })).filter(({ tsconfig }) => existsSync(tsconfig))
+
+  if (own.length === 0)
+    return []
+
+  const types = projectPaths(root).types
+  const appOptions = await typingOptions(root, options.tsconfig ?? 'tsconfig.json')
+  const programs = await Promise.all(own.map(async ({ library, tsconfig }) => {
+    const packageOptions = await typingOptions(root, tsconfig)
+
+    if (packageOptions === undefined || packageOptions === appOptions)
+      return undefined
+
+    const dir = dirname(shadowPath(root, join(library.dir, 'x')))
+    const from = (path: string) => {
+      const relation = relative(dir, path).split(sep).join('/')
+
+      return relation.startsWith('.') ? relation : `./${relation}`
+    }
+    const config = {
+      extends: from(tsconfig),
+      compilerOptions: { rootDirs: [from(root), from(types)], noEmit: true },
+      files: [...library.files.map(file => from(shadowPath(root, file))), ...APP_TYPES.map(name => from(join(types, name)))],
+    }
+
+    await tree.write(join(relative(types, dir), PACKAGE_TSCONFIG), `${JSON.stringify(config, null, 2)}\n`)
+
+    return { dir, tsconfig: join(dir, PACKAGE_TSCONFIG) }
+  }))
+
+  return programs.filter(program => program !== undefined)
 }
 
 // The package holding each of `extensionDirs`, an extension's routes or its editor's directory, that no kay library holds, the nearest directory above them with a package.json, as a library: its components are shadowed and reached as one's are.

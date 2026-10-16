@@ -378,7 +378,6 @@ describe('kay lsp imports', () => {
       Bun.write(join(dir, 'kay.config.ts'), 'throw new Error(\'Broken config\')\n'),
     ])
     // Every package of this checkout, and kay as a copy installed there: tsgo offers no import from a package whose files sit outside node_modules.
-    await mkdir(join(dir, 'node_modules'), { recursive: true })
     await Promise.all((await readdir(join(import.meta.dir, '../node_modules'))).filter(name => name !== 'kay' && name !== '.bin').map(async name => symlink(join(import.meta.dir, '../node_modules', name), join(dir, 'node_modules', name))))
     await cp(join(import.meta.dir, '../src'), join(dir, 'node_modules/kay/src'), { recursive: true })
     // Without the `types` build a packed kay carries, each export resolves to its source.
@@ -1223,6 +1222,44 @@ describe('kay lsp on an app holding a nested project and listing an extension be
 
   it('checks a path the extension\'s routes name only under its own prefix, a locale\'s before it or not, as kay check does', async () => {
     expect((await editor.open('../lib/routes/out.kay')).map(diagnostic => [diagnostic.range.start.line, diagnostic.message.match(/serves (\S+?)"/)?.[1]])).toEqual([[2, '/lib/no/such'], [4, '/fr/lib/no/such']])
+  })
+})
+
+// Two extensions written for other options than the app's, each beside it.
+describe('kay lsp on an app listing extensions with a tsconfig of their own', () => {
+  let editor: Editor
+  let dir: string
+
+  beforeAll(async () => {
+    const base = await scratchDir('lsp-options-')
+    const tsconfig = JSON.parse(await Bun.file(join(fixtures, 'site/tsconfig.json')).text()) as { compilerOptions: Record<string, unknown> }
+
+    delete tsconfig.compilerOptions.noUncheckedIndexedAccess
+
+    dir = join(base, 'app')
+    await Promise.all([
+      Bun.write(join(dir, 'tsconfig.json'), JSON.stringify(tsconfig)),
+      Bun.write(join(dir, 'kay.config.ts'), 'export default { extensions: [{ name: \'loose\', routes: { dir: \'../loose/routes\', prefix: \'/loose\' } }, { name: \'tight\', routes: { dir: \'../tight/routes\', prefix: \'/tight\' } }] }\n'),
+      Bun.write(join(dir, 'src/routes/index.kay'), 'p Home\n'),
+      Bun.write(join(base, 'loose/package.json'), JSON.stringify({ name: 'loose' })),
+      Bun.write(join(base, 'loose/tsconfig.json'), JSON.stringify({ compilerOptions: { ...tsconfig.compilerOptions, strict: false } })),
+      Bun.write(join(base, 'loose/routes/page.kay'), '---\nconst fine: number = null\nconst wrong: number = \'loose\'\n---\np {fine} {wrong}\na(href="/loose/nope") Nope\n'),
+      Bun.write(join(base, 'tight/package.json'), JSON.stringify({ name: 'tight' })),
+      Bun.write(join(base, 'tight/tsconfig.json'), JSON.stringify({ compilerOptions: { ...tsconfig.compilerOptions, noUncheckedIndexedAccess: true } })),
+      Bun.write(join(base, 'tight/routes/page.kay'), '---\nconst list: string[] = []\nconst first: string = list[0]\n---\np {first}\n'),
+    ])
+    editor = new Editor(dir)
+    await editor.start()
+  })
+
+  afterAll(async () => {
+    await editor.stop()
+    await rm(dirname(dir), { recursive: true, force: true })
+  })
+
+  it('types an extension\'s pages under its own options with the app\'s types in scope, as kay check does', async () => {
+    expect((await editor.open('../loose/routes/page.kay')).map(diagnostic => [diagnostic.range.start.line, diagnostic.message.slice(0, 40)])).toEqual([[2, 'Type \'string\' is not assignable to type '], [5, 'Argument of type \'"/loose/nope"\' is not ']])
+    expect((await editor.open('../tight/routes/page.kay')).map(diagnostic => diagnostic.range.start.line)).toEqual([2])
   })
 })
 

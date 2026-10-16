@@ -16,6 +16,8 @@ const TSC_GLOBAL_LINE = /^error (TS\d+): (.*)$/
 const TSGO_PACKAGE = fileURLToPath(import.meta.resolve('@typescript/native-preview/package.json'))
 
 export const TSGO = join(dirname(TSGO_PACKAGE), 'bin', 'tsgo')
+// The options that name a place, which do not change what a file's types are.
+const PLACED_OPTIONS = new Set(['rootDirs', 'rootDir', 'paths', 'baseUrl', 'typeRoots', 'outDir', 'declarationDir', 'tsBuildInfoFile', 'configFilePath', 'pathsBasePath'])
 // A filesystem stamps writes off a coarse clock, milliseconds behind on Linux and up to a second on some, so a file written that close before a run counts as written after it.
 const CLOCK_SLACK = 1000
 
@@ -57,10 +59,23 @@ export async function resolvedConfig(root: string, tsconfig: string): Promise<st
   return code === 0 ? output : undefined
 }
 
+// What a tsconfig's own options say apart from the places they name, which differ by where the config sits: two configs with the same text here type a file the same way.
+export async function typingOptions(root: string, tsconfig: string): Promise<string | undefined> {
+  const shown = await resolvedConfig(root, tsconfig)
+
+  if (shown === undefined)
+    return undefined
+
+  const { compilerOptions = {} } = JSON.parse(shown) as { compilerOptions?: Record<string, unknown> }
+
+  return JSON.stringify(Object.entries(compilerOptions).filter(([name]) => !PLACED_OPTIONS.has(name)).toSorted(([a], [b]) => a < b ? -1 : 1))
+}
+
 // Runs tsgo incrementally, or not at all when its last run was clean and nothing it read has changed since: tsgo's own incremental mode still parses every file, most of a warm run's time.
-export async function typecheck(root: string, tsconfig: string, shown: string | undefined): Promise<{ output: string, errors: string, code: number }> {
+// `program` names the run among the several of one project, each keeping its own state.
+export async function typecheck(root: string, tsconfig: string, shown: string | undefined, program = ''): Promise<{ output: string, errors: string, code: number }> {
   const { cache, types: shadowDir } = projectPaths(root)
-  const state = join(cache, 'check')
+  const state = join(cache, 'check', program)
   const buildInfo = join(state, 'tsbuildinfo')
   const args = ['--noEmit', '--pretty', 'false', '--noUnusedLocals', '-p', tsconfig, '--incremental', '--tsBuildInfoFile', buildInfo]
   // The resolved config lists the root files, so one added or removed changes it as an edited option does.

@@ -19,6 +19,8 @@ const CLI = resolve('src/cli.ts')
 
 const TSCONFIG = JSON.stringify({ compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true }, include: ['src', '.kay/types'] })
 
+const TSCONFIG_OPTIONS = (JSON.parse(TSCONFIG) as { compilerOptions: object }).compilerOptions
+
 // A library whose messages an app in two locales mounts, translating one of the library's texts its own way and adding one key: the base of the apps below writing catalogs of their own, or none.
 const CATALOGS: Record<string, string> = {
   'package.json': JSON.stringify({ name: 'app', dependencies: { 'kay-lib': '*' } }),
@@ -484,6 +486,44 @@ describe('an extension listed from beside the app', () => {
       expect(readShadowSettings(join(dir, 'app')).mounts.map(mount => mount.dir)).toContain(join(dir, 'lib/routes'))
       // The workspace package once, by the link the app imports it through, its routes listed by either path.
       expect((await writeShadowTypes(join(dir, 'app'), { extensions: [{ name: 'ws', routes: { dir: join(dir, 'app/node_modules/ws-lib/routes'), prefix: '/ws' } }, { name: 'ws-more', routes: { dir: join(dir, 'ws/more'), prefix: '/more' } }] })).libraries.filter(library => library.extension).map(library => library.dir.slice(dir.length + 1)).sort()).toEqual(['app/node_modules/ws-lib'])
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  }, 30_000)
+})
+
+// Two extensions written for other options than the app's: one beside it for looser ones, one linked into node_modules for `noUncheckedIndexedAccess`.
+const OWN_OPTIONS: Record<string, string> = {
+  'app/package.json': JSON.stringify({ name: 'app' }),
+  'app/tsconfig.json': TSCONFIG,
+  'app/kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ extensions: [{ name: \'loose\', routes: { dir: \'../loose/routes\', prefix: \'/loose\' } }, { name: \'tight\', routes: { dir: \'node_modules/tight/routes\', prefix: \'/tight\' } }] })\n',
+  'app/src/routes/index.kay': '---\nconst app: number = \'app\'\n---\np {app}\n',
+  'loose/package.json': JSON.stringify({ name: 'loose' }),
+  'loose/tsconfig.json': JSON.stringify({ compilerOptions: { ...TSCONFIG_OPTIONS, strict: false } }),
+  // Fine without strict null checks; the link is checked against the app's routes all the same.
+  'loose/routes/page.kay': '---\nconst fine: number = null\nconst wrong: number = \'loose\'\n---\np {fine} {wrong}\na(href="/loose/nope") Nope\n',
+  'tight/package.json': JSON.stringify({ name: 'tight' }),
+  'tight/tsconfig.json': JSON.stringify({ compilerOptions: { ...TSCONFIG_OPTIONS, noUncheckedIndexedAccess: true } }),
+  'tight/routes/page.kay': '---\nconst list: string[] = []\nconst first: string = list[0]\n---\np {first}\n',
+}
+
+describe('an extension with a tsconfig of its own', () => {
+  it('has kay check type its pages under the package\'s options with the app\'s types in scope, the app\'s own files once', async () => {
+    const dir = await scratchDir('extension-options-')
+
+    try {
+      await Promise.all(Object.entries(OWN_OPTIONS).map(async ([path, content]) => Bun.write(join(dir, path), content)))
+      await mkdir(join(dir, 'app/node_modules'))
+      await symlink('../../tight', join(dir, 'app/node_modules/tight'))
+
+      const { code, stdout, stderr } = await run([process.execPath, CLI, 'check'], join(dir, 'app'))
+      const output = `${stdout}${stderr}`
+
+      expect(code).toBe(1)
+      expect([...output.matchAll(/^ *--> (\S+)$/gm)].map(match => match[1]).sort()).toEqual(['../loose/routes/page.kay:3:7', '../loose/routes/page.kay:6:9', 'node_modules/tight/routes/page.kay:3:7', 'src/routes/index.kay:2:7'])
+      expect(output).toContain('"/loose/nope"')
+      expect(output).toContain('Type \'string | undefined\' is not assignable to type \'string\'')
     }
     finally {
       await rm(dir, { recursive: true, force: true })
