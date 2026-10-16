@@ -1,9 +1,11 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
-import { onRead } from '../runtime/cache'
+import { onRead, trackLoads } from '../runtime/cache'
 
 const scope = new AsyncLocalStorage<Set<string>>()
 
 onRead(key => scope.getStore()?.add(key))
+// A `cached` load runs in a scope of its own, so what it reads belongs to its value and not to the page that happened to load it.
+trackLoads(readsOf)
 
 // Runs a page render, reading its body too, and lists the cache keys and collections it read, which `invalidate` and `collection.invalidate()` refresh the page for.
 export async function readsOf<T>(render: () => Promise<T>): Promise<{ result: T, reads: string[] }> {

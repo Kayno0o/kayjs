@@ -117,7 +117,8 @@ const posts = await cached('posts', '5m', listPosts)
 - A first load that throws throws to its callers and keeps nothing.
 - A refresh that throws is logged and keeps the stale value, trying again a minute later at most.
 - For a visitor in preview mode (see [Preview mode](content.md#preview-mode)), every call runs `load` and keeps nothing, so they see what it gives now.
-- `invalidate(key)` from `kay/cache`, or `invalidate(key => key.startsWith('post:'))`, drops keys so the next call loads afresh: call it from the action that changed what they hold.
+- `invalidate(key)` from `kay/cache`, or `invalidate(key => key.startsWith('post:'))`, drops keys so the next call loads afresh, and marks stale every prerendered page that read a dropped key: call it from the action that changed what they hold.
+- A value also depends on the keys and collections its own `load` read: dropping `news` drops a `cached('latest', ...)` built from `news.all()`, and the pages hitting it. Not tracked: module-level data, and a store's value another process loaded.
 - A load already running for a dropped key never lands in the cache.
 - The value is the same object for every caller, so it is never mutated.
 - At most 10,000 keys are kept, the least recently written going first.

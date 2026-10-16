@@ -10,11 +10,16 @@ const TSCONFIG = JSON.stringify({
   compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true },
   include: ['src', '.kay/types'],
 })
+// Two pages share a value built from a collection: neither runs its load again once the first has.
+const latest = '--- server\nimport { cached } from \'kay/cache\'\nimport { news } from \'../content.config\'\n\nexport const page = { prerender: true }\n\nconst titles = await cached(\'latest\', 600, async () => (await news.all()).map(entry => entry.data.title).join())\n---\nh1 {titles}\n'
 const FILES: Record<string, string> = {
   'src/data.ts': 'export const data = { value: \'one\', title: \'first\' }\n',
   'src/content.config.ts': 'import { s } from \'kay\'\nimport { collection } from \'kay/content\'\nimport { data } from \'./data\'\n\nexport const news = collection({ name: \'news\', load: () => [{ slug: \'a\', data: { title: data.title }, html: \'<p>x</p>\' }] }, { schema: s.Object({ title: s.String() }) })\n',
   'src/routes/value.kay': '--- server\nimport { cached } from \'kay/cache\'\nimport { data } from \'../data\'\n\nexport const page = { prerender: true }\n\nconst value = await cached(\'value\', 600, () => data.value)\n---\nh1 {value}\n',
   'src/routes/news.kay': '--- server\nimport { news } from \'../content.config\'\n\nexport const page = { prerender: true }\n\nconst entries = await news.all()\n---\nh1 {entries[0]!.data.title}\n',
+  'src/routes/latest-a.kay': latest,
+  'src/routes/latest-b.kay': latest,
+  'src/routes/fn.kay': '--- server\nimport { cached } from \'kay/cache\'\nimport { data } from \'../data\'\n\nexport const page = { prerender: true }\n\nconst value = await cached(\'fn:1\', 600, () => data.value)\n---\nh1 {value}\n',
   'src/routes/plain.kay': '--- server\nimport { data } from \'../data\'\n\nexport const page = { prerender: true }\n---\nh1 {data.value}\n',
 }
 
@@ -31,15 +36,18 @@ const heading = async (path: string) => ((await (await app.handle(new Request(\`
 const seen: Record<string, (string | undefined)[]> = {}
 const look = async (name: string) => { (seen[name] ??= []).push(await heading('/' + name)) }
 
-for (const name of ['value', 'news', 'plain'])
+const names = ['value', 'news', 'plain', 'latest-a', 'latest-b', 'fn']
+
+for (const name of names)
   await look(name)
 
 data.value = 'two'
 data.title = 'second'
 invalidate('value')
+invalidate(key => key.startsWith('fn:'))
 news.invalidate()
 
-for (const name of ['value', 'news', 'plain'])
+for (const name of names)
   await look(name)
 
 console.log(JSON.stringify(seen))
@@ -72,6 +80,6 @@ describe('invalidating a data source refreshes the pages built from it', () => {
     if (served !== 0)
       throw new Error(`${out}${err}`)
 
-    expect(JSON.parse(out.slice(out.lastIndexOf('\n{') + 1)) as unknown).toEqual({ value: ['one', 'two'], news: ['first', 'second'], plain: ['one', 'one'] })
+    expect(JSON.parse(out.slice(out.lastIndexOf('\n{') + 1)) as unknown).toEqual({ 'value': ['one', 'two'], 'news': ['first', 'second'], 'plain': ['one', 'one'], 'latest-a': ['first', 'second'], 'latest-b': ['first', 'second'], 'fn': ['one', 'two'] })
   }, 120_000)
 })

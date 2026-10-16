@@ -176,6 +176,8 @@ describe('a CMS behind a collection', () => {
     expect((await get('/news')).html).toContain('<li>Launch day</li>')
     expect((await app.handle(new Request('http://localhost/api/hook', { method: 'POST' }))).status).toBe(204)
     expect((await get('/news')).html).toContain('<li>Launch moved</li>')
+    // The prerendered page of an entry, which the hook names no path of.
+    expect((await get('/news/launch')).html).toContain('<h1>Launch moved</h1>')
   })
 
   it('lists its published entries in the sitemap and the feed, drafts left out', async () => {

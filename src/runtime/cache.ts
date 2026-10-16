@@ -32,7 +32,12 @@ interface Entry {
   loaded: boolean
   // The load running for this key: the first miss's, which every concurrent caller awaits, or the background refresh of a stale value.
   loading?: Promise<unknown> | undefined
+  // The other keys and collections its load read, so a page hitting it reads them too and dropping one drops it.
+  deps?: string[] | undefined
 }
+
+// Runs a load apart from the render that triggered it, naming what it read: the server's, so a value built from a collection depends on it.
+type Tracker = <T>(load: () => Promise<T>) => Promise<{ result: T, reads: string[] }>
 
 const entries = new Map<string, Entry>()
 // Every store a call named, which `invalidate` empties too.
@@ -40,6 +45,7 @@ const stores = new Set<CacheStore>()
 // What hears the page paths another process marked stale: the server serving them.
 const pageListeners = new Set<(paths: string[]) => void>()
 // What learns of the keys a page render reads, and of the keys an invalidation drops: the server, to refresh the prerendered pages built from them.
+let tracker: Tracker | undefined
 let readListener: ((key: string) => void) | undefined
 const keyListeners = new Set<(matches: (key: string) => boolean) => string[]>()
 // Past this many keys, the least recently written goes first.
@@ -80,16 +86,31 @@ export async function cached<T, const Ttl extends Duration = Duration>(key: stri
     entries.set(key, pending)
     trim()
 
-    return (pending.loading = firstLoad(key, seconds, pending, load, store))
+    pending.loading = firstLoad(key, seconds, pending, load, store)
+
+    return waited<T>(key, pending)
   }
 
   if (!entry.loaded)
-    return entry.loading as Promise<T>
+    return waited<T>(key, entry)
+
+  for (const dep of entry.deps ?? [])
+    noteRead(dep)
 
   if (Date.now() >= entry.freshUntil && !entry.loading)
     void refresh(key, seconds, entry, load, store)
 
   return entry.value as T
+}
+
+// The first load's value, once the render waiting for it has noted what that load read.
+async function waited<T>(key: string, entry: Entry): Promise<T> {
+  const value = await entry.loading as T
+
+  for (const dep of entries.get(key)?.deps ?? [])
+    noteRead(dep)
+
+  return value
 }
 
 // Tells the server a render read `key`, a cached value or a collection's entries, so the page it renders is refreshed when `invalidate` drops it.
@@ -98,6 +119,16 @@ export function noteRead(key: string): void {
 }
 
 // The server hears each key a render reads; one listener at a time, which a second import replaces.
+export function trackLoads(track: Tracker): void {
+  tracker = track
+}
+
+async function trackedLoad<T>(load: () => T | Promise<T>): Promise<{ result: T, reads: string[] }> {
+  const run = async () => load()
+
+  return tracker ? tracker(run) : { result: await run(), reads: [] }
+}
+
 export function onRead(listener: (key: string) => void): void {
   readListener = listener
 }
@@ -127,16 +158,12 @@ export function invalidate(key: string | ((key: string) => boolean)): void {
   const matches = typeof key === 'string' ? (name: string) => name === key : key
   const dropped = new Set<string>(typeof key === 'string' ? [key] : [])
 
-  for (const name of entries.keys()) {
-    if (matches(name)) {
-      entries.delete(name)
-      dropped.add(name)
-    }
-  }
+  for (const name of dropEntries(matches))
+    dropped.add(name)
 
   for (const store of stores) {
     for (const name of store.keys()) {
-      if (matches(name)) {
+      if (matches(name) || dropped.has(name)) {
         store.delete(name)
         dropped.add(name)
       }
@@ -144,12 +171,26 @@ export function invalidate(key: string | ((key: string) => boolean)): void {
   }
 
   for (const listener of keyListeners) {
-    for (const name of listener(matches))
+    for (const name of listener(name => matches(name) || dropped.has(name)))
       dropped.add(name)
   }
 
   if (dropped.size > 0)
     broadcast({ keys: [...dropped] })
+}
+
+// Drops the entries a matcher names and those built from one it names, giving back their keys.
+function dropEntries(matches: (key: string) => boolean): string[] {
+  const names: string[] = []
+
+  for (const [name, entry] of entries) {
+    if (matches(name) || entry.deps?.some(matches)) {
+      entries.delete(name)
+      names.push(name)
+    }
+  }
+
+  return names
 }
 
 export function broadcast(invalidation: Invalidation): void {
@@ -174,10 +215,9 @@ function heard(message: string): void {
   const invalidation = JSON.parse(message) as Invalidation
 
   if ('keys' in invalidation) {
-    for (const key of invalidation.keys)
-      entries.delete(key)
-
     const named = new Set(invalidation.keys)
+
+    dropEntries(key => named.has(key))
 
     for (const listener of keyListeners)
       listener(key => named.has(key))
@@ -190,11 +230,11 @@ function heard(message: string): void {
 
 async function firstLoad<T>(key: string, ttl: number, pending: Entry, load: () => T | Promise<T>, store: CacheStore | undefined): Promise<T> {
   try {
-    const value = await load()
+    const { result: value, reads } = await trackedLoad(load)
 
     // Only when nothing invalidated the key meanwhile.
     if (entries.get(key) === pending)
-      keep(key, { value, freshUntil: Date.now() + ttl * 1000, loaded: true }, store)
+      keep(key, { value, freshUntil: Date.now() + ttl * 1000, loaded: true, ...reads.length > 0 ? { deps: reads } : {} }, store)
 
     return value
   }
@@ -207,19 +247,16 @@ async function firstLoad<T>(key: string, ttl: number, pending: Entry, load: () =
 }
 
 async function refresh(key: string, ttl: number, entry: Entry, load: () => unknown, store: CacheStore | undefined): Promise<void> {
-  // Promise.try, which a browser past kay's floor alone has: a load that throws at once becomes a rejection.
-  const loading = new Promise((resolve) => {
-    resolve(load())
-  })
+  const loading = trackedLoad(load)
 
   entry.loading = loading
 
   try {
-    const value = await loading
+    const { result: value, reads } = await loading
 
     // Only when nothing invalidated or replaced the key meanwhile.
     if (entries.get(key) === entry)
-      keep(key, { value, freshUntil: Date.now() + ttl * 1000, loaded: true }, store)
+      keep(key, { value, freshUntil: Date.now() + ttl * 1000, loaded: true, ...reads.length > 0 ? { deps: reads } : {} }, store)
   }
   catch (error) {
     entry.freshUntil = Date.now() + Math.min(ttl * 1000, RETRY_MS)

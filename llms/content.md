@@ -314,7 +314,7 @@ article
 
 #### Caching
 
-- `posts.invalidate()` loads the entries afresh on the next read; for a folder that only matters in development, where the files change.
+- `posts.invalidate()` loads the entries afresh on the next read; it also marks the prerendered pages that read the collection stale, in every process sharing a `sqliteCache`; for a folder it matters in development, where the files change.
 - Each entry compiles once and is cached in `.kay/cache/content`, one file per entry holding the content's hash, the highlighter's source and Bun's version it was compiled with, so a change, which restarts `kay dev`, recompiles that entry only.
 - A highlighter whose output changes with no change to its source, such as a new theme passed in, needs that folder cleared.
 - `kay build` compiles every collection into `.kay/client/content`, which production reads, an executable included, instead of the files.

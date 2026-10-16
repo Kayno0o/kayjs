@@ -8,7 +8,7 @@ import type { RawEntry } from './load'
 import type { Heading, Highlighter, Segment } from './markdown'
 import type { ContentProblem } from './validate'
 import { KayError } from '../compiler/errors'
-import { cached, invalidate, noteRead } from '../runtime/cache'
+import { cached, invalidate, noteRead, onKeysInvalidated } from '../runtime/cache'
 import { durationSeconds } from '../runtime/duration'
 import { editableEntries } from '../runtime/fields'
 import { child, localLinks } from '../runtime/html'
@@ -253,6 +253,14 @@ export function collection<Schema extends TSchema, Components extends Record<str
 
     return drafted
   }
+
+  // Whichever process invalidates it, this one loads the entries afresh.
+  onKeysInvalidated((matches) => {
+    if (matches(key))
+      loading = undefined
+
+    return []
+  })
   // A page reading the entries is refreshed when `invalidate()` drops them.
   const loaded = async () => {
     noteRead(key)
@@ -291,10 +299,7 @@ export function collection<Schema extends TSchema, Components extends Record<str
 
       return found && editableEntries(name, [found])[0]
     },
-    invalidate: () => {
-      loading = undefined
-      invalidate(key)
-    },
+    invalidate: () => invalidate(key),
   }
 }
 

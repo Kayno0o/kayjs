@@ -28,7 +28,7 @@ const posts = await cached('posts', '5m', listPosts)
 ---
 ```
 
-Concurrent calls share one load. Past the `ttl` the next call still gets the stale value and refreshes it in the background, so no request waits on a refresh. Drop keys from the action that changed their data:
+Concurrent calls share one load. Past the `ttl` the next call still gets the stale value and refreshes it in the background, so no request waits on a refresh. Drop keys from the action that changed their data. A prerendered page that read a dropped key is rendered again on its next request, and so is a cached value built from it:
 
 ```ts
 import { invalidate } from 'kay/cache'
