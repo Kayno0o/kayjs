@@ -191,9 +191,9 @@ describe('gate', () => {
   })
 
   // The types are checked by `bun run check`, not by running: `auth` is the Auth on every route, `auth:` takes a role or false.
-  test('a route after the gate sees `auth`, even one opened with `auth: false`', async () => {
+  test('a route after the gate sees `auth`, even one opened with `auth: false`, under a prefix', async () => {
     const { auth } = testApp()
-    const app = new Elysia()
+    const app = new Elysia({ prefix: '/api' })
       .use(auth.gate())
       .get('/me', async ({ auth }) => {
         expectTypeOf(auth).toEqualTypeOf<Auth<never, 'admin' | 'editor', never>>()
@@ -203,7 +203,8 @@ describe('gate', () => {
       .get('/admin', () => 'ok', { auth: 'admin' })
       .get('/open', ({ auth }) => auth instanceof Auth, { auth: false })
 
-    expect(await (await app.handle(new Request('http://localhost/open'))).text()).toBe('true')
+    expect((await app.handle(new Request('http://localhost/api/me'))).status).toBe(401)
+    expect(await (await app.handle(new Request('http://localhost/api/open'))).text()).toBe('true')
   })
 
   test('a gate can ask for a role on every route', async () => {
