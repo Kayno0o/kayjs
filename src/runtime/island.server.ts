@@ -44,6 +44,9 @@ export function islandCheckpoint(): (() => void) | undefined {
 
 // A set keeps the order it was filled in, so what came after the first `size` entries is what to drop.
 function trim(set: Set<string>, size: number): void {
+  if (set.size === size)
+    return
+
   for (const value of [...set].slice(size))
     set.delete(value)
 }

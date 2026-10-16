@@ -358,7 +358,7 @@ export function attempt(render: () => string, fallback?: (error: unknown) => str
     return render()
   }
   catch (error) {
-    // What the block set in the head and listed of islands goes with it: its islands are not in the page.
+    // The head tags and islands the block set go with it: its islands are not in the page.
     restoreHead(checkpoint)
     restoreIslands?.()
     const server = currentServerScope()
