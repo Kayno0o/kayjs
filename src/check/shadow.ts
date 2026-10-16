@@ -80,18 +80,25 @@ export interface ShadowOptions {
   insideIsland?: boolean
   lints?: LintLevels | undefined
   signals?: ImportedSignals
+  // Where a file's shadow is written when that is not where `shadowPath` puts it: a package reached through a `node_modules` link is shadowed beside its real path, where an editor finds its tsconfig. What the shadow imports is relative to there.
+  shadowOf?: ((file: string) => string) | undefined
 }
 
 // Compiles one .kay file for type checking, its route params typed when it is a page of the routes directory or of an extension's, by the matchers beside `routesDir`.
-export function compileShadow(root: string, file: string, source: string, { routesDir, mounts, insideIsland = false, lints, signals = importedSignals(file, source) }: ShadowOptions): { shadow: ShadowFile, diagnostics: Diagnostic[], queries: string[] | undefined } {
+export function compileShadow(root: string, file: string, source: string, { routesDir, mounts, insideIsland = false, lints, signals = importedSignals(file, source), shadowOf = path => shadowPath(root, path) }: ShadowOptions): { shadow: ShadowFile, diagnostics: Diagnostic[], queries: string[] | undefined } {
   const route = pageRoute(file, routesDir, mounts)
-  const shadowDir = dirname(shadowPath(root, file))
+  const shadowDir = dirname(shadowOf(file))
+  // rootDirs merges the shadow tree with the project at the same relative path, which a shadow written elsewhere does not keep.
+  const moved = shadowDir !== dirname(shadowPath(root, file))
   // rootDirs only merges paths inside the project, so an import reaching outside it is pointed there from the shadow file.
   const relocateImport = (specifier: string) => {
     if (!specifier.startsWith('.'))
       return undefined
 
     const target = resolve(dirname(file), specifier)
+
+    if (moved)
+      return relativeSpecifier(shadowDir, KAY_FILE.test(target) ? shadowOf(target).slice(0, -'.tsx'.length) : target)
 
     // A component beside a file outside the project has its shadow beside this one.
     if (target.startsWith(root + sep) || (KAY_FILE.test(target) && !file.startsWith(root + sep)))
@@ -100,7 +107,7 @@ export function compileShadow(root: string, file: string, source: string, { rout
     return relative(shadowDir, target)
   }
   const queries = layoutQueries(file, source, routesDir, mounts)
-  const { tsx, map, diagnostics } = compileKay(source, file, { root, params: route?.params, paramTypes: route && paramTypesOf(routesDir, shadowDir, route), outerQueries: queries, check: true, insideIsland, relocateImport, lints, importedSignals: signals })
+  const { tsx, map, diagnostics } = compileKay(source, file, { root, params: route?.params, paramTypes: route && paramTypesOf(routesDir, shadowDir, route), outerQueries: moved ? layoutQueries(file, source, routesDir, mounts, { dir: shadowDir, of: shadowOf }) : queries, check: true, insideIsland, relocateImport, lints, importedSignals: signals })
   // Reported as the server reports it, rather than as a type error in the shadow file.
   const unknown = Object.values(route?.matchers ?? {}).filter(matcher => matcherSource(routesDir, matcher) === undefined)
 
@@ -108,12 +115,25 @@ export function compileShadow(root: string, file: string, source: string, { rout
 }
 
 // The `query` types of the layouts above a page or a layout, which its shadow depends on besides its own source.
-export function layoutQueries(file: string, source: string, routesDir: string, mounts: RouteMount[]): string[] | undefined {
-  return pageRoute(file, routesDir, mounts) || basename(file) === LAYOUT ? outerQueries(file, source, routeTrees(routesDir, mounts)) : undefined
+// `placed` names the layouts by where their shadows are written, for a shadow written away from its path.
+export function layoutQueries(file: string, source: string, routesDir: string, mounts: RouteMount[], placed?: Placed): string[] | undefined {
+  return pageRoute(file, routesDir, mounts) || basename(file) === LAYOUT ? outerQueries(file, source, routeTrees(routesDir, mounts), placed) : undefined
+}
+
+interface Placed {
+  // The folder of the shadow, and where the shadow of a file is written.
+  dir: string
+  of: (file: string) => string
+}
+
+function relativeSpecifier(from: string, target: string): string {
+  const path = relative(from, target).split(sep).join('/')
+
+  return path.startsWith('.') ? path : `./${path}`
 }
 
 // The type of each `query` schema declared by the layouts above `file` in the URL tree of the app's routes and its extensions', outermost first: a layout or page reads them through `ctx.query` as the server merges them.
-export function outerQueries(file: string, source: string, trees: RouteMount[]): string[] {
+export function outerQueries(file: string, source: string, trees: RouteMount[], placed?: Placed): string[] {
   if (!trees.some(({ dir }) => file.startsWith(dir + sep)) || falseKeys(source).has('layouts'))
     return []
 
@@ -130,9 +150,9 @@ export function outerQueries(file: string, source: string, trees: RouteMount[]):
   const reset = above.findIndex(({ facts }) => facts.leavesLayoutsOut)
 
   return (reset === -1 ? above : above.slice(0, reset + 1)).reverse().filter(({ facts }) => facts.server?.page?.settings.has('query')).map(({ layout }) => {
-    const path = relative(dirname(file), layout).split(sep).join('/')
+    const path = placed ? relativeSpecifier(placed.dir, placed.of(layout).slice(0, -'.tsx'.length)) : relativeSpecifier(dirname(file), layout)
 
-    return `(typeof import(${JSON.stringify(path.startsWith('.') ? path : `./${path}`)}))["page"]["query"]`
+    return `(typeof import(${JSON.stringify(path)}))["page"]["query"]`
   })
 }
 

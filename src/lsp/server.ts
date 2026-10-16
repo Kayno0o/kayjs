@@ -13,10 +13,12 @@ import process from 'node:process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { KAY_DIR } from '../build/assets'
 import { findKayFiles, realPath } from '../build/files'
+import { throughNodeModules } from '../build/libraries'
 import { importedSignals } from '../build/signals'
 import { configCheckOptions, configProblems, contentChecks, generatedChecks, generatedProblem, projectProblems, stopProbes, TSGO, writeShadowTypes } from '../check'
 import { diagnoseShadow, reportsTypeErrors, servedByTheApp, servedLocales } from '../check/diagnose'
-import { compileShadow, generatedSpan, layoutQueries, shadowPath, shadowSource, sourceSpan } from '../check/shadow'
+import { compileShadow, generatedSpan, layoutQueries, shadowSource, sourceSpan } from '../check/shadow'
+import { programShadows } from '../check/shadow-types'
 import { formatKay } from '../compiler/format'
 import { lintLevels } from '../compiler/lints'
 import { offsetAt, positionAt } from '../compiler/mapping'
@@ -424,12 +426,21 @@ export class KayLanguageServer {
     const project = this.projectAt(projectRootOf(file, this.root))
     const insideIsland = project.islandOnly.has(file)
     const signals = importedSignals(file, source)
-    const { shadow, diagnostics, queries } = compileShadow(project.root, file, source, { routesDir: project.routesDir, mounts: project.mounts, insideIsland, lints: project.options.lints, signals })
-    const document = { ...shadow, uri, shadowUri: pathToFileURL(shadowPath(project.root, file)).href, version, diagnostics, insideIsland, signals: JSON.stringify(signals), queries: JSON.stringify(queries) }
+    const placed = this.placed(project, file)
+    const { shadow, diagnostics, queries } = compileShadow(project.root, placed.file, source, { routesDir: project.routesDir, mounts: project.mounts, insideIsland, lints: project.options.lints, signals, shadowOf: placed.shadowOf })
+    const document = { ...shadow, uri, shadowUri: pathToFileURL(placed.shadowOf(placed.file)).href, version, diagnostics, insideIsland, signals: JSON.stringify(signals), queries: JSON.stringify(queries) }
 
     this.documents.set(uri, document)
 
     return document
+  }
+
+  // A page of an extension with options of its own is compiled as the app reaches it, by its `node_modules` link whichever path the editor opened it by, and shadowed beside its real path, where its tsconfig is.
+  private placed(project: Project, file: string): { file: string, shadowOf: (file: string) => string } {
+    const programs = project.types?.programs ?? []
+    const library = programs.map(program => program.library).find(held => held.dir !== held.realDir && file.startsWith(held.realDir + sep))
+
+    return { file: library ? throughNodeModules(library, file) : file, shadowOf: programShadows(project.root, programs) }
   }
 
   private scheduleDiagnostics() {
@@ -934,10 +945,10 @@ export class KayLanguageServer {
     if (!project || !path.endsWith('.kay.tsx'))
       return undefined
 
-    const file = shadowSource(project.root, path)
-    const source = Bun.file(file)
+    const placed = this.placed(project, shadowSource(project.root, path))
+    const source = Bun.file(placed.file)
 
-    return await source.exists() ? compileShadow(project.root, file, await source.text(), { routesDir: project.routesDir, mounts: project.mounts, insideIsland: project.islandOnly.has(file), lints: project.options.lints }).shadow : undefined
+    return await source.exists() ? compileShadow(project.root, placed.file, await source.text(), { routesDir: project.routesDir, mounts: project.mounts, insideIsland: project.islandOnly.has(placed.file), lints: project.options.lints, shadowOf: placed.shadowOf }).shadow : undefined
   }
 
   // `offset` is the position in the .kay source.

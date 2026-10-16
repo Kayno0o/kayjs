@@ -801,6 +801,32 @@ describe('an extension whose tsconfig or dependencies sit apart from the app', (
     }
   }, 60_000)
 
+  it('has kay check resolve the imports and the matchers of a linked extension\'s pages under options of its own', async () => {
+    const dir = await scratchDir('extension-relative-')
+
+    try {
+      await Promise.all(Object.entries({
+        ...OWN_OPTIONS,
+        'app/src/params/int.ts': 'export default (value: string) => /^\\d+$/.test(value) ? Number(value) : undefined\n',
+        'tight/lib/util.ts': 'export const answer = 42\n',
+        'tight/routes/part.kay': 'p part\n',
+        'tight/routes/deep/page.kay': '---\nimport { answer } from \'../../lib/util\'\nimport Part from \'../part.kay\'\nconst list: string[] = []\nconst first: string = list[0]\n---\np {answer} {first}\nPart\n',
+        'tight/routes/[n=int]/page.kay': '--- server\nconst s: string = ctx.params.n\n---\np {s}\n',
+      }).map(async ([path, content]) => Bun.write(join(dir, path), content)))
+      await mkdir(join(dir, 'app/node_modules'))
+      await symlink('../../tight', join(dir, 'app/node_modules/tight'))
+
+      const { stdout, stderr } = await run([process.execPath, CLI, 'check'], join(dir, 'app'))
+      const output = `${stdout}${stderr}`
+
+      expect(output).not.toContain('Cannot find module')
+      expect([...output.matchAll(/^ *--> (\S+tight\S+)$/gm)].map(match => match[1]).sort()).toEqual(['node_modules/tight/routes/[n=int]/page.kay:2:7', 'node_modules/tight/routes/deep/page.kay:5:7', 'node_modules/tight/routes/page.kay:3:7'])
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  }, 60_000)
+
   it('has kay check type the pages of a linked extension as the app\'s once its tsconfig stops differing', async () => {
     const dir = await scratchDir('extension-converge-')
 

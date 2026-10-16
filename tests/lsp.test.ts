@@ -1247,6 +1247,12 @@ describe('kay lsp on an app listing extensions with a tsconfig of their own', ()
       Bun.write(join(base, 'tight/package.json'), JSON.stringify({ name: 'tight' })),
       Bun.write(join(base, 'tight/tsconfig.json'), JSON.stringify({ compilerOptions: { ...tsconfig.compilerOptions, noUncheckedIndexedAccess: true } })),
       Bun.write(join(base, 'tight/routes/page.kay'), '---\nconst list: string[] = []\nconst first: string = list[0]\n---\np {first}\n'),
+      // Imports beside the package and a matcher of the app's, which a shadow written elsewhere must still reach.
+      Bun.write(join(base, 'tight/lib/util.ts'), 'export const answer = 42\n'),
+      Bun.write(join(base, 'tight/routes/part.kay'), 'p part\n'),
+      Bun.write(join(base, 'tight/routes/deep/page.kay'), '---\nimport { answer } from \'../../lib/util\'\nimport Part from \'../part.kay\'\nconst list: string[] = []\nconst first: string = list[0]\n---\np {answer} {first}\nPart\n'),
+      Bun.write(join(base, 'tight/routes/[n=int]/page.kay'), '--- server\nconst s: string = ctx.params.n\n---\np {s}\n'),
+      Bun.write(join(dir, 'src/params/int.ts'), 'export default (value: string) => /^\\d+$/.test(value) ? Number(value) : undefined\n'),
     ])
     await mkdir(join(dir, 'node_modules'), { recursive: true })
     await symlink('../../tight', join(dir, 'node_modules/tight'))
@@ -1262,6 +1268,11 @@ describe('kay lsp on an app listing extensions with a tsconfig of their own', ()
   it('types an extension\'s pages under its own options with the app\'s types in scope, as kay check does', async () => {
     expect((await editor.open('../loose/routes/page.kay')).map(diagnostic => [diagnostic.range.start.line, diagnostic.message.slice(0, 40)])).toEqual([[2, 'Type \'string\' is not assignable to type '], [5, 'Argument of type \'"/loose/nope"\' is not ']])
     expect((await editor.open('../tight/routes/page.kay')).map(diagnostic => diagnostic.range.start.line)).toEqual([2])
+  })
+
+  it('resolves the imports and the matchers of a linked extension\'s pages as kay check does', async () => {
+    expect((await editor.open('../tight/routes/deep/page.kay')).map(diagnostic => diagnostic.range.start.line)).toEqual([4])
+    expect((await editor.open('../tight/routes/[n=int]/page.kay')).map(diagnostic => [diagnostic.range.start.line, diagnostic.message.slice(0, 40)])).toEqual([[1, 'Type \'number\' is not assignable to type ']])
   })
 })
 
