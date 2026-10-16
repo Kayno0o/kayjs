@@ -654,7 +654,9 @@ describe.concurrent('kay dev', () => {
     const body = (n: number) => `// ${n}\nsetInterval(() => undefined, 1000)\n`
 
     await Bun.write(server, body(0))
-    const stop = await dev(root, { onRestart: child => children.push(child) })
+    // What kay dev printed, so a failure names the file each extra restart was for.
+    const printed: string[] = []
+    const stop = await dev(root, { onRestart: child => children.push(child), log: line => printed.push(line) })
     const saves = [
       async () => Bun.write(server, body(1)),
       // A temporary file renamed over the source.
@@ -691,7 +693,7 @@ describe.concurrent('kay dev', () => {
       }
 
       await Bun.sleep(300)
-      expect(children).toHaveLength(saves.length + 1)
+      expect({ restarts: children.length, printed }).toEqual({ restarts: saves.length + 1, printed })
     }
     finally {
       await stop()
