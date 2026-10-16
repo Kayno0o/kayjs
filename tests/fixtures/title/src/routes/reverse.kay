@@ -1,0 +1,7 @@
+---
+import Room from '../components/room.kay'
+---
+h1 Reverse
+div(style="position: absolute; top: 4000px")
+  Room(label="First" hydrate="visible")
+Room(label="Second")

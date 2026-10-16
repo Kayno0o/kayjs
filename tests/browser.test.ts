@@ -921,7 +921,36 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
 
     await view.click('button.rename')
 
+    expect(await title(view)).toBe('Second | Site')
+
+    await view.evaluate(() => document.querySelectorAll<HTMLElement>('button.rename')[1]?.click())
+
     expect(await title(view)).toBe('Beta | Site')
+  })
+
+  it('keeps the title of the island last in the page when the first hydrates after it', async () => {
+    const view = await titles.open('/reverse')
+
+    expect(await title(view)).toBe('Second | Site')
+
+    await view.evaluate(() => scrollTo(0, 4000))
+    await view.waitUntil(() => (document.querySelector('[data-component]') as { _$k?: boolean } | null)?._$k === true)
+
+    expect(await title(view)).toBe('Second | Site')
+
+    await view.click('button.rename')
+
+    expect(await title(view)).toBe('Second | Site')
+  })
+
+  it('shows the title of the island last in the page after a swap to a page with two', async () => {
+    const view = await titles.open('/')
+
+    await view.click('a.two')
+    await view.waitFor('h1', { text: 'Two' })
+    await view.waitUntil(() => [...document.querySelectorAll('[data-component]')].every(island => (island as { _$k?: boolean })._$k === true))
+
+    expect(await title(view)).toBe('Second | Site')
   })
 })
 

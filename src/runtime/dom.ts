@@ -53,6 +53,9 @@ interface DelegatingDocument extends Document {
 
 let claim: Claim | undefined
 
+// The element of the island being hydrated, which orders the titles of several by their place in the page.
+export const islandHost = () => claim?.parent as Element | undefined
+
 // What plays an element's transition, set by the first one a template sets, so a page whose islands set none ships none of its code.
 export interface Transitions {
   has: (node: Node) => node is Element
