@@ -434,7 +434,8 @@ describe('prerendering', () => {
     const build = await scratchBuild()
 
     try {
-      expect(await build.prerender({ routes, i18n: config })).toBe(2)
+      // The home page that marks prerender, and the pages reading nothing from a request, in each of the two locales.
+      expect(await build.prerender({ routes, i18n: config })).toBe(6)
       await check(build)
     }
     finally {

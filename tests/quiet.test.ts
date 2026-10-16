@@ -51,7 +51,7 @@ describe('--quiet', () => {
     const { stdout, stderr, code } = await kay(['build', '.', '--no-check', '--quiet'], root)
 
     expect(code, stderr).toBe(0)
-    expect(stdout).toMatch(/^built 1 island, 0 stylesheets and 0 prerendered pages in \d+ ms\n$/)
+    expect(stdout).toMatch(/^built 1 island, 0 stylesheets and 1 prerendered page in \d+ ms\n$/)
   }, 30_000)
 
   it('builds printing the size report, with no escape code in a pipe', async () => {

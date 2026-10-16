@@ -7,6 +7,7 @@ This page lists what each release adds, newest first, with a link to where each 
 
 ## Unreleased
 
+- **Pages that read nothing are built once**: a page that reads nothing from its request (no `ctx`, `query`, clock, random number, environment or package import) is prerendered by `kay build` and served from memory without `prerender`, so the bench app's pages cost about 50 and 38 us of CPU per request instead of 650 and 80 (see [Prerendering](/essentials/routing#prerendering)).
 - **Warmer builds**: a build compresses a file and draws the favicons only when their content changed, keeping the results under `.kay/cache`, so a build with nothing new spends about a quarter less CPU. [CLI reference](/reference/cli)
 - A route of a module with a `cors` rule can no longer widen it: the `Access-Control-*` grant headers it sets itself, or a `Response` it passes on carries, are replaced by the module's, and a redirect or a `fetch()` result is answered with its `Vary: Origin` instead of a 500 ([CORS](api-routes.md#cors)).
 - **A signal handed to a parameter that takes anything**: `kay check` reports `String(count)` or `JSON.stringify(count)`, which rendered the function's source, as `uncalled-signal`, and leaves a parameter typed `Signal<T>`, `Memo<T>`, a function type or a generic `T` alone.

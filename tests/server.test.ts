@@ -946,7 +946,8 @@ describe('prerendering', () => {
   const build = prerendered({ routes })
 
   it('renders the pages marked prerender once at build time and serves them behind their guards', async () => {
-    expect(build.count()).toBe(4)
+    // The four that mark prerender or reach a server island, and the three that read nothing from a request.
+    expect(build.count()).toBe(7)
 
     const file = await Bun.file(join(build.pages, 'admin/report.html')).text()
     const signedIn = new Elysia().use(auth).use(await build.serve({ routes, publicDir: 'tests/fixtures/site/public' }))

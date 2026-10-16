@@ -1143,7 +1143,8 @@ describe('preview mode', () => {
     const build = await scratchBuild()
 
     try {
-      expect(await build.prerender(options)).toBe(1)
+      // The page visited below, and four that read nothing from a request.
+      expect(await build.prerender(options)).toBe(5)
 
       const served = await build.serve(options)
       const visit = async (cookie?: string) => {

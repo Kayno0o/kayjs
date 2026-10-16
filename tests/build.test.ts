@@ -1812,7 +1812,7 @@ describe('the build report', () => {
       'src/counter.kay': '---\nimport { signal } from \'kay\'\n\nconst n = signal(0)\n---\nbutton(type="button" onClick={() => n.set(n() + 1)}) {n()}\n',
       'src/page.css': '.page-marker { color: red }\n',
       'src/routes/index.kay': '--- server\nimport \'../page.css\'\n\nexport const page = { prerender: true }\n---\n---\nimport Counter from \'../counter.kay\'\n---\nhead\n  title Home\n  meta(name="description" content="Home")\nCounter\n',
-      'src/routes/live.kay': '---\nimport Counter from \'../counter.kay\'\n---\nhead\n  title Live\n  meta(name="description" content="Live")\nCounter\n',
+      'src/routes/live.kay': '--- server\nconst path = ctx.url.pathname\n---\n---\nimport Counter from \'../counter.kay\'\n---\nhead\n  title Live\n  meta(name="description" content="Live")\nCounter\np {path}\n',
       'src/routes/plain.kay': '--- server\nexport const page = { prerender: true }\n---\nhead\n  title Plain\n  meta(name="description" content="Plain")\np Plain\n',
     })
     // In a process of its own, as the prerender registers the .kay loader for the project.

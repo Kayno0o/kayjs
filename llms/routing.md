@@ -348,6 +348,9 @@ export function GET({ params }: EndpointContext<{ slug: string }>) {
 
 - A page whose `page` has `prerender: true` is rendered once by `kay build`, its loads included, and served from that file in production, revalidated by its ETag.
 - Its guards still run on every request.
+- A page without `prerender` is prerendered all the same when `kay build` can show it reads nothing from its request: no `ctx`, `query`, `Date`, `Math.random`, `process`, `Bun` or `fetch` in it, its layouts or the components and modules they import, no module state (`let` at the top of a file), and no import but `.kay` files, relative modules, files such as images, `kay/i18n` and the reactive core of `kay` (`signal`, `memo`, `effect`, `selection`, `watch` and the like).
+- Anything else, a package, `kay/server`, `persisted` or `queryParam`, leaves the page rendered per request. The build keeps such a page only when it renders twice to the same bytes, answers 200, holds no server island, stamp or site URL and sets no `revalidate`; it never fails the build.
+- A kept page is served as a `prerender: true` one is, per locale, with its guards run on every request, and takes no part in the sitemap, the search index or the head lints, which `prerender` opts into.
 - It renders without a request, so reading `ctx.cookies`, `ctx.query` or `ctx.locals` in its server fence is reported by `kay check`, and in a layout fails the build, and `ctx.failed` and `ctx.succeeded` return `undefined`; `ctx.url` is `http://localhost` plus its path.
 - A refused form post, and a request carrying the cookie a plain form post that went through leaves, as the browser coming back from one does, get it rendered for that request instead, with how the post went, as `Cache-Control: private, no-store` and no ETag; the next request gets the file again.
 - Development renders it per request like any other.

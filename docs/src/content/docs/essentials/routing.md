@@ -118,6 +118,8 @@ export const page = { prerender: true }
 ---
 ```
 
+A page without `prerender` is built the same way when `kay build` can show it reads nothing from its request or the moment: no `ctx`, `query`, `Date`, `Math.random`, `process`, `Bun` or `fetch` in it, its layouts or anything they import, no `let` at the top of a file, and no import but `.kay` files, relative modules, images and other files, `kay/i18n` and the reactive helpers of `kay` such as `signal` and `selection`. A page that does not qualify, or whose two builds differ, is rendered for each request as before, and the build never fails over it. Guards still run on every request, and development renders every page afresh.
+
 A page with params lists the ones to build. Passing a content collection builds one page per entry:
 
 ```kay
