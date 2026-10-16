@@ -1,0 +1,58 @@
+name: Soak
+
+# Nightly, so memory kay keeps over thousands of requests or hundreds of dev edits, and a CPU rise against the last release, show before a release ships them: `bench/soak.ts`.
+on:
+  schedule:
+    - cron: '47 5 * * *'
+  workflow_dispatch:
+    inputs:
+      wait:
+        description: Minutes to wait for a quiet host before measuring
+        default: '30'
+
+permissions:
+  contents: read
+
+# Pinned so the cache step and bun agree on one folder, whatever HOME the runner image sets.
+env:
+  BUN_INSTALL_CACHE_DIR: /tmp/bun-cache
+
+jobs:
+  soak:
+    runs-on: alpine
+    # The wait for a quiet host, then two checkouts soaked, each a few minutes.
+    timeout-minutes: 60
+
+    steps:
+      # The whole history, for the tag of the last release.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+
+      # actions/cache archives with GNU tar's --posix, which the image's BusyBox tar refuses, so the cache was never saved.
+      - name: Install GNU tar
+        run: apk info -e tar >/dev/null || apk add --no-cache tar
+
+      - name: Cache bun packages
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ${{ env.BUN_INSTALL_CACHE_DIR }}
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock', 'bench/apps/*/bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: bun install --silent --frozen-lockfile
+
+      # The release before this commit, the commit itself being one when a release was pushed.
+      - name: Check out the last release beside it
+        run: |
+          base=$(git describe --tags --abbrev=0 HEAD~1)
+          echo "Comparing with $base"
+          git worktree add --detach ../kay-base "$base"
+          bun install --cwd ../kay-base --silent --frozen-lockfile
+
+      # The runner shares its host with the sessions working on kay, so CPU is only judged when the load lets it mean something; memory is judged whatever the load.
+      - name: Soak
+        run: bun bench/soak.ts --wait "$WAIT" . ../kay-base
+        env:
+          WAIT: ${{ inputs.wait || '30' }}

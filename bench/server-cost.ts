@@ -1,5 +1,6 @@
-import { mkdir, readFile } from 'node:fs/promises'
+import { readFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
+import { anonOf, compiled, cpuOf, hammer, started } from './shared/process'
 
 // What the compiled bench app costs to serve, for each kay checkout given, as a markdown table for an issue: a fresh executable per round, interleaved, so the shared host's load weighs on each alike.
 // `bun bench/server-cost.ts [--rounds 5] <checkout>...`, each checkout installed (`bun install`), an older one as a detached worktree of its tag: `git worktree add --detach ../kay-1.31 v1.31.0`.
@@ -18,8 +19,6 @@ const LOADS = [['/', 'identity'], ['/', CHROME], ['/', NO_ZSTD], ['/table', 'ide
 const WARM = 300
 const MEASURED = 4000
 const AT_ONCE = 16
-const READY = /ready (\d+)/
-const ANON = /RssAnon:\s+(\d+)/
 
 const args = Bun.argv.slice(2)
 const roundsAt = args.indexOf('--rounds')
@@ -31,58 +30,7 @@ if (checkouts.length === 0)
 
 const median = (values: number[]) => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)]!
 
-async function compiled(checkout: string, index: number): Promise<string> {
-  const app = join(checkout, 'bench/apps/kay')
-  const out = join(import.meta.dir, '../.kay/server-cost', String(index))
-
-  await mkdir(join(app, '.kay'), { recursive: true })
-  await Bun.write(join(app, '.kay/server-cost.ts'), ENTRY)
-
-  const build = Bun.spawn(['bun', join(checkout, 'src/cli.ts'), 'build', '--compile', out, '--entry', '.kay/server-cost.ts', '--no-check'], { cwd: app, stdout: 'ignore', stderr: 'pipe' })
-
-  if (await build.exited !== 0)
-    throw new Error(`${checkout} did not compile: ${await new Response(build.stderr).text()}`)
-
-  return out
-}
-
-// The process's own CPU, user and system, in ms.
-async function cpuOf(pid: number): Promise<number> {
-  const stat = await readFile(`/proc/${pid}/stat`, 'utf8')
-  // Past the command's name, which may hold spaces.
-  const fields = stat.slice(stat.lastIndexOf(') ') + 2).split(' ')
-
-  return (Number(fields[11]) + Number(fields[12])) * 10
-}
-
-async function anonOf(pid: number): Promise<number> {
-  return Number(ANON.exec(await readFile(`/proc/${pid}/status`, 'utf8'))![1]) / 1024
-}
-
-async function started(executable: string): Promise<{ server: Bun.Subprocess<'ignore', 'pipe', 'ignore'>, origin: string }> {
-  const server = Bun.spawn([executable], { stdout: 'pipe', stderr: 'ignore', env: { ...process.env, NODE_ENV: 'production' } })
-  let output = ''
-
-  for await (const chunk of server.stdout) {
-    output += new TextDecoder().decode(chunk)
-
-    if (READY.test(output))
-      break
-  }
-
-  return { server, origin: `http://127.0.0.1:${READY.exec(output)![1]}` }
-}
-
-async function hammer(url: string, encoding: string, total: number): Promise<void> {
-  let left = total
-
-  await Promise.all(Array.from({ length: AT_ONCE }, async () => {
-    while (left-- > 0)
-      await (await fetch(url, { headers: { 'accept-encoding': encoding } })).arrayBuffer()
-  }))
-}
-
-const executables = await Promise.all(checkouts.map(compiled))
+const executables = await Promise.all(checkouts.map(async (checkout, index) => compiled(checkout, ENTRY, 'server-cost', join(import.meta.dir, '../.kay/server-cost', String(index)))))
 const results = executables.map(() => new Map<string, number[]>())
 const record = (index: number, metric: string, value: number) => results[index]!.set(metric, [...results[index]!.get(metric) ?? [], value])
 
@@ -102,12 +50,12 @@ for (let round = 0; round < rounds; round++) {
       const { server: loaded, origin: at } = await started(executable)
       const label = `${path} ${LABELS[encoding]}`
 
-      await hammer(`${at}${path}`, encoding, WARM)
+      await hammer(`${at}${path}`, encoding, WARM, AT_ONCE)
 
       const cpu = await cpuOf(loaded.pid)
       const start = performance.now()
 
-      await hammer(`${at}${path}`, encoding, MEASURED)
+      await hammer(`${at}${path}`, encoding, MEASURED, AT_ONCE)
       record(index, `${label}: CPU per request (us)`, (await cpuOf(loaded.pid) - cpu) * 1000 / MEASURED)
       record(index, `${label}: requests/s`, MEASURED / (performance.now() - start) * 1000)
       record(index, `${label}: anon after (MiB)`, await anonOf(loaded.pid))
