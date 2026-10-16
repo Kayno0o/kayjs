@@ -76,7 +76,7 @@ else
 
 On a plain Elysia app, which has no Origin check of kay's own, a browser's cross-site POST or websocket upgrade reads the session as signed out, and a session write from it, such as a sign-in or a sign-out, is refused with a 403. Its `Origin` must name the request's host or the host of `url`, so an app behind a proxy that does not pass `Host` on sets `url`. `auth.socketUser(ws)` answers `null` and closes such a socket. Requests with no `Origin` (scripts, webhooks), safe methods and `Authorization: Bearer` tokens are left alone.
 
-A page or an action that needs a user asks for one with `requireUser()`. An anonymous visitor reading a page goes to the sign-in page and comes back, and a post, an action's call included, is refused with a 401, so no check is written by hand:
+A page or an action that needs a user asks for one with `requireUser()`. An anonymous visitor reading a page goes to the sign-in page and comes back, and a post, an action's call included, is refused with a 401, so no check is written by hand. With no prebuilt pages, `requireUser({ redirect: '/login' })` names your sign-in page, and a bearer token limited to scopes is refused with a 403 unless `requireUser({ scope })` names one it holds:
 
 ```kay
 --- server

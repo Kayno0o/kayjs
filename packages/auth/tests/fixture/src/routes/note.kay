@@ -9,7 +9,13 @@ export const save = action(t.Object({ text: t.String({ maxLength: 100 }) }), asy
   return `${user.email}: ${text}`
 })
 
-const user = await ctx.locals.auth.requireUser()
+export const rename = action(t.Object({ name: t.String({ maxLength: 100 }) }), async ({ name }, ctx) => {
+  const result = await ctx.locals.auth.saveProfile({ displayName: name })
+
+  return result.ok ? 'saved' : ctx.fail(400, {})
+})
+
+const user = await ctx.locals.auth.requireUser({ scope: ctx.url.searchParams.get('scope') === 'read' ? 'notes:read' : undefined })
 const back = ctx.locals.auth.signInUrl(ctx.url.searchParams.get('back') ?? undefined)
 ---
 p#note Note of {user.email}

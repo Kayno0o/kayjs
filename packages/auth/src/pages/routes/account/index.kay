@@ -54,6 +54,7 @@ const profile = await auth.profile()
 const profileSaved = ctx.succeeded(saveProfile) !== undefined
 const profileRefused = ctx.failed(saveProfile)?.data
 const profileProblems = profileRefused && 'errors' in profileRefused ? profileRefused.errors : {}
+const problemOf = (name: string) => Object.hasOwn(profileProblems, name) ? profileProblems[name] : undefined
 ---
 PageSection(title={t('auth.account.profile.title')})
   .flex.flex-col.gap-3
@@ -84,11 +85,11 @@ PageSection(title={t('auth.account.profile.title')})
     if profile
       form.flex.flex-col.gap-3(action={saveProfile})
         for field of profile key={field.name}
-          FormField(label={field.label} issue={profileProblems[field.name] && profileIssue(profileProblems[field.name]!, field.maxLength)} required={field.required})
+          FormField(label={field.label} issue={problemOf(field.name) && profileIssue(problemOf(field.name)!, field.maxLength)} required={field.required})
             if field.type === 'textarea'
-              textarea(name={field.name} rows="4" maxlength={field.maxLength ?? 500} required={field.required}) {field.value}
+              textarea(name={field.name} rows="4" maxlength={field.maxLength} required={field.required}) {field.value}
             else
-              input(name={field.name} type={field.type ?? 'text'} value={field.value} autocomplete={field.autocomplete} maxlength={field.maxLength ?? 500} required={field.required})
+              input(name={field.name} type={field.type ?? 'text'} value={field.value} autocomplete={field.autocomplete} maxlength={field.maxLength} required={field.required})
         if profileSaved
           Message(tone="success" text={t('auth.account.profile.profileSaved')})
         if profileRefused && 'error' in profileRefused

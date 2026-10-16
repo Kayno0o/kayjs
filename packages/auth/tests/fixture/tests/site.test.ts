@@ -2,7 +2,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, setSystemTime, spyOn, test } from 'bun:test'
 import { testSite } from 'kay/test'
 import { totpCode, totpStep } from '../../../src/totp'
-import { mails, profiles, store } from '../src/auth'
+import { auth, mails, profiles, store } from '../src/auth'
 
 // The fixture is served the way an app serves itself: kay's pages, kayjs-auth's plugin handed over by its extension and its prebuilt pages among them.
 const ROOT = join(import.meta.dir, '..')
@@ -18,7 +18,7 @@ const browser = () => testSite({ root: ROOT })
 // Imported once a site has registered the .kay loader for the fixture, a project of its own beside kayjs-auth.
 await browser()
 const { changeEmail, saveProfile } = await import(join(PAGES, 'account', 'index.kay'))
-const { save } = await import('../src/routes/note.kay')
+const { rename: renameProfile, save } = await import('../src/routes/note.kay')
 const { connect } = await import(join(PAGES, 'account', 'connections.kay'))
 const { disable, enable, setUp } = await import(join(PAGES, 'account', 'security.kay'))
 const { end, endOthers } = await import(join(PAGES, 'account', 'sessions.kay'))
@@ -565,6 +565,34 @@ describe('a site on kayjs-auth with no wiring of its own', () => {
 
     for (const hostile of ['//evil.test', 'https://evil.test', '/\\evil.test', 'javascript:alert(1)'])
       expect(await backs(`?back=${encodeURIComponent(hostile)}`)).toBe('/auth/sign-in?redirect=%2F')
+  })
+
+  test('an app with its own sign-in page names it, and a visitor goes there and back', async () => {
+    expect(await (await browser()).visit('/gated')).toMatchObject({ url: '/login?redirect=%2Fgated' })
+  })
+
+  test('a bearer token limited to scopes passes requireUser only for a scope it holds, and no token edits a profile', async () => {
+    profiles.clear()
+
+    await signedUp('bearer@example.com')
+
+    const user = (await store.users.findByEmail('bearer@example.com'))!
+    const scoped = await auth.issueToken(user.id, 'scoped', { scopes: ['notes:read'] })
+    const whole = await auth.issueToken(user.id, 'whole')
+    const device = async (token: string, path: string) => (await browser()).visit(path, { headers: { authorization: `Bearer ${token}` } })
+
+    expect(scoped.ok && whole.ok).toBe(true)
+
+    const [scopedToken, wholeToken] = [scoped.ok ? scoped.token : '', whole.ok ? whole.token : '']
+
+    expect((await device(scopedToken, '/note')).status).toBe(403)
+    expect(text(await device(scopedToken, '/note?scope=read'), '#note')).toBe('Note of bearer@example.com')
+    expect(text(await device(wholeToken, '/note'), '#note')).toBe('Note of bearer@example.com')
+
+    const refused = await (await browser()).refusal(renameProfile, { name: 'Robot' }, { headers: { authorization: `Bearer ${wholeToken}` }, from: '/note' })
+
+    expect(refused.status).toBe(400)
+    expect(profiles.size).toBe(0)
   })
 
   test('a request reads its user once, however many times a page and its guards ask', async () => {

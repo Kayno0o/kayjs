@@ -24,7 +24,7 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ### kayjs-auth's account layout has no `signOut` action
 
-- The account pages sign out with a post to `/auth/sign-out` (under the `prefix` of `createAuth`), so `import { signOut } from '@kaynooo/kayjs-auth/pages/account/_layout.kay'` in a test or a page fails `kay check`: post to the route instead, `site.fetch('/auth/sign-out', { method: 'POST' })`, or put the button in your own page as a form posting there. No lint can find it: the import already fails `kay check` as a missing export. [kayjs-auth](../packages/auth/llms.txt)
+- The account pages sign out with a post to `/auth/sign-out` (under the `prefix` of `createAuth`), so `import { signOut } from '@kaynooo/kayjs-auth/pages/account/_layout.kay'` in a test or a page fails `kay check`: post to the route instead, `site.fetch('/auth/sign-out', { method: 'POST' })`, or put the button in your own page as a form posting there. No lint can find it: the import already fails `kay check` as a missing export. The plugin now serves `POST ${prefix}/sign-out` itself, ahead of the app's routes, so an app route of its own at that path is shadowed: rename it. [kayjs-auth](../packages/auth/llms.txt)
 
 ### `deprecated-schema-name` is in the `deprecated` group
 

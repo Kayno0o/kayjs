@@ -245,39 +245,46 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     return record && publicUser(record)
   }
 
-  // The signed-in user, who must be there: an anonymous visitor reading a page goes to the sign-in page and comes back, with `pages`, and any other request, an action's included, is refused with a 401, as `auth.guard()` does. For a page or an action to ask for a user without a guard above it; the user is read once per request.
-  async requireUser(): Promise<User> {
+  // The signed-in user, who must be there: an anonymous visitor reading a page goes to the sign-in page and comes back, and any other request, an action's call included, is refused with a 401, as `auth.guard()` does. For a page or an action to ask for a user without a guard above it; the user is read once per request.
+  // The sign-in page is the prebuilt one with `pages`, else `redirect`, else the visitor gets the 401 too. A bearer token limited to scopes is refused with a 403 unless `scope` names one it holds.
+  async requireUser(options: { redirect?: string | undefined, scope?: ScopeRequirement<Scope> | undefined } = {}): Promise<User> {
     const user = await this.user()
-
-    if (user)
-      return user
-
     const { redirect, deny } = stoppers(this.request)
 
-    if (this.core.pages && READ_METHODS.has(this.request.method))
-      redirect(this.signInUrl())
+    if (!user) {
+      const signIn = options.redirect ?? (this.core.pages && this.core.signInPage)
 
-    return deny(401, 'Sign in to continue')
+      if (signIn !== undefined && READ_METHODS.has(this.request.method))
+        redirect(this.signInLink(signIn))
+
+      return deny(401, 'Sign in to continue')
+    }
+
+    return !scopeAllows(await this.scopes(), options.scope) ? deny(403) : user
   }
 
   // The sign-in page with `?redirect=` set to where it should lead back: this request's path and query, or `back`. A `back` that is not a path of this site leads home, so no link built from input sends anyone away.
   signInUrl(back?: string): string {
-    const here = new URL(this.request.url)
-
-    return withQuery(this.core.signInPage, `redirect=${encodeURIComponent(safeRedirect(back ?? here.pathname + here.search))}`)
+    return this.signInLink(this.core.signInPage, back)
   }
 
-  // The fields of the profile form the account page shows beside the username, with what this user holds in each, or null when `pages.profile` is not set or no one is signed in.
+  private signInLink(page: string, back?: string): string {
+    const here = new URL(this.request.url)
+
+    return withQuery(page, `redirect=${encodeURIComponent(safeRedirect(back ?? here.pathname + here.search))}`)
+  }
+
+  // The fields of the profile form the account page shows beside the username, with what this user holds in each, or null when `pages.profile` is not set or the user is not signed in with a session.
   async profile(): Promise<ProfileFieldView[] | null> {
     const profile = this.core.pages?.profile
     const user = profile && await this.user()
 
-    if (!profile || !user)
+    if (!profile || !user || await this.via() !== 'session')
       return null
 
     const held = await profile.load(user)
 
-    return Object.entries(profile.fields).map(([name, field]) => ({ ...field, name, value: held[name] ?? '' }))
+    return Object.entries(profile.fields).map(([name, field]) => ({ ...field, name, maxLength: field.maxLength ?? PROFILE_MAX_LENGTH, value: Object.hasOwn(held, name) && typeof held[name] === 'string' ? held[name] : '' }))
   }
 
   // Stores the values posted from that form through `pages.profile.save`, once trimmed and checked against each field's `required` and `maxLength`: names that are no field are dropped, and nothing is stored while any field is refused.
@@ -289,7 +296,8 @@ export class Auth<Scope extends string = string, Role extends string = string, O
 
     const user = await this.user()
 
-    if (!user)
+    // A device's token cannot edit the profile of the account it was given for, as it cannot rename it.
+    if (!user || await this.via() !== 'session')
       return { ok: false, error: 'signed-out' }
 
     const clean: Record<string, string> = {}

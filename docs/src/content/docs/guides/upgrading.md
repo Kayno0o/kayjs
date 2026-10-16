@@ -37,7 +37,7 @@ A test or a script that reads a page's `link rel="stylesheet"` to fetch the file
 
 ### kayjs-auth's account layout has no `signOut` action
 
-The account pages sign out with a post to `/auth/sign-out`, under the `prefix` of `createAuth`. A test or a page importing `signOut` from `@kaynooo/kayjs-auth/pages/account/_layout.kay` now fails `kay check`, as an import of something that is gone. Post to the route instead, with `site.fetch('/auth/sign-out', { method: 'POST' })` in a test, or give your own page a form posting there. No lint finds it, as the import already fails the check. See [kayjs-auth](/libraries/kayjs-auth#the-signed-in-user).
+The account pages sign out with a post to `/auth/sign-out`, under the `prefix` of `createAuth`. A test or a page importing `signOut` from `@kaynooo/kayjs-auth/pages/account/_layout.kay` now fails `kay check`, as an import of something that is gone. Post to the route instead, with `site.fetch('/auth/sign-out', { method: 'POST' })` in a test, or give your own page a form posting there. No lint finds it, as the import already fails the check. The plugin also serves `POST /auth/sign-out` itself now, ahead of your routes, so a route of your own at that path is shadowed: rename it. See [kayjs-auth](/libraries/kayjs-auth#the-signed-in-user).
 
 ### `deprecated-schema-name` is in the `deprecated` group
 

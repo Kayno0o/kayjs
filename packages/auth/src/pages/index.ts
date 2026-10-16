@@ -26,6 +26,8 @@ export interface ProfileField {
 // A field of the profile form with what the user holds in it.
 export interface ProfileFieldView extends ProfileField {
   name: string
+  // The limit in force, 500 characters when the field gave none.
+  maxLength: number
   value: string
 }
 
@@ -124,9 +126,13 @@ export type AuthModule = { auth: { plugin: AnyElysia } } | { default: { plugin: 
 export type PluginOf<Module> = Module extends { auth: { plugin: infer Plugin extends AnyElysia } } ? Plugin : Module extends { default: { plugin: infer Plugin extends AnyElysia } } ? Plugin : never
 
 async function pluginIn<Module extends AuthModule>(load: () => Promise<Module>): Promise<PluginOf<Module>> {
-  const module: AuthModule = await load()
+  const module: Partial<Record<'auth' | 'default', { plugin: AnyElysia }>> = await load()
+  const auth = module.auth ?? module.default
 
-  return ('auth' in module ? module.auth.plugin : module.default.plugin) as PluginOf<Module>
+  if (!auth)
+    throw new Error('kayjs-auth: the module `authPages` or `authExtension` loads exports no `auth`, nor a default `createAuth` result')
+
+  return auth.plugin as PluginOf<Module>
 }
 
 // kayjs-auth for `extensions` in kay.config.ts, as the whole declaration: `authExtension(() => import('./src/auth'))` for the module making `auth` with `createAuth`, exported as `auth` or by default. The module loads as the server starts, never as the config is read, so the config stays off the app's database, and `kay check` types `ctx.locals.auth` and links to kayjs-auth's routes off it.

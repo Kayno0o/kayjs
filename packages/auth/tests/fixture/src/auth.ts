@@ -21,6 +21,7 @@ export const auth = createAuth({
   store,
   url: 'http://localhost',
   site: 'Fixture',
+  scopes: ['notes:read'],
   pages: {
     profile: {
       fields: { displayName: { label: 'Display name', required: true, maxLength: 20 }, bio: { label: 'Bio', type: 'textarea' } },
