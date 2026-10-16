@@ -20,6 +20,7 @@ This page lists what each release adds, newest first, with a link to where each 
 - **SEO defaults per language**: `seo.name`, `titleTemplate`, `description`, `image`, `imageAlt` and `locale` take a record of one text per locale, so no page sets a tag for its language's. [Head and SEO](/essentials/head-and-seo)
 - **A contact form in one line**: kayjs-mail's `contactForm(mail, options)` and kayjs-ui's `ContactForm` bring the schema, the link cap, the spam limits, the mail with the visitor in `replyTo` and worded refusals when the mail cannot go out, in English and French. [A contact form](/libraries/kayjs-mail#a-contact-form)
 - **A `match` that misses a member**: `kay check` warns of a `match` with no `else` over a union such as `'open' | 'closed'` whose `when` lines leave a member out, and names it. [Checks](/reference/checks)
+- **`server-only-import` reaches further**: `kay check` also follows a `.ts` module an island imports and a static component that may be promoted to an island, and reports a name destructured off a namespace import of `kay/cache`. [Caching and streaming](/guides/caching-and-streaming)
 
 ## 1.46.0
 

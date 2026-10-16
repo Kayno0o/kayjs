@@ -616,4 +616,15 @@ describe('server-only-import', () => {
     expect(lints(plain, { insideIsland: true }).filter(lint => lint.code === 'server-only-import')).toEqual([{ code: 'server-only-import', severity: 'error', at: 'sqliteCache' }])
     expect(only(namespace)).toEqual([{ code: 'server-only-import', severity: 'error', at: 'sqliteCache' }])
   })
+
+  it('reaches a static component that may be promoted to an island by a function it passes, and a name destructured off a namespace by assignment or a default', () => {
+    const promoted = '---\nimport Picker from \'./picker.kay\'\nimport { sqliteCache } from \'kay/cache\'\n\nconst disk = sqliteCache(\'a.sqlite\')\nfunction pick() {}\n---\nPicker(onPick={pick})\np {disk}'
+    const assigned = '---\nimport { signal } from \'kay\'\nimport * as cache from \'kay/cache\'\n\nconst count = signal(0)\nlet sqliteCache\n;({ sqliteCache } = cache)\nconst withDefault = ({ invalidatePage } = cache) => invalidatePage\n---\nbutton(onClick={() => count++}) {count()}'
+
+    expect(only(promoted)).toEqual([{ code: 'server-only-import', severity: 'error', at: 'sqliteCache' }])
+    expect(only(assigned)).toEqual([
+      { code: 'server-only-import', severity: 'error', at: 'sqliteCache' },
+      { code: 'server-only-import', severity: 'error', at: 'invalidatePage' },
+    ])
+  })
 })

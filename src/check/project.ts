@@ -1,13 +1,12 @@
 // What `kay check` finds across the project beside each file's compile and type errors, shared with the editor, which reports it on save.
 import type { Subprocess } from 'bun'
 import type { CheckDiagnostic, CheckOptions } from '.'
-import type { LintLevels } from '../compiler/lints'
 import type { I18nConfig, KayExtension } from '../config'
 import type { CollectionFeed } from '../content/claims'
 import type { ComponentUse } from '../content/server'
 import type { ContentProblem } from '../content/validate'
 import type { ShadowTypes } from './shadow-types'
-import { existsSync } from 'node:fs'
+import { existsSync, realpathSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
@@ -19,6 +18,7 @@ import { FEEDS_MARKER, PROBLEMS_MARKER, USES_MARKER } from '../content/claims'
 import { projectPaths } from '../project'
 import { bootProblems } from './boot'
 import { CONTENT_CHECK, contentPropsCheck } from './generated'
+import { browserModules } from './island-modules'
 import { FILES_MARKER, stampOf } from './loaded'
 import { configSeoLints } from './seo'
 import { fromCompile } from './shadow-types'
@@ -69,7 +69,7 @@ export function configProblems(root: string, options: CheckOptions, types: Shado
 
 // The collections, the messages, what the server refuses when it boots and the lints of the project's scripts, reported after the type errors.
 export async function projectProblems(root: string, options: CheckOptions, content: ContentChecks, memory?: ProbeMemory): Promise<CheckDiagnostic[]> {
-  const [messages, boot, modules] = await Promise.all([checkMessages(root, options.i18n, options.extensions, memory), bootProblems(resolve(root), options, content.feeds), moduleLints(root, options.lints)])
+  const [messages, boot, modules] = await Promise.all([checkMessages(root, options.i18n, options.extensions, memory), bootProblems(resolve(root), options, content.feeds), moduleLints(root, options)])
 
   return [...content.problems, ...messages, ...boot, ...modules]
 }
@@ -82,14 +82,16 @@ export function lintConfigTypeError(root: string, lints: Record<string, string> 
   return Object.entries(lints).some(([name, level]) => !isLint(name) && !isLintGroup(name) ? diagnostic.message.includes(`'${name}'`) : !LEVELS.has(level) && diagnostic.message.includes(`"${level}"`))
 }
 
-// The lints the compiler finds in fences, in the project's own scripts: a name imported from the entry point it left, and a stylesheet imported for a value with no text attribute.
-async function moduleLints(root: string, levels: LintLevels | undefined): Promise<CheckDiagnostic[]> {
+// The lints the compiler finds in fences, in the project's own scripts: a name imported from the entry point it left, a stylesheet imported for a value with no text attribute, and a name the browser's entry lacks imported by a module the browser bundle reaches.
+async function moduleLints(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
+  const levels = options.lints
   const files = (await findProjectFiles(root, SCRIPT_MODULE, { project: true, ownKayOnly: true })).filter(file => !DECLARATION_FILE.test(file))
+  const inBrowser = await browserModules(root, projectPaths(root, options).routes)
   const found = await Promise.all(files.map(async (file) => {
     const source = await Bun.file(file).text()
     const levelAt = lintLevels(source, levels)
 
-    return moduleChecks(source).flatMap((diagnostic) => {
+    return moduleChecks(source, inBrowser.has(realpathSync(file))).flatMap((diagnostic) => {
       const level = isLint(diagnostic.code) ? levelAt(diagnostic.code, diagnostic.start) : 'deny'
 
       return level === 'allow' ? [] : [fromCompile(file, source, { ...diagnostic, severity: level === 'warn' ? 'warning' : 'error' })]

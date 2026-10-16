@@ -403,6 +403,25 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 
+  it('reports a server-only name of kay/cache imported by a module an island reaches, and by none the server alone does', async () => {
+    const island = '---\nimport { signal } from \'kay\'\nimport { refresh } from \'../lib/refresh\'\n\nconst count = signal(0)\n---\nbutton(onClick={() => { count++; refresh() }}) {count()}\n'
+    const root = await scratchProject({
+      'src/routes/index.kay': '--- server\nimport { serverOnly } from \'../lib/server\'\nimport Counter from \'../components/counter.kay\'\n\nconst value = serverOnly()\n---\nCounter\np {value}\n',
+      'src/components/counter.kay': island,
+      'src/lib/refresh.ts': 'import { deep } from \'./deep\'\n\nexport const refresh = () => deep()\n',
+      'src/lib/deep.ts': 'import { invalidatePage } from \'kay/cache\'\n\nexport const deep = () => invalidatePage(\'/\')\n',
+      'src/lib/server.ts': 'import { sqliteCache } from \'kay/cache\'\n\nexport const serverOnly = () => sqliteCache(\'a.sqlite\')\n',
+    })
+
+    try {
+      expect((await check(root)).filter(d => d.code === 'server-only-import').map(d => [d.file.slice(root.length + 1), d.line])).toEqual([['src/lib/deep.ts', 1]])
+      expect((await check(root, { lints: { 'server-only-import': 'allow' } })).filter(d => d.code === 'server-only-import')).toEqual([])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('reports a signal written by assigning where it is held in a property or in a let from a function, which would replace it', async () => {
     const page = [
       '---',

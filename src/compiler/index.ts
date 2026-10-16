@@ -89,6 +89,19 @@ export function rendersAsIsland(source: string): boolean {
   return file.client !== undefined || isInteractive(file, analyzeScript(source, file.script, server?.data.map(data => data.name)))
 }
 
+// Whether a component's script runs in the browser, as an island's, or as a static component's that may be promoted to an island by what it passes; a page, a layout and a special page never do.
+export function runsInBrowser(source: string, filename: string): boolean {
+  const file = parseKay(source)
+
+  if (file.server !== undefined || ROUTE_FILES.has(basename(filename)))
+    return false
+
+  const server = analyzeServer(source, file.server)
+  const script = analyzeScript(source, file.script, server?.data.map(data => data.name))
+
+  return file.client !== undefined || isInteractive(file, script) || promotionCause(file, script) !== undefined
+}
+
 // Compiles a .kay component: to TSX the type checker reads, or with `output` to the HTML strings and DOM code that run.
 export function compileKay(source: string, filename: string, options: CompileOptions = {}): CompileResult {
   const file = parseKay(source)
@@ -142,8 +155,14 @@ export function compileKay(source: string, filename: string, options: CompileOpt
   // Code that did not compile may have taken reads and writes with it, so a file with an error is not searched for unread names or unwritten signals.
   const broken = diagnostics.some(diagnostic => !diagnostic.checkOnly)
 
-  if (options.check)
-    diagnostics.push(...unboundedFields(server), ...[script.fence, server?.fence].flatMap(fence => fence ? [...deprecatedImports(fence), ...cssImportsWithoutText(fence)] : []), ...(island !== undefined || options.insideIsland === true) && !routeFile && script.fence ? serverOnlyImports(script.fence) : [], ...broken ? [] : [...unreadNames(source, file.template, script, server, found.findings), ...constantSignals(source, file.script, found.findings)], ...templateLints(file))
+  if (options.check) {
+    const fenceLints = [script.fence, server?.fence].flatMap(fence => fence ? [...deprecatedImports(fence), ...cssImportsWithoutText(fence)] : [])
+    // The script runs in the browser as an island's, in a component only islands render, and in a static one that may be promoted to an island.
+    const browserScript = (island !== undefined || options.insideIsland === true || promote !== undefined) && !routeFile ? script.fence : undefined
+    const unusedLints = broken ? [] : [...unreadNames(source, file.template, script, server, found.findings), ...constantSignals(source, file.script, found.findings)]
+
+    diagnostics.push(...unboundedFields(server), ...fenceLints, ...browserScript === undefined ? [] : serverOnlyImports(browserScript), ...unusedLints, ...templateLints(file))
+  }
 
   if (file.client && routeFile)
     diagnostics.push({ ...file.client, code: 'client-route-fence', message: 'A page, layout or special page cannot be `--- client`', note: 'it renders on the server', help: 'move what needs the browser to a component it renders, and make that one `--- client`' })

@@ -219,6 +219,17 @@ function namespaceReads<Entry extends Named>(fence: ParsedFence, namespaces: Map
 
     return specifier && namespaces.get(specifier)?.find(entry => entry.name === name)
   }
+  const destructured = (pattern: t.ObjectPattern, init: t.Node | null | undefined, scope: NodePath['scope'] | undefined) => {
+    for (const property of pattern.properties) {
+      if (property.type !== 'ObjectProperty')
+        continue
+
+      const moved = movedBy(init, memberName(property.key, property.computed), scope)
+
+      if (moved)
+        found.push({ key: property.key, moved })
+    }
+  }
   const visit = (node: t.Node, scope: NodePath['scope'] | undefined): void => {
     if (node.type === 'MemberExpression' || node.type === 'OptionalMemberExpression') {
       const { property } = node
@@ -228,15 +239,11 @@ function namespaceReads<Entry extends Named>(fence: ParsedFence, namespaces: Map
         found.push({ key: property, moved })
     }
     else if (node.type === 'VariableDeclarator' && node.id.type === 'ObjectPattern') {
-      for (const property of node.id.properties) {
-        if (property.type !== 'ObjectProperty')
-          continue
-
-        const moved = movedBy(node.init, memberName(property.key, property.computed), scope)
-
-        if (moved)
-          found.push({ key: property.key, moved })
-      }
+      destructured(node.id, node.init, scope)
+    }
+    // `({ invalidatePage } = server)` and a parameter defaulting to the namespace, `({ invalidatePage } = server) => {}`.
+    else if ((node.type === 'AssignmentExpression' || node.type === 'AssignmentPattern') && node.left.type === 'ObjectPattern') {
+      destructured(node.left, node.right, scope)
     }
   }
 
@@ -437,8 +444,9 @@ function propertyKey(property: t.ObjectProperty | t.ObjectMethod): string | unde
 }
 
 // The checks a plain module takes, parsed only when one of them may find something.
-export function moduleChecks(source: string): Diagnostic[] {
-  if (!CSS_BINDING.test(source) && !MOVED_NAME.test(source))
+// A module the browser bundle reaches (`browser`) is checked for the names the browser's entries lack as well.
+export function moduleChecks(source: string, browser = false): Diagnostic[] {
+  if (!CSS_BINDING.test(source) && !MOVED_NAME.test(source) && !(browser && source.includes('kay/cache')))
     return []
 
   const whole = { start: 0, end: source.length }
@@ -447,11 +455,15 @@ export function moduleChecks(source: string): Diagnostic[] {
   // Babel's own recovery keeps every statement for the checks; a module it cannot read, or whose scopes it cannot build, is read again with its broken statements blanked.
   try {
     if (recovered)
-      return [...deprecatedImports(recovered), ...cssImportsWithoutText(recovered)]
+      return checksOf(recovered, browser)
   }
   catch {}
 
   const module = parseFence(source, whole, [])
 
-  return module ? [...deprecatedImports(module), ...cssImportsWithoutText(module)] : []
+  return module ? checksOf(module, browser) : []
+}
+
+function checksOf(module: ParsedFence, browser: boolean): Diagnostic[] {
+  return [...deprecatedImports(module), ...cssImportsWithoutText(module), ...browser ? serverOnlyImports(module) : []]
 }
