@@ -24,23 +24,16 @@ function setup(stored: StoredCredential, exchange: () => Promise<{ accessToken: 
 }
 
 describe('createTokenRefresher', () => {
-  test('non-expiring credential passes the stored token through without exchange', async () => {
-    const { refresher, calls } = setup({ accessToken: 'gh', expiresAt: null }, async () => null)
+  // Credentials the refresher answers from what is stored, never reaching the exchange.
+  test.each<[string, StoredCredential, string | null]>([
+    ['a non-expiring credential passes the stored token through', { accessToken: 'gh', expiresAt: null }, 'gh'],
+    ['a missing access token yields null', { accessToken: null, expiresAt: Date.now() + MIN }, null],
+    ['a token still outside the refresh margin is returned as-is', { accessToken: 'live', expiresAt: Date.now() + 10 * MIN }, 'live'],
+    ['an expiring token with no refresh token yields null', { accessToken: 'old', expiresAt: Date.now() + 1000 }, null],
+  ])('%s without an exchange', async (_name, stored, token) => {
+    const { refresher, calls } = setup(stored, async () => null)
 
-    expect(await refresher.getValidToken({ id: 'u1' })).toBe('gh')
-    expect(calls()).toBe(0)
-  })
-
-  test('a missing access token yields null', async () => {
-    const { refresher } = setup({ accessToken: null, expiresAt: Date.now() + MIN }, async () => null)
-
-    expect(await refresher.getValidToken({ id: 'u1' })).toBeNull()
-  })
-
-  test('a token still outside the refresh margin is returned as-is', async () => {
-    const { refresher, calls } = setup({ accessToken: 'live', expiresAt: Date.now() + 10 * MIN }, async () => null)
-
-    expect(await refresher.getValidToken({ id: 'u1' })).toBe('live')
+    expect(await refresher.getValidToken({ id: 'u1' })).toBe(token)
     expect(calls()).toBe(0)
   })
 
@@ -54,13 +47,6 @@ describe('createTokenRefresher', () => {
     // Second call is served from cache, so no second exchange.
     expect(await refresher.getValidToken({ id: 'u1' })).toBe('fresh')
     expect(calls()).toBe(1)
-  })
-
-  test('an expiring token with no refresh token yields null', async () => {
-    const { refresher, calls } = setup({ accessToken: 'old', expiresAt: Date.now() + 1000 }, async () => null)
-
-    expect(await refresher.getValidToken({ id: 'u1' })).toBeNull()
-    expect(calls()).toBe(0)
   })
 
   test('a failed refresh yields null and does not cache', async () => {
@@ -125,51 +111,36 @@ function oauthSetup(stored: StoredCredential, refreshTokens: (refreshToken: stri
 const EXPIRING: StoredCredential = { accessToken: 'old', refreshToken: 'r', expiresAt: Date.now() + 1000 }
 
 describe('createOAuthTokenRefresher', () => {
-  test('refreshes through the oauth client and persists the new tokens', async () => {
+  test('refreshes through the oauth client with the stored refresh token and persists the new tokens', async () => {
     const expiresAt = Date.now() + 10 * MIN
-    const { refresher, saves, errors } = oauthSetup(EXPIRING, async () => ({ accessToken: 'fresh', refreshToken: 'r2', expiresAt }))
+    const seen: string[] = []
+    const { refresher, saves, errors } = oauthSetup(EXPIRING, async (refreshToken) => {
+      seen.push(refreshToken)
+
+      return { accessToken: 'fresh', refreshToken: 'r2', expiresAt }
+    })
 
     expect(await refresher.getValidToken({ id: 'u1' })).toBe('fresh')
+    expect(seen).toEqual(['r'])
     expect(saves).toEqual([{ accessToken: 'fresh', refreshToken: 'r2', expiresAt }])
     expect(errors).toEqual([])
   })
 
-  test('passes the stored refresh token to the oauth client', async () => {
-    let seen: string | undefined
-    const { refresher } = oauthSetup(EXPIRING, async (refreshToken) => {
-      seen = refreshToken
-
-      return { accessToken: 'fresh', expiresAt: Date.now() + 10 * MIN }
-    })
-
-    await refresher.getValidToken({ id: 'u1' })
-
-    expect(seen).toBe('r')
-  })
-
-  // The security-relevant default: a credential revoked upstream must not keep granting
-  // access until the local session expires.
-  test('a rejected refresh clears the stored credential and yields null', async () => {
-    const rejection = new OAuthExchangeError(400, 'invalid_grant')
+  // The security-relevant default: a credential revoked upstream must not keep granting access until the local session expires, while an outage or a rate limit must not forget a credential that is fine.
+  test.each([
+    ['a 400 refusal yields null and clears the credential', new OAuthExchangeError(400, 'invalid_grant'), true],
+    ['a 401 refusal yields null and clears the credential', new OAuthExchangeError(401, 'invalid_client'), true],
+    ['a 503 outage yields null and keeps the credential', new OAuthExchangeError(503, 'down'), false],
+    ['a 429 rate limit yields null and keeps the credential', new OAuthExchangeError(429, 'slow down'), false],
+    ['a network error yields null and keeps the credential', new Error('network down'), false],
+  ])('%s', async (_name, failure, clears) => {
     const { refresher, saves, errors } = oauthSetup(EXPIRING, async () => {
-      throw rejection
+      throw failure
     })
 
     expect(await refresher.getValidToken({ id: 'u1' })).toBeNull()
-    expect(saves).toEqual([null])
-    expect(errors).toEqual([[rejection, 'refresh']])
-  })
-
-  test('an outage or a rate limit yields null but keeps the stored credential', async () => {
-    for (const failure of [new OAuthExchangeError(503, 'down'), new OAuthExchangeError(429, 'slow down'), new Error('network down')]) {
-      const { refresher, saves, errors } = oauthSetup(EXPIRING, async () => {
-        throw failure
-      })
-
-      expect(await refresher.getValidToken({ id: 'u1' })).toBeNull()
-      expect(saves).toEqual([])
-      expect(errors).toEqual([[failure, 'refresh']])
-    }
+    expect(saves).toEqual(clears ? [null] : [])
+    expect(errors).toEqual([[failure, 'refresh']])
   })
 
   test('a refresh the provider timed out on leaves none pending, so the next call asks again', async () => {
