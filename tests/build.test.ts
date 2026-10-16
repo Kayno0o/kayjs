@@ -2059,13 +2059,13 @@ describe('the files a build writes', () => {
 })
 
 describe('a compiled server\'s images', () => {
-  it('encodes an AVIF variant at run time with the encoder the executable carries', async () => {
+  it('encodes and decodes AVIF at run time with the coders the executable carries', async () => {
     const root = await scratchProject({
       'tsconfig.json': tsconfig,
-      'kay.config.ts': 'export default { favicon: false }\n',
+      'kay.config.ts': 'export default { favicon: false, images: { dirs: { \'/uploads/\': \'uploads\' } } }\n',
       'src/routes/index.kay': '---\nimport { image } from \'kay/image\'\nimport hero from \'../hero.png\'\n---\nimg({...image(hero, { sizes: \'100vw\' })} alt="Hero")\n',
       // 48 pixels wide is no width the build writes, so the server encodes it on the first request.
-      'src/server.ts': 'import process from \'node:process\'\nimport { Elysia } from \'elysia\'\nimport { pages } from \'kay/server\'\n\nconst app = new Elysia().use(await pages({ security: false }))\nconst page = await (await app.handle(new Request(\'http://localhost/\'))).text()\nconst src = /src=(%2F_kay%2Fassets%2F[^&]+)&amp;/.exec(page)![1]\nconst response = await app.handle(new Request(`http://localhost/_kay/image?src=${src}&w=48`, { headers: { accept: \'image/avif\' } }))\nconst bytes = new Uint8Array(await response.arrayBuffer())\n\nconsole.log(JSON.stringify({ status: response.status, type: response.headers.get(\'content-type\'), brand: new TextDecoder().decode(bytes.subarray(8, 12)) }))\nprocess.exit(0)\n',
+      'src/server.ts': 'import process from \'node:process\'\nimport { Elysia } from \'elysia\'\nimport { pages } from \'kay/server\'\n\nconst app = new Elysia().use(await pages({ security: false }))\nconst page = await (await app.handle(new Request(\'http://localhost/\'))).text()\nconst src = /src=(%2F_kay%2Fassets%2F[^&]+)&amp;/.exec(page)![1]\nconst response = await app.handle(new Request(`http://localhost/_kay/image?src=${src}&w=48`, { headers: { accept: \'image/avif\' } }))\nconst bytes = new Uint8Array(await response.arrayBuffer())\nawait Bun.write(\'uploads/a.avif\', bytes)\nconst decoded = await app.handle(new Request(\'http://localhost/_kay/image?src=/uploads/a.avif&w=32\'))\n\nconsole.log(JSON.stringify({ status: response.status, type: response.headers.get(\'content-type\'), brand: new TextDecoder().decode(bytes.subarray(8, 12)), decoded: decoded.status }))\nprocess.exit(0)\n',
     })
 
     await Bun.write(join(root, 'src/hero.png'), encodePng(new Uint8Array(96 * 64 * 4).map((_, at) => at % 4 === 3 ? 255 : (at * 37) % 251), 96, 64))
@@ -2080,7 +2080,7 @@ describe('a compiled server\'s images', () => {
       const [output, errors, exit] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
 
       expect({ exit, errors }).toEqual({ exit: 0, errors: expect.any(String) })
-      expect(JSON.parse(output.trim().split('\n').at(-1)!)).toEqual({ status: 200, type: 'image/avif', brand: 'avif' })
+      expect(JSON.parse(output.trim().split('\n').at(-1)!)).toEqual({ status: 200, type: 'image/avif', brand: 'avif', decoded: 200 })
     }
     finally {
       await rm(root, { recursive: true, force: true })

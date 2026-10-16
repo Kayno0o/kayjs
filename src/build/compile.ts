@@ -38,6 +38,7 @@ const LEFT_OUT_MODULES = new Map([
 const LEFT_OUT = 'kay-left-out'
 const RELATIVE = /^\.\.?\//
 const ANY = /.*/
+const AVIF_WASM = /(?:avif-enc|avif_dec)\.wasm$/
 
 // Leaves the compiler and resvg out of the executable: megabytes the server never runs.
 function withoutCompiler(): BunPlugin {
@@ -50,6 +51,16 @@ function withoutCompiler(): BunPlugin {
         return LEFT_OUT_MODULES.has(file) ? { path: file, namespace: LEFT_OUT } : undefined
       })
       build.onLoad({ filter: ANY, namespace: LEFT_OUT }, ({ path }) => ({ contents: `throw new Error(${JSON.stringify(`kay: ${LEFT_OUT_MODULES.get(path)}`)})`, loader: 'js' }))
+    },
+  }
+}
+
+// Embeds the AVIF coders' wasm zstd-compressed, 5.7 MB of executable down to 1.6; the worker, which reads its wasm through `wasmBytes`, unpacks it on first use.
+function compressedWasm(): BunPlugin {
+  return {
+    name: 'kay-compressed-wasm',
+    setup(build) {
+      build.onLoad({ filter: AVIF_WASM }, async ({ path }) => ({ contents: await Bun.zstdCompress(await Bun.file(path).bytes(), { level: 19 }), loader: 'file' }))
     },
   }
 }
@@ -153,7 +164,7 @@ export async function compileServer(project: Project, options: CompileOptions): 
     // The production code of the app and its packages, as `NODE_ENV=production` gives a server started with Bun.
     define: { 'process.env.NODE_ENV': JSON.stringify('production') },
     // Stylesheets reach pages through the client build, already embedded.
-    plugins: [...configPlugins, withoutStyles(), withoutCompiler(), kay({ target: 'ssr', root, cacheDir: paths.cache, settings: config.settings }), ...config.plugins ?? []],
+    plugins: [...configPlugins, withoutStyles(), withoutCompiler(), compressedWasm(), kay({ target: 'ssr', root, cacheDir: paths.cache, settings: config.settings }), ...config.plugins ?? []],
   })
 
   if (!build.success)

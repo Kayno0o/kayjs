@@ -17,6 +17,8 @@ export type AvifResult = { id: number, bytes: Uint8Array } | { id: number, error
 
 declare const self: Worker
 
+const WASM_MAGIC = [0, 0x61, 0x73, 0x6D]
+
 // Compiled once, as a trap has the encoder made again.
 const compiled = compileEncoder()
 let encoder = loadEncoder()
@@ -104,9 +106,16 @@ async function decoded(avif: Uint8Array, width: number, height: number): Promise
   return encodePng(new Uint8Array(image.data.buffer, image.data.byteOffset, image.data.byteLength), image.width, image.height)
 }
 
+// A wasm file's bytes: an executable embeds them zstd-compressed, which a wasm module's magic number tells from the plain file a build or `bun` reads.
+async function wasmBytes(path: string): Promise<Uint8Array> {
+  const bytes = await Bun.file(path).bytes()
+
+  return WASM_MAGIC.every((byte, index) => bytes[index] === byte) ? bytes : Bun.zstdDecompress(bytes)
+}
+
 // kay's own build of libavif and libaom, with SIMD (codecs/avif); jsquash's scalar one encodes about half as fast.
 async function compileEncoder(): Promise<WebAssembly.Module> {
-  return WebAssembly.compile(await Bun.file(wasmPath).arrayBuffer())
+  return WebAssembly.compile(await wasmBytes(wasmPath))
 }
 
 async function loadEncoder(): ReturnType<typeof factory> {
@@ -125,5 +134,5 @@ async function loadEncoder(): ReturnType<typeof factory> {
 
 // Loaded with the first AVIF to decode, which a server resizing none never pays for.
 async function loadDecoder(): Promise<AvifDecoder> {
-  return initEmscriptenModule<AvifDecoder>(decoderFactory, await WebAssembly.compile(await Bun.file(decoderPath).arrayBuffer()))
+  return initEmscriptenModule<AvifDecoder>(decoderFactory, await WebAssembly.compile(await wasmBytes(decoderPath)))
 }
