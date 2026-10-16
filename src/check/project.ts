@@ -10,7 +10,8 @@ import { existsSync, realpathSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
-import { findProjectFiles, writeIfChanged } from '../build/files'
+import { findKayFiles, findProjectFiles, writeIfChanged } from '../build/files'
+import { promotedChecks } from '../compiler'
 import { moduleChecks } from '../compiler/fence-checks'
 import { isLaunchLint, isLint, isLintGroup, LEVELS, lintLevels } from '../compiler/lints'
 import { CONFIG_FILE } from '../config'
@@ -82,25 +83,35 @@ export function lintConfigTypeError(root: string, lints: Record<string, string> 
   return Object.entries(lints).some(([name, level]) => !isLint(name) && !isLintGroup(name) ? diagnostic.message.includes(`'${name}'`) : !LEVELS.has(level) && diagnostic.message.includes(`"${level}"`))
 }
 
-// The lints the compiler finds in fences, in the project's own scripts: a name imported from the entry point it left, a stylesheet imported for a value with no text attribute, and a name the browser's entry lacks imported by a module the browser bundle reaches.
+// The lints the compiler finds in fences, in the project's own scripts: a name imported from the entry point it left, a stylesheet imported for a value with no text attribute, and a name the browser's entry lacks imported by a module the browser bundle reaches, or by a component the build promotes to an island.
 async function moduleLints(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
   const levels = options.lints
   const files = (await findProjectFiles(root, SCRIPT_MODULE, { project: true, ownKayOnly: true })).filter(file => !DECLARATION_FILE.test(file))
   const texts = new Map(await Promise.all(files.map(async file => [file, await Bun.file(file).text()] as const)))
-  // Following the imports of every component is worth it only when some module names the entry.
-  const inBrowser = [...texts.values()].some(text => text.includes('kay/cache')) ? await browserModules(root, projectPaths(root, options).routes) : new Set<string>()
-  const found = files.map((file) => {
-    const source = texts.get(file)!
+  // Following the imports of every component is worth it only when some module or component names the entry.
+  const components = await findKayFiles(root, { project: true, ownKayOnly: true })
+  const componentTexts = new Map(await Promise.all(components.map(async file => [file, await Bun.file(file).text()] as const)))
+  const named = [...texts.values(), ...componentTexts.values()].some(text => text.includes('kay/cache'))
+  const { modules: inBrowser, promoted } = named ? await browserModules(root, projectPaths(root, options).routes) : { modules: new Set<string>(), promoted: new Set<string>() }
+  const report = (file: string, source: string, diagnostics: ReturnType<typeof moduleChecks>) => {
     const levelAt = lintLevels(source, levels)
 
-    return moduleChecks(source, inBrowser.has(realpathSync(file))).flatMap((diagnostic) => {
+    return diagnostics.flatMap((diagnostic) => {
       const level = isLint(diagnostic.code) ? levelAt(diagnostic.code, diagnostic.start) : 'deny'
 
       return level === 'allow' ? [] : [fromCompile(file, source, { ...diagnostic, severity: level === 'warn' ? 'warning' : 'error' })]
     })
-  })
+  }
+  const found = [
+    ...files.flatMap((file) => {
+      const source = texts.get(file)!
 
-  return found.flat()
+      return report(file, source, moduleChecks(source, inBrowser.has(realpathSync(file))))
+    }),
+    ...[...promoted].flatMap(file => report(file, componentTexts.get(file)!, promotedChecks(componentTexts.get(file)!))),
+  ]
+
+  return found
 }
 
 // What a checking script printed on the lines it marked, whatever else the project's code logged, run in a process of its own so an edited file is read afresh; the reason it failed otherwise.

@@ -1,8 +1,8 @@
 import { realpathSync } from 'node:fs'
 import { sep } from 'node:path'
 import { findKayFiles, resolveFrom, transpilerFor } from '../build/files'
-import { importsOf } from '../build/libraries'
-import { runsInBrowser } from '../compiler'
+import { findKayLibraries, importsOf, reachesAny } from '../build/libraries'
+import { browserRole } from '../compiler'
 import { parseKay } from '../compiler/parser'
 import { islandOnlyComponents } from './island-only'
 
@@ -25,14 +25,24 @@ function scriptImportsOf(source: string): string[] {
   }
 }
 
-// The project's own TypeScript modules the browser bundle reaches: those the script of an island, of a component only islands render and of a static one that may be promoted to an island imports, and those they import in turn.
-// A module the server alone imports is left out, as the browser never loads it.
-export async function browserModules(root: string, routesDir: string): Promise<Set<string>> {
+// The project's own TypeScript modules the browser bundle reaches: those the script of an island, of a component only islands render and of a static one the build promotes to an island imports, and those they import in turn; and the promoted components themselves, by real path.
+// A static component that passes a function is promoted only when its imports reach an island, as the build decides, and a module the server alone imports is left out, as the browser never loads it.
+export async function browserModules(root: string, routesDir: string): Promise<{ modules: Set<string>, promoted: Set<string> }> {
   const files = await findKayFiles(root, { project: true, ownKayOnly: true })
   const sources = new Map(await Promise.all(files.map(async file => [file, await Bun.file(file).text()] as const)))
-  const inBrowser = new Set(files.filter(file => runsInBrowser(sources.get(file)!, file)))
-  const seeds = [...new Set([...inBrowser, ...await islandOnlyComponents(root, routesDir, files, sources)])]
+  const roles = new Map(files.map(file => [file, browserRole(sources.get(file)!, file)] as const))
   const project = realpathSync(root) + sep
+  const islandFiles = new Set(files.filter(file => roles.get(file) === 'island').map(file => realpathSync(file)))
+  const libraries = await findKayLibraries(root)
+  const edges = new Map<string, Promise<string[]>>()
+  const promoted = new Set<string>()
+
+  for (const file of files) {
+    if (roles.get(file) === 'promotable' && islandFiles.size > 0 && await reachesAny(root, libraries, realpathSync(file), islandFiles, edges, project))
+      promoted.add(file)
+  }
+
+  const seeds = [...new Set([...files.filter(file => roles.get(file) === 'island'), ...promoted, ...await islandOnlyComponents(root, routesDir, files, sources)])]
   const inside = (file: string) => file.startsWith(project) && !file.includes(`${sep}node_modules${sep}`)
   const reached = new Set<string>()
   const modulesOf = (file: string, specifiers: string[]) => specifiers.filter(specifier => !OUTSIDE.test(specifier)).flatMap((specifier) => {
@@ -50,5 +60,5 @@ export async function browserModules(root: string, routesDir: string): Promise<S
     queue.push(...modulesOf(module, await importsOf(module)))
   }
 
-  return reached
+  return { modules: reached, promoted }
 }

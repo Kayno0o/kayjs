@@ -422,6 +422,25 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 
+  it('reports a server-only name in a component the build promotes to an island, and in none it never promotes', async () => {
+    const component = (child: string) => `---\nimport Child from './${child}.kay'\nimport { sqliteCache } from 'kay/cache'\n\nconst disk = sqliteCache('a.sqlite')\nfunction pick() {}\n---\nChild(format={pick})\np {disk}\n`
+    const root = await scratchProject({
+      'src/routes/index.kay': '---\nimport Promoted from \'../components/promoted.kay\'\nimport Static from \'../components/static.kay\'\n---\nPromoted\nStatic\n',
+      'src/components/promoted.kay': component('island'),
+      'src/components/static.kay': component('plain'),
+      'src/components/island.kay': '---\nimport { signal } from \'kay\'\n\nconst count = signal(0)\nconst { format } = props<{ format: () => void }>()\n---\nbutton(onClick={() => { count++; format() }}) {count()}\n',
+      'src/components/plain.kay': '---\nconst { format } = props<{ format: () => void }>()\n---\np {format.name}\n',
+    })
+
+    try {
+      expect((await check(root)).filter(d => d.code === 'server-only-import').map(d => [d.file.slice(root.length + 1), d.line])).toEqual([['src/components/promoted.kay', 3]])
+      expect((await check(root, { lints: { 'server-only-import': 'allow' } })).filter(d => d.code === 'server-only-import')).toEqual([])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('reports a signal written by assigning where it is held in a property or in a let from a function, which would replace it', async () => {
     const page = [
       '---',

@@ -18,7 +18,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - kayjs-mail's `contactForm(mail, options)` and kayjs-ui's `ContactForm` make a contact form of one line, `export const contact = action(...contactForm(mail))` and `ContactForm(action={contact})`: the schema, the link cap, `rateLimit`, `honeypot` and `minTime`, the mail with the visitor in `replyTo`, and worded 503 and 502 refusals come with them, in English and French ([kayjs-mail](../packages/mail/llms.txt), [kayjs-ui](../packages/ui/llms.txt)).
 - `kay build` reports a page saying both `keep: true` and `prerender: false` as `unkept-page`, and the route table lists the reason of a route stopped past its 25 rows ([Routing](routing.md)).
 - `kay check` reports the head lints of prerendered pages (`untitled-page`, `undescribed-page`, `duplicate-title`, `long-description`, `unsized-share-image`, `noindex-in-sitemap`) at the page's file, without rendering the site ([Checks](checks.md)).
-- `server-only-import` also follows a `.ts` module an island imports and a static component that may be promoted to an island, and reports a name destructured off a namespace import of `kay/cache` by assignment or a parameter default ([Caching](rendering.md#keep-a-cached-value-across-restarts)).
+- `server-only-import` also follows a `.ts` module an island imports and a static component the build promotes to an island, and reports a name destructured off a namespace import of `kay/cache` by assignment or a parameter default ([Caching](rendering.md#keep-a-cached-value-across-restarts)).
 - `kay check` reports a `match` with no `else` over a finite union whose `when` lines leave members out, naming them (`incomplete-match`; [Checks](checks.md)).
 
 ## 1.46.0

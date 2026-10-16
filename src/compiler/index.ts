@@ -89,17 +89,29 @@ export function rendersAsIsland(source: string): boolean {
   return file.client !== undefined || isInteractive(file, analyzeScript(source, file.script, server?.data.map(data => data.name)))
 }
 
-// Whether a component's script runs in the browser, as an island's, or as a static component's that may be promoted to an island by what it passes; a page, a layout and a special page never do.
-export function runsInBrowser(source: string, filename: string): boolean {
+// Whether a component is an island, or a static component that may be promoted to one by what it passes, which the build does only when its imports reach an island; a page, a layout and a special page are neither.
+export function browserRole(source: string, filename: string): 'island' | 'promotable' | undefined {
   const file = parseKay(source)
 
   if (file.server !== undefined || ROUTE_FILES.has(basename(filename)))
-    return false
+    return undefined
 
   const server = analyzeServer(source, file.server)
   const script = analyzeScript(source, file.script, server?.data.map(data => data.name))
 
-  return file.client !== undefined || isInteractive(file, script) || promotionCause(file, script) !== undefined
+  if (file.client !== undefined || isInteractive(file, script))
+    return 'island'
+
+  return promotionCause(file, script) === undefined ? undefined : 'promotable'
+}
+
+// The server-only imports in the script of a component the build promotes to an island, which only the project knows: compiling it alone cannot tell whether it is.
+export function promotedChecks(source: string): Diagnostic[] {
+  const file = parseKay(source)
+  const server = analyzeServer(source, file.server)
+  const script = analyzeScript(source, file.script, server?.data.map(data => data.name))
+
+  return script.fence === undefined ? [] : serverOnlyImports(script.fence)
 }
 
 // Compiles a .kay component: to TSX the type checker reads, or with `output` to the HTML strings and DOM code that run.
@@ -157,8 +169,8 @@ export function compileKay(source: string, filename: string, options: CompileOpt
 
   if (options.check) {
     const fenceLints = [script.fence, server?.fence].flatMap(fence => fence ? [...deprecatedImports(fence), ...cssImportsWithoutText(fence)] : [])
-    // The script runs in the browser as an island's, in a component only islands render, and in a static one that may be promoted to an island.
-    const browserScript = (island !== undefined || options.insideIsland === true || promote !== undefined) && !routeFile ? script.fence : undefined
+    // The script runs in the browser as an island's and in a component only islands render; a static one that may be promoted to an island is read by the project check, which knows whether the build promotes it.
+    const browserScript = (island !== undefined || options.insideIsland === true) && !routeFile ? script.fence : undefined
     const unusedLints = broken ? [] : [...unreadNames(source, file.template, script, server, found.findings), ...constantSignals(source, file.script, found.findings)]
 
     diagnostics.push(...unboundedFields(server), ...fenceLints, ...browserScript === undefined ? [] : serverOnlyImports(browserScript), ...unusedLints, ...templateLints(file))

@@ -22,7 +22,7 @@ This page lists what each release adds, newest first, with a link to where each 
 - **Contradicting page settings are reported**: a page saying both `keep: true` and `prerender: false` is reported as `unkept-page`, and the build report lists the reason of every route it did not keep, however many routes there are. [Routing](/guides/routing)
 - **Head lints in `kay check`**: the page head lints `kay build` reports, such as a missing title or description, are reported by `kay check` too, at the page, without prerendering the site. [Checks](/reference/checks)
 - **A `match` that misses a member**: `kay check` warns of a `match` with no `else` over a union such as `'open' | 'closed'` whose `when` lines leave a member out, and names it. [Checks](/reference/checks)
-- **`server-only-import` reaches further**: `kay check` also follows a `.ts` module an island imports and a static component that may be promoted to an island, and reports a name destructured off a namespace import of `kay/cache`. [Caching and streaming](/guides/caching-and-streaming)
+- **`server-only-import` reaches further**: `kay check` also follows a `.ts` module an island imports and a static component the build promotes to an island, and reports a name destructured off a namespace import of `kay/cache`. [Caching and streaming](/guides/caching-and-streaming)
 
 ## 1.46.0
 
