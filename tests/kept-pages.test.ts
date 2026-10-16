@@ -5,7 +5,7 @@ import { afterAll, describe, expect, it } from 'bun:test'
 import { outputDir } from '../src/build/assets'
 import { formatRouteTable } from '../src/build/report'
 import { compileKay } from '../src/compiler'
-import { keptStop, readsNothing } from '../src/server/pure-page'
+import { KAY_EXPORTS, keptStop, readsNothing } from '../src/server/pure-page'
 import { scratchDir } from './scratch'
 
 const CLI = join(import.meta.dir, '../src/cli.ts')
@@ -740,4 +740,90 @@ describe('what stops a page from being kept', () => {
 
     expect(formatRouteTable(rows)).toContain('not kept: /r25: reads `Date`')
   })
+})
+
+describe('what kay exports to a page that is kept', () => {
+  const roots: string[] = []
+
+  afterAll(async () => {
+    await Promise.all(roots.map(async root => rm(root, { recursive: true, force: true })))
+  })
+
+  it('classes every export of kay once, so a new one is filed on purpose', async () => {
+    const exported = Object.keys(await import('../src/runtime')).sort()
+
+    expect(Object.keys(KAY_EXPORTS).sort()).toEqual(exported)
+  })
+
+  it('keeps a page importing the schema builder, in a page, a module, a config and through a barrel', async () => {
+    const root = await project({
+      'src/routes/in-page.kay': '--- server\nimport { s } from \'kay\'\n\nconst shape = s.Object({ id: s.Number() })\n---\np {typeof shape}\n',
+      'src/routes/in-module.kay': '---\nimport { shape } from \'../shape\'\n---\np {typeof shape}\n',
+      'src/routes/through-barrel.kay': '---\nimport { shape } from \'../barrel\'\n---\np {typeof shape}\n',
+      'src/routes/with-config.kay': '---\nimport { post } from \'../content.config\'\n---\np {typeof post}\n',
+      'src/shape.ts': 'import { s } from \'kay\'\n\nexport const shape = s.Object({ id: s.Number() })\n',
+      'src/barrel.ts': 'export * from \'./shape\'\n',
+      'src/content.config.ts': 'import { s } from \'kay\'\n\nexport const post = s.Object({ title: s.String() })\n',
+    })
+
+    roots.push(root)
+
+    const at = async (file: string) => keptStop({ file: join(root, file), layouts: [] })
+
+    for (const page of ['in-page', 'in-module', 'through-barrel', 'with-config'])
+      expect(await at(`src/routes/${page}.kay`)).toBeUndefined()
+  })
+
+  it('keeps a page reading a persisted signal kept in localStorage, and not one kept in a cookie or the query', async () => {
+    const root = await project({
+      'src/routes/local.kay': '---\nimport { persisted } from \'kay\'\n\nconst theme = persisted(\'theme\', \'light\', { storage: \'local\' })\n---\np {theme()}\n',
+      'src/routes/typed.kay': '---\nimport { persisted as keep } from \'kay\'\n\nconst open = keep<boolean>(\'open\', false, { storage: \'local\' })\n---\np {open()}\n',
+      'src/routes/in-module.kay': '---\nimport { theme } from \'../theme\'\n---\np {theme()}\n',
+      'src/routes/cookie.kay': '---\nimport { persisted } from \'kay\'\n\nconst theme = persisted(\'theme\', \'light\')\n---\np {theme()}\n',
+      'src/routes/query.kay': '---\nimport { persisted } from \'kay\'\n\nconst page = persisted(\'page\', \'1\', { storage: \'query\' })\n---\np {page()}\n',
+      'src/routes/mixed.kay': '---\nimport { persisted } from \'kay\'\n\nconst a = persisted(\'a\', \'1\', { storage: \'local\' })\nconst b = persisted(\'b\', \'1\')\n---\np {a()}{b()}\n',
+      'src/routes/passed.kay': '---\nimport { persisted } from \'kay\'\n\nconst make = persisted\nconst a = make(\'a\', \'1\', { storage: \'local\' })\n---\np {a()}\n',
+      'src/theme.ts': 'import { persisted } from \'kay\'\n\nexport const theme = persisted(\'theme\', \'light\', { storage: \'local\' })\n',
+    })
+
+    roots.push(root)
+
+    const at = async (file: string) => keptStop({ file: join(root, file), layouts: [] })
+
+    for (const page of ['local', 'typed', 'in-module'])
+      expect(await at(`src/routes/${page}.kay`)).toBeUndefined()
+
+    for (const page of ['cookie', 'query', 'mixed', 'passed'])
+      expect(await at(`src/routes/${page}.kay`)).toMatchObject({ why: expect.stringMatching(/^imports `persisted(?: as keep)?` from `kay`, which a request or the clock can change$/) })
+  })
+
+  it('names what a page really reads beside an export that reads nothing', async () => {
+    const root = await project({
+      'src/routes/both.kay': '--- server\nimport { s } from \'kay\'\n\nconst shape = s.String()\n---\np {ctx.url.pathname}\n',
+      'src/routes/bound.kay': '---\nimport { s, queryParam } from \'kay\'\n\nconst page = queryParam(\'page\')\n---\np {page()}\n',
+      'src/routes/unknown.kay': '---\nimport { somethingNew } from \'kay\'\n---\np Hi\n',
+    })
+
+    roots.push(root)
+
+    const at = async (file: string) => keptStop({ file: join(root, file), layouts: [] })
+
+    expect(await at('src/routes/both.kay')).toMatchObject({ why: 'reads `ctx`' })
+    expect(await at('src/routes/bound.kay')).toMatchObject({ why: 'imports `queryParam` from `kay`, which a request or the clock can change' })
+    expect(await at('src/routes/unknown.kay')).toMatchObject({ why: 'imports `somethingNew` from `kay`, which a request or the clock can change' })
+  })
+
+  it('keeps such pages in a build under a base', async () => {
+    const root = await project({
+      'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ log: false, base: \'/app\' })\n',
+      'src/routes/index.kay': '---\nimport { shape } from \'../shape\'\n---\np {typeof shape}\n',
+      'src/routes/local.kay': '---\nimport { persisted } from \'kay\'\n\nconst theme = persisted(\'theme\', \'light\', { storage: \'local\' })\n---\np {theme()}\n',
+      'src/routes/cookie.kay': '---\nimport { persisted } from \'kay\'\n\nconst theme = persisted(\'theme\', \'light\')\n---\np {theme()}\n',
+      'src/shape.ts': 'import { s } from \'kay\'\n\nexport const shape = s.Object({ id: s.Number() })\n',
+    })
+
+    roots.push(root)
+
+    expect(await built(root)).toEqual(['/', '/local'])
+  }, 60_000)
 })

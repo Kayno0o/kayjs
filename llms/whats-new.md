@@ -7,6 +7,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - A collection with a `highlight` recompiles its entries when a module the content config imports changes, so a helper the highlighter calls never leaves entries highlighted by its old code ([Content](content.md#caching)).
 - A refused cross-site post or request answers 403 in plain text naming the `Origin` it got, the origin or origins kay takes for the site and the `site` setting that fixes a proxy changing the host ([Actions](actions.md#cross-site-posts)).
 - A server from `kay new`, kay's own server and `./server --health` read `HOST` beside `PORT`, listening on every address when it is unset; `kay dev` keeps its own address ([Project](project.md#build-one-executable)).
+- `kay build` keeps a page importing `s`, `withBase`, `sanitizeHtml` or the other exports of `kay` that read nothing from a request, and one using a `persisted` signal kept in `localStorage`; a signal kept in a cookie or the query still reads the request ([Prerendering](routing.md#prerendering)).
 - `kay/test/dom` works with `@happy-dom/global-registrator` 20.14.6 or 21.0.3 and later, so an app on either needs no change ([Testing](testing.md#helpers-for-a-test-of-its-own)).
 
 ## 1.47.0

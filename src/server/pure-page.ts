@@ -6,8 +6,59 @@ import { analyzeServer } from '../compiler/script'
 import { stateAt } from './module-state'
 import { routeChain } from './routes'
 
-// What a page may take from `kay` and stay the same for every visitor and every moment: the reactive core and ids, none of which reads a request, a cookie, the environment or a clock.
-const PURE_KAY_NAMES = new Set(['signal', 'memo', 'effect', 'batch', 'onCleanup', 'onMount', 'root', 'untrack', 'selection', 'every', 'watch', 'debounced', 'listen', 'linked', 'context', 'uid'])
+// Every export of `kay` and whether a page importing it stays the same for every visitor and every moment: `free` reads no request, cookie, environment or clock; `request` does, or opens a route, a socket or a call that does; `local` is `persisted`, which reads the request's cookie or query unless it is kept in `localStorage`, read once the page has hydrated, so it is free only where every use says `storage: 'local'`.
+// One list, so an export missing from it is found by `tests/kept-pages.test.ts`, which holds it to the exports of `kay`.
+export const KAY_EXPORTS: Record<string, 'free' | 'request' | 'local'> = {
+  signal: 'free',
+  memo: 'free',
+  effect: 'free',
+  batch: 'free',
+  flush: 'free',
+  onCleanup: 'free',
+  onMount: 'free',
+  root: 'free',
+  untrack: 'free',
+  selection: 'free',
+  every: 'free',
+  watch: 'free',
+  debounced: 'free',
+  listen: 'free',
+  linked: 'free',
+  context: 'free',
+  uid: 'free',
+  s: 'free',
+  describeField: 'free',
+  sanitizeHtml: 'free',
+  trustHtml: 'free',
+  withBase: 'free',
+  localPath: 'free',
+  markInvalid: 'free',
+  focusInvalid: 'free',
+  guardLeave: 'free',
+  shortcut: 'free',
+  navigate: 'free',
+  refresh: 'free',
+  ActionError: 'free',
+  ActionRedirect: 'free',
+  ApiError: 'free',
+  persisted: 'local',
+  queryParam: 'request',
+  defer: 'request',
+  guard: 'request',
+  action: 'request',
+  call: 'request',
+  dispatch: 'request',
+  resource: 'request',
+  socket: 'request',
+  stream: 'request',
+  publicEnv: 'request',
+  editing: 'request',
+  previewing: 'request',
+  logFrom: 'request',
+  searchResults: 'request',
+  searchSite: 'request',
+}
+
 // The same for `kay/i18n`: messages and formats go by the locale, which is part of the key a copy is kept under; the relative time ones read the clock.
 const PURE_I18N_NAMES = new Set(['t', 'T', 'locale', 'locales', 'localeName', 'localize', 'alternate', 'formatNumber', 'formatDate', 'formatList', 'direction', 'defineMessages'])
 const CODE_FILE = /\.(?:kay|[cm]?[jt]sx?)$/
@@ -56,9 +107,51 @@ function moduleStateAt(file: string, source: string): number | undefined {
 const FROM = /\b(?:import|export)\b([^'";(=]*)\sfrom\s*['"]([^'"]+)['"]/g
 const FOR_EFFECT = /\bimport\s*['"]([^'"]+)['"]/g
 const BRACES = /\{([^}]*)\}/
+const AS_PREFIX = /^.*\sas\s+/
 const AS_NAME = /\s+as\s+(?:\S.*)?$/
 const TYPE_NAME = /^type\s/
 const TYPE_IMPORT = /^\s*type\b/
+const LOCAL_STORAGE = /\bstorage\s*:\s*(['"])local\1/
+const CALL_OPENING = /^\s*(?:<[^()]*>\s*)?\(/
+const REGEX_CHARS = /[$()*+.?[\\\]^{|}]/g
+
+// Whether every use of `name` in `source`, the import itself cut out, is a call saying `storage: 'local'`.
+function onlyLocalCalls(source: string, name: string, importAt: number, importLength: number): boolean {
+  const rest = source.slice(0, importAt) + source.slice(importAt + importLength)
+  const uses = rest.matchAll(new RegExp(`(?<![\\w$.])${name.replace(REGEX_CHARS, '\\$&')}(?![\\w$])`, 'g'))
+  let found = false
+
+  for (const use of uses) {
+    const after = rest.slice(use.index + name.length)
+    const opening = CALL_OPENING.exec(after)
+
+    if (opening === null)
+      return false
+
+    let depth = 0
+    let end = -1
+
+    for (let at = opening[0].length - 1; at < after.length; at++) {
+      if (after[at] === '(')
+        depth++
+      else if (after[at] === ')')
+        depth--
+
+      if (depth === 0) {
+        end = at
+
+        break
+      }
+    }
+
+    if (end === -1 || !LOCAL_STORAGE.test(after.slice(opening[0].length, end)))
+      return false
+
+    found = true
+  }
+
+  return found
+}
 
 // What stops a page from being kept: the file and line that decided it, and what is there; line 0 when a render decided it, not a line of source.
 export interface Stop {
@@ -136,15 +229,15 @@ async function scanned(file: string): Promise<Scan> {
   if (state !== undefined)
     return { stop: { file, line: lineAt(source, state), why: 'declares module state, a `let`, an empty container it fills or an export another module can change' }, code }
 
-  const imports = [...source.matchAll(FROM)].map(match => ({ clause: match[1]!, specifier: match[2]!, index: match.index }))
+  const imports = [...source.matchAll(FROM)].map(match => ({ clause: match[1]!, specifier: match[2]!, index: match.index, length: match[0].length }))
 
   for (const match of source.matchAll(FOR_EFFECT))
-    imports.push({ clause: '', specifier: match[1]!, index: match.index })
+    imports.push({ clause: '', specifier: match[1]!, index: match.index, length: match[0].length })
 
   // The first stop in the file is the one named.
   imports.sort((a, b) => a.index - b.index)
 
-  for (const { clause, specifier, index } of imports) {
+  for (const { clause, specifier, index, length } of imports) {
     if (TYPE_IMPORT.test(clause))
       continue
 
@@ -153,8 +246,17 @@ async function scanned(file: string): Promise<Scan> {
     if (specifier === 'kay' || specifier === 'kay/i18n') {
       const imported = (BRACES.exec(clause)?.[1] ?? '').split(',').map(name => name.trim()).filter(name => name !== '' && !TYPE_NAME.test(name))
 
-      const pure = specifier === 'kay' ? PURE_KAY_NAMES : PURE_I18N_NAMES
-      const impure = imported.filter(name => !pure.has(name.replace(AS_NAME, '')))
+      const impure = imported.filter((name) => {
+        const own = name.replace(AS_NAME, '')
+        const local = name.replace(AS_PREFIX, '')
+
+        if (specifier === 'kay/i18n')
+          return !PURE_I18N_NAMES.has(own)
+
+        const kind = Object.hasOwn(KAY_EXPORTS, own) ? KAY_EXPORTS[own] : 'request'
+
+        return kind === 'request' || (kind === 'local' && !onlyLocalCalls(source, local, index, length))
+      })
 
       if (imported.length === 0 || impure.length > 0)
         return stop(`imports ${imported.length === 0 ? 'the whole module' : impure.map(name => `\`${name}\``).join(', ')} from \`${specifier}\`, which a request or the clock can change`)
