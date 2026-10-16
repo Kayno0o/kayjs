@@ -12,7 +12,7 @@ import { localeState } from '../runtime/locale-state'
 import { localizedText } from '../runtime/localized'
 import { jsonLd } from '../runtime/seo'
 import { basePath } from './base'
-import { faviconTags } from './favicon'
+import { faviconTags, manifestPath } from './favicon'
 import { builtFonts, fontTags, prepareFonts } from './fonts'
 import { localeCopies } from './i18n'
 import { imageHeader } from './image-format'
@@ -111,7 +111,10 @@ export function seoHead(site: string | undefined, seo: SeoConfig = {}, extra: He
       return known
 
     const text = (value: Localized | undefined) => localizedText(value, locale, defaultLocale)
-    const tags: HeadTag[] = social ? [...extra, meta('property', 'og:type', 'website')] : [...extra]
+    const manifest = manifestPath(locale, seo, defaultLocale)
+    // The manifest link follows the locale, its text read in it.
+    const own = extra.map(tag => tag.tag === 'link' && tag.props.rel === 'manifest' ? { ...tag, props: { ...tag.props, href: manifest } } : tag)
+    const tags: HeadTag[] = social ? [...own, meta('property', 'og:type', 'website')] : [...own]
     const name = text(seo.name)
     const description = text(seo.description)
     const image = text(seo.image)

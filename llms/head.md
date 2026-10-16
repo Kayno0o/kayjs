@@ -240,7 +240,7 @@ export default defineConfig({
 })
 ```
 
-- With `i18n`, `name`, `titleTemplate`, `description`, `image`, `imageAlt` and `locale` each take a string or a record of one string per locale, `description: { en: 'What the site is', fr: 'Ce qu\'est le site' }`, so no page sets a tag for its language's; a locale the record lacks reads the default locale's. The head lints check every text, and the manifest and share cards read the default locale's `name` and `description`.
+- With `i18n`, `name`, `titleTemplate`, `description`, `image`, `imageAlt` and `locale` each take a string or a record of one string per locale, `description: { en: 'What the site is', fr: 'Ce qu\'est le site' }`, so no page sets a tag for its language's; a locale the record lacks reads the default locale's. The head lints check every text. Each surface reads the locale it is served for: the page's tags and share card name follow the page's locale, and the web manifest does too (see below), but the one OpenAPI document is titled with the default locale's `name`.
 - `head` adds tags to every page's head, written as a `head` block compiles them, a tag's text as `children`: `head: [{ tag: 'script', props: { src: '/stats.js', defer: true } }, { tag: 'meta', props: { name: 'color-scheme', content: 'light dark' } }]`. An analytics script that needs the visitor's consent loads from an island once they agreed (see [Privacy](privacy.md)).
 - A layout or the page setting a tag of the same identity replaces one of those.
 - An inline script or style among them is let through by the content security policy, its hash added.
@@ -337,6 +337,7 @@ export default defineConfig({
 ```
 
 - The manifest is named after `seo.name`, `shortName` defaulting to it, and described by `seo.description`.
+- A `name` or `description` written per locale gives each locale reading a text of its own a manifest of its own, `/manifest.fr.webmanifest` beside the default locale's `/manifest.webmanifest`, which that locale's pages link; a locale reading the default locale's text links the default's, and a site writing them once serves one. `shortName` and every path in the manifest are the same in all of them.
 - `themeColor` is also every page's `theme-color`, `favicon: false` included.
 - `startUrl` is the page the installed app opens, `scope` by default, else `/`, and `scope` the paths it keeps in its window.
 - `startUrl`, `scope` and each shortcut's `url` (`name`, `shortName`, `description`) are paths of the site, put under `base`.

@@ -1,11 +1,13 @@
 import type { Elysia } from 'elysia'
 import type { FaviconConfig, ManifestConfig } from '../config'
 import type { HeadTag } from '../runtime/head'
+import type { Localized } from '../runtime/localized'
 import type { ServedPaths } from './served-paths'
 import { mkdir } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { SVG_FILE } from '../build/files'
 import { KayError } from '../compiler/errors'
+import { localizedText } from '../runtime/localized'
 import { kayLog } from '../runtime/log'
 import { revalidated } from './public'
 
@@ -61,8 +63,10 @@ export interface FaviconOptions {
   source: FaviconSource
   // Where `kay build` wrote the files, read instead of the source when there; a server not serving a build leaves it out, so an older build never shadows the source.
   builtDir?: string | undefined
-  name?: string | undefined
-  description?: string | undefined
+  // The site's `seo.name` and `seo.description`; the manifest of each locale reading a text of its own is served beside the default locale's.
+  name?: Localized | undefined
+  description?: Localized | undefined
+  locales?: ManifestLocales | undefined
   manifest?: ManifestConfig | undefined
   // The site's mount point, which the manifest's paths go under.
   base?: string | undefined
@@ -195,6 +199,28 @@ export function faviconTags(favicon: string | FaviconConfig | undefined): HeadTa
   ]
 }
 
+export interface ManifestLocales {
+  locales: readonly string[]
+  defaultLocale: string
+}
+
+// The manifest a locale links: the default locale's, else its own at `/manifest.fr.webmanifest` once its name or description differs from the default locale's.
+export function manifestPath(locale: string | undefined, texts: { name?: Localized | undefined, description?: Localized | undefined }, defaultLocale: string | undefined): string {
+  if (locale === undefined || locale === defaultLocale)
+    return MANIFEST
+
+  return ownManifest(locale, texts, defaultLocale) ? `/manifest.${locale}.webmanifest` : MANIFEST
+}
+
+function ownManifest(locale: string, texts: { name?: Localized | undefined, description?: Localized | undefined }, defaultLocale: string | undefined): boolean {
+  return localizedText(texts.name, locale, defaultLocale) !== localizedText(texts.name, defaultLocale, defaultLocale) || localizedText(texts.description, locale, defaultLocale) !== localizedText(texts.description, defaultLocale, defaultLocale)
+}
+
+// Every manifest path of a site: the default locale's, then one per other locale reading its own text.
+export function manifestPaths(texts: { name?: Localized | undefined, description?: Localized | undefined }, locales: ManifestLocales | undefined): string[] {
+  return [MANIFEST, ...locales?.locales.filter(locale => locale !== locales.defaultLocale && ownManifest(locale, texts, locales.defaultLocale)).map(locale => manifestPath(locale, texts, locales.defaultLocale)) ?? []]
+}
+
 // Its icons, pages and scope under the site's mount point.
 export function manifestJson(name: string | undefined, description: string | undefined, manifest: ManifestConfig = {}, base = ''): string {
   const scope = manifest.scope === undefined ? undefined : sitePath(manifest.scope, 'scope')
@@ -272,9 +298,16 @@ export function serveFavicons(app: Elysia, served: ServedPaths, options: Favicon
     })
   }
 
-  if (served.offer({ path: MANIFEST, owner: 'the web app manifest', kind: 'kay', exported: true })) {
-    const manifest = manifestJson(options.name, options.description, options.manifest, options.base)
+  const texts = { name: options.name, description: options.description }
+  const defaultLocale = options.locales?.defaultLocale
 
-    app.get(MANIFEST, ({ request }) => respond(request, manifest, 'application/manifest+json'))
+  for (const path of manifestPaths(texts, options.locales)) {
+    if (!served.offer({ path, owner: 'the web app manifest', kind: 'kay', exported: true }))
+      continue
+
+    const locale = path === MANIFEST ? defaultLocale : options.locales!.locales.find(candidate => manifestPath(candidate, texts, defaultLocale) === path)
+    const manifest = manifestJson(localizedText(options.name, locale, defaultLocale), localizedText(options.description, locale, defaultLocale), options.manifest, options.base)
+
+    app.get(path, ({ request }) => respond(request, manifest, 'application/manifest+json'))
   }
 }

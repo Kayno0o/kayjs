@@ -339,7 +339,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   const favicon = faviconSource(root, options.favicon, options.manifest)
 
   if (favicon !== undefined)
-    serveFavicons(app, served, { source: favicon, builtDir: mode.prebuilt ? join(client.dir, '..', FAVICON_DIR) : undefined, name: localizedText(options.seo?.name, undefined, locales.settings.defaultLocale), description: localizedText(options.seo?.description, undefined, locales.settings.defaultLocale), manifest: options.manifest, base })
+    serveFavicons(app, served, { source: favicon, builtDir: mode.prebuilt ? join(client.dir, '..', FAVICON_DIR) : undefined, name: options.seo?.name, description: options.seo?.description, locales: locales.settings, manifest: options.manifest, base })
 
   const prerendered = await loadPrerendered(client)
   const guarded = new Set(routes.filter(route => route.guards.length > 0).map(route => route.pattern))

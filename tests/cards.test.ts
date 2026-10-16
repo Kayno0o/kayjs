@@ -7,6 +7,7 @@ import { afterAll, describe, expect, it } from 'bun:test'
 import { clientDir } from '../src/build/assets'
 import { bootProblems } from '../src/check/boot'
 import { registerImage, setCardMaker, shareCard } from '../src/runtime/image'
+import { runInLocale } from '../src/runtime/locale-state'
 import { pages } from '../src/server'
 import { setupCards, writeCards } from '../src/server/card'
 import { fitTitle, TEXT_WIDTH, textWidth } from '../src/server/card-draw'
@@ -429,6 +430,79 @@ describe('share cards', () => {
     }
     finally {
       await rm(outdir, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('share cards of a site with a name per locale', () => {
+  const i18n = { locales: ['fr', 'en'], defaultLocale: 'fr', messages: 'tests/fixtures/i18n/src/messages' }
+  const localized = async () => pages({ ...config, i18n, seo: { name: { fr: 'Les cartes', en: 'The cards' } } })
+  const written = async () => pages({ ...config, i18n, seo: { name: 'Cards' } })
+  const linked = async (page: string, server: Awaited<ReturnType<typeof localized>>) => new URL(await cardPath(page, server), 'http://localhost')
+
+  it('draws the name of the page\'s locale, signs it, and keeps the default locale\'s card as it was', async () => {
+    const server = await localized()
+    const fr = await linked('/plain', server)
+    const en = await linked('/en/plain', server)
+
+    expect(fr.searchParams.has('name')).toBe(false)
+    expect(en.searchParams.get('name')).toBe('The cards')
+
+    const card = async (url: URL, override?: [string, string | undefined]) => {
+      const copy = new URL(url)
+
+      if (override !== undefined) {
+        if (override[1] === undefined)
+          copy.searchParams.delete(override[0])
+        else
+          copy.searchParams.set(override[0], override[1])
+      }
+
+      return server.handle(new Request(`http://localhost${copy.pathname}${copy.search}`))
+    }
+    const frCard = await card(fr)
+    const enCard = await card(en)
+
+    expect([frCard.status, enCard.status]).toEqual([200, 200])
+    expect(await enCard.bytes()).not.toEqual(await frCard.bytes())
+    // A name nobody signed, or one taken off, is no card.
+    expect((await card(en, ['name', 'Other'])).status).toBe(404)
+    expect((await card(en, ['name', undefined])).status).toBe(404)
+    expect((await card(fr, ['name', 'The cards'])).status).toBe(404)
+  })
+
+  it('links the same card in every locale when the name is written once', async () => {
+    const server = await written()
+
+    expect((await linked('/en/plain', server)).searchParams.has('name')).toBe(false)
+    expect((await linked('/en/plain', server)).search).toBe((await linked('/plain', server)).search)
+  })
+
+  it('reads the default locale\'s name for a locale the record lacks', async () => {
+    const server = await pages({ ...config, i18n, seo: { name: { fr: 'Les cartes' } } })
+
+    expect((await linked('/en/plain', server)).search).toBe((await linked('/plain', server)).search)
+  })
+
+  it('writes at build time the card of each locale\'s name', async () => {
+    const client = clientDir(process.cwd())
+    const cache = await mkdtemp(join(tmpdir(), 'kay-cards-'))
+    const settings = { locales: ['fr', 'en'], defaultLocale: 'fr', prefixDefault: false }
+    const state = (locale: string) => ({ settings, path: '/', locale, messages: new Map() })
+
+    try {
+      await setupCards({ dir: join(client, '..'), clientDir: client, fonts: await prepareFonts(process.cwd(), config.fonts, cache), name: { fr: 'Les cartes', en: 'The cards' }, defaultLocale: 'fr', collect: true })
+
+      const urls = ['fr', 'en'].map(locale => runInLocale(state(locale), () => shareCard({ title: 'Same title' })))
+
+      expect(urls[0]).not.toBe(urls[1])
+      expect(await writeCards(client, cache)).toBe(2)
+    }
+    finally {
+      await rm(cache, { recursive: true, force: true })
+
+      for (const file of (await readdir(join(client, 'images'))).filter(name => name.startsWith('card-')))
+        await rm(join(client, 'images', file), { force: true })
     }
   })
 })

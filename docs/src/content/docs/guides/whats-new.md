@@ -7,6 +7,7 @@ This page lists what each release adds, newest first, with a link to where each 
 
 ## Unreleased
 
+- **The manifest and share cards follow the locale**: a `seo.name` or `seo.description` per locale gives each locale its own web manifest and share card name, and the one OpenAPI document keeps the default locale's. [Head and SEO](/essentials/head-and-seo)
 - **`resource` and `stream` over anything async**: they take a function returning a promise or an async iterable, so an island reading its own WebSocket or another server needs no hand-rolled counter. [API routes](/guides/api-routes)
 - **A fast `invalidate` on a large `sqliteCache`**: it reads the keys each stored value was built from in a table of their own, not every row. A custom `CacheStore` may offer `dependencies()` for the same. [Caching and streaming](/guides/caching-and-streaming)
 - A kayjs-auth profile field's `label` may be an object by locale, `{ en: 'Bio', fr: 'Biographie' }`, `auth.profile(locale)` resolves it, and `requireUser({ redirect: '' })` and `guard({ redirect: '' })` mean no redirect ([kayjs-auth](../../libraries/kayjs-auth/#your-own-profile-fields)).

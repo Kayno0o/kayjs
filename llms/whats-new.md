@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- A site with a `seo.name` or `seo.description` per locale links the web manifest and draws the share card name of the page's locale (`/manifest.fr.webmanifest` beside the default locale's), and titles its one OpenAPI document with the default locale's name ([Head](head.md#site-defaults-and-social-cards)).
 - `resource(load)` and `stream(source)` read any async function or async iterable in an island, not only an api route, with `loading`, `error`, the latest value, `refresh()` and a slower answer never replacing a newer one ([API routes](api-routes.md#read-a-routes-answer-in-an-island)).
 - `invalidate` on a `sqliteCache` reads the keys each stored value was built from in a table of their own, not every row, so it stays fast on a large cache; a custom `CacheStore` may offer `dependencies()` for the same ([Caching](rendering.md#keep-a-cached-value-across-restarts)).
 - A kayjs-auth profile field's `label` may be an object by locale, `{ en: 'Bio', fr: 'Biographie' }`, `auth.profile(locale)` resolves it, and `requireUser({ redirect: '' })` and `guard({ redirect: '' })` mean no redirect ([kayjs-auth](../packages/auth/llms.txt)).

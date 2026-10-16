@@ -821,4 +821,47 @@ describe('localized seo defaults', () => {
     expect(await head('/')).toBe(fr)
     expect(await head('/en')).toBe(en)
   })
+
+  it('titles the one OpenAPI document with the default locale\'s name, whatever locale asked', async () => {
+    const server = new Elysia().use(await pages({ routes, api: 'tests/fixtures/openapi/src/api', prebuilt: false, security: false, site: SITE, i18n, openapi: true, seo: { name: { en: 'The site', fr: 'Le site' } } }))
+
+    const response = await server.handle(new Request('http://localhost/api/openapi.json', { headers: { 'x-key': 'open', 'accept-language': 'en' } }))
+
+    expect((await response.json() as { info: { title: string } }).info.title).toBe('Le site')
+  })
+
+  it('links the manifest of the page\'s locale, the default locale\'s at the usual path and each other locale\'s beside it', async () => {
+    const server = await shared
+    const manifest = async (path: string) => (await server.handle(new Request(`http://localhost${path}`))).json() as Promise<{ name: string, description: string }>
+
+    expect(await head('/')).toContain('<link rel="manifest" href="/manifest.webmanifest">')
+    expect(await head('/en')).toContain('<link rel="manifest" href="/manifest.en.webmanifest">')
+    expect(await manifest('/manifest.webmanifest')).toMatchObject({ name: 'Le site', description: 'Ce que fait le site' })
+    expect(await manifest('/manifest.en.webmanifest')).toMatchObject({ name: 'The site', description: 'What the site does' })
+    expect((await server.handle(new Request('http://localhost/manifest.fr.webmanifest'))).status).toBe(404)
+  })
+
+  it('serves one manifest while the texts are written once or the other locale reads the default\'s, whatever base and trailingSlash', async () => {
+    for (const seo of [{ name: 'The site' }, { name: { fr: 'Le site' }, description: { fr: 'Ce que fait le site' } }]) {
+      for (const variant of [{}, { base: '/docs', trailingSlash: 'always' as const }]) {
+        const server = new Elysia().use(await pages({ routes, prebuilt: false, security: false, site: SITE, i18n, seo, ...variant }))
+        const html = await (await server.handle(new Request(`http://localhost/en${'base' in variant ? '/' : ''}`))).text()
+
+        expect(html).toContain(`<link rel="manifest" href="${'base' in variant ? '/docs' : ''}/manifest.webmanifest">`)
+        expect((await server.handle(new Request('http://localhost/manifest.en.webmanifest'))).status).toBe(404)
+        expect((await server.handle(new Request('http://localhost/manifest.webmanifest'))).status).toBe(200)
+      }
+    }
+  })
+
+  it('links the manifest of another locale under base, which its icons and start page go under too', async () => {
+    const server = new Elysia().use(await pages({ routes, prebuilt: false, security: false, site: SITE, i18n, base: '/docs', trailingSlash: 'always', seo: { name: { fr: 'Le site', en: 'The site' } } }))
+    const html = await (await server.handle(new Request('http://localhost/en/'))).text()
+    const manifest = await (await server.handle(new Request('http://localhost/manifest.en.webmanifest'))).json() as { name: string, start_url: string, icons: { src: string }[] }
+
+    expect(html).toContain('<link rel="manifest" href="/docs/manifest.en.webmanifest">')
+    expect(manifest.name).toBe('The site')
+    expect(manifest.start_url).toBe('/docs/')
+    expect(manifest.icons[0]!.src).toBe('/docs/icon-192.png')
+  })
 })

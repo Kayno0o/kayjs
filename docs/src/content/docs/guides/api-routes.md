@@ -55,7 +55,7 @@ The module's `cors` is the only place that grants. If a route sets `Access-Contr
 
 ## OpenAPI
 
-`openapi: true` in kay.config.ts publishes an OpenAPI 3.1 document of every module's routes at `/api/openapi.json`, read from the schemas they already declare. Give a route a `detail: { summary, tags }` to describe it, or `detail: { hide: true }` to leave it out. `openapi: { reference: true }` adds a page listing the routes at `/api/reference`, and `openapi: { dev: true }` keeps both to `kay dev`. The document sits behind `src/api/_guard.ts` when there is one, which reads the session as it does for any module, and lists the guards each route runs.
+`openapi: true` in kay.config.ts publishes an OpenAPI 3.1 document of every module's routes at `/api/openapi.json`, read from the schemas they already declare. Give a route a `detail: { summary, tags }` to describe it, or `detail: { hide: true }` to leave it out. `openapi: { reference: true }` adds a page listing the routes at `/api/reference`, and `openapi: { dev: true }` keeps both to `kay dev`. The document sits behind `src/api/_guard.ts` when there is one, which reads the session as it does for any module, and lists the guards each route runs. Its title is `openapi.title`, else the site's `seo.name`, the default locale's when that takes one text per locale, as the document is one for every locale.
 
 ## Calling it from an island
 

@@ -246,7 +246,7 @@ export default api()
 - `detail: { hide: true }` leaves a route out; websockets are left out.
 - A route behind guards lists them in `x-kay-guards`, by where they sit in the API directory, `private/_guard.ts`.
 - The document is served behind the guards every module runs, the API directory's own `_guard.ts`, a module setting `guards: false` aside, which get the context a module's guard gets, the app's session in `ctx.locals` included, so a private API keeps its spec private.
-- `{ title, version }` set its `info`, the site's `seo.name` and `1.0.0` by default.
+- `{ title, version }` set its `info`, the site's `seo.name` (the default locale's when it takes one text per locale, as the document is one for every locale) and `1.0.0` by default.
 - `{ reference: true }` adds `/api/reference`, a plain HTML page listing each route with what it takes and answers, behind the same guards.
 - `{ dev: true }` keeps both to `kay dev`.
 - The executable serves them as the server does.

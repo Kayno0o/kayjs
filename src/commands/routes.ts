@@ -18,7 +18,7 @@ import { OPENAPI_PATH, projectApi, REFERENCE_PATH } from '../server/api-modules'
 import { importModule } from '../server/bundle'
 import { buildingWithoutEnv, PUBLIC_ENV_PATH } from '../server/env-state'
 import { ERROR_REPORTS } from '../server/errors'
-import { FAVICON_PATHS, faviconSource } from '../server/favicon'
+import { FAVICON_PATHS, faviconSource, manifestPaths } from '../server/favicon'
 import { localeCopies, localeSettings, routedSettings } from '../server/i18n'
 import { HEALTH_PATH } from '../server/lifecycle'
 import { registerLoader } from '../server/loader'
@@ -224,7 +224,7 @@ function kayRoutes(root: string, config: KayConfig): Listed[] {
     ...config.preview ? [kay(PREVIEW_ROUTE, 'preview mode')] : [],
     ...openapi !== undefined && openapi.dev !== true ? [kay(OPENAPI_PATH, 'OpenAPI document'), ...openapi.reference === true ? [kay(REFERENCE_PATH, 'API reference')] : []] : [],
     ...config.site === undefined ? [] : [kay(SITEMAP, 'sitemap, unless the app serves it'), kay(ROBOTS, 'robots.txt, unless the app serves it')],
-    ...favicon ? FAVICON_PATHS.filter(path => (path !== SVG_ICON || favicon.svg !== undefined) && (!MASKABLE_ICON.test(path) || favicon.maskable !== undefined)).map(path => kay(path, 'favicon, unless the app serves it')) : [],
+    ...favicon ? FAVICON_PATHS.filter(path => (path !== SVG_ICON || favicon.svg !== undefined) && (!MASKABLE_ICON.test(path) || favicon.maskable !== undefined)).map(path => kay(path, 'favicon, unless the app serves it')).concat(manifestPaths({ name: config.seo?.name, description: config.seo?.description }, config.i18n).slice(1).map(path => kay(path, 'favicon, unless the app serves it'))) : [],
     kay(SERVICE_WORKER, 'service worker'),
   ]
 }

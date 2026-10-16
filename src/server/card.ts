@@ -1,5 +1,6 @@
 import type { Elysia } from 'elysia'
 import type { CardConfig } from '../config'
+import type { Localized } from '../runtime/localized'
 import type { CardLook } from './card-draw'
 import type { Face } from './face'
 import type { FontAssets } from './fonts'
@@ -14,6 +15,8 @@ import { countCache } from '../build/cache'
 import { SVG_FILE, writeAtomically } from '../build/files'
 import { KayError } from '../compiler/errors'
 import { CARD, CARD_ROUTE, IMPORTED, setCardMaker, variantFilesLinked, VARIANTS } from '../runtime/image'
+import { localeState } from '../runtime/locale-state'
+import { localizedText } from '../runtime/localized'
 import { nodeCrypto } from './builtins'
 import { drawCard, LOGO_SIZE } from './card-draw'
 import { coverImage } from './crop'
@@ -33,8 +36,10 @@ export interface CardSetup {
   config?: CardConfig | undefined
   // `images.card.logo`, absolute.
   logo?: string | undefined
-  // `seo.name`, written under the title.
-  name?: string | undefined
+  // `seo.name`, written under the title, in the page's locale when it holds one text per locale.
+  name?: Localized | undefined
+  // The locale a page outside any locale reads the name in.
+  defaultLocale?: string | undefined
   quality?: number | undefined
   // An executable, which only reads what its build wrote.
   bundled?: boolean | undefined
@@ -55,7 +60,10 @@ export interface Cards {
   look: string
   background: Color
   color: Color
+  // The name in the default locale, and every name `seo.name` holds.
   name?: string | undefined
+  names?: Localized | undefined
+  defaultLocale?: string | undefined
   logo?: Uint8Array | undefined
   quality: number
   collect: boolean
@@ -76,7 +84,7 @@ const REMOTE = /^https?:\/\//i
 
 // The setup pages link cards with, and the cards prerendered pages asked for, by file name, for `kay build` to write.
 let current: Cards | undefined
-const requested = new Map<string, { title: string, image?: string | undefined }>()
+const requested = new Map<string, { title: string, image?: string | undefined, name?: string | undefined }>()
 
 // Settles the face, look and key cards are drawn and signed with, for every card this process links, served or prerendered; a face `images.card.font` names that `fonts` lacks stops the boot.
 export async function setupCards(setup: CardSetup): Promise<Cards> {
@@ -95,10 +103,12 @@ export async function setupCards(setup: CardSetup): Promise<Cards> {
     key: await keyFile.exists() ? await keyFile.bytes() : undefined,
     dir: setup.dir,
     bundled: setup.bundled ?? false,
-    look: Bun.hash(JSON.stringify([DRAWING, font instanceof Error ? '' : font.path, background, color, setup.name ?? '', quality, ...logo === undefined ? [] : [Bun.hash(logo).toString(36)]])).toString(36),
+    look: Bun.hash(JSON.stringify([DRAWING, font instanceof Error ? '' : font.path, background, color, typeof setup.name === 'object' ? JSON.stringify(setup.name) : setup.name ?? '', quality, ...logo === undefined ? [] : [Bun.hash(logo).toString(36)]])).toString(36),
     background,
     color,
-    name: setup.name,
+    name: localizedText(setup.name, setup.defaultLocale, setup.defaultLocale),
+    names: setup.name,
+    defaultLocale: setup.defaultLocale,
     logo,
     quality,
     collect: setup.collect ?? false,
@@ -287,7 +297,8 @@ function cardUrl(cards: Cards, title: unknown, image: string | undefined): strin
   if (text === '')
     throw new KayError('share-card-invalid', 'kay: shareCard() was given an empty title')
 
-  const spec = cardSpec(text, image)
+  const name = nameFor(cards)
+  const spec = cardSpec(text, image, name)
   const linked = variantFilesLinked()
 
   // A static export downloads a remote image to draw its card; a server draws it on request, from the copy the image route keeps fresh.
@@ -296,21 +307,29 @@ function cardUrl(cards: Cards, title: unknown, image: string | undefined): strin
       throw new KayError('share-card-invalid', `kay: shareCard() was given ${image}, which a static export holds no file of: only the card of an imported image, or one images.remote lists, is written at build`)
   }
   else if (cards.collect) {
-    requested.set(cardFile(cards, spec), { title: text, image })
+    requested.set(cardFile(cards, spec), { title: text, image, name })
   }
 
   if (linked)
     return `${VARIANTS}${cardFile(cards, spec)}`
 
-  return `${CARD_ROUTE}?${new URLSearchParams({ title: text, ...(image === undefined ? {} : { src: image }), v: cards.look, sig: signature(signingKey(cards), spec) })}`
+  return `${CARD_ROUTE}?${new URLSearchParams({ title: text, ...(image === undefined ? {} : { src: image }), ...(name === undefined ? {} : { name }), v: cards.look, sig: signature(signingKey(cards), spec) })}`
 }
 
 function cardTitle(title: string): string {
   return [...title.normalize('NFC').replace(SPACES, ' ').trim()].slice(0, MAX_TITLE).join('')
 }
 
-function cardSpec(title: string, image: string | undefined): string {
-  return JSON.stringify([title, image ?? ''])
+// The name a page of another locale reads in place of the default locale's, undefined while it reads the same, so those cards and their URLs are the default locale's.
+function nameFor(cards: Cards): string | undefined {
+  const name = localizedText(cards.names, localeState()?.locale, cards.defaultLocale)
+
+  return name === cards.name ? undefined : name
+}
+
+// A name of its own is part of what is signed, so it cannot be made up either.
+function cardSpec(title: string, image: string | undefined, name?: string): string {
+  return JSON.stringify(name === undefined ? [title, image ?? ''] : [title, image ?? '', name])
 }
 
 // `version` tells apart the cards of an image from `images.dirs`, which may change in place.
@@ -334,7 +353,8 @@ export function serveCards(app: Elysia, cards: Cards, options: ImageRouteOptions
     const url = requestUrl(request)
     const title = url.searchParams.get('title') ?? ''
     const src = url.searchParams.get('src') ?? undefined
-    const spec = cardSpec(title, src)
+    const siteName = url.searchParams.get('name') ?? undefined
+    const spec = cardSpec(title, src, siteName)
     const key = cards.key ??= existingKey(cards)
 
     if (!key || cards.font instanceof Error || !signed(key, spec, url.searchParams.get('sig') ?? ''))
@@ -373,7 +393,7 @@ export function serveCards(app: Elysia, cards: Cards, options: ImageRouteOptions
       if (!writing) {
         writing = (async () => {
           try {
-            await drawing(async () => writeCard(cards, file, title, source && { path: source.path, maxPixels: source.immutable ? undefined : MAX_UPLOAD_PIXELS }))
+            await drawing(async () => writeCard(cards, file, title, siteName, source && { path: source.path, maxPixels: source.immutable ? undefined : MAX_UPLOAD_PIXELS }))
           }
           finally {
             pending.delete(file)
@@ -427,7 +447,7 @@ export async function writeCards(clientDir: string, cacheDir?: string, remote?: 
       if (source && 'status' in source)
         throw new KayError('share-card-invalid', `kay: a page's share card is drawn on ${card.image}, which the build could not download: ${source.message}`)
 
-      await writeCard(current!, cached ?? target, card.title, source && { path: source.path, maxPixels: source.immutable ? undefined : MAX_UPLOAD_PIXELS })
+      await writeCard(current!, cached ?? target, card.title, card.name, source && { path: source.path, maxPixels: source.immutable ? undefined : MAX_UPLOAD_PIXELS })
       drawn++
     }
 
@@ -441,8 +461,8 @@ export async function writeCards(clientDir: string, cacheDir?: string, remote?: 
   return drawn
 }
 
-async function writeCard(cards: Cards, target: string, title: string, image?: { path: string, maxPixels?: number | undefined }): Promise<void> {
-  const look: CardLook = { face: await cardFace(cards), background: cards.background, color: cards.color, name: cards.name, logo: cards.logo, quality: cards.quality }
+async function writeCard(cards: Cards, target: string, title: string, name: string | undefined, image?: { path: string, maxPixels?: number | undefined }): Promise<void> {
+  const look: CardLook = { face: await cardFace(cards), background: cards.background, color: cards.color, name: name ?? cards.name, logo: cards.logo, quality: cards.quality }
 
   await writeAtomically(target, await drawCard(look, title, image && await coverImage(Bun.file(image.path), CARD.width, CARD.height, image.maxPixels)))
 }

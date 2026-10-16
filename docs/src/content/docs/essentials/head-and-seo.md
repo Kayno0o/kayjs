@@ -82,7 +82,7 @@ seo: {
 },
 ```
 
-A locale the record leaves out reads the default locale's. `kay check` measures each description against the length search results show, and the manifest and the share cards read the default locale's `name` and `description`.
+A locale the record leaves out reads the default locale's. `kay check` measures each description against the length search results show, and the share card names the site in the page's locale. The web manifest follows the locale too: a locale with a `name` or `description` of its own links a manifest of its own, `/manifest.fr.webmanifest`, and one reading the default locale's text links `/manifest.webmanifest`. The OpenAPI document is one for every locale, so its title is the default locale's `name`.
 
 <Callout type="tip">
 
