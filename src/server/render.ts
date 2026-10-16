@@ -738,7 +738,7 @@ function pageHead(page: PageModule, head: HeadOptions | undefined): HeadOptions 
   return { ...head, defaults: [...head?.defaults ?? [], { tag: 'meta', props: { name: 'robots', content: 'noindex' } }] }
 }
 
-// Each route's modules by its chain, which `routeChain` keeps one array of: a module once imported stays for the process.
+// Each route's modules by its chain, which `routeChain` keeps one array of, a special page's chain being new each time: a module once imported stays for the process.
 const chainModules = new WeakMap<string[], PageModule[]>()
 
 async function importAll(files: string[], options: RenderOptions): Promise<PageModule[]> {

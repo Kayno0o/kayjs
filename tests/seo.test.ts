@@ -56,6 +56,16 @@ describe('seo head', () => {
     expect(head).toContain('<meta name="twitter:image:alt" content="The kay site">')
   })
 
+  it('gives every page the same site defaults, each with its own canonical URL', async () => {
+    const first = (await headOf('/')).head
+    const about = (await headOf('/about')).head
+
+    expect((await headOf('/')).head).toBe(first)
+    expect(about).toContain('<meta name="twitter:site" content="@kay">')
+    expect(about).toContain('<link rel="canonical" href="https://example.com/about">')
+    expect(about).not.toContain('href="https://example.com/">')
+  })
+
   it('gives the image a page sets its own size and alt text, not the site image\'s', async () => {
     const card = (await headOf('/card')).head
 

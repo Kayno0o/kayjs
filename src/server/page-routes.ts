@@ -184,7 +184,7 @@ export function servePageRoutes(app: Elysia, { table, served: claims, matchers, 
       if (params) {
         const { method } = context.request
 
-        return traced(`${method} ${route.pattern}`, { kind: SERVER_SPAN, attributes: { 'http.request.method': method, 'http.route': route.pattern, 'url.path': url.pathname, 'kay.request.id': requestId(context.request) } }, async (span) => {
+        return traced(() => `${method} ${route.pattern}`, () => ({ kind: SERVER_SPAN, attributes: { 'http.request.method': method, 'http.route': route.pattern, 'url.path': url.pathname, 'kay.request.id': requestId(context.request) } }), async (span) => {
           const response = await respond(route, params, context, url)
 
           if (span)

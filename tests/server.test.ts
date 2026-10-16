@@ -33,7 +33,7 @@ import { inServerScope } from '../src/server/scope'
 import { projectSource } from '../src/server/source'
 import { speculationRules } from '../src/server/speculation'
 import { KEEP_ALIVE_MS, streamDocument } from '../src/server/stream'
-import { setTracer } from '../src/server/trace'
+import { setTracer, traced } from '../src/server/trace'
 import { parsingRoutes, routePaths } from './elysia'
 import { auth } from './fixtures/site/src/auth'
 import { resetTodos } from './fixtures/site/src/data'
@@ -1795,6 +1795,16 @@ describe('tracing and timing in production', () => {
     expect((await traced.handle(new Request('http://localhost/todos/999'))).status).toBe(404)
     expect(ended.map(span => span.name)).toContain('kay.load tests/fixtures/site/src/routes/todos/[id].kay')
     expect(ended.filter(span => span.status !== undefined)).toEqual([])
+  })
+
+  it('builds no span name or attributes without a tracer', () => {
+    const never = () => {
+      throw new Error('built')
+    }
+
+    setTracer(undefined)
+
+    expect(traced(never, never, () => 1)).toBe(1)
   })
 
   it('hands it a span per action call', async () => {

@@ -47,11 +47,11 @@ export function answered(span: Span, status: number): void {
 }
 
 // Runs `fn` in a span the work it starts nests under, which ends as `fn` settles, recording what it throws; without a tracer it runs `fn` alone, a name given as a function never built.
-export function traced<T>(name: string | (() => string), options: SpanOptions, fn: (span?: Span) => T): T {
+export function traced<T>(name: string | (() => string), options: SpanOptions | (() => SpanOptions), fn: (span?: Span) => T): T {
   if (!tracer)
     return fn()
 
-  return tracer.startActiveSpan(typeof name === 'string' ? name : name(), options, (span) => {
+  return tracer.startActiveSpan(typeof name === 'string' ? name : name(), typeof options === 'function' ? options() : options, (span) => {
     let result: T
 
     try {

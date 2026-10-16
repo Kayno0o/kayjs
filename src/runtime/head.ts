@@ -56,11 +56,11 @@ const DATA_SCRIPT = /json|^(?:importmap|speculationrules)$/i
 const ABSOLUTE_PATH = /^\/(?!\/)/
 const STYLE_END = /<\/(style)/gi
 const VIEWPORT = 'meta:name:viewport'
-const NO_ATTRIBUTES: ReadonlyMap<string, string | true> = new Map()
 const OG_IMAGE = 'meta:property:og:image'
 const IMAGE_DETAILS = ['meta:property:og:image:width', 'meta:property:og:image:height', 'meta:property:og:image:alt', 'meta:name:twitter:image:alt']
 const CHARSET = 'charset'
 const SPACES = /\s+/
+const NO_ATTRIBUTES: ReadonlyMap<string, string | true> = new Map()
 
 // Renders are synchronous, so the head of the one in progress can live here; a `head` outside a page render sets nothing.
 let groups: HeadTag[][] | undefined
@@ -105,9 +105,6 @@ function renderHead(collected: HeadTag[][], options: HeadOptions): RenderedHead 
     for (const tag of group) {
       if (tag == null || !HEAD_TAGS.has(tag.tag))
         continue
-
-      if (index === 0 && options.defaults !== undefined)
-        keepMarkup(tag)
 
       if (tag.tag === 'html') {
         for (const [name, value] of Object.entries(tag.props)) {
@@ -309,12 +306,14 @@ function replaceableIdentity({ tag, props }: HeadTag): string | undefined {
   return undefined
 }
 
-// The markup of the tags every page starts from, mostly the config's, the same objects from one render to the next: a template's own tags are new each render, so they are not kept.
+// The markup of the tags every page starts from, the same objects from one render to the next, which nothing changes once kept.
 const keptMarkup = new WeakMap<HeadTag, string>()
 
-function keepMarkup(tag: HeadTag): void {
-  if (tag.tag !== 'html' && !keptMarkup.has(tag))
-    keptMarkup.set(tag, markupNow(tag))
+export function keepHeadMarkup(tags: HeadTag[]): void {
+  for (const tag of tags) {
+    if (tag.tag !== 'html' && HEAD_TAGS.has(tag.tag))
+      keptMarkup.set(tag, markupNow(tag))
+  }
 }
 
 function tagMarkup(tag: HeadTag): string {

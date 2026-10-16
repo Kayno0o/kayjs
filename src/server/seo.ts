@@ -5,7 +5,7 @@ import type { LocaleCopy } from './i18n'
 import { join } from 'node:path'
 import { KayError } from '../compiler/errors'
 import { projectPaths } from '../project'
-import { inlineText } from '../runtime/head'
+import { inlineText, keepHeadMarkup } from '../runtime/head'
 import { CARD, CARD_ROUTE, IMAGE_ROUTE, importedSize, RESIZABLE, VARIANTS } from '../runtime/image'
 import { localeState } from '../runtime/locale-state'
 import { jsonLd } from '../runtime/seo'
@@ -121,6 +121,8 @@ export function seoHead(site: string | undefined, seo: SeoConfig = {}, extra: He
 
   for (const data of seo.jsonLd ?? [])
     tags.push({ tag: 'script', props: { type: 'application/ld+json', children: jsonLd(data) } })
+
+  keepHeadMarkup(tags)
 
   // An error page is no URL to point search engines at.
   return (url, status) => ({
