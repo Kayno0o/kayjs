@@ -3,7 +3,7 @@ import { join, relative } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { outputDir } from '../src/build/assets'
-import { verifyExecutable } from '../src/build/verify'
+import { holdsRunning, verifyExecutable } from '../src/build/verify'
 import { LINT_GROUPS, LINTS } from '../src/compiler/lints'
 import { scratchDir } from './scratch'
 
@@ -163,13 +163,13 @@ describe('kay build --format json', () => {
       const refusing = await executable(serving(404))
 
       expect(await verifyExecutable(refusing.file, refusing.root, false)).toBeGreaterThan(0)
-      await expect(verifyExecutable(refusing.file, refusing.root, undefined, 1500)).rejects.toThrow('did not answer within 1.5 s')
+      await expect(verifyExecutable(refusing.file, refusing.root, undefined, { startTimeoutMs: 1500 })).rejects.toThrow('did not answer within 1.5 s')
     }, 30_000)
 
     it('fails when the executable never answers within the time it has', async () => {
       const silent = await executable('#!/bin/sh\necho starting\nexec sleep 30\n')
 
-      await expect(verifyExecutable(silent.file, silent.root, undefined, 1500)).rejects.toThrow(/did not answer within 1.5 s\nstarting/)
+      await expect(verifyExecutable(silent.file, silent.root, undefined, { startTimeoutMs: 1500 })).rejects.toThrow(/did not answer within 1.5 s\nstarting/)
     }, 30_000)
 
     it('reports a startup failure though a grandchild still holds its output open', async () => {
@@ -261,6 +261,27 @@ describe('kay build --format json', () => {
       const cut = await executable('#!/bin/sh\nprintf "last line \\342\\202" >&2\nexit 1\n')
 
       await expect(verifyExecutable(cut.file, cut.root, undefined)).rejects.toThrow(/last line \uFFFD/)
+    }, 30_000)
+
+    it('fails with a line saying so when the --health probe never exits', async () => {
+      const hanging = await executable('#!/usr/bin/env bun\nif (process.argv[2] === \'--health\') await Bun.sleep(60_000)\nBun.serve({ hostname: \'127.0.0.1\', port: Number(process.env.PORT), fetch: () => new Response(\'\') })\n')
+
+      await expect(verifyExecutable(hanging.file, hanging.root, undefined, { probeTimeoutMs: 1000 })).rejects.toThrow('run with --health did not exit within 1 s')
+    }, 30_000)
+
+    it('does not wait for the processes of a group that are only zombies', () => {
+      expect(holdsRunning([])).toBe(true)
+      expect(holdsRunning(['Z', 'Z'])).toBe(false)
+      expect(holdsRunning(['Z', 'S'])).toBe(true)
+    })
+
+    it.skipIf(process.platform !== 'linux')('looks at the sockets of the server now and then while another process answers', async () => {
+      const foreign = await executable(`#!/bin/sh\n[ "$1" = "--health" ] && exit 0\n(setsid bun -e '${listening}' >/dev/null 2>&1 &)\nsleep 4\n`)
+      let checks = 0
+
+      await expect(verifyExecutable(foreign.file, foreign.root, undefined, { startTimeoutMs: 2000, ownershipChecked: () => checks++ })).rejects.toThrow('did not answer within 2 s')
+      expect(checks).toBeGreaterThan(0)
+      expect(checks).toBeLessThanOrEqual(6)
     }, 30_000)
 
     it('names the signal that killed a server which had answered', async () => {

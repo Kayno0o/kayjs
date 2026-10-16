@@ -5,25 +5,35 @@ import { KayError } from '../compiler/errors'
 import { HEALTH_PATH } from '../server/lifecycle'
 
 const START_TIMEOUT_MS = 30_000
+const PROBE_TIMEOUT_MS = 10_000
+const OWNERSHIP_RETRY_MS = 500
 const POLL_MS = 50
 const STOP_TIMEOUT_MS = 5_000
 const OUTPUT_LINES = 40
 const OUTPUT_GRACE_MS = 500
 const SETTLE_MS = 250
 const GROUP_POLL_MS = 25
-// The process group id is the fifth field of /proc/<pid>/stat, after the command in parentheses and the state and parent id.
-const STAT_GROUP = /^\d+ \(.*\) \S (\d+) (\d+)/s
+// The state, parent id and process group id of /proc/<pid>/stat, which follow the command in parentheses.
+const STAT = /^\d+ \(.*\) (\S) (\d+) (\d+)/s
 const INTERRUPTS = { SIGINT: 130, SIGHUP: 129, SIGTERM: 143 } as const
 const WHITESPACE = /\s+/
 const DIGITS = /^\d+$/
 const SOCKET_LINK = /^socket:\[(\d+)\]$/
 const LISTENING = '0A'
 
+export interface VerifyOptions {
+  startTimeoutMs?: number
+  probeTimeoutMs?: number
+  // Called each time the sockets of the server are looked at, for a test to count them.
+  ownershipChecked?: () => void
+}
+
 // Starts the executable on a free port as a deploy would, waits until its health route answers 200, runs it again as `--health` the way a container's health check does, then stops it.
 // A server that exits before it answers fails with its own output, one that never answers within 30 s with what it printed so far.
 // An answer only counts when the socket answering it belongs to the server's own process group (where /proc says so, on Linux) and the server is still running a moment later, as another process that took the port between picking it and the server binding it would answer for a server that then exits.
 // The server runs in a group of its own, which is stopped whole: nothing it spawned outlives the verify, an interrupted build included, as the group no longer gets the terminal's signals.
-export async function verifyExecutable(executable: string, root: string, health: HealthConfig | false | undefined, startTimeoutMs = START_TIMEOUT_MS): Promise<number> {
+export async function verifyExecutable(executable: string, root: string, health: HealthConfig | false | undefined, options: VerifyOptions = {}): Promise<number> {
+  const { startTimeoutMs = START_TIMEOUT_MS, probeTimeoutMs = PROBE_TIMEOUT_MS } = options
   const started = performance.now()
   const port = String(await freePort())
   const env = { ...process.env, NODE_ENV: 'production', PORT: port }
@@ -47,9 +57,20 @@ export async function verifyExecutable(executable: string, root: string, health:
   try {
     const url = `http://127.0.0.1:${port}${health === false ? '/' : health?.path ?? HEALTH_PATH}`
     let ready = false
+    // While another process answers in the server's place, its sockets are looked at again only now and then.
+    let foreignUntil = 0
 
     while (!ready && running() && performance.now() - started < startTimeoutMs) {
-      ready = await answers(url, health === false) && await ownsPort(server.pid, Number(port)) !== false
+      ready = await answers(url, health === false)
+
+      if (ready && performance.now() < foreignUntil) {
+        ready = false
+      }
+      else if (ready) {
+        options.ownershipChecked?.()
+        ready = await ownsPort(server.pid, Number(port)) !== false
+        foreignUntil = ready ? 0 : performance.now() + OWNERSHIP_RETRY_MS
+      }
 
       if (!ready)
         await Bun.sleep(POLL_MS)
@@ -74,10 +95,20 @@ export async function verifyExecutable(executable: string, root: string, health:
 
       live.add(probe)
 
-      const [code, error] = await Promise.all([probe.exited, new Response(probe.stderr).text()])
+      let timer: ReturnType<typeof setTimeout> | undefined
+      const timeout = new Promise<'timeout'>((resolve) => {
+        timer = setTimeout(resolve, probeTimeoutMs, 'timeout')
+      })
+      const probed = await Promise.race([Promise.all([probe.exited, new Response(probe.stderr).text()]), timeout])
 
+      clearTimeout(timer)
       await stop(probe)
       live.delete(probe)
+
+      if (probed === 'timeout')
+        throw new KayError('executable-failed', `kay: the executable run with --health did not exit within ${probeTimeoutMs / 1000} s though the server answered`)
+
+      const [code, error] = probed
 
       if (code !== 0)
         throw new KayError('executable-failed', `kay: the executable run with --health exited with code ${code} though the server answered\n${tail(error)}`.trimEnd())
@@ -159,13 +190,57 @@ async function stop(server: Bun.Subprocess): Promise<void> {
 
   const deadline = performance.now() + STOP_TIMEOUT_MS
 
-  while (signalGroup(server, 0) && performance.now() < deadline)
+  while (await groupRunning(server) && performance.now() < deadline)
     await Bun.sleep(GROUP_POLL_MS)
 
   if (!signalGroup(server, 'SIGKILL'))
     server.kill('SIGKILL')
 
   await server.exited
+}
+
+// Whether the group still holds a process that runs: one that no process reaps stays a zombie, and a container without an init leaves them, which are nothing to wait for.
+async function groupRunning(server: Bun.Subprocess): Promise<boolean> {
+  if (!signalGroup(server, 0))
+    return false
+
+  const members = [...(await readStats()).values()].filter(stat => stat.group === String(server.pid))
+
+  return holdsRunning(members.map(stat => stat.state))
+}
+
+// Whether any of the states, as /proc gives them, is a process that runs; none listed is taken as one that does, as /proc may not list them.
+export function holdsRunning(states: string[]): boolean {
+  return states.length === 0 || states.some(state => state !== 'Z')
+}
+
+interface Stat {
+  state: string
+  parent: string
+  group: string
+}
+
+// The state and the family of each process /proc lists; empty where it lists none.
+async function readStats(): Promise<Map<string, Stat>> {
+  const stats = new Map<string, Stat>()
+
+  try {
+    for (const pid of await readdir('/proc')) {
+      if (!DIGITS.test(pid))
+        continue
+
+      try {
+        const stat = STAT.exec(await Bun.file(`/proc/${pid}/stat`).text())
+
+        if (stat !== null)
+          stats.set(pid, { state: stat[1]!, parent: stat[2]!, group: stat[3]! })
+      }
+      catch {}
+    }
+  }
+  catch {}
+
+  return stats
 }
 
 // Whether the socket listening on the port belongs to the server's processes, its group and what its processes started: false when the sockets of all of them were read and it is none of theirs, undefined where /proc cannot say.
@@ -205,29 +280,19 @@ async function ownsPort(group: number, port: number): Promise<boolean | undefine
 
 // The processes of the group and those they started, which may have left the group.
 async function membersOf(group: number): Promise<string[]> {
-  const parents = new Map<string, string>()
+  const stats = await readStats()
   const members = new Set<string>()
 
-  for (const pid of await readdir('/proc')) {
-    if (!DIGITS.test(pid))
-      continue
-
-    try {
-      const stat = STAT_GROUP.exec(await Bun.file(`/proc/${pid}/stat`).text())
-
-      parents.set(pid, stat?.[1] ?? '')
-
-      if (stat?.[2] === String(group))
-        members.add(pid)
-    }
-    catch {}
+  for (const [pid, stat] of stats) {
+    if (stat.group === String(group))
+      members.add(pid)
   }
 
   for (let grew = true; grew;) {
     grew = false
 
-    for (const [pid, parent] of parents) {
-      if (!members.has(pid) && members.has(parent)) {
+    for (const [pid, stat] of stats) {
+      if (!members.has(pid) && members.has(stat.parent)) {
         members.add(pid)
         grew = true
       }
@@ -235,19 +300,6 @@ async function membersOf(group: number): Promise<string[]> {
   }
 
   return [...members]
-}
-
-async function freePort(): Promise<number> {
-  const listener = Bun.serve({ hostname: '127.0.0.1', port: 0, fetch: () => new Response() })
-  const port = listener.port
-
-  await listener.stop(true)
-
-  return port!
-}
-
-function tail(text: string): string {
-  return text.split('\n').slice(-OUTPUT_LINES).join('\n')
 }
 
 // The inodes of the sockets a process holds open, undefined when its descriptors cannot be listed; a descriptor that closes while it is read, the directory listing's own among them, is left out.
@@ -270,4 +322,17 @@ async function socketsOf(pid: string): Promise<string[] | undefined> {
   }
 
   return inodes
+}
+
+async function freePort(): Promise<number> {
+  const listener = Bun.serve({ hostname: '127.0.0.1', port: 0, fetch: () => new Response() })
+  const port = listener.port
+
+  await listener.stop(true)
+
+  return port!
+}
+
+function tail(text: string): string {
+  return text.split('\n').slice(-OUTPUT_LINES).join('\n')
 }
