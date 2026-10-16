@@ -56,6 +56,7 @@ const DATA_SCRIPT = /json|^(?:importmap|speculationrules)$/i
 const ABSOLUTE_PATH = /^\/(?!\/)/
 const STYLE_END = /<\/(style)/gi
 const VIEWPORT = 'meta:name:viewport'
+const NO_ATTRIBUTES: ReadonlyMap<string, string | true> = new Map()
 const OG_IMAGE = 'meta:property:og:image'
 const IMAGE_DETAILS = ['meta:property:og:image:width', 'meta:property:og:image:height', 'meta:property:og:image:alt', 'meta:name:twitter:image:alt']
 const CHARSET = 'charset'
@@ -90,25 +91,33 @@ function renderHead(collected: HeadTag[][], options: HeadOptions): RenderedHead 
   const resources = new Set<string>()
   const winners = new Map<string, HeadTag[]>()
   let unique = 0
+  let rooted = false
   let resourcesHtml = ''
   let styles = ''
   let titleGroup = -1
   // An attribute a later group sets on `<html>` replaces an earlier one's, `false` or `null` taking it off; `class` gathers every group's tokens instead.
   const root: Record<string, unknown> = {}
 
-  for (const [index, group] of collected.entries()) {
+  for (let index = 0; index < collected.length; index++) {
+    const group = collected[index]!
     const own = new Map<string, HeadTag[]>()
 
     for (const tag of group) {
       if (tag == null || !HEAD_TAGS.has(tag.tag))
         continue
 
+      if (index === 0 && options.defaults !== undefined)
+        keepMarkup(tag)
+
       if (tag.tag === 'html') {
         for (const [name, value] of Object.entries(tag.props)) {
           const key = name.toLowerCase()
 
-          if (!LOCALE_ATTRIBUTES.has(key))
-            root[key] = key === 'class' ? joinClasses(root.class as string | undefined, classText(value)) : value
+          if (LOCALE_ATTRIBUTES.has(key))
+            continue
+
+          rooted = true
+          root[key] = key === 'class' ? joinClasses(root.class as string | undefined, classText(value)) : value
         }
 
         continue
@@ -129,7 +138,7 @@ function renderHead(collected: HeadTag[][], options: HeadOptions): RenderedHead 
         continue
       }
 
-      const identity = replaceableIdentity(tag, () => `u:${unique++}`)
+      const identity = replaceableIdentity(tag) ?? `u:${unique++}`
       const list = own.get(identity)
 
       if (list)
@@ -186,7 +195,7 @@ function renderHead(collected: HeadTag[][], options: HeadOptions): RenderedHead 
     }
   }
 
-  const rootAttributes = attributesOf(root)
+  const rootAttributes = rooted ? attributesOf(root) : NO_ATTRIBUTES
 
   if (rootAttributes.size > 0)
     metas += tagMarkup({ tag: 'meta', props: { name: ROOT_ATTRIBUTES, content: servedJson(rootAttributes) } })
@@ -264,7 +273,8 @@ function resourceIdentity({ tag, props }: HeadTag): string {
   return `${tag}:${String(props.rel ?? '')}:${String(props.href ?? props.src ?? '')}:${String(props.as ?? '')}:${String(props.media ?? '')}:${String(props.type ?? '')}`
 }
 
-function replaceableIdentity({ tag, props }: HeadTag, unique: () => string): string {
+// Undefined for a tag nothing replaces.
+function replaceableIdentity({ tag, props }: HeadTag): string | undefined {
   if (tag === 'title' || tag === 'base')
     return tag
 
@@ -277,7 +287,7 @@ function replaceableIdentity({ tag, props }: HeadTag, unique: () => string): str
         return `meta:${key}:${String(props[key])}${props.media != null ? `:media=${String(props.media)}` : ''}`
     }
 
-    return unique()
+    return undefined
   }
 
   if (tag === 'link') {
@@ -296,10 +306,22 @@ function replaceableIdentity({ tag, props }: HeadTag, unique: () => string): str
     return `link:${rel}:${String(props.href ?? '')}`
   }
 
-  return unique()
+  return undefined
+}
+
+// The markup of the tags every page starts from, mostly the config's, the same objects from one render to the next: a template's own tags are new each render, so they are not kept.
+const keptMarkup = new WeakMap<HeadTag, string>()
+
+function keepMarkup(tag: HeadTag): void {
+  if (tag.tag !== 'html' && !keptMarkup.has(tag))
+    keptMarkup.set(tag, markupNow(tag))
 }
 
 function tagMarkup(tag: HeadTag): string {
+  return keptMarkup.get(tag) ?? markupNow(tag)
+}
+
+function markupNow(tag: HeadTag): string {
   const attributes = markupOf(attributesOf(tag.props))
 
   if (VOID_TAGS.has(tag.tag))
@@ -323,11 +345,11 @@ function attributesOf(props: Record<string, unknown>): Map<string, string | true
 }
 
 // The attributes `<html>` takes, as JSON by name for the page swap, which reads one written bare as the browser does, `""`.
-function servedJson(attributes: Map<string, string | true>): string {
+function servedJson(attributes: ReadonlyMap<string, string | true>): string {
   return JSON.stringify(Object.fromEntries([...attributes].map(([name, value]) => [name, value === true ? '' : value])))
 }
 
-function markupOf(attributes: Map<string, string | true>): string {
+function markupOf(attributes: ReadonlyMap<string, string | true>): string {
   let markup = ''
 
   for (const [name, value] of attributes)

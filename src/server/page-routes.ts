@@ -101,8 +101,14 @@ export function pageResponder({ client, renderOptions, prerendered, settings, tr
     if (preview !== undefined)
       return forVisitor(async () => preview === 'edit' ? inPreview(render, true, requestDrafts(context.request)) : inPreview(render))
 
+    const copies = prerendered.get(route.pattern)
+
+    // A route `kay build` rendered nothing of is rendered without reading the path again.
+    if (!copies)
+      return render()
+
     const key = prerenderKey(settings, localeState()?.locale, canonicalPath(withoutSlash(url.pathname)))
-    const page = prerendered.get(route.pattern)?.get(key)
+    const page = copies.get(key)
 
     if (!page)
       return render()

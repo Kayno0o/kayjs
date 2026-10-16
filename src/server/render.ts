@@ -194,7 +194,7 @@ async function renderRoute(route: ServedRoute, rendering: Rendering, client: Cli
 
   try {
     const started = performance.now()
-    const body = traced(`kay.render ${projectPath(route.file)}`, {}, () => renderDocument(page.files, page.modules, page.data, client, rendering, options))
+    const body = traced(() => `kay.render ${projectPath(route.file)}`, {}, () => renderDocument(page.files, page.modules, page.data, client, rendering, options))
 
     timed(page, rendering, started, options)
 
@@ -324,6 +324,10 @@ async function loadRoute(route: ServedRoute, rendering: Rendering, client: Clien
 
 // Every load at once, each settling into `loaded`, where one that went through already is reused; when several fail, the outermost one throws.
 async function runLoads(files: string[], modules: PageModule[], ctx: PageContext<Record<string, unknown>>, loaded: Map<string, Loaded>, timings?: number[]): Promise<Record<string, unknown>[]> {
+  // Most chains load nothing: their data is settled at once, without a promise per module.
+  if (!modules.some(module => module.load))
+    return modules.map((_, index) => settledEmpty(files[index]!, loaded))
+
   const loads = await Promise.allSettled(modules.map(async (module, index) => {
     const prior = loaded.get(files[index]!)
 
@@ -339,6 +343,19 @@ async function runLoads(files: string[], modules: PageModule[], ctx: PageContext
 
     return load.value
   })
+}
+
+function settledEmpty(file: string, loaded: Map<string, Loaded>): Record<string, unknown> {
+  const prior = loaded.get(file)
+
+  if (prior?.status === 'fulfilled')
+    return prior.value
+
+  const value = {}
+
+  loaded.set(file, { status: 'fulfilled', value })
+
+  return value
 }
 
 // Times the loads and the render since `started` in a `Server-Timing` header, when `serverTiming` asks; development times the loads for the dev tool either way.
@@ -357,7 +374,7 @@ async function runLoad(file: string, module: PageModule, ctx: PageContext<Record
     return {}
 
   const load = module.load
-  const run = async () => traced(`kay.load ${projectPath(file)}`, {}, async () => await load(ctx) ?? {})
+  const run = async () => traced(() => `kay.load ${projectPath(file)}`, {}, async () => await load(ctx) ?? {})
 
   if (!timings)
     return run()
@@ -721,11 +738,19 @@ function pageHead(page: PageModule, head: HeadOptions | undefined): HeadOptions 
   return { ...head, defaults: [...head?.defaults ?? [], { tag: 'meta', props: { name: 'robots', content: 'noindex' } }] }
 }
 
+// Each route's modules by its chain, which `routeChain` keeps one array of: a module once imported stays for the process.
+const chainModules = new WeakMap<string[], PageModule[]>()
+
 async function importAll(files: string[], options: RenderOptions): Promise<PageModule[]> {
   if (options.editor !== undefined && editing())
     editors.set(options.editor, await importModule<EditorModule>(options.editor))
 
-  return Promise.all(files.map(async file => importModule<PageModule>(file)))
+  let modules = chainModules.get(files)
+
+  if (!modules)
+    chainModules.set(files, modules = await Promise.all(files.map(async file => importModule<PageModule>(file))))
+
+  return modules
 }
 
 // The editor's own extension's pages, its admin screens say, render no editor over them, nor does what they fail with, whichever page shows it.
