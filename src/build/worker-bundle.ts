@@ -1,5 +1,5 @@
 import type { KayPluginOptions } from './plugin'
-import { basename } from 'node:path'
+import { basename, resolve } from 'node:path'
 import process from 'node:process'
 import { apiStubs } from '../server/api-modules'
 import { kayPlugin } from './plugin'
@@ -16,6 +16,13 @@ export interface WorkerBundle {
   workers: string[]
 }
 
+// What the process prints: the name of the worker's file, every file the bundle wrote and every file it read.
+export interface WorkerResult {
+  name: string
+  outputs: string[]
+  inputs: string[]
+}
+
 // Bun cannot start a build while a plugin of another waits, so a worker is bundled by a process of its own, which prints its file's name.
 if (import.meta.main) {
   const bundle = JSON.parse(process.argv[2]!) as WorkerBundle
@@ -29,6 +36,7 @@ if (import.meta.main) {
     external: bundle.options.external ?? [],
     naming: { entry: '[name]-[hash].[ext]', chunk: '[name]-[hash].[ext]', asset: '[name]-[hash].[ext]' },
     plugins: [withoutStyles(), ...bundle.options.api ? [apiStubs(bundle.options.api)] : [], kayPlugin(bundle.options, bundle.workers)],
+    metafile: true,
     throw: false,
   })
 
@@ -37,5 +45,11 @@ if (import.meta.main) {
     process.exit(1)
   }
 
-  process.stdout.write(basename(out.outputs.find(output => output.kind === 'entry-point')!.path))
+  const result: WorkerResult = {
+    name: basename(out.outputs.find(output => output.kind === 'entry-point')!.path),
+    outputs: out.outputs.map(output => output.path),
+    inputs: Object.keys(out.metafile!.inputs).map(input => resolve(input)),
+  }
+
+  process.stdout.write(JSON.stringify(result))
 }

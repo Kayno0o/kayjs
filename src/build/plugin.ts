@@ -1,8 +1,8 @@
 import type { BunPlugin } from 'bun'
 import type { RouteMount } from '../server/routes'
 import type { Target } from './transform'
-import type { WorkerBundle } from './worker-bundle'
-import { readFileSync, realpathSync, statSync } from 'node:fs'
+import type { WorkerBundle, WorkerResult } from './worker-bundle'
+import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs'
 import { basename, dirname, join, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { ISLAND_TWIN, withoutTwin } from '../compiler'
@@ -52,6 +52,17 @@ const SCRIPT_FILE = /\.(?:[cm]?[jt]s|[jt]sx)$/
 const WASM_FILE = /\.wasm$/i
 const WORKER_BUNDLE = join(import.meta.dir, 'worker-bundle.ts')
 
+// The workers this process bundled, kept while the files they read and wrote are as they were: `kay dev` builds the same workers again with every edit, and a process each is most of what a build costs.
+const bundledWorkers = new Map<string, { result: WorkerResult, stamp: string }>()
+
+function stampOf(files: string[]): string {
+  return files.map((file) => {
+    const stat = statSync(file, { throwIfNoEntry: false })
+
+    return `${stat?.mtimeMs}:${stat?.size}`
+  }).join(',')
+}
+
 async function assetModule(path: string, url: string): Promise<string> {
   if (!RESIZABLE.test(path))
     return `export default ${JSON.stringify(url)}`
@@ -97,13 +108,26 @@ export function kayPlugin(options: KayPluginOptions, workers: string[]): BunPlug
 
       const bundleWorker = async (path: string): Promise<string> => {
         const bundle: WorkerBundle = { entry: path, outdir: join(dist, 'assets'), minify: config.minify ?? false, define: config.define ?? {}, options: { ...options, root, anchor: undefined, anchored: undefined }, workers: [...workers, path] }
+        const key = JSON.stringify(bundle)
+        const kept = bundledWorkers.get(key)
+
+        if (kept !== undefined && kept.result.outputs.every(output => existsSync(output)) && stampOf(kept.result.inputs) === kept.stamp)
+          return kept.result.name
+
+        const started = Date.now()
         const child = Bun.spawn([process.execPath, WORKER_BUNDLE, JSON.stringify(bundle)], { cwd: root, env: { ...process.env, [RENDER_OUTPUT]: basename(dirname(dist)) }, stdout: 'pipe', stderr: 'pipe' })
         const [name, problems, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
 
         if (code !== 0)
           throw new KayError('worker-build', `kay: the worker ${path} failed to build:\n${problems.trim()}`)
 
-        return name
+        const result = JSON.parse(name) as WorkerResult
+
+        // A file written while the bundle ran may not be the one it read.
+        if (result.inputs.every(input => (statSync(input, { throwIfNoEntry: false })?.mtimeMs ?? 0) < started))
+          bundledWorkers.set(key, { result, stamp: stampOf(result.inputs) })
+
+        return result.name
       }
 
       const fileUrl = async (file: string, specifier: string): Promise<string | undefined> => {

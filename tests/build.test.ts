@@ -11,7 +11,7 @@ import { tmpdir } from 'node:os'
 import { basename, dirname, join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import tailwind from 'bun-plugin-tailwind'
-import { describe, expect, it } from 'bun:test'
+import { describe, expect, it, spyOn } from 'bun:test'
 import { Elysia } from 'elysia'
 import { ASSET_FILE, clientDir, outputDir, writeAsset } from '../src/build/assets'
 import { writeCacheEntry } from '../src/build/cache'
@@ -243,6 +243,51 @@ describe('kay build', () => {
       expect(await rebuilds('Bonjour underline-offset-4 encore span.py-1 span.py-1.5 span(class="w-[13px]")')).toBe(true)
     }
     finally {
+      await rm(project, { recursive: true, force: true })
+    }
+  })
+
+  it('bundles a worker once for the builds of kay dev, and again once a file it read changes', async () => {
+    const project = await scratchDir('kay-worker-kept-')
+    const files = {
+      'src/echo.ts': 'postMessage(1)\n',
+      'src/lab.kay': '---\nonMount(() => {\n  new Worker(new URL(\'./echo.ts\', import.meta.url), { type: \'module\' })\n})\n---\np lab\n',
+      'src/routes/index.kay': '---\nimport Lab from \'../lab.kay\'\n---\nLab\n',
+    }
+
+    await Promise.all(Object.entries(files).map(async ([file, content]) => Bun.write(join(project, file), content)))
+    const spawn = Bun.spawn
+    const spawned: string[][] = []
+    const bundles = () => spawned.filter(args => String(args[1]).endsWith('worker-bundle.ts')).length
+    const spy = spyOn(Bun, 'spawn').mockImplementation(((command: string[], ...rest: unknown[]) => {
+      spawned.push(command)
+
+      return (spawn as (...args: unknown[]) => unknown)(command, ...rest)
+    }) as typeof Bun.spawn)
+    const build = devBuilder(project, {})
+    const lab = join(project, 'src/lab.kay')
+    const cwd = process.cwd()
+
+    try {
+      process.chdir(project)
+      expect((await build(null)).failed).toBe(false)
+
+      const first = bundles()
+
+      expect(first).toBeGreaterThan(0)
+      await Bun.write(lab, `${await Bun.file(lab).text()}p more\n`)
+      expect((await build(['src/lab.kay'])).failed).toBe(false)
+      expect(bundles()).toBe(first)
+
+      await Bun.sleep(20)
+      await Bun.write(join(project, 'src/echo.ts'), 'postMessage(2)\n')
+      await Bun.write(lab, `${await Bun.file(lab).text()}p again\n`)
+      expect((await build(['src/lab.kay'])).failed).toBe(false)
+      expect(bundles()).toBe(first + 1)
+    }
+    finally {
+      spy.mockRestore()
+      process.chdir(cwd)
       await rm(project, { recursive: true, force: true })
     }
   })
