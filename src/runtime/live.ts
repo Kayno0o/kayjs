@@ -604,6 +604,9 @@ function iterate(source: (signal: AbortSignal) => AsyncIterable<unknown>): Event
   const controller = new AbortController()
 
   const read = async () => {
+    if (controller.signal.aborted)
+      return
+
     setStatus('open')
 
     try {
@@ -640,7 +643,7 @@ function iterate(source: (signal: AbortSignal) => AsyncIterable<unknown>): Event
 // A GET stream that drops reconnects; `close()` aborts the request, and a stream closes with the component that opened it.
 export function stream<Module, const Path extends StreamPath<Module>, const M extends StreamMethod<NodeAt<Module, Path>> = never>(module: Module, path: Path, options: MethodOption<NodeAt<Module, Path>, M> & { start: false }): StreamRun<StreamValue<MethodRoute<Module, Path, Chosen<M>>>, StreamStartOptions<Module, Path, M>>
 export function stream<Module, const Path extends StreamPath<Module>, const M extends StreamMethod<NodeAt<Module, Path>> = never>(module: Module, path: Path, ...[options]: Optional<StreamOptions<Module, Path, M>>): StreamOf<Module, Path, M>
-// Reads any async iterable the same way, once the island is in the page: `source` gets a signal that aborts when `close()` is called or the component is gone. The stream is `done` once the iterable ends and `failed` when it throws.
+// Reads any async iterable the same way, once the island is in the page: `source` gets a signal that aborts when `close()` is called or the component is gone, and it has to stop on it, as a source ignoring the signal is not released while it waits for its next value. The stream is `done` once the iterable ends and `failed` when it throws.
 export function stream<T>(source: (signal: AbortSignal) => AsyncIterable<T>): EventReader<T>
 export function stream(module: unknown, path?: string, options?: { method?: string, start?: boolean }): EventReader<unknown> {
   if (typeof module === 'function')

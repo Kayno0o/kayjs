@@ -774,6 +774,24 @@ describe('resource()', () => {
     expect(found.error()).toBeUndefined()
   })
 
+  it('aborts a function once its component is gone, and keeps the status of an ApiError it throws', async () => {
+    let seen: AbortSignal | undefined
+    const [found, dispose] = root(done => [resource(async (abort) => {
+      seen = abort
+
+      throw new ApiError(503, 'busy')
+    }), done] as const)
+
+    await until(() => found.status() === 'failed')
+    expect(found.error()).toEqual({ status: 503, message: 'busy' })
+
+    const typed: Promise<number | undefined> = Promise.resolve(root(() => resource(async () => 1)).value())
+
+    await typed
+    dispose()
+    expect(seen?.aborted).toBe(true)
+  })
+
   it('takes only the GET routes answering a value, with the params they name', () => {
     const typed = () => {
       // @ts-expect-error: an event stream is read with stream()
@@ -1411,6 +1429,24 @@ describe('stream() over an async iterable', () => {
     await until(() => reader.status() === 'failed')
 
     expect(reader.last()).toBe(1)
+  })
+
+  it('never starts once closed before it mounts', () => {
+    let calls = 0
+    const reader = root(() => {
+      const read = stream(async function* () {
+        calls++
+        yield 1
+      })
+
+      read.close()
+
+      return read
+    })
+
+    flush()
+    expect(calls).toBe(0)
+    expect(reader.status()).toBe('closed')
   })
 
   it('aborts the signal and stops reading once closed', async () => {
