@@ -636,7 +636,7 @@ describe('the profile form of the account page', () => {
 
     const saved = await ada.submit(saveProfile, { displayName: '  Ada  ', bio: 'Maths', ignored: 'x' } as never, { from: '/auth/account' })
 
-    expect([...profiles.values()]).toEqual([{ displayName: 'Ada', bio: 'Maths' }])
+    expect([...profiles.values()]).toEqual([{ displayName: 'Ada', bio: 'Maths', constructor: '' }])
     expect(saved.find('input[name="displayName"]')[0]?.attributes.value).toBe('Ada')
     expect(saved.text()).toContain('Your profile is saved.')
   })
@@ -665,20 +665,23 @@ describe('the profile form of the account page', () => {
     expect((await ada.visit('/auth/account')).status).toBe(200)
   })
 
-  test('keys such as __proto__ and constructor in the posted form are no field: nothing is stored under them and no prototype changes', async () => {
+  test('a posted __proto__ key is no field and a field named constructor reads only what the form posted as its own', async () => {
     profiles.clear()
 
     const ada = await signedUp('hostile@example.com')
-    const body = Object.fromEntries([['displayName', 'Ada'], ['__proto__', 'polluted'], ['constructor', 'polluted'], ['hasOwnProperty', 'polluted']])
+    const page = await ada.visit('/auth/account')
+
+    expect(page.find('input[name="constructor"]')[0]?.attributes.value).toBe('')
+
+    const body = Object.fromEntries([['displayName', 'Ada'], ['__proto__', 'polluted'], ['constructor', 'mine'], ['hasOwnProperty', 'polluted']])
 
     await ada.submit(saveProfile, body as never, { from: '/auth/account' })
 
     const [stored] = [...profiles.values()]
 
-    expect(stored).toEqual({ displayName: 'Ada', bio: '' })
-    expect(Object.keys(stored!)).toEqual(['displayName', 'bio'])
+    expect(Object.entries(stored!)).toEqual([['displayName', 'Ada'], ['bio', ''], ['constructor', '']])
     expect(Object.getPrototypeOf(stored)).toBe(Object.prototype)
-    expect(({} as Record<string, unknown>).polluted).toBeUndefined()
+    expect(Object.hasOwn(stored!, 'hasOwnProperty')).toBe(false)
   })
 
   test('says what was refused, in the page\'s language, and stores nothing then', async () => {

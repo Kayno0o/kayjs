@@ -236,6 +236,13 @@ describe('guard', () => {
     expect(await run(auth.guard(), guardContext({ locals: anonymous }))).toBe('deny 401')
   })
 
+  test('takes an empty redirect for none: a 401 without pages', async () => {
+    const { auth } = testApp()
+    const anonymous = await contextOf(auth.plugin)
+
+    expect(await run(auth.guard({ redirect: '' }), guardContext({ locals: anonymous }))).toBe('deny 401')
+  })
+
   test('lets a signed-in user through, and denies one without the role asked', async () => {
     const { auth, browser } = await seeded()
     const ada = browser()

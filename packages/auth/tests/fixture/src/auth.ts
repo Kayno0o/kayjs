@@ -24,7 +24,7 @@ export const auth = createAuth({
   scopes: ['notes:read'],
   pages: {
     profile: {
-      fields: { displayName: { label: 'Display name', required: true, maxLength: 20 }, bio: { label: { en: 'Bio', fr: 'Biographie' }, type: 'textarea' } },
+      fields: { displayName: { label: 'Display name', required: true, maxLength: 20 }, bio: { label: { en: 'Bio', fr: 'Biographie' }, type: 'textarea' }, constructor: { label: 'Constructor' } },
       load: user => profiles.get(user.id) ?? {},
       save: (user, values) => {
         if (values.displayName === 'boom')

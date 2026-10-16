@@ -304,7 +304,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     const errors: Record<string, ProfileProblem> = {}
 
     for (const [name, field] of Object.entries(profile.fields)) {
-      const raw = values[name]
+      const raw = Object.hasOwn(values, name) ? values[name] : undefined
       const value = typeof raw === 'string' ? raw.trim() : ''
 
       clean[name] = value
