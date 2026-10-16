@@ -153,7 +153,7 @@ describe.concurrent('kay dev reloading', () => {
       // The entry ran again for each edit, and the app it replaced stopped before: its hooks end what it started.
       await until(() => project.ran().filter(line => line === 'run').length === 4)
       expect(project.ran().filter(line => line === 'stop')).toHaveLength(3)
-      expect(project.lines.filter(line => line.includes('restarted in'))).toHaveLength(3)
+      expect(project.lines.filter(line => line.includes('reloaded in'))).toHaveLength(3)
     }
     finally {
       await project.cleanup()

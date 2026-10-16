@@ -139,7 +139,7 @@ interface DevState {
   dismissed: string[]
 }
 
-// What `kay dev` says of a restart, or of a stylesheet edit it swapped in without one.
+// What `kay dev` says of a restart or a reload, or of a stylesheet edit it swapped in without either.
 interface Built {
   id: string
   // When it was done, by the clock of the machine `kay dev` runs on, which the browser's often is.
@@ -147,6 +147,8 @@ interface Built {
   changed: string
   ms: number
   styles?: boolean
+  // The running server took the change in, where a restart is a new process.
+  reloaded?: boolean
 }
 
 export interface DevTabOptions {
@@ -427,7 +429,9 @@ export function startDevTool(doc: Document = document): DevTool {
     saying = build.id
     clearTimeout(fading)
     clearTimeout(hiding)
-    built.textContent = `${build.changed}: ${build.styles === true ? 'stylesheets swapped' : 'restarted'} in ${build.ms} ms`
+    const did = build.styles === true ? 'stylesheets swapped' : 'restarted'
+
+    built.textContent = `${build.changed}: ${build.reloaded === true ? 'reloaded' : did} in ${build.ms} ms`
     built.classList.remove('fading')
     fading = setTimeout(() => built.classList.add('fading'), left)
     hiding = setTimeout(() => {

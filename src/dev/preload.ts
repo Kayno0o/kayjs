@@ -348,7 +348,7 @@ async function reloaded({ code, startedAt, changed, files }: ReloadRequest): Pro
     return { restart: 'the config does not load' }
   }
 
-  const plan = files === null ? { restart: 'too many files changed' } : planReload({ root, changed: files, loaded: Object.keys(require.cache), owned: [paths.routes, paths.api], config: join(root, CONFIG_FILE), entry: Bun.main })
+  const plan = files === null ? { restart: 'too many files changed' } : planReload({ root, changed: files, loaded: Object.keys(require.cache), owned: [paths.routes, paths.api], content: paths.content, config: join(root, CONFIG_FILE), entry: Bun.main })
 
   if ('restart' in plan)
     return plan

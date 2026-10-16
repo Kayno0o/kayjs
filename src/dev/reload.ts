@@ -12,6 +12,8 @@ export interface ReloadInput {
   loaded: string[]
   // The directories whose files only kay imports: the routes and the API modules.
   owned: string[]
+  // The content config, which only kay imports, and which the entries of its collections are read through: a change to one of them, or to what it imports, runs it again.
+  content?: string | undefined
   config: string
   entry: string
 }
@@ -21,6 +23,8 @@ const SPECIFIER = /(?:\bfrom\s*|\bimport\s*(?:\(\s*)?|\brequire\s*\(\s*)(['"])([
 // The patterns of `import.meta.glob`, one string or an array of them, which kay's loader expands into imports.
 const GLOB = /import\.meta\.glob\s*\(\s*(\[[^\]]*\]|(['"`])(?:(?!\2)[^\n])*\2)/g
 const QUOTED = /(['"`])((?:(?!\1)[^\n])*)\1/g
+// The files a collection reads.
+const ENTRY_FILE = /\.(?:md|json|ya?ml)$/
 const SOURCE_FILE = /\.(?:kay|[cm]?[jt]sx?)$/
 const QUERY = /\?.*$/
 const RELATIVE = /^\.\.?\//
@@ -55,10 +59,11 @@ const imports = new Map<string, Imports>()
 
 // The modules a change to `changed` leaves stale: each one that imports a changed module, however far, and the entry that builds the app again. A change that no module of the project's own explains, or that reaches the config, needs a new process.
 // The files of the routes and API directories and `.kay` files are kay's to import again. Any other changed module is too when only such files import it, as a helper of the pages is; one the entry or other code imports may hold what a reload cannot let go of, a connection, a timer, a cache an earlier module filled, so it needs a new process.
-export function planReload({ root, changed, loaded, owned, config, entry }: ReloadInput): ReloadPlan {
+export function planReload({ root, changed, loaded, owned, content, config, entry }: ReloadInput): ReloadPlan {
   const real = realpathOf(root)
   const modules = new Set(loaded.filter(file => file.startsWith(real + sep) && !NOT_PROJECT.test(file.slice(real.length))))
-  const kays = (file: string) => file.endsWith('.kay') || owned.some(dir => file.startsWith(dir + sep))
+  const contentConfig = content === undefined ? undefined : realpathOf(content)
+  const kays = (file: string) => file.endsWith('.kay') || file === contentConfig || owned.some(dir => file.startsWith(dir + sep))
   const seeds: string[] = []
   // The modules whose glob matches a changed file, which changed no more than their file list did.
   const holders = new Set<string>()
@@ -78,6 +83,9 @@ export function planReload({ root, changed, loaded, owned, config, entry }: Relo
 
     if (key !== undefined)
       seeds.push(key)
+    // An entry of a collection: the content config runs again, as its entries are read through it.
+    else if (contentConfig !== undefined && modules.has(contentConfig) && ENTRY_FILE.test(path) && path.startsWith(dirname(contentConfig) + sep))
+      seeds.push(contentConfig)
     else if (!kays(path))
       unknown.push(file)
   }

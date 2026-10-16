@@ -1705,7 +1705,7 @@ describe.concurrent('kay dev', () => {
       expect(await (await fetch(url)).text()).toContain('Grace</h1>')
       expect(written()).toEqual(before)
       // As it does of a restart, to a page connecting after it.
-      expect(await eventsUntil((await fetch(`${url}/_kay/dev/events`)).body!.getReader(), 'built')).toMatch(/\nevent: built\ndata: \{"id":"[\w-]+","at":\d+,"changed":"src\/name\.ts","ms":\d+\}\n\n$/)
+      expect(await eventsUntil((await fetch(`${url}/_kay/dev/events`)).body!.getReader(), 'built')).toMatch(/\nevent: built\ndata: \{"id":"[\w-]+","at":\d+,"changed":"src\/name\.ts","ms":\d+,"reloaded":true\}\n\n$/)
 
       await Bun.write(join(root, 'src/routes/index.kay'), `${page}else\n  p no\n`)
       await until(() => lines.length === 4, 10_000)

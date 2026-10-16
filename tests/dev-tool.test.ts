@@ -313,6 +313,8 @@ describe('the dev tool', () => {
     // The first build the page hears of, as the next.
     announce({ id: 'a', at: Date.now(), changed: 'src/routes/index.kay', ms: 58 })
     expect(built().textContent).toBe('src/routes/index.kay: restarted in 58 ms')
+    announce({ id: 'a2', at: Date.now(), changed: 'src/routes/index.kay', ms: 31, reloaded: true })
+    expect(built().textContent).toBe('src/routes/index.kay: reloaded in 31 ms')
     announce({ id: 'b', at: Date.now(), changed: 'src/app.css', ms: 24, styles: true })
     expect(built().textContent).toBe('src/app.css: stylesheets swapped in 24 ms')
     expect(document.activeElement).toBe(document.body)

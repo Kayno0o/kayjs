@@ -219,17 +219,18 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     repeatable = { key, count, rows: Math.max(1, Math.ceil(shown.replace(ANSI_STYLE, '').length / (process.stdout.columns || 80))) }
   }
   const stamp = () => dim(new Date().toLocaleTimeString('en-GB'))
-  // A restart or a reload is over, its report the terminal's and the open pages'.
-  const restarted = (server: Subprocess, url: string | undefined) => {
+  // A restart or a reload is over, its report the terminal's and the open pages'; `reloaded` says the running process took the change in, where a restart is a new one.
+  const restarted = (server: Subprocess, url: string | undefined, reloaded = false) => {
     const ms = Math.round(performance.now() - restartedAt)
     const changed = restartAsked ? 'r pressed' : describe(restartedFor)
     const moved = url !== undefined && url !== address
+    const verb = reloaded ? 'reloaded' : 'restarted'
 
     // Quiet, a restart is said only when it moved the address.
     if (options.quiet !== true || moved)
-      sayRebuild('restart', { changed: restartedFor, ms, ...url !== undefined && { url } }, `${changed}: restarted${moved ? `, now on ${url}` : ''}`, `${stamp()} ${changed}: restarted in ${ms} ms${moved ? `, now on ${url}` : ''}`)
+      sayRebuild('restart', { changed: restartedFor, ms, ...reloaded && { reloaded }, ...url !== undefined && { url } }, `${changed}: ${verb}${moved ? `, now on ${url}` : ''}`, `${stamp()} ${changed}: ${verb} in ${ms} ms${moved ? `, now on ${url}` : ''}`)
 
-    tell(server, { built: { changed, ms } })
+    tell(server, { built: { changed, ms, ...reloaded && { reloaded } } })
   }
   // A server reports its address over IPC from the preload; only the one running counts, and only the first time it listens.
   const listened = (server: Subprocess, message: unknown) => {
@@ -540,7 +541,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
       for (const file of sentFiles)
         changedFiles.delete(file)
 
-      restarted(server!, undefined)
+      restarted(server!, undefined, true)
     }
     // The server exited on its own while it reloaded, which `reportExit` says: nothing runs until the next change.
     else if (answer !== 'exited') {

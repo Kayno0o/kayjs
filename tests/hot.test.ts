@@ -136,14 +136,14 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('kay dev in 
     expect(await page.evaluate(() => window.scrollY)).toBe(400)
   }, 60_000)
 
-  it('refreshes it the same for a change to a server module, the server restarted', async () => {
+  it('refreshes it the same for a change to a server module, the server reloaded', async () => {
     await Bun.write(join(root, 'src/greeting.ts'), 'export const greeting = \'Hello\'\n')
     await Bun.write(join(root, 'src/routes/index.kay'), `--- server\nimport { greeting } from '../greeting'\n---\n${home('{greeting}')}`)
     await page.locator('p.static', { hasText: 'Hello' }).waitFor({ timeout: 30_000 })
     await Bun.write(join(root, 'src/greeting.ts'), 'export const greeting = \'Welcome\'\n')
     await page.locator('p.static', { hasText: 'Welcome' }).waitFor({ timeout: 30_000 })
-    // The dev tool's bar says what restarted the server.
-    await page.locator('kay-dev .bar .built', { hasText: /^src\/greeting\.ts: restarted in \d+ ms$/ }).waitFor()
+    // The dev tool's bar says what reloaded the server.
+    await page.locator('kay-dev .bar .built', { hasText: /^src\/greeting\.ts: reloaded in \d+ ms$/ }).waitFor()
 
     expect(await sameDocument()).toBe(true)
     expect(await page.textContent('.solo button.count')).toBe('Pressed 3')
