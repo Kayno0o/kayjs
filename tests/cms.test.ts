@@ -236,12 +236,14 @@ describe('the collections a CMS edits', () => {
 
   it('does not hand a read after a save the load that began before it', async () => {
     let held = [{ slug: 'hello', data: { title: 'Old' } }]
+    const gate = Promise.withResolvers<void>()
     let loads = 0
     const tales = collection({ name: 'tales', load: async () => {
       const seen = structuredClone(held)
 
-      loads++
-      await Bun.sleep(30)
+      // Only the first load, begun before the save, stays under way.
+      if (++loads === 1)
+        await gate.promise
 
       return seen
     }, save: (entry) => {
@@ -251,12 +253,13 @@ describe('the collections a CMS edits', () => {
     await exporting([['tales', tales]], async () => {
       const slow = entries('tales')
 
-      await Bun.sleep(5)
+      expect(loads).toBe(1)
       await saveEntry('tales', { slug: 'hello', data: { title: 'New' } })
 
       const after = await entries('tales')
 
       expect(after[0]!.data).toEqual({ title: 'New' })
+      gate.resolve()
       expect((await slow)[0]!.data).toEqual({ title: 'Old' })
       expect(loads).toBe(2)
     })
@@ -264,49 +267,69 @@ describe('the collections a CMS edits', () => {
 
   it.each(['save', 'remove'] as const)('does not hand a read during a %s the load that began before it', async (write) => {
     let held = [{ slug: 'hello', data: { title: 'Old' } }]
+    const slowGate = Promise.withResolvers<void>()
+    const writeGate = Promise.withResolvers<void>()
+    const writeBegun = Promise.withResolvers<void>()
+    const loadBegun = new Map<number, PromiseWithResolvers<void>>()
+    const begun = (nth: number): PromiseWithResolvers<void> => loadBegun.get(nth) ?? loadBegun.set(nth, Promise.withResolvers<void>()).get(nth)!
     let loads = 0
     const tales = collection({ name: 'tales', load: async () => {
       const seen = structuredClone(held)
+      const mine = ++loads
 
-      loads++
-      await Bun.sleep(30)
+      begun(mine).resolve()
+
+      // Only the first load, begun before the write, stays under way.
+      if (mine === 1)
+        await slowGate.promise
 
       return seen
     }, save: async (entry) => {
-      await Bun.sleep(10)
+      writeBegun.resolve()
+      await writeGate.promise
       held = [{ slug: entry.slug, data: entry.data as { title: string } }]
     }, remove: async () => {
-      await Bun.sleep(10)
+      writeBegun.resolve()
+      await writeGate.promise
       held = []
     } }, { schema: t.Object({ title: t.String() }) })
 
     await exporting([['tales', tales]], async () => {
       const slow = entries('tales')
 
-      await Bun.sleep(5)
+      await begun(1).promise
 
       const writing = write === 'save' ? saveEntry('tales', { slug: 'hello', data: { title: 'New' } }) : removeEntry('tales', 'hello')
 
-      await Bun.sleep(3)
+      await writeBegun.promise
 
+      const before = loads
       const during = entries('tales')
 
-      await Bun.sleep(3)
-      // The read made while the write is under way began its own load rather than joining the first.
-      expect(loads).toBe(2)
+      // The read made while the write is under way begins its own load rather than joining the first, which is still under way.
+      await begun(before + 1).promise
+      expect(loads).toBe(before + 1)
+      writeGate.resolve()
       await writing
       await during
+      slowGate.resolve()
       expect((await slow)[0]!.data).toEqual({ title: 'Old' })
       expect((await entries('tales')).map(entry => entry.data)).toEqual(write === 'save' ? [{ title: 'New' }] : [])
     })
   })
 
   it('keeps sharing the load a save started after the older one it replaced ends', async () => {
+    const gates = [Promise.withResolvers<void>(), Promise.withResolvers<void>()]
+    const secondBegun = Promise.withResolvers<void>()
     let loads = 0
     const tales = collection({ name: 'tales', load: async () => {
       const mine = ++loads
 
-      await Bun.sleep(mine === 1 ? 20 : 60)
+      if (mine === 2)
+        secondBegun.resolve()
+
+      // The first two loads stay under way until the test ends them; any other runs at once.
+      await gates[mine - 1]?.promise
 
       return [{ slug: 'hello', data: { title: 'Hello' } }]
     }, save: () => undefined }, { schema: t.Object({ title: t.String() }) })
@@ -314,16 +337,18 @@ describe('the collections a CMS edits', () => {
     await exporting([['tales', tales]], async () => {
       const first = entries('tales')
 
-      await Bun.sleep(2)
       await saveEntry('tales', { slug: 'hello', data: { title: 'Hello' } })
 
       const second = entries('tales')
 
+      await secondBegun.promise
+      gates[0]!.resolve()
       await first
-      await Bun.sleep(1)
 
+      // The older load has ended, and the newer one is still under way for this read to share.
       const third = entries('tales')
 
+      gates[1]!.resolve()
       await Promise.all([second, third])
 
       expect(loads).toBe(2)
