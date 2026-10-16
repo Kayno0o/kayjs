@@ -4,6 +4,7 @@ import type { LintLevels } from './compiler/lints'
 import type { Duration } from './runtime/duration'
 import type { HeadTag } from './runtime/head'
 import type { Guard, GuardContext } from './runtime/index'
+import type { Localized } from './runtime/localized'
 import type { JsonLd } from './runtime/seo'
 import type { EnvSchema } from './server/env'
 import type { Logger } from './server/log'
@@ -107,20 +108,21 @@ export interface KayConfig {
 }
 
 // What every page's head starts from; a layout or the page setting the same tag wins.
+// Each of `name`, `titleTemplate`, `description`, `image`, `imageAlt` and `locale` is a string, or a record of one string per locale for a site with `i18n`: `description: { en: 'The shop', fr: 'La boutique' }`. A locale the record lacks reads the default locale's.
 export interface SeoConfig {
   // The site's name: the title of a page that sets none, and `og:site_name`.
-  name?: string | undefined
+  name?: Localized | undefined
   // Wraps the title a layout or the page sets: `%s | Site`; a `title(raw)` stays as it is.
-  titleTemplate?: string | undefined
-  description?: string | undefined
+  titleTemplate?: Localized | undefined
+  description?: Localized | undefined
   // The social card image, a URL or a path such as an imported asset's.
-  image?: string | undefined
+  image?: Localized | undefined
   // What the card image shows, for `og:image:alt` and `twitter:image:alt`.
-  imageAlt?: string | undefined
+  imageAlt?: Localized | undefined
   // The site's Twitter handle, `@site`.
   twitter?: string | undefined
   // `og:locale`, such as `fr_FR`.
-  locale?: string | undefined
+  locale?: Localized | undefined
   // Structured data every page carries, such as the site's `WebSite` or `Organization`.
   jsonLd?: JsonLd[] | undefined
 }

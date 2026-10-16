@@ -238,6 +238,7 @@ export default defineConfig({
 })
 ```
 
+- With `i18n`, `name`, `titleTemplate`, `description`, `image`, `imageAlt` and `locale` each take a string or a record of one string per locale, `description: { en: 'What the site is', fr: 'Ce qu\'est le site' }`, so no page sets a tag for its language's; a locale the record lacks reads the default locale's. The head lints check every text, and the manifest and share cards read the default locale's `name` and `description`.
 - `head` adds tags to every page's head, written as a `head` block compiles them, a tag's text as `children`: `head: [{ tag: 'script', props: { src: '/stats.js', defer: true } }, { tag: 'meta', props: { name: 'color-scheme', content: 'light dark' } }]`. An analytics script that needs the visitor's consent loads from an island once they agreed (see [Privacy](privacy.md)).
 - A layout or the page setting a tag of the same identity replaces one of those.
 - An inline script or style among them is let through by the content security policy, its hash added.

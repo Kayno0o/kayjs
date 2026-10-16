@@ -786,3 +786,30 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('an islan
     }
   }, 60_000)
 })
+
+describe('localized seo defaults', () => {
+  const seoApp = async () => new Elysia().use(await pages({
+    routes,
+    prebuilt: false,
+    security: false,
+    site: SITE,
+    i18n,
+    seo: { name: { fr: 'Le site', en: 'The site' }, titleTemplate: { fr: '%s | Le site', en: '%s | The site' }, description: { fr: 'Ce que fait le site', en: 'What the site does' }, locale: { fr: 'fr_FR' } },
+  }))
+
+  async function head(path: string): Promise<string> {
+    return (await (await seoApp()).handle(new Request(`http://localhost${path}`))).text()
+  }
+
+  it('gives each locale its own name, description and title template, a locale the record lacks reading the default\'s', async () => {
+    const fr = await head('/')
+    const en = await head('/en')
+
+    expect(fr).toContain('<meta name="description" content="Ce que fait le site">')
+    expect(fr).toContain('<meta property="og:site_name" content="Le site">')
+    expect(fr).toContain('<meta property="og:locale" content="fr_FR">')
+    expect(en).toContain('<meta name="description" content="What the site does">')
+    expect(en).toContain('<meta property="og:site_name" content="The site">')
+    expect(en).toContain('<meta property="og:locale" content="fr_FR">')
+  })
+})

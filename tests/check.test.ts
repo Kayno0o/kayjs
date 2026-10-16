@@ -1865,6 +1865,13 @@ describe.concurrent('kay check, unused code', () => {
       expect(pageSeoLints(seo, [page(head(long))]).map(d => d.code)).toEqual([])
       expect(pageSeoLints(seo, [page(head(`${long}b`))]).map(d => [basename(d.file), d.code])).toEqual([['index.kay', 'long-description']])
       expect(pageSeoLints({ ...seo, seo: undefined, site: 'https://example.com' }, [page(head(long))]).map(d => [basename(d.file), d.code])).toEqual([['index.kay', 'long-description']])
+
+      // A description per locale is checked each, and a page inheriting one of them is not told again.
+      const perLocale = { ...seo, seo: { description: { en: 'short', fr: long }, image: '/og.png' } }
+
+      expect((await check(root, perLocale)).map(d => [d.code, d.line])).toEqual([['long-description', 1]])
+      expect(pageSeoLints(perLocale, [page(head(long))]).map(d => d.code)).toEqual([])
+      expect((await check(root, { ...seo, seo: { description: {}, image: '/og.png' } })).map(d => d.code)).toEqual(['missing-description'])
     }
     finally {
       await rm(root, { recursive: true, force: true })

@@ -19,6 +19,7 @@ import { clearContentMode } from '../content/load'
 import { serveFeeds } from '../content/server'
 import { offlineOf } from '../project'
 import { FILES_ROUTE, IMAGE_ROUTE } from '../runtime/image'
+import { localizedText } from '../runtime/localized'
 import { kayLog } from '../runtime/log'
 import { DRAFT_ROUTE } from '../runtime/swap'
 import { registerActionRoutes } from './actions'
@@ -300,7 +301,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
     // On a site requiring guards, the document is refused unless a guard covers every module not setting `guards: false`, or every module is open with no guard of its own, a library's guarded one counting as guarded.
     const guards = requiredGuards(await Promise.all(sharedGuards(apiModules).map(async file => loadGuard({ file, special: {} }))), { file: paths.api, open: apiModules.length > 0 && apiModules.every(module => module.open === true && module.guards.length === 0) ? true : undefined }, {}, options.requireGuards)
 
-    serveOpenApi(app, openApiDocument(api.mounted, { title: openapi.title ?? options.seo?.name ?? 'API', version: openapi.version ?? '1.0.0', base }), openapi, guards, actionOptions)
+    serveOpenApi(app, openApiDocument(api.mounted, { title: openapi.title ?? localizedText(options.seo?.name, undefined, locales.settings.defaultLocale) ?? 'API', version: openapi.version ?? '1.0.0', base }), openapi, guards, actionOptions)
   }
 
   serveErrorReports(app, options.onError)
@@ -338,7 +339,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   const favicon = faviconSource(root, options.favicon, options.manifest)
 
   if (favicon !== undefined)
-    serveFavicons(app, served, { source: favicon, builtDir: mode.prebuilt ? join(client.dir, '..', FAVICON_DIR) : undefined, name: options.seo?.name, description: options.seo?.description, manifest: options.manifest, base })
+    serveFavicons(app, served, { source: favicon, builtDir: mode.prebuilt ? join(client.dir, '..', FAVICON_DIR) : undefined, name: localizedText(options.seo?.name, undefined, locales.settings.defaultLocale), description: localizedText(options.seo?.description, undefined, locales.settings.defaultLocale), manifest: options.manifest, base })
 
   const prerendered = await loadPrerendered(client)
   const guarded = new Set(routes.filter(route => route.guards.length > 0).map(route => route.pattern))

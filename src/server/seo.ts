@@ -1,5 +1,6 @@
 import type { KayConfig, SeoConfig, TrailingSlash } from '../config'
 import type { HeadOptions, HeadTag, ImageSize } from '../runtime/head'
+import type { Localized } from '../runtime/localized'
 import type { FontAssets } from './fonts'
 import type { LocaleCopy } from './i18n'
 import { join } from 'node:path'
@@ -8,6 +9,7 @@ import { projectPaths } from '../project'
 import { inlineText, keepHeadMarkup } from '../runtime/head'
 import { CARD, CARD_ROUTE, IMAGE_ROUTE, importedSize, RESIZABLE, VARIANTS } from '../runtime/image'
 import { localeState } from '../runtime/locale-state'
+import { localizedText } from '../runtime/localized'
 import { jsonLd } from '../runtime/seo'
 import { basePath } from './base'
 import { faviconTags } from './favicon'
@@ -99,37 +101,64 @@ export function seoHead(site: string | undefined, seo: SeoConfig = {}, extra: He
   if (!social && extra.length === 0)
     return undefined
 
-  const tags: HeadTag[] = social ? [...extra, meta('property', 'og:type', 'website')] : [...extra]
+  // Built once per locale the site is asked for, the text of each default read in that locale.
+  const built = new Map<string, { tags: HeadTag[], titleTemplate: string | undefined }>()
+  const tagsFor = (locale: string | undefined, defaultLocale: string | undefined) => {
+    const key = locale ?? ''
+    const known = built.get(key)
 
-  if (seo.name !== undefined)
-    tags.push({ tag: 'title', props: { children: seo.name } }, meta('property', 'og:site_name', seo.name))
+    if (known !== undefined)
+      return known
 
-  if (seo.description !== undefined)
-    tags.push(meta('name', 'description', seo.description))
+    const text = (value: Localized | undefined) => localizedText(value, locale, defaultLocale)
+    const tags: HeadTag[] = social ? [...extra, meta('property', 'og:type', 'website')] : [...extra]
+    const name = text(seo.name)
+    const description = text(seo.description)
+    const image = text(seo.image)
+    const imageAlt = text(seo.imageAlt)
+    const ogLocale = text(seo.locale)
 
-  if (seo.image !== undefined)
-    tags.push(meta('property', 'og:image', seo.image))
+    if (name !== undefined)
+      tags.push({ tag: 'title', props: { children: name } }, meta('property', 'og:site_name', name))
 
-  if (seo.image !== undefined && seo.imageAlt !== undefined)
-    tags.push(meta('property', 'og:image:alt', seo.imageAlt))
+    if (description !== undefined)
+      tags.push(meta('name', 'description', description))
 
-  if (seo.twitter !== undefined)
-    tags.push(meta('name', 'twitter:site', seo.twitter))
+    if (image !== undefined)
+      tags.push(meta('property', 'og:image', image))
 
-  if (seo.locale !== undefined)
-    tags.push(meta('property', 'og:locale', seo.locale))
+    if (image !== undefined && imageAlt !== undefined)
+      tags.push(meta('property', 'og:image:alt', imageAlt))
 
-  for (const data of seo.jsonLd ?? [])
-    tags.push({ tag: 'script', props: { type: 'application/ld+json', children: jsonLd(data) } })
+    if (seo.twitter !== undefined)
+      tags.push(meta('name', 'twitter:site', seo.twitter))
 
-  keepHeadMarkup(tags)
+    if (ogLocale !== undefined)
+      tags.push(meta('property', 'og:locale', ogLocale))
+
+    for (const data of seo.jsonLd ?? [])
+      tags.push({ tag: 'script', props: { type: 'application/ld+json', children: jsonLd(data) } })
+
+    keepHeadMarkup(tags)
+
+    const made = { tags, titleTemplate: text(seo.titleTemplate) }
+
+    built.set(key, made)
+
+    return made
+  }
 
   // An error page is no URL to point search engines at.
-  return (url, status) => ({
-    defaults: origin !== undefined && status === 200 ? [...tags, ...pageLinks(origin, url, trailingSlash)] : tags,
-    titleTemplate: seo.titleTemplate,
-    social: social ? { origin, sizeOf } : undefined,
-  })
+  return (url, status) => {
+    const state = localeState()
+    const { tags, titleTemplate } = tagsFor(state?.locale, state?.settings.defaultLocale)
+
+    return {
+      defaults: origin !== undefined && status === 200 ? [...tags, ...pageLinks(origin, url, trailingSlash)] : tags,
+      titleTemplate,
+      social: social ? { origin, sizeOf } : undefined,
+    }
+  }
 }
 
 // The page's canonical URL, and in a site of several locales its copy in each, `x-default` the default locale's.

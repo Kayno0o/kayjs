@@ -73,6 +73,17 @@ export default defineConfig({
 
 With `site` set, every page gets a canonical link, `og:title`, `og:description`, `og:url` and `twitter:card`. A home page can put the name first with `title(raw) Example, the shop for kay`, which skips the template.
 
+A site with several languages gives `name`, `titleTemplate`, `description`, `image`, `imageAlt` and `locale` one text per locale instead of one string, so no page sets a tag to get its own language's:
+
+```ts
+seo: {
+  name: { en: 'Example', fr: 'Exemple' },
+  description: { en: 'What the site is', fr: 'Ce qu\'est le site' },
+},
+```
+
+A locale the record leaves out reads the default locale's. `kay check` measures each description against the length search results show, and the manifest and the share cards read the default locale's `name` and `description`.
+
 <Callout type="tip">
 
 Without `site` in the config, kay reads it from `SITE_URL`, so one build serves each host it is deployed to.
