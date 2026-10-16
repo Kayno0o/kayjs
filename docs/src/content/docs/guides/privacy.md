@@ -4,7 +4,9 @@ order: 9.5
 description: What kay keeps about visitors and for how long, erasing a person who asks, analytics behind consent and photos without their metadata.
 ---
 
-kay sets no cookie and keeps nothing about a visitor until the app uses a feature that does, and nothing it keeps follows a visitor across sites. This page lists what each feature keeps, for a site's privacy notice and for the app to decide what consent it needs, and how an app erases a person who asks, as the GDPR requires.
+Kay sets no cookie and keeps nothing about a visitor until the app uses a feature that does. Nothing it keeps follows a visitor across sites.
+
+This page lists what each feature keeps, for a site's privacy notice and for the consent your app needs. It also shows how to erase a person who asks, as the GDPR requires.
 
 ## Cookies
 
@@ -16,7 +18,7 @@ kay sets no cookie and keeps nothing about a visitor until the app uses a featur
 | `kay_preview` | `enterPreview()`, for an editor | an hour by default |
 | the name given to `persisted()` | a persisted signal | a year |
 
-The first four are necessary for what the visitor asked, so they need no consent. A persisted signal holds what the app puts in it: a theme or a language is necessary, anything else waits for consent.
+The first four are necessary for what the visitor asked, so they need no consent. A persisted signal holds what the app puts in it. A theme or a language is necessary, and anything else waits for consent.
 
 ## What the server keeps
 
@@ -31,7 +33,7 @@ Every SQLite file kay creates is readable by the server's user alone.
 
 ## Erasing a person
 
-Delete the app's own rows, then what kay keeps for them:
+Delete the app's own rows, then what kay keeps for them.
 
 ```ts
 import { files, queue, sqliteStore } from 'kay/server'
@@ -52,11 +54,15 @@ export async function erase(userId: string) {
 }
 ```
 
-`files.delete` also deletes every resized variant of the file and every social card drawn on it. Sessions kept in the cookie alone, without a store, cannot be listed: they end when they expire, or for everyone when the secret is replaced.
+`files.delete` also deletes every resized variant of the file and every social card drawn on it.
+
+Sessions kept in the cookie alone, without a store, cannot be listed. They end when they expire, or for everyone when the secret is replaced.
 
 ## Analytics behind consent
 
-An island keeps the visitor's answer in a persisted signal and loads the script once it is yes. A button stays to ask again, and refusing after agreeing clears the script's cookie and reloads, so the visitor can withdraw as easily as they agreed:
+An island keeps the visitor's answer in a persisted signal and loads the script once it is yes. A button stays to ask again.
+
+Refusing after agreeing clears the script's cookie and reloads, so the visitor can withdraw as easily as they agreed.
 
 ```kay
 ---
@@ -92,11 +98,17 @@ else
 
 ## Photos
 
-`files.put` keeps only what draws a JPEG, PNG or WebP, told by its bytes whatever its name: its pixels, colour profile and orientation. The EXIF, XMP, IPTC and text a camera or phone writes, such as where and when the photo was taken, go, and so does any metadata kay does not know. An AVIF or HEIC is stored as it came, and so is a file kay cannot read through, which it logs. `files.put(file, { keepMetadata: true })` keeps everything, for an archive that needs it. A photo of a person that only some visitors may see is stored with `private: true`, served only through a link the page signed.
+`files.put` keeps only what draws a JPEG, PNG or WebP, told by its bytes whatever its name. That is its pixels, colour profile and orientation.
+
+The EXIF, XMP, IPTC and text a camera or phone writes, such as where and when the photo was taken, go. So does any metadata kay does not know.
+
+An AVIF or HEIC is stored as it came, and so is a file kay cannot read through, which it logs. Use `files.put(file, { keepMetadata: true })` to keep everything, for an archive that needs it.
+
+Store a photo of a person that only some visitors may see with `private: true`. It is served only through a link the page signed.
 
 ## Error trackers
 
-`onError` gets the whole request. Send a tracker its path rather than `request.url`, whose query may hold an address or a token:
+`onError` gets the whole request. Send a tracker its path rather than `request.url`, whose query may hold an address or a token.
 
 ```ts
 import { defineConfig, requestId } from 'kay/server'
