@@ -46,7 +46,18 @@ type Tables = Map<string, DataView>
 const tag = (view: DataView, offset: number) => String.fromCharCode(view.getUint8(offset), view.getUint8(offset + 1), view.getUint8(offset + 2), view.getUint8(offset + 3))
 const viewOf = (bytes: Uint8Array) => new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
 
-// The tables of a TrueType or OpenType file, WOFF or WOFF2 compressed or not; a WOFF2 table kept in its transformed form is left out.
+// A WOFF2 transformed hmtx holds a flags byte then the advance widths, the side bearings being left out or kept after them; this is the plain table with the advances, which is all that is read of it.
+function plainHmtx(packed: DataView, hhea: DataView): DataView {
+  const counted = hhea.getUint16(34)
+  const plain = new DataView(new ArrayBuffer(counted * 4))
+
+  for (let index = 0; index < counted; index++)
+    plain.setUint16(index * 4, packed.getUint16(1 + index * 2))
+
+  return plain
+}
+
+// The tables of a TrueType or OpenType file, WOFF or WOFF2 compressed or not; a WOFF2 table kept in its transformed form is left out, but for `hmtx`, whose advances are read back into the plain table.
 function readTables(bytes: Uint8Array): Tables {
   const file = viewOf(bytes)
   const signature = tag(file, 0)
@@ -68,7 +79,7 @@ function readTables(bytes: Uint8Array): Tables {
 
   if (signature === 'wOF2') {
     let cursor = 48
-    const entries: { name: string, length: number, kept: boolean }[] = []
+    const entries: { name: string, length: number, kept: boolean, packed: boolean }[] = []
     const base128 = () => {
       let value = 0
 
@@ -97,15 +108,17 @@ function readTables(bytes: Uint8Array): Tables {
       const original = base128()
       const transformed = name === 'glyf' || name === 'loca' ? version === 0 : version !== 0
 
-      entries.push({ name: name!, length: transformed ? base128() : original, kept: !transformed })
+      entries.push({ name: name!, length: transformed ? base128() : original, kept: !transformed, packed: transformed && name === 'hmtx' })
     }
 
     const stream = new Uint8Array(nodeZlib().brotliDecompressSync(bytes.subarray(cursor, cursor + file.getUint32(20))))
     let offset = 0
 
-    for (const { name, length, kept } of entries) {
+    for (const { name, length, kept, packed } of entries) {
       if (kept)
         tables.set(name, viewOf(stream.subarray(offset, offset + length)))
+      else if (packed)
+        tables.set(name, plainHmtx(viewOf(stream.subarray(offset, offset + length)), tables.get('hhea')!))
 
       offset += length
     }

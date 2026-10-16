@@ -72,17 +72,21 @@ export interface FontFallback {
   name: string
 }
 
-// A file's metrics, read again only once the file changes.
-const METRICS = new Map<string, { stamp: number, metrics: FontMetrics | undefined }>()
+// A file's metrics, read again only once the file changes: its change time and size count beside its modified time, as a font swapped in keeping the old one's modified time is another file.
+const METRICS = new Map<string, { stamp: string, metrics: FontMetrics | undefined }>()
 // Under this share of English letters the file is a subset without them, and no fallback fits it.
 const MIN_COVERAGE = 0.9
 const FIRST_NUMBER = /\d+/
 // A `@font-face` block, whose `font-family` names one family and is left alone, or a font stack: the property with what precedes it, and the list.
-const FONT_STACK = /@font-face\s*\{[^}]*\}|((?:^|[;{\s])(?:font-family|--[\w-]*font[\w-]*)\s*:\s*)([^\s;}!][^;}!]*)/g
+const FONT_STACK = /@font-face\s*\{[^}]*\}|((?:^|[;{\s])(?:font-family|font|--[\w-]*font[\w-]*)\s*:\s*)([^\s;}!][^;}!]*)/g
+// The `font` shorthand lists its families after the size, which may carry a line height.
+const WORD = /(?<text>"[^"]*"|'[^']*'|\S+)\s*/g
+const FONT_SIZE = /^(?:(?:\d+\.)?\d+(?:[a-z]+|%)|(?:x{1,3}-)?(?:small|large)|medium|larger|smaller)(?:\/\S+)?$/i
+const SHORTHAND_PROPERTY = /(?:^|[;{\s])font\s*:/
 const QUOTED = /^(["'])(.*)\1$/
 
 function metricsOf(file: string): FontMetrics | undefined {
-  let stamp: number
+  let stamp: string
   let bytes: Buffer
 
   try {
@@ -91,7 +95,7 @@ function metricsOf(file: string): FontMetrics | undefined {
     if (found === undefined)
       return undefined
 
-    stamp = found.mtimeMs
+    stamp = `${found.mtimeMs}:${found.ctimeMs}:${found.size}`
     bytes = readFileSync(file)
   }
   catch {
@@ -139,6 +143,21 @@ export function fontFallbacks(root: string, fonts: (FontConfig | FontsourceConfi
   return fallbacks
 }
 
+// Where the family list of a `font` shorthand starts, or nothing for a value without a size, such as a system font keyword.
+function familiesAfterSize(value: string): number | undefined {
+  for (const word of value.matchAll(WORD)) {
+    const text = word.groups!.text!
+
+    if (text.startsWith('"') || text.startsWith('\'') || text.endsWith(','))
+      return undefined
+
+    if (FONT_SIZE.test(text))
+      return word.index + word[0].length
+  }
+
+  return undefined
+}
+
 function unquoted(item: string): string {
   const trimmed = item.trim()
 
@@ -157,7 +176,14 @@ export function withFontFallbacks(css: string, fallbacks: Map<string, FontFallba
     if (property === undefined || stack === undefined)
       return match
 
-    const items = stack.split(',')
+    // In the shorthand only the family list follows the size, so the rest is kept as it is.
+    const split = SHORTHAND_PROPERTY.test(property) ? familiesAfterSize(stack) : 0
+
+    if (split === undefined)
+      return match
+
+    const lead = stack.slice(0, split)
+    const items = stack.slice(split).split(',')
     const listed = new Set(items.map(item => unquoted(item).toLowerCase()))
     let changed = false
     const stacked = items.flatMap((item) => {
@@ -171,7 +197,7 @@ export function withFontFallbacks(css: string, fallbacks: Map<string, FontFallba
       return [item, `"${fallback.name}"`]
     })
 
-    return changed ? `${property}${stacked.join(',')}` : match
+    return changed ? `${property}${lead}${stacked.join(',')}` : match
   })
 }
 

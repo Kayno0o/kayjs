@@ -1,16 +1,125 @@
-import { rm } from 'node:fs/promises'
+import { copyFile, rm, utimes } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
+import { brotliCompressSync, brotliDecompressSync } from 'node:zlib'
 import { describe, expect, it } from 'bun:test'
 import { buildClient } from '../src/build/client'
 import { fallbackDescriptors, fontMetrics } from '../src/server/font-metrics'
 import { fontFallbacks, prepareFonts, withFontFallbacks } from '../src/server/fonts'
-import { fixtureCopy } from './scratch'
+import { fixtureCopy, scratchDir } from './scratch'
 
 const ROOT = process.cwd()
 const WOFF2 = 'tests/fixtures/cards/src/fonts/archivo-black-latin-400-normal.woff2'
 const WOFF = 'tests/fixtures/cards/src/fonts/archivo-black-latin-400-normal.woff'
 
+// The same WOFF2 with its hmtx kept in the transformed form the format allows: a flags byte with both side bearings left out, then the advance widths.
+function withTransformedHmtx(bytes: Uint8Array): Uint8Array {
+  const file = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+  const tags = ['cmap', 'head', 'hhea', 'hmtx', 'maxp', 'name', 'OS/2', 'post', 'cvt ', 'fpgm', 'glyf', 'loca']
+  const base128 = (value: number) => {
+    const parts = [value & 0x7F]
+
+    for (let rest = value >>> 7; rest > 0; rest >>>= 7)
+      parts.unshift((rest & 0x7F) | 0x80)
+
+    return parts
+  }
+  let cursor = 48
+  const entries: { flags: number, tag: number[], original: number, length: number, transformed: boolean }[] = []
+
+  for (let index = 0; index < file.getUint16(12); index++) {
+    const flags = file.getUint8(cursor++)
+    const known = (flags & 0x3F) === 63 ? undefined : tags[flags & 0x3F]
+    const tag = (flags & 0x3F) === 63 ? [...bytes.subarray(cursor, cursor + 4)] : []
+
+    if (tag.length > 0)
+      cursor += 4
+
+    const read = () => {
+      let value = 0
+
+      for (;;) {
+        const byte = file.getUint8(cursor++)
+
+        value = value * 128 + (byte & 0x7F)
+
+        if ((byte & 0x80) === 0)
+          return value
+      }
+    }
+    const original = read()
+    const nullTransform = known === 'glyf' || known === 'loca' ? (flags >> 6) !== 0 : (flags >> 6) === 0
+    const transformed = !nullTransform
+
+    entries.push({ flags, tag, original, length: transformed ? read() : original, transformed })
+  }
+
+  const stream = brotliDecompressSync(bytes.subarray(cursor, cursor + file.getUint32(20)))
+  const hhea = entries.findIndex(entry => (entry.flags & 0x3F) === 2)
+  const hmtx = entries.findIndex(entry => (entry.flags & 0x3F) === 3)
+  const offsetOf = (index: number) => entries.slice(0, index).reduce((sum, entry) => sum + entry.length, 0)
+  const counted = new DataView(stream.buffer, stream.byteOffset + offsetOf(hhea), entries[hhea]!.length).getUint16(34)
+  const plain = new DataView(stream.buffer, stream.byteOffset + offsetOf(hmtx), entries[hmtx]!.length)
+  const packed = new Uint8Array(1 + counted * 2)
+
+  packed[0] = 3
+
+  for (let index = 0; index < counted; index++)
+    new DataView(packed.buffer).setUint16(1 + index * 2, plain.getUint16(index * 4))
+
+  const body = Buffer.concat(entries.map((entry, index) => index === hmtx ? packed : stream.subarray(offsetOf(index), offsetOf(index) + entry.length)))
+  const directory = entries.flatMap((entry, index) => index === hmtx ? [(entry.flags & 0x3F) | 0x40, ...base128(entry.original), ...base128(packed.length)] : [entry.flags, ...entry.tag, ...base128(entry.original), ...entry.transformed ? base128(entry.length) : []])
+  const compressed = brotliCompressSync(body)
+  const header = Uint8Array.from(bytes.subarray(0, 48))
+
+  new DataView(header.buffer).setUint32(20, compressed.length)
+
+  return Buffer.concat([header, Uint8Array.from(directory), compressed])
+}
+
 describe('metric-matched font fallbacks', () => {
+  it('reads the advances of a woff2 whose hmtx table is transformed', async () => {
+    const bytes = new Uint8Array(await Bun.file(`${ROOT}/${WOFF2}`).arrayBuffer())
+    const transformed = withTransformedHmtx(bytes)
+
+    expect(transformed.length).not.toBe(bytes.length)
+    expect(fontMetrics(transformed)).toEqual(fontMetrics(bytes))
+  })
+
+  it('reads the metrics again when a font is swapped in with the same modified time', async () => {
+    const dir = await scratchDir('font-swap-')
+    const file = join(dir, 'font.woff2')
+    const fonts = [{ family: 'Swapped', src: file }]
+
+    try {
+      await copyFile(`${ROOT}/${WOFF2}`, file)
+
+      const stamp = new Date('2024-01-01T00:00:00Z')
+
+      await utimes(file, stamp, stamp)
+
+      const first = fontFallbacks(ROOT, fonts).get('Swapped')!.rule
+
+      await copyFile(`${ROOT}/node_modules/@fontsource/inter/files/inter-latin-400-normal.woff2`, file)
+      await utimes(file, stamp, stamp)
+
+      expect(fontFallbacks(ROOT, fonts).get('Swapped')!.rule).not.toBe(first)
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('lists the fallback in the family list of the font shorthand, after the size and line height', () => {
+    const fallbacks = fontFallbacks(ROOT, [{ family: 'Archivo Black', src: WOFF2 }])
+    const css = withFontFallbacks('a{font:italic 700 1.2rem/1.5 "Archivo Black",serif}b{font: 12px Archivo Black, sans-serif !important}c{font-size:12px;--my-font:Archivo Black}d{font:menu}', fallbacks)
+
+    expect(css).toContain('a{font:italic 700 1.2rem/1.5 "Archivo Black","Archivo Black Fallback",serif}')
+    expect(css).toContain('b{font: 12px Archivo Black,"Archivo Black Fallback", sans-serif !important}')
+    expect(css).toContain('c{font-size:12px;--my-font:Archivo Black,"Archivo Black Fallback"}')
+    expect(css).toContain('d{font:menu}')
+    expect(withFontFallbacks(css, fallbacks)).toBe(css)
+  })
+
   it('reads the metrics of a woff2 and of a woff alike', async () => {
     const fromWoff2 = fontMetrics(new Uint8Array(await Bun.file(`${ROOT}/${WOFF2}`).arrayBuffer()))
     const fromWoff = fontMetrics(new Uint8Array(await Bun.file(`${ROOT}/${WOFF}`).arrayBuffer()))
