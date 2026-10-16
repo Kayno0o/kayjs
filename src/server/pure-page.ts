@@ -6,7 +6,8 @@ import { analyzeServer } from '../compiler/script'
 import { stateAt } from './module-state'
 import { routeChain } from './routes'
 
-// Every export of `kay` and whether a page importing it stays the same for every visitor and every moment: `free` reads no request, cookie, environment or clock; `request` does, or opens a route, a socket or a call that does; `local` is `persisted`, which reads the request's cookie or query unless it is kept in `localStorage`, read once the page has hydrated, so it is free only where every use says `storage: 'local'`.
+// Every export of `kay` and whether a page importing it stays the same for every visitor and every moment: `free` reads no request, cookie, environment or clock; `request` does, or opens a route, a socket or a call that does.
+// `persisted` is `local`: it reads the request's cookie or query, so it is free only where every use says `storage: 'local'`, kept in `localStorage` and read once the page has hydrated.
 // One list, so an export missing from it is found by `tests/kept-pages.test.ts`, which holds it to the exports of `kay`.
 export const KAY_EXPORTS: Record<string, 'free' | 'request' | 'local'> = {
   signal: 'free',
@@ -111,9 +112,80 @@ const AS_PREFIX = /^.*\sas\s+/
 const AS_NAME = /\s+as\s+(?:\S.*)?$/
 const TYPE_NAME = /^type\s/
 const TYPE_IMPORT = /^\s*type\b/
-const LOCAL_STORAGE = /\bstorage\s*:\s*(['"])local\1/
+const LOCAL_STORAGE = /^storage\s*:\s*(['"])local\1$/
+const STORAGE_PROPERTY = /^storage\b/
 const CALL_OPENING = /^\s*(?:<[^()]*>\s*)?\(/
 const REGEX_CHARS = /[$()*+.?[\\\]^{|}]/g
+const OPENERS = '([{'
+const CLOSERS = ')]}'
+
+// The parts of `text` between the commas at its own level, up to the bracket that closes the one `text` sits in; brackets, strings and comments inside are skipped.
+// Undefined when that bracket never closes.
+function splitLevel(text: string): string[] | undefined {
+  const parts: string[] = []
+  let depth = 1
+  let from = 0
+
+  for (let at = 0; at < text.length; at++) {
+    const char = text[at]!
+
+    if (char === '"' || char === '\'' || char === '`') {
+      for (at++; at < text.length && text[at] !== char; at++) {
+        if (text[at] === '\\')
+          at++
+      }
+    }
+    else if (char === '/' && text[at + 1] === '/') {
+      at = text.indexOf('\n', at)
+
+      if (at === -1)
+        return undefined
+    }
+    else if (char === '/' && text[at + 1] === '*') {
+      at = text.indexOf('*/', at + 2)
+
+      if (at === -1)
+        return undefined
+
+      at++
+    }
+    else if (OPENERS.includes(char)) {
+      depth++
+    }
+    else if (CLOSERS.includes(char)) {
+      depth--
+
+      if (depth === 0) {
+        parts.push(text.slice(from, at))
+
+        return parts
+      }
+    }
+    else if (char === ',' && depth === 1) {
+      parts.push(text.slice(from, at))
+      from = at + 1
+    }
+  }
+
+  return undefined
+}
+
+// Whether the arguments of a `persisted` call, from just after its `(`, give the options as a literal with no spread and every `storage` in it `'local'`: anything else may be a cookie or the query.
+function savesLocally(args: string): boolean {
+  const options = splitLevel(args)?.[2]?.trim()
+
+  if (options === undefined || !options.startsWith('{') || !options.endsWith('}'))
+    return false
+
+  const properties = splitLevel(options.slice(1))?.map(part => part.trim()).filter(part => part !== '')
+
+  if (properties === undefined || properties.some(property => property.startsWith('...')))
+    return false
+
+  const storage = properties.filter(property => STORAGE_PROPERTY.test(property))
+
+  return storage.length > 0 && storage.every(property => LOCAL_STORAGE.test(property))
+}
 
 // Whether every use of `name` in `source`, the import itself cut out, is a call saying `storage: 'local'`.
 function onlyLocalCalls(source: string, name: string, importAt: number, importLength: number): boolean {
@@ -125,26 +197,7 @@ function onlyLocalCalls(source: string, name: string, importAt: number, importLe
     const after = rest.slice(use.index + name.length)
     const opening = CALL_OPENING.exec(after)
 
-    if (opening === null)
-      return false
-
-    let depth = 0
-    let end = -1
-
-    for (let at = opening[0].length - 1; at < after.length; at++) {
-      if (after[at] === '(')
-        depth++
-      else if (after[at] === ')')
-        depth--
-
-      if (depth === 0) {
-        end = at
-
-        break
-      }
-    }
-
-    if (end === -1 || !LOCAL_STORAGE.test(after.slice(opening[0].length, end)))
+    if (opening === null || !savesLocally(after.slice(opening[0].length)))
       return false
 
     found = true
@@ -182,7 +235,7 @@ function lineAt(source: string, offset: number): number {
 }
 
 // Whether the page, its layouts and everything they import provably read nothing a request or the moment changes, so one render serves every visitor.
-// Whatever cannot be shown to is left to render per request: a package, any `kay` entry but its reactive core, a `ctx`, a clock, a `query` schema, module state.
+// Whatever cannot be shown to is left to render per request: a package, any `kay` export `KAY_EXPORTS` does not class as free, a `ctx`, a clock, a `query` schema, module state.
 // `scans` keeps what each file holds across the routes of one build.
 export async function readsNothing(route: { layouts: string[], file: string }, scans = new Map<string, Promise<Scan>>()): Promise<boolean> {
   return await keptStop(route, scans) === undefined
