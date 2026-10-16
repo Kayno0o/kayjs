@@ -493,6 +493,9 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay dev in
 
     await shown.evaluate(() => document.querySelector('kay-dev')!.shadowRoot!.querySelector<HTMLButtonElement>('.bar > button')!.click())
     await shown.waitUntil(() => document.querySelector('kay-dev')!.shadowRoot!.querySelector<HTMLElement>('.drawer')!.hidden === false)
+    // The Env tab, whose panel is short and does not change: the Problems panel grows as axe-core and the dev server's checks report, at a time the test cannot know.
+    await shown.evaluate(() => document.querySelector('kay-dev')!.shadowRoot!.querySelector<HTMLButtonElement>('#kay-dev-tab-env')!.click())
+    await shown.waitUntil(() => document.querySelector('kay-dev')!.shadowRoot!.querySelector<HTMLElement>('.panel:not([hidden])')!.textContent.includes('no public env'))
 
     const heights = async () => shown.evaluate(() => {
       const drawer = document.querySelector('kay-dev')!.shadowRoot!.querySelector<HTMLElement>('.drawer')!
