@@ -240,7 +240,7 @@ article
 - `all()` gives every entry in the collection's `sort` order, by slug without one; filter and sort it like any array.
 - `get(slug)` gives one entry or `undefined`.
 - An entry has `slug`, its path in the folder without the extension (`guides/intro`; an `index` file takes its folder's), `data`, `headings` (`{ depth, id, text }` in order, for a table of contents), `Content`, the component rendering its body, `words`, `readingTime` and `file`.
-- `words` counts the words of the rendered text, code blocks and Markdown inside a component's tags included, and a component's own output left out, since it only exists once a page renders; `readingTime` is the minutes at 230 words a minute, at least 1 for a body with words: `post.readingTime` gives `3`.
+- `words` counts the words of the rendered text, code blocks and Markdown inside a component's tags included, and a component's own output left out, since it only exists once a page renders; `readingTime` is the minutes at 230 words a minute, at least 1 for a body with words and 0 for an entry with none: `post.readingTime` gives `3`.
 - A data file's `headings` is empty, its `words` and `readingTime` are 0, and its `Content` renders nothing.
 - Two files giving one slug, `guides.md` and `guides/index.md`, fail the collection.
 - Entries are the site's own content, trusted: their HTML, links and what a highlighter returns go out as written, unsanitised.

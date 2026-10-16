@@ -41,7 +41,7 @@ ul
 
 An entry has `slug`, `data`, `headings` (for a table of contents) and `Content`, the component rendering its body. Entries marked as drafts show in development only: under `kay dev`, or when the server's `dev` option is on, whatever `NODE_ENV` says.
 
-An entry also has `words` and `readingTime`, counted from the text the page shows, so no file is read again. Code blocks and the Markdown inside a component's tags count, while the text a component renders itself does not, as it only exists once the page renders. `readingTime` is in minutes at 230 words a minute, never less than 1 for a body with words: `p {post.readingTime} min read`. A data file has neither.
+An entry also has `words` and `readingTime`, counted from the text the page shows, so no file is read again. Code blocks and the Markdown inside a component's tags count, while the text a component renders itself does not, as it only exists once the page renders. `readingTime` is in minutes at 230 words a minute, never less than 1 for a body with words, and 0 for an entry with none: `p {post.readingTime} min read`. A data file has neither.
 
 ## A page per entry
 

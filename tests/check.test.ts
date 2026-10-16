@@ -1045,6 +1045,25 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 
+  it('types alternate() to take an element of locales() without a cast, with and without a Register naming the locales', async () => {
+    const switcher = '--- server\nimport { alternate, locales } from \'kay/i18n\'\n\nconst links = locales().map(code => alternate(code))\n---\nul\n  for link of links\n    li {link}\n'
+    const files = { 'src/routes/index.kay': switcher, 'src/messages/fr.ts': 'export default {}\n', 'src/messages/en.ts': 'export default {}\n' }
+    const bare = await scratchProject(files)
+    const named = await scratchProject({ ...files, 'src/routes/bad.kay': '--- server\nimport { alternate } from \'kay/i18n\'\n\nconst link = alternate(\'de\')\n---\np {link}\n' })
+
+    try {
+      expect((await check(bare)).filter(d => d.code.startsWith('TS'))).toEqual([])
+
+      const typed = await check(named, { i18n: { locales: ['fr', 'en'], defaultLocale: 'fr' } })
+
+      expect(typed.filter(d => d.code.startsWith('TS')).map(d => d.file.slice(d.file.lastIndexOf('/') + 1))).toEqual(['bad.kay'])
+    }
+    finally {
+      await rm(bare, { recursive: true, force: true })
+      await rm(named, { recursive: true, force: true })
+    }
+  })
+
   it('checks without the server\'s environment, as kay build renders pages: the config, the content and the messages may import an env module lacking a variable', async () => {
     const env = 'import { t } from \'elysia\'\nimport { defineEnv } from \'kay/server\'\n\nexport const env = defineEnv(t.Object({ KAY_CHECK_UNSET_SECRET: t.String() }))\n'
     const root = await scratchProject({
