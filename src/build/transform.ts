@@ -49,7 +49,7 @@ export interface Analysis {
 }
 
 // The packages a compile runs through, their versions part of every cache key.
-const COMPILER_PACKAGES = ['@babel/parser/package.json', '@babel/traverse/package.json', '@babel/types/package.json', '@typescript/native-preview/package.json']
+const COMPILER_PACKAGES = ['@babel/parser/package.json', '@babel/traverse/package.json', '@babel/types/package.json', 'typescript7/package.json']
 let fingerprint: string | undefined
 const SCRIPT_FILE = /\.tsx?$/
 // Each file's last analysis in this process, which spares reading its cache entry from disk again while the inputs stay the same.

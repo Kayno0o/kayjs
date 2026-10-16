@@ -17,8 +17,8 @@ export function browserGlobals(): ReadonlySet<string> {
   globals = new Set()
 
   try {
-    const preview = dirname(Bun.resolveSync('@typescript/native-preview/package.json', import.meta.dir))
-    const platform = dirname(Bun.resolveSync(`@typescript/native-preview-${process.platform}-${process.arch}/package.json`, preview))
+    const compiler = dirname(Bun.resolveSync('typescript7/package.json', import.meta.dir))
+    const platform = dirname(Bun.resolveSync(`@typescript/typescript-${process.platform}-${process.arch}/package.json`, compiler))
     const lib = readFileSync(join(platform, 'lib', 'lib.dom.d.ts'), 'utf8')
     const own = Bun.spawnSync([process.execPath, '-e', 'console.log(JSON.stringify(Object.getOwnPropertyNames(globalThis)))'], { cwd: tmpdir() })
     const bun = new Set(JSON.parse(own.stdout.toString()) as string[])

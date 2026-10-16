@@ -178,7 +178,7 @@ export class KayLanguageServer {
     await this.writeShadows()
     this.watchesFiles = (params.capabilities.workspace as { didChangeWatchedFiles?: { dynamicRegistration?: boolean } } | undefined)?.didChangeWatchedFiles?.dynamicRegistration === true
 
-    const child = Bun.spawn([process.execPath, TSGO, '--lsp', '--stdio'], { cwd: this.root, stdin: 'pipe', stdout: 'pipe', stderr: 'ignore' })
+    const child = Bun.spawn([TSGO, '--lsp', '--stdio'], { cwd: this.root, stdin: 'pipe', stdout: 'pipe', stderr: 'ignore' })
     const connection = new Connection(child.stdout, (data) => {
       void child.stdin.write(data)
       void child.stdin.flush()

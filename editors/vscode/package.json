@@ -65,7 +65,7 @@
   },
   "scripts": {
     "build": "bun build.ts",
-    "check": "tsgo --noEmit -p tsconfig.json",
+    "check": "bun ../../src/tsgo.ts --noEmit -p tsconfig.json",
     "package": "bun build.ts && bunx @vscode/vsce@4.0.0 package --no-dependencies --skip-license -o kay.vsix",
     "test": "bun test"
   },

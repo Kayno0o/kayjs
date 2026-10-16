@@ -13,9 +13,10 @@ import { projectPaths } from '../project'
 const TSC_LINE = /^(.+?)\((\d+),(\d+)\): (?:error|warning) (TS\d+): (.*)$/
 // An error about the whole run, such as a tsconfig that does not exist.
 const TSC_GLOBAL_LINE = /^error (TS\d+): (.*)$/
-const TSGO_PACKAGE = fileURLToPath(import.meta.resolve('@typescript/native-preview/package.json'))
+const TSGO_PACKAGE = fileURLToPath(import.meta.resolve('typescript7/package.json'))
 
-export const TSGO = join(dirname(TSGO_PACKAGE), 'bin', 'tsgo')
+// The native compiler of the `typescript7` alias, found as the package's own launcher does: its platform package holds the executable.
+export const TSGO = join(dirname(Bun.resolveSync(`@typescript/typescript-${process.platform}-${process.arch}/package.json`, dirname(TSGO_PACKAGE))), 'lib', process.platform === 'win32' ? 'tsc.exe' : 'tsc')
 // The options that name a place, which do not change what a file's types are.
 const PLACED_OPTIONS = new Set(['rootDirs', 'rootDir', 'paths', 'baseUrl', 'typeRoots', 'outDir', 'declarationDir', 'tsBuildInfoFile', 'configFilePath', 'pathsBasePath'])
 // A filesystem stamps writes off a coarse clock, milliseconds behind on Linux and up to a second on some, so a file written that close before a run counts as written after it.
@@ -53,7 +54,7 @@ export function parseTscOutput(output: string, config: string, root: string): Ch
 
 // The project's tsconfig as tsgo resolves it, its extends, options and root files, or undefined when tsgo cannot read it.
 export async function resolvedConfig(root: string, tsconfig: string): Promise<string | undefined> {
-  const child = Bun.spawn([process.execPath, TSGO, '--showConfig', '-p', tsconfig], { cwd: root, stdout: 'pipe', stderr: 'ignore' })
+  const child = Bun.spawn([TSGO, '--showConfig', '-p', tsconfig], { cwd: root, stdout: 'pipe', stderr: 'ignore' })
   const [output, code] = await Promise.all([new Response(child.stdout).text(), child.exited])
 
   return code === 0 ? output : undefined
@@ -155,7 +156,7 @@ export async function typecheck(root: string, tsconfig: string, shown: string | 
 
   const generated = await contentHashes(shadowDir)
   const started = Date.now()
-  const child = Bun.spawn([process.execPath, TSGO, ...args], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
+  const child = Bun.spawn([TSGO, ...args], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
   const [output, errors, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
   const read = slot && code === 0 && output === '' && errors === '' ? await filesRead(buildInfo) : undefined
 

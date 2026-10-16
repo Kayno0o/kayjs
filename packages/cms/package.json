@@ -38,7 +38,7 @@
   "scripts": {
     "prepare": "$npm_execpath ../../scripts/link-fixture.ts",
     "check": "$npm_execpath check",
-    "build:types": "rm -rf types && tsgo -p tsconfig.build.json",
+    "build:types": "rm -rf types && bun ../../src/tsgo.ts -p tsconfig.build.json",
     "prepack": "bun run build:types",
     "postpack": "rm -rf types",
     "prelint": "bun run --cwd ../.. build:eslint",
@@ -57,7 +57,6 @@
     "@kaynooo/eslint": "^7.0.4",
     "@kaynooo/kayjs-ui": "workspace:~",
     "@types/bun": "^1.4.3",
-    "@typescript/native-preview": "^7.0.0-dev.20260707.2",
     "bun-plugin-tailwind": "^0.1.2",
     "tailwindcss": "^4.3.3",
     "typescript": "^6.0.3"

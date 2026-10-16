@@ -150,7 +150,8 @@
     "./kay.tmLanguage.json": "./editors/vscode/syntaxes/kay.tmLanguage.json"
   },
   "bin": {
-    "kay": "./src/cli.ts"
+    "kay": "./src/cli.ts",
+    "tsgo": "./src/tsgo.ts"
   },
   "files": [
     "LICENSE",
@@ -169,7 +170,7 @@
   },
   "scripts": {
     "check": "$npm_execpath check",
-    "build:types": "rm -rf types && tsgo -p tsconfig.build.json",
+    "build:types": "rm -rf types && bun src/tsgo.ts -p tsconfig.build.json",
     "build:eslint": "bun build src/eslint/index.ts --target node --packages external --outfile dist/eslint.js",
     "prepack": "bun run build:types && bun run build:eslint",
     "postpack": "rm -rf types dist",
@@ -188,7 +189,7 @@
     "docs:build": "$npm_execpath src/cli.ts build docs --static",
     "bench:check": "$npm_execpath run bench:check:kay && $npm_execpath run bench:check:apps",
     "bench:check:kay": "$npm_execpath src/cli.ts check bench/apps/kay",
-    "bench:check:apps": "tsgo --noEmit -p bench/apps/solid && tsgo --noEmit -p bench/apps/svelte && tsgo --noEmit -p bench/apps/next && $npm_execpath --cwd=bench/apps/nuxt --bun run check && $npm_execpath --cwd=bench/apps/astro --bun run check"
+    "bench:check:apps": "bun src/tsgo.ts --noEmit -p bench/apps/solid && bun src/tsgo.ts --noEmit -p bench/apps/svelte && bun src/tsgo.ts --noEmit -p bench/apps/next && $npm_execpath --cwd=bench/apps/nuxt --bun run check && $npm_execpath --cwd=bench/apps/astro --bun run check"
   },
   "peerDependencies": {
     "@happy-dom/global-registrator": "^20.14.6 || ^21.0.3",
@@ -206,11 +207,11 @@
     "@jsquash/avif": "2.1.1",
     "@kaynooo/utils": "^2.29.0",
     "@resvg/resvg-js": "^2.6.2",
-    "@typescript/native-preview": "^7.0.0-dev.20260707.2",
     "axe-core": "^4.14.0",
     "devalue": "^6.0.3",
     "elysia": "^1.4.30",
-    "marked": "~18.1.1"
+    "marked": "~18.1.1",
+    "typescript7": "npm:typescript@^7.0.2"
   },
   "devDependencies": {
     "@fontsource/inter": "^5.3.0",

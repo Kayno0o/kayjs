@@ -48,7 +48,7 @@
   },
   "scripts": {
     "check": "$npm_execpath check",
-    "build:types": "rm -rf types && tsgo -p tsconfig.build.json",
+    "build:types": "rm -rf types && bun ../../src/tsgo.ts -p tsconfig.build.json",
     "prepack": "bun run build:types",
     "postpack": "rm -rf types",
     "prelint": "bun run --cwd ../.. build:eslint",
@@ -80,7 +80,6 @@
     "@kaynooo/kayjs-ui": "workspace:~",
     "@kaynooo/pg-orm": "^7.0.4",
     "@types/bun": "^1.4.3",
-    "@typescript/native-preview": "^7.0.0-dev.20260707.2",
     "elysia": "^1.4.30",
     "typescript": "^6.0.3"
   }
