@@ -11,6 +11,7 @@ import { openSqlite } from '../runtime/sqlite.server'
 import { overHttps } from './actions'
 import { nodeCrypto } from './builtins'
 import { requestCookies } from './cookies'
+import { onReload } from './reload'
 import { readPersonally } from './scope'
 import { GENERATE_SECRET, MIN_SECRET_LENGTH, openWith, sealWith, weakSecrets } from './seal'
 import { useStampSecret } from './stamp'
@@ -377,8 +378,14 @@ export function memoryStore(): SessionStore & { deleteWhere: NonNullable<Session
 // Sessions in a SQLite file, surviving restarts and shared by the processes on one machine.
 // One store per file, so a config read again, as in development, opens no second database and sweep timer; a file deleted or replaced at the same path is opened afresh, by a running server too.
 export function sqliteStore(path: string): SqliteSessionStore {
-  if (path === ':memory:' || path === '')
-    return openSqliteStore(path).store
+  if (path === ':memory:' || path === '') {
+    const { store, close } = openSqliteStore(path)
+
+    // Nothing else holds a store of its own, so a reload closes it with the module that opened it.
+    onReload(close)
+
+    return store
+  }
 
   const file = resolve(path)
   const opened = sqliteStores.get(file)

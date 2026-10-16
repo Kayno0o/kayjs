@@ -7,6 +7,7 @@ import { projectPaths } from '../project'
 import { forgetModules } from '../server/bundle'
 import { announceReload, stopRunning } from '../server/dev'
 import { registerEarlyLoader } from '../server/loader'
+import { disposeOwned, onReload } from '../server/reload'
 import { loopbackTaken } from './loopback'
 import { planReload } from './reload'
 import '../server'
@@ -252,8 +253,50 @@ process.on('message', (message: unknown) => {
 // An entry that ends on its own ends the process, as it does without a channel to `kay dev`.
 ;(process as { channel?: { unref?: () => void } }).channel?.unref?.()
 
-// The process listeners an app of the run before added, which a run after it adds again.
-const baseline = new Set(process.listeners('beforeExit'))
+// What the modules of the app open on their own, a listener on the process, an interval or a `Bun.SQL` pool, is let go of when the module runs again; what kay opens for them, as rooms and session stores, does the same itself.
+for (const method of ['on', 'once', 'addListener', 'prependListener', 'prependOnceListener'] as const) {
+  const add = process[method].bind(process) as (event: string | symbol, listener: (...args: unknown[]) => void) => typeof process
+
+  process[method] = ((event: string | symbol, listener: (...args: unknown[]) => void) => {
+    add(event, listener)
+    onReload(() => removeListener(event, listener), 'through')
+
+    return process
+  }) as typeof process[typeof method]
+}
+
+// Removes a listener however it was added, a `once` one included, which `process.off` takes by the function given.
+function removeListener(event: string | symbol, listener: (...args: unknown[]) => void) {
+  for (const raw of process.rawListeners(event)) {
+    if (raw === listener || (raw as { listener?: unknown }).listener === listener)
+      process.off(event, raw as (...args: unknown[]) => void)
+  }
+}
+
+const startInterval = globalThis.setInterval
+
+globalThis.setInterval = ((...args: Parameters<typeof setInterval>) => {
+  const timer = startInterval(...args)
+
+  onReload(() => clearInterval(timer), 'direct')
+
+  return timer
+}) as typeof setInterval
+
+Bun.SQL = new Proxy(Bun.SQL, {
+  construct(target, args, newTarget) {
+    return opened(Reflect.construct(target, args, newTarget) as InstanceType<typeof Bun.SQL>)
+  },
+  apply(target, self, args) {
+    return opened(Reflect.apply(target, self, args) as InstanceType<typeof Bun.SQL>)
+  },
+})
+
+function opened(sql: InstanceType<typeof Bun.SQL>): InstanceType<typeof Bun.SQL> {
+  onReload(async () => sql.close(), 'direct')
+
+  return sql
+}
 
 // Imports again the modules the change left stale and runs the entry once more, its servers taking over the ones listening; answers `kay dev` that it did, or that this change needs a new process.
 async function reload(request: ReloadRequest): Promise<void> {
@@ -295,11 +338,7 @@ async function reloaded({ code, startedAt, changed, files }: ReloadRequest): Pro
 
   try {
     await stopRunning()
-
-    for (const listener of process.listeners('beforeExit')) {
-      if (!baseline.has(listener))
-        process.off('beforeExit', listener)
-    }
+    await disposeOwned(new Set(plan.evict))
 
     forgetModules()
 

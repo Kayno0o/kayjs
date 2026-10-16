@@ -78,6 +78,17 @@ async function served(files: Record<string, string>) {
   }
 }
 
+// The entry with `extra` after the server it starts, which restarts the process once.
+async function entryWith(project: Awaited<ReturnType<typeof served>>, extra: string) {
+  await project.write('src/server.ts', `${ENTRY(project.log)}\n${extra}`)
+  await until(() => project.children.length === 2)
+  await project.sees('Edit 0')
+}
+
+function lines(file: string): string[] {
+  return existsSync(file) ? readFileSync(file, 'utf8').split('\n').filter(Boolean) : []
+}
+
 describe.concurrent('kay dev reloading', () => {
   it('ends on the last edit of a burst, in the one process', async () => {
     const project = await served({ 'src/routes/index.kay': 'h1 Burst 0\n' })
@@ -224,6 +235,80 @@ describe.concurrent('kay dev reloading', () => {
 
       await project.write('src/routes/index.kay', 'h1 Fixed\n')
       await project.sees('Fixed')
+      expect(project.children).toHaveLength(1)
+    }
+    finally {
+      await project.cleanup()
+    }
+  }, 60_000)
+
+  it('holds one listener and one interval of the entry after twenty reloads', async () => {
+    const project = await served({ 'src/routes/index.kay': 'h1 Edit 0\n' })
+    const counts = join(project.root, '.counts')
+    const ticks = join(project.root, '.ticks')
+
+    try {
+      await entryWith(project, `import { readFileSync } from 'node:fs'\nprocess.on('SIGUSR2', () => {})\nprocess.once('beforeExit', () => {})\nsetInterval(() => appendFileSync(${JSON.stringify(ticks)}, \`\${readFileSync(${JSON.stringify(project.log)}, 'utf8').split('\\n').length}\\n\`), 10)\nappendFileSync(${JSON.stringify(counts)}, \`\${process.listenerCount('SIGUSR2')} \${process.listenerCount('beforeExit')}\\n\`)\n`)
+
+      for (let edit = 1; edit <= 20; edit++) {
+        await project.write('src/routes/index.kay', `h1 Edit ${edit}\n`)
+        await project.sees(`Edit ${edit}`)
+      }
+
+      await until(() => lines(counts).length >= 21)
+      await Bun.write(ticks, '')
+      await Bun.sleep(200)
+
+      expect(project.children).toHaveLength(2)
+      // The entry's two listeners, and the one Elysia adds to stop its server.
+      expect(new Set(lines(counts))).toEqual(new Set(['1 2']))
+      // Only the run that is current still ticks.
+      expect(new Set(lines(ticks)).size).toBe(1)
+    }
+    finally {
+      await project.cleanup()
+    }
+  }, 120_000)
+
+  it('closes the rooms and the session store the earlier run opened, and the pool its entry opened', async () => {
+    const project = await served({ 'src/routes/index.kay': 'h1 Edit 0\n' })
+    const states = join(project.root, '.states')
+
+    try {
+      const probes = ['previous.rooms.members(\'r\')', 'previous.store.get(\'x\')', 'await previous.pool`select 1`']
+      const check = probes.map(probe => `try { ${probe}; state += 'open ' } catch { state += 'closed ' }`).join('\n')
+
+      await entryWith(project, `import { SQL } from 'bun'\nimport { sqliteRooms, sqliteStore } from 'kay/server'\nconst previous = (globalThis as any).kept\nlet state = 'none'\n;(globalThis as any).kept = { rooms: sqliteRooms(${JSON.stringify(join(project.root, 'rooms.sqlite'))}), store: sqliteStore(':memory:'), pool: new SQL('sqlite://:memory:') }\nif (previous) {\nstate = ''\n${check}\n}\nappendFileSync(${JSON.stringify(states)}, state.trim() + '\\n')\n`)
+
+      for (let edit = 1; edit <= 20; edit++) {
+        await project.write('src/routes/index.kay', `h1 Edit ${edit}\n`)
+        await project.sees(`Edit ${edit}`)
+      }
+
+      await until(() => lines(states).length >= 21)
+      expect(project.children).toHaveLength(2)
+      expect(lines(states).slice(1)).toEqual(Array.from<string>({ length: 20 }).fill('closed closed closed'))
+    }
+    finally {
+      await project.cleanup()
+    }
+  }, 120_000)
+
+  it('keeps a pool a module that did not run again opened', async () => {
+    const api = (edit: number) => `import { api } from 'kay/server'\nimport { state } from '../lib/db'\n\nexport default api().get('/', async () => ({ pool: await state(), edit: ${edit} }))\n`
+    const project = await served({
+      'src/routes/index.kay': 'h1 Home\n',
+      'src/lib/db.ts': 'import { SQL } from \'bun\'\n\nconst sql = new SQL(\'sqlite://:memory:\')\n\nexport async function state() {\n  try {\n    await sql`select 1`\n\n    return \'open\'\n  }\n  catch {\n    return \'closed\'\n  }\n}\n',
+      'src/api/hello.ts': api(0),
+    })
+
+    try {
+      for (let edit = 1; edit <= 3; edit++) {
+        await project.write('src/api/hello.ts', api(edit))
+        await until(async () => (await project.text('/api/hello')).includes(`"edit":${edit}`))
+        expect(await project.text('/api/hello')).toContain('"pool":"open"')
+      }
+
       expect(project.children).toHaveLength(1)
     }
     finally {

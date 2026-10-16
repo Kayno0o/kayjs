@@ -1,5 +1,6 @@
 import { kayLog } from '../runtime/log'
 import { openSqlite } from '../runtime/sqlite.server'
+import { onReload } from './reload'
 
 // What a room sends a connection through: Elysia's `ws`, read through its raw socket, the one object that stays the same from `open` to `close`.
 export interface RoomConnection {
@@ -284,7 +285,7 @@ export function sqliteRooms(path: string, { poll = POLL }: { poll?: number } = {
     }
   }
 
-  return {
+  const store: RoomStore = {
     add(room, connection, member) {
       own.set(`${room}\n${connection}`, { room, connection, member })
       sync()
@@ -329,4 +330,9 @@ export function sqliteRooms(path: string, { poll = POLL }: { poll?: number } = {
       db.close()
     },
   }
+
+  // A reload runs the module that opened the store again, which opens its own.
+  onReload(() => !closed && store.close())
+
+  return store
 }
