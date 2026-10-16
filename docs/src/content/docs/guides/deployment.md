@@ -58,21 +58,7 @@ With `health: false`, any answer on the port counts and `--health` is not run.
 
 ## Static export
 
-For a host with no server, `--static` writes the whole site to `dist`:
-
-```sh
-kay build --static --outdir dist
-```
-
-Every page is rendered, with `about.html` and `about/index.html` for `/about`. The export also holds each [endpoint file](/essentials/routing#endpoint-files) such as `llms.txt`, the sitemap, feeds and a `404.html`.
-
-The files of `public/` are copied, but not its dotfiles, `.env` files and editor backups. `.htaccess` and `.nojekyll` are kept for the host.
-
-The build fails and names each page or endpoint that needs a server. That means a page behind a guard, one exporting an action, one with params and no `prerender` list, and any module under `src/api/`.
-
-With no server to take them, the errors a browser meets are logged to its console only, not reported to `onError`.
-
-A `kay new` project keeps `.env` and `.env.*` out of git and out of its Docker image. A value the static build reads, such as `SITE_URL`, goes in the CI's variables or the build command's environment.
+For a host with no server, `kay build --static --outdir dist` writes the whole site as files. See [Static export and base path](/guides/static-export) for what is written and which pages cannot be exported.
 
 ## Docker
 
@@ -180,21 +166,7 @@ Each page request becomes a span named after its route, with one span per load a
 
 ## Behind a proxy
 
-Behind nginx, Caddy or Cloudflare, every request comes from the proxy. Tell kay how many proxies sit in front, so that rate limits and `clientAddress` see the visitor.
-
-```ts
-export default defineConfig({
-  proxy: true,
-})
-```
-
-`true` is one proxy. Use `proxy: 2` for Cloudflare then nginx, written as `{ hops: 2 }`. Use `proxy: { header: 'cf-connecting-ip' }` to read a header the proxy sets.
-
-Kay reads either only from this machine, a private network or the address ranges `trusted` lists. List a CDN's published ranges there when it reaches the server directly.
-
-```ts
-proxy: { header: 'cf-connecting-ip', trusted: ['173.245.48.0/20'] }
-```
+Behind nginx, Caddy or Cloudflare, every request comes from the proxy. Set `proxy` in kay.config.ts so that rate limits and `clientAddress` see the visitor. See [Trust a proxy](/guides/security#trust-a-proxy).
 
 Have the proxy pass `X-Forwarded-Proto`, or set `site` in kay.config.ts to the https address. Kay's cookies then stay `Secure`. Production warns once when it cannot tell.
 

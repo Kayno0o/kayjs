@@ -67,7 +67,7 @@ A page with a server fence, a layout and the special pages render once and are n
 
 A page reading a live value is rendered for each request. `kay build` does not keep it, and a static export of it fails.
 
-A client holds at most 20 live connections, a few tabs. The next one is refused until another closes. A client is its address, so behind a reverse proxy set `proxy` in kay.config.ts, or every visitor shares one address and one cap. See [Deployment](/guides/deployment#behind-a-proxy).
+A client holds at most 20 live connections, a few tabs. The next one is refused until another closes. A client is its address, so behind a reverse proxy set `proxy` in kay.config.ts, or every visitor shares one address and one cap. See [Deployment](/guides/security#trust-a-proxy).
 
 <ReadMore href="/llms/api-routes#live-values">Proof lifetimes and renewal, reconnect delays, how an island's imports are followed and the exact limits are in the full API routes reference.</ReadMore>
 

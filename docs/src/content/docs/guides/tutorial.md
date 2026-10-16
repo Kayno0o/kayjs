@@ -28,7 +28,7 @@ bun run dev
 
 `-y` takes the default `server` preset. Without it, `kay new` asks for a preset and then for each feature.
 
-`kay dev` serves the project on http://localhost:3000 and reloads the page on every change. Alt+click on any element opens the `.kay` line that wrote it in your editor. See the [inspector](/reference/cli#inspector).
+`kay dev` serves the project on http://localhost:3000 and reloads the page on every change. Alt+click on any element opens the `.kay` line that wrote it in your editor. See the [inspector](/guides/performance#the-inspector).
 
 Pages live in `src/routes/`, one `.kay` file per page. `src/routes/index.kay` is `/`.
 

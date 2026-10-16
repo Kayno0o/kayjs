@@ -4,7 +4,8 @@ order: 7
 description: Keep slow loads in memory, and stream slow parts of a page in after the rest.
 ---
 
-Each tool fits a different slow part:
+Each tool fits a different slow part.
+
 
 | The slow part | Use |
 | --- | --- |
@@ -13,7 +14,7 @@ Each tool fits a different slow part:
 | a value the rest of the page can show without, such as comments under a post | [streaming](#streaming) |
 | a part that differs per request in a page otherwise the same for everyone, such as a greeting | [a server island](/essentials/routing#server-islands) |
 
-They combine: a streamed value can come from `cached`, and a prerendered page can hold server islands.
+They combine. A streamed value can come from `cached`, and a prerendered page can hold server islands.
 
 ## Caching a load
 
@@ -28,7 +29,9 @@ const posts = await cached('posts', '5m', listPosts)
 ---
 ```
 
-Concurrent calls share one load. Past the `ttl` the next call still gets the stale value and refreshes it in the background, so no request waits on a refresh. Drop keys from the action that changed their data. A prerendered page that read a dropped key is rendered again on its next request, and so is a cached value built from it:
+Concurrent calls share one load. Past the `ttl`, the next call still gets the stale value and refreshes it in the background, so no request waits on a refresh.
+
+Drop keys from the action that changed their data. A prerendered page that read a dropped key is rendered again on its next request, and so is a cached value built from it.
 
 ```ts
 import { invalidate } from 'kay/cache'
@@ -37,7 +40,7 @@ invalidate('posts')
 invalidate(key => key.startsWith('post:'))
 ```
 
-To keep a value across restarts, name a store:
+To keep a value across restarts, name a store.
 
 ```ts
 import { cached, sqliteCache } from 'kay/cache'
@@ -48,19 +51,25 @@ const reviews = await cached('reviews', 86_400, fetchReviews, { store: disk })
 
 <Callout type="note">
 
-The cache lives in the process, and the value is shared by every caller, so never mutate it. A `sqliteCache` is shared by the processes of one machine. In the browser, `kay/cache` has `cached` and `invalidate` only, and `kay check` reports `invalidatePage` or `sqliteCache` imported by an island, a `--- client` fence, a component only islands render or a `.ts` module they import.
+The cache lives in the process, and every caller shares the value, so never mutate it. A `sqliteCache` is shared by the processes of one machine.
+
+In the browser, `kay/cache` has `cached` and `invalidate` only. `kay check` reports `invalidatePage` or `sqliteCache` imported by an island.
 
 </Callout>
 
 ## Page cache
 
-A page that is the same for everyone is rendered once with `prerender: true` in its `page` object, and rebuilt in the background with `revalidate: '1h'`. See [Routing](/essentials/routing#prerendering). After a change, `invalidate('posts')` or `news.invalidate()` refreshes the prerendered pages that read that value or collection. `invalidatePage(path => path.startsWith('/news'))` from `kay/cache` is for a page no data explains.
+A page that is the same for everyone is rendered once with `prerender: true` in its `page` object. Add `revalidate: '1h'` to rebuild it in the background. See [Routing](/essentials/routing#prerendering).
 
-A page rendered per request that read the session, a cookie (`ctx.cookies` or a `persisted` signal) or how a form post went goes out as `Cache-Control: private, no-cache` with `Vary: cookie`, so a CDN caching HTML never hands one visitor's page or redirect to another. A prerendered page keeps its public caching. A `cache-control` the page sets through `ctx.headers` wins.
+After a change, `invalidate('posts')` or `news.invalidate()` refreshes the prerendered pages that read that value or collection. Use `invalidatePage(path => path.startsWith('/news'))` from `kay/cache` for a page no data explains.
+
+A page rendered per request that read the session, a cookie or how a form post went goes out as `Cache-Control: private, no-cache` with `Vary: cookie`. A CDN caching HTML then never hands one visitor's page to another.
+
+A prerendered page keeps its public caching. A `cache-control` the page sets through `ctx.headers` wins.
 
 ## Streaming
 
-A load waits for every `await` in its server fence before the page renders. Leave a slow value unawaited and render it with an `await` block: the page goes out at once, and the `then` block streams in when the value resolves.
+A load waits for every `await` in its server fence before the page renders. Leave a slow value unawaited and render it with an `await` block. The page goes out at once, and the `then` block streams in when the value resolves.
 
 ```kay
 --- server
@@ -82,7 +91,7 @@ catch
 
 Without `catch`, a rejection removes the pending block and is logged. Islands inside a streamed block hydrate when it lands.
 
-An `await` block takes any promise, wherever it came from. A property, a prop or a promise a component made all work the same way:
+An `await` block takes any promise, wherever it came from. A property, a prop or a promise a component made all work the same way.
 
 ```kay
 --- server
@@ -96,7 +105,11 @@ catch
   p Comments are unavailable
 ```
 
-A promise may fail before the page gets to its block. That crashes nothing: the block still shows its `catch`. Kay holds any promise that fails with nothing awaiting it, in your own code too, instead of stopping the server. It logs the failure after 30 seconds, or when the process ends, which then exits with code 1. `defer()` from `kay` is no longer needed, though code that still calls it keeps working.
+A promise may fail before the page gets to its block. That crashes nothing, and the block still shows its `catch`.
+
+Kay holds any promise that fails with nothing awaiting it, in your own code too, instead of stopping the server. It logs the failure after 30 seconds, or when the process ends, which then exits with code 1.
+
+`defer()` from `kay` is no longer needed, though code that still calls it keeps working.
 
 <Callout type="warning">
 
@@ -106,7 +119,7 @@ Status, headers and cookies are sent before the first block, so a streamed block
 
 ## Rendering to a string
 
-`renderToString` renders a component outside a page, for a mail or a file:
+`renderToString` renders a component outside a page, for a mail or a file.
 
 ```ts
 import { renderToString } from 'kay/server'

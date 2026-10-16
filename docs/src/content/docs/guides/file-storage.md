@@ -6,7 +6,7 @@ description: Store uploads on disk or in an S3 bucket, link and resize them from
 
 ## Storing an upload
 
-`files` from `kay/server` keeps what visitors upload. An action stores the `File` it got with `files.put`, which resolves with a key for the app to save, and a page links it with `files.url(key)`:
+`files` from `kay/server` keeps what visitors upload. An action stores the `File` it got with `files.put`, which resolves with a key for the app to save. A page links it with `files.url(key)`.
 
 ```kay
 --- server
@@ -25,19 +25,37 @@ for key of photos key={key}
   img(src={files.url(key)} alt="")
 ```
 
-A key looks like `photos/1f3a9c0b2d4e6f8a0b1c.1600x1200.jpg`: an image's key holds its size, so `img` gives a stored image the same responsive variants as an imported one without opening the file. Keys are never reused, so a new avatar is a new file: `files.put(file, { replace: user.avatar })` deletes the old one once the new one is stored, and `files.delete(key)` deletes a file with every resized variant and social card of it. `files.list({ folder })` resolves with each stored file's `key` and when it was last written, `modified`, which is how an app finds the files nothing references any more, and `files.variants(keys)` names the variants made of each; a store of the app's own gives `list(prefix?)` for the first.
+A key looks like `photos/1f3a9c0b2d4e6f8a0b1c.1600x1200.jpg`. An image's key holds its size, so `img` gives a stored image the same responsive variants as an imported one, without opening the file.
 
-A JPEG, PNG or WebP is stored without the metadata a camera or phone writes in it, such as where and when the photo was taken, keeping its colour profile and orientation. `files.put(file, { keepMetadata: true })` stores it byte for byte.
+A JPEG, PNG or WebP is stored without the metadata a camera or phone writes in it, such as where and when the photo was taken. Its colour profile and orientation stay. Use `files.put(file, { keepMetadata: true })` to store it byte for byte.
 
-`/_kay/files/<key>` serves each file with its type, cached for good. Only PNG, JPEG, WebP, GIF and AVIF images, video, audio, PDFs and plain text are shown in place: any other file is sent as a sandboxed download, so an HTML page or an SVG never runs as the site, and every one but an image goes with no type, so a script or a stylesheet never loads into one of its pages. An SVG keeps its type, so it still shows in an `img`.
+`/_kay/files/<key>` serves each file with its type, cached for good. Images, video, audio, PDFs and plain text are shown in place. Any other file is sent as a sandboxed download, so an HTML page never runs as the site.
+
+### Replacing and deleting
+
+Keys are never reused, so a new avatar is a new file. `files.put(file, { replace: user.avatar })` deletes the old one once the new one is stored. `files.delete(key)` deletes a file with every resized variant and social card of it.
+
+### Finding unused files
+
+`files.list({ folder })` resolves with each stored file's `key` and `modified`, when it was last written. Use it to find the files nothing references any more. `files.variants(keys)` names the variants made of each key.
+
+<ReadMore href="/llms/files#storing-and-linking">Which types are shown in place, how an SVG is served and the store interface a custom store gives are in the full files reference.</ReadMore>
 
 ## Private files
 
-`files.put(file, { private: true })` stores a file only a signed link reaches. `files.url(key)` signs one valid an hour, with the app's `secret` or `KAY_SECRET` (see [Config](/reference/config)), which a script outside the server reads too, `secret` once it has used the store, `files.url(key, { expires: '1d' })` longer, so the page rendering it, behind its guard, decides who gets the file. A route of your own can answer with `files.response(key, request)` instead.
+`files.put(file, { private: true })` stores a file that only a signed link reaches. `files.url(key)` signs one, valid for an hour.
+
+The page rendering the link, behind its guard, decides who gets the file. Use `files.url(key, { expires: '1d' })` for a longer link.
+
+The link is signed with the app's `secret` or `KAY_SECRET`. See [Config](/reference/config).
+
+A route of your own can answer with `files.response(key, request)` instead.
+
+<ReadMore href="/llms/files#private-files">How links are signed, and how a script outside the server reads the secret, are in the full files reference.</ReadMore>
 
 ## Where files go
 
-Files go to `data/files` on the server's disk unless `storage` in `kay.config.ts` says otherwise. An S3 bucket, or R2, Spaces or MinIO, reads its settings from the usual `S3_*` variables:
+Files go to `data/files` on the server's disk unless `storage` in `kay.config.ts` says otherwise. An S3 bucket, or R2, Spaces or MinIO, reads its settings from the usual `S3_*` variables.
 
 ```ts
 import { defineConfig, s3Files } from 'kay/server'
@@ -47,11 +65,13 @@ export default defineConfig({
 })
 ```
 
-`publicUrl` is where the bucket serves files itself: a static export links stored files there. Under `bun test` files stay in memory, each `testSite` with its own.
+`publicUrl` is where the bucket serves files itself. A static export links stored files there.
+
+Under `bun test`, files stay in memory, each `testSite` with its own.
 
 ## Upload progress
 
-An island calling an action with a file reads `upload.progress()`, from 0 to 1 while the browser sends it:
+An island calling an action with a file reads `upload.progress()`, from 0 to 1 while the browser sends it.
 
 ```kay
 ---

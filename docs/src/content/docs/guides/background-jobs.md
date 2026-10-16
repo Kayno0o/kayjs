@@ -4,7 +4,8 @@ order: 8.5
 description: Run work on a schedule, keep a worker running with the server, and queue jobs that survive a restart.
 ---
 
-Three tools run work outside a request, each for its own kind of job:
+Three tools run work outside a request, each for its own kind of job.
+
 
 | The job | Use |
 | --- | --- |
@@ -14,7 +15,7 @@ Three tools run work outside a request, each for its own kind of job:
 
 ## Scheduled jobs
 
-`schedule(cron, job)` from `kay/server` is an Elysia plugin: the server runs the job from `.listen()` until it stops.
+`schedule(cron, job)` from `kay/server` is an Elysia plugin. The server runs the job from `.listen()` until it stops.
 
 ```ts
 import { Elysia } from 'elysia'
@@ -28,7 +29,7 @@ new Elysia()
   .listen(3000)
 ```
 
-Several jobs go in one call, as a list for one schedule or a table of schedules, and `boot: true` also runs them once as the server starts:
+Pass several jobs in one call, as a list for one schedule or a table of schedules. `boot: true` also runs them once as the server starts.
 
 ```ts
 app.use(schedule({
@@ -38,13 +39,17 @@ app.use(schedule({
 }, { boot: true }))
 ```
 
-With `lock` and several jobs, each job locks as `<lock>:<its schedule>:<its place in that schedule's list>`. `tz` applies to the crons and not to the lengths. A boot run happens wherever the server starts, so also at each restart of `kay dev`.
+A cron has five fields or a nickname such as `@daily`. A cron that can never run, such as `0 0 30 2 *`, is a type error. A length such as `'30s'` or `'1h'` runs at each multiple of it. `tz` applies to the crons and not to the lengths.
 
-A cron has five fields or a nickname such as `@daily`, and a cron that can never run, such as `0 0 30 2 *`, is a type error. A length such as `'30s'` or `'1h'` runs at each multiple of it. Runs never overlap, and a run that throws is logged without stopping the next. With several server processes, `{ lock: 'weekly-report' }` runs the job once across all of them.
+Runs never overlap. A run that throws is logged without stopping the next.
+
+With several server processes, `{ lock: 'weekly-report' }` runs the job once across all of them. With `lock` and several jobs, each job locks as `<lock>:<its schedule>:<its place in that schedule's list>`.
+
+A boot run happens wherever the server starts, so also at each restart of `kay dev`.
 
 ## Long-running work
 
-`background(work)` starts work with the server and keeps it running, such as a consumer reading another service's queue. On shutdown its signal aborts and the server waits for it to return. Work that throws is logged and not started again:
+`background(work)` starts work with the server and keeps it running, such as a consumer reading another service's queue. On shutdown its signal aborts, and the server waits for it to return. Work that throws is logged and not started again.
 
 ```ts
 import { background } from 'kay/server'
@@ -57,7 +62,7 @@ app.use(background(async (signal) => {
 
 ## Queues
 
-A queue holds jobs that must not be lost. An action enqueues one and answers at once, and the server runs the job after the response, or after a restart or a deploy if it has to:
+A queue holds jobs that must not be lost. An action enqueues one and answers at once. The server runs the job after the response, or after a restart or a deploy if it has to.
 
 ```ts
 // src/jobs.ts
@@ -70,6 +75,22 @@ export const welcomeMails = queue(
 )
 ```
 
-The server runs it with `.use(welcomeMails)`, and an action calls `await welcomeMails.enqueue({ to: email })`, or `enqueue(payload, { delay: '1h' })` to run it later. A job that throws is retried after a growing wait, and one that runs out of attempts is kept as failed and passed to `onFailed`, as is a run outlasting `lostAfter`, 10 minutes by default, or one whose process died each time. A failed job is kept 30 days, its payload included, or as long as `keepFailed` says, and `remove(match)` removes every waiting or failed job whose payload matches, `welcomeMails.remove(job => job.to === email)` once a person asked to be erased. An idle queue looks for a job from one worker, a second after a job and then twice as long after each empty look, up to `idlePoll`, 10 seconds by default, so a job another process enqueued waits 10 seconds at worst, while one enqueued in the same process still runs at once and a retry is picked up when due. `idlePoll: '1s'` looks every second as before 1.45, and `'30s'` asks the database less often. Jobs wait in a SQLite file shared by the server processes on one machine, kept in memory under `bun test`, where `site.runJobs()` from `kay/test` runs them.
+The server runs it with `.use(welcomeMails)`. An action calls `await welcomeMails.enqueue({ to: email })`, or `enqueue(payload, { delay: '1h' })` to run it later.
+
+A job that throws is retried after a growing wait. One that runs out of attempts is kept as failed and passed to `onFailed`. So is a run outlasting `lostAfter`, 10 minutes by default, or one whose process died each time.
+
+A failed job is kept 30 days, its payload included, or as long as `keepFailed` says. To erase a person's jobs, call `remove(match)`. It removes every waiting or failed job whose payload matches.
+
+```ts
+welcomeMails.remove(job => job.to === email)
+```
+
+Jobs wait in a SQLite file shared by the server processes on one machine. Under `bun test` they stay in memory, and `site.runJobs()` from `kay/test` runs them.
+
+An idle queue looks for a job from one worker. A job another process enqueued waits 10 seconds at worst, the default `idlePoll`.
+
+ A job enqueued in the same process still runs at once, and a retry is picked up when due.
+
+Set `idlePoll: '1s'` to look every second, or `'30s'` to ask the database less often.
 
 <ReadMore href="/llms/production#background-jobs">Job stores, concurrency, lost jobs and how shutdown waits for runs in progress are in the full production reference.</ReadMore>
