@@ -100,6 +100,7 @@ describe('parallel landings of the whats-new and upgrading files', () => {
 })
 
 const LAND = join(ROOT, 'scripts/land.ts')
+const IDENTITY = { GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@example.com', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@example.com' }
 
 // An origin, and for each name a clone on a branch with one commit of its own, whose lint step is `lint.ts`: it notes its run in LAND_TRACE, waits for LAND_GATE to exist and fails while LAND_FAIL is set.
 async function landings(...names: string[]) {
@@ -128,9 +129,9 @@ async function landings(...names: string[]) {
     await git(clones[name], 'commit', '-qm', name)
   }
 
-  // Runs a landing in a clone, its output and exit code once it ends.
+  // Runs a landing in a clone, its output and exit code once it ends; its rebase commits, so it gets an identity CI's git has none of.
   const land = (name: string, env: Record<string, string> = {}) => {
-    const child = Bun.spawn(['bun', LAND], { cwd: clones[name]!, env: { ...process.env, LAND_TRACE: trace, LAND_NAME: name, ...env }, stdout: 'pipe', stderr: 'pipe' })
+    const child = Bun.spawn(['bun', LAND], { cwd: clones[name]!, env: { ...process.env, ...IDENTITY, LAND_TRACE: trace, LAND_NAME: name, ...env }, stdout: 'pipe', stderr: 'pipe' })
 
     return {
       done: async () => {
