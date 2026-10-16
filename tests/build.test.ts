@@ -784,9 +784,9 @@ describe('kay.config.ts', () => {
     }
   }, 30_000)
 
-  it('gives the same prerendered pages on every build, their ids apart from page to page', async () => {
+  it('gives the same prerendered pages on every build, their ids apart from page to page and from block to block', async () => {
     const field = '---\nimport { signal, uid } from \'kay\'\n\nconst n = signal(0)\nconst id = uid()\n---\nlabel(for={id}) Count\nbutton(id={id} type="button" onClick={() => n.set(n() + 1)}) {n()}\n'
-    const page = (title: string) => `--- server\nexport const page = { prerender: true }\n---\n---\nimport Field from '../field.kay'\n---\nh1 ${title}\nField\nField\n`
+    const page = (title: string) => `--- server\nexport const page = { prerender: true }\nconst later = (async () => 1)()\n---\n---\nimport Field from '../field.kay'\n---\nh1 ${title}\nField\nField\nawait later then n\n  Field\n`
     const root = await scratchProject({
       'package.json': JSON.stringify({ name: 'app', private: true }),
       'src/field.kay': field,
@@ -804,10 +804,13 @@ describe('kay.config.ts', () => {
     try {
       const first = await build()
       const second = await build()
-      const ids = first.map(html => new Set([...html.matchAll(/\bid="([^"]+)"/g)].map(match => match[1]!)))
+      const drawn = first.map(html => [...html.matchAll(/\bid="([^"]+)"/g)].map(match => match[1]!))
+      const ids = drawn.map(found => new Set(found))
 
       expect(second).toEqual(first)
-      expect(ids[0]!.size).toBeGreaterThan(0)
+      // Three fields, the last in a streamed block, each with an id of its own.
+      expect(drawn.map(found => found.length)).toEqual([3, 3])
+      expect(ids.map(found => found.size)).toEqual([3, 3])
       expect([...ids[0]!].filter(id => ids[1]!.has(id))).toEqual([])
     }
     finally {

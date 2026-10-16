@@ -27,9 +27,9 @@ export function pageEtag(html: string): string {
   return `"${Bun.hash(html).toString(36)}"`
 }
 
-// The ids a kept page draws, the same on every render of it, so a render can be compared with the copy the build kept byte for byte.
+// The ids a prerendered page draws, the same on every render of it, so two builds and a live check agree byte for byte; the last digits, as the first of a hash are not spread over all of them.
 export function pageToken(key: string): string {
-  return `k${Bun.hash(key).toString(36).slice(0, 6)}`
+  return `k${Bun.hash(key).toString(36).slice(-6)}`
 }
 
 // The paths a page export such as `prerender` lists: `true` for a route without params; a list of params, a function returning one, a content collection, or a `paginate()` list, for a route with some.

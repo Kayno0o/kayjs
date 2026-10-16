@@ -12,10 +12,13 @@ export async function withPageToken<T>(token: string, run: () => Promise<T>): Pr
 }
 
 // A page render on the server: its static components draw from the page, each island from a prefix of its own.
-export function pageIds<T>(run: () => T): T {
+// A streamed block renders on its own, so under a fixed token its `salt`, the block's id, keeps its ids from those of the page.
+export function pageIds<T>(run: () => T, salt?: string): T {
   const previous = page
+  const fixed = fixedToken.getStore()
+  const token = fixed === undefined ? `k${Math.random().toString(36).slice(2, 8)}` : `${fixed}${salt === undefined ? '' : `_${salt}`}`
 
-  page = { token: fixedToken.getStore() ?? `k${Math.random().toString(36).slice(2, 8)}`, islands: 0 }
+  page = { token, islands: 0 }
 
   try {
     return withIds(`${page.token}-`, run)

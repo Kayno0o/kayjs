@@ -23,13 +23,13 @@ export interface RenderedIslands {
 }
 
 // Runs a synchronous page render and lists the islands it rendered.
-export function collectIslands<T>(render: () => T): { result: T, islands: RenderedIslands } {
+export function collectIslands<T>(render: () => T, salt?: string): { result: T, islands: RenderedIslands } {
   const islands: RenderedIslands = { eager: new Set(), count: 0, messages: new Set() }
 
   rendered = islands
 
   try {
-    return { result: pageIds(render), islands }
+    return { result: pageIds(render, salt), islands }
   }
   finally {
     rendered = undefined

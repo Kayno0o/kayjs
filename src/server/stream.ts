@@ -21,8 +21,8 @@ export interface Rendered {
 }
 
 // A static render, as pages and layouts are: only islands carry the markers hydration claims.
-export function renderStatic(view: () => unknown): Rendered {
-  const { result: { result: html, islands }, deferred } = collectDeferred(() => collectIslands(() => child(view())))
+export function renderStatic(view: () => unknown, salt?: string): Rendered {
+  const { result: { result: html, islands }, deferred } = collectDeferred(() => collectIslands(() => child(view()), salt))
 
   return { html, islands, deferred }
 }
@@ -90,7 +90,7 @@ export function streamDocument(shell: string, deferred: PendingBlock[], client: 
 
 // The `then` block once the value resolves, or the `catch` block once it rejects; without one, the pending block just goes away and the error is reported.
 // A block that throws while rendering is a bug in the page, not the value failing, so it is reported rather than shown as `catch`.
-export async function settle(block: PendingBlock, cancelled: () => boolean, report: (error: unknown) => void, render = renderStatic): Promise<Rendered> {
+export async function settle(block: PendingBlock, cancelled: () => boolean, report: (error: unknown) => void, render: (view: () => unknown, salt?: string) => Rendered = renderStatic): Promise<Rendered> {
   let value: unknown
 
   try {
@@ -105,15 +105,15 @@ export async function settle(block: PendingBlock, cancelled: () => boolean, repo
 
     const failed = block.failed
 
-    return renderOrReport(() => failed(error), report, render)
+    return renderOrReport(() => failed(error), report, render, block.id)
   }
 
-  return cancelled() ? EMPTY : renderOrReport(() => block.ready(value as never), report, render)
+  return cancelled() ? EMPTY : renderOrReport(() => block.ready(value as never), report, render, block.id)
 }
 
-function renderOrReport(view: () => unknown, report: (error: unknown) => void, render: (view: () => unknown) => Rendered): Rendered {
+function renderOrReport(view: () => unknown, report: (error: unknown) => void, render: (view: () => unknown, salt?: string) => Rendered, salt: string): Rendered {
   try {
-    return render(view)
+    return render(view, salt)
   }
   catch (error) {
     report(error)
