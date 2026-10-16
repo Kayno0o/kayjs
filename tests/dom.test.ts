@@ -1164,6 +1164,49 @@ describe('transitions', () => {
     expect([...parent.childNodes].map(node => node.nodeType === 3 ? node.textContent : node.nodeName)).toEqual(['P', '#comment', 'I', '#comment', 'B'])
   })
 
+  it('updates a part inside a range taken out while a node of it leaves, which shows the new content when it comes back', async () => {
+    const { insert, playTransitions, Range } = await import('../src/runtime/dom')
+    const { createSignal } = await import('../src/runtime/reactive')
+    const parent = document.createElement('div')
+    const first = document.createElement('p')
+    const start = document.createComment('[')
+    const end = document.createComment(']')
+    const last = document.createElement('aside')
+    const range = new Range(first, last)
+    const [part, setPart] = createSignal<unknown>('old')
+    const leaving = new Set<Node>()
+    // Only `last` has a transition, which plays until the test ends it; any other node leaves at once.
+    const hooks = { enter: () => undefined, leave: (node: Node) => node === last ? void leaving.add(node) : void node.parentNode?.removeChild(node), leaving, back: (nodes: Node[]) => {
+      for (const node of nodes) {
+        leaving.delete(node)
+      }
+    } }
+
+    playTransitions({ ...hooks, has: (node): node is Element => node === last })
+
+    try {
+      parent.append(first, start, end, last)
+      insert(null, start, end, part)
+
+      const [list, setList] = createSignal<unknown[]>([range])
+
+      insert(parent, null, null, list)
+      setList([])
+      await settle()
+      // The node with a transition is still playing its leave phase where it was.
+      expect([...parent.childNodes]).toEqual([last])
+      setPart(document.createElement('i'))
+      await settle()
+      last.remove()
+      setList([range])
+      await settle()
+      expect([...parent.childNodes].map(node => node.nodeName)).toEqual(['P', '#comment', 'I', '#comment', 'ASIDE'])
+    }
+    finally {
+      playTransitions({ ...hooks, has: (_node): _node is Element => false })
+    }
+  })
+
   it('does work linear in the kept units with transitions when one is appended or the order changes', async () => {
     const { insert, playTransitions, Range } = await import('../src/runtime/dom')
     const { createSignal } = await import('../src/runtime/reactive')

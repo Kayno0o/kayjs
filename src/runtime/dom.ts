@@ -16,10 +16,10 @@ export { componentClass, merge, omit, spreadAttributes } from './values'
 
 // Several sibling nodes rendered as one: a block or a component returning more than one node. Its first and last nodes stay in place while what sits between changes.
 export class Range {
-  // The nodes it was made of when it was taken out while some of them leave, as a walk from `first` could not find them once they are gone.
-  nodes?: Node[] | undefined
-  // What holds it while it is out with no node to play a leave phase: its nodes stay siblings, so a part inside it goes on updating.
+  // What holds it while it is out: its nodes stay siblings there, so a part inside it goes on updating, and a walk from `first` finds them all.
   held?: DocumentFragment | undefined
+  // The nodes it was made of when it was taken out while some of them play a leave phase, which leave from where they are rather than from `held`.
+  nodes?: Node[] | undefined
 
   constructor(readonly first: Node, readonly last: Node) {}
 }
@@ -351,7 +351,7 @@ function insertUnit(parent: Node, unit: Unit, before: Node | null): void {
 
 // Whether some nodes of a unit are not in the document, a unit taken out and not placed again.
 function isStale(unit: Unit): boolean {
-  return unit instanceof Range && (unit.nodes !== undefined || unit.held !== undefined)
+  return unit instanceof Range && unit.held !== undefined
 }
 
 // The nodes a unit is made of, in order.
@@ -360,7 +360,7 @@ function nodesOf(unit: Unit): Node[] {
     return [unit]
 
   if (unit.nodes)
-    return unit.nodes
+    return withHeld(unit.nodes, unit.held!)
 
   const nodes: Node[] = []
 
@@ -370,23 +370,44 @@ function nodesOf(unit: Unit): Node[] {
   return nodes
 }
 
-// An element with a `transition` plays its leave phase first.
-function removeUnit(unit: Unit): void {
-  const nodes = nodesOf(unit)
+// The nodes of a range taken out while some of them left: those in order, and between them what `held` has now, a part in it having changed meanwhile.
+function withHeld(nodes: Node[], held: DocumentFragment): Node[] {
+  const merged: Node[] = []
+  let next = held.firstChild
 
-  if (unit instanceof Range && !(transitions && nodes.some(transitions.has))) {
-    unit.held = document.createDocumentFragment()
-    unit.held.append(...nodes)
+  for (const node of nodes) {
+    if (transitions?.has(node)) {
+      merged.push(node)
+    }
+    else if (node.parentNode === held) {
+      for (const after = node.nextSibling; next !== after; next = next!.nextSibling)
+        merged.push(next!)
+    }
+  }
+
+  return merged
+}
+
+// An element with a `transition` plays its leave phase first; the rest of a range waits in a fragment of its own.
+function removeUnit(unit: Unit): void {
+  if (!(unit instanceof Range)) {
+    transitions ? transitions.leave(unit) : unit.parentNode?.removeChild(unit)
 
     return
   }
 
-  for (const node of nodes)
-    transitions ? transitions.leave(node) : node.parentNode?.removeChild(node)
+  const nodes = nodesOf(unit)
+  const held = unit.held = document.createDocumentFragment()
 
-  // Kept for a range, as its nodes leave apart and a walk from `first` would not find those already gone.
-  if (unit instanceof Range)
-    unit.nodes = nodes
+  for (const node of nodes) {
+    if (transitions?.has(node)) {
+      transitions.leave(node)
+      unit.nodes = nodes
+    }
+    else {
+      held.appendChild(node)
+    }
+  }
 }
 
 // What a block shows after its first render plays its enter phase, the elements with a `transition` it starts with.
