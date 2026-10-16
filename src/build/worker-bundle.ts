@@ -1,4 +1,5 @@
 import type { KayPluginOptions } from './plugin'
+import { readFileSync } from 'node:fs'
 import { basename, resolve } from 'node:path'
 import process from 'node:process'
 import { apiStubs } from '../server/api-modules'
@@ -21,6 +22,17 @@ export interface WorkerResult {
   name: string
   outputs: string[]
   inputs: string[]
+  // A module naming a file by `import.meta.url` may ship it or bundle a worker of its own, whose files this bundle's inputs do not list.
+  ships: boolean
+}
+
+function readText(file: string): string | undefined {
+  try {
+    return readFileSync(file, 'utf8')
+  }
+  catch {
+    return undefined
+  }
 }
 
 // Bun cannot start a build while a plugin of another waits, so a worker is bundled by a process of its own, which prints its file's name.
@@ -45,10 +57,13 @@ if (import.meta.main) {
     process.exit(1)
   }
 
+  // This process runs in the project's root, which the metafile's paths are relative to.
+  const inputs = Object.keys(out.metafile!.inputs).map(input => resolve(input))
   const result: WorkerResult = {
     name: basename(out.outputs.find(output => output.kind === 'entry-point')!.path),
     outputs: out.outputs.map(output => output.path),
-    inputs: Object.keys(out.metafile!.inputs).map(input => resolve(input)),
+    inputs,
+    ships: inputs.some(input => readText(input)?.includes('import.meta.url') !== false),
   }
 
   process.stdout.write(JSON.stringify(result))

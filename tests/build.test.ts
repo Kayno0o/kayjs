@@ -292,6 +292,42 @@ describe('kay build', () => {
     }
   })
 
+  it('bundles a worker again in kay dev when it names a file by import.meta.url, whose own files its inputs do not list', async () => {
+    const project = await scratchDir('kay-worker-ships-')
+    const files = {
+      'src/inner.ts': 'postMessage(1)\n',
+      'src/echo.ts': 'new Worker(new URL(\'./inner.ts\', import.meta.url), { type: \'module\' })\n',
+      'src/lab.kay': '---\nonMount(() => {\n  new Worker(new URL(\'./echo.ts\', import.meta.url), { type: \'module\' })\n})\n---\np lab\n',
+      'src/routes/index.kay': '---\nimport Lab from \'../lab.kay\'\n---\nLab\n',
+    }
+
+    await Promise.all(Object.entries(files).map(async ([file, content]) => Bun.write(join(project, file), content)))
+    const spawn = Bun.spawn
+    const spawned: string[][] = []
+    const echoes = () => spawned.filter(args => String(args[2]).includes('echo.ts')).length
+    const spy = spyOn(Bun, 'spawn').mockImplementation(((command: string[], ...rest: unknown[]) => {
+      spawned.push(command)
+
+      return (spawn as (...args: unknown[]) => unknown)(command, ...rest)
+    }) as typeof Bun.spawn)
+    const build = devBuilder(project, {})
+    const lab = join(project, 'src/lab.kay')
+    const cwd = process.cwd()
+
+    try {
+      process.chdir(project)
+      expect((await build(null)).failed).toBe(false)
+      await Bun.write(lab, `${await Bun.file(lab).text()}p more\n`)
+      expect((await build(['src/lab.kay'])).failed).toBe(false)
+      expect(echoes()).toBe(2)
+    }
+    finally {
+      spy.mockRestore()
+      process.chdir(cwd)
+      await rm(project, { recursive: true, force: true })
+    }
+  })
+
   it('builds the stylesheets again in kay dev for an edit of the imports of a module they follow, whatever other modules the earlier builds signed', async () => {
     const project = await scratchDir('kay-sheets-')
     const files = {

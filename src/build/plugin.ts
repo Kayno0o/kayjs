@@ -121,10 +121,17 @@ export function kayPlugin(options: KayPluginOptions, workers: string[]): BunPlug
         if (code !== 0)
           throw new KayError('worker-build', `kay: the worker ${path} failed to build:\n${problems.trim()}`)
 
-        const result = JSON.parse(name) as WorkerResult
+        let result: WorkerResult
+
+        try {
+          result = JSON.parse(name) as WorkerResult
+        }
+        catch {
+          throw new KayError('worker-build', `kay: the worker ${path} printed output where its name was expected:\n${name.trim()}`)
+        }
 
         // A file written while the bundle ran may not be the one it read.
-        if (result.inputs.every(input => (statSync(input, { throwIfNoEntry: false })?.mtimeMs ?? 0) < started))
+        if (!result.ships && result.inputs.every(input => (statSync(input, { throwIfNoEntry: false })?.mtimeMs ?? 0) < started))
           bundledWorkers.set(key, { result, stamp: stampOf(result.inputs) })
 
         return result.name
