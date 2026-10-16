@@ -90,6 +90,8 @@ An agent fills in no form, so `honeypot`, `minTime` and `proofOfWork` do not app
 
 Routes with a file in their body, and actions with a file in their schema, are not offered, as an agent sends JSON.
 
+When a guard answers 401, the agent is told where to learn how to sign in. With [kayjs-auth](/libraries/kayjs-auth#letting-an-ai-agent-sign-in), that is your own app: the agent opens a consent page in the browser, the user approves it, and the agent gets a token. You write nothing for it.
+
 In a test, `site.mcp.tools()` lists the tools and `site.mcp.call('add_note', { title: 'Milk' })` calls one. See [Testing](/guides/testing).
 
 ## Calling it from an island

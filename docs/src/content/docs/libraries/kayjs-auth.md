@@ -229,6 +229,26 @@ A mailed link opens a page of yours that shows a button posting the token to an 
 
 The `email` option sends the verification, reset and magic-link mails. With [kayjs-mail](/libraries/kayjs-mail), `email: { mailer: authMailer(mail.enqueue) }` renders them as themed mails; `authMailer` comes from kayjs-mail and needs its `mailExtension` in `kay.config.ts`. The `examples/noticeboard` project in the kay repository runs kayjs-auth on Postgres with `authPages`, `mailExtension` and `authMailer`, and no sign-in page of its own.
 
+## Letting an AI agent sign in
+
+An agent such as Claude Code or MCP Inspector can sign in to your app through [`/mcp`](/guides/api-routes#letting-an-agent-call-the-app) with no code on your side. With `authPages()` and a store that keeps OAuth data (`memoryStore` and `pgStore` do), your app is its own OAuth authorization server.
+
+The agent is pointed at `/mcp`, gets a 401, and reads where to sign in. It sends the user to a consent page of your app, which names the agent and lists what it asks for. Once the user allows it, the agent gets a token. That token is one of kayjs-auth's bearer tokens, so `user()`, `via()`, `requireUser({ scope })` and your gates see the user and the scopes as they do for any token.
+
+The app is asked once. Signing in again skips the consent page until the user revokes the agent, or the agent asks for more than was approved. Users revoke an agent on the account page, under Apps, which ends its access at once.
+
+Nothing is set up: the documents an agent reads, `/.well-known/oauth-authorization-server` and `/.well-known/oauth-protected-resource`, and the endpoints under `/auth/oauth/` are served for you, under your `base` if you have one. Agents sign in with PKCE, never a client secret. An access token lasts an hour. A refresh token lasts 30 days and is replaced each time it is used, and one used twice ends the whole sign-in.
+
+```ts
+createAuth({
+  // ...
+  // Turn it off with oauthServer: false
+  scopes: ['notes:read', 'notes:write'],
+})
+```
+
+Pass `oauthServer: false` to turn it off. The new tables are created by `db.sync()` if you use Postgres or SQLite.
+
 ## In the dev tool
 
 Under `kay dev`, the dev tool has an Auth tab with nothing to set up. It shows who is signed in, how, and their roles, with a Sign out button.
