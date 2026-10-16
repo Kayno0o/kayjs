@@ -219,7 +219,7 @@ kay lint --cache
 | `uncaught-await` | warn | code | An `await` block with no `catch` block: once its value rejects, the pending block goes with nothing in its place and the error only reaches the log. A `try` around it does not catch it, a streamed block settling after the page has rendered. |
 | `unguarded-route` | deny | security | With `requireGuards`, a page, a layout with actions, an endpoint or an API module of the app no guard covers and not setting `guards: false`, which the server refuses. |
 | `unguarded-tool` | warn | security | With `mcp`, an action that sets `tool` and a `honeypot`, `minTime` or `proofOfWork` with no guard covering it: an agent skips what those ask of a person, so anonymous callers can spam it. A `...spread` in the options counts as a `honeypot`, `minTime` or `proofOfWork`; options that are not an object literal are not read. |
-| `missing-site` | warn | seo | `seo` set with no `site`, in kay.config.ts or `SITE_URL`, on a `kay build --static` export: no canonical links, `og:url`, sitemap or robots.txt. A server warns at boot instead. |
+| `missing-site` | warn | seo | `seo` set with no `site`, in kay.config.ts, `SITE_URL` or `ORIGIN`, on a `kay build --static` export: no canonical links, `og:url`, sitemap or robots.txt. A server warns at boot instead. |
 | `missing-description` | warn | seo | A public site with no `seo.description`. |
 | `missing-share-image` | warn | seo | A public site with no `seo.image`, and no `.kay` file of the project setting an `og:image`. |
 | `default-favicon` | warn | seo | A public site with no `favicon`, showing kay's mark. |
@@ -240,7 +240,7 @@ kay lint --cache
 - `kay check` reads kay.config.ts: `missing-site`, `missing-description`, `missing-share-image`, `default-favicon`.
 - They point at kay.config.ts.
 - `missing-share-image` and `default-favicon` name what a site lacks until it goes public, as a fresh project from `kay new` does, so only `kay build` and `kay check --only seo` report them, never a plain `kay check`.
-- `missing-site` is reported by `kay build --static` alone: a server may read `SITE_URL` when it boots, and one with `seo` set and no site warns then.
+- `missing-site` is reported by `kay build --static` alone: a server may read `SITE_URL` or `ORIGIN` when it boots, and one with `seo` set and no site warns then.
 - `kay check` reads the head blocks of the pages that say `prerender` (every page without params under `--static`) and their layouts, without rendering them, and reports `untitled-page`, `undescribed-page`, `duplicate-title`, `long-description`, `unsized-share-image` and `noindex-in-sitemap` at the page's file; a tag whose value is an expression, or sits under an `if` or `for`, counts as given and is judged by its presence alone, so `kay check` is approximate: `kay build`, which reads the rendered HTML, may report a lint it does not, such as an `untitled-page` behind a branch that renders no title, or a `duplicate-title` between titles written as expressions.
 - They point at the page's module and name the path; a page rendered per request is not read.
 - One at `deny` fails the build and leaves the last one in place, as a failing check does; `--no-check` reads none.
@@ -302,7 +302,7 @@ kay lint --cache
 | `export-page-status` | export | A page that answers 500, a redirect or a status other than 200 as it is prerendered. | [Static export](routing.md#static-export) |
 | `export-needs-params` | export | A page with params whose `prerender` lists none, or that sets `prerender: false`, or lists values its matchers refuse. | [Prerendering](routing.md#prerendering) |
 | `export-image-route` | export | A page linking an image only the image route resizes, which no file of the export holds. | [Static export](routing.md#static-export) |
-| `export-site-url` | export | A page reading the site's URL when neither `site` nor SITE_URL sets it. | [Site defaults and social cards](head.md#site-defaults-and-social-cards) |
+| `export-site-url` | export | A page reading the site's URL when neither `site`, SITE_URL nor ORIGIN sets it. | [Site defaults and social cards](head.md#site-defaults-and-social-cards) |
 | `export-server-render` | export | A page with something only a server renders per request: a server island, a form stamp or work challenge, a deferred island with no browser entry. | [Server islands](routing.md#server-islands) |
 | `export-guard` | export | A page or endpoint a guard covers, or that `requireGuards` leaves with no guard: only a server runs one per request. | [Guards](server.md#guards) |
 | `export-action` | export | A page exporting an action, which only a server can take. | [Static export](routing.md#static-export) |

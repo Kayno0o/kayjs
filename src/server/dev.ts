@@ -16,6 +16,7 @@ import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { Elysia } from 'elysia'
 import { outputDir, underKayDev } from '../build/assets'
+import { siteFromEnv } from '../config'
 import { bootDevTool } from '../runtime/dev-boot'
 import { kayLog } from '../runtime/log'
 import { isCrossSite } from './actions'
@@ -496,7 +497,7 @@ export function bootFailure(error: unknown, root: string): Elysia {
   const app = new Elysia({ name: 'kay/pages', seed: root })
 
   rememberBoot(true)
-  refuseForeignHosts(app, process.env.SITE_URL)
+  refuseForeignHosts(app, siteFromEnv())
   app.get(DEV_EVENTS, () => devEvents(true))
   app.get(DEV_TOOL, () => devTool())
 

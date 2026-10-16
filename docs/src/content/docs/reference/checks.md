@@ -139,7 +139,7 @@ A template that does not compile, a build that stops, a collection that does not
 | `export-page-status` | export | A page that answers 500, a redirect or a status other than 200 as it is prerendered. | [Static export](/essentials/routing) |
 | `export-needs-params` | export | A page with params whose `prerender` lists none, or that sets `prerender: false`, or lists values its matchers refuse. | [Prerendering](/essentials/routing) |
 | `export-image-route` | export | A page linking an image only the image route resizes, which no file of the export holds. | [Static export](/essentials/routing) |
-| `export-site-url` | export | A page reading the site's URL when neither `site` nor SITE_URL sets it. | [Site defaults and social cards](/essentials/head-and-seo) |
+| `export-site-url` | export | A page reading the site's URL when neither `site`, SITE_URL nor ORIGIN sets it. | [Site defaults and social cards](/essentials/head-and-seo) |
 | `export-server-render` | export | A page with something only a server renders per request: a server island, a form stamp or work challenge, a deferred island with no browser entry. | [Server islands](/essentials/routing) |
 | `export-guard` | export | A page or endpoint a guard covers, or that `requireGuards` leaves with no guard: only a server runs one per request. | [Guards](/guides/sessions-and-guards) |
 | `export-action` | export | A page exporting an action, which only a server can take. | [Static export](/essentials/routing) |

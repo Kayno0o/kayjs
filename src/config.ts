@@ -32,7 +32,7 @@ export interface KayConfig {
   publicDir?: string | undefined
   minify?: boolean | undefined
   lang?: string | undefined
-  // The origin the site is public at, `https://example.com`: canonical links, social URLs and the sitemap are built from it. `SITE_URL` when left out, so one build serves each host it is deployed to.
+  // The origin the site is public at, `https://example.com`: canonical links, social URLs and the sitemap are built from it. `SITE_URL` when left out, else `ORIGIN`, so one build serves each host it is deployed to.
   site?: string | undefined
   seo?: SeoConfig | undefined
   // Tags every page's head carries, written as a `head` block compiles them: `[{ tag: 'script', props: { src: '/stats.js', defer: true } }]`, a tag's text as `children`. A layout or the page setting a tag of the same identity wins, and the content security policy lets their inline scripts and styles through.
@@ -451,10 +451,17 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return prototype === Object.prototype || prototype === null
 }
 
-function withSiteUrl<Config extends KayConfig>(config: Config): Config {
-  const { SITE_URL } = process.env
+// The site's URL the environment gives: `SITE_URL`, else `ORIGIN`, which SvelteKit's node adapter and many hosts set, so a server started for either finds its own address.
+export function siteFromEnv(): string | undefined {
+  const { SITE_URL, ORIGIN } = process.env
 
-  return config.site !== undefined || SITE_URL === undefined || SITE_URL === '' ? config : { ...config, site: SITE_URL }
+  return [SITE_URL, ORIGIN].find(url => url !== undefined && url !== '')
+}
+
+function withSiteUrl<Config extends KayConfig>(config: Config): Config {
+  const site = siteFromEnv()
+
+  return config.site !== undefined || site === undefined ? config : { ...config, site }
 }
 
 // The project's config under the options given in code; an option passed as `undefined` leaves the config's value alone rather than wiping it.

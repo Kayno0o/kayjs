@@ -2,6 +2,7 @@ import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { siteOrigin as currentSiteOrigin, jsonLd, siteUrl } from '../src/runtime/seo'
 import { pages } from '../src/server'
+import { isCrossSite } from '../src/server/actions'
 import { siteOrigin } from '../src/server/seo'
 
 const ROUTES = 'tests/fixtures/seo/src/routes'
@@ -181,6 +182,52 @@ describe('seo head', () => {
     expect(() => siteOrigin('https://example.com/blog')).toThrow('kay: site is the origin')
     expect(() => siteOrigin('ftp://example.com')).toThrow('kay: site is the origin')
     expect(() => siteOrigin('example.com')).toThrow('kay: site is the origin')
+  })
+
+  it('reads the site from ORIGIN when SITE_URL is unset, SITE_URL winning and the config before both, the cross-site check following it', async () => {
+    const before = { SITE_URL: process.env.SITE_URL, ORIGIN: process.env.ORIGIN }
+    const set = (env: { SITE_URL?: string | undefined, ORIGIN?: string | undefined }) => {
+      for (const name of ['SITE_URL', 'ORIGIN'] as const) {
+        if (env[name] === undefined)
+          delete process.env[name]
+        else
+          process.env[name] = env[name]
+      }
+    }
+    const post = new Request('http://127.0.0.1:4701/contact', { method: 'POST', headers: { origin: 'http://localhost:4701' } })
+
+    try {
+      for (const [env, expected] of [
+        [{ SITE_URL: 'https://a.example' }, 'https://a.example'],
+        [{ ORIGIN: 'http://localhost:4701' }, 'http://localhost:4701'],
+        [{ SITE_URL: 'https://a.example', ORIGIN: 'http://localhost:4701' }, 'https://a.example'],
+        [{ SITE_URL: '', ORIGIN: 'http://localhost:4701' }, 'http://localhost:4701'],
+        [{ ORIGIN: '' }, undefined],
+        [{}, undefined],
+      ] as const) {
+        set(env)
+        await pages({ routes: ROUTES, prebuilt: false, base: '/kay' })
+
+        if (expected === undefined)
+          expect(() => currentSiteOrigin()).toThrow('nor SITE_URL or ORIGIN')
+        else
+          expect(currentSiteOrigin()).toBe(expected)
+      }
+
+      set({ ORIGIN: 'http://localhost:4701' })
+      const app = await pages({ routes: ROUTES, prebuilt: false, base: '/kay' })
+
+      expect(siteUrl('/contact')).toBe('http://localhost:4701/kay/contact')
+      expect(await (await app.handle(new Request('http://localhost/about'))).text()).toContain('<link rel="canonical" href="http://localhost:4701/kay/about">')
+      expect(isCrossSite(post)).toBe(false)
+
+      await pages({ routes: ROUTES, prebuilt: false, site: 'https://example.com' })
+
+      expect(currentSiteOrigin()).toBe('https://example.com')
+    }
+    finally {
+      set(before)
+    }
   })
 
   it('reads the site from SITE_URL when the project leaves it out, its origin alone from siteOrigin()', async () => {

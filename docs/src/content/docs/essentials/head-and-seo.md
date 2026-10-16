@@ -86,7 +86,7 @@ A locale the record leaves out reads the default locale's. `kay check` measures 
 
 <Callout type="tip">
 
-Without `site` in the config, kay reads it from `SITE_URL`, so one build serves each host it is deployed to.
+Without `site` in the config, kay reads it from `SITE_URL`, else `ORIGIN` (SvelteKit's node adapter and many hosts set it), so one build serves each host it is deployed to.
 
 </Callout>
 

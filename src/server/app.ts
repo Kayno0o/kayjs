@@ -70,7 +70,7 @@ import { agreeOnWildcards } from './wildcards'
 
 const JSON_EXTENSION = /\.json$/
 // What the dev tool's Routes tab says when `seo` is set without the origin the site is public at.
-const NO_ORIGIN_NOTE = 'seo is set but not the origin the site is public at, so there is no sitemap or robots.txt: set site in kay.config.ts or SITE_URL.'
+const NO_ORIGIN_NOTE = 'seo is set but not the origin the site is public at, so there is no sitemap or robots.txt: set site in kay.config.ts, SITE_URL or ORIGIN.'
 
 // Options given here win over the project's `kay.config.ts`.
 export interface PagesOptions extends KayConfig {
@@ -347,7 +347,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
 
   // `kay build` leaves a server's site to `SITE_URL` at boot, so this is where one with none is told.
   if (site === undefined && options.seo !== undefined && !mode.dev && !exported)
-    kayLog('warn', '`seo` is set, but not the origin the site is public at, in kay.config.ts or SITE_URL: pages get no canonical link or og:url, and the site no sitemap or robots.txt')
+    kayLog('warn', '`seo` is set, but not the origin the site is public at, in kay.config.ts, SITE_URL or ORIGIN: pages get no canonical link or og:url, and the site no sitemap or robots.txt')
 
   if (site !== undefined)
     serveSitemap(app, served, routes, site, { dev: mode.dev, onError: options.onError, trailingSlash: options.trailingSlash, locales: i18n?.settings })

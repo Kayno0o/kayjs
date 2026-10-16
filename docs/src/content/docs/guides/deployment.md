@@ -50,7 +50,7 @@ kay build --static --outdir dist
 
 Every page is rendered, with `about.html` and `about/index.html` for `/about`, plus each [endpoint file](/essentials/routing#endpoint-files) such as `llms.txt`, the sitemap, feeds and a `404.html`. The files of `public/` are copied but its dotfiles, `.env` files and editor backups, `.htaccess` and `.nojekyll` kept for the host. The build fails naming each page or endpoint that needs a server: one behind a guard, one exporting an action, one with params and no `prerender` list, and any module under `src/api/`. With no server to take them, the errors a browser meets are logged to its console only, not reported to `onError`.
 
-A `kay new` project keeps `.env` and `.env.*` out of git and out of its Docker image, so a value the static build reads, such as `SITE_URL`, goes in the CI's variables or the build command's environment.
+A `kay new` project keeps `.env` and `.env.*` out of git and out of its Docker image, so a value the static build reads, such as `SITE_URL` (or `ORIGIN`), goes in the CI's variables or the build command's environment.
 
 ## Docker
 

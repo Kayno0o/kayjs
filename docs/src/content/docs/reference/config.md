@@ -33,7 +33,7 @@ Every option is optional. The ones below are the common ones, the rest are in th
 
 | Option | Effect |
 | --- | --- |
-| `site` | The public origin, for canonical links, the sitemap and social URLs. `SITE_URL` when left out. See [Head and SEO](/essentials/head-and-seo) |
+| `site` | The public origin, for canonical links, the sitemap and social URLs. `SITE_URL`, else `ORIGIN`, when left out. See [Head and SEO](/essentials/head-and-seo) |
 | `seo` | What every page's head starts from: `name`, `titleTemplate`, `description`, `image`, `twitter`, `jsonLd`. See [Head and SEO](/essentials/head-and-seo) |
 | `head` | Tags every page's head carries, written as a `head` block compiles them; the CSP lets their inline scripts through. See [Head and SEO](/essentials/head-and-seo) |
 | `favicon` | A square image of 512 px or more, or a square SVG, served as the favicon and the manifest icons. `false` serves none |

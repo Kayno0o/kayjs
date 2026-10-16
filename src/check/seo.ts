@@ -53,7 +53,7 @@ export function configSeoLints(config: SiteSeo, file: string, sources: Iterable<
   const at = { file, line: 1, column: 1 }
 
   if (exported && config.seo !== undefined && config.site === undefined)
-    report('missing-site', { ...at, message: '`seo` is set, but not the origin the site is public at', note: 'pages get no canonical link or `og:url`, and the site no sitemap or robots.txt', help: 'set `site: \'https://example.com\'`, or `SITE_URL` where the site builds' })
+    report('missing-site', { ...at, message: '`seo` is set, but not the origin the site is public at', note: 'pages get no canonical link or `og:url`, and the site no sitemap or robots.txt', help: 'set `site: \'https://example.com\'`, or `SITE_URL` (or `ORIGIN`) where the site builds' })
 
   const descriptions = localizedTexts(config.seo?.description)
 

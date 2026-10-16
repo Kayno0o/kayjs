@@ -175,7 +175,7 @@ it('shows why a todo was refused', async () => {
 ```
 
 - `site.visit(path)` GETs a page and follows redirects, stopping at one to another site.
-- A project setting no `site`, nor `SITE_URL`, is served as `http://localhost`, so a page reading `siteUrl()` or `siteOrigin()` renders as it does in production.
+- A project setting no `site`, nor `SITE_URL` or `ORIGIN`, is served as `http://localhost`, so a page reading `siteUrl()` or `siteOrigin()` renders as it does in production.
 - `site.submit(action, fields, { from })` posts a form without JavaScript, as multipart with any `File` among its fields, and follows it back to its page, or reads the page a refused post renders.
 - `from` may be a page `visit` or `submit` resolved with instead of a path: the post goes where its form posts, from the URL the browser shows it at.
 - So `site.submit(add, fields, { from: refused })` posts again from the page a refused post answered, as a visitor fixing the form does.

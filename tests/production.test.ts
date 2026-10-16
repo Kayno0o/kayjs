@@ -1428,7 +1428,7 @@ describe('revalidation', () => {
 
   it('warns once at boot of a server with seo set and no site, which kay build leaves to SITE_URL', async () => {
     const warned = spyOn(console, 'warn').mockImplementation(() => undefined)
-    const missing = 'kay: `seo` is set, but not the origin the site is public at, in kay.config.ts or SITE_URL: pages get no canonical link or og:url, and the site no sitemap or robots.txt'
+    const missing = 'kay: `seo` is set, but not the origin the site is public at, in kay.config.ts, SITE_URL or ORIGIN: pages get no canonical link or og:url, and the site no sitemap or robots.txt'
 
     try {
       await build.serve({ routes, prebuilt: true, security: false, seo: { name: 'Example' } })

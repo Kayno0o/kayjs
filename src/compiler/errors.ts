@@ -251,7 +251,7 @@ export const ERRORS = {
   },
   'export-site-url': {
     group: 'export',
-    summary: 'A page reading the site\'s URL when neither `site` nor SITE_URL sets it.',
+    summary: 'A page reading the site\'s URL when neither `site`, SITE_URL nor ORIGIN sets it.',
     fix: { file: 'llms/head.md', heading: 'Site defaults and social cards' },
   },
   'export-server-render': {
