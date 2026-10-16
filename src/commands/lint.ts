@@ -1,6 +1,6 @@
 import type { Command } from './command'
-import { delimiter, join } from 'node:path'
-import process from 'node:process'
+import { existsSync } from 'node:fs'
+import { join } from 'node:path'
 import { configCheckOptions, writeShadowTypes } from '../check'
 import { loadConfig } from '../config'
 import { buildingWithoutEnv } from '../server/env-state'
@@ -20,9 +20,10 @@ export const lint: Command = {
     if (root === undefined)
       return 1
 
-    const keslint = Bun.which('keslint', { PATH: `${join(root, 'node_modules/.bin')}${delimiter}${process.env.PATH ?? ''}` })
+    // Only the project's own, as kay resolves its other dependencies.
+    const keslint = join(root, 'node_modules/.bin/keslint')
 
-    if (keslint === null) {
+    if (!existsSync(keslint)) {
       printFailure('lint', 'the project has no `keslint`: add `@kaynooo/eslint`', 'text')
 
       return 1
