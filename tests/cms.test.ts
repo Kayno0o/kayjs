@@ -411,6 +411,30 @@ describe('the collections a CMS edits', () => {
     expect(() => parseEntry('broken.json', '{')).toThrow(MarkdownError)
   })
 
+  it('names the line of the file a frontmatter or YAML error sits on, not the YAML\'s own', () => {
+    const lineOf = (name: string, source: string): number | undefined => {
+      try {
+        parseEntry(name, source)
+
+        return undefined
+      }
+      catch (error) {
+        return error instanceof MarkdownError ? error.line : undefined
+      }
+    }
+
+    expect(lineOf('a.md', '---\ntitle: A\ndescription: How X: y\nz: 1\n---\nBody\n')).toBe(3)
+    // The first field is on line 2, after the delimiter.
+    expect(lineOf('a.md', '---\ntitle: How X: y\n---\n')).toBe(2)
+    // A field spanning lines is named where it starts, and what is valid before it stays unblamed.
+    expect(lineOf('a.md', '---\ntags: [a,\n  b]\nlist:\n  - one\ndescription: How X: y\n---\n')).toBe(6)
+    expect(lineOf('a.md', '---\ntags:\n  - a\n  - [b\n---\n')).toBe(2)
+    expect(lineOf('a.yaml', 'title: A\n\ndescription: How X: y\n')).toBe(3)
+    // A field breaking only with the others around it is told where the YAML starts.
+    expect(lineOf('a.md', '---\na: 1\n  b: 2\n---\n')).toBe(2)
+    expect(lineOf('a.md', '---\ntitle: A\nz: 1\n---\nBody\n')).toBeUndefined()
+  })
+
   it('takes as draft field a boolean one alone', () => {
     // @ts-expect-error title holds a string
     expect(collection('content/none', { schema: t.Object({ title: t.String(), hidden: t.Optional(t.Boolean()) }), draft: 'title' }).name).toBe('content/none')

@@ -269,6 +269,9 @@ async function compileEntry(name: string, file: string, source: string, highligh
   }
 }
 
+// A line that belongs to the field above it rather than starting one: indented, a list item, a comment or a document marker.
+const CONTINUATION = /^(?:\s|-\s|-$|#|---|\.\.\.)/
+
 function parseJson(text: string): unknown {
   try {
     return JSON.parse(text)
@@ -278,13 +281,31 @@ function parseJson(text: string): unknown {
   }
 }
 
+// `line` is the file's line the text starts on, which the error is named at, moved down to the top-level field that fails on its own.
 function parseYaml(text: string, line: number): unknown {
   try {
     return Bun.YAML.parse(text)
   }
   catch (error) {
-    throw new MarkdownError(`the YAML does not parse: ${error instanceof Error ? error.message : String(error)}`, line)
+    throw new MarkdownError(`the YAML does not parse: ${error instanceof Error ? error.message : String(error)}`, line + failingField(text))
   }
+}
+
+// Bun.YAML names no position, so the first top-level field that does not parse alone is the one blamed: its line within the text, 0 when each parses alone and only together they fail.
+function failingField(text: string): number {
+  const lines = text.split('\n')
+  const starts = lines.flatMap((row, index) => index === 0 || (row !== '' && !CONTINUATION.test(row)) ? [index] : [])
+
+  for (const [position, start] of starts.entries()) {
+    try {
+      Bun.YAML.parse(lines.slice(start, starts[position + 1] ?? lines.length).join('\n'))
+    }
+    catch {
+      return start
+    }
+  }
+
+  return 0
 }
 
 // Where each top-level field starts: the keys indented least, at the start of a line in YAML, or once in a JSON object.
