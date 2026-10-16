@@ -403,6 +403,21 @@ describe('fences', () => {
     expect(imported('const d = `signal`\nconst e = foo(\nconst f = signal(')).toBe(true)
   })
 
+  it('blame only the unfinished statement when the line after it starts with a bracket, a quote or a comment ends it', () => {
+    for (const next of ['[x] = [1]', '(async () => 1)()', '\'use strict\'', '`t`']) {
+      const { tsx } = compileKay(`---\nconst x = signal(1)\nconst a = x.\n${next}\nconst b = signal(2)\n---\np x\n`, 'test.kay', { check: true })
+
+      expect(tsx).toContain('const b = signal(2)')
+      expect(tsx.indexOf('const b = signal(2)')).toBeGreaterThan(tsx.indexOf(next))
+    }
+
+    for (const comment of ['// ok', '// url http://x', '// "q']) {
+      const { diagnostics } = compileKay(`---\nconst count = signal(1)\nconst x = count. ${comment}\nconst signal2 = signal(2)\n---\np {signal2}\n`, 'test.kay', { check: true })
+
+      expect(diagnostics.map(d => d.message)).toContain('`signal2` is a signal, read by calling it')
+    }
+  })
+
   it('write the statement being typed in a server fence wherever it stands', () => {
     const tail = compileKay('--- server\nconst a = 1\nconst todos = load.\n---\np {a}\n', 'test.kay', { check: true })
     const beforeExport = compileKay('--- server\nconst todos = load.\nexport const add = action(() => 1)\n---\np x\n', 'test.kay', { check: true })

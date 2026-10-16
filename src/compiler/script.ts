@@ -716,7 +716,7 @@ export function parseFence(source: string, span: Span, diagnostics: Diagnostic[]
   }
 }
 
-// The offset just after the last code before `at`, past the whitespace and the whole comment lines.
+// The offset just after the last code before `at`, past the whitespace and the comments ending a line.
 function endOfCode(code: string, starts: number[], at: number): number {
   let end = at
 
@@ -726,11 +726,37 @@ function endOfCode(code: string, starts: number[], at: number): number {
 
     const line = starts.findLastIndex(start => start < end)
 
-    if (line < 0 || !code.slice(starts[line], end).trimStart().startsWith('//'))
+    const comment = line < 0 ? -1 : lineCommentAt(code.slice(starts[line], end))
+
+    if (comment < 0)
       return end
 
-    end = starts[line]!
+    end = starts[line]! + comment
   }
+}
+
+// Where the `//` comment ending a line starts, `//` inside a string not counting.
+function lineCommentAt(line: string): number {
+  let quote = ''
+
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i]!
+
+    if (quote !== '') {
+      if (char === '\\')
+        i++
+      else if (char === quote)
+        quote = ''
+    }
+    else if (char === '\'' || char === '"' || char === '`') {
+      quote = char
+    }
+    else if (char === '/' && line[i + 1] === '/') {
+      return i
+    }
+  }
+
+  return -1
 }
 
 // The top-level statement a parse error falls in, found by indentation: from the line at the first column before it, to the next one.
@@ -748,7 +774,7 @@ function brokenStatement(code: string, pos: number): { start: number, end: numbe
   let probe = Math.min(pos, code.length)
   const row = Math.max(0, starts.findLastIndex(start => start <= probe))
   const firstToken = FIRST_TOKEN.exec(lines[row]!)![0].length
-  const inFirstToken = firstToken > 0 && STATEMENT_START.test(lines[row]!) && probe <= starts[row]! + firstToken
+  const inFirstToken = lines[row] !== '' && STATEMENT_START.test(lines[row]!) && probe <= starts[row]! + firstToken
   let before = inFirstToken ? starts[row]! : probe
 
   before = endOfCode(code, starts, before)
