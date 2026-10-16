@@ -54,7 +54,7 @@ Every project gets an `AGENTS.md` for coding agents. It points them at kay's doc
 | `starter` | A header, a skip link, a 404 page, and a home page greeting from the server with a counter island | server, site, app |
 | `tailwind` | Tailwind over the Catppuccin Mocha palette; without it, the markup carries no classes | server, site, app |
 | `accents` | An accent picker in the header, kept in a cookie; needs `starter` and `tailwind` | server, site, app |
-| `eslint` | ESLint through `@kaynooo/eslint`, `.kay` fences included | server, site, app |
+| `eslint` | ESLint through `@kaynooo/eslint`, `.kay` fences and template expressions included | server, site, app |
 | `tests` | `bun test` through `kay/test`, with a first test | server, site, app |
 | `ci` | A Forgejo workflow checking, linting and testing the server, or publishing the static site to Pages | server, site, app |
 | `docker` | A `Dockerfile` and `compose.prod.yaml` running the executable, or nginx serving the static site | server, site, app |

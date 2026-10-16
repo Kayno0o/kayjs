@@ -155,12 +155,12 @@ span {m}
   const tsParser = import('@typescript-eslint/parser')
 
   // The rules of ESLint run through the processor on the file, as keslint runs them: the reports as they stand, and after `--fix`.
-  async function lint(text: string) {
+  async function lint(text: string, rules: Record<string, string> = { 'eqeqeq': 'error', 'dot-notation': 'error' }) {
     const { default: parser } = await tsParser
     const { ESLint } = await import('eslint')
     const overrideConfig = [
       { files: ['**/*.kay'], processor },
-      { files: ['**/*.kay/*.tsx'], languageOptions: { parser }, rules: { 'eqeqeq': 'error', 'dot-notation': 'error' } },
+      { files: ['**/*.kay/*.tsx'], languageOptions: { parser }, rules },
     ] as never
     const run = async (fix: boolean) => (await new ESLint({ cwd: join(import.meta.dir, 'fixtures', 'lint'), overrideConfigFile: true, overrideConfig, fix }).lintText(text, { filePath: FILE }))[0]!
 
@@ -208,5 +208,53 @@ span {m}
 
     expect(fixed.output).toBe('---\nconst { list } = props<{ list: number[] }>()\nconst size = list.length\n---\np {list.length}\n')
     expect(fixed.messages).toEqual([])
+  })
+
+  it('reports the heads of else if, await and slot, and a spread, whose spans the other constructs do not cover', async () => {
+    const { messages } = await lint(`---
+const { rest, load } = props<{ rest: Record<string, string>, load: Promise<string> }>()
+---
+section({...rest['a']})
+  if rest.a === 'x'
+    p x
+  else if rest['b'] == 'y'
+    p y
+  await load['x'] then value
+    p {value}
+  slot row(rest['c'])
+`)
+
+    expect(messages.map(message => [message.ruleId, message.line])).toEqual([
+      ['dot-notation', 4],
+      ['dot-notation', 7],
+      ['eqeqeq', 7],
+      ['dot-notation', 9],
+      ['dot-notation', 11],
+    ])
+  })
+
+  it('reports an expression the compiler copies twice once', async () => {
+    const { messages } = await lint('---\nconst values = { a: signal(\'\') }\n---\ninput(bind:value={values[\'a\']})\n')
+
+    expect(messages.map(message => [message.ruleId, message.line, message.column])).toEqual([['dot-notation', 4, 26]])
+  })
+
+  it('drops a fix adding a line break to a template expression, and keeps one in a fence', () => {
+    const [block] = processor.preprocess(`---\nlet count = 1\n---\np {count == 1}\n`, FILE)
+    const tsx = block!.text
+    const fence = tsx.indexOf('let count')
+    const expression = tsx.indexOf('count == 1')
+    const messages = processor.postprocess([[
+      at(tsx, expression, { fix: { range: [expression, expression + 5], text: 'count\n' } }),
+      at(tsx, fence, { fix: { range: [fence, fence + 3], text: 'const\n' } }),
+    ]], FILE)
+
+    expect(messages.map(message => message.fix?.text)).toEqual([undefined, 'const\n'])
+  })
+
+  it('reports no rule on the generated parentheses and wrappers around an expression', async () => {
+    const { messages } = await lint('---\nconst { n } = props<{ n: number }>()\n---\nif n === 1\n  p {n === 2 ? \'a\' : \'b\'}\nconst m = n\nspan {m}\n', { 'no-extra-parens': 'error', 'no-void': 'error', 'no-sequences': 'error' })
+
+    expect(messages).toEqual([])
   })
 })

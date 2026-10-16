@@ -2,7 +2,7 @@
 import type { ShadowFile } from '../check/shadow'
 import { existsSync } from 'node:fs'
 import { relative, resolve } from 'node:path'
-import { codeEdit, compileShadow, readShadowSettings, shadowPath, sourceSpan } from '../check/shadow'
+import { codeEdit, compileShadow, inFences, readShadowSettings, shadowPath, sourceSpan } from '../check/shadow'
 import { offsetAt, positionAt } from '../compiler/mapping'
 import { projectRootOf } from '../project'
 
@@ -57,7 +57,19 @@ export const processor = {
 
     compiled.delete(filename)
 
-    return messages.flat().flatMap(message => mapMessage(entry, message) ?? [])
+    const seen = new Set<string>()
+
+    // The compiler copies some expressions twice, `bind:value={x}` for its read and its write, so one finding is reported at one place twice.
+    return messages.flat().flatMap(message => mapMessage(entry, message) ?? []).filter((message) => {
+      const key = JSON.stringify([message.ruleId, message.message, message.line, message.column, message.endLine, message.endColumn])
+
+      if (seen.has(key))
+        return false
+
+      seen.add(key)
+
+      return true
+    })
   },
 }
 
@@ -104,9 +116,9 @@ function mapMessage(entry: ShadowFile, message: LintMessage): LintMessage | unde
   return { ...message, ...positionAt(entry.source, span.start), endLine: endPosition?.line, endColumn: endPosition?.column, fix, suggestions }
 }
 
-// A fix stands only when the code it replaces was copied verbatim from the .kay file.
+// A fix stands only when the code it replaces was copied verbatim from the .kay file, and a line break it adds only in a fence: a template expression is one line of the file.
 function mapFix(entry: ShadowFile, fix: LintFix): LintFix | undefined {
   const span = codeEdit(entry, fix.range[0], fix.range[1])
 
-  return span && { range: [span.start, span.end], text: fix.text }
+  return span && (!fix.text.includes('\n') || inFences(entry, span.start, span.end)) ? { range: [span.start, span.end], text: fix.text } : undefined
 }

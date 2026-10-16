@@ -23,7 +23,7 @@ export const FEATURES: Record<Feature, { description: string, needs: readonly Fe
   starter: { description: 'a header, a 404 page, and a home page greeting from the server with a counter island', needs: [] },
   tailwind: { description: 'Tailwind over the Catppuccin Mocha palette', needs: [] },
   accents: { description: 'an accent picker in the header, kept in a cookie', needs: ['starter', 'tailwind'] },
-  eslint: { description: 'ESLint through @kaynooo/eslint, .kay fences included', needs: [] },
+  eslint: { description: 'ESLint through @kaynooo/eslint, .kay fences and template expressions included', needs: [] },
   tests: { description: 'bun test through kay/test, with a first test', needs: [] },
   ci: { description: 'a Forgejo workflow checking, linting and testing the server, or publishing the static site to Pages', needs: [] },
   docker: { description: 'a Dockerfile and compose.prod.yaml running the executable, or nginx serving the static site', needs: [] },

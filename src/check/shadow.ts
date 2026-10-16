@@ -27,7 +27,7 @@ const WORD_CHARACTER = /[\w$]/
 export type SpanMode = 'exact' | 'loose' | 'code'
 
 // The spans of a shadow file's source holding JavaScript, parsed once for the many spans ESLint maps in it.
-const codeOf = new WeakMap<ShadowFile, Span[]>()
+const codeOf = new WeakMap<ShadowFile, { fences: Span[], expressions: Span[] }>()
 
 export interface ShadowFile {
   source: string
@@ -170,15 +170,26 @@ export function generatedSpan(shadow: ShadowFile, start: number, end: number): S
 }
 
 function inCode(shadow: ShadowFile, start: number, end: number): boolean {
+  const { fences, expressions } = codeIn(shadow)
+
+  return [...fences, ...expressions].some(span => start >= span.start && end <= span.end)
+}
+
+// Whether a source span lies in the script or server fence, where lines are free, rather than in a template expression, which a line break ends or breaks.
+export function inFences(shadow: ShadowFile, start: number, end: number): boolean {
+  return codeIn(shadow).fences.some(span => start >= span.start && end <= span.end)
+}
+
+function codeIn(shadow: ShadowFile): { fences: Span[], expressions: Span[] } {
   let spans = codeOf.get(shadow)
 
   if (!spans) {
     const { script, server, template } = parseKay(shadow.source)
 
-    codeOf.set(shadow, spans = [script, server, ...expressionSpans(template)].filter(span => span !== undefined))
+    codeOf.set(shadow, spans = { fences: [script, server].filter(span => span !== undefined), expressions: expressionSpans(template) })
   }
 
-  return spans.some(span => start >= span.start && end <= span.end)
+  return spans
 }
 
 function wordEnd(source: string, offset: number): number {
