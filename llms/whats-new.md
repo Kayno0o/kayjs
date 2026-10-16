@@ -2,7 +2,7 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
-## Unreleased
+## 1.49.0
 
 - `requiredInProduction: true` on a `defineEnv` field makes a variable required under `NODE_ENV=production` only, refused at boot there and optional in development and tests; `kay env [--format json]` lists every variable the app, `publicEnv`, its extensions (kayjs-mail's SMTP ones) and kay declare, with whether each is required and its default, for a deploy script ([Server](server.md#environment), [Project](project.md#commands)).
 - The `font` shorthand's metric-matched fallback is listed when its size is `var()` or `calc()` too, `font: var(--size) "Inter", sans-serif` included ([Head](head.md#self-host-a-font)).

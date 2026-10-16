@@ -5,7 +5,7 @@ description: What each release of kay and its libraries adds, with a link to whe
 ---
 This page lists what each release adds, newest first, with a link to where each feature is documented. kay and its libraries share one version number, so one section covers them all. What a release breaks, and what to change in your app, is in [Upgrading](/guides/upgrading).
 
-## Unreleased
+## 1.49.0
 
 - **MCP refusals keep their headers**: a `tools/list` refused by a guard keeps the guard's headers, `Retry-After` of a 429 among them, and a call to a name no tool has is refused the same way, so a caller who may not list the tools cannot probe their names. [API routes](/guides/api-routes)
 - **Variables required in production only, and `kay env`**: `requiredInProduction: true` on a `defineEnv` field makes a variable required under `NODE_ENV=production` only, refused at boot there and optional in development and tests. `kay env` lists every variable the app, `publicEnv`, its libraries (kayjs-mail's SMTP ones) and kay declare, with whether each is required and its default, as text or `--format json` for a deploy script. [Environment variables](/essentials/data-loading#environment-variables)
