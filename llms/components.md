@@ -223,15 +223,14 @@ export default defineConfig({ extensions: [authPages()] })
 - `signal(value)` from `kay` makes state; `signal<T>()` starts as `undefined`.
 - A signal or a memo is read by calling it, `count()`, in the template as in the script.
 - In the template, one named bare where its value goes, `{count}` or `if count > 1`, is an error, `uncalled-signal`, which `kay check --fix` calls.
-- Named bare where it is handed on, as a component's prop, `Toggle(open={open})`, or a function's argument, it passes the signal itself.
+- Named bare where it is handed on, as a component's prop, `Toggle(open={open})`, or a function's argument, it passes the signal itself; an argument or prop typed `unknown` or `any`, `String(count)`, is `uncalled-signal`: call it there, or write `count as Signal<number>` to hand it on on purpose.
 - `bind:value={query}` and `.set`, `count.set(c => c * 2)`, take the signal itself too.
-- Before kay 1.41 a bare name handed on passed the value: `kay check` reports such a prop or argument typed for the value, with no fix, and one typed `unknown` or `any`, `String(count)` or `JSON.stringify(count)`, as `uncalled-signal`, a call to an untyped function or `console.log(count)` included: call it there, or write `count as Signal<number>` to hand it on on purpose. A parameter typed `Signal<T>`, `Memo<T>`, a function type or a generic `T` takes the signal.
 - A signal is written by assigning it, in the template and the script alike: `count = 0` compiles to `count.set(0)`.
 - `count += step` and `count++` compile to an updater, `count.set((c) => c + step)`, so an effect writing it does not track it.
 - `.set` stays for an updater of your own, `count.set(c => c * 2)`.
 - Assigning works on any signal a `const` or an import holds, wherever it was made: the script's own, a module's, a re-export, one a function returns or a destructuring gives, and a prop the props type, inline or a script `interface` or `type`, writes as `Signal<T>` from `kay`.
 - `kay check` reports assigning a memo, or a `const` or an import holding no signal, at its name; a `const` plainly holding none, `const n = 1` or `const seen = new Set()`, is a compile error.
-- A signal held in a `let`, a `var` or an object's property is written with `.set`: assigning it replaces what the variable or property holds.
+- Assigning writes any signal the compiler sees made: a `const`, an import, a `let` or `var` the script sets to `signal(...)`, a prop typed `Signal<T>`. A signal read from an object's property, `box.count`, or a `let` set from a function's result is written with `.set`: assigning it replaces the property or variable, and `kay check` reports `Type 'number' is not assignable to type 'Signal<number>'`.
 - A prop typed `Signal<T>` or `Memo<T>` from `kay` takes the signal a parent hands by name, `Toggle(open={open})`; one typed `T` takes its value, `Toggle(open={open()})`, kept current.
 - `persisted`, `queryParam` and `linked` signals read and write as `signal` ones do; a `selection`, a `resource` or a `socket` is called or read through its members.
 - `kay check` narrows a signal or memo a template expression calls within that expression: `{error() && error().message}`, with `error` a `signal<Error>()`, checks.

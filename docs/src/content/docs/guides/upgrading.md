@@ -235,3 +235,11 @@ STARTTLS is required on every port but 465. A relay that only speaks clear text,
 - `Dialog`'s title is an `h2`. Use `level` to change it.
 - Buttons draw their border with `--color-kui-field-border`, and a few theme colours changed. If you override theme tokens, set `field-border` too.
 - Toasts last 6 seconds, 10 for errors.
+
+## 1.41.0
+
+### A bare signal name handed on passes the signal
+
+- Before 1.41 a bare name handed to a prop or an argument passed the value. `kay check` reports a prop or argument typed for the value, with no fix: call the signal there, `open()`.
+- A parameter typed `unknown` or `any`, as in `String(count)`, is `uncalled-signal`: call the signal there, or write `count as Signal<number>` to pass it on purpose.
+- A parameter typed `Signal<T>`, `Memo<T>`, a function type or a generic `T` takes the signal.

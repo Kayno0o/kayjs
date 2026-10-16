@@ -210,3 +210,11 @@ The rules of kayjs-ui's theme, and of any kay library's exported stylesheet, who
 - `Dialog`'s title is an `h2`, was an `h3`: `level` (2 to 6) sets it.
 - Buttons draw their border with `--color-kui-field-border`, and `overlay1`, `accent`, `accent-hi` and `error` changed: an app overriding the theme's tokens sets `field-border` too, at 3:1 contrast.
 - Toasts last 6 s, 10 s for errors, up from 4 s.
+
+## 1.41.0
+
+### A bare signal name handed on passes the signal
+
+- Before 1.41 a bare name handed to a prop or an argument passed the value. `kay check` reports such a prop or argument typed for the value, with no fix: call the signal there, `open()`.
+- One typed `unknown` or `any`, `String(count)` or `JSON.stringify(count)`, is `uncalled-signal`, a call to an untyped function or `console.log(count)` included: call it there, or write `count as Signal<number>` to hand it on on purpose.
+- A parameter typed `Signal<T>`, `Memo<T>`, a function type or a generic `T` takes the signal.

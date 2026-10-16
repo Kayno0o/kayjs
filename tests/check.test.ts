@@ -403,6 +403,36 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 
+  it('reports a signal written by assigning where it is held in a property or in a let from a function, which would replace it', async () => {
+    const page = [
+      '---',
+      'import { signal } from \'kay\'',
+      '',
+      'const made = () => signal(0)',
+      'const box = { count: signal(0) }',
+      'let held = made()',
+      'let local = signal(0)',
+      'const bump = () => {',
+      '  box.count = 5',
+      '  held = 6',
+      '  local = 7',
+      '  box.count.set(5)',
+      '  held.set(6)',
+      '}',
+      '---',
+      'button(onClick={bump}) {box.count()} {held()} {local()}',
+      '',
+    ].join('\n')
+    const root = await scratchProject({ 'src/routes/index.kay': page })
+
+    try {
+      expect((await check(root)).map(d => [d.line, d.code])).toEqual([[9, 'TS2322'], [10, 'TS2322']])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('reports the schema builder a script imports as t, which --fix renames', async () => {
     const root = await scratchProject({
       'src/routes/index.kay': 'p Home\n',

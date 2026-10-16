@@ -112,7 +112,7 @@ Card(title="Todos")
 
 ## Signals
 
-`signal(value)` holds state. Read it by calling it, `{count()}`, and write it by assigning it, `count++`, or with `.set`, in the template as in the script. Handed to a component as a prop, `Toggle(open={open})`, it passes the signal itself, for a prop typed `Signal<boolean>` to read and write. Handed to a parameter typed `unknown` or `any`, as in `String(count)`, it is an error, `uncalled-signal`: call it there. `memo(fn)` caches a derived value.
+`signal(value)` holds state. Read it by calling it, `{count()}`, and write it by assigning it, `count++`, or with `.set`, in the template as in the script. Handed to a component as a prop, `Toggle(open={open})`, it passes the signal itself, for a prop typed `Signal<boolean>` to read and write. Handed to a parameter typed `unknown` or `any`, as in `String(count)`, it is an error, `uncalled-signal`: call it there. Assigning works on a signal held in a `const`, an import or a prop typed `Signal<boolean>`, and on a `let` the script sets to `signal(...)`. For a signal held in an object's property, `box.count`, or a `let` set from a function's result, write `.set`: assigning would replace the property, and `kay check` reports it as a type error. `memo(fn)` caches a derived value.
 
 ```kay
 ---

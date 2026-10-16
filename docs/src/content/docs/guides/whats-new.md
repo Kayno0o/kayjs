@@ -7,6 +7,7 @@ This page lists what each release adds, newest first, with a link to where each 
 
 ## Unreleased
 
+- **One rule for writing a signal**: assign a signal held in a `const`, an import or a prop, and use `.set` for one held in a property ([Components](/essentials/components)).
 - **Shorter config**: `proxy: true` is one proxy in front and `proxy: 2` two, `mailExtension('./src/mail')` names the module exporting the mailer, and an extension names its server plugin with `serverModule: { path, export }`. A Fontsource font entry takes `preload`. [Deployment](/guides/deployment#behind-a-proxy), [kayjs-mail](/libraries/kayjs-mail).
 - **Jobs in one call, and no server entry**: `schedule` takes a list of jobs or a table of schedules, and `boot: true` runs them once at start. `kay build --compile` serves the pages of a project with no `src/server.ts`. [Background jobs](/guides/background-jobs)
 - **One call's own pending state and outcome**: `add.track()` gives a component a handle on an action whose `pending()` reads only its own calls, and a call through it resolves with `{ ok, data }` or the refusal's status, field errors and data, with no `try`. [Forms and actions](/essentials/forms-and-actions#reading-one-calls-outcome)
