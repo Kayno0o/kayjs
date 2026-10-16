@@ -108,22 +108,23 @@ const CHALLENGE = createHash('sha256').update(VERIFIER).digest('base64url')
 const PAGES = join(ROOT, '..', '..', 'src', 'pages', 'routes')
 
 // An MCP client signing in the way Claude Code does: registers itself, sends the user to the consent page, and exchanges the code.
-async function signIn(site: Site, issuer: string, email: string) {
+async function signIn(site: Site, issuer: string, email: string, mount = { base: '', slash: '' }) {
+  const { base, slash } = mount
   const { register } = await import(join(PAGES, 'register.kay')) as { register: Parameters<Site['submit']>[0] }
   const { decide } = await import(join(PAGES, 'oauth', 'authorize.kay')) as { decide: Parameters<Site['submit']>[0] }
   const registered = await json(await site.fetch('/auth/oauth/register', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ client_name: 'Claude Code', redirect_uris: [REDIRECT] }) }))
   const clientId = registered.client_id as string
   const query = new URLSearchParams({ client_id: clientId, redirect_uri: REDIRECT, response_type: 'code', code_challenge: CHALLENGE, code_challenge_method: 'S256', scope: 'notes:read', state: 'xyz' })
-  const authorize = `/auth/oauth/authorize?${query}`
+  const authorize = `/auth/oauth/authorize${slash}?${query}`
 
   const signedOut = await site.fetch(authorize)
   const toSignIn = new URL(signedOut.headers.get('location')!, 'http://localhost')
 
   expect(signedOut.status).toBe(302)
-  expect(toSignIn.pathname).toStartWith('/auth/sign-in')
+  expect(toSignIn.pathname).toStartWith(`${base}/auth/sign-in`)
   expect(toSignIn.searchParams.get('redirect')).toContain('/auth/oauth/authorize')
 
-  await site.submit(register as never, { email, password: PASSWORD } as never, { from: await site.visit('/auth/register') })
+  await site.submit(register as never, { email, password: PASSWORD } as never, { from: await site.visit(`/auth/register${slash}`) })
 
   const consent = await site.visit(authorize)
 
@@ -173,18 +174,11 @@ describe('signing in', () => {
 describe('signing in under a base', () => {
   const site = served({ mcp: true, base: '/shop', trailingSlash: 'always' })
 
-  test('registers a client, sends a signed-out visitor to the sign-in page under the base, and refuses an unknown client without redirecting', async () => {
-    const registered = await site().fetch('/auth/oauth/register', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ redirect_uris: [REDIRECT] }) })
+  test('the full flow works with the base and trailing slashes, the issuer carrying the base, and the token works on /mcp', async () => {
+    const { exchanged } = await signIn(site(), 'http://localhost/shop', 'shop-user@example.com', { base: '/shop', slash: '/' })
 
-    expect(registered.status).toBe(201)
-
-    const query = new URLSearchParams({ client_id: (await json(registered)).client_id as string, redirect_uri: REDIRECT, response_type: 'code', code_challenge: CHALLENGE, code_challenge_method: 'S256' })
-    const signedOut = await site().fetch(`/auth/oauth/authorize/?${query}`)
-    const toSignIn = new URL(signedOut.headers.get('location')!, 'http://localhost')
-
-    expect(signedOut.status).toBe(302)
-    expect(toSignIn.pathname).toBe('/shop/auth/sign-in')
-    expect(toSignIn.searchParams.get('redirect')).toStartWith('/auth/oauth/authorize/?client_id=')
+    expect(exchanged).toMatchObject({ token_type: 'Bearer', scope: 'notes:read' })
+    await expect(site().mcp.tools({ headers: { authorization: `Bearer ${exchanged.access_token}` } })).resolves.toBeArray()
 
     const unknown = await site().visit('/auth/oauth/authorize/?client_id=kc_unknown&redirect_uri=http%3A%2F%2Fevil.example%2F')
 
