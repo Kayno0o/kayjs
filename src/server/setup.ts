@@ -15,7 +15,7 @@ import { setSite } from '../runtime/site'
 import { basePath } from './base'
 import { setupCards } from './card'
 import { readInlineStyles } from './client'
-import { implicitI18n, loadI18n, routedSettings, serveLocales } from './i18n'
+import { implicitI18n, linkedSettings, loadI18n, routedSettings, serveLocales } from './i18n'
 import { applyImageConfig } from './image'
 import { loadMatchers } from './params'
 import { setupPreview } from './preview'
@@ -94,6 +94,10 @@ export async function setupPages(project: Project, loadClient: () => ClientBuild
     return { ...head, cards: await setupCards({ dir: join(client.dir, '..'), clientDir: client.dir, fonts, config: config.images?.card, logo: config.images?.card?.logo === undefined ? undefined : resolve(root, config.images.card.logo), name: config.seo?.name, quality: config.images?.quality, bundled: source.embedded, prebuilt: mode.prebuilt, collect: prerendering }) }
   }
   const [{ head, scripts, styles, cards }, collections] = await Promise.all([headAndCards(), projectCollections(root, config.content)])
+
+  // A localized site's links are told of its pages and localized feeds, for the server and the static export alike.
+  if (i18n)
+    i18n.settings = linkedSettings(i18n.settings, routes, collections)
 
   return { source, client, mounts, routes, matchers, collections, i18n, locales, base, site, imageCache, scripts, styles, renderOptions: renderOptionsOf(config, mode, { head, maxDensity, editor: source.editor(root, config) }), cards }
 }

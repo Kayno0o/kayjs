@@ -1,0 +1,10 @@
+nav
+  a.about(href="/about") About
+  a.news(href="/news/launch") Launch
+  a.hash(href="/about#team") Team
+  a.query(href="/about?page=2") Page two
+  a.api(href="/api/ping") API
+  a.out(href="https://example.com/about") Elsewhere
+  a.kept(href="/about" hreflang="fr") French
+main
+  slot

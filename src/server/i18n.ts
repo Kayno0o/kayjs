@@ -157,6 +157,14 @@ export function routedSettings(settings: LocaleSettings, routes: Pick<Route, 'pa
   return { ...settings, paths }
 }
 
+// The settings told of the patterns the site's pages are served under and of its localized feeds, which a link written as the default locale names them goes to in the page's locale.
+// A localized collection's feed is served once per locale, as a page is; any other's once for all of them.
+export function linkedSettings(settings: LocaleSettings, routes: Pick<Route, 'pattern'>[], collections: { options: { feed?: { path: string } | undefined, localized?: boolean | undefined } }[]): LocaleSettings {
+  const feeds = settings.hosts ? [] : collections.flatMap(({ options }) => options.feed && options.localized === true ? [options.feed.path] : [])
+
+  return { ...settings, pages: routes.map(route => route.pattern), ...feeds.length > 0 && { feeds } }
+}
+
 // The pattern a page is served under in a locale, translated when i18n.paths names it.
 export function localePattern(settings: LocaleSettings, pattern: string, locale: string): string {
   return settings.paths?.[pattern]?.[locale] ?? pattern

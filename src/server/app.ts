@@ -80,17 +80,12 @@ export interface PagesOptions extends KayConfig {
   prebuilt?: boolean | undefined
 }
 
-// The routes with their guards loaded, which a localized site's links are told of, its localized feeds too.
-async function servedRoutes({ routes, i18n, collections }: PageSetup, required: boolean | undefined): Promise<ServedRoute[]> {
+// The routes with their guards loaded.
+async function servedRoutes({ routes, i18n }: PageSetup, required: boolean | undefined): Promise<ServedRoute[]> {
   const served = await Promise.all(routes.map(async route => loadGuards(route, required)))
 
-  if (i18n) {
+  if (i18n)
     refuseLocaleClashes(i18n.settings, served)
-    // A localized collection's feed is served once per locale, as a page is; any other's once for all of them.
-    const feeds = i18n.settings.hosts ? [] : collections.flatMap(({ options }) => options.feed && options.localized === true ? [options.feed.path] : [])
-
-    i18n.settings = { ...i18n.settings, pages: served.map(route => route.pattern), ...feeds.length > 0 && { feeds } }
-  }
 
   return served
 }
