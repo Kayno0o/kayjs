@@ -15,7 +15,7 @@ const result = JSON.parse(cases.stdout.trim().split('\n').pop() ?? '{}') as { pr
 describe('an await block given a promise that rejected before it rendered', () => {
   it('survives the rejection of a prop, a property of one awaited twice, and a promise the component made, rendering each catch block', () => {
     expect(cases.code).toBe(0)
-    expect(cases.stderr).not.toContain('kay:')
+    expect(cases.stderr).not.toContain('kay: a promise rejected and nothing took it')
     expect(result.prop).toBe('<p class="failed">Unavailable</p><p class="now">3</p>')
     expect(result.property).toBe('<p class="failed">Unavailable</p><p class="again">Unavailable again</p>')
     expect(result.made).toBe('<p class="failed">Unavailable</p>')

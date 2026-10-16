@@ -155,7 +155,7 @@ describe('the headers of every kind of answer', () => {
     const post = { method: 'POST', body: new URLSearchParams({ title: 'x' }) }
 
     await expectAnswer(await get(action, { origin: ORIGIN, referer: `${ORIGIN}/` }, post), 303, { 'location': `${ORIGIN}/`, 'set-cookie': 'kay_flash=<value>; Path=<value>; Max-Age=<value>; HttpOnly; SameSite=<value>' })
-    await expectAnswer(await get(action, { origin: 'http://evil.test' }, post), 403, {})
+    await expectAnswer(await get(action, { origin: 'http://evil.test' }, post), 403, { 'content-type': 'text/plain; charset=utf-8', 'vary': 'accept-encoding' })
   })
 
   it('sends a post back to the page its form names, else its script\'s, else its referer, never to another site', async () => {
