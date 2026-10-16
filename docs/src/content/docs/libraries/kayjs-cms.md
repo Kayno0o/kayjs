@@ -47,4 +47,8 @@ Replacing or removing a file leaves the old upload stored: the unused-uploads sc
 
 An app replaces a screen by writing a page at its path, `src/routes/admin/new/[collection].kay` say, and can render the screens' own `@kaynooo/kayjs-cms/entry-editor.kay` and `@kaynooo/kayjs-cms/entry-table.kay` in it.
 
+## In the dev tool
+
+Under `kay dev`, the dev tool has a CMS tab with nothing to set up. It says whether you are in edit mode. One button takes you into edit mode on the page you are viewing, as long as the guard lets you in, and another leaves it.
+
 <ReadMore href="/llms/kayjs-cms">Every option, the CMS API and the rules that are easy to get wrong are in the full kayjs-cms reference.</ReadMore>

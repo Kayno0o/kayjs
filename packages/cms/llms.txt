@@ -51,3 +51,7 @@ export default defineConfig({ extensions: [cms({ guard: { load: async () => (awa
 - `fieldsAt(node)`: the fields rendered at a node, innermost first.
 - `createDrafts({ show, delay })`: the unsaved edits of a page's entries. `open(entry, version?)`, `version(ref)`, `value(ref, path)`, `set(ref, path, value)`, `changed(ref)`, `reset(ref)`, `markSaved(ref, sent, version?)` (what was sent becomes the saved state, an edit typed meanwhile staying unsaved), `refuse(ref, refusal)`, `refusal(ref)` and `keepEdits(ref)` (why a save was refused as a whole, kept until the entry saves or resets, and taking a conflict's version), `issues(ref, path?)`, `failure()` and `rendering()`. Each change renders the page with every changed entry once typing pauses `delay` ms (150), keeping only the latest render's issues.
 - `valueAt(data, path)`, `withValueAt(data, path, value)`, `joinPath(parent, key)`: field paths.
+
+## Dev tool
+
+- `cms()` adds a CMS tab to the dev tool under `kay dev`, with nothing to add in the app: whether the visitor is in edit mode, a button into it for the page shown (through the screens' `page` route, so the guard decides) and one out of it (the `preview/exit` route). It reads `/_kay/cms`, a route mounted under `kay dev` alone.
