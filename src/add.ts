@@ -1,15 +1,20 @@
 import type { Feature } from './templates'
 import { existsSync } from 'node:fs'
-import { chmod, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 import process from 'node:process'
+import { isDeepStrictEqual } from 'node:util'
 import { detectHost, FEATURE_NAMES, FEATURES, projectFiles } from './new'
 
 // Files whose lines are a set: a feature adds the lines the file lacks and keeps the rest.
 const LINE_FILES = new Set(['.gitignore', '.dockerignore'])
 // Files describing the project to agents: rewritten while unedited, left alone once the author wrote in them.
 const SOFT_FILES = new Set(['AGENTS.md'])
-const IMPORTS = /^(?:import\b.*\n)*/
+// A whole import statement, a multi-line one included, with its line break.
+const IMPORT_STATEMENT = /^import\b(?:[^;'"]|'[^']*'|"[^"]*")*?(?:from\s*)?(?:'[^']*'|"[^"]*");?[ \t]*\r?\n/gm
+const CALLEE = /^(\w+)\(/
+const KEY = /\bextensions\s*:/
+const CLOSED = /^\s*\]/
 const DEFINE_CONFIG = /defineConfig\(\{[ \t]*\n?/
 const EXTENSIONS = /extensions:\s*\[/
 const NEWLINE = /\r?\n/
@@ -92,27 +97,36 @@ function withLines(current: string, wanted: string): string {
   return `${current === '' || current.endsWith('\n') ? current : `${current}\n`}${missing.join('\n')}\n`
 }
 
-// kay.config.ts with an import and an `extensions` entry added, or undefined when it holds no plain `defineConfig({ ... })`.
+// kay.config.ts with an import and an `extensions` entry added, or undefined when it is not a plain `defineConfig({ ... })` with no `extensions` or a literal list; an extension the config already calls is left as it is.
 export function addExtension(config: string, extension: { import: string, expression: string }): string | undefined {
-  if (extension.expression !== '' && config.includes(extension.expression))
-    return config
-
   const define = DEFINE_CONFIG.exec(config)
 
   if (define === null)
     return undefined
 
+  const callee = (CALLEE).exec(extension.expression)?.[1]
+
+  if (callee !== undefined && new RegExp(`\\b${callee}\\(`).test(config))
+    return config
+
+  const hasKey = KEY.test(config)
   const list = EXTENSIONS.exec(config)
+
+  if (hasKey && list === null)
+    return undefined
+
   const at = list === null ? define.index + define[0].length : list.index + list[0].length
-  const entry = list === null ? `  extensions: [${extension.expression}],\n` : `${extension.expression}, `
+  const empty = list !== null && CLOSED.test(config.slice(at))
+  const entry = list === null ? `${define[0].endsWith('\n') ? '' : '\n'}  extensions: [${extension.expression}],\n` : `${extension.expression}${empty ? '' : ', '}`
   const next = `${config.slice(0, at)}${entry}${config.slice(at)}`
 
-  if (extension.import === '' || next.includes(extension.import))
+  if (extension.import === '' || (callee !== undefined && new RegExp(`import[^;]*\\b${callee}\\b[^;]*from`).test(next)))
     return next
 
-  const head = IMPORTS.exec(next)![0]
+  const end = [...next.matchAll(IMPORT_STATEMENT)].at(-1)
+  const head = end === undefined ? 0 : end.index + end[0].length
 
-  return `${next.slice(0, head.length)}${extension.import}\n${next.slice(head.length)}`
+  return `${next.slice(0, head)}${extension.import}\n${next.slice(head)}`
 }
 
 // Merges the scripts and dependencies a feature needs into the project's package.json: a script is replaced only while it is still what `kay new` wrote for the features the project had.
@@ -139,6 +153,11 @@ function mergeManifest(current: Manifest, old: Manifest, next: Manifest, conflic
       if (!(name in merged.dependencies!) && !(name in merged.devDependencies!))
         merged[group]![name] = range
     }
+  }
+
+  for (const group of ['scripts', 'dependencies', 'devDependencies'] as const) {
+    if (current[group] === undefined && Object.keys(merged[group]!).length === 0)
+      delete merged[group]
   }
 
   return merged
@@ -224,10 +243,10 @@ async function planCore(dir: string, core: readonly Feature[]): Promise<Plan> {
     const was = old[path]
 
     if (path === 'package.json') {
-      const merged = `${JSON.stringify(mergeManifest(manifest, JSON.parse(was!) as Manifest, JSON.parse(content) as Manifest, conflicts), null, 2)}\n`
+      const merged = mergeManifest(manifest, JSON.parse(was!) as Manifest, JSON.parse(content) as Manifest, conflicts)
 
-      if (merged !== text)
-        writes.set(path, merged)
+      if (!isDeepStrictEqual(merged, JSON.parse(text)))
+        writes.set(path, `${JSON.stringify(merged, null, 2)}\n`)
     }
     else if (path === '.env') {
       mergeEnv(disk, content, plan)
@@ -264,11 +283,11 @@ async function spawn(command: string[], dir: string): Promise<{ code: number, ou
 const MANIFEST_FILES = ['package.json', 'bun.lock', 'bun.lockb']
 
 // What package.json and the lockfile held, a missing file as undefined.
-async function snapshot(dir: string): Promise<Map<string, Buffer | undefined>> {
+export async function snapshot(dir: string): Promise<Map<string, Buffer | undefined>> {
   return new Map(await Promise.all(MANIFEST_FILES.map(async name => [name, existsSync(join(dir, name)) ? Buffer.from(await Bun.file(join(dir, name)).arrayBuffer()) : undefined] as const)))
 }
 
-async function restore(dir: string, kept: Map<string, Buffer | undefined>): Promise<void> {
+export async function restore(dir: string, kept: Map<string, Buffer | undefined>): Promise<void> {
   for (const [name, content] of kept) {
     if (content === undefined)
       await rm(join(dir, name), { force: true })
@@ -278,7 +297,16 @@ async function restore(dir: string, kept: Map<string, Buffer | undefined>): Prom
 }
 
 async function loadLibrary(dir: string, name: string): Promise<LibraryFeature> {
-  const module = await import(Bun.resolveSync(`${LIBRARIES[name]![0]!}/add`, dir)) as { default?: LibraryFeature }
+  let path: string
+
+  try {
+    path = Bun.resolveSync(`${LIBRARIES[name]![0]!}/add`, dir)
+  }
+  catch {
+    throw new Error(`kay add: ${LIBRARIES[name]![0]!} is not installed, and --no-install keeps kay add from installing it: it has to be installed to say what it writes`)
+  }
+
+  const module = await import(path) as { default?: LibraryFeature }
 
   if (typeof module.default?.description !== 'string')
     throw new Error(`kay add: ${LIBRARIES[name]![0]!}/add does not export a feature as its default`)
@@ -294,13 +322,13 @@ function failIfConflicts({ conflicts }: Plan): void {
 // Adds the features to the project in `dir`: the files and edits `kay new --with` would have made, then the install. Nothing is written when a file does not have the shape `kay new` writes; the error says what to change by hand.
 // A library is installed first, as it cannot be asked what to write before; a refusal after that restores package.json and the lockfile.
 export async function addFeatures(dir: string, names: readonly string[], options: { install?: boolean | undefined } = {}): Promise<AddResult> {
-  const unknown = names.find(name => !FEATURE_NAMES.includes(name as Feature) && !(name in LIBRARIES))
+  const unknown = names.find(name => !FEATURE_NAMES.includes(name as Feature) && !Object.hasOwn(LIBRARIES, name))
 
   if (unknown !== undefined)
     throw new Error(`kay add: ${unknown} is none of the features ${[...FEATURE_NAMES, ...Object.keys(LIBRARIES)].join(', ')}`)
 
   const core = names.filter((name): name is Feature => FEATURE_NAMES.includes(name as Feature))
-  const libraries = names.filter(name => name in LIBRARIES)
+  const libraries = names.filter(name => Object.hasOwn(LIBRARIES, name))
   const notes: string[] = []
   let plan = await planCore(dir, core)
 
@@ -370,11 +398,7 @@ export async function addFeatures(dir: string, names: readonly string[], options
     const fresh = !existsSync(target)
 
     await mkdir(dirname(target), { recursive: true })
-    await writeFile(target, plan.writes.get(path)!)
-
-    // The session secret is for its owner's eyes only: a file just made takes the mode.
-    if (path === '.env' && fresh)
-      await chmod(target, 0o600)
+    await writeFile(target, plan.writes.get(path)!, fresh && path === '.env' ? { mode: 0o600 } : {})
   }
 
   const install = options.install !== false && (plan.writes.has('package.json') || libraries.length > 0)

@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, readdir, rm, symlink, writeFile } from 'node:fs/promise
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
-import { addExtension, addFeatures, detectFeatures } from '../src/add'
+import { addExtension, addFeatures, detectFeatures, restore, snapshot as snapshotManifest } from '../src/add'
 import { createProject, PRESETS } from '../src/new'
 
 const repo = join(import.meta.dir, '..')
@@ -201,6 +201,57 @@ it('leaves the project as it was when a library refuses, package.json included',
 
     await expect(addFeatures(dir, ['auth', 'mail'], { install: false })).rejects.toThrow('src/mail.ts exists and is not the file mail writes')
     expect(await Promise.all(files.map(async file => content(dir, file)))).toEqual(before)
+  }
+  finally {
+    await rm(join(dir, '..'), { recursive: true, force: true })
+  }
+})
+
+it('puts package.json and the lockfile back as they were, one a bun add made included', async () => {
+  const dir = join(await mkdtemp(join(tmpdir(), 'kay-add-')), 'app')
+
+  try {
+    await mkdir(dir, { recursive: true })
+    await writeFile(join(dir, 'package.json'), '{ "name": "a" }\n')
+    await writeFile(join(dir, 'bun.lock'), 'old lock')
+
+    const kept = await snapshotManifest(dir)
+
+    await writeFile(join(dir, 'package.json'), '{ "name": "changed" }')
+    await writeFile(join(dir, 'bun.lock'), 'new lock')
+    await writeFile(join(dir, 'bun.lockb'), 'made by bun add')
+    await restore(dir, kept)
+
+    expect(await Bun.file(join(dir, 'package.json')).text()).toBe('{ "name": "a" }\n')
+    expect(await Bun.file(join(dir, 'bun.lock')).text()).toBe('old lock')
+    expect(await Bun.file(join(dir, 'bun.lockb')).exists()).toBe(false)
+  }
+  finally {
+    await rm(join(dir, '..'), { recursive: true, force: true })
+  }
+})
+
+it('adds an extension without breaking a config it does not recognise', async () => {
+  const extension = { import: 'import { cms } from \'@kaynooo/kayjs-cms\'', expression: 'cms()' }
+  const multiline = 'import {\n  defineConfig,\n} from \'kay/server\'\n\nexport default defineConfig({})\n'
+
+  expect(addExtension(multiline, extension)).toBe('import {\n  defineConfig,\n} from \'kay/server\'\nimport { cms } from \'@kaynooo/kayjs-cms\'\n\nexport default defineConfig({\n  extensions: [cms()],\n})\n')
+  // Configured by hand already: left as it is, and a list held in a variable is a shape it stops at.
+  expect(addExtension('import { cms, forgejo } from \'@kaynooo/kayjs-cms\'\nexport default defineConfig({ extensions: [cms({ files: forgejo() })] })\n', extension)).toContain('extensions: [cms({ files: forgejo() })] })')
+  expect(addExtension('import { cms, forgejo } from \'@kaynooo/kayjs-cms\'\nexport default defineConfig({ extensions: [cms({ files: forgejo() })] })\n', extension)!.match(/cms\(/g)).toHaveLength(1)
+  expect(addExtension('export default defineConfig({ extensions: list })\n', extension)).toBeUndefined()
+  expect(addExtension('export default defineConfig({ extensions: [] })\n', extension)).toBe('import { cms } from \'@kaynooo/kayjs-cms\'\nexport default defineConfig({ extensions: [cms()] })\n')
+})
+
+it('refuses a name that is no feature, an inherited one included', async () => {
+  const dir = join(await mkdtemp(join(tmpdir(), 'kay-add-')), 'app')
+
+  try {
+    await createProject(dir, { kay: '^1.0.0', features: PRESETS.server.features })
+    await expect(addFeatures(dir, ['constructor'], { install: false })).rejects.toThrow('kay add: constructor is none of the features')
+    await expect(addFeatures(dir, ['mail'], { install: false })).rejects.toThrow('is not installed, and --no-install')
+    // Everything is there already: nothing to write.
+    expect((await addFeatures(dir, ['server', 'tests'], { install: false })).written).toEqual([])
   }
   finally {
     await rm(join(dir, '..'), { recursive: true, force: true })

@@ -9,7 +9,7 @@ export const add: Command = {
   options: { 'no-install': { type: 'boolean' }, 'quiet': { type: 'boolean' } },
   positionals: 2,
   run: async ({ values, positionals: [features, dir = '.'] }, refuse) => {
-    const names = (features ?? '').split(',').map(name => name.trim()).filter(name => name !== '')
+    const names = [...new Set((features ?? '').split(',').map(name => name.trim()).filter(name => name !== ''))]
 
     if (names.length === 0)
       return refuse()
