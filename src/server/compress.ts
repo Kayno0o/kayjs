@@ -266,6 +266,9 @@ export function fixedTexts(texts: string[]): FixedText[] {
 }
 
 export function fixedText(text: string): FixedText {
+  if (!text.startsWith('<style>'))
+    throw new TypeError('kay: a fixed text starts with <style>, the tag a response is searched at')
+
   const bytes = Buffer.from(text)
   const fixed: FixedText = {
     bytes,
@@ -302,7 +305,12 @@ function indexOfFixed(fixed: FixedText[]): FixedIndex {
     for (const text of fixed) {
       const key = text.head.toString('latin1')
 
-      byHead.set(key, [...byHead.get(key) ?? [], text])
+      const same = byHead.get(key)
+
+      if (same)
+        same.push(text)
+      else
+        byHead.set(key, [text])
     }
 
     index = { byHead, lengths: [...new Set(fixed.map(text => text.head.length))] }
