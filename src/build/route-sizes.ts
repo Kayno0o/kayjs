@@ -1,10 +1,12 @@
 import type { RenderedPage } from '../check/seo'
 import type { ClientBuild } from '../server/client'
+import type { Stop } from '../server/pure-page'
 import type { Route } from '../server/routes'
 import type { RouteSize, SizeReport } from './report'
 import { join, relative } from 'node:path'
 import { actionOf, elementsIn, serverIslandOf } from '../compiler/ast'
 import { parseKay } from '../compiler/parser'
+import { describeStop } from '../server/pure-page'
 import { ASSET_PREFIX } from './assets'
 import { resolveFrom, SCRIPT_FILE } from './files'
 import { gzipSize } from './report'
@@ -20,7 +22,7 @@ const IMPORT = /\b(?:from|import)\s*(?:\(\s*)?['"]([^'"]+)['"]/g
 // What each route loads, gzip: the stylesheets of its layouts and page, and the scripts its prerendered pages link, the heaviest page of them.
 // A route none of whose pages was prerendered has no page to read, so its scripts are the entry and every island its components can reach, through helpers, dynamic imports and aliases too, which is at most what a request loads.
 // A page answering a status other than 200 is still a prerendered page.
-export async function routeSizes(root: string, client: ClientBuild, routes: Route[], rendered: RenderedPage[], report: SizeReport | undefined, others: Pick<RenderedPage, 'file' | 'html'>[] = []): Promise<RouteSize[]> {
+export async function routeSizes(root: string, client: ClientBuild, routes: Route[], rendered: RenderedPage[], report: SizeReport | undefined, others: Pick<RenderedPage, 'file' | 'html'>[] = [], stops = new Map<string, Stop>()): Promise<RouteSize[]> {
   const sizes = new Map<string, Promise<number>>()
   const measure = async (url: string): Promise<number> => {
     let size = sizes.get(url)
@@ -46,6 +48,13 @@ export async function routeSizes(root: string, client: ClientBuild, routes: Rout
   const total = async (urls: Iterable<string>) => (await Promise.all([...urls].map(measure))).reduce((sum, size) => sum + size, 0)
   const pagesOf = Map.groupBy([...rendered, ...others], page => page.file)
   const islandChunks = new Map((report?.islands ?? []).map(island => [island.file, island.chunks ?? []]))
+  const keptPages = new Map<string, number>()
+
+  for (const page of client.pages?.values() ?? []) {
+    if (page.kept === true)
+      keptPages.set(page.pattern, (keptPages.get(page.pattern) ?? 0) + 1)
+  }
+
   const entryChunks = report?.entry?.chunks ?? []
   const reads = new Map<string, Promise<SourceFacts>>()
   const bySize = new Map<string, RouteSize>()
@@ -75,12 +84,15 @@ export async function routeSizes(root: string, client: ClientBuild, routes: Rout
       continue
 
     const pages = pagesOf.get(route.file) ?? []
+    const kept = keptPages.get(route.pattern) ?? 0
+    const stop = stops.get(route.pattern)
+    const why = stop === undefined ? undefined : describeStop(stop)
     const css = await total(new Set([...route.layouts, route.file].flatMap(file => client.styles.get(file) ?? [])))
 
     if (pages.length > 0) {
       const each = await Promise.all(pages.map(async page => total(new Set([...page.html.matchAll(SCRIPT_URL)].map(match => match[1]!)))))
 
-      bySize.set(route.pattern, { route: route.pattern, js: each.reduce((most, size) => Math.max(most, size), 0), css, islands: [...new Set(pages.flatMap(page => [...page.html.matchAll(ISLAND_SLOT)].map(match => match[1]!)))].sort(), pages: pages.length, estimated: false })
+      bySize.set(route.pattern, { route: route.pattern, js: each.reduce((most, size) => Math.max(most, size), 0), css, islands: [...new Set(pages.flatMap(page => [...page.html.matchAll(ISLAND_SLOT)].map(match => match[1]!)))].sort(), pages: pages.length, kept, estimated: false })
 
       continue
     }
@@ -94,7 +106,7 @@ export async function routeSizes(root: string, client: ClientBuild, routes: Rout
     // A chunk two islands share is weighed once, and the entry ships with an island or when a form or a deferred island needs it.
     const chunks = found.islands.size === 0 && !found.ships ? [] : new Set([...entryChunks, ...[...found.islands].flatMap(island => islandChunks.get(island)!)])
 
-    bySize.set(route.pattern, { route: route.pattern, js: await total(chunks), css, islands: [...found.islands].sort(), pages: 0, estimated: true })
+    bySize.set(route.pattern, { route: route.pattern, js: await total(chunks), css, islands: [...found.islands].sort(), pages: 0, kept, ...why !== undefined && { stop: why }, estimated: true })
   }
 
   return [...bySize.values()]

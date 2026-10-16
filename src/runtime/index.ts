@@ -372,6 +372,8 @@ export function defer<T>(value: T | PromiseLike<T>): Deferred<T> {
 export interface PageSettings {
   // `kay build` renders the page once: `true` for a route without params, else the params of each page to render, as a list, a function returning one, a content collection or a `paginate()` list.
   prerender?: boolean | object
+  // `true` says the page is to be kept prerendered by `kay build` on its own, as a page reading nothing from a request is: when the build cannot show it does, the `unkept-page` lint names what stops it.
+  keep?: true
   // How long a prerendered page is served before it renders again.
   revalidate?: Duration
   // `false` renders the page, or the layouts below this one, without the layouts above.

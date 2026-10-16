@@ -367,6 +367,14 @@ export const LINTS = {
     wrong: 'meta(property="og:image" content="https://cdn.example/cover.jpg")',
     right: 'meta(property="og:image" content={shareImage(cover)})',
   },
+  'unkept-page': {
+    level: 'warn',
+    group: 'code',
+    site: true,
+    summary: 'A page saying `keep: true` that `kay build` does not keep prerendered, as it reads the request or the clock, imports a package, holds module state or renders differently each time; the report names the file and line that decided it, and `kay build` lists what each page was kept or not for.',
+    wrong: '--- server\nimport dayjs from \'dayjs\'\n\nexport const page = { keep: true }\n---',
+    right: '--- server\nexport const page = { keep: true }\n---',
+  },
   'noindex-in-sitemap': {
     level: 'warn',
     group: 'seo',

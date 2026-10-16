@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { outputDir } from '../src/build/assets'
-import { readsNothing } from '../src/server/pure-page'
+import { keptStop, readsNothing } from '../src/server/pure-page'
 import { scratchDir } from './scratch'
 
 const CLI = join(import.meta.dir, '../src/cli.ts')
@@ -595,5 +595,52 @@ describe('a kept page and the state a script declares', () => {
 
     expect(files.sort()).toEqual(['about.html', 'index.html'])
     expect(await Bun.file(join(outputDir(root), 'pages', 'index.html')).text()).toContain('Asked index')
+  }, 120_000)
+})
+
+describe('what stops a page from being kept', () => {
+  const roots: string[] = []
+
+  afterAll(async () => {
+    await Promise.all(roots.map(async root => rm(root, { recursive: true, force: true })))
+  })
+
+  it('names the file, line and reason of each thing that stops it', async () => {
+    const root = await project({
+      'src/routes/clock.kay': '--- server\nconst now = Date.now()\n---\np {now}\n',
+      'src/routes/package.kay': '---\n\nimport { format } from \'dayjs\'\n---\np Hi\n',
+      'src/routes/state.kay': '--- server\nconst seen = []\n\nexport const add = action(s.Object({}), async () => {\n  seen.push(1)\n})\n---\np {seen.length}\n',
+      'src/routes/fine.kay': 'p Fine\n',
+    })
+
+    roots.push(root)
+
+    const at = async (file: string) => keptStop({ file: join(root, file), layouts: [] })
+
+    expect(await at('src/routes/clock.kay')).toEqual({ file: join(root, 'src/routes/clock.kay'), line: 2, why: 'reads `Date`' })
+    expect(await at('src/routes/package.kay')).toEqual({ file: join(root, 'src/routes/package.kay'), line: 3, why: 'imports the package `dayjs`' })
+    expect((await at('src/routes/state.kay'))?.why).toContain('module state')
+    expect(await at('src/routes/fine.kay')).toBeUndefined()
+  })
+
+  it('shows each route kept or on request in the build report, with what stopped it', async () => {
+    const root = await project({
+      'src/routes/index.kay': 'p Home\n',
+      'src/routes/clock.kay': '--- server\nconst now = Date.now()\n---\np {now}\n',
+      'src/routes/random.kay': '--- server\nexport const page = { keep: true }\n---\np {Math.random()}\n',
+    })
+
+    roots.push(root)
+
+    const child = Bun.spawn([process.execPath, CLI, 'build', root, '--format', 'json'], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, NODE_ENV: 'production' } })
+    const [out] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+    const document = JSON.parse(out) as { built: { routes: { route: string, kept: number, pages: number, stop?: string }[] }, problems: { code: string, message: string, line: number }[] }
+    const routes = Object.fromEntries(document.built.routes.map(route => [route.route, route]))
+
+    expect(routes['/']).toMatchObject({ kept: 1, pages: 0 })
+    expect(routes['/']!.stop).toBeUndefined()
+    expect(routes['/clock']).toMatchObject({ kept: 0 })
+    expect(routes['/clock']!.stop).toMatch(/clock\.kay:2 reads `Date`$/)
+    expect(document.problems.filter(problem => problem.code === 'unkept-page').map(problem => problem.line)).toEqual([4])
   }, 120_000)
 })

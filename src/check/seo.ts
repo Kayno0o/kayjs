@@ -1,5 +1,6 @@
 import type { LintLevels, LintName } from '../compiler/lints'
 import type { FaviconConfig, SeoConfig } from '../config'
+import type { Stop } from '../server/pure-page'
 import type { CheckDiagnostic } from './index'
 import { lintLevel } from '../compiler/lints'
 
@@ -106,6 +107,16 @@ export function pageSeoLints(config: SiteSeo, pages: RenderedPage[], exported = 
   }
 
   return found
+}
+
+// The pages that said `keep: true` and were not kept, each at the line that stopped it.
+export function unkeptPageLints(config: Pick<SiteSeo, 'lints'>, stops: (Stop & { keep: boolean })[]): CheckDiagnostic[] {
+  const level = lintLevel('unkept-page', config.lints)
+
+  if (level === 'allow')
+    return []
+
+  return stops.filter(stop => stop.keep).map(stop => ({ file: stop.file, line: Math.max(stop.line, 1), column: 1, code: 'unkept-page', severity: level === 'warn' ? 'warning' : 'error', message: `The build does not keep this page, though it says \`keep: true\`: it ${stop.why}`, help: 'drop what it reads or imports, move it into a component only an island renders, or remove `keep` and let it render per request' }))
 }
 
 // Pushes a lint at the level the config gives it, the `seo` lints allowed on a site that is not public.

@@ -72,7 +72,7 @@ export const page = { prerender: true, revalidate: '1h' }
 ---
 ```
 
-The usual keys are `prerender` and `revalidate` (see [Prerendering](#prerendering)), `layouts: false` to drop the layouts above the page, `query` (see [Data loading](/essentials/data-loading)), and `sitemap` and `noindex` (see [Head and SEO](/essentials/head-and-seo)). `kay check` types the object, so the editor completes the keys and an unknown one is an error.
+The usual keys are `prerender`, `keep` and `revalidate` (see [Prerendering](#prerendering)), `layouts: false` to drop the layouts above the page, `query` (see [Data loading](/essentials/data-loading)), and `sitemap` and `noindex` (see [Head and SEO](/essentials/head-and-seo)). `kay check` types the object, so the editor completes the keys and an unknown one is an error.
 
 ## Loading data
 
@@ -118,7 +118,19 @@ export const page = { prerender: true }
 ---
 ```
 
-A page without `prerender` is built the same way when `kay build` can show it reads nothing from its request or the moment: no `ctx`, `query`, `Date`, `Math.random` (or `Math` taken whole), `process`, `Bun` or `fetch` in it, its layouts or anything they import, no `let` at the top of a module or empty array or `Map` it fills (a `let` or an empty array in a `.kay` script or server fence is made for each render, and only counts when an export of the server fence reads it), and no import but `.kay` files, relative modules, images and data files, `kay/i18n` (except the relative time helpers, which read the clock) and the reactive helpers of `kay` such as `signal` and `selection`. A page showing data that another module changes between requests, such as an array an action edits, is caught as the app runs: the first visit after a request that can write (an action, or a route answering anything but GET and HEAD) renders the page again and compares it with the kept copy. A page that came out different is rendered for each request from then on, and the server warns once naming it; `export const page = { prerender: false }` says so up front and skips the check. A page the write did not change is still served from memory, and a page that sets `prerender: true` is never checked. A value that a timer or a background job changes with no request is not seen, so such a page needs `prerender: false`. A page that does not qualify, or whose two builds differ, is rendered for each request as before, and the build never fails over it. Guards still run on every request, and development renders every page afresh.
+A page without `prerender` is built the same way when `kay build` can show it reads nothing from its request or the moment: no `ctx`, `query`, `Date`, `Math.random` (or `Math` taken whole), `process`, `Bun` or `fetch` in it, its layouts or anything they import, no `let` at the top of a module or empty array or `Map` it fills (a `let` or an empty array in a `.kay` script or server fence is made for each render, and only counts when an export of the server fence reads it), and no import but `.kay` files, relative modules, images and data files, `kay/i18n` (except the relative time helpers, which read the clock) and the reactive helpers of `kay` such as `signal` and `selection`. A page showing data that another module changes between requests, such as an array an action edits, is caught as the app runs: the first visit after a request that can write (an action, or a route answering anything but GET and HEAD) renders the page again and compares it with the kept copy. A page that came out different is rendered for each request from then on, and the server warns once naming it; `export const page = { prerender: false }` says so up front and skips the check. A page the write did not change is still served from memory, and a page that sets `prerender: true` is never checked. A value that a timer or a background job changes with no request is not seen, so such a page needs `prerender: false`. A page that does not qualify, or whose two builds differ, is rendered for each request as before, and the build never fails over it.
+
+`kay build` shows what it decided. Its route table says `prerendered`, `kept` or `on request` for each route, and under an `on request` page the file and line that stopped it, such as `src/routes/clock.kay:2 reads Date`. `kay build --format json` gives the same as `kept` and `stop` on each route.
+
+To have the build tell you when a page stops being kept, say so in the page:
+
+```kay
+--- server
+export const page = { keep: true }
+---
+```
+
+If an import, a `Date` or anything else keeps the build from keeping it, `kay build` warns with the file and line. Set the `unkept-page` lint to `deny` in `kay.config.ts` to fail the build instead. The page is still rendered for each request when it is not kept. Guards still run on every request, and development renders every page afresh.
 
 A page with params lists the ones to build. Passing a content collection builds one page per entry:
 

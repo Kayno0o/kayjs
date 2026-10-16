@@ -4,6 +4,7 @@ import type { RenderedPage } from '../check/seo'
 import type { KayConfig } from '../config'
 import type { Project } from '../project'
 import type { ClientBuild } from '../server/client'
+import type { KeptStop } from '../server/prerender'
 import type { Route } from '../server/routes'
 import type { BuildSummary, RouteSize, SizeReport, StageTime, StoredReport } from './report'
 import { existsSync } from 'node:fs'
@@ -11,7 +12,7 @@ import { rename, rm } from 'node:fs/promises'
 import { availableParallelism } from 'node:os'
 import { join, relative, resolve } from 'node:path'
 import { check, configCheckOptions } from '../check'
-import { pageSeoLints } from '../check/seo'
+import { pageSeoLints, unkeptPageLints } from '../check/seo'
 import { pageHooks } from '../config'
 import { writeContentManifests } from '../content/server'
 import { cacheDir, clientOptionsOf, resolveProject } from '../project'
@@ -360,7 +361,8 @@ async function outputStage(project: Project, exported: boolean, client: ClientBu
   const rendered: RenderedPage[] = []
   const others: Pick<RenderedPage, 'file' | 'html'>[] = []
   const routes: Route[] = []
-  const prerendered = await prerenderPages(project, client, { exportAll: exported, rendered, others, routes, onRoute: (done, total) => report({ step: 'prerendering', done, total, unit: 'routes' }) })
+  const stops = new Map<string, KeptStop>()
+  const prerendered = await prerenderPages(project, client, { exportAll: exported, rendered, others, routes, stops, onRoute: (done, total) => report({ step: 'prerendering', done, total, unit: 'routes' }) })
 
   if (config.search === true) {
     report({ step: 'indexing for search' })
@@ -369,7 +371,7 @@ async function outputStage(project: Project, exported: boolean, client: ClientBu
 
   lap('prerender')
 
-  const sizes = await routeSizes(root, client, routes, rendered, client.report, others)
+  const sizes = await routeSizes(root, client, routes, rendered, client.report, others, stops)
 
   lap('route sizes')
 
@@ -377,7 +379,7 @@ async function outputStage(project: Project, exported: boolean, client: ClientBu
   await pruneCompileCache(cacheDir(root))
 
   // The heads are the check's to read, so a build without checking skips them with it.
-  const linted = checking ? pageSeoLints(config, rendered, exported) : []
+  const linted = checking ? [...pageSeoLints(config, rendered, exported), ...unkeptPageLints(config, [...stops.values()])] : []
 
   // Remote originals are kept between builds, revalidated as the image route does.
   const remote = remoteImages(cacheDir(root, 'remote'), remotePatterns(config.images?.remote))

@@ -3,7 +3,7 @@ import type { ErrorName, ExportProblem } from '../compiler/errors'
 import type { Project } from '../project'
 import type { PageSettings } from '../runtime'
 import type { ClientBuild, PrerenderedPage } from './client'
-import type { Scan } from './pure-page'
+import type { Scan, Stop } from './pure-page'
 import type { Route } from './routes'
 import { mkdir } from 'node:fs/promises'
 import { join, relative } from 'node:path'
@@ -25,7 +25,7 @@ import { localeCopies, stateFor } from './i18n'
 import { pageSetting } from './page-settings'
 import { matchedParams } from './params'
 import { listedIn, listedParams, pageEtag, pageToken, pathOf, storedHeaders } from './prerendered'
-import { readsNothing } from './pure-page'
+import { keptStop } from './pure-page'
 import { renderPage } from './render'
 import { scanEndpoints } from './routes'
 import { serverIslandModes } from './server-islands'
@@ -52,6 +52,11 @@ export class ExportError extends Error {
   }
 }
 
+// What keeps a page that nothing marks from being kept; `keep` when the page said it should be.
+export interface KeptStop extends Stop {
+  keep: boolean
+}
+
 export interface PrerenderOptions {
   // Every page, for `kay build --static`: one without params prerenders unless it opts out, and a page that cannot is reported rather than left to a server.
   exportAll?: boolean
@@ -61,6 +66,8 @@ export interface PrerenderOptions {
   others?: Pick<RenderedPage, 'file' | 'html'>[] | undefined
   // Receives every route of the project, for `kay build` to weigh what each loads.
   routes?: Route[] | undefined
+  // Receives, by route pattern, what stopped each page from being kept without being asked for, and whether the page said `keep: true`, for `kay build` to show it.
+  stops?: Map<string, KeptStop> | undefined
   // Hears how many of the routes it went through, those it prerenders nothing of included.
   onRoute?: ((done: number, total: number) => void) | undefined
 }
@@ -89,8 +96,14 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
 
   // `auto` is a page nothing marks, which the build keeps because it provably reads nothing from its request: it is skipped, never failed, as soon as one render shows otherwise.
   // Gives what writes the route, once every locale of it has rendered, so a route given up on leaves nothing behind.
-  async function prerenderRoute(route: Route, file: string, marked: boolean, auto = false): Promise<(() => Promise<void> | void)[]> {
+  async function prerenderRoute(route: Route, file: string, marked: boolean, auto = false, keep = false): Promise<(() => Promise<void> | void)[]> {
     const pending: (() => Promise<void> | void)[] = []
+    // Nothing is written for a page given up on, whose reason is kept for the build to show.
+    const skip = (why: string) => {
+      options.stops?.set(route.pattern, { file: route.file, line: 0, why, keep })
+
+      return []
+    }
     // The names this route's own copies take, which two of them may not share.
     const reserved = new Map<string, string>()
 
@@ -99,7 +112,7 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
 
     // A copy that goes stale is rendered again for every visitor with the request a page reads, which an unmarked page was never asked to.
     if (auto && revalidate !== undefined)
-      return []
+      return skip('sets `revalidate`, which has a stale copy render again for every visitor')
 
     const prerender = pageSetting(module, 'prerender')
 
@@ -140,7 +153,7 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
         const { response, html } = await once()
 
         if (auto && response.status !== 200)
-          return []
+          return skip(`answers ${response.status} when rendered without a request`)
 
         if (response.status >= 500)
           throw new KayError('export-page-status', `kay: prerendering ${copy.path} from ${file} failed with ${response.status}; the error is logged above`)
@@ -151,7 +164,7 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
 
         // Two renders of the same page differ when it draws on something the source does not show, a counter or a clock behind a function.
         if (auto && (await once()).html !== html)
-          return []
+          return skip('renders differently each time, as it draws on something its source does not show')
 
         if (options.exportAll && IMAGE_LINK.test(html))
           throw new KayError('export-image-route', `kay: ${copy.path} links an image only the image route resizes, such as one from images.dirs, and no file of it is exported`)
@@ -161,7 +174,7 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
         const readsSite = standInReads() > reads
 
         if (auto && (islands.length > 0 || stamps || readsSite))
-          return []
+          return skip(unkeptBy(islands.length > 0, stamps))
 
         if (options.exportAll && readsSite)
           throw new KayError('export-site-url', 'kay: it reads the site, through siteUrl() or siteOrigin(), which neither `site` in kay.config.ts nor SITE_URL sets')
@@ -185,7 +198,7 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
         }
         else if (taken !== undefined) {
           if (auto)
-            return []
+            return skip(`would share its prerendered file ${name} with ${taken}`)
 
           throw new KayError('export-path-clash', `kay: ${taken} and ${copy.key} would both be prerendered to ${name}; leave one out of prerender`)
         }
@@ -232,22 +245,30 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
     const marked = route.params.length === 0 && await reachesServerIsland(route.file)
 
     const asked = marked || options.exportAll === true || await exportsPrerender(route.file)
-    const auto = !asked && route.params.length === 0 && await readsNothing(route, scans)
+    const keep = !asked && await keepsPage(route.file)
+    const stop = asked ? undefined : await stopOf(route, scans)
+    const auto = !asked && stop === undefined
 
-    if (!asked && !auto)
+    if (!asked && !auto) {
+      options.stops?.set(route.pattern, { ...stop!, keep })
+
       continue
+    }
 
     const file = relative(root, route.file)
 
     let writes: Awaited<ReturnType<typeof prerenderRoute>>
 
     try {
-      writes = await prerenderRoute(route, file, marked, auto)
+      writes = await prerenderRoute(route, file, marked, auto, keep)
     }
     catch (error) {
       // A page kept on the strength of its source alone is rendered per request when it will not render here.
-      if (auto)
+      if (auto) {
+        options.stops?.set(route.pattern, { file: route.file, line: 0, why: `does not render at build: ${firstLine(error instanceof Error ? error.message : String(error))}`, keep })
+
         continue
+      }
 
       if (!options.exportAll)
         throw error
@@ -329,6 +350,35 @@ export async function reachesServerIsland(file: string, seen = new Set<string>()
   }
 
   return false
+}
+
+function unkeptBy(island: boolean, stamps: boolean): string {
+  if (island)
+    return 'holds a server island'
+
+  return stamps ? 'holds a form stamp or a work challenge, signed per request' : 'reads the site URL, which no config sets'
+}
+
+function firstLine(text: string): string {
+  const end = text.trim().indexOf('\n')
+
+  return end === -1 ? text.trim() : text.trim().slice(0, end)
+}
+
+// What keeps the page from being kept: what its files read, or that it takes params, which `prerender` lists.
+async function stopOf(route: Route, scans: Map<string, Promise<Scan>>): Promise<Stop | undefined> {
+  if (route.params.length > 0)
+    return { file: route.file, line: 0, why: 'takes params, so `prerender` lists the pages to render' }
+
+  return keptStop(route, scans)
+}
+
+// Whether the page says `keep: true`: the build is to keep it prerendered, and reports what stops it.
+async function keepsPage(file: string): Promise<boolean> {
+  const source = await Bun.file(file).text()
+  const setting = analyzeServer(source, parseKay(source).server)?.page?.settings.get('keep')
+
+  return setting !== undefined && source.slice(setting.value.start, setting.value.end) === 'true'
 }
 
 async function exportsPrerender(file: string): Promise<boolean> {

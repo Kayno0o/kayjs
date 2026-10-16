@@ -138,6 +138,10 @@ export interface RouteSize {
   islands: string[]
   // How many pages the build prerendered for it; none when a server renders it per request.
   pages: number
+  // How many pages the build kept on its own, as nothing marked them, which a server serves as prerendered ones.
+  kept: number
+  // For a route rendered per request, what stopped the build from keeping it, as `src/routes/index.kay:3 reads Date`: set for a page the build looked at, not one that takes params and lists none.
+  stop?: string | undefined
   // The scripts are what the route's components can load rather than what a rendered page did, as no page of it was prerendered.
   estimated: boolean
 }
@@ -241,7 +245,7 @@ function becauseOf(island: IslandSize): string | undefined {
   return island.promoted === true ? `static unless it passes an island what only an island sends: ${island.why}` : `an island because of ${island.why}`
 }
 
-// One row per route, the heaviest first: its pattern, whether it was prerendered, and what it loads.
+// One row per route, the heaviest first: its pattern, whether it was prerendered, kept or rendered per request, and what it loads; a page rendered per request gets a line saying what stopped the build from keeping it.
 export function formatRouteTable(routes: RouteSize[], { width = Infinity, previous }: ReportView = {}): string {
   if (routes.length === 0)
     return ''
@@ -254,7 +258,7 @@ export function formatRouteTable(routes: RouteSize[], { width = Infinity, previo
 
     return [
       route.route,
-      pagesLabel(route.pages),
+      pagesLabel(route.pages, route.kept),
       `${route.estimated ? '~' : ''}${kb(route.js)}${change(route.js, before?.js, compared)}`,
       `${kb(route.css)}${change(route.css, before?.css, compared)}`,
     ] as const
@@ -266,7 +270,10 @@ export function formatRouteTable(routes: RouteSize[], { width = Infinity, previo
 
   return [
     shorten('Routes, gzip (~: scripts it can load, no page prerendered):', width),
-    ...[header, ...rows].map(row => `  ${shorten(row[0], name).padEnd(name)}  ${row[1].padEnd(widths[1]!)}  ${row[2].padStart(widths[2]!)}  ${row[3].padStart(widths[3]!)}`),
+    ...[header, ...rows].flatMap((row, index) => [
+      `  ${shorten(row[0], name).padEnd(name)}  ${row[1].padEnd(widths[1]!)}  ${row[2].padStart(widths[2]!)}  ${row[3].padStart(widths[3]!)}`,
+      ...index > 0 && shown[index - 1]!.stop !== undefined ? [`      ${shorten(`not kept: ${shown[index - 1]!.stop}`, Math.max(20, width - 8))}`] : [],
+    ]),
     ...hidden > 0 ? [`  and ${hidden} more route${hidden === 1 ? '' : 's'}, lighter than these`] : [],
   ].join('\n')
 }
@@ -343,7 +350,10 @@ function kilobytes(size: Size): string {
   return `${kb(size.gzip)} (${(size.raw / 1024).toFixed(1)} KB)`
 }
 
-function pagesLabel(pages: number): string {
+function pagesLabel(pages: number, kept: number): string {
+  if (pages === 0 && kept > 0)
+    return kept === 1 ? 'kept' : `kept x${kept}`
+
   if (pages === 0)
     return 'on request'
 

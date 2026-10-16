@@ -1814,7 +1814,7 @@ describe('the size report', () => {
 
 describe('the build report', () => {
   const summary = (routes: RouteSize[]): BuildSummary => ({ routes, stages: [{ name: 'check', ms: 4210 }, { name: 'bundle', ms: 87.4 }], caches: [{ name: 'image variants', cached: 40, made: 2 }, { name: 'components', cached: 0, made: 3 }] })
-  const route = (pattern: string, js: number, css = 0, pages = 1): RouteSize => ({ route: pattern, js, css, islands: [], pages, estimated: pages === 0 })
+  const route = (pattern: string, js: number, css = 0, pages = 1): RouteSize => ({ route: pattern, js, css, islands: [], pages, kept: 0, estimated: pages === 0 })
 
   it('shows one row per route with its scripts, stylesheets and whether it was prerendered, the change since the last build beside each size', () => {
     const previous: StoredReport = { version: 1, exported: false, entry: 10_240, islands: {}, routes: { '/': { js: 10_240, css: 1024 }, '/blog/:slug': { js: 5120, css: 0 } } }
@@ -1826,6 +1826,15 @@ describe('the build report', () => {
     expect(printed).toMatch(/^ {2}\/blog\/:slug +prerendered x200 +5\.0 KB +0\.0 KB$/m)
     expect(printed).toMatch(/^ {2}\/live +on request +~2\.0 KB \[new\] +0\.0 KB \[new\]$/m)
     expect(formatRouteTable([route('/', 1024)])).not.toContain('[')
+  })
+
+  it('says whether a page is kept or on request, and what stopped it', () => {
+    const kept: RouteSize = { ...route('/kept', 1024, 0, 0), kept: 2 }
+    const stopped: RouteSize = { ...route('/clock', 2048, 0, 0), stop: 'src/routes/clock.kay:2 reads `Date`' }
+    const printed = formatRouteTable([kept, stopped])
+
+    expect(printed).toMatch(/^ {2}\/kept +kept x2 +~1\.0 KB/m)
+    expect(printed).toMatch(/^ {2}\/clock +on request +~2\.0 KB.*\n {6}not kept: src\/routes\/clock\.kay:2 reads `Date`$/m)
   })
 
   it('never runs past the width, shortening the middle of a long path and listing the lightest routes as a count', () => {
@@ -1871,7 +1880,7 @@ describe('the build report', () => {
       const html = '<script type="module" src="/base/_kay/a.js"></script><p><a href="/_kay/%zz.js">x</a><a href="/_kay/../outside.js">y</a></p>'
       const sizes = await routeSizes('/app', { dir, styles: new Map() } as unknown as ClientBuild, [{ pattern: '/', file: '/app/src/routes/index.kay', params: [], layouts: [] } as unknown as Route], [{ path: '/', file: '/app/src/routes/index.kay', html } as RenderedPage], undefined)
 
-      expect(sizes).toEqual([{ route: '/', js: Bun.gzipSync(await Bun.file(join(dir, 'a.js')).bytes(), { level: 9 }).length, css: 0, islands: [], pages: 1, estimated: false }])
+      expect(sizes).toEqual([{ route: '/', js: Bun.gzipSync(await Bun.file(join(dir, 'a.js')).bytes(), { level: 9 }).length, css: 0, islands: [], pages: 1, kept: 0, estimated: false }])
     }
     finally {
       await rm(dir, { recursive: true, force: true })
@@ -1896,7 +1905,7 @@ describe('the build report', () => {
       const route = { pattern: '/gone', file: '/app/src/routes/gone.kay', params: [], layouts: [] } as unknown as Route
       const sizes = await routeSizes('/app', { dir, styles: new Map() } as unknown as ClientBuild, [route], [], undefined, [{ file: route.file, html: '<script type="module" src="/_kay/a.js"></script>' }, { file: route.file, html: '' }])
 
-      expect(sizes).toEqual([{ route: '/gone', js: expect.any(Number), css: 0, islands: [], pages: 2, estimated: false }])
+      expect(sizes).toEqual([{ route: '/gone', js: expect.any(Number), css: 0, islands: [], pages: 2, kept: 0, estimated: false }])
       expect(sizes[0]!.js).toBeGreaterThan(0)
     }
     finally {
