@@ -830,6 +830,13 @@ describe('localized seo defaults', () => {
     expect((await response.json() as { info: { title: string } }).info.title).toBe('Le site')
   })
 
+  it('leaves a manifest link of the app\'s own head alone in every locale', async () => {
+    const server = new Elysia().use(await pages({ routes, prebuilt: false, security: false, site: SITE, i18n, favicon: false, head: [{ tag: 'link', props: { rel: 'manifest', href: '/my-app.json' } }], seo: { name: { fr: 'Le site', en: 'The site' } } }))
+
+    for (const path of ['/', '/en'])
+      expect(await (await server.handle(new Request(`http://localhost${path}`))).text()).toContain('<link rel="manifest" href="/my-app.json">')
+  })
+
   it('links the manifest of the page\'s locale, the default locale\'s at the usual path and each other locale\'s beside it', async () => {
     const server = await shared
     const manifest = async (path: string) => (await server.handle(new Request(`http://localhost${path}`))).json() as Promise<{ name: string, description: string }>

@@ -189,13 +189,24 @@ function ico(images: Uint8Array[], sizes: number[]): Uint8Array<ArrayBuffer> {
   return bytes
 }
 
+// The manifest link kay itself made, which a page's locale may point at its own manifest; a `head` link of the app's is never touched.
+const OWN_MANIFEST = new WeakSet<HeadTag>()
+
+export function isOwnManifest(tag: HeadTag): boolean {
+  return OWN_MANIFEST.has(tag)
+}
+
 // The links every page carries for them, which a page's own replace; an SVG is linked after the ICO, which browsers drawing SVG icons then prefer.
 export function faviconTags(favicon: string | FaviconConfig | undefined): HeadTag[] {
+  const manifest: HeadTag = { tag: 'link', props: { rel: 'manifest', href: MANIFEST } }
+
+  OWN_MANIFEST.add(manifest)
+
   return [
     { tag: 'link', props: { rel: 'icon', href: ICO, sizes: ICO_SIZES.map(size => `${size}x${size}`).join(' ') } },
     ...servesSvg(favicon) ? [{ tag: 'link', props: { rel: 'icon', href: SVG, type: 'image/svg+xml' } } satisfies HeadTag] : [],
     { tag: 'link', props: { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' } },
-    { tag: 'link', props: { rel: 'manifest', href: MANIFEST } },
+    manifest,
   ]
 }
 
@@ -216,9 +227,9 @@ function ownManifest(locale: string, texts: { name?: Localized | undefined, desc
   return localizedText(texts.name, locale, defaultLocale) !== localizedText(texts.name, defaultLocale, defaultLocale) || localizedText(texts.description, locale, defaultLocale) !== localizedText(texts.description, defaultLocale, defaultLocale)
 }
 
-// Every manifest path of a site: the default locale's, then one per other locale reading its own text.
-export function manifestPaths(texts: { name?: Localized | undefined, description?: Localized | undefined }, locales: ManifestLocales | undefined): string[] {
-  return [MANIFEST, ...locales?.locales.filter(locale => locale !== locales.defaultLocale && ownManifest(locale, texts, locales.defaultLocale)).map(locale => manifestPath(locale, texts, locales.defaultLocale)) ?? []]
+// The manifest of each locale other than the default's reading a name or description of its own.
+export function localeManifests(texts: { name?: Localized | undefined, description?: Localized | undefined }, locales: ManifestLocales | undefined): { path: string, locale: string }[] {
+  return (locales?.locales ?? []).filter(locale => locale !== locales!.defaultLocale && ownManifest(locale, texts, locales!.defaultLocale)).map(locale => ({ path: manifestPath(locale, texts, locales!.defaultLocale), locale }))
 }
 
 // Its icons, pages and scope under the site's mount point.
@@ -301,11 +312,12 @@ export function serveFavicons(app: Elysia, served: ServedPaths, options: Favicon
   const texts = { name: options.name, description: options.description }
   const defaultLocale = options.locales?.defaultLocale
 
-  for (const path of manifestPaths(texts, options.locales)) {
+  const manifests = [{ path: MANIFEST, locale: defaultLocale }, ...localeManifests(texts, options.locales)]
+
+  for (const { path, locale } of manifests) {
     if (!served.offer({ path, owner: 'the web app manifest', kind: 'kay', exported: true }))
       continue
 
-    const locale = path === MANIFEST ? defaultLocale : options.locales!.locales.find(candidate => manifestPath(candidate, texts, defaultLocale) === path)
     const manifest = manifestJson(localizedText(options.name, locale, defaultLocale), localizedText(options.description, locale, defaultLocale), options.manifest, options.base)
 
     app.get(path, ({ request }) => respond(request, manifest, 'application/manifest+json'))

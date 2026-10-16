@@ -337,7 +337,7 @@ export default defineConfig({
 ```
 
 - The manifest is named after `seo.name`, `shortName` defaulting to it, and described by `seo.description`.
-- A `name` or `description` written per locale gives each locale reading a text of its own a manifest of its own, `/manifest.fr.webmanifest` beside the default locale's `/manifest.webmanifest`, which that locale's pages link; a locale reading the default locale's text links the default's, and a site writing them once serves one. `shortName` and every path in the manifest are the same in all of them.
+- A `name` or `description` written per locale gives each locale reading a text of its own a manifest of its own, `/manifest.fr.webmanifest` beside the default locale's `/manifest.webmanifest`, which that locale's pages link; a locale reading the default locale's text links the default's, and a site writing them once serves one. An explicit `shortName` and every path in the manifest, `startUrl` and `scope` included, are the same in all of them, `short_name` otherwise following the locale's `name`.
 - `themeColor` is also every page's `theme-color`, `favicon: false` included.
 - `startUrl` is the page the installed app opens, `scope` by default, else `/`, and `scope` the paths it keeps in its window.
 - `startUrl`, `scope` and each shortcut's `url` (`name`, `shortName`, `description`) are paths of the site, put under `base`.
