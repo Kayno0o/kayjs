@@ -113,15 +113,22 @@ function readTables(bytes: Uint8Array): Tables {
 
     const stream = new Uint8Array(nodeZlib().brotliDecompressSync(bytes.subarray(cursor, cursor + file.getUint32(20))))
     let offset = 0
+    let packedHmtx: DataView | undefined
 
     for (const { name, length, kept, packed } of entries) {
       if (kept)
         tables.set(name, viewOf(stream.subarray(offset, offset + length)))
       else if (packed)
-        tables.set(name, plainHmtx(viewOf(stream.subarray(offset, offset + length)), tables.get('hhea')!))
+        packedHmtx = viewOf(stream.subarray(offset, offset + length))
 
       offset += length
     }
+
+    // The advance count lives in hhea, wherever the directory lists it; without one the metrics are left out.
+    const hhea = tables.get('hhea')
+
+    if (packedHmtx !== undefined && hhea !== undefined)
+      tables.set('hmtx', plainHmtx(packedHmtx, hhea))
 
     return tables
   }
