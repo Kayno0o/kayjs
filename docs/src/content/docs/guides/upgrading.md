@@ -22,9 +22,11 @@ A context you build by hand, such as a mock in a test, now needs `request`, `url
 A guard's `redirect` answers 302 to a GET or HEAD on an API route, an endpoint, or an image source's `resolve` and `guard`, where it answered 303. A post still gets 303.
 
 An endpoint that reads `ctx.cookies` goes out, a redirect, denial or 404 included, with `Cache-Control: private, no-cache` and `Vary: cookie`, unless it sets its own `cache-control`.
+
 ### `invalidatePage` is imported from `kay/cache`
 
 It sits beside `invalidate` now, and `kay/server` no longer exports it. Write `import { invalidatePage } from 'kay/cache'`. `kay upgrade` rewrites the import.
+
 ### A page inlines its small stylesheets by default
 
 A page whose stylesheets compress under about 14 KB together now carries them in its head in production, where it linked them. This includes the pages `kay build` prerenders and `--static` exports, so their bytes change. Above the limit nothing changes.
@@ -39,7 +41,6 @@ A test or a script that reads a page's `link rel="stylesheet"` to fetch the file
 
 The account pages sign out with a post to `/auth/sign-out`, under the `prefix` of `createAuth`. A test or a page importing `signOut` from `@kaynooo/kayjs-auth/pages/account/_layout.kay` now fails `kay check`, as an import of something that is gone. Post to the route instead, with `site.fetch('/auth/sign-out', { method: 'POST' })` in a test, or give your own page a form posting there. No lint finds it, as the import already fails the check. The plugin also serves `POST /auth/sign-out` itself now, ahead of your routes, so a route of your own at that path is shadowed: rename it. See [kayjs-auth](/libraries/kayjs-auth#the-signed-in-user).
 
-### `deprecated-schema-name` is in the `deprecated` group
 ### The schema builder's old name `t` is gone
 
 `import { t } from 'kay'` is gone, with its `deprecated-schema-name` lint. The schema builder is `s`: import it with `import { s } from 'kay'`, or use it with no import in a server fence, and write `s.Object(...)` where you wrote `t.Object(...)`. `kay check --fix` of 1.45 renames it. Otherwise rename it by hand, or import Elysia's own `t` from `elysia`.

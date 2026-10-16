@@ -13,10 +13,12 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 - A hand-built context, a test's mock for a guard or a handler, now needs `request`, `url`, `locale`, `params`, `cookies`, `locals`, `headers`, `redirect`, `notFound` and `deny`; take it from `RequestContext` or cast it.
 - A guard's `redirect` answers 302 to a GET or HEAD, on an API route, an endpoint or an image source's `resolve` and `guard` too, where it answered 303; a post still gets 303.
 - An endpoint that reads `ctx.cookies` goes out, a redirect, denial or 404 included, `Cache-Control: private, no-cache` with `Vary: cookie`, unless it sets its own `cache-control`.
+
 ### `invalidatePage` is imported from `kay/cache`
 
 - It sits beside `invalidate` now, and `kay/server` no longer exports it: `import { invalidatePage } from 'kay/cache'`. `kay upgrade` rewrites the import, `deprecated-import` finds the rest.
 - The rule for what needs an import is in [Components](components.md#imports-kay-adds): `props`, the reactive primitives, a server fence's `action` and `t` need none, everything else comes from `kay`, `kay/server` or its topic's entry.
+
 ### A page inlines its small stylesheets by default
 
 - A page whose stylesheets compress under about 14 KB together now carries them as `style` elements in its head in production, `kay build` prerendered pages and `--static` exports included, where it linked them: the bytes of those pages change, and a stylesheet no longer shows as a request. Above the limit nothing changes. No deprecated lint covers it, as nothing in the app's code is the old form: it is a default.
@@ -26,7 +28,6 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 - The account pages sign out with a post to `/auth/sign-out` (under the `prefix` of `createAuth`), so `import { signOut } from '@kaynooo/kayjs-auth/pages/account/_layout.kay'` in a test or a page fails `kay check`: post to the route instead, `site.fetch('/auth/sign-out', { method: 'POST' })`, or put the button in your own page as a form posting there. No lint can find it: the import already fails `kay check` as a missing export. The plugin now serves `POST ${prefix}/sign-out` itself, ahead of the app's routes, so an app route of its own at that path is shadowed: rename it. [kayjs-auth](../packages/auth/llms.txt)
 
-### `deprecated-schema-name` is in the `deprecated` group
 ### The schema builder's old name `t` is gone
 
 - `kay` no longer exports the schema builder as `t`, gone with its `deprecated-schema-name` lint: the schema builder is `s`, `import { s } from 'kay'` or no import in a server fence, and `s.Object(...)` in place of `t.Object(...)`. `kay check --fix` of 1.45 renames it, or rename it by hand, or import Elysia's own `t` from `elysia`.
