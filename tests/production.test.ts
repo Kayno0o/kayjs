@@ -1588,6 +1588,28 @@ describe('a prerendered page posted to', () => {
 describe('compression', () => {
   const routes = 'tests/fixtures/production/src/routes'
 
+  it('answers a Response a route returns again on every request, compressed or not, as it answered the first', async () => {
+    const report = new Response('row '.repeat(2000), { headers: { 'content-type': 'text/plain' } })
+    const small = new Response('ok', { headers: { 'content-type': 'text/plain' } })
+    const app = new Elysia()
+      .use(await pages({ routes, prebuilt: false, compress: true }))
+      .get('/api/report', () => report)
+      .get('/api/small', () => small)
+    const fetch = async (path: string, encoding: string) => app.handle(new Request(`http://localhost${path}`, { headers: { 'accept-encoding': encoding } }))
+
+    const decode: Record<string, (bytes: Uint8Array<ArrayBuffer>) => Uint8Array> = { zstd: Bun.zstdDecompressSync, gzip: Bun.gunzipSync, identity: bytes => bytes }
+
+    for (const encoding of ['zstd', 'gzip', 'identity', 'zstd']) {
+      const response = await fetch('/api/report', encoding)
+      const text = new TextDecoder().decode(decode[encoding]!(new Uint8Array(await response.arrayBuffer())))
+
+      expect(response.status).toBe(200)
+      expect(response.headers.get('content-encoding')).toBe(encoding === 'identity' ? null : encoding)
+      expect(text).toBe('row '.repeat(2000))
+      expect(await (await fetch('/api/small', encoding)).text()).toBe('ok')
+    }
+  })
+
   it('compresses what renders per request for a browser taking zstd, brotli or gzip, headers and cookies kept', async () => {
     // Registered after the pages, as hooks only reach the routes that come after them.
     const app = new Elysia()

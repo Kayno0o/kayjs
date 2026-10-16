@@ -481,6 +481,9 @@ function gzipMember(chunks: Uint8Array[], crc: number, length: number): Uint8Arr
   return gzip
 }
 
+// The bytes of a route's own Response read whole, by the Response.
+const readBodies = new WeakMap<Response, Uint8Array<ArrayBuffer>>()
+
 // The size of each body kay made whole, so compression judges it and reads it without a stream: opening a reader on a body costs Bun about 6 µs, more than a small response costs in all.
 const wholeSizes = new WeakMap<Response, number>()
 
@@ -506,13 +509,17 @@ export function compressResponse(request: Request, response: Response, fixed?: F
     return undefined
 
   const encoding = preferredEncoding(request.headers.get('accept-encoding'), ON_THE_FLY, ON_THE_FLY_ORDER)
+  const read = readBodies.get(response)
 
-  // Whatever the browser takes, a shared cache keeps one copy per encoding; one taking none gets the response as it is, its body never read.
+  // Whatever the browser takes, a shared cache keeps one copy per encoding; one taking none gets the response as it is, its body never read, or what was read of it before.
   if (!encoding) {
     varyOnEncoding(headers)
 
-    return undefined
+    return read && new Response(read, { status, statusText: response.statusText, headers })
   }
+
+  if (read)
+    return compressBody(response, read, encoding, request.headers.get('accept-encoding'))
 
   // The body is looked at last: asking a file response for it makes a stream of the file, which Bun sends slower than the file itself.
   if (!response.body)
@@ -528,9 +535,14 @@ function varyOnEncoding(headers: Headers): void {
     headers.append('vary', 'accept-encoding')
 }
 
-async function compressBody({ headers, status, statusText }: Response, source: Response | ReadableStream<Uint8Array>, encoding: Encoding, accept: string | null, fixed?: FixedText[]): Promise<Response> {
+async function compressBody(response: Response, source: Response | ReadableStream<Uint8Array> | Uint8Array<ArrayBuffer>, encoding: Encoding, accept: string | null, fixed?: FixedText[]): Promise<Response> {
+  const { headers, status, statusText } = response
   // From here on the body is read off the response, so every path answers a new one.
-  const body: ReadBody = source instanceof Response ? { whole: true, bytes: await source.bytes() } : await readWithinTick(source)
+  const body: ReadBody = source instanceof ReadableStream ? await readWithinTick(source) : { whole: true, bytes: source instanceof Uint8Array ? source : await source.bytes() }
+
+  // A route may return the same Response again, whose body this read used up: the next request gets these bytes.
+  if (body.whole && source instanceof ReadableStream)
+    readBodies.set(response, body.bytes)
 
   if (body.whole && body.bytes.length < MIN_SIZE)
     return new Response(body.bytes, { status, statusText, headers })
