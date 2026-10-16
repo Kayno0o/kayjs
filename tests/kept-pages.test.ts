@@ -466,6 +466,55 @@ describe('a kept page and the state a script declares', () => {
     expect(await readsNothing(route(root, 'src/routes/local.kay'))).toBe(true)
   })
 
+  it('tells a declarator holding an empty container from a default value, a parameter or a string', async () => {
+    // Each module is imported by a page of the same name; true is a module the page may be kept with.
+    const modules: Record<string, [string, boolean]> = {
+      'list-two': ['const a = 1, seen = []\n', false],
+      'list-three': ['const a = 1,\n  b = 2,\n  seen = []\n', false],
+      'list-object-before': ['const a = {\n  x: 1,\n}, seen = []\n', false],
+      'list-comment': ['const a = 1, // note\n  seen = []\n', false],
+      'list-typed-comma': ['const a = 1, seen: Map<string, number> = new Map()\n', false],
+      'first-typed-comma': ['const seen: Map<string, number> = new Map()\n', false],
+      'first-generic-new': ['const seen = new Map<string, number>()\nconst other = 1\n', false],
+      'nested-generic': ['const a = new Map<string, Set<number>>(), seen = {}\n', false],
+      'cast': ['const seen = [] as string[]\n', false],
+      'trailing-comment': ['const seen = {} // filled later\n', false],
+      'after-statement': ['const a = 1\nconst seen = new Set<string>()\n', false],
+      'exported': ['export const a = 1, seen = new Map()\n', false],
+      'let': ['let count = 0\n', false],
+      'default-param': ['export const f = (a: number, b: number[] = []) => a\n', true],
+      'default-destructure': ['const opts = { a: 1 }\nexport const { a, b = {} } = opts\n', true],
+      'quoted': ['export const s = \'x, y = []\'\n', true],
+      'template': ['export const s = `x, y = ${1 + 1} [] `\n', true],
+      'comment-only': ['// const seen = []\n/* let count = 0 */\nexport const a = 1\n', true],
+      'local-let': ['export function f(): number {\nlet sum = 0\n\nreturn sum\n}\n', true],
+      'filled': ['const a = [1], b = { x: 1 }, c = new Map([[1, 2]]).size\n\nexport const n = a.length + c\n', true],
+      'call-result': ['const a = [].concat([1]), b = 2\n\nexport const n = a.length + b\n', true],
+      'many-lines': ['export const a = 1,\n  b = 2,\n  c = 3\n', true],
+    }
+    const files: Record<string, string> = {}
+
+    for (const [name, [source]] of Object.entries(modules)) {
+      files[`src/${name}.ts`] = source
+      files[`src/routes/${name}.kay`] = `---\nimport '../${name}'\n---\np ${name}\n`
+    }
+
+    const root = await scratch(files)
+
+    for (const [name, [, kept]] of Object.entries(modules))
+      expect(await readsNothing(route(root, `src/routes/${name}.kay`)), name).toBe(kept)
+  })
+
+  it('tells them apart in a server fence too', async () => {
+    const root = await scratch({
+      'src/routes/list.kay': '--- server\nconst a = 1,\n  b = 2,\n  seen: Map<string, number> = new Map()\n\nexport const save = action(s.Object({}), async () => {\n  seen.set(\'a\', a + b)\n})\n---\np {seen.size}\n',
+      'src/routes/default.kay': '--- server\nconst f = (a: number, b: number[] = []) => a\n\nexport const save = action(s.Object({}), async () => {\n  f(1)\n})\n---\np {f(2)}\n',
+    })
+
+    expect(await readsNothing(route(root, 'src/routes/list.kay'))).toBe(false)
+    expect(await readsNothing(route(root, 'src/routes/default.kay'))).toBe(true)
+  })
+
   it('keeps refusing a page importing a .ts module with a module-level let or empty container', async () => {
     const root = await scratch({
       'src/routes/let.kay': '---\nimport { next } from \'../counted\'\n---\np {next()}\n',

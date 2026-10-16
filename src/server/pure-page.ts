@@ -2,6 +2,7 @@ import { resolveFrom } from '../build/files'
 import { PAGE, PAGE_SETTINGS } from '../compiler/page-settings'
 import { parseKay } from '../compiler/parser'
 import { analyzeServer } from '../compiler/script'
+import { declaresState } from './module-state'
 import { routeChain } from './routes'
 
 // What a page may take from `kay` and stay the same for every visitor and every moment: the reactive core and ids, none of which reads a request, a cookie, the environment or a clock.
@@ -13,34 +14,18 @@ const CODE_FILE = /\.(?:kay|[cm]?[jt]sx?)$/
 const STATIC_FILE = /\.(?:png|jpe?g|gif|webp|avif|svg|ico|woff2?|ttf|otf|json|css|txt|md|html|toml|ya?ml|csv)$/i
 // Every way a file reads the request or the moment: `ctx`, a clock, a random number, the environment, the file system through Bun, a network fetch, a dynamic import, or a `query` schema, which has the page read the URL's search params.
 const READS_REQUEST = /\b(?:ctx|Date|Intl|Temporal|crypto|process|Bun|performance|fetch|globalThis|require|eval)\b|\bMath\b(?!\s*\??\.\s*(?!random\b)\w)|\bimport\s*\(|\bimport\.meta\b|\bquery\s*:/
-// An empty container a cache fills.
-const EMPTY = '(?:\\[\\s*\\]|\\{\\s*\\}|new (?:Map|Set|WeakMap|WeakSet|Array|Object)\\b)'
-// State a module keeps from one render to the next, which a second render could show differently: a top-level `let` or `var`, an empty container a cache fills, one declared later in a list on a line, `const a = 1, seen = []`, or on the line after a comma, and a container another module imports and changes.
-const MODULE_STATES = [
-  /^(?:export )?(?:let|var) /m,
-  new RegExp(`^(?:export )?const [^=\\n]*= *${EMPTY}`, 'm'),
-  new RegExp(`^(?:export )?const [^\\n]*, *[\\w$]+(?: *|:[^=,\\n]*)= *${EMPTY}`, 'm'),
-  new RegExp(`^(?:export )?const [^\\n]*,[ \\t]*\\n\\s*[\\w$]+(?: *|:[^=,\\n]*)= *${EMPTY}`, 'm'),
-]
-// Where a statement of a server fence is judged, at its first line: what is written further down is its body, whatever the column.
-const STATEMENT_STATES = MODULE_STATES.map(state => new RegExp(state.source))
-// An exported literal or `new`, which another module can change; the settings of `page` are read as written, not run.
-const SETTING_NAMES = [PAGE, ...PAGE_SETTINGS].join('|')
-const EXPORTED_STATE = new RegExp(`^export const (?!(?:${SETTING_NAMES})\\b)[^=\\n]*= *(?:[[{]|new )`, 'm')
+// The names of exports read as written, not run.
+const SETTING_NAMES = new Set<string>([PAGE, ...PAGE_SETTINGS])
 // For a server fence the compiler cannot parse, the part of the rule left: it declares state only when it exports something besides a type or a page setting, which may read it.
-const MODULE_EXPORT = new RegExp(`^export (?!(?:type|interface) )(?!(?:async )?(?:const|let|var|function) (?:${SETTING_NAMES})\\b)`, 'm')
+const MODULE_EXPORT = new RegExp(`^export (?!(?:type|interface) )(?!(?:async )?(?:const|let|var|function) (?:${[...SETTING_NAMES].join('|')})\\b)`, 'm')
 
 // What may be a state declaration anywhere on a line, to spare the compiler's view to a file that has none.
-const MAYBE_STATE = /\b(?:let|var)\b|=\s*(?:\[\s*\]|\{\s*\}|new\b)/
-const LEADING_COMMENTS = /^\s*(?:\/\*[\s\S]*?\*\/\s*|\/\/.*\n\s*)*/
+const MAYBE_STATE = /\b(?:let|var|export)\b|=\s*(?:\[\s*\]|\{\s*\}|new\b)/
 
 // A `.kay` file runs its scripts and server fence for each render, so a `let` or an empty container there is state only when the compiler moves its statement to module level, as it does one an export of the server fence reads.
 function holdsModuleState(file: string, source: string): boolean {
-  if (EXPORTED_STATE.test(source))
-    return true
-
   if (!file.endsWith('.kay'))
-    return MODULE_STATES.some(state => state.test(source))
+    return declaresState(source, SETTING_NAMES)
 
   if (!MAYBE_STATE.test(source))
     return false
@@ -54,7 +39,7 @@ function holdsModuleState(file: string, source: string): boolean {
   if (server.unparsed !== undefined || server.broken.length > 0)
     return MODULE_EXPORT.test(source)
 
-  return server.exports.some(({ start, end }) => STATEMENT_STATES.some(state => state.test(source.slice(start, end).replace(LEADING_COMMENTS, ''))))
+  return server.exports.some(({ start, end }) => declaresState(source.slice(start, end), SETTING_NAMES))
 }
 
 // An import or a re-export with what it takes, then one for its effect alone.
