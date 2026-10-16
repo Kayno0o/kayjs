@@ -8,6 +8,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 - `kay build` now renders every prerendered page at the spelling `trailingSlash` serves, so a `prerender: true` page reading `ctx.url.pathname` sees `/about/` under `always`, where it saw `/about`. Under `ignore` such a page is still one copy served for both spellings, so it reads `/about` at `/about/` too. Compare a stripped path (`pathname.replace(/\/$/, '')`) where both matter. No deprecated lint is possible, as the pathname is a run-time value.
 
+### `/mcp` asks for a sign-in on a kay guard's 401 only
+
+- A 401 from an Elysia hook outside kay's guards (a `beforeHandle` or `derive` in an API module) is a tool result, `isError` set, where 1.48.0 answered it with 401 and the `resource_metadata` pointer. Deny from a `_guard.ts` to make the endpoint ask for a sign-in. No deprecated lint is possible, as the status is a run-time value.
+
 ## 1.47.0
 
 ### `auth.saveProfile` throws without `pages.profile`

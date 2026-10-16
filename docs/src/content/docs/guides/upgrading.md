@@ -15,6 +15,10 @@ kay and its libraries share one version number, so one section covers them all. 
 
 `kay build` now renders every prerendered page at the spelling `trailingSlash` serves. A `prerender: true` page reading `ctx.url.pathname` sees `/about/` under `always`, where it saw `/about`. Under `ignore` such a page is still one copy served for both spellings, so it reads `/about` at `/about/` too. Compare a path with its trailing slash stripped (`pathname.replace(/\/$/, '')`) where both matter.
 
+### `/mcp` asks for a sign-in on a kay guard's 401 only
+
+A 401 from an Elysia hook outside kay's guards, such as a `beforeHandle` or a `derive` in an API module, is now a plain tool result with `isError` set. In 1.48.0 it answered 401 with the sign-in pointer, which nothing serves yet. To make the endpoint ask for a sign-in, deny from a `_guard.ts` instead.
+
 ## 1.47.0
 
 ### `auth.saveProfile` throws without `pages.profile`

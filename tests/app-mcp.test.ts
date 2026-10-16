@@ -18,6 +18,8 @@ const mounted = await testSite({ routes, api, mcp: true, islands: false, base: '
 const openapi = await testSite({ routes, api, mcp: true, openapi: true, islands: false, locals })
 const guardedApi = 'tests/fixtures/mcp-guarded/src/api'
 const guarded = await testSite({ routes, api: guardedApi, mcp: true, islands: false })
+const limited = await testSite({ routes, api: 'tests/fixtures/mcp-limited/src/api', mcp: true, islands: false, base: '/shop' })
+const names = await testSite({ routes: 'tests/fixtures/mcp-names/src/routes', api: 'tests/fixtures/mcp-names/src/api', mcp: true, openapi: true, islands: false })
 const guardedMounted = await testSite({ routes, api: guardedApi, mcp: true, islands: false, base: '/shop' })
 // Guards that cover every module, and guards that cover only one of them.
 const strict = await testSite({ routes, api: guardedApi, mcp: true, islands: false, requireGuards: true })
@@ -28,7 +30,7 @@ const documentOnly = await testSite({ routes, api: guardedApi, openapi: true, is
 const localized = await testSite({ routes, api, mcp: true, islands: false, i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: 'tests/fixtures/i18n/src/messages' } })
 
 afterAll(async () => {
-  await Promise.all([site.close(), off.close(), mounted.close(), localized.close(), openapi.close(), guarded.close(), guardedMounted.close(), strict.close(), uncovered.close(), noApi.close(), documentOnly.close()])
+  await Promise.all([site.close(), off.close(), mounted.close(), localized.close(), openapi.close(), guarded.close(), guardedMounted.close(), strict.close(), uncovered.close(), noApi.close(), documentOnly.close(), limited.close(), names.close()])
 })
 
 async function post(target: typeof site, body: unknown, headers: Record<string, string> = {}) {
@@ -99,6 +101,26 @@ describe('the endpoint', () => {
 
   it('refuses a body over the limit with 413', async () => {
     const response = await post(site, JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'ping', params: { pad: 'x'.repeat(1_100_000) } }))
+
+    expect(response.status).toBe(413)
+  })
+
+  it('refuses a chunked body over the limit with 413 though the endpoint reads none itself', async () => {
+    const message = JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list', params: { pad: 'x'.repeat(1_100_000) } })
+    const chunks = message.match(/[\s\S]{1,65536}/g)!
+
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        const chunk = chunks.shift()
+
+        if (chunk === undefined)
+          controller.close()
+        else
+          controller.enqueue(new TextEncoder().encode(chunk))
+      },
+    })
+
+    const response = await site.fetch('/mcp', { method: 'POST', headers: { 'content-type': 'application/json' }, body, duplex: 'half' } as Parameters<typeof site.fetch>[1])
 
     expect(response.status).toBe(413)
   })
@@ -395,6 +417,27 @@ describe('a guarded API directory', () => {
     expect((await guardedMounted.mcp.tools({ headers: BEARER })).length).toBeGreaterThan(0)
   })
 
+  it('keeps the guard\'s response headers on a refused tools/list, Retry-After of a 429 among them', async () => {
+    const { response, body } = await asked(limited, 'tools/list')
+
+    expect(response.status).toBe(429)
+    expect(response.headers.get('retry-after')).toBe('30')
+    expect(response.headers.has('www-authenticate')).toBe(false)
+    expect(body.error?.message).toBe('Slow down')
+  })
+
+  it('answers a call of a guarded tool and of an unknown name alike to a caller the directory guard refuses', async () => {
+    const guardedTool = await asked(guarded, 'tools/call', { name: 'get_items_own_401' })
+    const unknown = await asked(guarded, 'tools/call', { name: 'no_such_tool' })
+
+    expect(unknown.response.status).toBe(401)
+    expect(unknown.response.headers.get('www-authenticate')).toBe(guardedTool.response.headers.get('www-authenticate'))
+    expect(unknown.body).toEqual(guardedTool.body)
+    expect((await asked(limited, 'tools/call', { name: 'no_such_tool' })).response.status).toBe(429)
+    expect((await asked(guarded, 'tools/call', { name: 'no_such_tool' }, BEARER)).body.error?.code).toBe(-32602)
+    expect((await asked(site, 'tools/call', { name: 'no_such_tool' })).body.error?.code).toBe(-32602)
+  })
+
   it('still answers initialize and ping to anyone', async () => {
     expect((await asked(guarded, 'ping')).response.status).toBe(200)
     expect((await asked(guarded, 'initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'test', version: '1' } })).response.status).toBe(200)
@@ -473,12 +516,25 @@ describe('operation ids', () => {
   })
 })
 
+describe('tool names', () => {
+  it('keeps the document\'s ids and the tools\' names the same when a chosen id and an action sanitise alike', async () => {
+    const document = await (await names.fetch('/api/openapi.json')).json() as { paths: Record<string, Record<string, { operationId: string }>> }
+    const ids = Object.values(document.paths).flatMap(each => Object.values(each).map(operation => operation.operationId))
+    const tools = (await names.mcp.tools()).map(tool => tool.name)
+
+    expect(document.paths['/api/items']!.get!.operationId).toBe('a.b')
+    expect(ids.sort()).toEqual(['a.b', 'a_b_2'])
+    expect(tools.sort()).toEqual(['a_b', 'a_b_2'])
+    expect((await names.mcp.call('a_b_2')).data).toBeUndefined()
+    expect((await names.mcp.call('a_b_2')).text).toBe('action')
+  })
+})
+
 describe('the test helper', () => {
-  it('sends the cookies so far with a call, and takes from as call does', async () => {
+  it('sends the cookies so far with a call', async () => {
     guarded.cookies.set('session', 'abc')
 
-    expect((await guarded.mcp.call('get_items_cookie', {}, { headers: BEARER, from: '/' })).data).toEqual({ seen: 'abc' })
-    expect((await guarded.mcp.tools({ headers: BEARER, from: '/' })).length).toBeGreaterThan(0)
+    expect((await guarded.mcp.call('get_items_cookie', {}, { headers: BEARER })).data).toEqual({ seen: 'abc' })
     guarded.cookies.delete('session')
     expect((await guarded.mcp.call('get_items_cookie', {}, { headers: BEARER })).data).toEqual({ seen: null })
   })

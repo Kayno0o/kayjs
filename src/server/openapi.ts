@@ -43,14 +43,14 @@ export interface DocumentedAction {
   guards: string[]
 }
 
-export interface Parameter {
+interface Parameter {
   name: string
   in: string
   required?: boolean
   schema: unknown
 }
 
-export interface RequestBody {
+interface RequestBody {
   required?: boolean
   content: Record<string, { schema: unknown }>
 }
@@ -133,7 +133,7 @@ const MAX_NAME = 64
 
 // `base` made safe as a tool's name, and `taken` kept free of it: a second one gets `_2`, a third `_3`.
 export function toolName(base: string, taken: Set<string>): string {
-  const name = base.replace(TOOL_NAME, '_').replace(EDGE_UNDERSCORES, '') || 'tool'
+  const name = safeName(base)
   let candidate = name.slice(0, MAX_NAME)
 
   for (let count = 2; taken.has(candidate); count++)
@@ -142,6 +142,10 @@ export function toolName(base: string, taken: Set<string>): string {
   taken.add(candidate)
 
   return candidate
+}
+
+function safeName(base: string): string {
+  return base.replace(TOOL_NAME, '_').replace(EDGE_UNDERSCORES, '') || 'tool'
 }
 
 // A route's own `operationId` as it was written, only kept free of `taken` the way a tool's name is.
@@ -222,13 +226,17 @@ export function openApiDocument(modules: MountedApi[], options: { title: string,
   }
 
   const named = new Set<string>()
+  // The tool names the ids come to, so a generated id never takes the name a chosen one is given as a tool.
+  const tools = new Set<string>()
 
-  for (const [operation, name] of wanted)
+  for (const [operation, name] of wanted) {
     operation.operationId = operationName(name, named)
+    tools.add(safeName(operation.operationId))
+  }
 
   for (const [path, methods] of Object.entries(paths)) {
     for (const [method, operation] of Object.entries(methods))
-      operation.operationId ??= toolName(`${method}/${path.replace(API_ROOT, '')}`, named)
+      operation.operationId ??= toolName(`${method}/${path.replace(API_ROOT, '')}`, tools)
   }
 
   for (const action of actions) {
@@ -240,7 +248,7 @@ export function openApiDocument(modules: MountedApi[], options: { title: string,
 
     paths[action.url] = {
       post: {
-        'operationId': toolName(action.tool.name ?? snakeCase(action.name), named),
+        'operationId': toolName(action.tool.name ?? snakeCase(action.name), tools),
         'tags': ['actions'],
         ...action.tool.description !== undefined && { summary: action.tool.description },
         'requestBody': { required: true, content: content(action.schema, 'application/json') },

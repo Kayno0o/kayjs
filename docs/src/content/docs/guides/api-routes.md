@@ -65,7 +65,7 @@ Every API route in the OpenAPI document becomes a tool. A route called `GET /api
 
 An action is a tool only when you say so, with `tool` in its third argument. This way, setting `mcp` never hands an agent an action such as "delete account".
 
-An action in a file whose pages have route params, such as `/notes/[id]`, is not a tool, because a call names no page to read the params from. Guards run when a tool is called. The list of tools sits behind `src/api/_guard.ts`, as the OpenAPI document does, so an anonymous caller gets a 401 asking for a sign-in when that guard refuses them. With `requireGuards`, the list is refused unless the guards cover every API module. Keep a route out with `detail: { hide: true }` when its name should stay private from everyone.
+An action in a file whose pages have route params, such as `/notes/[id]`, is not a tool, because a call names no page to read the params from. Guards run when a tool is called. The list of tools sits behind `src/api/_guard.ts`, as the OpenAPI document does, so an anonymous caller gets a 401 asking for a sign-in when that guard refuses them. Whatever else that guard answers, such as a 429 with `Retry-After`, comes through with its headers. Calling a name that is not a tool is refused the same way, so names cannot be probed. With `requireGuards`, the list is refused unless the guards cover every API module. Keep a route out with `detail: { hide: true }` when its name should stay private from everyone.
 
 ```kay
 --- server
@@ -82,7 +82,7 @@ h1 Notes
 
 Here `addNote` is the tool `add_note`, and its description is the text you gave. `tool: true` uses the export name alone, and `tool: { name, description }` sets both.
 
-A call goes through the whole app, just as a fetch from a browser would. Guards still guard, rate limits still count the caller, and `ctx.locals` holds what your session code puts there. The caller's `Authorization` header is passed on, so a guard that reads a bearer token sees it. When a guard answers 401, the endpoint answers 401 too, with a `WWW-Authenticate` header that points a client to your sign-in metadata. A route that answers 401 on its own is only a result for the agent.
+A call goes through the whole app, just as a fetch from a browser would. Guards still guard, rate limits still count the caller, and `ctx.locals` holds what your session code puts there. The caller's `Authorization` header is passed on, so a guard that reads a bearer token sees it. When a guard answers 401, the endpoint answers 401 too, with a `WWW-Authenticate` header that points a client to your sign-in metadata. A route that answers 401 on its own, or an Elysia hook outside the guards, is only a result for the agent.
 
 A call that is refused is not an error of the protocol. The agent gets the reason as the tool's result, with the field errors of a schema, and can fix its input and call again.
 

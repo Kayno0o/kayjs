@@ -43,7 +43,7 @@ it('shows why a book was refused', async () => {
 
 `site.call(action, input)` calls an action as an island does, and throws `ActionError` when it fails. An action with no input takes no second argument: `site.call(signOut)`. `site.refusal(action, input)` makes a call expected to be refused and resolves with that `ActionError`, its `status`, `errors` and `data` typed from the handler; it fails the test when the call goes through.
 
-With `mcp: true`, `site.mcp.tools()` lists the tools an agent sees, and `site.mcp.call('add_note', { title: 'Milk' })` calls one. It resolves with `{ isError, text, data, status }`. `isError` is true when the app refused the call, and `status` is 401 when a guard asks for a sign-in. Pass `{ headers: { authorization: 'Bearer token' } }` as the third argument to call as a signed-in agent. The cookies set so far go with a call, and `from` names the page it is made on, as for `site.call`.
+With `mcp: true`, `site.mcp.tools()` lists the tools an agent sees, and `site.mcp.call('add_note', { title: 'Milk' })` calls one. It resolves with `{ isError, text, data, status }`. `isError` is true when the app refused the call, and `status` is 401 when a guard asks for a sign-in. Pass `{ headers: { authorization: 'Bearer token' } }` as the third argument to call as a signed-in agent. The cookies set so far go with a call.
 
 An action with `minTime` takes the post as if its form had been open long enough, so a test of something else needs no waiting. A test of the minimum itself says how long the form was open: `{ from: '/', openedFor: 0 }` posts as soon as the page loaded. An action with `proofOfWork` gets a solved challenge with each post and call, unless the test sends its own `x-kay-work` header, `''` for none.
 

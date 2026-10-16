@@ -154,14 +154,21 @@ export class McpServer {
 
   // Answers one message, undefined for a notification or a response, which take none.
   async answer(line: string): Promise<Reply | undefined> {
-    let message: Request
+    let message: unknown
 
     try {
-      message = JSON.parse(line) as Request
+      message = JSON.parse(line)
     }
     catch {
       return { jsonrpc: '2.0', id: null, error: { code: PARSE_ERROR, message: 'Parse error' } }
     }
+
+    return this.answerMessage(message)
+  }
+
+  // Answers a message already parsed from JSON, for a caller that read it first.
+  async answerMessage(parsed: unknown): Promise<Reply | undefined> {
+    const message = parsed as Request
 
     if (typeof message !== 'object' || message === null || Array.isArray(message) || typeof message.method !== 'string') {
       // A response or a batch: this server sends no requests, and the revisions it speaks have no batches.

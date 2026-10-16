@@ -1,0 +1,6 @@
+--- server
+import { action } from 'kay'
+
+export const a_b = action(() => 'action', { tool: true })
+---
+h1 Names

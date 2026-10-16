@@ -302,27 +302,42 @@ function receiveDispatched(app: Elysia): void {
   })
 }
 
-// The request id of a `tools/list` message, or undefined for any other.
-function listsTools(text: string): { id: string | number | null } | undefined {
-  const message = parseJson(text)
-
-  if (!isRecord(message) || message.method !== 'tools/list')
+// The request id of the message when it asks what only the directory's guard may show: `tools/list`, or a call to a name no tool has, which would tell a name that is a tool from one that is not.
+function guardedMessage(message: unknown, known: Set<string>): { id: string | number | null, call: boolean } | undefined {
+  if (!isRecord(message))
     return undefined
 
-  return { id: typeof message.id === 'string' || typeof message.id === 'number' ? message.id : null }
+  const name = isRecord(message.params) ? message.params.name : undefined
+
+  if (message.method !== 'tools/list' && !(message.method === 'tools/call' && !(typeof name === 'string' && known.has(name))))
+    return undefined
+
+  return { id: typeof message.id === 'string' || typeof message.id === 'number' ? message.id : null, call: message.method === 'tools/call' }
 }
 
-// What a guard's refusal of the list is as a JSON-RPC error: a sign-in request with the pointer when it is a 401 or a redirect, else the refusal's own status.
-async function declined(refusal: Response, id: string | number | null, request: Request, base: string): Promise<Response> {
-  const challenge = refusal.status === 401 || (refusal.status >= 300 && refusal.status < 400)
+// Headers of a refusal that describe its own body or redirect, which the JSON-RPC answer replaces.
+const OWN_HEADERS = new Set(['content-type', 'content-length', 'content-encoding', 'transfer-encoding', 'location', 'cache-control'])
+
+// What a guard's refusal is as a JSON-RPC error: a sign-in request with the pointer when it is a 401 or a redirect, else the refusal's own status; the guard's headers go with it, `Retry-After` of a 429 among them.
+// A sign-in request to a call is worded as a guarded tool's is, a result that is an error, so the answer does not tell which names are tools.
+async function declined(denied: Response, id: string | number | null, request: Request, base: string, call: boolean): Promise<Response> {
+  const challenge = denied.status === 401 || (denied.status >= 300 && denied.status < 400)
   const headers = new Headers(ANSWER)
+
+  for (const [name, value] of denied.headers) {
+    if (!OWN_HEADERS.has(name))
+      headers.append(name, value)
+  }
 
   if (challenge)
     headers.set('www-authenticate', `Bearer resource_metadata="${resourceMetadata(request, base)}"`)
 
-  const message = challenge && refusal.status !== 401 ? '' : await refusal.text()
+  const message = challenge && denied.status !== 401 ? '' : await denied.text()
 
-  return new Response(JSON.stringify({ jsonrpc: '2.0', id, error: { code: REFUSED, message: message || 'Sign in to continue' } }), { status: challenge ? 401 : refusal.status, headers })
+  const text = message || 'Sign in to continue'
+  const body = challenge && call ? { jsonrpc: '2.0', id, result: refusal(text) } : { jsonrpc: '2.0', id, error: { code: REFUSED, message: text } }
+
+  return new Response(JSON.stringify(body), { status: challenge ? 401 : denied.status, headers })
 }
 
 // Where a client that was refused for want of a sign-in finds how to get one.
@@ -339,6 +354,7 @@ export const mcpBodyLimit: BodyLimit = {
 export function serveMcp(app: Elysia, document: Schema, options: McpOptions): void {
   const calls = new AsyncLocalStorage<CallContext>()
   const tools = documentedTools(document, async request => app.handle(request)).map(({ call, ...tool }): Tool => ({ ...tool, run: async args => call(args, calls.getStore()!) }))
+  const known = new Set(tools.map(tool => tool.name))
   const mcp = new McpServer(tools, [], undefined, { serverInfo: { name: options.title, title: options.title, version: options.version } })
   const notAllowed = () => new Response(null, { status: 405, headers: { allow: 'POST' } })
 
@@ -352,18 +368,20 @@ export function serveMcp(app: Elysia, document: Schema, options: McpOptions): vo
       return new Response('Cross-site request refused', { status: 403 })
 
     const text = await request.text()
-    const listing = listsTools(text)
+    const message = parseJson(text)
+    const guarded = guardedMessage(message, known)
 
     // The list names every tool and the guarded routes behind them, so it is as private as the document is.
-    if (listing !== undefined) {
+    if (guarded !== undefined) {
       const refusal = await guardRefusal(options.guards, served, options.actions)
 
       if (refusal)
-        return declined(refusal, listing.id, request, options.base)
+        return declined(refusal, guarded.id, request, options.base, guarded.call)
     }
 
     const context: CallContext = { request, server, challenged: false }
-    const reply = await calls.run(context, async () => mcp.answer(text))
+    // A text that is no JSON goes to the server as it is, which words the parse error.
+    const reply = await calls.run(context, async () => message === undefined ? mcp.answer(text) : mcp.answerMessage(message))
 
     if (!reply)
       return new Response(null, { status: 202 })
