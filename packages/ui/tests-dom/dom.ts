@@ -27,7 +27,11 @@ export const clock = {
     jest.useFakeTimers()
     this.faked = true
   },
+  // The timers still pending run once first, as a real clock would have, so none is left to hold the next `settle`.
   stop() {
+    if (this.faked)
+      jest.runOnlyPendingTimers()
+
     jest.useRealTimers()
     this.faked = false
   },

@@ -1,6 +1,7 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, describe, expect, spyOn, test } from 'bun:test'
 import { mount, settle } from 'kay/test'
+import { clock } from './dom'
 import { Board } from '../src/dnd/board'
 import { DropTargets } from '../src/dnd/drop-targets'
 import { ACTIVATION_DELAY_MS } from '../src/dnd/pointer'
@@ -12,6 +13,7 @@ let mounted: Mounted | undefined
 let staged: HTMLElement[] = []
 
 afterEach(async () => {
+  clock.stop()
   mounted?.unmount()
   mounted = undefined
 
@@ -226,15 +228,16 @@ describe('Sortable, by pointer', () => {
   test('starts a touch drag after a hold, and leaves a touch that moves first to scroll the page', async () => {
     const { moves, handles: [first], items } = stacked()
 
+    clock.start()
     pointer(first!, 'pointerdown', 5, 20, 'touch')
     pointer(document, 'pointermove', 5, 60, 'touch')
-    await Bun.sleep(ACTIVATION_DELAY_MS + 50)
+    await clock.elapse(ACTIVATION_DELAY_MS + 50)
 
     expect(items[0]!.style.position).toBe('')
 
     pointer(document, 'pointerup', 5, 60, 'touch')
     pointer(first!, 'pointerdown', 5, 20, 'touch')
-    await Bun.sleep(ACTIVATION_DELAY_MS + 50)
+    await clock.elapse(ACTIVATION_DELAY_MS + 50)
 
     expect(items[0]!.style.position).toBe('relative')
 

@@ -179,7 +179,6 @@ describe('CommandPalette with siteSearch', () => {
 
   async function until(ready: () => boolean) {
     for (let tries = 0; tries < 100 && !ready(); tries++) {
-      await Bun.sleep(5)
       await settle()
     }
   }
@@ -227,7 +226,7 @@ describe('CommandPalette with siteSearch', () => {
     press(window, 'k', { ctrlKey: true })
     await settle()
     await search(input()!, 'table')
-    await Bun.sleep(20)
+    await settle()
 
     expect(asked).toEqual([])
   })
