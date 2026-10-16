@@ -1,4 +1,4 @@
-import { readdir, rm, symlink } from 'node:fs/promises'
+import { mkdir, readdir, rm, symlink } from 'node:fs/promises'
 import { join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
@@ -169,6 +169,27 @@ describe('throughLinks', () => {
     expect(throughLinks(app, join(tree, 'scoped/src/b.kay'))).toBe(join(app, 'node_modules/@kaynooo/ui/src/b.kay'))
     expect(throughLinks(app, join(tree, 'elsewhere/c.kay'))).toBe(join(tree, 'elsewhere/c.kay'))
     expect(throughLinks(app, join(app, 'src/d.kay'))).toBe(join(app, 'src/d.kay'))
+  })
+
+  it('meets a package linked after it first read the links, a scoped one included', async () => {
+    const tree = await scratchDir('dom-')
+    const app = join(tree, 'app')
+
+    projects.push(tree)
+    await write(tree, { 'lib/src/a.kay': 'p a\n', 'scoped/src/b.kay': 'p b\n', 'app/node_modules/.keep': '' })
+    expect(throughLinks(app, join(tree, 'lib/src/a.kay'))).toBe(join(tree, 'lib/src/a.kay'))
+
+    await symlink(join(tree, 'lib'), join(app, 'node_modules/lib'))
+    expect(throughLinks(app, join(tree, 'lib/src/a.kay'))).toBe(join(app, 'node_modules/lib/src/a.kay'))
+
+    await mkdir(join(app, 'node_modules/@kaynooo'))
+    await symlink(join(tree, 'scoped'), join(app, 'node_modules/@kaynooo/ui'))
+    expect(throughLinks(app, join(tree, 'scoped/src/b.kay'))).toBe(join(app, 'node_modules/@kaynooo/ui/src/b.kay'))
+
+    // A link added to a scope that was already read.
+    await write(tree, { 'second/src/c.kay': 'p c\n' })
+    await symlink(join(tree, 'second'), join(app, 'node_modules/@kaynooo/second'))
+    expect(throughLinks(app, join(tree, 'second/src/c.kay'))).toBe(join(app, 'node_modules/@kaynooo/second/src/c.kay'))
   })
 
   it('names a file under a linked root by the root, inside a package linking an ancestor of it too, as a library repository linking itself into its example does', async () => {
