@@ -255,6 +255,8 @@ async function compressWhole(bytes: Uint8Array<ArrayBuffer>, encoding: Encoding)
 
 // Text a page carries whole every time it carries it, as an inlined stylesheet: it starts with `<style>`.
 export interface FixedText {
+  // Tells the texts of a process apart, for the key of a page's kept copy.
+  readonly id: number
   bytes: Buffer
   head: Buffer
   // Ends on a full flush, which empties the window, so it sits between two other deflate runs of a gzip member without either reaching into it. Deflated the first time a page carries the text, at the strongest level.
@@ -265,12 +267,15 @@ export function fixedTexts(texts: string[]): FixedText[] {
   return [...new Set(texts)].map(fixedText)
 }
 
+let fixedTextIds = 0
+
 export function fixedText(text: string): FixedText {
   if (!text.startsWith('<style>'))
     throw new TypeError('kay: a fixed text starts with <style>, the tag a response is searched at')
 
   const bytes = Buffer.from(text)
   const fixed: FixedText = {
+    id: fixedTextIds++,
     bytes,
     head: bytes.subarray(0, HEAD_BYTES),
     get deflated() {
@@ -374,11 +379,39 @@ async function splicedGzip(bytes: Uint8Array<ArrayBuffer>, fixed: FixedText[]): 
 
 async function gzipFound(body: Buffer, found: Found[]): Promise<{ gzip: Uint8Array<ArrayBuffer>, late: boolean }> {
   const left = body.length - found.reduce((total, { text }) => total + text.bytes.length, 0)
+  const { key, check } = splicedKey(body, found)
+  const kept = keptCopy(key, check)
 
-  if (left <= SPLICE_HERE_BYTES)
-    return { gzip: await gzipAround(body, found, deflateRawHere), late: false }
+  if (kept)
+    return { gzip: kept, late: true }
 
-  return { gzip: await compressing(async () => gzipAround(body, found, deflateRaw)), late: true }
+  const late = left > SPLICE_HERE_BYTES
+  const gzip = late ? await compressing(async () => gzipAround(body, found, deflateRaw)) : await gzipAround(body, found, deflateRawHere)
+
+  keepCopy(key, check, gzip)
+
+  return { gzip, late }
+}
+
+// A page's kept copy is keyed on what lies around its fixed texts, a few KB where the texts are many: the texts are told by id, as the bytes found there equal theirs.
+function splicedKey(body: Buffer, found: Found[]): { key: string, check: bigint } {
+  let hash = HASH_SEED
+  let second = HASH_SEED
+  let cursor = 0
+  let ids = ''
+
+  for (const { text, at } of found) {
+    const around = body.subarray(cursor, at)
+
+    hash = Bun.hash.xxHash3(around, hash)
+    second = BigInt(Bun.hash.wyhash(around, second))
+    ids += `${text.id}@${at},`
+    cursor = at + text.bytes.length
+  }
+
+  const rest = body.subarray(cursor)
+
+  return { key: `spliced${body.length}:${ids}${Bun.hash.xxHash3(rest, hash)}`, check: BigInt(Bun.hash.wyhash(rest, second)) }
 }
 
 // A part of a page cut at its holes, kept deflated only: the bytes are inflated for a browser taking no gzip, and `crc` and `shift` let the gzip trailer's crc be built without them.

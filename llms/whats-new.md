@@ -5,6 +5,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 ## Unreleased
 
 - `testSite` serves a site under its `base` (or `testSite({ base })`): `visit`, `submit`, `fetch` and `call`'s `from` take paths with or without it, a redirect to a base-prefixed URL is followed with the cookies, and the jar sends a cookie only to the paths its `Path` covers ([Testing](testing.md#test-site)).
+- A page carrying inlined stylesheets rendered alike a second time is no longer compressed again: its gzip is kept like any other page's, keyed on what lies around the stylesheets, which serves a short inlined page at about twice the requests per second.
 
 ## 1.49.0
 
