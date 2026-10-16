@@ -213,7 +213,7 @@ head
           @icon
             Terminal2
           | A static site, a server or an app with sign-in over Postgres, with Tailwind, ESLint, tests, CI and Docker to pick from.
-        ModuleCard(title="Dev inspector" use="kay dev" href="/reference/cli#inspector")
+        ModuleCard(title="Dev inspector" use="kay dev" href="/guides/performance#the-inspector")
           @icon
             HandClick
           | Alt+click any element to open the .kay line that wrote it, and watch each island's signals as they change.
