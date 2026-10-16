@@ -28,10 +28,11 @@ li(class={size})
 
 ## Fences
 
-- `---` is the component script: imports, props, signals, functions. It runs wherever the component renders.
-- `--- server` exists on pages and layouts only. It runs on the server for each request and never reaches the browser.
+`---` opens the component script: imports, props, signals, functions. It runs wherever the component renders.
 
-A fence ends on a `---` line, or on the line opening the next one. `--- script` is the component script spelled out, for when it follows another fence.
+`--- server` exists on pages and layouts only. It runs on the server for each request and never reaches the browser.
+
+A fence ends on a `---` line, or on the line opening the next one. `--- script` spells the component script out, for when it follows another fence.
 
 ```kay
 --- server
@@ -43,15 +44,17 @@ p {greeting}
 Badge(label="new")
 ```
 
-`props`, `signal`, `memo`, `effect`, `onMount`, `onCleanup`, the translation `t` and, in the server fence of a page or layout, `action` need no import. Anything else is imported, such as `persisted` from `kay`. [Modules](/reference/modules) says which entry holds what.
+Some names need no import: `props`, `signal`, `memo`, `effect`, `onMount`, `onCleanup`, the translation `t`, and `action` in a server fence. Import anything else, such as `persisted` from `kay`. [Modules](/reference/modules) says which entry holds what.
 
 ## Props
 
-Props are declared once with `props<T>()`. Destructure them, with defaults, and they stay reactive. A page has no props: its data comes from its `--- server` fence.
+Declare props once with `props<T>()`. Destructure them, with defaults, and they stay reactive.
+
+A page has no props. Its data comes from its `--- server` fence.
 
 ## Using a component
 
-A component is a capitalised tag, imported in the script. Pass props as attributes:
+A component is a capitalised tag, imported in the script. Pass props as attributes.
 
 ```kay
 ---
@@ -79,11 +82,11 @@ for Card of Object.values(cards)
   Card
 ```
 
-Without `eager`, each value is a function importing the file when called. Write the patterns and options in the call itself, as the build reads them.
+Without `eager`, each value is a function that imports the file when called. Write the patterns and options in the call itself, because the build reads them there.
 
 ## Slots and blocks
 
-Children of a component go to its `slot`. A `@name` block under it becomes the prop `name`, which the component renders with `slot name`. `src/components/card.kay`:
+Children of a component go to its `slot`. A `@name` block under it becomes the prop `name`, which the component renders with `slot name`. This is `src/components/card.kay`.
 
 ```kay
 ---
@@ -98,7 +101,7 @@ article.card
   slot
 ```
 
-And a parent filling both:
+A parent fills both.
 
 ```kay
 ---
@@ -112,7 +115,9 @@ Card(title="Todos")
 
 ## Signals
 
-`signal(value)` holds state. Read it by calling it, `{count()}`, and write it by assigning it, `count++`, or with `.set`, in the template as in the script. Handed to a component as a prop, `Toggle(open={open})`, it passes the signal itself, for a prop typed `Signal<boolean>` to read and write. Handed to a parameter typed `unknown` or `any`, as in `String(count)`, it is an error, `uncalled-signal`: call it there. Assigning works on a signal held in a `const`, an import or a prop typed `Signal<boolean>`, and on a `let` the script sets to `signal(...)`. For a signal held in an object's property, `box.count`, or a `let` set from a function's result, write `.set`: assigning would replace the property, and `kay check` reports it as a type error. `memo(fn)` caches a derived value.
+`signal(value)` holds state. Read it by calling it, `{count()}`. Write it by assigning it, `count++`, or with `.set`. Both work in the template and in the script.
+
+`memo(fn)` caches a derived value.
 
 ```kay
 ---
@@ -124,9 +129,15 @@ button(onClick={() => count++}) {count()} x 2 = {double()}
 
 A component using signals or handlers becomes an island: see [Islands](/essentials/islands).
 
+Handed to a component as a prop, `Toggle(open={open})`, a signal passes as itself. The prop is typed `Signal<boolean>`, and the component reads and writes it.
+
+Handed to a parameter typed `unknown` or `any`, as in `String(count)`, a signal is an error, `uncalled-signal`. Call it there.
+
+Assigning works on a signal held in a `const`, an import or a `Signal<boolean>` prop, and on a `let` the script sets to `signal(...)`. For a signal in an object's property, `box.count`, or a `let` set from a function's result, write `.set`. Assigning would replace the property, and `kay check` reports a type error.
+
 ## Generic components
 
-Type parameters on the fence line make a component generic. Each use infers them from its props:
+Type parameters on the fence line make a component generic. Each use infers them from its props.
 
 ```kay
 --- <T extends { id: number }>
