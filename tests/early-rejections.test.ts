@@ -1,5 +1,6 @@
 import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
+import { outputDir } from '../src/build/assets'
 import { fixtureCopy } from './scratch'
 
 // `bun test` fails a test on a rejection nothing has taken yet, as a server crashes on one, so the cases run in processes of their own.
@@ -65,7 +66,7 @@ describe('a page whose await block meets a promise that rejected early', () => {
 
     expect(built.code).toBe(0)
     expect(built.stderr).not.toContain('kay: a promise rejected and nothing took it')
-    expect(await Bun.file(join(dir, '.kay/client/pages/prerendered.html')).text()).toContain('<p class="failed">Prerendered comments are down</p>')
+    expect(await Bun.file(join(outputDir(dir), 'pages/prerendered.html')).text()).toContain('<p class="failed">Prerendered comments are down</p>')
   })
 
   it('serves a page reading a cached value holding one with its catch block', async () => {
