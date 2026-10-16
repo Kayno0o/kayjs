@@ -937,10 +937,21 @@ describe('kay lsp on a save', () => {
         if (method === 'textDocument/didChange')
           compiled.push((params as { contentChanges: { text: string }[] }).contentChanges[0]!.text)
       })
+      // A save is over when the server's own pass for it has ended, however long a loaded host takes to reach it; a fixed sleep read the tsgo notices before that pass ran.
+      const writes = spyOn(server as unknown as { writeAfterSave: () => Promise<void> }, 'writeAfterSave')
       const save = async (file: string, text: string) => {
+        const before = writes.mock.calls.length
+
         await Bun.write(file, text)
         client.notify('workspace/didChangeWatchedFiles', { changes: [{ uri: pathToFileURL(file).href, type: 2 }] })
-        await Bun.sleep(400)
+
+        const deadline = Date.now() + 20_000
+
+        while (writes.mock.calls.length === before && Date.now() < deadline)
+          await Bun.sleep(10)
+
+        await writes.mock.results[before]?.value
+        await Bun.sleep(50)
       }
 
       if (sibling !== undefined)
@@ -951,6 +962,7 @@ describe('kay lsp on a save', () => {
 
       const layoutReads = queries.mock.calls.filter(([file, text]) => file === join(project, page) && !text.includes('p disk')).length
 
+      writes.mockRestore()
       notify.mockRestore()
       queries.mockRestore()
 
@@ -1347,7 +1359,7 @@ describe('kay lsp project checks after a save', () => {
       client.notify('initialized', {})
 
       while (ran.content === 0 || ran.messages === 0)
-        await Bun.sleep(100)
+        await Bun.sleep(50)
 
       expect(await quiet()).toEqual({ content: 1, messages: 1 })
 
