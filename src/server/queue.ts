@@ -115,14 +115,19 @@ export function sqliteJobs(path: string): JobStore {
   let statements: ReturnType<typeof prepareJobs> | undefined
   let db: Database | undefined
   // A read before the file exists finds no job rather than creating it, then opens it once another process did.
-  const open = (create: boolean) => statements ??= create || existsSync(path) ? prepareJobs(db = openSqlite(path)) : undefined
+  // The default store is kept for good, so a reload only lets go of the file, which the next job opens again, under the module that did.
+  const open = (create: boolean) => {
+    if (statements === undefined && (create || existsSync(path))) {
+      statements = prepareJobs(db = openSqlite(path))
+      onReload(() => {
+        db?.close()
+        db = undefined
+        statements = undefined
+      })
+    }
 
-  // The default store is kept for good, so a reload only lets go of the file, which the next job opens again.
-  onReload(() => {
-    db?.close()
-    db = undefined
-    statements = undefined
-  })
+    return statements
+  }
 
   return {
     add(job) {
