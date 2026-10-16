@@ -53,6 +53,8 @@ export interface LiveRequest {
 export const LIVE_ROUTE = '/_kay/live'
 export const LIVE_SCRIPT = 'script[data-kay-live]'
 // How long the server takes a page's proof, and so how long a page may watch on it before asking for another.
+const RENEW_RETRY_MS = 60_000
+
 export const PROOF_LIFETIME_MS = 60 * 60_000
 
 // Another copy of this module, such as a workspace's second install or a dev reload, shares the one registry.
@@ -289,18 +291,18 @@ function settle(): void {
   settling = setTimeout(sync, SETTLE_MS)
 }
 
-// Asks for the page again and takes its live scripts in place of the page's own, so a proof the server no longer takes, or is about to stop taking, is replaced by one it made now; false when the page no longer holds any, as one the visitor may not see.
-async function renewProofs(signal: AbortSignal | null = null): Promise<boolean> {
+// Asks for the page again and takes its live scripts in place of the page's own, so a proof the server no longer takes, or is about to stop taking, is replaced by one it made now; `gone` when the page no longer holds any, as one the visitor may not see, `failed` when it could not be asked.
+async function renewProofs(signal: AbortSignal | null = null): Promise<'renewed' | 'gone' | 'failed'> {
   try {
-    const response = await fetch(location.href, { headers: { accept: 'text/html' }, credentials: 'same-origin', signal })
+    const response = await fetch(location.href, { headers: { accept: 'text/html' }, credentials: 'same-origin', cache: 'no-store', signal })
 
     if (!response.ok)
-      return false
+      return 'failed'
 
     const fresh = [...new DOMParser().parseFromString(await response.text(), 'text/html').querySelectorAll(LIVE_SCRIPT)]
 
     if (fresh.length === 0)
-      return false
+      return 'gone'
 
     for (const old of document.querySelectorAll(LIVE_SCRIPT))
       old.remove()
@@ -308,31 +310,43 @@ async function renewProofs(signal: AbortSignal | null = null): Promise<boolean> 
     for (const script of fresh)
       document.head.append(document.importNode(script, true))
 
-    return true
+    return 'renewed'
   }
   catch {
-    return false
+    return 'failed'
   }
 }
 
-// Gets the connection new proofs before the server stops taking the ones it opened with.
-function renewLater(): void {
+// Gets the connection new proofs before the server stops taking the ones it opened with, counted on the browser's own clock as the server's may differ; a renewal that could not ask is tried again after a minute.
+function renewLater(delay = PROOF_LIFETIME_MS / 2): void {
   clearTimeout(renewing)
+  renewing = undefined
 
-  const made = Math.min(...pagesOf().map(page => page.at))
-
-  if (!Number.isFinite(made))
+  if (pagesOf().length === 0)
     return
 
   const renew = async () => {
-    if (current && await renewProofs()) {
+    renewing = undefined
+
+    if (!current)
+      return
+
+    const renewed = await renewProofs()
+
+    if (renewed === 'failed') {
+      renewLater(RENEW_RETRY_MS)
+
+      return
+    }
+
+    if (renewed === 'renewed') {
       current.reader.close()
       current = undefined
       sync()
     }
   }
 
-  renewing = setTimeout(() => void renew(), Math.max(made + PROOF_LIFETIME_MS / 2 - Date.now(), SETTLE_MS))
+  renewing = setTimeout(() => void renew(), delay)
 }
 
 // Opens, moves or closes the one connection so it carries exactly the keys the islands read.
@@ -343,6 +357,7 @@ function sync(): void {
 
   if (keys.size === 0) {
     clearTimeout(renewing)
+    renewing = undefined
     current?.reader.close()
     current = undefined
 
@@ -361,12 +376,15 @@ function sync(): void {
     const response = await post(signal)
 
     // Refused: the proof may be one a restart or its age made stale, so the page is asked for a new one before the backoff.
-    return response.status === 403 && await renewProofs(signal) ? post(signal) : response
+    return response.status === 403 && await renewProofs(signal) === 'renewed' ? post(signal) : response
   }, true, false, true)
 
   reader.on(apply)
   current = { keys, reader }
-  renewLater()
+
+  if (renewing === undefined)
+    renewLater()
+
   reader.start()
 }
 

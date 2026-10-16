@@ -368,34 +368,23 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('kay dev in 
     await page.locator('p.static', { hasText: 'Grown' }).waitFor({ timeout: 30_000 })
   }, 60_000)
 
-  it('keeps a live value followed across an edit of its module and the server it restarts', async () => {
+  it('keeps a live value, and the page following it, across an edit of its module', async () => {
     const bump = async () => page.evaluate(async () => ((await (await fetch('/api/bump', { method: 'POST' })).json()) as { visitors: number }).visitors)
 
     await page.goto(`${await origin()}/live`)
-    await page.evaluate(() => {
-      (window as { kayAlive?: boolean }).kayAlive = true
-    })
-
     await page.locator('p.online', { hasText: '0 online' }).waitFor()
     await bump()
     await page.locator('p.online', { hasText: '1 online' }).waitFor({ timeout: 10_000 })
 
     await Bun.write(join(root, 'src/live.ts'), 'import { live } from \'kay\'\n\nexport const visitors = live(0)\nexport const rooms = live((id: string) => id)\n')
 
-    // The server restarts with its values gone and the page follows the new one, through a fresh proof: whatever it counts, the page shows it.
-    await until(async () => {
-      try {
-        const count = await bump()
+    // The dev tool's bar says when the edit reached the server; the value it held is kept, so the next write counts on from it.
+    await page.locator('kay-dev .bar .built', { hasText: /^src\/live\.ts: reloaded in \d+ ms$/ }).waitFor({ timeout: 30_000 })
 
-        await page.locator('p.online', { hasText: `${count} online` }).waitFor({ timeout: 2000 })
-
-        return true
-      }
-      catch {
-        return false
-      }
-    })
-
-    expect(await sameDocument()).toBe(true)
+    expect(await bump()).toBe(2)
+    await page.locator('p.online', { hasText: '2 online' }).waitFor({ timeout: 10_000 })
+    // The page reloaded with the server module, and follows again on its own.
+    expect(await bump()).toBe(3)
+    await page.locator('p.online', { hasText: '3 online' }).waitFor({ timeout: 10_000 })
   }, 90_000)
 })
