@@ -29,7 +29,7 @@ import { handOver, submittedValues, writeSuccess } from './flash'
 import { requiredGuards, runGuards, unguarded } from './guards'
 import { requestLocale, stateFor } from './i18n'
 import { answeringRequest } from './log'
-import { countSucceeded, PRETEND, protectionRefusal, requestId } from './protection'
+import { countSucceeded, markChallenge, PRETEND, protectionRefusal, requestId } from './protection'
 import { sharedContext } from './render'
 import { reportServerError } from './report'
 import { requestUrl } from './request-url'
@@ -572,6 +572,9 @@ export async function passGuards(guards: LoadedGuard[], context: { request: Requ
     ...stoppers(request),
   }
   const refusal = await runGuards(guards, ctx)
+
+  if (refusal?.error instanceof Denied && refusal.error.status === 401)
+    markChallenge(request)
 
   return refusal ? stopped(refusal.error, request, state, options) : state
 }

@@ -474,8 +474,9 @@ function toolOptions(args: t.CallExpression['arguments']): { botProtected: boole
     const keys = new Map(arg.properties.flatMap(property => property.type === 'ObjectProperty' && !property.computed ? [[keyName(property.key), property.value] as const] : []))
     const tool = keys.get('tool')
 
+    // A spread may bring any of them, so it counts as one; options that are not an object literal cannot be read, and the action is not taken for a tool.
     if (tool !== undefined && !(tool.type === 'BooleanLiteral' && !tool.value))
-      return { botProtected: [...keys.keys()].some(key => key !== undefined && BOT_PROTECTIONS.has(key)) }
+      return { botProtected: arg.properties.some(property => property.type === 'SpreadElement') || [...keys.keys()].some(key => key !== undefined && BOT_PROTECTIONS.has(key)) }
   }
 
   return undefined

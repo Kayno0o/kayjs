@@ -311,15 +311,14 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
     ? openApiDocument(api.mounted, { title: openapi?.title ?? localizedText(options.seo?.name, undefined, locales.settings.defaultLocale) ?? 'API', version: openapi?.version ?? '1.0.0', base, root }, toolActions)
     : undefined
 
-  if (servesOpenApi && document) {
-    // On a site requiring guards, the document is refused unless a guard covers every module not setting `guards: false`, or every module is open with no guard of its own, a library's guarded one counting as guarded.
-    const guards = requiredGuards(await Promise.all(sharedGuards(apiModules).map(async file => loadGuard({ file, special: {} }))), { file: paths.api, open: apiModules.length > 0 && apiModules.every(module => module.open === true && module.guards.length === 0) ? true : undefined }, {}, options.requireGuards)
+  // On a site requiring guards, the document and the tool list are refused unless a guard covers every module not setting `guards: false`, or every module is open with no guard of its own, a library's guarded one counting as guarded.
+  const guards = document ? requiredGuards(await Promise.all(sharedGuards(apiModules).map(async file => loadGuard({ file, special: {} }))), { file: paths.api, open: apiModules.length > 0 && apiModules.every(module => module.open === true && module.guards.length === 0) ? true : undefined }, {}, options.requireGuards) : []
 
+  if (servesOpenApi && document && openapi !== undefined)
     serveOpenApi(app, document, openapi, guards, actionOptions)
-  }
 
   if (options.mcp === true && document)
-    serveMcp(app, document, { title: (document.info as { title: string }).title, version: (document.info as { version: string }).version, base })
+    serveMcp(app, document, { title: (document.info as { title: string }).title, version: (document.info as { version: string }).version, base, guards, actions: actionOptions })
 
   serveErrorReports(app, options.onError)
 

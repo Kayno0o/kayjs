@@ -93,9 +93,9 @@ export interface TestSite {
   // The site's MCP endpoint, as an agent calls it: `mcp: true` serves it. Calls carry the cookies so far and the headers given, such as an `Authorization` bearer token.
   mcp: {
     // The tools `tools/list` gives.
-    tools: (init?: VisitInit) => Promise<McpTool[]>
-    // A call to the tool named `name`, which a model would make: its result, with `isError` set when the app refused it, and the HTTP `status` of the answer, 401 when a guard asked for a sign-in. A request the endpoint answers with a protocol error, such as an unknown tool, is thrown.
-    call: (name: string, args?: object, init?: VisitInit) => Promise<McpCall>
+    tools: (init?: VisitInit & { from?: string }) => Promise<McpTool[]>
+    // A call to the tool named `name`, which a model would make: its result, with `isError` set when the app refused it, and the HTTP `status` of the answer, 401 when a guard asked for a sign-in. A request the endpoint answers with a protocol error, such as an unknown tool, is thrown. `from` names the page the request is made on, as for `call`.
+    call: (name: string, args?: object, init?: VisitInit & { from?: string }) => Promise<McpCall>
   }
   // A request to any route, an API module's included, with the cookies so far; the response as it is, redirects not followed.
   fetch: (path: string, init?: Omit<RequestInit, 'headers'> & VisitInit) => Promise<Response>
@@ -335,8 +335,9 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
 
   let rpcId = 0
 
-  const rpc = async (method: string, params: object, init: VisitInit = {}): Promise<{ status: number, result: RpcResult }> => {
-    const response = await send(MCP_PATH, { method: 'POST', headers: { 'content-type': 'application/json', 'accept': 'application/json, text/event-stream', ...init.headers }, body: JSON.stringify({ jsonrpc: '2.0', id: ++rpcId, method, params }) })
+  const rpc = async (method: string, params: object, init: VisitInit & { from?: string } = {}): Promise<{ status: number, result: RpcResult }> => {
+    const page = init.from === undefined ? {} : { [PAGE_HEADER]: init.from }
+    const response = await send(MCP_PATH, { method: 'POST', headers: { 'content-type': 'application/json', 'accept': 'application/json, text/event-stream', ...page, ...init.headers }, body: JSON.stringify({ jsonrpc: '2.0', id: ++rpcId, method, params }) })
     const reply = await withNatives(async () => response.json() as Promise<unknown>) as { result?: RpcResult, error?: { message: string } }
 
     if (reply.error)

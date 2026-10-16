@@ -55,17 +55,17 @@ The module's `cors` is the only place that grants. If a route sets `Access-Contr
 
 ## OpenAPI
 
-`openapi: true` in kay.config.ts publishes an OpenAPI 3.1 document of every module's routes at `/api/openapi.json`, read from the schemas they already declare. Give a route a `detail: { summary, tags }` to describe it, or `detail: { hide: true }` to leave it out. `openapi: { reference: true }` adds a page listing the routes at `/api/reference`, and `openapi: { dev: true }` keeps both to `kay dev`. The document sits behind `src/api/_guard.ts` when there is one, which reads the session as it does for any module, and lists the guards each route runs. Its title is `openapi.title`, else the site's `seo.name`, the default locale's when that takes one text per locale, as the document is one for every locale. Each operation has an `operationId`. The actions that set `tool` are listed too, as `POST` operations.
+`openapi: true` in kay.config.ts publishes an OpenAPI 3.1 document of every module's routes at `/api/openapi.json`, read from the schemas they already declare. Give a route a `detail: { summary, tags }` to describe it, or `detail: { hide: true }` to leave it out. `openapi: { reference: true }` adds a page listing the routes at `/api/reference`, and `openapi: { dev: true }` keeps both to `kay dev`. The document sits behind `src/api/_guard.ts` when there is one, which reads the session as it does for any module, and lists the guards each route runs. Its title is `openapi.title`, else the site's `seo.name`, the default locale's when that takes one text per locale, as the document is one for every locale. Each operation has an `operationId`, the one you set in `detail.operationId` exactly as written, else one built from the method and path. A route that answers every method, with `.all()`, has one operation per method, and the method is added to its id, as `echo_get`. The actions that set `tool` are listed too, as `POST` operations.
 
 ## Letting an agent call the app
 
 `mcp: true` in kay.config.ts lets an AI agent use your app. Kay serves an MCP endpoint at `/mcp`, and an agent that is pointed at it can list and call your tools. You write no MCP server.
 
-Every API route in the OpenAPI document becomes a tool. A route called `GET /api/notes/{id}` is the tool `get_notes_id`, described by its `detail.summary`. Its input is built from the schemas the route already declares. Set `detail: { operationId: 'read_note' }` to name it yourself, or `detail: { hide: true }` to keep it out.
+Every API route in the OpenAPI document becomes a tool. A route called `GET /api/notes/{id}` is the tool `get_notes_id`, described by its `detail.summary`. Its input is built from the schemas the route already declares. Set `detail: { operationId: 'read_note' }` to name it yourself (the tool name is that id with anything but letters, digits and `_` made `_`), or `detail: { hide: true }` to keep it out.
 
 An action is a tool only when you say so, with `tool` in its third argument. This way, setting `mcp` never hands an agent an action such as "delete account".
 
-An action in a file whose pages have route params, such as `/notes/[id]`, is not a tool, because a call names no page to read the params from. Guards run when a tool is called, but the list of tools is the same for everyone, so keep a route out with `detail: { hide: true }` when its name should stay private.
+An action in a file whose pages have route params, such as `/notes/[id]`, is not a tool, because a call names no page to read the params from. Guards run when a tool is called. The list of tools sits behind `src/api/_guard.ts`, as the OpenAPI document does, so an anonymous caller gets a 401 asking for a sign-in when that guard refuses them. With `requireGuards`, the list is refused unless the guards cover every API module. Keep a route out with `detail: { hide: true }` when its name should stay private from everyone.
 
 ```kay
 --- server
@@ -82,11 +82,11 @@ h1 Notes
 
 Here `addNote` is the tool `add_note`, and its description is the text you gave. `tool: true` uses the export name alone, and `tool: { name, description }` sets both.
 
-A call goes through the whole app, just as a fetch from a browser would. Guards still guard, rate limits still count the caller, and `ctx.locals` holds what your session code puts there. The caller's `Authorization` header is passed on, so a guard that reads a bearer token sees it. When a guard answers 401, the endpoint answers 401 too, with a `WWW-Authenticate` header that points a client to your sign-in metadata.
+A call goes through the whole app, just as a fetch from a browser would. Guards still guard, rate limits still count the caller, and `ctx.locals` holds what your session code puts there. The caller's `Authorization` header is passed on, so a guard that reads a bearer token sees it. When a guard answers 401, the endpoint answers 401 too, with a `WWW-Authenticate` header that points a client to your sign-in metadata. A route that answers 401 on its own is only a result for the agent.
 
 A call that is refused is not an error of the protocol. The agent gets the reason as the tool's result, with the field errors of a schema, and can fix its input and call again.
 
-An agent fills in no form, so `honeypot`, `minTime` and `proofOfWork` do not apply to its calls. `kay check` warns when a tool action has one of them and no guard, because anyone could then call it. Add a guard, or use a `rateLimit` instead.
+An agent fills in no form, so `honeypot`, `minTime` and `proofOfWork` do not apply to its calls. `kay check` warns when a tool action has one of them and no guard (an options spread counts as one, but options kept in a variable are not read), because anyone could then call it. Add a guard, or use a `rateLimit` instead.
 
 Routes with a file in their body, and actions with a file in their schema, are not offered, as an agent sends JSON.
 

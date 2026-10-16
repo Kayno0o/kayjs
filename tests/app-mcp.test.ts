@@ -16,10 +16,17 @@ const site = await testSite({ routes, api, mcp: true, islands: false, locals })
 const off = await testSite({ routes, api, islands: false })
 const mounted = await testSite({ routes, api, mcp: true, islands: false, base: '/shop', trailingSlash: 'always', locals })
 const openapi = await testSite({ routes, api, mcp: true, openapi: true, islands: false, locals })
+const guardedApi = 'tests/fixtures/mcp-guarded/src/api'
+const guarded = await testSite({ routes, api: guardedApi, mcp: true, islands: false })
+const guardedMounted = await testSite({ routes, api: guardedApi, mcp: true, islands: false, base: '/shop' })
+// Guards that cover every module, and guards that cover only one of them.
+const strict = await testSite({ routes, api: guardedApi, mcp: true, islands: false, requireGuards: true })
+const uncovered = await testSite({ routes, api, mcp: true, islands: false, requireGuards: true })
+const documentOnly = await testSite({ routes, api: guardedApi, openapi: true, islands: false })
 const localized = await testSite({ routes, api, mcp: true, islands: false, i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: 'tests/fixtures/i18n/src/messages' } })
 
 afterAll(async () => {
-  await Promise.all([site.close(), off.close(), mounted.close(), localized.close(), openapi.close()])
+  await Promise.all([site.close(), off.close(), mounted.close(), localized.close(), openapi.close(), guarded.close(), guardedMounted.close(), strict.close(), uncovered.close(), documentOnly.close()])
 })
 
 async function post(target: typeof site, body: unknown, headers: Record<string, string> = {}) {
@@ -365,6 +372,111 @@ describe('the OpenAPI document', () => {
   })
 })
 
+describe('a guarded API directory', () => {
+  const asked = rpc
+
+  it('refuses tools/list to a caller the API directory\'s guard refuses, with the sign-in pointer', async () => {
+    const { response, body } = await asked(guarded, 'tools/list')
+
+    expect(response.status).toBe(401)
+    expect(response.headers.get('www-authenticate')).toBe('Bearer resource_metadata="http://localhost/.well-known/oauth-protected-resource"')
+    expect(body.result).toBeUndefined()
+    expect(body.error?.message).toBe('Sign in')
+    expect(JSON.stringify(body)).not.toContain('echo')
+  })
+
+  it('puts the base in that pointer, and lists to a caller the guard admits', async () => {
+    const { response } = await asked(guardedMounted, 'tools/list')
+
+    expect(response.status).toBe(401)
+    expect(response.headers.get('www-authenticate')).toContain('http://localhost/shop/.well-known/oauth-protected-resource')
+    expect((await guardedMounted.mcp.tools({ headers: BEARER })).length).toBeGreaterThan(0)
+  })
+
+  it('still answers initialize and ping to anyone', async () => {
+    expect((await asked(guarded, 'ping')).response.status).toBe(200)
+    expect((await asked(guarded, 'initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'test', version: '1' } })).response.status).toBe(200)
+  })
+
+  it('refuses tools/list under requireGuards when the guards do not cover every module', async () => {
+    const { response, body } = await asked(uncovered, 'tools/list', {}, BEARER)
+
+    expect(response.status).toBe(403)
+    expect(body.error?.message).toBe('No guard covers this route')
+    expect((await asked(strict, 'tools/list')).response.status).toBe(401)
+    expect((await strict.mcp.tools({ headers: BEARER })).length).toBeGreaterThan(0)
+  })
+
+  it('lists freely when the API directory has no guard and the site does not require them', async () => {
+    expect((await asked(site, 'tools/list')).response.status).toBe(200)
+  })
+
+  it('keeps the guard\'s 401 a challenge on a call, and an API route\'s own 401 a result', async () => {
+    const anonymous = await asked(guarded, 'tools/call', { name: 'get_items_own_401' })
+
+    expect(anonymous.response.status).toBe(401)
+    expect(anonymous.response.headers.has('www-authenticate')).toBe(true)
+
+    const own = await asked(guarded, 'tools/call', { name: 'get_items_own_401' }, BEARER)
+
+    expect(own.response.status).toBe(200)
+    expect(own.response.headers.has('www-authenticate')).toBe(false)
+    expect(own.body.result).toMatchObject({ isError: true, content: [{ text: 'Not yours' }] })
+  })
+})
+
+describe('operation ids', () => {
+  const methods = ['get', 'post', 'put', 'patch', 'delete']
+
+  it('keeps an explicit id on an .all() route, one operation and tool per method', async () => {
+    const document = await (await documentOnly.fetch('/api/openapi.json', { headers: BEARER })).json() as { paths: Record<string, Record<string, { operationId: string }>> }
+
+    expect(Object.keys(document.paths['/api/items/echo']!).sort()).toEqual([...methods].sort())
+    expect(methods.map(method => document.paths['/api/items/echo']![method]!.operationId)).toEqual(methods.map(method => `echo.any_${method}`))
+
+    const tools = (await guarded.mcp.tools({ headers: BEARER })).map(tool => tool.name)
+
+    for (const method of methods)
+      expect(tools).toContain(`echo_any_${method}`)
+
+    expect((await guarded.mcp.call('echo_any_put', {}, { headers: BEARER })).data).toEqual({ method: 'PUT' })
+    expect((await guarded.mcp.call('echo_any_delete', {}, { headers: BEARER })).data).toEqual({ method: 'DELETE' })
+  })
+
+  it('leaves a chosen id as written in the OpenAPI document, and makes a safe tool name of it', async () => {
+    const document = await (await documentOnly.fetch('/api/openapi.json', { headers: BEARER })).json() as { paths: Record<string, Record<string, { operationId: string }>> }
+
+    expect(document.paths['/api/items']!.get!.operationId).toBe('users.list')
+    expect(document.paths['/api/items']!.post!.operationId).toBe('users_list')
+
+    const tools = (await guarded.mcp.tools({ headers: BEARER })).map(tool => tool.name)
+
+    expect(tools).toContain('users_list')
+    expect(tools).toContain('users_list_2')
+    expect(tools.every(name => (/^\w{1,64}$/).test(name))).toBe(true)
+    expect(new Set(tools).size).toBe(tools.length)
+  })
+
+  it('keeps ids unique in the document when two choose the same', async () => {
+    const twice = await testSite({ routes, api: 'tests/fixtures/mcp-guarded/src/api', openapi: true, islands: false })
+    const ids = Object.values(((await (await twice.fetch('/api/openapi.json', { headers: BEARER })).json()) as { paths: Record<string, Record<string, { operationId: string }>> }).paths).flatMap(each => Object.values(each).map(operation => operation.operationId))
+
+    expect(new Set(ids).size).toBe(ids.length)
+    await twice.close()
+  })
+})
+
+describe('the test helper', () => {
+  it('sends the cookies so far with a call, and takes from as call does', async () => {
+    guarded.cookies.set('session', 'abc')
+
+    expect((await guarded.mcp.call('get_items_cookie', {}, { headers: BEARER, from: '/' })).data).toEqual({ seen: 'abc' })
+    expect((await guarded.mcp.tools({ headers: BEARER, from: '/' })).length).toBeGreaterThan(0)
+    guarded.cookies.delete('session')
+    expect((await guarded.mcp.call('get_items_cookie', {}, { headers: BEARER })).data).toEqual({ seen: null })
+  })
+})
+
 describe('kay check', () => {
   const COVERED = '--- server\nimport { t } from \'elysia\'\nimport { action } from \'kay\'\n\nexport const covered = action(t.Object({}), () => 1, { tool: true, honeypot: \'website\' })\n---\nh1 Covered\n'
 
@@ -376,6 +488,15 @@ describe('kay check', () => {
     await Bun.write(join(dir, 'src/routes/admin/covered.kay'), COVERED)
 
     expect(await reported(dir, true)).toEqual([['src/routes/index.kay', 'signup'], ['src/routes/index.kay', 'solve']])
+  })
+
+  it('counts an options spread as bot protection, and leaves out options it cannot read', async () => {
+    const dir = await fixtureCopy('mcp')
+    const page = (options: string) => `--- server\nimport { action } from 'kay'\n\nconst shared = { rateLimit: { max: 1, window: '1m' } }\n\nexport const spread = action(() => 1, ${options})\n---\nh1 Spread\n`
+
+    await Bun.write(join(dir, 'src/routes/spread.kay'), page('{ tool: true, ...shared }'))
+    await Bun.write(join(dir, 'src/routes/opaque.kay'), page('shared').replace('spread', 'opaque'))
+    expect((await reported(dir, true)).filter(([file]) => file !== 'src/routes/index.kay')).toEqual([['src/routes/spread.kay', 'spread']])
   })
 
   it('says nothing without mcp, or when the lint is allowed', async () => {

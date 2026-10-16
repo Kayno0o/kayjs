@@ -202,6 +202,18 @@ export function markAgentCall(request: Request): void {
   agentCalls.add(request)
 }
 
+// The agent's calls that a guard refused with 401, which is the sign-in challenge; a 401 the called route answered is its own.
+const challenges = new WeakSet<Request>()
+
+export function markChallenge(request: Request): void {
+  if (agentCalls.has(request))
+    challenges.add(request)
+}
+
+export function wasChallenged(request: Request): boolean {
+  return challenges.has(request)
+}
+
 // Why a post must not reach the handler, `PRETEND` for a bot to answer as if it went through, or undefined when it may.
 // `plain` is a post the browser sent itself, which a form posting to the action always sends with its stamp; a call from kay's script may come from an island's form, which renders none.
 export async function protectionRefusal(action: ServerAction<TSchema, unknown>, request: Request, body: unknown, form: boolean, server: Server<unknown> | null | undefined, plain = form): Promise<ProtectionRefusal | typeof PRETEND | undefined> {

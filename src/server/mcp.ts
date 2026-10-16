@@ -1,7 +1,10 @@
 import type { Elysia } from 'elysia'
 import type { Server } from 'elysia/universal'
 import type { Tool, ToolResult } from '../mcp/protocol'
+import type { ActionOptions } from './actions'
 import type { BodyLimit } from './body'
+import type { LoadedGuard } from './guards'
+import type { Operation } from './openapi'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { INVALID_REQUEST, McpServer, PARSE_ERROR } from '../mcp/protocol'
 import { joinBase } from '../runtime/base'
@@ -10,22 +13,14 @@ import { FAILURE_HEADER, REDIRECT_HEADER } from '../runtime/swap'
 import { decodeServerValue, encodeValue } from '../runtime/wire'
 import { isCrossSite } from './actions'
 import { MCP_PATH } from './api-modules'
-import { clientAddress, keepRequestId, markAgentCall, requestId } from './protection'
+import { guardRefusal, toolName } from './openapi'
+import { clientAddress, keepRequestId, markAgentCall, requestId, wasChallenged } from './protection'
 import { requestUrl } from './request-url'
 import { sendFrom } from './rewrite'
 import { visitAs } from './visit'
 
 type Schema = Record<string, unknown>
 type Handle = (request: Request) => Promise<Response>
-
-interface Operation {
-  'operationId': string
-  'summary'?: string
-  'description'?: string
-  'parameters'?: { name: string, in: string, required?: boolean, schema: Schema }[]
-  'requestBody'?: { required?: boolean, content: Record<string, { schema: Schema }> }
-  'x-kay-action'?: true
-}
 
 // What a call to a tool needs of the request that made it.
 interface CallContext {
@@ -50,6 +45,8 @@ const PATH_PARAM = /\{(\w+)\}/g
 const JSON_TYPE = /\bjson\b/
 const TEXT_TYPE = /^text\/|\bjson\b|\bxml\b/
 const DOT_SEGMENT = /^\.{1,2}$/
+// The JSON-RPC code of a request a guard refused, in the range the spec leaves to servers.
+const REFUSED = -32001
 const RESOURCE_METADATA = '/.well-known/oauth-protected-resource'
 const NO_BODY = new Set(['get', 'delete'])
 
@@ -60,9 +57,12 @@ const ANSWER = { 'content-type': 'application/json; charset=utf-8', 'cache-contr
 export function documentedTools(document: Schema, fallback: Handle): AppTool[] {
   const tools: AppTool[] = []
 
+  // Made safe as names and told apart here, as a route's own `operationId` is kept as written in the document.
+  const taken = new Set<string>()
+
   for (const [path, methods] of Object.entries(document.paths as Record<string, Record<string, Operation>>)) {
     for (const [method, operation] of Object.entries(methods)) {
-      const tool = HTTP_METHODS.has(method) ? toolOf(path, method, operation, fallback) : undefined
+      const tool = HTTP_METHODS.has(method) && operation.operationId !== undefined ? toolOf(path, method, operation, operation.operationId, fallback, taken) : undefined
 
       if (tool)
         tools.push(tool)
@@ -72,9 +72,9 @@ export function documentedTools(document: Schema, fallback: Handle): AppTool[] {
   return tools
 }
 
-function toolOf(path: string, method: string, operation: Operation, fallback: Handle): AppTool | undefined {
+function toolOf(path: string, method: string, operation: Operation, id: string, fallback: Handle, taken: Set<string>): AppTool | undefined {
   const description = [operation.summary, operation.description].filter(text => text !== undefined).join('\n\n') || `${method.toUpperCase()} ${path}`
-  const body = operation.requestBody?.content['application/json']?.schema
+  const body = operation.requestBody?.content['application/json']?.schema as Schema | undefined
   const action = operation['x-kay-action'] === true
 
   // A body of files, text or bytes cannot go as arguments.
@@ -104,9 +104,11 @@ function toolOf(path: string, method: string, operation: Operation, fallback: Ha
   const get = method === 'get'
   const inputSchema = { type: 'object', properties, ...required.size > 0 && { required: [...required] } }
 
+  const name = toolName(id, taken)
+
   return {
-    name: operation.operationId,
-    title: operation.operationId,
+    name,
+    title: name,
     description,
     inputSchema,
     annotations: { readOnlyHint: get, destructiveHint: method === 'delete', idempotentHint: get || method === 'put' || method === 'delete', openWorldHint: false },
@@ -187,11 +189,11 @@ async function dispatch(context: CallContext, url: string, init: RequestInit, ac
   const visit = new Request(new URL(url, request.url), { ...init, headers, redirect: 'manual' })
   const response = await visitAs(request, visit, server, fallback)
 
-  return result(context, response, action)
+  return result(context, visit, response, action)
 }
 
 // Words what the app answered for the agent: the result, or why there is none, which it may correct and call again.
-async function result(context: CallContext, response: Response, action: boolean): Promise<ToolResult> {
+async function result(context: CallContext, visit: Request, response: Response, action: boolean): Promise<ToolResult> {
   const type = response.headers.get('content-type') ?? ''
   const location = response.headers.get(REDIRECT_HEADER) ?? response.headers.get('location')
 
@@ -203,7 +205,8 @@ async function result(context: CallContext, response: Response, action: boolean)
 
   const text = await response.text()
 
-  if (response.status === 401 && !response.headers.has(FAILURE_HEADER)) {
+  // Only a guard's 401 asks for a sign-in, as a route answering 401 on its own account says something else.
+  if (response.status === 401 && wasChallenged(visit)) {
     context.challenged = true
 
     return refusal(text || 'Sign in to continue')
@@ -227,11 +230,17 @@ async function result(context: CallContext, response: Response, action: boolean)
   if (!JSON_TYPE.test(type))
     return { content: [{ type: 'text', text }] }
 
+  const parsed = parseJson(text)
+
+  return { content: [{ type: 'text', text }], ...isRecord(parsed) && { structuredContent: parsed } }
+}
+
+function parseJson(text: string): unknown {
   try {
-    return { content: [{ type: 'text', text }], ...isRecord(JSON.parse(text)) && { structuredContent: JSON.parse(text) as object } }
+    return JSON.parse(text)
   }
   catch {
-    return { content: [{ type: 'text', text }] }
+    return undefined
   }
 }
 
@@ -264,6 +273,9 @@ export interface McpOptions {
   version: string
   // Where the app is mounted, which the pointer to its sign-in metadata is served under.
   base: string
+  // The guards of the API directory, which `tools/list` runs as the OpenAPI document does.
+  guards: LoadedGuard[]
+  actions: ActionOptions
 }
 
 // Counts a request the endpoint dispatched as the client it came from and drops the marker, so the app never reads it.
@@ -290,6 +302,29 @@ function receiveDispatched(app: Elysia): void {
   })
 }
 
+// The request id of a `tools/list` message, or undefined for any other.
+function listsTools(text: string): { id: string | number | null } | undefined {
+  const message = parseJson(text)
+
+  if (!isRecord(message) || message.method !== 'tools/list')
+    return undefined
+
+  return { id: typeof message.id === 'string' || typeof message.id === 'number' ? message.id : null }
+}
+
+// What a guard's refusal of the list is as a JSON-RPC error: a sign-in request with the pointer when it is a 401 or a redirect, else the refusal's own status.
+async function declined(refusal: Response, id: string | number | null, request: Request, base: string): Promise<Response> {
+  const challenge = refusal.status === 401 || (refusal.status >= 300 && refusal.status < 400)
+  const headers = new Headers(ANSWER)
+
+  if (challenge)
+    headers.set('www-authenticate', `Bearer resource_metadata="${resourceMetadata(request, base)}"`)
+
+  const message = challenge && refusal.status !== 401 ? '' : await refusal.text()
+
+  return new Response(JSON.stringify({ jsonrpc: '2.0', id, error: { code: REFUSED, message: message || 'Sign in to continue' } }), { status: challenge ? 401 : refusal.status, headers })
+}
+
 // Where a client that was refused for want of a sign-in finds how to get one.
 function resourceMetadata(request: Request, base: string): string {
   return new URL(joinBase(base, RESOURCE_METADATA), configuredSite()?.origin ?? requestUrl(request).origin).href
@@ -309,13 +344,26 @@ export function serveMcp(app: Elysia, document: Schema, options: McpOptions): vo
 
   receiveDispatched(app)
 
-  app.post(MCP_PATH, async ({ request, server }) => {
+  app.post(MCP_PATH, async (served) => {
+    const { request, server } = served
+
     // A browser page of another site posting here would act with the visitor's cookies.
     if (isCrossSite(request))
       return new Response('Cross-site request refused', { status: 403 })
 
+    const text = await request.text()
+    const listing = listsTools(text)
+
+    // The list names every tool and the guarded routes behind them, so it is as private as the document is.
+    if (listing !== undefined) {
+      const refusal = await guardRefusal(options.guards, served, options.actions)
+
+      if (refusal)
+        return declined(refusal, listing.id, request, options.base)
+    }
+
     const context: CallContext = { request, server, challenged: false }
-    const reply = await calls.run(context, async () => mcp.answer(await request.text()))
+    const reply = await calls.run(context, async () => mcp.answer(text))
 
     if (!reply)
       return new Response(null, { status: 202 })
@@ -334,7 +382,7 @@ export function serveMcp(app: Elysia, document: Schema, options: McpOptions): vo
       status = 401
 
     return new Response(JSON.stringify(reply), { status, headers })
-  })
+  }, { parse: 'none' })
   app.get(MCP_PATH, notAllowed)
   app.delete(MCP_PATH, notAllowed)
 }

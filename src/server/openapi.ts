@@ -43,14 +43,26 @@ export interface DocumentedAction {
   guards: string[]
 }
 
+export interface Parameter {
+  name: string
+  in: string
+  required?: boolean
+  schema: unknown
+}
+
+export interface RequestBody {
+  required?: boolean
+  content: Record<string, { schema: unknown }>
+}
+
 export interface Operation {
   'operationId'?: string
   'tags': string[]
   'summary'?: string
   'description'?: string
   'deprecated'?: boolean
-  'parameters'?: Schema[]
-  'requestBody'?: Schema
+  'parameters'?: Parameter[]
+  'requestBody'?: RequestBody
   'responses': Record<string, Schema>
   'x-kay-guards'?: string[]
   // Called as kay's `action()` calls are, which an MCP tool does, rather than as a plain JSON `POST`.
@@ -119,13 +131,25 @@ const API_ROOT = new RegExp(`^${API_PREFIX}`)
 // The most characters an MCP client takes in a tool's name.
 const MAX_NAME = 64
 
-// `base` made safe as a name, and `taken` kept free of it: a second one gets `_2`, a third `_3`.
-function uniqueName(base: string, taken: Set<string>): string {
+// `base` made safe as a tool's name, and `taken` kept free of it: a second one gets `_2`, a third `_3`.
+export function toolName(base: string, taken: Set<string>): string {
   const name = base.replace(TOOL_NAME, '_').replace(EDGE_UNDERSCORES, '') || 'tool'
   let candidate = name.slice(0, MAX_NAME)
 
   for (let count = 2; taken.has(candidate); count++)
     candidate = `${name.slice(0, MAX_NAME - String(count).length - 1)}_${count}`
+
+  taken.add(candidate)
+
+  return candidate
+}
+
+// A route's own `operationId` as it was written, only kept free of `taken` the way a tool's name is.
+function operationName(id: string, taken: Set<string>): string {
+  let candidate = id
+
+  for (let count = 2; taken.has(candidate); count++)
+    candidate = `${id}_${count}`
 
   taken.add(candidate)
 
@@ -138,7 +162,7 @@ function snakeCase(name: string): string {
 }
 
 // An OpenAPI 3.1 document of every route the modules serve, read from the schemas their routes declare, and of the actions that opted in to being tools; a route behind a guard names it, as `x-kay-guards`.
-// Each operation has an `operationId`, the route's own `detail.operationId` or its method and path: `get_items_id` for `GET /api/items/{id}`. These are the names of the MCP tools.
+// Each operation has an `operationId`, the route's own `detail.operationId` as written or its method and path: `get_items_id` for `GET /api/items/{id}`. The MCP tools are named after them, made safe as names.
 export function openApiDocument(modules: MountedApi[], options: { title: string, version: string, base: string, root?: string }, actions: DocumentedAction[] = []): Schema {
   const paths: Record<string, Record<string, Operation>> = {}
   // Routes for every method, which give way to a route for one method wherever it was declared.
@@ -165,7 +189,7 @@ export function openApiDocument(modules: MountedApi[], options: { title: string,
           ...module.guards.length > 0 && { 'x-kay-guards': module.guards.map(guard => guard.path) },
         }
 
-        if (hooks.detail?.operationId !== undefined)
+        if (hooks.detail?.operationId !== undefined && hooks.detail.operationId !== '')
           wanted.set(operation, hooks.detail.operationId)
 
         if (method === 'ALL')
@@ -179,18 +203,32 @@ export function openApiDocument(modules: MountedApi[], options: { title: string,
   for (const { path, operation } of anyMethod) {
     const methods = paths[path] ??= {}
 
-    for (const each of ANY_METHOD)
-      methods[each.toLowerCase()] ??= { ...operation }
+    const id = wanted.get(operation)
+
+    // One operation per method cannot share an id, so each takes the method as a suffix.
+    wanted.delete(operation)
+
+    for (const each of ANY_METHOD) {
+      const method = each.toLowerCase()
+
+      if (methods[method] !== undefined)
+        continue
+
+      methods[method] = { ...operation }
+
+      if (id !== undefined)
+        wanted.set(methods[method], `${id}_${method}`)
+    }
   }
 
   const named = new Set<string>()
 
   for (const [operation, name] of wanted)
-    operation.operationId = uniqueName(name, named)
+    operation.operationId = operationName(name, named)
 
   for (const [path, methods] of Object.entries(paths)) {
     for (const [method, operation] of Object.entries(methods))
-      operation.operationId ??= uniqueName(`${method}/${path.replace(API_ROOT, '')}`, named)
+      operation.operationId ??= toolName(`${method}/${path.replace(API_ROOT, '')}`, named)
   }
 
   for (const action of actions) {
@@ -202,7 +240,7 @@ export function openApiDocument(modules: MountedApi[], options: { title: string,
 
     paths[action.url] = {
       post: {
-        'operationId': uniqueName(action.tool.name ?? snakeCase(action.name), named),
+        'operationId': toolName(action.tool.name ?? snakeCase(action.name), named),
         'tags': ['actions'],
         ...action.tool.description !== undefined && { summary: action.tool.description },
         'requestBody': { required: true, content: content(action.schema, 'application/json') },
@@ -216,12 +254,12 @@ export function openApiDocument(modules: MountedApi[], options: { title: string,
   return { openapi: '3.1.0', info: { title: options.title, version: options.version }, servers: [{ url: options.base || '/' }], paths }
 }
 
-function parameters(path: string, hooks: Record<string, unknown>): { parameters?: Schema[] } {
-  const found: Schema[] = []
+function parameters(path: string, hooks: Record<string, unknown>): { parameters?: Parameter[] } {
+  const found: Parameter[] = []
   const declared = (hooks.params as { properties?: Record<string, unknown> } | undefined)?.properties ?? {}
 
   for (const [, name] of path.matchAll(BRACED_PARAM))
-    found.push({ name, in: 'path', required: true, schema: name === 'wildcard' ? schemaOf(declared['*'] ?? { type: 'string' }) : schemaOf(declared[name!] ?? { type: 'string' }) })
+    found.push({ name: name!, in: 'path', required: true, schema: name === 'wildcard' ? schemaOf(declared['*'] ?? { type: 'string' }) : schemaOf(declared[name!] ?? { type: 'string' }) })
 
   for (const [where, schema] of [['query', hooks.query], ['header', hooks.headers]] as const) {
     const object = schema as { properties?: Record<string, unknown>, required?: string[] } | undefined
@@ -317,16 +355,18 @@ function jsonSchema(schema: unknown): unknown {
   return plain
 }
 
+// The answer of the API directory's guards when one stops the request, else undefined. They get what an API route's does, the app's session and other plugins included.
+export async function guardRefusal(guards: LoadedGuard[], context: { request: Request }, options: ActionOptions): Promise<Response | undefined> {
+  const { request } = context
+  const passed = guards.length > 0 ? await inLocale(request, options, async () => passGuards(guards, sharedContext(request, () => ({ ...context })), {}, options)) : undefined
+
+  return passed instanceof Response ? passed : undefined
+}
+
 // The document at `/api/openapi.json`, and the reference page when asked for, behind the guard of the API directory itself when it has one.
 export function serveOpenApi(app: Elysia, document: Schema, config: OpenApiConfig, guards: LoadedGuard[], options: ActionOptions): void {
   const json = JSON.stringify(document)
-  // The guard gets what an API route's does, the app's session and other plugins included.
-  const admitted = async (context: { request: Request }, answer: () => Response) => {
-    const { request } = context
-    const passed = guards.length > 0 ? await inLocale(request, options, async () => passGuards(guards, sharedContext(request, () => ({ ...context })), {}, options)) : undefined
-
-    return passed instanceof Response ? passed : answer()
-  }
+  const admitted = async (context: { request: Request }, answer: () => Response) => (await guardRefusal(guards, context, options)) ?? answer()
 
   app.get(OPENAPI_PATH, async context => admitted(context, () => new Response(json, { headers: { 'content-type': 'application/json; charset=utf-8' } })))
 
@@ -338,8 +378,8 @@ export function serveOpenApi(app: Elysia, document: Schema, config: OpenApiConfi
 }
 
 // A body or an answer: its type and schema.
-function schemaBlock(described: Schema): string {
-  const [type, { schema }] = Object.entries(described.content as Record<string, { schema: unknown }>)[0]!
+function schemaBlock(described: object): string {
+  const [type, { schema }] = Object.entries((described as RequestBody).content)[0]!
 
   return `<p>${escape(type)}</p><pre>${escape(JSON.stringify(schema, null, 2))}</pre>`
 }

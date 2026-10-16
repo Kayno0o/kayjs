@@ -278,15 +278,15 @@ export default api()
 - Schemas are read as TypeBox writes them: a model's name or another library's validator documents nothing.
 - An optional param lists the path with and without it, and a wildcard is `{wildcard}`.
 - A module serving `/api/openapi.json`, or `/api/reference` with the page on, stops the server.
-- Every operation has an `operationId`: the route's `detail.operationId`, else its method and path, `get_notes_id`; a clash gets `_2`.
+- Every operation has an `operationId`: the route's `detail.operationId` as written (`users.list` stays so), else its method and path, `get_notes_id`; a clash gets `_2`. A route answering every method, `.all()`, gets its id with the method as a suffix, `echo_get`, `echo_post`.
 - An action that sets `tool` is a `POST` operation at its URL under the tag `actions`, `x-kay-action` set, its guards in `x-kay-guards`, as the document and the MCP tools say the same. It is called as `action()` calls are, its input encoded as kay writes it, not as a plain JSON body.
 
 ### MCP
 
 - `mcp: true` serves Streamable HTTP at `/mcp`: one JSON-RPC message per `POST`, answered with JSON, `initialize`, `ping`, `tools/list` and `tools/call` only, no resources or prompts. `GET` and `DELETE` answer 405, a notification 202.
 - A message that is no JSON-RPC request answers 400, a body over `bodyLimit` 413, a request from another site (`Origin`, `Sec-Fetch-Site`) 403.
-- A tool per operation of the OpenAPI document, even with `openapi` off, named by its `operationId`, described by its `summary` and `description`, its input one JSON Schema of the path params, query and JSON body, merged by name.
-- Left out: `detail: { hide: true }` routes, websockets, a route whose body is files, text or bytes, an action holding a file, an action in a file whose pages have route params (a post from no page cannot name one), and `in: header` parameters. `tools/list` names every tool to any caller, guards or not, as the guards run on a call.
+- A tool per operation of the OpenAPI document, even with `openapi` off, named by its `operationId` made a safe name (`users.list` is `users_list`, a clash `_2`), described by its `summary` and `description`, its input one JSON Schema of the path params, query and JSON body, merged by name.
+- Left out: `detail: { hide: true }` routes, websockets, a route whose body is files, text or bytes, an action holding a file, an action in a file whose pages have route params (a post from no page cannot name one), and `in: header` parameters. `tools/list` is served behind the API directory's `_guard.ts` as the document is, and with `requireGuards` it is refused (403) unless the guards cover every module; `initialize` and `ping` stay open, and a call runs the guards of its own route.
 - A route answering every method, `.all()`, is a tool per method.
 - An action is a tool only when its third argument sets `tool`: `true`, a description, or `{ name, description }`; its name is the export in snake case, `addNote` is `add_note`, a clash `add_note_2`, and its input schema is the action's.
 - A name is made of letters, digits and `_`, at most 64 characters.
@@ -295,11 +295,11 @@ export default api()
 - `honeypot`, `minTime` and `proofOfWork` are skipped, as only a form a person filled in can pass them; a marker only the endpoint sets, a per-process secret no request can send, says so, and `rateLimit` still counts.
 - A path param is one segment: it is percent-encoded and an empty one, `.` or `..` is refused, so no value reaches another route.
 - A refused call is a result with `isError`: the schema's field errors, the `ctx.fail` data and status as `{ status, errors, data }` JSON, a route's own refusal text, a redirect naming where it leads. The agent corrects and calls again.
-- A guard answering 401 makes the endpoint answer 401 with `WWW-Authenticate: Bearer resource_metadata="<site>/.well-known/oauth-protected-resource"`, how a client learns to sign in; any other refusal, 403 included, is a result.
+- A guard answering 401 makes the endpoint answer 401 with `WWW-Authenticate: Bearer resource_metadata="<site>/.well-known/oauth-protected-resource"`, how a client learns to sign in; any other refusal, 403 included, is a result. Only a guard's 401 does: a route answering 401 itself is a result too. A refused `tools/list` answers the same way (401 and the pointer, a redirect counting as a 401), as a JSON-RPC error.
 - An action's result is JSON as its text, and `structuredContent` when an object; a route's JSON or text answer likewise, any other type read as its size.
 - `/mcp` is claimed like a route: a page, endpoint or file serving it stops the boot, and `kay check` reports it.
-- `unguarded-tool` warns, with `mcp`, of a tool action with a `honeypot`, `minTime` or `proofOfWork` that no guard covers: an agent calls it without the form those protections ask of a person.
-- `site.mcp.tools()` and `site.mcp.call(name, args)` in `kay/test`.
+- `unguarded-tool` warns, with `mcp`, of a tool action with a `honeypot`, `minTime` or `proofOfWork` that no guard covers: an agent calls it without the form those protections ask of a person. A `...spread` in the options counts as one of them; options that are not an object literal, `action(schema, run, options)`, are not read, so the action is not taken for a tool.
+- `site.mcp.tools()` and `site.mcp.call(name, args)` in `kay/test`, which send the cookies so far and take `headers` and `from` as `site.call` does.
 
 ### Calling modules from an island
 
