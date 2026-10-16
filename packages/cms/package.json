@@ -53,7 +53,7 @@
     "kay": "~1.47.0"
   },
   "devDependencies": {
-    "@happy-dom/global-registrator": "^20.14.6",
+    "@happy-dom/global-registrator": "^21.0.3",
     "@kaynooo/eslint": "^7.0.4",
     "@kaynooo/kayjs-ui": "workspace:~",
     "@types/bun": "^1.4.3",

@@ -108,7 +108,7 @@ room.close()
 
 ### Test a component's handlers
 
-`mount(file, props)` renders one component built for the browser into `document`, and `settle()` lets effects land before the DOM is read. `kay/test/dom` registers happy-dom's DOM, `@happy-dom/global-registrator` installed as a dev dependency:
+`mount(file, props)` renders one component built for the browser into `document`, and `settle()` lets effects land before the DOM is read. `kay/test/dom` registers happy-dom's DOM, `@happy-dom/global-registrator` installed as a dev dependency (20.14.6, or 21.0.3 and later):
 
 ```toml
 [test]

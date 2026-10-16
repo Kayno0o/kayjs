@@ -5,6 +5,10 @@ description: What each release of kay and its libraries adds, with a link to whe
 ---
 This page lists what each release adds, newest first, with a link to where each feature is documented. kay and its libraries share one version number, so one section covers them all. What a release breaks, and what to change in your app, is in [Upgrading](/guides/upgrading).
 
+## Unreleased
+
+- **happy-dom 21 for `mount`**: `kay/test/dom` works with `@happy-dom/global-registrator` 20.14.6 or 21.0.3 and later, so an app on either needs no change. [Testing](/guides/testing)
+
 ## 1.47.0
 
 - **The manifest and share cards follow the locale**: a `seo.name` or `seo.description` per locale gives each locale its own web manifest and share card name, and the one OpenAPI document keeps the default locale's. [Head and SEO](/essentials/head-and-seo)

@@ -2,6 +2,10 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
+## Unreleased
+
+- `kay/test/dom` works with `@happy-dom/global-registrator` 20.14.6 or 21.0.3 and later, so an app on either needs no change ([Testing](testing.md#helpers-for-a-test-of-its-own)).
+
 ## 1.47.0
 
 - A site with a `seo.name` or `seo.description` per locale links the web manifest and draws the share card name of the page's locale (`/manifest.fr.webmanifest` beside the default locale's), and titles its one OpenAPI document with the default locale's name ([Head](head.md#site-defaults-and-social-cards)).
