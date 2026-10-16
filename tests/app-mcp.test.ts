@@ -20,6 +20,7 @@ const guardedApi = 'tests/fixtures/mcp-guarded/src/api'
 const guarded = await testSite({ routes, api: guardedApi, mcp: true, islands: false })
 const limited = await testSite({ routes, api: 'tests/fixtures/mcp-limited/src/api', mcp: true, islands: false, base: '/shop' })
 const names = await testSite({ routes: 'tests/fixtures/mcp-names/src/routes', api: 'tests/fixtures/mcp-names/src/api', mcp: true, openapi: true, islands: false })
+const longNames = await testSite({ routes: 'tests/fixtures/mcp-long-names/src/routes', api: 'tests/fixtures/mcp-long-names/src/api', mcp: true, openapi: true, islands: false })
 const guardedMounted = await testSite({ routes, api: guardedApi, mcp: true, islands: false, base: '/shop' })
 // Guards that cover every module, and guards that cover only one of them.
 const strict = await testSite({ routes, api: guardedApi, mcp: true, islands: false, requireGuards: true })
@@ -528,6 +529,16 @@ describe('tool names', () => {
     expect(tools.sort()).toEqual(['a_b', 'a_b_2'])
     expect((await names.mcp.call('a_b_2')).data).toBeUndefined()
     expect((await names.mcp.call('a_b_2')).text).toBe('action')
+  })
+
+  it('keeps tool names unique when two ids differ only after the 64th character', async () => {
+    const document = await (await longNames.fetch('/api/openapi.json')).json() as { paths: Record<string, Record<string, { operationId: string }>> }
+    const ids = Object.values(document.paths).flatMap(each => Object.values(each).map(operation => operation.operationId))
+    const tools = (await longNames.mcp.tools()).map(tool => tool.name)
+
+    expect(tools.every(name => name.length <= 64)).toBe(true)
+    expect(tools.sort()).toEqual([`${'x'.repeat(62)}_2`, 'x'.repeat(64)])
+    expect(ids).toContain(`${'x'.repeat(62)}_2`)
   })
 })
 

@@ -231,7 +231,7 @@ export function openApiDocument(modules: MountedApi[], options: { title: string,
 
   for (const [operation, name] of wanted) {
     operation.operationId = operationName(name, named)
-    tools.add(safeName(operation.operationId))
+    tools.add(safeName(operation.operationId).slice(0, MAX_NAME))
   }
 
   for (const [path, methods] of Object.entries(paths)) {

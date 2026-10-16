@@ -893,6 +893,9 @@ describe('localized seo defaults', () => {
         const html = await (await server.handle(new Request(`http://localhost/en${'base' in variant ? '/' : ''}`))).text()
 
         expect(html).toContain(`<link rel="manifest" href="${'base' in variant ? '/docs' : ''}/manifest.webmanifest">`)
+        const prefix = 'base' in variant ? '/docs' : ''
+
+        expect((await server.handle(new Request(`http://localhost${prefix}/manifest.en.webmanifest`))).status).toBe(404)
         expect((await server.handle(new Request('http://localhost/manifest.en.webmanifest'))).status).toBe(404)
         expect((await server.handle(new Request('http://localhost/manifest.webmanifest'))).status).toBe(200)
       }

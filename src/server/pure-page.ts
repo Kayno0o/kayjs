@@ -241,6 +241,8 @@ function startsWithFolder(args: string): boolean {
 const BEFORE_REGEX = /(?:^|[(,=:[!&|?{};+\-*%<>~^]|(?<![\w$.])(?:return|typeof|case|do|else|in|of|void|delete|throw|new|yield|await))\s*$/
 // How far back `BEFORE_REGEX` needs to look.
 const REGEX_LOOKBACK = 16
+// A `{` that opens an object literal rather than a block: after one of these a `}` ends a value, so a `/` after it divides.
+const BEFORE_VALUE_BRACE = /[(,=[]\s*$/
 
 // The offset just after the regex literal starting at `at`, or undefined when its line ends before it closes: then the slash was a division.
 function regexEnd(source: string, at: number): number | undefined {
@@ -272,11 +274,14 @@ function withoutComments(source: string): string {
   const holes: number[] = []
   let braces = 0
   let inTemplate = false
+  // Whether each open `{` is an object literal, and the length of `result` right after the last `}` that closed one.
+  const literals: boolean[] = []
+  let valueEnd = -1
 
   for (let at = 0; at < source.length; at++) {
     const char = source[at]!
     const next = source[at + 1]
-    const regex = !inTemplate && char === '/' && next !== '/' && next !== '*' && BEFORE_REGEX.test(result.slice(-REGEX_LOOKBACK)) ? regexEnd(source, at) : undefined
+    const regex = !inTemplate && char === '/' && next !== '/' && next !== '*' && BEFORE_REGEX.test(result.slice(-REGEX_LOOKBACK)) && result.trimEnd().length !== valueEnd ? regexEnd(source, at) : undefined
 
     if (inTemplate) {
       if (char === '\\') {
@@ -286,6 +291,7 @@ function withoutComments(source: string): string {
       else if (char === '$' && next === '{') {
         result += '${'
         at++
+        literals.push(false)
         holes.push(braces++)
         inTemplate = false
       }
@@ -328,10 +334,12 @@ function withoutComments(source: string): string {
     }
     else {
       if (char === '{') {
+        literals.push(BEFORE_VALUE_BRACE.test(result.slice(-REGEX_LOOKBACK)))
         braces++
       }
       else if (char === '}') {
         braces--
+        valueEnd = literals.pop() === true ? result.length + 1 : -1
 
         if (holes.at(-1) === braces) {
           holes.pop()
