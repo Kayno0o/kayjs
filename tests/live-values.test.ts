@@ -7,16 +7,18 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
 import { chromium } from 'playwright-core'
 import { outputDir } from '../src/build/assets'
-import { liveIds } from '../src/build/live-ids'
+import { liveId, liveIds } from '../src/build/live-ids'
 import { compileKay } from '../src/compiler'
 import { decodeServerValue } from '../src/runtime/wire'
 import { browserPath, testSite } from '../src/test'
 import { fixtureCopy } from './scratch'
 
 const ROOT = 'tests/fixtures/live-values'
-const VISITORS = 'src/live.ts#visitors'
-const ROOM = 'src/live.ts#room'
-const SECRET = 'src/live.ts#secret'
+// The id of a value of the fixture's src/live.ts, which depends on the path from the project alone.
+const idOf = (name: string) => liveId('/app/src/live.ts', '/app', name)
+const VISITORS = idOf('visitors')
+const ROOM = idOf('room')
+const SECRET = idOf('secret')
 const SCRIPT = /<script type="application\/json" data-kay-live>([^<]*)<\/script>/g
 const JSON_POST = { method: 'POST', headers: { 'content-type': 'application/json' } }
 
@@ -111,10 +113,18 @@ describe('live values on the server', () => {
     const [page, ...others] = pagesOf(html)
 
     expect(others).toEqual([])
-    expect(idsOf(page!)).toEqual([ROOM, VISITORS])
+    expect(idsOf(page!)).toEqual([ROOM, VISITORS].toSorted())
     expect(page!.values).toEqual(expect.arrayContaining([[VISITORS, '', 3], [ROOM, 'lobby', { id: 'lobby', users: 2 }]]))
     expect(page!.sig).toMatch(/^[\w-]{20,}$/)
     expect(html).toMatch(/<p class="online"><!--\[-->3<!--\]--> online<\/p>/)
+  })
+
+  it('names a value by a short hash, so no file path of the project reaches a page', async () => {
+    const { html } = await site.visit('/')
+
+    expect(VISITORS).toMatch(/^[\w-]{12}$/)
+    expect(html).toContain(VISITORS)
+    expect(html).not.toContain('src/live')
   })
 
   it('writes nothing into a page reading none, which renders no island', async () => {
@@ -204,7 +214,7 @@ describe('live values on the server', () => {
     expect(await ask([{ keys: proofsOf([page!])[0]!.keys, sig: `${page!.sig}x` }], [[VISITORS, '']])).toBe(403)
     expect(await ask([{ keys: [[SECRET, '']], sig: page!.sig }], [[SECRET, '']])).toBe(403)
     expect(await ask(proofsOf([page!]), [[SECRET, '']])).toBe(403)
-    expect(await ask(proofsOf([page!]), [['src/live.ts#missing', '']])).toBe(403)
+    expect(await ask(proofsOf([page!]), [[idOf('missing'), '']])).toBe(403)
   })
 
   it('lets a proof cover only the keys its page read, not another key of the same value', async () => {
@@ -277,7 +287,7 @@ describe('live values in a page', () => {
     try {
       const { html } = await site.visit(path)
 
-      expect(idsOf(pagesOf(html)[0]!)).toEqual([ROOM, VISITORS])
+      expect(idsOf(pagesOf(html)[0]!)).toEqual([ROOM, VISITORS].toSorted())
 
       const answer = await site.fetch(`/_kay/live`, { ...JSON_POST, body: JSON.stringify({ proofs: proofsOf(pagesOf(html)), watch: [[VISITORS, '']] }) })
 
@@ -310,13 +320,13 @@ describe('the id of a live value', () => {
   const named = (declaration: string) => liveIds(`import { live } from 'kay'\n\n${declaration}\n`, '/app/src/live.ts', '/app')
 
   it('is added after the argument however it is written', () => {
-    expect(named('export const a = live(0)')).toContain('live(0, "src/live.ts#a")')
-    expect(named('export const a = live((0))')).toContain('live((0), "src/live.ts#a")')
-    expect(named('export const a = live(0,)')).toContain('live(0, "src/live.ts#a")')
-    expect(named('export const a = live({ x: [1, 2] })')).toContain('live({ x: [1, 2] }, "src/live.ts#a")')
-    expect(named('export const a = live(0 // first, then more\n)')).toContain('live(0, "src/live.ts#a" // first, then more\n)')
-    expect(named('export const a = live(0 /* zero */)')).toContain('live(0, "src/live.ts#a" /* zero */)')
-    expect(named('export const a = live(\n  (id: string) => ({ id }),\n)')).toContain('({ id }), "src/live.ts#a"\n)')
+    expect(named('export const a = live(0)')).toContain(`live(0, "${idOf('a')}")`)
+    expect(named('export const a = live((0))')).toContain(`live((0), "${idOf('a')}")`)
+    expect(named('export const a = live(0,)')).toContain(`live(0, "${idOf('a')}")`)
+    expect(named('export const a = live({ x: [1, 2] })')).toContain(`live({ x: [1, 2] }, "${idOf('a')}")`)
+    expect(named('export const a = live(0 // first, then more\n)')).toContain(`live(0, "${idOf('a')}" // first, then more\n)`)
+    expect(named('export const a = live(0 /* zero */)')).toContain(`live(0, "${idOf('a')}" /* zero */)`)
+    expect(named('export const a = live(\n  (id: string) => ({ id }),\n)')).toContain(`({ id }), "${idOf('a')}"\n)`)
   })
 })
 
@@ -548,7 +558,7 @@ describe('live values in a production build', () => {
       'const about = await page(\'/about\')',
       'const found = /<script type="application\\/json" data-kay-live>([^<]*)<\\/script>/.exec(home)?.[1]',
       'const proof = decodeServerValue(found)',
-      'const live = await app.handle(new Request(\'http://localhost/_kay/live\', { method: \'POST\', headers: { \'content-type\': \'application/json\' }, body: JSON.stringify({ proofs: [{ keys: proof.values.map(([id, key]) => [id, key]), sig: proof.sig }], watch: [[\'src/live.ts#visitors\', \'\']] }) }))',
+      `const live = await app.handle(new Request('http://localhost/_kay/live', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ proofs: [{ keys: proof.values.map(([id, key]) => [id, key]), sig: proof.sig }], watch: [[${JSON.stringify(VISITORS)}, '']] }) }))`,
       'const first = new TextDecoder().decode((await live.body.getReader().read()).value)',
       'console.log(JSON.stringify({ home: home.includes(\'data-kay-live\'), module: /<script type="module"/.test(home), about: about.includes(\'data-kay-live\'), aboutModule: about.includes(\'type="module"\'), status: live.status, type: live.headers.get(\'content-type\'), first }))',
       'process.exit(0)',
@@ -567,6 +577,6 @@ describe('live values in a production build', () => {
 
     expect(answer).toMatchObject({ home: true, module: true, about: false, aboutModule: false, status: 200 })
     expect(String(answer.type)).toContain('text/event-stream')
-    expect(String(answer.first)).toContain('src/live.ts#visitors')
+    expect(String(answer.first)).toContain(VISITORS)
   }, 120_000)
 })

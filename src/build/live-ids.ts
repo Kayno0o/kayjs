@@ -5,10 +5,11 @@ import { parse } from '@babel/parser'
 const MENTIONS_LIVE = /\blive\b/
 const NAMES_KAY = /["']kay["']/
 const SPACE = /\s/
+const ID_LENGTH = 12
 
-// The name the server and the browser know a live value by: its module's path from the project and its constant, `src/live.ts#visitors`.
+// The name the server and the browser know a live value by: a short hash of its module's path from the project and its constant, so no file path reaches a page.
 export function liveId(file: string, root: string, name: string): string {
-  return `${relative(root, file).split('\\').join('/')}#${name}`
+  return new Bun.CryptoHasher('sha256').update(`${relative(root, file).split('\\').join('/')}#${name}`).digest('base64url').slice(0, ID_LENGTH)
 }
 
 // Gives each `const name = live(...)` at the top of a module the id it is known by, as a second argument, so the server and the browser, which each load the module, name the same value.
