@@ -1,6 +1,6 @@
 ---
 title: Migrating from Next.js
-order: 10.2
+order: 3
 description: Map what you know from the Next.js app router to kay, concept by concept, and see what has no counterpart.
 ---
 

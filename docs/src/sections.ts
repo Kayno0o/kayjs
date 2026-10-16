@@ -3,6 +3,7 @@ export const SECTIONS = [
   { slug: 'getting-started', title: 'Getting started' },
   { slug: 'essentials', title: 'Essentials' },
   { slug: 'guides', title: 'Guides' },
+  { slug: 'migrating', title: 'Migrating' },
   { slug: 'reference', title: 'Reference' },
   { slug: 'libraries', title: 'Libraries' },
   // A part of its own, its sidebar the project's tree drawn from each page's `path`.

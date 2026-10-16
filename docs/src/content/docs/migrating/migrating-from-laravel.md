@@ -1,6 +1,6 @@
 ---
 title: Migrating from Laravel
-order: 10.3
+order: 4
 description: Find where the parts of a Laravel app live in kay, and see what kay leaves to you.
 ---
 

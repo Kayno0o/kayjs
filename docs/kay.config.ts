@@ -10,6 +10,9 @@ const MARKDOWN_EXTENSION = /\.md$/
 // The full reference moved from /reference to /llms; /reference/checks is the people's page on kay check now.
 const moved = readdirSync(join(import.meta.dir, '../llms')).map(file => file.replace(MARKDOWN_EXTENSION, '')).filter(topic => topic !== 'checks')
 
+// The migration guides moved from /guides to their own section.
+const migrations = ['astro', 'sveltekit', 'nextjs', 'laravel'].map(framework => `migrating-from-${framework}`)
+
 export default defineConfig({
   log: false,
   plugins: [tailwind],
@@ -29,5 +32,5 @@ export default defineConfig({
   // kay's own docs wear kay's mark.
   lints: { 'default-favicon': 'allow' },
   // /docs is where a visitor, or an agent, guesses the docs are.
-  redirects: { '/docs': '/getting-started/introduction', ...Object.fromEntries(moved.map(topic => [`/reference/${topic}`, `/llms/${topic}`])) },
+  redirects: { '/docs': '/getting-started/introduction', ...Object.fromEntries(migrations.map(guide => [`/guides/${guide}`, `/migrating/${guide}`])), ...Object.fromEntries(moved.map(topic => [`/reference/${topic}`, `/llms/${topic}`])) },
 })

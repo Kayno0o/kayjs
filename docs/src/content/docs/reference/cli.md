@@ -385,7 +385,7 @@ Translates an Astro project's `.astro` files into `.kay` ones, its pages into `s
 
 `--format json` gives what it wrote and left to do as one document ([Output for tools](#output-for-tools)).
 
-The [Astro guide](/guides/migrating-from-astro) shows what it translates and how to finish what it lists.
+The [Astro guide](/migrating/migrating-from-astro) shows what it translates and how to finish what it lists.
 
 ## kay mcp
 

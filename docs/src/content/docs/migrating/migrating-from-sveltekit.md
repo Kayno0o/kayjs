@@ -1,6 +1,6 @@
 ---
 title: Migrating from SvelteKit
-order: 10.1
+order: 2
 description: Map what you know from SvelteKit to kay, concept by concept, and see what has no counterpart.
 ---
 

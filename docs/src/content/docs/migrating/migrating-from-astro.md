@@ -1,6 +1,6 @@
 ---
 title: Migrating from Astro
-order: 10
+order: 1
 description: Translate an Astro site into a kay project with kay migrate astro, then finish by hand what it lists.
 ---
 
