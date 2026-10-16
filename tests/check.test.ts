@@ -1883,7 +1883,7 @@ describe.concurrent('kay check, unused code', () => {
       expect(warned.output).toStartWith('warning[positional-key]: These rows are keyed by their position, though each has an `id`\n --> ')
       expect(warned.output.trim().split('\n').at(-1)).toBe('1 warning')
       expect(warned.code).toBe(0)
-      expect(await runCheck(root, '--deny-warnings')).toEqual({ code: 1, output: expect.stringContaining('\n1 warning, failing the check under --deny-warnings\n'), report: '' })
+      expect(await runCheck(root, '--deny-warnings')).toEqual({ code: 1, output: expect.stringContaining('\n1 warning, failing under --deny-warnings\n'), report: '' })
     }
     finally {
       await rm(root, { recursive: true, force: true })

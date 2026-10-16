@@ -5,7 +5,7 @@ import type { ModuleSize, RouteSize, SizeReport } from './report'
 import { KayError } from '../compiler/errors'
 import { lintLevel } from '../compiler/lints'
 
-// A size in bytes, or a string with its unit: `'20kb'`, `'1.5mb'`, `'800b'`.
+// A size in bytes, or a string with its unit: `'20kb'`, `'1.5mb'`, `'800b'`; decimals are fine, zero, a negative number or an exponent is refused when the config is read, which the type cannot say.
 export type ByteSize = number | `${number}${'b' | 'kb' | 'mb'}`
 
 // The most a page may load, compressed as a host serves it; a key left out sets no limit.
@@ -28,6 +28,15 @@ export function byteSize(value: unknown, what: string): number {
     throw new KayError('config-invalid', `kay: ${what} is ${typeof value === 'string' ? `'${value}'` : String(value)}; it takes a positive size, bytes or a string such as '20kb' or '1.5mb'`)
 
   return bytes
+}
+
+// Throws for a limit that is no positive size, whatever the lint's level.
+export function checkBudget(budget: BudgetConfig | undefined): void {
+  if (budget?.js !== undefined)
+    byteSize(budget.js, '`budget.js`')
+
+  if (budget?.css !== undefined)
+    byteSize(budget.css, '`budget.css`')
 }
 
 // The routes loading more than `budget` allows, each at its file, with the modules that weigh most in its scripts when the build measured them.

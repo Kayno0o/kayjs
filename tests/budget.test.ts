@@ -23,8 +23,10 @@ async function project(config: string): Promise<string> {
     'src/words.ts': `export const words = [${NOISE}]\n`,
     'src/counter.kay': '---\nimport { signal } from \'kay\'\nimport { words } from \'./words\'\n\nconst n = signal(0)\n---\nbutton(type="button" onClick={() => n.set(n() + 1)}) {words[n()]} {n()}\n',
     'src/light.kay': '---\nimport { signal } from \'kay\'\n\nconst n = signal(0)\n---\nbutton(type="button" onClick={() => n.set(n() + 1)}) {n()}\n',
-    'src/routes/index.kay': 'import Counter from \'../counter.kay\'\n\nCounter\n',
+    'src/routes/index.kay': '---\nimport Counter from \'../counter.kay\'\n---\nCounter\n',
     'src/routes/plain.kay': 'p Plain\n',
+    'src/routes/styled.kay': '---\nimport \'../note.css\'\n---\np.note Styled\n',
+    'src/note.css': '.note { color: rebeccapurple; margin: 0 auto; padding: 1rem 2rem; border: 1px solid #123456 }\n',
   }
 
   roots.push(root)
@@ -82,11 +84,46 @@ describe('budgetLints', () => {
 })
 
 describe('kay build with a budget', () => {
+  it('prints the modules under --analyze only, measures nothing for an allowed lint, and keeps a route with no JavaScript out', async () => {
+    const analyzed = await built(await project('budget: { js: \'2kb\' }'), '--analyze')
+
+    expect(analyzed.document.built!.sizes!.islands.some(island => island.modules !== undefined)).toBe(true)
+    expect(analyzed.over.map(problem => problem.message)).toEqual([expect.stringContaining('`/` can load')])
+
+    const allowed = await built(await project('budget: { js: \'2kb\' }, lints: { \'over-budget\': \'allow\' }'))
+
+    expect(allowed.document.built!.sizes!.islands.every(island => island.modules === undefined)).toBe(true)
+  }, 120_000)
+
+  it('reports a css budget, and refuses a limit that is no positive size whatever the lint\'s level', async () => {
+    const css = await built(await project('budget: { css: \'1b\' }'))
+
+    expect(css.over.map(problem => problem.message)).toEqual([expect.stringContaining('of CSS, over the budget of 0.0 KB')])
+    expect(css.over[0]!.message).toContain('`/styled`')
+
+    const bad = await built(await project('budget: { js: \'20 kb\' }, lints: { \'over-budget\': \'allow\' }'))
+
+    expect(bad.code).toBe(1)
+    expect(bad.document.problems.map(problem => problem.message).join('\n')).toContain('`budget.js` is \'20 kb\'')
+  }, 120_000)
+
+  it('has --deny-warnings fail on a check warning with no budget set', async () => {
+    const root = await project('')
+
+    await Bun.write(join(root, 'src/routes/clicks.kay'), 'p Press <kbd>Ctrl</kbd>\n')
+
+    const child = Bun.spawn([process.execPath, CLI, 'build', root, '--deny-warnings'], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, NODE_ENV: 'production' } })
+    const [err, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
+
+    expect(err).toContain('failing under --deny-warnings')
+    expect(code).toBe(1)
+  }, 120_000)
+
   it('warns of a page over budget.js with its heaviest modules, leaves --analyze\'s breakdown out of the report, and passes under a larger budget', async () => {
     const root = await project('budget: { js: \'2kb\' }')
-    const { code, document, over } = await built(root)
+    const { code, err, document, over } = await built(root)
 
-    expect(code).toBe(0)
+    expect([code, err]).toEqual([0, ''])
     expect(over.map(problem => problem.severity)).toEqual(['warning'])
     expect(over[0]!.message).toContain('`/` can load')
     expect(over[0]!.note).toContain('src/words.ts')

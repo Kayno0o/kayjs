@@ -243,7 +243,7 @@ The build runs `kay check` first and keeps the last build when the check or the 
 | `--outdir <dir>` | Where `--static` writes, `dist` by default |
 | `--no-check` | Skips the check |
 | `--analyze` | Lists the modules weighing most in the entry and each island |
-| `--deny-warnings` | Fails the build on a warning too, such as `over-budget` |
+| `--deny-warnings` | Fails the build on a warning of the check or of a lint too, such as `over-budget`; the notes about icon sets and codecs are not counted |
 | `-p <tsconfig>` | Names another tsconfig |
 | `--format <format>` | `text` by default; `github` annotates what the check found as `kay check --format github` does, and a template that does not compile or a failed stage too; `json` prints the whole build as one document once it ends, see [Output for tools](#output-for-tools) |
 
@@ -263,7 +263,7 @@ To keep pages light, set a budget in `kay.config.ts`. Nothing is limited until y
 export default defineConfig({ budget: { js: '20kb', css: '10kb' } })
 ```
 
-Each key is a size in bytes, or a string ending in `b`, `kb` or `mb`, and limits what one page loads, compressed as a host serves it. The build then warns with `over-budget` for each route over it, at the route's file, and lists the three modules weighing most in its scripts. Set the lint to `deny` in `lints` to fail the build on it, or pass `--deny-warnings`, which fails it on any warning, the check's included.
+Each key is a size in bytes, or a string ending in `b`, `kb` or `mb`, and limits what one page loads, compressed as a host serves it. The build then warns with `over-budget` for each route over it, at the route's file, and lists the three modules weighing most in its scripts. Set the lint to `deny` in `lints` to fail the build on it, or pass `--deny-warnings`, which fails it on any warning of the check or a lint. Each limit is a positive size: decimals are fine, and zero, a negative number or an exponent is refused when the config is read, by `kay check` as well.
 
 Every build writes `/_kay/THIRD-PARTY-LICENSES.txt`, served beside the rest and copied by `--static`: each package whose code, stylesheets or fonts the browser gets, and every `@iconify-json` set the project depends on, with its licence text. A set whose licence asks for more than that notice, such as CC BY's credit where the icons show, gets a warning. An executable prints the same notices, its server's packages added, for `./server --licenses`, with the licences of the codecs kay's AVIF encoder and decoder compile in (libavif, libaom, libsharpyuv, Emscripten's glue and musl).
 

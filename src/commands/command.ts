@@ -214,7 +214,7 @@ export async function printProblems(diagnostics: CheckDiagnostic[], denyWarnings
   }
 
   if (diagnostics.length > 0)
-    console.error([errors > 0 ? count(errors, 'error') : '', warnings > 0 ? `${count(warnings, 'warning')}${denyWarnings ? ', failing the check under --deny-warnings' : ''}` : ''].filter(part => part !== '').join(', '))
+    console.error([errors > 0 ? count(errors, 'error') : '', warnings > 0 ? `${count(warnings, 'warning')}${denyWarnings ? ', failing under --deny-warnings' : ''}` : ''].filter(part => part !== '').join(', '))
 
   return { failing: errors + (denyWarnings ? warnings : 0), found: diagnostics.length }
 }

@@ -13,6 +13,7 @@ import { availableParallelism } from 'node:os'
 import { join, relative, resolve } from 'node:path'
 import { check, configCheckOptions } from '../check'
 import { pageSeoLints, unkeptPageLints } from '../check/seo'
+import { lintLevel } from '../compiler/lints'
 import { pageHooks } from '../config'
 import { writeContentManifests } from '../content/server'
 import { cacheDir, clientOptionsOf, resolveProject } from '../project'
@@ -30,7 +31,7 @@ import { prerenderPages } from '../server/prerender'
 import { remoteImages, remotePatterns } from '../server/remote'
 import { slashedPath } from '../server/routes'
 import { linkStoredFiles } from '../server/storage'
-import { budgetLints } from './budget'
+import { budgetLints, checkBudget } from './budget'
 import { cacheCounts, resetCacheCounts } from './cache'
 import { buildClient } from './client'
 import { compileServer } from './compile'
@@ -97,6 +98,8 @@ export async function buildProject(root: string, config: KayConfig, options: Bui
 }
 
 async function runBuild(root: string, config: KayConfig, options: BuildOptions): Promise<BuildResult> {
+  checkBudget(config.budget)
+
   const project = resolveProject(root, config)
   const { output } = project.paths
   const previous = `${output}-previous`
@@ -328,7 +331,7 @@ async function bundleStage(project: Project, exported: boolean, analyze: boolean
   if (exported)
     refuseStaticConfig(config)
 
-  const client = await buildClient(root, clientOptionsOf(config, project.mode, { exported, report: analyze || project.config.budget?.js !== undefined ? 'modules' : 'sizes' }))
+  const client = await buildClient(root, clientOptionsOf(config, project.mode, { exported, report: analyze || (project.config.budget?.js !== undefined && lintLevel('over-budget', project.config.lints) !== 'allow') ? 'modules' : 'sizes' }))
 
   // A static host cannot pick a format by `Accept`, so an export links WebP alone.
   const avif = exported ? undefined : avifQuality(config.images)

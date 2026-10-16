@@ -1,3 +1,4 @@
+import type { BudgetConfig } from '../build/budget'
 import type { Diagnostic } from '../compiler/ast'
 import type { Paint } from '../compiler/frame'
 import type { LintLevels } from '../compiler/lints'
@@ -50,6 +51,7 @@ export interface CheckOptions {
   base?: string | undefined
   site?: string | undefined
   shutdownTimeout?: Duration | undefined
+  budget?: BudgetConfig | undefined
   // The config's locales: links may carry their prefixes, `t()` reads the default locale's messages, and every other locale's must match them.
   i18n?: I18nConfig | undefined
   // The site's one language without `i18n`: `t()` reads its extensions' catalogs and the app's then.
@@ -87,9 +89,9 @@ export interface CheckDiagnostic extends Pick<Diagnostic, 'label' | 'related' | 
 }
 
 export function configCheckOptions(config: KayConfig): CheckOptions {
-  const { routes, publicDir, api, content, redirects, i18n, lang, settings, base, site, shutdownTimeout, lints, extensions, seo, favicon, manifest, images, publicEnv, requireGuards, mcp } = config
+  const { routes, publicDir, api, content, redirects, i18n, lang, settings, base, site, shutdownTimeout, budget, lints, extensions, seo, favicon, manifest, images, publicEnv, requireGuards, mcp } = config
 
-  return { routes, publicDir, api, content, redirects, i18n, lang, settings, base, site, shutdownTimeout, lints, extensions, seo, favicon, manifest, images, publicEnv, requireGuards, mcp }
+  return { routes, publicDir, api, content, redirects, i18n, lang, settings, base, site, shutdownTimeout, budget, lints, extensions, seo, favicon, manifest, images, publicEnv, requireGuards, mcp }
 }
 
 // Type-checks a project, .kay components included, and reports every error at the line and column the user wrote.

@@ -2,6 +2,7 @@ import type { CheckDiagnostic, CheckOptions } from '.'
 import type { CollectionFeed } from '../content/claims'
 import type { LocaleSettings } from '../runtime/i18n'
 import { join, resolve } from 'node:path'
+import { checkBudget } from '../build/budget'
 import { islandId } from '../compiler'
 import { CONFIG_FILE } from '../config'
 import { claimFeed } from '../content/claims'
@@ -42,7 +43,7 @@ export async function bootProblems(root: string, options: CheckOptions, feeds: C
     }
   }
 
-  const { base, site, shutdownTimeout } = options
+  const { base, site, shutdownTimeout, budget } = options
 
   refused(config, () => basePath(base))
 
@@ -51,6 +52,8 @@ export async function bootProblems(root: string, options: CheckOptions, feeds: C
 
   if (shutdownTimeout !== undefined)
     refused(config, () => shutdownSeconds(shutdownTimeout))
+
+  refused(config, () => checkBudget(budget))
 
   // An SVG favicon is drawn by `kay build`, which it would fail.
   for (const problem of await svgFaviconProblems(faviconSource(root, options.favicon, options.manifest)))
