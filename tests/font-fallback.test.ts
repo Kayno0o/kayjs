@@ -120,6 +120,17 @@ describe('metric-matched font fallbacks', () => {
     expect(withFontFallbacks(css, fallbacks)).toBe(css)
   })
 
+  it('lists the fallback after a font shorthand size written as var() or calc(), spaces and a line height included', () => {
+    const fallbacks = fontFallbacks(ROOT, [{ family: 'Archivo Black', src: WOFF2 }])
+    const css = withFontFallbacks('a{font:var(--size) "Archivo Black",serif}b{font:700 calc(1rem + 2px)/1.5 Archivo Black, serif}c{font:var(--weight) 12px "Archivo Black",serif}d{font:italic var(--weight) var(--size, 1rem) "Archivo Black",serif}e{font:var(--font)}', fallbacks)
+
+    expect(css).toContain('a{font:var(--size) "Archivo Black","Archivo Black Fallback",serif}')
+    expect(css).toContain('b{font:700 calc(1rem + 2px)/1.5 Archivo Black,"Archivo Black Fallback", serif}')
+    expect(css).toContain('c{font:var(--weight) 12px "Archivo Black","Archivo Black Fallback",serif}')
+    expect(css).toContain('d{font:italic var(--weight) var(--size, 1rem) "Archivo Black","Archivo Black Fallback",serif}')
+    expect(css).toContain('e{font:var(--font)}')
+  })
+
   it('reads the metrics of a woff2 and of a woff alike', async () => {
     const fromWoff2 = fontMetrics(new Uint8Array(await Bun.file(`${ROOT}/${WOFF2}`).arrayBuffer()))
     const fromWoff = fontMetrics(new Uint8Array(await Bun.file(`${ROOT}/${WOFF}`).arrayBuffer()))

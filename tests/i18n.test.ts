@@ -870,6 +870,22 @@ describe('localized seo defaults', () => {
     expect(await (await server.handle(new Request('http://localhost/manifest.webmanifest'))).text()).toBe('{"name":"Mine"}')
   })
 
+  it('serves and links no locale manifest while the app\'s own endpoint answers the default one, whatever the locale prefix and base', async () => {
+    const dir = await fixtureCopy('i18n')
+
+    await Bun.write(join(dir, 'src/routes/manifest.webmanifest.ts'), 'export function GET() {\n  return \'{"name":"Mine"}\'\n}\n')
+
+    for (const variant of [{}, { base: '/docs' }]) {
+      const prefix = 'base' in variant ? '/docs' : ''
+      const server = new Elysia().use(await pages({ routes: join(dir, 'src/routes'), prebuilt: false, security: false, site: SITE, i18n: { ...i18n, messages: join(dir, 'src/messages') }, seo: { name: { fr: 'Le site', en: 'The site' } }, ...variant }))
+      const html = await (await server.handle(new Request(`http://localhost/en`))).text()
+
+      expect(html).toContain(`<link rel="manifest" href="${prefix}/manifest.webmanifest">`)
+      expect((await server.handle(new Request(`http://localhost/manifest.en.webmanifest`))).status).toBe(404)
+      expect(await (await server.handle(new Request(`http://localhost/manifest.webmanifest`))).text()).toContain('"name":"Mine"')
+    }
+  })
+
   it('serves one manifest while the texts are written once or the other locale reads the default\'s, whatever base and trailingSlash', async () => {
     for (const seo of [{ name: 'The site' }, { name: { fr: 'Le site' }, description: { fr: 'Ce que fait le site' } }]) {
       for (const variant of [{}, { base: '/docs', trailingSlash: 'always' as const }]) {

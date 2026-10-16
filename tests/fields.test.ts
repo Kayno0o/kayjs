@@ -187,6 +187,28 @@ describe('readQuery', () => {
   it('denies a query its schema refuses with 400', () => {
     expect(() => query('?n=x', t.Object({ n: t.Integer() }))).toThrow(Denied)
   })
+
+  it('words a refusal with the field\'s error function as with a string, and keeps the default wording for one that throws', () => {
+    const message = (search: string, schema: unknown) => {
+      try {
+        query(search, schema)
+      }
+      catch (error) {
+        return (error as Denied).message
+      }
+
+      return undefined
+    }
+
+    expect(message('?page=x', t.Object({ page: t.Integer({ error: () => 'the page is a number' }) }))).toBe('Invalid query: page: the page is a number')
+    expect(message('?page=x', t.Object({ page: t.Integer({ error: 'a number please' }) }))).toBe('Invalid query: page: a number please')
+    expect(message('?page=x', t.Object({ page: t.Integer({ error: () => {
+      throw new Error('boom')
+    } }) }))).toStartWith('Invalid query: page: ')
+    expect(message('?page=x', t.Object({ page: t.Integer({ error: () => {
+      throw new Error('boom')
+    } }) }))).not.toContain('boom')
+  })
 })
 
 describe('readParam', () => {

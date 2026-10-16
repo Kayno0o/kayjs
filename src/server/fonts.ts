@@ -79,8 +79,9 @@ const MIN_COVERAGE = 0.9
 const FIRST_NUMBER = /\d+/
 // A `@font-face` block, whose `font-family` names one family and is left alone, or a font stack: the property with what precedes it, and the list.
 const FONT_STACK = /@font-face\s*\{[^}]*\}|((?:^|[;{\s])(?:font-family|font|--[\w-]*font[\w-]*)\s*:\s*)([^\s;}!][^;}!]*)/g
-// The `font` shorthand lists its families after the size, which may carry a line height.
-const WORD = /(?<text>"[^"]*"|'[^']*'|\S+)\s*/g
+// The `font` shorthand lists its families after the size, which may carry a line height, and which `var()` or `calc()` may stand for, spaces and one level of nesting included.
+const WORD = /(?<text>"[^"]*"|'[^']*'|[\w-]+\((?:[^()]|\([^()]*\))*\)(?:\/\S+)?|\S+)\s*/g
+const SIZE_FUNCTION = /^(?:var|calc|min|max|clamp|env)\(/i
 const FONT_SIZE = /^(?:(?:\d+\.)?\d+(?:[a-z]+|%)|(?:x{1,3}-)?(?:small|large)|medium|larger|smaller)(?:\/\S+)?$/i
 const SHORTHAND_PROPERTY = /(?:^|[;{\s])font\s*:/
 const QUOTED = /^(["'])(.*)\1$/
@@ -145,14 +146,20 @@ export function fontFallbacks(root: string, fonts: (FontConfig | FontsourceConfi
 
 // Where the family list of a `font` shorthand starts, or nothing for a value without a size, such as a system font keyword.
 function familiesAfterSize(value: string): number | undefined {
+  // A function may stand for a weight or a style as well as the size, so a size found later wins, else the last one before the families.
+  let afterFunction: number | undefined
+
   for (const word of value.matchAll(WORD)) {
     const text = word.groups!.text!
 
     if (text.startsWith('"') || text.startsWith('\'') || text.endsWith(','))
-      return undefined
+      return afterFunction
 
     if (FONT_SIZE.test(text))
       return word.index + word[0].length
+
+    if (SIZE_FUNCTION.test(text))
+      afterFunction = word.index + word[0].length
   }
 
   return undefined

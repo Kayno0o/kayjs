@@ -5,6 +5,11 @@ description: What each release of kay and its libraries adds, with a link to whe
 ---
 This page lists what each release adds, newest first, with a link to where each feature is documented. kay and its libraries share one version number, so one section covers them all. What a release breaks, and what to change in your app, is in [Upgrading](/guides/upgrading).
 
+## Unreleased
+
+- **Font fallback with a computed size**: the metric-matched fallback is listed in a `font` shorthand whose size is `var()` or `calc()` too. [Styling and assets](/essentials/styling-and-assets)
+- **kayjs-mail errors keep their cause**: `send` throws an `Error` with the original value as its `cause` when a transport throws something that is not an `Error`. [kayjs-mail](/libraries/kayjs-mail)
+
 ## 1.48.0
 
 - **Highlighter helpers in the content cache**: a collection with a `highlight` recompiles its entries when a module the content config imports changes, so a helper the highlighter calls never leaves entries highlighted by its old code. [Content](/guides/content)

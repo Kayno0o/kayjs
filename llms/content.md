@@ -317,7 +317,7 @@ article
 
 - `posts.invalidate()` loads the entries afresh on the next read; it also marks the prerendered pages that read the collection stale (`kay build` keeps a page over a folder collection by itself, not one over a loader: add `prerender: true` for that), in every process sharing a `sqliteCache`; for a folder it matters in development, where the files change.
 - Each entry compiles once and is cached in `.kay/cache/content`, one file per entry holding the content's hash, the highlighter's source, the source of every project module the content config imports (a highlighter's helpers) and Bun's version it was compiled with, so a change to an entry recompiles that entry only, and a change to a module the config imports recompiles them all when the collection has a highlighter.
-- A highlighter whose output changes with no change to its source, such as a new theme passed in, needs that folder cleared.
+- A highlighter whose output changes with no change to its source, such as a new theme passed in, a `.kay` file or a data file (JSON, YAML) it reads, needs that folder cleared: only `.ts` and `.js` modules the config imports are hashed.
 - `kay build` compiles every collection into `.kay/client/content`, which production reads, an executable included, instead of the files.
 
 ### Loaded collections

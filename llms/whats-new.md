@@ -2,6 +2,11 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
+## Unreleased
+
+- The `font` shorthand's metric-matched fallback is listed when its size is `var()` or `calc()` too, `font: var(--size) "Inter", sans-serif` included ([Head](head.md#self-host-a-font)).
+- kayjs-mail's `send` throws an `Error` with the original value as its `cause` when a transport throws something that is not an `Error` ([kayjs-mail](../packages/mail/llms.txt)).
+
 ## 1.48.0
 
 - A collection with a `highlight` recompiles its entries when a module the content config imports changes, so a helper the highlighter calls never leaves entries highlighted by its old code ([Content](content.md#caching)).
@@ -9,7 +14,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - A server from `kay new`, kay's own server and `./server --health` read `HOST` beside `PORT`, listening on every address when it is unset; `kay dev` keeps its own address ([Project](project.md#build-one-executable)).
 - `kay build` keeps a page, layout or component that reads only `ctx.url.pathname` and `ctx.params`, so a layout marking the current nav link no longer stops every page; `ctx.url.search`, `ctx.url` whole, `ctx.request`, cookies and the rest still do. A kept copy reading the pathname is served at the path it was rendered at and rendered per request at any other spelling of it ([Prerendering](routing.md#prerendering)).
 - `kay build` keeps a page importing `s`, `withBase`, `sanitizeHtml` or the other exports of `kay` that read nothing from a request, and one using a `persisted` signal kept in `localStorage`; a signal kept in a cookie or the query still reads the request ([Prerendering](routing.md#prerendering)).
-- The metric-matched font fallback is listed in the `font` shorthand's family list too, and covers a WOFF2 whose `hmtx` table is transformed; `kay dev` reads a swapped font file's metrics again ([Head](head.md#self-host-a-font)).
+- The metric-matched font fallback is listed in the `font` shorthand's family list too, and covers a WOFF2 whose `hmtx` table is transformed; `kay dev` reads a swapped font file's metrics again X.
 - A site serving its own `/manifest.webmanifest` keeps it in every locale: kay no longer serves or links the per-locale manifests beside it, and changing one locale's `seo.name` no longer renames every share card ([Head](head.md#favicon-and-web-manifest)).
 - An `await` block streams any promise it is given, `await data.comments`, a prop or one a component makes, with no `defer()`, and a rejection before it renders crashes no server: `kay check` no longer asks for `defer()` ([Caching and streaming](rendering.md#stream-a-slow-value-into-the-page)).
 - `mcp: true` in kay.config.ts serves an MCP endpoint at `/mcp` for agents: a tool per API route of the OpenAPI document and per action that sets `tool`, called through the app's own guards, rate limits and `ctx.locals`; the OpenAPI document gains an `operationId` per operation and the tool actions, `kay check` reports `unguarded-tool`, and `kay/test` has `site.mcp` ([API routes](api-routes.md#let-an-agent-call-the-app)).
@@ -29,7 +34,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - The editor's ESLint on a fresh app works with no command before it: it runs the new `kay types`, which writes `.kay/types` without checking, the first time it meets a component with no types ([Linting](checks.md#linting)).
 - `kay add <features> [dir]` gives an existing project a `kay new` feature (or `mail`, `cms`, the libraries' own), writing the same files and edits and installing what it needs, and stops with the edit to make by hand when a file is not what `kay new` wrote ([Project](project.md#commands)).
 - A fresh `app` runs `bun run dev` with Bun alone: its members live in a SQLite file through pg-orm, `bun run dev` migrates it, and its tests and workflow need no Postgres; `kay new --template app --with postgres` keeps the Postgres stack ([Project](project.md#commands)).
-- Self-hosted fonts get a metric-matched fallback: a `"Family Fallback"` face (Arial, Times New Roman or Courier New resized to the font) is declared and listed after the family in built stylesheets, so the swap shifts the layout less ([Head](head.md#self-host-a-font)).
+- Self-hosted fonts get a metric-matched fallback: a `"Family Fallback"` face (Arial, Times New Roman or Courier New resized to the font) is declared and listed after the family in built stylesheets, so the swap shifts the layout less X.
 - `seo.name`, `titleTemplate`, `description`, `image`, `imageAlt` and `locale` take a record of one text per locale, so a multilingual site writes its descriptions in `kay.config.ts` rather than a `meta` tag per page; the head lints check each ([Head](head.md#site-defaults-and-social-cards)).
 - A schema field's `error` may be a function, `error: () => t('key')`, which kay calls in the request's locale for the server's refusal and the rules rendered into the page; kayjs-mail's `contactForm` field errors and kayjs-ui's `ContactForm` labels follow the page's language this way, in English and French ([Actions](actions.md)).
 - kayjs-mail's `contactForm(mail, options)` and kayjs-ui's `ContactForm` make a contact form of one line, `export const contact = action(...contactForm(mail))` and `ContactForm(action={contact})`: the schema, the link cap, `rateLimit`, `honeypot` and `minTime`, the mail with the visitor in `replyTo`, and worded 503 and 502 refusals come with them, in English and French ([kayjs-mail](../packages/mail/llms.txt), [kayjs-ui](../packages/ui/llms.txt)).
