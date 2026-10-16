@@ -1,4 +1,3 @@
-
 import type { Static, t, TSchema } from 'elysia'
 import type { ErrorStatus, RouteParams } from './checks'
 import type { Duration } from './duration'
