@@ -63,16 +63,31 @@ export function validated(schema: TSchema): TSchema {
   return withoutFunctions.get(schema) as TSchema
 }
 
-// The `error` option at a JSON pointer of the action's own schema, a field's or an item's, read in the current locale.
-export function fieldMessage(schema: unknown, pointer: string): string | undefined {
-  let node = schema
+const segmentOf = (segment: string): string => segment.replaceAll('~1', '/').replaceAll('~0', '~')
 
-  for (const segment of pointer.split('/').slice(1)) {
-    if (!isNode(node))
-      return undefined
+// The first `error` found on the way down: a field's own, else a branch of its `anyOf`.
+function find(node: unknown, segments: string[]): string | undefined {
+  if (!isNode(node))
+    return undefined
 
-    node = isNode(node.properties) && segment in node.properties ? node.properties[segment] : node.items
+  const [head, ...rest] = segments
+  const named = head !== undefined && isNode(node.properties) && Object.hasOwn(node.properties, head)
+  const found = head === undefined ? errorText(node.error) : find(named ? (node.properties as Record<string, unknown>)[head] : node.items, rest)
+
+  if (found !== undefined || !Array.isArray(node.anyOf))
+    return found
+
+  for (const branch of node.anyOf) {
+    const inBranch = find(branch, segments)
+
+    if (inBranch !== undefined)
+      return inBranch
   }
 
-  return isNode(node) ? errorText(node.error) : undefined
+  return undefined
+}
+
+// The `error` option at a JSON pointer of the action's own schema, a field's, an item's or one of a union's branches, read in the current locale.
+export function fieldMessage(schema: unknown, pointer: string): string | undefined {
+  return find(schema, pointer.split('/').slice(1).map(segmentOf))
 }

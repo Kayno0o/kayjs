@@ -4,6 +4,7 @@ import { describe, expect, it } from 'bun:test'
 import { clientDir } from '../src/build/assets'
 import { resolveProject } from '../src/project'
 import { servePages } from '../src/server/app'
+import { fieldMessage, validated } from '../src/server/field-errors'
 import { testSite } from '../src/test'
 
 type Rules = Record<string, { properties: Record<string, { error?: string }> }>
@@ -43,5 +44,42 @@ describe('a field error written as a function', () => {
     expect(french.status).toBe(422)
     expect(french.html).toContain('Écrivez un nom')
     expect(french.html).not.toContain('no message')
+  })
+
+  it('words a file of the wrong type and a refused union branch in the page\'s language', async () => {
+    const site = await testSite({ routes: `${FIXTURE}/src/routes`, i18n })
+    const { attach } = await import(`${import.meta.dir}/fixtures/form-words/src/routes/index.kay`) as { attach: Parameters<typeof site.submit>[0] }
+    const input = { photo: new File(['text'], 'a.png', { type: 'image/png' }), contact: 'nope' }
+    const french = await site.submit(attach, input, { from: '/fr' })
+
+    expect(french.status).toBe(422)
+    expect(french.html).toContain('Écrivez un nom')
+  })
+})
+
+describe('the error functions of a schema', () => {
+  const schema = {
+    properties: {
+      'a/b': { error: () => 'slashed' },
+      'list': { items: { error: () => 'item' } },
+      'either': { anyOf: [{ type: 'null' }, { error: () => 'branch' }] },
+    },
+  }
+
+  it('are read at a pointer, an escaped name, an item and a union branch included, and never from the prototype', () => {
+    expect(fieldMessage(schema, '/a~1b')).toBe('slashed')
+    expect(fieldMessage(schema, '/list/3')).toBe('item')
+    expect(fieldMessage(schema, '/either')).toBe('branch')
+    expect(fieldMessage(schema, '/__proto__')).toBeUndefined()
+    expect(fieldMessage(schema, '/constructor')).toBeUndefined()
+  })
+
+  it('are left out of the copy Elysia validates with, the schema itself untouched', () => {
+    const copy = validated(schema as never) as unknown as typeof schema
+
+    expect(copy).not.toBe(schema)
+    expect(copy.properties['a/b']).not.toHaveProperty('error')
+    expect(schema.properties['a/b'].error()).toBe('slashed')
+    expect(validated(copy as never)).toBe(copy as never)
   })
 })

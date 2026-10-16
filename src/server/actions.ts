@@ -178,7 +178,7 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], m
           if (code === 'INVALID_FILE_TYPE') {
             const field = error.property.replace(BODY_PREFIX, '')
 
-            return failed(request, new Headers(), cookieJar(request).cookies, { action: value.url, status: 422, values: submittedValues(body), errors: { [field]: fieldError(value, field) ?? 'Invalid file type' } }, server, back)
+            return inLocale(request, options, async () => failed(request, new Headers(), cookieJar(request).cookies, { action: value.url, status: 422, values: submittedValues(body), errors: { [field]: fieldError(value, field) ?? 'Invalid file type' } }, server, back))
           }
 
           // Read as unknown: some apps' Elysia types narrow the error to an intersection holding `number`.

@@ -7,6 +7,11 @@ export const rename = action(s.Object({
   nickname: s.String({ minLength: 2, error: () => { throw new Error('no message') } }),
   note: s.String({ minLength: 2, error: () => 42 as unknown as string }),
 }), () => undefined)
+
+export const attach = action(s.Object({
+  photo: s.File({ type: 'image/png', error: () => t('form.name') }),
+  contact: s.Union([s.String({ format: 'email', error: () => t('form.name') }), s.Null()]),
+}), () => undefined)
 ---
 form(action={rename})
   input(field="name")
@@ -16,3 +21,9 @@ form(action={rename})
   input(field="note")
   error note
   button Rename
+form(action={attach})
+  input(field="photo" type="file")
+  error photo
+  input(field="contact")
+  error contact
+  button Send

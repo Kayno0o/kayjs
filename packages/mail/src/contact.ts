@@ -28,7 +28,8 @@ const DEFAULT_ERRORS = { name: 'Please write your name, on one line.', email: 'P
 // The message in the page's language, or the English text when kayjs-mail's messages are not brought in (`mailExtension`) or the language has none.
 function wording(key: string, english: string): string {
   try {
-    const text = (t)(key)
+    // eslint-disable-next-line ts/no-unnecessary-type-assertion -- t takes any key until an app registers its messages
+    const text = (t as (key: string) => string)(key)
 
     return text === key ? english : text
   }
