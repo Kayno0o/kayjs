@@ -567,7 +567,7 @@ describe('kay dev memory', () => {
   async function measuring(project: Awaited<ReturnType<typeof served>>, file: string) {
     const memory = JSON.stringify(file)
 
-    await entryWith(project, `Bun.gc(true)\nawait Bun.write(${memory}, \`\${await Bun.file(${memory}).text().catch(() => '')}\${process.memoryUsage().heapUsed} \${process.memoryUsage.rss()}\\n\`)\n`)
+    await entryWith(project, `Bun.gc(true)\nawait Bun.write(${memory}, \`\${await Bun.file(${memory}).text().catch(() => '')}\${process.memoryUsage().heapUsed} \${process.memoryUsage.rss()} \${process.pid}\\n\`)\n`)
   }
 
   async function editing(project: Awaited<ReturnType<typeof served>>, file: string) {
@@ -578,7 +578,7 @@ describe('kay dev memory', () => {
 
     await until(() => lines(file).length >= 61)
 
-    return lines(file).map(line => line.split(' ').map(Number) as [heap: number, rss: number])
+    return lines(file).map(line => line.split(' ').map(Number) as [heap: number, rss: number, pid: number])
   }
 
   it('holds the same heap after sixty edits of a large page as after thirty', async () => {
@@ -607,10 +607,17 @@ describe('kay dev memory', () => {
     try {
       await measuring(project, file)
 
-      const rss = (await editing(project, file)).map(([, resident]) => resident)
+      const samples = await editing(project, file)
+      const byProcess = Map.groupBy(samples, ([, , pid]) => pid)
 
-      // Bun keeps the code of every module it evaluates again, about 1 MB per edit of this page, so the process is replaced once it grew by the limit instead of by the edits.
-      expect(Math.max(...rss) - rss[3]!).toBeLessThan((LIMIT_MB + 16) * 2 ** 20)
+      // A process is replaced by the first reload that starts past the limit from its first reload, so it peaks at the limit plus what its first reload and its last one add, each up to about 12 MB: the first one compiles the page and fills Bun's module caches, the last one lands on a heap a collection just emptied.
+      // The sample a process starts with is the one before all that, taken after a collection like the others; sixty edits without a replacement grow by about 64 MB.
+      for (const [, own] of byProcess) {
+        const resident = own.map(([, bytes]) => bytes)
+
+        expect(Math.max(...resident) - resident[0]!).toBeLessThan((LIMIT_MB + 2 * 12) * 2 ** 20)
+      }
+
       expect(project.children.length).toBeGreaterThan(2)
     }
     finally {
