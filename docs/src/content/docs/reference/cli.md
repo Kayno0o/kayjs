@@ -138,7 +138,7 @@ The dev server answers 421 to a request whose `Host` is not `localhost`, a `*.lo
 KAY_DEV_HOSTS=dev.example.com bunx kay dev --host
 ```
 
-<ReadMore href="/llms/project#commands">What `kay dev` reloads and restarts on, what it closes after an edit, the network address line, `--inspect` rules and every `--format json` event.</ReadMore>
+<ReadMore href="/llms/dev-server">What `kay dev` reloads and restarts on, what it closes after an edit, the network address line, `--inspect` rules and every `--format json` event.</ReadMore>
 
 ### Errors without a browser
 
@@ -204,7 +204,7 @@ Every build writes `/_kay/THIRD-PARTY-LICENSES.txt`, with the licence of each pa
 
 See [Prove the executable starts](/guides/deployment#prove-the-executable-starts) for `--verify`.
 
-<ReadMore href="/llms/project#commands">Progress output, how a route's scripts are estimated, the notices for icon sets and codecs, and the build document in full.</ReadMore>
+<ReadMore href="/llms/build-and-start">Progress output, how a route's scripts are estimated, the notices for icon sets and codecs, and the build document in full.</ReadMore>
 
 ## kay start
 
@@ -247,7 +247,7 @@ A redirect prints `kay render: 302 Found, to /login` on stderr and exits 0. A st
 | `-i`, `--include` | Prints the status line and the response's headers on stderr |
 | `--entry <file>` | Runs that server entry instead, relative to the current directory |
 
-<ReadMore href="/llms/project#commands">Full URLs and hosts, `base`, the timeouts and how the temporary build is cleaned up.</ReadMore>
+<ReadMore href="/llms/check-and-tools">Full URLs and hosts, `base`, the timeouts and how the temporary build is cleaned up.</ReadMore>
 
 ## kay check
 

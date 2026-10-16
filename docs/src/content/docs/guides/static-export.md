@@ -20,7 +20,7 @@ The browser build goes under `_kay/`. The files of `public/` are copied to the r
 
 Compressible files also get a `.br` and a `.gz` copy beside them, for a server that sends them as they are, such as nginx with `gzip_static`. Asset names carry a hash, so `_kay/` can be cached forever.
 
-<ReadMore href="/llms/routing#static-export">Images, redirects, locales and how the output directory is cleared.</ReadMore>
+<ReadMore href="/llms/prerendering#static-export">Images, redirects, locales and how the output directory is cleared.</ReadMore>
 
 ## Pages that need a server
 
@@ -30,7 +30,7 @@ That covers a page behind a guard, one exporting an action, one holding a server
 
 List the values of a page with params in the `prerender` setting of its `page`, and it exports. Locales by domain need a server too.
 
-<ReadMore href="/llms/routing#static-export">The full list of what cannot be exported, and how redirects become pages.</ReadMore>
+<ReadMore href="/llms/prerendering#static-export">The full list of what cannot be exported, and how redirects become pages.</ReadMore>
 
 ## Mount the site under a path
 
@@ -82,4 +82,4 @@ Under `always`, canonical links, the sitemap and the links in search results end
 
 A static export writes both `about.html` and `about/index.html`, so any value works on a plain file host. Set `trailingSlash` to the one your host redirects to.
 
-<ReadMore href="/llms/routing#prerendering">How kept pages read `ctx.url.pathname` under each value.</ReadMore>
+<ReadMore href="/llms/prerendering#prerendering">How kept pages read `ctx.url.pathname` under each value.</ReadMore>

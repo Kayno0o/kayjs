@@ -141,7 +141,7 @@ button(onClick={() => navigate('/todos')}) Todos
 
 A link with `data-reload` loads its page fully. So does every link to a page setting `reload: true` in its `page`.
 
-<ReadMore href="/llms/islands#navigation">How focus moves on back and forward, and the other cases that load a page fully.</ReadMore>
+<ReadMore href="/llms/navigation#navigation">How focus moves on back and forward, and the other cases that load a page fully.</ReadMore>
 
 ## Browser-only code
 
@@ -213,7 +213,7 @@ Without `on` the shortcut binds the whole page. It cancels the browser's own act
 
 A shortcut with `mod`, `ctrl`, `meta` or `alt` also fires in a text field. A bare key such as `/` fires there only with `{ inputs: true }`. Of two bindings on one key, the innermost wins.
 
-<ReadMore href="/llms/islands">Which keys fire in a text field, how Shift and AltGr match, and the other options of `shortcut`.</ReadMore>
+<ReadMore href="/llms/navigation">Which keys fire in a text field, how Shift and AltGr match, and the other options of `shortcut`.</ReadMore>
 
 ## A page kay does not serve
 

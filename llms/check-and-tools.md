@@ -1,0 +1,115 @@
+# Check, inspect and tool commands
+
+## Common tasks
+
+### Check the project
+
+`kay check` type-checks the project, `.kay` files included, and fails on errors, and on warnings with `--deny-warnings`, which the `check` script `kay new` writes leaves out:
+
+```sh
+kay check --deny-warnings
+kay check --fix
+kay check --format github
+```
+
+### List the routes the project serves
+
+`kay routes` lists pages, actions, endpoints and API routes without running a page or a guard:
+
+```sh
+kay routes
+```
+
+### Check what a page renders
+
+`kay render` prints the HTML the server answers for one URL, as `kay dev` serves it, without starting a server; what the server logs goes to stderr, and a status of 400 or above exits 1:
+
+```sh
+kay render /about
+kay render /account --cookie session=…
+```
+
+### Give an agent kay's tools
+
+`kay mcp` serves the project in the current directory as an MCP server over stdio, for an agent to call instead of running `kay` in a shell. It needs nothing in the app: the agent's client starts it from the project's root, where kay is installed.
+
+```sh
+claude mcp add kay -- bunx kay mcp
+```
+
+Another client takes the same command in its MCP config, such as `.mcp.json` at the project's root for Claude Code (a client may name the key `servers`):
+
+```json
+{ "mcpServers": { "kay": { "command": "bunx", "args": ["kay", "mcp"] } } }
+```
+
+The tools are `check` (`paths`, `only`, `denyWarnings`), `routes`, `explain` (a lint or an error code, `name`), `render` (`url`, `method`, `body`, `headers`, `cookies`) and `dev_errors`; the resources are `kay://llms.txt` and one `kay://llms/<file>.md` per guide, each listing its sections. See [Commands](project.md#commands).
+
+### Format the templates
+
+`kay fmt` formats `.kay` files, and `--check` lists the unformatted ones and fails:
+
+```sh
+kay fmt
+kay fmt --check
+```
+
+## Reference
+
+### Check and inspect commands
+
+- `kay check [dir] [paths...] [-p tsconfig.json] [--entry <file>] [--deny-warnings] [--fix] [--only <group>] [--since <minor>] [--format text|github|json] [--watch] [--quiet]`:
+  - Type-check the project, `.kay` files included;
+  - The first path is the project when it is a directory holding a `kay.config.ts`, `package.json` or `tsconfig.json`, or any directory outside the current directory, so a directory given first to narrow the report must be neither;
+  - The other paths, files or directories relative to the current directory, a symlink read as what it points to, narrow the report, and `--fix`, to the problems in them, the project still checked as a whole, and one outside the project fails the check;
+  - `--watch` checks again on every change, tests included, each check a `kay check` of its own, so an edit to `kay.config.ts` counts and a check that cannot run, or exits before reporting, leaves the watch going, clearing the previous report in a terminal, and an interrupt or a closed terminal stops the check running and what it started, a second interrupt killing them;
+  - `-p` is relative to `dir`, and a tsconfig that is missing or matches no files fails the check.
+  - `--since 1.46` reports and, with `--fix`, fixes the `deprecated` lints that came in that minor alone, as `kay upgrade` runs it; it does not go with `--only`.
+  - `--entry` names the server entry whose `app` types `ctx.locals` and the app routes, `src/server.ts` by default, as `kay build --entry` does (see [Locals](server.md#locals)).
+  - It fails on errors, and on warnings too with `--deny-warnings` (see [Lints and warnings](lints.md#lints-and-warnings)).
+  - `--fix` first applies the quick fixes that change nothing else, removing an unread prop or writing `onclick` as `onClick`, then reports what is left; the others, such as a key or a `maxLength` to choose, stay the editor's.
+  - `--only seo` prints one group's lints alone, as an audit (see [Lints and warnings](lints.md#lints-and-warnings)).
+  - `--format github` prints each problem as a workflow command, `::error file=...,line=...,col=...::message`, which GitHub and Forgejo Actions show on the diff, as the CI `kay new` writes does, its `file` relative to `GITHUB_WORKSPACE`, the repository's root, when set;
+  - `--format json` prints `{ errors, warnings, problems }` on stdout, each problem's `file` relative to the current directory with its `line`, `column`, `endLine`, `endColumn`, `severity`, `code` and `message`;
+  - A check that cannot run, on a path that does not exist or a `kay.config.ts` that does not load, prints one error in the format too, with no `file` but where a config does not parse;
+  - The exit code is the same in every format.
+  - It also reports what the server would refuse when it boots, with the same functions: two pages serving one path, a redirect from a path a page serves or with syntax the router refuses, a page under a locale's prefix, a public file a page serves, two files whose actions share a URL (`a b.kay` and `a_b.kay`), a `base`, `site` or `shutdownTimeout` it cannot read, a collection feed without `site`, and a guard, API module or matcher whose default export is not a guard, an Elysia instance or a function.
+  - `kay build` reports them as it checks, and the editor after a save or a change on disk.
+- `kay render <url> [dir] [--method <method>] [--body <text>] [--header <name: value>]... [--cookie <name=value>]... [-i|--include] [--entry <file>]`:
+  - Answer one request as the server entry answers it under `NODE_ENV=development`, as `kay dev` serves it but without the inspector's attributes, and print the body on stdout; the server runs on a Unix socket of its own, not a port, stops once it answered, or starts stopping within a second once `kay render` is killed, and builds the browser code into a directory under `.kay` it removes, never touching `kay build`'s or `kay dev`'s; the next `kay render` removes what a SIGKILLed one left.
+  - What the server logs, a page's error report included, goes to stderr; a redirect prints `kay render: 302 Found, to /login` there and exits 0, a status of 400 or above prints its line there and exits 1, and a server exiting before it serves fails with its code.
+  - `--body` posts as a form does, `application/x-www-form-urlencoded`, unless a `--header` names another `content-type`; `--header` and `--cookie` repeat, a guarded page rendering signed in with the session cookie a browser holds; `-i` prints the status and headers on stderr.
+  - Under `base`, a path under it is taken as the proxy in front of the server hands it over, so a link a page printed renders as it is.
+  - The whole app boots for it: its jobs and modules' top-level code run, and a `POST` to an action runs it against the app's database. The request goes to the first server the entry starts, with the host a full URL names, over plain HTTP; a server not listening after 60 seconds fails it.
+- `kay routes [dir] [--format text|json]`:
+  - List the routes the project serves, without running a page or a guard: each page's pattern with its matchers, `/items/:id=integer`, and file, once per locale's path (`/about`, `/fr/a-propos`), with its layouts and guards, outermost first, `prerendered` with `prerender: true` or a server island, `prerendered as its prerender setting lists` with a list or a function, `open` with `guards: false` and the 403 `requireGuards` gives one with no guard;
+  - Each action, endpoint, API module route with its method, `WS` and `OPTIONS` included, and a library's with the guards of its own directory (API modules are imported, as only they know their routes, so their top-level code runs: what it writes to stdout, through the console or `process.stdout`, goes to stderr, and one that fails to load or calls `process.exit()` is listed by its mount with why), the routes of an extension's `server` given as an Elysia instance, each redirect and collection feed;
+  - And kay's own routes the config turns on, such as `/_kay/health`, the favicons and the sitemap.
+  - What the server entry adds, as a `.use(auth.plugin)`, and an extension's `server` given as a function are only known as the server starts: a last line names them, unlisted.
+- `kay env [dir] [--format text|json]`:
+  - Lists the environment variables the project declares, for a deploy script to compare with a compose or an env file: each `defineEnv` schema in the modules under `src` (imported without the server's environment, so their top-level code runs and its output goes to stderr; the server entry is not run, and a schema it declares is not listed; a schema built inside a function is not seen), `publicEnv`, the `env` schema of each extension, and kay's own `PORT`, `HOST`, `SITE_URL` and `ORIGIN`;
+  - Each with its source, type, whether it is required (`always`, `production` for a field with `requiredInProduction: true`, or `optional`) and its default; a module that does not load is named as not read.
+- `kay upgrade [dir]`:
+  - Move the `kay` and `@kaynooo/kayjs-*` ranges of `package.json` that are version ranges of the registry, `npm:@kaynooo/kayjs@~1.45.0` or `~1.45.0` (a path, workspace or git source is left), to `~<latest>` with the registry's answer, install, then run the installed kay's `kay check --fix --since <minor>` once per minor between the version the app was on and the one it moves to, oldest first, listing them from the installed kay's `kay explain deprecated --format json`, then `kay check --fix`, which prints what is left to do by hand and sets the exit code.
+  - An app already on the latest is left as it is, a registry older than the app's range never moves it back, and a failed install puts `package.json` back as it was. A deprecated form is one `deprecated` lint with its `since` minor and a safe fix; a minor's breaking changes carry one when `kay check` can see the old form, see [Checks](checks.md).
+- `kay explain [lint|error|group] [--format text|json]`:
+  - List the lints with their groups and default levels and the errors with theirs, or a group's, or print one: a lint with an example it reports and the same written right, an error with where its fix is written.
+- `kay fmt [paths...] [--check] [--format text|json] [--quiet]`:
+  - Format `.kay` files; `--check` lists unformatted files and fails.
+- `kay lint [keslint arguments]...`:
+  - Write the types the lint of `.kay` files reads, as `kay check` does, then run the project's `keslint` with the arguments, so linting needs no check before it; its exit code is `keslint`'s (see [Linting](checks.md#linting)).
+- `kay types [dir] [--quiet]`:
+  - Write `.kay/types`, which the language server, `kay lint` and the editor's ESLint read, without checking anything; the editor's ESLint runs it through `bun` the first time it meets a component whose types are missing.
+- `kay lsp --stdio`:
+  - The language server behind the editor extension in `editors/vscode`: errors, hover, completion with auto-import, signatures, definitions, references, rename, quick fixes and formatting in `.kay` files.
+  - An import it adds goes in the fence the name is used from, the server fence for server code and the component script otherwise, made if missing.
+  - Renaming a server value renames its reads in the template, and renaming a destructured prop renames it in every parent passing it.
+  - It runs the project's `kay.config.ts`, and the modules it imports, as soon as a `.kay` file is opened, as `bun` would: open only a project you trust, as with its `package.json` scripts.
+- `kay mcp [--stdio]`:
+  - Serve the project in the current directory to an agent as an MCP server over stdio (newline-delimited JSON-RPC), in both the revision that opens with `initialize` (`2025-11-25` and earlier) and `2026-07-28`, whose requests carry their version in `_meta`; it needs no setup in the app and prints nothing but protocol on stdout.
+  - Tools, each with an input schema: `check` runs `kay check --format json` and answers its document, taking `paths` (files or directories inside the project to report on, `.` for all of it; the project is checked whole either way), `only` (a lint group) and `denyWarnings`; `routes` answers `kay routes --format json`; `explain` lists the lints and error codes, or explains the lint, error code or group in `name`; `render` runs `kay render` on `url` with `method`, `body`, `headers` (`name: value`) and `cookies` (`name=value`), answering the body (an image or a blob, unchanged, when it is not text), then the status line, headers and server log, as an error result for a status of 400 or above; `dev_errors` reads `.kay/dev/errors.json` (see `kay dev`), an empty list when `kay dev` has met nothing.
+  - Each tool runs the command in a child process of its own, so a call pays what the command costs, a `check` as long as `kay check`; a problem found is a result, a command that could not run an error result (`isError`). Calls run one at a time, in the order they came, and a command that is stopped (timeout, client gone) takes what it started along.
+  - Resources: `kay://llms.txt`, and `kay://llms/<file>.md` for each file of `llms/`, with the file's title and the headings of its sections as description; only those are readable.
+  - Register it with `claude mcp add kay -- bunx kay mcp`, or as `{ "mcpServers": { "kay": { "command": "bunx", "args": ["kay", "mcp"] } } }` in a client's JSON config.
+- `kay fmt` refuses a path that is missing or is neither a directory nor a `.kay` file.
+- The TextMate grammar the extension highlights `.kay` files with ships as `kay/kay.tmLanguage.json`, for a highlighter such as Shiki: register it as `{ ...grammar, name: 'kay', embeddedLangs: ['typescript'] }`.

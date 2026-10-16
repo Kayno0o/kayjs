@@ -69,7 +69,7 @@ A page reading a live value is rendered for each request. `kay build` does not k
 
 A client holds at most 20 live connections, a few tabs. The next one is refused until another closes. A client is its address, so behind a reverse proxy set `proxy` in kay.config.ts, or every visitor shares one address and one cap. See [Deployment](/guides/security#trust-a-proxy).
 
-<ReadMore href="/llms/api-routes#live-values">Proof lifetimes and renewal, reconnect delays, how an island's imports are followed and the exact limits are in the full API routes reference.</ReadMore>
+<ReadMore href="/llms/api-from-islands#live-values">Proof lifetimes and renewal, reconnect delays, how an island's imports are followed and the exact limits are in the full API routes reference.</ReadMore>
 
 ## Reading a route in an island
 
@@ -168,7 +168,7 @@ p {answer.last()}
 
 `stream` also takes a function returning an async iterable, and gives `last()`, `on()`, `status()` and `close()`. The iterable has to stop on the `signal` the function receives.
 
-<ReadMore href="/llms/api-routes#event-streams">How a source is read and stopped, failure handling and keep-alive comments are in the full API routes reference.</ReadMore>
+<ReadMore href="/llms/api-from-islands#event-streams">How a source is read and stopped, failure handling and keep-alive comments are in the full API routes reference.</ReadMore>
 
 ## Websockets
 
@@ -260,4 +260,4 @@ dispatch(body, {
 
 It works on the server's `body` and on what an island's `socket` receives.
 
-<ReadMore href="/llms/api-routes#rooms">Sharing rooms between processes with SQLite, `to` targets, rejoining after a drop and reconnect timing are in the full API routes reference.</ReadMore>
+<ReadMore href="/llms/api-from-islands#rooms">Sharing rooms between processes with SQLite, `to` targets, rejoining after a drop and reconnect timing are in the full API routes reference.</ReadMore>

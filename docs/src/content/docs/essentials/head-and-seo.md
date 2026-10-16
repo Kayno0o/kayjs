@@ -110,7 +110,7 @@ export default defineConfig({
 
 An analytics script that needs the visitor's consent goes in an island instead, loaded once they agreed. [Privacy](/guides/privacy) shows how.
 
-<ReadMore href="/llms/head">The manifest of a locale, a site that serves its own manifest, and the OpenAPI title.</ReadMore>
+<ReadMore href="/llms/sitemap-search-fonts">The manifest of a locale, a site that serves its own manifest, and the OpenAPI title.</ReadMore>
 
 ## Social card
 
@@ -198,4 +198,4 @@ head
 
 `seo.jsonLd` in the config takes the same data for every page.
 
-<ReadMore href="/llms/head">Breadcrumb lists, `siteUrl()`, what the offline worker keeps and skips, and every favicon and manifest option.</ReadMore>
+<ReadMore href="/llms/sitemap-search-fonts">Breadcrumb lists, `siteUrl()`, what the offline worker keeps and skips, and every favicon and manifest option.</ReadMore>

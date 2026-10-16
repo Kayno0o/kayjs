@@ -187,7 +187,7 @@ export default defineMessages({
 })
 ```
 
-- A library listed in `extensions` can bring catalogs of its own, `<locale>.ts` each in the directory its `messages` names (see [Extensions](components.md#extensions)).
+- A library listed in `extensions` can bring catalogs of its own, `<locale>.ts` each in the directory its `messages` names (see [Extensions](component-libraries.md#extensions)).
 - Every locale reads the library's messages with the app's laid over them key by key, so `auth: { title: 'Connexion' }` in `src/messages/fr.ts` replaces that one text of the library and keeps the rest.
 - `t()` types the keys of both, and `kay check` holds each locale to the default one's keys, the library's included, so a locale the library does not translate is the app's to fill.
 - The app needs no file of its own for a locale the library translates.

@@ -62,27 +62,27 @@ export const ERRORS = {
   'browser-only-read': {
     group: 'compile',
     summary: 'A browser-only name such as `window` read while a component renders on the server too; reported by the type check, so a page still runs.',
-    fix: { file: 'llms/islands.md', heading: 'Browser globals on the server' },
+    fix: { file: 'llms/browser-only.md', heading: 'Browser globals on the server' },
   },
   'unknown-lint': {
     group: 'compile',
     summary: 'A `// kay-allow` comment naming something that is no lint.',
-    fix: { file: 'llms/checks.md', heading: 'Allow a lint on one line' },
+    fix: { file: 'llms/lints.md', heading: 'Allow a lint on one line' },
   },
   'browser-builtin-import': {
     group: 'build',
     summary: 'An island importing a module that reaches a Node built-in, which a browser does not have.',
-    fix: { file: 'llms/islands.md', heading: 'Browser-only components' },
+    fix: { file: 'llms/browser-only.md', heading: 'Browser-only components' },
   },
   'server-only-in-island': {
     group: 'build',
     summary: 'A chunk a page loads reading `process` or `Bun`, or an island importing the server\'s `s` schema builder, so the island dies as it loads.',
-    fix: { file: 'llms/islands.md', heading: 'Browser globals on the server' },
+    fix: { file: 'llms/browser-only.md', heading: 'Browser globals on the server' },
   },
   'inert-editor': {
     group: 'build',
     summary: 'An editor component running nothing in the browser, where an editor edits the page.',
-    fix: { file: 'llms/content.md', heading: 'The editor' },
+    fix: { file: 'llms/content-cms.md', heading: 'The editor' },
   },
   'worker-build': {
     group: 'build',
@@ -97,17 +97,17 @@ export const ERRORS = {
   'icon-unresolved': {
     group: 'build',
     summary: 'An icon of a set that is not installed, or a name the set does not have.',
-    fix: { file: 'llms/styles-and-assets.md', heading: 'Icons' },
+    fix: { file: 'llms/images.md', heading: 'Icons' },
   },
   'library-settings': {
     group: 'build',
     summary: '`settings` naming a library that is not installed, declares no settings module, or whose module is missing.',
-    fix: { file: 'llms/components.md', heading: 'Using a component library' },
+    fix: { file: 'llms/component-libraries.md', heading: 'Using a component library' },
   },
   'executable-invalid': {
     group: 'build',
     summary: '`kay build --compile` without a server entry, or with a public directory named like the client assets.',
-    fix: { file: 'llms/project.md', heading: 'Build one executable' },
+    fix: { file: 'llms/build-and-start.md', heading: 'Build one executable' },
   },
   'executable-failed': {
     group: 'build',
@@ -117,7 +117,7 @@ export const ERRORS = {
   'executable-incomplete': {
     group: 'build',
     summary: 'A compiled executable that lacks a part of what it needs: the build of a collection, the client build, its fonts or a share card key.',
-    fix: { file: 'llms/project.md', heading: 'Build one executable' },
+    fix: { file: 'llms/build-and-start.md', heading: 'Build one executable' },
   },
   'route-invalid': {
     group: 'build',
@@ -137,22 +137,22 @@ export const ERRORS = {
   'font-invalid': {
     group: 'build',
     summary: 'A font in `fonts` that is no font file, no installed Fontsource package, or lacks the weight, style or subset asked for.',
-    fix: { file: 'llms/head.md', heading: 'Fonts' },
+    fix: { file: 'llms/sitemap-search-fonts.md', heading: 'Fonts' },
   },
   'favicon-invalid': {
     group: 'build',
     summary: 'A favicon, manifest icon or SVG that is no SVG kay can draw, has no size, is not square, or a manifest path outside its scope.',
-    fix: { file: 'llms/head.md', heading: 'Favicon and web manifest' },
+    fix: { file: 'llms/sitemap-search-fonts.md', heading: 'Favicon and web manifest' },
   },
   'share-card-invalid': {
     group: 'build',
     summary: 'A share card drawn with no font, a logo that is missing, not square or not an image kay draws, a colour that is no #rrggbb, or an empty title.',
-    fix: { file: 'llms/styles-and-assets.md', heading: 'Draw a share card for a page' },
+    fix: { file: 'llms/images.md', heading: 'Draw a share card for a page' },
   },
   'image-invalid': {
     group: 'build',
     summary: 'An image the build cannot fetch, or `images` settings that do not go together: `guard` with no `resolve`, a box given both a width and a height.',
-    fix: { file: 'llms/styles-and-assets.md', heading: 'Responsive images' },
+    fix: { file: 'llms/images.md', heading: 'Responsive images' },
   },
   'env-invalid': {
     group: 'build',
@@ -167,12 +167,12 @@ export const ERRORS = {
   'export-private-file': {
     group: 'export',
     summary: 'A static export linking a private or stored file, which only a server can serve.',
-    fix: { file: 'llms/routing.md', heading: 'Static export' },
+    fix: { file: 'llms/prerendering.md', heading: 'Static export' },
   },
   'search-page-unreadable': {
     group: 'build',
     summary: 'The search index could not read a prerendered page.',
-    fix: { file: 'llms/head.md', heading: 'Site search' },
+    fix: { file: 'llms/sitemap-search-fonts.md', heading: 'Site search' },
   },
   'config-default-export': {
     group: 'build',
@@ -197,12 +197,12 @@ export const ERRORS = {
   'loader-result': {
     group: 'content',
     summary: 'A collection\'s `load` that threw, did not give an array, or gave an entry with no slug.',
-    fix: { file: 'llms/content.md', heading: 'Loaded collections' },
+    fix: { file: 'llms/content-cms.md', heading: 'Loaded collections' },
   },
   'loader-method': {
     group: 'content',
     summary: 'An entry saved or removed through a loader that declares no `save` or `remove`.',
-    fix: { file: 'llms/content.md', heading: 'Loaded collections' },
+    fix: { file: 'llms/content-cms.md', heading: 'Loaded collections' },
   },
   'feed-needs-site': {
     group: 'content',
@@ -217,37 +217,37 @@ export const ERRORS = {
   'content-api-misuse': {
     group: 'content',
     summary: 'An editor helper asked for what the collection is not: a locale of a collection that is not localized, a folder collection\'s file from a loaded one, a folder outside the repository or missing.',
-    fix: { file: 'llms/content.md', heading: 'A CMS editing the collections' },
+    fix: { file: 'llms/content-cms.md', heading: 'A CMS editing the collections' },
   },
   'export-unsupported-config': {
     group: 'export',
     summary: 'A config a static export cannot serve: locales by domain, or an image route resolving images per request.',
-    fix: { file: 'llms/routing.md', heading: 'Static export' },
+    fix: { file: 'llms/prerendering.md', heading: 'Static export' },
   },
   'export-output-dir': {
     group: 'export',
     summary: 'A static export into a directory that is the project itself, or holds files it did not write.',
-    fix: { file: 'llms/routing.md', heading: 'Static export' },
+    fix: { file: 'llms/prerendering.md', heading: 'Static export' },
   },
   'export-page-error': {
     group: 'export',
     summary: 'A page, endpoint or module that threw as it was imported or rendered for the export.',
-    fix: { file: 'llms/routing.md', heading: 'Static export' },
+    fix: { file: 'llms/prerendering.md', heading: 'Static export' },
   },
   'export-page-status': {
     group: 'export',
     summary: 'A page that answers 500, a redirect or a status other than 200 as it is prerendered.',
-    fix: { file: 'llms/routing.md', heading: 'Static export' },
+    fix: { file: 'llms/prerendering.md', heading: 'Static export' },
   },
   'export-needs-params': {
     group: 'export',
     summary: 'A page with params whose `prerender` lists none, or that sets `prerender: false`, or lists values its matchers refuse.',
-    fix: { file: 'llms/routing.md', heading: 'Prerendering' },
+    fix: { file: 'llms/prerendering.md', heading: 'Prerendering' },
   },
   'export-image-route': {
     group: 'export',
     summary: 'A page linking an image only the image route resizes, which no file of the export holds.',
-    fix: { file: 'llms/routing.md', heading: 'Static export' },
+    fix: { file: 'llms/prerendering.md', heading: 'Static export' },
   },
   'export-site-url': {
     group: 'export',
@@ -257,7 +257,7 @@ export const ERRORS = {
   'export-server-render': {
     group: 'export',
     summary: 'A page with something only a server renders per request: a server island, a form stamp or work challenge, a live value, a deferred island with no browser entry.',
-    fix: { file: 'llms/routing.md', heading: 'Server islands' },
+    fix: { file: 'llms/prerendering.md', heading: 'Server islands' },
   },
   'export-guard': {
     group: 'export',
@@ -267,12 +267,12 @@ export const ERRORS = {
   'export-action': {
     group: 'export',
     summary: 'A page exporting an action, which only a server can take.',
-    fix: { file: 'llms/routing.md', heading: 'Static export' },
+    fix: { file: 'llms/prerendering.md', heading: 'Static export' },
   },
   'export-path-clash': {
     group: 'export',
     summary: 'Two pages that would be prerendered to the same file.',
-    fix: { file: 'llms/routing.md', heading: 'Prerendering' },
+    fix: { file: 'llms/prerendering.md', heading: 'Prerendering' },
   },
   'export-api-module': {
     group: 'export',

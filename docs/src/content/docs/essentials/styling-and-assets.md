@@ -200,4 +200,4 @@ The icon sizes to the surrounding text and takes its colour from `currentColor`.
 
 An icon without text beside it needs `role="img"` and an `aria-label`.
 
-<ReadMore href="/llms/styles-and-assets">Worker and wasm details, fixed-width and cropped images, remote and uploaded images, share cards, AVIF settings and runtime icon lookup.</ReadMore>
+<ReadMore href="/llms/images">Worker and wasm details, fixed-width and cropped images, remote and uploaded images, share cards, AVIF settings and runtime icon lookup.</ReadMore>

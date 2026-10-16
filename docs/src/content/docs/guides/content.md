@@ -178,7 +178,7 @@ export const news = collection({
 
 `kay build` does not keep a page over a loader on its own, since a loader may read a database and `ttl` refreshes the entries without telling the page. Add `prerender: true` to the page to prerender it anyway. The webhook then refreshes it.
 
-<ReadMore href="/llms/content#loaded-collections">Counting entries and fetching one without running `load`, so a CMS can list a collection cheaply, are in the full content reference.</ReadMore>
+<ReadMore href="/llms/content-cms#loaded-collections">Counting entries and fetching one without running `load`, so a CMS can list a collection cheaply, are in the full content reference.</ReadMore>
 
 ## Markdown in an island
 
@@ -208,7 +208,7 @@ Edit mode is preview mode for a CMS that edits content on the page. Enter it wit
 
 In edit mode the page marks the markup each field and body renders, so the CMS can find them. An extension names its editor island with `editor`, and `showDraft(entries)` from `kay/edit` shows the page with the entries the editor has not saved.
 
-<ReadMore href="/llms/content#preview-mode">The signed link, which fields get marked and which do not, the editor island and what each special page renders are in the full content reference.</ReadMore>
+<ReadMore href="/llms/content-cms#preview-mode">The signed link, which fields get marked and which do not, the editor island and what each special page renders are in the full content reference.</ReadMore>
 
 ## A CMS editing the collections
 
@@ -218,6 +218,6 @@ A CMS that runs in your app's server reads the collections with `collections()` 
 
 These give drafts and files to whoever calls them, so serve them behind a guard or `editRequested(request)`.
 
-<ReadMore href="/llms/content#a-cms-editing-the-collections">Paged reads, counting without running a loader, `create: true`, `entryFile`, field markers such as `imageField()` and every failure shape are in the full content reference.</ReadMore>
+<ReadMore href="/llms/content-cms#a-cms-editing-the-collections">Paged reads, counting without running a loader, `create: true`, `entryFile`, field markers such as `imageField()` and every failure shape are in the full content reference.</ReadMore>
 
 <ReadMore href="/llms/content">Syntax highlighting, `renderMarkdown`, the caches, atom feeds and the loader options are in the full content reference.</ReadMore>

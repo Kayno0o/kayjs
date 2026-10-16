@@ -69,7 +69,7 @@ export default defineConfig({
 
 Do not set `'script-src': false` unless you mean it. kay's inline scripts then fall back to `default-src` and are blocked, and islands stop hydrating.
 
-<ReadMore href="/llms/production#security-headers">Which inline scripts kay writes, how `X-Frame-Options` follows `frame-ancestors`, and the hashes for a policy written elsewhere.</ReadMore>
+<ReadMore href="/llms/proxy-and-security#security-headers">Which inline scripts kay writes, how `X-Frame-Options` follows `frame-ancestors`, and the hashes for a policy written elsewhere.</ReadMore>
 
 ## Try a policy before enforcing it
 
@@ -139,7 +139,7 @@ rateLimit: { max: 5, window: '1m', store: sqliteRates('data/rates.sqlite') }
 
 `sqliteRates` stores each key hashed, so the file alone cannot be checked against a guessed address.
 
-<ReadMore href="/llms/actions#rate-limits">Several limits at once, writing your own store and the exact counting rules.</ReadMore>
+<ReadMore href="/llms/action-protection#rate-limits">Several limits at once, writing your own store and the exact counting rules.</ReadMore>
 
 ## Rate limit a guard or an API route
 
@@ -179,7 +179,7 @@ Raise it for one action in its third argument, `{ bodyLimit: 20 * 1024 * 1024 }`
 
 A form post goes back to its page with a message, an island's call throws an `ActionError` with status 413, and an API route answers 413. Bun's own cap of 128 MB still holds over any `bodyLimit`.
 
-<ReadMore href="/llms/actions#body-limit">The refusal message in your own words, and the cap on routes that are not actions or API routes.</ReadMore>
+<ReadMore href="/llms/action-protection#body-limit">The refusal message in your own words, and the cap on routes that are not actions or API routes.</ReadMore>
 
 ## Trust a proxy
 
@@ -207,7 +207,7 @@ Each entry is an IPv4 or IPv6 range or a single address. Cloudflare publishes th
 
 Pass `X-Forwarded-Proto` from the proxy on every location, websockets included. kay's cookies are `Secure`, and the session is named `__Host-session` over https, so a request that says `http` reads no session.
 
-<ReadMore href="/llms/production#behind-a-proxy">How `hops` reads `X-Forwarded-For`, the warnings kay logs and `clientAddress` in a plain Elysia app.</ReadMore>
+<ReadMore href="/llms/proxy-and-security#behind-a-proxy">How `hops` reads `X-Forwarded-For`, the warnings kay logs and `clientAddress` in a plain Elysia app.</ReadMore>
 
 ## Allow another site to call an API
 

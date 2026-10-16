@@ -79,8 +79,8 @@ describe('error codes', () => {
     expect(missing).toEqual([])
   })
 
-  it('are listed in llms/checks.md and the docs reference, with a link to the fix', async () => {
-    const llms = await Bun.file(join(root, 'llms/checks.md')).text()
+  it('are listed in llms/errors.md and the docs reference, with a link to the fix', async () => {
+    const llms = await Bun.file(join(root, 'llms/errors.md')).text()
     const docs = await Bun.file(join(root, 'docs/src/content/docs/reference/checks.md')).text()
 
     expect(Object.keys(ERRORS).filter(name => !llms.includes(`| \`${name}\` | ${ERRORS[name as keyof typeof ERRORS].group} |`))).toEqual([])

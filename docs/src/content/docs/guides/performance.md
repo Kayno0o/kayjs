@@ -30,7 +30,7 @@ Each tab answers one question about the page in view. A tab with a count in the 
 
 A library can add a tab of its own, with nothing to declare in the app. kayjs-auth shows who is signed in, kayjs-mail lists the mails sent to the outbox, and kayjs-cms toggles edit mode.
 
-<ReadMore href="/llms/components#a-tab-for-a-library">Writing a tab for your own library.</ReadMore>
+<ReadMore href="/llms/component-libraries#a-tab-for-a-library">Writing a tab for your own library.</ReadMore>
 
 ## Problems
 
@@ -85,7 +85,7 @@ KAY_EDITOR="tmux new-window nvim" bun run dev
 
 With no editor found, the page says so and the terminal prints the position. Tests, `pages({ dev: true })` and production builds carry no inspector.
 
-<ReadMore href="/llms/project#commands">Editors reached over SSH, how the position is passed to each editor and the other dev tool tabs in full.</ReadMore>
+<ReadMore href="/llms/dev-server">Editors reached over SSH, how the position is passed to each editor and the other dev tool tabs in full.</ReadMore>
 
 ## The error page
 
@@ -136,4 +136,4 @@ export default defineConfig({
 })
 ```
 
-<ReadMore href="/llms/project#commands">How a route's scripts are estimated when none of its pages was prerendered, and the JSON form of the report.</ReadMore>
+<ReadMore href="/llms/build-and-start">How a route's scripts are estimated when none of its pages was prerendered, and the JSON form of the report.</ReadMore>

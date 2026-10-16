@@ -56,7 +56,7 @@ A query needs all its words. Each is found as a word or the start of one, with c
 
 A word in the page's title counts most, then one in a heading, then the text. The browser loads only the part of the index holding the words typed, then the texts of the best hits.
 
-<ReadMore href="/llms/head#site-search">How words are cut, which matters for Chinese and Japanese, and how hits are scored are in the full reference.</ReadMore>
+<ReadMore href="/llms/sitemap-search-fonts#site-search">How words are cut, which matters for Chinese and Japanese, and how hits are scored are in the full reference.</ReadMore>
 
 ## What goes in
 
@@ -77,4 +77,4 @@ With [locales](/guides/i18n), each locale gets its own index, and the search rea
 
 The index is written by `kay build`, so `kay dev` has none. Run `kay build` then `kay start` to try it.
 
-<ReadMore href="/llms/head#site-search">How sections are cut, how hits are scored and how the index is split are in the full reference.</ReadMore>
+<ReadMore href="/llms/sitemap-search-fonts#site-search">How sections are cut, how hits are scored and how the index is split are in the full reference.</ReadMore>

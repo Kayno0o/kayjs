@@ -150,7 +150,7 @@ Add `revalidate: '1h'` to `page` to rebuild a prerendered page in the background
 
 </Callout>
 
-<ReadMore href="/llms/routing#prerendering">What makes a page keepable, how the run-time check works, and how kept pages treat locales and `trailingSlash`.</ReadMore>
+<ReadMore href="/llms/prerendering#prerendering">What makes a page keepable, how the run-time check works, and how kept pages treat locales and `trailingSlash`.</ReadMore>
 
 ### Server islands
 
@@ -194,6 +194,6 @@ export default defineConfig({ extensions: [authPages()] })
 
 Its pages serve under their prefix, such as `/auth/login`, inside your layouts and guards. To change one, put your own file at the same path, `src/routes/auth/login.kay`. It replaces that page alone.
 
-<ReadMore href="/llms/components#extensions">Writing an extension, its layouts, messages, API modules and config, page hooks and editor.</ReadMore>
+<ReadMore href="/llms/component-libraries#extensions">Writing an extension, its layouts, messages, API modules and config, page hooks and editor.</ReadMore>
 
 <ReadMore href="/llms/routing">Matchers, the page settings in full, server island options such as `noscript`, rewrites, base path and static export are in the full routing reference.</ReadMore>

@@ -6,6 +6,10 @@ import { LINTS } from '../src/compiler/lints'
 import { SCRIPT_GLOBALS, SERVER_GLOBALS } from '../src/compiler/script'
 import { formatKay } from '../src/format'
 
+// A doc an agent reads whole stays under this many bytes, as a tool output over 30 KB is cut to a preview; a release that grows whats-new.md or upgrading.md past it moves its oldest minor into the archive file.
+const MAX_DOC_BYTES = 25_000
+// The library docs still over it, waiting to be split.
+const WAITING = ['packages/auth/llms.txt', 'packages/mail/llms.txt', 'packages/ui/llms.txt']
 const KAY_BLOCK = /```kay\n([\s\S]*?)```/g
 const root = join(import.meta.dir, '..')
 // llms.txt and every doc of llms/, read as one.
@@ -42,6 +46,15 @@ function documentedImports(): Map<string, Set<string>> {
 describe('llms.txt and its docs', () => {
   it('has examples', () => {
     expect(examples.length).toBeGreaterThan(5)
+  })
+
+  it('keeps every doc under the size an agent reads with one command', async () => {
+    const files = [...(await readdir(join(root, 'llms'))).map(name => `llms/${name}`), ...new Bun.Glob('packages/*/llms.txt').scanSync({ cwd: root })]
+    const sizes = await Promise.all(files.map(async file => [file, Bun.file(join(root, file)).size] as const))
+
+    expect(sizes.filter(([file, size]) => size >= MAX_DOC_BYTES && !WAITING.includes(file)).map(([file, size]) => `${file}: ${size}`)).toEqual([])
+    // A file that fits is taken off the list, so the list only ever shrinks.
+    expect(WAITING.filter(file => Bun.file(join(root, file)).size < MAX_DOC_BYTES)).toEqual([])
   })
 
   it('lists every lint at its default level', () => {
