@@ -606,8 +606,9 @@ export interface TypeLint {
 }
 
 const IDENTITY_KEY = 'kayLint: "identity-key"'
-const INCOMPLETE_MATCH = 'kayLint: "incomplete-match"'
-const MISSING = /kayMissing: (.+?);? \}/
+const INCOMPLETE_MATCH = 'IncompleteMatch<'
+const MISSING = /^Argument of type '(.+?)' is not assignable to parameter of type/
+const TRUNCATED = / \| \.\.\. (\d+) more \.\.\. \| /g
 const HANDED_SIGNAL = 'kayLint: "uncalled-signal"'
 
 export function typeLint(message: string): TypeLint | undefined {
@@ -621,7 +622,7 @@ export function typeLint(message: string): TypeLint | undefined {
   }
 
   if (message.includes(INCOMPLETE_MATCH)) {
-    const missing = MISSING.exec(message)?.[1]
+    const missing = MISSING.exec(message)?.[1]?.replace(TRUNCATED, ' | (and $1 more) | ')
 
     return {
       code: 'incomplete-match',

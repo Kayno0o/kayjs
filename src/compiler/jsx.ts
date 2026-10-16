@@ -8,8 +8,12 @@ import { DYNAMIC_TAG } from './mapping'
 import { addBindWrite, bindRead, helperName } from './markup'
 import { bindEvent, bindProblem } from './validate'
 
-// A subject TypeScript narrows by itself in a `switch`: a name or a chain of properties.
-const REFERENCE = /^[a-z_$][\w$]*(?:\.[a-z_$][\w$]*)*$/i
+// A subject holding a call, which TypeScript does not narrow in a `switch`.
+const CALLED = /[\w$\])]\s*\(/
+// A subject that narrows by its type or its condition, which the lint for a `match` with no `else` leaves alone.
+const TYPED_SUBJECT = /^(?:typeof\s|true$|false$)/
+// A `when` value of a unit type: a literal, or an enum member written `Level.Low`; any other value may hold a union, which narrows nothing.
+const UNIT_VALUE = /^(?:'[^'\\]*'|"[^"\\]*"|-?\d[\w.]*|true|false|null|undefined|[A-Z][\w$]*(?:\.[a-z_$][\w$]*)+)$/i
 
 export interface JsxOptions {
   // `kay check`'s output: links, form fields and island props asserted through the globals it declares.
@@ -163,14 +167,15 @@ export class JsxTemplate {
   private emitMatch(node: MatchNode) {
     const { b } = this
     const { fallback } = node
-    const unmatched = this.options.check && !fallback
-    const subject = this.src.slice(node.subject.start, node.subject.end).trim()
-    // A reference narrows by itself; any other subject is read once into a name, which then narrows, as its branches see the value alone.
-    const reference = REFERENCE.test(subject)
+    const text = (span: Span) => this.src.slice(span.start, span.end).trim()
+    const subject = text(node.subject)
+    const unmatched = this.options.check && !fallback && !TYPED_SUBJECT.test(subject) && node.cases.every(branch => branch.values.every(value => UNIT_VALUE.test(text(value))))
+    // A call is read once into a name, which then narrows by what the branches match; any other subject is the `switch`'s own, so it narrows what it is read off in the branches.
+    const called = CALLED.test(subject)
 
     b.add('(() => { ')
 
-    if (unmatched && !reference)
+    if (unmatched && called)
       b.add('const kayMatched = (').addSource(node.subject).add('); switch (kayMatched) { ')
     else
       b.add('switch (').addSource(node.subject).add(') { ')
@@ -195,10 +200,10 @@ export class JsxTemplate {
     }
 
     if (unmatched) {
-      if (reference)
-        b.add('default: KayUnmatched((').addSource(node.subject).add(')); ')
-      else
+      if (called)
         b.add('default: KayUnmatched(kayMatched); ')
+      else
+        b.add('default: KayUnmatched((').addSource(node.subject).add(')); ')
     }
 
     b.add(fallback ? '} })()' : '} return null })()')

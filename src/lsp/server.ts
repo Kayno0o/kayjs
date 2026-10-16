@@ -600,12 +600,21 @@ export class KayLanguageServer {
 
     // Related information points into the shadow TSX, a file the user never sees. Each one reads as `kay check` reports it: unused code is the `unread-name` lint, which TypeScript only hints at without `noUnusedLocals`.
     const levelAt = lintLevels(document.source, project.options.lints)
+    // A template expression the shadow code writes twice, as a `match` subject, is mistyped twice in one place.
+    const seen = new Set<string>()
     const typeErrors = (report?.items ?? []).flatMap(({ relatedInformation: _related, ...diagnostic }) => {
       const start = toOffset(document.tsx, diagnostic.range.start)
       const diagnosed = diagnoseShadow(document, { code: typeof diagnostic.code === 'number' ? diagnostic.code : undefined, message: diagnostic.message, start, end: toOffset(document.tsx, diagnostic.range.end) }, levelAt)
 
       if (!diagnosed || servedByTheApp(document.file, diagnosed.message, project.mounts, project.locales))
         return []
+
+      const key = JSON.stringify([diagnosed.span, diagnosed.code, diagnosed.message])
+
+      if (seen.has(key))
+        return []
+
+      seen.add(key)
 
       return [{
         ...diagnostic,

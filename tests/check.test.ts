@@ -1877,6 +1877,49 @@ describe.concurrent('kay check, unused code', () => {
     }
   })
 
+  it('keeps what a match narrows in its blocks, and reports no match it cannot judge', async () => {
+    const many = Array.from({ length: 30 }, (_, index) => `'m${index}'`).join(' | ')
+    const page = [
+      '---',
+      `const { size, shape, text, wide, expected, many } = props<{ size: 1 | 2 | 3 | undefined, shape?: { kind: 'a', size: number } | { kind: 'b' }, text: string | number, wide: 'x' | 'y', expected: 'x' | 'y', many: ${many} }>()`,
+      '---',
+      'match size',
+      '  when 1, 2',
+      '    p Small',
+      'match shape?.kind',
+      '  when \'a\'',
+      '    p {shape.size}',
+      'match typeof text',
+      '  when \'string\'',
+      '    p {text.length}',
+      'match wide',
+      '  when expected',
+      '    p Expected',
+      'match many',
+      '  when \'m0\'',
+      '    p First',
+      'match nope',
+      '  when 1',
+      '    p One',
+      '',
+    ].join('\n')
+    const root = await scratchProject({ 'src/routes/index.kay': page })
+
+    try {
+      const found = (await check(root)).map(d => [d.line, d.code, d.message])
+
+      expect(found.filter(entry => entry[1] === 'incomplete-match')).toEqual([
+        [4, 'incomplete-match', 'This `match` has no `else` and leaves 3 | undefined out'],
+        [7, 'incomplete-match', 'This `match` has no `else` and leaves "b" | undefined out'],
+        [16, 'incomplete-match', expect.stringContaining('(and 4 more)')],
+      ])
+      expect(found.filter(entry => entry[1] !== 'incomplete-match')).toEqual([[19, 'TS2304', 'Cannot find name \'nope\'.']])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('warns of an island\'s for over objects with no id and no key, and of no other list', async () => {
     const list = '---\nconst posts = signal([{ slug: \'a\', title: \'A\' }])\nconst todos = signal([{ id: 1, title: \'T\' }])\nconst tags = signal([\'x\'])\n---\nul\n  for post of posts()\n    li {post.title}\n  // kay-allow identity-key\n  for post of posts()\n    li {post.slug}\n  for todo of todos()\n    li {todo.title}\n  for tag of tags()\n    li {tag}\n  for post of posts() key={post.slug}\n    li {post.title}\nbutton(onClick={() => { posts.set([]); todos.set([]); tags.set([]) }}) Clear\n'
     const root = await scratchProject({

@@ -131,6 +131,9 @@ export async function check(root: string, options: CheckOptions = {}): Promise<C
       diagnostics.push({ file: program.tsconfig, line: 1, column: 1, message: `tsgo exited with code ${program.code} and no diagnostics` })
   }
 
+  // A template expression the shadow code writes twice, as a `match` subject, is mistyped twice in one place.
+  const seen = new Set<string>()
+
   for (const diagnostic of reported) {
     if (lintConfigTypeError(root, options.lints, diagnostic))
       continue
@@ -148,8 +151,10 @@ export async function check(root: string, options: CheckOptions = {}): Promise<C
 
     if (generated)
       diagnostics.push(generated)
-    else if (reportsTypeErrors(remapped.file, scope) && !servedByTheApp(remapped.file, remapped.message, mounts, locales))
+    else if (reportsTypeErrors(remapped.file, scope) && !servedByTheApp(remapped.file, remapped.message, mounts, locales) && !seen.has(JSON.stringify([remapped.file, remapped.line, remapped.column, remapped.code, remapped.message])))
       diagnostics.push(remapped)
+
+    seen.add(JSON.stringify([remapped.file, remapped.line, remapped.column, remapped.code, remapped.message]))
   }
 
   diagnostics.push(...problems)

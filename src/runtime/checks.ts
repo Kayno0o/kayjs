@@ -153,7 +153,10 @@ export type IdentityKeyed<Each> = [RowOf<Each>] extends [object] ? [RowOf<Each>]
 type Finite<Member> = Member extends string | number ? Record<never, never> extends Record<Member, 1> ? false : true : Member extends boolean | bigint | symbol | null | undefined ? true : false
 
 // What a `match` with no `else` leaves out: `Rest` is the subject narrowed by its `when` lines, and a member of a finite union (literals, enum members, booleans, `null`, `undefined`) left in it is a value the template renders nothing for. `kay check` reports it as the `incomplete-match` lint.
-export type Unmatched<Rest> = [Rest] extends [never] ? unknown : false extends Finite<Rest> ? unknown : { kayLint: 'incomplete-match', kayMissing: Rest }
+export type Unmatched<Rest> = [Rest] extends [never] ? unknown : false extends Finite<Rest> ? unknown : IncompleteMatch<Rest>
+
+// A named type, so the type checker's message keeps its name when it shortens the members of a long union.
+export interface IncompleteMatch<Missing> { kayLint: 'incomplete-match', kayMissing: Missing }
 
 // What `KayHanded` reads of a parameter before the type checker knows it: a generic one not yet inferred.
 export interface UnresolvedParameter { kayUnresolved: true }
