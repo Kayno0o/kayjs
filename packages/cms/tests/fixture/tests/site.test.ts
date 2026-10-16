@@ -65,8 +65,10 @@ test('the screens and the editor render their own toaster, for an app rendering 
 
 test('the screens ship kayjs-ui\'s theme built by Tailwind', async () => {
   const built = await testSite({ root: ROOT, browser: true })
-  const links = (await built.visit('/admin')).find('link').filter(link => link.attributes.rel === 'stylesheet').map(link => link.attributes.href ?? '')
-  const css = (await Promise.all(links.map(async href => (await built.fetch(href)).text()))).join('\n')
+  const page = await built.visit('/admin')
+  const links = page.find('link').filter(link => link.attributes.rel === 'stylesheet').map(link => link.attributes.href ?? '')
+  // A page inlines its stylesheets when they compress small enough, and links them above.
+  const css = [...page.find('style').map(style => style.html), ...await Promise.all(links.map(async href => (await built.fetch(href)).text()))].join('\n')
 
   expect(css).toContain('.kui-btn')
   expect(css).not.toContain('@apply')
