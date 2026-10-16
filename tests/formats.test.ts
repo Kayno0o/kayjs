@@ -121,6 +121,43 @@ describe('kay build --format json', () => {
     expect(await Bun.file(join(outputDir(root), 'executable')).exists()).toBe(true)
   }, 60_000)
 
+  it('bakes the module an extension names its server plugin by into the executable', async () => {
+    const config = 'export default { favicon: false, extensions: [{ name: \'own\', serverModule: { path: \'./src/own\', export: \'own\' } }] }\n'
+    const own = 'import { Elysia } from \'elysia\'\n\nexport const own = new Elysia().get(\'/own/ping\', () => \'pong\')\n'
+    const root = await project({ 'kay.config.ts': config, 'src/routes/index.kay': 'p Home\n', 'src/own.ts': own })
+    const built = await kay(['build', root, '--no-check', '--compile', join(root, 'server'), '--verify'])
+
+    expect(built.code, built.stderr).toBe(0)
+    // The executable runs where the project is gone, so the plugin can only come from what it holds.
+    await rm(join(root, 'src/own.ts'))
+
+    const probe = Bun.serve({ port: 0, fetch: () => new Response('') })
+    const port = probe.port
+
+    await probe.stop(true)
+
+    const child = Bun.spawn([join(root, 'server')], { cwd: await project({}), env: { ...process.env, PORT: String(port) }, stdout: 'ignore', stderr: 'pipe' })
+
+    try {
+      let answer: string | undefined
+
+      for (let attempt = 0; attempt < 200 && answer === undefined; attempt++) {
+        try {
+          answer = await (await fetch(`http://127.0.0.1:${port}/own/ping`)).text()
+        }
+        catch {
+          await Bun.sleep(50)
+        }
+      }
+
+      expect(answer).toBe('pong')
+    }
+    finally {
+      child.kill()
+      await child.exited
+    }
+  }, 60_000)
+
   it('starts the executable it compiled under --verify, and fails the build with the server\'s own error when it cannot start', async () => {
     const serving = 'import { Elysia } from \'elysia\'\nimport { pages } from \'kay/server\'\n\nnew Elysia().use(await pages()).listen(Number(process.env.PORT))\n'
     const files = { 'kay.config.ts': 'export default { favicon: false }\n', 'src/routes/index.kay': 'p Home\n' }

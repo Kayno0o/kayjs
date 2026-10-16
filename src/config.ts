@@ -15,9 +15,10 @@ import type { Prefetch } from './server/speculation'
 import type { FileStore } from './server/storage'
 import type { Tracer } from './server/trace'
 import { existsSync, realpathSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { KayError } from './compiler/errors'
+import { bundled, importModule } from './server/bundle'
 
 // What `kay.config.ts` exports by default; `pages()`, `kay build`, `kay dev` and `kay check` all read it.
 export interface KayConfig {
@@ -47,8 +48,8 @@ export interface KayConfig {
   fonts?: (FontConfig | FontsourceConfig)[] | undefined
   // The security headers every response carries, or `false` for none; a header the app sets itself wins.
   security?: SecurityConfig | false | undefined
-  // The proxies in front of the server, which the client's address that rate limits count is read through. Without it, the address the server was reached from is the client, so behind a proxy every visitor counts as that proxy.
-  proxy?: ProxyConfig | undefined
+  // The proxies in front of the server, `true` for one and a number for that many, which the client's address that rate limits count is read through. Without it, the address the server was reached from is the client, so behind a proxy every visitor counts as that proxy.
+  proxy?: ProxyConfig | number | true | undefined
   // The most bytes a request to an action or an API route may send, 1 MB by default; an action or an `api()` module raises or lowers it for itself. A bigger one answers 413 before it is read.
   bodyLimit?: number | undefined
   // Every page, action, endpoint and API module of the app answers 403 unless a `_guard.ts` covers it or it sets `guards: false`, in its `page` or its `api()` options; `kay check` reports each such route. A library's routes keep the guards it gives them.
@@ -181,6 +182,8 @@ export interface FontsourceConfig {
   // Defaults to the package's own, `latin` for most; several, `['latin', 'latin-ext']`, give each face its subset's `unicode-range`, so a page loads only the files its text needs.
   subset?: string | string[] | undefined
   display?: FontConfig['display'] | undefined
+  // Preloads every face the entry declares, as `preload` does a font's: give it to an entry of one subset and the faces the first paint shows.
+  preload?: boolean | undefined
 }
 
 // A favicon with an SVG of it: kay makes the ICO and the PNG icons from `image`, and serves `svg` as it is.
@@ -276,6 +279,8 @@ export interface KayExtension<Server extends AnyElysia = AnyElysia> {
   // An Elysia plugin `pages()` uses before the pages, actions and API modules, so its derives reach their `ctx.locals` and `kay check` types them; scoped or global hooks reach them, local ones only the plugin's own routes.
   // Given as a function, it is called only when `pages()` builds the app, never when `kay check`, the editor or `kay build` read the config: the way to hand a plugin built on a database or the server's environment.
   server?: Server | (() => Server | Promise<Server>) | undefined
+  // The server plugin named by the module that exports it, `{ path: './src/auth', export: 'auth' }` for `export const auth` (`default` by default): imported only as `pages()` builds the app, and baked into an executable `kay build --compile` makes, which a path built at run time inside a library could not be. Its type is the one the extension's `Server` argument gives, so a library's helper types its locals; used beside `server`, the module wins. A path is relative to the project root.
+  serverModule?: { path: string, export?: string | undefined } | undefined
   // Config laid under the app's `kay.config.ts`: objects merged key by key, arrays joined with the extension's items first, any other value the app sets winning. Bun plugins the library's files need go in its `plugins`.
   config?: Omit<KayConfig, 'extensions'> | undefined
   // A directory of `.kay` pages, layouts and guards laid over the app's routes under `prefix`, the root by default: a file of the app at the same path replaces the library's.
@@ -292,8 +297,30 @@ export interface KayExtension<Server extends AnyElysia = AnyElysia> {
 }
 
 // The server plugins the extensions carry, in their order, those given as a function built now.
-export async function extensionServers(extensions: KayExtension[] | undefined): Promise<{ name: string, server: AnyElysia }[]> {
-  return Promise.all((extensions ?? []).flatMap(({ name, server }) => server === undefined ? [] : [(async () => ({ name, server: typeof server === 'function' ? await server() : server }))()]))
+export async function extensionServers(extensions: KayExtension[] | undefined, root: string): Promise<{ name: string, server: AnyElysia }[]> {
+  return Promise.all((extensions ?? []).flatMap(({ name, server, serverModule }) => {
+    if (serverModule !== undefined)
+      return [(async () => ({ name, server: await serverFromModule(name, serverModule, root) }))()]
+
+    return server === undefined ? [] : [(async () => ({ name, server: typeof server === 'function' ? await server() : server }))()]
+  }))
+}
+
+// The module files the extensions name their server plugin by, as the executable holds them.
+export function extensionServerModules(root: string, extensions: KayExtension[] | undefined): string[] {
+  return (extensions ?? []).flatMap(({ serverModule }) => serverModule === undefined ? [] : [resolve(root, serverModule.path)])
+}
+
+// The plugin a module exports, or what a function it exports builds; an executable reads it from the copy it holds, keyed by where the build found the file.
+async function serverFromModule(name: string, { path, export: exported = 'default' }: NonNullable<KayExtension['serverModule']>, root: string): Promise<AnyElysia> {
+  const file = resolve(bundled()?.root ?? root, path)
+  const value = (await importModule<Record<string, unknown>>(file))[exported]
+  const server = typeof value === 'function' ? await (value as () => unknown)() : value
+
+  if (typeof server !== 'object' || server === null || !('handle' in server))
+    throw new KayError('config-invalid', `kay: the extension ${name} takes its server from ${path}, which does not export an Elysia plugin as \`${exported}\``)
+
+  return server as AnyElysia
 }
 
 // The page hooks the extensions carry, in their order.

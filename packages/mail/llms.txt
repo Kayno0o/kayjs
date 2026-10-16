@@ -26,10 +26,10 @@ export const mail = mailer({ from: 'Site <contact@example.com>', lang: 'fr' })
 import { mailExtension } from '@kaynooo/kayjs-mail'
 import { defineConfig } from 'kay/server'
 
-export default defineConfig({ extensions: [mailExtension(async () => (await import('./src/mail')).mail)] })
+export default defineConfig({ extensions: [mailExtension('./src/mail')] })
 ```
 
-- `mailExtension(load)` hands the mailer to `pages()`, which uses it before the pages: `src/server.ts` needs no `.use(mail)`. `load` imports the module only as `pages()` builds the app, never as `kay check`, the editor or `kay build` read the config: a `.kay` mail imported while the config loads comes before kay compiles any, so `kay.config.ts` never imports `src/mail.ts` itself. It also brings the `mail.auth` messages kayjs-auth's mails are written in, in English and French (see kayjs-auth below): a site in another language fills them in its own messages for `kay check`.
+- `mailExtension(module)` hands the mailer to `pages()`, which uses it before the pages: `src/server.ts` needs no `.use(mail)`. `module` is the path of the file exporting the mailer as `mail`, relative to the project root, and kay imports it, and bakes it into an executable `kay build --compile` makes, only as `pages()` builds the app, never as `kay check`, the editor or `kay build` read the config: a function `async () => (await import('./src/mail')).mail` in its place loads it the same way, and a `.kay` mail imported while the config loads comes before kay compiles any, so `kay.config.ts` never imports `src/mail.ts` itself. It also brings the `mail.auth` messages kayjs-auth's mails are written in, in English and French (see kayjs-auth below): a site in another language fills them in its own messages for `kay check`.
 - An Elysia app not served by `pages()` uses it as a plugin instead: `new Elysia().use(mail)`.
 
 - `mailer(options)` returns an Elysia plugin: the server using it, through `mailExtension` or `.use(mail)`, runs the queue `enqueue` fills and, under `kay dev`, serves the outbox page. A script that only sends need not use it.

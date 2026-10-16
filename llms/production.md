@@ -118,11 +118,11 @@ Then `await welcomeMails.enqueue({ to: email })` in an action, or `enqueue(paylo
 
 ### Read the visitor's address behind a proxy
 
-`proxy` in kay.config.ts says how many proxies sit in front, so `rateLimit` and `clientAddress` count the visitor and not the proxy:
+`proxy` in kay.config.ts says how many proxies sit in front, so `rateLimit` and `clientAddress` count the visitor and not the proxy, `true` for one:
 
 ```ts
 export default defineConfig({
-  proxy: { hops: 1 },
+  proxy: true,
 })
 ```
 
@@ -287,10 +287,11 @@ new Elysia().use(welcomeMails).use(await pages()).listen(3000)
 
 ```ts
 export default defineConfig({
-  proxy: { hops: 1 },
+  proxy: true,
 })
 ```
 
+- `proxy: true` is one proxy in front, `proxy: 2` two: the short forms of `{ hops: 1 }` and `{ hops: 2 }`.
 - `hops` is the number of proxies in front, each appending the address it was reached from to `X-Forwarded-For`, so the visitor is the entry `hops` from its end: 1 for nginx or Caddy alone, 2 for Cloudflare then nginx.
 - A request with fewer entries skipped an outer proxy, and its first entry is who reached the inner one.
 - `header` names a header a proxy sets to the visitor's address, read instead: `{ header: 'cf-connecting-ip' }`, or `{ header: 'x-real-ip' }` for nginx's `proxy_set_header X-Real-IP $remote_addr`.

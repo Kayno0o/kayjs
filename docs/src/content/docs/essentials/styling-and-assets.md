@@ -143,7 +143,7 @@ Then use the family as usual: `font-family: Inter, system-ui, sans-serif`, or wi
 
 <Callout type="note">
 
-Faces load once the page uses them. `preload: true` fetches one with the page, but can hold back the first paint on a slow phone.
+Faces load once the page uses them. `preload: true` fetches one with the page, on a Fontsource entry too, but can hold back the first paint on a slow phone.
 
 </Callout>
 

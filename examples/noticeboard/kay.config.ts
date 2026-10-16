@@ -10,6 +10,6 @@ export default defineConfig({
   seo: { name: 'Noticeboard', titleTemplate: '%s | Noticeboard', description: 'A club noticeboard, made with kay and its libraries' },
   extensions: [
     authPages({ server: async () => (await import('./src/auth')).auth.plugin }),
-    mailExtension(async () => (await import('./src/mail')).mail),
+    mailExtension('./src/mail'),
   ],
 })

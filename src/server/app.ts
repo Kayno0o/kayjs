@@ -249,7 +249,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   // After kay's own hooks, so their routes are logged and compressed as the pages are, and before the pages, actions and API modules whose context they derive.
   const mountedByExtensions: OwnRoutes['extensions'] = []
 
-  for (const { name, server } of await extensionServers(options.extensions)) {
+  for (const { name, server } of await extensionServers(options.extensions, root)) {
     if (!mode.dev) {
       app.use(server)
 

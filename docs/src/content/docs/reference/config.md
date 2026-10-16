@@ -21,7 +21,7 @@ export default defineConfig({
   redirects: { '/blog/:slug': '/posts/:slug' },
   i18n: { locales: ['fr', 'en'], defaultLocale: 'fr' },
   security: { csp: { 'img-src': ["'self'", 'data:'] } },
-  proxy: { hops: 1 },
+  proxy: true,
   compress: false,
   lints: { 'positional-key': 'deny' },
 })

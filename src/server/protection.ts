@@ -347,8 +347,18 @@ export function rateKey(address: string): string {
   return `${groups.slice(0, 4).map(group => group.replace(LEADING_ZEROS, '')).join(':')}::/64`
 }
 
+// `true` is one proxy in front and a number that many, the short forms of `{ hops }`.
+function proxyOf(setting: ProxyConfig | number | true | undefined): ProxyConfig | undefined {
+  if (setting === true)
+    return { hops: 1 }
+
+  return typeof setting === 'number' ? { hops: setting } : setting
+}
+
 // Records the app's proxy settings on each request it gets, for `clientAddress` to read them wherever it is called from.
-export function trustProxy(app: Elysia, proxy: ProxyConfig | undefined): void {
+export function trustProxy(app: Elysia, setting: ProxyConfig | number | true | undefined): void {
+  const proxy = proxyOf(setting)
+
   if (proxy) {
     const { hops, header } = proxy
 
@@ -374,7 +384,8 @@ export function trustProxy(app: Elysia, proxy: ProxyConfig | undefined): void {
 
 // The socket's address, unless it is a proxy on this machine or network the app's `proxy` setting trusts: then the client's address as that proxy passed it on.
 // `proxy` stands in for the app's setting, for a plain Elysia app that `pages()` does not serve.
-export function clientAddress(request: Request, server: Server<unknown> | null | undefined, proxy?: ProxyConfig): string {
+export function clientAddress(request: Request, server: Server<unknown> | null | undefined, setting?: ProxyConfig | number | true): string {
+  const proxy = proxyOf(setting)
   const address = rewrittenAddress(request) ?? (server ?? servers.get(request))?.requestIP(request)?.address
   const trusted = proxy ?? proxies.get(request)
   // Under `app.handle()`, as in a test, there is no socket: the request came from whatever the test says.

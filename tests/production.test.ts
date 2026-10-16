@@ -801,6 +801,9 @@ console.log(JSON.stringify([keys.has(plain('before')), keys.has(plain('after')),
     expect(clientAddress(behind, socket('100.101.1.1'), { header: 'cf-connecting-ip' })).toBe('203.0.113.7')
     // A request that skipped the outer proxy carries what the inner one appended, who reached it.
     expect(clientAddress(skipped, socket('10.0.0.2'), { hops: 2 })).toBe('203.0.113.8')
+    // `true` is one proxy and a number that many.
+    expect(clientAddress(behind, socket('127.0.0.1'), true)).toBe('172.70.1.1')
+    expect(clientAddress(behind, socket('127.0.0.1'), 2)).toBe('203.0.113.7')
     // A client reaching the server itself forges nothing, whatever the setting.
     expect(clientAddress(behind, socket('198.51.100.9'), { hops: 2 })).toBe('198.51.100.9')
   })
@@ -860,7 +863,7 @@ console.log(JSON.stringify([keys.has(plain('before')), keys.has(plain('after')),
     // One through `pages()`, which reads it as the server boots; the rest where it is read, as setting the routes up costs half a second each, which a busy host multiplies.
     await expect(pages({ routes: `${FIXTURE}/src/routes`, prebuilt: false, proxy: {} })).rejects.toThrow('kay: proxy')
 
-    for (const proxy of [{ hops: 1, header: 'x-real-ip' }, { hops: 0 }, { hops: 1.5 }, { header: ' ' }, { hops: 1, trusted: ['a CDN'] }, { hops: 1, trusted: ['10.0.0.0/33'] }, { hops: 1, trusted: ['::/129'] }])
+    for (const proxy of [{ hops: 1, header: 'x-real-ip' }, { hops: 0 }, { hops: 1.5 }, 0, 1.5, { header: ' ' }, { hops: 1, trusted: ['a CDN'] }, { hops: 1, trusted: ['10.0.0.0/33'] }, { hops: 1, trusted: ['::/129'] }])
       expect(() => trustProxy(new Elysia(), proxy)).toThrow('kay: proxy')
   })
 

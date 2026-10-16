@@ -97,7 +97,7 @@ interface FontsourceMetadata {
 
 // One face per weight and style, each the package's own file, or one per style spanning the weights of a variable package.
 function fontsourceFaces(root: string, font: FontsourceConfig): FontConfig[] {
-  const { fontsource, weights, styles = ['normal'], display } = font
+  const { fontsource, weights, styles = ['normal'], display, preload } = font
   let file: string
 
   try {
@@ -139,7 +139,7 @@ function fontsourceFaces(root: string, font: FontsourceConfig): FontConfig[] {
       if (weights !== undefined)
         throw new KayError('font-invalid', `kay: ${fontsource} is variable, one face spanning weights ${variable.min} to ${variable.max}, so its entry lists no weights`)
 
-      faces.push(...facesOf(`wght-${style}`, { weight: `${variable.min} ${variable.max}`, style, display }))
+      faces.push(...facesOf(`wght-${style}`, { weight: `${variable.min} ${variable.max}`, style, display, preload }))
 
       continue
     }
@@ -151,7 +151,7 @@ function fontsourceFaces(root: string, font: FontsourceConfig): FontConfig[] {
       if (!metadata.weights.includes(weight))
         throw new KayError('font-invalid', `kay: ${fontsource} has no weight ${weight}; it has ${metadata.weights.join(', ')}`)
 
-      faces.push(...facesOf(`${weight}-${style}`, { weight, style, display }))
+      faces.push(...facesOf(`${weight}-${style}`, { weight, style, display, preload }))
     }
   }
 

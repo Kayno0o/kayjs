@@ -10,7 +10,7 @@ import { treeEntries } from '../src/build/files'
 import { servedByTheApp, servedLocales } from '../src/check/diagnose'
 import { readShadowSettings } from '../src/check/shadow'
 import { writeShadowTypes } from '../src/check/shadow-types'
-import { mergeConfig } from '../src/config'
+import { extensionServers, mergeConfig } from '../src/config'
 import { UNSERVED_MESSAGE } from '../src/runtime/checks'
 import { apiStubs } from '../src/server/api-modules'
 import { routeMounts, scanRoutes } from '../src/server/routes'
@@ -456,6 +456,20 @@ const LOCAL_CHECKED: Record<string, string> = {
   'mono/shared/package.json': JSON.stringify({ name: 'shared' }),
   'mono/shared/util.ts': 'const wrong: number = \'sibling\'\n\nexport const shared = `${wrong}`\n',
 }
+
+describe('an extension naming its server plugin by module', () => {
+  it('takes the export it names, or what a function exported builds, and refuses one that is no plugin', async () => {
+    const root = await scratchDir('extension-module-')
+
+    await Bun.write(join(root, 'plugins.ts'), 'import { Elysia } from \'elysia\'\n\nconst plugin = new Elysia({ name: \'built\' })\n\nexport default plugin\nexport const lazy = async () => plugin\nexport const nothing = 3\n')
+
+    const [whole, built] = await extensionServers([{ name: 'a', serverModule: { path: './plugins' } }, { name: 'b', serverModule: { path: './plugins', export: 'lazy' } }], root)
+
+    expect(whole?.server).toBe(built?.server)
+    await expect(extensionServers([{ name: 'c', serverModule: { path: './plugins', export: 'nothing' } }], root)).rejects.toThrow('the extension c takes its server from ./plugins')
+    await expect(extensionServers([{ name: 'd', serverModule: { path: './plugins', export: 'missing' } }], root)).rejects.toThrow('the extension d')
+  })
+})
 
 describe('an extension listed from beside the app', () => {
   it('has kay check report the errors of its pages and editor and the components they reach as the app\'s own, linked or not', async () => {

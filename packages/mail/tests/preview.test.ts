@@ -74,6 +74,15 @@ describe('the development outbox page', () => {
     expect((await site.visit('/_kay/mail')).html).toContain('Through the app')
   })
 
+  it('is served by an app naming the module that exports the mailer, kay importing it', async () => {
+    const site = await testSite({ root: 'tests/fixture', extensions: [mailExtension('./src/mail')] })
+    const { mail } = await import('./fixture/src/mail')
+
+    await mail.send({ to: 'ada@example.com', subject: 'Through the module', text: 'Hello' })
+
+    expect((await site.visit('/_kay/mail')).html).toContain('Through the module')
+  })
+
   it('serves every page of the dev pages through an app, the page fallback not answering for them', async () => {
     const mail = mailer({ from: 'dev@example.com' })
     const site = await testSite({ root: 'tests/fixture', extensions: [mailExtension(async () => mail)] })

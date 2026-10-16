@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- `proxy: true` is one proxy in front and `proxy: 2` two; `mailExtension('./src/mail')` names the module exporting the mailer, and any extension names its server plugin with `serverModule: { path, export }`, which kay imports as the server starts and `kay build --compile` bakes in; a Fontsource font entry takes `preload` ([Production](production.md#behind-a-proxy), [Components](components.md#extensions), [Head](head.md)).
 - `schedule` takes a list of jobs, or a table of schedules to jobs, in one plugin, and `boot: true` runs them once as the server starts; `kay build --compile` compiles a project with no `src/server.ts` into kay's own server of its pages, so an app with nothing custom writes no server entry ([Production](production.md#background-jobs), [Project](project.md)).
 - `add.track()` gives an island a handle on an action for one component, row or button: its `pending()` reads only its own calls, and a call resolves with `{ ok, data }` or the refusal's `{ ok: false, status, errors, data }` instead of throwing ([Actions](actions.md#calling-from-an-island)).
 - `kay new --host github` writes a GitHub Actions workflow in `.github/workflows`, annotating each `kay check` problem on the diff and publishing a static site with GitHub Pages; the host is read from the `origin` remote when the flag is absent, Forgejo by default ([Project](project.md)).

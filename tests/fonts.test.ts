@@ -82,7 +82,7 @@ describe('fonts', () => {
       Bun.write(join(root, 'node_modules/@fontsource-variable/figtree/files/figtree-latin-ext-wght-normal.woff2'), display),
     ])
 
-    const { css } = await prepareFonts(root, [{ fontsource: '@fontsource/open-sans', weights: [400, 700], styles: ['normal', 'italic'] }, { fontsource: '@fontsource-variable/figtree', subset: 'latin-ext', display: 'optional' }], join(root, 'out'))
+    const { css, preload } = await prepareFonts(root, [{ fontsource: '@fontsource/open-sans', weights: [400, 700], styles: ['normal', 'italic'] }, { fontsource: '@fontsource-variable/figtree', subset: 'latin-ext', display: 'optional', preload: true }], join(root, 'out'))
     const faces = css.split(/(?<=\})(?=@)/).map(rule => rule.replace(/url\("[^"]+"\)/, 'url()'))
 
     expect(faces).toEqual([
@@ -92,6 +92,9 @@ describe('fonts', () => {
       '@font-face{font-family:"Open Sans";src:url() format("woff2");font-weight:700;font-style:italic;font-display:swap}',
       '@font-face{font-family:"Figtree";src:url() format("woff2");font-weight:300 700;font-style:normal;font-display:optional}',
     ])
+    // Only the entry that asks for it is preloaded.
+    expect(preload).toHaveLength(1)
+    expect(css).toContain(preload[0]!.href)
 
     await expect(prepareFonts(root, [{ fontsource: '@fontsource/open-sans' }], scratch)).rejects.toThrow('lists the weights the site uses, among 300, 400, 700')
     await expect(prepareFonts(root, [{ fontsource: '@fontsource/open-sans', weights: [500] }], scratch)).rejects.toThrow('has no weight 500')
