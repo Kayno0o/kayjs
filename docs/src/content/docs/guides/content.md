@@ -152,7 +152,7 @@ export const news = collection({
 })
 ```
 
-`news.invalidate()` refreshes it, and every prerendered page that read it, typically from a webhook in an API route: that one line is the whole webhook.
+`news.invalidate()` refreshes it, and every prerendered page that read it, typically from a webhook in an API route: that one line is the whole webhook. A page over a loader like this one is not kept by `kay build` on its own, since a loader may read a database and `ttl` refreshes the entries without telling the page; add `prerender: true` to the page to prerender it anyway, and the webhook refreshes it.
 
 A loader able to count its entries or give one says so with `count({ preview })`, `body: false` when it gives `html` rather than Markdown, and `get(place, { preview })`: a CMS listing or editing the collection asks them in place of running `load` for every entry.
 

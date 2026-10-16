@@ -5,7 +5,7 @@ import { afterAll, describe, expect, it } from 'bun:test'
 import { outputDir } from '../src/build/assets'
 import { formatRouteTable } from '../src/build/report'
 import { compileKay } from '../src/compiler'
-import { KAY_EXPORTS, keptStop, readsNothing } from '../src/server/pure-page'
+import { CONTENT_EXPORTS, KAY_EXPORTS, keptStop, readsNothing } from '../src/server/pure-page'
 import { scratchDir } from './scratch'
 
 const CLI = join(import.meta.dir, '../src/cli.ts')
@@ -805,6 +805,64 @@ describe('what kay exports to a page that is kept', () => {
 
     expect(await at('src/routes/through-barrel.kay')).toMatchObject({ file: join(root, 'src/cookie.ts') })
   })
+
+  it('classes every export of kay/content once', async () => {
+    expect(Object.keys(CONTENT_EXPORTS).sort()).toEqual(Object.keys(await import('../src/content')).sort())
+  })
+
+  it('keeps a page reading a collection over a folder, in a page, a module, a config and through a barrel, and not one over a loader', async () => {
+    const root = await project({
+      'src/routes/in-page.kay': '--- server\nimport { collection } from \'kay/content\'\nimport { s } from \'kay\'\n\nconst posts = collection(\'content/posts\', { schema: s.Object({ title: s.String() }) })\nconst all = await posts.all()\n---\np {all.length}\n',
+      'src/routes/in-module.kay': '--- server\nimport { posts } from \'../posts\'\n\nconst all = await posts.all()\n---\np {all.length}\n',
+      'src/routes/through-barrel.kay': '--- server\nimport { posts } from \'../barrel\'\n\nconst all = await posts.all()\n---\np {all.length}\n',
+      'src/routes/with-config.kay': '--- server\nimport { posts } from \'../content.config\'\nimport { paginate } from \'kay/content\'\n\nconst all = await posts.all()\n---\np {all.length}{typeof paginate}\n',
+      'src/routes/loader.kay': '--- server\nimport { rows } from \'../rows\'\n\nconst all = await rows.all()\n---\np {all.length}\n',
+      'src/routes/loader-barrel.kay': '--- server\nimport { rows } from \'../rows-barrel\'\n\nconst all = await rows.all()\n---\np {all.length}\n',
+      'src/routes/edits.kay': '---\nimport { collection, saveEntry } from \'kay/content\'\n---\np {typeof saveEntry}\n',
+      'src/routes/unknown.kay': '---\nimport { somethingNew } from \'kay/content\'\n---\np Hi\n',
+      'src/routes/whole.kay': '---\nimport * as content from \'kay/content\'\n---\np {typeof content}\n',
+      'src/routes/aliased.kay': '---\nimport { collection as make } from \'kay/content\'\nimport { s } from \'kay\'\n\nconst posts = make(\'content/posts\', { schema: s.Object({ title: s.String() }) })\n---\np {typeof posts}\n',
+      'src/routes/passed.kay': '---\nimport { collection } from \'kay/content\'\n\nconst make = collection\nconst posts = make(\'content/posts\', {})\n---\np {typeof posts}\n',
+      'src/posts.ts': 'import { s } from \'kay\'\nimport { collection } from \'kay/content\'\n\nexport const posts = collection<{ title: string }>("content/posts", { schema: s.Object({ title: s.String() }) })\n',
+      'src/barrel.ts': 'export * from \'./posts\'\n',
+      'src/content.config.ts': 'import { s } from \'kay\'\nimport { collection } from \'kay/content\'\n\nexport const posts = collection(`content/posts`, { schema: s.Object({ title: s.String() }), sort: (a, b) => a.data.title.localeCompare(b.data.title) })\n',
+      'src/rows.ts': 'import { s } from \'kay\'\nimport { collection } from \'kay/content\'\n\nconst loader = { name: \'rows\', load: () => [{ slug: \'a\', data: { title: \'A\' } }] }\n\nexport const rows = collection(loader, { schema: s.Object({ title: s.String() }) })\n',
+      'src/rows-barrel.ts': 'export { rows } from \'./rows\'\n',
+    })
+
+    roots.push(root)
+
+    const at = async (file: string) => keptStop({ file: join(root, file), layouts: [] })
+
+    for (const page of ['in-page', 'in-module', 'through-barrel', 'with-config'])
+      expect(await at(`src/routes/${page}.kay`)).toBeUndefined()
+
+    const loader = { why: expect.stringMatching(/^calls `collection` with something other than a folder written as a string/) }
+
+    for (const page of ['loader', 'loader-barrel'])
+      expect(await at(`src/routes/${page}.kay`)).toMatchObject({ file: join(root, 'src/rows.ts'), ...loader })
+
+    expect(await at('src/routes/passed.kay')).toMatchObject(loader)
+    expect(await at('src/routes/aliased.kay')).toBeUndefined()
+    expect(await at('src/routes/edits.kay')).toMatchObject({ why: 'imports `collection`, `saveEntry` from `kay/content`, which a request or the clock can change' })
+    expect(await at('src/routes/unknown.kay')).toMatchObject({ why: 'imports `somethingNew` from `kay/content`, which a request or the clock can change' })
+    expect(await at('src/routes/whole.kay')).toMatchObject({ why: 'imports the whole module from `kay/content`, which a request or the clock can change' })
+  })
+
+  it('keeps a page over a folder collection in a build, and not one over a loader or reading ctx', async () => {
+    const root = await project({
+      'src/routes/index.kay': '--- server\nimport { posts } from \'../content.config\'\n\nconst all = await posts.all()\n---\nul\n  for post of all\n    li {post.data.title}\n',
+      'src/routes/loaded.kay': '--- server\nimport { rows } from \'../rows\'\n\nconst all = await rows.all()\n---\np {all.length}\n',
+      'src/routes/about.kay': '--- server\nimport { posts } from \'../content.config\'\n\nconst all = await posts.all()\nconst path = ctx.url.pathname\n---\np {all.length}{path}\n',
+      'src/content.config.ts': 'import { s } from \'kay\'\nimport { collection } from \'kay/content\'\n\nexport const posts = collection(\'content/posts\', { schema: s.Object({ title: s.String() }) })\n',
+      'src/rows.ts': 'import { s } from \'kay\'\nimport { collection } from \'kay/content\'\n\nexport const rows = collection({ name: \'rows\', load: () => [{ slug: \'a\', data: { title: \'A\' } }] }, { schema: s.Object({ title: s.String() }) })\n',
+      'src/content/posts/one.json': '{ "title": "One" }\n',
+    })
+
+    roots.push(root)
+
+    expect(await built(root)).toEqual(['/'])
+  }, 60_000)
 
   it('names what a page really reads beside an export that reads nothing', async () => {
     const root = await project({

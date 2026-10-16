@@ -60,6 +60,32 @@ export const KAY_EXPORTS: Record<string, 'free' | 'request' | 'local'> = {
   searchSite: 'request',
 }
 
+// The same for `kay/content`: `collection` is `folder` because a collection over a folder is compiled by `kay build` and the same for every visitor until the next one, while one over a loader may read a database or refresh on a `ttl` that no invalidation tells the page of; the `request` ones read the files and the edit session now, or write them.
+// A page reading a collection is refreshed by `collection.invalidate()`, and one in preview mode is never served a kept copy, so neither makes a folder collection request-bound.
+export const CONTENT_EXPORTS: Record<string, 'free' | 'request' | 'folder'> = {
+  collection: 'folder',
+  isCollection: 'free',
+  COLLECTION: 'free',
+  reference: 'free',
+  imageField: 'free',
+  fileField: 'free',
+  markdownField: 'free',
+  renderMarkdown: 'free',
+  bodyHtml: 'free',
+  highlightCode: 'free',
+  MarkdownError: 'free',
+  paginate: 'free',
+  isPaginated: 'free',
+  collections: 'request',
+  collectionInfo: 'request',
+  entries: 'request',
+  entrySource: 'request',
+  entryFile: 'request',
+  saveEntry: 'request',
+  removeEntry: 'request',
+  repositoryRoot: 'request',
+}
+
 // The same for `kay/i18n`: messages and formats go by the locale, which is part of the key a copy is kept under; the relative time ones read the clock.
 const PURE_I18N_NAMES = new Set(['t', 'T', 'locale', 'locales', 'localeName', 'localize', 'alternate', 'formatNumber', 'formatDate', 'formatList', 'direction', 'defineMessages'])
 const CODE_FILE = /\.(?:kay|[cm]?[jt]sx?)$/
@@ -113,6 +139,7 @@ const AS_NAME = /\s+as\s+(?:\S.*)?$/
 const TYPE_NAME = /^type\s/
 const TYPE_IMPORT = /^\s*type\b/
 const LOCAL_STORAGE = /^storage\s*:\s*(['"])local\1$/
+const FOLDER_LITERAL = /^(?:'[^'\\\n]*'|"[^"\\\n]*"|`[^`\\$]*`)$/
 const STORAGE_PROPERTY = /^storage\b/
 const CALL_OPENING = /^\s*(?:<[^()]*>\s*)?\(/
 const REGEX_CHARS = /[$()*+.?[\\\]^{|}]/g
@@ -187,8 +214,15 @@ function savesLocally(args: string): boolean {
   return storage.length > 0 && storage.every(property => LOCAL_STORAGE.test(property))
 }
 
-// Whether every use of `name` in `source`, the import itself cut out, is a call saying `storage: 'local'`.
-function onlyLocalCalls(source: string, name: string, importAt: number, importLength: number): boolean {
+// Whether the arguments of a `collection` call, from just after its `(`, start with a folder as a plain string, not a loader.
+function startsWithFolder(args: string): boolean {
+  const first = splitLevel(args)?.[0]?.trim()
+
+  return first !== undefined && FOLDER_LITERAL.test(first)
+}
+
+// Whether every use of `name` in `source`, the import itself cut out, is a call whose arguments `accepts`.
+function onlyCalls(source: string, name: string, importAt: number, importLength: number, accepts: (args: string) => boolean): boolean {
   const rest = source.slice(0, importAt) + source.slice(importAt + importLength)
   const uses = rest.matchAll(new RegExp(`(?<![\\w$.])${name.replace(REGEX_CHARS, '\\$&')}(?![\\w$])`, 'g'))
   let found = false
@@ -197,7 +231,7 @@ function onlyLocalCalls(source: string, name: string, importAt: number, importLe
     const after = rest.slice(use.index + name.length)
     const opening = CALL_OPENING.exec(after)
 
-    if (opening === null || !savesLocally(after.slice(opening[0].length)))
+    if (opening === null || !accepts(after.slice(opening[0].length)))
       return false
 
     found = true
@@ -308,11 +342,32 @@ async function scanned(file: string): Promise<Scan> {
 
         const kind = Object.hasOwn(KAY_EXPORTS, own) ? KAY_EXPORTS[own] : 'request'
 
-        return kind === 'request' || (kind === 'local' && !onlyLocalCalls(source, local, index, length))
+        return kind === 'request' || (kind === 'local' && !onlyCalls(source, local, index, length, savesLocally))
       })
 
       if (imported.length === 0 || impure.length > 0)
         return stop(`imports ${imported.length === 0 ? 'the whole module' : impure.map(name => `\`${name}\``).join(', ')} from \`${specifier}\`, which a request or the clock can change`)
+
+      continue
+    }
+
+    if (specifier === 'kay/content') {
+      const imported = (BRACES.exec(clause)?.[1] ?? '').split(',').map(name => name.trim()).filter(name => name !== '' && !TYPE_NAME.test(name))
+
+      const impure = imported.filter((name) => {
+        const own = name.replace(AS_NAME, '')
+        const kind = Object.hasOwn(CONTENT_EXPORTS, own) ? CONTENT_EXPORTS[own] : 'request'
+
+        return kind === 'request' || (kind === 'folder' && !onlyCalls(source, name.replace(AS_PREFIX, ''), index, length, startsWithFolder))
+      })
+
+      if (imported.length === 0 || impure.length > 0) {
+        const loader = impure.length > 0 && impure.every(name => name.replace(AS_NAME, '') === 'collection')
+
+        return stop(loader
+          ? 'calls `collection` with something other than a folder written as a string, a loader that may read a database or refresh on a `ttl` no rebuild or invalidation tells the page of'
+          : `imports ${imported.length === 0 ? 'the whole module' : impure.map(name => `\`${name}\``).join(', ')} from \`kay/content\`, which a request or the clock can change`)
+      }
 
       continue
     }
