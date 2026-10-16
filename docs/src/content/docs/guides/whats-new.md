@@ -9,6 +9,7 @@ This page lists what each release adds, newest first, with a link to where each 
 
 - **Font fallback with a computed size**: the metric-matched fallback is listed in a `font` shorthand whose size is `var()` or `calc()` too. [Styling and assets](/essentials/styling-and-assets)
 - **kayjs-mail errors keep their cause**: `send` throws an `Error` with the original value as its `cause` when a transport throws something that is not an `Error`. [kayjs-mail](/libraries/kayjs-mail)
+- **A size budget for pages**: `budget: { js: '20kb', css: '10kb' }` in `kay.config.ts` limits what one page loads, compressed. `kay build` warns with `over-budget` for each page over it and names the modules weighing most in its scripts, and `kay build --deny-warnings` fails on it. [CLI](/reference/cli)
 
 ## 1.48.0
 

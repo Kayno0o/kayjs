@@ -228,6 +228,7 @@ kay lint --cache
 | `duplicate-title` | warn | seo | A prerendered page with the title of another of the same locale. |
 | `long-description` | warn | seo | A description over 160 characters, which search results cut: `seo.description`, reported in kay.config.ts by `kay check` and `kay build`, or a prerendered page's own, reported at the page by `kay build`. |
 | `unsized-share-image` | warn | seo | A prerendered page whose `og:image` has no `og:image:width`, kay reading no size off it. |
+| `over-budget` | warn | code | A page loading more JavaScript or CSS, compressed, than `budget` in kay.config.ts allows: reported by `kay build` at the route's file with the modules weighing most in its scripts, never by `kay check`, and no `// kay-allow` comment reaches it. `kay build --deny-warnings` or `lints: { 'over-budget': 'deny' }` fails the build on it. |
 | `noindex-in-sitemap` | warn | seo | A prerendered page whose head says `noindex` while the sitemap lists it; `noindex: true` in `page` does both. |
 
 ### SEO lints

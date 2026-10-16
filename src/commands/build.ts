@@ -19,7 +19,7 @@ import { USAGES } from './usages'
 // With `--compile`, also bundles the server and all of it into one executable; with `--static`, writes the whole site to `--outdir`, `dist` by default, for a host with no server. `--no-check` builds without checking.
 export const build: Command = {
   usage: USAGES.build,
-  options: { 'compile': { type: 'string' }, 'verify': { type: 'boolean' }, 'entry': { type: 'string' }, 'static': { type: 'boolean' }, 'outdir': { type: 'string' }, 'no-check': { type: 'boolean' }, 'analyze': { type: 'boolean' }, 'project': { type: 'string', short: 'p' }, 'format': { type: 'string' }, 'quiet': { type: 'boolean' } },
+  options: { 'compile': { type: 'string' }, 'verify': { type: 'boolean' }, 'entry': { type: 'string' }, 'static': { type: 'boolean' }, 'outdir': { type: 'string' }, 'no-check': { type: 'boolean' }, 'analyze': { type: 'boolean' }, 'deny-warnings': { type: 'boolean' }, 'project': { type: 'string', short: 'p' }, 'format': { type: 'string' }, 'quiet': { type: 'boolean' } },
   positionals: 1,
   run: async ({ values, positionals }, refuseUsage) => {
     const { compile, outdir, project: tsconfig } = values
@@ -68,6 +68,7 @@ export const build: Command = {
       exportTo: exported ? resolve(typeof outdir === 'string' ? outdir : join(root, 'dist')) : undefined,
       compile: typeof compile === 'string' ? { outfile: resolve(compile), entry, verify: values.verify === true } : undefined,
       analyze: values.analyze === true,
+      denyWarnings: values['deny-warnings'] === true,
     }
 
     if (format === 'json')
@@ -79,7 +80,7 @@ export const build: Command = {
     let result: BuildResult
 
     try {
-      result = await buildProject(root, await loadConfig(root), { ...options, onStage: async (stage, result) => printStage(stage, result, format, values.quiet === true), onProgress: progress?.update })
+      result = await buildProject(root, await loadConfig(root), { ...options, onStage: async (stage, result) => printStage(stage, result, format, values.quiet === true, values['deny-warnings'] === true), onProgress: progress?.update })
     }
     finally {
       progress?.stop()
@@ -120,13 +121,14 @@ export const build: Command = {
 }
 
 // Each stage as it ends, so its problems come before what a later stage's code logs, and are shown though that code ends the process.
+// `denyWarnings` says in the count that the warnings fail the build.
 // `quiet` leaves the size report out, each stage still saying what it made.
-async function printStage(stage: BuildStage, result: BuildResult, format: ProblemFormat, quiet: boolean): Promise<void> {
+async function printStage(stage: BuildStage, result: BuildResult, format: ProblemFormat, quiet: boolean, denyWarnings: boolean): Promise<void> {
   if (stage === 'check')
-    await printProblems(result.checked, false, format)
+    await printProblems(result.checked, denyWarnings, format)
 
   if (stage === 'output') {
-    await printProblems(result.linted, false, format)
+    await printProblems(result.linted, denyWarnings, format)
 
     if (result.built) {
       const { islands, stylesheets, prerendered, entries, report, summary, previous, ms } = result.built

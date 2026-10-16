@@ -69,6 +69,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `deprecated-import` | warn | deprecated | A name imported from the entry point it left, such as `invalidatePage`, once in `kay/server` |
 | `css-import-without-text` | deny | code | A stylesheet imported for a value without `with { type: 'text' }` |
 | `literal-tag` | warn | code | An HTML tag written in template text, shown as written |
+| `over-budget` | warn | code | A page loading more JavaScript or CSS than `budget` allows |
 | `uncaught-await` | warn | code | An `await` block with no `catch` |
 | `unkept-page` | warn | code | A page saying `keep: true` that `kay build` does not keep |
 | `unguarded-route` | deny | security | With `requireGuards`, a route no guard covers that does not set `guards: false` |

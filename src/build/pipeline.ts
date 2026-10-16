@@ -30,6 +30,7 @@ import { prerenderPages } from '../server/prerender'
 import { remoteImages, remotePatterns } from '../server/remote'
 import { slashedPath } from '../server/routes'
 import { linkStoredFiles } from '../server/storage'
+import { budgetLints } from './budget'
 import { cacheCounts, resetCacheCounts } from './cache'
 import { buildClient } from './client'
 import { compileServer } from './compile'
@@ -69,6 +70,8 @@ export interface BuildOptions {
   compile?: { outfile: string, entry?: string | undefined, verify?: boolean | undefined } | undefined
   // Breaks the size report down by module.
   analyze?: boolean | undefined
+  // Fails the build on a warning, the check's or a lint of the output's, as an error does.
+  denyWarnings?: boolean | undefined
   // Called with the result so far once each stage that answers something is done, for the command line to print it as it comes rather than after a later stage's own output: the check, the output, the export and the compile.
   onStage?: ((stage: BuildStage, result: BuildResult) => Promise<void> | void) | undefined
   // Called as the build moves on to each step, and through the images it encodes and the routes it prerenders.
@@ -179,7 +182,7 @@ async function runBuild(root: string, config: KayConfig, options: BuildOptions):
   result.checked = checked.value
   await reportAside('check')
 
-  if (failing(checked.value)) {
+  if (failing(checked.value, options.denyWarnings)) {
     await putBack(output, previous)
 
     return { ...result, failed: { stage: 'check' } }
@@ -209,15 +212,15 @@ async function runBuild(root: string, config: KayConfig, options: BuildOptions):
 
   result.linted = linted
 
-  if (!failing(linted)) {
+  if (!failing(linted, options.denyWarnings)) {
     const summary: BuildSummary = { routes: made.routes, stages: [...checking ? [{ name: 'check', ms: checkMs }] : [], { name: 'bundle', ms: bundleMs }, ...made.stages], caches: cacheCounts() }
 
-    result.built = { islands: Object.keys(client.islands).length, stylesheets: client.styles.size, prerendered, entries, report: client.report, summary, previous: lastReport, ms: performance.now() - started }
+    result.built = { islands: Object.keys(client.islands).length, stylesheets: client.styles.size, prerendered, entries, report: options.analyze === true ? client.report : withoutModules(client.report), summary, previous: lastReport, ms: performance.now() - started }
   }
 
   await reportAside('output')
 
-  if (failing(linted)) {
+  if (failing(linted, options.denyWarnings)) {
     await putBack(output, previous)
 
     return { ...result, failed: { stage: 'output' } }
@@ -289,9 +292,14 @@ function shippedPackages({ root, config }: Project, client: ClientBuild): string
   return [...client.packages ?? [], ...packagesOf(fontFiles(root, config.fonts ?? [])), ...iconSetPackages(root)]
 }
 
-// The errors fail a build; warnings are only printed.
-function failing(diagnostics: CheckDiagnostic[]): boolean {
-  return diagnostics.some(diagnostic => diagnostic.severity !== 'warning')
+// The errors fail a build; warnings are only printed unless `denyWarnings`.
+function failing(diagnostics: CheckDiagnostic[], denyWarnings = false): boolean {
+  return diagnostics.some(diagnostic => denyWarnings || diagnostic.severity !== 'warning')
+}
+
+// The modules a budget made the bundle measure, which only `--analyze` shows.
+function withoutModules(report: SizeReport | undefined): SizeReport | undefined {
+  return report && { entry: report.entry && { ...report.entry, modules: undefined }, islands: report.islands.map(island => ({ ...island, modules: undefined })) }
 }
 
 async function checkStage(project: Project, { tsconfig = 'tsconfig.json', entry }: { tsconfig?: string | undefined, entry?: string | undefined }, exported: boolean): Promise<CheckDiagnostic[]> {
@@ -320,7 +328,7 @@ async function bundleStage(project: Project, exported: boolean, analyze: boolean
   if (exported)
     refuseStaticConfig(config)
 
-  const client = await buildClient(root, clientOptionsOf(config, project.mode, { exported, report: analyze ? 'modules' : 'sizes' }))
+  const client = await buildClient(root, clientOptionsOf(config, project.mode, { exported, report: analyze || project.config.budget?.js !== undefined ? 'modules' : 'sizes' }))
 
   // A static host cannot pick a format by `Accept`, so an export links WebP alone.
   const avif = exported ? undefined : avifQuality(config.images)
@@ -379,7 +387,7 @@ async function outputStage(project: Project, exported: boolean, client: ClientBu
   await pruneCompileCache(cacheDir(root))
 
   // The heads are the check's to read, so a build without checking skips them with it.
-  const linted = checking ? [...pageSeoLints(config, rendered, exported), ...unkeptPageLints(config, [...stops.values()])] : []
+  const linted = [...checking ? [...pageSeoLints(config, rendered, exported), ...unkeptPageLints(config, [...stops.values()])] : [], ...budgetLints(config.budget, config.lints, sizes, routes, client.report)]
 
   // Remote originals are kept between builds, revalidated as the image route does.
   const remote = remoteImages(cacheDir(root, 'remote'), remotePatterns(config.images?.remote))

@@ -242,6 +242,7 @@ The build runs `kay check` first and keeps the last build when the check or the 
 | `--outdir <dir>` | Where `--static` writes, `dist` by default |
 | `--no-check` | Skips the check |
 | `--analyze` | Lists the modules weighing most in the entry and each island |
+| `--deny-warnings` | Fails the build on a warning too, such as `over-budget` |
 | `-p <tsconfig>` | Names another tsconfig |
 | `--format <format>` | `text` by default; `github` annotates what the check found as `kay check --format github` does, and a template that does not compile or a failed stage too; `json` prints the whole build as one document once it ends, see [Output for tools](#output-for-tools) |
 
@@ -254,6 +255,14 @@ The build prints the JavaScript a page with islands loads, gzip and minified: th
 - **Caches**: for each cache under `.kay/cache` (`components`, `analyses`, `image variants`, `share cards`, `favicons`, `compressed copies`, `package probes`, `runtime chunk`), how many entries came from it and how many were made, as `image variants: 40 cached, 2 made`.
 
 Each size shows its change since the last build, as `[+3.2 KB]`, or `[new]` for a row the last build did not have, and nothing when it did not change. A route, an island or the entry the last build had and this one does not is listed after the routes under `Removed since the last build:`. The sizes of the last successful build are kept in `.kay/report.json`, and a build that fails leaves them as they were; a `--static` export is compared with the last export, and a server build with the last server build. Long paths lose their middle to fit the terminal, and the report has no colour or control code, so a CI log reads the same. `--quiet` leaves the report out.
+
+To keep pages light, set a budget in `kay.config.ts`. Nothing is limited until you do:
+
+```ts
+export default defineConfig({ budget: { js: '20kb', css: '10kb' } })
+```
+
+Each key is a size in bytes, or a string ending in `b`, `kb` or `mb`, and limits what one page loads, compressed as a host serves it. The build then warns with `over-budget` for each route over it, at the route's file, and lists the three modules weighing most in its scripts. Set the lint to `deny` in `lints` to fail the build on it, or pass `--deny-warnings`, which fails it on any warning, the check's included.
 
 Every build writes `/_kay/THIRD-PARTY-LICENSES.txt`, served beside the rest and copied by `--static`: each package whose code, stylesheets or fonts the browser gets, and every `@iconify-json` set the project depends on, with its licence text. A set whose licence asks for more than that notice, such as CC BY's credit where the icons show, gets a warning. An executable prints the same notices, its server's packages added, for `./server --licenses`, with the licences of the codecs kay's AVIF encoder and decoder compile in (libavif, libaom, libsharpyuv, Emscripten's glue and musl).
 

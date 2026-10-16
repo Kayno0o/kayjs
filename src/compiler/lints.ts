@@ -398,6 +398,14 @@ export const LINTS = {
     wrong: '--- server\nimport dayjs from \'dayjs\'\n\nexport const page = { keep: true }\n---',
     right: '--- server\nexport const page = { keep: true }\n---',
   },
+  'over-budget': {
+    level: 'warn',
+    group: 'code',
+    site: true,
+    summary: 'A page loading more JavaScript or CSS, compressed, than `budget` in kay.config.ts allows. `kay build` reports it at the route\'s file with the modules weighing most in its scripts, `kay build --deny-warnings` or `lints` set to `deny` fails the build on it, and with no `budget` it reports nothing.',
+    wrong: 'export default defineConfig({ budget: { js: \'20kb\' } })',
+    right: 'export default defineConfig({ budget: { js: \'60kb\' } })',
+  },
   'noindex-in-sitemap': {
     level: 'warn',
     group: 'seo',
