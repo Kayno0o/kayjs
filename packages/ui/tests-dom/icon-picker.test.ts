@@ -3,10 +3,12 @@ import type { IconChoice } from '../src/icon-picker'
 import { afterEach, expect, test } from 'bun:test'
 import { trustHtml } from 'kay'
 import { mount, settle } from 'kay/test'
-import { click } from './dom'
+import { click, clock } from './dom'
 
-// Past the picker's debounce.
+// Fake time past the picker's debounce.
 const TYPED_MS = 250
+// Fake time between two keystrokes, well inside the debounce.
+const KEYSTROKE_MS = 50
 
 let mounted: Mounted | undefined
 const changes: string[] = []
@@ -17,6 +19,7 @@ const inputs: string[] = []
 const held: { query: string, release: () => void }[] = []
 
 afterEach(() => {
+  clock.stop()
   mounted?.unmount()
   changes.length = 0
   searches.length = 0
@@ -56,6 +59,7 @@ async function picker(options: { value?: string, hold?: (query: string) => boole
     inputs.push(`${name}=${value}`)
   })
   await settle()
+  clock.start()
 
   const search = root.querySelector<HTMLInputElement>('input[type="search"]')!
   const all = () => [...root.querySelectorAll('.kui-icon-grid-option')]
@@ -86,22 +90,22 @@ test('picks an icon into the form, and picking it again or clearing it empties t
   expect(view.selection()).toBeNull()
 
   click(view.option('house'))
-  await settle()
+  await clock.settle()
 
   expect([view.pressed(), view.hidden(), changes, inputs]).toEqual([['house'], 'tabler:house', ['tabler:house'], ['icon=tabler:house']])
   expect(view.selection()!.textContent).toContain('house')
   expect(view.selection()!.querySelector('[data-icon="tabler:house"]')).not.toBeNull()
 
   click(view.option('house'))
-  await settle()
+  await clock.settle()
 
   expect([view.pressed(), view.hidden(), changes.at(-1)]).toEqual([[], '', ''])
   expect(view.selection()).toBeNull()
 
   click(view.option('home'))
-  await settle()
+  await clock.settle()
   click(view.selection()!.querySelector('.kui-icon-grid-clear'))
-  await settle()
+  await clock.settle()
 
   expect([view.pressed(), view.hidden(), changes]).toEqual([[], '', ['tabler:house', '', 'tabler:home', '']])
   expect(inputs).toEqual(['icon=tabler:house', 'icon=', 'icon=tabler:home', 'icon='])
@@ -111,31 +115,31 @@ test('searches once the typing pauses, from the first page again', async () => {
   const view = await picker()
 
   click(view.more())
-  await settle()
+  await clock.settle()
 
   expect(searches.at(-1)).toEqual(['', 50, 50])
   expect(view.names()).toHaveLength(72)
   expect(view.more()).toBeNull()
 
   // The first run's pause, on the same empty search, keeps the pages shown.
-  await Bun.sleep(TYPED_MS)
+  await clock.elapse(TYPED_MS)
 
   expect(view.names()).toHaveLength(72)
 
   type(view.search, 'ho')
-  await settle()
+  await clock.elapse(KEYSTROKE_MS)
   type(view.search, 'hou')
-  await settle()
+  await clock.elapse(KEYSTROKE_MS)
 
   expect(searches).toHaveLength(2)
 
-  await Bun.sleep(TYPED_MS)
+  await clock.elapse(TYPED_MS)
 
   expect(searches.slice(2)).toEqual([['hou', 50, 0]])
   expect(view.names()).toEqual(['house'])
 
   type(view.search, 'nothing')
-  await Bun.sleep(TYPED_MS)
+  await clock.elapse(TYPED_MS)
 
   expect([view.names(), view.empty()]).toEqual([[], 'No icons found.'])
 })
@@ -144,22 +148,22 @@ test('keeps the last grid while a search is in flight, and drops a search a late
   const view = await picker({ hold: query => query === 'shape' || query === 'home' })
 
   type(view.search, 'shape')
-  await Bun.sleep(TYPED_MS)
+  await clock.elapse(TYPED_MS)
 
   expect(view.names()).toHaveLength(50)
   expect(view.root.querySelector('.kui-icon-grid')!.getAttribute('aria-busy')).toBe('true')
   expect(view.names()[0]).toBe('home')
 
   type(view.search, 'home')
-  await Bun.sleep(TYPED_MS)
+  await clock.elapse(TYPED_MS)
   held.shift()!.release()
-  await settle()
+  await clock.settle()
 
   expect(view.names()).toHaveLength(50)
   expect(view.root.querySelector('.kui-icon-grid')!.getAttribute('aria-busy')).toBe('true')
 
   held.shift()!.release()
-  await settle()
+  await clock.settle()
 
   expect(view.names()).toEqual(['home'])
   expect(view.root.querySelector('.kui-icon-grid')!.hasAttribute('aria-busy')).toBe(false)
@@ -171,7 +175,7 @@ test('reads Searching… until the first search lands', async () => {
   expect(view.empty()).toBe('Searching…')
 
   held.shift()!.release()
-  await settle()
+  await clock.settle()
 
   expect(view.empty()).toBeUndefined()
   expect(view.names()).toHaveLength(50)
@@ -185,7 +189,7 @@ test('starts on the given icon, drawing it once a search finds it and after one 
 
   click(view.option('house'))
   type(view.search, 'shape')
-  await Bun.sleep(TYPED_MS)
+  await clock.elapse(TYPED_MS)
 
   expect(view.selection()!.textContent).toContain('house')
   expect(view.selection()!.querySelector('[data-icon="tabler:house"]')).not.toBeNull()
@@ -195,7 +199,7 @@ test('follows an icon its parent passes', async () => {
   const view = await picker({ value: 'tabler:home' })
 
   click(view.root.querySelector('#choose'))
-  await settle()
+  await clock.settle()
 
   expect([view.pressed(), view.hidden(), changes]).toEqual([['shape-3'], 'tabler:shape-3', []])
 })
@@ -216,7 +220,7 @@ test('asks for each page after the one shown, and adds it to the grid', async ()
 
   expect(view.names()).toHaveLength(50)
   click(view.more())
-  await settle()
+  await clock.settle()
 
   expect(searches).toEqual([['', 50, 0], ['', 50, 50]])
   expect(view.names()).toEqual(SET.map(entry => entry.name.replace('tabler:', '')))
@@ -226,7 +230,7 @@ test('ends the paging when a page brings nothing the grid lacks, as an app ignor
   const view = await picker({ ignoreOffset: true })
 
   click(view.more())
-  await settle()
+  await clock.settle()
 
   expect(view.names()).toHaveLength(50)
   expect(new Set(view.names()).size).toBe(50)
@@ -238,7 +242,7 @@ test('asks for one page on a double click of Show more', async () => {
 
   click(view.more())
   click(view.more())
-  await settle()
+  await clock.settle()
 
   expect(searches).toEqual([['', 50, 0], ['', 50, 50]])
 })
@@ -247,13 +251,13 @@ test('a Show more pressed while a new search loads asks for nothing, and the gri
   const view = await picker({ hold: query => query === 'ho' })
 
   type(view.search, 'ho')
-  await Bun.sleep(TYPED_MS)
+  await clock.elapse(TYPED_MS)
   click(view.more())
 
   expect(searches).toEqual([['', 50, 0], ['ho', 50, 0]])
 
   held.shift()!.release()
-  await settle()
+  await clock.settle()
 
   expect(view.names()).toEqual(['home', 'house'])
 })
