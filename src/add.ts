@@ -1,6 +1,6 @@
 import type { Feature } from './templates'
 import { existsSync } from 'node:fs'
-import { chmod, mkdir, readFile, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 import process from 'node:process'
 import { detectHost, FEATURE_NAMES, FEATURES, projectFiles } from './new'
@@ -261,6 +261,22 @@ async function spawn(command: string[], dir: string): Promise<{ code: number, ou
   return { code, output: `${out}${err}` }
 }
 
+const MANIFEST_FILES = ['package.json', 'bun.lock', 'bun.lockb']
+
+// What package.json and the lockfile held, a missing file as undefined.
+async function snapshot(dir: string): Promise<Map<string, Buffer | undefined>> {
+  return new Map(await Promise.all(MANIFEST_FILES.map(async name => [name, existsSync(join(dir, name)) ? Buffer.from(await Bun.file(join(dir, name)).arrayBuffer()) : undefined] as const)))
+}
+
+async function restore(dir: string, kept: Map<string, Buffer | undefined>): Promise<void> {
+  for (const [name, content] of kept) {
+    if (content === undefined)
+      await rm(join(dir, name), { force: true })
+    else
+      await writeFile(join(dir, name), content)
+  }
+}
+
 async function loadLibrary(dir: string, name: string): Promise<LibraryFeature> {
   const module = await import(Bun.resolveSync(`${LIBRARIES[name]![0]!}/add`, dir)) as { default?: LibraryFeature }
 
@@ -270,13 +286,13 @@ async function loadLibrary(dir: string, name: string): Promise<LibraryFeature> {
   return module.default
 }
 
-function failIfConflicts({ conflicts }: Plan, added = ''): void {
+function failIfConflicts({ conflicts }: Plan): void {
   if (conflicts.length > 0)
-    throw new Error(`kay add: ${added}nothing was written\n\n${conflicts.join('\n\n')}`)
+    throw new Error(`kay add: nothing was written\n\n${conflicts.join('\n\n')}`)
 }
 
 // Adds the features to the project in `dir`: the files and edits `kay new --with` would have made, then the install. Nothing is written when a file does not have the shape `kay new` writes; the error says what to change by hand.
-// A library is added to the package.json first, as it cannot be asked what to write before it is installed.
+// A library is installed first, as it cannot be asked what to write before; a refusal after that restores package.json and the lockfile.
 export async function addFeatures(dir: string, names: readonly string[], options: { install?: boolean | undefined } = {}): Promise<AddResult> {
   const unknown = names.find(name => !FEATURE_NAMES.includes(name as Feature) && !(name in LIBRARIES))
 
@@ -299,42 +315,52 @@ export async function addFeatures(dir: string, names: readonly string[], options
     const { manifest } = await readManifest(dir)
     const missing = libraries.flatMap(library => LIBRARIES[library]!).filter(name => manifest.dependencies?.[name] === undefined && manifest.devDependencies?.[name] === undefined)
 
-    if (missing.length > 0 && options.install !== false) {
-      const own = JSON.parse(await readFile(join(import.meta.dir, '../package.json'), 'utf8')) as { version: string, devDependencies: Record<string, string> }
-      const added = await spawn([process.execPath, 'add', ...missing.map(name => name.startsWith('@kaynooo/kayjs-') ? `${name}@~${own.version}` : `${name}@${own.devDependencies[name]!}`)], dir)
+    // A library can only be asked what it writes once installed, so a refusal after that puts package.json and the lockfile back.
+    const kept = await snapshot(dir)
 
-      if (added.code !== 0)
-        throw new Error(`kay add: bun add failed, nothing was written\n${added.output}`)
+    try {
+      if (missing.length > 0 && options.install !== false) {
+        const own = JSON.parse(await readFile(join(import.meta.dir, '../package.json'), 'utf8')) as { version: string, devDependencies: Record<string, string> }
+        const added = await spawn([process.execPath, 'add', ...missing.map(name => name.startsWith('@kaynooo/kayjs-') ? `${name}@~${own.version}` : `${name}@${own.devDependencies[name]!}`)], dir)
 
-      // The package.json changed on disk, so the merge starts over from it.
-      plan = await planCore(dir, core)
-      failIfConflicts(plan, `${missing.join(' and ')} was added to package.json, but `)
-    }
+        if (added.code !== 0)
+          throw new Error(`kay add: bun add failed, nothing was written\n${added.output}`)
 
-    for (const library of libraries) {
-      const feature = await loadLibrary(dir, library)
-
-      for (const [path, content] of Object.entries(feature.files ?? {})) {
-        const disk = await read(join(dir, path))
-
-        if (disk === undefined)
-          plan.writes.set(path, content)
-        else if (disk !== content)
-          plan.conflicts.push(`${path} exists and is not the file ${library} writes: add\n${handEdit(disk, content)}`)
+        // The package.json changed on disk, so the merge starts over from it.
+        plan = await planCore(dir, core)
+        failIfConflicts(plan)
       }
 
-      if (feature.extension !== undefined) {
-        const disk = await read(join(dir, 'kay.config.ts')) ?? ''
-        const next = addExtension(plan.writes.get('kay.config.ts') ?? disk, feature.extension)!
+      for (const library of libraries) {
+        const feature = await loadLibrary(dir, library)
 
-        if (next !== disk)
-          plan.writes.set('kay.config.ts', next)
+        for (const [path, content] of Object.entries(feature.files ?? {})) {
+          const disk = await read(join(dir, path))
+
+          if (disk === undefined)
+            plan.writes.set(path, content)
+          else if (disk !== content)
+            plan.conflicts.push(`${path} exists and is not the file ${library} writes: add\n${handEdit(disk, content)}`)
+        }
+
+        if (feature.extension !== undefined) {
+          const disk = await read(join(dir, 'kay.config.ts')) ?? ''
+          const next = addExtension(plan.writes.get('kay.config.ts') ?? disk, feature.extension)!
+
+          if (next !== disk)
+            plan.writes.set('kay.config.ts', next)
+        }
+
+        notes.push(...feature.notes ?? [])
       }
 
-      notes.push(...feature.notes ?? [])
+      failIfConflicts(plan)
     }
+    catch (error) {
+      await restore(dir, kept)
 
-    failIfConflicts(plan, `${libraries.join(' and ')} is in package.json, but `)
+      throw error
+    }
   }
 
   const written = [...plan.writes.keys()].sort()

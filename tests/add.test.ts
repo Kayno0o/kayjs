@@ -21,7 +21,7 @@ async function content(dir: string, path: string): Promise<unknown> {
 }
 
 async function snapshot(dir: string): Promise<Record<string, unknown>> {
-  const paths = (await readdir(dir, { recursive: true, withFileTypes: true })).filter(entry => entry.isFile()).map(entry => join(entry.parentPath, entry.name).slice(dir.length + 1))
+  const paths = (await readdir(dir, { recursive: true, withFileTypes: true })).filter(entry => entry.isFile() && !entry.parentPath.includes('node_modules')).map(entry => join(entry.parentPath, entry.name).slice(dir.length + 1))
 
   return Object.fromEntries(await Promise.all(paths.toSorted().map(async path => [path, await content(dir, path)] as const)))
 }
@@ -180,6 +180,31 @@ it('puts an extension first in an existing list, and refuses a config without de
 
   expect(addExtension('import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({\n  lang: \'en\',\n  extensions: [other()],\n})\n', extension)).toBe('import { defineConfig } from \'kay/server\'\nimport { cms } from \'@kaynooo/kayjs-cms\'\n\nexport default defineConfig({\n  lang: \'en\',\n  extensions: [cms(), other()],\n})\n')
   expect(addExtension('export default { lang: \'en\' }\n', extension)).toBeUndefined()
+})
+
+it('leaves the project as it was when a library refuses, package.json included', async () => {
+  const dir = join(await mkdtemp(join(tmpdir(), 'kay-add-')), 'app')
+
+  try {
+    await createProject(dir, { kay: '^1.0.0', features: PRESETS.server.features })
+    await mkdir(join(dir, 'node_modules/@kaynooo'), { recursive: true })
+    await symlink(join(repo, 'packages/mail'), join(dir, 'node_modules/@kaynooo/kayjs-mail'))
+    await writeFile(join(dir, 'src/mail.ts'), 'export const mail = 1\n')
+
+    const manifest = await Bun.file(join(dir, 'package.json')).json() as { dependencies: Record<string, string> }
+
+    manifest.dependencies['@kaynooo/kayjs-mail'] = '~1.0.0'
+    await writeFile(join(dir, 'package.json'), JSON.stringify(manifest))
+
+    const files = ['package.json', 'kay.config.ts', 'src/mail.ts', '.gitignore']
+    const before = await Promise.all(files.map(async file => content(dir, file)))
+
+    await expect(addFeatures(dir, ['auth', 'mail'], { install: false })).rejects.toThrow('src/mail.ts exists and is not the file mail writes')
+    expect(await Promise.all(files.map(async file => content(dir, file)))).toEqual(before)
+  }
+  finally {
+    await rm(join(dir, '..'), { recursive: true, force: true })
+  }
 })
 
 it('runs as kay add, printing what it wrote', async () => {
