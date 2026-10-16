@@ -271,7 +271,7 @@ class RewriteFinder {
     if (source === undefined || source < this.input.templateStart || tagPosition(reference) !== undefined || typeQueryOf(reference) !== undefined)
       return undefined
 
-    if ((parent.type === 'CallExpression' || parent.type === 'OptionalCallExpression' || parent.type === 'NewExpression') && (parent.callee === node || !compilerCall(parent.callee)))
+    if (isCall(parent) && (parent.callee === node || !compilerCall(parent.callee)))
       return undefined
 
     if ((parent.type === 'MemberExpression' || parent.type === 'OptionalMemberExpression') && parent.object === node && !parent.computed && parent.property.type === 'Identifier' && parent.property.name === 'set')
@@ -290,9 +290,7 @@ class RewriteFinder {
     if (!this.input.values || source === undefined || source < this.input.templateStart || tagPosition(reference) !== undefined || typeQueryOf(reference) !== undefined)
       return undefined
 
-    const argument = (parent.type === 'CallExpression' || parent.type === 'OptionalCallExpression' || parent.type === 'NewExpression') && parent.callee !== node && !compilerCall(parent.callee)
-
-    return argument || handedToComponent(reference) ? source : undefined
+    return (isCall(parent) && parent.callee !== node && !compilerCall(parent.callee)) || handedToComponent(reference) ? source : undefined
   }
 
   // The rewrite asking the types whether the parameter a signal is handed to takes one.
@@ -660,6 +658,11 @@ export function importedFromKay(scope: Scope, callee: t.Node, module = 'kay'): s
 // Whether every use of the binding reads the signal, a call with no arguments or its name left uncalled in the template: a `.set`, or the signal handed on, may write it.
 function onlyRead(binding: Binding | undefined, uncalled: (reference: NodePath) => number | undefined): boolean {
   return binding !== undefined && binding.constant && valueReferences(binding).length > 0 && valueReferences(binding).every(reference => (reference.parent.type === 'CallExpression' && reference.parent.callee === reference.node && reference.parent.arguments.length === 0) || uncalled(reference) !== undefined)
+}
+
+// A call or a `new`, whose arguments hand a name on.
+function isCall(node: t.Node): node is t.CallExpression | t.OptionalCallExpression | t.NewExpression {
+  return node.type === 'CallExpression' || node.type === 'OptionalCallExpression' || node.type === 'NewExpression'
 }
 
 // A helper the compiler wraps a template expression in, such as `KayIdentityKey`, which hands nothing on.

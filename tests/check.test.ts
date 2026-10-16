@@ -474,6 +474,9 @@ describe.concurrent('kay check, edge cases', () => {
       'export const run = (action: () => number) => action()',
       'export const same = <T,>(value: T) => value',
       'export const label = (n: number) => String(n)',
+      'export const readGeneric = <T,>(s: Signal<T>): T => s()',
+      'export const identity = <T,>(s: T): T => s',
+      'export class Box { constructor(public value: unknown) {} }',
       '',
     ].join('\n')
 
@@ -484,6 +487,7 @@ describe.concurrent('kay check, edge cases', () => {
       'const { open, anything } = props<{ open: Signal<boolean>, anything: unknown }>()',
       '---',
       'button(onClick={() => open.set(!open())}) {String(anything)}',
+      'p {String(open)}',
       '',
     ].join('\n')
 
@@ -491,7 +495,8 @@ describe.concurrent('kay check, edge cases', () => {
       '---',
       'import { memo, signal } from \'kay\'',
       'import Toggle from \'../components/Toggle.kay\'',
-      'import { label, read, readMemo, run, same, show, showAny } from \'../lib\'',
+      'import { Box, identity, label, read, readGeneric, readMemo, run, same, show, showAny } from \'../lib\'',
+      'import { shared } from \'../shared\'',
       '',
       'const count = signal(0)',
       'const double = memo(() => count() * 2)',
@@ -504,13 +509,16 @@ describe.concurrent('kay check, edge cases', () => {
       'p {read(count)} {readMemo(double)} {run(double)} {same(count)()} {label(count())}',
       'Toggle(open={open} anything={count})',
       'button(onClick={() => show(count)}) go',
+      'p {readGeneric(count)} {identity(count)()}',
+      'button(onClick={() => readGeneric(count)}) go',
+      'p {String(readGeneric(count))} {show(shared)} {show(new Box(count))}',
       '',
     ].join('\n')
 
-    const root = await scratchProject({ 'src/lib.ts': lib, 'src/components/Toggle.kay': toggle, 'src/routes/index.kay': page })
+    const root = await scratchProject({ 'src/shared.ts': 'import { signal } from \'kay\'\n\nexport const shared = signal(1)\n', 'src/lib.ts': lib, 'src/components/Toggle.kay': toggle, 'src/routes/index.kay': page })
 
     try {
-      expect((await check(root)).map(d => [d.line, d.code])).toEqual([[10, 'uncalled-signal'], [11, 'uncalled-signal'], [12, 'uncalled-signal'], [13, 'uncalled-signal'], [15, 'uncalled-signal'], [16, 'uncalled-signal']])
+      expect((await check(root)).map(d => [basename(d.file), d.line, d.code])).toEqual([['Toggle.kay', 7, 'uncalled-signal'], ...[11, 12, 13, 14, 16, 17, 20, 20].map(line => ['index.kay', line, 'uncalled-signal'])])
     }
     finally {
       await rm(root, { recursive: true, force: true })

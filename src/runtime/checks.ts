@@ -157,9 +157,6 @@ export interface UnresolvedParameter { kayUnresolved: true }
 // A parameter typed `Signal<T>`, `Memo<T>`, a function type, or a generic `T` the call infers from the signal stays silent.
 export type HandedSignal<Parameter> = 0 extends 1 & Parameter ? { kayLint: 'uncalled-signal' } : [Parameter] extends [UnresolvedParameter] ? unknown : unknown extends Parameter ? { kayLint: 'uncalled-signal' } : unknown
 
-// What the signal must fit: the parameter's type, once the type checker knows it.
-export type HandedFit<Parameter> = [Parameter] extends [UnresolvedParameter] ? unknown : Parameter
-
 // A literal schedule has five fields or is a nickname, and comes some day; a computed one, or a field this does not read, is checked when the server starts.
 export type CronSchedule<Cron extends string> = string extends Cron
   ? unknown
