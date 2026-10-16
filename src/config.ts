@@ -94,6 +94,8 @@ export interface KayConfig {
   publicEnv?: EnvSchema | undefined
   // The level of each lint `kay check`, `kay build`, `kay dev` and the editor report, or of each lint in a group, over its default: `{ 'positional-key': 'deny', 'seo': 'deny', 'unread-name': 'warn' }`. `kay explain` lists them.
   lints?: LintLevels | undefined
+  // What signs form stamps, links to private files and the flash cookie when the app has no `session()`: at least 32 random characters, read from the environment as `secret: process.env.KAY_SECRET`. `KAY_SECRET` alone does the same, and a `session()` secret takes its place. Without any, a key of the process signs them, which a restart changes and other replicas do not share.
+  secret?: string | undefined
   // Lets an editor see drafts on the live site: a visitor in preview mode sees every draft, and pages render for them alone, past prerendered and cached copies.
   preview?: PreviewConfig | undefined
   // Where `files` from `kay/server` keeps what it stores: `diskFiles('data/files')` by default, `s3Files()` for a bucket, or memory under `bun test`.

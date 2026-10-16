@@ -313,7 +313,7 @@ form(action={add})
 - An island reads them in the browser too, as its server render did, but for `values`, which stay on the server, so no field the server cannot tell is a secret reaches the page's source: the fields hold what was sent.
 - Once the page shown called the action, they read how its last call went instead, reactively, a call clearing them as it starts: an island calling `add({ title })` catches the `ActionError` and `add.error('title')` shows the message, the field marked invalid.
 - A post that succeeds goes back to the page with what the handler returned: `ctx.succeeded(add)` returns `{ data }`, typed from the action, or `undefined`, on that one render only.
-- `data` travels in a cookie, sealed (AES-GCM under a key derived from the session's secret, else from the preview `secret`, else a key of the process, which a restart changes), so a secret shown once, such as a new API token, can be neither read nor altered in it.
+- `data` travels in a cookie, sealed (AES-GCM under a key derived from the session's secret, else from `secret` in kay.config.ts or `KAY_SECRET`, else from the preview `secret`, else a key of the process, which a restart changes), so a secret shown once, such as a new API token, can be neither read nor altered in it.
 - Data too big for it, over about 3.5 KB sealed, is left out with a warning, and `ctx.succeeded` returns `undefined`, as it does for a cookie that does not open, forged or sealed before a restart.
 - A prerendered page reads both too: the request carrying that cookie renders it afresh, see [Prerendering](routing.md#prerendering).
 - The cookie carrying `ctx.succeeded` back is `HttpOnly`, `SameSite=Lax`, and `Secure` when the request came over https, `X-Forwarded-Proto` included, as is every request in production when `site` is https.
@@ -408,7 +408,7 @@ button(onClick={save} disabled={add.pending()}) Add
 #### Minimum time
 
 - `minTime: '3s'` refuses a form posted sooner than that after its page rendered, with 422 and `errors['']`.
-- A form posting to the action renders a hidden `kay_since` field by itself, a stamp of when it rendered bound to the action and signed with a key derived from the session's secret, else from the preview `secret`, else a key of the process, which a restart changes and a production server warns of once.
+- A form posting to the action renders a hidden `kay_since` field by itself, a stamp of when it rendered bound to the action and signed with a key derived from the session's secret, else from `secret` in kay.config.ts or `KAY_SECRET` (at least 32 random characters, so an app without sessions needs no `session()` for one), else from the preview `secret`, else a key of the process, which a restart changes and a production server warns of once, naming where the secret goes; a test server never warns.
 - A plain form post whose stamp is missing, forged, another action's or older than `maxAge`, a day by default, fails the same way, and the page it answers keeps the stamp the form rendered with, so the visitor does not wait again from zero.
 - A prerendered page holding such a form is still rendered once: the server signs a fresh stamp into it on every visit, as it splices in an inline server island, so the page goes out gzipped rather than in brotli and kept by no cache.
 - `minTime: { after: '3s', maxAge: '1h', pretend: true }` answers a post sent too soon as `honeypot`'s `pretend` does.

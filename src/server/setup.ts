@@ -8,6 +8,7 @@ import type { RenderOptions } from './render'
 import type { Route, RouteMount } from './routes'
 import type { ProjectSource } from './source'
 import { join, resolve } from 'node:path'
+import process from 'node:process'
 import { setContentMode } from '../content/load'
 import { projectCollections } from '../content/server'
 import { renderOptionsOf } from '../project'
@@ -23,7 +24,7 @@ import { refuseClashes } from './route-table'
 import { routeMounts } from './routes'
 import { configHead, siteOrigin } from './seo'
 import { projectSource } from './source'
-import { warnOnStampKey } from './stamp'
+import { setupStampSecret, warnOnStampKey } from './stamp'
 import { setupStorage } from './storage'
 import { setTracer } from './trace'
 
@@ -78,10 +79,12 @@ export async function setupPages(project: Project, loadClient: () => ClientBuild
 
   // A build may run without the server's secrets, the preview one included.
   if (!prerendering) {
+    setupStampSecret(config.secret)
     setupPreview(config.preview, base)
     setTracer(config.tracer)
     setupStorage(config.storage, join(imageCache, 'stored'), imageCache)
-    warnOnStampKey(!mode.dev)
+    // A test's server restarts with its process and has no replica, so a key of the process is right there.
+    warnOnStampKey(!mode.dev && process.env.NODE_ENV !== 'test')
   }
 
   if (config.inlineStyles === true && !mode.dev)

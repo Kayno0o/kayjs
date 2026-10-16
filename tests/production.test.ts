@@ -635,6 +635,63 @@ console.log(JSON.stringify(warnings))
     expect(await warned('useStampSecret("the preview secret, long enough", "preview")')).toEqual([])
   })
 
+  it('signs with the secret of the config or KAY_SECRET, below the session and above the preview one, and refuses a short one', async () => {
+    const stamps = async (script: string, env: Record<string, string> = {}) => {
+      const run = Bun.spawn([process.execPath, '-e', `import { setLogSink } from ${JSON.stringify(join(import.meta.dir, '../src/runtime/log.ts'))}
+import { setupStampSecret, signStamp, sharedKey, useStampSecret, warnOnStampKey } from ${JSON.stringify(join(import.meta.dir, '../src/server/stamp.ts'))}
+const warnings = []
+setLogSink((level, message) => warnings.push(level + ' ' + message))
+warnOnStampKey(true)
+${script}
+console.log(JSON.stringify({ warnings, shared: sharedKey('x')?.toString('hex') }))
+`], { env: { ...process.env, KAY_SECRET: '', ...env }, stdout: 'pipe', stderr: 'pipe' })
+      const [out, err] = await Promise.all([new Response(run.stdout).text(), new Response(run.stderr).text()])
+
+      return { code: await run.exited, out, err }
+    }
+    const long = 'a configured secret of enough length for kay'
+    const shared = async (script: string, env?: Record<string, string>) => {
+      const { code, out, err } = await stamps(script, env)
+
+      expect({ code, err }).toEqual({ code: 0, err: '' })
+
+      return JSON.parse(out) as { warnings: string[], shared: string | undefined }
+    }
+    const config = await shared(`setupStampSecret(${JSON.stringify(long)}); signStamp('a', 1)`)
+    const env = await shared('setupStampSecret(undefined); signStamp(\'a\', 1)', { KAY_SECRET: long })
+
+    // No warning, and a key every replica derives alike.
+    expect(config.warnings).toEqual([])
+    expect(config.shared).toBeDefined()
+    expect(env).toEqual(config)
+    expect((await shared(`setupStampSecret(${JSON.stringify(long)}); useStampSecret('the session secret, long enough!!!!', 'session'); signStamp('a', 1)`)).shared).not.toBe(config.shared)
+    expect((await shared(`useStampSecret('the session secret, long enough!!!!', 'session'); setupStampSecret(${JSON.stringify(long)}); signStamp('a', 1)`)).shared).not.toBe(config.shared)
+    expect((await shared(`useStampSecret('the preview secret, long enough!!!!', 'preview'); setupStampSecret(${JSON.stringify(long)}); signStamp('a', 1)`)).shared).toBe(config.shared)
+    expect((await shared(`setupStampSecret(${JSON.stringify(long)}); useStampSecret('the preview secret, long enough!!!!', 'preview'); signStamp('a', 1)`)).shared).toBe(config.shared)
+    expect((await stamps('setupStampSecret("short")')).err).toContain('`secret` in kay.config.ts is 5 characters long')
+    expect((await stamps('setupStampSecret(undefined)', { KAY_SECRET: 'short' })).err).toContain('KAY_SECRET is 5 characters long')
+  })
+
+  it('says nothing of the key of the process under bun test, and names where the secret goes elsewhere', async () => {
+    const script = (env: string) => `import { setLogSink } from ${JSON.stringify(join(import.meta.dir, '../src/runtime/log.ts'))}
+import { pages } from ${JSON.stringify(join(import.meta.dir, '../src/server/index.ts'))}
+import { signStamp } from ${JSON.stringify(join(import.meta.dir, '../src/server/stamp.ts'))}
+const warnings = []
+setLogSink((level, message) => warnings.push(level + ' ' + message))
+process.env.NODE_ENV = ${JSON.stringify(env)}
+await pages({ routes: ${JSON.stringify(join(import.meta.dir, '../', ROUTES))}, prebuilt: false })
+signStamp('a', 1)
+console.log(JSON.stringify(warnings))
+process.exit(0)
+`
+    const test = await isolated(script('test')) as string[]
+    const production = await isolated(script('production')) as string[]
+
+    expect(test).toEqual([])
+    expect(production.filter(line => line.includes('signed with a key of this process'))).toHaveLength(1)
+    expect(production.join('\n')).toContain('set KAY_SECRET')
+  })
+
   it('lets a client post as often as the limit allows in a window, then answers 429 with when to retry', async () => {
     const app = await pages({ routes: `${FIXTURE}/src/routes`, prebuilt: false, proxy: { hops: 1 } })
     const { send } = await import(CONTACT) as { send: Action<{ message: string }, number> }

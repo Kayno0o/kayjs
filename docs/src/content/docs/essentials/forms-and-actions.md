@@ -174,4 +174,6 @@ export const contact = action(schema, send, {
 })
 ```
 
+`minTime` stamps are signed. An app with no `session()` gives the signing key as `secret` in `kay.config.ts`, or as `KAY_SECRET`, at least 32 random characters. Without one a production server signs with a key of its own process, which a restart changes and other replicas do not share, and says so once in its log.
+
 <ReadMore href="/llms/actions">Optimistic calls, aborting a call, custom browser validation, proof of work, shared rate limit stores, messages and body limits are in the full actions reference.</ReadMore>
