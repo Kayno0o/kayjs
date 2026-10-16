@@ -12,6 +12,8 @@ import { decodePath } from './routes'
 export interface RenderedPage {
   // The path it serves, without the base, a locale's under its segment.
   path: string
+  // The locale it is in: the site's one language without `i18n`.
+  locale: string
   html: string
   // The file serving a root-relative URL the page links, absolute: a built stylesheet, script, font or image variant, a public file or a favicon; undefined for any other, such as another site's.
   file: (url: string) => Promise<string | undefined>
@@ -64,11 +66,11 @@ async function fileWithin(dir: string, encoded: string): Promise<string | undefi
   return path !== undefined && path.startsWith(dir + sep) && await Bun.file(path).exists() ? path : undefined
 }
 
-export async function applyPageHooks(hooks: PageHook[], path: string, html: string, file: RenderedPage['file']): Promise<string> {
+export async function applyPageHooks(hooks: PageHook[], path: string, locale: string, html: string, file: RenderedPage['file']): Promise<string> {
   let result = html
 
   for (const hook of hooks)
-    result = await hook({ path, html: result, file })
+    result = await hook({ path, locale, html: result, file })
 
   return result
 }
@@ -85,7 +87,7 @@ export async function hookPrerendered(root: string, hooks: PageHook[], dirs: Ass
 
   await Promise.all(Object.entries(manifest.pages).map(async ([path, page]) => hooking(async () => {
     const name = join(base, PRERENDERED_DIR, page.file)
-    const html = await applyPageHooks(hooks, path, await Bun.file(name).text(), file)
+    const html = await applyPageHooks(hooks, path, page.locale, await Bun.file(name).text(), file)
 
     await Bun.write(name, html)
     page.etag = pageEtag(html)
@@ -95,9 +97,9 @@ export async function hookPrerendered(root: string, hooks: PageHook[], dirs: Ass
 }
 
 // A page the server renders again in place of a prerendered one, through the same hooks.
-export async function hookedResponse(response: Response, hooks: PageHook[], path: string, file: RenderedPage['file']): Promise<Response> {
+export async function hookedResponse(response: Response, hooks: PageHook[], path: string, locale: string, file: RenderedPage['file']): Promise<Response> {
   if (hooks.length === 0)
     return response
 
-  return new Response(await applyPageHooks(hooks, path, await response.text(), file), { status: response.status, headers: response.headers })
+  return new Response(await applyPageHooks(hooks, path, locale, await response.text(), file), { status: response.status, headers: response.headers })
 }

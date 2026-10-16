@@ -45,25 +45,25 @@ describe('page hooks', () => {
     const html = await applyPageHooks([
       ({ html }) => html.replace('</body>', '<footer>one</footer></body>'),
       async ({ path, html }) => html.replace('one', `${path} two`),
-    ], '/about', '<body></body>', file)
+    ], '/about', 'en', '<body></body>', file)
 
     expect(html).toBe('<body><footer>/about two</footer></body>')
   })
 
   it('hooks several prerendered pages at once, at most 8, each written back with its own etag', async () => {
     const paths = Array.from({ length: 20 }, (_, index) => `/page-${index}`)
-    const pages = Object.fromEntries(paths.map(path => [path, { pattern: path, file: `${path.slice(1)}.html`, status: 200, headers: {}, etag: 'stale', renderedAt: 0 }]))
+    const pages = Object.fromEntries(paths.map(path => [path, { pattern: path, file: `${path.slice(1)}.html`, status: 200, headers: {}, etag: 'stale', renderedAt: 0, locale: path === '/page-3' ? 'fr' : 'en' }]))
     let running = 0
     let most = 0
 
     await Promise.all(paths.map(async path => Bun.write(join(outputDir(scratch), PRERENDERED_DIR, `${path.slice(1)}.html`), `<p>${path}</p>`)))
     await writeManifest(scratch, { entryImports: [], islands: {}, styles: {}, pages })
-    await hookPrerendered(scratch, [async ({ path, html }) => {
+    await hookPrerendered(scratch, [async ({ path, locale, html }) => {
       most = Math.max(most, ++running)
       await Bun.sleep(5)
       running--
 
-      return html.replace('</p>', ` hooked ${path}</p>`)
+      return html.replace('</p>', ` hooked ${path} ${locale}</p>`)
     }], { clientDir, publicDir, base: '' })
 
     const written = (await readManifest(scratch))!.pages!
@@ -73,7 +73,7 @@ describe('page hooks', () => {
     for (const path of paths) {
       const html = await Bun.file(join(outputDir(scratch), PRERENDERED_DIR, written[path]!.file)).text()
 
-      expect(html).toBe(`<p>${path} hooked ${path}</p>`)
+      expect(html).toBe(`<p>${path} hooked ${path} ${path === '/page-3' ? 'fr' : 'en'}</p>`)
       expect(written[path]!.etag).toBe(pageEtag(html))
     }
   })

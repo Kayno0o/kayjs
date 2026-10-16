@@ -1501,7 +1501,7 @@ describe('revalidation', () => {
 
   it('runs the page hook of an extension over a page the server renders again, as the build ran it', async () => {
     const { news } = await import('./fixtures/production/src/news')
-    const extensions = [{ name: 'signed', transformPage: ({ path, html }: { path: string, html: string }) => html.replace('</body>', `<!--signed ${path}--></body>`) }]
+    const extensions = [{ name: 'signed', transformPage: ({ path, locale, html }: { path: string, locale: string, html: string }) => html.replace('</body>', `<!--signed ${path} ${locale}--></body>`) }]
 
     try {
       await build.keeping(async () => {
@@ -1512,7 +1512,7 @@ describe('revalidation', () => {
         const built = await visit()
 
         expect(built).toContain('<h1>Edition 1</h1>')
-        expect(built).toContain('<!--signed /news--></body>')
+        expect(built).toContain('<!--signed /news en--></body>')
         expect(built.match(/<!--signed/g)).toHaveLength(1)
 
         news.edition = 2
@@ -1521,7 +1521,7 @@ describe('revalidation', () => {
         const fresh = await visit()
 
         expect(fresh).toContain('<h1>Edition 2</h1>')
-        expect(fresh).toContain('<!--signed /news--></body>')
+        expect(fresh).toContain('<!--signed /news en--></body>')
       })
     }
     finally {

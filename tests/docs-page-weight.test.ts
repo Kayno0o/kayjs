@@ -22,7 +22,7 @@ const brotli = (text: string) => brotliCompressSync(text).length
 async function transform(head: string, body = ''): Promise<string> {
   const html = `<html><head><link rel="stylesheet" href="/app.css"><link rel="icon" href="/favicon.ico"><link rel="apple-touch-icon" href="/apple-touch-icon.png">${head}</head><body>${body}<footer><span data-page-weight></span></footer></body></html>`
 
-  return pageWeight.transformPage!({ path: '/', html, file: async url => url in FILES ? join(dir, url) : undefined })
+  return pageWeight.transformPage!({ path: '/', locale: 'en', html, file: async url => url in FILES ? join(dir, url) : undefined })
 }
 
 describe('the docs footer\'s page weight', () => {
@@ -41,7 +41,7 @@ describe('the docs footer\'s page weight', () => {
   })
 
   it('leaves a page without the footer as it is', async () => {
-    const page: RenderedPage = { path: '/404', html: '<p>Nothing here</p>', file: async () => undefined }
+    const page: RenderedPage = { path: '/404', locale: 'en', html: '<p>Nothing here</p>', file: async () => undefined }
 
     expect(await pageWeight.transformPage!(page)).toBe(page.html)
   })

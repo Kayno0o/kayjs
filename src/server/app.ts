@@ -358,5 +358,5 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   servePageRoutes(app, { table, served, matchers, i18n, locales, client, renderOptions, trailingSlash: options.trailingSlash ?? 'never', fallback: source.fallback(paths.routes, mounts), respond })
   agreeOnWildcards(app)
 
-  return { app, served }
+  return { app, served, locale: locales.settings.defaultLocale }
 }

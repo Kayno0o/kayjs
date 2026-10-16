@@ -127,7 +127,7 @@ export async function exportStatic(project: Project, client: ClientBuild, outdir
   if (missing.status === 404 && missing.headers.get('content-type')?.startsWith('text/html')) {
     const files = assetFiles({ clientDir: client.dir, publicDir, base: basePath(config.base), aspects: config.images?.aspects })
 
-    await Bun.write(join(out, '404.html'), await applyPageHooks(pageHooks(config.extensions), '/404.html', await missing.text(), files))
+    await Bun.write(join(out, '404.html'), await applyPageHooks(pageHooks(config.extensions), '/404.html', pages.locale, await missing.text(), files))
     written.push(join(out, '404.html'))
   }
 

@@ -95,7 +95,7 @@ interface LoadedRoute {
 }
 
 // A prerendered page as the server holds it from boot: the brotli copy in memory, which nearly every browser takes, the others as files.
-export interface ServedPage extends Omit<PrerenderedPage, 'pattern' | 'file' | 'headers'> {
+export interface ServedPage extends Omit<PrerenderedPage, 'pattern' | 'file' | 'headers' | 'locale'> {
   html: string | Bun.BunFile
   // The compressed copies `kay build` wrote, or a revalidation made.
   encoded: Partial<Record<StoredEncoding, Uint8Array<ArrayBuffer> | Bun.BunFile>>

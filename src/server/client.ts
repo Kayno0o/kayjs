@@ -35,6 +35,8 @@ export interface ClientManifest {
 export interface PrerenderedPage {
   // The route the path belongs to.
   pattern: string
+  // The locale it was rendered in.
+  locale: string
   // Under `.kay/client/pages`.
   file: string
   status: number

@@ -18,6 +18,7 @@ import { relativeTime } from '../src/runtime/i18n.server'
 import { runInLocale } from '../src/runtime/locale-state'
 import { pages } from '../src/server'
 import { acceptedLocale, localeSettings, messagesScript, requestLocale } from '../src/server/i18n'
+import { hookPrerendered } from '../src/server/page-hook'
 import { browserPath, testSite } from '../src/test'
 import { scratchBuild } from './prerendered'
 import { fixtureCopy } from './scratch'
@@ -453,6 +454,21 @@ describe('prerendering', () => {
 
       expect(english.html).toContain('<h1>Hello Ada</h1>')
       expect(english.etag).not.toBeNull()
+    })
+  })
+
+  it('hands a page hook the locale each page was rendered in', async () => {
+    await prerendered(i18n, async (build) => {
+      const seen: Record<string, string> = {}
+
+      await hookPrerendered(build.dir, [({ path, locale, html }) => {
+        seen[path] = locale
+
+        return html
+      }], { clientDir: (await build.client()).dir, publicDir: join(build.dir, 'public'), base: '' }, build.dir)
+
+      expect(seen['/']).toBe('fr')
+      expect(seen['/en']).toBe('en')
     })
   })
 

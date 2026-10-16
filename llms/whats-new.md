@@ -28,6 +28,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `kay upgrade [dir]` moves `kay` and the kay libraries in `package.json` to their latest version, installs, applies the fixes of each minor it crosses and prints what is left to do by hand; the old forms a minor replaced are the `deprecated` lints, each with a `--fix` ([Project](project.md#commands), [Checks](checks.md#apply-the-quick-fixes)).
 - `kay build` lists each island with what makes it one, `onClick, line 4`, and a static component that may render as one with the prop it passes, and `--format json` gives them with the islands of each route ([Islands](islands.md#islands)).
 - An action with no input is declared with its handler alone, `action(async (ctx) => ...)`, and called as `signOut()` ([Actions](actions.md#declaring-an-action)).
+- A `transformPage` hook gets the page's `locale` beside its `path` ([Routing](routing.md#page-hooks)).
 
 ## 1.45.0
 
