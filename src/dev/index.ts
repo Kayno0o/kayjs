@@ -291,6 +291,14 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   const env = await environmentWithoutDotenv()
   // Set once the first types settled, which say a config that does not load: until then a builder started ahead of them stays quiet about its own exit.
   let typesSettled = false
+  // The builder exited before the types settled, so its notice waits for them.
+  let builderExitHeld = false
+  const sayBuilderExit = () => {
+    if (!builderExitSaid)
+      say('builder-exit', {}, `${stamp()} the process building the client exited; each change starts it again, the servers building their own until one build succeeds`)
+
+    builderExitSaid = true
+  }
   const buildClientNow = async (): Promise<BuildOutcome | undefined> => {
     if (ownClient || stopping)
       return undefined
@@ -317,10 +325,10 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
 
     // Gone on its own while building, as when the config failed to load: the next build starts it again.
     if (current !== undefined && current === builder && !stopping && !ownClient) {
-      if (!builderExitSaid && typesSettled)
-        say('builder-exit', {}, `${stamp()} the process building the client exited; each change starts it again, the servers building their own until one build succeeds`)
-
-      builderExitSaid = true
+      if (typesSettled)
+        sayBuilderExit()
+      else
+        builderExitHeld = true
     }
 
     return undefined
@@ -718,6 +726,12 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   }
   finally {
     typesSettled = true
+    // A config that does not load is the types' to report, once; any other crash of the builder shows its error and the notice.
+    builder?.release(!configRefused)
+
+    if (builderExitHeld && !configRefused && !stopping)
+      sayBuilderExit()
+
     verified.resolve()
   }
 

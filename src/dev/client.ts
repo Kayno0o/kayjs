@@ -12,6 +12,8 @@ export interface ClientBuilder {
   gone: () => boolean
   // Whether a change to the file, relative to the root, changes what the process loaded as it started: the config and the project's modules it imports.
   loaded: (file: string) => boolean
+  // Ends the hold `quiet` put on the first process's error output: `show` writes what it printed meanwhile, otherwise it is dropped, and what it prints later goes straight through.
+  release: (show: boolean) => void
   stop: () => Promise<void>
 }
 
@@ -24,15 +26,31 @@ interface Builder {
 }
 
 const BUILDER = join(import.meta.dir, 'builder.ts')
+// How much of a held error output is kept: the start of a stack is what says why.
+const HELD_LIMIT = 64 * 1024
 
 // The process building the client for the servers `kay dev` starts, kept from one build to the next: its modules stay loaded and what it last built tells what an edit reaches.
 // `stdout` is where what the build prints goes, `kay dev`'s own by default.
-// `quiet` keeps the first process's error output to itself, as the types of a config that does not load say it already.
+// `quiet` holds the first process's error output back until `release`, as the types of a config that does not load say it already.
 export function startClientBuilder(root: string, env: Record<string, string | undefined>, stdout: 'inherit' | number = 'inherit', quiet = false): ClientBuilder {
   const realRoot = realpathSync(root)
   let modules = new Set<string>()
   let current = spawn(quiet)
   let stopped = false
+  let held: string | undefined = quiet ? '' : undefined
+
+  async function relay(stream: ReadableStream<Uint8Array>) {
+    const decoder = new TextDecoder()
+
+    for await (const chunk of stream) {
+      const text = decoder.decode(chunk, { stream: true })
+
+      if (held === undefined)
+        process.stderr.write(text)
+      else if (held.length < HELD_LIMIT)
+        held += text
+    }
+  }
 
   function spawn(silent = false) {
     const state: Builder = {
@@ -46,7 +64,7 @@ export function startClientBuilder(root: string, env: Record<string, string | un
       child: Bun.spawn([process.execPath, BUILDER], {
         cwd: root,
         env: { ...env, NODE_ENV: 'development', KAY_DEV_CODE: '0' },
-        stdio: ['ignore', stdout, silent ? 'ignore' : 'inherit'],
+        stdio: ['ignore', stdout, silent ? 'pipe' : 'inherit'],
         ipc: (message: { reads?: string[], built?: BuildOutcome }) => {
           if (message.reads)
             modules = new Set(message.reads)
@@ -58,6 +76,9 @@ export function startClientBuilder(root: string, env: Record<string, string | un
         },
       }),
     }
+
+    if (silent)
+      void relay(state.child.stderr as ReadableStream<Uint8Array>)
 
     void (async () => {
       await state.child.exited
@@ -103,6 +124,12 @@ export function startClientBuilder(root: string, env: Record<string, string | un
     },
     gone: () => current.gone && (stopped || current.replacing === undefined),
     loaded: file => file === CONFIG_FILE || modules.has(join(realRoot, file)),
+    release: (show) => {
+      if (show && held !== undefined && held !== '')
+        process.stderr.write(held)
+
+      held = undefined
+    },
     stop: async () => {
       stopped = true
       current.child.kill()

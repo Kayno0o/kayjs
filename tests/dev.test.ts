@@ -535,17 +535,67 @@ describe.concurrent('kay dev', () => {
 
       await Bun.write(join(root, '.kay/dev/manifest.json'), '{}')
 
-      const second = await dev(root)
+      const lines: string[] = []
+      const second = await dev(root, { log: line => lines.push(line) })
 
-      await until(() => childrenRunning(real, 'builder.ts').length === 1, 5000)
+      // The builder clears the placeholder as it builds, however late the host runs it; the project cannot resolve kay here, so the build fails and leaves none.
+      await until(() => statSync(join(root, '.kay/dev/manifest.json'), { throwIfNoEntry: false })?.size !== 2, 20_000)
+      expect(childrenRunning(real, 'builder.ts')).toHaveLength(1)
+      expect(lines.filter(line => line.includes('process building the client exited'))).toEqual([])
       await second()
 
-      // A config that does not load is refused with the builder stopped, and its error shown once.
-      await Bun.write(join(root, 'kay.config.ts'), 'throw new Error(\'config broke\')\n')
-      await expect(dev(root, { refuseConfig: true })).rejects.toBeInstanceOf(ConfigRefused)
-      expect(childrenRunning(real, 'builder.ts')).toHaveLength(0)
+      // A config that does not load is refused with the builder stopped, and its error shown once, by the types.
+      const written: string[] = []
+      const stderr = spyOn(process.stderr, 'write').mockImplementation((text: string) => {
+        written.push(String(text))
+
+        return true
+      })
+
+      try {
+        await Bun.write(join(root, 'kay.config.ts'), 'throw new Error(\'config broke\')\n')
+        await expect(dev(root, { refuseConfig: true })).rejects.toBeInstanceOf(ConfigRefused)
+        expect(childrenRunning(real, 'builder.ts')).toHaveLength(0)
+        expect(written.filter(text => text.includes('config broke'))).toEqual([])
+      }
+      finally {
+        stderr.mockRestore()
+      }
     }
     finally {
+      said.mockRestore()
+      await rm(root, { recursive: true, force: true })
+    }
+  }, 60_000)
+
+  it('shows the error and the exit notice of a first client builder that crashes for another reason than the config, with no edit', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
+    const said = spyOn(console, 'error').mockImplementation(() => undefined)
+    const written: string[] = []
+    const stderr = spyOn(process.stderr, 'write').mockImplementation((text: string) => {
+      written.push(String(text))
+
+      return true
+    })
+    const lines: string[] = []
+
+    await Bun.write(join(root, 'src/server.ts'), 'setInterval(() => undefined, 1000)\n')
+    await Bun.write(join(root, 'src/routes/index.kay'), 'p Home\n')
+    await Bun.write(join(root, '.kay/dev/manifest.json'), '{}')
+    // Loads in every process but the builder, as a build plugin throwing as it loads would.
+    await Bun.write(join(root, 'kay.config.ts'), 'if (process.argv.some(arg => arg.endsWith(\'builder.ts\')))\n  throw new Error(\'builder boom\')\n\nexport default {}\n')
+
+    try {
+      const stop = await dev(root, { refuseConfig: true, log: line => lines.push(line) })
+
+      await until(() => lines.some(line => line.includes('process building the client exited')), 20_000)
+      await Bun.sleep(200)
+      await stop()
+      expect(lines.filter(line => line.includes('process building the client exited'))).toHaveLength(1)
+      expect(written.filter(text => text.includes('builder boom'))).toHaveLength(1)
+    }
+    finally {
+      stderr.mockRestore()
       said.mockRestore()
       await rm(root, { recursive: true, force: true })
     }
