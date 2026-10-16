@@ -275,7 +275,8 @@ export type NoInputAction<Output, Honeypot extends string = never> = ServerActio
 // An empty object schema built by hand: `t.Object({})` would carry Elysia into the islands importing this module, and TypeBox reads a schema by this symbol.
 type EmptySchema = ReturnType<typeof t.Object<Record<never, never>>>
 
-const EMPTY_SCHEMA = { [Symbol.for('TypeBox.Kind')]: 'Object', type: 'object', properties: {} } as unknown as EmptySchema
+// Built per declaration, so an island bundle that never declares an action drops it.
+const emptySchema = () => ({ [Symbol.for('TypeBox.Kind')]: 'Object', type: 'object', properties: {} }) as unknown as EmptySchema
 
 // Declares a server action in a page's `--- server` fence: Elysia validates the input against `schema` before `handler` runs.
 // Without a schema the action takes no input, as with an empty object schema, and its handler gets the context alone.
@@ -285,7 +286,7 @@ export function action(first: unknown, second?: unknown, third?: ActionProtectio
   if (typeof first === 'function') {
     const handler = first as (ctx: ActionContext) => unknown
 
-    return declare(EMPTY_SCHEMA, (_input, ctx) => handler(ctx), second as ActionProtection<string> | undefined)
+    return declare(emptySchema(), (_input, ctx) => handler(ctx), second as ActionProtection<string> | undefined)
   }
 
   return declare(first as TSchema, second as (input: unknown, ctx: ActionContext) => unknown, third)
@@ -627,7 +628,7 @@ async function post<Output>(url: string, input: unknown, onProgress: (sent: numb
 }
 
 // The encoding keeps numbers, booleans and Dates typed, which form fields would turn into strings; only a call carrying files needs multipart, whose boundary fetch writes.
-export function encodeCall(input: unknown = {}): EncodedCall {
+export function encodeCall(input: unknown): EncodedCall {
   // Sent as the form it is, for the server to read as a form post and answer as a call.
   if (input instanceof FormData)
     return { headers: { 'x-kay-action': FORM_CALL }, body: input }
