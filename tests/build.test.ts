@@ -1780,8 +1780,10 @@ describe('the size report', () => {
       'src/field.kay': '---\nlet text = \'\'\n---\ninput(bind:value={text})\n',
       'src/state.kay': '---\nimport { signal } from \'kay\'\n\nconst n = signal(0)\n---\np {n()}\n',
       'src/client.kay': '--- client\nconst x = 1\n---\np {x}\n',
+      'src/handle.kay': '---\nlet el\n---\ndiv(ref={el}) Here\n',
+      'src/ago.kay': '---\nimport { relativeTime } from \'kay/i18n\'\n---\np {relativeTime(new Date())}\n',
       'src/wrap.kay': '---\nimport Clicks from \'./clicks.kay\'\n\nfunction pick() {}\n---\np Wrapped\nClicks(format={pick})\n',
-      'src/routes/index.kay': '---\nimport Clicks from \'../clicks.kay\'\nimport Field from \'../field.kay\'\nimport State from \'../state.kay\'\nimport Client from \'../client.kay\'\nimport Wrap from \'../wrap.kay\'\n---\nClicks\nField\nState\nClient\nWrap\n',
+      'src/routes/index.kay': '---\nimport Clicks from \'../clicks.kay\'\nimport Field from \'../field.kay\'\nimport State from \'../state.kay\'\nimport Client from \'../client.kay\'\nimport Wrap from \'../wrap.kay\'\nimport Handle from \'../handle.kay\'\nimport Ago from \'../ago.kay\'\n---\nClicks\nField\nState\nClient\nWrap\nHandle\nAgo\n',
     })
 
     try {
@@ -1793,6 +1795,8 @@ describe('the size report', () => {
         'src/field.kay': '`bind:value`, line 4',
         'src/state.kay': '`signal` from kay',
         'src/client.kay': 'a `--- client` fence',
+        'src/handle.kay': '`ref`, line 4',
+        'src/ago.kay': '`relativeTime` from kay/i18n',
         'src/wrap.kay': '`format` passed to Clicks, line 7',
       })
       expect(report!.islands.filter(island => island.promoted).map(island => island.file)).toEqual(['src/wrap.kay'])

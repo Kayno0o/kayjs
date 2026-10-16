@@ -3,7 +3,7 @@ import type { LintLevels } from '../compiler/lints'
 import type { KayExtension } from '../config'
 import type { ClientBuild, ClientManifest } from '../server/client'
 import type { ImportGraph, KayLibrary } from './libraries'
-import type { ChunkInputs } from './report'
+import type { ChunkInputs, IslandWhy } from './report'
 import type { FileDiagnostic } from './transform'
 import { existsSync, realpathSync } from 'node:fs'
 import { mkdir, rm } from 'node:fs/promises'
@@ -89,7 +89,7 @@ const BUILTINS = [...builtinModules, 'node:*', 'bun', 'bun:*']
 export interface ClientSources {
   islands: Map<string, string>
   // What makes each island one, by id, as `onClick, line 4`; for a static component that may render as one, what may.
-  why: Map<string, { why: string, promoted: boolean }>
+  why: Map<string, IslandWhy>
   classes: Set<string>
   problems: string[]
   pages: string[]
@@ -143,7 +143,7 @@ export async function bothBundles<Islands extends Promise<unknown> | undefined, 
 // Compiles every component, throwing all of their errors at once. `graph` keeps what each module imports, across builds when given.
 export async function readClientSources(root: string, options: ClientOptions = {}, graph: ImportGraph = new Map()): Promise<ClientSources> {
   const islands = new Map<string, string>()
-  const why = new Map<string, { why: string, promoted: boolean }>()
+  const why = new Map<string, IslandWhy>()
   const classes = new Set<string>()
   const diagnostics: FileDiagnostic[] = []
   // A library's components the app reaches compile with its own; a kay project nested inside, such as an example, builds on its own.
@@ -183,7 +183,7 @@ export async function readClientSources(root: string, options: ClientOptions = {
 
     if (compiled.island !== undefined) {
       islands.set(compiled.island, file)
-      why.set(compiled.island, { why: compiled.why ?? '', promoted: false })
+      why.set(compiled.island, { why: compiled.why, promoted: false })
     }
     else if (file === editor) {
       throw new KayError('inert-editor', `kay: the editor ${relative(root, file)} runs nothing in the browser, where an editor edits the page: give it a script reading signals, or a \`--- client\` fence`)
@@ -207,7 +207,7 @@ export async function readClientSources(root: string, options: ClientOptions = {
   for (const [index, promote] of promoted.entries()) {
     if (promote !== undefined) {
       islands.set(promote, files[index]!)
-      why.set(promote, { why: analyses[index]!.why ?? '', promoted: true })
+      why.set(promote, { why: analyses[index]!.why, promoted: true })
     }
   }
 

@@ -8,7 +8,15 @@ export interface Size {
   gzip: number
 }
 
-export interface IslandSize {
+// Why a component is in the island list.
+export interface IslandWhy {
+  // What makes it an island, as `onClick, line 4`; for a static component that only becomes one when it passes an island a function, what may, as `onPick passed to Picker, line 8`.
+  why?: string | undefined
+  // The component renders as an island only when a page passes it what only an island sends, so a page may ship none of it.
+  promoted?: boolean | undefined
+}
+
+export interface IslandSize extends IslandWhy {
   // The island's `.kay` file, relative to the root.
   file: string
   // What it loads beyond the entry, the chunks it shares with other islands included.
@@ -17,10 +25,6 @@ export interface IslandSize {
   chunks?: string[] | undefined
   // The modules weighing most in those chunks, with `kay build --analyze`.
   modules?: ModuleSize[] | undefined
-  // What makes it an island, as `onClick, line 4`; for a static component that only becomes one when it passes an island a function, what may, as `onPick passed to Picker, line 8`.
-  why?: string | undefined
-  // The component renders as an island only when a page passes it what only an island sends, so a page may ship none of it.
-  promoted?: boolean | undefined
 }
 
 export interface ModuleSize {
@@ -60,7 +64,7 @@ const KAY_ROOT = resolve(import.meta.dir, '../..')
 const SHOWN_MODULES = 5
 
 // Sizes read off the files the build wrote, gzip as most hosts serve them; `inputs` breaks each chunk down by module.
-export async function sizeReport(root: string, dir: string, manifest: Omit<ClientManifest, 'styles'>, islands: Map<string, string>, why: Map<string, { why: string, promoted: boolean }>, inputs?: ChunkInputs): Promise<SizeReport> {
+export async function sizeReport(root: string, dir: string, manifest: Omit<ClientManifest, 'styles'>, islands: Map<string, string>, why: Map<string, IslandWhy>, inputs?: ChunkInputs): Promise<SizeReport> {
   const sizes = new Map<string, Size>()
   const measure = async (url: string): Promise<Size> => {
     let size = sizes.get(url)
@@ -231,7 +235,7 @@ export function formatSizeReport(report: SizeReport, { width = Infinity, previou
 
 // Why a component is in the list, one line: what makes it an island, or for a static one what would.
 function becauseOf(island: IslandSize): string | undefined {
-  if (island.why === undefined || island.why === '')
+  if (island.why === undefined)
     return undefined
 
   return island.promoted === true ? `static unless it passes an island what only an island sends: ${island.why}` : `an island because of ${island.why}`

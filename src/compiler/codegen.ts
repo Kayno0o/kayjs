@@ -15,7 +15,7 @@ import { CodeBuilder, DYNAMIC_TAG } from './mapping'
 import { helperName } from './markup'
 import { defaultName, LOAD, PROPS, VALUES } from './names'
 import { PAGE, PAGE_SETTINGS } from './page-settings'
-import { reactiveName } from './script'
+import { reactiveValue } from './script'
 import { headTagProblem, sharedImports } from './validate'
 
 export interface GenerateOptions {
@@ -813,10 +813,9 @@ export function islandCause(file: KayFile, script: ScriptAnalysis): string | und
     return false
   })
 
-  if (cause === undefined && script.reactive)
-    cause = `\`${reactiveName(script)}\` from kay`
+  const value = cause === undefined && script.reactive ? reactiveValue(script) : undefined
 
-  return cause
+  return value === undefined ? cause : `\`${value.name}\` from ${value.source}`
 }
 
 function lineOf(source: string, offset: number): number {
