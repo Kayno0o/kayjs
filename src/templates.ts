@@ -1,6 +1,6 @@
 // The files `kay new` writes, `__NAME__` standing for the package name. Written as strings rather than template files, which the repository's own `.kay` scans would pick up.
 
-export type Feature = 'server' | 'starter' | 'tailwind' | 'accents' | 'eslint' | 'tests' | 'ci' | 'docker' | 'auth' | 'ws'
+export type Feature = 'server' | 'starter' | 'tailwind' | 'accents' | 'eslint' | 'tests' | 'ci' | 'docker' | 'auth' | 'postgres' | 'ws'
 
 // What kay.config.ts sets beyond the features, for a project migrated from a site that already had them.
 export interface ConfigSettings {
@@ -306,7 +306,7 @@ function workflowSetup(host: Host): string {
 
 // Every push is checked and tested before anything deploys it; the container build checks again, as `kay build` does. An app's tests copy a database per test file on a Postgres service.
 function testWorkflow({ has, host }: Setup): string {
-  const database = has('auth') && has('tests')
+  const database = has('postgres') && has('tests')
 
   return blocks(
     `name: ${has('tests') ? 'Tests' : 'Checks'}
@@ -519,8 +519,51 @@ volumes:
   db:
 `
 
+// An app on SQLite: the file lives on a volume, which a one-shot service migrates before the app starts.
+// The migration runs as root, so it hands the file to `nobody`, the user the image runs the app as.
+const SQLITE_COMPOSE = `services:
+  # Applies the pending migrations before the app starts, from the build stage, which holds them and the pg-orm command.
+  migrate:
+    build:
+      context: .
+      target: build
+    command: [sh, -c, bun run db:migrate && chown -R nobody data]
+    environment:
+      DATABASE_URL: sqlite://data/app.db
+    volumes:
+      - data:/app/data
+
+  app:
+    build: .
+    restart: unless-stopped
+    # This machine alone: the reverse proxy in front serves the site over HTTPS.
+    ports:
+      - 127.0.0.1:3000:3000
+    environment:
+      # At least 32 characters, kept out of the repository.
+      SESSION_SECRET: \${SESSION_SECRET:?set SESSION_SECRET}
+      DATABASE_URL: sqlite://data/app.db
+      # \`true\` keeps the demo sign-in, which lets anyone in under any name, for a site that is only a demo.
+      DEMO_SIGN_IN: \${DEMO_SIGN_IN:-}
+    volumes:
+      - data:/app/data
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+volumes:
+  data:
+`
+
+function databaseCompose(postgres: boolean): string {
+  return postgres ? APP_COMPOSE : SQLITE_COMPOSE
+}
+
 // The binary `kay build --compile` makes carries the pages, their assets and the browser build, so the image holds it alone.
 function serverContainerFiles({ has }: Setup): Record<string, string> {
+  // The members' SQLite file is written under `data`, which the image holds for the volume compose mounts there.
+  const sqlite = has('auth') && !has('postgres')
+
   return {
     'Dockerfile': `FROM oven/bun:${Bun.version} AS build
 WORKDIR /app
@@ -533,15 +576,15 @@ FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=build /app/server ./server
-ENV NODE_ENV=production PORT=3000
+${sqlite ? 'RUN mkdir data && chown nobody data\n' : ''}ENV NODE_ENV=production PORT=3000
 EXPOSE 3000
 USER nobody
 HEALTHCHECK --interval=30s --timeout=6s CMD ["./server", "--health"]
 CMD ["./server"]
 `,
-    '.dockerignore': 'node_modules\n.kay\nserver\n.git\n.env\n.env.*\n',
+    '.dockerignore': `node_modules\n.kay\nserver\n.git\n.env\n.env.*\n${sqlite ? 'data\n' : ''}`,
     'compose.prod.yaml': has('auth')
-      ? APP_COMPOSE
+      ? databaseCompose(has('postgres'))
       : `services:
   app:
     build: .
@@ -584,11 +627,13 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
   }
 }
 
-// Sessions, a sign-in, members kept in Postgres through pg-orm and a guarded section.
-function authFiles({ tw }: Setup): Record<string, string> {
+// Sessions, a sign-in, members kept in SQLite (Postgres with the `postgres` feature) through pg-orm and a guarded section.
+function authFiles({ has, tw }: Setup): Record<string, string> {
+  const postgres = has('postgres')
+
   return {
     // What production sets, for compose.prod.yaml; development's own settings are in the .env `kay new` wrote.
-    '.env.example': `# Each one generated and kept out of the repository: \`bun -e "console.log((crypto.randomUUID() + crypto.randomUUID()).replaceAll('-', ''))"\`.\nSESSION_SECRET=\nPOSTGRES_PASSWORD=\nAPP_DB_PASSWORD=\n# true keeps the demo sign-in, which lets anyone in under any name, for a site that is only a demo.\nDEMO_SIGN_IN=\n`,
+    '.env.example': `# Each one generated and kept out of the repository: \`bun -e "console.log((crypto.randomUUID() + crypto.randomUUID()).replaceAll('-', ''))"\`.\nSESSION_SECRET=\n${postgres ? 'POSTGRES_PASSWORD=\nAPP_DB_PASSWORD=\n' : ''}# true keeps the demo sign-in, which lets anyone in under any name, for a site that is only a demo.\nDEMO_SIGN_IN=\n`,
     'src/env.ts': `import process from 'node:process'
 import { s } from 'kay'
 import { defineEnv } from 'kay/server'
@@ -629,14 +674,15 @@ export const db = new Database({ url: env.DATABASE_URL, tables })
 import { Database, defineConfig } from '@kaynooo/pg-orm'
 import { Member } from './src/db/member'
 
-// For the \`pg-orm\` command: \`bun run db:generate\` writes a migration from what the tables declare, \`bun run db:migrate\` applies the pending ones.
-export default defineConfig({
-  // The owner, which changes the schema; the app itself connects as app_rw through DATABASE_URL.
-  db: new Database({ url: process.env.MIGRATE_DATABASE_URL ?? process.env.DATABASE_URL, tables: [Member] }),
+// For the \`pg-orm\` command: \`bun run db:generate\` writes a migration from what the tables declare, \`bun run db:migrate\` applies the pending ones${postgres ? '' : '; `bun run dev` applies them first'}.
+export default defineConfig({${postgres ? '\n  // The owner, which changes the schema; the app itself connects as app_rw through DATABASE_URL.' : ''}
+  db: new Database({ url: process.env.${postgres ? 'MIGRATE_DATABASE_URL ?? process.env.' : ''}DATABASE_URL, tables: [Member] }),
   migrationsDir: 'migrations',
 })
 `,
-    'migrations/0001_member.sql': `-- migrate:up
+    // The SQLite one is what \`pg-orm generate\` writes for the table.
+    'migrations/0001_member.sql': postgres
+      ? `-- migrate:up
 CREATE TABLE "member" (
   "id" serial,
   "name" varchar(40) NOT NULL,
@@ -647,9 +693,20 @@ CREATE TABLE "member" (
 
 -- migrate:down
 DROP TABLE IF EXISTS "member";
+`
+      : `-- migrate:up
+CREATE TABLE "member" (
+  "id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+  "name" TEXT NOT NULL UNIQUE,
+  "joined_at" TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+
+-- migrate:down
+DROP TABLE IF EXISTS "member";
 `,
-    'db/roles.sh': APP_ROLES_SCRIPT,
-    'compose.dev.yaml': `# The database for development and tests: \`docker compose up -d --wait\`, which .env points at this file. Tests copy a database per test file on it.
+    ...postgres && {
+      'db/roles.sh': APP_ROLES_SCRIPT,
+      'compose.dev.yaml': `# The database for development and tests: \`docker compose up -d --wait\`, which .env points at this file. Tests copy a database per test file on it.
 services:
   db:
     image: postgres:18-alpine
@@ -673,6 +730,7 @@ services:
 volumes:
   db:
 `,
+    },
     'src/session.ts': `import { session } from 'kay/server'
 import { env } from './env'
 
@@ -748,10 +806,12 @@ form${tw('.mt-4')}(action={signOut})
   }
 }
 
-const AUTH_TEST_FILES: Record<string, string> = {
+// The tests of the members' database: SQLite files under `data` by default, a Postgres the tests may create databases on with `postgres`.
+function authTestFiles({ has }: Setup): Record<string, string> {
+  return {
   // Read by `bun test` only, so tests run in a fresh clone and CI; never a real secret. Each test file gets a copy of this database, which need not exist.
-  '.env.test': 'SESSION_SECRET=only-for-tests-0123456789abcdefghijklmnop\nDATABASE_URL=postgres://app:app@127.0.0.1:5433/app_test\n',
-  'tests/database.ts': `import process from 'node:process'
+    '.env.test': `SESSION_SECRET=only-for-tests-0123456789abcdefghijklmnop\nDATABASE_URL=${has('postgres') ? 'postgres://app:app@127.0.0.1:5433/app_test' : 'sqlite://data/test.db'}\n`,
+    'tests/database.ts': `import process from 'node:process'
 import { testDatabase } from '@kaynooo/pg-orm'
 import { afterAll } from 'bun:test'
 import { Member } from '../src/db/member'
@@ -773,7 +833,7 @@ afterAll(async () => {
   await database.drop()
 })
 `,
-  'tests/members.test.ts': `import { expect, it } from 'bun:test'
+    'tests/members.test.ts': `import { expect, it } from 'bun:test'
 import { db } from '../src/db'
 import { Member } from '../src/db/member'
 
@@ -784,7 +844,7 @@ it('starts from the seed, with no member another test file added', async () => {
   expect((await db.repo(Member).read.findMany(q => q.orderBy('name', 'asc'))).map(member => member.name)).toEqual(['Ada', 'Linus'])
 })
 `,
-  'tests/account.test.ts': `import { afterAll, expect, it } from 'bun:test'
+    'tests/account.test.ts': `import { afterAll, expect, it } from 'bun:test'
 import { testSite } from 'kay/test'
 import { signIn } from '../src/routes/login.kay'
 import { sessions } from '../src/session'
@@ -804,6 +864,7 @@ it('knows a member from the seed, and since when', async () => {
   expect((await site.submit(signIn, { name: 'Ada' }, { from: '/login' })).html).toContain('Member since January 1, 2024')
 })
 `,
+  }
 }
 
 // An API module and a live island over its websocket.
@@ -887,7 +948,7 @@ export function templateFiles(features: ReadonlySet<Feature>, settings: ConfigSe
   return {
     // kay itself is published there, as are @kaynooo/eslint and @kaynooo/pg-orm.
     '.npmrc': `@kaynooo:registry=${REGISTRY}\n`,
-    '.gitignore': lines('node_modules', '.kay', has('eslint') && '.eslintcache', server ? '/server' : 'dist', '.env', '.env.*', '!.env.example', '!.env.test'),
+    '.gitignore': lines('node_modules', '.kay', has('eslint') && '.eslintcache', server ? '/server' : 'dist', has('auth') && !has('postgres') && 'data', '.env', '.env.*', '!.env.example', '!.env.test'),
     'kay.config.ts': config(setup),
     'src/routes/_layout.kay': layout(setup),
     'src/routes/index.kay': home(setup),
@@ -908,7 +969,7 @@ export function templateFiles(features: ReadonlySet<Feature>, settings: ConfigSe
     ...has('ci') && { [`.${host}/workflows/${server ? 'test' : 'pages'}.yml`]: server ? testWorkflow(setup) : pagesWorkflow(setup) },
     ...has('docker') && (server ? serverContainerFiles(setup) : staticContainerFiles(setup)),
     ...has('auth') && authFiles(setup),
-    ...has('auth') && has('tests') && AUTH_TEST_FILES,
+    ...has('auth') && has('tests') && authTestFiles(setup),
     ...has('ws') && wsFiles(setup),
     ...has('ws') && has('tests') && { 'tests/online.test.ts': WS_TEST },
   }

@@ -75,11 +75,11 @@ HEALTHCHECK --interval=30s --timeout=6s CMD ["./server", "--health"]
 CMD ["./server"]
 ```
 
-Its `compose.prod.yaml` publishes the app on `127.0.0.1:3000` alone, for the reverse proxy serving it over HTTPS. The image has no curl, so `./server --health` checks the health route and exits with 0 or 1. If you keep SQLite files, mount a volume the `nobody` user can write.
+Its `compose.prod.yaml` publishes the app on `127.0.0.1:3000` alone, for the reverse proxy serving it over HTTPS. The image has no curl, so `./server --health` checks the health route and exits with 0 or 1. If you keep SQLite files, mount a volume the `nobody` user can write. The `app` preset does: its `compose.prod.yaml` mounts a `data` volume at `/app/data`, and a `migrate` service applies the migrations to it and hands the file to `nobody` before the app starts.
 
 ### Database roles
 
-The `app` preset's `compose.prod.yaml` runs the app and the migrations under two Postgres roles, so a SQL injection or a compromised app process can read and write rows but cannot drop or alter a table.
+An app made with `--with postgres` has a `compose.prod.yaml` that runs the app and the migrations under two Postgres roles, so a SQL injection or a compromised app process can read and write rows but cannot drop or alter a table.
 
 | Role | Connects | Can |
 | --- | --- | --- |

@@ -30,7 +30,8 @@ export const FEATURES: Record<Feature, { description: string, needs: readonly Fe
   tests: { description: 'bun test through kay/test, with a first test', needs: [] },
   ci: { description: 'a Forgejo or GitHub workflow checking, linting and testing the server, or publishing the static site to Pages', needs: [] },
   docker: { description: 'a Dockerfile and compose.prod.yaml running the executable, or nginx serving the static site', needs: [] },
-  auth: { description: 'sessions, a sign-in, members in Postgres through pg-orm and a guarded /account', needs: ['server'] },
+  auth: { description: 'sessions, a sign-in, members in SQLite through pg-orm and a guarded /account', needs: ['server'] },
+  postgres: { description: 'the members in Postgres instead of SQLite: a compose stack for development, roles and migrations as an owner', needs: ['auth'] },
   ws: { description: 'an API module over a websocket, with an island counting the visitors online', needs: ['server'] },
 }
 
@@ -42,7 +43,7 @@ export const PRESETS: Record<Preset, { description: string, features: readonly F
   blank: { description: 'one bare page and nothing else', features: [] },
   server: { description: 'an Elysia server run as one executable, styled, linted, tested and containerised', features: ['server', ...SITE] },
   site: { description: 'the same as a static site, published to Pages or served by nginx', features: SITE },
-  app: { description: 'the server, plus sessions, members in Postgres and a websocket island', features: ['server', ...SITE, 'auth', 'ws'] },
+  app: { description: 'the server, plus sessions, members in SQLite and a websocket island', features: ['server', ...SITE, 'auth', 'ws'] },
 }
 
 export const PRESET_NAMES = Object.keys(PRESETS) as Preset[]
@@ -155,7 +156,8 @@ export async function projectFiles(dir: string, features: ReadonlySet<Feature>, 
   const dependency = kayDependency ?? (existsSync(join(KAY_ROOT, '.git')) ? await packKay(join(dir, 'vendor')) : `npm:${kay.name}@~${kay.version}`)
   // An app's tests run each file in modules of its own, so each gets the database tests/database.ts copies for it.
   const scripts = {
-    dev: 'kay dev',
+    // The members' SQLite file is migrated before the server starts, so a fresh app needs nothing else.
+    dev: has('auth') && !has('postgres') ? 'pg-orm apply && kay dev' : 'kay dev',
     ...has('server') ? { build: 'kay build', compile: 'kay build --compile server', start: 'kay start' } : { build: 'kay build --static' },
     check: 'kay check',
     ...has('eslint') && { 'lint': 'kay lint --cache', 'lint:fix': 'kay lint --fix --cache' },
@@ -183,9 +185,14 @@ export async function projectFiles(dir: string, features: ReadonlySet<Feature>, 
     'tsconfig.json': `${JSON.stringify({ extends: 'kay/tsconfig.json' }, null, 2)}\n`,
   }
 
-  // The app's session secret and development database, never committed: the app connects as app_rw, which cannot change the schema, and the migrations as the owner. COMPOSE_FILE makes a bare `docker compose` start that database.
-  if (has('auth'))
-    files['.env'] = `SESSION_SECRET=${randomBytes(32).toString('hex')}\nDATABASE_URL=postgres://app_rw:app_rw@127.0.0.1:5433/app\nMIGRATE_DATABASE_URL=postgres://app:app@127.0.0.1:5433/app\nCOMPOSE_FILE=compose.dev.yaml\n`
+  // The app's session secret and development database, never committed. With Postgres the app connects as app_rw, which cannot change the schema, and the migrations as the owner; COMPOSE_FILE makes a bare `docker compose` start that database.
+  if (has('auth')) {
+    const secret = `SESSION_SECRET=${randomBytes(32).toString('hex')}\n`
+
+    files['.env'] = has('postgres')
+      ? `${secret}DATABASE_URL=postgres://app_rw:app_rw@127.0.0.1:5433/app\nMIGRATE_DATABASE_URL=postgres://app:app@127.0.0.1:5433/app\nCOMPOSE_FILE=compose.dev.yaml\n`
+      : `${secret}DATABASE_URL=sqlite://data/app.db\n`
+  }
 
   return Object.fromEntries(Object.entries(files).map(([path, content]) => [path, content.replaceAll('__NAME__', name)]))
 }

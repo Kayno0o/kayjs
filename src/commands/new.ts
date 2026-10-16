@@ -70,9 +70,9 @@ export const scaffold: Command = {
 
       done('created', `${dir}, ${features.length > 0 ? features.join(', ') : 'blank'}, ${count(files.length, 'file')}`)
 
-      // An app's database runs in the container its compose.dev.yaml describes, migrated before the first start.
+      // With Postgres, the database runs in the container its compose.dev.yaml describes, migrated before the first start; SQLite is a file, which `bun run dev` migrates.
       if (values.quiet !== true)
-        console.log(`\n  ${colors.cyan(`cd ${shellQuote(dir)} && bun install && ${features.includes('auth') ? 'docker compose up -d --wait && bun run db:migrate && ' : ''}bun run dev`)}`)
+        console.log(`\n  ${colors.cyan(`cd ${shellQuote(dir)} && bun install && ${features.includes('postgres') ? 'docker compose up -d --wait && bun run db:migrate && ' : ''}bun run dev`)}`)
 
       return 0
     }

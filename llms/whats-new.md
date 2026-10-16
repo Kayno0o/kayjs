@@ -10,6 +10,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - A kayjs-auth profile field's `label` may be an object by locale, `{ en: 'Bio', fr: 'Biographie' }`, `auth.profile(locale)` resolves it, and `requireUser({ redirect: '' })` and `guard({ redirect: '' })` mean no redirect ([kayjs-auth](../packages/auth/llms.txt)).
 - The cms editor's Markdown body takes a pasted or dropped image: it uploads to the collection's folder like a file field's and is embedded at the cursor, and a failed `MarkdownEditor` upload now leaves the text exactly as it was ([kayjs-cms](../packages/cms/llms.txt)).
 - The dev tool's tabs sit in a vertical rail instead of a row that scrolled sideways, its dock, size and close controls are icon buttons, a button fills the window and the size is remembered, and a Content-Security-Policy header reads one directive to a line ([Project](project.md)).
+- A fresh `app` runs `bun run dev` with Bun alone: its members live in a SQLite file through pg-orm, `bun run dev` migrates it, and its tests and workflow need no Postgres; `kay new --template app --with postgres` keeps the Postgres stack ([Project](project.md#commands)).
 
 ## 1.46.0
 

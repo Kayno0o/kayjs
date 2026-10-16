@@ -1,10 +1,10 @@
 import type { Subprocess } from 'bun'
 import type { Feature } from '../src/new'
+import { afterAll, describe, expect, it } from 'bun:test'
 import { chmod, cp, mkdir, mkdtemp, readdir, rm, stat, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, join, posix } from 'node:path'
 import process from 'node:process'
-import { afterAll, describe, expect, it } from 'bun:test'
 import { parse, stringify } from 'devalue'
 import { clientDir, outputDir } from '../src/build/assets'
 import { buildClient } from '../src/build/client'
@@ -287,7 +287,7 @@ describe('kay command line', () => {
     const root = await mkdtemp(join(tmpdir(), 'kay-new-'))
 
     try {
-      const app = await createProject(join(root, 'app'), { kay: '^1.0.0', features: PRESETS.app.features, host: 'github' })
+      const app = await createProject(join(root, 'app'), { kay: '^1.0.0', features: [...PRESETS.app.features, 'postgres'], host: 'github' })
       const site = await createProject(join(root, 'site'), { kay: '^1.0.0', features: PRESETS.site.features, host: 'github' })
 
       expect(app).toContain('.github/workflows/test.yml')
@@ -384,7 +384,7 @@ describe('kay command line', () => {
       expect((await kay(['new', 'lean', '--kay', '^1.0.0', '--without', 'docker,ci'], dir)).code).toBe(0)
       expect(await readdir(join(dir, 'lean'))).not.toEqual(expect.arrayContaining(['Dockerfile']))
       expect(await Bun.file(join(dir, 'lean/src/server.ts')).exists()).toBe(true)
-      expect(await kay(['new', 'unknown', '--with', 'bogus'], dir)).toEqual({ stdout: '', stderr: 'kay new: bogus is none of the features server, starter, tailwind, accents, eslint, tests, ci, docker, auth, ws\n', code: 1 })
+      expect(await kay(['new', 'unknown', '--with', 'bogus'], dir)).toEqual({ stdout: '', stderr: 'kay new: bogus is none of the features server, starter, tailwind, accents, eslint, tests, ci, docker, auth, postgres, ws\n', code: 1 })
       expect(await kay(['new', 'both', '--with', 'docker', '--without', 'ci,docker'], dir)).toEqual({ stdout: '', stderr: 'kay new: docker is in both --with and --without\n', code: 1 })
       expect(await kay(['new', 'static', '--kay', '^1.0.0', '--template', 'site', '--with', 'auth'], dir)).toEqual({ stdout: '', stderr: 'kay: auth needs server: add --with server, or drop it with --without auth\n', code: 1 })
       expect(await kay(['new', 'unstyled', '--kay', '^1.0.0', '--without', 'tailwind'], dir)).toEqual({ stdout: '', stderr: 'kay: accents needs tailwind: add --with tailwind, or drop it with --without accents\n', code: 1 })
@@ -595,15 +595,67 @@ describe('kay new', () => {
     }
   }, SCAFFOLD_MS)
 
-  it('scaffolds an app with sessions, members in Postgres, a guarded section and a websocket island, which checks, tests and builds as it is', async () => {
+  it('scaffolds an app on SQLite with sessions, a guarded section and a websocket island, which runs its tests with Bun alone', async () => {
     const dir = join(await mkdtemp(join(tmpdir(), 'kay-new-')), 'my-app')
 
     try {
       const files = await createProject(dir, { kay: '^1.0.0', features: PRESETS.app.features })
 
+      expect(files).toEqual(expect.arrayContaining(['.env', '.env.example', '.env.test', 'migrations/0001_member.sql', 'pg-orm.config.ts', 'src/db/index.ts', 'tests/database.ts']))
+      expect(files.filter(file => file === 'compose.dev.yaml' || file.startsWith('db/'))).toEqual([])
+      expect(await Bun.file(join(dir, '.env')).text()).toMatch(/^SESSION_SECRET=[0-9a-f]{64}\nDATABASE_URL=sqlite:\/\/data\/app\.db\n$/)
+      expect(await Bun.file(join(dir, '.env.test')).text()).toContain('DATABASE_URL=sqlite://data/test.db\n')
+      expect(await Bun.file(join(dir, '.env.example')).text()).toStartWith('# Each one generated and kept out of the repository: ')
+      expect(await Bun.file(join(dir, '.env.example')).text()).toMatch(/\nSESSION_SECRET=\n# true keeps the demo sign-in[^\n]*\nDEMO_SIGN_IN=\n$/)
+      expect((await Bun.file(join(dir, '.gitignore')).text()).split('\n')).toContain('data')
+      expect((await Bun.file(join(dir, '.dockerignore')).text()).split('\n')).toContain('data')
+      expect((await Bun.file(join(dir, 'package.json')).json() as { scripts: { dev: string } }).scripts.dev).toBe('pg-orm apply && kay dev')
+      // No Postgres service in CI, and the file lives on a volume the image prepares for the app's user.
+      expect(await Bun.file(join(dir, '.forgejo/workflows/test.yml')).text()).not.toContain('postgres')
+      expect(await Bun.file(join(dir, 'Dockerfile')).text()).toContain('RUN mkdir data && chown nobody data\n')
+
+      const compose = await Bun.file(join(dir, 'compose.prod.yaml')).text()
+
+      expect(compose).toContain('DATABASE_URL: sqlite://data/app.db')
+      expect(compose).toContain('- data:/app/data')
+      expect(compose).not.toContain('postgres')
+
+      await installKay(dir)
+      expect(await checked(dir)).toEqual([])
+      expect((await formatFiles([join(dir, 'src')], { write: false })).changed).toEqual([])
+      expect((await lint(dir, '.')).flatMap(result => result.messages)).toEqual([])
+
+      // The first start of a fresh app, as in development (bun test sets NODE_ENV=test, which reads .env.test): `pg-orm apply` makes the members table, which the second run finds applied.
+      for (let run = 0; run < 2; run++) {
+        const apply = Bun.spawn([process.execPath, 'run', 'db:migrate'], { cwd: dir, stdout: 'pipe', stderr: 'pipe', env: { ...process.env, NODE_ENV: 'development' } })
+        const [output, errors, code] = await Promise.all([new Response(apply.stdout).text(), new Response(apply.stderr).text(), apply.exited])
+
+        expect({ run, code, errors }).toEqual({ run, code: 0, errors: expect.not.stringContaining('error') })
+        expect(output).toContain(run === 0 ? 'Applied: ' : 'Nothing to apply')
+      }
+
+      expect(await Bun.file(join(dir, 'data/app.db')).exists()).toBe(true)
+
+      const tests = Bun.spawn([process.execPath, 'run', 'test'], { cwd: dir, stdout: 'pipe', stderr: 'pipe' })
+      const [report, output, code] = await Promise.all([new Response(tests.stderr).text(), new Response(tests.stdout).text(), tests.exited])
+
+      expect({ code, passed: report.includes('5 pass'), ...code === 0 && report.includes('5 pass') ? {} : { report, output } }).toEqual({ code: 0, passed: true })
+    }
+    finally {
+      await rm(join(dir, '..'), { recursive: true, force: true })
+    }
+  }, SCAFFOLD_MS)
+
+  it('scaffolds an app with members in Postgres behind the postgres feature, which checks, tests and builds as it is', async () => {
+    const dir = join(await mkdtemp(join(tmpdir(), 'kay-new-')), 'my-app')
+
+    try {
+      const files = await createProject(dir, { kay: '^1.0.0', features: [...PRESETS.app.features, 'postgres'] })
+
       expect(files).toEqual(expect.arrayContaining(['.env', '.env.example', '.env.test', 'compose.dev.yaml', 'db/roles.sh', 'migrations/0001_member.sql', 'pg-orm.config.ts', 'src/db/index.ts', 'src/routes/account/_guard.ts', 'src/api/online.ts', 'tests/account.test.ts', 'tests/database.ts', 'tests/members.test.ts', 'tests/online.test.ts']))
       expect((await stat(join(dir, '.env'))).mode & 0o777).toBe(0o600)
       expect(await Bun.file(join(dir, '.env')).text()).toMatch(/^SESSION_SECRET=[0-9a-f]{64}\nDATABASE_URL=postgres:\/\/app_rw:app_rw@127\.0\.0\.1:5433\/app\nMIGRATE_DATABASE_URL=postgres:\/\/app:app@127\.0\.0\.1:5433\/app\nCOMPOSE_FILE=compose\.dev\.yaml\n$/)
+      expect((await Bun.file(join(dir, 'package.json')).json() as { scripts: { dev: string } }).scripts.dev).toBe('kay dev')
       // Every env file but the example and the tests' own stays out of git, and all of them out of the image.
       expect((await Bun.file(join(dir, '.gitignore')).text()).split('\n')).toEqual(expect.arrayContaining(['.env', '.env.*', '!.env.example', '!.env.test']))
       expect((await Bun.file(join(dir, '.dockerignore')).text()).split('\n')).toEqual(expect.arrayContaining(['.git', '.env', '.env.*']))
@@ -730,9 +782,8 @@ describe('kay new', () => {
         if (variant.has('eslint'))
           expect({ features, messages: (await lint(dir, '.')).flatMap(result => result.messages) }).toEqual({ features, messages: [] })
 
-        // An app's tests need a Postgres, which the app preset's own test runs them on.
-        if (variant.has('tests') && !variant.has('auth')) {
-          const tests = Bun.spawn([process.execPath, 'test'], { cwd: dir, stdout: 'pipe', stderr: 'pipe' })
+        if (variant.has('tests')) {
+          const tests = Bun.spawn([process.execPath, 'run', 'test'], { cwd: dir, stdout: 'pipe', stderr: 'pipe' })
           const [report, code] = await Promise.all([new Response(tests.stderr).text(), tests.exited])
 
           expect({ features, code, report }).toEqual({ features, code: 0, report: expect.stringContaining(' 0 fail') })

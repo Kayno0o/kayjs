@@ -38,7 +38,7 @@ kay new my-app --template app --without docker
 
 | Option | Effect |
 | --- | --- |
-| `--template blank\|server\|site\|app` | The preset: one bare static page, an Elysia server (the default), a static site, or a server with sessions and members in Postgres |
+| `--template blank\|server\|site\|app` | The preset: one bare static page, an Elysia server (the default), a static site, or a server with sessions and members in SQLite |
 | `--with <features>` | Adds comma-separated [features](#features) to the preset, such as `tailwind,tests` |
 | `--without <features>` | Drops features from the preset |
 | `--host forgejo\|github` | Where the repository lives, which decides the CI workflow. Without it, `kay new` reads the `origin` remote of the directory, or of the closest one above it that exists |
@@ -62,7 +62,8 @@ Every project gets an `AGENTS.md` for coding agents. It points them at kay's doc
 | `tests` | `bun test` through `kay/test`, with a first test | server, site, app |
 | `ci` | A Forgejo or GitHub workflow checking, linting and testing the server, or publishing the static site to Pages | server, site, app |
 | `docker` | A `Dockerfile` and `compose.prod.yaml` running the executable, or nginx serving the static site | server, site, app |
-| `auth` | Sessions, a sign-in, members in Postgres through pg-orm and a guarded `/account`; needs `server` | app |
+| `auth` | Sessions, a sign-in, members in SQLite through pg-orm and a guarded `/account`; needs `server` | app |
+| `postgres` | The members in Postgres instead of SQLite, with a compose stack for development and the roles below; needs `auth`, as in `--template app --with postgres` | none |
 | `ws` | An API module over a websocket, with an island counting the visitors online; needs `server` | app |
 
 `blank` has none of them. Asked in the terminal, checking a feature checks what it needs, and unchecking one unchecks what needs it. With options, a feature missing what it needs is refused with the flag to add:
