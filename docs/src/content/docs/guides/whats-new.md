@@ -12,6 +12,7 @@ This page lists what each release adds, newest first, with a link to where each 
 - A kayjs-auth profile field's `label` may be an object by locale, `{ en: 'Bio', fr: 'Biographie' }`, and `requireUser({ redirect: '' })` and `guard({ redirect: '' })` mean no redirect ([kayjs-auth](../../libraries/kayjs-auth/#your-own-profile-fields)).
 - A kayjs-auth profile field's `label` may be an object by locale, `{ en: 'Bio', fr: 'Biographie' }`, `auth.profile(locale)` resolves it, and `requireUser({ redirect: '' })` and `guard({ redirect: '' })` mean no redirect ([kayjs-auth](../../libraries/kayjs-auth/#your-own-profile-fields)).
 - The cms editor's Markdown body takes a pasted or dropped image: it uploads to the collection's folder like a file field's and is embedded at the cursor, and a failed `MarkdownEditor` upload now leaves the text exactly as it was ([kayjs-cms](/libraries/kayjs-cms)).
+- The dev tool's tabs sit in a vertical rail instead of a row that scrolled sideways, its dock, size and close controls are icon buttons, a button fills the window and the size is remembered, and a Content-Security-Policy header reads one directive to a line ([kay dev](/reference/cli)).
 
 ## 1.46.0
 

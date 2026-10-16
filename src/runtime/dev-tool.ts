@@ -68,16 +68,24 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { .built { transition: none; } }
 .error { color: var(--error); }
 .warn { color: var(--warn); }
-.drawer { position: fixed; bottom: 52px; left: 12px; z-index: 2147483647; display: flex; flex-direction: column; width: min(36rem, calc(100vw - 24px)); max-height: min(60vh, 36rem); border: 1px solid var(--border); border-radius: 10px; background: var(--bg); box-shadow: var(--shadow); overflow: hidden; }
+.drawer { position: fixed; bottom: 52px; left: 12px; z-index: 2147483647; display: flex; flex-direction: column; width: min(36rem, calc(100vw - 24px)); height: min(28rem, 60vh); border: 1px solid var(--border); border-radius: 10px; background: var(--bg); box-shadow: var(--shadow); overflow: hidden; }
 .right .drawer { left: auto; right: 12px; }
-.head { display: flex; align-items: center; gap: 4px; padding: 6px; border-bottom: 1px solid var(--border); background: var(--surface); }
-.tabs { display: flex; gap: 2px; flex: 1; min-width: 0; overflow-x: auto; }
-.tabs button { padding: 4px 10px; border-radius: 6px; color: var(--muted); white-space: nowrap; }
+.max .drawer { width: calc(100vw - 24px); height: calc(100vh - 64px); }
+.head { display: flex; align-items: center; gap: 2px; padding: 4px 6px 4px 12px; border-bottom: 1px solid var(--border); background: var(--surface); }
+.title { flex: 1; font-weight: 600; color: var(--muted); }
+.body { display: flex; flex: 1; min-height: 0; }
+.tabs { display: flex; flex-direction: column; gap: 2px; flex: none; padding: 6px; border-right: 1px solid var(--border); background: var(--surface); overflow-y: auto; }
+.tabs button { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 4px 8px; border-radius: 6px; color: var(--muted); text-align: left; white-space: nowrap; }
+.tabs button:hover { background: var(--bg); }
 .tabs button[aria-selected=true] { background: var(--bg); color: var(--fg); box-shadow: 0 0 0 1px var(--border); }
-.tabs .count { margin-left: 6px; padding: 0 6px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 11px; }
+.tabs .count { padding: 0 6px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 11px; }
 .tabs .count.error { background: var(--error); color: var(--bg); }
+.content { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }
 .tool { padding: 4px 8px; border-radius: 6px; color: var(--muted); }
 .tool:hover { background: var(--bg); color: var(--fg); }
+.icon { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 6px; color: var(--muted); }
+.icon:hover { background: var(--bg); color: var(--fg); }
+.icon svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
 .panel { flex: 1; overflow: auto; padding: 10px; }
 .actions { display: flex; justify-content: flex-end; margin-bottom: 8px; }
 .empty { color: var(--muted); padding: 8px 2px; }
@@ -94,6 +102,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .row:last-child { border-bottom: 0; }
 .link { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
 .value { white-space: pre-wrap; word-break: break-all; }
+.directive { padding-left: 1.5em; overflow-wrap: anywhere; }
 .note { color: var(--muted); }
 .outline { position: fixed; z-index: 2147483646; pointer-events: none; border: 2px solid var(--accent); border-radius: 2px; background: var(--accent-soft); }
 .facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 14px; margin: 0; }
@@ -128,14 +137,48 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .json { margin: 4px 0 0; white-space: pre-wrap; word-break: break-word; }
 .label { position: fixed; z-index: 2147483647; pointer-events: none; padding: 2px 6px; border-radius: 4px; background: var(--accent); color: var(--on-accent); white-space: nowrap; }
 @media (max-width: 480px) {
-  .drawer, .right .drawer { left: 8px; right: 8px; width: auto; max-height: 55vh; }
+  .drawer, .right .drawer, .max .drawer { left: 8px; right: 8px; width: auto; height: min(28rem, 60vh); }
+  .max .drawer { height: calc(100vh - 64px); }
+  .tabs { padding: 4px; }
+  .tabs button { gap: 6px; padding: 4px 6px; }
 }
 `
+
+const SVG = 'http://www.w3.org/2000/svg'
+// Strokes on a 16 by 16 grid, one path each.
+const ICONS = {
+  close: ['M4 4l8 8', 'M12 4l-8 8'],
+  maximize: ['M3 3h10v10H3z'],
+  restore: ['M5 3h8v8', 'M3 5h8v8H3z'],
+  dockLeft: ['M2 3h12v10H2z', 'M6 3v10'],
+  dockRight: ['M2 3h12v10H2z', 'M10 3v10'],
+}
+
+// An icon button: the drawing with its name for screen readers and as the native tooltip.
+function setIcon(button: HTMLButtonElement, label: string, strokes: string[]): void {
+  const svg = button.ownerDocument.createElementNS(SVG, 'svg')
+
+  svg.setAttribute('viewBox', '0 0 16 16')
+  svg.setAttribute('aria-hidden', 'true')
+
+  for (const stroke of strokes) {
+    const path = button.ownerDocument.createElementNS(SVG, 'path')
+
+    path.setAttribute('d', stroke)
+    svg.append(path)
+  }
+
+  button.replaceChildren(svg)
+  button.title = label
+  button.setAttribute('aria-label', label)
+}
 
 interface DevState {
   open: boolean
   tab: string
   side: 'left' | 'right'
+  // The drawer fills the window.
+  max: boolean
   dismissed: string[]
 }
 
@@ -204,9 +247,13 @@ export function startDevTool(doc: Document = document): DevTool {
   const mark = make('button', 'mark', 'kay')
   const drawer = make('div', 'drawer')
   const head = make('div', 'head')
+  const title = make('span', 'title', 'kay dev tools')
+  const body = make('div', 'body')
   const tabList = make('div', 'tabs')
-  const side = make('button', 'tool')
-  const close = make('button', 'tool', 'Close')
+  const content = make('div', 'content')
+  const size = make('button', 'icon')
+  const side = make('button', 'icon')
+  const close = make('button', 'icon')
   const status = make('span', 'sr')
   const built = make('span', 'built')
   const tabs: { options: DevTabOptions, button: HTMLButtonElement, panel: HTMLElement, badge: HTMLButtonElement }[] = []
@@ -215,19 +262,24 @@ export function startDevTool(doc: Document = document): DevTool {
   sheet.replaceSync(STYLE)
   root.adoptedStyleSheets = [sheet]
   ui.classList.toggle('right', state.side === 'right')
+  ui.classList.toggle('max', state.max)
   drawer.id = 'kay-dev-drawer'
   drawer.setAttribute('role', 'dialog')
   drawer.setAttribute('aria-label', 'kay dev tools')
   tabList.setAttribute('role', 'tablist')
+  tabList.setAttribute('aria-orientation', 'vertical')
   mark.type = 'button'
   mark.setAttribute('aria-label', 'kay dev tools (Alt+Shift+K)')
   mark.setAttribute('aria-controls', drawer.id)
   status.setAttribute('role', 'status')
   built.setAttribute('role', 'status')
+  size.type = 'button'
   side.type = 'button'
   close.type = 'button'
-  head.append(tabList, side, close)
-  drawer.append(head)
+  setIcon(close, 'Close', ICONS.close)
+  head.append(title, size, side, close)
+  body.append(tabList, content)
+  drawer.append(head, body)
   bar.append(mark, status, built)
   ui.append(drawer, bar)
   root.append(ui)
@@ -239,7 +291,9 @@ export function startDevTool(doc: Document = document): DevTool {
 
     drawer.hidden = !state.open
     mark.setAttribute('aria-expanded', String(state.open))
-    side.textContent = state.side === 'left' ? 'Dock right' : 'Dock left'
+    ui.classList.toggle('max', state.max)
+    setIcon(size, state.max ? 'Restore the size' : 'Fill the window', state.max ? ICONS.restore : ICONS.maximize)
+    setIcon(side, state.side === 'left' ? 'Dock right' : 'Dock left', state.side === 'left' ? ICONS.dockRight : ICONS.dockLeft)
 
     for (const tab of tabs) {
       const selected = tab === current
@@ -300,7 +354,7 @@ export function startDevTool(doc: Document = document): DevTool {
     badge.setAttribute('aria-controls', drawer.id)
     badge.onclick = () => state.open && state.tab === options.id ? closeDrawer() : openTab(options.id)
     tabList.append(button)
-    drawer.append(panel)
+    content.append(panel)
     bar.insertBefore(badge, bar.children[2 + tabs.length] ?? null)
     tabs.push(entry)
     // Once the caller is done setting the tab up, as showing it runs its `shown`.
@@ -334,6 +388,11 @@ export function startDevTool(doc: Document = document): DevTool {
 
   mark.onclick = () => state.open ? closeDrawer() : openTab(undefined)
   close.onclick = () => closeDrawer(true)
+  size.onclick = () => {
+    state.max = !state.max
+    save()
+    render()
+  }
   side.onclick = () => {
     state.side = state.side === 'left' ? 'right' : 'left'
     ui.classList.toggle('right', state.side === 'right')
@@ -341,10 +400,10 @@ export function startDevTool(doc: Document = document): DevTool {
     render()
   }
 
-  // Arrow keys, Home and End move between the tabs, as a tab list's do.
+  // Up and Down, Home and End move between the tabs, as a vertical tab list's do.
   tabList.onkeydown = (event) => {
     const index = tabs.findIndex(tab => tab.button === root.activeElement)
-    const next = { ArrowRight: index + 1, ArrowLeft: index - 1, Home: 0, End: tabs.length - 1 }[event.key]
+    const next = { ArrowDown: index + 1, ArrowUp: index - 1, Home: 0, End: tabs.length - 1 }[event.key]
 
     if (index < 0 || next === undefined)
       return
@@ -696,7 +755,7 @@ function requestTab(doc: Document, tool: DevTool): { stop: () => void } {
 
     fact('Server time', formatMs(recorded.ms))
     fact('Redirected from', ...lines(hops, 'none'))
-    fact('Headers', ...lines(headers.map(([name, value]) => tool.make('span', 'mono', `${name}: ${value}`)), 'none'))
+    fact('Headers', ...lines(headers.map(([name, value]) => headerLine(tool, name, value)), 'none'))
   }
   const read = () => {
     // A swap adds the next page's block before it drops this one's.
@@ -1896,7 +1955,7 @@ function a11yTargets(doc: Document, text: string): Element[] {
 }
 
 function readState(win: Window): DevState {
-  const fallback: DevState = { open: false, tab: 'problems', side: 'left', dismissed: [] }
+  const fallback: DevState = { open: false, tab: 'problems', side: 'left', max: false, dismissed: [] }
 
   try {
     return { ...fallback, ...JSON.parse(win.sessionStorage.getItem(STATE_KEY) ?? '{}') as Partial<DevState> }
@@ -1926,4 +1985,21 @@ function boundsOf(target: Element): DOMRect {
   const top = Math.min(...boxes.map(box => box.top))
 
   return new DOMRect(left, top, Math.max(...boxes.map(box => box.right)) - left, Math.max(...boxes.map(box => box.bottom)) - top)
+}
+
+// A header on one line, except a policy: its directives each get a line, as one wrapped block of hashes hides which is which.
+function headerLine(tool: DevTool, name: string, value: string): HTMLElement {
+  const line = tool.make('div', 'mono', `${name}:`)
+  const directives = name.startsWith('content-security-policy') ? value.split(';').map(directive => directive.trim()).filter(directive => directive !== '') : []
+
+  if (directives.length < 2) {
+    line.textContent = `${name}: ${value}`
+
+    return line
+  }
+
+  for (const directive of directives)
+    line.append(tool.make('div', 'directive', `${directive};`))
+
+  return line
 }

@@ -91,6 +91,40 @@ describe('the dev tool', () => {
     expect(shadow().querySelector('[role=status]')?.textContent).toBe('3 problems')
   })
 
+  it('lists its tabs in a vertical rail that moves by Up and Down, and keeps the size and side it was given for the browser tab', async () => {
+    tool = startDevTool()
+    tool.tab({ id: 'other', label: 'Other' })
+    await Bun.sleep(0)
+
+    const rail = shadow().querySelector('[role=tablist]')!
+    const icons = () => [...shadow().querySelectorAll<HTMLButtonElement>('.head .icon')].map(button => [button.getAttribute('aria-label'), button.title, button.textContent])
+
+    expect(rail.getAttribute('aria-orientation')).toBe('vertical')
+    expect([...rail.querySelectorAll('[role=tab]')].map(tab => tab.id)).toEqual(['problems', 'request', 'head', 'env', 'images', 'performance', 'routes', 'other'].map(id => `kay-dev-tab-${id}`))
+    expect(icons()).toEqual([['Fill the window', 'Fill the window', ''], ['Dock right', 'Dock right', ''], ['Close', 'Close', '']])
+
+    key({ key: 'K', code: 'KeyK', altKey: true, shiftKey: true })
+    key({ key: 'ArrowDown' }, shadow().activeElement!)
+    expect(shadow().activeElement?.id).toBe('kay-dev-tab-request')
+    key({ key: 'ArrowUp' }, shadow().activeElement!)
+    key({ key: 'ArrowUp' }, shadow().activeElement!)
+    expect(shadow().activeElement?.id).toBe('kay-dev-tab-other')
+    key({ key: 'ArrowRight' }, shadow().activeElement!)
+    expect(shadow().activeElement?.id).toBe('kay-dev-tab-other')
+
+    shadow().querySelector<HTMLButtonElement>('.icon[aria-label="Fill the window"]')!.click()
+    expect(shadow().querySelector('.ui.max')).not.toBeNull()
+    expect(icons()[0]).toEqual(['Restore the size', 'Restore the size', ''])
+    tool.stop()
+
+    tool = startDevTool()
+    await Bun.sleep(0)
+
+    expect(shadow().querySelector('.ui.max')).not.toBeNull()
+    shadow().querySelector<HTMLButtonElement>('.icon[aria-label="Restore the size"]')!.click()
+    expect(shadow().querySelector('.ui.max')).toBeNull()
+  })
+
   it('opens on the bar or Alt+Shift+K, moves between tabs by arrow keys, closes on Escape from inside it, and keeps its tab and dock side for the browser tab', async () => {
     tool = startDevTool()
     tool.tab({ id: 'other', label: 'Other' })
@@ -107,7 +141,7 @@ describe('the dev tool', () => {
     expect(shadow().activeElement?.id).toBe('kay-dev-tab-problems')
     expect(shadow().querySelector('.empty')?.textContent).toBe('No problems on this page.')
 
-    key({ key: 'ArrowRight' }, shadow().activeElement!)
+    key({ key: 'ArrowDown' }, shadow().activeElement!)
     expect(shadow().activeElement?.id).toBe('kay-dev-tab-request')
     key({ key: 'End' }, shadow().activeElement!)
     expect(shadow().activeElement?.id).toBe('kay-dev-tab-other')
@@ -124,7 +158,7 @@ describe('the dev tool', () => {
     expect(shadow().activeElement?.textContent).toBe('kay')
 
     shadow().querySelector<HTMLButtonElement>('.mark')!.click()
-    ;[...shadow().querySelectorAll<HTMLButtonElement>('.tool')].find(button => button.textContent === 'Dock right')!.click()
+    shadow().querySelector<HTMLButtonElement>('.icon[aria-label="Dock right"]')!.click()
     tool.stop()
 
     tool = startDevTool()
@@ -352,7 +386,7 @@ describe('the dev tool', () => {
     const facts = () => [...shadow().querySelectorAll('#kay-dev-request dt')].map(term => `${term.textContent}: ${[...term.nextElementSibling!.children].map(line => line.textContent).join(' / ') || term.nextElementSibling!.textContent}`)
     const opened: string[] = []
     let recorded: DevResponse | undefined = {
-      headers: [['x-request-id', 'abc'], ['cache-control', 'no-store'], ['content-type', 'text/html'], ['content-security-policy', 'default-src \'self\'']],
+      headers: [['x-request-id', 'abc'], ['cache-control', 'no-store'], ['content-type', 'text/html'], ['content-security-policy', 'default-src \'self\'; script-src \'self\' \'sha256-abc\'; img-src *']],
       ms: 51.2,
       redirects: [{ from: '/members', status: 307, by: 'the guard src/routes/members/_guard.ts' }],
     }
@@ -383,8 +417,11 @@ describe('the dev tool', () => {
       'Loads, 44 ms: src/routes/_layout.kay1.5 ms / src/routes/items/[id].kay42 ms',
       'Server time: 51 ms',
       'Redirected from: /members (307, by the guard src/routes/members/_guard.ts)',
-      'Headers: content-security-policy: default-src \'self\' / cache-control: no-store / x-request-id: abc / content-type: text/html',
+      'Headers: content-security-policy:default-src \'self\';script-src \'self\' \'sha256-abc\';img-src *; / cache-control: no-store / x-request-id: abc / content-type: text/html',
     ])
+
+    // A policy reads a directive to a line.
+    expect([...shadow().querySelectorAll('.facts .directive')].map(line => line.textContent)).toEqual(['default-src \'self\';', 'script-src \'self\' \'sha256-abc\';', 'img-src *;'])
 
     // The swap adds the next page's block, then drops this one's.
     recorded = undefined
