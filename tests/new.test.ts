@@ -646,10 +646,10 @@ describe('kay new', () => {
       // They need a Postgres the test user may create databases on, which CI always has.
       if ((TEST_DATABASE_URL ?? '') !== '' || (process.env.CI ?? '') !== '') {
         const tests = Bun.spawn([process.execPath, 'run', 'test'], { cwd: dir, stdout: 'pipe', stderr: 'pipe', env: { ...process.env, ...TEST_DATABASE_URL !== undefined && TEST_DATABASE_URL !== '' && { DATABASE_URL: TEST_DATABASE_URL } } })
-        const [report, code] = await Promise.all([new Response(tests.stderr).text(), tests.exited])
+        const [report, output, code] = await Promise.all([new Response(tests.stderr).text(), new Response(tests.stdout).text(), tests.exited])
 
-        expect(report).toContain('5 pass')
-        expect(code).toBe(0)
+        // A run that passed its tests and still exited 1 failed in CI once with no report to read, so a failure prints both streams.
+        expect({ code, passed: report.includes('5 pass'), ...code === 0 && report.includes('5 pass') ? {} : { report, output } }).toEqual({ code: 0, passed: true })
       }
 
       expect(Object.keys((await buildClient(dir)).islands).toSorted()).toEqual(['src/components/accent-picker.kay', 'src/components/counter.kay', 'src/components/online.kay'])
