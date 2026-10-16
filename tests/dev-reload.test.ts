@@ -311,4 +311,49 @@ describe('the modules a change leaves stale', () => {
       await rm(dir, { recursive: true, force: true })
     }
   })
+
+  it('shows a file added to or deleted from an import.meta.glob on the next request, in the one process', async () => {
+    const project = await served({
+      'src/routes/index.kay': '---\nconst names = Object.keys(import.meta.glob(\'../cards/*.txt\')).sort().join(\',\')\nconst rooted = Object.keys(import.meta.glob(\'/src/cards/*.txt\')).length\n---\np Cards {names} of {rooted}\n',
+      'src/cards/a.txt': 'a',
+    })
+
+    try {
+      await project.sees('Cards ../cards/a.txt of 1')
+      await project.write('src/cards/b.txt', 'b')
+      await project.sees('Cards ../cards/a.txt,../cards/b.txt of 2')
+      await rm(join(project.root, 'src/cards/a.txt'))
+      await project.sees('Cards ../cards/b.txt of 1')
+      expect(project.children).toHaveLength(1)
+    }
+    finally {
+      await project.cleanup()
+    }
+  })
+
+  it('evicts the module holding a glob for a file added to it, a /-rooted pattern resolving from the project root', async () => {
+    const dir = await scratchDir('reload-plan-')
+
+    await Bun.write(join(dir, 'src/routes/index.kay'), '---\nconst a = import.meta.glob(\'../cards/*.txt\')\nconst b = import.meta.glob([\'/src/more/*.txt\', \'!/src/more/skip.txt\'])\n---\np home\n')
+    await Bun.write(join(dir, 'src/routes/other.kay'), 'p other\n')
+
+    try {
+      const real = realpathSync(dir)
+      const at = (file: string) => join(real, file)
+      const input = { root: dir, loaded: ['src/routes/index.kay', 'src/routes/other.kay'].map(at), owned: [at('src/routes')], config: at('kay.config.ts'), entry: at('src/server.ts') }
+      const evicted = (changed: string) => {
+        const plan = planReload({ ...input, changed: [changed] })
+
+        return 'evict' in plan ? plan.evict : plan
+      }
+
+      expect(evicted('src/cards/new.txt')).toEqual([at('src/routes/index.kay'), at('src/server.ts')])
+      expect(evicted('src/more/new.txt')).toEqual([at('src/routes/index.kay'), at('src/server.ts')])
+      expect(evicted('src/more/skip.txt')).toEqual({ restart: 'src/more/skip.txt is no module kay loaded' })
+      expect(evicted('src/elsewhere/new.txt')).toEqual({ restart: 'src/elsewhere/new.txt is no module kay loaded' })
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
 })

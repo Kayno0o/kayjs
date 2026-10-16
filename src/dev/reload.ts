@@ -1,5 +1,5 @@
 import { readFileSync, realpathSync, statSync } from 'node:fs'
-import { basename, dirname, join, relative, sep } from 'node:path'
+import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 
 // What reloading the modules a change reached in the running server takes: the files to ask Bun for again, or why the change needs a new process.
 export type ReloadPlan = { evict: string[] } | { restart: string }
@@ -23,13 +23,22 @@ const GLOB = /import\.meta\.glob\s*\(\s*(\[[^\]]*\]|(['"`])(?:(?!\2)[^\n])*\2)/g
 const QUOTED = /(['"`])((?:(?!\1)[^\n])*)\1/g
 const SOURCE_FILE = /\.(?:kay|[cm]?[jt]sx?)$/
 const QUERY = /\?.*$/
+const RELATIVE = /^\.\.?\//
+const GLOB_MAGIC = /[*?[\]{}()!]/
 // A dependency, or what kay keeps of the project under `.kay`.
 const NOT_PROJECT = /^\/(?:\.kay|(?:.*\/)?node_modules)\//
+
+// The patterns of one `import.meta.glob` call as absolute globs, the negated ones apart.
+interface Glob {
+  include: string[]
+  exclude: string[]
+}
 
 interface Imports {
   mtime: number
   size: number
   files: string[]
+  globs: Glob[]
 }
 
 // What each file imported as last read, until it changes, so a reload reads the files an edit touched and no others.
@@ -42,6 +51,8 @@ export function planReload({ root, changed, loaded, owned, config, entry }: Relo
   const modules = new Set(loaded.filter(file => file.startsWith(real + sep) && !NOT_PROJECT.test(file.slice(real.length))))
   const kays = (file: string) => file.endsWith('.kay') || owned.some(dir => file.startsWith(dir + sep))
   const seeds: string[] = []
+  // The changed files that are no loaded module and in no folder of kay's, which only a glob can account for.
+  const unknown: string[] = []
 
   for (const file of changed) {
     const path = join(real, file)
@@ -57,14 +68,36 @@ export function planReload({ root, changed, loaded, owned, config, entry }: Relo
     if (key !== undefined)
       seeds.push(key)
     else if (!kays(path))
-      return { restart: `${file} is no module kay loaded` }
+      unknown.push(file)
   }
 
   const importers = new Map<string, string[]>()
+  const globs = new Map<string, Glob[]>()
 
   for (const file of modules) {
-    for (const dependency of importsOf(file, modules))
+    const read = importsRead(file, real)
+
+    for (const dependency of read.files.filter(dependency => modules.has(dependency)))
       importers.set(dependency, [...importers.get(dependency) ?? [], file])
+
+    if (read.globs.length > 0)
+      globs.set(file, read.globs)
+  }
+
+  // A file added to a glob is no module yet, and one the glob newly matches may be loaded by another importer: the module holding the glob is stale either way.
+  for (const file of changed) {
+    const path = join(real, file)
+    let matched = false
+
+    for (const [module, moduleGlobs] of globs) {
+      if (moduleGlobs.some(glob => matches(glob, path))) {
+        seeds.push(module)
+        matched = true
+      }
+    }
+
+    if (!matched && unknown.includes(file))
+      return { restart: `${file} is no module kay loaded` }
   }
 
   const evict = new Set(seeds)
@@ -87,20 +120,22 @@ export function planReload({ root, changed, loaded, owned, config, entry }: Relo
   return { evict: [...evict] }
 }
 
-// The loaded modules `file` imports.
-function importsOf(file: string, modules: Set<string>): string[] {
+const NOTHING: Imports = { mtime: 0, size: 0, files: [], globs: [] }
+
+// What `file` imports, the files its globs match as of the last read and the globs themselves.
+function importsRead(file: string, root: string): Imports {
   if (!SOURCE_FILE.test(file))
-    return []
+    return NOTHING
 
   const stats = statSync(file, { throwIfNoEntry: false })
 
   if (stats === undefined)
-    return []
+    return NOTHING
 
   const known = imports.get(file)
 
   if (known?.mtime === stats.mtimeMs && known.size === stats.size)
-    return known.files.filter(dependency => modules.has(dependency))
+    return known
 
   let source: string
 
@@ -108,10 +143,11 @@ function importsOf(file: string, modules: Set<string>): string[] {
     source = readFileSync(file, 'utf8')
   }
   catch {
-    return []
+    return NOTHING
   }
 
   const files = new Set<string>()
+  const globs: Glob[] = []
   const dir = dirname(file)
 
   for (const [, , specifier] of source.matchAll(SPECIFIER)) {
@@ -122,15 +158,28 @@ function importsOf(file: string, modules: Set<string>): string[] {
   }
 
   for (const [, written] of source.matchAll(GLOB)) {
-    for (const [, , pattern] of written!.matchAll(QUOTED)) {
-      for (const match of globbed(pattern!, dir))
-        files.add(match)
+    const patterns = [...written!.matchAll(QUOTED)].map(([, , pattern]) => pattern!)
+    const absolute = (pattern: string) => RELATIVE.test(pattern) ? resolve(dir, pattern) : join(root, pattern)
+    const glob = {
+      include: patterns.filter(pattern => !pattern.startsWith('!')).map(absolute),
+      exclude: patterns.filter(pattern => pattern.startsWith('!')).map(pattern => absolute(pattern.slice(1))),
     }
+
+    globs.push(glob)
+
+    for (const match of globbed(glob))
+      files.add(match)
   }
 
-  imports.set(file, { mtime: stats.mtimeMs, size: stats.size, files: [...files] })
+  const read = { mtime: stats.mtimeMs, size: stats.size, files: [...files], globs }
 
-  return [...files].filter(dependency => modules.has(dependency))
+  imports.set(file, read)
+
+  return read
+}
+
+function matches(glob: Glob, path: string): boolean {
+  return glob.include.some(pattern => new Bun.Glob(pattern).match(path)) && !glob.exclude.some(pattern => new Bun.Glob(pattern).match(path))
 }
 
 function resolveImport(specifier: string, dir: string): string | undefined {
@@ -145,17 +194,23 @@ function resolveImport(specifier: string, dir: string): string | undefined {
   }
 }
 
-// The files a glob of a relative pattern matches, as the loader would import them.
-function globbed(pattern: string, dir: string): string[] {
-  if (pattern.startsWith('!') || !(pattern.startsWith('.') || pattern.startsWith('/')))
-    return []
+// The files a glob matches, as the loader would import them.
+function globbed(glob: Glob): string[] {
+  const found = new Set<string>()
 
-  try {
-    return [...new Bun.Glob(pattern.startsWith('/') ? pattern.slice(1) : pattern).scanSync({ cwd: pattern.startsWith('/') ? '/' : dir, absolute: true, onlyFiles: true })].map(realpathOf)
+  for (const full of glob.include) {
+    const segments = full.split(sep)
+    const magic = segments.findIndex(segment => GLOB_MAGIC.test(segment))
+    const base = magic === -1 ? dirname(full) : segments.slice(0, magic).join(sep) || sep
+
+    try {
+      for (const match of new Bun.Glob(relative(base, full)).scanSync({ cwd: base, absolute: true, onlyFiles: true }))
+        found.add(realpathOf(match))
+    }
+    catch {}
   }
-  catch {
-    return []
-  }
+
+  return [...found].filter(file => !glob.exclude.some(pattern => new Bun.Glob(pattern).match(file)))
 }
 
 // Bun keys its modules by real path; a file gone is looked for by its folder's.
