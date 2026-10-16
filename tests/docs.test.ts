@@ -34,6 +34,12 @@ const LINK = /\]\(((?:llms\/)?[\w-]+\.md)?(#[\w-]+)?\)/g
 const CARD_LINK = /ModuleCard\([^)]*\bhref="([^"]+)"/g
 const FRONTMATTER_PATH = /^path: (.+)$/m
 const HOME_LINK = /href[=:] ?["'](\/[\w/-]*?)\/?(?:#([\w-]+))?["']/g
+const FENCE = /^```[\s\S]*?^```/gm
+const FRONTMATTER = /^---\n[\s\S]*?\n---\n/
+const BLANK_LINE = /\n\s*\n/
+const LIST_ITEM = /\n(?=\s*(?:[-*]|\d+\.) )/
+const NOT_PROSE = /^[|<#]/
+const PARAGRAPH_CAP = 500
 
 describe('llms.txt', () => {
   it('stays an index an agent reads whole, listing every doc of llms/ once', () => {
@@ -133,6 +139,24 @@ describe('the documentation site', () => {
       resolve('the home page', path!, anchor)
 
     expect(broken).toEqual([])
+  })
+
+  // The docs site is read by people: plain prose, one idea per paragraph, as llms/ stays dense for agents.
+  it('keeps every paragraph and list item of the docs site under 500 characters', async () => {
+    const contentDir = join(root, 'docs/src/content')
+    const long: string[] = []
+
+    for (const file of new Bun.Glob('{docs,ui}/**/*.md').scanSync(contentDir)) {
+      const body = (await Bun.file(join(contentDir, file)).text()).replace(FRONTMATTER, '').replace(FENCE, '')
+
+      for (const block of body.split(BLANK_LINE).flatMap(paragraph => paragraph.split(LIST_ITEM))) {
+        const text = block.trim()
+        if (text.length > PARAGRAPH_CAP && !NOT_PROSE.test(text))
+          long.push(`${file}: ${text.length} characters, "${text.slice(0, 60)}"`)
+      }
+    }
+
+    expect(long).toEqual([])
   })
 
   it('gives each card of the home page a link of its own', async () => {
