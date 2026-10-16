@@ -297,7 +297,7 @@ expect(jar.cookies.has('session')).toBe(true)
 - Once the page's renderer crashes, killed or out of memory, the call waiting on it and every later one fail at once saying so, rather than at the test's timeout.
 - `view` is the `Bun.WebView` behind it, for a `screenshot()` or a raw `cdp()` call.
 - Each page opened starts with no cookie or storage for the site, and pages opened at once share them, the browser's own rather than `site.cookies`.
-- `site.close()` closes the pages it opened.
+- `site.close()` closes the pages, sockets and streams it opened, and stops the site without waiting on any connection.
 
 ### The browser itself
 

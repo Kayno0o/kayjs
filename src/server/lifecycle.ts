@@ -157,14 +157,14 @@ async function withTimeout(check: unknown): Promise<unknown> {
   }
 }
 
-// Stops the server once its open requests finished, then runs each `onStop` hook in turn, awaiting it, which Elysia's own `stop()` does not.
-export async function shutdown(app: AnyElysia): Promise<void> {
+// Stops the server once its open requests finished, or at once when `force` is set, then runs each `onStop` hook in turn, awaiting it, which Elysia's own `stop()` does not.
+export async function shutdown(app: AnyElysia, force = false): Promise<void> {
   const server = app.server
 
   if (!server)
     return
 
-  await server.stop()
+  await server.stop(force)
   app.server = null
 
   for (const hook of app.event.stop ?? []) {

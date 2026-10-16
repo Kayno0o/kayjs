@@ -324,6 +324,7 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
   const answeredAt = new WeakMap<Visit, string>()
   let server: Bun.Server<unknown> | undefined
   const opened = new Set<TestPage>()
+  const connections = new Set<{ close: () => void }>()
 
   const listening = (): Bun.Server<unknown> => {
     if (!server) {
@@ -386,6 +387,7 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
       const client = openSocket(() => new BunWebSocket(`ws://localhost:${listening().port}${url}`, { headers: { ...options?.headers, ...jar.cookies.size > 0 ? { cookie: jar.header(joinBase(base, url)) } : {} } }))
       const tested = Object.assign(client, inbox(client))
 
+      connections.add(client)
       client.start()
 
       return tested as never
@@ -407,6 +409,7 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
       })
 
       Object.assign(tested, { finished: async () => finished })
+      connections.add(reader)
       reader.start()
 
       return tested as never
@@ -430,8 +433,14 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
       for (const page of opened)
         page.close()
 
+      // The sockets and streams the test left open are closed with the site, and the stop is forced as nothing but the test is left to finish.
+      for (const connection of connections)
+        connection.close()
+
+      connections.clear()
+
       if (server)
-        await shutdown(app)
+        await shutdown(app, true)
 
       server = undefined
     },
