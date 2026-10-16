@@ -524,10 +524,13 @@ describe.concurrent('kay dev', () => {
     await Bun.write(join(root, 'kay.config.ts'), 'export default {}\n')
 
     const real = realpathSync(root)
+    const running: (() => Promise<void>)[] = []
 
     try {
       // No build before: the server never asks for the client, so no builder starts.
       const first = await dev(root)
+
+      running.push(first)
 
       await Bun.sleep(1500)
       expect(childrenRunning(real, 'builder.ts')).toHaveLength(0)
@@ -538,11 +541,14 @@ describe.concurrent('kay dev', () => {
       const lines: string[] = []
       const second = await dev(root, { log: line => lines.push(line) })
 
+      running.push(second)
+
       // The builder clears the placeholder as it builds, however late the host runs it; the project cannot resolve kay here, so the build fails and leaves none.
       await until(() => statSync(join(root, '.kay/dev/manifest.json'), { throwIfNoEntry: false })?.size !== 2, 20_000)
       expect(childrenRunning(real, 'builder.ts')).toHaveLength(1)
       expect(lines.filter(line => line.includes('process building the client exited'))).toEqual([])
       await second()
+      expect(childrenRunning(real, 'preload.ts')).toHaveLength(0)
 
       // A config that does not load is refused with the builder stopped, and its error shown once, by the types.
       const written: string[] = []
@@ -556,6 +562,7 @@ describe.concurrent('kay dev', () => {
         await Bun.write(join(root, 'kay.config.ts'), 'throw new Error(\'config broke\')\n')
         await expect(dev(root, { refuseConfig: true })).rejects.toBeInstanceOf(ConfigRefused)
         expect(childrenRunning(real, 'builder.ts')).toHaveLength(0)
+        expect(childrenRunning(real, 'preload.ts')).toHaveLength(0)
         expect(written.filter(text => text.includes('config broke'))).toEqual([])
       }
       finally {
@@ -563,6 +570,8 @@ describe.concurrent('kay dev', () => {
       }
     }
     finally {
+      // A failed assertion above must not leave a server running.
+      await Promise.all(running.map(async stop => stop()))
       said.mockRestore()
       await rm(root, { recursive: true, force: true })
     }
@@ -578,6 +587,7 @@ describe.concurrent('kay dev', () => {
       return true
     })
     const lines: string[] = []
+    let stop: (() => Promise<void>) | undefined
 
     await Bun.write(join(root, 'src/server.ts'), 'setInterval(() => undefined, 1000)\n')
     await Bun.write(join(root, 'src/routes/index.kay'), 'p Home\n')
@@ -586,15 +596,17 @@ describe.concurrent('kay dev', () => {
     await Bun.write(join(root, 'kay.config.ts'), 'if (process.argv.some(arg => arg.endsWith(\'builder.ts\')))\n  throw new Error(\'builder boom\')\n\nexport default {}\n')
 
     try {
-      const stop = await dev(root, { refuseConfig: true, log: line => lines.push(line) })
+      stop = await dev(root, { refuseConfig: true, log: line => lines.push(line) })
 
       await until(() => lines.some(line => line.includes('process building the client exited')), 20_000)
       await Bun.sleep(200)
       await stop()
+      expect(childrenRunning(realpathSync(root), 'preload.ts')).toHaveLength(0)
       expect(lines.filter(line => line.includes('process building the client exited'))).toHaveLength(1)
       expect(written.filter(text => text.includes('builder boom'))).toHaveLength(1)
     }
     finally {
+      await stop?.()
       stderr.mockRestore()
       said.mockRestore()
       await rm(root, { recursive: true, force: true })
