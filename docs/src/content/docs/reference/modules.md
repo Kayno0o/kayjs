@@ -3,7 +3,7 @@ title: Modules
 order: 3
 description: What each public kay entry point exports.
 ---
-Import from the entry point that matches where the code runs. `kay` works in pages, components and islands, `kay/server` only on the server, and a topic's own entry holds that topic's helpers, whichever side runs them.
+Import from the entry point that matches where the code runs. `kay` works in pages, components and islands, and `kay/server` only on the server. A topic's own entry, such as `kay/i18n`, `kay/cache` or `kay/content`, holds that topic's helpers, whichever side runs them.
 
 ```ts
 import { action, s, signal } from 'kay'
@@ -11,7 +11,7 @@ import { defineConfig, pages, session } from 'kay/server'
 import { collection } from 'kay/content'
 ```
 
-`signal`, `memo`, `effect`, `onMount`, `onCleanup`, `props`, a server fence's `action` and the translation `t` need no import inside a `.kay` file: they are what a component is written with. Everything else is imported. `kay` holds what pages, components, guards and routes are written with, `kay/server` what sets up and runs the server, and a topic's own entry, such as `kay/i18n`, `kay/cache` or `kay/content`, that topic's helpers. Components, such as `T`, are always imported.
+Inside a `.kay` file, `signal`, `memo`, `effect`, `onMount`, `onCleanup`, `props`, a server fence's `action` and the translation `t` need no import. A component is written with them. Everything else is imported, and components, such as `T`, are always imported.
 
 ## kay
 
@@ -37,8 +37,8 @@ import { collection } from 'kay/content'
 | `localPath`, `withBase` | A path with the locale prefix or the `base` applied |
 | `sanitizeHtml`, `trustHtml` | Clean untrusted HTML, its options typed `SanitizeOptions`, or mark HTML as safe to render, which a spread's `innerHTML` requires |
 | `uid` | A unique id that matches between server and browser |
-| `describeField` | Adds ids to the `aria-describedby` of the first field a component renders on the server, its slot included, for a form field linking the control its parent writes to its hint |
-| `markInvalid` | Marks a field `aria-invalid` for one source among several, such as a form field's own message beside a refused post in an island, taking the mark off once none holds it |
+| `describeField` | Adds ids to the `aria-describedby` of the first field a component renders, for a form field linking its parent's hint |
+| `markInvalid` | Marks a field `aria-invalid` for one of several sources, and clears the mark once none holds it |
 | `previewing` | Whether the visitor is in preview mode |
 | `editing` | Whether the visitor is in edit mode, a CMS editing content on the page |
 | `logFrom` | A library's log, `logFrom('my-library').error(message, error)`, written where the app's `log` setting sends kay's messages, or to the console as `[my-library] message` outside a server |
