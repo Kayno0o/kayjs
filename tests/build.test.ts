@@ -2075,6 +2075,8 @@ describe('a compiled server\'s images', () => {
 
       expect(report).not.toContain('error')
       expect(code).toBe(0)
+      // The coders' wasm is embedded zstd-compressed, and no other wasm is in this executable.
+      expect(Buffer.from(await Bun.file(join(root, 'server')).arrayBuffer()).includes(Buffer.from([0, 0x61, 0x73, 0x6D, 1, 0, 0, 0]))).toBe(false)
 
       const child = Bun.spawn([join(root, 'server')], { cwd: root, env: { ...process.env, NODE_ENV: 'production' }, stdout: 'pipe', stderr: 'pipe' })
       const [output, errors, exit] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])

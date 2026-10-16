@@ -38,7 +38,7 @@ const LEFT_OUT_MODULES = new Map([
 const LEFT_OUT = 'kay-left-out'
 const RELATIVE = /^\.\.?\//
 const ANY = /.*/
-const AVIF_WASM = /(?:avif-enc|avif_dec)\.wasm$/
+const AVIF_WASM = /(?:\/src\/server\/codec\/avif-enc|\/@jsquash\/avif\/codec\/dec\/avif_dec)\.wasm$/
 
 // Leaves the compiler and resvg out of the executable: megabytes the server never runs.
 function withoutCompiler(): BunPlugin {
@@ -55,12 +55,12 @@ function withoutCompiler(): BunPlugin {
   }
 }
 
-// Embeds the AVIF coders' wasm zstd-compressed, 5.7 MB of executable down to 1.6; the worker, which reads its wasm through `wasmBytes`, unpacks it on first use.
+// Embeds the AVIF coders' wasm zstd-compressed, which the worker unpacks on first use.
 function compressedWasm(): BunPlugin {
   return {
     name: 'kay-compressed-wasm',
     setup(build) {
-      build.onLoad({ filter: AVIF_WASM }, async ({ path }) => ({ contents: await Bun.zstdCompress(await Bun.file(path).bytes(), { level: 19 }), loader: 'file' }))
+      build.onLoad({ filter: AVIF_WASM }, async ({ path }) => ({ contents: await Bun.zstdCompress(await Bun.file(path).bytes(), { level: 10 }), loader: 'file' }))
     },
   }
 }
