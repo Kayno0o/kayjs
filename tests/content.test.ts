@@ -470,15 +470,25 @@ describe('Markdown outside collections', () => {
   })
 
   it('renders a user\'s text of unclosed tags in linear time', async () => {
-    const time = async (markup: string) => {
-      const start = performance.now()
+    // The best of three runs, so a pause under load does not count; eight times the input takes about eight times as long, where a quadratic pass took sixty-four.
+    const best = async (markup: string) => {
+      const times: number[] = []
 
-      await renderMarkdown(markup, { highlight: code => code })
+      for (let run = 0; run < 3; run++) {
+        const start = performance.now()
 
-      return performance.now() - start
+        await renderMarkdown(markup, { highlight: code => code })
+        times.push(performance.now() - start)
+      }
+
+      return Math.min(...times)
     }
 
-    expect(await time('<pre><code>'.repeat(40_000))).toBeLessThan(500)
-    expect(await time('<h2 id="a"><a href="#b">x\n\n'.repeat(40_000))).toBeLessThan(500)
+    for (const unit of ['<pre><code>', '<h2 id="a"><a href="#b">x\n\n']) {
+      const small = await best(unit.repeat(5000))
+      const large = await best(unit.repeat(40_000))
+
+      expect(large / small).toBeLessThan(24)
+    }
   })
 })
