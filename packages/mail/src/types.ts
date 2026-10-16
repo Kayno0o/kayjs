@@ -69,6 +69,8 @@ export interface Delivery {
 
 export interface Transport {
   send: (mail: Mail) => Promise<Delivery>
+  // Connects and checks the server accepts this transport's settings without sending a mail, rejecting with what a send would. Optional: the outbox has none.
+  verify?: (() => Promise<void>) | undefined
 }
 
 // One line of a `Fields`: a label, its value, blank or left out for one not given, and where the value links to, a `mailto:` or `tel:` say.

@@ -42,7 +42,7 @@ In production the mailer reads, as the server boots, through kay's `defineEnv`:
 | Variable | |
 | --- | --- |
 | `SMTP_HOST` | required |
-| `SMTP_PORT` | `465` by default: TLS from the start; another port upgrades with STARTTLS, and a server not offering it is refused, so a stripped STARTTLS never sends a reset link in clear |
+| `SMTP_PORT` | `465` by default: TLS from the start; another port upgrades with STARTTLS, and a server not offering it is refused, at the first send and in a boot warning naming `SMTP_INSECURE`, so a stripped STARTTLS never sends a reset link in clear |
 | `SMTP_INSECURE` | `true` sends in clear to a server not offering STARTTLS, such as a local Mailpit; a password still never goes in clear |
 | `SMTP_USER`, `SMTP_PASS` | both or neither, for a server needing no login |
 | `SMTP_RATE_LIMIT` | optional: the most mails a second, for a provider capping the rate |

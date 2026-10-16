@@ -37,7 +37,7 @@ export default defineConfig({
 
 The path is the file exporting the mailer as `mail`, relative to the project root. kay imports it only as the server starts, and `kay build --compile` bakes it into the executable.
 
-In production the mailer reads `SMTP_HOST` (required), `SMTP_PORT` (465 by default), `SMTP_USER` and `SMTP_PASS`, and `SMTP_FROM` unless `from` is set. A missing one stops the boot. On a port other than 465 a server not offering STARTTLS is refused, unless `SMTP_INSECURE=true`, for a local Mailpit, which a set `SMTP_PASS` overrides; the error says so. Each mail sent is logged with its subject and how many recipients it went to at which domains, `mailer({ logRecipients: true })` naming them in full. `MAIL_TO` is where a mail naming no recipient goes, such as a contact form's, and DKIM signing and a rate limit have variables of their own.
+In production the mailer reads `SMTP_HOST` (required), `SMTP_PORT` (465 by default), `SMTP_USER` and `SMTP_PASS`, and `SMTP_FROM` unless `from` is set. A missing one stops the boot. On a port other than 465 a server not offering STARTTLS is refused, unless `SMTP_INSECURE=true`, for a local Mailpit, which a set `SMTP_PASS` overrides; the error says so, at the first mail and in a warning when the server starts. Each mail sent is logged with its subject and how many recipients it went to at which domains, `mailer({ logRecipients: true })` naming them in full. `MAIL_TO` is where a mail naming no recipient goes, such as a contact form's, and DKIM signing and a rate limit have variables of their own.
 
 ## Writing a mail
 

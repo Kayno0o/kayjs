@@ -178,6 +178,8 @@ function named(address: string, name: string | undefined): Address {
   return name === undefined || address.includes('<') ? address : { name, address }
 }
 
+const KAYJS_MAIL_PREFIX = /^kayjs-mail: /
+
 function delivering(): 'outbox' | 'smtp' {
   return process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test' ? 'outbox' : 'smtp'
 }
@@ -216,13 +218,12 @@ function fromEnvironment(from: Address | undefined, fromName: string | undefined
   const missing = () => [...env.SMTP_HOST === undefined ? ['SMTP_HOST'] : [], ...from === undefined && env.SMTP_FROM === undefined ? ['SMTP_FROM'] : []]
 
   // Built on the first mail, as `kay build` runs without the server's environment and leaves a missing variable to throw where it is read.
+  const opened = () => transport ??= smtp({ host: env.SMTP_HOST, port: env.SMTP_PORT, insecure: env.SMTP_INSECURE, user: env.SMTP_USER, pass: env.SMTP_PASS, rateLimit: env.SMTP_RATE_LIMIT, name: domainOf(sender()), dkim: dkimKey === undefined ? undefined : { domain: env.SMTP_DKIM_DOMAIN ?? domainOf(sender())!, selector: env.SMTP_DKIM_SELECTOR!, privateKey: dkimKey } })
+
   return {
     transport: {
-      send: async (mail) => {
-        transport ??= smtp({ host: env.SMTP_HOST, port: env.SMTP_PORT, insecure: env.SMTP_INSECURE, user: env.SMTP_USER, pass: env.SMTP_PASS, rateLimit: env.SMTP_RATE_LIMIT, name: domainOf(sender()), dkim: dkimKey === undefined ? undefined : { domain: env.SMTP_DKIM_DOMAIN ?? domainOf(sender())!, selector: env.SMTP_DKIM_SELECTOR!, privateKey: dkimKey } })
-
-        return transport.send(mail)
-      },
+      send: async mail => opened().send(mail),
+      verify: async () => opened().verify?.(),
     },
     get from() {
       return sender()
@@ -360,6 +361,19 @@ export function mailer(options: MailerOptions = {}): Mailer {
     },
   })
   const plugin = new Elysia().use(jobs)
+
+  // Checked as the server starts, so a relay refused for lacking STARTTLS shows in the boot log with the setting that allows it, not only at the first mail. Only that is said: an unreachable relay may be up by the time a mail goes.
+  if (configured !== undefined && configured.missing().length === 0) {
+    plugin.onStart(async () => {
+      try {
+        await configured.transport.verify?.()
+      }
+      catch (error) {
+        if (error instanceof Error && (error.cause as { code?: unknown } | undefined)?.code === 'ETLS')
+          log.warn(error.message.replace(KAYJS_MAIL_PREFIX, ''))
+      }
+    })
+  }
 
   // The outbox page, which shows every mail with its links live, is served by `kay dev` alone, never by a server merely started with NODE_ENV=development.
   if (transport === outbox && underKayDev())

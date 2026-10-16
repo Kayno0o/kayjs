@@ -2,6 +2,8 @@ import { generateKeyPairSync } from 'node:crypto'
 import process from 'node:process'
 import { mailer, smtp } from '@kaynooo/kayjs-mail'
 import { afterAll, describe, expect, it } from 'bun:test'
+import { Elysia } from 'elysia'
+import { memoryJobs } from 'kay/server'
 import { bodyText, startSmtp } from '../../helpers/smtp'
 import Welcome from '../src/mails/welcome.kay'
 import { logged } from './logged'
@@ -53,6 +55,37 @@ describe('smtp', () => {
 
     await expect(mail.send({ to: 'ada@example.com', subject: 'S', text: 'T' })).rejects.toThrow(`kayjs-mail: 127.0.0.1:${server.port} did not upgrade to TLS with STARTTLS, which kayjs-mail requires on every port but 465, so nothing was sent; a relay taking mail in clear, as on a private network, needs SMTP_INSECURE=true`)
     expect(server.received).toHaveLength(before)
+  })
+
+  it('names a relay without STARTTLS in the boot log, with the setting that allows it, and says nothing of one that is allowed', async () => {
+    const saved = { ...process.env }
+    // The boot check ran once its connection to the stub closed.
+    const boot = async (insecure: string) => logged(async () => {
+      const closed = server.connections.closed
+
+      Object.assign(process.env, { NODE_ENV: 'production', SMTP_HOST: '127.0.0.1', SMTP_PORT: String(server.port), SMTP_INSECURE: insecure, SMTP_FROM: 'site@env.test' })
+
+      const app = new Elysia().use(mailer({ queue: { name: 'boot-check', store: memoryJobs() } }))
+
+      app.listen(0)
+
+      for (const start = Date.now(); server.connections.closed === closed && Date.now() - start < 10_000;)
+        await Bun.sleep(20)
+
+      await Bun.sleep(50)
+      await app.stop()
+    })
+
+    try {
+      const refused = (await boot('false')).map(([level, line]) => `${level} ${line}`).join('\n')
+
+      expect(refused).toContain(`warn kayjs-mail: 127.0.0.1:${server.port} did not upgrade to TLS with STARTTLS`)
+      expect(refused).toContain('SMTP_INSECURE=true')
+      expect(await boot('true')).toEqual([])
+    }
+    finally {
+      process.env = saved
+    }
   })
 
   it('never sends a password over a connection that did not upgrade to TLS', async () => {
