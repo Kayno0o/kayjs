@@ -8,7 +8,7 @@ import { fileTree, pathTree } from '../docs/src/file-tree'
 import { loadComponents, loadLibraries } from '../docs/src/libraries'
 import { pageWeight } from '../docs/src/page-weight'
 import { PALETTES, paletteStylesheet, themeCss } from '../docs/src/palettes'
-import { loadReference } from '../docs/src/reference'
+import { LLMS_GUIDES, loadReference } from '../docs/src/reference'
 import { partOf } from '../docs/src/sections'
 import { palette, pickTheme, scheme, THEME_SCRIPT, THEMES } from '../docs/src/theme'
 import { compileKay, formatDiagnostic } from '../src/compiler'
@@ -100,6 +100,9 @@ describe('the documentation site', () => {
 
     for (const library of await loadLibraries())
       served.set(`/llms/${library.slug}`, await headings(library.body))
+
+    for (const guide of LLMS_GUIDES)
+      served.set(`/${guide.slug}`, served.get(`/llms/${guide.topic}`))
 
     served.set('/llms.txt', await headings(llms))
 
