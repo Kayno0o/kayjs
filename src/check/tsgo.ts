@@ -1,8 +1,8 @@
 // The tsgo run `kay check` makes, skipped where its last run was clean and nothing it read has changed since, and what it prints read back as diagnostics.
 import type { CheckDiagnostic } from '.'
 import type { TsgoDiagnostic } from './diagnose'
-import { existsSync, statSync } from 'node:fs'
-import { dirname, join, resolve } from 'node:path'
+import { existsSync, readFileSync, statSync } from 'node:fs'
+import { dirname, isAbsolute, join, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { readCacheEntry, writeCacheEntry } from '../build/cache'
@@ -60,15 +60,83 @@ export async function resolvedConfig(root: string, tsconfig: string): Promise<st
 }
 
 // What a tsconfig's own options say apart from the places they name, which differ by where the config sits: two configs with the same text here type a file the same way.
+// Kept while the config and each config it extends keep their size and time, as tsgo would print the same: a run on a project whose configs did not change spawns nothing.
 export async function typingOptions(root: string, tsconfig: string): Promise<string | undefined> {
+  const config = resolve(root, tsconfig)
+  const stamps = configStamps(config)
+  const slot = stamps === undefined ? undefined : { file: join(projectPaths(root).cache, 'config', `${Bun.hash(config).toString(36)}.json`), key: JSON.stringify([(await Bun.file(TSGO_PACKAGE).json() as { version: string }).version, stamps]) }
+  const kept = slot && await readCacheEntry<string>(slot)
+
+  if (kept !== undefined)
+    return kept
+
   const shown = await resolvedConfig(root, tsconfig)
 
   if (shown === undefined)
     return undefined
 
   const { compilerOptions = {} } = JSON.parse(shown) as { compilerOptions?: Record<string, unknown> }
+  const options = JSON.stringify(Object.entries(compilerOptions).filter(([name]) => !PLACED_OPTIONS.has(name)).toSorted(([a], [b]) => a < b ? -1 : 1))
 
-  return JSON.stringify(Object.entries(compilerOptions).filter(([name]) => !PLACED_OPTIONS.has(name)).toSorted(([a], [b]) => a < b ? -1 : 1))
+  if (slot)
+    await writeCacheEntry(slot, options)
+
+  return options
+}
+
+// The size and time of a config and of every config it extends, or undefined when one cannot be found or read, which leaves the answer to tsgo.
+function configStamps(config: string, seen = new Set<string>()): string[] | undefined {
+  if (seen.has(config))
+    return []
+
+  seen.add(config)
+
+  try {
+    const stat = statSync(config, { throwIfNoEntry: false })
+
+    if (stat === undefined)
+      return undefined
+
+    const { size, mtimeMs } = stat
+    const { extends: base } = Bun.JSONC.parse(readFileSync(config, 'utf8')) as { extends?: string | string[] }
+    const stamps = [`${config}:${size}:${mtimeMs}`]
+
+    for (const name of typeof base === 'string' ? [base] : base ?? []) {
+      const found = extendedConfig(dirname(config), name)
+
+      if (found === undefined)
+        return undefined
+
+      const inner = configStamps(found, seen)
+
+      if (inner === undefined)
+        return undefined
+
+      stamps.push(...inner)
+    }
+
+    return stamps
+  }
+  catch {
+    return undefined
+  }
+}
+
+// The config an `extends` names, a file beside the one extending or one a package ships.
+function extendedConfig(dir: string, name: string): string | undefined {
+  const candidates = name.startsWith('.') || isAbsolute(name) ? [resolve(dir, name), resolve(dir, `${name}.json`)] : [name, `${name}.json`, `${name}/tsconfig.json`]
+
+  for (const candidate of candidates) {
+    try {
+      const found = name.startsWith('.') || isAbsolute(name) ? candidate : Bun.resolveSync(candidate, dir)
+
+      if (statSync(found, { throwIfNoEntry: false })?.isFile())
+        return found
+    }
+    catch {}
+  }
+
+  return undefined
 }
 
 // Runs tsgo incrementally, or not at all when its last run was clean and nothing it read has changed since: tsgo's own incremental mode still parses every file, most of a warm run's time.

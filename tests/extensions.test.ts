@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
 import process from 'node:process'
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
+import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { parse } from 'devalue'
 import { t } from 'elysia'
 import { treeEntries } from '../src/build/files'
@@ -849,6 +849,45 @@ describe('an extension whose tsconfig or dependencies sit apart from the app', (
       await rm(dir, { recursive: true, force: true })
     }
   }, 60_000)
+
+  it('resolves a package tsconfig once while it and what it extends keep their size and time', async () => {
+    const dir = await scratchDir('extension-config-')
+    const extensions = [{ name: 'tight', routes: { dir: join(dir, 'app/node_modules/tight/routes'), prefix: '/tight' } }]
+    const spawn = Bun.spawn
+    const shown: string[] = []
+    const counting = spyOn(Bun, 'spawn').mockImplementation(((command: string[], ...rest: unknown[]) => {
+      if (command.includes('--showConfig'))
+        shown.push(command.at(-1)!)
+
+      return (spawn as (...args: unknown[]) => unknown)(command, ...rest)
+    }) as typeof Bun.spawn)
+
+    try {
+      // The package extends a base that sets the app's options, so its own are the app's and no program is made.
+      await Promise.all(Object.entries({ ...OWN_OPTIONS, 'tight/tsconfig.json': JSON.stringify({ extends: './base.json' }), 'tight/base.json': TSCONFIG }).map(async ([path, content]) => Bun.write(join(dir, path), content)))
+      await mkdir(join(dir, 'app/node_modules'))
+      await symlink('../../tight', join(dir, 'app/node_modules/tight'))
+
+      const spawned = async () => {
+        shown.length = 0
+        await writeShadowTypes(join(dir, 'app'), { extensions })
+
+        return shown.filter(path => path.includes('tight')).length
+      }
+
+      expect(await spawned()).toBe(1)
+      expect(await spawned()).toBe(0)
+
+      // What it extends changed: tsgo reads it again, and the package now has options of its own.
+      await Bun.write(join(dir, 'tight/base.json'), JSON.stringify({ compilerOptions: { ...TSCONFIG_OPTIONS, noUncheckedIndexedAccess: true } }))
+      expect(await spawned()).toBeGreaterThan(0)
+      expect((await writeShadowTypes(join(dir, 'app'), { extensions })).programs).toHaveLength(1)
+    }
+    finally {
+      counting.mockRestore()
+      await rm(dir, { recursive: true, force: true })
+    }
+  }, 30_000)
 
   it('has kay check report a package tsconfig tsgo cannot read', async () => {
     const dir = await scratchDir('extension-broken-')
