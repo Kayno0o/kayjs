@@ -73,7 +73,7 @@ kay check --only seo
 
 ### Lint the script fences and template expressions with ESLint
 
-`kay: true` wires `kay/eslint` in, which lints the JavaScript of a component, its fences and the expressions of its template (`a={...}`, `{...}` in text, the heads of `if`, `match`, `for`, `await`, `const` and `slot`), at their `.kay` line and column; a fix lands in the file when the code it replaces was written there as is. Tags, classes and static text stay with `kay check`. Type-aware rules need `kay check` to have run first:
+`kay: true` wires `kay/eslint` in, which lints the JavaScript of a component, its fences and the expressions of its template (`a={...}`, `{...}` in text, the heads of `if`, `match`, `for`, `await`, `const` and `slot`), at their `.kay` line and column; a fix lands in the file when the code it replaces was written there as is. The classes of a template reach the Tailwind rules of `@kaynooo/eslint` (`tailwind: true`), a shorthand `.flex` and a static `class="..."` alike, reported at the class; a fix lands in the file only inside a static `class="..."`, and a shorthand class is reported without one. Tags and static text stay with `kay check`. Type-aware rules need `kay check` to have run first:
 
 ```ts
 import { defineConfig } from '@kaynooo/eslint'
@@ -306,7 +306,7 @@ kay check && keslint --cache
 
 ### Linting
 
-- ESLint lints the script and server fences and the template expressions of `.kay` files through `kay/eslint`, which `@kaynooo/eslint` wires in with `kay: true`: an `eslint.config.ts` of `export default defineConfig({ strict: true, kay: true })`, run with `keslint --cache`, which `kay new` writes along with `lint` and `lint:fix` scripts.
+- ESLint lints the script and server fences, the template expressions and the template classes (Tailwind rules) of `.kay` files through `kay/eslint`, which `@kaynooo/eslint` wires in with `kay: true`: an `eslint.config.ts` of `export default defineConfig({ strict: true, kay: true })`, run with `keslint --cache`, which `kay new` writes along with `lint` and `lint:fix` scripts.
 - The processor lints the TSX `kay check` type-checks a component as and reports only what falls in the code the author wrote, a fence or a template expression, at its `.kay` line and column; `--fix` rewrites the `.kay` file, a fix reaching into generated code dropped, and one adding a line break outside the fences.
 - The markup of a template, its tags, classes and static text, is left to `kay check`, and the rules the generated code around the author's would trip are off in `.kay` files: indentation, blank lines and padding, import order and adjacency, arrow parentheses, nested ternaries and one-line handlers.
 - Type-aware rules, such as `ts/no-floating-promises` under `strict`, read the shadow files `kay check`, `kay dev` and the editor's language server write under `.kay/types`, so lint runs after one of them: a component with none yet fails with `has no type information yet: run kay check, or kay dev, before linting it`, and CI runs `bun run lint` after `bun run check`.

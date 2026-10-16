@@ -2,6 +2,7 @@
 import type { ShadowFile } from '../check/shadow'
 import { existsSync } from 'node:fs'
 import { relative, resolve } from 'node:path'
+import { classEdit, classSpan } from '../check/class-words'
 import { codeEdit, compileShadow, inFences, readShadowSettings, shadowPath, sourceSpan } from '../check/shadow'
 import { offsetAt, positionAt } from '../compiler/mapping'
 import { projectRootOf } from '../project'
@@ -30,6 +31,8 @@ export interface ParserOptions {
 }
 
 const BLOCK = 'kay.tsx'
+// The classes of a template are written into the TSX as strings of their own, which only the rules about classes judge: any other rule on one would report the generated string.
+const TAILWIND_RULE = /^better-tailwindcss\//
 // What ESLint names the block `preprocess` returns: the .kay file's path, then `<index>_kay.tsx`.
 const BLOCK_PATH = /^(.+\.kay)[/\\]\d+_kay\.tsx$/
 
@@ -96,19 +99,20 @@ export function shadowParser<Options extends ParserOptions, Result>(parser: { pa
 }
 
 function mapMessage(entry: ShadowFile, message: LintMessage): LintMessage | undefined {
+  const tailwind = TAILWIND_RULE.test(message.ruleId ?? '')
   // A parser that throws, as the shadow parser does without a shadow file, reports no line, or line 0.
   const start = message.line >= 1 ? offsetAt(entry.tsx, { line: message.line, column: message.column }) : undefined
   const end = message.endLine === undefined || message.endColumn === undefined ? undefined : offsetAt(entry.tsx, { line: message.endLine, column: message.endColumn })
-  const span = start === undefined ? undefined : sourceSpan(entry, start, end ?? start, 'code')
+  const span = start === undefined ? undefined : sourceSpan(entry, start, end ?? start, 'code') ?? (tailwind ? classSpan(entry, start, end ?? start + 1) : undefined)
 
   // A file that does not parse would otherwise pass: kay check names the reason at its line, this only keeps lint from passing.
   if (!span)
     return message.fatal ? { ...message, line: 1, column: 1, endLine: undefined, endColumn: undefined } : undefined
 
   const endPosition = end === undefined ? undefined : positionAt(entry.source, span.end)
-  const fix = message.fix && mapFix(entry, message.fix)
+  const fix = message.fix && mapFix(entry, message.fix, tailwind)
   const suggestions = message.suggestions?.flatMap((suggestion) => {
-    const mappedFix = mapFix(entry, suggestion.fix)
+    const mappedFix = mapFix(entry, suggestion.fix, tailwind)
 
     return mappedFix ? [{ ...suggestion, fix: mappedFix }] : []
   })
@@ -116,9 +120,15 @@ function mapMessage(entry: ShadowFile, message: LintMessage): LintMessage | unde
   return { ...message, ...positionAt(entry.source, span.start), endLine: endPosition?.line, endColumn: endPosition?.column, fix, suggestions }
 }
 
-// A fix stands only when the code it replaces was copied verbatim from the .kay file, and a line break it adds only in a fence: a template expression is one line of the file.
-function mapFix(entry: ShadowFile, fix: LintFix): LintFix | undefined {
+// A fix stands only when the code it replaces was copied verbatim from the .kay file, or is a class the template writes as the string joins it, and a line break it adds only in a fence: a template expression is one line of the file.
+function mapFix(entry: ShadowFile, fix: LintFix, classes: boolean): LintFix | undefined {
   const span = codeEdit(entry, fix.range[0], fix.range[1])
 
-  return span && (!fix.text.includes('\n') || inFences(entry, span.start, span.end)) ? { range: [span.start, span.end], text: fix.text } : undefined
+  if (!span) {
+    const edit = classes ? classEdit(entry, fix.range[0], fix.range[1], fix.text) : undefined
+
+    return edit && { range: [edit.start, edit.end], text: edit.text }
+  }
+
+  return !fix.text.includes('\n') || inFences(entry, span.start, span.end) ? { range: [span.start, span.end], text: fix.text } : undefined
 }

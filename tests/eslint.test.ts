@@ -8,6 +8,7 @@ import { readShadowSettings, serializeShadowSettings, SHADOW_SETTINGS } from '..
 import { positionAt } from '../src/compiler/mapping'
 import { processor, shadowParser } from '../src/eslint'
 import { projectPaths } from '../src/project'
+import { scratchDir } from './scratch'
 
 const FILE = join(import.meta.dir, 'fixtures', 'lint', 'src', 'components', 'card.kay')
 const CARD = `---
@@ -256,5 +257,99 @@ section({...rest['a']})
     const { messages } = await lint('---\nconst { n } = props<{ n: number }>()\n---\nif n === 1\n  p {n === 2 ? \'a\' : \'b\'}\nconst m = n\nspan {m}\n', { 'no-extra-parens': 'error', 'no-void': 'error', 'no-sequences': 'error' })
 
     expect(messages).toEqual([])
+  })
+})
+
+describe('kay/eslint over template classes', () => {
+  const TEMPLATE = `---
+const { n } = props<{ n: number }>()
+---
+div.flex.flex-col.nope-x(class="p-4 m-2 w-4 h-4" id="a")
+  p.text-sm.w-4.h-4(class={n ? 'a-b w-4' : 'c-d'}) hi
+  span(class="w-4 h-4 flex")
+`
+
+  // The tailwind rules of the plugin @kaynooo/eslint ships, run through the processor on the file, reports as they stand and after \`--fix\`.
+  async function lint(text: string) {
+    const { default: parser } = await import('@typescript-eslint/parser')
+    const { default: plugin } = await import('eslint-plugin-better-tailwindcss')
+    const { ESLint } = await import('eslint')
+    const cwd = await scratchDir('kay-eslint-classes')
+
+    await Bun.write(join(cwd, 'src', 'app.css'), '@import "tailwindcss";\n')
+
+    const overrideConfig = [
+      { files: ['**/*.kay'], processor },
+      {
+        files: ['**/*.kay/*.tsx'],
+        languageOptions: { parser },
+        plugins: { 'better-tailwindcss': plugin },
+        settings: { 'better-tailwindcss': { entryPoint: join(cwd, 'src', 'app.css') } },
+        rules: { 'better-tailwindcss/no-unknown-classes': 'warn', 'better-tailwindcss/enforce-shorthand-classes': 'warn', 'better-tailwindcss/enforce-consistent-class-order': 'warn' },
+      },
+    ] as never
+    const run = async (fix: boolean) => (await new ESLint({ cwd, overrideConfigFile: true, overrideConfig, fix }).lintText(text, { filePath: join(cwd, 'src', 'card.kay') }))[0]!
+
+    return { messages: (await run(false)).messages, fixed: await run(true) }
+  }
+
+  it('reports a class of the shorthand and of a static class attribute at its .kay position', async () => {
+    const { messages } = await lint(TEMPLATE)
+    const lines = TEMPLATE.split('\n')
+    const unknown = messages.filter(message => message.ruleId === 'better-tailwindcss/no-unknown-classes').map(message => lines[message.line - 1]!.slice(message.column - 1, message.endColumn! - 1))
+
+    expect(unknown).toEqual(['nope-x', 'a-b', 'c-d'])
+  })
+
+  it('reports a shorthand rule at the first class of the pair, in the shorthand and in the attribute', async () => {
+    const { messages } = await lint(TEMPLATE)
+    const lines = TEMPLATE.split('\n')
+    const shorthand = messages.filter(message => message.ruleId === 'better-tailwindcss/enforce-shorthand-classes' && message.message.startsWith('Non shorthand')).map(message => `${message.line}:${lines[message.line - 1]!.slice(message.column - 1, message.endColumn! - 1)}`)
+
+    expect(shorthand).toEqual(['4:w-4', '5:w-4', '6:w-4'])
+  })
+
+  it('fixes a class inside a static attribute, and leaves the shorthand and a mixed string without a fix', async () => {
+    const { fixed } = await lint('---\n---\nspan(class="w-4 h-4 flex")\ndiv.w-4.h-4(class="flex")\n')
+
+    expect(fixed.output).toMatch(/span\(class="size-4\s+flex"\)/)
+    expect(fixed.output).toContain('div.w-4.h-4(class="flex")')
+  })
+
+  it('reports nothing on a template without a class', async () => {
+    const { messages } = await lint('---\n---\np hello\n')
+
+    expect(messages).toEqual([])
+  })
+
+  it('tells two elements with the same classes apart, a component call and a class merged with a spread among them', async () => {
+    const text = '---\nconst { rest } = props<{ rest: Record<string, string> }>()\n---\ndiv.zz-a\ndiv.zz-a\nFoo.zz-b(class="zz-c")\np.zz-d({...rest} class="zz-e")\n'
+    const { messages } = await lint(text)
+    const lines = text.split('\n')
+    const found = messages.filter(message => message.ruleId === 'better-tailwindcss/no-unknown-classes').map(message => `${message.line}:${lines[message.line - 1]!.slice(message.column - 1, message.endColumn! - 1)}`)
+
+    expect(found).toEqual(['4:zz-a', '5:zz-a', '6:zz-b', '6:zz-c', '7:zz-d', '7:zz-e'])
+  })
+
+  it('drops a class fix that would reach into a shorthand, or across the separators of a string it does not write as is', () => {
+    const [block] = processor.preprocess('---\n---\ndiv.w-4.h-4(class="flex")\nspan(class="a  b")\n', FILE)
+    const tsx = block!.text
+    const shorthand = tsx.indexOf('w-4 h-4 flex')
+    const spaced = tsx.indexOf('a b')
+    const messages = processor.postprocess([[
+      at(tsx, shorthand, { ruleId: 'better-tailwindcss/probe', fix: { range: [shorthand, shorthand + 3], text: 'size-4' } }),
+      at(tsx, shorthand + 'w-4 h-4 '.length, { ruleId: 'better-tailwindcss/probe', fix: { range: [shorthand + 'w-4 h-4 '.length, shorthand + 'w-4 h-4 flex'.length], text: 'block' } }),
+      at(tsx, spaced, { ruleId: 'better-tailwindcss/probe', fix: { range: [spaced + 1, spaced + 2], text: '' } }),
+    ]], FILE)
+
+    expect(messages.map(message => message.fix)).toEqual([undefined, { range: expect.any(Array), text: 'block' }, undefined])
+  })
+
+  it('leaves the rules about code off the strings generated for classes', () => {
+    const [block] = processor.preprocess('---\n---\np.flex(class="mt-2") hi\n', FILE)
+    const tsx = block!.text
+    const literal = tsx.indexOf('"flex mt-2"')
+
+    expect(processor.postprocess([[at(tsx, literal, { ruleId: 'style/quotes' }), at(tsx, literal + 1, { ruleId: 'better-tailwindcss/no-unknown-classes' })]], FILE).map(message => message.ruleId)).toEqual(['better-tailwindcss/no-unknown-classes'])
   })
 })
