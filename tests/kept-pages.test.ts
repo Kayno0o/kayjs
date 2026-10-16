@@ -428,6 +428,16 @@ describe('a kept page and the state a script declares', () => {
     expect(await readsNothing({ file: join(root, 'src/routes/index.kay'), layouts: [join(root, 'src/routes/_layout.kay')] })).toBe(true)
   })
 
+  it('keeps a page exporting an action when its let or empty container is not one the export reads', async () => {
+    const root = await scratch({
+      'src/routes/script.kay': '--- server\nexport const save = action(s.Object({}), async () => {})\n---\n---\nlet label = \'Save\'\nconst parts = []\n---\nform(action={save}) button {label}\n',
+      'src/routes/fence.kay': '--- server\nlet title = \'Home\'\nconst items: string[] = []\n\nexport const save = action(s.Object({}), async () => {})\n---\nh1 {title}\nform(action={save}) button Save\n',
+    })
+
+    expect(await readsNothing(route(root, 'src/routes/script.kay'))).toBe(true)
+    expect(await readsNothing(route(root, 'src/routes/fence.kay'))).toBe(true)
+  })
+
   it('keeps refusing a page importing a .ts module with a module-level let or empty container', async () => {
     const root = await scratch({
       'src/routes/let.kay': '---\nimport { next } from \'../counted\'\n---\np {next()}\n',

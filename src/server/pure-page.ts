@@ -1,5 +1,7 @@
 import { resolveFrom } from '../build/files'
 import { PAGE, PAGE_SETTINGS } from '../compiler/page-settings'
+import { parseKay } from '../compiler/parser'
+import { analyzeServer } from '../compiler/script'
 import { routeChain } from './routes'
 
 // What a page may take from `kay` and stay the same for every visitor and every moment: the reactive core and ids, none of which reads a request, a cookie, the environment or a clock.
@@ -16,14 +18,29 @@ const MODULE_STATES = [/^(?:export )?(?:let|var) /m, /^(?:export )?const [^=\n]*
 // An exported literal or `new`, which another module can change; the settings of `page` are read as written, not run.
 const SETTING_NAMES = [PAGE, ...PAGE_SETTINGS].join('|')
 const EXPORTED_STATE = new RegExp(`^export const (?!(?:${SETTING_NAMES})\\b)[^=\\n]*= *(?:[[{]|new )`, 'm')
-// A `.kay` file runs its scripts and server fence for each render, so what they declare is state only when its server fence exports something besides a type or a page setting, which may read it and so move it to module level.
+// For a server fence the compiler cannot parse, the part of the rule left: it declares state only when it exports something besides a type or a page setting, which may read it.
 const MODULE_EXPORT = new RegExp(`^export (?!(?:type|interface) )(?!(?:async )?(?:const|let|var|function) (?:${SETTING_NAMES})\\b)`, 'm')
 
+// A `.kay` file runs its scripts and server fence for each render, so a `let` or an empty container there is state only when the compiler moves its statement to module level, as it does one an export of the server fence reads.
 function holdsModuleState(file: string, source: string): boolean {
   if (EXPORTED_STATE.test(source))
     return true
 
-  return (!file.endsWith('.kay') || MODULE_EXPORT.test(source)) && MODULE_STATES.some(state => state.test(source))
+  if (!MODULE_STATES.some(state => state.test(source)))
+    return false
+
+  if (!file.endsWith('.kay'))
+    return true
+
+  const server = analyzeServer(source, parseKay(source).server)
+
+  if (server === undefined)
+    return false
+
+  if (server.unparsed !== undefined)
+    return MODULE_EXPORT.test(source)
+
+  return server.exports.some(({ start, end }) => MODULE_STATES.some(state => state.test(source.slice(start, end))))
 }
 
 // An import or a re-export with what it takes, then one for its effect alone.
