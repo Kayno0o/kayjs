@@ -1,20 +1,23 @@
-import type { Attribute, ElementNode, Span } from '../compiler/ast'
+import type { ElementNode, NamedAttribute, Span } from '../compiler/ast'
 import type { ShadowFile } from './shadow'
 import { visitNodes } from '../compiler/ast'
 import { parseKay } from '../compiler/parser'
 
-// One class of a template, as the generated code joins it into a `class` string: the `.flex` of a shorthand, or a word of a static `class="..."`.
-interface ClassWord {
-  text: string
+// A piece of a class string: a class of the shorthand, or the whole text of a static `class` attribute, which the generated code copies as it is.
+interface ClassPiece {
+  // Where it sits in the generated string, and in the source.
+  at: number
   start: number
-  shorthand: boolean
+  length: number
 }
 
 // What the generated code joins into one string literal, and the source span all of it comes from.
 interface ClassGroup {
-  words: ClassWord[]
+  pieces: ClassPiece[]
   region: Span
-  joined: string
+  content: string
+  // Whether the element writes no shorthand, so no rule can have the other half of a fix in a string beside this one.
+  editable: boolean
 }
 
 // A string literal of the TSX written for classes, found around an offset.
@@ -25,12 +28,11 @@ interface ClassLiteral {
   close: number
 }
 
-const WORD = /\S+/g
 const QUOTE = /["']/
 const QUOTE_OR_BACKSLASH = /["'\\]/
 const groupsOf = new WeakMap<ShadowFile, ClassGroup[]>()
 
-// The source span of a TSX span inside a class string, which the generated code joins from the shorthand and the `class` attribute: from the class it starts in to the class it ends in.
+// The source span of a TSX span inside a class string, which the generated code joins from the shorthand and the `class` attribute: from where it starts to where it ends, within the piece it starts in.
 export function classSpan(shadow: ShadowFile, start: number, end: number): Span | undefined {
   const literal = classLiteral(shadow, start, end)
 
@@ -38,50 +40,40 @@ export function classSpan(shadow: ShadowFile, start: number, end: number): Span 
     return undefined
 
   const { group, open, close } = literal
-  const from = start <= open ? group.words[0]!.start : sourceOf(group, start - open - 1, false)
-  const to = end > close ? sourceEnd(group.words.at(-1)!) : sourceOf(group, end - open - 2, false, true)
+  const piece = start <= open ? group.pieces[0] : pieceAt(group, start - open - 1) ?? group.pieces.find(candidate => candidate.at > start - open - 1)
+  const from = start <= open ? piece?.start : sourceOf(group, start - open - 1, false)
+  const to = end > close ? group.pieces.at(-1) && group.pieces.at(-1)!.start + group.pieces.at(-1)!.length : sourceOf(group, end - open - 2, true)
 
-  return from !== undefined && to !== undefined && to >= from ? { start: from, end: to } : undefined
+  // A span running on into another piece, the shorthand into the attribute, stops where its first piece does.
+  return piece && from !== undefined && to !== undefined ? { start: from, end: Math.max(from, Math.min(to, piece.start + piece.length)) } : undefined
 }
 
-// The source an edit of a class string replaces, when the classes it touches were written as they are in the string: inside one static `class="..."`, or within one static class beside a shorthand.
+// The source an edit of a class string replaces, when it lies in a static `class="..."` that is copied as it is, on an element with no shorthand: with one, a rule's fix for a pair of classes would be applied for one half.
 export function classEdit(shadow: ShadowFile, start: number, end: number, text: string): (Span & { text: string }) | undefined {
   const literal = classLiteral(shadow, start, end)
+  const piece = literal?.group.pieces[0]
 
-  if (!literal || text.includes('\n'))
+  if (!literal || !piece || !literal.group.editable || text.includes('\n'))
     return undefined
 
-  const { group, open, close } = literal
-  const { words } = group
+  const { open, close } = literal
 
   // The whole string, quotes included, as a class-order rule rewrites it.
   if (start === open && end === close + 1) {
     const quote = shadow.tsx[open]!
 
-    return words.every(word => !word.shorthand) && text.length >= 2 && text.startsWith(quote) && text.endsWith(quote) && !text.slice(1, -1).includes(quote)
-      ? { start: words[0]!.start, end: sourceEnd(words.at(-1)!), text: text.slice(1, -1) }
+    return text.length >= 2 && text.startsWith(quote) && text.endsWith(quote) && !QUOTE_OR_BACKSLASH.test(text.slice(1, -1))
+      ? { start: piece.start, end: piece.start + piece.length, text: text.slice(1, -1) }
       : undefined
   }
 
-  if (start <= open || end > close)
-    return undefined
+  const from = start - open - 1
+  const to = end - open - 1
 
-  const first = wordIndex(group, start - open - 1)
-  const last = wordIndex(group, end - open - 2)
-
-  // A shorthand class is not fixed: a rule that merges two of them, `w-4` and `h-4` into `size-4`, has a fix for each, and applying one alone would leave the other behind.
-  if (words.some(word => word.shorthand)) {
-    if (first === undefined || first !== last || words[first]!.shorthand)
-      return undefined
-  }
-
-  const from = sourceOf(group, start - open - 1, true)
-  const to = sourceOf(group, end - open - 2, true, true)
-
-  return from !== undefined && to !== undefined && to >= from && !QUOTE_OR_BACKSLASH.test(text) ? { start: from, end: to, text } : undefined
+  return from >= 0 && to <= piece.length && !QUOTE_OR_BACKSLASH.test(text) ? { start: piece.start + from, end: piece.start + to, text } : undefined
 }
 
-// The class string literal the TSX span lies in, and which classes of the template it joins.
+// The class string literal the TSX span lies in, and which classes of the template it joins; none when two strings of the element read the same, which cannot be told apart.
 function classLiteral(shadow: ShadowFile, start: number, end: number): ClassLiteral | undefined {
   const { tsx } = shadow
   const open = tsx[start] === '"' ? start : tsx.lastIndexOf('"', start)
@@ -100,68 +92,30 @@ function classLiteral(shadow: ShadowFile, start: number, end: number): ClassLite
   if (from === undefined)
     return undefined
 
-  const group = classGroups(shadow).find(candidate => candidate.joined === content && from >= candidate.region.start && from <= candidate.region.end)
+  const found = classGroups(shadow).filter(candidate => candidate.content === content && from >= candidate.region.start && from <= candidate.region.end)
 
-  return group && { group, open, close }
+  return found.length === 1 ? { group: found[0]!, open, close } : undefined
 }
 
-// The index of the word a character of the joined string belongs to, none for the space between two.
-function wordIndex(group: ClassGroup, offset: number): number | undefined {
-  let position = 0
-
-  for (const [index, word] of group.words.entries()) {
-    if (offset >= position && offset < position + word.text.length)
-      return index
-
-    position += word.text.length + 1
-  }
-
-  return undefined
+// The piece a character of the generated string belongs to, none for the space between two.
+function pieceAt(group: ClassGroup, offset: number): ClassPiece | undefined {
+  return group.pieces.find(piece => offset >= piece.at && offset < piece.at + piece.length)
 }
 
-function sourceEnd(word: ClassWord): number {
-  return word.start + word.text.length
-}
+// The source offset of a character of the generated string, `end` taking it as the last character of a span. A space between two pieces maps to the next as a start and to the previous as an end.
+function sourceOf(group: ClassGroup, offset: number, end: boolean): number | undefined {
+  const piece = pieceAt(group, offset)
 
-// The source offset of a character of the joined string, `end` taking it as the last character of a span. A space between two classes maps to the next class as a start and to the previous as an end, or, in `strict`, to the gap between them when that gap is one character as the space is.
-function sourceOf(group: ClassGroup, offset: number, strict: boolean, end = false): number | undefined {
-  const index = wordIndex(group, offset)
-  const { words } = group
+  if (piece)
+    return piece.start + (offset - piece.at) + (end ? 1 : 0)
 
-  if (index !== undefined) {
-    let position = 0
+  if (end) {
+    const before = group.pieces.findLast(candidate => candidate.at < offset)
 
-    for (const word of words.slice(0, index))
-      position += word.text.length + 1
-
-    return words[index]!.start + (offset - position) + (end ? 1 : 0)
+    return before && before.start + before.length
   }
 
-  // On the space after the class before it.
-  let position = 0
-
-  for (const [before, word] of words.entries()) {
-    position += word.text.length
-
-    if (offset === position) {
-      const next = words[before + 1]
-
-      if (!next)
-        return undefined
-
-      if (!strict)
-        return end ? sourceEnd(word) : next.start
-
-      if (next.start - sourceEnd(word) !== 1)
-        return undefined
-
-      return end ? next.start : sourceEnd(word)
-    }
-
-    position++
-  }
-
-  return undefined
+  return group.pieces.find(candidate => candidate.at > offset)?.start
 }
 
 // Every string the generated code builds from a template's classes: a shorthand with the static class beside it, the shorthand alone, and the static class alone.
@@ -171,45 +125,47 @@ function classGroups(shadow: ShadowFile): ClassGroup[] {
   if (groups)
     return groups
 
-  groups = []
-  groupsOf.set(shadow, groups)
-
+  const found: ClassGroup[] = []
   const { source } = shadow
-  const add = (words: ClassWord[], region: Span) => {
-    if (words.length > 0)
-      groups.push({ words, region, joined: words.map(word => word.text).join(' ') })
-  }
 
   visitNodes(parseKay(source).template, (node) => {
     if (node.kind === 'element')
-      addElement(source, node, add)
+      addElement(source, node, group => found.push(group))
   })
+
+  groups = found
+  groupsOf.set(shadow, groups)
 
   return groups
 }
 
-function addElement(source: string, element: ElementNode, add: (words: ClassWord[], region: Span) => void): void {
-  const shorthand = element.classes.map(span => ({ text: source.slice(span.start, span.end), start: span.start, shorthand: true }))
-  const attribute = element.attributes.find((candidate): candidate is Exclude<Attribute, { kind: 'spread' }> => candidate.kind !== 'spread' && source.slice(candidate.name.start, candidate.name.end) === 'class')
-  const statics: ClassWord[] = []
-  let region: Span | undefined = shorthand.length > 0 ? { start: shorthand[0]!.start, end: shorthand.at(-1)!.start + shorthand.at(-1)!.text.length } : undefined
+function addElement(source: string, element: ElementNode, add: (group: ClassGroup) => void): void {
+  const named = element.attributes.find((candidate): candidate is NamedAttribute => candidate.kind !== 'spread' && source.slice(candidate.name.start, candidate.name.end) === 'class')
+  const shorthand: ClassPiece[] = []
+  let content = ''
 
-  if (attribute?.kind === 'static') {
+  for (const span of element.classes) {
+    shorthand.push({ at: content.length === 0 ? 0 : content.length + 1, start: span.start, length: span.end - span.start })
+    content = content.length === 0 ? source.slice(span.start, span.end) : `${content} ${source.slice(span.start, span.end)}`
+  }
+
+  const first = element.classes[0]
+  let region: Span | undefined = first && { start: first.start, end: element.classes.at(-1)!.end }
+  let value: { text: string, start: number } | undefined
+
+  if (named?.kind === 'static') {
     // The value span holds the quotes when the attribute list was written one way, and leaves them out when it was written the other.
-    const quoted = QUOTE.test(source[attribute.value.start]!)
-    const inner = quoted ? { start: attribute.value.start + 1, end: attribute.value.end - 1 } : attribute.value
+    const inner = QUOTE.test(source[named.value.start]!) ? { start: named.value.start + 1, end: named.value.end - 1 } : named.value
 
     // Only a value written as it is read, between quotes with no entity, is mapped.
-    if (source.slice(inner.start, inner.end) === attribute.text && QUOTE.test(source[inner.start - 1]!)) {
-      for (const match of attribute.text.matchAll(WORD))
-        statics.push({ text: match[0], start: inner.start + match.index, shorthand: false })
-    }
+    if (source.slice(inner.start, inner.end) === named.text && QUOTE.test(source[inner.start - 1]!))
+      value = { text: named.text, start: inner.start }
 
-    region = { start: Math.min(region?.start ?? attribute.name.start, attribute.name.start), end: Math.max(region?.end ?? attribute.value.end, attribute.value.end) }
+    region = { start: Math.min(region?.start ?? named.name.start, named.name.start), end: Math.max(region?.end ?? named.value.end, named.value.end) }
   }
-  else if (attribute && region) {
+  else if (named && region) {
     // A `class={...}` beside a shorthand is generated from the attribute's name.
-    region = { start: Math.min(region.start, attribute.name.start), end: Math.max(region.end, attribute.name.end) }
+    region = { start: Math.min(region.start, named.name.start), end: Math.max(region.end, named.name.end) }
   }
 
   if (!region)
@@ -218,10 +174,16 @@ function addElement(source: string, element: ElementNode, add: (words: ClassWord
   // A string built beside the attributes, not from them, is mapped to the start of the element.
   region = { start: Math.min(region.start, element.start), end: region.end }
 
-  add([...shorthand, ...statics], region)
+  const editable = shorthand.length === 0
+  const staticPieces = (at: number): ClassPiece[] => value ? [{ at, start: value.start, length: value.text.length }] : []
 
-  if (shorthand.length > 0 && statics.length > 0) {
-    add(shorthand, region)
-    add(statics, region)
-  }
+  // The shorthand and the static class in one string, as without a spread; then each alone, as with one.
+  if (shorthand.length > 0 && value)
+    add({ pieces: [...shorthand, ...staticPieces(content.length + 1)], region, content: `${content} ${value.text}`, editable })
+
+  if (shorthand.length > 0)
+    add({ pieces: shorthand, region, content, editable })
+
+  if (value)
+    add({ pieces: staticPieces(0), region, content: value.text, editable })
 }

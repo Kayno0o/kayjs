@@ -312,7 +312,7 @@ div.flex.flex-col.nope-x(class="p-4 m-2 w-4 h-4" id="a")
   it('fixes a class inside a static attribute, and leaves the shorthand and a mixed string without a fix', async () => {
     const { fixed } = await lint('---\n---\nspan(class="w-4 h-4 flex")\ndiv.w-4.h-4(class="flex")\n')
 
-    expect(fixed.output).toMatch(/span\(class="size-4\s+flex"\)/)
+    expect(fixed.output).toMatch(/span\(class="flex\s+size-4"\)/)
     expect(fixed.output).toContain('div.w-4.h-4(class="flex")')
   })
 
@@ -331,18 +331,18 @@ div.flex.flex-col.nope-x(class="p-4 m-2 w-4 h-4" id="a")
     expect(found).toEqual(['4:zz-a', '5:zz-a', '6:zz-b', '6:zz-c', '7:zz-d', '7:zz-e'])
   })
 
-  it('drops a class fix that would reach into a shorthand, or across the separators of a string it does not write as is', () => {
+  it('maps an edit inside a static class as written, and none on an element that also has a shorthand', () => {
     const [block] = processor.preprocess('---\n---\ndiv.w-4.h-4(class="flex")\nspan(class="a  b")\n', FILE)
     const tsx = block!.text
-    const shorthand = tsx.indexOf('w-4 h-4 flex')
-    const spaced = tsx.indexOf('a b')
+    const mixed = tsx.indexOf('w-4 h-4 flex')
+    const plain = tsx.indexOf('a  b')
     const messages = processor.postprocess([[
-      at(tsx, shorthand, { ruleId: 'better-tailwindcss/probe', fix: { range: [shorthand, shorthand + 3], text: 'size-4' } }),
-      at(tsx, shorthand + 'w-4 h-4 '.length, { ruleId: 'better-tailwindcss/probe', fix: { range: [shorthand + 'w-4 h-4 '.length, shorthand + 'w-4 h-4 flex'.length], text: 'block' } }),
-      at(tsx, spaced, { ruleId: 'better-tailwindcss/probe', fix: { range: [spaced + 1, spaced + 2], text: '' } }),
+      at(tsx, mixed, { ruleId: 'better-tailwindcss/probe', fix: { range: [mixed, mixed + 3], text: 'size-4' } }),
+      at(tsx, mixed + 8, { ruleId: 'better-tailwindcss/probe', fix: { range: [mixed + 8, mixed + 12], text: 'block' } }),
+      at(tsx, plain + 1, { ruleId: 'better-tailwindcss/probe', fix: { range: [plain + 1, plain + 2], text: '' } }),
     ]], FILE)
 
-    expect(messages.map(message => message.fix)).toEqual([undefined, { range: expect.any(Array), text: 'block' }, undefined])
+    expect(messages.map(message => message.fix?.text)).toEqual([undefined, undefined, ''])
   })
 
   it('leaves the rules about code off the strings generated for classes', () => {
@@ -351,5 +351,29 @@ div.flex.flex-col.nope-x(class="p-4 m-2 w-4 h-4" id="a")
     const literal = tsx.indexOf('"flex mt-2"')
 
     expect(processor.postprocess([[at(tsx, literal, { ruleId: 'style/quotes' }), at(tsx, literal + 1, { ruleId: 'better-tailwindcss/no-unknown-classes' })]], FILE).map(message => message.ruleId)).toEqual(['better-tailwindcss/no-unknown-classes'])
+  })
+
+  it('fixes no class of an element that also writes a shorthand, whichever string the pair is split across', async () => {
+    const text = '---\n---\ndiv.w-4(class="h-4")\ndiv.h-4(class="w-4 flex")\n'
+    const { fixed } = await lint(text)
+
+    expect(fixed.output ?? text).toBe(text)
+  })
+
+  it('rewrites a static class in the order the plugin wants, quotes kept, and maps a string with irregular spaces', async () => {
+    const { fixed, messages } = await lint('---\n---\ndiv(class=\'m-2 p-4 flex w-4\')\nspan(class="flex  w-4  h-4")\n')
+
+    expect(fixed.output).toMatch(/div\(class='[^']*'\)/)
+    expect(fixed.output).not.toContain('m-2 p-4 flex w-4')
+    expect(messages.some(message => message.line === 4)).toBe(true)
+  })
+
+  it('reports a class on a component call, and two strings of one element reading the same only once told apart', async () => {
+    const text = '---\nconst { rest } = props<{ rest: Record<string, string> }>()\n---\nFoo.zz-a(class="zz-b")\ndiv.zz-c({...rest} class="zz-c")\n'
+    const { messages } = await lint(text)
+    const lines = text.split('\n')
+    const found = messages.filter(message => message.ruleId === 'better-tailwindcss/no-unknown-classes').map(message => `${message.line}:${lines[message.line - 1]!.slice(message.column - 1, message.endColumn! - 1)}`)
+
+    expect(found).toEqual(['4:zz-a', '4:zz-b'])
   })
 })

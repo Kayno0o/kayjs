@@ -54,7 +54,7 @@ export const processor = {
     return [{ text: shadow.tsx, filename: BLOCK }]
   },
 
-  // Only what is reported in the author's own JavaScript stands: the rest of the TSX is generated, and its problems are kay check's to report.
+  // Only what is reported in the author's own JavaScript, and by the rules about classes in the template's classes, stands: the rest of the TSX is generated, and its problems are kay check's to report.
   postprocess(messages: LintMessage[][], filename: string): LintMessage[] {
     const entry = compiled.get(filename)!
 

@@ -4,7 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
-- `kay/eslint` passes the classes of a template, the shorthand `.flex.flex-col` and a static `class="..."`, to the Tailwind rules of `@kaynooo/eslint`, reporting at the class in the `.kay` file and fixing inside a static `class` ([Checks](checks.md#lint-the-script-fences-and-template-expressions-with-eslint)).
+- `kay/eslint` passes the classes of a template, the shorthand `.flex.flex-col` and a static `class="..."`, to the Tailwind rules of `@kaynooo/eslint`, reporting at the class in the `.kay` file and fixing inside a static `class` of an element with no shorthand ([Checks](checks.md#lint-the-script-fences-and-template-expressions-with-eslint)).
 - `kay/eslint` lints the expressions of a template, attribute values, `{...}` in text and the heads of `if`, `match`, `for`, `await`, `const` and `slot`, reporting at their `.kay` line and column and fixing them in the file ([Checks](checks.md#lint-the-script-fences-and-template-expressions-with-eslint)).
 - A page that reads nothing from its request (no `ctx`, `query`, clock, random number, environment or package import) is prerendered by `kay build` and served from memory without `prerender`: the bench app's pages cost 650 and 80 us of CPU per request, about 50 and 38 now ([Prerendering](routing.md#prerendering)).
 - `kay dev` runs one server process for the whole session: an edit to a template, island, loader or API route imports what changed again and swaps the routes in place, spending about 40% less CPU than a new process per edit, and the spare process is gone ([Project](project.md)).

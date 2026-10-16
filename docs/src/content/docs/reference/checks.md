@@ -184,7 +184,7 @@ const label = signal('Save')
 
 ## ESLint
 
-ESLint lints the script and server fences of `.kay` files through `kay/eslint`, and the JavaScript in their templates: attribute values, `{...}` in text, and the heads of `if`, `match`, `for`, `await`, `const` and `slot`. It reports at the `.kay` line and column, and `--fix` edits the file when the code it replaces was written there as is. The classes of a template reach the Tailwind rules of `@kaynooo/eslint` when `tailwind` is on, a shorthand `.flex` and a static `class="..."` alike. A class is reported at its place in the file; its fix is made there only inside a `class="..."`, and a shorthand class is reported without one. Tags and static text are left to `kay check`. With `@kaynooo/eslint`, turn it on in `eslint.config.ts`:
+ESLint lints the script and server fences of `.kay` files through `kay/eslint`, and the JavaScript in their templates: attribute values, `{...}` in text, and the heads of `if`, `match`, `for`, `await`, `const` and `slot`. It reports at the `.kay` line and column, and `--fix` edits the file when the code it replaces was written there as is. The classes of a template reach the Tailwind rules of `@kaynooo/eslint` when `tailwind` is on, a shorthand `.flex` and a static `class="..."` alike. A class is reported at its place in the file; its fix is made there only inside a `class="..."` of an element with no shorthand, so a shorthand class is reported without one. A `class={...}` on a component call, a value with entities or quotes in it, and two strings of one element reading the same are left out. Tags and static text are left to `kay check`. With `@kaynooo/eslint`, turn it on in `eslint.config.ts`:
 
 ```ts
 export default defineConfig({ strict: true, kay: true })
