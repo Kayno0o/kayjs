@@ -31,8 +31,6 @@ export interface Swap {
   focused?: Element | null
   // A form the server refused a post of, and the control focused in it, by their index among the page's forms and the form's controls.
   refused?: { form: number, control: number }
-  // Development: `kay dev` refreshing the page for an edit, where a field the edit leaves as it was keeps what was typed into it, rather than showing what the next page renders.
-  typed?: boolean
 }
 
 // A guard `guardLeave` registers, which a leave asks once it holds unsaved changes.
@@ -74,6 +72,8 @@ export const navigation: {
   released: boolean
   // Lands the query param writes held back to be spaced out, which run before the address is read to leave or change it.
   flush?: () => void
+  // Development: set while `kay dev` refreshes the page for an edit, where a field the edit leaves as it was keeps what was typed into it.
+  typed?: boolean
 } = { shown: '', at: 0, page: 0, current: 0, released: false }
 
 // Pages fetched ahead of a click, by URL; an action may change what they show, so each post forgets them.

@@ -261,7 +261,7 @@ export async function show(page: FetchedPage, hash: string, swap: Swap, isCurren
     document.title = next.title
     root()
     head.commit()
-    typing = process.env.NODE_ENV !== 'production' && swap.typed === true
+    typing = process.env.NODE_ENV !== 'production' && navigation.typed === true
 
     try {
       swapBody(next, policy)
