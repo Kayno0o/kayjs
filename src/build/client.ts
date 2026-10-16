@@ -255,10 +255,8 @@ export async function bundleIslands(root: string, islands: Map<string, string>, 
 
   await Bun.write(bootFile, [
     ...publicEnv !== undefined ? [`import kayPublicEnv from ${JSON.stringify(publicEnv)}`] : [],
-    `import { ${[...navigation ? ['disposeIslands'] : [], ...options.hot ? ['enableHotSwap'] : [], 'hydrateIslands', ...navigation ? ['startNavigation'] : []].join(', ')} } from 'kay/client'`,
+    `import { ${[...navigation ? ['disposeIslands'] : [], ...options.hot ? ['enableHotSwap'] : [], 'hydrateIslands', ...options.hot && navigation ? ['refreshForEdit'] : [], ...navigation ? ['startNavigation'] : []].join(', ')} } from 'kay/client'`,
     ...options.i18n ? ['import \'kay/i18n\''] : [],
-    // Development: `kay dev`'s page script refreshes the page through the swap for an edit no island swap covers.
-    ...options.hot && navigation ? ['import { refresh } from \'kay\''] : [],
     '',
     ...publicEnv !== undefined ? [`;(globalThis as Record<symbol, unknown>)[Symbol.for('kay.publicEnv')] = kayPublicEnv`, ''] : [],
     `const islands = {\n${registry}\n}`,
@@ -267,7 +265,8 @@ export async function bundleIslands(root: string, islands: Map<string, string>, 
     // A lazy module of the runtime the page also loads up front, as `navigate`, imports the module importing this one, a cycle in which this one may run before a module it calls: what it starts waits until all of them have run.
     'const ready = Promise.resolve().then(async () => {',
     ...options.hot ? ['  enableHotSwap(islands)'] : [],
-    ...options.hot && navigation ? ['  ;(globalThis as { $kayRefresh?: () => Promise<void> }).$kayRefresh = refresh'] : [],
+    // Development: `kay dev`'s page script refreshes the page through the swap for an edit no island swap covers.
+    ...options.hot && navigation ? ['  ;(globalThis as { $kayRefresh?: () => Promise<void> }).$kayRefresh = refreshForEdit'] : [],
     '  const hydrated = hydrate()',
     '',
     ...navigation ? ['  startNavigation({ hydrate, dispose: disposeIslands })', ''] : [],

@@ -120,6 +120,15 @@ export async function navigate(to: string | { query: QueryChanges }, options: Na
 
 // Runs the page's loads again and shows what they return, keeping scroll, focus and every island whose props did not change.
 export async function refresh(): Promise<void> {
+  await reload()
+}
+
+// Development: the refresh `kay dev` makes of the page for an edit, keeping what was typed into the fields the edit leaves as they were.
+export async function refreshForEdit(): Promise<void> {
+  await reload(true)
+}
+
+async function reload(typed?: true): Promise<void> {
   if (typeof document === 'undefined')
     return
 
@@ -131,7 +140,7 @@ export async function refresh(): Promise<void> {
   }
 
   prefetched.clear()
-  await follow(new URL(location.href), { intent: 'refresh', focused: document.activeElement })
+  await follow(new URL(location.href), { intent: 'refresh', focused: document.activeElement, ...typed && { typed } })
 }
 
 async function loadSwap(): Promise<typeof import('./page-swap')> {

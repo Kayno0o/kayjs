@@ -15,6 +15,11 @@ const scratch = join(import.meta.dir, '../node_modules/.cache')
 const todos = (label: string) => `---\nimport { signal } from 'kay'\n\nconst items = signal(['a', 'b', 'c'])\n---\nbutton.drop(onClick={() => items.set(list => list.slice(1))}) ${label}\nul.todos\n  for item of items() key={item}\n    li {item}\n`
 const counter = (label: string) => `---\nimport { signal } from 'kay'\n\nconst count = signal(0)\nconst note = signal('')\n---\nbutton.count(onClick={() => count.set(n => n + 1)}) ${label} {count()}\ninput.note(bind:value={note})\n`
 
+const field = '---\nimport { signal } from \'kay\'\n\nconst taps = signal(0)\n---\nbutton.tap(type="button" onClick={() => taps.set(n => n + 1)}) Taps {taps()}\ninput.inner(name="inner")\n'
+const FORM_FIELDS = ['input.who(name="who")', 'input.old(name="old")', 'input.gone(name="gone")', 'textarea.bio(name="bio")', 'input.agree(type="checkbox" name="agree")', 'select.pick(name="pick")\n    option(value="a") A\n    option(value="b") B']
+// The form page: the server renders its fields, and one more sits inside an island.
+const form = (label: string, fields = FORM_FIELDS) => `--- server\nimport Field from '../components/field.kay'\nimport { formTitle } from '../form-title'\n---\nh1.title {formTitle} ${label}\nform\n${fields.map(line => `  ${line}\n`).join('')}  Field\n`
+
 const extra = '---\nimport { signal } from \'kay\'\n\nconst on = signal(false)\n---\nbutton.extra(onClick={() => on.set(!on())}) Extra {on() ? \'on\' : \'off\'}\n'
 const home = (text: string, withExtra = false) => `---\nimport '../app.css'\nimport Counter from '../components/counter.kay'\n${withExtra ? 'import Extra from \'../components/extra.kay\'\n' : ''}import Panel from '../components/panel.kay'\nimport Todos from '../components/todos.kay'\n---\nh1 Home\ndiv.solo\n  Counter\nPanel\nTodos\np.static ${text}\n${withExtra ? 'Extra\n' : ''}div(style="height: 3000px")\n`
 
@@ -50,6 +55,9 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('kay dev in 
       'src/components/todos.kay': todos('Drop'),
       'src/app.css': 'p.static { color: rgb(255, 0, 0) }\n',
       'src/routes/index.kay': home('Static'),
+      'src/components/field.kay': field,
+      'src/form-title.ts': 'export const formTitle = \'Form\'\n',
+      'src/routes/form.kay': form('one'),
       'src/routes/other.kay': '---\nimport Counter from \'../components/counter.kay\'\n---\nh1 Other\np.static Other\nCounter\n',
     }
 
@@ -140,6 +148,59 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('kay dev in 
     expect(await sameDocument()).toBe(true)
     expect(await page.textContent('.solo button.count')).toBe('Pressed 3')
   }, 60_000)
+
+  it('keeps what was typed into a field the edit leaves in the page, for a template and for a server code edit, and drops it from one the edit removed or renamed', async () => {
+    const typed = await browser.newPage()
+
+    try {
+      await typed.goto(`${await origin()}/form`)
+      await typed.locator('button.tap').click()
+      await typed.locator('button.tap', { hasText: 'Taps 1' }).waitFor()
+      await typed.fill('input.who', 'Ada')
+      await typed.fill('input.old', 'stale')
+      await typed.fill('input.gone', 'stale')
+      await typed.fill('textarea.bio', 'Hello')
+      await typed.check('input.agree')
+      await typed.selectOption('select.pick', 'b')
+      await typed.fill('input.inner', 'in an island')
+      await typed.evaluate(() => {
+        (window as { kayAlive?: boolean }).kayAlive = true
+      })
+
+      const values = async () => typed.evaluate(() => ({
+        alive: (window as { kayAlive?: boolean }).kayAlive === true,
+        who: document.querySelector<HTMLInputElement>('input.who')?.value,
+        old: document.querySelector<HTMLInputElement>('input.old')?.value,
+        gone: document.querySelector<HTMLInputElement>('input.gone')?.value ?? null,
+        bio: document.querySelector<HTMLTextAreaElement>('textarea.bio')?.value,
+        agree: document.querySelector<HTMLInputElement>('input.agree')?.checked,
+        pick: document.querySelector<HTMLSelectElement>('select.pick')?.value,
+        inner: document.querySelector<HTMLInputElement>('input.inner')?.value,
+      }))
+
+      // A template edit: `gone` leaves the page and `old` is renamed in place.
+      await Bun.write(join(root, 'src/routes/form.kay'), form('two', FORM_FIELDS.filter(line => !line.includes('.gone')).map(line => line.replace('name="old"', 'name="renamed"'))))
+      await typed.locator('h1.title', { hasText: 'two' }).waitFor({ timeout: 30_000 })
+
+      expect(await values()).toEqual({ alive: true, who: 'Ada', old: '', gone: null, bio: 'Hello', agree: true, pick: 'b', inner: 'in an island' })
+      expect(await typed.textContent('button.tap')).toBe('Taps 1')
+
+      // A server code edit, which restarts the server.
+      await Bun.write(join(root, 'src/form-title.ts'), 'export const formTitle = \'Changed\'\n')
+      await typed.locator('h1.title', { hasText: 'Changed' }).waitFor({ timeout: 30_000 })
+
+      expect(await values()).toEqual({ alive: true, who: 'Ada', old: '', gone: null, bio: 'Hello', agree: true, pick: 'b', inner: 'in an island' })
+
+      // A field whose rendered value the edit changes shows the new one, as a page loaded afresh does.
+      await Bun.write(join(root, 'src/routes/form.kay'), form('three', FORM_FIELDS.filter(line => !line.includes('.gone')).map(line => line.replace('name="old"', 'name="renamed"').replace('input.who(name="who")', 'input.who(name="who" value="Grace")'))))
+      await typed.locator('h1.title', { hasText: 'three' }).waitFor({ timeout: 30_000 })
+
+      expect((await values()).who).toBe('Grace')
+    }
+    finally {
+      await typed.close()
+    }
+  }, 90_000)
 
   it('swaps an edited stylesheet into the open page, the server kept running and the page not reloaded', async () => {
     const color = async () => page.evaluate(() => getComputedStyle(document.querySelector('p.static')!).color)

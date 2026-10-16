@@ -25,6 +25,11 @@ interface Policy {
   transition: boolean
 }
 
+// Whether the swap in progress keeps what was typed into the fields the next page renders as they were, which `kay dev` asks of a refresh for an edit.
+let typing = false
+// The selects the swap in progress found renamed, whose options show what the next page renders.
+const renamed = new WeakSet<Element>()
+
 const POLICIES: Record<Intent, Policy> = {
   visit: { history: 'push', scroll: 'top', focus: 'page', islands: 'persist', transition: true },
   query: { history: 'push', scroll: 'keep', focus: 'kept', islands: 'persist', transition: true },
@@ -256,7 +261,15 @@ export async function show(page: FetchedPage, hash: string, swap: Swap, isCurren
     document.title = next.title
     root()
     head.commit()
-    swapBody(next, policy)
+    typing = swap.typed === true
+
+    try {
+      swapBody(next, policy)
+    }
+    finally {
+      typing = false
+    }
+
     forgetPageData()
     writeHistory(policy, target)
 
@@ -636,6 +649,23 @@ function alike(live: Node, next: Node): boolean {
   return !live.matches(OPAQUE) && !other.matches(OPAQUE) && live.id === other.id && live.getAttribute('class') === other.getAttribute('class')
 }
 
+// Whether a field keeps what was typed into it: it is the same field and the edit left what the server renders in it as it was, so only a visitor changed it.
+function typedKept(live: Element, other: Element): boolean {
+  if (!typing)
+    return false
+
+  if (live instanceof HTMLInputElement && other instanceof HTMLInputElement)
+    return live.name === other.name && live.type === other.type && live.defaultValue === other.defaultValue && live.defaultChecked === other.defaultChecked
+
+  if (live instanceof HTMLTextAreaElement && other instanceof HTMLTextAreaElement)
+    return live.name === other.name && live.defaultValue === other.defaultValue
+
+  if (live instanceof HTMLOptionElement && other instanceof HTMLOptionElement)
+    return live.defaultSelected === other.defaultSelected && !renamed.has(live.closest('select') ?? live)
+
+  return false
+}
+
 // Makes the live node read as the next one, keeping it and each child of it the next page renders again.
 function morph(live: Node, next: Node): void {
   if (!(live instanceof Element)) {
@@ -646,6 +676,11 @@ function morph(live: Node, next: Node): void {
   }
 
   const other = next as Element
+  // Read before the attributes and the children become the next page's, which the defaults come from.
+  const typed = typedKept(live, other)
+
+  if (typing && live instanceof HTMLSelectElement && live.name !== (other as HTMLSelectElement).name)
+    renamed.add(live)
 
   // An element's open state is closed through it, as the attribute alone would leave a modal dialog blocking the page.
   if (live instanceof HTMLDialogElement && live.open && !other.hasAttribute('open'))
@@ -664,6 +699,9 @@ function morph(live: Node, next: Node): void {
   morphChildren(live, other)
 
   // A field shows what the next page renders, as a page loaded afresh does, rather than what was typed into it.
+  if (typed)
+    return
+
   if (live instanceof HTMLInputElement) {
     live.value = (other as HTMLInputElement).value
     live.checked = (other as HTMLInputElement).checked

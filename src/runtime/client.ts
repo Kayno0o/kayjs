@@ -6,7 +6,7 @@ import { batch, flush, ownSignal, recordSignals, reportError, root, setErrorRepo
 import { freshPrefix, withIds } from './uid'
 import { decodeServerValue } from './wire'
 
-export { startNavigation } from './navigate'
+export { refreshForEdit, startNavigation } from './navigate'
 
 export type IslandRegistry = Record<string, () => Promise<{ default: (props: object) => unknown }>>
 
