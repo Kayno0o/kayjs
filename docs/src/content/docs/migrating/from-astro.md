@@ -6,14 +6,16 @@ description: Translate an Astro site into a kay project with kay migrate astro, 
 
 ## Run the migration
 
-`kay migrate astro` reads an Astro project and writes its `.astro` files as `.kay` ones. Point `--out` at a directory that does not exist yet, and it writes a whole kay project there. With Bun pointed at kay's registry, as in [Installation](/getting-started/installation), run it from the Astro project:
+`kay migrate astro` reads an Astro project and writes its `.astro` files as `.kay` ones.
+
+Point `--out` at a new or empty directory, one with no `package.json`, and it writes a whole kay project there. With Bun pointed at kay's registry, as in [Installation](/getting-started/installation), run it from the Astro project.
 
 ```sh
 bunx -p @kaynooo/kayjs kay migrate astro . --out ../my-site-kay
 cd ../my-site-kay && bun install && bun run dev
 ```
 
-The new project has:
+The new project has these.
 
 - `src/routes` with each page of `src/pages`, `404.astro` becoming `_404.kay` and `500.astro` `_error.kay`.
 - Components and layouts in their own folders, named in kebab-case (`BaseLayout.astro` becomes `base-layout.kay`), with every import of them rewritten, through `tsconfig.json` aliases such as `~/*` too.
@@ -25,7 +27,9 @@ The new project has:
 - `src/server.ts` when the Astro site renders on demand (`output: 'server'` or an adapter); otherwise it is a static site built with `kay build --static`.
 - Tailwind, ESLint, the Forgejo workflow and the Dockerfile when the Astro project had them.
 
-It never writes over a file that exists. Run without `--out`, it writes the `.kay` files next to the `.astro` ones and leaves the Astro project's `package.json` alone.
+It never writes over a file that exists.
+
+Run without `--out`, it writes the `.kay` files next to the `.astro` ones and leaves the Astro project's `package.json` alone. The project's files are then yours to add by hand.
 
 ## What it translates
 
@@ -43,7 +47,7 @@ It never writes over a file that exists. Run without `--out`, it writes the `.ka
 | `set:html` | `innerHTML` through `trustHtml` |
 | A layout's `<head>` | A `head` block |
 
-A page reads like this before:
+A page reads like this before.
 
 ```astro
 ---
@@ -62,7 +66,7 @@ const featured = Astro.url.searchParams.has('featured')
 </Layout>
 ```
 
-And after:
+And after.
 
 ```kay
 --- server
@@ -84,7 +88,9 @@ Layout(title="Blog")
 
 ## Finish by hand
 
-The command ends with a list of what it could not translate, each item at its line in the Astro file. In the `.kay` file, the code an item concerns is commented out under a `// kay migrate:` line, so a search for `kay migrate:` finds every place left. Each kind has its kay counterpart:
+The command ends with a list of what it could not translate, each item at its line in the Astro file.
+
+In the `.kay` file, the code an item concerns is commented out under a `// kay migrate:` line. A search for `kay migrate:` finds every place left. Each kind has its kay counterpart.
 
 - **A script Astro bundles** (`<script>` with no `is:inline`): write what it does as an [island](/essentials/islands), or import it in an inline script.
 - **An endpoint** (`src/pages/*.ts`): an [API route](/guides/api-routes) in `src/api/`, or an [endpoint file](/essentials/routing#endpoint-files) for a feed or a `robots.txt`.
@@ -97,6 +103,8 @@ The command ends with a list of what it could not translate, each item at its li
 - **A Markdown page** (`src/pages/*.md`): make it an entry of a [content collection](/guides/content) and render it from a page.
 - **A `site` or `base` that is not a plain string**, such as one read from the environment: set it in `kay.config.ts`.
 
-Then run `bun run check`: it type-checks every `.kay` file and reports what is still wrong at its line. The migrated `kay.config.ts` leaves out kay's `seo` defaults, since the pages write their own head, so a page with no description is reported too: give it a `meta(name="description")` in its `head` block, or set `seo.description` for every page.
+Then run `bun run check`. It type-checks every `.kay` file and reports what is still wrong at its line.
+
+The migrated `kay.config.ts` leaves out kay's `seo` defaults, since the pages write their own head. So a page with no description is reported too. Give it a `meta(name="description")` in its `head` block, or set `seo.description` for every page.
 
 <ReadMore href="/llms/project">The command's full behaviour, with every option of the other `kay` commands, is in the project reference.</ReadMore>

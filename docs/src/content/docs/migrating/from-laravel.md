@@ -4,7 +4,7 @@ order: 4
 description: Find where the parts of a Laravel app live in kay, and see what kay leaves to you.
 ---
 
-Moving from Laravel to kay changes the language and the framework at once, so this page stays short. It maps the parts of a Laravel app you will look for first. There is no `kay migrate` command for it, and the code does not translate: you rewrite each route in TypeScript.
+Moving from Laravel to kay changes the language and the framework at once, so this page stays short. It maps the parts of a Laravel app you will look for first. There is no `kay migrate` command for it, and the code does not translate. You rewrite each route in TypeScript.
 
 kay renders on the server like Laravel does. Where Laravel sends a Blade view and leaves the JavaScript to you, kay sends HTML and hydrates only the components that react to the user. Start with `kay new` (see [Installation](/getting-started/installation)).
 
@@ -29,7 +29,7 @@ public function show(string $slug)
 <h1>{{ $post->title }}</h1>
 ```
 
-In kay, `src/routes/posts/[slug].kay`:
+In kay, that is `src/routes/posts/[slug].kay`.
 
 ```kay
 --- server

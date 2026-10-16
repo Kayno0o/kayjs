@@ -4,9 +4,11 @@ order: 3
 description: Map what you know from the Next.js app router to kay, concept by concept, and see what has no counterpart.
 ---
 
-There is no `kay migrate` command for Next.js: JSX and hooks do not become `.kay` templates by a mechanical rewrite. You move a project by hand, one route at a time. This page maps each part of the app router to its kay counterpart, and lists what kay does not have.
+There is no `kay migrate` command for Next.js, as JSX and hooks do not become `.kay` templates by a mechanical rewrite. You move a project by hand, one route at a time. This page maps each part of the app router to its kay counterpart, and lists what kay does not have.
 
-Start with `kay new` (see [Installation](/getting-started/installation)). The biggest change is the way components work. In Next.js a component is a server component until it says `'use client'`. In kay a component is HTML until it reacts to the user, and nothing marks the line.
+Start with `kay new` (see [Installation](/getting-started/installation)).
+
+The biggest change is the way components work. In Next.js a component is a server component until it says `'use client'`. In kay a component is HTML until it reacts to the user, and nothing marks the line.
 
 ## Files and routes
 
@@ -19,7 +21,7 @@ Start with `kay new` (see [Installation](/getting-started/installation)). The bi
 | `loading.tsx` and `Suspense` | An `await` block around a promise left unawaited |
 | `route.ts` | An [API route](/guides/api-routes) in `src/api/`, or an [endpoint file](/essentials/routing#endpoint-files) |
 | `[slug]` and `[...slug]` | `[slug]` and `[...slug]` |
-| `[[...slug]]` | No single file: `[[page]]` is one optional segment, and `[...path]` is a catch-all, see [Routing](/essentials/routing#dynamic-routes) |
+| `[[...slug]]` | No single file. `[[page]]` is one optional segment and `[...path]` a catch-all, see [Routing](/essentials/routing#dynamic-routes) |
 | `(group)` | `(group)`, a folder that adds nothing to the URL |
 | `public/` | `public/` |
 | `next.config.js` | `kay.config.ts` |
@@ -57,7 +59,7 @@ export default async function Page() {
 }
 ```
 
-And in kay:
+In kay it is one file.
 
 ```kay
 --- server
@@ -85,7 +87,9 @@ form(action={add})
 
 The fence never reaches the browser, and the page renders again after the action, so there is no `revalidatePath` to call for it.
 
-A client component becomes an island, with no marker. A component is an island when it has an `on*` handler, a `bind:`, a `ref` or a script using `signal` or another value from `kay`. Everything else ships no JavaScript.
+A client component becomes an island, with no marker. A component is an island when it has an `on*` handler, a `bind:`, a `ref` or a script using `signal` or another value from `kay`.
+
+Everything else ships no JavaScript.
 
 ```tsx
 'use client'
@@ -105,7 +109,9 @@ const count = signal(0)
 button(onClick={() => count++}) Clicked {count()} times
 ```
 
-`kay build` lists every island and the first thing that made it one. As in Next.js, props to an island are serialized, so a page cannot pass one a function. Props can be objects, arrays, strings, numbers, booleans, dates, maps and sets. See [Islands](/essentials/islands).
+`kay build` lists every island and the first thing that made it one.
+
+As in Next.js, props to an island are serialized, so a page cannot pass one a function. Props can be objects, arrays, strings, numbers, booleans, dates, maps and sets. See [Islands](/essentials/islands).
 
 ## Hooks and state
 
@@ -127,7 +133,7 @@ button(onClick={() => count++}) Clicked {count()} times
 | Zustand, Jotai, Redux | A module exporting a signal, shared by every island that imports it |
 | A preference kept in a cookie or `localStorage` | `persisted('theme', 'light')`, kept in a cookie the server reads too |
 
-State shared across islands lives in a `.ts` module:
+State shared across islands lives in a `.ts` module.
 
 ```ts
 import { persisted, signal } from 'kay'
@@ -157,7 +163,7 @@ export const theme = persisted('theme', 'light')
 | `.env` and `NEXT_PUBLIC_` | `defineEnv` for the server, `publicEnv` in `kay.config.ts` for the browser |
 | Streaming with `Suspense` | An `await` block, see [Data loading](/essentials/data-loading) |
 
-`kay build` prerenders a page by itself when it can show that the page reads nothing from its request or the clock, and reports what it decided for each route. See [Routing](/essentials/routing#prerendering).
+`kay build` prerenders a page by itself when it can show that the page reads nothing from its request or the clock. It reports what it decided for each route. See [Routing](/essentials/routing#prerendering).
 
 ## Server actions
 
@@ -176,7 +182,7 @@ A form posts without JavaScript, and an action refuses a post from another site.
 
 ## Middleware
 
-`middleware.ts` runs in front of every request, and a matcher picks the paths. In kay the work splits by what it does.
+`middleware.ts` runs in front of every request, and a matcher picks the paths. In kay the work splits by what it does. A redirect for signed-out visitors is a guard.
 
 ```ts
 // middleware.ts
@@ -200,7 +206,7 @@ export default guard(({ locals, redirect }) => {
 
 | Next.js | kay |
 | --- | --- |
-| A matcher on a path | The folder a `_guard.ts` sits in: it runs before every page, action and endpoint in it and below |
+| A matcher on a path | The folder a `_guard.ts` sits in. It runs before every page, action and endpoint in it and below |
 | Redirecting or rejecting | `return redirect(...)` or `return deny(403, ...)` in a guard |
 | Adding a user or a header for the request | An Elysia plugin using `derive`, which puts it on `ctx.locals` |
 | A sign-in library such as Auth.js | `session()` and [kayjs-auth](/libraries/kayjs-auth) |
@@ -215,4 +221,4 @@ See [Sessions and guards](/guides/sessions-and-guards).
 - **Edge and Node runtimes.** kay runs on Bun alone. `kay build --compile` makes one executable and `kay build --static` makes plain files, see [Deployment](/guides/deployment).
 - **A server payload beside the HTML.** kay sends none, so a page costs its HTML plus its islands.
 
-Run `bun run check` as you go: it type-checks every `.kay` file and reports each link to a page that does not exist.
+Run `bun run check` as you go. It type-checks every `.kay` file and reports each link to a page that does not exist.

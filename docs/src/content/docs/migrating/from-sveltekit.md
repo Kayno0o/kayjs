@@ -4,7 +4,7 @@ order: 2
 description: Map what you know from SvelteKit to kay, concept by concept, and see what has no counterpart.
 ---
 
-SvelteKit is the closest model to kay's. A page loads its data on the server, a form works without JavaScript, and layouts wrap pages. There is no `kay migrate` command for it: `.svelte` and `.kay` differ too much for a tool to translate, so you move a project by hand, one route at a time.
+SvelteKit is the closest model to kay's. A page loads its data on the server, a form works without JavaScript, and layouts wrap pages. There is no `kay migrate` command for it, as `.svelte` and `.kay` differ too much for a tool to translate. You move a project by hand, one route at a time.
 
 Start with `kay new` (see [Installation](/getting-started/installation)), then move the routes. Each section below maps one part of SvelteKit.
 
@@ -25,11 +25,13 @@ Start with `kay new` (see [Installation](/getting-started/installation)), then m
 | `static/` | `public/` |
 | `svelte.config.js` | `kay.config.ts` |
 
-A fixed name wins over a param, and a param over a catch-all, as in SvelteKit. A `_404.kay` renders for `ctx.notFound()` and for every URL no page serves.
+A fixed name wins over a param, and a param over a catch-all, as in SvelteKit.
+
+A `_404.kay` renders for `ctx.notFound()` and for every URL no page serves.
 
 ## Loading data
 
-A `load` function returns an object, and the page reads it as `data`. In kay the fence is the load: every top-level name it declares reaches the template, typed, and none of the fence ships to the browser.
+A `load` function returns an object, and the page reads it as `data`. In kay the fence is the load. Every top-level name it declares reaches the template, typed, and none of the fence ships to the browser.
 
 ```ts
 // +page.server.ts
@@ -43,7 +45,7 @@ export async function load({ params }) {
 }
 ```
 
-And in kay:
+In kay it is one file.
 
 ```kay
 --- server
@@ -68,7 +70,9 @@ h1 {post.title}
 | `entries()` for prerendering | `prerender: [{ slug: 'a' }]` in `page`, or a content collection |
 | `export const trailingSlash` | `trailingSlash` in `kay.config.ts` |
 
-A layout's fence runs in parallel with the page's. What it declares reaches the layout's own template and no further, so a page does not get a layout's data as `data`. A page reads what it needs in its own fence. A value several loads share goes through `cached()` from `kay/cache`, and a value of the request, such as the signed-in user, through `ctx.locals`.
+A layout's fence runs in parallel with the page's. What it declares reaches the layout's own template and no further, so a page does not get a layout's data as `data`.
+
+A page reads what it needs in its own fence. A value several loads share goes through `cached()` from `kay/cache`. A value of the request, such as the signed-in user, goes through `ctx.locals`.
 
 ## Form actions
 
@@ -102,19 +106,19 @@ form(action={add})
 | --- | --- |
 | `export const actions = { add }` | `export const add = action(schema, handler)`, one export per action |
 | `<form method="POST" action="?/add">` | `form(action={add})` |
-| `use:enhance` | Nothing to add: with kay's script a form posts without a reload, and without it the form still posts |
+| `use:enhance` | Nothing to add. With kay's script a form posts without a reload, and without it the form still posts |
 | `fail(400, { missing: true })` | The schema refuses the input, or the handler returns `ctx.fail(409, data)` |
 | `form?.missing` | `add.error('title')`, `error title` in the template, or `add.failed()?.data` |
 | `form` after a success | `add.succeeded()` |
 | `redirect(303, '/')` in an action | `return ctx.redirect('/')` |
-| `invalidateAll()` after a post | Automatic: the page's loads run again after an action |
+| `invalidateAll()` after a post | Automatic. The page's loads run again after an action |
 | `enhance` with a callback | An island calls `add({ title })` from a submit handler, see [Forms and actions](/essentials/forms-and-actions) |
 
 A refused post renders the page again and the fields keep what was sent, so there is no `value={form?.title}` to write.
 
 ## Layouts
 
-A `+layout.svelte` renders `{@render children()}`. A `_layout.kay` renders `slot`:
+A `+layout.svelte` renders `{@render children()}`. A `_layout.kay` renders `slot`.
 
 ```kay
 header
@@ -153,7 +157,7 @@ Runes become the signals of kay. A signal is read by calling it and written by a
 | `goto('/todos')` | `navigate('/todos')` from `kay` |
 | `page.url.searchParams` in a component | `queryParam('page')` from `kay`, or `ctx.query` on the server |
 
-A store is a module that exports a signal. Every island that imports it shares one state:
+A store is a module that exports a signal. Every island that imports it shares one state.
 
 ```ts
 // src/cart.ts
@@ -167,7 +171,9 @@ export const theme = persisted('theme', 'light')
 
 ## What hydrates
 
-SvelteKit hydrates the whole page. kay hydrates islands only: a component with an `on*` handler, a `bind:`, a `ref` or a signal. Every other component renders to HTML and ships no JavaScript. So a component that was only markup in Svelte needs nothing, and one with state becomes an island by having it. `kay build` lists the islands and what made each one. See [Islands](/essentials/islands).
+SvelteKit hydrates the whole page. kay hydrates islands only. An island is a component with an `on*` handler, a `bind:`, a `ref` or a signal. Every other component renders to HTML and ships no JavaScript.
+
+So a component that was only markup in Svelte needs nothing, and one with state becomes an island by having it. `kay build` lists the islands and what made each one. See [Islands](/essentials/islands).
 
 ## Hooks
 
@@ -216,7 +222,9 @@ See [Sessions and guards](/guides/sessions-and-guards), which also covers `sessi
 
 ## Styles
 
-A component imports its stylesheet in its script, `import './card.css'`. Svelte's `<style>` block, scoped to its component, has no counterpart. Tailwind works as in SvelteKit. See [Styling and assets](/essentials/styling-and-assets).
+A component imports its stylesheet in its script, `import './card.css'`. Svelte's `<style>` block, scoped to its component, has no counterpart.
+
+Tailwind works as in SvelteKit. See [Styling and assets](/essentials/styling-and-assets).
 
 ## What has no equivalent
 
@@ -228,4 +236,4 @@ A component imports its stylesheet in its script, `import './card.css'`. Svelte'
 - **`use:` actions.** Use a `ref` or an `onMount` instead. Transitions are the `transition="fade"` attribute, played by CSS classes, see the [islands reference](/llms/islands).
 - **`data-sveltekit-preload-data`.** Links are prefetched by kay's `prefetch` setting, and `data-no-prefetch` opts one out.
 
-Run `bun run check` as you go: it type-checks every `.kay` file and reports each link to a page that does not exist.
+Run `bun run check` as you go. It type-checks every `.kay` file and reports each link to a page that does not exist.
