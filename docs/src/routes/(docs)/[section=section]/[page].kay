@@ -1,13 +1,14 @@
 --- server
 import { shareCard } from 'kay/image'
-import { docs } from '../../../content.config'
+import { docs, reference } from '../../../content.config'
 import { FORGE } from '../../../forge'
-import { neighbours } from '../../../pages'
+import { docPages, neighbours } from '../../../pages'
+import { LLMS_GUIDES } from '../../../reference'
 import { sectionOf } from '../../../sections'
 
 export const page = {
   prerender: async () => {
-    return (await docs.all()).map((entry) => {
+    return (await docPages()).map((entry) => {
       const [section, page] = entry.slug.split('/')
 
       return { section: section!, page: page! }
@@ -15,13 +16,19 @@ export const page = {
   },
 }
 
-const entry = await docs.get(`${ctx.params.section}/${ctx.params.page}`) ?? ctx.notFound()
+const slug = `${ctx.params.section}/${ctx.params.page}`
+// A page served from llms/ has no frontmatter of its own: its title is the doc's, its description is kept in reference.ts.
+const guide = LLMS_GUIDES.find(one => one.slug === slug)
+const entry = guide ? await reference.get(guide.topic) ?? ctx.notFound() : await docs.get(slug) ?? ctx.notFound()
 const { Content } = entry
-const { title, description, path } = entry.data
+const { title } = entry.data
+const description = guide?.description ?? ('description' in entry.data ? entry.data.description : '')
+const path = 'path' in entry.data ? entry.data.path : undefined
+const source = guide ? `${FORGE}/llms/${guide.topic}.md` : `${FORGE}/docs/src/content/docs/${slug}.md`
 const sections = entry.headings.filter(heading => heading.depth === 2 || heading.depth === 3)
 // The pager stays in the page's part: the Structure pages lead to each other, the other sections to theirs.
 const structure = (slug: string) => sectionOf(slug)?.slug === 'structure'
-const { previous, next } = neighbours((await docs.all()).filter(one => structure(one.slug) === structure(entry.slug)), entry.slug, slug => `/${slug}`)
+const { previous, next } = neighbours((await docPages()).filter(one => structure(one.slug) === structure(slug)), slug, href => `/${href}`)
 --- script
 import Pager from '../../../components/pager.kay'
 import Toc from '../../../components/toc.kay'
@@ -36,11 +43,11 @@ head
     if path as file
       p.eyebrow: code {file}
     else
-      p.eyebrow {sectionOf(entry.slug)?.title}
+      p.eyebrow {sectionOf(slug)?.title}
     h1 {title}
     p.lede {description}
   if sections.length > 0
     Toc(sections={sections})
   article.prose
     Content
-  Pager(previous={previous} next={next} source={`${FORGE}/docs/src/content/docs/${entry.slug}.md`})
+  Pager(previous={previous} next={next} source={source})

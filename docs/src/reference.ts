@@ -14,9 +14,17 @@ const DOC_LINK = /\]\((?:llms\/)?([\w-]+)\.md(#[\w-]+)?\)/g
 const TITLE = /^# (.+)\n+/
 const QUOTED = /^> /gm
 
+// The two reference docs the guides serve as pages of their own, so a release edits one file: `/guides/whats-new` and `/guides/upgrading`.
+export const LLMS_GUIDES = [
+  { slug: 'guides/whats-new', topic: 'whats-new', order: 10.5, description: 'What each release of kay and its libraries adds, with a link to where each feature is documented.' },
+  { slug: 'guides/upgrading', topic: 'upgrading', order: 11, description: 'What each minor release breaks, and what to change in your app.' },
+] as const
+
+const GUIDE_OF = new Map<string, string>(LLMS_GUIDES.map(guide => [guide.topic, `/${guide.slug}`]))
+
 export const llmsHref = (slug: string) => slug === 'overview' ? '/llms' : `/llms/${slug}`
 
-const linked = (markdown: string) => markdown.replace(DOC_LINK, (_link, slug: string, anchor = '') => `](/llms/${slug}${anchor})`)
+const linked = (markdown: string) => markdown.replace(DOC_LINK, (_link, slug: string, anchor = '') => `](${GUIDE_OF.get(slug) ?? `/llms/${slug}`}${anchor})`)
 
 // llms.txt as the overview, then one page per doc it lists, in its order, links between them made links between pages.
 export async function loadReference(): Promise<ReferencePage[]> {

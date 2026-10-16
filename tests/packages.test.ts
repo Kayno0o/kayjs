@@ -1,6 +1,6 @@
 import { Glob } from 'bun'
 import { describe, expect, it } from 'bun:test'
-import { stampUnreleased, WHATS_NEW } from '../scripts/whats-new'
+import { stampUnreleased } from '../scripts/whats-new'
 
 interface Manifest {
   name: string
@@ -52,12 +52,5 @@ describe('what\'s new', () => {
   it('names the Unreleased section after the version, and leaves a page without one as it is', () => {
     expect(stampUnreleased('# What\'s new\n\n## Unreleased\n\n- a\n\n## 1.43.0\n\n- b\n', '1.44.0')).toBe('# What\'s new\n\n## 1.44.0\n\n- a\n\n## 1.43.0\n\n- b\n')
     expect(stampUnreleased('# What\'s new\n\nNothing is ## Unreleased here.\n\n### Unreleased\n\n## 1.43.0\n', '1.44.0')).toBe('# What\'s new\n\nNothing is ## Unreleased here.\n\n### Unreleased\n\n## 1.43.0\n')
-  })
-
-  it('gives the docs page and the llms page the same releases in the same order', async () => {
-    const sections = await Promise.all(WHATS_NEW.map(async path => [...(await Bun.file(path).text()).matchAll(/^## (.+)$/gm)].map(match => match[1])))
-
-    expect(sections[0]!.length).toBeGreaterThan(0)
-    expect(sections[1]).toEqual(sections[0])
   })
 })

@@ -14,11 +14,13 @@ import { SECTIONS } from './sections'
 const byOrder = (a: { data: { order: number } }, b: { data: { order: number } }) => a.data.order - b.data.order
 const sectionIndex = (slug: string) => SECTIONS.findIndex(section => slug.startsWith(`${section.slug}/`))
 
+export const byPosition = (a: { slug: string, data: { order: number } }, b: { slug: string, data: { order: number } }) => sectionIndex(a.slug) - sectionIndex(b.slug) || byOrder(a, b)
+
 // Written for people: one folder per section, read in the sidebar's order. A Structure page's `path` is the file or folder it is about.
 export const docs = collection('content/docs', {
   schema: s.Object({ title: s.String(), order: s.Number(), description: s.String(), path: s.Optional(s.String()) }),
   components: { Callout, FileTree, ReadMore, RequestFlow, ThemeTokens },
-  sort: (a, b) => sectionIndex(a.slug) - sectionIndex(b.slug) || byOrder(a, b),
+  sort: byPosition,
   highlight,
 })
 

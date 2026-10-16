@@ -1,10 +1,10 @@
 import type { FileEntry } from './file-tree'
 import type { Part } from './sections'
 import { join } from 'node:path'
-import { components, docs, reference } from './content.config'
+import { byPosition, components, docs, reference } from './content.config'
 import { pathTree } from './file-tree'
 import { FORGE } from './forge'
-import { llmsHref } from './reference'
+import { LLMS_GUIDES, llmsHref } from './reference'
 import { sectionOf, SECTIONS } from './sections'
 
 export interface PageLink {
@@ -47,15 +47,23 @@ export interface Navigation {
   version: string
 }
 
+// The pages of the docs part in the sidebar's order: the written ones, then the two the guides serve from llms/.
+export async function docPages(): Promise<{ slug: string, data: { title: string, order: number } }[]> {
+  const served = await Promise.all(LLMS_GUIDES.map(async guide => ({ slug: guide.slug, data: { title: (await reference.get(guide.topic))!.data.title, order: guide.order } })))
+
+  return [...await docs.all(), ...served].sort(byPosition)
+}
+
 // The sidebar's links, one part at a time: the docs by section, the project's tree, the kayjs-ui components, then the full reference written for agents.
 export async function navigation(): Promise<Navigation> {
   const pages = await docs.all()
+  const all = await docPages()
   const { version } = await Bun.file(join(import.meta.dir, '../../package.json')).json() as { version: string }
   const inSection = (slug: string) => pages.filter(page => sectionOf(page.slug)?.slug === slug)
   const structure = inSection('structure')
   const groups = SECTIONS.filter(section => section.slug !== 'structure').map(section => ({
     title: section.title,
-    links: inSection(section.slug).map(page => ({ href: `/${page.slug}`, title: page.data.title })),
+    links: all.filter(page => sectionOf(page.slug)?.slug === section.slug).map(page => ({ href: `/${page.slug}`, title: page.data.title })),
   }))
   const componentLinks = (await components.all()).map(component => ({ href: `/ui/${component.slug}`, title: component.data.title }))
   const referenceLinks = (await reference.all()).map(topic => ({ href: llmsHref(topic.slug), title: topic.data.title }))

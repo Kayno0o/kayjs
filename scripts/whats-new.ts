@@ -1,5 +1,5 @@
-// The pages listing what each release adds, the docs site's and the one agents read, each keeping what is not released yet under `## Unreleased`.
-export const WHATS_NEW = ['docs/src/content/docs/guides/whats-new.md', 'llms/whats-new.md']
+// The page listing what each release adds, which the docs site renders too, keeping what is not released yet under `## Unreleased`.
+export const WHATS_NEW = ['llms/whats-new.md']
 
 const UNRELEASED = /^## Unreleased$/m
 

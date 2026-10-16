@@ -61,7 +61,7 @@ A test that writes into a fixture works on `fixtureCopy()` from `tests/scratch.t
 - **A test.** A bug fix comes with a test that fails without it.
 - **The docs.** `llms/` and `docs/src/content/docs/` say what changed, in the same commit. `llms/` stays dense; the site reads as short, plain sentences. `llms.txt` stays under 10,000 characters, which `tests/docs.test.ts` checks.
 - **A new lint** has its entry in `llms/checks.md` and `docs/src/content/docs/reference/checks.md`.
-- **A breaking change** adds what an app changes to the next minor's section of `llms/upgrading.md` and `docs/src/content/docs/guides/upgrading.md`. Breaking changes ship in minor releases; a major is kept for a rewrite.
+- **A breaking change** adds what an app changes to the next minor's section of `llms/upgrading.md`. Breaking changes ship in minor releases; a major is kept for a rewrite.
 
 Every feature should ask the least of the app using it: the fewest declarations and the simplest setup. A design that is harder to build inside kay beats one each app has to work around.
 

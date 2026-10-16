@@ -8,14 +8,14 @@ import { addedMarkers } from '../scripts/merge-markers'
 import { scratchDir } from './scratch'
 
 const ROOT = join(import.meta.dir, '..')
-const MERGED = ['llms/whats-new.md', 'llms/upgrading.md', 'docs/src/content/docs/guides/whats-new.md', 'docs/src/content/docs/guides/upgrading.md']
+const MERGED = ['llms/whats-new.md', 'llms/upgrading.md']
 const BASE = '# What\'s new\n\n## Unreleased\n\n- first\n\n| a | b |\n| - | - |\n| 1 | 2 |\n'
 
 async function git(cwd: string, ...args: string[]) {
   return $`git -c user.name=t -c user.email=t@example.com -c commit.gpgsign=false ${args}`.cwd(cwd).quiet()
 }
 
-// An origin and a clone of it holding the four merged files and the repo's own .gitattributes.
+// An origin and a clone of it holding the two merged files and the repo's own .gitattributes.
 async function scratchRepo() {
   const dir = await scratchDir('land-')
   const origin = join(dir, 'origin.git')
