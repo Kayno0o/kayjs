@@ -13,6 +13,9 @@ const view = signal('list')
     options={VIEWS}
     value={view()}
     label="View"
-    onChange={async (next) => { await wait(800); view.set(next) }}
+    onChange={async (next) => {
+      await wait(800)
+      view.set(next)
+    }}
   )
   p Saved view: {view()}.

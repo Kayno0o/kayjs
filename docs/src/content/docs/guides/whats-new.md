@@ -7,6 +7,7 @@ This page lists what each release adds, newest first, with a link to where each 
 
 ## Unreleased
 
+- **ESLint reaches template expressions**: `kay/eslint` lints attribute values, `{...}` in text and the heads of `if`, `match`, `for`, `await`, `const` and `slot`, reporting at their `.kay` line and column and fixing them in the file. [Checks reference](/reference/checks#eslint)
 - **Pages that read nothing are built once**: a page that reads nothing from its request (no `ctx`, `query`, clock, random number, environment or package import) is prerendered by `kay build` and served from memory without `prerender`, so the bench app's pages cost about 50 and 38 us of CPU per request instead of 650 and 80 (see [Prerendering](/essentials/routing#prerendering)).
 - **One server for the whole `kay dev` session**: an edit to a template, island, loader or API route imports what changed again in the running process and swaps the routes in place, spending about 40% less CPU than a new process per edit. The config, the entry and modules they import still start a new process. [CLI reference](/reference/cli)
 - **Live page titles**: an island can have a `head` block holding a `title`, which follows the signals it reads and is wrapped in `seo.titleTemplate` as on the server. [Head and SEO](/essentials/head-and-seo)

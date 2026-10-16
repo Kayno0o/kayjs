@@ -133,3 +133,80 @@ describe('kay/eslint', () => {
     expect(() => parser.parseForESLint('', { filePath: block, projectService: true })).toThrow('tests/fixtures/lint/src/components/card.kay has no type information yet: run kay check, or kay dev, before linting it')
   })
 })
+
+describe('kay/eslint over template expressions', () => {
+  const TEMPLATE = `---
+const { n, list } = props<{ n: number, list: { id: number }[] }>()
+---
+p(
+  title={n == 1 ? 'a' : 'b'}
+  onClick={() => list['length']}
+) {n == 2}
+if n == 3 as x
+  span {x}
+for a, i of list key={a.id == i ? 1 : 2}
+  span {a.id}
+match n
+  when 1, list['length']
+    span x
+const m = n == 4
+span {m}
+`
+  const tsParser = import('@typescript-eslint/parser')
+
+  // The rules of ESLint run through the processor on the file, as keslint runs them: the reports as they stand, and after `--fix`.
+  async function lint(text: string) {
+    const { default: parser } = await tsParser
+    const { ESLint } = await import('eslint')
+    const overrideConfig = [
+      { files: ['**/*.kay'], processor },
+      { files: ['**/*.kay/*.tsx'], languageOptions: { parser }, rules: { 'eqeqeq': 'error', 'dot-notation': 'error' } },
+    ] as never
+    const run = async (fix: boolean) => (await new ESLint({ cwd: join(import.meta.dir, 'fixtures', 'lint'), overrideConfigFile: true, overrideConfig, fix }).lintText(text, { filePath: FILE }))[0]!
+
+    return { messages: (await run(false)).messages, fixed: await run(true) }
+  }
+
+  it('reports the rules of ESLint in expressions at their .kay line and column, whichever construct holds them', async () => {
+    const { messages } = await lint(TEMPLATE)
+
+    expect(messages.map(message => [message.ruleId, message.line, message.column])).toEqual([
+      ['eqeqeq', 5, 12],
+      ['dot-notation', 6, 23],
+      ['eqeqeq', 7, 6],
+      ['eqeqeq', 8, 6],
+      ['eqeqeq', 10, 28],
+      ['dot-notation', 13, 16],
+      ['eqeqeq', 15, 13],
+    ])
+  })
+
+  it('reports nothing on the generated code around an expression, nor on static text', async () => {
+    const { messages } = await lint('---\nconst { n } = props<{ n: number }>()\n---\np.flex(title="a == b") a == b {n === 1}\n')
+
+    expect(messages).toEqual([])
+  })
+
+  it('drops a fix reaching past an expression', () => {
+    const [block] = processor.preprocess(TEMPLATE, FILE)
+    const tsx = block!.text
+    const start = tsx.indexOf('__props.n == 1')
+    const messages = processor.postprocess([[at(tsx, start + '__props.n '.length, { fix: { range: [start, tsx.indexOf('</p>')], text: '' } })]], FILE)
+
+    expect(messages).toEqual([expect.objectContaining({ line: 5, fix: undefined })])
+  })
+
+  it('applies the fixes inside expressions to the .kay file', async () => {
+    const { fixed } = await lint(TEMPLATE)
+
+    expect(fixed.output).toContain('onClick={() => list.length}')
+    expect(fixed.output).toContain('when 1, list.length')
+  })
+
+  it('fixes a fence and a template expression of one file together', async () => {
+    const { fixed } = await lint('---\nconst { list } = props<{ list: number[] }>()\nconst size = list["length"]\n---\np {list["length"]}\n')
+
+    expect(fixed.output).toBe('---\nconst { list } = props<{ list: number[] }>()\nconst size = list.length\n---\np {list.length}\n')
+    expect(fixed.messages).toEqual([])
+  })
+})

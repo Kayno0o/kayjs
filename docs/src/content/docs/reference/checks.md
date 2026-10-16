@@ -184,7 +184,7 @@ const label = signal('Save')
 
 ## ESLint
 
-ESLint lints the script and server fences of `.kay` files through `kay/eslint`. With `@kaynooo/eslint`, turn it on in `eslint.config.ts`:
+ESLint lints the script and server fences of `.kay` files through `kay/eslint`, and the JavaScript in their templates: attribute values, `{...}` in text, and the heads of `if`, `match`, `for`, `await`, `const` and `slot`. It reports at the `.kay` line and column, and `--fix` edits the file when the code it replaces was written there as is. Tags, classes and static text are left to `kay check`. With `@kaynooo/eslint`, turn it on in `eslint.config.ts`:
 
 ```ts
 export default defineConfig({ strict: true, kay: true })

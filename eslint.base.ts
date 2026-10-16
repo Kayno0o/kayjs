@@ -16,5 +16,12 @@ export const kayRules: TypedFlatConfigItem[] = [{
 }, {
   // A component declares its handlers and hooks in any order: a function body runs after the whole component, and TypeScript itself rejects a read of a const before its declaration.
   files: ['**/*.kay/*.tsx'],
-  rules: { 'ts/no-use-before-define': 'off' },
+  rules: {
+    // Pending @kaynooo/eslint 7.0.4, whose kay preset turns off the rules below. A handler stays on the one line of its attribute list, and with `style/indent` off the autofix of a split cannot lay it out; a slot's params and a loop's callbacks are generated in parentheses the template never wrote; a prop with a default is read as a ternary the template never wrote, which nests the ternaries around it.
+    'antfu/if-newline': 'off',
+    'kaynooo/max-statements-per-line': 'off',
+    'no-nested-ternary': 'off',
+    'style/arrow-parens': 'off',
+    'ts/no-use-before-define': 'off',
+  },
 }]

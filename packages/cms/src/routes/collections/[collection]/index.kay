@@ -30,5 +30,5 @@ PageSection(title={humanize(collection.name)} level={1})
   else
     form.kcms-search(method="get" role="search")
       input.kui-field-input(type="search" name="q" value={search} placeholder="Search" aria-label="Search entries")
-    EntryTable(prefix={prefix} collection={collection} rows={listed.rows} searched={search !== ""})
+    EntryTable(prefix={prefix} collection={collection} rows={listed.rows} searched={search !== ''})
     Pagination(page={listed.page} pages={listed.pages} url={url})

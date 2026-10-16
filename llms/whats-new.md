@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- `kay/eslint` lints the expressions of a template, attribute values, `{...}` in text and the heads of `if`, `match`, `for`, `await`, `const` and `slot`, reporting at their `.kay` line and column and fixing them in the file ([Checks](checks.md#lint-the-script-fences-and-template-expressions-with-eslint)).
 - A page that reads nothing from its request (no `ctx`, `query`, clock, random number, environment or package import) is prerendered by `kay build` and served from memory without `prerender`: the bench app's pages cost 650 and 80 us of CPU per request, about 50 and 38 now ([Prerendering](routing.md#prerendering)).
 - `kay dev` runs one server process for the whole session: an edit to a template, island, loader or API route imports what changed again and swaps the routes in place, spending about 40% less CPU than a new process per edit, and the spare process is gone ([Project](project.md)).
 - An island sets the page title with a `head` block holding a `title`, which follows the signals it reads in the browser and is wrapped in `seo.titleTemplate` as on the server, so a title from live state no longer needs `document.title` ([Head](head.md#follow-live-state-in-the-page-title)).

@@ -31,7 +31,7 @@ Table.kcms-uploads(columns={columns} rows={uploads} rowKey={upload => upload.key
     if column.key === 'key'
       a(href={row.url} target="_blank" rel="noopener") {row.key}
     else if column.key === 'variants'
-      span(data-tooltip={row.variants.join(", ")} tabindex="0") {row.variants.length === 0 ? 'None' : `${row.variants.length} variant${row.variants.length === 1 ? '' : 's'}`}
+      span(data-tooltip={row.variants.join(', ')} tabindex="0") {row.variants.length === 0 ? 'None' : `${row.variants.length} variant${row.variants.length === 1 ? '' : 's'}`}
     else
       ConfirmDelete(message={`Delete ${row.key}${row.variants.length === 0 ? '' : ` and its ${row.variants.length} variant${row.variants.length === 1 ? '' : 's'}`}? Check that no page, unsaved form or older revision uses it: this cannot be undone.`} label={`Delete ${row.key}`} failure="Could not delete" size="sm" variant="ghost" onConfirm={async () => { await remove([row.key]) }})
   @empty

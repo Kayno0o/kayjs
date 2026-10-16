@@ -9,6 +9,7 @@ import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import { KAY_FILE, TS_FILE } from '../build/files'
 import { importedSignals } from '../build/signals'
 import { compileKay } from '../compiler'
+import { expressionSpans } from '../compiler/ast'
 import { parseKay } from '../compiler/parser'
 import { projectPaths, SHADOW_SETTINGS } from '../project'
 import * as builtInMatchers from '../runtime/params'
@@ -22,11 +23,11 @@ const PARENT = '..'
 const OUTSIDE = '__'
 const WORD_CHARACTER = /[\w$]/
 
-// How a generated span maps back to the .kay source: `exact` when both its ends were copied from it, `loose` letting glue stand for the construct it was generated for, `fences` only where the script and server fences' own code was copied character for character.
-export type SpanMode = 'exact' | 'loose' | 'fences'
+// How a generated span maps back to the .kay source: `exact` when both its ends were copied from it, `loose` letting glue stand for the construct it was generated for, `code` only where the JavaScript the author wrote, in the fences and in the template's expressions, was copied character for character.
+export type SpanMode = 'exact' | 'loose' | 'code'
 
-// The fences of a shadow file's source, parsed once for the many spans ESLint maps in it.
-const fencesOf = new WeakMap<ShadowFile, Span[]>()
+// The spans of a shadow file's source holding JavaScript, parsed once for the many spans ESLint maps in it.
+const codeOf = new WeakMap<ShadowFile, Span[]>()
 
 export interface ShadowFile {
   source: string
@@ -145,7 +146,7 @@ export function sourceSpan(shadow: ShadowFile, start: number, end: number, mode:
   const from = map.toSource(start)
 
   // A copied run maps its end too, which is where generated code follows it, such as the `;` after a fence's last statement.
-  if (from === undefined || (mode === 'fences' && (shadow.tsx[start] !== shadow.source[from] || !inFences(shadow, from, from))))
+  if (from === undefined || (mode === 'code' && (shadow.tsx[start] !== shadow.source[from] || !inCode(shadow, from, from))))
     return undefined
 
   const to = map.isExact(end) ? map.toSource(end) : undefined
@@ -153,11 +154,11 @@ export function sourceSpan(shadow: ShadowFile, start: number, end: number, mode:
   return { start: from, end: to !== undefined && to >= from ? to : wordEnd(shadow.source, from) }
 }
 
-// The source a generated edit replaces, when one run copied from the fences holds all of it, so the edit can be made to the source instead.
-export function fenceEdit(shadow: ShadowFile, start: number, end: number): Span | undefined {
+// The source a generated edit replaces, when one run copied from the author's JavaScript holds all of it, so the edit can be made to the source instead.
+export function codeEdit(shadow: ShadowFile, start: number, end: number): Span | undefined {
   const span = shadow.map.toSourceSpan(start, end)
 
-  return span && inFences(shadow, span.start, span.end) ? span : undefined
+  return span && inCode(shadow, span.start, span.end) ? span : undefined
 }
 
 // A source span in the generated code, when both its ends were copied there.
@@ -168,16 +169,16 @@ export function generatedSpan(shadow: ShadowFile, start: number, end: number): S
   return from === undefined || to === undefined ? undefined : { start: from, end: to }
 }
 
-function inFences(shadow: ShadowFile, start: number, end: number): boolean {
-  let fences = fencesOf.get(shadow)
+function inCode(shadow: ShadowFile, start: number, end: number): boolean {
+  let spans = codeOf.get(shadow)
 
-  if (!fences) {
-    const { script, server } = parseKay(shadow.source)
+  if (!spans) {
+    const { script, server, template } = parseKay(shadow.source)
 
-    fencesOf.set(shadow, fences = [script, server].filter(span => span !== undefined))
+    codeOf.set(shadow, spans = [script, server, ...expressionSpans(template)].filter(span => span !== undefined))
   }
 
-  return fences.some(fence => start >= fence.start && end <= fence.end)
+  return spans.some(span => start >= span.start && end <= span.end)
 }
 
 function wordEnd(source: string, offset: number): number {

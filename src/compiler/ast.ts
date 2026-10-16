@@ -587,3 +587,63 @@ function mergesComponentClass(element: ElementNode, source: string): boolean {
 
   return element.classes.length > 0 && attribute?.kind === 'expression'
 }
+
+// The spans of a template written in JavaScript, which is all of it a linter can judge: attribute values and spreads, `{...}` in text, the heads of `if`, `match`, `for`, `await`, `const` and `slot`. Tags, classes, static values and text stay with kay.
+export function expressionSpans(nodes: readonly Node[]): Span[] {
+  const spans: Span[] = []
+
+  visitNodes(nodes, (node) => {
+    switch (node.kind) {
+      case 'element':
+        for (const attribute of node.attributes) {
+          if (attribute.kind === 'expression' || attribute.kind === 'spread')
+            spans.push(attribute.expression)
+        }
+
+        if (node.outlet?.args)
+          spans.push(node.outlet.args)
+
+        break
+      case 'text':
+        for (const part of node.parts) {
+          if (part.kind === 'expression')
+            spans.push(part.expression)
+        }
+
+        break
+      case 'if':
+        spans.push(...node.branches.map(branch => branch.test))
+
+        break
+      case 'match':
+        spans.push(node.subject, ...node.cases.flatMap(branch => branch.values))
+
+        break
+      case 'for':
+        spans.push(node.each)
+
+        if (node.key)
+          spans.push(node.key)
+
+        break
+      case 'await':
+        spans.push(node.value)
+
+        break
+      case 'slot':
+        if (node.params)
+          spans.push(node.params)
+
+        break
+      case 'const':
+        spans.push(node.pattern, node.value)
+
+        break
+      case 'try':
+      case 'error':
+        break
+    }
+  })
+
+  return spans
+}

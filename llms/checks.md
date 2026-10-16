@@ -71,9 +71,9 @@ kay explain positional-key
 kay check --only seo
 ```
 
-### Lint the script fences with ESLint
+### Lint the script fences and template expressions with ESLint
 
-`kay: true` wires `kay/eslint` in, and type-aware rules need `kay check` to have run first:
+`kay: true` wires `kay/eslint` in, which lints the JavaScript of a component, its fences and the expressions of its template (`a={...}`, `{...}` in text, the heads of `if`, `match`, `for`, `await`, `const` and `slot`), at their `.kay` line and column; a fix lands in the file when the code it replaces was written there as is. Tags, classes and static text stay with `kay check`. Type-aware rules type-aware rules need `kay check` to have run first:
 
 ```ts
 import { defineConfig } from '@kaynooo/eslint'
@@ -306,7 +306,7 @@ kay check && keslint --cache
 
 ### Linting
 
-- ESLint lints the script and server fences of `.kay` files through `kay/eslint`, which `@kaynooo/eslint` wires in with `kay: true`: an `eslint.config.ts` of `export default defineConfig({ strict: true, kay: true })`, run with `keslint --cache`, which `kay new` writes along with `lint` and `lint:fix` scripts.
+- ESLint lints the script and server fences and the template expressions of `.kay` files through `kay/eslint`, which `@kaynooo/eslint` wires in with `kay: true`: an `eslint.config.ts` of `export default defineConfig({ strict: true, kay: true })`, run with `keslint --cache`, which `kay new` writes along with `lint` and `lint:fix` scripts.
 - The processor lints the TSX `kay check` type-checks a component as and reports only what falls in a fence's own code, at its `.kay` line and column; `--fix` rewrites the `.kay` file, a fix reaching into generated code dropped.
 - The template is left to `kay check`, and the rules the generated code around a fence would trip are off in fences: indentation, blank lines and padding, import order and adjacency.
 - Type-aware rules, such as `ts/no-floating-promises` under `strict`, read the shadow files `kay check`, `kay dev` and the editor's language server write under `.kay/types`, so lint runs after one of them: a component with none yet fails with `has no type information yet: run kay check, or kay dev, before linting it`, and CI runs `bun run lint` after `bun run check`.

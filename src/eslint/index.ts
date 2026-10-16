@@ -1,8 +1,8 @@
-// `kay/eslint`: lints the script and server fences of .kay files through the TSX `kay check` type-checks them as, reporting at the .kay line.
+// `kay/eslint`: lints the JavaScript of .kay files, the script and server fences and the template's expressions, through the TSX `kay check` type-checks them as, reporting at the .kay line.
 import type { ShadowFile } from '../check/shadow'
 import { existsSync } from 'node:fs'
 import { relative, resolve } from 'node:path'
-import { compileShadow, fenceEdit, readShadowSettings, shadowPath, sourceSpan } from '../check/shadow'
+import { codeEdit, compileShadow, readShadowSettings, shadowPath, sourceSpan } from '../check/shadow'
 import { offsetAt, positionAt } from '../compiler/mapping'
 import { projectRootOf } from '../project'
 
@@ -51,7 +51,7 @@ export const processor = {
     return [{ text: shadow.tsx, filename: BLOCK }]
   },
 
-  // Only what is reported in the fences' own code stands: the rest of the TSX is generated, and its problems are kay check's to report.
+  // Only what is reported in the author's own JavaScript stands: the rest of the TSX is generated, and its problems are kay check's to report.
   postprocess(messages: LintMessage[][], filename: string): LintMessage[] {
     const entry = compiled.get(filename)!
 
@@ -87,7 +87,7 @@ function mapMessage(entry: ShadowFile, message: LintMessage): LintMessage | unde
   // A parser that throws, as the shadow parser does without a shadow file, reports no line, or line 0.
   const start = message.line >= 1 ? offsetAt(entry.tsx, { line: message.line, column: message.column }) : undefined
   const end = message.endLine === undefined || message.endColumn === undefined ? undefined : offsetAt(entry.tsx, { line: message.endLine, column: message.endColumn })
-  const span = start === undefined ? undefined : sourceSpan(entry, start, end ?? start, 'fences')
+  const span = start === undefined ? undefined : sourceSpan(entry, start, end ?? start, 'code')
 
   // A file that does not parse would otherwise pass: kay check names the reason at its line, this only keeps lint from passing.
   if (!span)
@@ -104,9 +104,9 @@ function mapMessage(entry: ShadowFile, message: LintMessage): LintMessage | unde
   return { ...message, ...positionAt(entry.source, span.start), endLine: endPosition?.line, endColumn: endPosition?.column, fix, suggestions }
 }
 
-// A fix stands only when the fence code it replaces was copied verbatim from the .kay file.
+// A fix stands only when the code it replaces was copied verbatim from the .kay file.
 function mapFix(entry: ShadowFile, fix: LintFix): LintFix | undefined {
-  const span = fenceEdit(entry, fix.range[0], fix.range[1])
+  const span = codeEdit(entry, fix.range[0], fix.range[1])
 
   return span && { range: [span.start, span.end], text: fix.text }
 }

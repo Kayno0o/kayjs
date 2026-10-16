@@ -8,6 +8,9 @@ const saved = signal(false)
   Toggle(
     label="Notifications"
     checked={saved()}
-    onChange={async (next) => { await wait(800); saved.set(next) }}
+    onChange={async (next) => {
+      await wait(800)
+      saved.set(next)
+    }}
   )
   p Saved as {saved() ? 'on' : 'off'}.

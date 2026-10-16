@@ -23,5 +23,7 @@ const columns: Column<Moon>[] = [
 const hidden = signal<number[]>([])
 ---
 Table(columns={columns} rows={moons.filter(moon => !hidden().includes(moon.id))} rowKey="id" selectable)
-  @bulk(keys, clear)
-    Button(label="Hide" onClick={() => { hidden.set([...hidden(), ...keys as number[]]) }})
+  @bulk(keys)
+    Button(label="Hide" onClick={() => {
+      hidden.set([...hidden(), ...keys as number[]])
+    }})
