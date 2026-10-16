@@ -66,7 +66,7 @@
   "devDependencies": {
     "@happy-dom/global-registrator": "^20.14.5",
     "@iconify-json/tabler": "^1.2.41",
-    "@kaynooo/eslint": "^7.0.3",
+    "@kaynooo/eslint": "^7.0.4",
     "@types/bun": "^1.4.2",
     "chartist": "^1.5.0",
     "elysia": "^1.4.30",

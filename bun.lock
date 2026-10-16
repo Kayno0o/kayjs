@@ -21,7 +21,7 @@
         "@fontsource/inter": "^5.3.0",
         "@happy-dom/global-registrator": "^20.14.5",
         "@iconify-json/tabler": "^1.2.41",
-        "@kaynooo/eslint": "^7.0.3",
+        "@kaynooo/eslint": "^7.0.4",
         "@kaynooo/kayjs-auth": "workspace:*",
         "@kaynooo/kayjs-cms": "workspace:*",
         "@kaynooo/kayjs-mail": "workspace:*",
@@ -62,7 +62,7 @@
         "reflect-metadata": "^0.2.2",
       },
       "devDependencies": {
-        "@kaynooo/eslint": "^7.0.3",
+        "@kaynooo/eslint": "^7.0.4",
         "@kaynooo/kayjs-mail": "workspace:~",
         "@kaynooo/kayjs-ui": "workspace:~",
         "@kaynooo/pg-orm": "^7.0.4",
@@ -86,7 +86,7 @@
       "version": "1.44.0",
       "devDependencies": {
         "@happy-dom/global-registrator": "^20.14.5",
-        "@kaynooo/eslint": "^7.0.3",
+        "@kaynooo/eslint": "^7.0.4",
         "@kaynooo/kayjs-ui": "workspace:~",
         "@types/bun": "^1.4.2",
         "@typescript/native-preview": "^7.0.0-dev.20260707.2",
@@ -106,7 +106,7 @@
         "nodemailer": "^10.0.16",
       },
       "devDependencies": {
-        "@kaynooo/eslint": "^7.0.3",
+        "@kaynooo/eslint": "^7.0.4",
         "@types/bun": "^1.4.2",
         "@typescript/native-preview": "^7.0.0-dev.20260707.2",
         "elysia": "^1.4.30",
@@ -126,7 +126,7 @@
       "devDependencies": {
         "@happy-dom/global-registrator": "^20.14.5",
         "@iconify-json/tabler": "^1.2.41",
-        "@kaynooo/eslint": "^7.0.3",
+        "@kaynooo/eslint": "^7.0.4",
         "@types/bun": "^1.4.2",
         "chartist": "^1.5.0",
         "elysia": "^1.4.30",
@@ -234,7 +234,7 @@
 
     "@jsquash/avif": ["@jsquash/avif@2.1.1", "", { "dependencies": { "wasm-feature-detect": "^1.2.11" } }, "sha512-LMRxd0fMgfCLtobDh0/sFYJMMiRJTNYSEEWvRDKXlAeZ08t3gI5V+1thIT0XjXJ+SVG7Zug9B0XPyx0Ti5VRNA=="],
 
-    "@kaynooo/eslint": ["@kaynooo/eslint@7.0.3", "https://git.kaynooo.fr/api/packages/kaynooo/npm/%40kaynooo%2Feslint/-/7.0.3/eslint-7.0.3.tgz", { "dependencies": { "@e18e/eslint-plugin": "^0.8.0", "@eslint-community/eslint-plugin-eslint-comments": "^4.7.2", "@eslint/markdown": "^8.0.3", "@stylistic/eslint-plugin": "^5.10.0", "@typescript-eslint/eslint-plugin": "^8.67.0", "@typescript-eslint/parser": "^8.67.0", "eslint-config-flat-gitignore": "^2.3.0", "eslint-flat-config-utils": "^3.2.0", "eslint-merge-processors": "^2.0.0", "eslint-plugin-antfu": "^3.2.3", "eslint-plugin-better-tailwindcss": "^4.7.0", "eslint-plugin-format": "^2.0.1", "eslint-plugin-import-lite": "^0.6.0", "eslint-plugin-jsonc": "^3.4.1", "eslint-plugin-no-only-tests": "^3.4.0", "eslint-plugin-perfectionist": "^5.10.1", "eslint-plugin-regexp": "^3.2.0", "eslint-plugin-toml": "^1.5.0", "eslint-plugin-unicorn": "^73.0.0", "eslint-plugin-unused-imports": "^4.4.1", "eslint-plugin-yml": "^3.8.1", "globals": "^17.11.0", "toml-eslint-parser": "^1.0.3", "yaml-eslint-parser": "^2.1.0" }, "peerDependencies": { "eslint": "^10.7.0" }, "bin": { "keslint": "dist/bin.js" } }, "sha512-jMdRIfo7u1YwDSic9p60ffs2VvZpLz9an0tlC4zffGFrlQul4sjP2dnyypsqKY2fMa9uM78kQylH529OwTdGVg=="],
+    "@kaynooo/eslint": ["@kaynooo/eslint@7.0.4", "https://git.kaynooo.fr/api/packages/kaynooo/npm/%40kaynooo%2Feslint/-/7.0.4/eslint-7.0.4.tgz", { "dependencies": { "@e18e/eslint-plugin": "^0.8.0", "@eslint-community/eslint-plugin-eslint-comments": "^4.7.2", "@eslint/markdown": "^8.0.3", "@stylistic/eslint-plugin": "^5.10.0", "@typescript-eslint/eslint-plugin": "^8.67.0", "@typescript-eslint/parser": "^8.67.0", "eslint-config-flat-gitignore": "^2.3.0", "eslint-flat-config-utils": "^3.2.0", "eslint-merge-processors": "^2.0.0", "eslint-plugin-antfu": "^3.2.3", "eslint-plugin-better-tailwindcss": "^4.7.0", "eslint-plugin-format": "^2.0.1", "eslint-plugin-import-lite": "^0.6.0", "eslint-plugin-jsonc": "^3.4.1", "eslint-plugin-no-only-tests": "^3.4.0", "eslint-plugin-perfectionist": "^5.10.1", "eslint-plugin-regexp": "^3.2.0", "eslint-plugin-toml": "^1.5.0", "eslint-plugin-unicorn": "^73.0.0", "eslint-plugin-unused-imports": "^4.4.1", "eslint-plugin-yml": "^3.8.1", "globals": "^17.11.0", "toml-eslint-parser": "^1.0.3", "yaml-eslint-parser": "^2.1.0" }, "peerDependencies": { "eslint": "^10.7.0" }, "bin": { "keslint": "dist/bin.js" } }, "sha512-TF1Bgvz5l1eD3IHrUvX2ESZ8WR8gSn6CFgK/GxNX1+H94yHzqKyPJ0aDQuNOT+sg82HCD7c7OIuBGPT/xgahcg=="],
 
     "@kaynooo/kayjs-auth": ["@kaynooo/kayjs-auth@workspace:packages/auth"],
 
