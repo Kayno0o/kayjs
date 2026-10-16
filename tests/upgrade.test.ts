@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it, setDefaultTimeout, spyOn } from 'bun:test'
 import { upgradeProject } from '../src/commands/upgrade'
-import { deprecationMinors, LINTS } from '../src/compiler/lints'
+import { LINTS } from '../src/compiler/lints'
 import { scratchDir } from './scratch'
 
 setDefaultTimeout(90_000)
@@ -135,7 +135,7 @@ describe('kay upgrade', () => {
     }
   })
 
-  it('stops, rewriting nothing, when the install fails or the registry answers nothing', async () => {
+  it('stops, putting package.json back, when the install fails or the registry answers nothing', async () => {
     const root = await project()
     const failing = fakes({ '@kaynooo/kayjs': '1.46.0', '@kaynooo/kayjs-ui': '1.46.0' }, ['1.44'])
     const unreachable = fakes({ '@kaynooo/kayjs': '1.46.0' })
@@ -145,8 +145,23 @@ describe('kay upgrade', () => {
     try {
       expect(await quietly(async () => upgradeProject(root, failing.deps))).toBe(1)
       expect(failing.calls.kay).toEqual([])
+      expect(await Bun.file(join(root, 'package.json')).text()).toBe(MANIFEST)
       expect(await quietly(async () => upgradeProject(root, unreachable.deps))).toBe(1)
       expect(unreachable.calls.installs).toEqual([])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('moves the range in the section listing it, not one like it in overrides', async () => {
+    const manifest = MANIFEST.replace('  "devDependencies"', '  "overrides": { "kay": "npm:@kaynooo/kayjs@~1.40.1" },\n  "devDependencies"')
+    const root = await project(manifest)
+
+    try {
+      await quietly(async () => upgradeProject(root, fakes({ '@kaynooo/kayjs': '1.46.0', '@kaynooo/kayjs-ui': '1.46.0' }).deps))
+      expect(await Bun.file(join(root, 'package.json')).text()).toContain('"overrides": { "kay": "npm:@kaynooo/kayjs@~1.40.1" }')
+      expect(await Bun.file(join(root, 'package.json')).text()).toContain('"kay": "npm:@kaynooo/kayjs@~1.46.0"')
     }
     finally {
       await rm(root, { recursive: true, force: true })
@@ -191,6 +206,25 @@ describe('kay upgrade', () => {
 })
 
 describe('kay check --since', () => {
+  it('fixes the deprecations of its minor alone', async () => {
+    const root = await project(MANIFEST, {
+      'tsconfig.json': await Bun.file(join(import.meta.dir, '../tsconfig.json')).text(),
+      'src/routes/index.kay': 'p Home\n',
+      'src/schemas.ts': 'import { t } from \'kay\'\n\nexport const page = t.Integer({ minimum: 1 })\n',
+    })
+    const run = async (since: string) => Bun.spawn([process.execPath, CLI, 'check', '--fix', '--since', since], { cwd: root, stdout: 'ignore', stderr: 'ignore' }).exited
+
+    try {
+      await run('1.29')
+      expect(await Bun.file(join(root, 'src/schemas.ts')).text()).toContain('{ t }')
+      await run('1.28')
+      expect(await Bun.file(join(root, 'src/schemas.ts')).text()).toContain('{ s }')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('takes a minor, and no group beside it', async () => {
     const run = async (...args: string[]) => {
       const child = Bun.spawn([process.execPath, CLI, 'check', ...args], { stdout: 'pipe', stderr: 'pipe' })
@@ -209,6 +243,5 @@ describe('the deprecations', () => {
     const lints = Object.entries(LINTS).map(([name, lint]) => ({ name, group: lint.group, since: 'since' in lint ? lint.since : undefined }))
 
     expect(lints.filter(lint => (lint.group === 'deprecated') !== (lint.since !== undefined))).toEqual([])
-    expect(deprecationMinors()).toEqual([{ since: '1.28', lints: ['deprecated-schema-name'] }])
   })
 })

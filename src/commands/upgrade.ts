@@ -81,7 +81,8 @@ export async function upgradeProject(root: string, deps: UpgradeDeps): Promise<n
     return 1
   }
 
-  let source = await Bun.file(manifest).text()
+  const original = await Bun.file(manifest).text()
+  let source = original
   let packageJson: Record<string, unknown>
 
   try {
@@ -97,7 +98,7 @@ export async function upgradeProject(root: string, deps: UpgradeDeps): Promise<n
   const kay = found.find(dependency => dependency.registry === KAY_PACKAGE)
 
   if (kay === undefined) {
-    printFailure('upgrade', 'package.json has no `kay` dependency to move, a version range of `@kaynooo/kayjs`; one pointing at a path or a workspace is moved by hand', 'text')
+    printFailure('upgrade', 'package.json has no `kay` dependency with a full version range to move, as `npm:@kaynooo/kayjs@~1.45.0`; one written another way, a path or a workspace, is moved by hand', 'text')
 
     return 1
   }
@@ -122,12 +123,12 @@ export async function upgradeProject(root: string, deps: UpgradeDeps): Promise<n
       return 1
     }
 
-    if (!newer(target, dependency.version))
+    if (Bun.semver.order(target, dependency.version) !== 1)
       continue
 
     const spec = `${dependency.prefix}~${target}`
 
-    source = source.replace(new RegExp(`("${dependency.name.replace(REGEX_SPECIALS, '\\$&')}"\\s*:\\s*)${JSON.stringify(dependency.spec).replace(REGEX_SPECIALS, '\\$&')}`), (_whole, key: string) => `${key}${JSON.stringify(spec)}`)
+    source = replaceSpec(source, dependency, spec)
     changes.push({ name: dependency.name, spec, section: dependency.section })
   }
 
@@ -140,14 +141,9 @@ export async function upgradeProject(root: string, deps: UpgradeDeps): Promise<n
   await Bun.write(manifest, source)
   done('moved', changes.map(({ name, spec }) => `${name} to ${spec.slice(spec.lastIndexOf('~'))}`).join(', '))
 
-  if (!await deps.install(root, changes)) {
-    printFailure('upgrade', 'the install failed, so nothing was rewritten; fix it, then run `kay upgrade` again or `kay check --fix`', 'text')
-
-    return 1
-  }
-
-  if (!existsSync(join(root, 'node_modules/kay/src/cli.ts'))) {
-    printFailure('upgrade', 'kay is not installed in node_modules after the install, so nothing was rewritten; run `kay check --fix` once it is', 'text')
+  if (!await deps.install(root, changes) || !existsSync(join(root, 'node_modules/kay/src/cli.ts'))) {
+    await Bun.write(manifest, original)
+    printFailure('upgrade', 'the install failed or left no kay in node_modules, so package.json is back as it was and nothing was rewritten; fix the install, then run `kay upgrade` again', 'text')
 
     return 1
   }
@@ -214,7 +210,7 @@ async function crossed(root: string, from: string, to: string, deps: UpgradeDeps
     lints = code === 0 ? (JSON.parse(stdout) as { lints?: { since?: string }[] }).lints ?? [] : []
   }
   catch {
-    lints = []
+    // An older kay prints no such document: it lists no deprecation.
   }
 
   const sinces = new Set(lints.flatMap(lint => lint.since === undefined ? [] : [lint.since]))
@@ -228,15 +224,18 @@ async function crossed(root: string, from: string, to: string, deps: UpgradeDeps
     .sort((a, b) => minorAfter(minorOf(a)!, minorOf(b)!) ? 1 : -1)
 }
 
-function newer(a: string, b: string): boolean {
-  const [left, right] = [a, b].map(version => version.split('.').map(Number))
+// Rewrites the range inside the section listing the dependency, so a same-looking range in `overrides` or `peerDependencies` is left alone.
+function replaceSpec(source: string, dependency: KayDependency, spec: string): string {
+  const open = new RegExp(`"${dependency.section}"\\s*:\\s*\\{`).exec(source)
 
-  for (const [index, part] of left!.entries()) {
-    if (part !== right![index])
-      return part > right![index]!
-  }
+  if (open === null)
+    return source
 
-  return false
+  const start = open.index + open[0].length
+  const end = source.indexOf('}', start)
+  const entry = new RegExp(`("${dependency.name.replace(REGEX_SPECIALS, '\\$&')}"\\s*:\\s*)${JSON.stringify(dependency.spec).replace(REGEX_SPECIALS, '\\$&')}`)
+
+  return source.slice(0, start) + source.slice(start, end).replace(entry, (_whole, key: string) => `${key}${JSON.stringify(spec)}`) + source.slice(end)
 }
 
 async function run(args: string[], root: string, capture: boolean): Promise<{ code: number, stdout: string }> {

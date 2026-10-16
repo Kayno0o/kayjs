@@ -412,15 +412,6 @@ export function minorAfter(a: [number, number], b: [number, number]): boolean {
   return a[0] === b[0] ? a[1] > b[1] : a[0] > b[0]
 }
 
-// The minors that deprecated a form, oldest first, each with the lints that did.
-export function deprecationMinors(): { since: string, lints: LintName[] }[] {
-  const bySince = Map.groupBy((Object.entries(LINTS) as [LintName, Lint][]).filter(([, lint]) => lint.since !== undefined), ([, lint]) => lint.since!)
-
-  return [...bySince]
-    .sort(([a], [b]) => minorAfter(minorOf(a)!, minorOf(b)!) ? 1 : -1)
-    .map(([since, lints]) => ({ since, lints: lints.map(([name]) => name) }))
-}
-
 export function isLintGroup(name: string | undefined): name is LintGroup {
   return name !== undefined && Object.hasOwn(LINT_GROUPS, name)
 }

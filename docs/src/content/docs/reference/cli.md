@@ -298,7 +298,7 @@ It moves `kay` and every `@kaynooo/kayjs-*` library in `package.json` to the lat
 
 Then it runs the kay it just installed. Each minor between your old version and the new one may have replaced a form with a new one, and each such replacement is a lint in the `deprecated` group with a fix. The fixes of the oldest minor run first, then the next, and so on. A last `kay check --fix` applies any other quick fix and prints what is left for you to change by hand. Its exit code is the check's.
 
-An app already on the latest version is left alone. If the install fails, nothing is rewritten, and you can run `kay upgrade` again or `kay check --fix` once it works. What a minor breaks that `kay check` cannot see is in [Upgrading](/guides/upgrading).
+An app already on the latest version is left alone. If the install fails, `package.json` goes back as it was, and you can run `kay upgrade` again once the install works. What a minor breaks that `kay check` cannot see is in [Upgrading](/guides/upgrading).
 
 ## kay routes
 
