@@ -3,8 +3,7 @@ import Button from '@kaynooo/kayjs-ui/button.kay'
 import FileDrop from '@kaynooo/kayjs-ui/file-drop.kay'
 import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
 import { attempt } from '@kaynooo/kayjs-ui'
-import { call } from 'kay'
-import filesApi from '../api/files'
+import { uploadFile } from './upload'
 
 // An image or file field: the path of an upload dropped or picked, or one typed.
 const { value, image, collection, onChange } = props<{ value: string, image: boolean, collection: string, onChange: (path: string) => void }>()
@@ -25,16 +24,13 @@ async function upload([file]: File[]): Promise<void> {
   if (!file)
     return
 
-  const form = new FormData()
-
-  form.append('file', file)
   sent = 0
 
   try {
-    const answer = await attempt(() => call(filesApi, '/:collection', { method: 'post', params: { collection }, body: form, progress: share => sent = share }), 'Could not upload')
+    const path = await attempt(() => uploadFile(collection, file, share => sent = share), 'Could not upload')
 
-    if (answer)
-      onChange(answer.path)
+    if (path)
+      onChange(path)
   }
   finally {
     sent = undefined

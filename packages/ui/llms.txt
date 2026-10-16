@@ -417,7 +417,7 @@ ul
 - `MarkdownEditor(value={body()} onInput={body.set} onImage={upload} name="body")`: a markdown `textarea` that writes like an editor, in an island.
   - Ctrl or Cmd with B, I or K wraps the selection in bold, italics or a link; Enter continues a list, and Tab indents a list item, leaving Tab alone elsewhere and after Escape, so the keyboard can always leave the field; `keysHint` tells screen readers so, as the field's description. These go through the browser's own editing, so Ctrl+Z undoes them like typing.
   - A page pasted as HTML turns into markdown.
-  - With `onImage(file)`, a pasted or dropped image is embedded behind an `![Uploading …]()` placeholder at once, swapped for `![](url)` once `onImage` resolves with its url, or removed with `uploadFailure` toasted if it throws (or a refusal of the whole call such as a limit, as `attempt` does). Writing goes on meanwhile, and a finished upload never takes focus back; the field is `aria-busy` while one is under way.
+  - With `onImage(file)`, a pasted or dropped image is embedded behind an `![Uploading …]()` placeholder at once, swapped for `![](url)` once `onImage` resolves with its url, or removed, line break included, with `uploadFailure` toasted if it throws (or a refusal of the whole call such as a limit, as `attempt` does). Writing goes on meanwhile, and a finished upload never takes focus back; the field is `aria-busy` while one is under way.
   - It shows about 12 lines and grows with its text up to 70% of the screen, where the browser sizes a field by its content (Chromium); it can be resized by hand.
   - `onInput(value)` reports the text after every change, typed or applied. A parent passing other text replaces it; passing back what it was given leaves the caret alone.
 

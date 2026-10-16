@@ -110,21 +110,23 @@ function keyDown(event: KeyboardEvent) {
 }
 
 // Swaps a placeholder for what replaces it wherever the text has moved it to, keeping the caret where the user left it.
-function swap(placeholder: string, replacement: string): void {
+function swap(placeholder: string, replacement: string): boolean {
   const el = area
 
   if (!el)
-    return
+    return false
 
   const at = el.value.indexOf(placeholder)
 
   if (at === -1)
-    return
+    return false
 
   const { selectionStart, selectionEnd } = el
   const shift = (index: number) => index >= at + placeholder.length ? index + replacement.length - placeholder.length : Math.min(index, at)
 
   applyEdit(el, { start: at, end: at + placeholder.length, text: replacement, selectionStart: shift(selectionStart), selectionEnd: shift(selectionEnd) }, false)
+
+  return true
 }
 
 // Embeds each image behind a placeholder right away, so writing goes on while it uploads.
@@ -146,7 +148,11 @@ async function upload(files: File[]): Promise<void> {
     try {
       const url = await attempt(async () => send(file), uploadFailure)
 
-      swap(placeholder, url === undefined ? '' : `![](${url})`)
+      // A failed upload takes the line break the placeholder came with, unless typing has parted them.
+      if (url === undefined)
+        swap(text, '') || swap(placeholder, '')
+      else
+        swap(placeholder, `![](${url})`)
     }
     finally {
       uploading.set(count => count - 1)

@@ -10,6 +10,7 @@ This page lists what each release adds, newest first, with a link to where each 
 - **`resource` and `stream` over anything async**: they take a function returning a promise or an async iterable, so an island reading its own WebSocket or another server needs no hand-rolled counter. [API routes](/guides/api-routes)
 - **A fast `invalidate` on a large `sqliteCache`**: it reads the keys each stored value was built from in a table of their own, not every row. A custom `CacheStore` may offer `dependencies()` for the same. [Caching and streaming](/guides/caching-and-streaming)
 - A kayjs-auth profile field's `label` may be an object by locale, `{ en: 'Bio', fr: 'Biographie' }`, and `requireUser({ redirect: '' })` and `guard({ redirect: '' })` mean no redirect ([kayjs-auth](../../libraries/kayjs-auth/#your-own-profile-fields)).
+- The cms editor's Markdown body takes a pasted or dropped image: it uploads to the collection's folder like a file field's and is embedded at the cursor, and a failed `MarkdownEditor` upload now leaves the text exactly as it was ([kayjs-cms](/libraries/kayjs-cms)).
 
 ## 1.46.0
 

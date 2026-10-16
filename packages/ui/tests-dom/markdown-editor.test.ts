@@ -148,7 +148,7 @@ describe('MarkdownEditor', () => {
     paste(state.area, [new File(['x'], 'cat.png', { type: 'image/png' })])
     await settle()
 
-    expect(state.value).toBe('\n')
+    expect(state.value).toBe('')
     expect([...state.root.querySelectorAll('.kui-toast-message')].at(-1)?.textContent).toBe('Could not upload the image')
   })
 

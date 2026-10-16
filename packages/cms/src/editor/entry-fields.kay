@@ -7,6 +7,7 @@ import MarkdownEditor from '@kaynooo/kayjs-ui/markdown-editor.kay'
 import { fieldsOf } from '../fields'
 import { BODY } from '../markers'
 import FieldInput from './field-input.kay'
+import { uploadFile } from './upload'
 
 // An entry's form: a control per field of its collection's schema, then its Markdown body.
 const { drafts, entry, collection } = props<{ drafts: Drafts, entry: EntryRef, collection: CollectionInfo }>()
@@ -26,4 +27,4 @@ for field of fields() key={field.key}
 if collection.body
   .kcms-field(data-kcms-body)
     FormField(label="Body" issue={drafts.issues(entry, BODY)[0]?.message})
-      MarkdownEditor(value={String(drafts.value(entry, BODY) ?? '')} onInput={text => drafts.set(entry, BODY, text)})
+      MarkdownEditor(value={String(drafts.value(entry, BODY) ?? '')} onInput={text => drafts.set(entry, BODY, text)} onImage={file => uploadFile(entry.collection, file)})

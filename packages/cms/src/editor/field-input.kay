@@ -14,6 +14,7 @@ import { emptyValue, itemAt } from '../fields'
 import { joinPath } from '../paths'
 import FieldInput from './field-input.kay'
 import FileInput from './file-input.kay'
+import { uploadFile } from './upload'
 import './fields.css'
 
 const { drafts, entry, field, path } = props<{ drafts: Drafts, entry: EntryRef, field: Field, path: string }>()
@@ -60,7 +61,7 @@ function setJson(next: string): void {
         Textarea(rows="4" value={text()} onInput={set})
     when 'markdown'
       FormField(label={current.label} hint={current.hint} issue={issue()} required={current.required})
-        MarkdownEditor(value={text()} onInput={set})
+        MarkdownEditor(value={text()} onInput={set} onImage={file => uploadFile(entry.collection, file)})
     when 'number', 'integer'
       FormField(label={current.label} hint={current.hint} issue={issue()} required={current.required})
         TextInput(type="number" step={current.kind === 'integer' ? '1' : 'any'} value={text()} onInput={next => set(next ?? undefined)})

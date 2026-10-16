@@ -373,3 +373,53 @@ test('an image field previews what it holds, takes a drop or a pick, and still a
   expect(page.find('[data-kcms-path="photo"] .kcms-file-drop')).toHaveLength(1)
   expect(page.find('[data-kcms-path="photo"] input[aria-label="Path"]')).toHaveLength(1)
 })
+
+// A paste as the browser sends it, its files in `clipboardData`.
+async function paste(page: Awaited<ReturnType<typeof site.open>>, selector: string, name: string, type: string, bytes: Uint8Array): Promise<void> {
+  await page.evaluate((target, fileName, fileType, content) => {
+    const data = new DataTransfer()
+
+    data.items.add(new File([new Uint8Array(content)], fileName, { type: fileType }))
+    document.querySelector(target)!.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }))
+  }, selector, name, type, [...bytes])
+}
+
+test('an image pasted into the Markdown body is uploaded to the collection\'s folder and embedded where the cursor is, and the save keeps it', async () => {
+  saved.length = 0
+
+  const built = await testSite({ root: ROOT, browser: true })
+  const page = await built.open('/admin/collections/posts/hello')
+  const body = '[data-kcms-body] textarea'
+
+  await page.click(body)
+  await paste(page, body, 'moon.png', 'image/png', PIXEL)
+  await page.waitUntil(() => document.querySelector<HTMLTextAreaElement>('[data-kcms-body] textarea')!.value.includes('![](/_kay/files/posts/'))
+
+  const text = (await page.value(body))!
+  const path = (/!\[\]\((\/_kay\/files\/posts\/\w+\.1x1\.png)\)/).exec(text)![1]!
+
+  expect(text).not.toContain('Uploading')
+  expect(new Uint8Array(await (await built.fetch(path)).arrayBuffer())).toEqual(PIXEL)
+
+  await page.click('.kcms-entry-actions button:last-child')
+
+  for (let waited = 0; saved.length === 0 && waited < 5000; waited += 50)
+    await Bun.sleep(50)
+
+  expect(saved[0]?.text).toContain(`![](${path})`)
+  expect(page.errors).toEqual([])
+}, 60_000)
+
+test('a refused upload toasts, and leaves the body as it was', async () => {
+  const built = await testSite({ root: ROOT, browser: true })
+  const page = await built.open('/admin/collections/posts/hello')
+  const body = '[data-kcms-body] textarea'
+  const before = await page.value(body)
+
+  await page.click(body)
+  await paste(page, body, 'logo.svg', 'image/svg+xml', new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg"/>'))
+  await page.waitUntil(() => document.querySelector('.kui-toaster')?.textContent?.includes('Could not upload') === true)
+
+  expect(await page.value(body)).toBe(before)
+  expect(page.errors).toEqual([])
+}, 60_000)
