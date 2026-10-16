@@ -2,11 +2,11 @@ import type { Collection } from '../content'
 import type { Project } from '../project'
 import type { Cards } from './card'
 import type { ClientBuild } from './client'
-import type { AppManifest } from './favicon'
 import type { I18n } from './i18n'
 import type { Matcher } from './params'
+import type { PublicFile } from './public'
 import type { RenderOptions } from './render'
-import type { Route, RouteMount } from './routes'
+import type { Endpoint, Route, RouteMount } from './routes'
 import type { ProjectSource } from './source'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
@@ -17,10 +17,12 @@ import { setSite } from '../runtime/site'
 import { basePath } from './base'
 import { setupCards } from './card'
 import { chooseInlineStyles } from './client'
+import { appServesManifest } from './favicon'
 import { implicitI18n, linkedSettings, loadI18n, routedSettings, serveLocales } from './i18n'
 import { applyImageConfig } from './image'
 import { loadMatchers } from './params'
 import { setupPreview } from './preview'
+import { publicFiles } from './public'
 import { refuseClashes } from './route-table'
 import { routeMounts } from './routes'
 import { configHead, siteOrigin } from './seo'
@@ -47,8 +49,9 @@ export interface PageSetup {
   styles: string[]
   renderOptions: RenderOptions
   cards: Cards
-  // Set once the paths are claimed: whether the app serves the default web manifest itself.
-  appManifest: AppManifest
+  // The files of `public/` and the endpoints, which the server claims paths for once it boots.
+  files: PublicFile[]
+  endpoints: Endpoint[]
 }
 
 // What serving pages and prerendering them both start from: the routes and their param matchers, the collections, the locales, the head and the render options.
@@ -93,11 +96,12 @@ export async function setupPages(project: Project, loadClient: () => ClientBuild
   if (!mode.dev)
     await chooseInlineStyles(client, base, config.inlineStyles)
 
-  const appManifest = { served: false }
+  const [files, endpoints] = await Promise.all([publicFiles(paths.public), source.endpoints(paths.routes, mounts)])
+  const ownManifest = appServesManifest(files, endpoints, routes)
 
   // Cards are drawn in the fonts the head just wrote, rather than those a `fonts.json` held before.
   const headAndCards = async () => {
-    const { fonts, ...head } = await configHead(root, config, client.dir, source.embedded, appManifest)
+    const { fonts, ...head } = await configHead(root, config, client.dir, source.embedded, ownManifest)
 
     return { ...head, cards: await setupCards({ dir: join(client.dir, '..'), clientDir: client.dir, fonts, config: config.images?.card, logo: config.images?.card?.logo === undefined ? undefined : resolve(root, config.images.card.logo), name: config.seo?.name, defaultLocale: locales.settings.defaultLocale, quality: config.images?.quality, bundled: source.embedded, prebuilt: mode.prebuilt, collect: prerendering }) }
   }
@@ -107,5 +111,5 @@ export async function setupPages(project: Project, loadClient: () => ClientBuild
   if (i18n)
     i18n.settings = linkedSettings(i18n.settings, routes, collections)
 
-  return { source, client, mounts, routes, matchers, collections, i18n, locales, base, site, imageCache, scripts, styles, renderOptions: renderOptionsOf(config, mode, { head, maxDensity, editor: source.editor(root, config) }), cards, appManifest }
+  return { source, client, mounts, routes, matchers, collections, i18n, locales, base, site, imageCache, scripts, styles, renderOptions: renderOptionsOf(config, mode, { head, maxDensity, editor: source.editor(root, config) }), cards, files, endpoints }
 }

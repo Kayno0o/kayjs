@@ -16,7 +16,8 @@ export const FAVICON_DIR = 'favicon'
 const DEFAULT_FAVICON = join(import.meta.dir, 'favicon.png')
 const DEFAULT_SVG = join(import.meta.dir, 'favicon.svg')
 const SVG = '/favicon.svg'
-const MANIFEST = '/manifest.webmanifest'
+
+export const MANIFEST = '/manifest.webmanifest'
 // Browsers ask for the first two at these paths on their own; the manifest points at the others.
 const PNG_FILES: Record<string, number> = { '/apple-touch-icon.png': 180, '/icon-192.png': 192, '/icon-512.png': 512 }
 const MASKABLE_FILES: Record<string, number> = { '/icon-maskable-192.png': 192, '/icon-maskable-512.png': 512 }
@@ -68,7 +69,6 @@ export interface FaviconOptions {
   description?: Localized | undefined
   locales?: ManifestLocales | undefined
   manifest?: ManifestConfig | undefined
-  appManifest?: AppManifest | undefined
   // The site's mount point, which the manifest's paths go under.
   base?: string | undefined
 }
@@ -211,9 +211,9 @@ export function faviconTags(favicon: string | FaviconConfig | undefined): HeadTa
   ]
 }
 
-// Whether the app serves the default manifest itself, set once the paths are claimed: kay then neither serves nor links the manifests of the locales.
-export interface AppManifest {
-  served: boolean
+// Whether the app serves the default manifest itself, as a public file, an endpoint or a page: kay then neither serves nor links the manifests of the locales.
+export function appServesManifest(files: readonly { url: string }[], endpoints: readonly { pattern: string, suffix?: string | undefined }[], routes: readonly { pattern: string }[]): boolean {
+  return files.some(file => file.url === MANIFEST) || endpoints.some(endpoint => `${endpoint.pattern}${endpoint.suffix ?? ''}` === MANIFEST) || routes.some(route => route.pattern === MANIFEST)
 }
 
 export interface ManifestLocales {
@@ -323,13 +323,9 @@ export function serveFavicons(app: Elysia, served: ServedPaths, options: Favicon
   for (const { path, locale } of manifests) {
     const offered = served.offer({ path, owner: 'the web app manifest', kind: 'kay', exported: true })
 
-    // The app's own manifest is the one pages link, so kay serves and links none of the locales'.
-    if (path === MANIFEST && !offered) {
-      if (options.appManifest)
-        options.appManifest.served = true
-
+    // The app's own manifest is the one pages link, so kay serves none of the locales'.
+    if (path === MANIFEST && !offered)
       break
-    }
 
     if (!offered)
       continue

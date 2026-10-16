@@ -52,7 +52,7 @@ import { assetFiles } from './page-hook'
 import { loadPrerendered, pageResponder, servePageRoutes } from './page-routes'
 import { DRAFT_BODY_LIMIT, serveDrafts, servePreview } from './preview'
 import { REQUEST_ID_HEADER, requestId, trustProxy } from './protection'
-import { claimPublic, publicFiles, servePublic } from './public'
+import { claimPublic, servePublic } from './public'
 import { claimRedirects, readRedirects, serveRedirects } from './redirects'
 import { remoteImages, remotePatterns } from './remote'
 import { reportServerError } from './report'
@@ -197,7 +197,7 @@ export async function servePages(project: Project<PagesOptions>, loadClient: () 
 export async function pagesApp(project: Project<PagesOptions>, loadClient: () => ClientBuild | Promise<ClientBuild>, exported = false) {
   const { root, config: options, paths, mode } = project
   const setup = await setupPages(project, loadClient)
-  const { source, client, mounts, matchers, collections, i18n, locales, base, site, scripts, styles, renderOptions, cards, appManifest } = setup
+  const { source, client, mounts, matchers, collections, i18n, locales, base, site, scripts, styles, renderOptions, cards, files, endpoints } = setup
   const routes = await servedRoutes(setup, options.requireGuards)
   const served = new ServedPaths()
   const table = routeTable(routes, i18n?.settings, served)
@@ -274,10 +274,9 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
     filePaths.add(path)
 
   const actionOptions = { dev: mode.dev, onError: options.onError, i18n: locales, base, requireGuards: options.requireGuards }
-  const [{ limits: actionLimits, tools: toolActions }, apiModules, files] = await Promise.all([registerActionRoutes(app, routes, routeMatch(table, matchers, options.trailingSlash), actionOptions), source.api(root, options), publicFiles(paths.public)])
+  const [{ limits: actionLimits, tools: toolActions }, apiModules] = await Promise.all([registerActionRoutes(app, routes, routeMatch(table, matchers, options.trailingSlash), actionOptions), source.api(root, options)])
   const publicServed = claimPublic(served, files)
   const api = await serveApi(app, apiModules, actionOptions)
-  const endpoints = await source.endpoints(paths.routes, mounts)
 
   claimEndpoints(served, endpoints, root)
   await serveEndpoints(app, endpoints, actionOptions)
@@ -357,7 +356,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   const favicon = faviconSource(root, options.favicon, options.manifest)
 
   if (favicon !== undefined)
-    serveFavicons(app, served, { source: favicon, builtDir: mode.prebuilt ? join(client.dir, '..', FAVICON_DIR) : undefined, name: options.seo?.name, description: options.seo?.description, locales: locales.settings, manifest: options.manifest, appManifest, base })
+    serveFavicons(app, served, { source: favicon, builtDir: mode.prebuilt ? join(client.dir, '..', FAVICON_DIR) : undefined, name: options.seo?.name, description: options.seo?.description, locales: locales.settings, manifest: options.manifest, base })
 
   const prerendered = await loadPrerendered(client)
   const guarded = new Set(routes.filter(route => route.guards.length > 0).map(route => route.pattern))

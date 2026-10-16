@@ -1,7 +1,6 @@
 import type { KayConfig, SeoConfig, TrailingSlash } from '../config'
 import type { HeadOptions, HeadTag, ImageSize } from '../runtime/head'
 import type { Localized } from '../runtime/localized'
-import type { AppManifest } from './favicon'
 import type { FontAssets } from './fonts'
 import type { LocaleCopy } from './i18n'
 import { join } from 'node:path'
@@ -28,7 +27,7 @@ export type SeoHead = (url: URL, status: number) => HeadOptions
 
 // Everything kay.config.ts gives every page's head: the fonts, the favicon, its `head`, then `site` and `seo`, with the inline scripts and styles among them for the content security policy, and the fonts themselves, which share cards draw in.
 // An executable reads the fonts `kay build` recorded, its project being elsewhere; anything else writes them from their files.
-export async function configHead(root: string, config: KayConfig, clientDir: string, bundled = false, appManifest?: AppManifest): Promise<{ head: SeoHead | undefined, scripts: string[], styles: string[], fonts: FontAssets | undefined }> {
+export async function configHead(root: string, config: KayConfig, clientDir: string, bundled = false, appServesManifest = false): Promise<{ head: SeoHead | undefined, scripts: string[], styles: string[], fonts: FontAssets | undefined }> {
   const extra: HeadTag[] = []
   const scripts: string[] = []
   const styles: string[] = []
@@ -64,7 +63,7 @@ export async function configHead(root: string, config: KayConfig, clientDir: str
   const social = config.site !== undefined || config.seo !== undefined
   const sizeOf = social ? await cardImageSizes(projectPaths(root, config).public) : undefined
 
-  return { head: seoHead(config.site, config.seo, extra, config.trailingSlash, basePath(config.base), sizeOf, appManifest), scripts, styles, fonts }
+  return { head: seoHead(config.site, config.seo, extra, config.trailingSlash, basePath(config.base), sizeOf, appServesManifest), scripts, styles, fonts }
 }
 
 // The pixel size of a card image named by its path: an imported image's, a public file's, read once here, and a share card's 1200x630.
@@ -93,7 +92,7 @@ export async function cardImageSizes(publicDir: string): Promise<(path: string) 
 
 // What `site`, `seo` and other settings such as the favicon give every page's head, or undefined when the project sets none and pages keep only their own tags.
 // Every URL it makes absolute goes under `base`, the site's mount point.
-export function seoHead(site: string | undefined, seo: SeoConfig = {}, extra: HeadTag[] = [], trailingSlash?: TrailingSlash, base = '', sizeOf?: (path: string) => ImageSize | undefined, appManifest?: AppManifest): SeoHead | undefined {
+export function seoHead(site: string | undefined, seo: SeoConfig = {}, extra: HeadTag[] = [], trailingSlash?: TrailingSlash, base = '', sizeOf?: (path: string) => ImageSize | undefined, appServesManifest = false): SeoHead | undefined {
   const origin = site === undefined ? undefined : siteOrigin(site) + base
 
   // Fonts or a favicon alone give a page no social card.
@@ -113,7 +112,7 @@ export function seoHead(site: string | undefined, seo: SeoConfig = {}, extra: He
 
     const text = (value: Localized | undefined) => localizedText(value, locale, defaultLocale)
     // The manifest link follows the locale, its text read in it, unless the app serves the manifest itself.
-    const manifest = appManifest?.served === true ? undefined : manifestPath(locale, seo, defaultLocale)
+    const manifest = appServesManifest ? undefined : manifestPath(locale, seo, defaultLocale)
     const own = manifest === undefined ? extra : extra.map(tag => isOwnManifest(tag) ? { ...tag, props: { ...tag.props, href: manifest } } : tag)
     const tags: HeadTag[] = social ? [...own, meta('property', 'og:type', 'website')] : [...own]
     const name = text(seo.name)

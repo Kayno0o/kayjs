@@ -1,4 +1,4 @@
-import type { I18nConfig } from '../src/config'
+import type { I18nConfig, KayConfig } from '../src/config'
 import type { ScratchBuild } from './prerendered'
 import { existsSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
@@ -439,12 +439,12 @@ describe('locale detection', () => {
 })
 
 describe('prerendering', () => {
-  async function prerendered(config: I18nConfig, check: (build: ScratchBuild) => Promise<void>): Promise<void> {
+  async function prerendered(config: I18nConfig, check: (build: ScratchBuild) => Promise<void>, more: Partial<KayConfig> = {}): Promise<void> {
     const build = await scratchBuild()
 
     try {
       // The home page that marks prerender, and the pages reading nothing from a request, in each of the two locales.
-      expect(await build.prerender({ routes, i18n: config })).toBe(6)
+      expect(await build.prerender({ routes, i18n: config, ...more })).toBe(6)
       await check(build)
     }
     finally {
@@ -463,6 +463,15 @@ describe('prerendering', () => {
       expect(english.html).toContain('<h1>Hello Ada</h1>')
       expect(english.etag).not.toBeNull()
     })
+  })
+
+  it('links no locale manifest from a page prerendered while the app serves the default one itself', async () => {
+    const publicDir = await scratchDir('manifest-')
+
+    await Bun.write(join(publicDir, 'manifest.webmanifest'), '{"name":"Mine"}')
+    await prerendered(i18n, async (build) => {
+      expect(await Bun.file(join(build.pages, 'en.html')).text()).toContain('<link rel="manifest" href="/manifest.webmanifest">')
+    }, { publicDir, seo: { name: { fr: 'Le site', en: 'The site' } } })
   })
 
   it('hands a page hook the locale each page was rendered in', async () => {
