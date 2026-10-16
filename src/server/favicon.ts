@@ -69,6 +69,8 @@ export interface FaviconOptions {
   description?: Localized | undefined
   locales?: ManifestLocales | undefined
   manifest?: ManifestConfig | undefined
+  // The app serves the default manifest itself, so kay serves none, as the pages link none of the locales'.
+  appManifest?: boolean | undefined
   // The site's mount point, which the manifest's paths go under.
   base?: string | undefined
 }
@@ -318,16 +320,10 @@ export function serveFavicons(app: Elysia, served: ServedPaths, options: Favicon
   const texts = { name: options.name, description: options.description }
   const defaultLocale = options.locales?.defaultLocale
 
-  const manifests = [{ path: MANIFEST, locale: defaultLocale }, ...localeManifests(texts, options.locales)]
+  const manifests = options.appManifest === true ? [] : [{ path: MANIFEST, locale: defaultLocale }, ...localeManifests(texts, options.locales)]
 
   for (const { path, locale } of manifests) {
-    const offered = served.offer({ path, owner: 'the web app manifest', kind: 'kay', exported: true })
-
-    // The app's own manifest is the one pages link, so kay serves none of the locales'.
-    if (path === MANIFEST && !offered)
-      break
-
-    if (!offered)
+    if (!served.offer({ path, owner: 'the web app manifest', kind: 'kay', exported: true }))
       continue
 
     const manifest = manifestJson(localizedText(options.name, locale, defaultLocale), localizedText(options.description, locale, defaultLocale), options.manifest, options.base)

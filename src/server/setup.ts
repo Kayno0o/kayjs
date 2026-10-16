@@ -52,6 +52,8 @@ export interface PageSetup {
   // The files of `public/` and the endpoints, which the server claims paths for once it boots.
   files: PublicFile[]
   endpoints: Endpoint[]
+  // Whether the app serves the default manifest itself, which kay then links in place of the locales'.
+  appManifest: boolean
 }
 
 // What serving pages and prerendering them both start from: the routes and their param matchers, the collections, the locales, the head and the render options.
@@ -111,5 +113,5 @@ export async function setupPages(project: Project, loadClient: () => ClientBuild
   if (i18n)
     i18n.settings = linkedSettings(i18n.settings, routes, collections)
 
-  return { source, client, mounts, routes, matchers, collections, i18n, locales, base, site, imageCache, scripts, styles, renderOptions: renderOptionsOf(config, mode, { head, maxDensity, editor: source.editor(root, config) }), cards, files, endpoints }
+  return { source, client, mounts, routes, matchers, collections, i18n, locales, base, site, imageCache, scripts, styles, renderOptions: renderOptionsOf(config, mode, { head, maxDensity, editor: source.editor(root, config) }), cards, files, endpoints, appManifest: ownManifest }
 }
