@@ -34,7 +34,7 @@ const LINK = /\]\(((?:llms\/)?[\w-]+\.md)?(#[\w-]+)?\)/g
 const CARD_LINK = /ModuleCard\([^)]*\bhref="([^"]+)"/g
 const FRONTMATTER_PATH = /^path: (.+)$/m
 const HOME_LINK = /href[=:] ?["'](\/[\w/-]*?)\/?(?:#([\w-]+))?["']/g
-const FENCE = /^```[\s\S]*?^```/gm
+const FENCE = /^```[\s\S]+?^```/gm
 const FRONTMATTER = /^---\n[\s\S]*?\n---\n/
 const BLANK_LINE = /\n\s*\n/
 const LIST_ITEM = /\n(?=\s*(?:[-*]|\d+\.) )/
@@ -151,6 +151,7 @@ describe('the documentation site', () => {
 
       for (const block of body.split(BLANK_LINE).flatMap(paragraph => paragraph.split(LIST_ITEM))) {
         const text = block.trim()
+
         if (text.length > PARAGRAPH_CAP && !NOT_PROSE.test(text))
           long.push(`${file}: ${text.length} characters, "${text.slice(0, 60)}"`)
       }
