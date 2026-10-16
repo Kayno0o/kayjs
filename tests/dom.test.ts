@@ -2009,10 +2009,10 @@ describe('the dev patch', () => {
   })
 
   it('leaves the stylesheets to the live reload', () => {
-    const { happyDOM } = globalThis as unknown as { happyDOM: { settings: { disableCSSFileLoading: boolean } } }
+    const { happyDOM } = globalThis as unknown as { happyDOM: { settings: { disableCSSFileLoading: boolean, handleDisabledFileLoadingAsSuccess: boolean } } }
     const before = page('<p>Text</p>', '<link rel="stylesheet" href="/app-1.css">')
 
-    happyDOM.settings.disableCSSFileLoading = true
+    Object.assign(happyDOM.settings, { disableCSSFileLoading: true, handleDisabledFileLoadingAsSuccess: true })
 
     try {
       const live = parse(before)
@@ -2022,7 +2022,7 @@ describe('the dev patch', () => {
       expect(live.querySelector('p')!.textContent).toBe('Other')
     }
     finally {
-      happyDOM.settings.disableCSSFileLoading = false
+      Object.assign(happyDOM.settings, { disableCSSFileLoading: false, handleDisabledFileLoadingAsSuccess: false })
     }
   })
 })
