@@ -113,6 +113,14 @@ describe('kay build --format json', () => {
     expect(built.compiled.ms).toBeGreaterThan(0)
   }, 60_000)
 
+  it('compiles a project with no server entry into an executable serving its pages on PORT', async () => {
+    const root = await project({ 'kay.config.ts': 'export default { favicon: false }\n', 'src/routes/index.kay': 'p Home\n' })
+    const built = await kay(['build', root, '--no-check', '--compile', join(root, 'server'), '--verify'])
+
+    expect(built.code, built.stderr).toBe(0)
+    expect(await Bun.file(join(outputDir(root), 'executable')).exists()).toBe(true)
+  }, 60_000)
+
   it('starts the executable it compiled under --verify, and fails the build with the server\'s own error when it cannot start', async () => {
     const serving = 'import { Elysia } from \'elysia\'\nimport { pages } from \'kay/server\'\n\nnew Elysia().use(await pages()).listen(Number(process.env.PORT))\n'
     const files = { 'kay.config.ts': 'export default { favicon: false }\n', 'src/routes/index.kay': 'p Home\n' }

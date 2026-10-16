@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- `schedule` takes a list of jobs, or a table of schedules to jobs, in one plugin, and `boot: true` runs them once as the server starts; `kay build --compile` compiles a project with no `src/server.ts` into kay's own server of its pages, so an app with nothing custom writes no server entry ([Production](production.md#background-jobs), [Project](project.md)).
 - `kay new --host github` writes a GitHub Actions workflow in `.github/workflows`, annotating each `kay check` problem on the diff and publishing a static site with GitHub Pages; the host is read from the `origin` remote when the flag is absent, Forgejo by default ([Project](project.md)).
 - `LineChart` no longer makes the page scroll past its content when it has many labels: its data table for screen readers sits in a visually hidden block, as a table box ignored the hiding ([kayjs-ui](../packages/ui/llms.txt)).
 - Pages, layouts, guards, endpoints and actions share one request context, `RequestContext`: `request`, `url`, `locale`, `params`, `cookies`, `locals`, `headers`, `redirect`, `notFound` and `deny` read and stop the same way in each, an endpoint gets `cookies`, `headers`, `locale`, `redirect`, `notFound` and `deny` it lacked, an action `url`, `notFound` and `deny`, a guard `notFound`, and `redirect` is written as a statement everywhere ([Routing](routing.md#the-request-context)).

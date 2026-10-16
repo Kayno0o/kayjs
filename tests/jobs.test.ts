@@ -116,6 +116,105 @@ describe('schedule', () => {
     expect(typed(() => schedule('0 0 31 04 *', () => undefined))).toBe(true)
   })
 
+  it('runs a list of jobs, and a table of schedules to jobs, each on its own schedule from one plugin', async () => {
+    const cron = fakeCron()
+    const runs: string[] = []
+    const jobs = [() => runs.push('a'), async () => {
+      throw new Error('b down')
+    }, () => runs.push('c')]
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+    const app = new Elysia().use(schedule({ '@hourly': jobs, '0 2 * * *': () => runs.push('daily'), '30s': () => runs.push('often') }, { tz: 'Europe/Paris' })).listen(0)
+
+    try {
+      expect(cron.fired).toHaveLength(4)
+      await Promise.all(cron.fired.map(async entry => entry.handler()))
+      expect(runs.toSorted()).toEqual(['a', 'c', 'daily'])
+      expect(logged.mock.calls.flat().join(' ')).toContain('kay: the job scheduled @hourly failed')
+      await shutdown(app)
+      expect(cron.fired.map(entry => entry.stopped)).toEqual([true, true, true, true])
+    }
+    finally {
+      logged.mockRestore()
+      cron.restore()
+    }
+  })
+
+  it('numbers the locks of several jobs sharing one, each taken once across processes', async () => {
+    const cron = fakeCron()
+    const path = await jobsPath()
+    const runs: string[] = []
+
+    setSystemTime(new Date('2026-01-01T12:00:00Z'))
+
+    const process = (name: string) => new Elysia().use(schedule('@hourly', [() => runs.push(`${name}-a`), () => runs.push(`${name}-b`)], { lock: 'report', store: sqliteJobs(path) })).listen(0)
+    const first = process('first')
+    const second = process('second')
+
+    try {
+      await Promise.all(cron.fired.map(async entry => entry.handler()))
+      expect(runs.toSorted()).toEqual(['first-a', 'first-b'])
+    }
+    finally {
+      setSystemTime()
+      cron.restore()
+      await Promise.all([shutdown(first), shutdown(second)])
+    }
+  })
+
+  it('runs the jobs once as the server starts with boot, the lock taken and a stop waiting for the run', async () => {
+    const cron = fakeCron()
+    const path = await jobsPath()
+    const runs: string[] = []
+
+    setSystemTime(new Date('2026-01-01T12:00:00Z'))
+
+    const app = new Elysia().use(schedule('@daily', async () => {
+      await Bun.sleep(20)
+      runs.push('cron')
+    }, { boot: true, lock: 'boot', store: sqliteJobs(path) }))
+    const other = new Elysia().use(schedule('@hourly', () => runs.push('other'), { boot: true, lock: 'boot', store: sqliteJobs(path) }))
+
+    try {
+      app.listen(0)
+      other.listen(0)
+      await shutdown(app)
+      expect(runs).toEqual(['cron'])
+      expect(cron.fired[0]!.stopped).toBe(true)
+      await shutdown(other)
+      expect(runs).toEqual(['cron'])
+    }
+    finally {
+      setSystemTime()
+      cron.restore()
+    }
+  })
+
+  it('runs a job at boot only when asked to', async () => {
+    const cron = fakeCron()
+    const runs: string[] = []
+    const app = new Elysia().use(schedule({ '@daily': () => runs.push('daily') })).use(schedule('30s', () => runs.push('every'), { boot: true })).listen(0)
+
+    try {
+      await shutdown(app)
+      expect(runs).toEqual(['every'])
+    }
+    finally {
+      cron.restore()
+    }
+  })
+
+  it('types a table by its keys, refusing a schedule that never comes or a length that is not positive', () => {
+    const typed = (_build: () => unknown) => true
+
+    expect(typed(() => schedule({ '@hourly': () => undefined, '30 2 * * MON': [() => undefined], '30s': () => undefined }, { tz: 'Europe/Paris', boot: true }))).toBe(true)
+    // @ts-expect-error -- no such nickname
+    expect(typed(() => schedule({ '@minutely': () => undefined }))).toBe(true)
+    // @ts-expect-error -- February has no 30th
+    expect(typed(() => schedule({ '0 0 30 feb *': () => undefined }))).toBe(true)
+    // @ts-expect-error -- not a function
+    expect(typed(() => schedule({ '@hourly': 'purge' }))).toBe(true)
+  })
+
   it('runs a locked schedule once across processes sharing its store, each minute it comes', async () => {
     const cron = fakeCron()
     const path = await jobsPath()

@@ -242,6 +242,8 @@ new Elysia()
 - Stopping on a signal waits for a scheduled run in progress, and for every `onStop` hook the app registers, async ones included, in turn.
 - `shutdown(app)` from `kay/server` stops a server the same way, as a test does; Elysia's own `app.stop()` does not wait for the hooks.
 - With several server processes, each runs its own schedules.
+- `schedule(cron, [jobA, jobB])` gives each job of the list that schedule, and `schedule({ '* * * * *': [jobA, jobB], '@hourly': jobC, '30s': jobD }, options)` several schedules at once, each key checked as a literal schedule is and `tz` read by the crons alone, all in one plugin: `lock` then names each job `<lock>:<its place among them>`.
+- `schedule(cron, job, { boot: true })` runs the jobs once as the server starts too, taking the lock like any run, a stop waiting for it, so a job needing a first run does not start itself by hand.
 - `schedule(cron, job, { lock: 'weekly-report' })` runs each time once across every process sharing the job store (below), the first to reach it taking it; `store` names another store than the default one.
 
 A queue holds jobs that must not be lost: an action enqueues one and goes on, and the server runs it in the background, after a restart or a deploy if need be:

@@ -28,6 +28,18 @@ new Elysia()
   .listen(3000)
 ```
 
+Several jobs go in one call, as a list for one schedule or a table of schedules, and `boot: true` also runs them once as the server starts:
+
+```ts
+app.use(schedule({
+  '* * * * *': [collectTraffic, checkSites],
+  '12 * * * *': checkCertificates,
+  '30s': collectMetrics,
+}, { boot: true }))
+```
+
+With `lock`, each job takes `<lock>:<its place>` as its lock. `tz` applies to the crons and not to the lengths.
+
 A cron has five fields or a nickname such as `@daily`, and a cron that can never run, such as `0 0 30 2 *`, is a type error. A length such as `'30s'` or `'1h'` runs at each multiple of it. Runs never overlap, and a run that throws is logged without stopping the next. With several server processes, `{ lock: 'weekly-report' }` runs the job once across all of them.
 
 ## Long-running work

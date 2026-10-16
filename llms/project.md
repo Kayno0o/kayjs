@@ -76,6 +76,8 @@ kay build --compile server
 PORT=8080 ./server
 ```
 
+A project with no `src/server.ts` and no `--entry` runs kay's own server of its pages on `PORT`, 3000 by default, as `kay dev`, `kay start` and `kay render` do, so an app with nothing custom on its server writes no entry: it adds one to mount a plugin, a job or an `onStop` hook.
+
 ### Export a static site
 
 `--static` writes the whole site to a directory for a host with no server:

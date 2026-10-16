@@ -5,6 +5,7 @@ import { existsSync } from 'node:fs'
 import { basename, dirname, join, resolve } from 'node:path'
 import { buildFailure, KayError, raisedMark } from '../compiler/errors'
 import { CONFIG_FILE } from '../config'
+import { PAGES_ENTRY } from '../dev/sources'
 import { projectApi } from '../server/api-modules'
 import { AVIF_WORKER_SOURCE } from '../server/avif'
 import { DEFAULT_LANG, extensionMessageFiles, messagesFile } from '../server/i18n'
@@ -17,7 +18,7 @@ import { runtimeConfig, withoutPlugins } from './runtime-config'
 import { withoutStyles } from './styles'
 
 export interface CompileOptions {
-  // The server entry, `src/server.ts` under the root by default.
+  // The server entry, `src/server.ts` under the root by default; with no file there, kay's own server of the pages.
   entry?: string | undefined
   outfile: string
   // The packages the browser build ships, credited with the server's in what `--licenses` prints.
@@ -65,12 +66,17 @@ function compressedWasm(): BunPlugin {
   }
 }
 
+// The project's server entry, else kay's own, which only mounts the pages.
+function ownEntry(entry: string): string {
+  return existsSync(entry) ? entry : PAGES_ENTRY
+}
+
 // Bundles the server, its pages and the client build `kay build` wrote into one executable, which runs as `NODE_ENV=production bun <entry>` would.
 // The entry it generates registers every route module before the server entry calls `pages()`, which then reads nothing from disk but the embedded files.
 export async function compileServer(project: Project, options: CompileOptions): Promise<string> {
   const { root, config, paths } = project
   const { routes: routesDir, public: publicDir, output: clientBase } = paths
-  const entry = options.entry === undefined ? paths.entry : resolve(root, options.entry)
+  const entry = options.entry === undefined ? ownEntry(paths.entry) : resolve(root, options.entry)
   const outfile = resolve(root, options.outfile)
 
   if (!existsSync(entry))

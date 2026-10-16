@@ -14,7 +14,15 @@ export interface ScheduleOptions {
   lock?: string | undefined
   // Where the lock is taken: the queues' default store unless given.
   store?: JobStore | undefined
+  // Runs each job once as the server starts too, taking the lock like any run, without waiting for the first time it comes.
+  boot?: boolean | undefined
 }
+
+export type Job = () => unknown
+type Jobs = Job | readonly Job[]
+
+// What a table's key must be: a positive length, or a cron that comes some day.
+type WhenOf<Key extends string> = Key extends Duration ? PositiveDuration<Key> : CronSchedule<Key>
 
 // What a schedule repeating every so long takes: it runs on the epoch's multiples of its length, the same instants in every time zone.
 export type EveryOptions = Omit<ScheduleOptions, 'tz'>
@@ -23,11 +31,26 @@ export type EveryOptions = Omit<ScheduleOptions, 'tz'>
 const SLOT_MS = 60_000
 
 // Runs `job` on a cron schedule, such as `@hourly` or `30 2 * * MON`, or every so long, `'30s'` or `30` seconds, from when the server starts until it stops: once per process, or once across processes with `lock`, never two runs at a time.
+// A list of jobs, or a table of schedules to jobs, gives each job a schedule of its own in one plugin, a table's `tz` read by its crons alone; with `lock`, each job's lock is its name and its place among them, `report:0`.
 // A run that throws is logged and the next one comes as planned; a stopping server waits for the run in progress.
-export function schedule<const Every extends Duration>(every: Every & PositiveDuration<Every>, job: () => unknown, options?: EveryOptions): Elysia
-export function schedule<const Cron extends string>(cron: Cron & CronSchedule<Cron>, job: () => unknown, options?: ScheduleOptions): Elysia
-export function schedule(when: Duration | string, job: () => unknown, options: ScheduleOptions = {}) {
-  return typeof when === 'number' || DURATION_TEXT.test(when) ? scheduleEvery(when as Duration, job, options) : scheduleCron(when, job, options)
+export function schedule<const Every extends Duration>(every: Every & PositiveDuration<Every>, jobs: Jobs, options?: EveryOptions): Elysia
+export function schedule<const Cron extends string>(cron: Cron & CronSchedule<Cron>, jobs: Jobs, options?: ScheduleOptions): Elysia
+export function schedule<const Table extends Record<string, Jobs>>(table: Table & { readonly [Key in keyof Table & string]: Jobs & WhenOf<Key> }, options?: ScheduleOptions): Elysia
+export function schedule(first: Duration | string | Record<string, Jobs>, second?: Jobs | ScheduleOptions, third?: ScheduleOptions) {
+  const table = typeof first === 'object'
+  const entries = table ? Object.entries(first) : [[first, second as Jobs] as const]
+  const options = (table ? second : third) as ScheduleOptions | undefined ?? {}
+  const jobs = entries.flatMap(([when, listed]) => (Array.isArray(listed) ? listed as Job[] : [listed as Job]).map(job => [when, job] as const))
+  const plugins = jobs.map(([when, job], index) => {
+    const own = jobs.length > 1 && options.lock !== undefined ? { ...options, lock: `${options.lock}:${index}` } : options
+
+    if (typeof when === 'number' || DURATION_TEXT.test(when))
+      return scheduleEvery(when as Duration, job, table ? { ...own, tz: undefined } : own)
+
+    return scheduleCron(when, job, own)
+  })
+
+  return plugins.length === 1 ? plugins[0]! : plugins.reduce((app, plugin) => app.use(plugin), new Elysia())
 }
 
 function scheduleCron(cron: string, job: () => unknown, options: ScheduleOptions) {
@@ -39,21 +62,29 @@ function scheduleCron(cron: string, job: () => unknown, options: ScheduleOptions
 
   let handle: Bun.CronJob | undefined
   let running: Promise<void> | undefined
+  let booting: Promise<void> | undefined
   const run = scheduledRun(cron, SLOT_MS, job, options)
 
   // Unnamed, so Elysia never takes two schedules for one plugin.
   return new Elysia()
     .onStart(() => {
-      handle ??= Bun.cron(cron, async () => {
+      if (handle)
+        return
+
+      handle = Bun.cron(cron, async () => {
         running = run()
         await running
         running = undefined
       }, zone)
+
+      if (options.boot === true)
+        booting = run()
     })
     .onStop(async () => {
       handle?.stop()
       handle = undefined
-      await running
+      await Promise.all([running, booting])
+      booting = undefined
     })
 }
 
@@ -66,6 +97,7 @@ function scheduleEvery(every: Duration, job: () => unknown, options: ScheduleOpt
 
   let timer: Timer | undefined
   let running: Promise<void> | undefined
+  let booting: Promise<void> | undefined
   const run = scheduledRun(`every ${String(every)}`, ms, job, options)
 
   const plan = () => {
@@ -83,13 +115,19 @@ function scheduleEvery(every: Duration, job: () => unknown, options: ScheduleOpt
 
   return new Elysia()
     .onStart(() => {
-      if (!timer)
-        plan()
+      if (timer)
+        return
+
+      plan()
+
+      if (options.boot === true)
+        booting = run()
     })
     .onStop(async () => {
       clearTimeout(timer)
       timer = undefined
-      await running
+      await Promise.all([running, booting])
+      booting = undefined
     })
 }
 

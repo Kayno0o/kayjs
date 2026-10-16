@@ -96,7 +96,7 @@ When another process holds the port, the server moves to the next free one, and 
 
 The dev server answers 421 to a request whose `Host` is not `localhost`, a `*.localhost` name, an IP address or the site's host, so a page of another site that renames itself to this machine (DNS rebinding) cannot read it. Any other name the server is reached by, such as a tunnel's, goes in `KAY_DEV_HOSTS`, comma-separated and without ports: `KAY_DEV_HOSTS=dev.example.com bunx kay dev --host`.
 
-A project with no server entry, such as a static site, gets a server of kay's own on `PORT` (3000 by default).
+A project with no server entry, such as a static site, gets a server of kay's own on `PORT` (3000 by default). So does `kay build --compile`.
 
 The terminal shows the address once, then one line per restart, naming what changed and how long the new server took to listen, or how long a stylesheet edit took to reach the server, with `, now on <address>` when the address changed, and says so when the server exits on its own:
 

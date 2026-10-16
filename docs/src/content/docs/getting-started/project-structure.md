@@ -34,7 +34,7 @@ import { pages } from 'kay/server'
 export const app = new Elysia().use(await pages()).listen(3000)
 ```
 
-Exporting `app` lets `kay check` check links against your own routes and types `ctx.locals`. A static site has no server entry: `kay dev` serves the pages itself.
+Exporting `app` lets `kay check` check links against your own routes and types `ctx.locals`. A project with nothing custom on its server has no server entry: kay serves the pages itself.
 
 ## kay.config.ts
 
