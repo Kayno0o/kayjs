@@ -215,8 +215,8 @@ let scriptSecretRead = false
 
 function readScriptSecret(): void {
   if (!scriptSecretRead && current.store === undefined) {
-    scriptSecretRead = true
     setupStampSecret(undefined)
+    scriptSecretRead = true
   }
 }
 
