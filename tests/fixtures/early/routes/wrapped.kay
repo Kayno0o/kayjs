@@ -4,6 +4,7 @@ const data = {
   count: Promise.resolve(3),
   late: new Promise<string>((_resolve, reject) => setTimeout(reject, 60, new Error('late'))),
   unclaimed: Promise.resolve('x'),
+  inner: Promise.reject(new Error('inner')),
 }
 
 await Bun.sleep(20)
@@ -24,3 +25,9 @@ catch
   p.late Late is down
 await data.unclaimed then text
   p.plain {text}
+  await data.inner
+    p.inner Waiting
+  then value
+    p {value}
+  catch
+    p.innerfailed Inner is down

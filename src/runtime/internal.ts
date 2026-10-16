@@ -1,15 +1,11 @@
-import type { Deferred } from './checks'
-
 // The compiler's output contract, not API: what generated code imports, free to change with any release.
 export { actionStub, formAction, formChecked, formDescribed, formError, formInvalid, formMarked, formProtection, formValue, isAction, registerActions } from './action'
 export { registerImage } from './image'
 
-export type AutoDeferred<T> = T extends Promise<infer Value> ? Deferred<Value> : T
-
-// A server value an `await` block renders: a promise is handled at once, as `defer()` handles it, and anything else is left as it is.
-export function autoDefer<T>(value: T): AutoDeferred<T> {
+// Takes the rejection of a server value an `await` block renders by name right where it is declared, so no later statement of the fence can leave it unhandled; any other promise is held by the server until its block takes it.
+export function autoDefer<T>(value: T): T {
   if (value instanceof Promise)
     void Promise.allSettled([value])
 
-  return value as AutoDeferred<T>
+  return value
 }

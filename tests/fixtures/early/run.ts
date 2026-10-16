@@ -19,7 +19,7 @@ const result: Record<string, unknown> = {}
 const rejected = () => Promise.reject(new Error('down'))
 
 // Each promise rejects before its block renders.
-const early = [rejected(), rejected(), rejected()] as const
+const early = [rejected(), rejected()] as const
 
 await Bun.sleep(20)
 
@@ -34,18 +34,17 @@ result.page = await (await app.handle(new Request('http://localhost/wrapped'))).
 const logged: unknown[][] = []
 const log = console.error
 
-earlyRejections.graceMs = 30
+earlyRejections.graceMs = 300
 console.error = (...args: unknown[]) => void logged.push(args)
 
-const lost = Promise.reject(new Error('lost'))
+void Promise.reject(new Error('lost'))
 const taken = Promise.reject(new Error('taken'))
 
-await Bun.sleep(10)
+await Bun.sleep(20)
 await Promise.allSettled([taken])
-await Bun.sleep(80)
+await Bun.sleep(700)
 console.error = log
 
 result.logged = logged.map(args => args.map(arg => arg instanceof Error ? arg.message : String(arg)))
-result.alive = lost instanceof Promise
 
 console.log(JSON.stringify(result))

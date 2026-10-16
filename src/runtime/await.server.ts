@@ -14,30 +14,45 @@ export interface PendingBlock {
 }
 
 interface EarlyRejections {
-  // Rejected promises nothing has taken yet, with how they failed.
-  held: Map<Promise<unknown>, unknown>
+  // Rejected promises nothing has taken yet, with how they failed and the timer that logs them.
+  held: Map<Promise<unknown>, { reason: unknown, timer: ReturnType<typeof setTimeout> }>
   // How long one may wait for an `await` block, or any code, to take it before it is logged.
   graceMs: number
 }
 
 // Shared by every copy of the runtime in the process, so one listener holds them all.
-const EARLY = Symbol.for('kay.earlyRejections')
+const EARLY = Symbol.for('kay.earlyRejections.1')
 const early = ((globalThis as Record<symbol, unknown>)[EARLY] ??= installEarlyRejections()) as EarlyRejections
 
 export const earlyRejections: Pick<EarlyRejections, 'graceMs'> = early
 
+const NOT_TAKEN = 'kay: a promise rejected and nothing took it'
+
 // A promise a page's data holds can reject before its `await` block renders, whoever made it: the process would crash on it, so it is held until something takes it, and logged if nothing does.
+// A process ending first logs what it still holds and exits with code 1, as an unhandled rejection ends it without this.
 function installEarlyRejections(): EarlyRejections {
   const state: EarlyRejections = { held: new Map(), graceMs: 30_000 }
 
   process.on('unhandledRejection', (reason, promise) => {
-    state.held.set(promise, reason)
-    setTimeout(() => {
-      if (state.held.delete(promise))
-        console.error('kay: a promise rejected and nothing took it', reason)
-    }, state.graceMs).unref()
+    const timer = setTimeout(() => {
+      state.held.delete(promise)
+      console.error(NOT_TAKEN, reason)
+    }, state.graceMs)
+
+    timer.unref()
+    state.held.set(promise, { reason, timer })
   })
-  process.on('rejectionHandled', promise => state.held.delete(promise))
+  process.on('rejectionHandled', (promise) => {
+    clearTimeout(state.held.get(promise)?.timer)
+    state.held.delete(promise)
+  })
+  process.on('exit', () => {
+    for (const { reason } of state.held.values())
+      console.error(NOT_TAKEN, reason)
+
+    if (state.held.size > 0 && (process.exitCode === undefined || process.exitCode === 0))
+      process.exitCode = 1
+  })
 
   return state
 }

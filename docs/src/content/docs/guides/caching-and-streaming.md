@@ -96,7 +96,7 @@ catch
   p Comments are unavailable
 ```
 
-A promise may fail before the page gets to its block. That crashes nothing: the block still shows its `catch`. A promise that fails and that nothing awaits is logged after 30 seconds. `defer()` from `kay` is no longer needed, though code that still calls it keeps working.
+A promise may fail before the page gets to its block. That crashes nothing: the block still shows its `catch`. Kay holds any promise that fails with nothing awaiting it, in your own code too, instead of stopping the server. It logs the failure after 30 seconds, or when the process ends, which then exits with code 1. `defer()` from `kay` is no longer needed, though code that still calls it keeps working.
 
 <Callout type="warning">
 

@@ -27,7 +27,7 @@ import { collection } from 'kay/content'
 | `ActionError`, `ActionRedirect` | What an action called from an island throws: its schema's messages, or the redirect it answered |
 | `focusInvalid`, `flush` | Focus the first invalid field once pending writes rendered; run pending effects now |
 | `guard` | A route guard. See [Sessions and guards](/guides/sessions-and-guards) |
-| `defer` | Makes a promise an `await` block can stream |
+| `defer` | No longer needed, as an `await` block streams any promise; returns the promise as is |
 | `navigate`, `refresh` | Go to a page, or re-render the current one, without a reload |
 | `searchResults`, `searchSite` | The site search from an island: following a signal holding the query, or as a promise |
 | `shortcut` | Binds a keyboard shortcut such as `mod+s` for as long as the island lives, on the page or one element. See [Islands](/essentials/islands#keyboard-shortcuts) |

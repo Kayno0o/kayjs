@@ -177,7 +177,7 @@ catch
 - Without `catch`, a rejection removes the pending block and is logged, which `kay check` warns of (`uncaught-await`).
 - A `then` block that throws while rendering is a bug, not a rejection: it removes the pending block and is logged too, never showing `catch`.
 - An `await` block takes any promise, whatever made it: a server fence variable, `await data.comments`, a prop or one a component makes; a value that is no promise renders at once.
-- A promise rejecting before its block renders crashes nothing: the server holds it until a block, or any code, takes it, and logs one nothing took within 30 seconds. `defer()` from `kay` is no longer needed and still works.
+- A promise rejecting before its block renders crashes nothing: the server holds every unhandled rejection of its process until a block, or any code, takes it, logs one nothing took within 30 seconds, and a process ending with one held logs it and exits with code 1. `defer()` from `kay` is no longer needed and still works.
 - Status, headers and cookies are sent before the first block, so a streamed block cannot redirect or set them, and a `head` block inside one is ignored.
 - A block renders on its own, outside its layouts, and an `await` inside a pending block renders its own pending block only.
 - The response stays open until the last value settles, an empty comment going out every 5 seconds meanwhile, so neither Bun, which closes a connection idle for 10 seconds by default, nor a proxy in front closes it under a slow value.

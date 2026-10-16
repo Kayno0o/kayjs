@@ -258,7 +258,7 @@ export class JsxTemplate {
     const { b } = this
 
     b.wrap(node, () => {
-      // An error about the value, such as a promise `defer()` never took, lands on the value itself.
+      // An error about the value lands on the value itself.
       b.add('<KayAwait ')
       b.wrap(node.value, () => b.add('value'))
       b.add('={').addSource(node.value).add('}')
