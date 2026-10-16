@@ -5,8 +5,7 @@ import { mkdir, readdir, rm, stat } from 'node:fs/promises'
 import { join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { pruneCache, touchCacheFile } from '../build/cache'
-import { resolveFrom, writeAtomically } from '../build/files'
-import { importsOf } from '../build/libraries'
+import { resolveFrom, scriptLoader, transpilerFor, writeAtomically } from '../build/files'
 import { KayError } from '../compiler/errors'
 import { modeOf, cacheDir as projectCache } from '../project'
 import { projectSource } from '../server/source'
@@ -273,7 +272,8 @@ async function importedSource(root: string, config: string | undefined): Promise
 
       hashes.set(file, Bun.hash(source).toString(36))
 
-      for (const specifier of await importsOf(file, source)) {
+      // Scanned here rather than through build/libraries, which pulls the .kay parser into the production server.
+      for (const { path: specifier } of transpilerFor(scriptLoader(file)).scanImports(source)) {
         const target = resolveFrom(specifier, file)
 
         if (target !== undefined && target.startsWith(project) && !target.includes(`${sep}node_modules${sep}`) && SCRIPT_MODULE.test(target))
