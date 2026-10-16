@@ -1,8 +1,25 @@
-import { expect, test } from 'bun:test'
+import { Database } from '@kaynooo/pg-orm'
+import { afterAll, expect, test } from 'bun:test'
 import { memoryStore } from '../src/memoryStore'
+import { authTables, pgStore } from '../src/pg'
 import { storeContract } from './helpers/storeContract'
 
+const opened: Database[] = []
+
+afterAll(async () => {
+  await Promise.all(opened.map(async db => db.close()))
+})
+
 storeContract('memoryStore', async () => memoryStore())
+
+storeContract('pgStore on SQLite', async () => {
+  const db = new Database({ url: 'sqlite://:memory:', tables: [...authTables] })
+
+  opened.push(db)
+  await db.sync({ allowDestructive: true })
+
+  return pgStore(db)
+})
 
 test('memoryStore lists audit entries of one millisecond newest added first', async () => {
   const store = memoryStore()
