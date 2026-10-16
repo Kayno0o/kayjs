@@ -16,6 +16,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - Self-hosted fonts get a metric-matched fallback: a `"Family Fallback"` face (Arial, Times New Roman or Courier New resized to the font) is declared and listed after the family in built stylesheets, so the swap shifts the layout less ([Head](head.md#self-host-a-font)).
 - `seo.name`, `titleTemplate`, `description`, `image`, `imageAlt` and `locale` take a record of one text per locale, so a multilingual site writes its descriptions in `kay.config.ts` rather than a `meta` tag per page; the head lints check each ([Head](head.md#site-defaults-and-social-cards)).
 - kayjs-mail's `contactForm(mail, options)` and kayjs-ui's `ContactForm` make a contact form of one line, `export const contact = action(...contactForm(mail))` and `ContactForm(action={contact})`: the schema, the link cap, `rateLimit`, `honeypot` and `minTime`, the mail with the visitor in `replyTo`, and worded 503 and 502 refusals come with them, in English and French ([kayjs-mail](../packages/mail/llms.txt), [kayjs-ui](../packages/ui/llms.txt)).
+- `kay check` reports a `match` with no `else` over a finite union whose `when` lines leave members out, naming them (`incomplete-match`; [Checks](checks.md)).
 
 ## 1.46.0
 

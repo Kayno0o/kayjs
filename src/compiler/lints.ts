@@ -257,6 +257,14 @@ export const LINTS = {
     wrong: 'for post of posts\n  PostRow(slug={post.slug} title={post.title})',
     right: 'for post of posts key={post.slug}\n  PostRow(slug={post.slug} title={post.title})',
   },
+  'incomplete-match': {
+    level: 'warn',
+    group: 'code',
+    typed: true,
+    summary: 'A `match` with no `else` over a finite union (string or number literals, an enum, a boolean, `null`, `undefined`) whose `when` lines leave members out: it renders nothing for them, and a member added to the union later goes blank with no error.',
+    wrong: '---\nconst { status } = props<{ status: \'open\' | \'closed\' | \'draft\' }>()\n---\nmatch status\n  when \'open\'\n    p Open\n  when \'closed\'\n    p Closed',
+    right: '---\nconst { status } = props<{ status: \'open\' | \'closed\' | \'draft\' }>()\n---\nmatch status\n  when \'open\'\n    p Open\n  when \'closed\'\n    p Closed\n  else\n    p Draft',
+  },
   'uncalled-signal': {
     level: 'deny',
     group: 'islands',
@@ -598,6 +606,8 @@ export interface TypeLint {
 }
 
 const IDENTITY_KEY = 'kayLint: "identity-key"'
+const INCOMPLETE_MATCH = 'kayLint: "incomplete-match"'
+const MISSING = /kayMissing: (.+?);? \}/
 const HANDED_SIGNAL = 'kayLint: "uncalled-signal"'
 
 export function typeLint(message: string): TypeLint | undefined {
@@ -607,6 +617,17 @@ export function typeLint(message: string): TypeLint | undefined {
       message: 'A signal or memo is handed to a parameter that takes anything, which receives the signal itself',
       note: 'a string or JSON of it is the function\'s source, not its value',
       help: 'read it by calling it, `count()`, or type the parameter `Signal<T>` or `Memo<T>` to take the signal itself',
+    }
+  }
+
+  if (message.includes(INCOMPLETE_MATCH)) {
+    const missing = MISSING.exec(message)?.[1]
+
+    return {
+      code: 'incomplete-match',
+      message: missing === undefined ? 'This `match` has no `else` and leaves members of its union out' : `This \`match\` has no \`else\` and leaves ${missing} out`,
+      note: 'it renders nothing for them, and a member added to the union later goes blank with no error',
+      help: 'add a `when` line for each, or an `else` for the rest',
     }
   }
 

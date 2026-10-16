@@ -1789,6 +1789,75 @@ describe.concurrent('kay check, unused code', () => {
     }
   })
 
+  it('warns of a match with no else that leaves members of a finite union out, and of no other', async () => {
+    const page = [
+      '---',
+      'import { Level } from \'../levels\'',
+      'type Shape = { kind: \'a\', size: number } | { kind: \'b\' } | { kind: \'c\' }',
+      'const { status, level, flag, maybe, name, count, shape, full, other } = props<{ status: \'open\' | \'closed\' | \'draft\', level: Level, flag: boolean, maybe: \'x\' | \'y\' | null, name: string, count: number, shape: Shape, full: \'p\' | \'q\', other: \'r\' | \'s\' }>()',
+      'const picked = signal<\'u\' | \'v\'>(\'u\')',
+      '---',
+      'match status',
+      '  when \'open\'',
+      '    p Open',
+      'match status',
+      '  when \'open\', \'closed\'',
+      '    p Open',
+      'match level',
+      '  when Level.Low',
+      '    p Low',
+      'match flag',
+      '  when true',
+      '    p Yes',
+      'match maybe',
+      '  when \'x\'',
+      '    p X',
+      'match shape.kind',
+      '  when \'a\'',
+      '    p A',
+      'match picked()',
+      '  when \'u\'',
+      '    p U',
+      'match name',
+      '  when \'a\'',
+      '    p A',
+      'match count',
+      '  when 1',
+      '    p One',
+      'match full',
+      '  when \'p\'',
+      '    p P',
+      '  when \'q\'',
+      '    p Q',
+      'match other',
+      '  when \'r\'',
+      '    p R',
+      '  else',
+      '    p S',
+      'button(onClick={() => picked.set(\'v\')}) Go',
+      '',
+    ].join('\n')
+    const root = await scratchProject({ 'src/routes/index.kay': page, 'src/levels.ts': 'export enum Level { Low, High, Max }\n' })
+
+    try {
+      const found = (await check(root)).filter(d => d.code === 'incomplete-match')
+
+      expect(found.map(d => [d.line, d.message])).toEqual([
+        [7, 'This `match` has no `else` and leaves "closed" | "draft" out'],
+        [10, 'This `match` has no `else` and leaves "draft" out'],
+        [13, 'This `match` has no `else` and leaves Level.High | Level.Max out'],
+        [16, 'This `match` has no `else` and leaves false out'],
+        [19, 'This `match` has no `else` and leaves "y" | null out'],
+        [22, 'This `match` has no `else` and leaves "b" | "c" out'],
+        [25, 'This `match` has no `else` and leaves "v" out'],
+      ])
+      expect(await check(root, { lints: { 'incomplete-match': 'allow' } })).toEqual([])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('warns of an island\'s for over objects with no id and no key, and of no other list', async () => {
     const list = '---\nconst posts = signal([{ slug: \'a\', title: \'A\' }])\nconst todos = signal([{ id: 1, title: \'T\' }])\nconst tags = signal([\'x\'])\n---\nul\n  for post of posts()\n    li {post.title}\n  // kay-allow identity-key\n  for post of posts()\n    li {post.slug}\n  for todo of todos()\n    li {todo.title}\n  for tag of tags()\n    li {tag}\n  for post of posts() key={post.slug}\n    li {post.title}\nbutton(onClick={() => { posts.set([]); todos.set([]); tags.set([]) }}) Clear\n'
     const root = await scratchProject({

@@ -8,6 +8,9 @@ import { DYNAMIC_TAG } from './mapping'
 import { addBindWrite, bindRead, helperName } from './markup'
 import { bindEvent, bindProblem } from './validate'
 
+// A subject TypeScript narrows by itself in a `switch`: a name or a chain of properties.
+const REFERENCE = /^[a-z_$][\w$]*(?:\.[a-z_$][\w$]*)*$/i
+
 export interface JsxOptions {
   // `kay check`'s output: links, form fields and island props asserted through the globals it declares.
   check: boolean
@@ -156,11 +159,21 @@ export class JsxTemplate {
   }
 
   // A `switch`, so `kay check` narrows the subject in each branch and reports a value its type cannot hold.
+  // With no `else`, `kay check` also gets a `default` handing what the branches left to `KayUnmatched`, which reports the members of a finite union they missed.
   private emitMatch(node: MatchNode) {
     const { b } = this
     const { fallback } = node
+    const unmatched = this.options.check && !fallback
+    const subject = this.src.slice(node.subject.start, node.subject.end).trim()
+    // A reference narrows by itself; any other subject is read once into a name, which then narrows, as its branches see the value alone.
+    const reference = REFERENCE.test(subject)
 
-    b.add('(() => { switch (').addSource(node.subject).add(') { ')
+    b.add('(() => { ')
+
+    if (unmatched && !reference)
+      b.add('const kayMatched = (').addSource(node.subject).add('); switch (kayMatched) { ')
+    else
+      b.add('switch (').addSource(node.subject).add(') { ')
 
     for (const branch of node.cases) {
       b.wrap(branch, () => {
@@ -179,6 +192,13 @@ export class JsxTemplate {
         this.emitRoot(fallback.children)
         b.add('); ')
       })
+    }
+
+    if (unmatched) {
+      if (reference)
+        b.add('default: KayUnmatched((').addSource(node.subject).add(')); ')
+      else
+        b.add('default: KayUnmatched(kayMatched); ')
     }
 
     b.add(fallback ? '} })()' : '} return null })()')
