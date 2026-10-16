@@ -18,7 +18,7 @@ export interface ScheduleOptions {
   boot?: boolean | undefined
 }
 
-export type Job = () => unknown
+type Job = () => unknown
 type Jobs = Job | readonly Job[]
 
 // What a table's key must be: a positive length, or a cron that comes some day.
@@ -31,7 +31,7 @@ export type EveryOptions = Omit<ScheduleOptions, 'tz'>
 const SLOT_MS = 60_000
 
 // Runs `job` on a cron schedule, such as `@hourly` or `30 2 * * MON`, or every so long, `'30s'` or `30` seconds, from when the server starts until it stops: once per process, or once across processes with `lock`, never two runs at a time.
-// A list of jobs, or a table of schedules to jobs, gives each job a schedule of its own in one plugin, a table's `tz` read by its crons alone; with `lock`, each job's lock is its name and its place among them, `report:0`.
+// A list of jobs, or a table of schedules to jobs, gives each job a schedule of its own in one plugin, a table's `tz` read by its crons alone; with `lock`, each job's lock is its schedule and its place in that schedule's list, `report:@hourly:0`.
 // A run that throws is logged and the next one comes as planned; a stopping server waits for the run in progress.
 export function schedule<const Every extends Duration>(every: Every & PositiveDuration<Every>, jobs: Jobs, options?: EveryOptions): Elysia
 export function schedule<const Cron extends string>(cron: Cron & CronSchedule<Cron>, jobs: Jobs, options?: ScheduleOptions): Elysia
@@ -40,9 +40,12 @@ export function schedule(first: Duration | string | Record<string, Jobs>, second
   const table = typeof first === 'object'
   const entries = table ? Object.entries(first) : [[first, second as Jobs] as const]
   const options = (table ? second : third) as ScheduleOptions | undefined ?? {}
-  const jobs = entries.flatMap(([when, listed]) => (Array.isArray(listed) ? listed as Job[] : [listed as Job]).map(job => [when, job] as const))
-  const plugins = jobs.map(([when, job], index) => {
-    const own = jobs.length > 1 && options.lock !== undefined ? { ...options, lock: `${options.lock}:${index}` } : options
+  const jobs = entries.flatMap(([when, listed]) => (Array.isArray(listed) ? listed as Job[] : [listed as Job]).map((job, place) => [when, job, place] as const))
+  const plugins = jobs.map(([when, job, place]) => {
+    if (typeof job !== 'function')
+      throw new KayError('config-invalid', `kay: the job scheduled ${String(when)} is no function`)
+
+    const own = jobs.length > 1 && options.lock !== undefined ? { ...options, lock: `${options.lock}:${String(when)}:${place}` } : options
 
     if (typeof when === 'number' || DURATION_TEXT.test(when))
       return scheduleEvery(when as Duration, job, table ? { ...own, tz: undefined } : own)
@@ -62,7 +65,6 @@ function scheduleCron(cron: string, job: () => unknown, options: ScheduleOptions
 
   let handle: Bun.CronJob | undefined
   let running: Promise<void> | undefined
-  let booting: Promise<void> | undefined
   const run = scheduledRun(cron, SLOT_MS, job, options)
 
   // Unnamed, so Elysia never takes two schedules for one plugin.
@@ -71,20 +73,19 @@ function scheduleCron(cron: string, job: () => unknown, options: ScheduleOptions
       if (handle)
         return
 
-      handle = Bun.cron(cron, async () => {
-        running = run()
-        await running
-        running = undefined
-      }, zone)
-
+      // The boot run is the first, which the first scheduled run waits for: runs never overlap.
       if (options.boot === true)
-        booting = run()
+        running = run(true)
+
+      handle = Bun.cron(cron, async () => {
+        running = after(running, run)
+        await running
+      }, zone)
     })
     .onStop(async () => {
       handle?.stop()
       handle = undefined
-      await Promise.all([running, booting])
-      booting = undefined
+      await running
     })
 }
 
@@ -97,14 +98,12 @@ function scheduleEvery(every: Duration, job: () => unknown, options: ScheduleOpt
 
   let timer: Timer | undefined
   let running: Promise<void> | undefined
-  let booting: Promise<void> | undefined
   const run = scheduledRun(`every ${String(every)}`, ms, job, options)
 
   const plan = () => {
     const tick = async () => {
-      running = run()
+      running = after(running, run)
       await running
-      running = undefined
 
       if (timer)
         plan()
@@ -121,21 +120,27 @@ function scheduleEvery(every: Duration, job: () => unknown, options: ScheduleOpt
       plan()
 
       if (options.boot === true)
-        booting = run()
+        running = run(true)
     })
     .onStop(async () => {
       clearTimeout(timer)
       timer = undefined
-      await Promise.all([running, booting])
-      booting = undefined
+      await running
     })
 }
 
+// A run starting once the one before settles, which never rejects.
+async function after(previous: Promise<void> | undefined, run: () => Promise<void>): Promise<void> {
+  await previous
+  await run()
+}
+
 // One run of a schedule, taken by one process when it locks: `slotMs` is how far apart its runs fall due.
+// A boot run locks under a name of its own, so its slot, rounded to the nearest, never takes the one of the run due next.
 function scheduledRun(label: string, slotMs: number, job: () => unknown, options: ScheduleOptions) {
-  return async () => {
+  return async (boot = false) => {
     try {
-      if (options.lock !== undefined && !await (options.store ?? defaultJobStore()).lock(options.lock, Math.round(Date.now() / slotMs)))
+      if (options.lock !== undefined && !await (options.store ?? defaultJobStore()).lock(boot ? `${options.lock}:boot` : options.lock, Math.round(Date.now() / slotMs)))
         return
 
       await job()

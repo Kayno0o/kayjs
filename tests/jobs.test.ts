@@ -189,6 +189,53 @@ describe('schedule', () => {
     }
   })
 
+  it('never runs a boot run and a scheduled one at once', async () => {
+    const cron = fakeCron()
+    let active = 0
+    let overlapped = false
+    const app = new Elysia().use(schedule('@hourly', async () => {
+      active++
+      overlapped ||= active > 1
+      await Bun.sleep(30)
+      active--
+    }, { boot: true })).listen(0)
+
+    try {
+      await cron.fired[0]!.handler()
+      expect(overlapped).toBe(false)
+    }
+    finally {
+      await shutdown(app)
+      cron.restore()
+    }
+  })
+
+  it('keeps a boot just before a run is due from taking that run\'s lock', async () => {
+    const cron = fakeCron()
+    const path = await jobsPath()
+    const runs: string[] = []
+
+    setSystemTime(new Date('2026-01-01T11:59:40Z'))
+
+    const app = new Elysia().use(schedule('@hourly', () => runs.push('run'), { boot: true, lock: 'report', store: sqliteJobs(path) })).listen(0)
+
+    try {
+      await shutdown(app)
+      expect(runs).toEqual(['run'])
+      setSystemTime(new Date('2026-01-01T12:00:00Z'))
+      await cron.fired[0]!.handler()
+      expect(runs).toEqual(['run', 'run'])
+    }
+    finally {
+      setSystemTime()
+      cron.restore()
+    }
+  })
+
+  it('refuses a job that is no function when the schedule is built', () => {
+    expect(() => schedule({ '@hourly': ['purge'] as unknown as (() => void)[] })).toThrow('the job scheduled @hourly is no function')
+  })
+
   it('runs a job at boot only when asked to', async () => {
     const cron = fakeCron()
     const runs: string[] = []

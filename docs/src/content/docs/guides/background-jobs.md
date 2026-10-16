@@ -38,7 +38,7 @@ app.use(schedule({
 }, { boot: true }))
 ```
 
-With `lock`, each job takes `<lock>:<its place>` as its lock. `tz` applies to the crons and not to the lengths.
+With `lock` and several jobs, each job locks as `<lock>:<its schedule>:<its place in that schedule's list>`. `tz` applies to the crons and not to the lengths. A boot run happens wherever the server starts, so also at each restart of `kay dev`.
 
 A cron has five fields or a nickname such as `@daily`, and a cron that can never run, such as `0 0 30 2 *`, is a type error. A length such as `'30s'` or `'1h'` runs at each multiple of it. Runs never overlap, and a run that throws is logged without stopping the next. With several server processes, `{ lock: 'weekly-report' }` runs the job once across all of them.
 
