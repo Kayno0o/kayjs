@@ -24,8 +24,8 @@ const guardedMounted = await testSite({ routes, api: guardedApi, mcp: true, isla
 // Guards that cover every module, and guards that cover only one of them.
 const strict = await testSite({ routes, api: guardedApi, mcp: true, islands: false, requireGuards: true })
 const uncovered = await testSite({ routes, api, mcp: true, islands: false, requireGuards: true })
-// A site with tool actions and no API module has no guard to add, so requireGuards leaves its list open.
-const noApi = await testSite({ routes, api: 'tests/fixtures/mcp/src/none', mcp: true, islands: false, requireGuards: true })
+// A site with tool actions and no API module has no guard to add, so requireGuards leaves its list open, while its OpenAPI document stays refused.
+const noApi = await testSite({ routes, api: 'tests/fixtures/mcp/src/none', mcp: true, openapi: true, islands: false, requireGuards: true })
 const documentOnly = await testSite({ routes, api: guardedApi, openapi: true, islands: false })
 const localized = await testSite({ routes, api, mcp: true, islands: false, i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: 'tests/fixtures/i18n/src/messages' } })
 
@@ -452,8 +452,9 @@ describe('a guarded API directory', () => {
     expect((await strict.mcp.tools({ headers: BEARER })).length).toBeGreaterThan(0)
   })
 
-  it('lists an action-only site\'s tools under requireGuards', async () => {
+  it('lists an action-only site\'s tools under requireGuards, and keeps its OpenAPI document refused', async () => {
     expect((await noApi.mcp.tools()).map(tool => tool.name)).toContain('add_note')
+    expect((await noApi.fetch('/api/openapi.json')).status).toBe(403)
   })
 
   it('lists freely when the API directory has no guard and the site does not require them', async () => {
