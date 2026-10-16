@@ -487,37 +487,71 @@ describe('the modules a change leaves stale', () => {
 
 // Apart from the others: the growth limit is read from the environment the server process starts with.
 describe('kay dev memory', () => {
-  it('holds its resident memory within the growth limit over sixty edits of a large page', async () => {
-    const LIMIT_MB = 8
+  // A project whose server process starts with the given growth limit.
+  async function servedWithin(limitMb: number) {
     const before = process.env.KAY_DEV_RELOAD_GROWTH_MB
 
-    process.env.KAY_DEV_RELOAD_GROWTH_MB = String(LIMIT_MB)
-
-    const project = await served({ 'src/routes/index.kay': 'h1 Edit 0\n' })
-    const memory = join(project.root, '.memory')
-
-    if (before === undefined)
-      delete process.env.KAY_DEV_RELOAD_GROWTH_MB
-    else
-      process.env.KAY_DEV_RELOAD_GROWTH_MB = before
+    process.env.KAY_DEV_RELOAD_GROWTH_MB = String(limitMb)
 
     try {
-      // The server process measures itself once the entry ran again, which the page changing waits on.
-      await project.write('src/server.ts', `${ENTRY(project.log)}\nBun.gc(true)\nawait Bun.write(${JSON.stringify(memory)}, \`\${await Bun.file(${JSON.stringify(memory)}).text().catch(() => '')}\${process.memoryUsage.rss()}\\n\`)\n`)
-      await until(() => project.children.length === 2)
-      await project.sees('Edit 0')
+      return await served({ 'src/routes/index.kay': 'h1 Edit 0\n' })
+    }
+    finally {
+      if (before === undefined)
+        delete process.env.KAY_DEV_RELOAD_GROWTH_MB
+      else
+        process.env.KAY_DEV_RELOAD_GROWTH_MB = before
+    }
+  }
 
-      for (let edit = 1; edit <= 60; edit++) {
-        await project.write('src/routes/index.kay', `h1 Edit ${edit}\np ${'x'.repeat(200_000)} ${edit}\n`)
-        await project.sees(`Edit ${edit}`)
-      }
+  // The entry measures its own process once it ran again, which the page changing waits on.
+  async function measuring(project: Awaited<ReturnType<typeof served>>, file: string) {
+    const memory = JSON.stringify(file)
 
-      await until(() => lines(memory).length >= 61)
-      const sizes = lines(memory).map(Number)
-      const settled = sizes[3]!
+    await entryWith(project, `Bun.gc(true)\nawait Bun.write(${memory}, \`\${await Bun.file(${memory}).text().catch(() => '')}\${process.memoryUsage().heapUsed} \${process.memoryUsage.rss()}\\n\`)\n`)
+  }
+
+  async function editing(project: Awaited<ReturnType<typeof served>>, file: string) {
+    for (let edit = 1; edit <= 60; edit++) {
+      await project.write('src/routes/index.kay', `h1 Edit ${edit}\np ${'x'.repeat(200_000)} ${edit}\n`)
+      await project.sees(`Edit ${edit}`)
+    }
+
+    await until(() => lines(file).length >= 61)
+
+    return lines(file).map(line => line.split(' ').map(Number) as [heap: number, rss: number])
+  }
+
+  it('holds the same heap after sixty edits of a large page as after thirty', async () => {
+    const project = await servedWithin(4096)
+    const file = join(project.root, '.memory')
+
+    try {
+      await measuring(project, file)
+
+      const sizes = await editing(project, file)
+
+      // The heap settles within a few dozen edits; one keeping each version of the page, 200 KB, would grow by 6 MB over the next thirty.
+      expect(project.children).toHaveLength(2)
+      expect(sizes.at(-1)![0]).toBeLessThan(sizes[30]![0] + 3_000_000)
+    }
+    finally {
+      await project.cleanup()
+    }
+  }, 120_000)
+
+  it('holds its resident memory within the growth limit over sixty edits of a large page', async () => {
+    const LIMIT_MB = 8
+    const project = await servedWithin(LIMIT_MB)
+    const file = join(project.root, '.memory')
+
+    try {
+      await measuring(project, file)
+
+      const rss = (await editing(project, file)).map(([, resident]) => resident)
 
       // Bun keeps the code of every module it evaluates again, about 1 MB per edit of this page, so the process is replaced once it grew by the limit instead of by the edits.
-      expect(Math.max(...sizes) - settled).toBeLessThan((LIMIT_MB + 16) * 2 ** 20)
+      expect(Math.max(...rss) - rss[3]!).toBeLessThan((LIMIT_MB + 16) * 2 ** 20)
       expect(project.children.length).toBeGreaterThan(2)
     }
     finally {

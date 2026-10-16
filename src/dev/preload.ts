@@ -48,6 +48,11 @@ let calls = 0
 let reloading = false
 // Why the run being loaded cannot take over, as an entry asking for another port or a server fewer.
 let mismatch: string | undefined
+// How far the process may grow from its first reload before the next change starts a new one: Bun keeps the code of every ES module it evaluates again, which adds up to about the size of the modules reloaded.
+const GROWTH_LIMIT = (Number(process.env.KAY_DEV_RELOAD_GROWTH_MB) || 64) * 1024 * 1024
+let grownFrom: number | undefined
+
+delete process.env.KAY_DEV_RELOAD_GROWTH_MB
 
 Bun.serve = ((given: Parameters<typeof Bun.serve>[0]) => {
   const options = hosted(given)
@@ -329,12 +334,6 @@ async function reload(request: ReloadRequest): Promise<void> {
   process.send?.(answer)
 }
 
-// How far the process may grow from its first reload before the next change starts a new one: Bun keeps the code of every ES module it evaluated again, which adds up to about the size of the modules reloaded.
-const GROWTH_LIMIT = Number(process.env.KAY_DEV_RELOAD_GROWTH_MB ?? 64) * 1024 * 1024
-let baseline: number | undefined
-
-delete process.env.KAY_DEV_RELOAD_GROWTH_MB
-
 async function reloaded({ code, startedAt, changed, files }: ReloadRequest): Promise<{ reloaded: true } | { restart: string }> {
   const root = process.cwd()
   let paths: ReturnType<typeof projectPaths>
@@ -354,9 +353,11 @@ async function reloaded({ code, startedAt, changed, files }: ReloadRequest): Pro
   if (started.length === 0)
     return { restart: 'the entry started no server' }
 
-  baseline ??= process.memoryUsage.rss()
+  const rss = process.memoryUsage.rss()
 
-  if (process.memoryUsage.rss() - baseline > GROWTH_LIMIT)
+  grownFrom ??= rss
+
+  if (rss - grownFrom > GROWTH_LIMIT)
     return { restart: 'the server process grew with its reloads' }
 
   process.env.KAY_DEV_CODE = String(code)
