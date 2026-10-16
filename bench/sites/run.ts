@@ -34,12 +34,12 @@ const STOP_MS = 10_000
 const average = (values: number[]) => values.reduce((sum, value) => sum + value, 0) / values.length
 const megabytes = (bytes: number) => `${(bytes / MB).toFixed(0)} MB`
 
-// The site's own stylesheet, the largest a page links.
-async function stylesheet(variant: Variant): Promise<string> {
+// The site's own stylesheet, the largest a page links, none when its pages carry theirs.
+async function stylesheet(variant: Variant): Promise<string[]> {
   const html = await (await fetch(`http://127.0.0.1:${variant.ports.backend}/`)).text()
   const sizes = await Promise.all([...html.matchAll(STYLESHEET)].map(async ([, href]) => ({ href: href!, size: (await (await fetch(`http://127.0.0.1:${variant.ports.backend}${href}`)).arrayBuffer()).byteLength })))
 
-  return sizes.toSorted((a, b) => b.size - a.size)[0]!.href
+  return sizes.toSorted((a, b) => b.size - a.size).slice(0, 1).map(({ href }) => href)
 }
 
 if (VARIANTS.length === 0)
@@ -122,7 +122,7 @@ try {
     console.error(`weight and load: ${label(variant)}`)
     for (const path of variant.site.pages)
       result.weights.push(await weigh(variant, path))
-    for (const path of [...variant.site.loaded ?? variant.site.pages.slice(0, 2), await stylesheet(variant)])
+    for (const path of [...variant.site.loaded ?? variant.site.pages.slice(0, 2), ...await stylesheet(variant)])
       result.loads.push(await load(variant, path, server, lab!.nginx))
     result.memory = serverMemory(server.pid)
   }

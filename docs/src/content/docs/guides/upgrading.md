@@ -25,6 +25,15 @@ An endpoint that reads `ctx.cookies` goes out, a redirect, denial or 404 include
 ### `invalidatePage` is imported from `kay/cache`
 
 It sits beside `invalidate` now, and `kay/server` no longer exports it. Write `import { invalidatePage } from 'kay/cache'`. `kay upgrade` rewrites the import.
+### A page inlines its small stylesheets by default
+
+A page whose stylesheets compress under about 14 KB together now carries them in its head in production, where it linked them. This includes the pages `kay build` prerenders and `--static` exports, so their bytes change. Above the limit nothing changes.
+
+No deprecated lint covers this, because nothing in your code is the old form: it is a default.
+
+To keep every page's stylesheets linked, set `inlineStyles: false` in `kay.config.ts`. To inline them all whatever their size, keep `inlineStyles: true`.
+
+A test or a script that reads a page's `link rel="stylesheet"` to fetch the file now reads the `style` text instead, or sets `inlineStyles: false`.
 
 ### `deprecated-schema-name` is in the `deprecated` group
 

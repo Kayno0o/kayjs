@@ -879,6 +879,29 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     expect(await transitions('reduce', '@view-transition { navigation: auto; }')).toBe(0)
   })
 
+  it('brings the next page\'s inlined stylesheet with the swap and drops it again going back', async () => {
+    const fresh = await browser.newPage()
+    const rules = async () => fresh.evaluate(() => [...document.head.querySelectorAll('style')].filter(style => style.textContent.includes('.bar')).length)
+
+    await fresh.goto(origin)
+    await fresh.evaluate(() => {
+      (window as { kayAlive?: boolean }).kayAlive = true
+      document.body.insertAdjacentHTML('beforeend', '<a class="to-below" href="/below">Below</a>')
+    })
+    expect(await rules()).toBe(0)
+    await fresh.click('a.to-below')
+    await fresh.locator('h1', { hasText: 'Below' }).waitFor()
+
+    expect(await rules()).toBe(1)
+    expect(await fresh.evaluate(() => getComputedStyle(document.querySelector('.bar')!).position)).toBe('fixed')
+    expect(await fresh.evaluate(() => (window as { kayAlive?: boolean }).kayAlive)).toBe(true)
+    await fresh.goBack()
+    await fresh.locator('h1', { hasText: 'Home' }).waitFor()
+
+    expect(await rules()).toBe(0)
+    await fresh.close()
+  })
+
   it('swaps in the page a post redirects to, another one taking a history entry', async () => {
     const fresh = await browser.newPage()
     const alive = async () => fresh.evaluate(() => (window as { kayAlive?: boolean }).kayAlive === true)

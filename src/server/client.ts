@@ -63,8 +63,10 @@ export interface ClientBuild extends Omit<ClientManifest, 'styles' | 'pages'> {
   // By absolute path.
   styles: Map<string, string>
   pages: Map<string, PrerenderedPage>
-  // With `inlineStyles`, the text each stylesheet URL is written into heads as.
+  // The text each stylesheet URL is written into heads as, for those a page may inline.
   inlineStyles?: Map<string, string> | undefined
+  // Without `inlineStyles` set, how many bytes each of them compresses to: a page inlines its stylesheets when together they stay under `INLINE_LIMIT`.
+  inlineSizes?: Map<string, number> | undefined
   // What the browser loads for islands, when the build was asked to measure it.
   report?: SizeReport | undefined
   // The directories of the packages its modules and stylesheets come from, for the notices file.
@@ -147,6 +149,36 @@ export async function readInlineStyles(client: ClientBuild, base: string): Promi
     // A `</style` in a string would close the element: `\/` is the same slash to CSS.
     return [url, absolute.replace(STYLE_END, '<\\/style')]
   })))
+}
+
+// What a page's stylesheets may add to it compressed and still be inlined: about what the first round trip carries, past which a linked stylesheet costs no more.
+export const INLINE_LIMIT = 14_000
+
+// `inlineStyles: true` makes every stylesheet inlinable, `false` none, and unset the ones that compress under `INLINE_LIMIT`, the page deciding by the sum of its own.
+export async function chooseInlineStyles(client: ClientBuild, base: string, setting: boolean | undefined): Promise<void> {
+  if (setting === false)
+    return
+
+  const texts = await readInlineStyles(client, base)
+
+  if (setting === true) {
+    client.inlineStyles = texts
+
+    return
+  }
+
+  client.inlineStyles = new Map()
+  client.inlineSizes = new Map()
+  for (const [url, css] of texts) {
+    // A page inlined goes out as gzip whatever the browser takes, so gzip is the weight it adds.
+    const size = Bun.gzipSync(css).length
+
+    if (size > INLINE_LIMIT)
+      continue
+
+    client.inlineStyles.set(url, css)
+    client.inlineSizes.set(url, size)
+  }
 }
 
 export function fromManifest(root: string, manifest: ClientManifest, dir = clientDir(root)): ClientBuild {

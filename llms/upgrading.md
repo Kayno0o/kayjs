@@ -17,6 +17,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 - It sits beside `invalidate` now, and `kay/server` no longer exports it: `import { invalidatePage } from 'kay/cache'`. `kay upgrade` rewrites the import, `deprecated-import` finds the rest.
 - The rule for what needs an import is in [Components](components.md#imports-kay-adds): `props`, the reactive primitives, a server fence's `action` and `t` need none, everything else comes from `kay`, `kay/server` or its topic's entry.
+### A page inlines its small stylesheets by default
+
+- A page whose stylesheets compress under about 14 KB together now carries them as `style` elements in its head in production, `kay build` prerendered pages and `--static` exports included, where it linked them: the bytes of those pages change, and a stylesheet no longer shows as a request. Above the limit nothing changes. No deprecated lint covers it, as nothing in the app's code is the old form: it is a default.
+- An app keeping every page's stylesheets linked sets `inlineStyles: false` in `kay.config.ts`; one that wants them all inlined whatever their size keeps `inlineStyles: true`. A test or a script reading a page's `link rel="stylesheet"` to fetch the file reads the `style` text instead, or sets `inlineStyles: false`.
 
 ### `deprecated-schema-name` is in the `deprecated` group
 

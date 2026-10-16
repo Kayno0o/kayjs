@@ -15,7 +15,7 @@ import { renderOptionsOf } from '../project'
 import { setSite } from '../runtime/site'
 import { basePath } from './base'
 import { setupCards } from './card'
-import { readInlineStyles } from './client'
+import { chooseInlineStyles } from './client'
 import { implicitI18n, linkedSettings, loadI18n, routedSettings, serveLocales } from './i18n'
 import { applyImageConfig } from './image'
 import { loadMatchers } from './params'
@@ -87,8 +87,8 @@ export async function setupPages(project: Project, loadClient: () => ClientBuild
     warnOnStampKey(!mode.dev && process.env.NODE_ENV !== 'test')
   }
 
-  if (config.inlineStyles === true && !mode.dev)
-    client.inlineStyles = await readInlineStyles(client, base)
+  if (!mode.dev)
+    await chooseInlineStyles(client, base, config.inlineStyles)
 
   // Cards are drawn in the fonts the head just wrote, rather than those a `fonts.json` held before.
   const headAndCards = async () => {

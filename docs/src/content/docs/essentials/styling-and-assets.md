@@ -26,6 +26,20 @@ Imported `with { type: 'text' }`, a stylesheet is its text as a string instead, 
 import theme from './theme.css' with { type: 'text' }
 ```
 
+## Linked or inlined styles
+
+In production, a page with small styles writes them into its head. The browser then paints without a stylesheet request. A page whose styles compress to more than about 14 KB links them instead, so one cached file serves every page.
+
+The page's own styles are counted, its layouts' and its page's together. Two pages of one app can differ. `kay dev` always links them.
+
+Set `inlineStyles` in `kay.config.ts` to force one way:
+
+```ts
+export default defineConfig({ inlineStyles: false })
+```
+
+`true` inlines every page's styles, whatever their size. `false` links them all.
+
 ## Tailwind
 
 Tailwind runs as a build plugin. Install it with `bun add -d tailwindcss bun-plugin-tailwind`, then register it in `kay.config.ts`:

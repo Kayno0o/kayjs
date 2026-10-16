@@ -35,6 +35,7 @@ import { editing } from '../runtime/preview'
 import { encodeValue, unsendable } from '../runtime/wire'
 import { rebaseHtml } from './base'
 import { importModule, onForgetModules } from './bundle'
+import { INLINE_LIMIT } from './client'
 import { preferredEncoding, wholeResponse } from './compress'
 import { cookieJar, requestCookies } from './cookies'
 import { A11Y_SCRIPT, DEV_BOOT, devToolScripts, errorPageScripts, liveReload, problemsBlock } from './dev'
@@ -885,11 +886,17 @@ function stylesheets(client: ClientBuild, files: string[]): string {
   if (client.styles.size === 0)
     return ''
 
-  return stylesheetsOf(client.styles, files.join('\n'), () => [...new Set(files.map(file => client.styles.get(file)))].filter(url => url !== undefined).map((url) => {
-    const css = client.inlineStyles?.get(url)
+  return stylesheetsOf(client.styles, files.join('\n'), () => {
+    const urls = [...new Set(files.map(file => client.styles.get(file)))].filter(url => url !== undefined)
+    // Unset, the page inlines its stylesheets only while together they stay within the limit.
+    const inline = client.inlineStyles !== undefined && (client.inlineSizes === undefined || urls.reduce((sum, url) => sum + (client.inlineSizes!.get(url) ?? Infinity), 0) <= INLINE_LIMIT)
 
-    return css === undefined ? `<link rel="stylesheet" href="${url}">` : `<style>${css}</style>`
-  }).join(''))
+    return urls.map((url) => {
+      const css = inline ? client.inlineStyles!.get(url) : undefined
+
+      return css === undefined ? `<link rel="stylesheet" href="${url}">` : `<style>${css}</style>`
+    }).join('')
+  })
 }
 
 // Preloads every chunk the page's eager islands need, so the browser fetches them alongside the entry instead of one round trip after another. A streamed page loads the entry after its first part instead.

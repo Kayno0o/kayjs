@@ -81,8 +81,10 @@ export const NO_SITES = `no sites to measure: write ${CONFIG} after ${EXAMPLE}, 
 export const KIND = oneOf('KIND', ['astro', 'kay'] as const)
 // `PHASE=prod` measures the production builds only, `PHASE=dev` the dev servers only, of the sites naming what to edit.
 export const PHASE = oneOf('PHASE', ['prod', 'dev'] as const)
-// `KAY_PACKAGE` runs the kay dev copies on another kay than the one each site pins: `checkout` for this checkout, packed, a version from the registry, or any dependency specifier (`file:`, `npm:`).
+// `KAY_PACKAGE` runs the kay copies, production and dev, on another kay than the one each site pins: `checkout` for this checkout, packed, a version from the registry, or any dependency specifier (`file:`, `npm:`).
 const KAY_PACKAGE = process.env.KAY_PACKAGE ?? ''
+// `INLINE_STYLES=true|false` writes `inlineStyles` into each kay copy's config, to time a site with every page's stylesheets inlined or linked rather than as kay decides.
+const INLINE_STYLES = process.env.INLINE_STYLES ?? ''
 const CHECKOUT = join(import.meta.dir, '../..')
 const PUBLISHED = '@kaynooo/kayjs'
 // What stops the services the sites' servers need, in the order they started.
@@ -202,7 +204,7 @@ function checkoutSource(): string {
 
 // Under `SKIP_PREPARE`, the kay dev copies whose install is not what `KAY_PACKAGE` names now, as after the checkout moved, and copies of uncommitted changes, which may not be the ones packed then.
 export async function staleInstalls(): Promise<string[]> {
-  if (KAY_PACKAGE === '' || PHASE === 'prod' || KIND === 'astro')
+  if (KAY_PACKAGE === '' || KIND === 'astro')
     return []
 
   const wanted = wantedSource(KAY_PACKAGE, checkoutSource)
@@ -223,7 +225,7 @@ export async function staleInstalls(): Promise<string[]> {
 // Exports each site at its Astro commit and at its kay ref and installs them, once for the production builds, which build.ts then builds as they deploy, and once for the dev servers.
 export async function prepare() {
   mkdirSync(WORK, { recursive: true })
-  const kay = PHASE === 'prod' || KIND === 'astro' ? undefined : kayPackage()
+  const kay = KIND === 'astro' ? undefined : kayPackage()
 
   for (const variant of VARIANTS) {
     if (variant.kind === 'astro')
@@ -241,14 +243,20 @@ export async function prepare() {
       if (variant.kind === 'astro')
         variant.site.patch?.(manifest)
 
-      if (variant.kind === 'kay' && dir === variant.devDir && kay !== undefined)
+      if (variant.kind === 'kay' && kay !== undefined)
         manifest.dependencies.kay = kay.specifier
+
+      if (variant.kind === 'kay' && INLINE_STYLES !== '') {
+        const config = Bun.file(join(dir, 'kay.config.ts'))
+
+        await Bun.write(config, (await config.text()).replace('defineConfig({', () => `defineConfig({ inlineStyles: ${INLINE_STYLES},`))
+      }
 
       await Bun.write(file, JSON.stringify(manifest, null, 2))
       run([process.execPath, 'install'], dir)
 
       if (variant.kind === 'kay')
-        await Bun.write(join(dir, KAY_SOURCE), dir === variant.devDir && kay !== undefined ? kay.source : `the site's own ${pinned}`)
+        await Bun.write(join(dir, KAY_SOURCE), kay !== undefined ? kay.source : `the site's own ${pinned}`)
 
       if (dir === variant.devDir)
         await variant.site.prepareDev?.(dir, variant.kind)

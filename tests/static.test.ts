@@ -411,7 +411,7 @@ describe('base on a server', () => {
   })
 
   it('puts the links, assets and redirects of every page under the mount point', async () => {
-    const app = new Elysia().use(await pages({ routes: 'tests/fixtures/static/src/routes', prebuilt: false, security: false, site: 'https://x.example', base: '/repo/', redirects: { '/old': '/about' } }))
+    const app = new Elysia().use(await pages({ routes: 'tests/fixtures/static/src/routes', prebuilt: false, security: false, site: 'https://x.example', base: '/repo/', inlineStyles: false, redirects: { '/old': '/about' } }))
     const visit = async (path: string) => app.handle(new Request(`http://localhost${path}`))
     const about = await (await visit('/about')).text()
 

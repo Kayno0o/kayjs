@@ -169,14 +169,14 @@ onMount(() => {
 p {result()}
 ```
 
-### Inline the stylesheets in the page
+### Link or inline the stylesheets
 
-`inlineStyles: true` writes a page's stylesheets into its head as `style` elements in production, so the first paint waits for no stylesheet request:
+In production a page writes its stylesheets into its head as `style` elements while together they compress under about 14 KB, so the first paint waits for no stylesheet request, and links them above it, where one cached file serves every page. `inlineStyles` forces one way:
 
 ```ts
 import { defineConfig } from 'kay/server'
 
-export default defineConfig({ inlineStyles: true })
+export default defineConfig({ inlineStyles: false })
 ```
 
 ## Reference
@@ -189,13 +189,13 @@ export default defineConfig({ inlineStyles: true })
 - Bun bundles them: `@import`, nesting and relative `url()` assets work, and `url(/logo.png)` is left for a public file.
 - `import theme from './theme.css' with { type: 'text' }` gives the file's text as written (a Tailwind entry's source, not its build) as a string instead, in server code, the compiled executable and an island's script alike, and joins no page stylesheet.
 - A name without the attribute is the `css-import-without-text` error.
-- `inlineStyles: true` in kay.config.ts writes those stylesheets into each page's head as `style` elements instead of linking them, in production and prerendered pages, `kay dev` still linking them.
-- The first paint then waits for no stylesheet request, which on a phone over slow 4G painted a page with a 110 KB stylesheet 440 ms sooner.
-- But every page then carries the stylesheet again, compressed, since no cache keeps it between pages, the swap's included.
+- By default a page writes those stylesheets into its head as `style` elements when together they gzip under 14,000 bytes, and links them above that, in production and prerendered pages alike, `kay dev` always linking them. The sum is the page's own (its layouts' and its page's), so two pages of one app can differ, and a stylesheet alone over the limit is never inlined.
+- `inlineStyles: true` in kay.config.ts inlines every page's whatever their size and `false` links them all, which is how a build before 1.46 behaved.
+- The first paint then waits for no stylesheet request, which on a phone over slow 4G painted a page with a 110 KB stylesheet 440 ms sooner, but every page carries the stylesheet again, compressed, since no cache keeps it between pages, the swap's included: past 14 KB that costs more than the request saves, which is why the default links.
 - With `compress` on, a rendered page compresses only what lies around them, their compressed copy made once as the server starts, so it goes out as gzip even to a browser taking zstd or brotli: on a 110 KB stylesheet, a fifth of the CPU brotli takes, for no more bytes.
 - A streamed page, one with an `await` block, compresses whole as before.
 - Their relative `url()`s point where the linked file's did, and kay's `content-security-policy` lets each through by its hash.
-- Pages `kay build` prerendered keep what the setting was then, so it belongs in kay.config.ts rather than in `pages()` alone, where a server turning it off would hash none of their styles.
+- Pages `kay build` prerendered keep what the setting and the stylesheets were then, so it belongs in kay.config.ts rather than in `pages()` alone, where a server turning it off would hash none of their styles.
 - Tailwind runs as a build plugin. `bun add -d tailwindcss bun-plugin-tailwind`, then:
 
 ```ts

@@ -114,7 +114,7 @@ const EXTENSIONS: Record<string, string> = {
   'kay.config.ts': `import { defineConfig } from 'kay/server'
 import { accounts, authPages, greeter, statsApi } from 'kay-lib'
 
-export default defineConfig({ seo: { name: 'App' }, head: [{ tag: 'meta', props: { name: 'app', content: 'mine' } }], openapi: true, i18n: { locales: ['en', 'fr'], defaultLocale: 'en' }, extensions: [authPages(), statsApi(), greeter, accounts()] })
+export default defineConfig({ inlineStyles: false, seo: { name: 'App' }, head: [{ tag: 'meta', props: { name: 'app', content: 'mine' } }], openapi: true, i18n: { locales: ['en', 'fr'], defaultLocale: 'en' }, extensions: [authPages(), statsApi(), greeter, accounts()] })
 `,
   'src/messages/en.ts': CATALOGS['src/messages/en.ts']!,
   'src/messages/fr.ts': CATALOGS['src/messages/fr.ts']!,

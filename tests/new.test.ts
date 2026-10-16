@@ -578,7 +578,8 @@ describe('kay new', () => {
       expect(report).toContain('exported 1 page')
       expect(code).toBe(0)
       const html = await Bun.file(join(dir, 'dist/index.html')).text()
-      const stylesheet = await Bun.file(join(dir, 'dist', (/href="\/me\/my-site\/(_kay\/[^"]+\.css)"/).exec(html)![1]!)).text()
+      // The scaffold's stylesheet is small, so the page carries it.
+      const stylesheet = [...html.matchAll(/<style>([\s\S]*?)<\/style>/g)].map(match => match[1]).join('')
 
       expect(html).toContain('<link rel="canonical" href="https://pages.example/me/my-site/">')
       expect(html).toContain('<title>Home | my-site</title>')

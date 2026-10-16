@@ -2322,7 +2322,7 @@ describe('a compiled server', () => {
     const root = await scratchProject({
       'package.json': JSON.stringify({ name: 'notices', private: true, dependencies: { elysia: '*' }, devDependencies: { '@iconify-json/tabler': '*' } }),
       'tsconfig.json': tsconfig,
-      'kay.config.ts': `export default { favicon: 'src/favicon.svg', images: { card: { logo: 'src/favicon.svg' } }, requireGuards: true, preview: { secret: '${secret}' }, fonts: [{ fontsource: '@fontsource/inter', weights: [700] }], extensions: [{ name: 'lib', routes: { dir: 'lib/routes', prefix: '/lib' }, editor: \`\${import.meta.dir}/lib/editor.kay\` }] }\n`,
+      'kay.config.ts': `export default { favicon: 'src/favicon.svg', images: { card: { logo: 'src/favicon.svg' } }, requireGuards: true, inlineStyles: false, preview: { secret: '${secret}' }, fonts: [{ fontsource: '@fontsource/inter', weights: [700] }], extensions: [{ name: 'lib', routes: { dir: 'lib/routes', prefix: '/lib' }, editor: \`\${import.meta.dir}/lib/editor.kay\` }] }\n`,
       'src/favicon.svg': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#c00"/></svg>',
       'lib/editor.css': '.edited { outline: 1px dashed teal }\n',
       'lib/editor.kay': '---\nimport { signal } from \'kay\'\nimport \'./editor.css\'\n\nconst clicks = signal(0)\n---\nbutton.edited(onClick={() => clicks.set(n => n + 1)}) Edit {clicks()}\n',

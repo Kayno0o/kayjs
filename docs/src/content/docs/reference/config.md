@@ -73,7 +73,7 @@ Every option is optional. The ones below are the common ones, the rest are in th
 | `images` | `quality`, `avif`, the share cards' look and logo (`card`), which extra directories (`dirs`) or hosts (`remote`) are resized, and the app's own lookup of private images (`resolve`, `guard`). See [Styling and assets](/essentials/styling-and-assets) |
 | `fonts` | Self-hosted fonts, from files or a Fontsource package |
 | `plugins` | Bun plugins the browser build runs, such as Tailwind's |
-| `inlineStyles` | Writes each page's styles into its head in production |
+| `inlineStyles` | `true` writes every page's styles into its head in production, `false` links them. Unset, a page inlines them when they compress under about 14 KB. See [Styling and assets](/essentials/styling-and-assets#linked-or-inlined-styles) |
 | `minify` | Minifies the browser build, on for `kay build` |
 | `publicEnv` | The environment variables islands may read, as a schema |
 | `settings` | A module for a kay library's settings, such as `{ '@kaynooo/kayjs-ui': './src/ui-settings.ts' }`. See [kayjs-ui](/libraries/kayjs-ui) |

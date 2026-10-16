@@ -54,11 +54,11 @@ describe('the noticeboard example', () => {
       try {
         const origin = `http://localhost:${await listeningPort(server)}`
         const magic = await (await fetch(`${origin}/auth/magic-link?token=mailed`)).text()
-        const stylesheet = (/<link rel="stylesheet" href="(\/_kay\/[^"]+\.css)"/).exec(magic)![1]!
+        const stylesheet = [...magic.matchAll(/<style>([\s\S]*?)<\/style>/g)].map(match => match[1]).join('')
 
         expect(magic).toContain('<title>Sign in | Noticeboard</title>')
         expect(magic).toContain('class="kui-btn')
-        expect(await (await fetch(`${origin}${stylesheet}`)).text()).toContain('.kui-btn')
+        expect(stylesheet).toContain('.kui-btn')
         expect(await Bun.spawn([join(dir, 'server'), '--health'], { cwd: dir, env: { PATH: process.env.PATH, PORT: new URL(origin).port }, stdin: 'ignore', stdout: 'ignore', stderr: 'ignore' }).exited).toBe(0)
       }
       finally {

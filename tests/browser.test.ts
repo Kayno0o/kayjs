@@ -526,7 +526,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('edit mode 
   it('shows a draft through the page swap, the island showing it kept alive, or where the schema refuses it', async () => {
     const secret = 'a-preview-secret-long-enough-for-kay-0123456789'
     const fixture = 'tests/fixtures/cms/src'
-    const cms = await testSite({ routes: `${fixture}/routes`, content: `${fixture}/content.config.ts`, api: `${fixture}/api`, preview: { secret }, browser: { path }, extensions: [{ name: 'editor', editor: `${fixture}/components/draft-editor.kay` }] })
+    const cms = await testSite({ routes: `${fixture}/routes`, content: `${fixture}/content.config.ts`, api: `${fixture}/api`, preview: { secret }, inlineStyles: false, browser: { path }, extensions: [{ name: 'editor', editor: `${fixture}/components/draft-editor.kay` }] })
 
     try {
       const editor = await cms.open(previewUrl('/marks/launch', { edit: true }))

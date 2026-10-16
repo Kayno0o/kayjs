@@ -6,7 +6,7 @@ import type { Span, SpanOptions, Tracer } from '../src/server/trace'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import process from 'node:process'
 import { brotliDecompressSync } from 'node:zlib'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
@@ -18,7 +18,7 @@ import { projectPaths, resolveProject } from '../src/project'
 import { ActionError } from '../src/runtime'
 import { currentPage } from '../src/runtime/html'
 import { inlineScriptHashes, pages } from '../src/server'
-import { readClient, readInlineStyles, readManifest } from '../src/server/client'
+import { chooseInlineStyles, INLINE_LIMIT, readClient, readInlineStyles, readManifest } from '../src/server/client'
 import { compressFiles, preferredEncoding } from '../src/server/compress'
 import { requestCookies } from '../src/server/cookies'
 import { sourceHash } from '../src/server/csp'
@@ -81,8 +81,11 @@ async function waitFor(done: () => boolean): Promise<void> {
   }
 }
 
-async function get(path: string): Promise<{ status: number, html: string, headers: Headers }> {
-  const response = await app.handle(new Request(`http://localhost${path}`))
+// The stylesheets linked, as `inlineStyles: false` serves them.
+const linked = await pages({ routes: 'tests/fixtures/site/src/routes', publicDir: 'tests/fixtures/site/public', inlineStyles: false })
+
+async function get(path: string, served: typeof app = app): Promise<{ status: number, html: string, headers: Headers }> {
+  const response = await served.handle(new Request(`http://localhost${path}`))
 
   return { status: response.status, html: (await response.text()), headers: response.headers }
 }
@@ -125,8 +128,8 @@ describe('pages', () => {
   })
 
   it('merges the head blocks of layouts and page, the page winning per title and meta name', async () => {
-    const about = (await get('/about')).html
-    const home = (await get('/')).html
+    const about = (await get('/about', linked)).html
+    const home = (await get('/', linked)).html
 
     expect(about).toStartWith('<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><link rel="stylesheet"')
     expect(about.match(/name="viewport"/g)).toHaveLength(1)
@@ -160,7 +163,7 @@ describe('pages', () => {
   })
 
   it('links the stylesheets the layouts and the page import, through components, islands and modules, right after the viewport', async () => {
-    const home = (await get('/')).html
+    const home = (await get('/', linked)).html
     const links = [...home.matchAll(/<link rel="stylesheet" href="([^"]+)">/g)].map(match => match[1]!)
     const [layout, page] = await Promise.all(links.map(async link => (await app.handle(new Request(`http://localhost${link}`))).text()))
 
@@ -168,8 +171,85 @@ describe('pages', () => {
     expect(layout).toContain('background: url("/paper.png")')
     expect(page).toContain('.card {')
     expect(page).toContain('.counter {')
-    expect((await get('/about')).html).toContain(`<meta name="viewport" content="width=device-width"><link rel="stylesheet" href="${links[0]}"><link rel="icon"`)
+    expect((await get('/about', linked)).html).toContain(`<meta name="viewport" content="width=device-width"><link rel="stylesheet" href="${links[0]}"><link rel="icon"`)
     expect((await Bun.file(projectPaths(process.cwd()).classes).text()).split('\n')).toEqual(expect.arrayContaining(['card', 'counter']))
+  })
+
+  it('inlines the stylesheets by default while a page keeps them small, each let through a strict style-src by its hash, `false` linking them', async () => {
+    for (const base of [undefined, '/docs']) {
+      const small = await pages({ routes: 'tests/fixtures/site/src/routes', publicDir: 'tests/fixtures/site/public', prebuilt: true, base, security: { csp: { 'style-src': ['\'self\''] } } })
+      const response = await small.handle(new Request('http://localhost/'))
+      const html = await response.text()
+      const styles = [...html.matchAll(/<style>([\s\S]*?)<\/style>/g)].map(match => match[1]!)
+
+      expect(html).not.toContain('rel="stylesheet"')
+      expect(styles).toHaveLength(2)
+      expect(styles[0]).toContain(`background: url("${base ?? ''}/paper.png")`)
+      for (const style of styles)
+        expect(response.headers.get('content-security-policy')).toContain(sourceHash(style))
+    }
+    expect((await get('/', linked)).html).not.toContain('<style>')
+  })
+
+  it('links the stylesheets of a page whose together compress past the limit, and inlines those of a page below it', async () => {
+    const scratch = await scratchBuild()
+
+    try {
+      const client = await scratch.client()
+      const home = client.styles.get(resolve('tests/fixtures/site/src/routes/index.kay'))!
+      // Hex lines of an LCG, which gzip cannot shrink much below their entropy.
+      let seed = 1
+      const noise = Array.from({ length: 4000 }, () => (seed = (seed * 1103515245 + 12345) % 2147483648).toString(16)).join('\n')
+      const file = join(scratch.dir, 'dist', ...home.slice('/_kay/'.length).split('/'))
+
+      await Bun.write(file, `${await Bun.file(file).text()}\n/* ${noise} */`)
+      for (const base of [undefined, '/docs']) {
+        const served = await scratch.serve({ routes: 'tests/fixtures/site/src/routes', publicDir: 'tests/fixtures/site/public', base, compress: true })
+        const page = async (path: string) => (await served.handle(new Request(`http://localhost${path}`))).text()
+        const long = await page('/')
+        const short = await page('/about')
+
+        expect(long).not.toContain('<style>')
+        expect(long.match(/<link rel="stylesheet"/g)).toHaveLength(2)
+        expect(short).not.toContain('rel="stylesheet"')
+        expect(short).toContain('<style>')
+      }
+    }
+    finally {
+      await scratch.remove()
+    }
+  })
+
+  it('weighs the stylesheets of a page together: each under the limit alone, their sum past it', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kay-inline-'))
+
+    try {
+      let seed = 7
+      const noise = (lines: number) => Array.from({ length: lines }, () => (seed = (seed * 1103515245 + 12345) % 2147483648).toString(16)).join('\n')
+
+      await Bun.write(join(dir, 'a.css'), `/* ${noise(3000)} */`)
+      await Bun.write(join(dir, 'b.css'), `/* ${noise(3000)} */`)
+      await Bun.write(join(dir, 'c.css'), `/* ${noise(9000)} */`)
+      const client = { dir: join(dir), styles: new Map([['/a.kay', '/_kay/a.css'], ['/b.kay', '/_kay/b.css'], ['/c.kay', '/_kay/c.css']]) } as ClientBuild
+
+      await chooseInlineStyles(client, '', undefined)
+      expect([...client.inlineStyles!.keys()]).toEqual(['/_kay/a.css', '/_kay/b.css'])
+      expect(client.inlineSizes!.get('/_kay/a.css')! + client.inlineSizes!.get('/_kay/b.css')!).toBeGreaterThan(INLINE_LIMIT)
+
+      const forced = { ...client, inlineStyles: undefined, inlineSizes: undefined } as ClientBuild
+
+      await chooseInlineStyles(forced, '', true)
+      expect([...forced.inlineStyles!.keys()]).toHaveLength(3)
+      expect(forced.inlineSizes).toBeUndefined()
+
+      const off = { ...forced, inlineStyles: undefined } as ClientBuild
+
+      await chooseInlineStyles(off, '', false)
+      expect(off.inlineStyles).toBeUndefined()
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
   })
 
   it('writes the stylesheets into the head with inlineStyles, each let through a strict style-src by its hash under the mount point', async () => {
@@ -962,6 +1042,21 @@ describe('prerendering', () => {
     expect(served.headers.get('set-cookie')).toStartWith('seen=admin;')
     expect((await visit('ada', { 'if-none-match': `"other", W/${etag}` })).status).toBe(304)
     expect((await visit('bob')).status).toBe(403)
+  })
+
+  it('prerenders the pages with their small stylesheets inlined by default and linked with inlineStyles: false', async () => {
+    await build.keeping(async () => {
+      await build.prerender({ routes })
+      const inlined = await Bun.file(join(build.pages, 'admin/report.html')).text()
+
+      expect(inlined).toContain('<style>')
+      expect(inlined).not.toContain('rel="stylesheet"')
+      await build.prerender({ routes, inlineStyles: false })
+      const linked = await Bun.file(join(build.pages, 'admin/report.html')).text()
+
+      expect(linked).toContain('rel="stylesheet"')
+      expect(linked).not.toContain('<style>')
+    })
   })
 
   it('writes the stylesheets into the pages it prerenders with inlineStyles', async () => {
