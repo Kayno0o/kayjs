@@ -181,6 +181,41 @@ describe('deprecated-import', () => {
     expect(moduleChecks(typed).flatMap(d => d.fixes ?? []).map(fix => fix.edits.map(edit => edit.text))).toEqual([['', '\nimport type { invalidatePage } from \'kay/cache\'']])
   })
 
+  it('merges the name into the import of kay/cache already there, whole when it was alone', () => {
+    const shared = '--- server\nimport { api, invalidatePage } from \'kay/server\'\nimport { cached } from \'kay/cache\'\n---\np x'
+    const alone = '--- server\nimport { invalidatePage } from \'kay/server\'\nimport { cached } from \'kay/cache\'\n---\np x'
+    const twice = 'import { invalidatePage } from \'kay/server\'\nimport { invalidatePage } from \'kay/cache\'\n'
+    const typed = 'import type { invalidatePage } from \'kay/server\'\nimport { cached } from \'kay/cache\'\n'
+
+    expect(fixed(shared)).toEqual(['--- server\nimport { api } from \'kay/server\'\nimport { cached, invalidatePage } from \'kay/cache\'\n---\np x'])
+    expect(fixed(alone)).toEqual(['--- server\nimport { cached, invalidatePage } from \'kay/cache\'\n---\np x'])
+    expect(moduleChecks(twice).flatMap(d => d.fixes ?? []).map(fix => fix.edits)).toEqual([[{ start: 0, end: 44, text: '' }]])
+    expect(moduleChecks(typed).flatMap(d => d.fixes ?? []).map(fix => fix.edits.map(edit => edit.text))).toEqual([['\'kay/cache\'']])
+  })
+
+  it('keeps the comments around a removed name and the default import beside it', () => {
+    const line = '--- server\nimport {\n  api,\n  invalidatePage, // refreshes\n  pages,\n} from \'kay/server\'\n---\np x'
+    const block = '--- server\nimport { api, invalidatePage /* why */, pages } from \'kay/server\'\n---\np x'
+    const last = '--- server\nimport { api, /* why */ invalidatePage } from \'kay/server\'\n---\np x'
+    const fallback = '--- server\nimport api, { invalidatePage } from \'kay/server\'\n---\np x'
+
+    expect(fixed(line)).toEqual([line.replace('  invalidatePage, // refreshes\n', '   // refreshes\n').replace('} from \'kay/server\'', '} from \'kay/server\'\nimport { invalidatePage } from \'kay/cache\'')])
+    expect(fixed(block)).toEqual(['--- server\nimport { api,  /* why */ pages } from \'kay/server\'\nimport { invalidatePage } from \'kay/cache\'\n---\np x'])
+    expect(fixed(last)).toEqual(['--- server\nimport { api, /* why */  } from \'kay/server\'\nimport { invalidatePage } from \'kay/cache\'\n---\np x'])
+    expect(fixed(fallback)).toEqual(['--- server\nimport api from \'kay/server\'\nimport { invalidatePage } from \'kay/cache\'\n---\np x'])
+  })
+
+  it('reports a namespace read and a re-export, fixing the re-export', () => {
+    const namespace = '--- server\nimport * as server from \'kay/server\'\n\nserver.invalidatePage(\'/\')\nserver[\'invalidatePage\']\n---\np x'
+    const reexport = 'export { invalidatePage } from \'kay/server\'\n'
+
+    expect(lints(namespace)).toEqual([{ code: 'deprecated-import', severity: 'warning', at: 'invalidatePage' }, { code: 'deprecated-import', severity: 'warning', at: '\'invalidatePage\'' }])
+    expect(fixed(namespace)).toEqual([])
+    expect(moduleChecks(reexport).map(d => d.code)).toEqual(['deprecated-import'])
+    expect(moduleChecks(reexport).flatMap(d => d.fixes ?? []).map(fix => fix.edits.map(edit => edit.text))).toEqual([['\'kay/cache\'']])
+    expect(moduleChecks('import * as other from \'./mine\'\nother.invalidatePage()\n')).toEqual([])
+  })
+
   it('leaves the names of other modules and kay/cache alone, and finds the import in a plain module too', () => {
     expect(lints('--- server\nimport { invalidatePage } from \'./mine\'\nimport { invalidate } from \'kay/cache\'\n---\np x')).toEqual([])
     expect(moduleChecks('import { invalidatePage } from \'kay/server\'\n').map(d => d.code)).toEqual(['deprecated-import'])

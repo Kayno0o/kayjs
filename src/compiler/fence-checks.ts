@@ -184,50 +184,158 @@ export function deprecatedSchemaNames(fence: ParsedFence, renamable = true, stri
 const MOVED_IMPORTS = [{ name: 'invalidatePage', from: 'kay/server', to: 'kay/cache' }]
 const MOVED_NAME = new RegExp(`\\b(?:${MOVED_IMPORTS.map(({ name }) => name).join('|')})\\b`)
 
-// A name imported from the entry it left. The fix points the whole import at the new entry when the name is alone in it, else takes the name out and adds an import after it.
+interface Edit { start: number, end: number, text: string }
+type Moving = t.ImportDeclaration | t.ExportNamedDeclaration
+type NamedSpecifier = t.ImportSpecifier | t.ExportSpecifier
+
+const COMMENT = /\/\/[^\n]*|\/\*[\s\S]*?\*\//y
+const ONLY_COMMA = /^\s*,\s*$/
+
+// The index of the first comma between two offsets that no comment holds.
+function commaBetween(code: string, from: number, to: number): number {
+  for (let index = from; index < to; index++) {
+    if (code[index] === ',')
+      return index
+
+    if (code[index] === '/') {
+      COMMENT.lastIndex = index
+      const comment = COMMENT.exec(code)
+
+      if (comment)
+        index += comment[0].length - 1
+    }
+  }
+
+  return -1
+}
+
+// The edits taking one specifier out of the braces, leaving the comments around it where they were.
+function removeSpecifier(code: string, specifiers: t.Node[], index: number): Edit[] {
+  const specifier = specifiers[index]!
+  const next = specifiers[index + 1]
+  const previous = specifiers[index - 1]
+  const own = { start: specifier.start!, end: specifier.end!, text: '' }
+
+  if (next) {
+    if (ONLY_COMMA.test(code.slice(specifier.end!, next.start!)))
+      return [{ ...own, end: next.start! }]
+
+    const comma = commaBetween(code, specifier.end!, next.start!)
+
+    return comma === -1 ? [own] : [own, { start: comma, end: comma + 1, text: '' }]
+  }
+
+  if (previous && ONLY_COMMA.test(code.slice(previous.end!, specifier.start!)))
+    return [{ ...own, start: previous.end! }]
+
+  return [own]
+}
+
+function isNamed(specifier: t.Node): specifier is NamedSpecifier {
+  return specifier.type === 'ImportSpecifier' || specifier.type === 'ExportSpecifier'
+}
+
+function kindOf(node: Moving): string | null | undefined {
+  return node.type === 'ImportDeclaration' ? node.importKind : node.exportKind
+}
+
+// A name imported, re-exported or read off a namespace from the entry it left. The fix points the whole statement at the new entry when the name is alone in it, merges the name into the statement already naming that entry, else takes it out and adds a statement after it; a namespace read is reported with no fix, as none renames it safely.
 export function deprecatedImports(fence: ParsedFence): Diagnostic[] {
   if (!MOVED_NAME.test(fence.code))
     return []
 
   const span = fence.shift
+  const code = fence.code
+  const body = fence.ast.program.body
   const diagnostics: Diagnostic[] = []
+  const namespaces = new Map<string, typeof MOVED_IMPORTS>()
 
-  for (const node of fence.ast.program.body) {
-    if (node.type !== 'ImportDeclaration')
+  for (const node of body) {
+    if (node.type !== 'ImportDeclaration' && !(node.type === 'ExportNamedDeclaration' && node.source))
       continue
 
-    for (const [index, specifier] of node.specifiers.entries()) {
-      const imported = specifier.type === 'ImportSpecifier' && specifier.imported.type === 'Identifier' ? specifier.imported.name : undefined
-      const moved = MOVED_IMPORTS.find(({ name, from }) => name === imported && from === node.source.value)
+    const source = node.source!.value
+    const keyword = node.type === 'ImportDeclaration' ? 'import' : 'export'
+    const named = (node.specifiers as t.Node[]).filter(isNamed)
+    const others = node.specifiers.length - named.length
+
+    if (node.type === 'ImportDeclaration' && node.importKind !== 'type') {
+      for (const specifier of node.specifiers) {
+        if (specifier.type === 'ImportNamespaceSpecifier')
+          namespaces.set(specifier.local.name, MOVED_IMPORTS.filter(({ from }) => from === source))
+      }
+    }
+
+    for (const [index, specifier] of named.entries()) {
+      const name = specifier.type === 'ImportSpecifier' ? specifier.imported : specifier.local
+      const imported = name.type === 'Identifier' ? name.name : name.value
+      const moved = MOVED_IMPORTS.find(entry => entry.name === imported && entry.from === source)
 
       if (!moved)
         continue
 
-      const written = fence.code.slice(specifier.start!, specifier.end!)
-      const kind = node.importKind === 'type' ? 'type ' : ''
-      let edits: { start: number, end: number, text: string }[]
+      const written = code.slice(specifier.start!, specifier.end!)
+      const kind = kindOf(node) === 'type' ? 'type ' : ''
+      // A statement of the same kind already naming the new entry takes the name into its braces.
+      const target = body.find((other): other is Moving => other !== node && other.type === node.type && (other).source?.value === moved.to && kindOf(other) === kindOf(node) && (other).specifiers.some(isNamed))
+      const targetLast = target?.specifiers.filter(isNamed).at(-1)
+      const whole = named.length === 1 && others === 0
+      let edits: Edit[]
 
-      if (node.specifiers.length === 1) {
-        edits = [{ ...span(node.source), text: `'${moved.to}'` }]
-      }
-      else {
-        const next = node.specifiers[index + 1]
-        const previous = node.specifiers[index - 1]
-        const removed = next ? { start: specifier.start!, end: next.start! } : { start: previous!.end!, end: specifier.end! }
+      if (whole && !target)
+        edits = [{ ...span(node.source!), text: `'${moved.to}'` }]
+      else if (whole)
+        edits = [{ ...span({ start: node.start!, end: node.end! + (code[node.end!] === '\n' ? 1 : 0) } as t.Node), text: '' }]
+      else if (named.length === 1)
+        // A default import stays, and the braces go with the only name in them.
+        edits = [{ ...span({ start: node.specifiers.find(entry => !isNamed(entry))!.end!, end: code.lastIndexOf('}', node.source!.start!) + 1 } as t.Node), text: '' }]
+      else
+        edits = removeSpecifier(code, named, index).map(edit => ({ ...span(edit as unknown as t.Node), text: '' }))
 
-        edits = [{ ...span(removed as t.Node), text: '' }, { ...span({ start: node.end!, end: node.end! } as t.Node), text: `\nimport ${kind}{ ${written} } from '${moved.to}'` }]
-      }
+      const already = target?.specifiers.filter(isNamed).some(entry => code.slice(entry.start!, entry.end!) === written)
+
+      if (targetLast && !already)
+        edits.push({ ...span({ start: targetLast.end!, end: targetLast.end! } as t.Node), text: `, ${written}` })
+      else if (!target && !whole)
+        edits.push({ ...span({ start: node.end!, end: node.end! } as t.Node), text: `\n${keyword} ${kind}{ ${written} } from '${moved.to}'` })
 
       diagnostics.push({
         ...span(specifier),
         code: 'deprecated-import',
-        message: `\`${moved.name}\` is imported from '${moved.to}' now, not '${moved.from}'`,
+        message: `\`${moved.name}\` is ${keyword === 'import' ? 'imported' : 're-exported'} from '${moved.to}' now, not '${moved.from}'`,
         note: `'${moved.to}' holds the helpers of the same job, \`invalidate\` beside it`,
-        help: `import it from '${moved.to}'`,
-        fixes: [{ title: `Import it from '${moved.to}'`, edits, safe: true }],
+        help: `${keyword} it from '${moved.to}'`,
+        fixes: [{ title: `${keyword === 'import' ? 'Import' : 'Export'} it from '${moved.to}'`, edits, safe: true }],
         checkOnly: true,
       })
     }
+  }
+
+  for (const statement of body) {
+    if (namespaces.size === 0)
+      break
+
+    eachNode(statement, (node) => {
+      if (node.type !== 'MemberExpression' && node.type !== 'OptionalMemberExpression')
+        return
+
+      const property = node.property
+      const key = property.type === 'Identifier' && !node.computed ? property.name : undefined
+      const quoted = property.type === 'StringLiteral' && node.computed ? property.value : undefined
+      const moved = node.object.type === 'Identifier' ? namespaces.get(node.object.name)?.find(({ name }) => name === (key ?? quoted)) : undefined
+
+      if (!moved)
+        return
+
+      diagnostics.push({
+        ...span(property),
+        code: 'deprecated-import',
+        message: `\`${moved.name}\` is imported from '${moved.to}' now, not '${moved.from}'`,
+        note: `'${moved.to}' holds the helpers of the same job, \`invalidate\` beside it`,
+        help: `import it from '${moved.to}' by name`,
+        checkOnly: true,
+      })
+    })
   }
 
   return diagnostics
