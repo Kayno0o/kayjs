@@ -690,7 +690,7 @@ function draftOf(collection: Collection<unknown>, entry: Omit<SourceEntry, 'draf
   if (draft === undefined)
     return false
 
-  const read: Entry<unknown> = { slug: entry.slug, locale: entry.locale, data, headings: [], Content: () => ({ t: '' }), file: entry.path ?? entry.slug }
+  const read: Entry<unknown> = { slug: entry.slug, locale: entry.locale, data, headings: [], words: 0, readingTime: 0, Content: () => ({ t: '' }), file: entry.path ?? entry.slug }
 
   return isDraft(draft as ((entry: Entry<unknown>) => boolean) | string, read)
 }

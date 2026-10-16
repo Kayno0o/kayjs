@@ -16,7 +16,7 @@ import { localeState } from '../runtime/locale-state'
 import { previewing, previewState } from '../runtime/preview'
 import { isDraft } from './drafts'
 import { contentMode, loadEntries } from './load'
-import { compileMarkdown, MarkdownError } from './markdown'
+import { compileMarkdown, countWords, MarkdownError } from './markdown'
 import { ContentError, decodeEntries } from './validate'
 
 export type { CollectionInfo, DataValue, EntryFile, EntryFilter, EntryPath, FieldKind, JsonSchema, SourceEntry, WrittenEntry } from './edit'
@@ -32,6 +32,7 @@ export const COLLECTION = Symbol.for('kay.collection')
 declare const FEED_PATH: unique symbol
 // Loaded entries are kept until `invalidate()` or a restart unless the loader sets a `ttl`: about thirty years.
 const FOREVER = 1e9
+const WORDS_PER_MINUTE = 230
 
 export interface Entry<Data> {
   // The file's path in the collection without its extension, `guides/intro` for `guides/intro.md`; an `index` file takes its folder's.
@@ -39,6 +40,10 @@ export interface Entry<Data> {
   data: Data
   // A Markdown entry's headings, in order, for a table of contents; empty for a data file.
   headings: Heading[]
+  // The words of a Markdown entry's rendered text, none for a data file; see `readingTime`.
+  words: number
+  // The minutes a Markdown entry takes to read at 230 words a minute, at least 1, 0 for a data file.
+  readingTime: number
   // Renders a Markdown entry's body, the kay components it uses included; renders nothing for a data file.
   Content: Component
   // The file, relative to the project root; a loaded entry's collection name and slug, `posts/hello`.
@@ -346,10 +351,10 @@ async function compileLoaded(loader: ContentLoader, preview: boolean, highlight:
     slugs.add(slug)
 
     try {
-      const fromHtml = typeof html === 'string' ? { segments: [html], headings: [] } : undefined
+      const fromHtml = typeof html === 'string' ? { segments: [html], headings: [], words: countWords(html) } : undefined
       const compiled = typeof body === 'string' ? await compileMarkdown(body, 1, highlight) : fromHtml
 
-      entries.push({ slug, file, data, lines: {}, segments: compiled?.segments, headings: compiled?.headings })
+      entries.push({ slug, file, data, lines: {}, segments: compiled?.segments, headings: compiled?.headings, words: compiled?.words })
     }
     catch (error) {
       problems.push({ file, line: error instanceof MarkdownError ? error.line : 1, message: error instanceof Error ? error.message : String(error) })
@@ -379,12 +384,15 @@ function bySlugThenLocale(a: { slug: string, locale?: string | undefined }, b: {
 function toEntry<Data>(entry: RawEntry, data: Data, components: Record<string, Component<never>>, localized: boolean): Entry<Data> {
   const segments = entry.segments ?? []
   const split = entry.slug.indexOf('/')
+  const words = entry.words ?? 0
 
   return {
     ...localized && { locale: entry.slug.slice(0, split) },
     slug: localized ? entry.slug.slice(split + 1) : entry.slug,
     data,
     headings: entry.headings ?? [],
+    words,
+    readingTime: words === 0 ? 0 : Math.max(1, Math.round(words / WORDS_PER_MINUTE)),
     Content: () => render(segments, components, entry.file),
     file: entry.file,
   }

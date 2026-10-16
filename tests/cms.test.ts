@@ -114,7 +114,7 @@ describe('loaded collections', () => {
 
     expect(notes.dir).toBeUndefined()
     expect(notes.name).toBe('notes-compiled')
-    expect(first).toMatchObject({ slug: 'a', data: { title: 'First' }, headings: [], file: 'notes-compiled/a' })
+    expect(first).toMatchObject({ slug: 'a', data: { title: 'First' }, headings: [], words: 3, readingTime: 1, file: 'notes-compiled/a' })
     expect(String((first!.Content as () => { t: string })().t)).toBe('<p>From the CMS</p>')
     expect(second!.headings).toEqual([{ depth: 1, id: 'intro', text: 'Intro' }])
     expect((second!.Content as () => { t: string })().t).toContain('<strong>bold</strong>')

@@ -24,6 +24,8 @@ export interface RawEntry {
   lines: Record<string, number>
   segments?: Segment[] | undefined
   headings?: Heading[] | undefined
+  // Absent from entries a build wrote before words were counted.
+  words?: number | undefined
 }
 
 // Under `.kay/client`, beside the build's other output, and embedded with it in an executable.
@@ -35,7 +37,7 @@ const INDEX = /(?:^|\/)index$/
 const BACKSLASH = /\\/g
 const TOP_LEVEL_FIELD = /^["']?([\w$-]+)["']?\s*:/
 // Bumped whenever what an entry compiles to changes shape, so no cache from before is read.
-const CACHE_VERSION = 3
+const CACHE_VERSION = 4
 
 // What the cache holds for one entry, in a file named after the entry's path: the compile it is the result of, the file's size and time when it was read, and its content's hash, which stands in for reading it while the stamp holds.
 interface CachedEntry {
@@ -266,6 +268,7 @@ async function compileEntry(name: string, file: string, source: string, highligh
     lines: frontmatter === undefined ? {} : fieldLines(frontmatter, false, 1),
     segments: compiled.segments,
     headings: compiled.headings,
+    words: compiled.words,
   }
 }
 

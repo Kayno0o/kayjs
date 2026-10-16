@@ -31,6 +31,8 @@ export type Segment = string | ComponentSegment
 export interface CompiledMarkdown {
   segments: Segment[]
   headings: Heading[]
+  // The words of the rendered text, see `countWords`.
+  words: number
 }
 
 // Turns a code block into highlighted HTML at build time, such as with Shiki: the whole `<pre>`, given the code and its fence's language.
@@ -92,8 +94,22 @@ export async function compileMarkdown(body: string, bodyLine: number, highlight?
   const { text, components } = extractComponents(body, bodyLine)
   const { html, headings } = await renderMarkdown(text, { highlight })
 
-  return { segments: componentSegments(html, components), headings }
+  return { segments: componentSegments(html, components), headings, words: countWords(html) }
 }
+
+// The words an entry's reader sees in Markdown's HTML: tags and entities set aside, code included.
+// A component's own output is not in it, as it only exists once the page renders, so only the Markdown inside a component's tags counts.
+export function countWords(html: string): number {
+  let words = 0
+
+  for (const { isWordLike } of WORDS.segment(decode(html.replace(TAGS, ' '))))
+    words += isWordLike ? 1 : 0
+
+  return words
+}
+
+// Words as the reader counts them, a CJK text's too, which has no spaces to split on.
+const WORDS = new Intl.Segmenter('und', { granularity: 'word' })
 
 // The HTML an entry's Markdown body puts on the page, each component standing as a `<kay-component>` element around what it wraps, so a CMS can check what an editor wrote before saving it; throws a MarkdownError for components kay cannot read.
 export async function bodyHtml(body: string): Promise<string> {

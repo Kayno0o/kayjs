@@ -225,7 +225,7 @@ describe('feeds', () => {
   })
 
   it('write Atom, escaping what they carry', () => {
-    const xml = feedXml([{ slug: 'a', data: {}, headings: [], Content: () => ({ t: '' }), file: 'a.md' }], { path: '/feed.xml', title: 'Fish & chips', format: 'atom', item: () => ({ title: 'A <b>bold</b> move', path: '/a', date: new Date('2026-01-02') }) }, 'https://x.example')
+    const xml = feedXml([{ slug: 'a', data: {}, headings: [], words: 0, readingTime: 0, Content: () => ({ t: '' }), file: 'a.md' }], { path: '/feed.xml', title: 'Fish & chips', format: 'atom', item: () => ({ title: 'A <b>bold</b> move', path: '/a', date: new Date('2026-01-02') }) }, 'https://x.example')
 
     expect(xml).toContain('<feed xmlns="http://www.w3.org/2005/Atom">')
     expect(xml).toContain('<title>Fish &amp; chips</title>')
@@ -355,6 +355,21 @@ describe('compiling Markdown', () => {
       setContentPlace(process.cwd(), join(process.cwd(), FIXTURE, 'src'))
       await rm(dir, { recursive: true, force: true })
     }
+  })
+})
+
+describe('Markdown entries\' length', () => {
+  it('counts the words of the rendered text, components\' own output left out, and reads them at 230 a minute', async () => {
+    const { posts } = await import(`../${content}`) as { posts: Collection<{ title: string }> }
+    const hello = await posts.get('hello')
+
+    // Headings and paragraphs count, the code's symbols and the Counter and Callout elements do not; the Callout's Markdown does.
+    expect(hello).toMatchObject({ words: 17, readingTime: 1 })
+
+    const long = await compileMarkdown(`${'word '.repeat(460)}\n\n<b>a &amp; b</b>\n`, 1)
+
+    expect(long.words).toBe(462)
+    expect(Math.max(1, Math.round(462 / 230))).toBe(2)
   })
 })
 
