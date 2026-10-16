@@ -1,4 +1,5 @@
 import type { Elysia, Static, TSchema } from 'elysia'
+import type { EnvSchemaRecord } from './env-state'
 import type { ServedPaths } from './served-paths'
 import process from 'node:process'
 import { t } from 'elysia'
@@ -6,15 +7,21 @@ import { KayError } from '../compiler/errors'
 import { PUBLIC_ENV } from '../runtime/env'
 import { kayLog } from '../runtime/log'
 import { fixedReply } from './compress'
-import { building, PUBLIC_ENV_PATH } from './env-state'
+import { building, PUBLIC_ENV_PATH, recordEnv } from './env-state'
 import { readFields } from './query'
+
+const OPTIONAL = Symbol.for('TypeBox.Optional')
 
 // A `s.Object` of the variables, each read on its own.
 export type EnvSchema = TSchema & { properties: Record<string, TSchema> }
 
 // The environment read once against `schema`, as the server boots: numbers and booleans from their text, defaults filled in, and every variable missing or refused named in the error that stops it.
 // Holds the declared names only, so logging it never shows the rest of the environment.
-export function defineEnv<Schema extends EnvSchema>(schema: Schema, source: Record<string, string | undefined> = process.env): Static<Schema> {
+// A field with `requiredInProduction: true`, such as `s.String({ default: 'dev-secret', requiredInProduction: true })`, takes its default or `s.Optional` outside production, and is required there with the default dropped; `kay env` lists it as required in production.
+export function defineEnv<Schema extends EnvSchema>(declared: Schema, source: Record<string, string | undefined> = process.env): Static<Schema> {
+  recordEnv(declared)
+
+  const schema = source.NODE_ENV === 'production' ? requiredInProduction(declared) : declared
   const input: Record<string, string> = {}
 
   for (const name of Object.keys(schema.properties)) {
@@ -50,6 +57,57 @@ export function defineEnv<Schema extends EnvSchema>(schema: Schema, source: Reco
   }
 
   return env
+}
+
+// The schema with every `requiredInProduction` field made required and stripped of its default.
+function requiredInProduction<Schema extends EnvSchema>(schema: Schema): Schema {
+  if (!Object.values(schema.properties).some(field => (field as { requiredInProduction?: unknown }).requiredInProduction === true))
+    return schema
+
+  return t.Object(Object.fromEntries(Object.entries(schema.properties).map(([name, field]) => {
+    if ((field as { requiredInProduction?: unknown }).requiredInProduction !== true)
+      return [name, field]
+
+    const required: Record<string | symbol, unknown> = { ...field }
+
+    delete required.default
+    delete required[OPTIONAL]
+
+    return [name, required]
+  }))) as unknown as Schema
+}
+
+// One variable of a schema as `kay env` lists it.
+export interface EnvVariable {
+  name: string
+  type: string
+  // `'always'` when no default takes its place, `'production'` when only production needs a value, `false` when it is optional or defaulted.
+  required: 'always' | 'production' | false
+  default?: unknown
+  description?: string
+}
+
+// What a schema declares, as `defineEnv` reads it: each name with its type, whether it is required and its default.
+export function describeEnv(schema: EnvSchemaRecord): EnvVariable[] {
+  const required = new Set((schema as { required?: string[] }).required ?? [])
+
+  return Object.entries(schema.properties).map(([name, field]) => {
+    const { default: fallback, description, requiredInProduction: production, type, anyOf, format } = field as { default?: unknown, description?: unknown, requiredInProduction?: unknown, type?: unknown, anyOf?: { type?: unknown }[], format?: unknown }
+    // A number or boolean is a union with its text, the form it is read from.
+    const parts = anyOf?.map(part => part.type).filter(part => typeof part === 'string') ?? []
+    const kinds = parts.length > 1 ? parts.filter(part => part !== 'string') : parts
+    const kind = typeof type === 'string' ? type : kinds.join(' | ') || 'string'
+
+    const always = required.has(name) && fallback === undefined
+
+    return {
+      name,
+      type: typeof format === 'string' ? `${kind} (${format})` : kind,
+      required: production === true ? 'production' : always && 'always',
+      ...fallback !== undefined && { default: fallback },
+      ...typeof description === 'string' && { description },
+    }
+  })
 }
 
 // Names a variable meant for the server alone goes by, which no visitor should read: a map or analytics key is public by design, a secret or a database address never is.

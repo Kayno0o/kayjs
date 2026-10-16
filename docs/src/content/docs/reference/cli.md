@@ -26,6 +26,7 @@ bun run dev
 | `kay check [dir]` | Type-check the project, `.kay` files included |
 | `kay upgrade [dir]` | Move kay and its libraries to the latest version and rewrite the old forms |
 | `kay routes [dir]` | List every route the project serves, and the file serving it |
+| `kay env [dir]` | List the environment variables the project, its libraries and kay declare |
 | `kay explain [lint\|error\|group]` | List the lints and the errors, or a group's, or explain one |
 | `kay fmt [paths]` | Format `.kay` files |
 | `kay migrate astro [dir]` | Translate an Astro project into a kay one |
@@ -341,6 +342,14 @@ Then it runs the kay it just installed. Each minor between your old version and 
 
 An app already on the latest version is left alone. If the install fails, `package.json` goes back as it was, and you can run `kay upgrade` again once the install works. What a minor breaks that `kay check` cannot see is in [Upgrading](/guides/upgrading).
 
+## kay env
+
+```sh
+kay env
+```
+
+It lists the environment variables the project declares, without the server's environment and without running the server entry: the `defineEnv` schemas in the modules under `src`, `publicEnv`, the environment each library in `extensions` declares and kay's own `PORT`, `HOST` and `SITE_URL`. Each has its source, its type, whether it is required (`always`, `production` for a field with `requiredInProduction: true`, or `optional`) and its default. A module that does not load is named as not read. The modules under `src` are imported, so their top-level code runs, and what it prints goes to stderr under `--format json`. See [Environment variables](/essentials/data-loading#environment-variables).
+
 ## kay routes
 
 ```sh
@@ -430,12 +439,13 @@ Colour only goes to a terminal, and not under `NO_COLOR` or `TERM=dumb`; `FORCE_
 
 ## Output for tools
 
-`kay build`, `kay routes`, `kay explain`, `kay fmt` and `kay migrate` take `--format json`, as `kay check` does, for a script or an agent to read: stdout then holds one JSON document on one line, what the app's own code prints through the console or `process.stdout`, such as `kay.config.ts`, an API module or a prerendered page, going to stderr; a write straight to the file descriptor, as `Bun.write(Bun.stdout, ...)`, still lands on stdout. The exit code is the one the text output gives.
+`kay build`, `kay routes`, `kay env`, `kay explain`, `kay fmt` and `kay migrate` take `--format json`, as `kay check` does, for a script or an agent to read: stdout then holds one JSON document on one line, what the app's own code prints through the console or `process.stdout`, such as `kay.config.ts`, an API module or a prerendered page, going to stderr; a write straight to the file descriptor, as `Bun.write(Bun.stdout, ...)`, still lands on stdout. The exit code is the one the text output gives.
 
 | Command | Document |
 | --- | --- |
 | `kay build` | `{ errors, warnings, problems }` as `kay check` prints them, a template that does not compile at its place and any other failure as one problem with `code: null`; `failed: { stage }` when a stage stopped it (`check`, `bundle`, `output`, `export` or `compile`); `built: { islands, stylesheets, prerendered, entries, ms, sizes, routes, stages, caches }`, `sizes` holding the entry's and each island's `raw` and `gzip` bytes, with their heaviest `modules` under `--analyze`, the `why` of each island and `promoted` for a static component that only may be one, `routes` each route's `js` and `css` gzip bytes with the `islands` its pages render, or its components can reach when it is an `estimated` reach, and its `pages` prerendered, the `kept` pages the build kept on its own and, for a route rendered per request, the `stop` that decided it and whether its scripts are an `estimated` reach, `stages` the `ms` of each stage and `caches` how many entries each cache gave (`cached`) and had made (`made`); `exported: { pages, files, dir, ms }` with `--static`; `compiled: { executable, ms, verifiedMs }` with `--compile`, `verifiedMs` with `--verify` |
 | `kay routes` | `{ routes, unlisted }`, each route with its `methods`, `path`, `kind`, `by` as the listing shows it, and `file`, `notes`, `layouts` and `guards` when it has them |
+| `kay env` | `{ variables, unread }`, each variable with its `name`, `source`, `type`, `required` (`"always"`, `"production"` or `false`), and `default` and `description` when it has them; `unread` the `file` and `error` of each module that failed to load |
 | `kay explain` | `{ groups, lints, errorGroups, errors }`, each lint's `name`, `group`, `level` and whole `summary`; for one lint, its `name`, `level`, `group`, `summary`, the `wrong` and `right` examples, and `typed`, `site` and `launch` when set; for an error, its `name`, `group`, `summary` and `fix`, the file and heading that cover it |
 | `kay fmt` | `{ errors, warnings, problems, written, changed }`: what does not parse as problems, and the files it formatted, or under `--check` would, `written` false |
 | `kay migrate` | `{ written, kept, copied, notes }`: the files written and those kept as they exist, how many other files it copied, and each item left to do by hand with its `file`, `line`, `target` and `message` |

@@ -163,7 +163,7 @@ async function apiRoutes(root: string, config: KayConfig): Promise<Listed[]> {
 }
 
 // An API module runs as it is imported: what it writes to stdout goes to stderr, off the listing, and its `process.exit()` fails it alone.
-async function importApi(file: string): Promise<{ default?: unknown }> {
+export async function importApi(file: string): Promise<{ default?: unknown }> {
   const exit: unknown = Reflect.get(process, 'exit')
 
   process.exit = (code?: number) => {

@@ -299,6 +299,8 @@ export interface KayExtension<Server extends AnyElysia = AnyElysia> {
   api?: { dir: string, prefix?: string | undefined } | undefined
   // A directory of message catalogs, `<locale>.ts` each, under the app's own: a key the app translates is the app's.
   messages?: string | undefined
+  // The environment variables the library reads, as a `defineEnv` schema: `kay env` lists them with the app's own, so a deploy script knows what to set without wiring the library. A field with `requiredInProduction: true` is one production needs.
+  env?: EnvSchema | undefined
   // A `.kay` island every page renders at the end of its body in edit mode alone, kept alive across navigations, given `{ entries }`: each entry the page read, as `kay/edit`'s `EditorProps` types them. Absolute, or relative to the project root; one extension at most gives one.
   editor?: string | undefined
   // A browser module that adds to the dev tool every dev page carries, named by an absolute path (from `import.meta.dir`) or relative to the project root: kay serves it in development alone, loads it after the tool, and calls its default export with the `DevTool` (`import type { DevTool } from 'kay/dev-tool'`). It is a single file, as nothing bundles its imports, and gets its data from a dev-only route of the library's own. One that fails is logged as a problem and the others still load.

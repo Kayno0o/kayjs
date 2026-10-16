@@ -39,7 +39,7 @@ export default defineConfig({ extensions: [mailExtension('./src/mail')] })
 
 ## Environment
 
-In production the mailer reads, as the server boots, through kay's `defineEnv`:
+In production the mailer reads, as the server boots, through kay's `defineEnv`; `mailExtension` lists them for `kay env`, `SMTP_HOST` and `SMTP_FROM` as required in production, with nothing wired in the app:
 
 | Variable | |
 | --- | --- |

@@ -143,4 +143,30 @@ export const env = defineEnv(s.Object({
 
 Import `env` from server code. An island never sees it.
 
+A secret that development and tests can do without, and production must have, takes `requiredInProduction: true`. Under `NODE_ENV=production` a missing value stops the boot, whatever the default; anywhere else the default applies, or the variable is left out when its field is `s.Optional`.
+
+```ts
+export const env = defineEnv(s.Object({
+  SESSION_SECRET: s.String({ default: 'dev-secret', requiredInProduction: true }),
+  SMTP_HOST: s.Optional(s.String({ requiredInProduction: true })),
+}))
+```
+
+### List the variables
+
+`kay env` lists every variable the project declares, for a deploy script to compare with a compose file or an env file. It reads the `defineEnv` schemas in the modules under `src`, `publicEnv`, the environment each library lists in `extensions` declares (kayjs-mail's SMTP variables, with nothing wired in the app) and kay's own `PORT`, `HOST` and `SITE_URL`, without the server's environment and without running the server entry.
+
+```sh
+kay env
+```
+
+```
+DATABASE_URL    src/env.ts  string   always
+SESSION_SECRET  src/env.ts  string   production  "dev-secret"
+SMTP_HOST       the extension @kaynooo/kayjs-mail  string  production
+PORT            kay         integer  optional    3000
+```
+
+Each variable is `always` required, required in `production` only, or `optional`, with its default. `kay env --format json` prints `{ variables, unread }` on one line, each variable with its `name`, `source`, `type`, `required` (`"always"`, `"production"` or `false`), and `default` and `description` when it has them. A module that does not load is named under `unread`. The modules are imported, so their top-level code runs.
+
 <ReadMore href="/llms/server">Locals, sessions, guards and the environment variables an island may read are in the full server reference.</ReadMore>

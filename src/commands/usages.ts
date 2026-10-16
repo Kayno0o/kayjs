@@ -9,6 +9,7 @@ export const USAGES = {
   check: 'check [dir] [paths...] [-p tsconfig.json] [--entry <file>] [--deny-warnings] [--fix] [--only <group>] [--since <minor>] [--format text|github|json] [--watch] [--quiet]',
   upgrade: 'upgrade [dir]',
   routes: 'routes [dir] [--format text|json]',
+  env: 'env [dir] [--format text|json]',
   explain: 'explain [lint|error|group] [--format text|json]',
   types: 'types [dir] [--quiet]',
   fmt: 'fmt [paths...] [--check] [--format text|json] [--quiet]',

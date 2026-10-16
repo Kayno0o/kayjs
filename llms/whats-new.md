@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- `requiredInProduction: true` on a `defineEnv` field makes a variable required under `NODE_ENV=production` only, refused at boot there and optional in development and tests; `kay env [--format json]` lists every variable the app, `publicEnv`, its extensions (kayjs-mail's SMTP ones) and kay declare, with whether each is required and its default, for a deploy script ([Server](server.md#environment), [Project](project.md#commands)).
 - The `font` shorthand's metric-matched fallback is listed when its size is `var()` or `calc()` too, `font: var(--size) "Inter", sans-serif` included ([Head](head.md#self-host-a-font)).
 - kayjs-mail's `send` throws an `Error` with the original value as its `cause` when a transport throws something that is not an `Error` ([kayjs-mail](../packages/mail/llms.txt)).
 - `budget: { js: '20kb', css: '10kb' }` in kay.config.ts limits what one page loads, compressed: `kay build` warns with `over-budget` for each page over it, naming the modules weighing most in its scripts, and `kay build --deny-warnings` fails on it ([Project](project.md#commands)).
