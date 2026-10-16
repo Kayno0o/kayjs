@@ -4,13 +4,15 @@ order: 1
 description: kay is a Bun web framework where a page is plain HTML and only the interactive parts ship JavaScript.
 ---
 
-kay is a web framework for Bun. Pages render to plain HTML on the server, and only the parts that react to the visitor ship JavaScript. Everything is typed, templates included, so `kay check` catches a mistake at its line before it reaches the browser.
+kay is a web framework for Bun. Pages render to plain HTML on the server. Only the parts that react to the visitor ship JavaScript.
+
+Everything is typed, templates included. `kay check` catches a mistake at its line before it reaches the browser.
 
 A `.kay` file is one component: TypeScript in fences, then an indented template. An [Elysia](https://elysiajs.com) plugin serves the pages.
 
 ## A first look
 
-`src/routes/index.kay` is the home page. The `--- server` fence runs on the server for each request, and what it declares is available in the template:
+`src/routes/index.kay` is the home page. The `--- server` fence runs on the server for each request. What it declares is available in the template.
 
 ```kay
 --- server
@@ -20,7 +22,7 @@ h1 Hello {name}
 p Welcome to #[a(href="/about") kay].
 ```
 
-A component that reacts to the user is an island. This one has an `onClick` and a signal, so kay renders it on the server and hydrates it in the browser:
+A component that reacts to the user is an island. This one has an `onClick` and a signal, so kay renders it on the server and hydrates it in the browser.
 
 ```kay
 ---
@@ -29,7 +31,7 @@ const count = signal(0)
 button(onClick={() => count.set(c => c + 1)}) Clicked {count()} times
 ```
 
-Saved as `src/components/counter.kay`, a page uses it like any component. The page around it stays plain HTML.
+Save it as `src/components/counter.kay`. A page uses it like any component, and the page around it stays plain HTML.
 
 ```kay
 ---
@@ -41,10 +43,10 @@ Counter
 
 ## Key ideas
 
-- HTML first: a page with no interactive component ships no JavaScript bundle, only one line of script keeping Back right.
+- HTML first: a page with no interactive component ships no JavaScript bundle. It has one line of script that keeps the Back button right.
 - Islands: a component with an event handler, a `bind:` or a signal hydrates by itself, and only it.
 - Typed actions: forms post to server actions checked against a schema, with or without JavaScript.
-- `kay check` type-checks everything, templates included, and reports errors at the `.kay` line and column.
+- Typed templates: `kay check` reports errors at the `.kay` line and column.
 
 ## Where to go next
 

@@ -4,7 +4,9 @@ order: 4
 description: Where the files of a kay project live and what the two entry files look like.
 ---
 
-A kay project grows into this shape. `kay new` writes part of it, depending on the preset and features you pick, and the rest appears as you need it. Only `src/routes` is required. Each entry leads to its page in the [Structure](/structure/routes) part, which draws the whole tree in its sidebar.
+A kay project grows into this shape. `kay new` writes part of it, depending on the preset and features you pick. The rest appears as you need it, and only `src/routes` is required.
+
+Each entry leads to its page in the [Structure](/structure/routes) part.
 
 <FileTree tree="
 my-app/
@@ -25,7 +27,7 @@ my-app/
 
 ## The server entry
 
-`src/server.ts` mounts the pages on an Elysia server:
+`src/server.ts` mounts the pages on an Elysia server.
 
 ```ts
 import { Elysia } from 'elysia'
@@ -34,11 +36,13 @@ import { pages } from 'kay/server'
 export const app = new Elysia().use(await pages()).listen(3000)
 ```
 
-Exporting `app` lets `kay check` check links against your own routes and types `ctx.locals`. A project with nothing custom on its server has no server entry: kay serves the pages itself.
+Exporting `app` lets `kay check` check links against your own routes and type `ctx.locals`.
+
+A project with nothing custom on its server has no server entry. kay serves the pages itself.
 
 ## kay.config.ts
 
-Settings live in an optional `kay.config.ts` that exports its config by default:
+Settings live in an optional `kay.config.ts` that exports its config by default.
 
 ```ts
 import { defineConfig } from 'kay/server'
@@ -49,10 +53,10 @@ export default defineConfig({
 })
 ```
 
-`tsconfig.json` extends kay's:
+`tsconfig.json` extends kay's.
 
 ```json
 { "extends": "kay/tsconfig.json" }
 ```
 
-<ReadMore href="/llms/project">The reference lists every config option and how the server, the config and `pages()` options combine.</ReadMore>
+<ReadMore href="/llms/project">Every config option, and how the server, the config and `pages()` options combine.</ReadMore>
