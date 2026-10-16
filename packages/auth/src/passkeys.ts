@@ -53,7 +53,7 @@ export type RegisterPasskeyResult = { ok: true, passkey: Passkey } | { ok: false
 
 export type PasskeySignInResult = { ok: true, redirect: string } | { ok: false, error: 'expired' | 'invalid' | 'limited' | 'banned' }
 
-// The options for the browser's `navigator.credentials.create`, through `startRegistration` of `@simplewebauthn/browser`, once `proof` re-proves the user.
+// The options for the browser's `navigator.credentials.create`, through `makePasskey` of `@kaynooo/kayjs-auth/browser`, once `proof` re-proves the user.
 // A passkey is a way in that skips the second factor and outlives every sign-out, so a stolen session alone may not add one, and the second factor proves it when it is on.
 export async function passkeyRegistrationOptions(state: RequestState, proof: Proof): Promise<PasskeyOptionsResult<PublicKeyCredentialCreationOptionsJSON, ProofFailure>> {
   const relying = relyingParty(state.core)

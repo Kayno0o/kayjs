@@ -165,6 +165,11 @@ describe('the prebuilt pages', () => {
     const expired = await visitor.refusal(passkey, { response: whole as never }, { from })
 
     expect([expired.status, expired.data]).toEqual([400, { error: 'expired' }])
+
+    // A credential id may be 1023 bytes, 1364 characters in base64url.
+    const long = 'a'.repeat(1364)
+
+    expect((await visitor.refusal(passkey, { response: { ...whole, id: long, rawId: long } as never }, { from })).status).toBe(400)
   })
 
   test('a form checks the browser before going through: refused without its script, sent too soon or filling the hidden field, in the page\'s language', async () => {

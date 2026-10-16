@@ -26,9 +26,10 @@ export function canMakePasskey(): boolean {
 }
 
 // The answer to what `passkeySignInOptions()`, `twoFactorPasskeyOptions()` or `passkeyProofOptions()` gave, for the action calling `signInWithPasskey`, `verifyTwoFactorPasskey` or a proof; null when the person picked none.
-export async function askPasskey(options: RequestOptions): Promise<AuthenticationResponseJSON | null> {
+// With `autofill`, the passkeys are offered in the autofill of a field with `autocomplete="username webauthn"` and the call waits until one is picked, or `signal` aborts it.
+export async function askPasskey(options: RequestOptions, { autofill = false, signal }: { autofill?: boolean, signal?: AbortSignal } = {}): Promise<AuthenticationResponseJSON | null> {
   // @simplewebauthn types the prf extension's values as BufferSource where the DOM's JSON type has strings, for the same JSON.
-  const credential = await navigator.credentials.get({ publicKey: PublicKeyCredential.parseRequestOptionsFromJSON(options as unknown as Parameters<typeof PublicKeyCredential.parseRequestOptionsFromJSON>[0]) })
+  const credential = await navigator.credentials.get({ publicKey: PublicKeyCredential.parseRequestOptionsFromJSON(options as unknown as Parameters<typeof PublicKeyCredential.parseRequestOptionsFromJSON>[0]), ...autofill && { mediation: 'conditional' }, ...signal && { signal } })
   const answer = credential instanceof PublicKeyCredential ? credential.toJSON() : undefined
 
   return answer !== undefined && isAssertion(answer) ? answer : null
@@ -44,8 +45,11 @@ export async function makePasskey(options: CreationOptions): Promise<Registratio
 
 // What to tell the person when a passkey request threw: the message for the code an action refused it with, nothing when they dismissed the browser's prompt, else `failed`.
 export function passkeyFailure(caught: unknown, errors: Record<string, string>, failed: string): string {
-  if (caught instanceof ActionError)
-    return errors[(caught.data as { error?: string } | undefined)?.error ?? ''] ?? failed
+  if (caught instanceof ActionError) {
+    const code = (caught.data as { error?: string } | undefined)?.error
+
+    return code !== undefined && Object.hasOwn(errors, code) ? errors[code] ?? failed : failed
+  }
 
   return caught instanceof DOMException && caught.name === 'NotAllowedError' ? '' : failed
 }

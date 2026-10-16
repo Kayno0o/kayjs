@@ -4,7 +4,10 @@ import { t } from 'elysia'
 // The parts of a browser's answer a ceremony reads, as `credential.toJSON()` writes them: a post that lacks one is refused here, and the signature and challenge are the ceremony's to check.
 const PART_MAX = 32_768
 const part = t.String({ maxLength: PART_MAX })
-const credential = { id: t.String({ maxLength: 1024 }), rawId: t.String({ maxLength: 1024 }), type: t.Literal('public-key') }
+// A credential id is up to 1023 bytes, 1364 characters in base64url.
+const ID_MAX = 1366
+const credential = { id: t.String({ maxLength: ID_MAX }), rawId: t.String({ maxLength: ID_MAX }), type: t.Literal('public-key'), clientExtensionResults: t.Object({}, { additionalProperties: true }) }
+const transports = t.Optional(t.Array(t.String({ maxLength: 32 }), { maxItems: 8 }))
 
 // The answer to `passkeySignInOptions()`, `twoFactorPasskeyOptions()` or `passkeyProofOptions()`, for the schema of an action calling `signInWithPasskey`, `verifyTwoFactorPasskey` or a proof.
 export const passkeyAssertion = t.Unsafe<AuthenticationResponseJSON>(t.Object({
@@ -15,5 +18,5 @@ export const passkeyAssertion = t.Unsafe<AuthenticationResponseJSON>(t.Object({
 // The answer to `passkeyRegistrationOptions()`, for the schema of an action calling `registerPasskey`.
 export const passkeyAttestation = t.Unsafe<RegistrationResponseJSON>(t.Object({
   ...credential,
-  response: t.Object({ clientDataJSON: part, attestationObject: part }, { additionalProperties: true }),
+  response: t.Object({ clientDataJSON: part, attestationObject: part, transports }, { additionalProperties: true }),
 }, { additionalProperties: true }))

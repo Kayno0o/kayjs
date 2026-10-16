@@ -173,7 +173,7 @@ export default guard(({ locals, redirect, deny }) => {
 })
 ```
 
-A library's own guard names the locals it reads with `guard<{ auth: Auth }>(...)`, so its `ctx.locals` has them whatever the app registers.
+A library's own guard names the locals it reads with `guard<{ auth: Auth }>(...)`, so its `ctx.locals` has them whatever the app registers. It is an assertion about the plugin the app mounts, not checked at runtime.
 
 ### Leave a page open under a guard
 

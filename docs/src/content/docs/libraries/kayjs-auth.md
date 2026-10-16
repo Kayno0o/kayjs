@@ -108,6 +108,12 @@ form(action={signIn})
 
 Changing what protects the account (`changePassword`, `changeEmail`, `deleteAccount`, the second factor, passkeys, linked providers, tokens) takes a `proof`: `{ password }`, `{ code }` from the authenticator or a recovery code, or `{ passkey }`. With two-factor on, `changeEmail`, `disableTwoFactor`, `regenerateRecoveryCodes`, `passkeyRegistrationOptions` and `linkProvider` refuse the password alone and take the code or a passkey.
 
+## Passkeys in an island
+
+An island asks for a passkey with `@kaynooo/kayjs-auth/browser`, which calls the browser's own WebAuthn methods and ships no library. `askPasskey(options)` and `makePasskey(options)` take the options an action returned and answer the JSON the next action takes, or null when the person picked none. `canAskPasskey()` and `canMakePasskey()` say whether to show the button, and `passkeyFailure(caught, errors, failed)` gives the message for what threw.
+
+An action takes that answer with `passkeyAssertion` for a sign-in, a second factor or a proof, and `passkeyAttestation` for adding a passkey. They type it as kayjs-auth reads it, so no cast is needed, and refuse an answer missing a part with a 422.
+
 ## Bots
 
 Registering, password resets and magic links ask for a proof of work by default, and a password sign-in from the third attempt: the browser hashes for some tens of milliseconds before the request goes through, with no third party and no cookie. The prebuilt pages carry it; your own form carries `captchaChallenge` in a `data-kay-work` field, whose solution your action passes on as `captcha`:

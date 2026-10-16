@@ -21,7 +21,7 @@ export default guard(({ locals, redirect, deny }) => {
 
 A guard's `ctx` is the same one a page, an endpoint and an action get: `request`, `url`, `locale`, `params`, `cookies`, `locals`, `headers`, `redirect`, `notFound` and `deny`. `redirect`, `notFound` and `deny` throw. Write `return redirect(...)`, so TypeScript knows nothing after it runs.
 
-A guard in a library reads locals the app may not have registered. It names them as a type argument, `guard<{ auth: Auth }>(...)`, and its `ctx.locals` has them.
+A guard in a library reads locals the app may not have registered. It names them as a type argument, `guard<{ auth: Auth }>(...)`, and its `ctx.locals` has them. That is a claim about the plugin the app mounts, which nothing checks when the guard runs.
 
 Guards still run on every request to a prerendered page. A guard under a param folder reads that param, as `src/routes/orgs/[org]/_guard.ts` reads `params.org`. One in [`src/api/`](/structure/api) protects its routes the same way.
 
