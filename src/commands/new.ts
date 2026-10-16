@@ -1,14 +1,14 @@
-import type { Feature, Preset } from '../new'
+import type { Feature, Host, Preset } from '../new'
 import type { Command, Parsed } from './command'
 import process from 'node:process'
 import { colors } from '@kaynooo/utils/tools/colors'
-import { createProject, FEATURE_NAMES, pickFeatures, PRESET_NAMES, PRESETS, refuseTarget } from '../new'
+import { createProject, detectHost, FEATURE_NAMES, HOSTS, pickFeatures, PRESET_NAMES, PRESETS, refuseTarget } from '../new'
 import { count, done, shellQuote } from './command'
 import { USAGES } from './usages'
 
 export const scaffold: Command = {
   usage: USAGES.new,
-  options: { kay: { type: 'string' }, template: { type: 'string' }, with: { type: 'string' }, without: { type: 'string' }, yes: { type: 'boolean', short: 'y' }, quiet: { type: 'boolean' } },
+  options: { kay: { type: 'string' }, template: { type: 'string' }, with: { type: 'string' }, host: { type: 'string' }, without: { type: 'string' }, yes: { type: 'boolean', short: 'y' }, quiet: { type: 'boolean' } },
   positionals: 1,
   run: async ({ values, positionals: [dir] }, refuse) => {
     if (dir === undefined || dir === '')
@@ -19,6 +19,12 @@ export const scaffold: Command = {
 
       if (template !== undefined && !PRESET_NAMES.includes(template as Preset)) {
         console.error(`kay new: --template is ${String(template)}, which is none of ${PRESET_NAMES.join(', ')}`)
+
+        return 1
+      }
+
+      if (values.host !== undefined && !HOSTS.includes(values.host as Host)) {
+        console.error(`kay new: --host is ${String(values.host)}, which is none of ${HOSTS.join(', ')}`)
 
         return 1
       }
@@ -60,7 +66,7 @@ export const scaffold: Command = {
         return 1
       }
 
-      const files = await createProject(dir, { kay: typeof values.kay === 'string' ? values.kay : undefined, features })
+      const files = await createProject(dir, { kay: typeof values.kay === 'string' ? values.kay : undefined, features, host: values.host === undefined ? await detectHost(dir) : values.host as Host })
 
       done('created', `${dir}, ${features.length > 0 ? features.join(', ') : 'blank'}, ${count(files.length, 'file')}`)
 

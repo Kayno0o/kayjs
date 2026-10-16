@@ -41,9 +41,12 @@ kay new my-app --template app --without docker
 | `--template blank\|server\|site\|app` | The preset: one bare static page, an Elysia server (the default), a static site, or a server with sessions and members in Postgres |
 | `--with <features>` | Adds comma-separated [features](#features) to the preset, such as `tailwind,tests` |
 | `--without <features>` | Drops features from the preset |
+| `--host forgejo\|github` | Where the repository lives, which decides the CI workflow. Without it, `kay new` reads the `origin` remote of the directory, or of the closest one above it that exists |
 | `-y` | Takes the `server` preset without asking |
 
 In a terminal with none of these options, `kay new` asks for a preset, then for each feature.
+
+The CI is a Forgejo workflow in `.forgejo/workflows`, or, for a repository on GitHub, a GitHub Actions workflow in `.github/workflows`. A remote on github.com picks GitHub, any other remote or none picks Forgejo, and `--host` overrides it. Both annotate each problem of `kay check` on the diff. A static site is published with GitHub Pages there, its address and base path read from the repository.
 
 Every project gets an `AGENTS.md` for coding agents. It points them at kay's docs for the installed version, `node_modules/kay/llms.txt`, which Claude Code loads at the start of each session through its `@node_modules/kay/llms.txt` line, and names the checks the project's scripts run. A project made before it existed adds it by hand.
 
@@ -57,7 +60,7 @@ Every project gets an `AGENTS.md` for coding agents. It points them at kay's doc
 | `accents` | An accent picker in the header, kept in a cookie; needs `starter` and `tailwind` | server, site, app |
 | `eslint` | ESLint through `@kaynooo/eslint`, `.kay` fences and template expressions included | server, site, app |
 | `tests` | `bun test` through `kay/test`, with a first test | server, site, app |
-| `ci` | A Forgejo workflow checking, linting and testing the server, or publishing the static site to Pages | server, site, app |
+| `ci` | A Forgejo or GitHub workflow checking, linting and testing the server, or publishing the static site to Pages | server, site, app |
 | `docker` | A `Dockerfile` and `compose.prod.yaml` running the executable, or nginx serving the static site | server, site, app |
 | `auth` | Sessions, a sign-in, members in Postgres through pg-orm and a guarded `/account`; needs `server` | app |
 | `ws` | An API module over a websocket, with an island counting the visitors online; needs `server` | app |

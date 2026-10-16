@@ -1,4 +1,4 @@
-import type { ConfigSettings, Feature } from './templates'
+import type { ConfigSettings, Feature, Host } from './templates'
 import { randomBytes } from 'node:crypto'
 import { existsSync, statSync } from 'node:fs'
 import { cp, mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises'
@@ -12,8 +12,11 @@ import { agentsFile, templateFiles } from './templates'
 const KAY_ROOT = resolve(import.meta.dir, '..')
 const INVALID_NAME_CHARS = /[^a-z0-9._~-]+/g
 const NAME_EDGES = /^[-._~]+|[-._~]+$/g
+const GITHUB_REMOTE = /(?:@|\/\/)github\.com[:/]/
 
-export type { Feature }
+export const HOSTS: readonly Host[] = ['forgejo', 'github']
+
+export type { Feature, Host }
 
 export type Preset = 'blank' | 'server' | 'site' | 'app'
 
@@ -25,7 +28,7 @@ export const FEATURES: Record<Feature, { description: string, needs: readonly Fe
   accents: { description: 'an accent picker in the header, kept in a cookie', needs: ['starter', 'tailwind'] },
   eslint: { description: 'ESLint through @kaynooo/eslint, .kay fences and template expressions included', needs: [] },
   tests: { description: 'bun test through kay/test, with a first test', needs: [] },
-  ci: { description: 'a Forgejo workflow checking, linting and testing the server, or publishing the static site to Pages', needs: [] },
+  ci: { description: 'a Forgejo or GitHub workflow checking, linting and testing the server, or publishing the static site to Pages', needs: [] },
   docker: { description: 'a Dockerfile and compose.prod.yaml running the executable, or nginx serving the static site', needs: [] },
   auth: { description: 'sessions, a sign-in, members in Postgres through pg-orm and a guarded /account', needs: ['server'] },
   ws: { description: 'an API module over a websocket, with an island counting the visitors online', needs: ['server'] },
@@ -49,6 +52,8 @@ export interface NewOptions {
   kay?: string | undefined
   // What the project holds, the `server` preset's by default; each feature's needs must be among them.
   features?: readonly Feature[] | undefined
+  // Where the repository lives, which decides the CI's format: Forgejo by default.
+  host?: Host | undefined
 }
 
 // What checking or unchecking a feature leaves checked: checking takes what it needs along, unchecking drops what needs it.
@@ -89,6 +94,24 @@ export async function pickFeatures(): Promise<Feature[] | undefined> {
   return features && FEATURE_NAMES.filter(name => features.has(name))
 }
 
+// GitHub when the `origin` remote of the target, or of the nearest directory above it that exists, is on github.com, else Forgejo: a project made in a fresh directory inside a clone takes the clone's host.
+export async function detectHost(target: string): Promise<Host> {
+  let dir = resolve(target)
+
+  while (!existsSync(dir) && dirname(dir) !== dir)
+    dir = dirname(dir)
+
+  try {
+    const git = Bun.spawn(['git', '-C', dir, 'remote', 'get-url', 'origin'], { stdout: 'pipe', stderr: 'ignore' })
+    const [url, code] = await Promise.all([new Response(git.stdout).text(), git.exited])
+
+    return code === 0 && GITHUB_REMOTE.test(url) ? 'github' : 'forgejo'
+  }
+  catch {
+    return 'forgejo'
+  }
+}
+
 // Refuses a target `kay new` would write over: a file, or a directory that already holds files.
 export async function refuseTarget(target: string): Promise<void> {
   const dir = resolve(target)
@@ -114,7 +137,7 @@ export async function createProject(target: string, options: NewOptions = {}): P
 
   await refuseTarget(target)
 
-  const files = await projectFiles(dir, features, options.kay)
+  const files = await projectFiles(dir, features, options.kay, {}, options.host)
 
   // The session secret in .env is for its owner's eyes only from the moment it is written, which Bun.write cannot do as it ignores a mode.
   await mkdir(dir, { recursive: true })
@@ -124,7 +147,7 @@ export async function createProject(target: string, options: NewOptions = {}): P
 }
 
 // Every file of a project with these features in `dir`, named after it; run from a checkout of kay, packs it into `dir/vendor` for the project to depend on.
-export async function projectFiles(dir: string, features: ReadonlySet<Feature>, kayDependency?: string | undefined, settings: ConfigSettings = {}): Promise<Record<string, string>> {
+export async function projectFiles(dir: string, features: ReadonlySet<Feature>, kayDependency?: string | undefined, settings: ConfigSettings = {}, host?: Host): Promise<Record<string, string>> {
   const has = (feature: Feature) => features.has(feature)
   const name = packageName(basename(dir))
   const kay = await Bun.file(join(KAY_ROOT, 'package.json')).json() as { name: string, version: string, dependencies: Record<string, string>, devDependencies: Record<string, string> }
@@ -147,7 +170,7 @@ export async function projectFiles(dir: string, features: ReadonlySet<Feature>, 
     ...has('tailwind') ? ['bun-plugin-tailwind', 'tailwindcss'] : [],
   ].filter(entry => entry !== false)
   const files: Record<string, string> = {
-    ...templateFiles(features, settings),
+    ...templateFiles(features, settings, host),
     'AGENTS.md': agentsFile(scripts),
     'package.json': `${JSON.stringify({
       name,

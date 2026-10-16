@@ -7,6 +7,7 @@ This page lists what each release adds, newest first, with a link to where each 
 
 ## Unreleased
 
+- **CI for GitHub**: `kay new --host github` writes a GitHub Actions workflow instead of a Forgejo one, and picks it alone when the `origin` remote is on github.com. [kay new](/reference/cli#kay-new)
 - **Lint with no check first**: `kay lint` writes the types ESLint reads for `.kay` files, then runs `keslint`. A new project's `lint` script is `kay lint --cache`, its `check` script no longer fails on warnings, and it writes the `.vscode/settings.json` the ESLint extension needs for `.kay` files. [ESLint](/reference/checks#eslint)
 - **One command to move to a newer kay**: `kay upgrade` moves `kay` and the kay libraries in `package.json` to their latest version, installs, applies the fixes of each minor it crosses and prints what is left for you to change. The old forms a minor replaced are the `deprecated` lints, each with a `--fix`. [CLI reference](/reference/cli#kay-upgrade), [Checks reference](/reference/checks#deprecations)
 - **`kay build` says why a component is an island**: each island is listed with what made it one, such as `onClick, line 4`, and a static component that may become one with the prop it passes. `--format json` adds them, and the islands of each route. [Islands](/essentials/islands#see-which-components-are-islands)

@@ -12,8 +12,12 @@ export interface ConfigSettings {
 }
 
 // The features a project is scaffolded with, as the files ask for them.
+// Where the project's repository is hosted, which decides the CI it is scaffolded with.
+export type Host = 'forgejo' | 'github'
+
 interface Setup {
   has: (feature: Feature) => boolean
+  host: Host
   // A Tailwind class list, left out of the markup of a project without Tailwind.
   tw: (classes: string) => string
   settings: ConfigSettings
@@ -281,22 +285,27 @@ import { pages } from 'kay/server'
 export const app = new Elysia().use(await pages()).listen(Number(process.env.PORT ?? 3000))
 `
 
-const WORKFLOW_SETUP = `      - name: Install unzip and git
+// The Forgejo runner image carries neither unzip nor git, which GitHub's hosted runners do.
+function workflowSetup(host: Host): string {
+  return `${host === 'forgejo'
+    ? `      - name: Install unzip and git
         run: apt-get update && apt-get install -y unzip git
 
-      - name: Checkout
+`
+    : ''}      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Setup Bun
-        uses: oven-sh/setup-bun@v1
+        uses: oven-sh/setup-bun@${host === 'forgejo' ? 'v1' : 'v2'}
         with:
           bun-version: ${Bun.version}
 
       - name: Install dependencies
         run: bun install --frozen-lockfile`
+}
 
 // Every push is checked and tested before anything deploys it; the container build checks again, as `kay build` does. An app's tests copy a database per test file on a Postgres service.
-function testWorkflow({ has }: Setup): string {
+function testWorkflow({ has, host }: Setup): string {
   const database = has('auth') && has('tests')
 
   return blocks(
@@ -308,7 +317,7 @@ on:
 
 jobs:
   test:
-    runs-on: debian${database
+    runs-on: ${host === 'forgejo' ? 'debian' : 'ubuntu-latest'}${database
       ? `
     services:
       postgres:
@@ -316,11 +325,15 @@ jobs:
         env:
           POSTGRES_USER: app
           POSTGRES_PASSWORD: app
-          POSTGRES_DB: app_test
+          POSTGRES_DB: app_test${host === 'github'
+            ? `
+        ports:
+          - 5432:5432`
+            : ''}
         options: --health-cmd "pg_isready -h 127.0.0.1 -U app" --health-interval 2s --health-retries 15`
       : ''}
     steps:
-${WORKFLOW_SETUP}`,
+${workflowSetup(host)}`,
     `      # Each problem shows on the diff.
       - name: Check
         run: bun run check --format github`,
@@ -330,13 +343,15 @@ ${WORKFLOW_SETUP}`,
         run: bun run test${database
           ? `
         env:
-          DATABASE_URL: postgres://app:app@postgres:5432/app_test`
+          DATABASE_URL: postgres://app:app@${host === 'forgejo' ? 'postgres' : 'localhost'}:5432/app_test`
           : ''}`,
   )
 }
 
-// A site with no server: `kay build --static` writes it to `dist`, which this workflow publishes to Forgejo Pages.
-function pagesWorkflow({ has }: Setup): string {
+// A site with no server: `kay build --static` writes it to `dist`, which this workflow publishes to Forgejo Pages, or to GitHub Pages.
+function pagesWorkflow({ has, host }: Setup): string {
+  const github = host === 'github'
+
   return blocks(
     `name: Publish to Pages
 
@@ -345,26 +360,55 @@ on:
     branches:
       - main
 
-permissions:
+${github
+  ? `permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: \${{ steps.deployment.outputs.page_url }}`
+  : `permissions:
   contents: write
 
 jobs:
   publish:
-    runs-on: debian
+    runs-on: debian`}
     steps:
-${WORKFLOW_SETUP}`,
+${workflowSetup(host)}`,
     has('tests') && `      # A failing test publishes nothing; the build checks the project itself.
       - name: Test
         run: bun run test`,
     `${has('tests') ? '' : '      # The build checks the project itself.\n'}      - name: Build the site
-        env:
+        env:${github
+          ? `
+          SITE_URL: https://\${{ github.repository_owner }}.github.io
+          SITE_BASE: /\${{ github.event.repository.name }}`
+          : `
           # The host your Forgejo instance publishes Pages on: replace it with yours.
           SITE_URL: https://pages.example.com
-          SITE_BASE: /\${{ github.repository }}
+          SITE_BASE: /\${{ github.repository }}`}
         run: bun run build`,
     has('eslint') && `      - name: Lint
         run: bun run lint`,
-    `      - name: Publish to the gitea-pages branch
+    github
+      ? `      - name: Upload the site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+      - name: Publish to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4`
+      : `      - name: Publish to the gitea-pages branch
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: \${{ secrets.GITHUB_TOKEN }}
@@ -834,9 +878,9 @@ export function agentsFile(scripts: Record<string, string>): string {
 }
 
 // Every file but package.json, tsconfig.json and the agents' instructions, which `createProject` writes from the same features and scripts.
-export function templateFiles(features: ReadonlySet<Feature>, settings: ConfigSettings = {}): Record<string, string> {
+export function templateFiles(features: ReadonlySet<Feature>, settings: ConfigSettings = {}, host: Host = 'forgejo'): Record<string, string> {
   const has = (feature: Feature) => features.has(feature)
-  const setup: Setup = { has, tw: classes => has('tailwind') ? classes : '', settings }
+  const setup: Setup = { has, host, tw: classes => has('tailwind') ? classes : '', settings }
   const server = has('server')
 
   return {
@@ -860,7 +904,7 @@ export function templateFiles(features: ReadonlySet<Feature>, settings: ConfigSe
       'bunfig.toml': has('auth') ? '[test]\npreload = [\n  "kay/test/preload",\n  "./tests/database.ts",\n]\n' : '[test]\npreload = [ "kay/test/preload" ]\n',
       'tests/home.test.ts': homeTest(setup),
     },
-    ...has('ci') && (server ? { '.forgejo/workflows/test.yml': testWorkflow(setup) } : { '.forgejo/workflows/pages.yml': pagesWorkflow(setup) }),
+    ...has('ci') && { [`.${host}/workflows/${server ? 'test' : 'pages'}.yml`]: server ? testWorkflow(setup) : pagesWorkflow(setup) },
     ...has('docker') && (server ? serverContainerFiles(setup) : staticContainerFiles(setup)),
     ...has('auth') && authFiles(setup),
     ...has('auth') && has('tests') && AUTH_TEST_FILES,

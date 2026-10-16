@@ -11,7 +11,7 @@ import { buildClient } from '../src/build/client'
 import { check, configCheckOptions } from '../src/check'
 import { loadConfig } from '../src/config'
 import { formatFiles } from '../src/format'
-import { createProject, FEATURE_NAMES, PRESETS, toggle } from '../src/new'
+import { createProject, detectHost, FEATURE_NAMES, PRESETS, toggle } from '../src/new'
 
 const repo = join(import.meta.dir, '..')
 const LISTENING = /localhost:(\d+)/
@@ -277,6 +277,65 @@ describe('kay command line', () => {
       await Bun.write(join(root, 'node_modules/.bin/keslint'), '#!/bin/sh\necho "keslint $@"\n')
       await chmod(join(root, 'node_modules/.bin/keslint'), 0o755)
       expect(await kay(['lint', '--fix'], project)).toEqual({ stdout: 'keslint --fix\n', stderr: '', code: 0 })
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('writes a GitHub Actions workflow with annotations for --host github, and none for Forgejo', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'kay-new-'))
+
+    try {
+      const app = await createProject(join(root, 'app'), { kay: '^1.0.0', features: PRESETS.app.features, host: 'github' })
+      const site = await createProject(join(root, 'site'), { kay: '^1.0.0', features: PRESETS.site.features, host: 'github' })
+
+      expect(app).toContain('.github/workflows/test.yml')
+      expect(site).toContain('.github/workflows/pages.yml')
+      expect([...app, ...site].filter(file => file.startsWith('.forgejo'))).toEqual([])
+
+      const test = await Bun.file(join(root, 'app/.github/workflows/test.yml')).text()
+      const pages = await Bun.file(join(root, 'site/.github/workflows/pages.yml')).text()
+
+      expect(test).toContain('runs-on: ubuntu-latest')
+      expect(test).toContain('uses: oven-sh/setup-bun@v2')
+      expect(test).toContain('run: bun run check --format github')
+      expect(test).toContain('- 5432:5432')
+      expect(test).toContain('DATABASE_URL: postgres://app:app@localhost:5432/app_test')
+      expect(test).not.toContain('apt-get')
+      expect(pages).toContain('uses: actions/deploy-pages@v4')
+      expect(pages).toContain('SITE_BASE: /${{ github.event.repository.name }}')
+      expect(pages).not.toContain('gitea-pages')
+
+      // Each is a workflow GitHub reads: a mapping with its jobs.
+      for (const text of [test, pages])
+        expect(Object.keys((Bun.YAML.parse(text) as { jobs: object }).jobs)).toHaveLength(1)
+
+      expect(await createProject(join(root, 'plain'), { kay: '^1.0.0', features: PRESETS.server.features })).toContain('.forgejo/workflows/test.yml')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('takes the host from the origin remote of the target or the directory it lands in, GitHub only for github.com', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'kay-host-'))
+    const remote = async (url: string, name: string) => {
+      const dir = join(root, name)
+
+      await mkdir(dir, { recursive: true })
+      expect(await Bun.spawn(['git', 'init', '-q', dir]).exited).toBe(0)
+      expect(await Bun.spawn(['git', '-C', dir, 'remote', 'add', 'origin', url]).exited).toBe(0)
+
+      return dir
+    }
+
+    try {
+      expect(await detectHost(join(await remote('git@github.com:me/site.git', 'ssh'), 'not', 'yet'))).toBe('github')
+      expect(await detectHost(await remote('https://github.com/me/site', 'https'))).toBe('github')
+      expect(await detectHost(await remote('git@git.example.com:me/github.com.git', 'other'))).toBe('forgejo')
+      expect(await detectHost(join(root, 'no-remote'))).toBe('forgejo')
+      expect(await kay(['new', 'app', '--host', 'gitlab'], root)).toEqual({ stdout: '', stderr: 'kay new: --host is gitlab, which is none of forgejo, github\n', code: 1 })
     }
     finally {
       await rm(root, { recursive: true, force: true })
