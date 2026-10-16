@@ -5,7 +5,7 @@ description: What each release of kay and its libraries adds, with a link to whe
 ---
 This page lists what each release adds, newest first, with a link to where each feature is documented. kay and its libraries share one version number, so one section covers them all. What a release breaks, and what to change in your app, is in [Upgrading](/guides/upgrading).
 
-## Unreleased
+## 1.47.0
 
 - **The manifest and share cards follow the locale**: a `seo.name` or `seo.description` per locale gives each locale its own web manifest and share card name, and the one OpenAPI document keeps the default locale's. [Head and SEO](/essentials/head-and-seo)
 - **`resource` and `stream` over anything async**: they take a function returning a promise or an async iterable, so an island reading its own WebSocket or another server needs no hand-rolled counter. [API routes](/guides/api-routes)

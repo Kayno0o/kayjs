@@ -2,7 +2,7 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
-## Unreleased
+## 1.47.0
 
 - A site with a `seo.name` or `seo.description` per locale links the web manifest and draws the share card name of the page's locale (`/manifest.fr.webmanifest` beside the default locale's), and titles its one OpenAPI document with the default locale's name ([Head](head.md#site-defaults-and-social-cards)).
 - `resource(load)` and `stream(source)` read any async function or async iterable in an island, not only an api route, with `loading`, `error`, the latest value, `refresh()` and a slower answer never replacing a newer one ([API routes](api-routes.md#read-a-routes-answer-in-an-island)).
