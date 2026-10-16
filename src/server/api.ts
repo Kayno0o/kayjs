@@ -14,7 +14,7 @@ import { TRAILING_SLASH } from '../runtime/base'
 import { API_MOUNT, END_EVENT, ERROR_EVENT } from '../runtime/live'
 import { kayLog } from '../runtime/log'
 import { encodeValue, unsendable } from '../runtime/wire'
-import { admitCrossSite, crossSiteRefused, guardsFirst, inLocale, passGuards } from './actions'
+import { admitCrossSite, crossSiteRefused, crossSiteResponse, guardsFirst, inLocale, passGuards } from './actions'
 import { importModule } from './bundle'
 import { corsAdmits, corsResponse, corsRule, dropOwnGrant, grantedByKay, preflight, varyByOrigin, withCors, withoutOwnGrant } from './cors'
 import { loadGuard, requiredGuards } from './guards'
@@ -104,7 +104,7 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
         // With no guard and no cors rule nothing runs in the request's scope, so only the cross-site check is left.
         .onBeforeHandle(async (context) => {
           if (guards.length === 0 && !cors)
-            return crossSiteRefused(context.request) ? new Response('Cross-site request refused', { status: 403 }) : undefined
+            return crossSiteRefused(context.request) ? crossSiteResponse(context.request, 'request') : undefined
 
           return answeringRequest(context.request, async () => inLocale(context.request, options, async () => admit(guards, sharedContext(context.request, () => ({ ...context })), options, cors)))
         })
@@ -337,7 +337,7 @@ async function admit(guards: LoadedGuard[], context: { request: Request, params?
 
   // A browser lets any page open a websocket or post a form to any host, the user's cookies attached; a request with neither header, such as a webhook, is no browser's.
   if (crossSiteRefused(context.request))
-    return new Response('Cross-site request refused', { status: 403 })
+    return crossSiteResponse(context.request, 'request')
 
   if (!passed)
     return undefined

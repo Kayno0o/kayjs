@@ -385,6 +385,7 @@ button(onClick={save} disabled={add.pending()}) Add
 ### Cross-site posts
 
 - A post another site sends, as its `Origin` or `Sec-Fetch-Site` header shows, is refused with 403.
+- The 403 is `text/plain` and says what it saw: `Cross-site action refused: Origin http://localhost:4701 is not this site (http://127.0.0.1:4701; set site in kay.config.ts if a proxy changes the host)`, or `Sec-Fetch-Site is cross-site, not same-origin or none`; the echoed header is stripped of control characters and cut at 100. The same text, `request` for `action`, refuses an api route.
 - A post from the host of `site` in kay.config.ts is the site's own, so a proxy that does not pass the browser's `Host` on, and nginx leaves it out unless told `proxy_set_header Host $host`, refuses none.
 
 ### Protecting an action

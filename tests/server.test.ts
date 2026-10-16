@@ -481,6 +481,30 @@ describe('pages', () => {
     expect((await get('/')).html).toContain('From a form</a></li>')
   })
 
+  it('says in a text body which origin a refused post sent and which it expected', async () => {
+    const post = async (headers: Record<string, string>, url = 'http://localhost/_kay/action/tests/fixtures/site/src/routes/index.kay/add') => app.handle(new Request(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded', ...headers },
+      body: new URLSearchParams({ title: 'Elsewhere' }),
+    }))
+    const hint = 'set site in kay.config.ts if a proxy changes the host'
+    const wrongHost = await post({ origin: 'http://127.0.0.1' })
+
+    expect(wrongHost.status).toBe(403)
+    expect(wrongHost.headers.get('content-type')).toContain('text/plain')
+    expect(await wrongHost.text()).toBe(`Cross-site action refused: Origin http://127.0.0.1 is not this site (http://localhost; ${hint})`)
+    expect(await (await post({ origin: 'http://localhost:4701' })).text()).toContain('Origin http://localhost:4701 is not this site (http://localhost;')
+    expect(await (await post({ origin: 'null' })).text()).toContain('Origin null is not this site')
+    expect(await (await post({ 'origin': 'https://evil.example', 'sec-fetch-site': 'cross-site' })).text()).toContain('Origin https://evil.example is not this site')
+    expect(await (await post({ 'sec-fetch-site': 'cross-site' })).text()).toBe('Cross-site action refused: Sec-Fetch-Site is cross-site, not same-origin or none')
+    // A visitor controls the header, so it is echoed on one line and cut short.
+    const long = await (await post({ origin: `https://${'a'.repeat(500)}.examplex\u0085y` })).text()
+
+    expect(long).not.toMatch(/\p{Cc}/u)
+    expect(long.length).toBeLessThan(400)
+    expect(long).toContain('...')
+  })
+
   it('refuses actions posted from another site and never redirects to one', async () => {
     const post = async (headers: Record<string, string>) => app.handle(new Request('http://localhost/_kay/action/tests/fixtures/site/src/routes/index.kay/add', {
       method: 'POST',

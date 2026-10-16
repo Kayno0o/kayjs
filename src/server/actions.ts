@@ -204,7 +204,7 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], m
 // A post over the action's body limit, answered as a refused one is, with a message for the whole form; another site's is refused as such.
 async function tooLarge(action: ServerAction<TSchema, unknown>, request: Request, bytes: number, server: Server | null, back: Back): Promise<Response> {
   if (isCrossSite(request))
-    return crossSiteRefusal()
+    return crossSiteRefusal(request)
 
   const message = action.protection?.messages?.bodyLimit ?? (most => `Too large to send; ${sizeText(most)} at most`)
 
@@ -391,11 +391,40 @@ function isEmptyFile(value: unknown): boolean {
 // Browsers send `Origin` on every POST, so a form another site submits on the user's behalf is refused before anything else runs.
 function refuseCrossSite(request: Request) {
   if (isCrossSite(request))
-    throw new Refusal(crossSiteRefusal())
+    throw new Refusal(crossSiteRefusal(request))
 }
 
-function crossSiteRefusal(): Response {
-  return new Response('Cross-site action refused', { status: 403 })
+function crossSiteRefusal(request: Request): Response {
+  return crossSiteResponse(request, 'action')
+}
+
+const UNPRINTABLE = /[\p{Cc}\p{Zl}\p{Zp}]/gu
+const SHOWN_MOST = 100
+
+// What a refused request sent, which a visitor controls, so cut to a line of printable text.
+function shown(value: string): string {
+  const text = value.replace(UNPRINTABLE, '')
+
+  return text.length > SHOWN_MOST ? `${text.slice(0, SHOWN_MOST)}...` : text
+}
+
+// The 403 for a request `isCrossSite` refused, saying what it sent and what kay took for the site, so a proxy changing the host is fixed in one step.
+export function crossSiteResponse(request: Request, what: 'action' | 'request', site?: string): Response {
+  const origin = request.headers.get('origin')
+  const fetchSite = request.headers.get('sec-fetch-site')
+  const head = `Cross-site ${what} refused`
+  let reason: string
+
+  if (origin !== null && !sameHost(request, URL.parse(origin), site)) {
+    const own = [requestUrl(request).origin, configuredSite()?.origin, site === undefined ? undefined : URL.parse(site)?.origin].filter((value, index, all) => value !== undefined && all.indexOf(value) === index)
+
+    reason = `Origin ${shown(origin)} is not this site (${own.join(' or ')}; set site in kay.config.ts if a proxy changes the host)`
+  }
+  else {
+    reason = `Sec-Fetch-Site is ${shown(fetchSite ?? '')}, not same-origin or none`
+  }
+
+  return new Response(`${head}: ${reason}`, { status: 403, headers: { 'content-type': TEXT } })
 }
 
 // A browser names where a request comes from in `Origin`, and in `Sec-Fetch-Site` too, which it sends even when it leaves `Origin` out.

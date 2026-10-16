@@ -3,7 +3,7 @@ import { join, relative } from 'node:path'
 import { brotliDecompressSync } from 'node:zlib'
 import { afterAll, describe, expect, it, spyOn } from 'bun:test'
 import { check } from '../src/check'
-import { admitCrossSite, crossSiteRefused } from '../src/server/actions'
+import { admitCrossSite, crossSiteRefused, crossSiteResponse } from '../src/server/actions'
 import { corsRule } from '../src/server/cors'
 import { testSite } from '../src/test'
 import { scratchDir } from './scratch'
@@ -278,6 +278,18 @@ describe('crossSiteRefused', () => {
     expect(crossSiteRefused(post({}))).toBe(false)
     expect(crossSiteRefused(post({ origin: 'http://app.test' }))).toBe(false)
     expect(crossSiteRefused(post({ origin: 'https://public.example' }), 'https://public.example')).toBe(false)
+  })
+
+  it('names the origin it saw and the ones it takes for the site, with the request or action word', async () => {
+    const refused = crossSiteResponse(post({ origin: 'https://other.example' }), 'request', 'https://public.example')
+
+    expect(refused.status).toBe(403)
+    expect(refused.headers.get('content-type')).toContain('text/plain')
+    const text = await refused.text()
+
+    expect(text).toStartWith('Cross-site request refused: Origin https://other.example is not this site (http://app.test')
+    expect(text).toEndWith('https://public.example; set site in kay.config.ts if a proxy changes the host)')
+    expect(await crossSiteResponse(post({ 'sec-fetch-site': 'same-site' }), 'action').text()).toBe('Cross-site action refused: Sec-Fetch-Site is same-site, not same-origin or none')
   })
 
   it('leaves a request an API module\'s cors let in', () => {

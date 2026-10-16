@@ -202,6 +202,16 @@ Any answer other than success gives `{ ok: false, status, errors, data }`, with 
 
 Use `s.File()` in the schema and `input(type="file" name="avatar")` in the form, and the handler receives a `File`, which `files.put` stores. A post carries 1 MB at most, so raise `bodyLimit` in the third argument of `action`. See [File storage](/guides/file-storage).
 
+## A post from another site
+
+An action refuses a post that another site sends, as its `Origin` or `Sec-Fetch-Site` header shows, with a 403 in plain text that says what it saw:
+
+```text
+Cross-site action refused: Origin http://localhost:4701 is not this site (http://127.0.0.1:4701; set site in kay.config.ts if a proxy changes the host)
+```
+
+The `Origin` must have the host of the request or of `site` in kay.config.ts, whatever the scheme. So open the site by the address it is served on, or, behind a proxy that does not pass the browser's `Host` on (nginx leaves it out unless told `proxy_set_header Host $host`), set `site` to the public address. A refusal for `Sec-Fetch-Site` says `Sec-Fetch-Site is cross-site, not same-origin or none`.
+
 ## Rate limit, honeypot, minimum time and proof-of-work
 
 The third argument of `action` protects it from scripts. `rateLimit` answers 429 past `max` posts per `window`, `honeypot` names a hidden field that kay renders for you and bots fill in, and `minTime` refuses a form posted sooner than that after its page rendered. For spam that still gets through, `proofOfWork: true` makes each post cost the sender CPU, with no third-party script, and needs JavaScript in the browser. `minTime: { after: '3s', plain: true }` checks only forms posted without JavaScript, and `workChallenge` and `verifyWork` from `kay/server` put proof of work in a form field your own code checks.
