@@ -4,6 +4,7 @@ import type { CaptchaWidget } from '../captcha'
 import type { Core, User } from '../core'
 import type { CodedLink, CodeMode } from '../email'
 import type { LinkType } from '../store'
+import { pickLocale } from '../locale'
 
 export interface AuthPagesOptions {
   // Where the pages are served, `/auth` by default, beside kayjs-auth's own routes: `/auth/sign-in`.
@@ -14,7 +15,8 @@ export interface AuthPagesOptions {
 
 // One input of the profile form the account page shows beside the username.
 export interface ProfileField {
-  label: string
+  // A string, or the label in each locale of the site by tag (`{ en: 'Bio', fr: 'Biographie' }`): the page shows the one matching its locale, else the first.
+  label: string | Record<string, string>
   // An `input` of this type, or a `textarea`; `text` by default.
   type?: 'text' | 'textarea' | 'tel' | 'url' | 'email' | undefined
   autocomplete?: string | undefined
@@ -24,8 +26,10 @@ export interface ProfileField {
 }
 
 // A field of the profile form with what the user holds in it.
-export interface ProfileFieldView extends ProfileField {
+export interface ProfileFieldView extends Omit<ProfileField, 'label'> {
   name: string
+  // The label in the locale asked for.
+  label: string
   // The limit in force, 500 characters when the field gave none.
   maxLength: number
   value: string
@@ -163,4 +167,25 @@ export function pagesOf(pages: boolean | AuthPagesConfig | undefined): { prefix:
   const options = pages === true ? {} : pages
 
   return { prefix: options.prefix ?? DEFAULT_PREFIX, home: options.home ?? '/', ...options.profile && { profile: options.profile } }
+}
+
+// The label of a profile field in `locale`: a plain string as it is, a map by locale tag the entry matching `locale` exactly or by language, else the first.
+export function profileLabel(label: ProfileField['label'], locale: string | undefined): string {
+  if (typeof label === 'string')
+    return label
+
+  const tags = Object.keys(label)
+
+  return tags.length === 0 ? '' : label[pickLocale(tags, [locale])] ?? ''
+}
+
+// What `load` answered for a field as the text the form shows: nothing is empty, and anything else than a string is the app's mistake, told rather than shown as empty.
+export function profileValue(name: string, held: unknown): string {
+  if (held === undefined || held === null)
+    return ''
+
+  if (typeof held !== 'string')
+    throw new TypeError(`kayjs-auth: pages.profile.load answered a ${typeof held} for the field "${name}", which takes a string, null or undefined`)
+
+  return held
 }

@@ -24,9 +24,12 @@ export const auth = createAuth({
   scopes: ['notes:read'],
   pages: {
     profile: {
-      fields: { displayName: { label: 'Display name', required: true, maxLength: 20 }, bio: { label: 'Bio', type: 'textarea' } },
+      fields: { displayName: { label: 'Display name', required: true, maxLength: 20 }, bio: { label: { en: 'Bio', fr: 'Biographie' }, type: 'textarea' } },
       load: user => profiles.get(user.id) ?? {},
       save: (user, values) => {
+        if (values.displayName === 'boom')
+          throw new Error('profile store down')
+
         if (values.displayName === 'admin')
           return { errors: { displayName: 'Pick another name.' } }
 

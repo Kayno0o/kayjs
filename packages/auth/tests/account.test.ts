@@ -194,6 +194,14 @@ describe('changing the email on an account with a second factor', () => {
   })
 })
 
+describe('the profile without pages.profile', () => {
+  test('saveProfile throws, as the app asked for a form it did not declare', async () => {
+    const { ada } = await registered()
+
+    expect((await ada.fetch('/call/saveProfile', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify([{ bio: 'x' }]) })).status).toBe(500)
+  })
+})
+
 describe('changing the username', () => {
   test('names a user without one, the name then signing in, and lets them recase it', async () => {
     const { ada, browser } = await registered()

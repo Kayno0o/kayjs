@@ -144,7 +144,7 @@ export const auth = createAuth({
 })
 ```
 
-`load` gives what each field holds now. `save` gets the values trimmed, after `required` and `maxLength` (500 by default) passed, and may return `{ errors: { displayName: 'Taken' } }` to refuse one. A page of your own calls `auth.profile()` and `auth.saveProfile(values)`.
+`load` gives what each field holds now. `save` gets the values trimmed, after `required` and `maxLength` (500 by default) passed, and may return `{ errors: { displayName: 'Taken' } }` to refuse one. A `label` is a string, or an object by locale such as `{ en: 'Bio', fr: 'Biographie' }`, and the page shows the one for its own locale. `load` must answer a string, `null` or `undefined` for each field, or the page throws. A page of your own calls `auth.profile(locale)` and `auth.saveProfile(values)`; `saveProfile` throws when `pages` has no `profile`.
 
 ## Passkeys in an island
 

@@ -9,6 +9,12 @@ kay and its libraries share one version number, so one section covers them all. 
 
 `kay upgrade` moves your app to the latest version and rewrites what it can, one minor at a time. Read the sections here for what it cannot.
 
+## 1.47.0
+
+### `auth.saveProfile` throws without `pages.profile`
+
+It answered `{ ok: false, error: 'unavailable' }` there; a call with no `pages.profile` is the app's mistake and now throws. Declare `pages.profile`, or drop the call, and drop a branch on `'unavailable'`.
+
 ## 1.46.0
 
 ### `ctx.locale` is the site's language in actions and guards without `i18n`

@@ -571,6 +571,20 @@ describe('a site on kayjs-auth with no wiring of its own', () => {
     expect(await (await browser()).visit('/gated')).toMatchObject({ url: '/login?redirect=%2Fgated' })
   })
 
+  test('an empty redirect is no redirect: the visitor goes to the prebuilt sign-in page', async () => {
+    expect(await (await browser()).visit('/blank')).toMatchObject({ url: '/auth/sign-in?redirect=%2Fblank', status: 200 })
+  })
+
+  test('under a base and trailing slashes, a visitor is sent to the sign-in page under the base, coming back to the path the server saw', async () => {
+    const site = await testSite({ root: ROOT, base: '/app', trailingSlash: 'always' })
+    const sentTo = async (path: string) => (await site.fetch(path, { redirect: 'manual' })).headers.get('location')
+
+    expect(await sentTo('/note/')).toBe('/app/auth/sign-in?redirect=%2Fnote%2F')
+    expect(await sentTo('/note/?a=1')).toBe('/app/auth/sign-in?redirect=%2Fnote%2F%3Fa%3D1')
+    expect(await sentTo('/gated/')).toBe('/app/login?redirect=%2Fgated%2F')
+    expect(await sentTo('/blank/')).toBe('/app/auth/sign-in?redirect=%2Fblank%2F')
+  })
+
   test('a bearer token limited to scopes passes requireUser only for a scope it holds, and no token edits a profile', async () => {
     profiles.clear()
 
@@ -625,6 +639,46 @@ describe('the profile form of the account page', () => {
     expect([...profiles.values()]).toEqual([{ displayName: 'Ada', bio: 'Maths' }])
     expect(saved.find('input[name="displayName"]')[0]?.attributes.value).toBe('Ada')
     expect(saved.text()).toContain('Your profile is saved.')
+  })
+
+  test('shows each field\'s label in the page\'s language, and a plain string label in every one', async () => {
+    const ada = await signedUp('labels@example.com')
+
+    expect((await ada.visit('/auth/account')).find('label').map(label => label.text)).toContain('Bio')
+    expect((await ada.visit('/fr/auth/account')).find('label').map(label => label.text)).toContain('Biographie')
+    expect((await ada.visit('/fr/auth/account')).text()).toContain('Display name')
+  })
+
+  test('answers 500 when the app\'s save throws, and when load answers what is no string', async () => {
+    profiles.clear()
+
+    const ada = await signedUp('throws@example.com')
+
+    expect((await ada.refusal(saveProfile, { displayName: 'boom' } as never, { from: '/auth/account' })).status).toBe(500)
+    expect(profiles.size).toBe(0)
+
+    const user = (await store.users.findByEmail('throws@example.com'))!
+
+    profiles.set(user.id, { bio: 5 as never })
+    expect((await ada.visit('/auth/account')).status).toBe(500)
+    profiles.set(user.id, { bio: null as never })
+    expect((await ada.visit('/auth/account')).status).toBe(200)
+  })
+
+  test('keys such as __proto__ and constructor in the posted form are no field: nothing is stored under them and no prototype changes', async () => {
+    profiles.clear()
+
+    const ada = await signedUp('hostile@example.com')
+    const body = Object.fromEntries([['displayName', 'Ada'], ['__proto__', 'polluted'], ['constructor', 'polluted'], ['hasOwnProperty', 'polluted']])
+
+    await ada.submit(saveProfile, body as never, { from: '/auth/account' })
+
+    const [stored] = [...profiles.values()]
+
+    expect(stored).toEqual({ displayName: 'Ada', bio: '' })
+    expect(Object.keys(stored!)).toEqual(['displayName', 'bio'])
+    expect(Object.getPrototypeOf(stored)).toBe(Object.prototype)
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined()
   })
 
   test('says what was refused, in the page\'s language, and stores nothing then', async () => {

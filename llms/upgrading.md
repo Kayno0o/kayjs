@@ -2,6 +2,12 @@
 
 What each minor release breaks, and what an app changes to move to it. kay and its libraries share one version, so one section covers them all; a patch breaks nothing, and a minor missing here broke nothing.
 
+## 1.47.0
+
+### `auth.saveProfile` throws without `pages.profile`
+
+It answered `{ ok: false, error: 'unavailable' }` there; a call with no `pages.profile` is the app's mistake and now throws. Declare `pages.profile`, or drop the call, and drop a branch on `'unavailable'`.
+
 ## 1.46.0
 
 ### `ctx.locale` is the site's language in actions, guards on actions and API routes without `i18n`

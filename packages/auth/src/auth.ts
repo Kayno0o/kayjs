@@ -48,7 +48,7 @@ import { finishOAuth, providerToken, sealTokens, startLink, startOAuth } from '.
 import { safeRedirect } from './oauth/redirect'
 import { createOAuthTokenRefresher } from './oauth/refresher'
 import { acceptInvitation, createOrganization, declineInvitation, deleteOrganization, getInvitation, getMembership, holdsInOrganization, invite, listInvitations, listMembers, listMemberships, myInvitations, organizationsCore, removeMember, revokeInvitation, setMemberRoles, updateOrganization } from './organizations'
-import { featuresOf, pagePaths, pagesOf } from './pages'
+import { featuresOf, pagePaths, pagesOf, profileLabel, profileValue } from './pages'
 import { listPasskeys, passkeyProofOptions, passkeyRegistrationOptions, passkeySignInOptions, registerPasskey, removePasskey, renamePasskey, signInWithPasskey, twoFactorPasskeyOptions, verifyTwoFactorPasskey } from './passkeys'
 import { createUser, register, signInWithPassword } from './password'
 import { pruneWhenDue } from './prune'
@@ -252,7 +252,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     const { redirect, deny } = stoppers(this.request)
 
     if (!user) {
-      const signIn = options.redirect ?? (this.core.pages && this.core.signInPage)
+      const signIn = options.redirect === undefined || options.redirect === '' ? this.core.pages && this.core.signInPage : options.redirect
 
       if (signIn !== undefined && READ_METHODS.has(this.request.method))
         redirect(this.signInLink(signIn))
@@ -275,7 +275,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   }
 
   // The fields of the profile form the account page shows beside the username, with what this user holds in each, or null when `pages.profile` is not set or the user is not signed in with a session.
-  async profile(): Promise<ProfileFieldView[] | null> {
+  async profile(locale?: string): Promise<ProfileFieldView[] | null> {
     const profile = this.core.pages?.profile
     const user = profile && await this.user()
 
@@ -284,15 +284,15 @@ export class Auth<Scope extends string = string, Role extends string = string, O
 
     const held = await profile.load(user)
 
-    return Object.entries(profile.fields).map(([name, field]) => ({ ...field, name, maxLength: field.maxLength ?? PROFILE_MAX_LENGTH, value: Object.hasOwn(held, name) && typeof held[name] === 'string' ? held[name] : '' }))
+    return Object.entries(profile.fields).map(([name, field]) => ({ ...field, label: profileLabel(field.label, locale), name, maxLength: field.maxLength ?? PROFILE_MAX_LENGTH, value: profileValue(name, Object.hasOwn(held, name) ? held[name] : undefined) }))
   }
 
   // Stores the values posted from that form through `pages.profile.save`, once trimmed and checked against each field's `required` and `maxLength`: names that are no field are dropped, and nothing is stored while any field is refused.
-  async saveProfile(values: Record<string, unknown>): Promise<{ ok: true } | { ok: false, error: 'signed-out' | 'unavailable' } | { ok: false, errors: Record<string, ProfileProblem> }> {
+  async saveProfile(values: Record<string, unknown>): Promise<{ ok: true } | { ok: false, error: 'signed-out' } | { ok: false, errors: Record<string, ProfileProblem> }> {
     const profile = this.core.pages?.profile
 
     if (!profile)
-      return { ok: false, error: 'unavailable' }
+      throw new Error('kayjs-auth: saveProfile needs `pages.profile` in createAuth')
 
     const user = await this.user()
 
@@ -1192,7 +1192,7 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
     // A `_guard.ts` default export. An anonymous visitor goes to `redirect`, the prebuilt sign-in page with `pages`, with where they were going as `?redirect=`, or gets a 401 without one, as does any post; a user who does not meet `require` gets a 403.
     // A scoped bearer token passes only with one of `scope`.
     guard(guardOptions: { redirect?: string, require?: AuthRequirement<Role>, scope?: ScopeRequirement<Scope> } = {}): Guard {
-      const redirect = guardOptions.redirect ?? (core.pages && core.signInPage)
+      const redirect = guardOptions.redirect === undefined || guardOptions.redirect === '' ? core.pages && core.signInPage : guardOptions.redirect
 
       return async (ctx) => {
         const user = await authOf(ctx.locals).user()

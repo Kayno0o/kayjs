@@ -50,7 +50,7 @@ const emailSent = ctx.succeeded(changeEmail)?.data
 const emailRefused = ctx.failed(changeEmail)?.data
 const usernameSaved = ctx.succeeded(changeUsername) !== undefined
 const usernameRefused = ctx.failed(changeUsername)?.data
-const profile = await auth.profile()
+const profile = await auth.profile(ctx.locale)
 const profileSaved = ctx.succeeded(saveProfile) !== undefined
 const profileRefused = ctx.failed(saveProfile)?.data
 const profileProblems = profileRefused && 'errors' in profileRefused ? profileRefused.errors : {}

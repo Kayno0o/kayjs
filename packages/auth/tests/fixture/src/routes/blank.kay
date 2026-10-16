@@ -1,0 +1,6 @@
+--- server
+export const page = { guards: false }
+
+const user = await ctx.locals.auth.requireUser({ redirect: '' })
+---
+p#blank {user.email}
