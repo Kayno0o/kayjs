@@ -19,7 +19,7 @@ export type EnvSchema = TSchema & { properties: Record<string, TSchema> }
 // Holds the declared names only, so logging it never shows the rest of the environment.
 // A field with `requiredInProduction: true`, such as `s.String({ default: 'dev-secret', requiredInProduction: true })`, takes its default or `s.Optional` outside production, and is required there with the default dropped; `kay env` lists it as required in production.
 export function defineEnv<Schema extends EnvSchema>(declared: Schema, source: Record<string, string | undefined> = process.env): Static<Schema> {
-  recordEnv(declared)
+  recordEnv(declared, defineEnv)
 
   const schema = source.NODE_ENV === 'production' ? requiredInProduction(declared) : declared
   const input: Record<string, string> = {}

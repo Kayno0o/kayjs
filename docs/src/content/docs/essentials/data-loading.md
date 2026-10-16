@@ -154,7 +154,7 @@ export const env = defineEnv(s.Object({
 
 ### List the variables
 
-`kay env` lists every variable the project declares, for a deploy script to compare with a compose file or an env file. It reads the `defineEnv` schemas in the modules under `src`, `publicEnv`, the environment each library lists in `extensions` declares (kayjs-mail's SMTP variables, with nothing wired in the app) and kay's own `PORT`, `HOST`, `SITE_URL` and `ORIGIN`, without the server's environment and without running the server entry, whose own schema it leaves out. A schema built inside a function is not seen.
+`kay env` lists every variable the project declares, for a deploy script to compare with a compose file or an env file. It reads the `defineEnv` schemas in the modules under `src`, `publicEnv`, the environment each library lists in `extensions` declares (kayjs-mail's SMTP variables, with nothing wired in the app) and kay's own `PORT`, `HOST`, `SITE_URL` and `ORIGIN`, without the server's environment and without running the server entry, whose own schema it leaves out. A schema built inside a function is not seen. A library's mailer built in one of those modules, such as `mailer()` from kayjs-mail, is listed once under that module, as its options set it up.
 
 ```sh
 kay env

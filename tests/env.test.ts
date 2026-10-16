@@ -101,6 +101,23 @@ describe('kay env', () => {
     expect(lines.some(line => line.startsWith('Not read: src/broken.ts ('))).toBe(true)
     expect((await kay(['env', '--format', 'xml'], root)).stderr).toBe('kay env: --format takes `text`, `json`, not `xml`\n')
   })
+
+  it('lists a mailer built at import time once, under the module that builds it and as the mailer is set up, and finds a caller whose path says defineEnv', async () => {
+    const root = await project({
+      'kay.config.ts': 'import { mailExtension } from \'@kaynooo/kayjs-mail\'\n\nexport default { favicon: false, extensions: [mailExtension(\'./src/defineEnv-mail/mail.ts\')] }\n',
+      'src/defineEnv-mail/mail.ts': 'import { mailer } from \'@kaynooo/kayjs-mail\'\nimport { s } from \'kay\'\nimport { defineEnv } from \'kay/server\'\n\nexport const env = defineEnv(s.Object({ OWN: s.String() }))\nexport const mail = mailer({ optional: true })\n',
+    })
+    const { stdout, stderr, code } = await kay(['env', '--format', 'json'], root)
+
+    expect(code, stderr).toBe(0)
+
+    const listed = JSON.parse(stdout) as { variables: { name: string, source: string, required: string | false }[] }
+    const rows = (name: string) => listed.variables.filter(variable => variable.name === name)
+
+    expect(rows('OWN')).toEqual([expect.objectContaining({ source: 'src/defineEnv-mail/mail.ts' })])
+    expect(rows('SMTP_HOST')).toEqual([expect.objectContaining({ source: 'src/defineEnv-mail/mail.ts', required: false })])
+    expect(rows('SMTP_PORT')).toHaveLength(1)
+  })
 })
 
 describe('a compiled server', () => {

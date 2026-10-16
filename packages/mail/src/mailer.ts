@@ -191,10 +191,13 @@ function delivering(): 'outbox' | 'smtp' {
   return process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test' ? 'outbox' : 'smtp'
 }
 
-// The SMTP variables. Listed for the app, `kay env` shows the host and the sender as required in production, where the mailer sends over SMTP; the sender is not when the mailer sets `from`, which the list cannot know.
-function smtpEnv(optional: boolean, hasFrom: boolean, listed = false) {
+// The SMTP variables. `listed` is the extension's list for `kay env`, which shows the host and the sender as required in production, where the mailer sends over SMTP; the sender is not when the mailer sets `from`, which the list cannot know.
+function smtpEnv({ optional = false, hasFrom = false, listed = false }: { optional?: boolean, hasFrom?: boolean, listed?: boolean } = {}) {
+  const hostOptional = listed || optional
+  const fromOptional = hostOptional || hasFrom
+
   return s.Object({
-    SMTP_HOST: listed || optional ? s.Optional(s.String(listed ? { requiredInProduction: true } : {})) : s.String(),
+    SMTP_HOST: hostOptional ? s.Optional(s.String(listed ? { requiredInProduction: true } : {})) : s.String(),
     SMTP_PORT: s.Integer({ minimum: 1, maximum: 65_535, default: 465 }),
     SMTP_INSECURE: s.Optional(s.Boolean()),
     SMTP_USER: s.Optional(s.String()),
@@ -203,14 +206,14 @@ function smtpEnv(optional: boolean, hasFrom: boolean, listed = false) {
     SMTP_DKIM_SELECTOR: s.Optional(s.String()),
     SMTP_DKIM_PRIVATE_KEY: s.Optional(s.String()),
     SMTP_DKIM_DOMAIN: s.Optional(s.String()),
-    SMTP_FROM: listed || optional || hasFrom ? s.Optional(s.String(listed ? { pattern: SENDER, description: 'required unless the mailer sets `from`', requiredInProduction: true } : { pattern: SENDER })) : s.String({ pattern: SENDER }),
+    SMTP_FROM: fromOptional ? s.Optional(s.String(listed ? { pattern: SENDER, description: 'required unless the mailer sets `from`', requiredInProduction: true } : { pattern: SENDER })) : s.String({ pattern: SENDER }),
     MAIL_TO: s.Optional(s.String({ pattern: RECIPIENTS })),
   })
 }
 
 // SMTP from `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_RATE_LIMIT`, `SMTP_DKIM_*`, `SMTP_FROM` and `MAIL_TO`, read as the server boots, which stops naming each one missing or refused unless the mailer is `optional`.
 function fromEnvironment(from: Address | undefined, fromName: string | undefined, optional: boolean): { transport: Transport, from: Address, to: string | undefined, server: string, missing: () => string[] } {
-  const env = defineEnv(smtpEnv(optional, from !== undefined))
+  const env = defineEnv(smtpEnv({ optional, hasFrom: from !== undefined }))
 
   // Optional both, so reading them never throws under `kay build`, and a server given one without the other stops as it boots.
   if ((env.SMTP_USER === undefined) !== (env.SMTP_PASS === undefined))
@@ -272,7 +275,7 @@ export function mailExtension(from: string | (() => Promise<Mailer>)): KayExtens
 
   const devTool = { module: `${import.meta.dir}/devTool.ts` }
 
-  const env = smtpEnv(false, false, true)
+  const env = smtpEnv({ listed: true })
 
   return typeof from === 'string' ? { name: '@kaynooo/kayjs-mail', serverModule: { path: from, export: 'mail' }, messages, devTool, env } : { name: '@kaynooo/kayjs-mail', server: from, messages, devTool, env }
 }

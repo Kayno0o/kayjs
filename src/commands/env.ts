@@ -90,10 +90,12 @@ async function listEnv(root: string): Promise<{ variables: Listed[], unread: { f
     }
   }
 
+  // A library built at import time declares its own variables for the app, which says more than the extension's list, so the list adds only the rest.
+  const declaredNames = new Set(declared.flatMap(({ schema }) => Object.keys(schema.properties)))
   const variables: Listed[] = [
     ...declared.flatMap(({ schema, file }) => described(schema, file === undefined ? 'src' : shown(file))),
     ...config.publicEnv ? described(config.publicEnv, 'publicEnv in kay.config.ts') : [],
-    ...(config.extensions ?? []).flatMap(extension => extension.env === undefined ? [] : described(extension.env, `the extension ${extension.name}`)),
+    ...(config.extensions ?? []).flatMap(extension => extension.env === undefined ? [] : described(extension.env, `the extension ${extension.name}`).filter(({ name }) => !declaredNames.has(name))),
     ...KAY_VARIABLES.map(variable => ({ ...variable, source: 'kay' })),
   ]
 
