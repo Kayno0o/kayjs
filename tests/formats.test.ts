@@ -2,6 +2,8 @@ import { mkdir, rm } from 'node:fs/promises'
 import { join, relative } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
+import { outputDir } from '../src/build/assets'
+import { verifyExecutable } from '../src/build/verify'
 import { LINT_GROUPS, LINTS } from '../src/compiler/lints'
 import { scratchDir } from './scratch'
 
@@ -126,12 +128,56 @@ describe('kay build --format json', () => {
     expect(failed.code).toBe(1)
     expect(failed.stderr).toContain('the executable exited with code')
     expect(failed.stderr).toContain('boom at startup')
+    expect(await Bun.file(join(outputDir(broken), 'executable')).exists()).toBe(false)
+    expect(await Bun.file(join(outputDir(working), 'executable')).exists()).toBe(true)
 
     const alone = await kay(['build', working, '--no-check', '--verify'])
 
     expect(alone.code).toBe(1)
     expect(alone.stderr).toContain('--verify starts the executable --compile writes')
   }, 120_000)
+
+  describe('verifying an executable', () => {
+    // A script run as the executable would be.
+    async function executable(script: string): Promise<{ file: string, root: string }> {
+      const root = await project({})
+      const file = join(root, 'server')
+
+      await Bun.write(file, script)
+      await Bun.spawn(['chmod', '755', file]).exited
+
+      return { file, root }
+    }
+
+    const serving = (status: number) => `#!/usr/bin/env bun\nBun.serve({ hostname: '127.0.0.1', port: Number(process.env.PORT), fetch: () => new Response('', { status: ${status} }) })\nif (process.argv[2] === '--health') process.exit(0)\n`
+
+    it('takes any answer when the health route is off, and fails on a refusal when it is not', async () => {
+      const refusing = await executable(serving(404))
+
+      expect(await verifyExecutable(refusing.file, refusing.root, false)).toBeGreaterThan(0)
+      await expect(verifyExecutable(refusing.file, refusing.root, undefined, 1500)).rejects.toThrow('did not answer within 1.5 s')
+    }, 30_000)
+
+    it('fails when the executable never answers within the time it has', async () => {
+      const silent = await executable('#!/bin/sh\necho starting\nexec sleep 30\n')
+
+      await expect(verifyExecutable(silent.file, silent.root, undefined, 600)).rejects.toThrow(/did not answer within 0.6 s\nstarting/)
+    }, 30_000)
+
+    it('reports a startup failure though a grandchild still holds its output open', async () => {
+      const leaving = await executable('#!/bin/sh\nsleep 5 &\necho "boom at startup" >&2\nexit 1\n')
+      const started = performance.now()
+
+      await expect(verifyExecutable(leaving.file, leaving.root, undefined)).rejects.toThrow(/exited with code 1[\s\S]*boom at startup/)
+      expect(performance.now() - started).toBeLessThan(4000)
+    }, 30_000)
+
+    it('fails when another process answers on the port and the executable exits', async () => {
+      const taken = await executable(`#!/bin/sh\n[ "$1" = "--health" ] && exit 0\nbun -e 'Bun.serve({ hostname: "127.0.0.1", port: Number(process.env.PORT), fetch: () => new Response("other") }); setTimeout(() => process.exit(0), 3000)' >/dev/null 2>&1 &\nsleep 0.1\necho "address in use" >&2\nexit 1\n`)
+
+      await expect(verifyExecutable(taken.file, taken.root, undefined)).rejects.toThrow(/exited with code 1[\s\S]*address in use/)
+    }, 30_000)
+  })
 
   it('gives a template that does not compile as a problem at its place, and the stage it stopped', async () => {
     const root = await project({

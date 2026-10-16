@@ -250,14 +250,17 @@ async function runBuild(root: string, config: KayConfig, options: BuildOptions):
     try {
       const executable = await compileServer(project, { outfile: resolve(root, options.compile.outfile), entry: options.compile.entry === undefined ? undefined : resolve(root, options.compile.entry), packages: shippedPackages(project, client) })
 
-      await Bun.write(join(output, EXECUTABLE_RECORD), relative(root, executable))
-
       result.compiled = { executable, ms: performance.now() - stage }
 
       if (options.compile.verify)
         result.compiled.verifiedMs = await verifyExecutable(executable, root, project.config.health)
+
+      // Written once the executable runs, so `kay start` never runs one that failed its verify.
+      await Bun.write(join(output, EXECUTABLE_RECORD), relative(root, executable))
     }
     catch (error) {
+      await rm(join(output, EXECUTABLE_RECORD), { force: true })
+
       return { ...result, failed: { stage: 'compile', error } }
     }
 
