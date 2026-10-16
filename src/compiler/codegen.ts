@@ -68,6 +68,8 @@ export interface Generated {
 const CTX_REFERENCE = /\bctx\b/
 const IMPORT_COMMA_AFTER = /^\s*,\s*/
 const IMPORT_COMMA_BEFORE = /,\s*$/
+// The specifier of an import that did not parse, quoted and closed or not.
+const BROKEN_SPECIFIER = /^((?:\s*(?:\/\/.*\n|\/\*[\s\S]*?\*\/))*\s*import\b(?:[^'"]*[^\w$'"]from)?\s*)((['"])[^'";\s]*\3?)/
 // `kay build` renders the page once when it is `true`.
 const PRERENDER: PageSettingName = 'prerender'
 // The page's query schema, which types and validates `ctx.query`.
@@ -84,6 +86,18 @@ type OutputMode = 'jsx' | 'check' | 'html' | 'dom'
 
 // Where a component stands toward islands: an island root; a static component rendering through its hydratable twin inside one, which may also render as an island itself where it must (`promotable twin`, or `promotable` without a twin); a static component only islands render; or a plain one.
 type IslandKind = 'island' | 'twin' | 'promotable twin' | 'promotable' | 'inside island' | 'static'
+
+// The specifier of an import statement that did not parse, when it can still be read, an unclosed one ending at the first space, semicolon or line end.
+function brokenSpecifier(source: string, span: Span): Span[] {
+  const match = BROKEN_SPECIFIER.exec(source.slice(span.start, span.end))
+
+  if (!match)
+    return []
+
+  const start = span.start + match[1]!.length
+
+  return [{ start, end: start + match[2]!.length }]
+}
 
 function outputMode(options: GenerateOptions): OutputMode {
   // Only the final pass builds what runs.
@@ -202,7 +216,7 @@ class ModuleShell {
 
     for (const span of unparsed) {
       if (span)
-        this.emitHoisted(span, [], [], [])
+        this.emitHoisted(span, brokenSpecifier(this.src, span), [], [])
     }
 
     if (server)
@@ -416,7 +430,8 @@ class ModuleShell {
     const edits: { start: number, end: number, text?: string }[] = left.map(binding => this.withoutComma(binding.span, binding.declaration))
 
     for (const specifier of specifiers) {
-      const target = specifier.start >= span.start && specifier.end <= span.end ? this.options.relocateImport?.(this.src.slice(specifier.start + 1, specifier.end - 1)) : undefined
+      const quoted = this.src.slice(specifier.start, specifier.end)
+      const target = specifier.start >= span.start && specifier.end <= span.end ? this.options.relocateImport?.(quoted.length > 1 && quoted.endsWith(quoted[0]!) ? quoted.slice(1, -1) : quoted.slice(1)) : undefined
 
       if (target !== undefined)
         edits.push({ ...specifier, text: JSON.stringify(target) })

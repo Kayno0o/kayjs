@@ -133,7 +133,8 @@ const KAY_SCHEMA_T = /\{[^}]*\bt\b[^}]*\}\s*from\s*['"]kay['"]/
 
 // `t` imported from 'kay', the schema builder's name before `s`.
 // The fix renames it throughout the fence, or imports `s as t` where `s` is taken or `t` is read where the fix cannot reach, such as a template (`renamable` false).
-export function deprecatedSchemaNames(fence: ParsedFence, renamable = true): Diagnostic[] {
+// A fence Babel gives no scopes (a name declared twice) gives none, or throws with `strict`.
+export function deprecatedSchemaNames(fence: ParsedFence, renamable = true, strict = false): Diagnostic[] {
   if (!KAY_SCHEMA_T.test(fence.code))
     return []
 
@@ -169,7 +170,10 @@ export function deprecatedSchemaNames(fence: ParsedFence, renamable = true): Dia
       },
     })
   }
-  catch {
+  catch (error) {
+    if (strict)
+      throw error
+
     return []
   }
 
@@ -229,7 +233,17 @@ export function moduleChecks(source: string): Diagnostic[] {
   if (!KAY_SCHEMA_T.test(source) && !CSS_BINDING.test(source))
     return []
 
-  const module = parseFence(source, { start: 0, end: source.length }, [])
+  const whole = { start: 0, end: source.length }
+  const recovered = parseFence(source, whole, [], false)
+
+  // Babel's own recovery keeps every statement for the checks; a module it cannot read, or whose scopes it cannot build, is read again with its broken statements blanked.
+  try {
+    if (recovered)
+      return [...deprecatedSchemaNames(recovered, true, true), ...cssImportsWithoutText(recovered)]
+  }
+  catch {}
+
+  const module = parseFence(source, whole, [])
 
   return module ? [...deprecatedSchemaNames(module), ...cssImportsWithoutText(module)] : []
 }

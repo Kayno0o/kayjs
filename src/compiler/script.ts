@@ -13,7 +13,7 @@ import { loadTraverse, POSITION_SUFFIX } from './rewrite'
 // The keys of a Babel node that say where it is written, or hold its comments, rather than its children.
 const NOT_CHILDREN = new Set(['loc', 'start', 'end', 'extra', 'leadingComments', 'trailingComments', 'innerComments'])
 // A broken module whose first statement, comments aside, is a static import.
-const STATIC_IMPORT_START = /^(?:\s*\/\/.*\n)*\s*import\b(?!\s*\()/
+const STATIC_IMPORT_START = /^(?:\s*(?:\/\/.*\n|\/\*[\s\S]*?\*\/))*\s*import\b(?!\s*[.(])/
 const WHITESPACE = /\s/
 const FIRST_TOKEN = /^[\w$]*/
 const STATIC_EXPORTS = new Set(['uid', 'describeField', 'sanitizeHtml', 'trustHtml', 'defer'])
@@ -196,7 +196,7 @@ function splitFence(source: string, fence: Span, globals: string[], names: strin
       analysis.broken.push(span)
   }
 
-  analysis.implicit = undeclared(ast, parsed.code, globals, parsed.broken.map(text => source.slice(text.start, text.end)).join('\n'))
+  analysis.implicit = undeclared(ast, parsed.code, globals, codeOf(parsed.broken.map(text => source.slice(text.start, text.end)).join('\n')))
 
   for (const statement of ast.program.body) {
     const span = withLeadingComments(statement, shift)
@@ -670,7 +670,8 @@ const UNFINISHED = /[.,([{=+\-*/&|?:<>!~^%]/
 // A line of a fence that begins a statement: written from its first column, and not closing or continuing the one before it.
 const STATEMENT_START = /^(?![\s})\]]|else\b|catch\b|finally\b)/
 
-export function parseFence(source: string, span: Span, diagnostics: Diagnostic[]): ParsedFence | undefined {
+// Without `blank`, the parse is the one Babel's recovery gives, its statements that do not parse left in; none is read again.
+export function parseFence(source: string, span: Span, diagnostics: Diagnostic[], blank = true): ParsedFence | undefined {
   const original = source.slice(span.start, span.end)
   const broken: Span[] = []
   let code = original
@@ -692,14 +693,14 @@ export function parseFence(source: string, span: Span, diagnostics: Diagnostic[]
     if (!reported) {
       reported = true
 
-      if (errors.length > 0 && reportJsx(original, span, diagnostics))
+      if (blank && errors.length > 0 && reportJsx(original, span, diagnostics))
         return undefined
 
       for (const { pos, message } of errors)
         diagnostics.push({ start: span.start + pos, end: span.start + pos + 1, code: 'fence-syntax', message: message.replace(POSITION_SUFFIX, '') })
     }
 
-    const statements = broken.length < MAX_BROKEN ? new Map(errors.flatMap(({ pos }) => brokenStatement(code, pos)).map(statement => [statement.start, statement])) : new Map<number, { start: number, end: number }>()
+    const statements = blank && broken.length < MAX_BROKEN ? new Map(errors.flatMap(({ pos }) => brokenStatement(code, pos)).map(statement => [statement.start, statement])) : new Map<number, { start: number, end: number }>()
 
     if (errors.length === 0 || statements.size === 0)
       return ast && { code, offset: span.start, ast, broken, shift: node => ({ start: span.start + node.start!, end: span.start + node.end! }) }
@@ -712,6 +713,23 @@ export function parseFence(source: string, span: Span, diagnostics: Diagnostic[]
     }
 
     broken.sort((a, b) => a.start - b.start)
+  }
+}
+
+// The offset just after the last code before `at`, past the whitespace and the whole comment lines.
+function endOfCode(code: string, starts: number[], at: number): number {
+  let end = at
+
+  while (true) {
+    while (end > 0 && WHITESPACE.test(code[end - 1]!))
+      end--
+
+    const line = starts.findLastIndex(start => start < end)
+
+    if (line < 0 || !code.slice(starts[line], end).trimStart().startsWith('//'))
+      return end
+
+    end = starts[line]!
   }
 }
 
@@ -733,8 +751,7 @@ function brokenStatement(code: string, pos: number): { start: number, end: numbe
   const inFirstToken = STATEMENT_START.test(lines[row]!) && probe <= starts[row]! + firstToken
   let before = inFirstToken ? starts[row]! : probe
 
-  while (before > 0 && WHITESPACE.test(code[before - 1]!))
-    before--
+  before = endOfCode(code, starts, before)
 
   // An error at the end or in blank text is the fault of the text before it, and so is one in the first word of a statement when the text before it is unfinished: `count.` then `const` reads as `count.const`.
   if (probe >= code.length || WHITESPACE.test(code[probe]!) || inFirstToken) {
@@ -795,7 +812,15 @@ function findJsx(node: t.Node): t.Node | undefined {
   return jsx
 }
 
-// Which of `names` the fence reads with nothing in it declaring or importing them, `typed` being the text of the statements that did not parse, where a mention counts as a read.
+// What a statement being typed mentions as code: its comments, strings and object keys are no read of a name.
+const NOT_CODE = /\/\/[^\n]*|\/\*[\s\S]*?(?:\*\/|$)|'(?:[^'\\\n]|\\.)*'?|"(?:[^"\\\n]|\\.)*"?|`(?:[^`\\$]|\\.|\$(?!\{))*(?:`|\$\{|$)/g
+const OBJECT_KEY = /([{,]\s*)[\w$]+(?=\s*:)/g
+
+function codeOf(text: string): string {
+  return text.replaceAll(NOT_CODE, ' ').replaceAll(OBJECT_KEY, '$1')
+}
+
+// Which of `names` the fence reads with nothing in it declaring or importing them, `typed` being the code of the statements that did not parse, where a mention counts as a read.
 function undeclared(ast: ParseResult<t.File>, code: string, names: string[], typed: string): string[] {
   const mentioned = names.filter(name => GLOBAL_NAME.get(name)!.test(code) || GLOBAL_NAME.get(name)!.test(typed))
   const found: string[] = []

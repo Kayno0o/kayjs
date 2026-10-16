@@ -354,6 +354,44 @@ describe('fences', () => {
     expect(server.tsx).toContain('return { a }')
   })
 
+  it('read past the comment lines above a statement to tell what the text before it left unfinished', () => {
+    for (const comment of ['// what?', '// note', '// a > b', '// a.']) {
+      const { tsx, diagnostics } = compileKay(`---\nconst b = signal.\n${comment}\nconst count = signal(1)\n---\np {count}\n`, 'test.kay', { check: true })
+
+      expect(diagnostics.map(d => d.message)).toContain('`count` is a signal, read by calling it')
+      expect(tsx).toContain('count()')
+    }
+
+    // A comment is no unfinished statement: the error in the first word is the fault of the one before it, which ends with a comment.
+    const finished = compileKay('---\nconst a = 1\n// what?\nconst count = signal(1\n---\np {a}\n', 'test.kay', { check: true })
+
+    expect(finished.tsx).toContain('const a = 1')
+  })
+
+  it('keep a broken import.meta statement in the body, and read a block comment before a broken import', () => {
+    const meta = compileKay('---\nimport.meta.hot.\nconst count = signal(1)\n---\np {count()}\n', 'test.kay', { check: true }).tsx
+    const block = compileKay('---\n/* c */ import { a } from \'x\nconst count = signal(1)\n---\np {count()}\n', 'test.kay', { check: true }).tsx
+    const multiline = compileKay('---\n/* a\n b */ import { a } from \'x\nconst count = signal(1)\n---\np {count()}\n', 'test.kay', { check: true }).tsx
+    const island = (code: string) => code.indexOf('import { island')
+
+    expect(meta.indexOf('import.meta.hot.')).toBeGreaterThan(island(meta))
+    expect(block.indexOf('import { a }')).toBeLessThan(island(block))
+    expect(multiline.indexOf('import { a }')).toBeLessThan(island(multiline))
+  })
+
+  it('count a name of a statement that does not parse as read only where it is code', () => {
+    const imported = (body: string) => compileKay(`---\n${body}\n---\np x\n`, 'test.kay', { check: true }).tsx.includes('import { signal }')
+
+    expect(imported('const d = \'signal(1')).toBe(false)
+    expect(imported('const d = foo( // signal(1)\n')).toBe(false)
+    expect(imported('const d = foo( /* signal */\n')).toBe(false)
+    expect(imported('const d = { signal: 1,\n')).toBe(false)
+    expect(imported('const d = `signal\n')).toBe(false)
+    expect(imported('const d = { x: signal(1),\n')).toBe(true)
+    expect(imported('const d = { x: \'a\', y: signal(1),\n')).toBe(true)
+    expect(imported('const d = `${signal(1)}\n')).toBe(true)
+  })
+
   it('write the statement being typed in a server fence wherever it stands', () => {
     const tail = compileKay('--- server\nconst a = 1\nconst todos = load.\n---\np {a}\n', 'test.kay', { check: true })
     const beforeExport = compileKay('--- server\nconst todos = load.\nexport const add = action(() => 1)\n---\np x\n', 'test.kay', { check: true })
@@ -378,6 +416,19 @@ describe('fences', () => {
     const { tsx } = compileKay('---\nimport { a } from \'../../outside/a\'\nconst b = a.\n---\np x\n', 'test.kay', { check: true, relocateImport: specifier => specifier === '../../outside/a' ? '../../../outside/a' : undefined })
 
     expect(tsx).toContain('import { a } from "../../../outside/a"')
+  })
+
+  it('relocate the specifier of an import that does not parse itself, closed or not', () => {
+    const relocateImport = (specifier: string) => specifier === '../../outside/a' ? '../../../outside/a' : undefined
+    const open = compileKay('---\nimport { a } from \'../../outside/a\nconst b = 1\n---\np x\n', 'test.kay', { check: true, relocateImport }).tsx
+    const closed = compileKay('---\nimport { a } from \'../../outside/a\' foo\nconst b = 1\n---\np x\n', 'test.kay', { check: true, relocateImport }).tsx
+    const bare = compileKay('---\nimport \'../../outside/a\' foo\nconst b = 1\n---\np x\n', 'test.kay', { check: true, relocateImport }).tsx
+    const other = compileKay('---\nimport { a } from \'../other\nconst b = 1\n---\np x\n', 'test.kay', { check: true, relocateImport }).tsx
+
+    expect(open).toContain('import { a } from "../../../outside/a"\n')
+    expect(closed).toContain('import { a } from "../../../outside/a" foo\n')
+    expect(bare).toContain('import "../../../outside/a" foo\n')
+    expect(other).toContain('import { a } from \'../other\n')
   })
 
   it('keep the lints of the rewrites for the template and the other fence while one fence does not parse', () => {

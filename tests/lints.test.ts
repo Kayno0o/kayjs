@@ -1,7 +1,8 @@
 import type { CompileOptions } from '../src/compiler'
 import { join } from 'node:path'
 import process from 'node:process'
-import { describe, expect, it } from 'bun:test'
+import * as parser from '@babel/parser'
+import { describe, expect, it, spyOn } from 'bun:test'
 import { compileKay } from '../src/compiler'
 import { moduleChecks } from '../src/compiler/fence-checks'
 import { explainLint, isLint, LINT_GROUPS, lintList, LINTS } from '../src/compiler/lints'
@@ -144,6 +145,19 @@ describe('deprecated-schema-name', () => {
     expect(lints(`---\n${twice}---\ndiv {a}`)).toEqual([deprecated, duplicate])
     expect(lints(`--- server\n${twice}---\ndiv x`)).toEqual([deprecated, duplicate])
     expect(moduleChecks(twice).map(d => d.message)).toEqual(['`t` from \'kay\' is `s` now'])
+  })
+
+  it('reads a module whose statement does not parse once, so the checks inside that statement still run', () => {
+    const module = 'import { t } from \'kay\'\nexport const a = t.Object({}) foo\nimport theme from \'./theme.css\' bar\n'
+    const parse = spyOn(parser, 'parse')
+
+    try {
+      expect(moduleChecks(module).map(d => d.message)).toEqual(['`t` from \'kay\' is `s` now', expect.stringContaining('./theme.css')])
+      expect(parse).toHaveBeenCalledTimes(1)
+    }
+    finally {
+      parse.mockRestore()
+    }
   })
 })
 
