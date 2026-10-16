@@ -23,6 +23,8 @@ const ROOM = idOf('room')
 const SECRET = idOf('secret')
 const SCRIPT = /<script type="application\/json" data-kay-live>([^<]*)<\/script>/g
 const JSON_POST = { method: 'POST', headers: { 'content-type': 'application/json' } }
+// The gzipped JS the fixture's home page, with islands reading live values, loads up front: a few bytes above what it measures, as the budget in tests/static.test.ts is.
+const LIVE_EAGER_JS_BUDGET = 11_900
 
 // The live values of the fixture, imported once a site is up: its plugin gives them their ids.
 type Values = typeof import('./fixtures/live-values/src/live')
@@ -638,11 +640,20 @@ describe('live values in a production build', () => {
       'const page = async path => (await app.handle(new Request(`http://localhost${path}`))).text()',
       'const home = await page(\'/\')',
       'const about = await page(\'/about\')',
+      'const pending = [...home.matchAll(/<(?:script type="module" src|link rel="modulepreload" href)="([^"]+)"/g)].map(match => match[1])',
+      'const loaded = new Map()',
+      'for (let url = pending.pop(); url !== undefined; url = pending.pop()) {',
+      '  if (loaded.has(url)) continue',
+      '  const code = await page(url)',
+      '  loaded.set(url, Bun.gzipSync(code).length)',
+      '  pending.push(...[...code.matchAll(/(?:from|import)\\s*"([^"]+\\.js)"/g)].map(match => new URL(match[1], `http://x${url}`).pathname))',
+      '}',
+      'const eager = [...loaded.values()].reduce((sum, size) => sum + size, 0)',
       'const found = /<script type="application\\/json" data-kay-live>([^<]*)<\\/script>/.exec(home)?.[1]',
       'const proof = decodeServerValue(found)',
       `const live = await app.handle(new Request('http://localhost/_kay/live', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ proofs: [{ keys: proof.values.map(([id, key]) => [id, key]), at: proof.at, sig: proof.sig }], watch: [[${JSON.stringify(VISITORS)}, '']] }) }))`,
       'const first = new TextDecoder().decode((await live.body.getReader().read()).value)',
-      'console.log(JSON.stringify({ home: home.includes(\'data-kay-live\'), module: /<script type="module"/.test(home), about: about.includes(\'data-kay-live\'), aboutModule: about.includes(\'type="module"\'), status: live.status, type: live.headers.get(\'content-type\'), first }))',
+      'console.log(JSON.stringify({ eager, home: home.includes(\'data-kay-live\'), module: /<script type="module"/.test(home), about: about.includes(\'data-kay-live\'), aboutModule: about.includes(\'type="module"\'), status: live.status, type: live.headers.get(\'content-type\'), first }))',
       'process.exit(0)',
       '',
     ].join('\n')
@@ -658,6 +669,8 @@ describe('live values in a production build', () => {
     const answer = JSON.parse(served.slice(served.lastIndexOf('\n{') + 1)) as Record<string, unknown>
 
     expect(answer).toMatchObject({ home: true, module: true, about: false, aboutModule: false, status: 200 })
+    expect(Number(answer.eager)).toBeGreaterThan(0)
+    expect(Number(answer.eager), `${String(answer.eager)} bytes of gzipped JS load up front`).toBeLessThanOrEqual(LIVE_EAGER_JS_BUDGET)
     expect(String(answer.type)).toContain('text/event-stream')
     expect(String(answer.first)).toContain(VISITORS)
   }, 120_000)

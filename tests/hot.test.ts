@@ -58,6 +58,10 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('kay dev in 
       'src/components/field.kay': field,
       'src/form-title.ts': 'export const formTitle = \'Form\'\n',
       'src/routes/form.kay': form('one'),
+      'src/live.ts': 'import { live } from \'kay\'\n\nexport const visitors = live(0)\n',
+      'src/components/online.kay': '---\nimport { visitors } from \'../live\'\n---\np.online {visitors()} online\n',
+      'src/routes/live.kay': '---\nimport Online from \'../components/online.kay\'\n---\nh1 Live\nOnline\n',
+      'src/api/bump.ts': 'import { api } from \'kay/server\'\nimport { visitors } from \'../live\'\n\nexport default api().post(\'/\', () => {\n  visitors.set(n => n + 1)\n\n  return { visitors: visitors() }\n})\n',
       'src/routes/other.kay': '---\nimport Counter from \'../components/counter.kay\'\n---\nh1 Other\np.static Other\nCounter\n',
     }
 
@@ -363,4 +367,35 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('kay dev in 
     await Bun.write(join(root, 'src/routes/index.kay'), home('Grown', true))
     await page.locator('p.static', { hasText: 'Grown' }).waitFor({ timeout: 30_000 })
   }, 60_000)
+
+  it('keeps a live value followed across an edit of its module and the server it restarts', async () => {
+    const bump = async () => page.evaluate(async () => ((await (await fetch('/api/bump', { method: 'POST' })).json()) as { visitors: number }).visitors)
+
+    await page.goto(`${await origin()}/live`)
+    await page.evaluate(() => {
+      (window as { kayAlive?: boolean }).kayAlive = true
+    })
+
+    await page.locator('p.online', { hasText: '0 online' }).waitFor()
+    await bump()
+    await page.locator('p.online', { hasText: '1 online' }).waitFor({ timeout: 10_000 })
+
+    await Bun.write(join(root, 'src/live.ts'), 'import { live } from \'kay\'\n\nexport const visitors = live(0)\nexport const rooms = live((id: string) => id)\n')
+
+    // The server restarts with its values gone and the page follows the new one, through a fresh proof: whatever it counts, the page shows it.
+    await until(async () => {
+      try {
+        const count = await bump()
+
+        await page.locator('p.online', { hasText: `${count} online` }).waitFor({ timeout: 2000 })
+
+        return true
+      }
+      catch {
+        return false
+      }
+    })
+
+    expect(await sameDocument()).toBe(true)
+  }, 90_000)
 })
