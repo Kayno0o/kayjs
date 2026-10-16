@@ -2,7 +2,7 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
-## Unreleased
+## 1.46.0
 
 - `kay check` now type-checks the pages of an extension the app reaches through a workspace link, as it does an installed one, so an app linking a library may see new diagnostics; kayjs-mail's `authWords` throws for a mail kind kayjs-auth does not send ([Components](components.md#add-pages-to-the-app-from-a-library)).
 - `locales()` and `localeName(code)` from `kay/i18n` list the configured locales and name each in its own language, so a language switcher hard-codes neither ([Locales](locales.md#switch-language)).
