@@ -2,7 +2,7 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
-## Unreleased
+## 1.45.0
 
 - A `try` block that throws on the server takes back the `head` tags and island titles its components set, so a page never serves a title from an island it did not render ([Head](head.md)).
 - A `kay/test` page whose renderer crashes, killed or out of memory, fails the call waiting on it and every later one at once, where they waited for the test's timeout ([Testing](testing.md)).
