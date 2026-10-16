@@ -5,6 +5,7 @@ import { sep } from 'node:path'
 import { childBlocks, isHead } from '../compiler/ast'
 import { parseKay } from '../compiler/parser'
 import { analyzeServer } from '../compiler/script'
+import { localizedText, localizedTexts } from '../runtime/localized'
 import { cardImageSizes } from '../server/seo'
 import { decode, DESCRIPTION_LENGTH, isPublicSite, lintReporter, NOINDEX } from './seo'
 
@@ -40,6 +41,11 @@ export async function pageHeadLints(options: CheckOptions, routes: Route[], rout
 
   const found: CheckDiagnostic[] = []
   const report = lintReporter(options, exported, found)
+  // A source read gives no locale, so a per-locale default reads the default locale's text.
+  const defaultLocale = options.i18n?.defaultLocale
+  const siteName = localizedText(options.seo?.name, undefined, defaultLocale)
+  const siteImage = localizedText(options.seo?.image, undefined, defaultLocale)
+  const siteDescriptions = localizedTexts(options.seo?.description)
   const sources = new Map<string, { file: KayFile, prerender: string | undefined, noindex: boolean, sitemap: boolean }>()
   const read = async (path: string) => {
     let known = sources.get(path)
@@ -78,7 +84,7 @@ export async function pageHeadLints(options: CheckOptions, routes: Route[], rout
 
     const facts = merge(chain.map(entry => entry.facts))
     const at = { file: route.file, line: 1, column: 1 }
-    const title = facts.title === undefined ? options.seo?.name : facts.title.text
+    const title = facts.title === undefined ? siteName : facts.title.text
 
     if (facts.title === undefined && options.seo?.name === undefined) {
       report('untitled-page', { ...at, message: `\`${route.pattern}\` has no title`, help: 'set one with `title` in a `head` block, or `seo.name` for every page' })
@@ -96,10 +102,10 @@ export async function pageHeadLints(options: CheckOptions, routes: Route[], rout
 
     if (facts.description === undefined && !facts.unknownMeta && options.seo?.description === undefined)
       report('undescribed-page', { ...at, message: `\`${route.pattern}\` has no description`, help: 'set `meta(name="description" content="...")` in a `head` block, or `seo.description` for every page' })
-    else if (description !== undefined && description.length > DESCRIPTION_LENGTH && description !== options.seo?.description)
+    else if (description !== undefined && description.length > DESCRIPTION_LENGTH && !siteDescriptions.includes(description))
       report('long-description', { ...at, message: `The description of \`${route.pattern}\` runs ${description.length} characters`, note: `search results cut it after about ${DESCRIPTION_LENGTH}`, help: 'shorten it to a sentence or two' })
 
-    const image = facts.image === undefined ? options.seo?.image : facts.image.text
+    const image = facts.image === undefined ? siteImage : facts.image.text
 
     if (image !== undefined && !facts.imageWidth && sizeOf(image) === undefined)
       report('unsized-share-image', { ...at, message: `The share image of \`${route.pattern}\` has no size`, note: `kay reads no size off ${image}, so a network fetches it before laying the card out`, help: 'link a public file, an imported image, `shareImage()` or `shareCard()`, or set `og:image:width` and `og:image:height`' })

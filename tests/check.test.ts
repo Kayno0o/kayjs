@@ -1966,6 +1966,16 @@ describe.concurrent('kay check, unused code', () => {
         ['same.kay', 'duplicate-title'],
       ])
       expect(await check(root, { site: 'https://example.com', favicon: false, seo: { image: '/og.png' }, lints: { seo: 'allow' } })).toEqual([])
+
+      // Defaults per locale: a page with no title takes the site's name, and one repeating a locale's description is not told of its length again.
+      const perLocale = await check(root, { site: 'https://example.com', favicon: false, seo: { name: { en: 'Site', fr: 'Site' }, description: { en: 'Fine', fr: long } } })
+
+      expect(perLocale.filter(d => d.code !== undefined).map(d => [basename(d.file), d.code])).toEqual([
+        ['kay.config.ts', 'long-description'],
+        ['hidden.kay', 'noindex-in-sitemap'],
+        ['image.kay', 'unsized-share-image'],
+        ['same.kay', 'duplicate-title'],
+      ])
     }
     finally {
       await rm(root, { recursive: true, force: true })
