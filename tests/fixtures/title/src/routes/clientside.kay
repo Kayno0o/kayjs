@@ -1,0 +1,5 @@
+---
+import Room from '../components/room.kay'
+---
+h1 Client
+Room(label="Only" hydrate="client")

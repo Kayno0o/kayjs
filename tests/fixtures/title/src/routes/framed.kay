@@ -1,0 +1,7 @@
+---
+import Frame from '../components/frame.kay'
+import Room from '../components/room.kay'
+---
+h1 Framed
+Frame
+  Room(label="Inside")

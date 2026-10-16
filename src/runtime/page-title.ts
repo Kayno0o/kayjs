@@ -1,5 +1,5 @@
 import { islandHost } from './dom'
-import { ISLAND } from './markers'
+import { ISLAND, TITLED } from './markers'
 import { renderEffect } from './reactive'
 
 // The meta the server wrote with the `seo.titleTemplate` to wrap the title in and the title to show while it is empty, as JSON.
@@ -9,9 +9,6 @@ interface TitleSettings {
   template?: string
   fallback?: string
 }
-
-// The islands the server rendered with a title, hydrated or not.
-const TITLED = 'slot[data-titled]'
 
 // An island's `head` title: the page's title follows `read`, wrapped in `seo.titleTemplate` as the server wraps it unless `raw`, and the site's own while it reads empty.
 // With several islands the title is the one of the island last in the page as the server renders it, whichever hydrated last.
@@ -35,6 +32,9 @@ export function pageTitle(read: () => string, raw: boolean): void {
 
 // Whether a titled island, hydrated or not, comes after `host` in the page, one inside it not counting.
 function followed(host: Element): boolean {
+  if (!host.isConnected)
+    return false
+
   for (const other of document.querySelectorAll(TITLED)) {
     const position = host.compareDocumentPosition(other)
 

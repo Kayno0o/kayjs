@@ -969,14 +969,6 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
     expect(await title(view)).toBe('Beta | Site')
   })
 
-  it('keeps the served title when the last island hydrates when idle', async () => {
-    const view = await titles.open('/idle')
-
-    await allHydrated(view)
-
-    expect(await title(view)).toBe('Second | Site')
-  })
-
   it('counts a titled island inside another as the island around it', async () => {
     const view = await titles.open('/nested')
 

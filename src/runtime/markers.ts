@@ -7,3 +7,6 @@ export const PART_END = ']'
 export const FAILED = 'kay-failed'
 // The element an island renders in.
 export const ISLAND = 'slot[data-component]'
+// The island the server rendered with a title of its own set in its `head`, which the browser leaves the page's title to the last of.
+export const TITLED_ATTRIBUTE = 'data-titled'
+export const TITLED = `slot[${TITLED_ATTRIBUTE}]`

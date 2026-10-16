@@ -66,19 +66,24 @@ const NO_ATTRIBUTES: ReadonlyMap<string, string | true> = new Map()
 
 // Renders are synchronous, so the head of the one in progress can live here; a `head` outside a page render sets nothing.
 let groups: HeadTag[][] | undefined
+// How many islands set a title so far, which counts outside a page render too, as in a server island or an `await` block.
+let islandTitles = 0
 
 // Each call is one group: a later group's tag replaces an earlier one's of the same identity, so a page's title wins over its layouts', which register first.
 export function head(tags: HeadTag[]): void {
+  if (tags.some(tag => tag.tag === 'title' && tag.props.island === true))
+    islandTitles++
+
   groups?.push(tags)
 }
 
-// Where the head of the render in progress stands, to tell later whether a component set an island's title since.
+// Tells whether an island set a title since `mark`.
 export function headMark(): number {
-  return groups?.length ?? 0
+  return islandTitles
 }
 
 export function setsIslandTitle(mark: number): boolean {
-  return groups?.slice(mark).some(group => group.some(tag => tag.tag === 'title' && tag.props.island === true)) ?? false
+  return islandTitles > mark
 }
 
 export function collectHead<T>(render: () => T, options: HeadOptions = {}): { result: T, head: RenderedHead } {
