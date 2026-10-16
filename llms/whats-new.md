@@ -2,7 +2,7 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
-## Unreleased
+## 1.48.0
 
 - A collection with a `highlight` recompiles its entries when a module the content config imports changes, so a helper the highlighter calls never leaves entries highlighted by its old code ([Content](content.md#caching)).
 - A refused cross-site post or request answers 403 in plain text naming the `Origin` it got, the origin or origins kay takes for the site and the `site` setting that fixes a proxy changing the host ([Actions](actions.md#cross-site-posts)).
