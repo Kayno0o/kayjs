@@ -13,6 +13,8 @@ const OPENERS = '([{'
 const CLOSERS = ')]}'
 // The last character of a line after which the statement goes on, and the first one of the next line that continues it.
 const TRAILING = ',=+-*/%&|^<>?:.(['
+// What a regular expression literal may follow.
+const REGEX_AFTER = '(,=:[!&|?{};+-*%<>~^'
 const LEADING = '.?:,+-*/%&|=<>'
 
 export function declaresState(source: string, settings: ReadonlySet<string>): boolean {
@@ -24,7 +26,8 @@ export function declaresState(source: string, settings: ReadonlySet<string>): bo
     if (statementDeclaresState(source, at, end, settings))
       return true
 
-    at = skipTrivia(source, end)
+    // A stray closer ends a statement without being part of it.
+    at = skipTrivia(source, Math.max(end, at + 1))
   }
 
   return false
@@ -74,6 +77,46 @@ function skipString(source: string, at: number): number {
   return source.length
 }
 
+// The index after the string, template or regular expression literal opening at `at`, or -1 when none does.
+// A `/` opens a regular expression where an operand is expected: at the start, or after an operator or an opening bracket.
+function skipLiteral(source: string, at: number): number {
+  const char = source[at]!
+
+  if (char === '"' || char === '\'' || char === '`')
+    return skipString(source, at)
+
+  if (char !== '/' || source[at + 1] === '/' || source[at + 1] === '*')
+    return -1
+
+  let before = at - 1
+
+  while (before >= 0 && WHITESPACE.test(source[before]!))
+    before--
+
+  if (before >= 0 && !REGEX_AFTER.includes(source[before]!))
+    return -1
+
+  let inClass = false
+
+  for (let i = at + 1; i < source.length; i++) {
+    const char = source[i]
+
+    if (char === '\n')
+      return -1
+
+    if (char === '\\')
+      i++
+    else if (char === '[')
+      inClass = true
+    else if (char === ']')
+      inClass = false
+    else if (char === '/' && !inClass)
+      return i + 1
+  }
+
+  return -1
+}
+
 // The index after the `{}` opening at `at`, whatever it holds.
 function skipHole(source: string, at: number): number {
   let depth = 0
@@ -81,8 +124,10 @@ function skipHole(source: string, at: number): number {
   for (let i = at; i < source.length; i++) {
     const char = source[i]!
 
-    if (char === '"' || char === '\'' || char === '`')
-      i = skipString(source, i) - 1
+    const literal = skipLiteral(source, i)
+
+    if (literal >= 0)
+      i = literal - 1
     else if (char === '{')
       depth++
     else if (char === '}' && --depth === 0)
@@ -100,9 +145,11 @@ function statementEnd(source: string, at: number): number {
   for (let i = at; i < source.length; i++) {
     const char = source[i]!
 
-    if (char === '"' || char === '\'' || char === '`') {
-      i = skipString(source, i) - 1
-      last = char
+    const literal = skipLiteral(source, i)
+
+    if (literal >= 0) {
+      i = literal - 1
+      last = char === '/' ? ')' : char
     }
     else if (source.startsWith('//', i) || source.startsWith('/*', i)) {
       i = skipTrivia(source, i) - 1
@@ -172,8 +219,10 @@ function declaratorsHoldContainer(source: string, from: number, end: number, exp
   for (let i = from; i <= end; i++) {
     const char = i < end ? source[i]! : ','
 
-    if (char === '"' || char === '\'' || char === '`') {
-      i = skipString(source, i) - 1
+    const literal = skipLiteral(source, i)
+
+    if (literal >= 0) {
+      i = literal - 1
     }
     else if (source.startsWith('//', i) || source.startsWith('/*', i)) {
       i = skipTrivia(source, i) - 1
