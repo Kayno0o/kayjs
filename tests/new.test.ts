@@ -115,8 +115,8 @@ async function installKay(dir: string) {
   await cp(await packed, kay, { recursive: true })
 }
 
-// Each feature alone, and the app with each one left out.
-const VARIANTS = FEATURE_NAMES.flatMap(feature => [[`${feature} alone`, toggle(new Set(), feature)], [`the app without ${feature}`, toggle(new Set(PRESETS.app.features), feature)]] as const)
+// Each feature alone, and the app with each one left out, or put in where the app lacks it.
+const VARIANTS = FEATURE_NAMES.flatMap(feature => [[`${feature} alone`, toggle(new Set(), feature)], [PRESETS.app.features.includes(feature) ? `the app without ${feature}` : `the app with ${feature}`, toggle(new Set(PRESETS.app.features), feature)]] as const)
 // Installed, checked, linted and tested besides the four presets. With them, server runs with auth and ws (app), with ws alone (the app without auth) and with neither (server); starter and tailwind each run with accents (server) and without (the app without tailwind, the app without starter); server, starter and tailwind each run absent, and the tests of a project with neither a server nor the starter pages run in eslint and tests alone. ci and docker write only text files.
 const INSTALLED: [string, ReadonlySet<Feature>][] = [
   ['the app without starter', toggle(new Set(PRESETS.app.features), 'starter')],
@@ -603,6 +603,7 @@ describe('kay new', () => {
 
       expect(files).toEqual(expect.arrayContaining(['.env', '.env.example', '.env.test', 'migrations/0001_member.sql', 'pg-orm.config.ts', 'src/db/index.ts', 'tests/database.ts']))
       expect(files.filter(file => file === 'compose.dev.yaml' || file.startsWith('db/'))).toEqual([])
+      expect((await stat(join(dir, '.env'))).mode & 0o777).toBe(0o600)
       expect(await Bun.file(join(dir, '.env')).text()).toMatch(/^SESSION_SECRET=[0-9a-f]{64}\nDATABASE_URL=sqlite:\/\/data\/app\.db\n$/)
       expect(await Bun.file(join(dir, '.env.test')).text()).toContain('DATABASE_URL=sqlite://data/test.db\n')
       expect(await Bun.file(join(dir, '.env.example')).text()).toStartWith('# Each one generated and kept out of the repository: ')

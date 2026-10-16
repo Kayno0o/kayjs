@@ -258,7 +258,7 @@ expect(jar.cookies.has('session')).toBe(true)
 - kay holds no database code: an app keeps its data with `@kaynooo/pg-orm`, as `kay new --template app` does, and its tests get a database each from pg-orm's `testDatabase()`.
 - A preload listed after `kay/test/preload` copies, for each test file, a database migrated from `migrations/` and seeded once, points `DATABASE_URL` at the copy before the app's modules read it, and drops it in `afterAll`.
 - `bun test --isolate` runs each file in modules of its own, so each reads its own copy, and files never see each other's rows; the app's `bun run test` passes it, while a plain `bun test` runs the preload once and every file shares one copy.
-- The test database in `.env.test` need not exist, its server's user only needs `CREATEDB`.
+- The test database in `.env.test` need not exist, a SQLite file is made on first use, and a Postgres server's user only needs `CREATEDB`.
 - Without `browser`, pages render their islands' markup without scripts.
 - `testSite()` still builds the islands for the browser, unminified, into `.kay/test-client` (`.kay/test-client-<n>` in a `bun test --parallel` worker), leaving what `kay build` wrote in `.kay/client` alone, and throws that build's error when one fails, such as an island reaching a Bun builtin or a server module (`browser-builtin-import`), which no server-side render meets.
 - It runs once per process (once per file under `bun test --isolate`) for as long as the files under `src`, the routes and the API stay unchanged, one at a time, and `browser: true` shares it; `kay.config.ts`, `public` and library sources are not watched.

@@ -304,7 +304,7 @@ function workflowSetup(host: Host): string {
         run: bun install --frozen-lockfile`
 }
 
-// Every push is checked and tested before anything deploys it; the container build checks again, as `kay build` does. An app's tests copy a database per test file on a Postgres service.
+// Every push is checked and tested before anything deploys it; the container build checks again, as `kay build` does. With `postgres`, the tests copy a database per test file on a Postgres service.
 function testWorkflow({ has, host }: Setup): string {
   const database = has('postgres') && has('tests')
 
@@ -809,7 +809,7 @@ form${tw('.mt-4')}(action={signOut})
 // The tests of the members' database: SQLite files under `data` by default, a Postgres the tests may create databases on with `postgres`.
 function authTestFiles({ has }: Setup): Record<string, string> {
   return {
-  // Read by `bun test` only, so tests run in a fresh clone and CI; never a real secret. Each test file gets a copy of this database, which need not exist.
+    // Read by `bun test` only, so tests run in a fresh clone and CI; never a real secret. Each test file gets a copy of this database, which need not exist.
     '.env.test': `SESSION_SECRET=only-for-tests-0123456789abcdefghijklmnop\nDATABASE_URL=${has('postgres') ? 'postgres://app:app@127.0.0.1:5433/app_test' : 'sqlite://data/test.db'}\n`,
     'tests/database.ts': `import process from 'node:process'
 import { testDatabase } from '@kaynooo/pg-orm'
