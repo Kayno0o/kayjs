@@ -8,6 +8,7 @@ import process from 'node:process'
 import tailwind from 'bun-plugin-tailwind'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { chromium } from 'playwright-core'
+import { outputDir } from '../src/build/assets'
 import { styledClassNames } from '../src/build/class-rules'
 import { buildClient } from '../src/build/client'
 import { parse } from '../src/build/supports'
@@ -146,7 +147,7 @@ describe('a page\'s head', () => {
   it('carries the rules of static classes whose names hold quotes, equals signs and angle brackets', async () => {
     const rules = await head(await serve(), '/static')
 
-    for (const name of ['data-[state=open]:bg-red-500', '[&>svg]:size-4', 'bg-[url(\'/a.png\')]', 'has-[>img]:p-2', 'after:content-[\'x\']', '2xl:p-4'])
+    for (const name of ['data-[state=open]:bg-red-500', '[&>svg]:size-4', 'font-[\'Fira_Code\']', 'has-[>img]:p-2', 'after:content-[\'x\']', '2xl:p-4'])
       expect(styles(rules.styles, name), name).toBe(true)
   })
 
@@ -228,7 +229,7 @@ describe('a page\'s head', () => {
   it('is written into a page kept at build time, its hash known to the server that serves it', async () => {
     expect(await prerenderPages(resolveProject(root, { routes: 'src/routes' }, PRODUCTION), client)).toBeGreaterThan(0)
 
-    const file = await Bun.file(join(root, '.kay/client/pages/prerendered.html')).text()
+    const file = await Bun.file(join(outputDir(root), 'pages/prerendered.html')).text()
     const styles = [...file.matchAll(STYLE)].map(match => match[1]!).join('\n')
 
     expect(file).toContain('data-kay-rest')
