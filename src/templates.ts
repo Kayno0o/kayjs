@@ -11,10 +11,10 @@ export interface ConfigSettings {
   seo?: boolean | undefined
 }
 
-// The features a project is scaffolded with, as the files ask for them.
 // Where the project's repository is hosted, which decides the CI it is scaffolded with.
 export type Host = 'forgejo' | 'github'
 
+// The features a project is scaffolded with, as the files ask for them.
 interface Setup {
   has: (feature: Feature) => boolean
   host: Host
@@ -400,7 +400,8 @@ ${workflowSetup(host)}`,
     has('eslint') && `      - name: Lint
         run: bun run lint`,
     github
-      ? `      - name: Upload the site
+      ? `      # Set Pages to deploy from GitHub Actions in the repository's settings; a site named <owner>.github.io is served from the root, so empty SITE_BASE.
+      - name: Upload the site
         uses: actions/upload-pages-artifact@v3
         with:
           path: dist
