@@ -259,7 +259,8 @@ for (const method of ['on', 'once', 'addListener', 'prependListener', 'prependOn
 
   process[method] = ((event: string | symbol, listener: (...args: unknown[]) => void) => {
     add(event, listener)
-    onReload(() => removeListener(event, listener), 'through')
+    // A library adding `beforeExit` for the app, as Elysia does to stop its server, is the app's; its other listeners may be kept for every caller.
+    onReload(() => removeListener(event, listener), event === 'beforeExit' ? 'through' : 'direct')
 
     return process
   }) as typeof process[typeof method]
@@ -273,27 +274,43 @@ function removeListener(event: string | symbol, listener: (...args: unknown[]) =
   }
 }
 
+const forgetters = new WeakMap<object, () => void>()
 const startInterval = globalThis.setInterval
 
 globalThis.setInterval = ((...args: Parameters<typeof setInterval>) => {
   const timer = startInterval(...args)
+  const forget = onReload(() => clearInterval(timer), 'direct')
 
-  onReload(() => clearInterval(timer), 'direct')
+  if (forget !== undefined)
+    forgetters.set(timer, forget)
 
   return timer
 }) as typeof setInterval
 
-Bun.SQL = new Proxy(Bun.SQL, {
-  construct(target, args, newTarget) {
-    return opened(Reflect.construct(target, args, newTarget) as InstanceType<typeof Bun.SQL>)
-  },
-  apply(target, self, args) {
-    return opened(Reflect.apply(target, self, args) as InstanceType<typeof Bun.SQL>)
-  },
-})
+const stopInterval = globalThis.clearInterval
+
+globalThis.clearInterval = ((timer: Parameters<typeof clearInterval>[0]) => {
+  if (typeof timer === 'object' && timer !== null)
+    forgetters.get(timer)?.()
+
+  stopInterval(timer)
+}) as typeof clearInterval
+
+try {
+  Bun.SQL = new Proxy(Bun.SQL, {
+    construct(target, args, newTarget) {
+      return opened(Reflect.construct(target, args, newTarget) as InstanceType<typeof Bun.SQL>)
+    },
+    apply(target, self, args) {
+      return opened(Reflect.apply(target, self, args) as InstanceType<typeof Bun.SQL>)
+    },
+  })
+}
+catch {}
 
 function opened(sql: InstanceType<typeof Bun.SQL>): InstanceType<typeof Bun.SQL> {
-  onReload(async () => sql.close(), 'direct')
+  // Without a timeout, closing waits for the queries still pending.
+  onReload(async () => sql.close({ timeout: 0 }), 'direct')
 
   return sql
 }

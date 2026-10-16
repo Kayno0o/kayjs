@@ -248,7 +248,7 @@ describe.concurrent('kay dev reloading', () => {
     const ticks = join(project.root, '.ticks')
 
     try {
-      await entryWith(project, `import { readFileSync } from 'node:fs'\nprocess.on('SIGUSR2', () => {})\nprocess.once('beforeExit', () => {})\nsetInterval(() => appendFileSync(${JSON.stringify(ticks)}, \`\${readFileSync(${JSON.stringify(project.log)}, 'utf8').split('\\n').length}\\n\`), 10)\nappendFileSync(${JSON.stringify(counts)}, \`\${process.listenerCount('SIGUSR2')} \${process.listenerCount('beforeExit')}\\n\`)\n`)
+      await entryWith(project, `import { readFileSync } from 'node:fs'\nprocess.on('SIGUSR2', () => {})\nprocess.once('beforeExit', () => {})\nconst run = readFileSync(${JSON.stringify(project.log)}, 'utf8').split('\\n').length\nsetInterval(() => appendFileSync(${JSON.stringify(ticks)}, \`\${run}\\n\`), 10)\nappendFileSync(${JSON.stringify(counts)}, \`\${process.listenerCount('SIGUSR2')} \${process.listenerCount('beforeExit')}\\n\`)\n`)
 
       for (let edit = 1; edit <= 20; edit++) {
         await project.write('src/routes/index.kay', `h1 Edit ${edit}\n`)
@@ -293,6 +293,34 @@ describe.concurrent('kay dev reloading', () => {
       await project.cleanup()
     }
   }, 120_000)
+
+  it('closes what an API module opened when it is edited, and keeps what one that did not run again opened', async () => {
+    const ticks = join(await scratchDir('dev-reload-ticks-'), '.ticks')
+    const api = (edit: number, name: string) => `import { appendFileSync } from 'node:fs'\nimport { api } from 'kay/server'\nimport { sqliteRooms } from 'kay/server'\n\nconst rooms = sqliteRooms(${JSON.stringify(`${ticks}-${name}.sqlite`)})\nconst previous = (globalThis as any).${name}\n;(globalThis as any).${name} = rooms\nsetInterval(() => appendFileSync(${JSON.stringify(ticks)}, '${name}${edit}\\n'), 10)\n\nexport default api().get('/', () => {\n  try {\n    previous?.members('r')\n\n    return { previous: previous ? 'open' : 'none', edit: ${edit} }\n  }\n  catch {\n    return { previous: 'closed', edit: ${edit} }\n  }\n})\n`
+    const project = await served({ 'src/routes/index.kay': 'h1 Home\n', 'src/api/one.ts': api(0, 'one'), 'src/api/two.ts': api(0, 'two') })
+
+    try {
+      expect(await project.text('/api/one')).toContain('"previous":"none"')
+      expect(await project.text('/api/two')).toContain('"previous":"none"')
+      await project.write('src/api/one.ts', api(1, 'one'))
+      await until(async () => (await project.text('/api/one')).includes('"edit":1'))
+      expect(await project.text('/api/one')).toContain('"previous":"closed"')
+      await Bun.write(ticks, '')
+      await Bun.sleep(200)
+
+      const seen = new Set(lines(ticks))
+
+      // The edited module's first interval stopped and its second ticks; the other module's rooms and interval go on.
+      expect(seen.has('one0')).toBe(false)
+      expect(seen.has('one1')).toBe(true)
+      expect(seen.has('two0')).toBe(true)
+      expect(await project.text('/api/two')).toContain('"previous":"none"')
+      expect(project.children).toHaveLength(1)
+    }
+    finally {
+      await project.cleanup()
+    }
+  }, 60_000)
 
   it('keeps a pool a module that did not run again opened', async () => {
     const api = (edit: number) => `import { api } from 'kay/server'\nimport { state } from '../lib/db'\n\nexport default api().get('/', async () => ({ pool: await state(), edit: ${edit} }))\n`

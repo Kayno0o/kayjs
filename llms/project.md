@@ -12,7 +12,7 @@ bunx -p @kaynooo/kayjs kay new my-app --template app --without ws
 
 ### Run the dev server
 
-`kay dev` runs one server process for the whole session: a change to a template, island, loader or API route imports what changed again in that process and swaps the routes in place, and only a change it cannot (the config, the entry, a module the entry or other code imports) starts a new process, from cold. Each reload lets go of what the modules that run again opened: their `process.on` listeners, `setInterval` timers and `Bun.SQL` pools, and the `sqliteRooms` and unnamed SQLite session stores they created, so an edit leaves one of each, not one more; a resource of a module that did not run again stays, and a `bun:sqlite` `Database` the entry opens is not closed (open it in a module the entry does not re-run, or close it in `onStop`). It refreshes the open pages and shows errors in the browser:
+`kay dev` runs one server process for the whole session: a change to a template, island, loader or API route imports what changed again in that process and swaps the routes in place, and only a change it cannot (the config, the entry, a module the entry or other code imports) starts a new process, from cold. Each reload lets go of what the modules that run again opened: the `process.on` listeners, `setInterval` timers and `Bun.SQL` pools they created themselves, and the `sqliteRooms` and unnamed SQLite session stores, so an edit leaves one of each, not one more. What a library opens for them, a `bun:sqlite` `Database`, `sqliteCache`, `sqliteRates` and the queue's store stay open: open those in a module that does not run again, or close them in `onStop`. It refreshes the open pages and shows errors in the browser:
 
 ```sh
 kay dev --port 4000 --open

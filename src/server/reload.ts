@@ -9,40 +9,47 @@ interface Owned {
 }
 
 const KAY = resolve(import.meta.dir, '..') + sep
-// The files of kay that take the stack's top frames: they are not the app's.
-const OWN = /\/(?:server\/reload|dev\/preload)\.ts$/
-const FRAME = /\(?(?:file:\/\/)?(\/[^\s()]+?):\d+:\d+\)?$/
+// The files that take the top frames of a stack when an app calls a patched function: they are not the app's.
+const OWN = new Set([resolve(import.meta.dir, 'reload.ts'), resolve(import.meta.dir, '../dev/preload.ts')])
+const LIBRARY = /\/node_modules\//
 
 const owned = new Set<Owned>()
 
 // The files of the stack that are the app's, innermost first.
 function appFrames(): string[] {
-  const files: string[] = []
+  const prepareStackTrace: unknown = Reflect.get(Error, 'prepareStackTrace')
+  let files: string[] = []
 
-  for (const line of (new Error('stack').stack ?? '').split('\n').slice(1)) {
-    const file = FRAME.exec(line)?.[1]
+  Error.prepareStackTrace = (_error, sites) => sites.map(site => site.getFileName() ?? '')
 
-    if (file !== undefined && !(file.startsWith(KAY) && OWN.test(file)))
-      files.push(file)
+  try {
+    files = new Error('stack').stack as unknown as string[]
+  }
+  finally {
+    Reflect.set(Error, 'prepareStackTrace', prepareStackTrace)
   }
 
-  return files
+  return files.filter(file => file.startsWith('/') && !OWN.has(file))
 }
 
 // Who a resource belongs to: `app` is the first module outside kay, for what kay opens on a module's behalf; `direct` the module calling the function that opens it, so one a library or kay opens for itself is left; `through` the same but past the libraries, for what a library opens on a module's behalf, as a listener.
 export type Owner = 'app' | 'direct' | 'through'
 
-const LIBRARY = /\/node_modules\//
-
-// Closes `dispose` when the module that owns the resource runs again. Does nothing outside `kay dev`.
-export function onReload(dispose: () => unknown, owner: Owner = 'app'): void {
+// Closes `dispose` when the module that owns the resource runs again, and returns what forgets it once the app closed it. Does nothing outside `kay dev`.
+export function onReload(dispose: () => unknown, owner: Owner = 'app'): (() => void) | undefined {
   if (process.env.KAY_DEV_CODE === undefined)
-    return
+    return undefined
 
   const file = ownerOf(owner)
 
-  if (file !== undefined)
-    owned.add({ file, dispose })
+  if (file === undefined)
+    return undefined
+
+  const entry = { file, dispose }
+
+  owned.add(entry)
+
+  return () => owned.delete(entry)
 }
 
 function ownerOf(owner: Owner): string | undefined {
@@ -54,8 +61,11 @@ function ownerOf(owner: Owner): string | undefined {
       return undefined
     }
 
-    if (owner !== 'through' || !LIBRARY.test(file))
-      return file
+    if (owner === 'through' && LIBRARY.test(file))
+      continue
+
+    // A library's own resource may be one it keeps for every caller, which closing would leave dead.
+    return owner === 'direct' && LIBRARY.test(file) ? undefined : file
   }
 
   return undefined
@@ -63,10 +73,9 @@ function ownerOf(owner: Owner): string | undefined {
 
 // Closes what the modules in `files` opened, which are about to run again.
 export async function disposeOwned(files: Set<string>): Promise<void> {
-  for (const entry of owned) {
-    if (!files.has(entry.file))
-      continue
+  const closing = [...owned].filter(entry => files.has(entry.file))
 
+  await Promise.all(closing.map(async (entry) => {
     owned.delete(entry)
 
     try {
@@ -75,5 +84,5 @@ export async function disposeOwned(files: Set<string>): Promise<void> {
     catch (error) {
       kayLog('error', 'letting go of what the app opened before a reload failed', error)
     }
-  }
+  }))
 }
