@@ -336,10 +336,9 @@ function fieldError(action: ServerAction<TSchema, unknown>, field: string): stri
   return typeof error === 'string' ? error : undefined
 }
 
-// A file input left empty still posts a nameless, empty file; dropping it lets `s.Optional(s.File())` see no file at all.
 // The fields the form's action URL fixes through `with()`, which stand over the ones posted under the same name.
 function withFixedFields(body: unknown, request: Request): unknown {
-  const query = new URL(request.url).searchParams.get(PAYLOAD_PARAM)
+  const query = requestUrl(request).searchParams.get(PAYLOAD_PARAM)
 
   if (query === null)
     return body
@@ -359,6 +358,7 @@ function withFixedFields(body: unknown, request: Request): unknown {
   return fields
 }
 
+// A file input left empty still posts a nameless, empty file; dropping it lets `s.Optional(s.File())` see no file at all.
 function withoutEmptyFiles(body: unknown): unknown {
   if (typeof body !== 'object' || body === null)
     return body

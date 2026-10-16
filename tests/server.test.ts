@@ -2036,7 +2036,7 @@ describe('action input', () => {
     const fence = '--- server\nimport { t } from \'elysia\'\nimport { action } from \'kay\'\n\nexport const reorder = action(t.Object({ id: t.Integer(), to: t.Integer(), tags: t.Optional(t.Array(t.String({ maxLength: 9 }))), done: t.Optional(t.Boolean()) }), (input, ctx) => {\n  ctx.headers.set(\'x-got\', JSON.stringify(input))\n})\n---\n'
 
     try {
-      await Bun.write(join(dir, 'index.kay'), `${fence}form(action={reorder.with({ id: 3, to: 2, tags: ['a', 'b'], done: false, skipped: undefined, none: null })}) button Up\nform(action={reorder}) button Plain\n`)
+      await Bun.write(join(dir, 'index.kay'), `${fence}form(action={reorder.with({ id: 3, to: 2, tags: ['a', 'b'], done: false, skipped: undefined, none: null })}) button Up\nform(action={reorder}) button Plain\nform(action={reorder.with({ id: 7 }).with({ to: 8 })}) button Chained\n`)
 
       const url = `/_kay/action/${id}/index.kay/reorder`
       const query = '?kay_with=id%3D3%26to%3D2%26tags%3Da%26tags%3Db%26done%3Dfalse'
@@ -2049,6 +2049,8 @@ describe('action input', () => {
 
         expect(html).toContain(`action="${base ?? ''}${url}${query}"`)
         expect(html).toContain(`action="${base ?? ''}${url}"`)
+        // A further `with` adds to the fields.
+        expect(html).toContain(`action="${base ?? ''}${url}?kay_with=id%3D7%26to%3D8"`)
         expect(html).not.toContain('type="hidden"')
         // Posted as a plain form: the payload reaches the handler typed by the schema, with nothing else posted.
         expect(got(await post(`${url}${query}`))).toEqual([303, JSON.stringify({ id: 3, to: 2, tags: ['a', 'b'], done: false })])

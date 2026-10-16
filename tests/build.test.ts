@@ -2335,6 +2335,9 @@ describe('a compiled server', () => {
       'src/routes/staff/_guard.ts': 'import { guard } from \'kay\'\n\nexport default guard(({ request, deny }) => {\n  if (!request.headers.has(\'x-admin\'))\n    deny(403, \'Admins only\')\n})\n',
       'src/routes/staff/_layout.kay': action('promote'),
       'src/routes/staff/_actions.kay': action('demote').replace('\nslot\n', '\n'),
+      'src/routes/vault/_guard.ts': 'import { guard } from \'kay\'\n\nexport default guard(({ request, deny }) => {\n  if (!request.headers.has(\'x-vault\'))\n    deny(403, \'Vault only\')\n})\n',
+      'src/routes/vault/_actions.kay': action('unlock').replace('\nslot\n', '\n'),
+      'src/routes/vault/index.kay': '--- server\nexport const page = { guards: false }\n---\nh1 Vault\n',
       'src/routes/staff/sign-in.kay': '--- server\nexport const page = { guards: false }\n---\nh1 Staff\n',
       'src/server.ts': `import process from 'node:process'
 import { Elysia } from 'elysia'
@@ -2351,7 +2354,7 @@ const icons = await Promise.all(['/favicon.ico', '/icon-512.png', '/favicon.svg'
 const card = new URL(page.split('property="og:image" content="')[1]!.split('"')[0]!.replaceAll('&amp;', '&'), 'http://localhost')
 const drawn = await get(card.pathname + card.search)
 
-console.log(JSON.stringify({ home: (await get('/')).status, leave: await post('_layout.kay', 'leave'), promote: await post('staff/_layout.kay', 'promote'), admin: await post('staff/_layout.kay', 'promote', { 'x-admin': '1' }), demote: await post('staff/_actions.kay', 'demote'), demoted: await post('staff/_actions.kay', 'demote', { 'x-admin': '1' }), track: await post('../../lib/routes/_layout.kay', 'track'), tracked: await post('../../lib/routes/_layout.kay', 'track', { 'x-lib': '1' }), editor: page.includes('class="edited"'), sheet: styles.includes('dashed teal'), icons, card: [drawn.status, drawn.headers.get('content-type')] }))
+console.log(JSON.stringify({ home: (await get('/')).status, leave: await post('_layout.kay', 'leave'), promote: await post('staff/_layout.kay', 'promote'), admin: await post('staff/_layout.kay', 'promote', { 'x-admin': '1' }), demote: await post('staff/_actions.kay', 'demote'), demoted: await post('staff/_actions.kay', 'demote', { 'x-admin': '1' }), locked: await post('vault/_actions.kay', 'unlock'), unlocked: await post('vault/_actions.kay', 'unlock', { 'x-vault': '1' }), track: await post('../../lib/routes/_layout.kay', 'track'), tracked: await post('../../lib/routes/_layout.kay', 'track', { 'x-lib': '1' }), editor: page.includes('class="edited"'), sheet: styles.includes('dashed teal'), icons, card: [drawn.status, drawn.headers.get('content-type')] }))
 process.exit(0)
 `,
     })
@@ -2398,7 +2401,7 @@ process.exit(0)
       const [output, errors, exited] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
 
       expect({ exited, errors }).toEqual({ exited: 0, errors: expect.any(String) })
-      expect(JSON.parse(output.trim().split('\n').at(-1)!)).toEqual({ home: 200, leave: 200, promote: 403, admin: 200, demote: 403, demoted: 200, track: 403, tracked: 200, editor: true, sheet: true, icons: [200, 200, 200], card: [200, 'image/jpeg'] })
+      expect(JSON.parse(output.trim().split('\n').at(-1)!)).toEqual({ home: 200, leave: 200, promote: 403, admin: 200, demote: 403, demoted: 200, locked: 403, unlocked: 200, track: 403, tracked: 200, editor: true, sheet: true, icons: [200, 200, 200], card: [200, 'image/jpeg'] })
       expect((await Bun.file(join(root, 'server')).text()).includes('resvg-js')).toBe(false)
     }
     finally {

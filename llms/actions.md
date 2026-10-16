@@ -244,9 +244,11 @@ form(action={add})
 - `kay check` verifies every `field` and `name` against the schema.
 - Once kay's script runs it sets `novalidate` on every form posting to an action and checks the form against the schema itself, so the schema's `error` messages show rather than the browser's, then the constraints the template wrote itself.
 - An island renders its fields without the constraints, kay's check covering them.
-- `form(action={move.with({ id, to: 2 }))})` posts those fields as hidden inputs would, with or without JavaScript, from a page or an island, with no input for them in the form: they travel in the form's action URL, `?kay_with=` holding them URL-encoded, and the server reads them as the form's own fields, coerced by the schema, standing over a posted field of the same name.
+- `form(action={move.with({ id, to: 2 })})` posts those fields as hidden inputs would, with or without JavaScript, from a page or an island, with no input for them in the form: they travel in the form's action URL, `?kay_with=` holding them URL-encoded, and the server reads them as the form's own fields, coerced by the schema, standing over a posted field of the same name.
 - `with` takes the schema's fields, text, numbers, booleans, dates or lists of them, `undefined` and `null` left out; a call from an island sends its input as it is and reads none of it.
-- A button alone is one such form: `form(action={move.with({ id, to: 2 }))}) button(aria-label="Move up") ↑`.
+- `with` on a `with` adds to its fields; they are in the URL, so in logs and referrers: no secrets.
+- An `_actions.kay` is served for the pages at or below its directory, so it sits at or above a page.
+- A button alone is one such form: `form(action={move.with({ id, to: 2 })}) button(aria-label="Move up") ↑`.
 - After the post the browser goes back to the page, or wherever the handler's `ctx.redirect` points.
 - A visitor following a link to another page while the post is under way stays where it led, what the post answers dropped.
 - A line break a form posts, CRLF per the standard, is read as `\n`, the one character the `textarea` the visitor typed in counts, so a `maxLength` matches what the browser let them write.

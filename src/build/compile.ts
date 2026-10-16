@@ -197,7 +197,7 @@ function routeModules(routes: Route[], fallback: SpecialPages): Set<string> {
 
     addSpecial(route.special)
 
-    for (const guard of [...route.guards, ...(route.layoutAccess ?? []).flatMap(access => access.guards)]) {
+    for (const guard of [...route.guards, ...(route.layoutAccess ?? []).flatMap(access => access.guards), ...(route.actionAccess ?? []).flatMap(access => access.guards)]) {
       files.add(guard.file)
       addSpecial(guard.special)
     }

@@ -62,7 +62,7 @@ import { deleteTissue } from '../routes/admin/_actions.kay'
 button(onClick={() => deleteTissue({ id })}) Delete
 ```
 
-It is served behind the `_guard.ts` files of its directory and above, like the actions of a `_layout.kay`, and it can read the params of every page below it.
+It is served behind the `_guard.ts` files of its directory and above, like the actions of a `_layout.kay`, and it can read the params of every page below it. It is served for the pages in its folder and below, so it sits in or above a folder with a page.
 
 ## Showing errors
 
@@ -168,7 +168,7 @@ form(action={move.with({ id, to: 2 })})
   button(aria-label="Move up") Up
 ```
 
-The handler gets `id` and `to` as if the form had posted them, checked by the schema. The values travel in the form's action URL, so a visitor can change them as they could change hidden inputs: the handler still checks what it may do.
+The handler gets `id` and `to` as if the form had posted them, checked by the schema. The values travel in the form's action URL, so a visitor can change them as they could change hidden inputs: the handler still checks what it may do. They also show in server logs and in referrers, so keep secrets out of them.
 
 ## Reading one call's outcome
 

@@ -223,7 +223,7 @@ export interface Action<Input, Output, Honeypot extends string = never> {
   // How the form post the page renders for went, refused, as `ctx.failed` reads it; in an island, how its last call went, read reactively.
   readonly failed: () => FormFailure<Input, FailureData<Output>, Honeypot> | undefined
   readonly succeeded: () => FormSuccess<Success<Output>> | undefined
-  // This action for a form to post with fixed fields, as hidden inputs would carry them: `form(action={move.with({ id, to: 2 }))})`. They travel in the form's action URL, so the form needs no inputs for them and posts them with or without JavaScript.
+  // This action for a form to post with fixed fields, as hidden inputs would carry them: `form(action={move.with({ id, to: 2 })})`. They travel in the form's action URL, so the form needs no inputs for them and posts them with or without JavaScript.
   // eslint-disable-next-line ts/method-signature-style
   with(fields: Partial<Input>): Action<Input, Output, Honeypot>
   // The message a refused post got for one field, or for the whole form under ''; a method, so any action still passes where `Action<never, unknown>` is expected.
@@ -392,12 +392,22 @@ function payloadQuery(fields: Record<string, unknown>): string {
   return query.toString()
 }
 
-// The same action for a form to post with `fields` fixed; its other readings are the action's own.
+// The same action for a form to post with `fields` fixed, a further `with` adding to them; its other readings are the action's own.
 function withFields<Target extends object>(target: Target, fields: Record<string, unknown>): Target {
   const query = payloadQuery(fields)
 
   // The URL a form posts to, which the action's own `url` stays apart from: the stamp and the protections name that one.
-  return new Proxy(target, { get: (action, key) => key === 'formUrl' ? `${(action as { url: string }).url}?${PAYLOAD_PARAM}=${encodeURIComponent(query)}` : Reflect.get(action, key) })
+  // Over a function of its own, whose properties the traps may answer differently from the action's, which holds `with` read-only.
+  return new Proxy((() => undefined) as unknown as Target, {
+    get: (_, key) => {
+      if (key === 'with')
+        return (more: Record<string, unknown>) => withFields(target, { ...fields, ...more })
+
+      return key === 'formUrl' ? `${(target as { url: string }).url}?${PAYLOAD_PARAM}=${encodeURIComponent(query)}` : Reflect.get(target, key)
+    },
+    apply: (_, self, args: unknown[]): unknown => Reflect.apply(target as unknown as () => unknown, self, args),
+    has: (_, key) => key in target,
+  })
 }
 
 export function formAction(target: string | Action<never, unknown>): string {
