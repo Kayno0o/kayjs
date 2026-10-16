@@ -37,6 +37,13 @@ async function copyOfFixture(): Promise<string> {
   const dir = resolve(await fixtureCopy('page-styles'))
 
   await Bun.write(join(dir, 'src/routes/bulk.kay'), `h1 Bulk\np(class="${BULK}") bulk\n`)
+  // A failure and a missing page have chains of their own, and a page rendering a collection's Markdown may name any class.
+  await Bun.write(join(dir, 'src/routes/_404.kay'), 'h1 Gone\np.italic nothing here\n')
+  await Bun.write(join(dir, 'src/routes/_error.kay'), 'h1 Broken\np.tracking-wide went wrong\n')
+  await Bun.write(join(dir, 'src/routes/boom.kay'), '--- server\nthrow new Error(\'boom\')\n---\nh1 Boom\n')
+  await Bun.write(join(dir, 'src/content.config.ts'), 'import { s } from \'kay\'\nimport { collection } from \'kay/content\'\n\nexport const notes = collection(\'content/notes\', { schema: s.Object({ title: s.String() }) })\n')
+  await Bun.write(join(dir, 'src/content/notes/first.md'), '---\ntitle: First\n---\n\nHello\n')
+  await Bun.write(join(dir, 'src/routes/notes.kay'), '--- server\nimport { notes } from \'../content.config\'\n\nconst { Content } = (await notes.get(\'first\'))!\n---\nh1 Notes\nContent\n')
 
   return dir
 }
@@ -175,6 +182,33 @@ describe('a page\'s head', () => {
     expect(await sharedText(client, data.rest[0]!)).toContain('.ring-4')
   })
 
+  it('links the stylesheets whole for a page rendering a collection\'s Markdown, which may name any class', async () => {
+    const notes = await head(await serve(), '/notes')
+
+    expect(notes.blocking).toHaveLength(1)
+    expect(notes.rest).toEqual([])
+    expect(notes.html).not.toContain('data-kay-rest')
+  })
+
+  it('writes the head of the missing page and of the error page as any page\'s', async () => {
+    const app = await serve()
+    const missing = await app.handle(new Request('http://localhost/nowhere'))
+    const failed = await app.handle(new Request('http://localhost/boom'))
+
+    expect(missing.status).toBe(404)
+    expect(failed.status).toBe(500)
+
+    for (const [response, rule, other] of [[missing, 'italic', 'tracking-wide'], [failed, 'tracking-wide', 'italic']] as const) {
+      const html = await response.text()
+      const inline = [...html.matchAll(STYLE)].map(match => match[1]!).join('\n')
+
+      expect(hasRule(inline, rule), rule).toBe(true)
+      expect(hasRule(inline, other), other).toBe(false)
+      expect(html).toContain('data-kay-rest')
+      expect(html).toMatch(/<noscript><link rel="stylesheet" href="\/_kay\/[^"]+"><\/noscript>/)
+    }
+  })
+
   it('links the stylesheets whole when its own rules pass the limit too', async () => {
     const bulk = await head(await serve(), '/bulk')
 
@@ -243,6 +277,20 @@ describe('a page\'s head', () => {
     expect(body).toBe(file)
     for (const [, style] of body.matchAll(STYLE))
       expect(response.headers.get('content-security-policy')).toContain(sourceHash(style!))
+  }, 120_000)
+})
+
+describe('a page kept at build time under a mount point', () => {
+  it('carries the mount point in the href of its noscript and of its linked stylesheet', async () => {
+    const built = await buildClient(root, { plugins: [tailwind], base: '/docs' })
+
+    expect(await prerenderPages(resolveProject(root, { routes: 'src/routes', base: '/docs' }, PRODUCTION), built)).toBeGreaterThan(0)
+
+    const file = await Bun.file(join(outputDir(root), 'pages/prerendered.html')).text()
+
+    expect(file).toContain('data-kay-rest')
+    expect(file).toMatch(/<link rel="stylesheet" href="\/docs\/_kay\/[^"]+" media="print" data-kay-rest>/)
+    expect(file).toMatch(/<noscript><link rel="stylesheet" href="\/docs\/_kay\/[^"]+"><\/noscript>/)
   }, 120_000)
 })
 
