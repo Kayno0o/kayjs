@@ -1874,6 +1874,25 @@ describe('compression', () => {
     }
   })
 
+  it('never serves a kept gzip for a text made after a reload, as the ids of texts are not reused', async () => {
+    const { compressResponse, fixedTexts, wholeResponse } = await import('../src/server/compress')
+    // The same length and place, another rule.
+    const before = `<style>.a{color:red}${'.x{margin:0}'.repeat(40)}</style>`
+    const after = `<style>.a{color:blue}${'.x{margin:0}'.repeat(40)}</style>`
+    const text = `<p>${'reload '.repeat(120)}</p>`
+    const send = async (page: string, fixed: ReturnType<typeof fixedTexts>) => (await compressResponse(new Request('http://localhost/', { headers: { 'accept-encoding': 'gzip' } }), wholeResponse(page, { headers: { 'content-type': 'text/html' } }), fixed))!
+    const first = fixedTexts([before])
+    const second = fixedTexts([after])
+
+    expect(second[0]!.id).not.toBe(first[0]!.id)
+
+    for (let round = 0; round < 4; round++)
+      expect(new TextDecoder().decode(Bun.gunzipSync(await (await send(`${before}${text}`, first)).bytes()))).toBe(`${before}${text}`)
+
+    for (let round = 0; round < 4; round++)
+      expect(new TextDecoder().decode(Bun.gunzipSync(await (await send(`${after}${text}`, second)).bytes()))).toBe(`${after}${text}`)
+  })
+
   it('sends a body of 15 KB or more that waited on zlib\'s threads as a stream, which Bun writes corked, and a smaller one or one compressed within the request\'s tick with its length', async () => {
     const { compressResponse, fixedTexts, wholeResponse } = await import('../src/server/compress')
     // Hashed numbers compress to about half their size, well past what Bun corks once a reply waited on a zlib callback.

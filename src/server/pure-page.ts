@@ -241,8 +241,21 @@ function startsWithFolder(args: string): boolean {
 const BEFORE_REGEX = /(?:^|[(,=:[!&|?{};+\-*%<>~^]|(?<![\w$.])(?:return|typeof|case|do|else|in|of|void|delete|throw|new|yield|await))\s*$/
 // How far back `BEFORE_REGEX` needs to look.
 const REGEX_LOOKBACK = 16
+// How far back a `case` or a label is looked for before its colon.
+const BLOCK_LOOKBACK = 80
 // A `{` that opens an object literal rather than a block: after one of these a `}` ends a value, so a `/` after it divides.
-const BEFORE_VALUE_BRACE = /[(,=[]\s*$/
+const BEFORE_VALUE_BRACE = /[(,=[?]\s*$/
+const AFTER_COLON = /:\s*$/
+// The start of a statement that ends in a colon with a block after it: a `case`, a `default` or a label.
+const BLOCK_COLON = /(?:^|[;{}\n])\s*(?:case\b[^;{}\n:]*|[\w$]+\s*):\s*$/
+
+// Whether the `{` coming after `before` opens an object literal: after a colon it does as a property's value or a ternary's branch, and does not after a `case`, `default` or label.
+function opensValue(before: string, insideObject: boolean): boolean {
+  if (BEFORE_VALUE_BRACE.test(before.slice(-REGEX_LOOKBACK)))
+    return true
+
+  return AFTER_COLON.test(before.slice(-REGEX_LOOKBACK)) && (insideObject || !BLOCK_COLON.test(before.slice(-BLOCK_LOOKBACK)))
+}
 
 // The offset just after the regex literal starting at `at`, or undefined when its line ends before it closes: then the slash was a division.
 function regexEnd(source: string, at: number): number | undefined {
@@ -334,7 +347,7 @@ function withoutComments(source: string): string {
     }
     else {
       if (char === '{') {
-        literals.push(BEFORE_VALUE_BRACE.test(result.slice(-REGEX_LOOKBACK)))
+        literals.push(opensValue(result, literals.at(-1) === true))
         braces++
       }
       else if (char === '}') {
