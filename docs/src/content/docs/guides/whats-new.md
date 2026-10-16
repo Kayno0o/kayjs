@@ -7,12 +7,12 @@ This page lists what each release adds, newest first, with a link to where each 
 
 ## Unreleased
 
+- **AI agents sign in to your app**: an MCP client such as Claude Code signs in to an app with kayjs-auth and `mcp` through OAuth, with no code on your side. Your app serves the sign-in documents, a consent page and the tokens, which are kayjs-auth's bearer tokens, and users revoke an agent from the account page. Postgres and SQLite apps run `db.sync()` for the new tables. [Letting an AI agent sign in](/libraries/kayjs-auth#letting-an-ai-agent-sign-in)
 - **Smaller first paints on pages with big stylesheets**: a page whose styles pass the 14 KB inline size writes into its head the rules its own components use, Tailwind's classes included, and links the full stylesheet for the rest without holding the first paint back. A class built at runtime or added by an island still gets its style, and you configure nothing. [Styling and assets](/essentials/styling-and-assets#linked-or-inlined-styles)
 - **Tests under a base**: `testSite` serves a site under its `base`, `visit`, `submit` and `fetch` take paths with or without it, a redirect to a base-prefixed URL is followed with the cookies, and the cookie jar sends a cookie only to the paths its `Path` covers. [Testing](/guides/testing)
 - **Faster pages with inlined styles**: a page that carries inlined stylesheets and renders the same again is no longer compressed again. Its gzip is kept like any other page's, so a short page with inlined styles serves about twice the requests per second.
 - **Live values read late**: a live value an island imports is followed on every page rendering the island, so one read behind a click or in a `--- client` island follows the server too. A value per key read only after the render still does not. [API routes](/guides/api-routes)
 - **Live connections, tidier**: a connection lasts as long as the newest proof of the keys it watches, a response nobody reads holds no connection slot, an error about a live value names its constant, and a page that no longer holds a live value asks again only every five minutes after a refusal. [API routes](/guides/api-routes)
-- **AI agents sign in to your app**: an MCP client such as Claude Code signs in to an app with kayjs-auth and `mcp` through OAuth, with no code on your side. Your app serves the sign-in documents, a consent page and the tokens, which are kayjs-auth's bearer tokens, and users revoke an agent from the account page. Postgres and SQLite apps run `db.sync()` for the new tables. [Letting an AI agent sign in](/libraries/kayjs-auth#letting-an-ai-agent-sign-in)
 
 ## 1.49.0
 
