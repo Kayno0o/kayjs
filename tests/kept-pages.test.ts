@@ -223,6 +223,7 @@ const GUESTBOOK: Record<string, string> = {
   'src/routes/about.kay': '---\nimport { stable } from \'../guestbook\'\n---\np {stable()}\n',
   'src/routes/asked.kay': '--- server\nimport { asked } from \'../guestbook\'\n\nexport const page = { prerender: true }\n---\np {asked()}\n',
   'src/routes/add.kay': '--- server\nimport { s } from \'kay\'\nimport { add } from \'../guestbook\'\n\nexport const save = action(s.Object({}), async () => {\n  add()\n})\n---\nform(action={save}) button Add\n',
+  'src/routes/invalidate.kay': '--- server\nimport { s } from \'kay\'\nimport { invalidatePage } from \'kay/server\'\nimport { add } from \'../guestbook\'\n\nexport const save = action(s.Object({}), async () => {\n  add()\n  invalidatePage(\'/\')\n})\n---\nform(action={save}) button Invalidate\n',
   'src/routes/fail.kay': '--- server\nimport { s } from \'kay\'\nimport { add } from \'../guestbook\'\n\nexport const save = action(s.Object({}), async () => {\n  add()\n\n  throw new Error(\'boom\')\n})\n---\nform(action={save}) button Fail\n',
   'src/routes/calls.json.ts': 'import { counts } from \'../guestbook\'\n\nexport function GET(): Response {\n  return Response.json(counts)\n}\n',
   'src/routes/private/_guard.ts': 'import { guard } from \'kay\'\n\nexport default guard(({ request, deny }) => {\n  if (!request.headers.has(\'x-pass\'))\n    deny(403)\n})\n',
@@ -301,6 +302,15 @@ describe('a kept page after a request that can write', () => {
     expect(allowed!.status).toBe(200)
     expect(allowed!.text).toContain('first,m1')
     expect(again!.status).toBe(403)
+  }, 120_000)
+
+  it('keeps a page an action refreshed with invalidatePage, without a warning', async () => {
+    const root = await guestbook()
+    const { answers: [, after, again], warnings } = await servedWith(root, [post('invalidate.kay', 'save'), read('/'), read('/')])
+
+    expect(after!.text).toContain('first,m1')
+    expect(again!.text).toContain('first,m1')
+    expect(warnings).not.toContain('renders differently')
   }, 120_000)
 
   it('checks again after a write that failed', async () => {

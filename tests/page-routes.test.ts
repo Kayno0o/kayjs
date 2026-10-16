@@ -68,7 +68,7 @@ describe('pageResponder', () => {
     // Boots the site, which builds the browser bundle the responder reads.
     await pages({ routes: 'tests/fixtures/site/src/routes', prebuilt: false })
     const about = { ...(await scanRoutes(join(root, 'tests/fixtures/site/src/routes'))).find(route => route.pattern === '/about')!, guards: [] }
-    const respond = pageResponder({ client: (await readClient(root))!, renderOptions: {}, prerendered: new Map([['/about', built('/about')]]), settings: undefined, transforms: [], pageFile: async () => undefined })
+    const respond = pageResponder({ client: (await readClient(root))!, renderOptions: {}, prerendered: new Map([['/about', built('/about')]]), settings: undefined, transforms: [], pageFile: async () => undefined, writes: { count: 0 } })
     const visit = async (path: string, headers: Record<string, string> = {}) => {
       const response = await respond(about, {}, { request: new Request(`http://localhost${path}`, { headers }) }, new URL(`http://localhost${path}`))
 
@@ -98,7 +98,7 @@ describe('pageResponder', () => {
     const client = (await readClient(root))!
     const routes = await Promise.all((await scanRoutes(dir)).map(async route => loadGuards(route)))
     const { head } = await configHead(root, {}, client.dir)
-    const respond = pageResponder({ client, renderOptions: { base: '/b', head }, prerendered: new Map([['/vip', built('/vip')], ['/gone', built('/gone')]]), settings: undefined, transforms: [], pageFile: async () => undefined })
+    const respond = pageResponder({ client, renderOptions: { base: '/b', head }, prerendered: new Map([['/vip', built('/vip')], ['/gone', built('/gone')]]), settings: undefined, transforms: [], pageFile: async () => undefined, writes: { count: 0 } })
 
     for (const [path, status] of [['/vip', 403], ['/gone', 404]] as const) {
       const response = await respond(routes.find(route => route.pattern === path)!, {}, { request: new Request(`http://localhost${path}`) }, new URL(`http://localhost${path}`))

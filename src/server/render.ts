@@ -103,7 +103,7 @@ export interface ServedPage extends Omit<PrerenderedPage, 'pattern' | 'file' | '
   revalidation?: Revalidation | undefined
   // For a kept page: the write count it was last shown to match the live render at, and the check running now.
   checkedAt?: number | undefined
-  checking?: Promise<void> | undefined
+  checking?: Promise<boolean | undefined> | undefined
   cut?: CutIslands | undefined
 }
 

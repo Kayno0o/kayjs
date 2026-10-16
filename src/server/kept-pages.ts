@@ -9,11 +9,11 @@ export interface Writes {
   count: number
 }
 
-// A request that is not a GET or a HEAD can change what a page renders, an action as much as a route of the app; counted when it starts and when it ends, so a visit between the two is checked again.
+// A request that is not a GET, a HEAD or an OPTIONS can change what a page renders, an action as much as a route of the app; counted when it starts and when it ends, so a visit between the two is checked again.
 export function countWrites(app: Elysia): Writes {
   const writes = { count: 0 }
   const counted = ({ request }: { request: Request }) => {
-    if (request.method !== 'GET' && request.method !== 'HEAD')
+    if (request.method !== 'GET' && request.method !== 'HEAD' && request.method !== 'OPTIONS')
       writes.count++
   }
 
@@ -24,28 +24,31 @@ export function countWrites(app: Elysia): Writes {
 }
 
 // Whether a kept page still renders as the build kept it, rendered live once per write however many visits wait for it.
-// One that does not is dropped from `copies` for good, so it is rendered per request from then on, and the server says so once.
+// One that does not is dropped from `copies` for good, so it is rendered per request from then on, and the server says so once; a live render that failed settles nothing, and only this visit is rendered per request.
 export async function stillKept(copies: Map<string, ServedPage>, key: string, page: ServedPage, writes: Writes, render: () => Promise<Response>): Promise<boolean> {
-  while (copies.get(key) === page && (page.checkedAt ?? 0) !== writes.count) {
+  const arrived = writes.count
+
+  while (copies.get(key) === page && (page.checkedAt ?? 0) < arrived) {
     page.checking ??= check(copies, key, page, writes.count, render)
 
-    await page.checking
+    if (await page.checking === undefined)
+      return false
   }
 
   return copies.get(key) === page
 }
 
-async function check(copies: Map<string, ServedPage>, key: string, page: ServedPage, count: number, render: () => Promise<Response>): Promise<void> {
-  let same = false
+async function check(copies: Map<string, ServedPage>, key: string, page: ServedPage, count: number, render: () => Promise<Response>): Promise<boolean | undefined> {
+  let same: boolean | undefined
 
   try {
-    const response = await withPageToken(pageToken(key), async () => {
-      const rendered = await render()
+    const rendered = await withPageToken(pageToken(key), async () => {
+      const response = await render()
 
-      return { status: rendered.status, html: await rendered.text() }
+      return { status: response.status, html: await response.text() }
     })
 
-    same = response.status === page.status && pageEtag(response.html) === page.etag
+    same = rendered.status >= 500 ? undefined : rendered.status === page.status && pageEtag(rendered.html) === page.etag
   }
   catch {
     // The live render reports what it throws.
@@ -53,12 +56,13 @@ async function check(copies: Map<string, ServedPage>, key: string, page: ServedP
 
   page.checking = undefined
 
-  if (same) {
+  if (same === true)
     page.checkedAt = count
 
-    return
+  if (same === false) {
+    copies.delete(key)
+    kayLog('warn', `the page ${key} was kept by the build, but renders differently now that a request has written: it is rendered per request from now on, which \`export const page = { prerender: false }\` says outright`)
   }
 
-  copies.delete(key)
-  kayLog('warn', `the page ${key} was kept by the build, but renders differently now that a request has written: it is rendered per request from now on, which \`export const page = { prerender: false }\` says outright`)
+  return same
 }
