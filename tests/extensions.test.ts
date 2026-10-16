@@ -764,3 +764,81 @@ describe('an extension\'s config', () => {
     expect(config.lang).toBe('it')
   })
 })
+
+describe('an extension whose tsconfig or dependencies sit apart from the app', () => {
+  const page = '---\nimport { answer } from \'dep\'\nconst list: string[] = []\nconst first: string = list[0]\n---\np {answer} {first}\n'
+
+  it('has kay check read a dependency hoisted above the package, outside the app\'s ancestors, with or without options of its own', async () => {
+    for (const own of [true, false]) {
+      const dir = await scratchDir('extension-hoisted-')
+
+      try {
+        await Promise.all(Object.entries({
+          'app/package.json': JSON.stringify({ name: 'app' }),
+          'app/tsconfig.json': TSCONFIG,
+          'app/kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ extensions: [{ name: \'pkg\', routes: { dir: \'node_modules/pkg/routes\', prefix: \'/pkg\' } }] })\n',
+          'app/src/routes/index.kay': 'p Home\n',
+          'ws/node_modules/dep/package.json': JSON.stringify({ name: 'dep', types: 'index.d.ts' }),
+          'ws/node_modules/dep/index.d.ts': 'export declare const answer: number\n',
+          'ws/node_modules/@scope/other/package.json': JSON.stringify({ name: '@scope/other' }),
+          'ws/pkg/package.json': JSON.stringify({ name: 'pkg' }),
+          'ws/pkg/node_modules/own/package.json': JSON.stringify({ name: 'own' }),
+          'ws/pkg/tsconfig.json': JSON.stringify({ compilerOptions: { ...TSCONFIG_OPTIONS, ...own ? { noUncheckedIndexedAccess: true } : {} } }),
+          'ws/pkg/routes/page.kay': page,
+        }).map(async ([path, content]) => Bun.write(join(dir, path), content)))
+        await mkdir(join(dir, 'app/node_modules'))
+        await symlink('../../ws/pkg', join(dir, 'app/node_modules/pkg'))
+
+        const { stdout, stderr } = await run([process.execPath, CLI, 'check'], join(dir, 'app'))
+        const output = `${stdout}${stderr}`
+
+        expect(output).not.toContain('Cannot find module')
+        expect(output.includes('node_modules/pkg/routes/page.kay:4:7')).toBe(own)
+      }
+      finally {
+        await rm(dir, { recursive: true, force: true })
+      }
+    }
+  }, 60_000)
+
+  it('has kay check type the pages of a linked extension as the app\'s once its tsconfig stops differing', async () => {
+    const dir = await scratchDir('extension-converge-')
+
+    try {
+      await Promise.all(Object.entries(OWN_OPTIONS).map(async ([path, content]) => Bun.write(join(dir, path), content)))
+      await mkdir(join(dir, 'app/node_modules'))
+      await symlink('../../tight', join(dir, 'app/node_modules/tight'))
+
+      const before = await run([process.execPath, CLI, 'check'], join(dir, 'app'))
+
+      await Bun.write(join(dir, 'tight/tsconfig.json'), TSCONFIG)
+
+      const after = await run([process.execPath, CLI, 'check'], join(dir, 'app'))
+
+      expect(`${before.stdout}${before.stderr}`).toContain('node_modules/tight/routes/page.kay:3:7')
+      expect(`${after.stdout}${after.stderr}`).not.toContain('tight')
+      expect(await Bun.file(join(dir, 'app/.kay/types/node_modules/tight/routes/page.kay.tsx')).exists()).toBe(true)
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  }, 60_000)
+
+  it('has kay check report a package tsconfig tsgo cannot read', async () => {
+    const dir = await scratchDir('extension-broken-')
+
+    try {
+      // A folder where the file should be: it exists, and tsgo cannot read it as a config.
+      await Promise.all(Object.entries({ ...OWN_OPTIONS, 'tight/tsconfig.json': undefined, 'tight/tsconfig.json/keep': '' }).filter((entry): entry is [string, string] => entry[1] !== undefined).map(async ([path, content]) => Bun.write(join(dir, path), content)))
+      await mkdir(join(dir, 'app/node_modules'))
+      await symlink('../../tight', join(dir, 'app/node_modules/tight'))
+
+      const { stdout, stderr } = await run([process.execPath, CLI, 'check'], join(dir, 'app'))
+
+      expect(`${stdout}${stderr}`).toContain('tsgo cannot read the tsconfig of the extension tight')
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  }, 30_000)
+})

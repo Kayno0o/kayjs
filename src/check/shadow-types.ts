@@ -9,7 +9,7 @@ import type { PublicFile } from '../server/public'
 import type { Endpoint, Route, RouteMount } from '../server/routes'
 import type { ShadowFile, ShadowOptions } from './shadow'
 import { existsSync, realpathSync } from 'node:fs'
-import { mkdir, readlink, rm, symlink } from 'node:fs/promises'
+import { lstat, mkdir, readdir, readlink, rm, symlink, unlink } from 'node:fs/promises'
 import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import { readCacheEntry, writeCacheEntry } from '../build/cache'
 import { findKayFiles, treeEntries, writeIfChanged } from '../build/files'
@@ -42,9 +42,10 @@ const APP_TYPES = ['kay-env.d.ts', 'kay-assets.d.ts', 'kay-icons.d.ts', 'kay-pac
 
 // A linked extension's package checked as a program of its own, as its tsconfig sets the options its pages are written for: the shadow tree holds a tsconfig for it, which the editor finds as tsgo does the nearest one.
 export interface ExtensionProgram {
-  // The package's shadow folder and the tsconfig kay writes there.
+  // The package's shadow folder, beside the shadows of its real path whatever `node_modules` link the app reaches it by, and the tsconfig kay writes there.
   dir: string
   tsconfig: string
+  library: KayLibrary
 }
 
 export interface ShadowTypes {
@@ -202,9 +203,10 @@ async function libraryShadows(root: string, options: CheckOptions, own: string[]
   const localEditor = editor !== undefined && linked(editor) ? editor : undefined
   const followed = [...libraries, ...await extensionPackages(root, libraries, [...local.map(mount => mount.dir), ...localEditor === undefined ? [] : [dirname(localEditor)]])]
   const files = [...new Set(followed.flatMap(library => library.files))]
-  const programs = await extensionPrograms(root, options, followed.filter(library => library.extension), tree)
-  // The editor finds a package's tsconfig for the files beside the app but not under a `node_modules`, where tsgo takes them as the app's imports: those stay imported, and the editor types them as the app's.
-  const apart = (file: string) => !relative(projectPaths(root).types, shadowPath(root, file)).split(sep).includes('node_modules') && programs.some(({ dir }) => shadowPath(root, file).startsWith(dir + sep))
+  const programs = await extensionPrograms(root, options, followed.filter(library => library.extension), tree, diagnostics)
+  // The editor finds a package's tsconfig for the files beside the app but not under a `node_modules`, where tsgo takes them as the app's imports: a package of a program is shadowed beside its real path, and the shadows under `node_modules` are a link to them.
+  const apart = (file: string) => programs.some(({ library }) => libraryOf([library], file) !== undefined)
+  const shadowed = (file: string) => shadowPath(root, programs.some(({ library }) => file.startsWith(library.dir + sep)) ? realFile(followed, file) : file)
   const pages = files.filter(file => file === localEditor || local.some(mount => file.startsWith(mount.dir + sep)))
   const reached = new Set([...pages, ...(await reachableLibraryFiles(root, followed, [...own, ...pages])).components.map((file) => {
     const library = libraryOf(followed, file)
@@ -213,19 +215,21 @@ async function libraryShadows(root: string, options: CheckOptions, own: string[]
   })])
   const unreached = new Set<string>()
 
-  // A bare import climbs from the shadow, not from the package, so the dependencies the package installs itself are linked beside its shadows.
-  await Promise.all(followed.filter(library => library.extension).map(async ({ dir, realDir }) => {
-    const installed = join(realDir, 'node_modules')
+  await Promise.all(followed.filter(library => library.extension).map(async (library) => {
+    const apart = programs.some(program => program.library === library)
 
-    if (existsSync(installed))
-      await tree.link(join(relative(projectPaths(root).types, dirname(shadowPath(root, join(dir, 'x')))), 'node_modules'), installed)
+    // A link left from a run in which the package was a program of its own would take what is written under `node_modules` to that program's folder.
+    if (!apart)
+      await dropLink(dirname(shadowPath(root, join(library.dir, 'x'))))
+
+    await linkDependencies(root, library, apart, tree)
   }))
 
   await Promise.all(files.map(async (file) => {
     const source = await Bun.file(file).text()
     const { shadow, diagnostics: compileDiagnostics } = await compileShadowCached(cacheDir, root, file, source, { routesDir, mounts, lints: options.lints })
 
-    await tree.shadow(shadow, shadowPath(root, file))
+    await tree.shadow(shadow, shadowed(file))
 
     if (!reached.has(file)) {
       unreached.add(file)
@@ -241,21 +245,28 @@ async function libraryShadows(root: string, options: CheckOptions, own: string[]
 }
 
 // The programs of the linked extensions whose tsconfig types a file other than the app's does, each with the tsconfig kay writes in its shadow folder: it extends the package's and lays the app's declarations over it, so the app's catalogs, locals and matchers stay in scope.
-async function extensionPrograms(root: string, options: CheckOptions, extensions: KayLibrary[], tree: ShadowTree): Promise<ExtensionProgram[]> {
+async function extensionPrograms(root: string, options: CheckOptions, extensions: KayLibrary[], tree: ShadowTree, diagnostics: CheckDiagnostic[]): Promise<ExtensionProgram[]> {
   const own = extensions.map(library => ({ library, tsconfig: join(library.realDir, PACKAGE_TSCONFIG) })).filter(({ tsconfig }) => existsSync(tsconfig))
 
   if (own.length === 0)
     return []
 
   const types = projectPaths(root).types
-  const appOptions = await typingOptions(root, options.tsconfig ?? 'tsconfig.json')
+  const appOptions = typingOptions(root, options.tsconfig ?? 'tsconfig.json')
   const programs = await Promise.all(own.map(async ({ library, tsconfig }) => {
     const packageOptions = await typingOptions(root, tsconfig)
 
-    if (packageOptions === undefined || packageOptions === appOptions)
+    if (packageOptions === undefined) {
+      diagnostics.push({ file: tsconfig, line: 1, column: 1, message: `tsgo cannot read the tsconfig of the extension ${library.name}, so its pages are checked under the app's options.` })
+
+      return undefined
+    }
+
+    if (packageOptions === await appOptions)
       return undefined
 
-    const dir = dirname(shadowPath(root, join(library.dir, 'x')))
+    // Where the package really is, as tsgo ignores a tsconfig under a `node_modules` path: the shadows the app reaches through its link are the ones here.
+    const dir = dirname(shadowPath(root, join(library.realDir, 'x')))
     const from = (path: string) => {
       const relation = relative(dir, path).split(sep).join('/')
 
@@ -267,15 +278,69 @@ async function extensionPrograms(root: string, options: CheckOptions, extensions
       compilerOptions: { jsx: 'preserve', jsxImportSource: 'kay', module: 'Preserve', moduleResolution: 'bundler', rootDirs: [from(root), from(types)], noEmit: true },
       // The package's own `include` is not inherited, as it names its sources.
       include: [],
-      files: [...library.files.map(file => from(shadowPath(root, file))), ...APP_TYPES.map(name => from(join(types, name)))],
+      files: [...library.files.map(file => from(shadowPath(root, realFile(extensions, file)))), ...APP_TYPES.map(name => from(join(types, name)))],
     }
 
     await tree.write(join(relative(types, dir), PACKAGE_TSCONFIG), `${JSON.stringify(config, null, 2)}\n`)
 
-    return { dir, tsconfig: join(dir, PACKAGE_TSCONFIG) }
+    if (library.dir !== library.realDir)
+      await tree.link(relative(types, dirname(shadowPath(root, join(library.dir, 'x')))), dir)
+
+    return { dir, tsconfig: join(dir, PACKAGE_TSCONFIG), library }
   }))
 
   return programs.filter(program => program !== undefined)
+}
+
+// A file of a package given by the `node_modules` link the app reaches it by, as its real path.
+function realFile(libraries: KayLibrary[], file: string): string {
+  const library = libraryOf(libraries, file)
+
+  return library && file.startsWith(library.dir + sep) ? join(library.realDir, relative(library.dir, file)) : file
+}
+
+async function dropLink(path: string) {
+  try {
+    if ((await lstat(path)).isSymbolicLink())
+      await unlink(path)
+  }
+  catch {}
+}
+
+// A bare import climbs from the shadow, not from the package, so the dependencies the package installs are linked beside its shadows: its own `node_modules`, and the ones above it that the app's ancestors do not include.
+async function linkDependencies(root: string, { dir, realDir }: KayLibrary, apart: boolean, tree: ShadowTree) {
+  const types = projectPaths(root).types
+  // The package of a program is shadowed beside its real path.
+  const folder = join(relative(types, dirname(shadowPath(root, join(apart ? realDir : dir, 'x')))), 'node_modules')
+  const above: string[] = []
+
+  for (let level = realDir; level !== dirname(level) && !(root + sep).startsWith(level + sep); level = dirname(level)) {
+    if (existsSync(join(level, 'node_modules')))
+      above.push(join(level, 'node_modules'))
+  }
+
+  // One link to the folder while it is the only one, else a link per package, the nearest folder naming it winning.
+  if (above.length <= 1) {
+    if (above.length === 1)
+      await tree.link(folder, above[0]!)
+
+    return
+  }
+
+  // A link to a whole folder from an earlier run would take the links below it to the packages' own.
+  await dropLink(join(types, folder))
+
+  const taken = new Set<string>()
+
+  for (const modules of above) {
+    const names = (await readdir(modules, { withFileTypes: true })).filter(entry => !entry.name.startsWith('.'))
+    const named = (await Promise.all(names.map(async entry => entry.name.startsWith('@') ? (await readdir(join(modules, entry.name))).map(name => join(entry.name, name)) : [entry.name]))).flat()
+
+    await Promise.all(named.filter(name => !taken.has(name)).map(async (name) => {
+      taken.add(name)
+      await tree.link(join(folder, name), join(modules, name))
+    }))
+  }
 }
 
 // The package holding each of `extensionDirs`, an extension's routes or its editor's directory, that no kay library holds, the nearest directory above them with a package.json, as a library: its components are shadowed and reached as one's are.

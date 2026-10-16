@@ -1239,7 +1239,7 @@ describe('kay lsp on an app listing extensions with a tsconfig of their own', ()
     dir = join(base, 'app')
     await Promise.all([
       Bun.write(join(dir, 'tsconfig.json'), JSON.stringify(tsconfig)),
-      Bun.write(join(dir, 'kay.config.ts'), 'export default { extensions: [{ name: \'loose\', routes: { dir: \'../loose/routes\', prefix: \'/loose\' } }, { name: \'tight\', routes: { dir: \'../tight/routes\', prefix: \'/tight\' } }] }\n'),
+      Bun.write(join(dir, 'kay.config.ts'), 'export default { extensions: [{ name: \'loose\', routes: { dir: \'../loose/routes\', prefix: \'/loose\' } }, { name: \'tight\', routes: { dir: \'node_modules/tight/routes\', prefix: \'/tight\' } }] }\n'),
       Bun.write(join(dir, 'src/routes/index.kay'), 'p Home\n'),
       Bun.write(join(base, 'loose/package.json'), JSON.stringify({ name: 'loose' })),
       Bun.write(join(base, 'loose/tsconfig.json'), JSON.stringify({ compilerOptions: { ...tsconfig.compilerOptions, strict: false } })),
@@ -1248,6 +1248,8 @@ describe('kay lsp on an app listing extensions with a tsconfig of their own', ()
       Bun.write(join(base, 'tight/tsconfig.json'), JSON.stringify({ compilerOptions: { ...tsconfig.compilerOptions, noUncheckedIndexedAccess: true } })),
       Bun.write(join(base, 'tight/routes/page.kay'), '---\nconst list: string[] = []\nconst first: string = list[0]\n---\np {first}\n'),
     ])
+    await mkdir(join(dir, 'node_modules'), { recursive: true })
+    await symlink('../../tight', join(dir, 'node_modules/tight'))
     editor = new Editor(dir)
     await editor.start()
   })
