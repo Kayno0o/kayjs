@@ -95,24 +95,29 @@ async function step(label: string, argv: string[], cwd = '.') {
   process.stdout.write(`${label}: `)
   await appendFile(LOG, `$ ${label}\n`)
 
-  const child = Bun.spawn(argv, { cwd, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe', detached: true })
+  // Its stderr into its stdout, so one pipe keeps their lines in the order they were written.
+  const child = Bun.spawn(['sh', '-c', 'exec "$@" 2>&1', 'sh', ...argv], { cwd, stdin: 'ignore', stdout: 'pipe', stderr: 'inherit', detached: true })
   let output = ''
   let hung = false
   const limit = setTimeout(() => {
     hung = true
     killGroup(child.pid)
   }, STEP_LIMIT_MS)
-  const drain = async (stream: ReadableStream<Uint8Array>) => {
-    const decoder = new TextDecoder()
+  const reader = child.stdout.getReader()
+  const decoder = new TextDecoder()
+  const drained = (async () => {
+    try {
+      for (let read = await reader.read(); !read.done; read = await reader.read()) {
+        const text = decoder.decode(read.value, { stream: true })
 
-    for await (const chunk of stream) {
-      const text = decoder.decode(chunk, { stream: true })
-
-      output += text
-      await appendFile(LOG, text)
+        output += text
+        await appendFile(LOG, text)
+      }
     }
-  }
-  const drained = Promise.all([drain(child.stdout), drain(child.stderr)])
+    catch {
+      // Cancelled, or the log could not be written: the step's output stays in `output`.
+    }
+  })()
 
   running = child.pid
 
@@ -121,6 +126,8 @@ async function step(label: string, argv: string[], cwd = '.') {
   running = undefined
   clearTimeout(limit)
   await Promise.race([drained, Bun.sleep(DRAIN_MS)])
+  // A process left holding the pipe would otherwise keep the landing alive once it is done.
+  await reader.cancel()
   await appendFile(LOG, '\n')
 
   const seconds = Math.round((performance.now() - started) / 1000)
@@ -137,7 +144,7 @@ async function step(label: string, argv: string[], cwd = '.') {
   const failures = failedTests(lines)
 
   console.error([...failures, lines.slice(failures.length > 0 ? -SUMMARY : -TAIL).join('\n')].join('\n\n'))
-  fail(hung ? `${label} ran past ${Math.round(STEP_LIMIT_MS / 1000)} s, so it was killed with what it started: its output up to then is in ${LOG}` : `${label} exited with ${exitCode}: its whole output is in ${LOG}`, EXIT.step)
+  fail(hung ? `${label} ran past ${STEP_LIMIT_MS / 1000} s, so it was killed with what it started: its output up to then is in ${LOG}` : `${label} exited with ${exitCode}: its whole output is in ${LOG}`, EXIT.step)
 }
 
 if ((await $`git status --porcelain`.text()).trim() !== '')

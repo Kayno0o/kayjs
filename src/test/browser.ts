@@ -201,12 +201,16 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
     crashed(CRASHED)
   })
 
-  // A call of the view, failing at once when the renderer crashed rather than at the test's timeout.
-  const live = async <T>(call: Promise<T>): Promise<T> => {
-    const answer = await Promise.race([call, crash])
+  const crashError = () => new Error('kay: the page crashed, its renderer killed or out of memory, so the browser answers nothing more of it')
+  // A call of the view, failing at once when the renderer crashed rather than at the test's timeout; one made after it, which Bun may refuse as another still pending, is not made.
+  const live = async <T>(call: () => Promise<T>): Promise<T> => {
+    if (gone)
+      throw crashError()
+
+    const answer = await Promise.race([crash, call()])
 
     if (answer === CRASHED)
-      throw new Error('kay: the page crashed, its renderer killed or out of memory, so the browser answers nothing more of it')
+      throw crashError()
 
     return answer
   }
@@ -218,9 +222,9 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
   const inView = async <T>(expression: string): Promise<T> => {
     const previous = evaluating
     const call = (async () => {
-      await within(previous, timeout)
+      await within(Promise.race([previous, crash]), timeout)
 
-      return live(view.evaluate<T>(expression))
+      return live(async () => view.evaluate<T>(expression))
     })()
 
     evaluating = ended(call)
@@ -328,7 +332,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
       const target = new URL(path, origin)
 
       origin = target.origin
-      await live(view.navigate(target.href))
+      await live(async () => view.navigate(target.href))
       await settle(SETTLED, `${target.pathname} to load and hydrate its islands`)
     }),
     path: async () => serial(async () => inView<string>('location.pathname + location.search')),
@@ -344,7 +348,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
 
         return element !== null
       }, [selector]), selector, budget)
-      await live(view.click(selector, { timeout: Math.max(until - Date.now(), 1) }))
+      await live(async () => view.click(selector, { timeout: Math.max(until - Date.now(), 1) }))
     }),
     fill: async (selector, text) => serial(async () => {
       await poll(`!!document.querySelector(${JSON.stringify(selector)})`, selector)
@@ -355,10 +359,10 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
         field.select()
       }, [selector]))
 
-      await live(text === '' ? view.press('Delete') : view.type(text))
+      await live(async () => text === '' ? view.press('Delete') : view.type(text))
     }),
-    type: async text => serial(async () => live(view.type(text))),
-    press: async (key, keyOptions) => serial(async () => live(view.press(key, keyOptions))),
+    type: async text => serial(async () => live(async () => view.type(text))),
+    press: async (key, keyOptions) => serial(async () => live(async () => view.press(key, keyOptions))),
     text: async selector => serial(async () => inView<string | null>(script((css: string) => document.querySelector(css)?.textContent ?? null, [selector]))),
     value: async selector => serial(async () => inView<string | null>(script((css: string) => document.querySelector<HTMLInputElement>(css)?.value ?? null, [selector]))),
     count: async selector => serial(async () => inView<number>(script((css: string) => document.querySelectorAll(css).length, [selector]))),
@@ -371,7 +375,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
     a11y: async selector => serial(async () => {
       // Injected again after each navigation, which drops it; through DevTools, which the page's CSP does not hold back.
       if (!await inView<boolean>('!!window.axe')) {
-        const { exceptionDetails } = await live(view.cdp<{ exceptionDetails?: { text: string, exception?: { description?: string } } }>('Runtime.evaluate', { expression: await axeSource() }))
+        const { exceptionDetails } = await live(async () => view.cdp<{ exceptionDetails?: { text: string, exception?: { description?: string } } }>('Runtime.evaluate', { expression: await axeSource() }))
 
         if (exceptionDetails)
           throw new Error(`kay: axe-core did not load in the page: ${exceptionDetails.exception?.description ?? exceptionDetails.text}`)
@@ -402,7 +406,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
     back: async () => serial(async () => traverse('history.back()')),
     forward: async () => serial(async () => traverse('history.forward()')),
     reload: async () => serial(async () => {
-      await live(view.reload())
+      await live(async () => view.reload())
       await settle(SETTLED, 'the page to reload and hydrate its islands')
     }),
     close: () => {
@@ -420,20 +424,20 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
   // Once open, a page is the caller's to close; one that failed to open is closed here.
   try {
     // A blank page first: the DevTools session the next calls use starts with a navigation.
-    await live(view.navigate('about:blank'))
+    await live(async () => view.navigate('about:blank'))
 
     if (first)
       await noteBunProfile(view, dir)
 
-    await live(view.cdp('Runtime.enable'))
-    await live(view.cdp('Inspector.enable'))
+    await live(async () => view.cdp('Runtime.enable'))
+    await live(async () => view.cdp('Inspector.enable'))
     view.addEventListener('Runtime.exceptionThrown', (event) => {
       const { exceptionDetails } = (event as MessageEvent<{ exceptionDetails: { text: string, exception?: { description?: string } } }>).data
 
       errors.push(exceptionDetails.exception?.description ?? exceptionDetails.text)
     })
     // Pages share one browser, whose cookies and storage outlive a page. Named one by one, as `all` takes Chrome 2 to 5 s a page, the rest under a millisecond.
-    await live(view.cdp('Storage.clearDataForOrigin', { origin, storageTypes: STORAGE_TYPES }))
+    await live(async () => view.cdp('Storage.clearDataForOrigin', { origin, storageTypes: STORAGE_TYPES }))
     await page.goto(url)
   }
   catch (error) {

@@ -103,7 +103,7 @@ describe('parallel landings of the whats-new and upgrading files', () => {
 const LAND = join(ROOT, 'scripts/land.ts')
 const IDENTITY = { GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@example.com', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@example.com' }
 
-// An origin, and for each name a clone on a branch with one commit of its own, whose lint step is `lint.ts`: it notes its run in LAND_TRACE, waits for LAND_GATE to exist and fails while LAND_FAIL is set.
+// An origin, and for each name a clone on a branch with one commit of its own, whose lint step is `lint.ts`: it notes its run in LAND_TRACE, leaves a process of another group holding its output while LAND_LEAK is set, waits for LAND_GATE to exist and fails while LAND_FAIL is set.
 async function landings(...names: string[]) {
   const dir = await scratchDir('land-')
   const origin = join(dir, 'origin.git')
@@ -115,7 +115,7 @@ async function landings(...names: string[]) {
   await $`git clone -q ${origin} ${seed}`.quiet()
   await Bun.write(join(seed, 'package.json'), JSON.stringify({ name: 'landing', scripts: { lint: 'bun lint.ts', check: 'true', test: 'true' } }))
   await Bun.write(join(seed, 'shared.txt'), 'one\n')
-  await Bun.write(join(seed, 'lint.ts'), 'import { appendFileSync, existsSync } from \'node:fs\'\n\nappendFileSync(process.env.LAND_TRACE!, `${process.env.LAND_NAME}\\n`)\n\nwhile (process.env.LAND_GATE && !existsSync(process.env.LAND_GATE))\n  await Bun.sleep(20)\n\nif (process.env.LAND_FAIL)\n  process.exit(1)\n')
+  await Bun.write(join(seed, 'lint.ts'), 'import { appendFileSync, existsSync } from \'node:fs\'\n\nappendFileSync(process.env.LAND_TRACE!, `${process.env.LAND_NAME}\\n`)\n\nif (process.env.LAND_LEAK)\n  Bun.spawn([\'setsid\', \'sleep\', \'30\'], { stdout: \'inherit\', stderr: \'inherit\' }).unref()\n\nwhile (process.env.LAND_GATE && !existsSync(process.env.LAND_GATE))\n  await Bun.sleep(20)\n\nif (process.env.LAND_FAIL)\n  process.exit(1)\n')
   await $`bun install --silent`.cwd(seed).quiet()
   await git(seed, 'add', '-A')
   await git(seed, 'commit', '-qm', 'base')
@@ -242,11 +242,32 @@ describe('landing', () => {
       }
     })
 
-    expect({ code, killed: err.includes('lint ran past 2 s, so it was killed'), fast: Date.now() - started < 20_000 }).toEqual({ code: 4, killed: true, fast: true })
+    expect({ code, killed: err.includes('lint ran past 1.5 s, so it was killed'), fast: Date.now() - started < 20_000 }).toEqual({ code: 4, killed: true, fast: true })
     expect(await ran('a')).toBe(1)
     // Lint's `bun run` and the script it ran are gone with it.
     expect(cwds).not.toContain(clones.a)
     expect(await tree()).not.toContain('a.txt')
+  }, 60_000)
+
+  it('lands and ends though a step left a process of another group holding its output', async () => {
+    const { clones, land, tree } = await landings('a')
+    const started = Date.now()
+
+    try {
+      const { code } = await land('a', { LAND_LEAK: '1' }).done()
+
+      expect({ code, fast: Date.now() - started < 25_000 }).toEqual({ code: 0, fast: true })
+      expect(await tree()).toContain('a.txt')
+    }
+    finally {
+      for (const name of readdirSync('/proc')) {
+        try {
+          if (readlinkSync(`/proc/${name}/cwd`) === clones.a)
+            process.kill(Number(name), 'SIGKILL')
+        }
+        catch {}
+      }
+    }
   }, 60_000)
 
   it('keeps its exit codes: 2 for nothing to land or changes, 3 for a conflict, 4 for a failed step, 5 for a refused push', async () => {

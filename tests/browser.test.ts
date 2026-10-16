@@ -788,7 +788,7 @@ const pending = outcome(page.waitFor('p.never'))
 for (const pid of renderers)
   process.kill(Number(pid), 'SIGKILL')
 
-console.log(JSON.stringify({ renderers: renderers.length > 0, pending: await pending, next: await outcome(page.goto('/')) }))
+console.log(JSON.stringify({ renderers: renderers.length > 0, pending: await pending, next: [await outcome(page.goto('/')), await outcome(page.text('p')), await outcome(page.count('p')), await outcome(page.click('p'))] }))
 page.close()
 await server.stop()
 process.exit(0)
@@ -798,7 +798,7 @@ process.exit(0)
       const child = Bun.spawn([process.execPath, script, path!], { env: { ...process.env, TMPDIR: temp }, stdout: 'pipe', stderr: 'pipe' })
       const [out, code] = await printed(child)
 
-      expect({ code, result: JSON.parse(out.slice(0, out.indexOf('\n'))) as unknown }).toEqual({ code: 0, result: { renderers: true, pending: 'crashed in time', next: 'crashed in time' } })
+      expect({ code, result: JSON.parse(out.slice(0, out.indexOf('\n'))) as unknown }).toEqual({ code: 0, result: { renderers: true, pending: 'crashed in time', next: Array.from({ length: 4 }).fill('crashed in time') } })
     }
     finally {
       await rm(temp, { recursive: true, force: true })

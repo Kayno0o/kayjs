@@ -10,14 +10,19 @@ const LOCK = join(DIR, 'test-run.lock')
 const HELD = 'KAY_TEST_RUN_LOCK'
 const AFTER_NAME = /\)\s(.*)$/s
 
-// A pid and its start time, so a pid the system gave again to another process reads as a run gone. The start time is Linux's, empty elsewhere.
-function identity(pid: number): string {
+// The fields of a process's /proc stat line after its name, its state first: none where there is no /proc.
+function stat(pid: number): string[] {
   try {
-    return `${pid} ${AFTER_NAME.exec(readFileSync(`/proc/${pid}/stat`, 'utf8'))?.[1]?.split(' ')[19] ?? ''}`
+    return AFTER_NAME.exec(readFileSync(`/proc/${pid}/stat`, 'utf8'))?.[1]?.split(' ') ?? []
   }
   catch {
-    return `${pid} `
+    return []
   }
+}
+
+// A pid and its start time, so a pid the system gave again to another process reads as a run gone. The start time is Linux's, empty elsewhere.
+function identity(pid: number): string {
+  return `${pid} ${stat(pid)[19] ?? ''}`
 }
 
 function read(path: string): string | undefined {
@@ -26,16 +31,6 @@ function read(path: string): string | undefined {
   }
   catch {
     return undefined
-  }
-}
-
-// A run that ended but that nobody reaped yet, which a signal still reaches: it holds the lock no more than one gone.
-function zombie(pid: number): boolean {
-  try {
-    return AFTER_NAME.exec(readFileSync(`/proc/${pid}/stat`, 'utf8'))?.[1]?.startsWith('Z') === true
-  }
-  catch {
-    return false
   }
 }
 
@@ -57,7 +52,8 @@ function running(held: string): boolean {
     return false
   }
 
-  return identity(pid) === held && !zombie(pid)
+  // A run that ended but that nobody reaped yet, which the signal still reaches, holds the lock no more than one gone.
+  return identity(pid) === held && stat(pid)[0] !== 'Z'
 }
 
 // Written whole under another name and linked into place, so the lock never exists without its holder in it.
