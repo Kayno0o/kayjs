@@ -3,6 +3,21 @@ import { defineMessages } from 'kay/i18n'
 // The wording of kayjs-auth's mails as `authMailer` renders them, which an app overrides key by key in its own `src/messages/<locale>.ts`. Placeholders: `{site}`, `{email}`, the address written to, and `{detail}`, the organization, provider, passkey, token or new address a mail is about.
 export default defineMessages({
   mail: {
+    contact: {
+      subject: 'Message from {name}',
+      footer: 'Sent from the contact form of {origin}. Replying to this mail writes to {name}.',
+      empty: 'not given',
+      reply: 'Reply to {name}',
+      tooManyLinks: 'No more than {max} links per message.',
+      notConfigured: 'The form cannot send messages yet.',
+      notConfiguredReach: 'The form cannot send messages yet: write to {reach}.',
+      sendFailed: 'Your message could not be sent. Please try again later.',
+      sendFailedReach: 'Your message could not be sent. Please try again later, or write to {reach}.',
+      rateLimit: 'Too many messages sent from here in a short time: try again in a few minutes.',
+      rateLimitReach: 'Too many messages sent from here in a short time: try again in a few minutes, or write to {reach}.',
+      early: 'One moment: read your message again, then send it.',
+      expired: 'This page has expired: reload it, then send your message again.',
+    },
     auth: {
       'link': 'link',
       'code': 'code',

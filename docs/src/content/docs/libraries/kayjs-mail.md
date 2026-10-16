@@ -96,6 +96,30 @@ export const signUp = action(newUser, async ({ name, email }) => {
 
 A message also takes `cc`, `bcc`, `replyTo`, `attachments`, `lang`, `unsubscribe` for one-click unsubscribe, or `html` and `text` in place of `view`. Left without `to`, it goes to `MAIL_TO`. Each address holds one mailbox: a visitor's `a@x.com,b@y.com` is refused, and several recipients go as a list. An empty `cc`, `bcc`, `replyTo` or `from`, as a form's blank field gives, is left out; an empty `to` is refused.
 
+## A contact form
+
+`contactForm(mail, options)` gives the arguments of `action` for a contact form, so a site writes no schema, no error mapping and no mail wrapper:
+
+```kay
+--- server
+import { contactForm } from '@kaynooo/kayjs-mail'
+import { s } from 'kay'
+import { mail } from '../mail'
+
+export const contact = action(...contactForm(mail, {
+  fields: { phone: s.Optional(s.String({ maxLength: 30 })) },
+  reach: 'hello@example.com',
+}))
+---
+```
+
+The page shows it with [ContactForm](/ui/contact-form) from kayjs-ui, or with its own `form(action={contact})` and `input(field="name")`, `input(field="email")` and `textarea(field="message")`.
+
+- The action checks a one-line `name`, an `email` and a `message` of at most 5000 characters, then the `fields` you add, whose schemas are yours. It mails them to `to`, or `MAIL_TO` when left out, with the visitor in `replyTo` and the message quoted. `labels` renames a field in the mail, `subject` and `view` replace the subject and the mail's component, which gets `ContactMailProps`.
+- A message with more than `maxLinks` links (3 by default) is refused. `rateLimit` allows 30 posts and 5 that went through every 10 minutes, `honeypot` is the `website` field, answered as if it worked, and `minTime` is 3 seconds. `protection` replaces the limits.
+- A mailer that is `optional` and not set up answers 503, a mail that fails to send answers 502, each with a worded refusal the form shows; `reach` adds how else to reach the site, `hello@example.com` or a phone number. The refusals read the `mail.contact` messages in the page's language, in English and French, which your own `src/messages` override key by key.
+- The schema's own messages are in English; `errors: { name, email, message }` words them.
+
 ## Previewing
 
 Under `kay dev`, `/_kay/mail` lists the mails sent, each with its html at desktop or phone width, its text and its size. `/_kay/mail/samples` renders every mail under `src/mails` without sending it, with the props a `.preview.ts` beside it default-exports:

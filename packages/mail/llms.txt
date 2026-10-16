@@ -154,6 +154,26 @@ export const signUp = action(s.Object({ name: s.String({ maxLength: 100 }), emai
 - Every mail with html goes out with a text part too: the one `text` gives, else one written from the html, links followed by their address, list items dashed, table rows one to a line and a row header written `Label: value`, what the html hides, such as the preheader, left out. `htmlToText(html)` is exported.
 - `send(message)` renders and sends now, resolving with `{ messageId, accepted, rejected, response }`. Each mail sent, from `send` or the queue, logs one line naming its subject, how many recipients the server took and their domains (`sent to 2 recipients at example.com`), and its answer, so an app logs nothing of its own. These lines go where the app's `log` setting sends kay's, as text headed `kayjs-mail:`, as JSON with `from: 'kayjs-mail'` or to the app's function, under the request being answered. A mail the server takes for some recipients and refuses for others is sent all the same, and logged counting those refused: it is not retried, which would send it again to those who have it. A send that fails logs the mail and the reason before it throws. `enqueue(message, { delay })` renders now and queues it, resolving with the job's id; a failed send is retried as kay's queues retry, 5 attempts by default, each wait twice the last from 10 seconds, and a mail given up after its last attempt is logged naming it and the reason, then handed to `queue.onFailed` if given. `render(message)` gives the rendered `Mail` without sending it. `drain()` sends every queued mail due, here and now, for a script. `failed()` lists the mails given up on, with why, and `remove(id)`, `remove({ recipient })` or `remove(match)` deletes queued and failed mails, a person's to, cc or bcc once they asked to be erased, resolving with how many went.
 
+## A contact form
+
+`contactForm(mail, options)` gives the arguments of `action` for a contact form, so a site writes no schema, error mapping or mail wrapper; spread into `action(...)`, which kay finds by name:
+
+```kay
+--- server
+import { contactForm } from '@kaynooo/kayjs-mail'
+import { s } from 'kay'
+import { mail } from '../mail'
+
+export const contact = action(...contactForm(mail, { fields: { phone: s.Optional(s.String({ maxLength: 30 })) }, reach: 'hello@example.com' }))
+---
+```
+
+- Pair it with `ContactForm(action={contact})` from kayjs-ui, or a form of your own with `field="name"`, `field="email"`, `field="message"` and one per extra field; `kay check` cannot read the schema through the spread, so it does not run `unbounded-string` on the extras: give them a `maxLength`.
+- The action checks a one-line `name` (100 characters), an `email` and a `message` (`maxLength`, 5000 by default), then `fields`, a record of schemas of yours, listed in the mail in order after the email. It sends to `to` or `MAIL_TO`, `replyTo` the visitor, the message quoted. `labels` names an extra field in the mail (its key with a capital by default), `subject` is `(input) => string`, `view` a `.kay` component given `ContactMailProps` (`subject`, `name`, `email`, `message`, `fields`, `origin`).
+- More than `maxLinks` links (3) is refused with 422. `protection` replaces the defaults: `rateLimit` 30 posts and 5 that went through every 10 minutes, `minTime` `'3s'`; the honeypot is always the `website` field, with `pretend`.
+- `MailNotConfigured` answers 503 and any other send failure 502, as a refusal the form shows through `contact.error()`; the mailer logs the cause. `reach` is named in the 503, the 502 and the rate-limit refusal.
+- The refusals, subject and mail footer read the `mail.contact` messages, in the page's language (English and French shipped), overridden key by key in the app's `src/messages`. The schema's own field messages are English: `errors: { name, email, message }` words them.
+
 ## Testing
 
 Under `bun test` mails go to the outbox, with no SMTP server to stub:

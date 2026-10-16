@@ -1,0 +1,19 @@
+---
+import type { ContactMailProps } from './contact'
+import { t } from 'kay/i18n'
+import Button from './button.kay'
+import Fields from './fields.kay'
+import Heading from './heading.kay'
+import Layout from './layout.kay'
+import Quote from './quote.kay'
+
+// The default view of `contactForm`'s mail: the visitor's answers listed, then their message quoted.
+const { subject, name, email, fields, message, origin } = props<ContactMailProps>()
+---
+Layout(preheader={message.slice(0, 120)})
+  @footer
+    | {t('mail.contact.footer', { name, origin })}
+  Heading {subject}
+  Fields(fields={fields} empty={t('mail.contact.empty')})
+  Quote(text={message})
+  Button(href={`mailto:${email}?subject=${encodeURIComponent(`Re: ${subject}`)}`}) {t('mail.contact.reply', { name })}

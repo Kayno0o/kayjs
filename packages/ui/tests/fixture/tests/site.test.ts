@@ -452,6 +452,32 @@ test('QrCode with inline draws the SVG in the page, so CSS colours resolve, and 
 })
 
 // A script a page loads.
+describe('ContactForm', () => {
+  test('posts to the action with its fields, the honeypot and the extra field between the email and the message', async () => {
+    const { html } = await site.visit('/contact')
+
+    expect(html.indexOf('name="name"')).toBeLessThan(html.indexOf('name="email"'))
+    expect(html.indexOf('name="email"')).toBeLessThan(html.indexOf('name="topic"'))
+    expect(html.indexOf('name="topic"')).toBeLessThan(html.indexOf('name="message"'))
+    expect(html).toContain('name="website"')
+    expect(html).toContain('Send it')
+    expect(html).not.toContain('Thank you')
+  })
+
+  test('shows each refused field\'s message under it and the thanks once a post goes through', async () => {
+    const { contact } = await import('../src/routes/contact.kay')
+    const refused = await site.submit(contact, { name: 'A', email: 'nope', topic: 'quote', message: 'Hi' }, { from: '/contact' })
+
+    expect(refused.html).toContain('<span class="kui-form-field-issue">Tell us your name</span>')
+    expect(refused.html).toContain('<span class="kui-form-field-issue">Not an email address</span>')
+    expect(refused.html).toContain('<span class="kui-form-field-issue">A few words at least</span>')
+
+    const sent = await site.submit(contact, { name: 'Ada', email: 'ada@example.com', topic: 'quote', message: 'Hello there' }, { from: '/contact' })
+
+    expect(sent.html).toContain('Thank you, your message has been sent.')
+  })
+})
+
 const SCRIPT_PATH = /src="(\/[^"]+\.js)"/g
 // A script a module imports, statically or through `import()`.
 const STATIC_IMPORT = /(?:from|import)\s*["'](\.\/[^"']+\.js)["']/g

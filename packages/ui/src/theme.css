@@ -653,6 +653,11 @@
     @apply contents;
   }
 
+  /* ContactForm: its fields and the button in a column. */
+  .kui-contact-form {
+    @apply flex flex-col items-start gap-4;
+  }
+
   :where(.kui-form-field, .kui-form-field-label) > * {
     @apply basis-full;
   }

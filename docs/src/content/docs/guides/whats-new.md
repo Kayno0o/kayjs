@@ -16,6 +16,7 @@ This page lists what each release adds, newest first, with a link to where each 
 - **ESLint in the editor needs no command first**: it writes the types it reads itself the first time it meets a component without them, through the new `kay types`. [`kay types`](/reference/cli)
 - **Add a feature to an existing project**: `kay add tailwind`, `kay add auth` or `kay add mail` writes the files and edits `kay new --with` would have, installs what it needs, and stops with the edit to make by hand when a file is not what `kay new` wrote. [`kay add`](/reference/cli)
 - **A fresh app needs Bun alone**: the `app` preset keeps its members in a SQLite file, `bun run dev` migrates it, and its tests and CI need no Postgres. `kay new --template app --with postgres` still writes the Postgres stack. [`kay new`](/reference/cli)
+- **A contact form in one line**: kayjs-mail's `contactForm(mail, options)` and kayjs-ui's `ContactForm` bring the schema, the link cap, the spam limits, the mail with the visitor in `replyTo` and worded refusals when the mail cannot go out, in English and French. [A contact form](/libraries/kayjs-mail#a-contact-form)
 
 ## 1.46.0
 

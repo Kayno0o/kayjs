@@ -2,6 +2,21 @@ import { defineMessages } from 'kay/i18n'
 
 export default defineMessages({
   mail: {
+    contact: {
+      subject: 'Message de {name}',
+      footer: 'Envoyé depuis le formulaire de contact de {origin}. Répondre à ce mail écrit à {name}.',
+      empty: 'non renseigné',
+      reply: 'Répondre à {name}',
+      tooManyLinks: 'Pas plus de {max} liens par message.',
+      notConfigured: 'Le formulaire ne peut pas encore envoyer de message.',
+      notConfiguredReach: 'Le formulaire ne peut pas encore envoyer de message : écrivez à {reach}.',
+      sendFailed: 'Votre message n\'a pas pu être envoyé. Merci de réessayer plus tard.',
+      sendFailedReach: 'Votre message n\'a pas pu être envoyé. Merci de réessayer plus tard, ou d\'écrire à {reach}.',
+      rateLimit: 'Trop de messages envoyés d\'ici en peu de temps : réessayez dans quelques minutes.',
+      rateLimitReach: 'Trop de messages envoyés d\'ici en peu de temps : réessayez dans quelques minutes, ou écrivez à {reach}.',
+      early: 'Un instant : relisez votre message, puis renvoyez-le.',
+      expired: 'Cette page a expiré : rechargez-la, puis renvoyez votre message.',
+    },
     auth: {
       'link': 'lien',
       'code': 'code',

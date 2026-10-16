@@ -1,0 +1,17 @@
+--- server
+import { s } from 'kay'
+import { contactForm } from '@kaynooo/kayjs-mail'
+import { mail } from '../mail'
+
+export const contact = action(...contactForm(mail, { to: 'team@fixture.test', fields: { phone: s.Optional(s.String({ maxLength: 30 })), topic: s.UnionEnum(['quote', 'other']) }, labels: { topic: 'Subject' }, reach: 'hello@fixture.test' }))
+---
+form(action={contact} novalidate)
+  input(field="name" aria-label="Name")
+  input(field="email" aria-label="Email")
+  input(field="phone" aria-label="Phone")
+  select(field="topic" aria-label="Topic")
+    option(value="quote") Quote
+    option(value="other") Other
+  textarea(field="message" aria-label="Message")
+  button(type="submit") Send
+  error

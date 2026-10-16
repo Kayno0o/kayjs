@@ -503,6 +503,11 @@ FormField also works outside a dialog, in a plain form posting to an action:
 - Its messages sit in an `aria-live` region, so a screen reader reads them as they appear.
 - `compact` sizes it by its control rather than the row, for a filter bar of fields side by side, a Select inside as wide as its options with no class. It holds no message region then unless given a `name` or an `issue`.
 
+`ContactForm(action={contact})` is the form for the action `contactForm(mail, ...)` from kayjs-mail builds (any action with `name`, `email` and `message` fields works): a `form` posting without JavaScript, a FormField per field with the message the action refused it with, a submit button, and a `Notice` that the message went out (`sentLabel`) or why not (`contact.error()`).
+
+- Fields beyond the three go in as children, between the email and the message, in a `FormField` with `issue={contact.error('topic')}` and a control named with `name`, since `field` is only valid inside the form's own markup.
+- `nameLabel`, `emailLabel`, `messageLabel`, `submitLabel`, `sentLabel` replace the English texts, `rows` sets the message box, `class` goes on the form.
+
 A GET filter form, whose every pick lands in the URL, submits as soon as a Select changes with `submit`, no ref to the form needed:
 
 ```kay

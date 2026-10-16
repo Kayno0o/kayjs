@@ -2,6 +2,8 @@ export type { AuthKind, AuthLinkKind, AuthMail, AuthMailerOptions, AuthNoticeKin
 export { authMailer } from './auth'
 export type { AuthWords } from './auth-words'
 export { authWords } from './auth-words'
+export type { ContactInput, ContactMailProps, ContactOptions } from './contact'
+export { contactForm } from './contact'
 export { cssColours } from './css'
 export { darkPalette } from './dark'
 export type { Palette, Settings } from './defaults'

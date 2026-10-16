@@ -1,0 +1,9 @@
+---
+import { actionStub } from 'kay/internal'
+import ContactForm from '@kaynooo/kayjs-ui/contact-form.kay'
+
+// Stands in for a page's action, which a static site cannot serve.
+const contact = actionStub('/contact')
+---
+.max-w-md
+  ContactForm(action={contact})

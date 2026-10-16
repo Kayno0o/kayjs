@@ -1,0 +1,34 @@
+---
+import type { Action } from 'kay'
+import Button from './button.kay'
+import FormField from './form-field.kay'
+import Notice from './notice.kay'
+
+const { action, nameLabel = 'Name', emailLabel = 'Email', messageLabel = 'Message', submitLabel = 'Send', sentLabel = 'Thank you, your message has been sent.', rows = 6, class: className } = props<{
+  // The action `contactForm(mail)` from kayjs-mail gives, or any with a `name`, an `email` and a `message` field.
+  action: Action<never, unknown>
+  nameLabel?: string | undefined
+  emailLabel?: string | undefined
+  messageLabel?: string | undefined
+  submitLabel?: string | undefined
+  // Shown once the message went out.
+  sentLabel?: string | undefined
+  // The message box's height, in lines.
+  rows?: number | undefined
+  class?: string | undefined
+}>()
+---
+// Posts without JavaScript; the honeypot, the time check and the refused fields' messages come from the action. Fields beyond those three go in as children, between the email and the message.
+form.kui-contact-form(action={action} novalidate class={className})
+  FormField(label={nameLabel} required issue={action.error('name')})
+    input(field="name" autocomplete="name")
+  FormField(label={emailLabel} required issue={action.error('email')})
+    input(field="email" autocomplete="email")
+  slot
+  FormField(label={messageLabel} required issue={action.error('message')})
+    textarea(field="message" rows={rows})
+  Button(type="submit" variant="accent" label={submitLabel})
+  if action.succeeded()
+    Notice(tone="success" compact) {sentLabel}
+  else if action.error() as message
+    Notice(tone="error" compact) {message}
