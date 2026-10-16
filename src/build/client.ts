@@ -4,12 +4,13 @@ import type { KayConfig, KayExtension } from '../config'
 import type { ClientBuild, ClientManifest } from '../server/client'
 import type { FontFallback } from '../server/fonts'
 import type { ImportGraph, KayLibrary } from './libraries'
+import type { BrowserRole } from './promotion'
 import type { ChunkInputs, IslandWhy } from './report'
 import type { FileDiagnostic } from './transform'
-import { existsSync, realpathSync } from 'node:fs'
+import { existsSync } from 'node:fs'
 import { mkdir, rm } from 'node:fs/promises'
 import { builtinModules } from 'node:module'
-import { join, relative, resolve, sep } from 'node:path'
+import { join, relative, resolve } from 'node:path'
 import { formatDiagnostic } from '../compiler'
 import { buildFailure, errorCodeOf, KayError, raisedMark } from '../compiler/errors'
 import { projectPaths } from '../project'
@@ -18,13 +19,13 @@ import { rebaseCss } from '../server/base'
 import { fromManifest, MANIFEST, PRERENDERED_DIR, writeManifest } from '../server/client'
 import { PUBLIC_ENV_PATH } from '../server/env-state'
 import { fontFallbacks, withFontFallbacks } from '../server/fonts'
-import { extensionEditor, routeMounts } from '../server/routes'
 import { ASSET_PREFIX, clientDir, outputDir } from './assets'
 import { CSS_FILE, findKayFiles, readSource, writeIfChanged } from './files'
-import { fileWords, findKayLibraries, reachableLibraryFiles, reachesAny } from './libraries'
+import { fileWords } from './libraries'
 import { packagesOf } from './licenses'
 import { throughLinks } from './links'
 import { kay } from './plugin'
+import { buildFiles, promotedFiles } from './promotion'
 import { pruneNodes, unusedLibraryClasses } from './prune'
 import { sizeReport } from './report'
 import { ANCHOR, runtimeAnchor, runtimeChunk } from './runtime-chunk'
@@ -150,16 +151,7 @@ export async function readClientSources(root: string, options: ClientOptions = {
   const why = new Map<string, IslandWhy>()
   const classes = new Set<string>()
   const diagnostics: FileDiagnostic[] = []
-  // A library's components the app reaches compile with its own; a kay project nested inside, such as an example, builds on its own.
-  const own = await findKayFiles(root, { project: true, ownKayOnly: true })
-  // The pages of the libraries the app mounts, which it reaches through its config rather than an import.
-  const ownFiles = new Set(own)
-  const editor = extensionEditor(root, options.extensions)
-  const mountedFiles = (await Promise.all(routeMounts(root, options.extensions).map(async mount => existsSync(mount.dir) ? findKayFiles(mount.dir) : []))).flat()
-  const mounted = [...new Set([...mountedFiles, ...editor === undefined ? [] : [editor]])].filter(file => !ownFiles.has(file))
-  const libraries = await findKayLibraries(root)
-  const fromLibraries = await reachableLibraryFiles(root, libraries, [...own, ...mounted], graph)
-  const files = [...own, ...mounted, ...fromLibraries.components]
+  const { files, own, mounted, editor, libraries, fromLibraries } = await buildFiles(root, options.extensions, graph)
   const sources = files.map(file => readSource(file).text)
 
   const cacheDir = projectPaths(root).cache
@@ -199,17 +191,17 @@ export async function readClientSources(root: string, options: ClientOptions = {
 
   // A static component that may render as an island gets a chunk too, which a page loads only when it does: when it hands an island it renders what only an island sends.
   // One reaching no island through its imports never does, and its chunk would only bundle for the browser what its script imports, a library's server code included.
-  const islandFiles = new Set([...islands.values()].map(file => realpathSync(file)))
-  const edges = new Map<string, Promise<string[]>>()
-  const project = realpathSync(root) + sep
-  const promoted = await Promise.all(files.map(async (file, index) => {
-    const { island, promote } = analyses[index]!
+  const promoted = await promotedFiles(root, libraries, files, analyses.map(({ island, promote }): BrowserRole => {
+    if (island !== undefined)
+      return 'island'
 
-    return island === undefined && promote !== undefined && islandFiles.size > 0 && await reachesAny(root, libraries, realpathSync(file), islandFiles, edges, project, graph) ? promote : undefined
-  }))
+    return promote === undefined ? undefined : 'promotable'
+  }), graph)
 
-  for (const [index, promote] of promoted.entries()) {
-    if (promote !== undefined) {
+  for (const [index, yes] of promoted.entries()) {
+    const { promote } = analyses[index]!
+
+    if (yes && promote !== undefined) {
       islands.set(promote, files[index]!)
       why.set(promote, { why: analyses[index]!.why, promoted: true })
     }

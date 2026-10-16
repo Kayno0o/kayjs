@@ -441,6 +441,52 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 
+  it('follows the imports of a promoted component to the island it reaches, a library\'s included, and reads the modules it imports as the browser\'s', async () => {
+    const island = '---\nimport { signal } from \'kay\'\n\nconst { format } = props<{ format: () => void }>()\nconst count = signal(0)\n---\nbutton(onClick={() => { count++; format() }}) {count()}\n'
+    const passing = (child: string, module: string) => `---\nimport ${child === 'Lib' ? 'Lib from \'ui-lib/card.kay\'' : `Child from './${child}.kay'`}\nimport { disk } from '../${module}'\n\nfunction pick() {}\n---\n${child === 'Lib' ? 'Lib' : 'Child'}(format={pick})\np {disk.name}\n`
+    const root = await scratchProject({
+      'package.json': JSON.stringify({ name: 'app', private: true, dependencies: { 'ui-lib': '1.0.0' } }),
+      'node_modules/ui-lib/package.json': JSON.stringify({ name: 'ui-lib', version: '1.0.0', type: 'module', peerDependencies: { kay: '*' }, exports: { './*.kay': './src/*.kay' } }),
+      'node_modules/ui-lib/src/card.kay': island,
+      'src/routes/index.kay': '---\nimport Through from \'../components/through.kay\'\nimport Lib from \'../components/library.kay\'\nimport Plain from \'../components/plain.kay\'\n---\nThrough\nLib\nPlain\n',
+      'src/components/through.kay': passing('middle', 'through-disk.ts'),
+      'src/components/middle.kay': '---\nimport Island from \'./island.kay\'\n---\nIsland\n',
+      'src/components/island.kay': island,
+      'src/components/library.kay': passing('Lib', 'library-disk.ts'),
+      'src/components/plain.kay': passing('leaf', 'plain-disk.ts'),
+      'src/components/leaf.kay': '---\nconst { format } = props<{ format: () => void }>()\n---\np {format.name}\n',
+      'src/through-disk.ts': 'import { sqliteCache } from \'kay/cache\'\n\nexport const disk = sqliteCache(\'a.sqlite\')\n',
+      'src/library-disk.ts': 'import { sqliteCache } from \'kay/cache\'\n\nexport const disk = sqliteCache(\'b.sqlite\')\n',
+      'src/plain-disk.ts': 'import { sqliteCache } from \'kay/cache\'\n\nexport const disk = sqliteCache(\'c.sqlite\')\n',
+    })
+
+    try {
+      const found = (await check(root)).filter(d => d.code === 'server-only-import').map(d => d.file.slice(root.length + 1)).sort()
+
+      // The component reaching an island through another, and the one reaching a library's, are promoted; the one reaching none is not, so its module is the server's.
+      expect(found).toEqual(['src/library-disk.ts', 'src/through-disk.ts'])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('reports a server-only name of a component both promoted and only rendered by islands once', async () => {
+    const root = await scratchProject({
+      'src/routes/index.kay': '---\nimport Host from \'../components/host.kay\'\n---\nHost\n',
+      'src/components/host.kay': '---\nimport { signal } from \'kay\'\nimport Promoted from \'./promoted.kay\'\n\nconst count = signal(0)\n---\nbutton(onClick={() => count++}) {count()}\nPromoted\n',
+      'src/components/promoted.kay': '---\nimport Island from \'./island.kay\'\nimport { sqliteCache } from \'kay/cache\'\n\nconst disk = sqliteCache(\'a.sqlite\')\nfunction pick() {}\n---\nIsland(format={pick})\np {disk}\n',
+      'src/components/island.kay': '---\nimport { signal } from \'kay\'\n\nconst { format } = props<{ format: () => void }>()\nconst count = signal(0)\n---\nbutton(onClick={() => { count++; format() }}) {count()}\n',
+    })
+
+    try {
+      expect((await check(root)).filter(d => d.code === 'server-only-import').map(d => [d.file.slice(root.length + 1), d.line])).toEqual([['src/components/promoted.kay', 3]])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('reports a signal written by assigning where it is held in a property or in a let from a function, which would replace it', async () => {
     const page = [
       '---',
@@ -1975,6 +2021,39 @@ describe.concurrent('kay check, unused code', () => {
         ['hidden.kay', 'noindex-in-sitemap'],
         ['image.kay', 'unsized-share-image'],
         ['same.kay', 'duplicate-title'],
+      ])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('reads a seo default of an empty per-locale record as none, and a per-locale name as the title of every untitled page', async () => {
+    const head = (lines: string[]) => `--- server\nexport const page = { prerender: true }\n---\nhead\n${lines.map(line => `  ${line}`).join('\n')}\nh1 Hi\n`
+    const root = await scratchProject({
+      'src/routes/one.kay': head(['meta(name="description" content="Fine")']),
+      'src/routes/two.kay': head(['meta(name="description" content="Fine")']),
+      'src/routes/three.kay': head(['title Three']),
+    })
+
+    try {
+      const options = { site: 'https://example.com', favicon: false as const }
+      const named = (await check(root, { ...options, seo: { name: { en: 'Site', fr: 'Site' }, description: 'Fine', image: { en: '/og.png' } } })).filter(d => d.code === 'duplicate-title' || d.code === 'unsized-share-image')
+
+      // The two untitled pages share the site's name, and the record's image has no size.
+      expect(named.map(d => [basename(d.file), d.code, d.message])).toEqual([
+        ['one.kay', 'unsized-share-image', 'The share image of `/one` has no size'],
+        ['three.kay', 'unsized-share-image', 'The share image of `/three` has no size'],
+        ['two.kay', 'duplicate-title', '`/two` has the title of `/one`, "Site"'],
+        ['two.kay', 'unsized-share-image', 'The share image of `/two` has no size'],
+      ])
+
+      const empty = (await check(root, { ...options, seo: { name: {}, description: {} } })).filter(d => d.code !== undefined && d.code !== 'missing-description').map(d => [basename(d.file), d.code])
+
+      expect(empty).toEqual([
+        ['one.kay', 'untitled-page'],
+        ['three.kay', 'undescribed-page'],
+        ['two.kay', 'untitled-page'],
       ])
     }
     finally {

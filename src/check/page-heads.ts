@@ -86,7 +86,7 @@ export async function pageHeadLints(options: CheckOptions, routes: Route[], rout
     const at = { file: route.file, line: 1, column: 1 }
     const title = facts.title === undefined ? siteName : facts.title.text
 
-    if (facts.title === undefined && options.seo?.name === undefined) {
+    if (facts.title === undefined && siteName === undefined) {
       report('untitled-page', { ...at, message: `\`${route.pattern}\` has no title`, help: 'set one with `title` in a `head` block, or `seo.name` for every page' })
     }
     else if (title !== undefined) {
@@ -100,7 +100,7 @@ export async function pageHeadLints(options: CheckOptions, routes: Route[], rout
 
     const description = facts.description?.text
 
-    if (facts.description === undefined && !facts.unknownMeta && options.seo?.description === undefined)
+    if (facts.description === undefined && !facts.unknownMeta && siteDescriptions.length === 0)
       report('undescribed-page', { ...at, message: `\`${route.pattern}\` has no description`, help: 'set `meta(name="description" content="...")` in a `head` block, or `seo.description` for every page' })
     else if (description !== undefined && description.length > DESCRIPTION_LENGTH && !siteDescriptions.includes(description))
       report('long-description', { ...at, message: `The description of \`${route.pattern}\` runs ${description.length} characters`, note: `search results cut it after about ${DESCRIPTION_LENGTH}`, help: 'shorten it to a sentence or two' })
