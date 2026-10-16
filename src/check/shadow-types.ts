@@ -9,10 +9,10 @@ import type { PublicFile } from '../server/public'
 import type { Endpoint, Route, RouteMount } from '../server/routes'
 import type { ShadowFile, ShadowOptions } from './shadow'
 import { existsSync, realpathSync } from 'node:fs'
-import { readdir, rm } from 'node:fs/promises'
+import { mkdir, readlink, rm, symlink } from 'node:fs/promises'
 import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import { readCacheEntry, writeCacheEntry } from '../build/cache'
-import { findKayFiles, writeIfChanged } from '../build/files'
+import { findKayFiles, treeEntries, writeIfChanged } from '../build/files'
 import { iconTypes } from '../build/icons'
 import { findKayLibraries, libraryOf, packageRoot, reachableLibraryFiles, throughNodeModules } from '../build/libraries'
 import { importedSignals } from '../build/signals'
@@ -72,6 +72,8 @@ interface ShadowTree {
   // At a path, or a name in the tree.
   write: (path: string, text: string) => Promise<void>
   shadow: (shadow: ShadowFile, path: string) => Promise<void>
+  // A symlink at a path in the tree to `target`.
+  link: (path: string, target: string) => Promise<void>
   // Rewriting in place keeps every file present for editors reading the tree meanwhile; only stale ones go, but for the names another step writes.
   removeStale: (kept: string[]) => Promise<void>
 }
@@ -129,11 +131,24 @@ function shadowTree(dir: string): ShadowTree {
       shadows.set(path, shadow)
       await write(path, shadow.tsx)
     },
+    link: async (path, target) => {
+      const file = resolve(dir, path)
+
+      written.add(file)
+
+      try {
+        if (await readlink(file) === target)
+          return
+      }
+      catch {}
+
+      await rm(file, { recursive: true, force: true })
+      await mkdir(dirname(file), { recursive: true })
+      await symlink(target, file, 'dir')
+    },
     removeStale: async (kept) => {
-      const stale = (await readdir(dir, { recursive: true, withFileTypes: true }))
-        .filter(entry => entry.isFile())
-        .map(entry => join(entry.parentPath, entry.name))
-        .filter(path => !written.has(path) && !kept.some(name => path === join(dir, name)))
+      const { files, links } = await treeEntries(dir)
+      const stale = [...files, ...links].filter(path => !written.has(path) && !kept.some(name => path === join(dir, name)))
 
       await Promise.all(stale.map(async path => rm(path)))
     },
@@ -181,6 +196,14 @@ async function libraryShadows(root: string, options: CheckOptions, own: string[]
     return library ? throughNodeModules(library, file) : file
   })])
   const unreached = new Set<string>()
+
+  // A bare import climbs from the shadow, not from the package, so the dependencies the package installs itself are linked beside its shadows.
+  await Promise.all(followed.filter(library => library.extension).map(async ({ dir, realDir }) => {
+    const installed = join(realDir, 'node_modules')
+
+    if (existsSync(installed))
+      await tree.link(join(relative(projectPaths(root).types, dirname(shadowPath(root, join(dir, 'x')))), 'node_modules'), installed)
+  }))
 
   await Promise.all(files.map(async (file) => {
     const source = await Bun.file(file).text()

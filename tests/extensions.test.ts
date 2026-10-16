@@ -406,7 +406,9 @@ const LOCAL_CHECKED: Record<string, string> = {
   'app/src/params/code.ts': 'export default (value: string): number | undefined => (/^\\d+$/).test(value) ? Number(value) : undefined\n',
   'lib/package.json': JSON.stringify({ name: 'lib' }),
   'lib/card.kay': '---\nconst { title } = props<{ title: string }>()\n---\np.card {title}\n',
-  'lib/routes/login.kay': '---\nimport Card from \'../card.kay\'\nimport { title } from \'../titles\'\nimport { format } from \'../helpers/format\'\n---\nCard(title={format(title)})\n',
+  'lib/routes/login.kay': '---\nimport Card from \'../card.kay\'\nimport { title } from \'../titles\'\nimport { format } from \'../helpers/format\'\nimport { dep } from \'dep\'\n---\nCard(title={format(title + dep)})\n',
+  'lib/node_modules/dep/package.json': JSON.stringify({ name: 'dep', type: 'module', exports: { '.': './index.ts' } }),
+  'lib/node_modules/dep/index.ts': 'const wrong: number = \'libdependency\'\n\nexport const dep = `${wrong}`\n',
   // A module of the package, its own to check as a library's are: the strictness it is written for may not be the app's.
   'lib/titles.ts': 'const wrong: number = \'module\'\n\nexport const title = `Sign in ${wrong}`\n',
   // A folder setting its module type alone, still the package's.
@@ -439,7 +441,7 @@ const LOCAL_CHECKED: Record<string, string> = {
   'edit/labels.ts': 'const wrong: number = \'editmodule\'\n\nexport const label = `${wrong}`\n',
   // Listed through the link a workspace gives, its routes under `node_modules` by path but not for real.
   'ws/package.json': JSON.stringify({ name: 'ws-lib' }),
-  'ws/routes/broken.kay': '---\nimport { label } from \'../labels\'\nimport { dep } from \'../node_modules/dep/index\'\n\nconst wrong: number = \'workspace\'\n---\np {wrong} {label} {dep}\n',
+  'ws/routes/broken.kay': '---\nimport { label } from \'../labels\'\nimport { dep } from \'dep\'\n\nconst wrong: number = \'workspace\'\n---\np {wrong} {label} {dep}\n',
   // More of its routes listed by the real path, the package checked once, and a dependency it installs itself, reached by its path.
   'ws/more/page.kay': '---\nconst wrong: number = \'wsmore\'\n---\np {wrong}\n',
   'ws/node_modules/dep/package.json': JSON.stringify({ name: 'dep', type: 'module', exports: { '.': './index.ts' } }),

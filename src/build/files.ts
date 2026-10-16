@@ -1,7 +1,7 @@
 import type { Dirent } from 'node:fs'
 import { readFileSync, realpathSync, statSync } from 'node:fs'
 import { mkdir, readdir, readFile, rename, rm } from 'node:fs/promises'
-import { basename, dirname, join } from 'node:path'
+import { basename, dirname, join, sep } from 'node:path'
 import { KAY_DIR } from './assets'
 
 // Never source at any depth: dependencies, kay's own output and version control.
@@ -255,4 +255,12 @@ export async function writeAtomically(path: string, content: string | Uint8Array
     if (!moved)
       await rm(draft, { force: true })
   }
+}
+
+// The files and symbolic links of a tree, the files behind a link left out: a recursive listing goes through a link to a directory, into files that are not the tree's.
+export async function treeEntries(dir: string): Promise<{ files: string[], links: string[] }> {
+  const entries = (await readdir(dir, { recursive: true, withFileTypes: true })).map(entry => ({ path: join(entry.parentPath, entry.name), link: entry.isSymbolicLink(), file: entry.isFile() }))
+  const links = entries.filter(entry => entry.link).map(entry => entry.path)
+
+  return { links, files: entries.filter(entry => entry.file && !links.some(link => entry.path.startsWith(link + sep))).map(entry => entry.path) }
 }

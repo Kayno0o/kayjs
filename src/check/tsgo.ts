@@ -2,11 +2,11 @@
 import type { CheckDiagnostic } from '.'
 import type { TsgoDiagnostic } from './diagnose'
 import { existsSync, statSync } from 'node:fs'
-import { readdir } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { readCacheEntry, writeCacheEntry } from '../build/cache'
+import { treeEntries } from '../build/files'
 import { offsetAt } from '../compiler/mapping'
 import { projectPaths } from '../project'
 
@@ -105,7 +105,7 @@ async function filesRead(buildInfo: string): Promise<Pick<CleanRun, 'files' | 'm
 }
 
 async function contentHashes(dir: string): Promise<Record<string, string>> {
-  const files = existsSync(dir) ? (await readdir(dir, { recursive: true, withFileTypes: true })).filter(entry => entry.isFile()).map(entry => join(entry.parentPath, entry.name)) : []
+  const files = existsSync(dir) ? (await treeEntries(dir)).files : []
 
   return Object.fromEntries(await Promise.all(files.map(async file => [file, Bun.hash(await Bun.file(file).bytes()).toString(36)] as const)))
 }
