@@ -25,7 +25,7 @@ const { end, endOthers } = await import(join(PAGES, 'account', 'sessions.kay'))
 const { create, revoke } = await import(join(PAGES, 'account', 'tokens.kay'))
 const { prove, remove, signInAgain } = await import(join(PAGES, 'account', 'data.kay'))
 const { confirm } = await import(join(PAGES, 'confirm-email.kay'))
-const { magicLink, password } = await import(join(PAGES, 'sign-in.kay'))
+const { magicLink, passkey, password } = await import(join(PAGES, 'sign-in.kay'))
 const { register } = await import(join(PAGES, 'register.kay'))
 const { request, reset } = await import(join(PAGES, 'reset-password.kay'))
 const { verify } = await import(join(PAGES, 'two-factor.kay'))
@@ -64,6 +64,19 @@ test('kay check passes on the fixture, its links to kayjs-auth routes, its use o
   }
   finally {
     check.kill()
+  }
+}, 60_000)
+
+// kay check leaves kayjs-auth's own modules, the guards and form helpers its pages import, to the package's own check, which knows no app's messages or locals: type-checked here as an app registering them reads them.
+test('kayjs-auth\'s own modules type-check under the fixture\'s registered locals and messages', async () => {
+  const tsc = Bun.spawn(['bunx', 'tsgo', '-p', 'tsconfig.json', '--noEmit'], { cwd: ROOT, stdout: 'pipe', stderr: 'pipe' })
+
+  try {
+    expect(await new Response(tsc.stdout).text() + await new Response(tsc.stderr).text()).toBe('')
+    expect(await tsc.exited).toBe(0)
+  }
+  finally {
+    tsc.kill()
   }
 }, 60_000)
 
@@ -139,6 +152,19 @@ describe('the prebuilt pages', () => {
 
     expect(text(refused, '[role="alert"]')).toBe('Wrong email, username or password.')
     expect(await visitor.submit(password, { identifier: 'grace@example.com', password: PASSWORD, redirect: '/auth/account' }, { from: await visitor.visit('/auth/sign-in') })).toMatchObject({ url: '/auth/account' })
+  })
+
+  test('a passkey answer lacking a part a ceremony reads is refused as input, and a well-formed one that no request waits for is expired', async () => {
+    const visitor = await browser()
+    const from = '/auth/sign-in'
+    const whole = { id: 'credential', rawId: 'credential', type: 'public-key', clientExtensionResults: {}, response: { clientDataJSON: 'a', authenticatorData: 'b', signature: 'c' } }
+
+    for (const response of [5, {}, { ...whole, response: 'nope' }, { ...whole, response: { clientDataJSON: 'a' } }, { ...whole, type: 'password' }])
+      expect((await visitor.refusal(passkey, { response } as never, { from })).status).toBe(422)
+
+    const expired = await visitor.refusal(passkey, { response: whole as never }, { from })
+
+    expect([expired.status, expired.data]).toEqual([400, { error: 'expired' }])
   })
 
   test('a form checks the browser before going through: refused without its script, sent too soon or filling the hidden field, in the page\'s language', async () => {

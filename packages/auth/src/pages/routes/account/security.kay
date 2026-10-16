@@ -56,7 +56,7 @@ export const passkeyOptions = action(schemas.proof, async (input, ctx) => {
 })
 
 export const addPasskey = action(schemas.registerPasskey, async (input, ctx) => {
-  const result = await ctx.locals.auth.registerPasskey(input.response as never, input.name)
+  const result = await ctx.locals.auth.registerPasskey(input.response, input.name)
 
   return result.ok ? result.passkey.id : ctx.fail(400, { error: result.error })
 })
@@ -83,7 +83,7 @@ const recoveryCodes = ctx.succeeded(enable)?.data ?? ctx.succeeded(regenerate)?.
 const codesLeft = user.twoFactor ? await auth.recoveryCodesLeft() : 0
 const passkeys = features.passkeys ? await auth.passkeys() : []
 const removeRefused = ctx.failed(removePasskey)?.data
-const passkeyErrors = Object.fromEntries(['proof', 'stale', 'limited', 'impersonating', 'expired', 'invalid', 'signed-out'].map(code => [code, failure(code)]))
+const passkeyErrors = Object.fromEntries((['proof', 'stale', 'limited', 'impersonating', 'expired', 'invalid', 'signed-out'] as const).map(code => [code, failure(code)]))
 ---
 PageSection(title={t('auth.account.password.title')})
   form.flex.flex-col.gap-3(action={changePassword})

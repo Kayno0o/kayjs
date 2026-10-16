@@ -3,13 +3,22 @@ import type { Auth } from '../auth'
 import type { CaptchaAction } from '../captcha'
 import type { Proof } from '../twoFactor'
 import type { AuthFeatures } from './index'
+import type en from './messages/en'
 import { t } from 'elysia'
 import { t as message } from 'kay/i18n'
+import { passkeyAssertion, passkeyAttestation } from '../payloads'
 import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH, USERNAME_MAX_LENGTH, USERNAME_MIN_LENGTH } from '../rules'
+
+// The codes the pages word, as the English catalog, which every other language mirrors, holds them: a code a flow answers with no message is a type error here.
+type Catalog = typeof en['auth']
+export type FailureCode = keyof Catalog['errors']
+export type OAuthFailureCode = keyof Catalog['oauth']
+type Fields = Catalog['fields']
+type Problem<Field extends keyof Fields> = keyof Fields[Field]
 
 // Stands for a `minTime` refusal's reason, which kay words before the request's locale is known: `refusal` puts it in the page's language.
 const MIN_TIME = 'kayjs-auth-min-time:'
-const OAUTH_FAILURES = new Set(['oauth', 'cancelled', 'refused', 'taken', 'unavailable', 'signed-out', 'banned'])
+const OAUTH_FAILURES: ReadonlySet<string> = new Set<OAuthFailureCode>(['oauth', 'cancelled', 'refused', 'taken', 'unavailable', 'signed-out', 'banned'])
 
 // What the prebuilt pages' actions take. A field longer than kayjs-auth would ever accept is refused here rather than read.
 const email = t.String({ maxLength: 254 })
@@ -40,9 +49,8 @@ export const schemas = {
   signIn: t.Object({ identifier: email, password, remember, redirect, ...captcha }),
   magicLink: t.Object({ email, remember, redirect, ...captcha }),
   emailCode: t.Object({ code }),
-  // A browser's answer to a passkey request, read by kayjs-auth, which checks every part of it.
-  passkey: t.Object({ response: t.Unknown(), redirect, remember }),
-  registerPasskey: t.Object({ response: t.Unknown(), name: t.Optional(t.String({ maxLength: 64 })) }),
+  passkey: t.Object({ response: passkeyAssertion, redirect, remember }),
+  registerPasskey: t.Object({ response: passkeyAttestation, name: t.Optional(t.String({ maxLength: 64 })) }),
   register: t.Object({ email, password, username: t.Optional(t.String({ maxLength: 128 })), remember, redirect, ...captcha }),
   twoFactor: t.Object({ code }),
   requestReset: t.Object({ email, ...captcha }),
@@ -85,25 +93,32 @@ export function proofOf(input: { password?: string | undefined, code?: string | 
 }
 
 // What a page shows for a failure code, in the request's language.
-export function failure(error: string): string {
-  return message(`auth.errors.${error}` as never)
+export function failure(error: FailureCode): string {
+  return message(`auth.errors.${error}`)
 }
 
-function captchaFailure(captcha: AuthFeatures['captcha'], error: string): string {
+function captchaFailure(captcha: AuthFeatures['captcha'], error: string): FailureCode {
   if (captcha !== 'proof-of-work')
     return 'captcha'
 
   return error === 'captcha' ? 'captchaAgain' : 'captchaScript'
 }
 
+// What kay refused a post for before the action: a reason `guarded` worded as `MIN_TIME` followed by it.
+function minTimeReason(refused: string): FailureCode | undefined {
+  const reason = refused.slice(MIN_TIME.length)
+
+  return reason === 'early' || reason === 'expired' ? reason : undefined
+}
+
 // What a page open to visitors shows for a refused post: what kay refused it for before the action, or its failure code, a refused proof of work worded by whether the browser ran it.
-export function refusal(failed: { errors: Partial<Record<string, string>>, data?: unknown } | undefined, captcha: AuthFeatures['captcha']): string | undefined {
-  const error = (failed?.data as { error?: string } | undefined)?.error
+export function refusal(failed: { errors: Partial<Record<string, string>>, data?: { error?: FailureCode } | undefined } | undefined, captcha: AuthFeatures['captcha']): string | undefined {
+  const error = failed?.data?.error
 
   if (error === undefined) {
     const refused = failed?.errors['']
 
-    return refused?.startsWith(MIN_TIME) ? failure(refused.slice(MIN_TIME.length)) : refused
+    return refused?.startsWith(MIN_TIME) ? failure(minTimeReason(refused) ?? 'form') : refused
   }
 
   // A proof of work refused with a solution is a stale one, which the page now holds a fresh challenge for; a widget keeps its one message.
@@ -111,13 +126,19 @@ export function refusal(failed: { errors: Partial<Record<string, string>>, data?
 }
 
 // What a page shows under a field refused for `problem`, with the limits the rule holds it to.
-export function issue(field: 'email' | 'password' | 'username', problem: string): string {
-  const limits = field === 'password' ? { min: PASSWORD_MIN_LENGTH, max: PASSWORD_MAX_LENGTH } : { min: USERNAME_MIN_LENGTH, max: USERNAME_MAX_LENGTH }
-
-  return message(`auth.fields.${field}.${problem}` as never, limits)
+export function issue(...[field, problem]: [field: 'email', problem: Problem<'email'>] | [field: 'password', problem: Problem<'password'>] | [field: 'username', problem: Problem<'username'>]): string {
+  switch (field) {
+    case 'email': return message(`auth.fields.email.${problem}`)
+    case 'password': return message(`auth.fields.password.${problem}`, { min: PASSWORD_MIN_LENGTH, max: PASSWORD_MAX_LENGTH })
+    case 'username': return message(`auth.fields.username.${problem}`, { min: USERNAME_MIN_LENGTH, max: USERNAME_MAX_LENGTH })
+  }
 }
 
 // The message for the `?error=` a failed provider sign-in comes back with; undefined for none, or one kayjs-auth never sends.
 export function oauthFailure(error: string | null): string | undefined {
-  return error !== null && OAUTH_FAILURES.has(error) ? message(`auth.oauth.${error}` as never) : undefined
+  return error !== null && isOAuthFailure(error) ? message(`auth.oauth.${error}`) : undefined
+}
+
+function isOAuthFailure(error: string): error is OAuthFailureCode {
+  return OAUTH_FAILURES.has(error)
 }

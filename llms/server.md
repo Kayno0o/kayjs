@@ -173,6 +173,8 @@ export default guard(({ locals, redirect, deny }) => {
 })
 ```
 
+A library's own guard names the locals it reads with `guard<{ auth: Auth }>(...)`, so its `ctx.locals` has them whatever the app registers.
+
 ### Leave a page open under a guard
 
 `guards: false` in `page` runs none of the guards above the page or its actions, as a sign-in page under a root guard needs:

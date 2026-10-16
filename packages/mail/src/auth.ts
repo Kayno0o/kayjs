@@ -11,8 +11,16 @@ export type AuthKind = AuthLinkKind | AuthNoticeKind
 export const AUTH_LINK_KINDS: readonly AuthLinkKind[] = ['verify-email', 'reset-password', 'magic-link', 'change-email', 'invitation', 'account-exists']
 export const AUTH_NOTICE_KINDS: readonly AuthNoticeKind[] = ['new-sign-in', 'password-changed', 'email-changed', 'two-factor-enabled', 'two-factor-disabled', 'recovery-code-used', 'recovery-codes-regenerated', 'provider-linked', 'provider-unlinked', 'passkey-added', 'passkey-removed', 'token-created', 'signed-out-everywhere', 'account-deleted']
 
-export const LINK_KINDS = new Set<string>(AUTH_LINK_KINDS)
-const NOTICE_KINDS = new Set<string>(AUTH_NOTICE_KINDS)
+export const LINK_KINDS: ReadonlySet<string> = new Set<AuthLinkKind>(AUTH_LINK_KINDS)
+const NOTICE_KINDS: ReadonlySet<string> = new Set<AuthNoticeKind>(AUTH_NOTICE_KINDS)
+
+export function isLinkKind(kind: string): kind is AuthLinkKind {
+  return LINK_KINDS.has(kind)
+}
+
+export function isNoticeKind(kind: string): kind is AuthNoticeKind {
+  return NOTICE_KINDS.has(kind)
+}
 
 // A mail kayjs-auth hands its mailer, typed by its shape so neither package depends on the other.
 export interface AuthMail {
@@ -56,13 +64,13 @@ export function authMailer<R>(send: Send<R>, options: AuthMailerOptions = {}): {
 
 // The message `authMailer` sends for a mail, rendered in `lang`, the site's default language when undefined. A kind it does not know goes as kayjs-auth wrote it.
 export async function authMessage(mail: AuthMail, options: AuthMailerOptions, lang: string | undefined): Promise<Message<{ mail: AuthMail }>> {
-  if (!LINK_KINDS.has(mail.kind) && !NOTICE_KINDS.has(mail.kind))
+  if (!isLinkKind(mail.kind) && !isNoticeKind(mail.kind))
     return { to: mail.to, subject: mail.subject, lang, html: mail.html, text: mail.text }
 
-  const own = options.views?.[mail.kind as AuthKind]
+  const own = options.views?.[mail.kind]
   // Imported here, as the module loads with kay.config.ts before kay compiles any .kay file; typed by hand, as kay check types a package's .kay files for the apps importing them alone.
   // eslint-disable-next-line ts/no-unnecessary-type-assertion -- widened, so the .kay specifier is not resolved
-  const view = own === undefined ? (await (LINK_KINDS.has(mail.kind) ? import('./auth-link.kay' as string) : import('./auth-notice.kay' as string)) as { default: AuthView }).default : (await own()).default
+  const view = own === undefined ? (await (isLinkKind(mail.kind) ? import('./auth-link.kay' as string) : import('./auth-notice.kay' as string)) as { default: AuthView }).default : (await own()).default
   // eslint-disable-next-line ts/no-unnecessary-type-assertion -- as above
   const subject = (await import('./auth-subject.kay' as string) as { default: AuthView }).default
   // The subject goes through the messages as the view does, in the same language.

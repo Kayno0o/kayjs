@@ -335,7 +335,8 @@ export interface ErrorPageContext<Params extends Record<string, unknown> = Recor
 
 // What a `_guard.ts` decides from: who is asking, and the params of the page asked for, each matcher's value in place of its text.
 // For an action, `url` and `params` are those of the page it was posted from; for an API route, its own as Elysia hands them to the handler.
-export type GuardContext = RequestContext<RouteParams>
+// `Own` names locals a guard knows beyond the app's, for a library's own guard to read what its plugin adds with no cast.
+export type GuardContext<Own extends object = object> = Omit<RequestContext<RouteParams>, 'locals'> & { locals: Locals & Own }
 
 export type Guard = (ctx: GuardContext) => void | Promise<void>
 
@@ -355,8 +356,8 @@ declare global {
 }
 
 // The default export of a `_guard.ts`: runs before every page and every action in its directory and below, and lets the request through unless it redirects or denies.
-export function guard(check: Guard): Guard {
-  return check
+export function guard<Own extends object = object>(check: (ctx: GuardContext<Own>) => void | Promise<void>): Guard {
+  return check as Guard
 }
 
 // Marks a promise for an `await` block and handles its rejection at once: the block renders the failure, and nothing crashes the process before it does.

@@ -20,6 +20,14 @@ test('kay check passes on the fixture, the library\'s components its mails rende
   expect(await check.exited).toBe(0)
 }, 60_000)
 
+// kay check leaves the library's own modules to the package's check, which knows no app's messages: type-checked here as an app registering them reads them.
+test('the library\'s own modules type-check under the fixture\'s registered messages', async () => {
+  const tsc = Bun.spawn(['bunx', 'tsgo', '-p', 'tsconfig.json', '--noEmit'], { cwd: ROOT, stdout: 'pipe', stderr: 'pipe' })
+
+  expect(await new Response(tsc.stdout).text() + await new Response(tsc.stderr).text()).toBe('')
+  expect(await tsc.exited).toBe(0)
+}, 60_000)
+
 test('an action enqueues a mail, which the queue sends to the outbox once run', async () => {
   const page = await site.submit(signUp, { name: 'Ada', email: 'ada@example.com' }, { from: '/' })
 

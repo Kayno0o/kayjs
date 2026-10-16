@@ -21,6 +21,10 @@
       "types": "./types/index.d.ts",
       "default": "./src/index.ts"
     },
+    "./browser": {
+      "types": "./types/browser.d.ts",
+      "default": "./src/browser.ts"
+    },
     "./rules": {
       "types": "./types/rules.d.ts",
       "default": "./src/rules.ts"

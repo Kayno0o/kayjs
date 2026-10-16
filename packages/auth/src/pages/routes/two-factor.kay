@@ -26,7 +26,7 @@ export const passkeyOptions = action(async (ctx) => {
 })
 
 export const passkey = action(schemas.passkey, async (input, ctx) => {
-  const result = await ctx.locals.auth.verifyTwoFactorPasskey(input.response as never)
+  const result = await ctx.locals.auth.verifyTwoFactorPasskey(input.response)
 
   if (!result.ok)
     return ctx.fail(400, { error: result.error === 'invalid' ? 'code' : result.error })

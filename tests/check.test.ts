@@ -728,6 +728,28 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 
+  it('types the pages of an extension the app reaches through a workspace link in a node_modules above it', async () => {
+    const base = await scratchDir('linked-')
+    const root = join(base, 'app')
+    const lib = join(base, 'lib')
+
+    try {
+      await Promise.all(Object.entries({
+        'app/tsconfig.json': tsconfig,
+        'app/package.json': JSON.stringify({ name: 'app', dependencies: { lib: '*' } }),
+        'app/src/routes/index.kay': 'p home\n',
+        'lib/package.json': JSON.stringify({ name: 'lib', peerDependencies: { kay: '*' } }),
+        'lib/routes/login.kay': '--- server\nconst q: number = ctx.url.pathname\n---\np {q}\n',
+      }).map(async ([path, content]) => Bun.write(join(base, path), content)))
+      await mkdir(join(base, 'node_modules'), { recursive: true })
+      await symlink(lib, join(base, 'node_modules/lib'))
+      expect((await check(root, { extensions: [{ name: 'lib', routes: { dir: join(lib, 'routes'), prefix: '/auth' } }] })).map(d => [basename(d.file), d.line, named(d)])).toEqual([['login.kay', 2, 'TS2322']])
+    }
+    finally {
+      await rm(base, { recursive: true, force: true })
+    }
+  })
+
   it('reports a name a layout and its page declare with different schemas, and a special page declaring a query', async () => {
     const schema = (field: string) => `--- server\nimport { s } from 'kay'\n\nexport const page = { query: s.Object({ period: ${field} }) }\n---\np Page\n`
     const root = await scratchProject({

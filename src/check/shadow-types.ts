@@ -207,7 +207,7 @@ async function libraryShadows(root: string, options: CheckOptions, own: string[]
   // The editor finds a package's tsconfig for the files beside the app but not under a `node_modules`, where tsgo takes them as the app's imports: a package of a program is shadowed beside its real path, and the shadows under `node_modules` are a link to them.
   const apart = (file: string) => programs.some(({ library }) => libraryOf([library], file) !== undefined)
   const shadowOf = programShadows(root, programs)
-  const pages = files.filter(file => file === localEditor || local.some(mount => file.startsWith(mount.dir + sep)))
+  const pages = files.filter(file => file === localEditor || local.some(mount => [file, realFile(followed, file)].some(path => path.startsWith(mount.dir + sep))))
   const reached = new Set([...pages, ...(await reachableLibraryFiles(root, followed, [...own, ...pages])).components.map((file) => {
     const library = libraryOf(followed, file)
 

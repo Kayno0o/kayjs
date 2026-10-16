@@ -1,8 +1,9 @@
 ---
 import type { User } from '../../core'
-import { ActionError, onMount, signal } from 'kay'
+import { onMount, signal } from 'kay'
 import Button from '@kaynooo/kayjs-ui/button.kay'
 import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import { canMakePasskey, makePasskey, passkeyFailure } from '../../browser'
 import { addPasskey, passkeyOptions } from '../routes/account/security.kay'
 import Proof from './proof.kay'
 
@@ -12,7 +13,7 @@ const supported = signal<boolean>()
 const error = signal('')
 const name = signal('')
 
-onMount(() => supported.set(typeof PublicKeyCredential !== 'undefined' && 'parseCreationOptionsFromJSON' in PublicKeyCredential))
+onMount(() => supported.set(canMakePasskey()))
 
 async function add(event: SubmitEvent) {
   event.preventDefault()
@@ -24,22 +25,13 @@ async function add(event: SubmitEvent) {
     proof.delete('name')
 
     const options = await passkeyOptions(proof, { refresh: false })
-    // @simplewebauthn types the prf extension's values as BufferSource where the DOM's JSON type has strings, for the same JSON.
-    const credential = await navigator.credentials.create({ publicKey: PublicKeyCredential.parseCreationOptionsFromJSON(options as unknown as PublicKeyCredentialCreationOptionsJSON) })
+    const response = await makePasskey(options)
 
-    if (credential instanceof PublicKeyCredential)
-      await addPasskey({ response: credential.toJSON(), ...(name() ? { name: name() } : {}) })
+    if (response)
+      await addPasskey({ response, ...(name() ? { name: name() } : {}) })
   }
   catch (caught) {
-    if (caught instanceof ActionError) {
-      const code = (caught.data as { error?: string } | undefined)?.error
-
-      error.set(code === undefined ? failed : errors[code] ?? failed)
-    }
-    // Dismissing the browser's prompt is no failure.
-    else if (!(caught instanceof DOMException && caught.name === 'NotAllowedError')) {
-      error.set(failed)
-    }
+    error.set(passkeyFailure(caught, errors, failed))
   }
 }
 ---
