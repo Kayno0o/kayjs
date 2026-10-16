@@ -5,7 +5,8 @@ import { $, Glob } from 'bun'
 import { addedMarkers } from './merge-markers'
 import { failedTests } from './test-failures'
 
-// `just land`, which holds the landing lock: this branch rebased on origin's main, linted, checked and run through the tests its changes reach, then pushed as main, and the main checkout moved to it. The full suite is CI's, on every push, which `just ci` follows.
+// `just land`: this branch rebased on origin's main, linted, checked and run through the tests its changes reach, then pushed as main, and the main checkout moved to it. The full suite is CI's, on every push, which `just ci` follows.
+// Landings verify side by side and queue only for the push: the one that finds origin's main where its rebase left it pushes at once under the landing lock, one that finds it moved rebases and verifies again under the lock.
 // It prints one line per step, their output going to a log in the worktree's git folder, and a failure ends on the step's last lines, exiting with one of EXIT's codes.
 const EXIT = { unlandable: 2, conflict: 3, step: 4, refused: 5 }
 const LOG = join((await $`git rev-parse --absolute-git-dir`.text()).trim(), 'land.log')
@@ -30,6 +31,37 @@ const WORKERS = '--parallel=6'
 function fail(message: string, code: number): never {
   console.error(`land failed: ${message}`)
   process.exit(code)
+}
+
+// `flock` on the lock file running a shell that says it holds it and keeps it while its stdin stays open, so a landing killed at any point frees it.
+async function holder(lock: string, wait: boolean) {
+  const child = Bun.spawn(['flock', ...wait ? [] : ['-n'], lock, 'sh', '-c', 'echo held; cat >/dev/null'], { stdin: 'pipe', stdout: 'pipe', stderr: 'inherit' })
+  let said = ''
+
+  for await (const chunk of child.stdout) {
+    said += Buffer.from(chunk).toString()
+
+    if (said.includes('held'))
+      break
+  }
+
+  return { held: said.includes('held'), release: async () => {
+    await child.stdin.end()
+    await child.exited
+  } }
+}
+
+// The landing lock, taken once the checks passed: a landing already holding it is waited for.
+async function takeLock() {
+  const lock = join((await $`git rev-parse --git-common-dir`.text()).trim(), 'kay-land.lock')
+  const free = await holder(lock, false)
+
+  if (free.held)
+    return free.release
+
+  console.log('waiting for another landing to finish')
+
+  return (await holder(lock, true)).release
 }
 
 // Runs one step with its output in the log, failing the landing on its failed tests and last lines.
@@ -63,69 +95,85 @@ if ((await $`git status --porcelain`.text()).trim() !== '')
   fail('the working tree has changes: commit them first', EXIT.unlandable)
 
 await Bun.write(LOG, '')
-await $`git fetch -q origin main`
 
-if ((await $`git rebase -q origin/main`.nothrow().quiet()).exitCode !== 0) {
-  const conflicts = (await $`git diff --name-only --diff-filter=U`.text()).trim().split('\n').join(', ')
+// Rebases on origin's main and runs the checks and tests the changes reach, answering the commit of origin's main it stands on.
+async function verify(): Promise<string> {
+  await $`git fetch -q origin main`
 
-  await $`git rebase --abort`.nothrow().quiet()
-  fail(`the branch conflicts with main in ${conflicts}: rebase it by hand, then land again`, EXIT.conflict)
-}
+  if ((await $`git rebase -q origin/main`.nothrow().quiet()).exitCode !== 0) {
+    const conflicts = (await $`git diff --name-only --diff-filter=U`.text()).trim().split('\n').join(', ')
 
-const changed = (await $`git diff --name-only origin/main HEAD`.text()).split('\n').filter(Boolean)
-
-if (changed.length === 0)
-  fail('nothing to land: the branch is main', EXIT.unlandable)
-
-// A rebase resolved by hand can leave a conflict marker in a file no check reads.
-const markers = addedMarkers(await $`git diff --unified=0 --no-color origin/main HEAD`.text())
-
-if (markers.length > 0)
-  fail(`the branch adds merge markers: ${markers.map(({ file, line, text }) => `${file}:${line} (${text})`).join(', ')}`, EXIT.unlandable)
-
-// Main may have moved the lockfile under this branch.
-await step('bun install', $`bun install --silent --frozen-lockfile 2>&1`)
-await step('lint', $`bun run lint 2>&1`)
-await step('check', $`bun run check 2>&1`)
-
-if (changed.some(path => path.startsWith('bench/') || path === 'bun.lock')) {
-  await step('bench:check', $`bun run bench:check 2>&1`)
-  await step('bench hydration markers', $`bun test ./bench -t ${'leave hydration markers'} 2>&1`)
-}
-else if (changed.some(path => path.startsWith('src/'))) {
-  await step('bench:check:kay', $`bun run bench:check:kay 2>&1`)
-}
-
-if (changed.some(path => path.startsWith('.forgejo/')))
-  await step('lint-actions', $`just lint-actions 2>&1`)
-
-if (changed.some(path => WHOLE_SUITE.test(path))) {
-  await step('tests, the whole suite', $`bun run test ${WORKERS} 2>&1`)
-}
-else {
-  await step('tests the changes reach', $`bun run test --changed=origin/main ${WORKERS} 2>&1`)
-
-  const readers = new Set(READERS.flatMap(([folder, tests]) => changed.some(path => folder.test(path)) ? tests : []))
-  const fixtures = [...new Set(changed.map(path => FIXTURE.exec(path)?.[1]).filter(name => name !== undefined))]
-  // A fixture's name as a path segment or a quoted string, as in `fixtures/site`, `join(fixtures, 'site')` or `fixtureCopy('site')`.
-  const names = fixtures.map(name => new RegExp(`[/'"\`]${name}[/'"\`]`))
-
-  if (names.length > 0) {
-    for await (const test of new Glob('tests/*.test.ts').scan()) {
-      const text = await Bun.file(test).text()
-
-      if (names.some(name => name.test(text)))
-        readers.add(test)
-    }
+    await $`git rebase --abort`.nothrow().quiet()
+    fail(`the branch conflicts with main in ${conflicts}: rebase it by hand, then land again`, EXIT.conflict)
   }
 
-  if (readers.size > 0)
-    await step('tests reading the changed files', $`bun run test ${[...readers]} ${WORKERS} 2>&1`)
+  const changed = (await $`git diff --name-only origin/main HEAD`.text()).split('\n').filter(Boolean)
+
+  if (changed.length === 0)
+    fail('nothing to land: the branch is main', EXIT.unlandable)
+
+  // A rebase resolved by hand can leave a conflict marker in a file no check reads.
+  const markers = addedMarkers(await $`git diff --unified=0 --no-color origin/main HEAD`.text())
+
+  if (markers.length > 0)
+    fail(`the branch adds merge markers: ${markers.map(({ file, line, text }) => `${file}:${line} (${text})`).join(', ')}`, EXIT.unlandable)
+
+  // Main may have moved the lockfile under this branch.
+  await step('bun install', $`bun install --silent --frozen-lockfile 2>&1`)
+  await step('lint', $`bun run lint 2>&1`)
+  await step('check', $`bun run check 2>&1`)
+
+  if (changed.some(path => path.startsWith('bench/') || path === 'bun.lock')) {
+    await step('bench:check', $`bun run bench:check 2>&1`)
+    await step('bench hydration markers', $`bun test ./bench -t ${'leave hydration markers'} 2>&1`)
+  }
+  else if (changed.some(path => path.startsWith('src/'))) {
+    await step('bench:check:kay', $`bun run bench:check:kay 2>&1`)
+  }
+
+  if (changed.some(path => path.startsWith('.forgejo/')))
+    await step('lint-actions', $`just lint-actions 2>&1`)
+
+  if (changed.some(path => WHOLE_SUITE.test(path))) {
+    await step('tests, the whole suite', $`bun run test ${WORKERS} 2>&1`)
+  }
+  else {
+    await step('tests the changes reach', $`bun run test --changed=origin/main ${WORKERS} 2>&1`)
+
+    const readers = new Set(READERS.flatMap(([folder, tests]) => changed.some(path => folder.test(path)) ? tests : []))
+    const fixtures = [...new Set(changed.map(path => FIXTURE.exec(path)?.[1]).filter(name => name !== undefined))]
+    // A fixture's name as a path segment or a quoted string, as in `fixtures/site`, `join(fixtures, 'site')` or `fixtureCopy('site')`.
+    const names = fixtures.map(name => new RegExp(`[/'"\`]${name}[/'"\`]`))
+
+    if (names.length > 0) {
+      for await (const test of new Glob('tests/*.test.ts').scan()) {
+        const text = await Bun.file(test).text()
+
+        if (names.some(name => name.test(text)))
+          readers.add(test)
+      }
+    }
+
+    if (readers.size > 0)
+      await step('tests reading the changed files', $`bun run test ${[...readers]} ${WORKERS} 2>&1`)
+  }
+
+  for (const name of new Set(changed.map(path => PACKAGE.exec(path)?.[1]).filter(name => name !== undefined))) {
+    await step(`packages/${name} check`, $`bun run check 2>&1`.cwd(`packages/${name}`))
+    await step(`packages/${name} tests`, $`bun run test 2>&1`.cwd(`packages/${name}`))
+  }
+
+  return (await $`git rev-parse origin/main`.text()).trim()
 }
 
-for (const name of new Set(changed.map(path => PACKAGE.exec(path)?.[1]).filter(name => name !== undefined))) {
-  await step(`packages/${name} check`, $`bun run check 2>&1`.cwd(`packages/${name}`))
-  await step(`packages/${name} tests`, $`bun run test 2>&1`.cwd(`packages/${name}`))
+let verified = await verify()
+const release = await takeLock()
+
+await $`git fetch -q origin main`
+
+if ((await $`git rev-parse origin/main`.text()).trim() !== verified) {
+  console.log('main moved while verifying: rebasing and verifying again')
+  verified = await verify()
 }
 
 // origin pushes to Forgejo, then mirrors to GitHub: main is Forgejo's, so only its refusal stops a landing.
@@ -175,5 +223,6 @@ async function followMain() {
 }
 
 await followMain()
+await release()
 
 console.log(`landed ${short} on main: \`just ci ${short}\` follows its CI run`)

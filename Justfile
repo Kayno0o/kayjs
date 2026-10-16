@@ -45,14 +45,9 @@ watch-runs after:
 	echo "the runs did not finish in 15 minutes: $runs" >&2
 	exit 1
 
-# land this branch on main: rebased on origin's, checked, the tests its changes reach, pushed; one landing at a time, a second one waiting for the first; one line per step, their output in the git folder's land.log
+# land this branch on main: rebased on origin's, checked, the tests its changes reach, pushed; landings verify side by side and take turns only to push, one that finds main moved verifying again; one line per step, their output in the git folder's land.log
 land:
-	#!/usr/bin/env bash
-	set -euo pipefail
-	exec 9>"$(git rev-parse --git-common-dir)/kay-land.lock"
-	flock -n 9 || { echo "waiting for another landing to finish"; flock 9; }
-	# Only this shell holds the lock: a process the landing leaves running must not keep it.
-	bun scripts/land.ts 9>&-
+	bun scripts/land.ts
 
 # wait for the CI run covering a commit on main, origin's tip by default, printing what failed
 ci sha="":
