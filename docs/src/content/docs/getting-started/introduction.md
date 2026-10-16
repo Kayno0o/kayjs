@@ -54,7 +54,7 @@ Counter
 - [Templates](/essentials/templates) and [Components](/essentials/components) teach the syntax.
 - [How a request runs](/essentials/how-a-request-runs) shows what runs on the server and what in the browser.
 - [The tutorial](/guides/tutorial) builds a small app step by step.
-- [Migrating from Astro](/migrating/migrating-from-astro) moves an Astro site over with one command.
-- [Migrating from SvelteKit](/migrating/migrating-from-sveltekit), [from Next.js](/migrating/migrating-from-nextjs) and [from Laravel](/migrating/migrating-from-laravel) map what you know to kay, concept by concept.
+- [Migrating from Astro](/migrating/from-astro) moves an Astro site over with one command.
+- [Migrating from SvelteKit](/migrating/from-sveltekit), [from Next.js](/migrating/from-nextjs) and [from Laravel](/migrating/from-laravel) map what you know to kay, concept by concept.
 
 <ReadMore href="/llms">The full reference documents every topic, written for people and coding agents alike.</ReadMore>
