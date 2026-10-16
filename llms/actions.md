@@ -45,6 +45,8 @@ form(action={rename})
   button Rename
 ```
 
+A field's `error` is a text, or a function such as `error: () => t('names.required')` that kay calls in the request's locale, for the server's refusal and for the rules rendered into the page, so a visitor reads their language with or without JavaScript. A function that throws or returns no string leaves the field its default wording.
+
 ### Show what a post returned
 
 The handler's result comes back on the next render of the page, once, through `ctx.succeeded`:

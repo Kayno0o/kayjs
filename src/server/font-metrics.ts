@@ -1,7 +1,4 @@
-import process from 'node:process'
-
-// Read when a font is, which only a build or a dev server does: the compiled server keeps zlib out of its eager imports.
-const zlib = () => process.getBuiltinModule('node:zlib')
+import { nodeZlib } from './builtins'
 
 export type FallbackKind = 'sans' | 'serif' | 'mono'
 
@@ -63,7 +60,7 @@ function readTables(bytes: Uint8Array): Tables {
       const length = file.getUint32(entry + 12)
       const data = bytes.subarray(offset, offset + compressed)
 
-      tables.set(tag(file, entry), viewOf(compressed < length ? new Uint8Array(zlib().inflateSync(data)) : data))
+      tables.set(tag(file, entry), viewOf(compressed < length ? new Uint8Array(nodeZlib().inflateSync(data)) : data))
     }
 
     return tables
@@ -103,7 +100,7 @@ function readTables(bytes: Uint8Array): Tables {
       entries.push({ name: name!, length: transformed ? base128() : original, kept: !transformed })
     }
 
-    const stream = new Uint8Array(zlib().brotliDecompressSync(bytes.subarray(cursor, cursor + file.getUint32(20))))
+    const stream = new Uint8Array(nodeZlib().brotliDecompressSync(bytes.subarray(cursor, cursor + file.getUint32(20))))
     let offset = 0
 
     for (const { name, length, kept } of entries) {

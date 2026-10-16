@@ -6,7 +6,7 @@ import { s } from 'kay'
 import { t } from 'kay/i18n'
 import { siteOrigin } from 'kay/seo'
 import { log } from './log'
-import { MailNotConfigured } from './mailer'
+import { MailNotConfigured, wasLogged } from './mailer'
 
 // What the view of a contact mail is given: the visitor's answers as `fields` (the name and email first, the message apart), the `subject` and the site's `origin`.
 export interface ContactMailProps {
@@ -23,9 +23,19 @@ const ONE_LINE = '^[^\\r\\n]*\\S[^\\r\\n]*$'
 const LINK = /https?:\/\//gi
 const WORDS = /[-_]+/g
 const RESERVED = ['name', 'email', 'message', 'website']
-// The English text stays as `error`; `localizedError` words it in the page's language when kay refuses the field.
 const DEFAULT_ERRORS = { name: 'Please write your name, on one line.', email: 'Please write a valid email address.', message: 'Please write your message.' }
-const LOCALIZED_ERRORS = { name: () => t('mail.contact.errors.name'), email: () => t('mail.contact.errors.email'), message: () => t('mail.contact.errors.message') }
+
+// The message in the page's language, or the English text when kayjs-mail's messages are not brought in (`mailExtension`) or the language has none.
+function wording(key: string, english: string): string {
+  try {
+    const text = (t)(key)
+
+    return text === key ? english : text
+  }
+  catch {
+    return english
+  }
+}
 
 export interface ContactOptions<Extra extends Record<string, TSchema> = Record<never, TSchema>> {
   // The fields beyond `name`, `email` and `message`, as schemas: `{ phone: s.Optional(s.String({ maxLength: 30 })), topic: s.UnionEnum(['quote', 'other']) }`. They go in the mail, after the email, in this order.
@@ -62,14 +72,7 @@ export function contactForm<const Extra extends Record<string, TSchema> = Record
   protection: ActionProtection<'website'>,
 ] {
   const { fields = {} as Extra, labels = {}, reach, maxLinks = 3, maxLength = 5000 } = options
-  const refusal = (key: keyof typeof DEFAULT_ERRORS) => {
-    const given = options.errors?.[key]
-
-    if (typeof given === 'string')
-      return { error: given }
-
-    return { error: DEFAULT_ERRORS[key], localizedError: given ?? LOCALIZED_ERRORS[key] }
-  }
+  const refusal = (key: keyof typeof DEFAULT_ERRORS) => ({ error: options.errors?.[key] ?? (() => wording(`mail.contact.errors.${key}`, DEFAULT_ERRORS[key])) })
   const reserved = RESERVED.filter(key => key in fields)
 
   if (reserved.length > 0)
@@ -115,14 +118,15 @@ export function contactForm<const Extra extends Record<string, TSchema> = Record
       })
     }
     catch (error) {
-      // The mailer logs a failed send itself.
+      // The mailer logs a delivery that fails after it is queued; what stops before that (not configured, a view that does not render) is logged here.
       if (error instanceof MailNotConfigured) {
-        log.error(error.message)
+        log.error(error.message, error)
 
         return ctx.fail(503, reach === undefined ? t('mail.contact.notConfigured') : t('mail.contact.notConfiguredReach', words))
       }
 
-      log.error(`the contact mail could not be sent: ${error instanceof Error ? error.message : String(error)}`)
+      if (!wasLogged(error))
+        log.error('the contact mail could not be sent', error)
 
       return ctx.fail(502, reach === undefined ? t('mail.contact.sendFailed') : t('mail.contact.sendFailedReach', words))
     }

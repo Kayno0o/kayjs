@@ -1,17 +1,28 @@
 import type { Action } from 'kay'
 import { beforeEach, describe, expect, it } from 'bun:test'
-import { s } from 'kay'
+import { action, s } from 'kay'
 import { testSite } from 'kay/test'
 import { contactForm } from '../src/contact'
+import { mailer } from '../src/mailer'
 import { outbox } from '../src/outbox'
+
+const SINK = Symbol.for('kay.log')
 
 interface Answers { name: string, email: string, phone?: string, topic: 'quote' | 'other', message: string }
 
 // Imported by path, as the fixture is no part of this package's type check.
 const { contact } = await import(`${import.meta.dir}/fixture/src/routes/contact.kay`) as { contact: Action<Answers, unknown> }
-const { noRecipient, serverDown } = await import(`${import.meta.dir}/fixture/src/routes/broken.kay`) as { noRecipient: Action<Answers, unknown>, serverDown: Action<Answers, unknown> }
+const { noRecipient, serverDown, worded, unrendered } = await import(`${import.meta.dir}/fixture/src/routes/broken.kay`) as Record<'noRecipient' | 'serverDown' | 'worded' | 'unrendered', Action<Answers, unknown>>
+
+// Spread into `action`, the form keeps its input typed: the extra field is there, and a field it does not have is refused.
+const typed = action(...contactForm(mailer({ from: 'a@fixture.test' }), { fields: { phone: s.Optional(s.String({ maxLength: 30 })) } }))
+const held: Action<{ name: string, email: string, message: string, phone?: string }, unknown, 'website'> = typed
+// @ts-expect-error `nope` is no field of the contact form
+const dropped: Action<{ nope: number }, unknown, 'website'> = typed
 
 const fields: Answers = { name: 'Ada Lovelace', email: 'ada@example.com', phone: '06 12 34 56 78', topic: 'quote', message: 'Hello,\nI would like a quote.' }
+
+void [held, dropped]
 
 beforeEach(() => outbox.clear())
 
@@ -58,6 +69,24 @@ describe('contactForm', () => {
 
     expect(refused.status).toBe(502)
     expect(refused.errors['']).toBe('Your message could not be sent. Please try again later.')
+  })
+
+  it('logs a failed send once, the mailer having logged it already', async () => {
+    const { refusal } = await site()
+    const calls: unknown[][] = []
+    const global = globalThis as { [SINK]?: unknown }
+    const sink = global[SINK]
+
+    global[SINK] = (...args: unknown[]) => calls.push(args)
+
+    try {
+      await refusal(serverDown, fields)
+    }
+    finally {
+      global[SINK] = sink
+    }
+
+    expect(calls.filter(call => call[0] === 'error')).toHaveLength(1)
   })
 
   it('refuses a name holding a line break and a missing topic with the field\'s message', async () => {
@@ -107,5 +136,42 @@ describe('contactForm', () => {
 
     expect((await refusal(contact, bad)).errors.email).toBe('Please write a valid email address.')
     expect((await refusal(contact, bad, { from: '/fr/contact' })).errors.email).toBe('Merci d\'écrire une adresse e-mail valide.')
+  })
+
+  it('refuses a field with the errors option, a text or a function', async () => {
+    const { refusal } = await site()
+    const refused = await refusal(worded, { ...fields, name: '', email: 'nope' })
+
+    expect(refused.errors.email).toBe('Bad address')
+    expect(refused.errors.name).toBe('A name, please')
+    expect(refused.errors.message).toBeUndefined()
+  })
+
+  it('words a refused field in English when the messages are not brought in', () => {
+    const [{ properties }] = contactForm(mailer({ from: 'a@fixture.test' })) as unknown as [{ properties: Record<string, { error: () => string }> }]
+
+    expect(properties.email!.error()).toBe('Please write a valid email address.')
+  })
+
+  it('logs a mail the view could not render, with the error', async () => {
+    const { refusal } = await site()
+    const calls: unknown[][] = []
+    const global = globalThis as { [SINK]?: unknown }
+    const sink = global[SINK]
+
+    global[SINK] = (...args: unknown[]) => calls.push(args)
+
+    try {
+      expect((await refusal(unrendered, fields)).status).toBe(502)
+    }
+    finally {
+      global[SINK] = sink
+    }
+
+    const [level, message, error] = calls.find(call => call[0] === 'error') ?? []
+
+    expect(level).toBe('error')
+    expect(message).toBe('the contact mail could not be sent')
+    expect((error as Error).message).toContain('the view does not render')
   })
 })

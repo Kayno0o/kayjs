@@ -23,6 +23,7 @@ import { routerPath } from './base'
 import { sizeText } from './body'
 import { importModule } from './bundle'
 import { cookieJar } from './cookies'
+import { fieldMessage, validated } from './field-errors'
 import { handOver, submittedValues, writeSuccess } from './flash'
 import { requiredGuards, runGuards, unguarded } from './guards'
 import { requestLocale, stateFor } from './i18n'
@@ -135,7 +136,7 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], m
 
         return carryContext(context.set, response)
       }), {
-        body: value.schema,
+        body: validated(value.schema),
         transform: async (context) => {
           refuseCrossSite(context.request)
 
@@ -330,11 +331,9 @@ function callInput(body: unknown): unknown {
   }
 }
 
-// The `error` option the schema gives a top-level field, when it is a string.
+// The `error` option the schema gives a top-level field, read in the request's locale.
 function fieldError(action: ServerAction<TSchema, unknown>, field: string): string | undefined {
-  const error = (action.schema as { properties?: Record<string, { error?: unknown }> }).properties?.[field]?.error
-
-  return typeof error === 'string' ? error : undefined
+  return fieldMessage(action.schema, `/${field}`)
 }
 
 // The fields the form's action URL fixes through `with()`, which stand over the ones posted under the same name.
@@ -717,16 +716,16 @@ function encodeOrExplain(value: unknown, what: string): string {
   }
 }
 
-// Input the schema refused: a message per field, the schema's own `error` when it has one, or what its `localizedError` function words in the request's locale (Elysia would call a function `error` outside it).
+// Input the schema refused: a message per field, the schema's own `error` when it has one, a function `error` called in the request's locale.
 async function refused(action: ServerAction<TSchema, unknown>, error: Readonly<ValidationError>, request: Request, server: Server | null, back: Back): Promise<Response> {
   const errors: Record<string, string> = {}
 
   for (const issue of error.all) {
     const field = 'path' in issue ? FIELD.exec(issue.path)?.[1] ?? '' : ''
-    const schema = 'schema' in issue ? issue.schema as { error?: unknown, localizedError?: unknown } : undefined
-    const custom = typeof schema?.localizedError === 'function' ? (schema.localizedError as () => unknown)() : schema?.error
+    const own = 'schema' in issue ? (issue.schema as { error?: unknown }).error : undefined
+    const custom = ('path' in issue ? fieldMessage(action.schema, issue.path) : undefined) ?? (typeof own === 'string' ? own : undefined)
 
-    errors[field] ??= typeof custom === 'string' ? custom : issue.summary ?? 'Invalid value'
+    errors[field] ??= custom ?? issue.summary ?? 'Invalid value'
   }
 
   return failed(request, new Headers(), cookieJar(request).cookies, { action: action.url, status: 422, values: submittedValues(error.value), errors }, server, back)

@@ -1,0 +1,18 @@
+--- server
+import { s } from 'kay'
+import { t } from 'kay/i18n'
+
+export const rename = action(s.Object({
+  name: s.String({ minLength: 2, maxLength: 40, error: () => t('form.name') }),
+  nickname: s.String({ minLength: 2, error: () => { throw new Error('no message') } }),
+  note: s.String({ minLength: 2, error: () => 42 as unknown as string }),
+}), () => undefined)
+---
+form(action={rename})
+  input(field="name")
+  error name
+  input(field="nickname")
+  error nickname
+  input(field="note")
+  error note
+  button Rename

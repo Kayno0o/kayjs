@@ -61,6 +61,13 @@ export interface MailerOptions {
   optional?: boolean | undefined
 }
 
+// The errors `send` has logged, so a caller logging what it catches skips them.
+const logged = new WeakSet<object>()
+
+export function wasLogged(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && logged.has(error)
+}
+
 // Thrown by an `optional` mailer while the environment lacks what it needs to send, so a form can tell the visitor another way to reach the site.
 export class MailNotConfigured extends Error {
   override name = 'MailNotConfigured'
@@ -391,6 +398,9 @@ export function mailer(options: MailerOptions = {}): Mailer {
       }
       catch (error) {
         log.error(`${quoted(mail.subject)} to ${whom(recipientsOf(mail))} was not sent`, error)
+
+        if (typeof error === 'object' && error !== null)
+          logged.add(error)
 
         throw error
       }

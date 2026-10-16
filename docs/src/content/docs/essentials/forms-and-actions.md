@@ -26,6 +26,8 @@ form(action={add})
 
 `form(action={add})` posts without JavaScript. `field="title"` names the input `title`, and `kay check` verifies the name against the schema. It also writes what the schema asks of `title` as attributes the browser checks: here `required`, `minlength` and `maxlength`. With kay's script the form posts without a reload, checked against the schema first, so the browser shows the schema's `error` message.
 
+A field's `error` is a text, or a function such as `error: () => t('titles.required')` that kay calls in the request's locale, both for the server's refusal and for the rules the page carries, so a visitor reads their own language with or without JavaScript. A function that throws or returns no string leaves the field its default wording.
+
 Text reaches the schema trimmed, and an optional field left blank counts as left out.
 
 ## An action with no input
