@@ -48,7 +48,7 @@ let calls = 0
 let reloading = false
 // Why the run being loaded cannot take over, as an entry asking for another port or a server fewer.
 let mismatch: string | undefined
-// How far the process may grow from its first reload before the next change starts a new one: Bun keeps the code of every ES module it evaluates again, which adds up to about the size of the modules reloaded.
+// How far the process may grow from its first reload before the next change starts a new one: Bun caches the code of the ES modules it evaluates again, up to 2000 of them, which adds up to about the size of the modules reloaded long before that.
 const GROWTH_LIMIT = (Number(process.env.KAY_DEV_RELOAD_GROWTH_MB) || 64) * 1024 * 1024
 let grownFrom: number | undefined
 
