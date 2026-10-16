@@ -173,6 +173,14 @@ describe('deprecated-import', () => {
     expect(fixed(last)).toEqual([last.replace('{ api, invalidatePage as refresh } from \'kay/server\'', '{ api } from \'kay/server\'\nimport { invalidatePage as refresh } from \'kay/cache\'')])
   })
 
+  it('takes the name out of a multi-line import and keeps a type import a type', () => {
+    const many = '--- server\nimport {\n  api,\n  invalidatePage,\n  pages,\n} from \'kay/server\'\n\ninvalidatePage(\'/\')\n---\np x'
+    const typed = 'import type { invalidatePage, pages } from \'kay/server\'\n'
+
+    expect(fixed(many)).toEqual([many.replace('  api,\n  invalidatePage,\n  pages,\n} from \'kay/server\'', '  api,\n  pages,\n} from \'kay/server\'\nimport { invalidatePage } from \'kay/cache\'')])
+    expect(moduleChecks(typed).flatMap(d => d.fixes ?? []).map(fix => fix.edits.map(edit => edit.text))).toEqual([['', '\nimport type { invalidatePage } from \'kay/cache\'']])
+  })
+
   it('leaves the names of other modules and kay/cache alone, and finds the import in a plain module too', () => {
     expect(lints('--- server\nimport { invalidatePage } from \'./mine\'\nimport { invalidate } from \'kay/cache\'\n---\np x')).toEqual([])
     expect(moduleChecks('import { invalidatePage } from \'kay/server\'\n').map(d => d.code)).toEqual(['deprecated-import'])

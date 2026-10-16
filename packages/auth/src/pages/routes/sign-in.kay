@@ -1,5 +1,5 @@
 --- server
-import { action, localPath } from 'kay'
+import { localPath } from 'kay'
 import { localize, t } from 'kay/i18n'
 import Captcha from '../components/captcha.kay'
 import Message from '../components/message.kay'

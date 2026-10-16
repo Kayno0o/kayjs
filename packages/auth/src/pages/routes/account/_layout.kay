@@ -1,5 +1,4 @@
 --- server
-import { action } from 'kay'
 import { localize, t } from 'kay/i18n'
 import Button from '@kaynooo/kayjs-ui/button.kay'
 import TabNav from '@kaynooo/kayjs-ui/tab-nav.kay'

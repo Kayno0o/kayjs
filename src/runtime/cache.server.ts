@@ -10,7 +10,7 @@ const EVENT_TTL_MS = 60_000
 // Tells this process's own messages apart from the others', whatever store instance wrote them.
 const PROCESS = crypto.randomUUID()
 
-export { invalidatePage } from '../server/revalidate'
+export { invalidatePage } from '../server/stale-pages'
 export type { CacheOptions, CacheStore } from './cache'
 export { cached, invalidate } from './cache'
 

@@ -199,7 +199,7 @@ describe('cached with a store', () => {
       expect(await visit()).toContain('<h1>Edition 1</h1>')
       news.edition = 7
 
-      const child = Bun.spawn([process.execPath, '-e', `import { sqliteCache } from ${JSON.stringify(resolve('src/runtime/cache.server.ts'))}\nimport { invalidatePage } from ${JSON.stringify(resolve('src/server/revalidate.ts'))}\nsqliteCache(${JSON.stringify(path)})\ninvalidatePage('/news')\n`], { stderr: 'inherit' })
+      const child = Bun.spawn([process.execPath, '-e', `import { sqliteCache } from ${JSON.stringify(resolve('src/runtime/cache.server.ts'))}\nimport { invalidatePage } from ${JSON.stringify(resolve('src/server/stale-pages.ts'))}\nsqliteCache(${JSON.stringify(path)})\ninvalidatePage('/news')\n`], { stderr: 'inherit' })
 
       expect(await child.exited).toBe(0)
 

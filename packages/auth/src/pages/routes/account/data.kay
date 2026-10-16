@@ -1,5 +1,4 @@
 --- server
-import { action } from 'kay'
 import { localize, t } from 'kay/i18n'
 import Message from '../../components/message.kay'
 import Proof from '../../components/proof.kay'

@@ -43,7 +43,7 @@ p {greeting}
 Badge(label="new")
 ```
 
-`props`, `signal`, `memo`, `effect`, `onMount`, `onCleanup` and the translation `t` need no import. Anything else from `kay`, such as `persisted`, is imported.
+`props`, `signal`, `memo`, `effect`, `onMount`, `onCleanup`, the translation `t` and, in the server fence of a page or layout, `action` need no import. Anything else is imported, such as `persisted` from `kay`. [Modules](/reference/modules) says which entry holds what.
 
 ## Props
 

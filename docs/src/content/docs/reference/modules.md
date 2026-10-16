@@ -11,7 +11,7 @@ import { defineConfig, pages, session } from 'kay/server'
 import { collection } from 'kay/content'
 ```
 
-`signal`, `memo`, `effect`, `onMount`, `onCleanup`, `props`, a server fence's `action` and the translation `t` need no import inside a `.kay` file: they are what a component is written with. Everything else is imported: from `kay` when browser code may run it, from `kay/server` when only the server does, from the entry of its topic otherwise, `kay/i18n`, `kay/cache` or `kay/content`. Components, such as `T`, are always imported.
+`signal`, `memo`, `effect`, `onMount`, `onCleanup`, `props`, a server fence's `action` and the translation `t` need no import inside a `.kay` file: they are what a component is written with. Everything else is imported. `kay` holds what pages, components, guards and routes are written with, `kay/server` what sets up and runs the server, and a topic's own entry, such as `kay/i18n`, `kay/cache` or `kay/content`, that topic's helpers. Components, such as `T`, are always imported.
 
 ## kay
 
