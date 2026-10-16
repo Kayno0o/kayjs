@@ -132,7 +132,7 @@ export function smtp(settings: SmtpSettings): Transport {
         await verifying.verify()
       }
       catch (error) {
-        throw explained(error, settings)
+        throw explained(error, settings, 'no mail would be sent')
       }
       finally {
         verifying.close()
@@ -142,11 +142,11 @@ export function smtp(settings: SmtpSettings): Transport {
 }
 
 // nodemailer says only that STARTTLS failed, not that kay required it nor how a relay taking mail in clear is allowed.
-function explained(error: unknown, settings: SmtpSettings): unknown {
+function explained(error: unknown, settings: SmtpSettings, outcome = 'nothing was sent'): unknown {
   if ((error as { code?: unknown }).code !== 'ETLS')
     return error
 
-  return new Error(`kayjs-mail: ${settings.host}:${settings.port ?? DEFAULT_PORT} did not upgrade to TLS with STARTTLS, which kayjs-mail requires on every port but 465, so nothing was sent; a relay taking mail in clear, as on a private network, needs SMTP_INSECURE=true (smtp({ insecure: true })), which is ignored while SMTP_PASS is set, as a password never goes in clear`, { cause: error })
+  return new Error(`kayjs-mail: ${settings.host}:${settings.port ?? DEFAULT_PORT} did not upgrade to TLS with STARTTLS, which kayjs-mail requires on every port but 465, so ${outcome}; a relay taking mail in clear, as on a private network, needs SMTP_INSECURE=true (smtp({ insecure: true })), which is ignored while SMTP_PASS is set, as a password never goes in clear`, { cause: error })
 }
 
 async function closeOpened(pending: Promise<Awaited<ReturnType<typeof open>>>): Promise<void> {

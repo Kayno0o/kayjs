@@ -72,7 +72,8 @@ describe('smtp', () => {
       for (const start = Date.now(); server.connections.closed === closed && Date.now() - start < 10_000;)
         await Bun.sleep(20)
 
-      await Bun.sleep(50)
+      // The warning follows the connection's close by a tick.
+      await Bun.sleep(200)
       await app.stop()
     })
 
@@ -80,6 +81,7 @@ describe('smtp', () => {
       const refused = (await boot('false')).map(([level, line]) => `${level} ${line}`).join('\n')
 
       expect(refused).toContain(`warn kayjs-mail: 127.0.0.1:${server.port} did not upgrade to TLS with STARTTLS`)
+      expect(refused).toContain('so no mail would be sent')
       expect(refused).toContain('SMTP_INSECURE=true')
       expect(await boot('true')).toEqual([])
     }
