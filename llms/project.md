@@ -138,7 +138,7 @@ kay migrate astro ../my-astro-site --out ../my-kay-site
 
 ### Project setup
 
-- kay is published as `@kaynooo/kayjs` to the registry at `https://git.kaynooo.fr/api/packages/kaynooo/npm/` and installed under the name its imports use: `"kay": "npm:@kaynooo/kayjs@~<version>"` in `package.json`, a tilde since a minor release may break what the one before it took, each break listed in [Upgrading](upgrading.md), and a major is a rewrite, with `@kaynooo:registry=https://git.kaynooo.fr/api/packages/kaynooo/npm/` in the project's `.npmrc`.
+- kay is published as `@kaynooo/kayjs` to the registry at `https://git.kaynooo.fr/api/packages/kaynooo/npm/` and installed under the name its imports use: `"kay": "npm:@kaynooo/kayjs@~<version>"` in `package.json`, a tilde since a minor release may break what the one before it took, each break listed in [Upgrading](upgrading.md) and every one `kay check` can recognise a `deprecated` lint with a fix, which `kay upgrade` applies as it moves the app, and a major is a rewrite, with `@kaynooo:registry=https://git.kaynooo.fr/api/packages/kaynooo/npm/` in the project's `.npmrc`.
 - Before the first `kay new`, Bun is told once where the `@kaynooo` scope lives, in `~/.bunfig.toml`: `[install.scopes]` with `"@kaynooo" = "https://git.kaynooo.fr/api/packages/kaynooo/npm/"`.
 - `bunx -p @kaynooo/kayjs kay new my-app` writes a project that, after `cd my-app && bun install`, checks, builds and runs (`bun run dev`), both of those included: this setup, a layout, a page, a `_404.kay` and islands, or only what is picked of them (see [Commands](#commands) for the presets and features).
 
@@ -312,12 +312,13 @@ export default defineConfig({
   - `--body` posts as a form does, `application/x-www-form-urlencoded`, unless a `--header` names another `content-type`; `--header` and `--cookie` repeat, a guarded page rendering signed in with the session cookie a browser holds; `-i` prints the status and headers on stderr.
   - Under `base`, a path under it is taken as the proxy in front of the server hands it over, so a link a page printed renders as it is.
   - The whole app boots for it: its jobs and modules' top-level code run, and a `POST` to an action runs it against the app's database. The request goes to the first server the entry starts, with the host a full URL names, over plain HTTP; a server not listening after 60 seconds fails it.
-- `kay check [dir] [paths...] [-p tsconfig.json] [--entry <file>] [--deny-warnings] [--fix] [--only <group>] [--format text|github|json] [--watch] [--quiet]`:
+- `kay check [dir] [paths...] [-p tsconfig.json] [--entry <file>] [--deny-warnings] [--fix] [--only <group>] [--since <minor>] [--format text|github|json] [--watch] [--quiet]`:
   - Type-check the project, `.kay` files included;
   - The first path is the project when it is a directory holding a `kay.config.ts`, `package.json` or `tsconfig.json`, or any directory outside the current directory, so a directory given first to narrow the report must be neither;
   - The other paths, files or directories relative to the current directory, a symlink read as what it points to, narrow the report, and `--fix`, to the problems in them, the project still checked as a whole, and one outside the project fails the check;
   - `--watch` checks again on every change, tests included, each check a `kay check` of its own, so an edit to `kay.config.ts` counts and a check that cannot run, or exits before reporting, leaves the watch going, clearing the previous report in a terminal, and an interrupt or a closed terminal stops the check running and what it started, a second interrupt killing them;
   - `-p` is relative to `dir`, and a tsconfig that is missing or matches no files fails the check.
+  - `--since 1.46` reports and, with `--fix`, fixes the `deprecated` lints that came in that minor alone, as `kay upgrade` runs it; it does not go with `--only`.
   - `--entry` names the server entry whose `app` types `ctx.locals` and the app routes, `src/server.ts` by default, as `kay build --entry` does (see [Locals](server.md#locals)).
   - It fails on errors, and on warnings too with `--deny-warnings` (see [Lints and warnings](checks.md#lints-and-warnings)).
   - `--fix` first applies the quick fixes that change nothing else, removing an unread prop or writing `onclick` as `onClick`, then reports what is left; the others, such as a key or a `maxLength` to choose, stay the editor's.
@@ -333,6 +334,9 @@ export default defineConfig({
   - Each action, endpoint, API module route with its method, `WS` and `OPTIONS` included, and a library's with the guards of its own directory (API modules are imported, as only they know their routes, so their top-level code runs: what it writes to stdout, through the console or `process.stdout`, goes to stderr, and one that fails to load or calls `process.exit()` is listed by its mount with why), the routes of an extension's `server` given as an Elysia instance, each redirect and collection feed;
   - And kay's own routes the config turns on, such as `/_kay/health`, the favicons and the sitemap.
   - What the server entry adds, as a `.use(auth.plugin)`, and an extension's `server` given as a function are only known as the server starts: a last line names them, unlisted.
+- `kay upgrade [dir]`:
+  - Move the `kay` and `@kaynooo/kayjs-*` ranges of `package.json` that are version ranges of the registry, `npm:@kaynooo/kayjs@~1.45.0` or `~1.45.0` (a path, workspace or git source is left), to `~<latest>` with the registry's answer, install, then run the installed kay's `kay check --fix --since <minor>` once per minor between the version the app was on and the one it moves to, oldest first, listing them from the installed kay's `kay explain deprecated --format json`, then `kay check --fix`, which prints what is left to do by hand and sets the exit code.
+  - An app already on the latest is left as it is, a registry older than the app's range never moves it back, and nothing is rewritten when the install fails. A deprecated form is one `deprecated` lint with its `since` minor and a safe fix; a minor's breaking changes carry one when `kay check` can see the old form, see [Checks](checks.md).
 - `kay explain [lint|error|group] [--format text|json]`:
   - List the lints with their groups and default levels and the errors with theirs, or a group's, or print one: a lint with an example it reports and the same written right, an error with where its fix is written.
 - `kay fmt [paths...] [--check] [--format text|json] [--quiet]`:

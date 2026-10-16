@@ -22,6 +22,7 @@ bun run dev
 | `kay start [dir]` | Serve the last build as production does |
 | `kay render <url> [dir]` | Print what the server answers for one URL, without starting it on a port |
 | `kay check [dir]` | Type-check the project, `.kay` files included |
+| `kay upgrade [dir]` | Move kay and its libraries to the latest version and rewrite the old forms |
 | `kay routes [dir]` | List every route the project serves, and the file serving it |
 | `kay explain [lint\|error\|group]` | List the lints and the errors, or a group's, or explain one |
 | `kay fmt [paths]` | Format `.kay` files |
@@ -279,11 +280,25 @@ The first path is the project when it is a directory holding a `kay.config.ts`, 
 | `--watch` | Checks again on every change to the project, tests included, clearing the previous report in a terminal. Each check is a `kay check` of its own, so an edit to `kay.config.ts` counts and a check that cannot run, or exits before reporting, leaves the watch going. An interrupt or a closed terminal stops the check running and what it started, a second interrupt killing them |
 | `--fix` | Applies the fixes that change nothing else, then reports what is left |
 | `--only <group>` | Reports one group's lints alone, such as `seo`, as an audit |
+| `--since <minor>` | Reports, and with `--fix` fixes, the `deprecated` lints that came in that minor alone, as `1.46`. `kay upgrade` runs it once per minor. It does not go with `--only` |
 | `--format <format>` | `text` by default; `github` prints each problem as a workflow command, `::error file=src/a.kay,line=4,col=3,title=missing-alt::...`, which GitHub and Forgejo Actions show on the diff, its `file` relative to `GITHUB_WORKSPACE`, the repository's root, when set, else to the current directory; `json` prints them as one document on stdout, `{ errors, warnings, problems }`, each problem with its `file` relative to the current directory, `line`, `column`, `endLine` and `endColumn` past the span, `severity`, `code`, `message`, and `label`, `note`, `help` and `related` when it has them. A check that cannot run, on a path that does not exist or a `kay.config.ts` that does not load, prints one error in the format too, `{ errors: 1, warnings: 0, problems: [{ severity, code: null, message }] }`, with the config's `file`, `line` and `column` when it does not parse. The exit code is the same in every format |
 | `-p <tsconfig>` | Names another tsconfig, relative to the directory |
 | `--entry <file>` | The server entry whose `app` types `ctx.locals`, `src/server.ts` by default |
 
 `kay check` and its lints have their [own page](/reference/checks).
+
+## kay upgrade
+
+```sh
+kay upgrade
+kay upgrade ../my-site
+```
+
+It moves `kay` and every `@kaynooo/kayjs-*` library in `package.json` to the latest version the registry has, then installs. A range pointing at a path, a workspace or a git source is left as it is.
+
+Then it runs the kay it just installed. Each minor between your old version and the new one may have replaced a form with a new one, and each such replacement is a lint in the `deprecated` group with a fix. The fixes of the oldest minor run first, then the next, and so on. A last `kay check --fix` applies any other quick fix and prints what is left for you to change by hand. Its exit code is the check's.
+
+An app already on the latest version is left alone. If the install fails, nothing is rewritten, and you can run `kay upgrade` again or `kay check --fix` once it works. What a minor breaks that `kay check` cannot see is in [Upgrading](/guides/upgrading).
 
 ## kay routes
 

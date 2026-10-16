@@ -5,6 +5,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 ## Unreleased
 
 - `kay lint` writes the types ESLint reads for `.kay` files, then runs the project's `keslint`, so linting needs no `kay check` first; a new project's `lint` script is `kay lint --cache`, its `check` script is `kay check` so a warning shows without failing CI, and `eslint` writes the `.vscode/settings.json` that lets the ESLint extension lint `.kay` files ([Checks](checks.md#linting), [Project](project.md)).
+- `kay upgrade [dir]` moves `kay` and the kay libraries in `package.json` to their latest version, installs, applies the fixes of each minor it crosses and prints what is left to do by hand; the old forms a minor replaced are the `deprecated` lints, each with a `--fix` ([Project](project.md#commands), [Checks](checks.md#apply-the-quick-fixes)).
 
 ## 1.45.0
 

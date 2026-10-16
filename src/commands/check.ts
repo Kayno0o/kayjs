@@ -1,6 +1,6 @@
 import type { Subprocess } from 'bun'
 import type { CheckDiagnostic } from '../check'
-import type { LintGroup } from '../compiler/lints'
+import type { Lint, LintGroup } from '../compiler/lints'
 import type { KayConfig } from '../config'
 import type { Command, ProblemFormat } from './command'
 import { existsSync, realpathSync, statSync } from 'node:fs'
@@ -20,6 +20,8 @@ import { USAGES } from './usages'
 const CLI = join(import.meta.dir, '../cli.ts')
 // What makes a directory given first the project rather than a path to report on.
 const PROJECT_FILES = [CONFIG_FILE, 'package.json', 'tsconfig.json']
+// A minor as `1.46`, which a version with a patch is not.
+const SINCE = /^\d+\.\d+$/
 // Erases the screen and its scrollback, then moves to the top.
 const CLEAR_SCREEN = '\x1B[2J\x1B[3J\x1B[H'
 // An editor's save comes as several changes.
@@ -28,11 +30,12 @@ const WATCH_DEBOUNCE_MS = 50
 // `--format github` annotates a CI diff and `--format json` gives tools one document; the exit code is the same in every format.
 export const check: Command = {
   usage: USAGES.check,
-  options: { 'project': { type: 'string', short: 'p' }, 'entry': { type: 'string' }, 'deny-warnings': { type: 'boolean' }, 'fix': { type: 'boolean' }, 'only': { type: 'string' }, 'format': { type: 'string' }, 'watch': { type: 'boolean' }, 'quiet': { type: 'boolean' } },
+  options: { 'project': { type: 'string', short: 'p' }, 'entry': { type: 'string' }, 'deny-warnings': { type: 'boolean' }, 'fix': { type: 'boolean' }, 'only': { type: 'string' }, 'since': { type: 'string' }, 'format': { type: 'string' }, 'watch': { type: 'boolean' }, 'quiet': { type: 'boolean' } },
   positionals: Infinity,
   run: async ({ values, positionals }) => {
     const { project, entry } = values
     const only = typeof values.only === 'string' ? values.only : undefined
+    const since = typeof values.since === 'string' ? values.since : undefined
     const format = formatOption('check', values.format, PROBLEM_FORMATS)
 
     if (format === undefined)
@@ -40,6 +43,12 @@ export const check: Command = {
 
     if (only !== undefined && !isLintGroup(only)) {
       console.error(`kay check: --only takes a group of lints, ${Object.keys(LINT_GROUPS).map(group => `\`${group}\``).join(', ')}, not \`${only}\``)
+
+      return 1
+    }
+
+    if (since !== undefined && (only !== undefined || !SINCE.test(since))) {
+      console.error(only === undefined ? `kay check: --since takes a minor, as \`1.46\`, not \`${since}\`` : 'kay check: --since reports the deprecations of one minor, so it does not go with --only')
 
       return 1
     }
@@ -74,6 +83,7 @@ export const check: Command = {
         ...values.fix === true ? ['--fix'] : [],
         ...values.quiet === true ? ['--quiet'] : [],
         ...only === undefined ? [] : ['--only', only],
+        ...since === undefined ? [] : ['--since', since],
       ]
 
       // The text report goes to stderr; the other formats are left whole for what reads them.
@@ -88,7 +98,7 @@ export const check: Command = {
     const started = performance.now()
 
     try {
-      const { failing, found } = await checkProject(root, await loadConfig(root), typeof project === 'string' ? project : 'tsconfig.json', typeof entry === 'string' ? relative(root, resolve(entry)) : undefined, { denyWarnings: values['deny-warnings'] === true, fix: values.fix === true, only, launch: only === 'seo', format, scope, quiet: values.quiet === true })
+      const { failing, found } = await checkProject(root, await loadConfig(root), typeof project === 'string' ? project : 'tsconfig.json', typeof entry === 'string' ? relative(root, resolve(entry)) : undefined, { denyWarnings: values['deny-warnings'] === true, fix: values.fix === true, only, since, launch: only === 'seo', format, scope, quiet: values.quiet === true })
 
       if (found === 0 && format !== 'json')
         done('checked', 'with no problems', performance.now() - started)
@@ -221,7 +231,7 @@ function inScope(diagnostic: CheckDiagnostic, scope: string[]): boolean {
 
 // Prints what `kay check` finds in the project and answers how many it found and how many of those fail it: the errors, and the warnings too with `denyWarnings`.
 // With `fix`, applies the safe fixes first, then checks again and prints what is left; with `only`, prints that group's lints alone; with a `scope`, the problems in those files and directories alone, the project still checked as a whole.
-async function checkProject(root: string, config: KayConfig, tsconfig: string, entry: string | undefined, { denyWarnings, fix, only, launch, format, scope, quiet }: { denyWarnings: boolean, fix: boolean, only: LintGroup | undefined, launch: boolean, format: ProblemFormat, scope: string[], quiet: boolean }): Promise<{ failing: number, found: number }> {
+async function checkProject(root: string, config: KayConfig, tsconfig: string, entry: string | undefined, { denyWarnings, fix, only, since, launch, format, scope, quiet }: { denyWarnings: boolean, fix: boolean, only: LintGroup | undefined, since: string | undefined, launch: boolean, format: ProblemFormat, scope: string[], quiet: boolean }): Promise<{ failing: number, found: number }> {
   const options = { ...configCheckOptions(config), tsconfig, entry, launch }
   const checkScope = async () => (await checkTypes(root, options)).filter(diagnostic => inScope(diagnostic, scope))
   let diagnostics = await checkScope()
@@ -230,7 +240,9 @@ async function checkProject(root: string, config: KayConfig, tsconfig: string, e
   if (scope.length === 0)
     await pruneCheckCache(cacheDir(root))
 
-  const fixed = fix ? await applySafeFixes(root, diagnostics) : 0
+  // `since` narrows what is fixed and reported to the deprecations of one minor, which `kay upgrade` applies in order.
+  const inMinor = (diagnostic: CheckDiagnostic) => isLint(diagnostic.code) && (LINTS[diagnostic.code] as Lint).since === since
+  const fixed = fix ? await applySafeFixes(root, since === undefined ? diagnostics : diagnostics.filter(inMinor)) : 0
 
   if (fixed > 0) {
     // JSON is the whole of stdout; quiet, what is left is all that is said.
@@ -241,6 +253,9 @@ async function checkProject(root: string, config: KayConfig, tsconfig: string, e
 
     diagnostics = await checkScope()
   }
+
+  if (since !== undefined)
+    diagnostics = diagnostics.filter(inMinor)
 
   if (only !== undefined)
     diagnostics = diagnostics.filter(diagnostic => isLint(diagnostic.code) && LINTS[diagnostic.code].group === only)

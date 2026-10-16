@@ -15,6 +15,7 @@ export const LINT_GROUPS = {
   islands: 'Keys, signals and what an island renders again.',
   seo: 'What search engines and social networks read off a public site: warnings once `site` or `seo` is set, or the site is exported with `--static`, and nothing otherwise.',
   security: 'What anyone may reach on a site asking for guards.',
+  deprecated: 'Old forms a minor replaced, which `kay upgrade` rewrites and a later minor stops reporting.',
 } as const
 
 export type LintGroup = keyof typeof LINT_GROUPS
@@ -31,6 +32,8 @@ export interface Lint {
   site?: boolean
   // What a site lacks before it goes public rather than a fault of the code, which a scaffold lacks too: reported by `kay build` and `kay check --only seo`, never a plain `kay check`.
   launch?: boolean
+  // Set on a deprecation, in the `deprecated` group only: the minor, as `1.46`, that replaced the form, so `kay upgrade` runs its fix when an app moves across that minor.
+  since?: string
 }
 
 // What kay reports as advice rather than as an error in the code: each lint's level is set in `kay.config.ts`'s `lints`, and a `// kay-allow <lint>` comment allows it on the line it ends or the one after it.
@@ -226,7 +229,8 @@ export const LINTS = {
   },
   'deprecated-schema-name': {
     level: 'warn',
-    group: 'code',
+    group: 'deprecated',
+    since: '1.28',
     summary: 'The schema builder imported from `kay` as `t`, its name before `s`, which leaves `t` to translations. `kay check --fix` renames it, in `.kay` fences and `.ts` modules alike.',
     wrong: '--- server\nimport { t } from \'kay\'\n\nexport const page = { query: t.Object({ page: t.Integer({ minimum: 1 }) }) }\n---\np Page',
     right: '--- server\nimport { s } from \'kay\'\n\nexport const page = { query: s.Object({ page: s.Integer({ minimum: 1 }) }) }\n---\np Page',
@@ -381,6 +385,7 @@ export const LEVELS: ReadonlySet<string> = new Set<LintLevel>(['allow', 'warn', 
 
 const ALLOW_COMMENT = /\/\/[ \t]*kay-allow[ \t]+([\w-]+(?:[ \t]*,[ \t]*[\w-]+)*)/g
 const LINT_NAME = /[\w-]+/g
+const MINOR = /^(\d+)\.(\d+)(?:\.\d+)?$/
 const IDENTIFIER = /^[a-z_$][\w$]*$/i
 // An opening, closing or self-closing tag, with what it holds after its name.
 const TAG = /<(\/?)([a-z][a-z\d]*)(?=[\s/>])([^<>]*)>/gi
@@ -393,6 +398,27 @@ const HTML_ELEMENTS = new Set(['a', 'abbr', 'address', 'article', 'aside', 'audi
 
 export function isLint(code: string | undefined): code is LintName {
   return code !== undefined && Object.hasOwn(LINTS, code)
+}
+
+// The minor, as `[major, minor]`, a version or a `1.46` names, or undefined for what is neither.
+export function minorOf(version: string): [number, number] | undefined {
+  const found = MINOR.exec(version)
+
+  return found === null ? undefined : [Number(found[1]), Number(found[2])]
+}
+
+// Whether the minor `a` comes after `b`.
+export function minorAfter(a: [number, number], b: [number, number]): boolean {
+  return a[0] === b[0] ? a[1] > b[1] : a[0] > b[0]
+}
+
+// The minors that deprecated a form, oldest first, each with the lints that did.
+export function deprecationMinors(): { since: string, lints: LintName[] }[] {
+  const bySince = Map.groupBy((Object.entries(LINTS) as [LintName, Lint][]).filter(([, lint]) => lint.since !== undefined), ([, lint]) => lint.since!)
+
+  return [...bySince]
+    .sort(([a], [b]) => minorAfter(minorOf(a)!, minorOf(b)!) ? 1 : -1)
+    .map(([since, lints]) => ({ since, lints: lints.map(([name]) => name) }))
 }
 
 export function isLintGroup(name: string | undefined): name is LintGroup {
@@ -618,6 +644,7 @@ export function explainLint(name: LintName): string {
   return [
     `${name}: ${lint.level} by default, in ${lint.group}`,
     lint.summary,
+    ...lint.since === undefined ? [] : [`An old form since ${lint.since}: \`kay upgrade\` rewrites it when an app moves across that minor, and \`kay check --fix\` any time.`],
     ...lint.launch === true ? ['Reported by `kay build` and `kay check --only seo`, never a plain `kay check`: a site lacks it until it goes public, a fresh project included.'] : [],
     `Reported:\n\n${indent(lint.wrong)}`,
     `Written right:\n\n${indent(lint.right)}`,

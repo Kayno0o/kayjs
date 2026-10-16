@@ -2,6 +2,12 @@
 
 What each minor release breaks, and what an app changes to move to it. kay and its libraries share one version, so one section covers them all; a patch breaks nothing, and a minor missing here broke nothing.
 
+## 1.46.0
+
+### `deprecated-schema-name` is in the `deprecated` group
+
+- `lints: { code: ... }` in `kay.config.ts` no longer sets it, and `kay check --only code` no longer lists it: set `deprecated` or the lint by name. `kay upgrade` rewrites it and every later deprecation, see [Checks](checks.md#apply-the-quick-fixes).
+
 ## 1.45.0
 
 ### An idle queue looks at its store every 10 seconds at most

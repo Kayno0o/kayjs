@@ -64,7 +64,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `redundant-alt` | warn | a11y | Alt text that says it is an image |
 | `uncalled-signal` | deny | islands | A signal read by name where its value goes, or handed to a parameter that takes anything, not called |
 | `constant-signal` | warn | islands | A signal that is only ever read |
-| `deprecated-schema-name` | warn | code | The schema builder imported as `t`, now `s` |
+| `deprecated-schema-name` | warn | deprecated | The schema builder imported as `t`, now `s` |
 | `css-import-without-text` | deny | code | A stylesheet imported for a value without `with { type: 'text' }` |
 | `literal-tag` | warn | code | An HTML tag written in template text, shown as written |
 | `uncaught-await` | warn | code | An `await` block with no `catch` |
@@ -151,9 +151,16 @@ kay explain seo        # lists a group's
 kay explain missing-alt
 kay explain template-syntax   # an error: where its fix is written
 kay check --only seo   # one group's lints alone, as an audit
+kay upgrade            # moves kay to the latest version, then fixes what it deprecated
 ```
 
 `kay explain <lint>` prints an example it reports and the same written right.
+
+## Deprecations
+
+When a minor replaces a form with a new one, kay keeps recognising the old one for three minors. Each such lint is in the `deprecated` group, has a fix that rewrites the old form, and says in `kay explain` which minor it came in. `kay explain deprecated` lists them all.
+
+[`kay upgrade`](/reference/cli#kay-upgrade) applies these fixes as it moves your app to a newer version, and `kay check --fix` applies them at any time. A change `kay check` cannot recognise is not a lint, and is explained in [Upgrading](/guides/upgrading) instead.
 
 ## Changing a level
 

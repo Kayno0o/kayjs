@@ -58,7 +58,7 @@ function lintDocument(group: LintGroup | undefined) {
 
   return {
     groups: group === undefined ? LINT_GROUPS : { [group]: LINT_GROUPS[group] },
-    lints: lints.map(([name, lint]) => ({ name, group: lint.group, level: lint.level, summary: lint.summary })),
+    lints: lints.map(([name, lint]) => ({ name, group: lint.group, level: lint.level, ...lint.since !== undefined && { since: lint.since }, summary: lint.summary })),
     ...group === undefined && errorDocument(undefined),
   }
 }

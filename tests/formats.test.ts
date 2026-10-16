@@ -373,13 +373,14 @@ describe('kay routes --format json', () => {
 
 describe('kay explain --format json', () => {
   it('lists the lints, or a group\'s, with their summaries whole', async () => {
-    const all = document<{ groups: Record<string, string>, lints: { name: string, group: string, level: string, summary: string }[] }>((await kay(['explain', '--format', 'json'])).stdout)
+    const all = document<{ groups: Record<string, string>, lints: { name: string, group: string, level: string, since?: string, summary: string }[] }>((await kay(['explain', '--format', 'json'])).stdout)
     const islands = document<{ groups: Record<string, string>, lints: { name: string }[] }>((await kay(['explain', 'islands', '--format', 'json'])).stdout)
 
     expect(all.groups).toEqual(LINT_GROUPS)
     expect(all.lints.map(lint => lint.name)).toEqual(Object.keys(LINTS))
     expect(all.lints[0]).toEqual({ name: 'unread-name', group: 'code', level: 'deny', summary: LINTS['unread-name'].summary })
     expect(islands.groups).toEqual({ islands: LINT_GROUPS.islands })
+    expect(all.lints.find(lint => lint.name === 'deprecated-schema-name')).toEqual({ name: 'deprecated-schema-name', group: 'deprecated', level: 'warn', since: '1.28', summary: LINTS['deprecated-schema-name'].summary })
     expect(islands.lints.map(lint => lint.name)).toEqual(['positional-key', 'identity-key', 'uncalled-signal', 'constant-signal'])
   })
 

@@ -1805,7 +1805,7 @@ describe.concurrent('kay check, unused code', () => {
       expect(served).not.toContain('missing-site')
       expect(await build('--static')).toContain('warning[missing-site]')
       expect((await runCheck(root, '--only', 'a11y')).output.match(/^\w+\[[\w-]+\]/gm)).toEqual(['error[missing-alt]'])
-      expect(await runCheck(root, '--only', 'nope')).toEqual({ code: 1, output: 'kay check: --only takes a group of lints, `code`, `a11y`, `forms`, `islands`, `seo`, `security`, not `nope`\n', report: '' })
+      expect(await runCheck(root, '--only', 'nope')).toEqual({ code: 1, output: 'kay check: --only takes a group of lints, `code`, `a11y`, `forms`, `islands`, `seo`, `security`, `deprecated`, not `nope`\n', report: '' })
     }
     finally {
       await rm(root, { recursive: true, force: true })

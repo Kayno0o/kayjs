@@ -8,6 +8,7 @@ This page lists what each release adds, newest first, with a link to where each 
 ## Unreleased
 
 - **Lint with no check first**: `kay lint` writes the types ESLint reads for `.kay` files, then runs `keslint`. A new project's `lint` script is `kay lint --cache`, its `check` script no longer fails on warnings, and it writes the `.vscode/settings.json` the ESLint extension needs for `.kay` files. [ESLint](/reference/checks#eslint)
+- **One command to move to a newer kay**: `kay upgrade` moves `kay` and the kay libraries in `package.json` to their latest version, installs, applies the fixes of each minor it crosses and prints what is left for you to change. The old forms a minor replaced are the `deprecated` lints, each with a `--fix`. [CLI reference](/reference/cli#kay-upgrade), [Checks reference](/reference/checks#deprecations)
 
 ## 1.45.0
 
