@@ -36,6 +36,10 @@ export interface Route {
   matchers?: Record<string, string> | undefined
   // `_layout.kay` files wrapping the page, outermost first.
   layouts: string[]
+  // `_actions.kay` files of the page's directory and above, outermost first: modules of actions no page renders, which components import too.
+  actionModules?: string[] | undefined
+  // What each of `actionModules`' actions are behind, as a layout's.
+  actionAccess?: LayoutAccess<GuardFile>[] | undefined
   // What each layout's actions are behind, as `layouts` lists them, read at scan time since a compiled server has no source to read.
   layoutAccess?: LayoutAccess<GuardFile>[] | undefined
   special: SpecialPages
@@ -101,6 +105,7 @@ const PAGE_EXPORT = /^export\s+const\s+page\s*=\s*\{/m
 const FALSE_KEY = /(?:([A-Za-z_$][\w$]*)|'([^'\n]*)'|"([^"\n]*)")\s*:\s*false(?![\w$])/y
 const SPACE = /\s/
 const LAYOUT = '_layout.kay'
+const ACTIONS = '_actions.kay'
 const NOT_FOUND = '_404.kay'
 const ERROR = '_error.kay'
 const GUARD = '_guard.ts'
@@ -217,7 +222,9 @@ export async function scanRoutes(routesDir: string, mounts: RouteMount[] = []): 
         const layouts = layoutsOf(trees, at, file, read)
         const mounted = tree !== trees[0]
 
-        own.push({ ...route, layouts, layoutAccess: layouts.map(accessOf), special: specialPagesOf(trees, at, read), guards: open ? [] : guardsOf(trees, at, read), ...(open || mounted) && { open: true }, ...tree.editor && { editorOwn: true } })
+        const actionModules = directoriesUp(at).flatMap(dir => fileAt(trees, dir, ACTIONS) ?? []).reverse()
+
+        own.push({ ...route, layouts, layoutAccess: layouts.map(accessOf), ...actionModules.length > 0 && { actionModules, actionAccess: actionModules.map(accessOf) }, special: specialPagesOf(trees, at, read), guards: open ? [] : guardsOf(trees, at, read), ...(open || mounted) && { open: true }, ...tree.editor && { editorOwn: true } })
       }
     }
 

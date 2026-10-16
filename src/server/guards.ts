@@ -8,10 +8,12 @@ export interface LoadedGuard extends GuardFile {
 }
 
 // A route with its guards imported once at boot, so a request only calls them.
-export interface ServedRoute extends Omit<Route, 'guards' | 'layoutAccess'> {
+export interface ServedRoute extends Omit<Route, 'guards' | 'layoutAccess' | 'actionAccess'> {
   guards: LoadedGuard[]
   // Each layout's `layoutAccess`, its guards loaded.
   layoutGuards?: LayoutAccess<LoadedGuard>[] | undefined
+  // Each action module's `actionAccess`, its guards loaded.
+  actionGuards?: LayoutAccess<LoadedGuard>[] | undefined
 }
 
 export interface Refusal {
@@ -23,7 +25,9 @@ export interface Refusal {
 export async function loadGuards(route: Route, required = false): Promise<ServedRoute> {
   const layoutGuards = await Promise.all((route.layoutAccess ?? []).map(async access => ({ ...access, guards: await Promise.all(access.guards.map(loadGuard)) })))
 
-  return { ...route, layoutGuards, guards: requiredGuards(await Promise.all(route.guards.map(loadGuard)), route, route.special, required) }
+  const actionGuards = route.actionAccess && await Promise.all(route.actionAccess.map(async access => ({ ...access, guards: await Promise.all(access.guards.map(loadGuard)) })))
+
+  return { ...route, layoutGuards, ...actionGuards && { actionGuards }, guards: requiredGuards(await Promise.all(route.guards.map(loadGuard)), route, route.special, required) }
 }
 
 // What a site with `requireGuards` answers on a route of its own that no guard covers and that did not set `guards: false`.

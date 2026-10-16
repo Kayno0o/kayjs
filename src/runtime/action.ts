@@ -223,6 +223,9 @@ export interface Action<Input, Output, Honeypot extends string = never> {
   // How the form post the page renders for went, refused, as `ctx.failed` reads it; in an island, how its last call went, read reactively.
   readonly failed: () => FormFailure<Input, FailureData<Output>, Honeypot> | undefined
   readonly succeeded: () => FormSuccess<Success<Output>> | undefined
+  // This action for a form to post with fixed fields, as hidden inputs would carry them: `form(action={move.with({ id, to: 2 }))})`. They travel in the form's action URL, so the form needs no inputs for them and posts them with or without JavaScript.
+  // eslint-disable-next-line ts/method-signature-style
+  with(fields: Partial<Input>): Action<Input, Output, Honeypot>
   // The message a refused post got for one field, or for the whole form under ''; a method, so any action still passes where `Action<never, unknown>` is expected.
   // eslint-disable-next-line ts/method-signature-style
   error(field?: Extract<keyof Input, string> | Honeypot | ''): string | undefined
@@ -367,13 +370,43 @@ export function collectForms<T>(render: () => T): { result: T, forms: Set<Action
   }
 }
 
+// The query of an action's URL carrying the fields `with` fixes, as a form's own encoding of them.
+export const PAYLOAD_PARAM = 'kay_with'
+
+// Fields as a form posts them: text, numbers, booleans and dates as text, a list as one entry per item, nothing for undefined and null.
+function payloadQuery(fields: Record<string, unknown>): string {
+  const query = new URLSearchParams()
+
+  for (const [name, value] of Object.entries(fields)) {
+    for (const item of Array.isArray(value) ? value : [value]) {
+      if (item === undefined || item === null)
+        continue
+
+      if (typeof item === 'object' && !(item instanceof Date))
+        throw new TypeError(`kay: ${name} in \`with()\` is neither text, a number, a boolean, a date nor a list of them`)
+
+      query.append(name, item instanceof Date ? item.toISOString() : String(item))
+    }
+  }
+
+  return query.toString()
+}
+
+// The same action for a form to post with `fields` fixed; its other readings are the action's own.
+function withFields<Target extends object>(target: Target, fields: Record<string, unknown>): Target {
+  const query = payloadQuery(fields)
+
+  // The URL a form posts to, which the action's own `url` stays apart from: the stamp and the protections name that one.
+  return new Proxy(target, { get: (action, key) => key === 'formUrl' ? `${(action as { url: string }).url}?${PAYLOAD_PARAM}=${encodeURIComponent(query)}` : Reflect.get(action, key) })
+}
+
 export function formAction(target: string | Action<never, unknown>): string {
   if (typeof target === 'string')
     return target
 
   renderedForms?.add(target)
 
-  return target.url
+  return (target as { formUrl?: string }).formUrl ?? target.url
 }
 
 export type FieldName<Target> = Target extends Action<infer Input, unknown> ? Extract<keyof Input, string> | HoneypotOf<Target> : string
@@ -597,6 +630,7 @@ function callable(url: () => string): { call: (input: never, options?: CallOptio
       error: read((field = '') => failed()?.errors[field]),
       refused: read((error: unknown) => error instanceof ActionError && refusedAt.get(error) === url()),
       track: read(() => tracked(call, url)),
+      with: read((fields: Record<string, unknown>) => withFields(call, fields)),
     },
   }
 }

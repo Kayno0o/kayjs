@@ -1901,6 +1901,30 @@ describe('actions called from the browser', () => {
   })
 })
 
+describe('a form posting an action with fixed fields from an island', () => {
+  const mountFixed = site({
+    'page.kay': '--- server\nimport { t } from \'elysia\'\nimport { action } from \'kay\'\n\nexport const move = action(t.Object({ id: t.Integer(), to: t.Integer() }), ({ id }) => id)\n---\np Page\n',
+    'main.kay': '---\nimport { move } from \'./page.kay\'\n\nconst to = signal(2)\n---\nform(action={move.with({ id: 3, to: to() })})\n  button Up\n',
+  })
+
+  it('carries them in its action URL and renders no input', async () => {
+    const { root, dispose } = await mountFixed()
+
+    try {
+      const form = root.querySelector('form')!
+      const query = () => new URLSearchParams(new URL(form.getAttribute('action')!, 'http://x').searchParams.get('kay_with')!).toString()
+
+      await settle()
+      expect(form.getAttribute('action')).toMatch(/\/page\.kay\/move\?kay_with=/)
+      expect(query()).toBe('id=3&to=2')
+      expect(root.querySelector('input')).toBeNull()
+    }
+    finally {
+      await dispose()
+    }
+  })
+})
+
 describe('the dev patch', () => {
   const page = (body: string, head = '<title>Home</title>') => `<!doctype html><html lang="en"><head>${head}<script>new EventSource("/_kay/dev/events")</script></head><body>${body}</body></html>`
   const parse = (html: string) => new DOMParser().parseFromString(html, 'text/html')

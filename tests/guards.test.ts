@@ -43,6 +43,8 @@ describe('requireGuards', () => {
       Bun.write(join(dir, 'routes/staff/_layout.kay'), ACTION('promote', '', 'slot')),
       Bun.write(join(dir, 'routes/staff/sign-in.kay'), `--- server\n${OPEN}---\nh1 Staff sign in\n`),
       Bun.write(join(dir, 'routes/news/_layout.kay'), ACTION('subscribe', '', 'slot')),
+      Bun.write(join(dir, 'routes/staff/_actions.kay'), ACTION('demote', '', '')),
+      Bun.write(join(dir, 'routes/news/_actions.kay'), ACTION('unsubscribe', '', '')),
       Bun.write(join(dir, 'routes/news/index.kay'), `--- server\n${OPEN}---\nh1 News\n`),
       Bun.write(join(dir, 'routes/feed.json.ts'), 'export function GET() {\n  return \'items\'\n}\n'),
       Bun.write(join(dir, 'routes/status.json.ts'), `${OPEN}\nexport function GET() {\n  return 'up'\n}\n`),
@@ -92,6 +94,13 @@ describe('requireGuards', () => {
     expect(await post('news/_layout.kay', 'subscribe', {}, optional)).toBe(200)
   })
 
+  it('runs the guards of an _actions.kay\'s own directory for its actions', async () => {
+    expect(await post('staff/_actions.kay', 'demote')).toBe(403)
+    expect(await post('staff/_actions.kay', 'demote', { 'x-admin': '1' })).toBe(200)
+    expect(await post('news/_actions.kay', 'unsubscribe')).toBe(403)
+    expect(await post('news/_actions.kay', 'unsubscribe', {}, optional)).toBe(200)
+  })
+
   it('keeps an endpoint no guard covers out of a static export', async () => {
     const endpoints = await scanEndpoints(join(dir, 'routes'))
 
@@ -106,6 +115,7 @@ describe('requireGuards', () => {
       ['routes/index.kay', 'No guard covers `/`, so the server refuses it'],
       ['routes/_layout.kay', 'No guard covers the actions of this layout, `leave`, so the server refuses them'],
       ['routes/news/_layout.kay', 'No guard covers the actions of this layout, `subscribe`, so the server refuses them'],
+      ['routes/news/_actions.kay', 'No guard covers the actions of this module, `unsubscribe`, so the server refuses them'],
       ['routes/feed.json.ts', 'No guard covers `/feed.json`, so the server refuses it'],
       ['api/notes.ts', 'No guard covers `/api/notes`, so the server refuses its routes'],
     ])

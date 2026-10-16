@@ -79,6 +79,10 @@ describe('kay/test', () => {
     expect(await bare.call(ping, {})).toBe('pong')
     expect(await bare.call(ping, new FormData())).toBe('pong')
     // `bun run check` fails on an `@ts-expect-error` with no error under it, so the type check is what this asserts.
+    // `with` fixes fields the schema names, and only those.
+    expect(add.with({ title: 'Fixed' })).toBeFunction()
+    // @ts-expect-error -- no such field
+    expect(add.with({ nope: 1 })).toBeFunction()
     // @ts-expect-error -- an action with fields needs them
     const missing = async () => bare.call(add)
 

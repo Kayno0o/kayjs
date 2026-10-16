@@ -10,7 +10,7 @@ import type { CookieJar } from './cookies'
 import type { Flash } from './flash'
 import type { LoadedGuard, ServedRoute } from './guards'
 import type { I18n } from './i18n'
-import { decodeCall, failure, FORM_CALL, isAction, isFailure } from '../runtime/action'
+import { decodeCall, failure, FORM_CALL, isAction, isFailure, PAYLOAD_PARAM } from '../runtime/action'
 import { escapeAttribute } from '../runtime/escape'
 import { formInput } from '../runtime/form'
 import { localeState, runInLocale } from '../runtime/locale-state'
@@ -155,7 +155,7 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], m
           if (refusal)
             throw new Refusal(failed(context.request, new Headers(refusal.headers), cookieJar(context.request).cookies, { action: value.url, status: refusal.status, values: call ? {} : submittedValues(context.body), errors: { [refusal.field]: refusal.message } }, context.server, back))
 
-          context.body = asForm ? formInput(value.schema, withoutEmptyFiles(context.body)) : callInput(context.body)
+          context.body = asForm ? formInput(value.schema, withFixedFields(withoutEmptyFiles(context.body), context.request)) : callInput(context.body)
         },
         // After validation, the one stage where the app's `resolve` values are there for `ctx.locals`.
         ...(guards.length > 0 && { beforeHandle: async (context: { request: Request }) => inLocale(context.request, options, async () => admit(guards, sharedContext(context.request, () => ({ ...context })), pageParams.get(context.request) ?? {}, pageUrls.get(context.request), options)) }),
@@ -221,7 +221,9 @@ function actionFiles(routes: ServedRoute[], required: boolean | undefined): Map<
   const files = new Map<string, ActionPage & { guards: LoadedGuard[] }>()
 
   for (const route of routes) {
-    for (const [index, file] of [...route.layouts, route.file].entries()) {
+    const modules = route.actionModules ?? []
+
+    for (const [index, file] of [...route.layouts, ...modules, route.file].entries()) {
       const known = files.get(file)
 
       if (known) {
@@ -233,7 +235,8 @@ function actionFiles(routes: ServedRoute[], required: boolean | undefined): Map<
 
       // A layout runs the guards of its own directory and above, whichever page the scan met it under; a page those of its route.
       // A route built by hand, with no `layoutAccess`, refuses its layouts' actions rather than serve them unguarded.
-      const { guards, open } = file === route.file ? route : route.layoutGuards?.[index] ?? { guards: [{ file, special: route.special, check: unguarded }] }
+      const access = index < route.layouts.length ? route.layoutGuards?.[index] : route.actionGuards?.[index - route.layouts.length]
+      const { guards, open } = file === route.file ? route : access ?? { guards: [{ file, special: route.special, check: unguarded }] }
 
       files.set(file, { guards: requiredGuards(guards, { file, open }, route.special, required), routes: [route], params: route.params })
     }
@@ -334,6 +337,28 @@ function fieldError(action: ServerAction<TSchema, unknown>, field: string): stri
 }
 
 // A file input left empty still posts a nameless, empty file; dropping it lets `s.Optional(s.File())` see no file at all.
+// The fields the form's action URL fixes through `with()`, which stand over the ones posted under the same name.
+function withFixedFields(body: unknown, request: Request): unknown {
+  const query = new URL(request.url).searchParams.get(PAYLOAD_PARAM)
+
+  if (query === null)
+    return body
+
+  const fields: Record<string, unknown> = typeof body === 'object' && body !== null ? { ...body } : {}
+  const fixed = new Map<string, string[]>()
+
+  for (const [name, value] of new URLSearchParams(query)) {
+    // An own `__proto__` field would change the prototype of what the handler reads.
+    if (name !== '__proto__')
+      fixed.set(name, [...fixed.get(name) ?? [], value])
+  }
+
+  for (const [name, values] of fixed)
+    fields[name] = values.length === 1 ? values[0] : values
+
+  return fields
+}
+
 function withoutEmptyFiles(body: unknown): unknown {
   if (typeof body !== 'object' || body === null)
     return body

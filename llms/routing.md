@@ -192,6 +192,7 @@ Pages live in `src/routes/`:
 | `items/[id=integer].kay` | `/items/:id` where the matcher `integer` takes the segment, `ctx.params.id` the `number` it returns |
 | `(marketing)/pricing.kay` | `/pricing`: a group, in parentheses, adds nothing to the URL, only its `_layout.kay` and `_guard.ts` |
 | `_layout.kay` | Wraps every page in its directory and below, outermost first, rendering the page at its `slot`. |
+| `_actions.kay` | A server fence of actions and no template, served behind the guards of its directory and above, which pages and components import by path; see [Actions](actions.md#declaring-an-action). |
 | `_404.kay` | Rendered with status 404 for `ctx.notFound()` in its directory and below; the root one also answers URLs no page serves. |
 | `_error.kay` | Rendered with status 500 when a load or render throws, and for 404s with no `_404.kay`. |
 | `_guard.ts` | Runs before every page and every action in its directory and below; see [Guards](server.md#guards). |

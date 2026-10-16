@@ -41,6 +41,29 @@ export const signOut = action(async (ctx) => {
 
 `form(action={signOut})` posts it, and an island calls `signOut()`. Options such as a rate limit go second, as they do with a schema.
 
+## Actions shared by pages and components
+
+An action that a page and a component both use lives in a file called `_actions.kay`, in a routes directory. It has a server fence and no template, and it is not a page. A page or a component imports its actions by path.
+
+```kay
+--- server
+import { s } from 'kay'
+
+export const deleteTissue = action(s.Object({ id: s.Integer() }), async ({ id }) => {
+  await removeTissue(id)
+})
+---
+```
+
+```kay
+---
+import { deleteTissue } from '../routes/admin/_actions.kay'
+---
+button(onClick={() => deleteTissue({ id })}) Delete
+```
+
+It is served behind the `_guard.ts` files of its directory and above, like the actions of a `_layout.kay`, and it can read the params of every page below it.
+
 ## Showing errors
 
 A post the schema refuses renders the page again, and the fields keep what was sent. An `error` line shows the message of a field, and a bare `error` the form-wide one.
@@ -130,6 +153,22 @@ In a `catch`, `add.refused(error)` tells a refusal from `ctx.fail` apart from an
 While an island's `onSubmit` returns a promise, the form and its submit buttons are `aria-busy`.
 
 Once a call goes through, the page's loads run again, so the list it shows is up to date. `add({ title }, { refresh: false })` leaves the page as it is.
+
+## Fixed fields
+
+A button that always posts the same values, such as a row's move-up arrow, needs no hidden inputs. `with` gives the action with its fields fixed, and the form carries them without JavaScript too.
+
+```kay
+---
+import { move } from '../routes/index.kay'
+
+const { id } = props<{ id: number }>()
+---
+form(action={move.with({ id, to: 2 })})
+  button(aria-label="Move up") Up
+```
+
+The handler gets `id` and `to` as if the form had posted them, checked by the schema. The values travel in the form's action URL, so a visitor can change them as they could change hidden inputs: the handler still checks what it may do.
 
 ## Reading one call's outcome
 

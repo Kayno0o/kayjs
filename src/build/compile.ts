@@ -192,7 +192,7 @@ function routeModules(routes: Route[], fallback: SpecialPages): Set<string> {
   }
 
   for (const route of routes) {
-    for (const file of [...route.layouts, route.file])
+    for (const file of [...route.layouts, ...route.actionModules ?? [], route.file])
       files.add(file)
 
     addSpecial(route.special)

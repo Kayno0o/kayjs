@@ -224,6 +224,8 @@ form(action={add})
 ```
 
 - An action with no input leaves the schema out: `action(async (ctx) => { ... }, protection?)`, validated as an empty object, its handler getting the context alone, called as `signOut()`, `signOut(undefined, { refresh: false })` or `site.call(signOut)`, and posted by `form(action={signOut})`.
+- An action several pages and components share lives in an `_actions.kay` of a routes directory, a file with a `--- server` fence and no template: it is served like a layout's actions, behind the guards of its directory and above, reading the params of every page below it, and `page = { guards: false }` opens it as a layout's.
+- A page or a component imports it by its path, `import { removeTissue } from '../routes/admin/_actions.kay'`, in the server fence of a page or an island alike; no route file is imported, and `kay build`, `kay check` and `kay routes` see it as they see a layout's actions.
 - `s` from `kay` is Elysia's schema builder, its `t` under the name translations leave free, there to save an import in server fences and server modules, `defineEnv` and API modules included.
 - The browser has none, nor Elysia's, which reads `Bun`: schemas live in modules only the server imports, and what an island needs of one, a length or a list of choices, in another module both import.
 - A client build, `kay dev`'s and `kay test`'s included, refuses an island reaching kay's `s`, naming the modules taking it from `kay`.
@@ -242,6 +244,9 @@ form(action={add})
 - `kay check` verifies every `field` and `name` against the schema.
 - Once kay's script runs it sets `novalidate` on every form posting to an action and checks the form against the schema itself, so the schema's `error` messages show rather than the browser's, then the constraints the template wrote itself.
 - An island renders its fields without the constraints, kay's check covering them.
+- `form(action={move.with({ id, to: 2 }))})` posts those fields as hidden inputs would, with or without JavaScript, from a page or an island, with no input for them in the form: they travel in the form's action URL, `?kay_with=` holding them URL-encoded, and the server reads them as the form's own fields, coerced by the schema, standing over a posted field of the same name.
+- `with` takes the schema's fields, text, numbers, booleans, dates or lists of them, `undefined` and `null` left out; a call from an island sends its input as it is and reads none of it.
+- A button alone is one such form: `form(action={move.with({ id, to: 2 }))}) button(aria-label="Move up") ↑`.
 - After the post the browser goes back to the page, or wherever the handler's `ctx.redirect` points.
 - A visitor following a link to another page while the post is under way stays where it led, what the post answers dropped.
 - A line break a form posts, CRLF per the standard, is read as `\n`, the one character the `textarea` the visitor typed in counts, so a `maxLength` matches what the browser let them write.

@@ -1990,6 +1990,87 @@ describe('action input', () => {
     }
   })
 
+  it('serves the actions of an _actions.kay with no template, behind the guards and params of its directory, to a page that imports it', async () => {
+    const root = process.cwd()
+    const dir = await mkdtemp(join(root, '.kay/routes-'))
+    const id = dir.slice(root.length + 1)
+    const module = (body: string) => `--- server\nimport { t } from 'elysia'\nimport { action } from 'kay'\n\n${body}\n---\n`
+
+    try {
+      await Bun.write(join(dir, '_actions.kay'), module('export const leave = action(() => \'left\')'))
+      await Bun.write(join(dir, 'index.kay'), '---\nimport { leave } from \'./_actions.kay\'\n---\nform(action={leave}) button Leave\n')
+      await Bun.write(join(dir, 'orgs/[org]/_actions.kay'), module('export const rename = action(t.Object({}), (_, ctx) => ctx.params)'))
+      await Bun.write(join(dir, 'orgs/[org]/_guard.ts'), 'import { guard } from \'kay\'\n\nexport default guard(({ params, deny }) => params.org === \'acme\' ? undefined : deny(403, \'Not yours\'))\n')
+      await Bun.write(join(dir, 'orgs/[org]/index.kay'), 'p Org\n')
+
+      const served = await pages({ routes: dir, prebuilt: true })
+      const call = async (file: string, name: string, from?: string) => {
+        const response = await served.handle(new Request(`http://localhost/_kay/action/${id}/${file}/${name}`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-kay-action': '1', ...from === undefined ? {} : { referer: `http://localhost${from}` } }, body: stringify({}) }))
+
+        return `${response.status} ${await response.text()}`
+      }
+
+      expect(await call('_actions.kay', 'leave')).toBe('200 ["left"]')
+      // The module is no page: nothing is served at its path.
+      expect((await served.handle(new Request('http://localhost/_actions'))).status).toBe(404)
+      // A page importing it posts a form without JavaScript, as to its own action.
+      const page = await (await served.handle(new Request('http://localhost/'))).text()
+
+      expect(page).toContain(`action="/_kay/action/${id}/_actions.kay/leave"`)
+
+      const form = await served.handle(new Request(`http://localhost/_kay/action/${id}/_actions.kay/leave`, { method: 'POST', headers: { referer: 'http://localhost/' }, body: new URLSearchParams() }))
+
+      expect(form.status).toBe(303)
+      expect(await call('orgs/_org_/_actions.kay', 'rename', '/orgs/acme')).toBe('200 [{"org":1},"acme"]')
+      expect(await call('orgs/_org_/_actions.kay', 'rename', '/orgs/other')).toBe('403 Not yours')
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('posts a fixed payload through the form\'s action URL, as hidden fields would, with and without a base, whatever the form or a crafted query adds', async () => {
+    const root = process.cwd()
+    const dir = await mkdtemp(join(root, '.kay/routes-'))
+    const id = dir.slice(root.length + 1)
+    const fence = '--- server\nimport { t } from \'elysia\'\nimport { action } from \'kay\'\n\nexport const reorder = action(t.Object({ id: t.Integer(), to: t.Integer(), tags: t.Optional(t.Array(t.String({ maxLength: 9 }))), done: t.Optional(t.Boolean()) }), (input, ctx) => {\n  ctx.headers.set(\'x-got\', JSON.stringify(input))\n})\n---\n'
+
+    try {
+      await Bun.write(join(dir, 'index.kay'), `${fence}form(action={reorder.with({ id: 3, to: 2, tags: ['a', 'b'], done: false, skipped: undefined, none: null })}) button Up\nform(action={reorder}) button Plain\n`)
+
+      const url = `/_kay/action/${id}/index.kay/reorder`
+      const query = '?kay_with=id%3D3%26to%3D2%26tags%3Da%26tags%3Db%26done%3Dfalse'
+
+      for (const base of [undefined, '/shop']) {
+        const served = await pages({ routes: dir, prebuilt: true, base })
+        const html = await (await served.handle(new Request('http://localhost/'))).text()
+        const post = async (path: string, body = new URLSearchParams(), headers: Record<string, string> = {}) => served.handle(new Request(`http://localhost${path}`, { method: 'POST', headers: { referer: `http://localhost${base ?? ''}/`, ...headers }, body }))
+        const got = (response: Response) => [response.status, response.headers.get('x-got')]
+
+        expect(html).toContain(`action="${base ?? ''}${url}${query}"`)
+        expect(html).toContain(`action="${base ?? ''}${url}"`)
+        expect(html).not.toContain('type="hidden"')
+        // Posted as a plain form: the payload reaches the handler typed by the schema, with nothing else posted.
+        expect(got(await post(`${url}${query}`))).toEqual([303, JSON.stringify({ id: 3, to: 2, tags: ['a', 'b'], done: false })])
+        // The payload is the form's to fix: a field of the same name does not change it, one of another name goes along.
+        expect(got(await post(`${url}${query}`, new URLSearchParams('id=9&tags=c')))).toEqual([303, JSON.stringify({ id: 3, to: 2, tags: ['a', 'b'], done: false })])
+        // A crafted payload is a form's fields read the same way: the schema refuses what it cannot take, and the prototype is left alone.
+        expect(got(await post(`${url}?kay_with=id%3Dx%26to%3D1`))[0]).toBe(422)
+        expect(got(await post(`${url}?kay_with=__proto__%3Dx%26id%3D1%26to%3D1`))).toEqual([303, JSON.stringify({ id: 1, to: 1 })])
+        expect(got(await post(`${url}?kay_with=%E0%A4%A`))[0]).toBe(422)
+        // Only a form post reads it: a call sends its input as it is.
+        const call = await post(`${url}${query}`, stringify({ id: 5, to: 6 }) as never, { 'content-type': 'application/json', 'x-kay-action': '1' })
+
+        expect(got(call)).toEqual([200, JSON.stringify({ id: 5, to: 6 })])
+        // Nothing but the action's own query is a payload.
+        expect(got(await post(`${url}?id=3&to=2`))[0]).toBe(422)
+      }
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
   it('refuses to boot when two files would serve one action URL', async () => {
     const root = process.cwd()
     const dir = await mkdtemp(join(root, '.kay/routes-'))

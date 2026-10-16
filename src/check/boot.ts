@@ -99,7 +99,7 @@ export async function bootProblems(root: string, options: CheckOptions, feeds: C
   for (const feed of feeds)
     refused(projectPaths(root, options).content, () => claimFeed(served, feed, settings))
 
-  diagnostics.push(...await actionClashes(root, [...new Set(routes.flatMap(route => [...route.layouts, route.file]))]))
+  diagnostics.push(...await actionClashes(root, [...new Set(routes.flatMap(route => [...route.layouts, ...route.actionModules ?? [], route.file]))]))
 
   diagnostics.push(...await queryClashes(routes))
 

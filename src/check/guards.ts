@@ -16,6 +16,7 @@ export async function unguardedRoutes(options: CheckOptions, { routes, endpoints
   const report = (file: string, message: string, help = HELP): CheckDiagnostic => ({ file, line: 1, column: 1, message, help, code: 'unguarded-route', severity: level === 'warn' ? 'warning' : 'error' })
   const found: CheckDiagnostic[] = []
   const layouts = new Map<string, boolean>()
+  const modules = new Set<string>()
 
   for (const route of routes) {
     if (route.guards.length === 0 && route.open !== true)
@@ -26,6 +27,13 @@ export async function unguardedRoutes(options: CheckOptions, { routes, endpoints
 
       layouts.set(layout, access !== undefined && (access.guards.length > 0 || access.open === true))
     }
+
+    for (const [index, module] of (route.actionModules ?? []).entries()) {
+      const access = route.actionAccess?.[index]
+
+      modules.add(module)
+      layouts.set(module, access !== undefined && (access.guards.length > 0 || access.open === true))
+    }
   }
 
   for (const [layout, guarded] of layouts) {
@@ -33,7 +41,7 @@ export async function unguardedRoutes(options: CheckOptions, { routes, endpoints
     const actions = guarded ? [] : analyzeServer(source, parseKay(source).server)?.actionNames ?? []
 
     if (actions.length > 0)
-      found.push(report(layout, `No guard covers the actions of this layout, ${actions.map(name => `\`${name}\``).join(', ')}, so the server refuses them`, `${HELP} in its \`page\``))
+      found.push(report(layout, `No guard covers the actions of this ${modules.has(layout) ? 'module' : 'layout'}, ${actions.map(name => `\`${name}\``).join(', ')}, so the server refuses them`, `${HELP} in its \`page\``))
   }
 
   for (const endpoint of endpoints) {

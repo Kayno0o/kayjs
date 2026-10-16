@@ -117,7 +117,7 @@ async function appRoutes(root: string, config: KayConfig): Promise<Listed[]> {
       listed.push({ methods: 'GET', path: withMatchers(copy.path, route), kind: 'page', by: shown(route.file), file: shown(route.file), notes: [...localeNotes(copy, settings), ...prerendered, ...guards], layouts: route.layouts.map(shown), guards: route.guards.map(guard => shown(guard.file)), ...index > 0 && { copy: true } })
 
     // A layout's actions once, though every page under it renders it.
-    for (const file of [...route.layouts, route.file].filter(file => !actionFiles.has(file))) {
+    for (const file of [...route.layouts, ...route.actionModules ?? [], route.file].filter(file => !actionFiles.has(file))) {
       actionFiles.add(file)
 
       for (const name of (await serverOf(file))?.analysis.actionNames ?? [])
