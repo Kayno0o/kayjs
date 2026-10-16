@@ -725,6 +725,55 @@ describe('resource()', () => {
     expect(served.mock.calls.length).toBe(calls)
   })
 
+  it('reads any async function, reactively, and drops an answer a newer run overtook', async () => {
+    const query = signal('a')
+    const gates = new Map<string, PromiseWithResolvers<string>>()
+    const seen: AbortSignal[] = []
+    const found = root(() => resource(async (abort) => {
+      const wanted = query()
+      const gate = Promise.withResolvers<string>()
+
+      gates.set(wanted, gate)
+      seen.push(abort)
+
+      return gate.promise
+    }))
+
+    flush()
+    query.set('b')
+    flush()
+    expect(seen[0]?.aborted).toBe(true)
+    gates.get('b')?.resolve('B')
+    await until(() => found.status() === 'ready')
+    gates.get('a')?.resolve('A')
+    await Bun.sleep(10)
+
+    expect(found.value()).toBe('B')
+    expect(found.status()).toBe('ready')
+  })
+
+  it('fails a function with status 0 and its message, and runs it again on refresh', async () => {
+    let runs = 0
+    const found = root(() => resource(() => {
+      runs++
+
+      if (runs === 1)
+        throw new Error('down')
+
+      return 'up'
+    }))
+
+    await until(() => found.status() !== 'loading')
+    expect(found.status()).toBe('failed')
+    expect(found.error()).toEqual({ status: 0, message: 'down' })
+
+    found.refresh()
+    await until(() => found.status() === 'ready')
+
+    expect(found.value()).toBe('up')
+    expect(found.error()).toBeUndefined()
+  })
+
   it('takes only the GET routes answering a value, with the params they name', () => {
     const typed = () => {
       // @ts-expect-error: an event stream is read with stream()
@@ -1324,5 +1373,62 @@ describe('rooms', () => {
 
     // @ts-expect-error every type is handled
     dispatch(reset, { reset: () => 0 })
+  })
+})
+
+describe('stream() over an async iterable', () => {
+  beforeAll(() => {
+    globalThis.document = { querySelector: () => null } as unknown as Document
+  })
+
+  afterAll(() => {
+    Reflect.deleteProperty(globalThis, 'document')
+  })
+
+  it('reads each value, then is done', async () => {
+    const reader = root(() => stream(async function* () {
+      yield 1
+      yield 2
+    }))
+    const heard: number[] = []
+
+    reader.on(value => heard.push(value))
+    flush()
+    await until(() => reader.status() === 'done')
+
+    expect(reader.last()).toBe(2)
+    expect(heard).toEqual([1, 2])
+  })
+
+  it('fails when the iterable throws', async () => {
+    const reader = root(() => stream(async function* () {
+      yield 1
+
+      throw new Error('cut')
+    }))
+
+    flush()
+    await until(() => reader.status() === 'failed')
+
+    expect(reader.last()).toBe(1)
+  })
+
+  it('aborts the signal and stops reading once closed', async () => {
+    let aborted: AbortSignal | undefined
+    const reader = root(() => stream(async function* (signal) {
+      aborted = signal
+      yield 1
+      await Bun.sleep(20)
+      yield 2
+    }))
+
+    flush()
+    await until(() => reader.last() === 1)
+    reader.close()
+    await Bun.sleep(40)
+
+    expect(aborted?.aborted).toBe(true)
+    expect(reader.status()).toBe('closed')
+    expect(reader.last()).toBe(1)
   })
 })

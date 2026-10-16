@@ -597,11 +597,58 @@ export interface StreamRun<T, Options> extends EventReader<T> {
   start: (...[options]: Optional<Options>) => void
 }
 
+// An async iterable read as it arrives, from the moment the island is in the page.
+function iterate(source: (signal: AbortSignal) => AsyncIterable<unknown>): EventReader<unknown> {
+  const [status, setStatus] = ownSignal<StreamStatus>('connecting')
+  const values = listeners<unknown>()
+  const controller = new AbortController()
+
+  const read = async () => {
+    setStatus('open')
+
+    try {
+      for await (const value of source(controller.signal)) {
+        if (controller.signal.aborted)
+          return
+
+        values.receive(value)
+      }
+
+      if (!controller.signal.aborted)
+        setStatus('done')
+    }
+    catch {
+      if (!controller.signal.aborted)
+        setStatus('failed')
+    }
+  }
+  const close = () => {
+    setStatus('closed')
+    controller.abort()
+  }
+
+  onMount(() => {
+    if (typeof document !== 'undefined')
+      void read()
+  })
+  onCleanup(close)
+
+  return { last: values.last, status, on: values.on, close }
+}
+
 // Reads a route of a module under `src/api` answering with `eventStream()` from an island, once it is in the page, or with `start: false` each time `start()` is called: each value typed as the route sends it, Dates, Maps and Sets included.
 // A GET stream that drops reconnects; `close()` aborts the request, and a stream closes with the component that opened it.
 export function stream<Module, const Path extends StreamPath<Module>, const M extends StreamMethod<NodeAt<Module, Path>> = never>(module: Module, path: Path, options: MethodOption<NodeAt<Module, Path>, M> & { start: false }): StreamRun<StreamValue<MethodRoute<Module, Path, Chosen<M>>>, StreamStartOptions<Module, Path, M>>
 export function stream<Module, const Path extends StreamPath<Module>, const M extends StreamMethod<NodeAt<Module, Path>> = never>(module: Module, path: Path, ...[options]: Optional<StreamOptions<Module, Path, M>>): StreamOf<Module, Path, M>
-export function stream(module: unknown, path: string, options?: { method?: string, start?: boolean }): EventReader<unknown> {
+// Reads any async iterable the same way, once the island is in the page: `source` gets a signal that aborts when `close()` is called or the component is gone. The stream is `done` once the iterable ends and `failed` when it throws.
+export function stream<T>(source: (signal: AbortSignal) => AsyncIterable<T>): EventReader<T>
+export function stream(module: unknown, path?: string, options?: { method?: string, start?: boolean }): EventReader<unknown> {
+  if (typeof module === 'function')
+    return iterate(module as (signal: AbortSignal) => AsyncIterable<unknown>)
+
+  if (path === undefined)
+    throw new TypeError('kay: stream() takes the default export of a module under src/api and a path, or a function returning an async iterable')
+
   const lazy = options?.start === false
   const opened = (given: object | undefined) => {
     const init = streamRequest(given)
@@ -700,35 +747,30 @@ function refusal(answer: unknown, response: Response): string {
 }
 
 // Reads a GET route of a module under `src/api` from an island, once it is in the page, typed from the route. Options given as a function are read reactively: the route is asked again when a signal they read changes, and an answer a newer request overtook is dropped.
-export function resource<Module, const Path extends ResourcePath<Module>>(module: Module, path: Path, ...[options]: Optional<ResourceOptions<Module, Path> | (() => ResourceOptions<Module, Path>)>): ResourceOf<Module, Path> {
+export function resource<Module, const Path extends ResourcePath<Module>>(module: Module, path: Path, ...[options]: Optional<ResourceOptions<Module, Path> | (() => ResourceOptions<Module, Path>)>): ResourceOf<Module, Path>
+// Reads anything else the same way: `load` gets a signal that aborts when it is superseded or the component is gone, and the signals it reads before its first await are tracked, so it runs again when one changes. A throw is the `error()`, its `status` 0 unless it is an `ApiError`.
+export function resource<T>(load: (signal: AbortSignal) => T | PromiseLike<T>): Resource<Awaited<T>>
+export function resource(module: unknown, path?: string, options?: UrlInput | (() => UrlInput)): Resource<unknown> {
   const [value, setValue] = ownSignal<unknown>(undefined, { equals: false })
   const [status, setStatus] = ownSignal<ResourceStatus>('loading')
   const [error, setError] = ownSignal<ResourceFailure | undefined>(undefined)
   let current: AbortController | undefined
-  let asked = ''
+  let asked: ((signal: AbortSignal) => unknown) | undefined
   let gone = false
 
-  const load = async (url: string) => {
+  const load = async (read: (signal: AbortSignal) => unknown) => {
     const controller = new AbortController()
 
     current?.abort()
     current = controller
-    asked = url
+    asked = read
     setStatus('loading')
 
     try {
-      const response = await fetch(withBase(url), { headers: { accept: 'application/json' }, signal: controller.signal })
-      const answer = await readAnswer(response, controller.signal)
+      const answer = await read(controller.signal)
 
       if (controller.signal.aborted)
         return
-
-      if (!response.ok) {
-        setError({ status: response.status, message: refusal(answer, response) })
-        setStatus('failed')
-
-        return
-      }
 
       setValue(answer)
       setError(undefined)
@@ -745,7 +787,22 @@ export function resource<Module, const Path extends ResourcePath<Module>>(module
 
   // The server renders the island loading, as the browser does until the answer comes.
   if (typeof document !== 'undefined') {
-    effect(() => void load(routeUrl(module, path, (typeof options === 'function' ? options() : options) as UrlInput | undefined)))
+    effect(() => {
+      if (typeof module === 'function')
+        return void load(module as (signal: AbortSignal) => unknown)
+
+      const url = routeUrl(module, path ?? '', (typeof options === 'function' ? options() : options))
+
+      return void load(async (signal) => {
+        const response = await fetch(withBase(url), { headers: { accept: 'application/json' }, signal })
+        const answer = await readAnswer(response, signal)
+
+        if (!response.ok && !signal.aborted)
+          throw new ApiError(response.status, refusal(answer, response), answer)
+
+        return answer
+      })
+    })
   }
 
   onCleanup(() => {
@@ -753,7 +810,7 @@ export function resource<Module, const Path extends ResourcePath<Module>>(module
     current?.abort()
   })
 
-  return { value, status, error, refresh: () => asked === '' || gone ? undefined : void load(asked) } as ResourceOf<Module, Path>
+  return { value, status, error, refresh: () => asked === undefined || gone ? undefined : void load(asked) }
 }
 
 // What `call()` throws when a route refused or no answer came, aborting aside.
