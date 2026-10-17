@@ -13,4 +13,12 @@ describe('naming the user to other libraries', () => {
     expect(await ada.json('/named')).toBe((registered as { user: { id: string } }).user.id)
     expect(await browser().json('/named')).toBe('anonymous')
   })
+
+  test('a guest is not named', async () => {
+    const guest = testApp().browser()
+
+    await guest.callOk('signInAsGuest')
+
+    expect(await guest.json('/named')).toBe('anonymous')
+  })
 })

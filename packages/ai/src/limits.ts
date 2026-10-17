@@ -145,8 +145,13 @@ async function bounded<T>(read: () => T | Promise<T>): Promise<T> {
 }
 
 async function visitorKey(visitor: Settings['visitor'], { request, visitor: named }: Asker): Promise<string | undefined> {
-  const hooked = request && await visitor?.(request)
-  const user = named ?? (hooked !== undefined && hooked !== '' ? hooked : request && await userOf(request))
+  let user = named
+
+  if ((user === undefined || user === '') && request) {
+    const hooked = await visitor?.(request)
+
+    user = typeof hooked === 'string' && hooked !== '' ? hooked : await userOf(request)
+  }
 
   if (typeof user === 'string' && user !== '')
     return `user:${user}`

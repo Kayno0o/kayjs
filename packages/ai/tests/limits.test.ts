@@ -148,6 +148,13 @@ describe('ai({ limit })', () => {
     expect((await failure(inside(named('dan', '203.0.113.8'), () => ask('b')))).limit).toBe('asks')
   })
 
+  it('does not run the visitor hook for an ask that names its visitor', async () => {
+    ai({ limit: { max: 1, window: '1m' }, visitor: () => {
+      throw new Error('hook ran')
+    } })
+    await inside(rewrittenRequest('203.0.113.1'), () => ask('a', { visitor: 'named' }))
+  })
+
   it('lets a visitor hook answer later, and a call name the visitor over it', async () => {
     ai({ limit: { max: 1, window: '1m' }, visitor: async () => 'late' })
     await inside(rewrittenRequest('203.0.113.1'), () => ask('a'))

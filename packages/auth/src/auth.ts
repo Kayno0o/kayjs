@@ -1078,8 +1078,12 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
 
       const auth = new Auth<Scope, Role, OrgRole>(session, core, ctx.request, rateKey(address), address)
 
-      // Lets other libraries, such as kayjs-ai counting a visitor, know the signed-in user without importing kayjs-auth.
-      nameUser(ctx.request, async () => (await auth.user())?.id)
+      // Lets other libraries, such as kayjs-ai counting a visitor, know the signed-in user without importing kayjs-auth; a guest costs nothing to mint, so it is not named and stays counted by address.
+      nameUser(ctx.request, async () => {
+        const user = await auth.user()
+
+        return user && !user.guest ? user.id : undefined
+      })
 
       return { auth }
     })
