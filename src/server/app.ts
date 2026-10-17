@@ -40,7 +40,7 @@ import { serveErrorReports } from './errors'
 import { FAVICON_DIR, faviconSource, serveFavicons } from './favicon'
 import { loadGuard, loadGuards, requiredGuards } from './guards'
 import { refuseLocaleClashes } from './i18n'
-import { avifQuality, serveImages } from './image'
+import { avifQuality, serveImages, webpQuality } from './image'
 import { countWrites } from './kept-pages'
 import { HEALTH_PATH, serveHealth, stopOnSignal } from './lifecycle'
 import { serveLive } from './live'
@@ -160,7 +160,7 @@ function imageRouteOf({ root, config: options, mode }: Project<PagesOptions>, { 
     clientDir: client.dir,
     cacheDir: imageCache,
     dirs: Object.fromEntries(Object.entries(options.images?.dirs ?? {}).map(([prefix, dir]) => [prefix, resolve(runtimeRoot, dir)])),
-    quality: options.images?.quality,
+    quality: webpQuality(options.images),
     avif: mode.dev ? undefined : avifQuality(options.images),
     aspects: options.images?.aspects,
     remote: remoteImages(join(imageCache, 'remote'), remotePatterns(options.images?.remote), imageCache, undefined, remoteLimits(options.images)),
@@ -217,6 +217,8 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   const filePaths = new Set<string>([IMAGE_ROUTE])
   const log = options.log ?? process.env.NODE_ENV === 'production'
   const lifecycle = { draining: false }
+
+  const hasPreview = options.preview !== undefined && options.preview !== false
 
   setRequestIdHeader(options.requestIdHeader)
   trustProxy(app, options.proxy)
@@ -325,7 +327,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
     }
   }
 
-  limitBodies(app, options.bodyLimit ?? DEFAULT_BODY_LIMIT, new Map([...actionLimits, ...options.preview ? [[DRAFT_ROUTE, DRAFT_BODY_LIMIT] as const] : [], ...mcpAt === undefined ? [] : [[mcpAt, mcpBodyLimit] as const]]), api.limits, api.routeLimits)
+  limitBodies(app, options.bodyLimit ?? DEFAULT_BODY_LIMIT, new Map([...actionLimits, ...hasPreview ? [[DRAFT_ROUTE, DRAFT_BODY_LIMIT] as const] : [], ...mcpAt === undefined ? [] : [[mcpAt, mcpBodyLimit] as const]]), api.limits, api.routeLimits)
 
   // The actions that opted in to being tools are in the document beside the routes, and the MCP endpoint reads its tools from it.
   const document = servesOpenApi || mcpAt !== undefined
@@ -348,7 +350,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   if (options.security !== undefined && options.security !== false && options.security.reports === true)
     serveViolationReports(app, options.onError)
 
-  if (options.preview) {
+  if (hasPreview) {
     servePreview(app)
     serveDrafts(app, collections)
   }

@@ -254,7 +254,12 @@ function fontsourceFaces(root: string, font: FontsourceConfig): FontConfig[] {
   }
 
   const metadata = JSON.parse(readFileSync(file, 'utf8')) as FontsourceMetadata
-  const subsets = typeof font.subset === 'string' ? [font.subset] : font.subset ?? [metadata.defSubset]
+
+  if (font.subsets !== undefined && font.subset !== undefined)
+    throw new KayError('font-invalid', `kay: the font ${fontsource} sets both subsets and its older spelling subset; keep subsets`)
+
+  const named = font.subsets ?? font.subset
+  const subsets = typeof named === 'string' ? [named] : named ?? [metadata.defSubset]
   // A static package's metadata describes the family's variable axes too: only a `@fontsource-variable` package ships them.
   const variable = fontsource.startsWith(VARIABLE_SCOPE) && metadata.variable !== undefined && metadata.variable !== false ? metadata.variable.wght : undefined
 

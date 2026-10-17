@@ -727,7 +727,7 @@ async function renderFailure(error: unknown, special: SpecialPages, rendering: R
 
   rendering.headers.set('content-type', TEXT['content-type'])
 
-  return respond(rendering, notFound ? 'Not found' : pageError.message)
+  return respond(rendering, notFound ? 'Not Found' : pageError.message)
 }
 
 // Inside its layouts, reusing what their loads returned for the failed page; bare when one of them is what failed.

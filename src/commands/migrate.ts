@@ -7,10 +7,10 @@ import { migrateAstroProject } from '../migrate/project'
 import { count, done, formatOption, printDocument, printFailure, shellQuote } from './command'
 import { USAGES } from './usages'
 
-// Translates an Astro project's `.astro` files and content config, in place or into `--out`, a directory with no package.json getting the kay project around them, and lists what is left to do by hand.
+// Translates an Astro project's `.astro` files and content config, in place or into `--outdir` (`--out` as before), a directory with no package.json getting the kay project around them, and lists what is left to do by hand.
 export const migrate: Command = {
   usage: USAGES.migrate,
-  options: { out: { type: 'string' }, format: { type: 'string' }, quiet: { type: 'boolean' } },
+  options: { outdir: { type: 'string' }, out: { type: 'string' }, format: { type: 'string' }, quiet: { type: 'boolean' } },
   positionals: 2,
   run: async ({ values, positionals }) => {
     const [from, dir = '.'] = positionals
@@ -31,7 +31,14 @@ export const migrate: Command = {
       return 1
     }
 
-    const out = typeof values.out === 'string' ? resolve(values.out) : resolve(dir)
+    if (typeof values.out === 'string' && typeof values.outdir === 'string' && resolve(values.out) !== resolve(values.outdir)) {
+      printFailure('migrate', '--out is the older spelling of --outdir, and the two name different directories; keep --outdir', format)
+
+      return 1
+    }
+
+    const outdir = values.outdir ?? values.out
+    const out = typeof outdir === 'string' ? resolve(outdir) : resolve(dir)
     let migrated: Awaited<ReturnType<typeof migrateAstroProject>>
 
     try {

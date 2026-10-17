@@ -229,6 +229,8 @@ export interface FontsourceConfig {
   // Defaults to `['normal']`.
   styles?: ('normal' | 'italic')[] | undefined
   // Defaults to the package's own, `latin` for most; several, `['latin', 'latin-ext']`, give each face its subset's `unicode-range`, so a page loads only the files its text needs.
+  subsets?: string[] | undefined
+  // The older spelling of `subsets`, which also takes one name.
   subset?: string | string[] | undefined
   display?: FontConfig['display'] | undefined
   // Preloads every face the entry declares, as `preload` does a font's: give it to an entry of one subset and the faces the first paint shows.
@@ -294,8 +296,10 @@ export interface ImagesConfig {
   remoteMaxSize?: ByteSize | undefined
   // How long the image route waits for a remote host, redirects included, seconds or a string such as `'30s'`; 10 seconds by default. A slower host answers 502.
   remoteTimeout?: Duration | undefined
-  // WebP quality, 1 to 100. Defaults to 80. It also sets the quality of the share cards' JPEG; `image(src, { quality })` sets one image's variants.
+  // WebP quality, 1 to 100. Defaults to 80. It also sets the quality of the share cards' JPEG, which `webp.quality` leaves alone; `image(src, { quality })` sets one image's variants.
   quality?: number | undefined
+  // WebP variants beside the AVIF ones: `{ quality: 75 }` over `quality`, for the variants alone.
+  webp?: { quality?: number | undefined } | undefined
   // The widths in pixels `image()` resizes to and the route makes, whole numbers from 1 to 16384, at most 16, in any order: `[480, 960, 1440, 1920]`. Defaults to `[320, 640, 960, 1280, 1920, 2560, 3840]`. Each width is a file per image, so a short ladder builds fewer.
   widths?: number[] | undefined
   // AVIF variants beside the WebP ones, a third to a half smaller, sent to a browser whose `Accept` names `image/avif`: on at quality 50 by default, `false` serves WebP alone. Development and a static export serve WebP.

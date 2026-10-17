@@ -398,7 +398,7 @@ kay lint --fix --cache       # ESLint, with the types it reads written first
 ## kay migrate
 
 ```sh
-kay migrate astro . --out ../kay-site
+kay migrate astro . --outdir ../kay-site
 ```
 
 `kay migrate` translates an Astro project's `.astro` files into `.kay` ones, its pages into `src/routes` and its content config into kay's. It lists what is left to do by hand at its line in the Astro file. It never writes over a file that exists.
@@ -406,7 +406,7 @@ kay migrate astro . --out ../kay-site
 | Option | Effect |
 | --- | --- |
 | `[dir]` | The Astro project, the current directory by default |
-| `--out <dir>` | Writes there instead of next to the `.astro` files. A directory with no `package.json` gets a whole kay project |
+| `--outdir <dir>` | Writes there instead of next to the `.astro` files. A directory with no `package.json` gets a whole kay project |
 
 The [Astro guide](/migrating/from-astro) shows what it translates and how to finish what it lists.
 

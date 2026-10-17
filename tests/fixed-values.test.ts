@@ -5,6 +5,7 @@ import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { Elysia } from 'elysia'
 import { check, configCheckOptions } from '../src/check'
 import { pages } from '../src/server'
+import { webpQuality } from '../src/server/image'
 import { probeHealth } from '../src/server/lifecycle'
 import { liveLimits } from '../src/server/live'
 import { clientAddress, trustProxy } from '../src/server/protection'
@@ -197,5 +198,24 @@ describe('options that also take false', () => {
     expect(headers['content-security-policy-report-only']).toContain('img-src \'none\'')
     expect(securityHeaders({ security }, [{ csp: { 'img-src': ['https://a.example'] } }])!['content-security-policy']).toContain('https://a.example')
     expect(securityHeaders({}, [{ csp: { 'img-src': ['https://a.example'] } }, { csp: false }])!['content-security-policy']).toBeUndefined()
+  })
+})
+
+describe('images.webp', () => {
+  it('sets the WebP quality over images.quality, which stays the default and the cards\' alone', () => {
+    expect(webpQuality(undefined)).toBeUndefined()
+    expect(webpQuality({ quality: 70 })).toBe(70)
+    expect(webpQuality({ webp: { quality: 75 } })).toBe(75)
+    expect(webpQuality({ quality: 70, webp: { quality: 75 } })).toBe(75)
+    expect(webpQuality({ quality: 70, webp: {} })).toBe(70)
+  })
+})
+
+describe('one Not Found spelling', () => {
+  it('answers the image route 404 as Not Found, as the pages and endpoints do', async () => {
+    const app = await pages({ routes: ROUTES, prebuilt: false })
+    const text = async (path: string) => (await app.handle(new Request(`http://localhost${path}`))).text()
+
+    expect(await text('/_kay/image?src=%2Fnone.png&w=320')).toBe('Not Found')
   })
 })

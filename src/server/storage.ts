@@ -344,7 +344,7 @@ export function serveFiles(app: Elysia, security: Record<string, string> | undef
     const key = params['*']
 
     if (!KEY.test(key))
-      return new Response('Not found', { status: 404, headers: ownHeaders(set, text) })
+      return new Response('Not Found', { status: 404, headers: ownHeaders(set, text) })
 
     const own = (headers: Record<string, string>) => ownedHeaders(set, headers, entries)
 
@@ -418,7 +418,7 @@ async function fileResponse(key: string, request: Request | undefined, cacheCont
   const data = await (await activeStore()).read(key)
 
   if (!data)
-    return new Response('Not found', { status: 404, headers: own({ ...TEXT }) })
+    return new Response('Not Found', { status: 404, headers: own({ ...TEXT }) })
 
   const type = Bun.file(key).type
   const inline = INLINE.test(type)

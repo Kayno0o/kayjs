@@ -433,7 +433,7 @@ export function serveCards(app: Elysia, cards: Cards, options: ImageRouteOptions
     const key = cards.key ??= existingKey(cards)
 
     if (!key || cards.font instanceof Error || !signed(key, spec, url.searchParams.get('sig') ?? ''))
-      return new Response('Not found', { status: 404, headers: TEXT })
+      return new Response('Not Found', { status: 404, headers: TEXT })
 
     const svg = isSvgCard(src)
     const source = src === undefined || svg ? undefined : await findSource(src, options)
@@ -443,11 +443,11 @@ export function serveCards(app: Elysia, cards: Cards, options: ImageRouteOptions
       return new Response(source.message, { status: source.status, headers: TEXT })
 
     if (svg && svgFile(cards, src) === undefined)
-      return new Response('Not found', { status: 404, headers: TEXT })
+      return new Response('Not Found', { status: 404, headers: TEXT })
 
     if (src !== undefined && !svg) {
       if (!source)
-        return new Response('Not found', { status: 404, headers: TEXT })
+        return new Response('Not Found', { status: 404, headers: TEXT })
 
       try {
         const stats = await stat(source.path)
@@ -456,7 +456,7 @@ export function serveCards(app: Elysia, cards: Cards, options: ImageRouteOptions
           version = `\n${stats.size}\n${stats.mtimeMs}`
       }
       catch {
-        return new Response('Not found', { status: 404, headers: TEXT })
+        return new Response('Not Found', { status: 404, headers: TEXT })
       }
     }
 

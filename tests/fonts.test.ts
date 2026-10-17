@@ -119,7 +119,7 @@ describe('fonts', () => {
       ...['latin', 'latin-ext', 'greek'].map(async subset => Bun.write(join(root, `node_modules/@fontsource-variable/grotesk/files/grotesk-${subset}-wght-normal.woff2`), display)),
     ])
 
-    const { css } = await prepareFonts(root, [{ fontsource: '@fontsource/anton', weights: [400], subset: ['latin', 'latin-ext'] }, { fontsource: '@fontsource-variable/grotesk', subset: ['latin', 'latin-ext'] }], join(root, 'out'))
+    const { css } = await prepareFonts(root, [{ fontsource: '@fontsource/anton', weights: [400], subsets: ['latin', 'latin-ext'] }, { fontsource: '@fontsource-variable/grotesk', subsets: ['latin', 'latin-ext'] }], join(root, 'out'))
     const faces = css.split(/(?<=\})(?=@)/).map(rule => rule.replace(/url\("[^"]+"\)/, 'url()'))
 
     expect(faces).toEqual([
@@ -129,8 +129,14 @@ describe('fonts', () => {
       '@font-face{font-family:"Grotesk";src:url() format("woff2");font-weight:100 900;font-style:normal;font-display:swap;unicode-range:U+0100-02BA}',
     ])
 
-    await expect(prepareFonts(root, [{ fontsource: '@fontsource-variable/grotesk', subset: ['latin', 'cyrillic'] }], scratch)).rejects.toThrow('has no subset cyrillic')
-    await expect(prepareFonts(root, [{ fontsource: '@fontsource-variable/grotesk', subset: ['latin', 'greek'] }], scratch)).rejects.toThrow('names no unicode-range for its greek subset')
+    await expect(prepareFonts(root, [{ fontsource: '@fontsource-variable/grotesk', subsets: ['latin', 'cyrillic'] }], scratch)).rejects.toThrow('has no subset cyrillic')
+    await expect(prepareFonts(root, [{ fontsource: '@fontsource-variable/grotesk', subsets: ['latin', 'greek'] }], scratch)).rejects.toThrow('names no unicode-range for its greek subset')
+
+    const older = await prepareFonts(root, [{ fontsource: '@fontsource-variable/grotesk', subset: ['latin', 'latin-ext'] }], join(root, 'out'))
+    const newer = await prepareFonts(root, [{ fontsource: '@fontsource-variable/grotesk', subsets: ['latin', 'latin-ext'] }], join(root, 'out'))
+
+    expect(older.css).toBe(newer.css)
+    await expect(prepareFonts(root, [{ fontsource: '@fontsource-variable/grotesk', subsets: ['latin'], subset: 'latin' }], scratch)).rejects.toThrow('sets both subsets and its older spelling subset')
   })
 
   it('names a font that is missing or no font file', async () => {

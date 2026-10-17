@@ -8,10 +8,10 @@ description: Translate an Astro site into a kay project with kay migrate astro, 
 
 `kay migrate astro` reads an Astro project and writes its `.astro` files as `.kay` ones.
 
-Point `--out` at a new or empty directory, one with no `package.json`, and it writes a whole kay project there. With Bun pointed at kay's registry, as in [Installation](/getting-started/installation), run it from the Astro project.
+Point `--outdir` at a new or empty directory, one with no `package.json`, and it writes a whole kay project there. With Bun pointed at kay's registry, as in [Installation](/getting-started/installation), run it from the Astro project.
 
 ```sh
-bunx -p @kaynooo/kayjs kay migrate astro . --out ../my-site-kay
+bunx -p @kaynooo/kayjs kay migrate astro . --outdir ../my-site-kay
 cd ../my-site-kay && bun install && bun run dev
 ```
 
@@ -29,7 +29,7 @@ The new project has these.
 
 It never writes over a file that exists.
 
-Run without `--out`, it writes the `.kay` files next to the `.astro` ones and leaves the Astro project's `package.json` alone. The project's files are then yours to add by hand.
+Run without `--outdir`, it writes the `.kay` files next to the `.astro` ones and leaves the Astro project's `package.json` alone. The project's files are then yours to add by hand.
 
 ## What it translates
 

@@ -1382,7 +1382,7 @@ describe('without special pages', () => {
       expect((await visit('/locked')).headers.get('x-guard')).toBe('locked')
       expect(await visit('/?fail')).toMatchObject({ status: 500, text: 'Internal Server Error', cookie: expect.stringMatching(/^visited=yes;/) })
       expect((await visit('/?fail')).headers.get('x-page')).toBe('index')
-      expect(await visit('/?missing')).toMatchObject({ status: 404, text: 'Not found', cookie: expect.stringMatching(/^visited=yes;/) })
+      expect(await visit('/?missing')).toMatchObject({ status: 404, text: 'Not Found', cookie: expect.stringMatching(/^visited=yes;/) })
       expect(await visit('/?deny')).toMatchObject({ status: 403, text: 'Members only', cookie: expect.stringMatching(/^visited=yes;/) })
 
       const dev = await visit('/?fail', await pages({ routes: 'tests/fixtures/bare/src/routes', prebuilt: true, dev: true }))

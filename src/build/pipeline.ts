@@ -26,7 +26,7 @@ import { ENTRY_RECORD, EXECUTABLE_RECORD, PRERENDERED_DIR } from '../server/clie
 import { compressFiles } from '../server/compress'
 import { FAVICON_DIR, faviconSource } from '../server/favicon'
 import { fontFiles } from '../server/fonts'
-import { avifQuality, writeImageVariants, writeRemoteVariants } from '../server/image'
+import { avifQuality, webpQuality, writeImageVariants, writeRemoteVariants } from '../server/image'
 import { hookPrerendered } from '../server/page-hook'
 import { prerenderPages } from '../server/prerender'
 import { remoteImages, remoteLimits, remotePatterns } from '../server/remote'
@@ -342,7 +342,7 @@ async function bundleStage(project: Project, exported: boolean, analyze: boolean
   // The ladder is set before the first variant is written, as the server sets it for the pages.
   setImageWidths(config.images?.widths)
   // The prerender may import more images, so the cache is pruned once it has.
-  await writeImageVariants(client.dir, config.images?.quality, cacheDir(root, 'variants'), { prune: false, avif, onImage: imageProgress(report) })
+  await writeImageVariants(client.dir, webpQuality(config.images), cacheDir(root, 'variants'), { prune: false, avif, onImage: imageProgress(report) })
 
   return client
 }
@@ -400,9 +400,9 @@ async function outputStage(project: Project, exported: boolean, client: ClientBu
   // Remote originals are kept between builds, revalidated as the image route does.
   const remote = remoteImages(cacheDir(root, 'remote'), remotePatterns(config.images?.remote), undefined, undefined, remoteLimits(config.images))
 
-  await writeImageVariants(client.dir, config.images?.quality, cacheDir(root, 'variants'), { avif: exported ? undefined : avifQuality(config.images), onImage: imageProgress(report) })
+  await writeImageVariants(client.dir, webpQuality(config.images), cacheDir(root, 'variants'), { avif: exported ? undefined : avifQuality(config.images), onImage: imageProgress(report) })
   report({ step: 'writing images, cards and favicons' })
-  await writeRemoteVariants(client.dir, remote, config.images?.quality)
+  await writeRemoteVariants(client.dir, remote, webpQuality(config.images))
   await writeCards(client.dir, cacheDir(root, 'cards'), remote)
   lap('images and cards')
 

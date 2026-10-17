@@ -160,7 +160,7 @@ export default defineConfig({
 
 An image gets variants at 320, 640, 960, 1280, 1920, 2560 and 3840 pixels, those narrower than the image itself. `images.widths` sets another list: whole numbers from 1 to 16384, at most 16, in any order. A shorter list builds fewer files.
 
-`image(photo, { quality: 90 })` encodes that one image's variants at a quality of its own, for a photograph that shows banding at the default. `images.quality`, 80 by default, is the quality of all the others, and of the JPEG share cards too. The AVIF variants move the same step from `images.avif`'s quality, so 90 gives WebP at 90 and AVIF at 60 by default.
+`image(photo, { quality: 90 })` encodes that one image's variants at a quality of its own, for a photograph that shows banding at the default. `images.quality`, 80 by default, is the quality of all the others, and of the JPEG share cards too; `images.webp: { quality }` sets the WebP variants alone, as `images.avif` does the AVIF ones. The AVIF variants move the same step from `images.avif`'s quality, so 90 gives WebP at 90 and AVIF at 60 by default.
 
 ```ts
 export default defineConfig({
@@ -248,11 +248,11 @@ While a font loads, kay shows the text in a stand-in sized like it. It reads the
 
 kay adds the fallback right after the family in your stylesheets' `font-family`, `font` and `--font-*` values. The page then barely moves when the font arrives. A stack in an inline `style` attribute is left as you wrote it.
 
-A face can cover only some characters with `unicodeRange`, passed to the `@font-face` as it is. A Fontsource entry takes `subset: ['latin', 'latin-ext']` instead. Each face then gets its subset's range, and a page loads only the files its text needs.
+A face can cover only some characters with `unicodeRange`, passed to the `@font-face` as it is. A Fontsource entry takes `subsets: ['latin', 'latin-ext']` instead. Each face then gets its subset's range, and a page loads only the files its text needs.
 
 ```ts
 export default defineConfig({
-  fonts: [{ fontsource: '@fontsource/inter', subset: ['latin', 'latin-ext'] }],
+  fonts: [{ fontsource: '@fontsource/inter', subsets: ['latin', 'latin-ext'] }],
 })
 ```
 

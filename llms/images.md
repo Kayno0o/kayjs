@@ -183,6 +183,7 @@ img(src={hero} sizes="(min-width: 60rem) 50vw, 100vw" alt="The workshop")
 - Both take a `Blob`, such as a form's `File`, or bytes, and refuse an image over `maxPixels`, 50 million by default, before decoding it.
 - `images.quality` sets the WebP quality, 80 by default, and the JPEG quality of the share cards `shareCard()` and `shareImage()` draw; a card's quality is part of its URL, so changing it renames the cards.
 - Each variant also comes as an AVIF, a third to a half smaller than the WebP, on the same URL: the route answers it to a browser whose `Accept` names `image/avif`, about 95% of them, and the WebP to any other, with `Vary: Accept` on both.
+- `images.webp: { quality: 75 }` sets the WebP quality over `images.quality`, which then keeps the share cards' JPEG alone.
 - `images.avif: { quality: 60 }` sets its quality, 50 by default, and `images.avif: false` serves WebP alone.
 - `kay build` writes both formats of every imported image's variants, the AVIF taking 25 ms to half a second each, on up to four threads, cached between builds as the WebP is.
 - A runtime or remote image's AVIF is encoded on its first request, on a worker thread the server starts then and stops after 30 seconds with nothing to encode, so a request for another page never waits on it.

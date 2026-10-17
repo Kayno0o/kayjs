@@ -251,7 +251,7 @@ export async function migrateAstroProject(root: string, out = root, options: Mig
     if (resolve(out) === resolve(root)) {
       const astroPackages = Object.keys(dependencies).filter(name => ASTRO_PACKAGE.test(name)).toSorted()
 
-      note('package.json', undefined, { line: 1, message: `the Astro project's, left as it is: add the \`kay\` dependency \`kay new\` writes, run \`kay dev\`, \`kay build\` and \`kay check\` from its scripts${astroPackages.length > 0 ? ` and remove ${astroPackages.join(', ')}` : ''}; or migrate into an empty directory with --out, which writes it` })
+      note('package.json', undefined, { line: 1, message: `the Astro project's, left as it is: add the \`kay\` dependency \`kay new\` writes, run \`kay dev\`, \`kay build\` and \`kay check\` from its scripts${astroPackages.length > 0 ? ` and remove ${astroPackages.join(', ')}` : ''}; or migrate into an empty directory with --outdir, which writes it` })
     }
   }
 

@@ -74,6 +74,11 @@ export function variantName(source: string, variant: number | ImageVariant, form
 }
 
 // `images.avif` as a quality, or undefined when it is off.
+// The WebP quality of the variants: `images.webp.quality`, else `images.quality`, else the default applied where it is read.
+export function webpQuality(images: { quality?: number | undefined, webp?: { quality?: number | undefined } | undefined } | undefined): number | undefined {
+  return images?.webp?.quality ?? images?.quality
+}
+
 export function avifQuality(images: { avif?: false | { quality?: number | undefined } | undefined } | undefined): number | undefined {
   return images?.avif === false ? undefined : images?.avif?.quality ?? DEFAULT_AVIF_QUALITY
 }
@@ -260,7 +265,7 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
     }
 
     if (!source)
-      return fail('Not found', 404)
+      return fail('Not Found', 404)
 
     if ('status' in source)
       return fail(source.message, source.status)
@@ -282,7 +287,7 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
         if ((error as { code?: string }).code === 'ERR_IMAGE_TOO_MANY_PIXELS')
           return fail(`Image over ${MAX_UPLOAD_PIXELS} pixels`, 413)
 
-        return stats ? fail('Not an image kay can resize', 415) : fail('Not found', 404)
+        return stats ? fail('Not an image kay can resize', 415) : fail('Not Found', 404)
       }
 
       if (source.immutable)
