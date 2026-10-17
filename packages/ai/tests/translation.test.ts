@@ -46,3 +46,22 @@ it('fences around the JSON reply are tolerated, and the usage of both asks is su
   expect(result.inputTokens).toBeGreaterThan(0)
   fakeAi.clear()
 })
+
+it('leaves a string field of a kind the app adds as it is, and translates a markdown one', async () => {
+  const { collectPaths } = await import('../src/translate')
+  const schema = {
+    type: 'object',
+    properties: {
+      title: { type: 'string' },
+      color: { 'type': 'string', 'x-kay': { kind: 'color' } },
+      note: { 'type': 'string', 'x-kay': { kind: 'markdown' } },
+      cover: { 'type': 'string', 'x-kay': { kind: 'image' } },
+      swatches: { type: 'array', items: { 'type': 'string', 'x-kay': { kind: 'color' } } },
+    },
+  }
+  const found: (string | number)[][] = []
+
+  collectPaths(schema, { title: 'Hi', color: '#fff', note: 'Hello', cover: '/a.png', swatches: ['#000'] }, [], found)
+
+  expect(found).toEqual([['title'], ['note']])
+})

@@ -10,7 +10,8 @@ type Path = (string | number)[]
 // Texts per request: a model keeps ids and placeholders straight in a short list.
 const BATCH_UNITS = 40
 const BATCH_CHARS = 8000
-const SKIPPED_KINDS = new Set(['image', 'file', 'reference'])
+// The kinds of field a model translates: no kind is plain text; every other, built in (image, file, reference) or the app's own, holds data a component edits.
+const TRANSLATED_KINDS = new Set(['markdown'])
 
 interface MessageUnit extends Unit {
   key: string
@@ -282,15 +283,15 @@ function schemaAt(schema: JsonSchema, path: Path): JsonSchema | undefined {
   return node
 }
 
-// The paths of the strings worth translating: free text, not an identifier, a date, a choice, a pattern or a file.
-function collectPaths(schema: JsonSchema | undefined, data: unknown, path: Path, found: Path[]): void {
+// The paths of the strings worth translating: free text, not an identifier, a date, a choice, a pattern, a file or a field of a kind the app adds.
+export function collectPaths(schema: JsonSchema | undefined, data: unknown, path: Path, found: Path[]): void {
   const node = narrowed(schema)
 
   if (node === undefined)
     return
 
   if (typeof data === 'string') {
-    const plain = node.type === 'string' && node.format === undefined && node.enum === undefined && node.const === undefined && node.pattern === undefined && !SKIPPED_KINDS.has(node['x-kay']?.kind ?? '')
+    const plain = node.type === 'string' && node.format === undefined && node.enum === undefined && node.const === undefined && node.pattern === undefined && (node['x-kay'] === undefined || TRANSLATED_KINDS.has(node['x-kay'].kind))
 
     if (plain && data.trim() !== '')
       found.push(path)
