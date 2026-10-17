@@ -104,6 +104,7 @@ describe('the wire of an action', () => {
     const response = await site.fetch('/untyped')
 
     expect(response.status).toBe(500)
+    expect((await site.fetch('/browser-only')).status).toBe(200)
     expect(() => child(island('untyped.kay', (_props: { run: unknown }) => null)({ run: greet }))).toThrow('import `Action` from \'kay\'')
     expect(() => child(island('typed.kay', (_props: { run: unknown }) => null, [], false, undefined, [], true)({ run: greet }))).not.toThrow()
   })

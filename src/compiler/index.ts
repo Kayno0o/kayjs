@@ -8,7 +8,7 @@ import { basename, relative } from 'node:path'
 import process from 'node:process'
 import { drawIcons, templateFacts, visitNodes } from './ast'
 import { browserReads } from './browser'
-import { generate, isInteractive, islandCause, islandMessages, promotionCause } from './codegen'
+import { generate, isInteractive, islandCause, islandMessages, promotionCause, typesAction } from './codegen'
 import { cssImportsWithoutText, separatePageSettings, serverOnlyImports, staleAuthCalls, unboundedFields } from './fence-checks'
 import { applyLints, templateLints } from './lints'
 import { SourceMap } from './mapping'
@@ -198,7 +198,7 @@ export function compileKay(source: string, filename: string, options: CompileOpt
     const lives = liveBindings(script, options.importedSignals)
     const imports = lives.map(binding => `import { ${binding.imported} as ${binding.local} } from ${JSON.stringify(binding.source)}\n`).join('')
 
-    return { tsx: `import { island as KayIsland } from 'kay/island'\n${imports}\nexport default KayIsland(${JSON.stringify(island)}, undefined${islandMessages(source, true, lives.map(binding => binding.local))})\n`, map: new SourceMap([], []), island, why, classes: templateFacts(file).classes, diagnostics: reported }
+    return { tsx: `import { island as KayIsland } from 'kay/island'\n${imports}\nexport default KayIsland(${JSON.stringify(island)}, undefined${islandMessages(source, true, lives.map(binding => binding.local), typesAction(script))})\n`, map: new SourceMap([], []), island, why, classes: templateFacts(file).classes, diagnostics: reported }
   }
 
   return {

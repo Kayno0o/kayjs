@@ -82,6 +82,11 @@ const MESSAGE_KEY = /(?:\b(?:t|wording)\(\s*|\bT\([^)]*?\bkey=)(['"`])([\w.-]+)\
 // The types of `kay` an island types a prop with when a page may pass it an action.
 const ACTION_TYPES = new Set(['Action', 'ServerAction', 'NoInputAction'])
 
+// Whether the script types a prop as an action, so the page may pass the island one.
+export function typesAction(script: ScriptAnalysis): boolean {
+  return script.imports.some(binding => binding.source === 'kay' && ACTION_TYPES.has(binding.imported))
+}
+
 // The server exports that are no actions: the page's settings, and each under its own name as they were exported before.
 const NOT_ACTIONS = new Set<string>([PAGE, ...PAGE_SETTINGS])
 // A type parameter's name, past the `const`, `in` and `out` modifiers it may carry.
@@ -134,6 +139,8 @@ export function generate(file: KayFile, script: ScriptAnalysis, server: ServerAn
 class ModuleShell {
   private readonly b: CodeBuilder
   private readonly sites: Sites = { rows: new Set(), consts: new Map(), props: new Map() }
+  // Whether the island types a prop as an action, so the server lets it be passed one.
+  private takesActions = false
   private readonly src: string
   private readonly mode: OutputMode
   private readonly kind: IslandKind
@@ -251,7 +258,7 @@ class ModuleShell {
       kayHelpers.push(fence ? 'registerActions' : 'actionStub')
 
     // An island typing a prop as an action may be passed one by a page, which arrives as its URL: the island's chunk is what brings the code building the stub, so an app without one ships none.
-    this.takesActions = this.kind === 'island' && script.imports.some(binding => binding.source === 'kay' && ACTION_TYPES.has(binding.imported))
+    this.takesActions = this.kind === 'island' && typesAction(script)
 
     const takesActions = mode === 'dom' && this.takesActions
 
@@ -387,7 +394,7 @@ class ModuleShell {
     else if (this.kind === 'twin')
       b.add(`\nexport default ((props: never) => KayInsideIsland() ? KayHydrated(props) : ${name}(props)) as typeof ${name}\n`)
     else if (this.kind === 'island')
-      b.add(`\nexport default KayIsland(${JSON.stringify(this.options.island)}, ${name}${this.genericComponent ? ' as never' : ''}${islandMessages(src, this.options.client, this.options.output === 'html' ? this.options.lives : undefined, this.takesActions)})${this.genericIslandType()}\n`)
+      b.add(`\nexport default KayIsland(${JSON.stringify(this.options.island)}, ${name}${this.genericComponent ? ' as never' : ''}${islandMessages(src, this.options.client, this.options.output === 'html' ? this.options.lives : undefined, this.options.output === 'html' && this.takesActions)})${this.genericIslandType()}\n`)
   }
 
   private get wrapped(): boolean {
@@ -421,9 +428,6 @@ class ModuleShell {
   private settingType(name: PageSettingName): string | undefined {
     return this.server?.page?.settings.has(name) ? `typeof ${PAGE}.${name}` : undefined
   }
-
-  // Whether the island types a prop as an action, so the server lets it be passed one.
-  private takesActions = false
 
   private get genericComponent(): boolean {
     return this.file.typeParameters !== undefined && this.server === undefined

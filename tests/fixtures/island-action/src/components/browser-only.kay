@@ -1,0 +1,6 @@
+--- client
+import type { Action } from 'kay'
+
+const { run } = props<{ run: Action<{ name: string }, string> }>()
+---
+button.only(type="button" onClick={() => void run({ name: 'x' })}) {run.url}

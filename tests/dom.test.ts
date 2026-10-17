@@ -2258,7 +2258,10 @@ describe('a stream an island starts', () => {
       await settle()
       await settle()
       expect(streams().map(stream => stream.status())).toEqual(['open'])
-      await dispose()
+      root.querySelector<HTMLButtonElement>('button.hide')!.click()
+      await settle()
+      await settle()
+      expect(root.querySelector('button.start')).toBeNull()
       expect(streams().map(stream => stream.status())).toEqual(['open'])
     }
     finally {
