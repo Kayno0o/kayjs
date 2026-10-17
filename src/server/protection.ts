@@ -552,7 +552,7 @@ export function trustProxy(app: Elysia, setting: ProxyConfig | number | boolean 
 
 // The socket's address, unless it is a proxy on this machine or network the app's `proxy` setting trusts: then the client's address as that proxy passed it on.
 // `proxy` stands in for the app's setting, for a plain Elysia app that `pages()` does not serve.
-export function clientAddress(request: Request, server: Server<unknown> | null | undefined, setting?: ProxyConfig | number | true): string {
+export function clientAddress(request: Request, server: Server<unknown> | null | undefined, setting?: ProxyConfig | number | boolean): string {
   const proxy = proxyOf(setting)
   const address = rewrittenAddress(request) ?? (server ?? servers.get(request))?.requestIP(request)?.address
   const trusted = proxy ?? proxies.get(request)
