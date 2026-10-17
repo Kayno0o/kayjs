@@ -69,3 +69,18 @@ describe('what\'s new', () => {
     expect(archiveOldest(page.replace(/Releases before.*\n/, ''), archive, 1)).toEqual({ page: page.replace(/Releases before.*\n/, ''), archive })
   })
 })
+
+describe('the TypeScript packages', () => {
+  it('give kay the native compiler under its own alias and typescript 6 under the name typescript-eslint reads', () => {
+    expect(root.dependencies?.typescript7).toStartWith('npm:typescript@')
+    expect(root.dependencies?.typescript).toStartWith('^6')
+  })
+
+  it('give an app the tsgo command running the native compiler', async () => {
+    const run = Bun.spawn(['bun', 'src/tsgo.ts', '--version'], { stdout: 'pipe', stderr: 'pipe' })
+
+    expect(await new Response(run.stdout).text()).toMatch(/^Version 7\./)
+    expect(await run.exited).toBe(0)
+    expect((root as Manifest & { bin: Record<string, string> }).bin.tsgo).toBe('./src/tsgo.ts')
+  })
+})

@@ -79,7 +79,7 @@ test('kay check passes on the fixture, its links to kayjs-auth routes, its use o
 
 // kay check leaves kayjs-auth's own modules, the guards and form helpers its pages import, to the package's own check, which knows no app's messages or locals: type-checked here as an app registering them reads them.
 test('kayjs-auth\'s own modules type-check under the fixture\'s registered locals and messages', async () => {
-  const tsc = Bun.spawn(['bunx', 'tsgo', '-p', 'tsconfig.json', '--noEmit'], { cwd: ROOT, stdout: 'pipe', stderr: 'pipe' })
+  const tsc = Bun.spawn(['bun', join(ROOT, '../../../../src/tsgo.ts'), '-p', 'tsconfig.json', '--noEmit'], { cwd: ROOT, stdout: 'pipe', stderr: 'pipe' })
 
   try {
     expect(await new Response(tsc.stdout).text() + await new Response(tsc.stderr).text()).toBe('')
