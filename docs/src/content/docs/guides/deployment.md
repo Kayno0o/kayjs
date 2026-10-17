@@ -122,7 +122,9 @@ A tab with something typed in it is not reloaded under the visitor. The next lin
 
 A tab reloads once a minute at most, so a cache that keeps serving the old page cannot loop it. Static exports work the same way, with the tab reading the build off the host's page.
 
-Kay also keeps the script, stylesheet and asset files of the last three builds in `.kay/client`, so an old tab keeps working through a few deploys before it needs to reload. This needs the `.kay` folder to survive from one build to the next, as it does on your machine and not on a clean CI checkout: keep `.kay/client` and `.kay/client-kept` between builds there. Static exports and executables carry the kept files too.
+Kay also keeps the script, stylesheet and asset files of the last three builds in `.kay/client`, so an old tab finds the files it loads until it reloads, for a few deploys. This needs the `.kay` folder to survive from one build to the next, as it does on your machine and not on a clean CI checkout: keep `.kay/client` and `.kay/client-kept` between builds there. Static exports and executables carry the kept files too.
+
+A build with other options in the same `.kay`, such as `--static`, takes a slot of its own.
 
 Keep your HTML pages revalidating in any cache in front of the server, as kay's own pages do.
 

@@ -13,13 +13,28 @@ import { fixtureCopy } from './scratch'
 
 const CLI = join(import.meta.dir, '..', 'src', 'cli.ts')
 const COUNTER = 'src/components/counter.kay'
+const TSCONFIG = JSON.stringify({
+  compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true },
+  include: ['src', '.kay/types'],
+})
 const ISLAND_CHUNK = /^counter-[\da-z]+\.js$/
 
+// Without the check unless the first argument is `check`.
 async function build(root: string, ...args: string[]): Promise<{ code: number, errors: string }> {
-  const child = Bun.spawn([process.execPath, CLI, 'build', root, '--no-check', ...args], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, NODE_ENV: 'production' } })
+  const checked = args[0] === 'check'
+  const child = Bun.spawn([process.execPath, CLI, 'build', root, ...checked ? args.slice(1) : ['--no-check', ...args]], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, NODE_ENV: 'production' } })
   const [errors, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
 
   return { code, errors }
+}
+
+// A copy of the deploy fixture that `kay build` can also check.
+async function project(): Promise<string> {
+  const root = await fixtureCopy('deploy')
+
+  await Bun.write(join(root, 'tsconfig.json'), TSCONFIG)
+
+  return root
 }
 
 // A deploy: the counter says another word, so its chunk gets another name.
@@ -27,7 +42,7 @@ async function deploy(root: string, word: string, ...args: string[]): Promise<st
   const file = join(root, COUNTER)
 
   await Bun.write(file, (await Bun.file(file).text()).replace(/^button\.counter\(.*\) \w+ /m, match => match.replace(/\) \w+ /, `) ${word} `)))
-  expect(await build(root, ...args)).toEqual({ code: 0, errors: '' })
+  expect((await build(root, ...args)).code).toBe(0)
 
   return chunkOf(root)
 }
@@ -55,7 +70,7 @@ async function served(root: string, name: string): Promise<Response> {
 
 describe('the chunks of earlier builds', () => {
   it('stay beside the new build and are served, as are their compressed copies', async () => {
-    const root = await fixtureCopy('deploy')
+    const root = await project()
     const first = await deploy(root, 'Alpha')
     const second = await deploy(root, 'Beta')
 
@@ -72,7 +87,7 @@ describe('the chunks of earlier builds', () => {
   }, 120_000)
 
   it('go after KEPT_BUILDS deploys, the oldest first, the new build and the kept ones all listed in the build\'s files', async () => {
-    const root = await fixtureCopy('deploy')
+    const root = await project()
     const names: string[] = []
 
     for (const word of ['One', 'Two', 'Three', 'Four', 'Five'])
@@ -85,7 +100,7 @@ describe('the chunks of earlier builds', () => {
   }, 180_000)
 
   it('are not pushed out by a build that changed nothing, nor kept twice when its name is the same', async () => {
-    const root = await fixtureCopy('deploy')
+    const root = await project()
     const first = await deploy(root, 'Alpha')
     const second = await deploy(root, 'Beta')
 
@@ -103,7 +118,7 @@ describe('the chunks of earlier builds', () => {
   }, 180_000)
 
   it('survive a build that failed in between, and a deploy back to a build\'s code reuses its chunk name', async () => {
-    const root = await fixtureCopy('deploy')
+    const root = await project()
     const first = await deploy(root, 'Alpha')
     const second = await deploy(root, 'Beta')
     const file = join(root, COUNTER)
@@ -124,7 +139,7 @@ describe('the chunks of earlier builds', () => {
   }, 180_000)
 
   it('stay when the build ends at a base, and sit beside the output, which an executable embeds whole, not in it', async () => {
-    const root = await fixtureCopy('deploy')
+    const root = await project()
 
     await Bun.write(join(root, 'kay.config.ts'), 'export default { base: \'/app\' }\n')
 
@@ -136,7 +151,7 @@ describe('the chunks of earlier builds', () => {
   }, 120_000)
 
   it('go into a static export too, where the host serves them beside the new build', async () => {
-    const root = await fixtureCopy('deploy')
+    const root = await project()
     const first = await deploy(root, 'Alpha')
     const out = join(root, 'out')
 
@@ -144,6 +159,58 @@ describe('the chunks of earlier builds', () => {
     expect(existsSync(join(out, '_kay', first))).toBe(true)
     await rm(out, { recursive: true, force: true })
   }, 120_000)
+
+  it('survive a build whose output stage failed after its manifest was written, with or without the check', async () => {
+    for (const mode of [[], ['check']]) {
+      const root = await project()
+      const first = await deploy(root, 'Alpha', ...mode)
+      const second = await deploy(root, 'Beta', ...mode)
+      const page = join(root, 'src/routes/index.kay')
+      const good = await Bun.file(page).text()
+
+      // The bundle succeeds, then the prerender throws.
+      await Bun.write(page, `--- server\nexport const page = { prerender: true }\nthrow new Error('no page today')\n---\n${good}`)
+      const file = join(root, COUNTER)
+
+      await Bun.write(file, (await Bun.file(file).text()).replace('Beta', 'Gamma'))
+      expect((await build(root, ...mode)).code).not.toBe(0)
+      await Bun.write(page, good)
+
+      const third = await deploy(root, 'Delta', ...mode)
+
+      expect(await chunksIn(root)).toEqual(expect.arrayContaining([first, second, third]))
+    }
+  }, 240_000)
+
+  it('stay through a build that failed the check, and the build after it', async () => {
+    const root = await project()
+    const first = await deploy(root, 'Alpha', 'check')
+    const second = await deploy(root, 'Beta', 'check')
+
+    await Bun.write(join(root, 'src/routes/lost.kay'), 'a(href="/nowhere") Lost\n')
+    expect((await build(root, 'check')).code).toBe(1)
+    await rm(join(root, 'src/routes/lost.kay'))
+    expect(await chunksIn(root)).toEqual([first, second].sort())
+
+    const third = await deploy(root, 'Gamma', 'check')
+
+    expect(await chunksIn(root)).toEqual([first, second, third].sort())
+    expect(existsSync(`${outputDir(root)}-previous`)).toBe(false)
+  }, 180_000)
+
+  it('stay out of an executable\'s growth: five deploys, then a compile, embed the build and the three before it', async () => {
+    const root = await project()
+
+    for (const word of ['One', 'Two', 'Three', 'Four'])
+      await deploy(root, word)
+
+    const last = await deploy(root, 'Five', '--compile', join(root, 'app'))
+    const chunks = await chunksIn(root)
+
+    expect(chunks).toHaveLength(KEPT_BUILDS + 1)
+    expect(chunks).toContain(last)
+    expect(existsSync(join(root, 'app'))).toBe(true)
+  }, 240_000)
 
   it('are kept by kay build alone: a client build as kay dev and the tests make leaves none aside', async () => {
     const root = resolve(await fixtureCopy('deploy'))

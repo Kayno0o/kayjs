@@ -235,8 +235,8 @@ async function runBuild(root: string, config: KayConfig, options: BuildOptions):
     return { ...result, failed: { stage: 'output' } }
   }
 
-  await rm(previous, { recursive: true, force: true })
   await restoreKept(output)
+  await rm(previous, { recursive: true, force: true })
 
   if (options.exportTo !== undefined) {
     const stage = performance.now()

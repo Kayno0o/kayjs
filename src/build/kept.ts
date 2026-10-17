@@ -12,6 +12,7 @@ const CHUNK = /-[\da-z]{6,}\.(?:js|css)(?:\.br|\.gz)?$/i
 const ASSET = /^assets[/\\]/
 // The build just replaced, until the new one is good and it takes its place among the others, each a folder named after the time it was kept at.
 const STAGING = 'next'
+const BUILD_NAME = /^\d+$/
 
 function keepable(file: string): boolean {
   return CHUNK.test(file) || ASSET.test(file)
@@ -31,7 +32,7 @@ async function buildsIn(kept: string): Promise<string[]> {
   if (!existsSync(kept))
     return []
 
-  return (await readdir(kept)).filter(name => name !== STAGING).sort((a, b) => Number(b) - Number(a))
+  return (await readdir(kept)).filter(name => BUILD_NAME.test(name)).sort((a, b) => Number(b) - Number(a))
 }
 
 async function place(from: string, to: string): Promise<void> {
@@ -48,6 +49,7 @@ async function place(from: string, to: string): Promise<void> {
 
 // Called before a build replaces the output: sets aside, as hard links, the files of the build in place that no earlier kept build holds.
 // A run that did not finish leaves the output without its manifest, or with the last build waiting aside (`aside`): what was set aside then is still right, so it stays.
+// One that failed after its manifest was written leaves a set-aside folder and an output nobody served: the files it holds join what was set aside.
 export async function setAsideKept(output: string, aside: string): Promise<void> {
   if (existsSync(aside) || !existsSync(join(output, MANIFEST)))
     return
@@ -57,10 +59,10 @@ export async function setAsideKept(output: string, aside: string): Promise<void>
   const dist = join(output, 'dist')
   const older = new Set((await Promise.all((await buildsIn(kept)).map(async name => filesOf(join(kept, name))))).flat())
 
-  await rm(staging, { recursive: true, force: true })
+  const waiting = new Set(await filesOf(staging))
 
   for (const file of await filesOf(dist)) {
-    if (keepable(file) && !older.has(file))
+    if (keepable(file) && !older.has(file) && !waiting.has(file))
       await place(join(dist, file), join(staging, file))
   }
 }
