@@ -81,6 +81,30 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
     expect(page.errors).toEqual([])
   })
 
+  test('tool calls show before the text of their turn, running then done, with their arguments and result', async () => {
+    const page = await site.open('/helper')
+
+    fakeAi.reply({ text: 'Adding. ', calls: [{ name: 'add_note', input: { title: 'Milk' } }, { name: 'breaks' }] })
+    fakeAi.reply('Done, **all** of it')
+    await page.fill('textarea', 'Add milk')
+    await page.press('Enter')
+    await page.waitFor('[data-pending]', { gone: true })
+    await page.waitFor('.kai-chat-turn[data-role="assistant"] strong', { text: 'all' })
+
+    const turn = '.kai-chat-turn[data-role="assistant"]'
+
+    expect(await page.count(`${turn} .kai-chat-call`)).toBe(2)
+    expect(await page.text(`${turn} .kai-chat-call:nth-child(1) .kai-chat-call-name`)).toBe('add_note')
+    expect(await page.text(`${turn} .kai-chat-call:nth-child(1) .kai-chat-call-status`)).toBe('Done')
+    expect(await page.text(`${turn} .kai-chat-call:nth-child(2) .kai-chat-call-status`)).toBe('Failed')
+    expect(await page.text(`${turn} .kai-chat-call:nth-child(1) pre`)).toContain('"title": "Milk"')
+    // The calls come before the text, and a call's markup is text, never HTML.
+    expect(await page.evaluate(() => document.querySelector('.kai-chat-calls')?.nextElementSibling?.classList.contains('kai-chat-text'))).toBe(true)
+    expect(await page.text(`${turn} .kai-chat-call:nth-child(2) pre:last-of-type`)).toContain('Something went wrong on our side')
+    expect(await page.a11y('.kai-chat')).toEqual([])
+    expect(page.errors).toEqual([])
+  })
+
   test('the chat has no accessibility violation, its log and field named', async () => {
     const page = await site.open('/assistant')
 

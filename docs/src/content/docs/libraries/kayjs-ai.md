@@ -151,7 +151,11 @@ The visitor leaving stops the loop. A tool already running finishes, but nothing
 
 `ask` with tools must run while kay answers a request, in a page, an action or a handler, because the tools run as that visitor. A background job has none.
 
-To show the calls in a chat, read `reply.progress()`. It gives the text so far and every tool call, again with each change, and an action can return it to stream both to the island. Each call is `{ id, name, input, status, result }`, its status `running`, then `done` or `failed`. `await reply.calls` gives the final list.
+To show the calls in a chat, return `reply.progress()` from the chat's action instead of the reply: `ask(messages, { tools: [addNote] }).progress()`.
+
+The chat then lists each call before the text of its turn, with its status and, when opened, its arguments and result. Set `toolDetails={false}` on `Chat` to show names and statuses only.
+
+You can also read `reply.progress()` yourself. It gives the text so far and every tool call, again with each change. Each call is `{ id, name, input, status, result }`, its status `running`, then `done` or `failed`. `await reply.calls` gives the final list.
 
 <ReadMore href="/llms/kayjs-ai-tools">What the model is told for each kind of failure, the limits, and how to test it.</ReadMore>
 

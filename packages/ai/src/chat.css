@@ -115,3 +115,49 @@
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+/* The tools a reply called, before its text. */
+.kai-chat-calls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin: 0 0 0.5rem;
+  padding: 0;
+  list-style: none;
+  font-size: 0.8125rem;
+}
+
+.kai-chat-call {
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--color-kui-surface2);
+  background-color: var(--color-kui-mantle);
+}
+
+.kai-chat-call summary {
+  cursor: pointer;
+}
+
+.kai-chat-call-name {
+  font-family: ui-monospace, monospace;
+}
+
+.kai-chat-call-status {
+  margin-inline-start: 0.5rem;
+  color: var(--color-kui-muted);
+}
+
+.kai-chat-call[data-status='failed'] .kai-chat-call-status {
+  color: var(--color-kui-error);
+}
+
+.kai-chat-call-title {
+  margin: 0.5rem 0 0.25rem;
+  color: var(--color-kui-muted);
+}
+
+.kai-chat-call-code {
+  margin: 0;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  font-family: ui-monospace, monospace;
+}

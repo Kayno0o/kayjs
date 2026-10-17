@@ -40,7 +40,8 @@ Every failure is a result with `failed` set, in words the model can correct from
 | more than 16 calls in one step | the 17th gets `Too many tool calls in one step` and none after it run |
 | schema refused | the action's `{"status":422,"errors":{...}}`, so the model can fix the field |
 | guard refused, rate limited, `ctx.fail`, redirect | the action's answer (`Sign in`, a 429, a redirect sentence) |
-| the action threw | `The tool could not run`, never what it threw, which is logged by the app's logger (`kayjs-ai`) |
+| the action threw | kay's own 500 answer (`Something went wrong on our side...`), never what it threw, which kay logs as for any action |
+| the call itself threw | `The tool could not run`, logged by the app's logger (`kayjs-ai`) |
 
 A result over 20,000 characters is cut. A success is the text kay's MCP tool call returns for the action. Calls of a step run in order, one at a time. A call the model repeats an id for, or leaves it out, gets a new unique id. The calls go back to the provider with their arguments as the parsed object (`{}` when they were not one), never the text a model garbled.
 

@@ -1,0 +1,5 @@
+---
+import Helper from '../components/helper.kay'
+---
+h1 Helper
+Helper

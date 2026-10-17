@@ -1,8 +1,9 @@
 ---
 import type { Action, ActionStream, SanitizeOptions } from 'kay'
-import type { Message } from './types'
+import type { Message, Progress, ToolCall } from './types'
 import { ActionError, effect, sanitizeHtml, signal, untrack } from 'kay'
 import { markdownHtml } from 'kay/markdown'
+import Calls from './chat-calls.kay'
 import './chat.css'
 
 // What a reply keeps of markdown: no image, which a model reading a hostile page could point at a URL carrying the conversation, and no task checkbox. Tables stay.
@@ -14,11 +15,14 @@ interface Turn extends Message {
   id: number
   // A reply the visitor stopped, or one whose stream broke off, cut where it was.
   stopped?: boolean | undefined
+  // The tools the reply called, when the action streams `reply.progress()`.
+  calls?: ToolCall[] | undefined
 }
 
-const { action, initial = [], label = 'Chat', placeholder = 'Write a message…', sendLabel = 'Send', stopLabel = 'Stop', retryLabel = 'Try again', thinkingLabel = 'Thinking…', stoppedLabel = 'Stopped', errorMessage = 'The reply failed.', keep = 20, class: className } = props<{
+const { action, initial = [], label = 'Chat', placeholder = 'Write a message…', sendLabel = 'Send', stopLabel = 'Stop', retryLabel = 'Try again', thinkingLabel = 'Thinking…', stoppedLabel = 'Stopped', errorMessage = 'The reply failed.', keep = 20, toolDetails = true, runningLabel = 'Running', doneLabel = 'Done', failedLabel = 'Failed', argumentsLabel = 'Arguments', resultLabel = 'Result', class: className } = props<{
   // The page's streaming action, `action(schema, ({ messages }) => ask(messages))`; the chat posts the whole history to it and reads the reply as it streams.
-  action: Action<{ messages: Message[] }, AsyncIterable<string>>
+  // Returning `ask(messages, { tools }).progress()` instead streams the tool calls as well, which the chat shows before the text of their turn.
+  action: Action<{ messages: Message[] }, AsyncIterable<string | Progress>>
   // The messages shown to start with.
   initial?: Message[] | undefined
   // Names the chat and its message list for screen readers.
@@ -33,6 +37,14 @@ const { action, initial = [], label = 'Chat', placeholder = 'Write a message…'
   stoppedLabel?: string | undefined
   // How many of the latest messages each send posts, so the history never outgrows the action's `maxItems`.
   keep?: number | undefined
+  // Whether each tool call opens to its arguments and result, shown as plain text; false shows its name and status only.
+  toolDetails?: boolean | undefined
+  // The status of a tool call, and the names of its two parts.
+  runningLabel?: string | undefined
+  doneLabel?: string | undefined
+  failedLabel?: string | undefined
+  argumentsLabel?: string | undefined
+  resultLabel?: string | undefined
   // Shown when the call is refused or the stream breaks off.
   errorMessage?: string | undefined
   class?: string | undefined
@@ -43,15 +55,28 @@ const history = signal<Turn[]>(untrack(() => initial).map(message => ({ ...messa
 const draft = signal('')
 // The call is out and no word of the reply is there yet.
 const waiting = signal(false)
-const streaming = signal<ActionStream<string> | undefined>(undefined)
+const streaming = signal<ActionStream<string | Progress> | undefined>(undefined)
 // The reply so far, which becomes a turn of the history once the stream ends.
 const partial = signal('')
+// The tool calls of the reply being written, as last seen.
+const calls = signal<ToolCall[]>([])
 const failure = signal<string | undefined>(undefined)
 const busy = () => waiting() || streaming() !== undefined
 let run: AbortController | undefined
 let field: HTMLTextAreaElement | undefined
 let log: HTMLElement | undefined
 let pinned = true
+
+function show(value: string | Progress) {
+  if (typeof value === 'string') {
+    partial.set(value)
+
+    return
+  }
+
+  partial.set(value.text)
+  calls.set(value.calls)
+}
 
 function markdown(text: string) {
   return sanitizeHtml(markdownHtml(text), REPLY)
@@ -60,12 +85,14 @@ function markdown(text: string) {
 // The reply ended on its own, was stopped or broke off: what arrived joins the history.
 function finish(state: string) {
   const text = partial()
+  const made = calls()
 
   streaming.set(undefined)
   partial.set('')
+  calls.set([])
 
-  if (text !== '')
-    history.set([...history(), { id: nextId++, role: 'assistant', content: text, stopped: state === 'closed' }])
+  if (text !== '' || made.length > 0)
+    history.set([...history(), { id: nextId++, role: 'assistant', content: text, calls: made, stopped: state === 'closed' }])
 
   if (state === 'failed')
     failure.set(errorMessage)
@@ -87,6 +114,7 @@ effect(() => {
 effect(() => {
   history()
   partial()
+  calls()
   waiting()
 
   if (pinned)
@@ -110,10 +138,12 @@ async function send(again = false) {
   pinned = true
   failure.set(undefined)
   partial.set('')
+  calls.set([])
   waiting.set(true)
 
   try {
-    const stream = await action({ messages: history().slice(-keep).map(({ role, content }) => ({ role, content })) }, { signal: mine.signal, refresh: false })
+    // A turn that only called tools has no text to post, which a provider refuses.
+    const stream = await action({ messages: history().slice(-keep).filter(({ content }) => content !== '').map(({ role, content }) => ({ role, content })) }, { signal: mine.signal, refresh: false })
 
     if (mine.signal.aborted) {
       stream.close()
@@ -121,7 +151,7 @@ async function send(again = false) {
       return
     }
 
-    stream.on(partial.set)
+    stream.on(show)
     streaming.set(stream)
   }
   catch (error) {
@@ -175,21 +205,24 @@ section.kai-chat(class={className} aria-label={label})
   .kai-chat-log(role="log" aria-label={label} tabindex="0" ref={element => { log = element }} onScroll={scrolled})
     for turn of history() key={turn.id}
       article.kai-chat-turn(data-role={turn.role})
-        // Tool calls and results of the turn go here, before its text.
         if turn.role === 'user'
           p.kai-chat-text {turn.content}
         else
-          .kai-chat-text(innerHTML={markdown(turn.content)})
+          if turn.calls && turn.calls.length > 0
+            Calls(calls={turn.calls} details={toolDetails} runningLabel={runningLabel} doneLabel={doneLabel} failedLabel={failedLabel} argumentsLabel={argumentsLabel} resultLabel={resultLabel})
+          if turn.content !== ''
+            .kai-chat-text(innerHTML={markdown(turn.content)})
           if turn.stopped
             small.kai-chat-note {stoppedLabel}
     if busy()
       article.kai-chat-turn(data-role="assistant" data-pending="" aria-hidden="true")
-        // Tool calls and results of the reply being written go here, before its text.
-        if partial() === ''
-          p.kai-chat-text.kai-chat-thinking {thinkingLabel}
-        else
+        if calls().length > 0
+          Calls(calls={calls()} details={toolDetails} runningLabel={runningLabel} doneLabel={doneLabel} failedLabel={failedLabel} argumentsLabel={argumentsLabel} resultLabel={resultLabel})
+        if partial() !== ''
           .kai-chat-text(innerHTML={markdown(partial())})
-  p.kai-chat-status(role="status") {busy() && partial() === '' ? thinkingLabel : ''}
+        else if calls().length === 0
+          p.kai-chat-text.kai-chat-thinking {thinkingLabel}
+  p.kai-chat-status(role="status") {busy() && partial() === '' && calls().length === 0 ? thinkingLabel : ''}
   if failure()
     .kui-notice(role="alert" data-tone="error")
       | {failure()}

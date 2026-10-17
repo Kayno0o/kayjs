@@ -1,0 +1,5 @@
+---
+import Chat from '@kaynooo/kayjs-ai/chat.kay'
+import { helper } from '../routes/tools.kay'
+---
+Chat(action={helper} label="Helper")

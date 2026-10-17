@@ -41,6 +41,9 @@ export const converse = action(s.Object({ prompt: s.String({ maxLength: 200 }), 
 
 export const watch = action(s.Object({ prompt: s.String({ maxLength: 200 }) }), ({ prompt }) => ask(prompt, { tools: [addNote, slow], provider: testing.provider }).progress())
 
+// The chat's action when the model has tools: the stream carries the calls too.
+export const helper = action(s.Object({ messages: s.Array(s.Object({ role: s.UnionEnum(['user', 'assistant']), content: s.String({ maxLength: 4000 }) }), { minItems: 1, maxItems: 50 }) }), ({ messages }) => ask(messages, { tools: [addNote, breaks], provider: testing.provider }).progress())
+
 export const refusedTools = action(s.Object({ which: s.UnionEnum(['vetoed', 'upload']) }), ({ which }) => {
   ask('x', { tools: [which === 'vetoed' ? vetoed : upload] })
 
