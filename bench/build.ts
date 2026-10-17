@@ -42,7 +42,7 @@ export const BUILDS: BuildLabel[] = [
   { name: 'solid', app: 'solid', build: { command: [BUN, 'build.ts'], clean: ['dist'], counted: ['dist'] } },
   { name: 'svelte', app: 'svelte', build: { command: [BUN, 'build.ts'], clean: ['dist'], counted: ['dist'] } },
   { name: 'astro', app: 'astro', build: { command: [BUN, join('node_modules', 'astro', 'bin', 'astro.mjs'), 'build'], clean: ['dist', '.astro', 'node_modules/.astro', 'node_modules/.vite'], counted: ['dist'] } },
-  { name: 'next', app: 'next', build: { command: [BUN, join('node_modules', 'next', 'dist', 'bin', 'next'), 'build'], clean: ['.next'], counted: ['.next'], ignored: /^\.next\/(?:cache|diagnostics|types|trace)/ } },
+  { name: 'next', app: 'next', build: { command: [BUN, join('node_modules', 'next', 'dist', 'bin', 'next'), 'build'], clean: ['.next'], counted: ['.next'], ignored: /^\.next\/(?:cache|diagnostics|types|trace[^/]*)(?:\/|$)|\.nft\.json$/ } },
   { name: 'nuxt', app: 'nuxt', build: { command: [BUN, join('node_modules', 'nuxt', 'bin', 'nuxt.mjs'), 'build'], clean: ['.nuxt', '.output', 'node_modules/.cache', 'node_modules/.vite'], counted: ['.output'] } },
 ]
 
