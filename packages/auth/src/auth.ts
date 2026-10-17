@@ -1,6 +1,6 @@
 import type { AuthenticationResponseJSON, PublicKeyCredentialCreationOptionsJSON, PublicKeyCredentialRequestOptionsJSON, RegistrationResponseJSON } from '@simplewebauthn/server'
 import type { DefinitionBase, EphemeralType, MetadataBase, RouteBase, SingletonBase } from 'elysia'
-import type { Guard } from 'kay'
+import type { Duration, Guard } from 'kay'
 import type { KayConfig, Session } from 'kay/server'
 import type { ChangeUsernameResult } from './account'
 import type { AdminFailure, BanResult, DeleteResult, ManagedUser, RoleResult, UnbanResult } from './admin'
@@ -13,7 +13,7 @@ import type { ChangeEmailResult, CodeResult, EmailOptions, LinkResult, MailReque
 import type { AuditCursorInput, AuditEntry, AuthEvent, EventContext } from './events'
 import type { DataExport } from './export'
 import type { ScopeRequirement } from './gate'
-import type { Limits } from './limits'
+import type { LimitsOption } from './limits'
 import type { LinkProviderResult, OAuthFailure } from './oauth/flow'
 import type { AcceptResult, CreateOrganizationResult, Invitation, InviteResult, Member, MemberResult, Membership, OrganizationFailure, OrganizationsOptions, UpdateOrganizationResult } from './organizations'
 import type { AuthFeatures, AuthPagesConfig, ProfileFieldView, ProfileProblem } from './pages'
@@ -27,7 +27,7 @@ import type { AuthStore, LinkType, SessionRecord, UserRecord } from './store'
 import type { Proof, ProofFailure, TwoFactorResult, TwoFactorSetup } from './twoFactor'
 import type { Level, PolicyContext, Predicate, Requirement } from './types'
 import { Elysia } from 'elysia'
-import { READ_METHODS, stoppers, underKayDev } from 'kay/library'
+import { durationSeconds, READ_METHODS, stoppers, underKayDev } from 'kay/library'
 import { clientAddress, crossSiteRefused, crossSiteResponse, rateKey } from 'kay/server'
 import { changePassword, changeUsername, deleteAccount, unlink } from './account'
 import { actingAdmin, adminAuditLog, banUser, changeRole, deleteUser, getUser, isAdmin, listUsers, unbanUser } from './admin'
@@ -45,7 +45,7 @@ import { auditEntries, report } from './events'
 import { exportData } from './export'
 import { createGate, scopeAllows } from './gate'
 import { deriveKeys } from './keys'
-import { DEFAULT_LIMITS } from './limits'
+import { resolveLimits } from './limits'
 import { acceptedLocales, validLocale } from './locale'
 import { log } from './log'
 import { localeTemplates } from './mail'
@@ -144,8 +144,8 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   onExport?: ((user: User) => unknown) | undefined
   // Called with every change to what protects an account, the ones mailed to the user, and with every sign-in, sign-out and failed sign-in of a known account, for an audit log of the app's own.
   onEvent?: ((event: AuthEvent, user: User, detail: string | undefined, context: EventContext) => void | Promise<void>) | undefined
-  // Keeps the same events in the store's audit log, for `auditLog()`; `maxAge` in seconds, a year by default.
-  audit?: boolean | { maxAge?: number } | undefined
+  // Keeps the same events in the store's audit log, for `auditLog()`; `maxAge` seconds or a string such as '365d', a year by default.
+  audit?: boolean | { maxAge?: Duration } | undefined
   // What a bearer token may be limited to, such as `['posts:read', 'posts:write']`: a route asks for one with `scope:`.
   scopes?: readonly Scope[] | undefined
   // Each role and the roles it includes: `{ admin: ['editor'], editor: [] }`.
@@ -156,14 +156,14 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   admin?: AuthRequirement<NoInfer<Role>> | undefined
   // The roles every new user starts with, by password or by provider, such as a site's `user`. An unverified account holding only these counts as given none: see `requireVerified`.
   defaultRoles?: NoInfer<Role>[] | undefined
-  // Seconds a session lives unseen when its sign-in asked to be remembered, `remember: true`: 90 days by default. The other lifetimes are the session plugin's own: its `maxAge` without a choice, its `browserMaxAge` for `remember: false`, and its `absoluteMaxAge` from the sign-in however much it is used, "remember me" included.
-  rememberMaxAge?: number | undefined
+  // How long a session lives unseen when its sign-in asked to be remembered, `remember: true`: seconds or a string such as '90d', 90 days by default. The other lifetimes are the session plugin's own: its `maxAge` without a choice, its `browserMaxAge` for `remember: false`, and its `absoluteMaxAge` from the sign-in however much it is used, "remember me" included.
+  rememberMaxAge?: Duration | undefined
   // The app's page listing where the user is signed in, linked from new sign-in mails: `/account/sessions`.
   sessionsPage?: string | undefined
   // Where an address is, shown beside each session, from a geolocation database of the app's: `ip => cityOf(ip)`.
   locate?: ((ip: string) => string | null | undefined | Promise<string | null | undefined>) | undefined
   // Attempts allowed per client address and per account, over `DEFAULT_LIMITS`.
-  limits?: Partial<Limits> | undefined
+  limits?: LimitsOption | undefined
   // Passkeys are made for `url`'s host and its origin; `rpId` widens them to a parent domain, `origins` lists every origin the site's pages are served from.
   passkeys?: { rpId?: string, origins?: string[] } | undefined
   // A CAPTCHA asked of registering, password sign-in, password resets and magic links: kay's proof of work by default, `proofOfWork({ difficulty })` to tune it, `{ verify: turnstile(secret) }` for a third party's, false for none.
@@ -1272,6 +1272,10 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
   }
 }
 
+function auditMaxAge(audit: true | { maxAge?: Duration }): number {
+  return audit === true || audit.maxAge === undefined ? DEFAULT_AUDIT_MAX_AGE : durationSeconds(audit.maxAge, 'audit.maxAge', 'kayjs-auth')
+}
+
 function createCore<Data extends AuthSessionData, Role extends string, Prefix extends string, Scope extends string, OrgRole extends string>(options: AuthOptions<Data, Role, Prefix, Scope, OrgRole>): Core {
   const prefix = options.prefix ?? '/auth'
   const oauth: Core['oauth'] = new Map()
@@ -1296,8 +1300,8 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
     twoFactorPage: options.twoFactorPage ?? paths?.twoFactor ?? '/two-factor',
     pages,
     site: options.site ?? (url === undefined ? 'kayjs-auth' : new URL(url).host),
-    limits: { ...DEFAULT_LIMITS, ...options.limits },
-    rememberMaxAge: options.rememberMaxAge ?? DEFAULT_REMEMBER_MAX_AGE,
+    limits: resolveLimits(options.limits),
+    rememberMaxAge: options.rememberMaxAge === undefined ? DEFAULT_REMEMBER_MAX_AGE : durationSeconds(options.rememberMaxAge, 'rememberMaxAge', 'kayjs-auth'),
     sessionsPage: options.sessionsPage ?? paths?.sessions,
     locate: options.locate,
     scopes: new Set(options.scopes),
@@ -1328,7 +1332,7 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
     onEvent: options.onEvent,
     organizations: options.organizations && organizationsCore(options.organizations),
     pruned: { at: 0, running: Promise.resolve() },
-    audit: options.audit == null || options.audit === false ? undefined : { maxAge: (options.audit === true ? undefined : options.audit.maxAge) ?? DEFAULT_AUDIT_MAX_AGE, prunedAt: 0 },
+    audit: options.audit == null || options.audit === false ? undefined : { maxAge: auditMaxAge(options.audit), prunedAt: 0 },
   }
 
   for (const [name, { client }] of oauth) {

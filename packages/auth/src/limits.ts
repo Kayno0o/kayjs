@@ -1,5 +1,7 @@
+import type { Duration } from 'kay'
 import type { Core } from './core'
 import type { AuthStore } from './store'
+import { durationSeconds } from 'kay/library'
 
 const MINUTE = 60
 const HOUR = 60 * MINUTE
@@ -50,6 +52,27 @@ export const DEFAULT_LIMITS = {
 } satisfies Record<string, Limit>
 
 export type Limits = Record<keyof typeof DEFAULT_LIMITS, Limit>
+
+// A limit as the app writes it: the window seconds or a string such as '15m'.
+export interface LimitOption {
+  max: number
+  window: Duration
+}
+
+// The limits `limits` overrides, the rest keeping their defaults.
+export type LimitsOption = Partial<Record<keyof Limits, LimitOption>>
+
+// The defaults over what the app set, every window in seconds; a bad window throws naming its limit.
+export function resolveLimits(given: LimitsOption | undefined): Limits {
+  const limits: Limits = { ...DEFAULT_LIMITS }
+
+  for (const [name, option] of Object.entries(given ?? {}) as [keyof Limits, LimitOption | undefined][]) {
+    if (option)
+      limits[name] = { max: option.max, window: durationSeconds(option.window, `limits.${name}.window`, 'kayjs-auth') }
+  }
+
+  return limits
+}
 
 // Counts one attempt and answers whether it was over the limit.
 export async function spend(store: AuthStore, key: string, limit: Limit): Promise<boolean> {

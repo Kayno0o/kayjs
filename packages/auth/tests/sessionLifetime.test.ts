@@ -84,8 +84,8 @@ describe('a sign-in follows the session plugin\'s lifetimes', () => {
     expect(stored.maxAge).toBe(2 * 60 * 60)
   })
 
-  test('remember true lasts rememberMaxAge, and remember undefined the plugin\'s maxAge', async () => {
-    const app = await setup({ maxAge: '7d', absoluteMaxAge: '200d' }, { rememberMaxAge: 45 * DAY })
+  test('remember true lasts rememberMaxAge, as a duration string, and remember undefined the plugin\'s maxAge', async () => {
+    const app = await setup({ maxAge: '7d', absoluteMaxAge: '200d' }, { rememberMaxAge: '45d' })
 
     expect((await signedIn(app, true)).stored.maxAge).toBe(45 * DAY)
     expect((await signedIn(app)).stored.maxAge).toBeNull()
@@ -94,7 +94,7 @@ describe('a sign-in follows the session plugin\'s lifetimes', () => {
   test('the pruning keeps what the plugin lets live', async () => {
     const limits: unknown[] = []
     const store = { ...memoryStore(), prune: async (given: unknown) => void limits.push(given) }
-    const app = await setup({ maxAge: '7d', absoluteMaxAge: '20d', browserMaxAge: '1h' }, { store, rememberMaxAge: 15 * DAY })
+    const app = await setup({ maxAge: '7d', absoluteMaxAge: '20d', browserMaxAge: '1h' }, { store, rememberMaxAge: '15d' })
 
     await app.browser().json('/me')
     expect(limits).toMatchObject([{ sessionMaxAge: 15 * DAY, sessionAbsoluteMaxAge: 20 * DAY }])

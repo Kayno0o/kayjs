@@ -1,7 +1,9 @@
+import type { Duration } from 'kay'
 import type { Core, User } from './core'
 import type { RequestState } from './state'
 import type { AuthStore, InvitationRecord, MemberRecord, OrganizationRecord, UserRecord } from './store'
 import type { Requirement } from './types'
+import { durationSeconds } from 'kay/library'
 import { publicUser } from './core'
 import { impersonatorOf, report } from './events'
 import { spend, typedKey } from './limits'
@@ -31,8 +33,8 @@ export interface OrganizationsOptions<OrgRole extends string, Role extends strin
   create?: Requirement<User, NoInfer<Role>> | undefined
   // The app's page an invitation link opens, the invitation's id in `?invitation=`: it shows `invitation(id)` and accepts it. Inviting answers 'unavailable' without it.
   invitationPage?: string | undefined
-  // Seconds an invitation lasts, a week by default.
-  invitationMaxAge?: number | undefined
+  // How long an invitation lasts, seconds or a string such as '7d', a week by default.
+  invitationMaxAge?: Duration | undefined
   // The route param naming the organization a route is about, by id or slug, for `memberOf`: `org` by default.
   param?: string | undefined
 }
@@ -64,7 +66,7 @@ export function organizationsCore<OrgRole extends string, Role extends string>(o
     defaultRoles: [...options.defaultRoles ?? []],
     param: options.param ?? 'org',
     invitationPage: options.invitationPage,
-    invitationMaxAge: options.invitationMaxAge ?? DEFAULT_INVITATION_MAX_AGE,
+    invitationMaxAge: options.invitationMaxAge === undefined ? DEFAULT_INVITATION_MAX_AGE : durationSeconds(options.invitationMaxAge, 'organizations.invitationMaxAge', 'kayjs-auth'),
   }
 }
 

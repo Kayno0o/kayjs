@@ -102,7 +102,7 @@ describe('pruning what expired', () => {
     await store.sessions.create(session('fresh', now - HOUR_MS))
     await store.attempts.hit('closed', 1)
 
-    const { browser } = testApp({ store, sessions: sessionPlugin({ secret: SECRET, absoluteMaxAge: '365d' }), rememberMaxAge: 30 * 24 * 3600 })
+    const { browser } = testApp({ store, sessions: sessionPlugin({ secret: SECRET, absoluteMaxAge: '365d' }), rememberMaxAge: '30d' })
 
     setSystemTime(now + 5000)
     await browser().json('/me')

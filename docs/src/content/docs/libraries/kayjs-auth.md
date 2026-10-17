@@ -55,7 +55,7 @@ A file of yours at the same path, such as `src/routes/auth/sign-in.kay`, replace
 
 `pages.home` is where a visitor lands when nothing asked for another page, `/` by default: after a password reset, a verified address, a changed one, a magic link, a code, registering, a passkey or a provider. On a site with locales it is read as written for the default locale, and the pages put it in the visitor's language.
 
-How long a session lasts is the `session()` plugin's: its `maxAge` unseen, its `absoluteMaxAge` from the sign-in, and its `browserMaxAge` for a visitor who did not ask to be remembered. kayjs-auth repeats none of it, so the cookie and the list of sessions agree. Only the longer session of "keep me signed in" is its own, `rememberMaxAge`.
+How long a session lasts is the `session()` plugin's: its `maxAge` unseen, its `absoluteMaxAge` from the sign-in, and its `browserMaxAge` for a visitor who did not ask to be remembered. kayjs-auth repeats none of it, so the cookie and the list of sessions agree. Only the longer session of "keep me signed in" is its own, `rememberMaxAge: '90d'`.
 
 The sign-in and register pages show a "Keep me signed in" box. Unchecked, every way of signing in gives the same short session, a browser-session cookie lasting a day unseen; checked, every way gives `rememberMaxAge`, the provider buttons and the passkey button included. `pages.remember` changes that: `'always'` hides the box and remembers every sign-in, `'never'` hides it and never does, and `'checkbox'` is the default.
 
@@ -222,13 +222,13 @@ From then on, every way of signing in stops at the two-factor page. `verifyTwoFa
 A bearer token lets a device or a script call your API with `Authorization: Bearer <token>`. `createToken(proof, label, options)` makes one from a signed-in session. The token is shown once, as only its digest is stored.
 
 ```ts
-const result = await auth.createToken({ password }, 'Deploy script', { scopes: ['posts:read'], expiresIn: 60 * 60 * 24 * 30 })
+const result = await auth.createToken({ password }, 'Deploy script', { scopes: ['posts:read'], expiresIn: '30d' })
 
 if (result.ok)
   console.log(result.token)
 ```
 
-`scopes` limits what the token reaches, from the `scopes` you declare in `createAuth`. `expiresIn` is in seconds. A token never makes another token.
+`scopes` limits what the token reaches, from the `scopes` you declare in `createAuth`. `expiresIn` is seconds or a string such as `'30d'`. A token never makes another token.
 
 `tokens()` lists the user's tokens and `revokeToken(id)` revokes one. A password change, a reset and `signOutEverywhere` end them all.
 
@@ -333,7 +333,7 @@ createAuth({
 
 `context` is `{ ip, userAgent, actor }`. `actor` is the admin when an admin did it.
 
-With `audit: true`, the same events are kept in the store for a year. Pass `audit: { maxAge }` in seconds to change it. `auth.auditLog({ before, limit })` gives the signed-in user their own, newest first. Pass the last entry of a page as `before` for the next one.
+With `audit: true`, the same events are kept in the store for a year. Pass `audit: { maxAge: '90d' }`, seconds or a string, to change it. `auth.auditLog({ before, limit })` gives the signed-in user their own, newest first. Pass the last entry of a page as `before` for the next one.
 
 `describeAuditEntry(entry, { locale })` words an entry for a person, such as `Role editor granted`, in English or French.
 
@@ -374,6 +374,7 @@ createAuth({
     manage: 'admin',
     defaultRoles: ['member'],
     invitationPage: '/invitation',
+    invitationMaxAge: '7d',
   },
 })
 ```
@@ -478,12 +479,12 @@ The agents can only ask for the scopes you declare. The new tables are created b
 
 Attempts are counted in the store, so every process shares them. They are counted per client address and per account.
 
-`limits` overrides any of `DEFAULT_LIMITS`, each `{ max, window }` with `window` in seconds.
+`limits` overrides any of `DEFAULT_LIMITS`, each `{ max, window }` with `window` seconds or a string such as `'1h'`.
 
 ```ts
 createAuth({
   // ...
-  limits: { register: { max: 3, window: 60 * 60 } },
+  limits: { register: { max: 3, window: '1h' } },
 })
 ```
 

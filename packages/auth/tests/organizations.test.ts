@@ -1,4 +1,4 @@
-import type { GuardContext } from 'kay'
+import type { Duration, GuardContext } from 'kay'
 import type { User } from '../src/auth'
 import type { AuthEvent } from '../src/events'
 import type { Mail } from '../src/mail'
@@ -14,7 +14,7 @@ afterEach(() => {
   setSystemTime()
 })
 
-async function setup(options: { invitationPage?: string | undefined, create?: 'admin' } = {}) {
+async function setup(options: { invitationPage?: string | undefined, create?: 'admin', invitationMaxAge?: Duration } = {}) {
   const mails: Mail[] = []
   const events: [AuthEvent, string | null, string | undefined, string | undefined][] = []
   const app = testApp({
@@ -174,6 +174,18 @@ describe('organizations', () => {
     expect((await ada.browser.callOk('members', org)).members).toMatchObject([{ user: { email: 'ada@example.com' }, roles: ['owner'] }, { user: { id: grace.id }, roles: ['admin'] }])
     expect(await store.members!.get(org, grace.id)).toMatchObject({ roles: ['admin'] })
     expect(events.at(-1)).toEqual(['member-joined', 'grace@example.com', `${org} admin`, undefined])
+  })
+
+  test('invitationMaxAge takes seconds or a duration string, and a bad one fails naming the option', async () => {
+    for (const maxAge of ['2d', 2 * 24 * 60 * 60] as const) {
+      const { ada, org } = await setup({ invitationMaxAge: maxAge })
+      const { invitation } = await ada.browser.callOk('invite', org, 'grace@example.com')
+
+      expect(new Date(invitation.expiresAt).getTime() - Date.now()).toBeGreaterThan(2 * 24 * 60 * 60 * 1000 - 60_000)
+      expect(new Date(invitation.expiresAt).getTime() - Date.now()).toBeLessThanOrEqual(2 * 24 * 60 * 60 * 1000)
+    }
+
+    await expect(setup({ invitationMaxAge: 'soon' as Duration })).rejects.toThrow('kayjs-auth: organizations.invitationMaxAge is \'soon\'')
   })
 
   test('invitations are listed for managers, replaced when sent again, revoked, declined and expire', async () => {

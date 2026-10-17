@@ -1,7 +1,9 @@
+import type { Duration } from 'kay'
 import type { Core } from './core'
 import type { RequestState } from './state'
 import type { BearerTokenRecord, UserRecord } from './store'
 import type { Proof, ProofFailure } from './twoFactor'
+import { durationSeconds } from 'kay/library'
 import { banned, TOUCH_EVERY_MS } from './core'
 import { digest, randomToken } from './keys'
 import { notify } from './notify'
@@ -26,8 +28,18 @@ export interface BearerToken {
 export interface TokenOptions<Scope extends string = string> {
   // What the token may reach, from the scopes the app declares; every one when left out.
   scopes?: Scope[] | undefined
-  // Seconds until it stops working; never when left out.
-  expiresIn?: number | undefined
+  // How long until it stops working, seconds or a string such as '30d'; never when left out.
+  expiresIn?: Duration | undefined
+}
+
+// The seconds a token lives, undefined for a value that is no positive duration.
+function expirySeconds(expiresIn: Duration): number | undefined {
+  try {
+    return durationSeconds(expiresIn, 'expiresIn', 'kayjs-auth')
+  }
+  catch {
+    return undefined
+  }
 }
 
 type TokenProblem = 'label' | 'scope' | 'expiry'
@@ -43,10 +55,7 @@ function tokenProblem(core: Core, name: string, options: TokenOptions): TokenPro
   if (options.scopes && (options.scopes.length === 0 || options.scopes.some(scope => !core.scopes.has(scope))))
     return 'scope'
 
-  if (options.expiresIn !== undefined && !(Number.isFinite(options.expiresIn) && options.expiresIn > 0))
-    return 'expiry'
-
-  return undefined
+  return options.expiresIn !== undefined && expirySeconds(options.expiresIn) === undefined ? 'expiry' : undefined
 }
 
 async function storeToken(core: Core, userId: string, name: string, options: TokenOptions, token: string): Promise<string> {
@@ -60,7 +69,7 @@ async function storeToken(core: Core, userId: string, name: string, options: Tok
     scopes: options.scopes ? [...new Set(options.scopes)] : null,
     createdAt: new Date(),
     lastUsedAt: null,
-    expiresAt: options.expiresIn === undefined ? null : new Date(Date.now() + options.expiresIn * 1000),
+    expiresAt: options.expiresIn === undefined ? null : new Date(Date.now() + expirySeconds(options.expiresIn)! * 1000),
   })
 
   return id
