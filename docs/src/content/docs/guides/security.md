@@ -101,7 +101,7 @@ export const page = {
 }
 ```
 
-Its `csp` adds sources to the site's directives and never replaces them, so a page cannot loosen the policy by dropping one. A layout's `security` applies to every page under it, and the page's own is applied after it.
+Its `csp` adds sources to the site's directives and never replaces them, so a page cannot loosen the policy by dropping one. A layout's `security` applies to every page under it, and the page's own is applied after it. `csp: false` as the whole value sends the page no policy at all.
 
 A static export has no server to send these headers, so the host sets them instead.
 

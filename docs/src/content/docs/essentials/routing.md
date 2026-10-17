@@ -207,9 +207,12 @@ Old URLs go in `kay.config.ts`.
 export default defineConfig({
   redirects: {
     '/blog/:slug': '/posts/:slug',
+    '/old': { to: '/new', status: 301 },
   },
 })
 ```
+
+A redirect answers 308, or 307 with `permanent: false`. `status` names another: 301 or 302 for clients and crawlers that expect them.
 
 ### Rewrite a request to another path
 

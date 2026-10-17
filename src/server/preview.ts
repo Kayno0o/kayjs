@@ -50,8 +50,8 @@ const pendingDrafts = new Map<string, Map<string, EntryDraft[]>>()
 setPreviewScope(() => store.getStore())
 
 // `preview` from kay.config.ts, checked as the server boots; without it no request is ever in preview mode.
-export function setupPreview(config: PreviewConfig | undefined, base: string): void {
-  if (!config) {
+export function setupPreview(config: PreviewConfig | false | undefined, base: string): void {
+  if (config === undefined || config === false) {
     settings = undefined
 
     return

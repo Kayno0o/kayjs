@@ -63,8 +63,8 @@ export interface KayConfig {
   fonts?: (FontConfig | FontsourceConfig)[] | undefined
   // The security headers every response carries, or `false` for none; a header the app sets itself wins.
   security?: SecurityConfig | false | undefined
-  // The proxies in front of the server, `true` for one and a number for that many, which the client's address that rate limits count is read through. Without it, the address the server was reached from is the client, so behind a proxy every visitor counts as that proxy.
-  proxy?: ProxyConfig | number | true | undefined
+  // The proxies in front of the server, `true` for one and a number for that many, which the client's address that rate limits count is read through. Without it, or with `false`, the address the server was reached from is the client, so behind a proxy every visitor counts as that proxy.
+  proxy?: ProxyConfig | number | boolean | undefined
   // The most a request to an action or an API route may send, bytes or a size such as `'4mb'`, 1 MB by default; an action or an `api()` module raises or lowers it for itself. A bigger one answers 413 before it is read.
   bodyLimit?: ByteSize | undefined
   // Every page, action, endpoint and API module of the app answers 403 unless a `_guard.ts` covers it or it sets `guards: false`, in its `page` or its `api()` options; `kay check` reports each such route. A library's routes keep the guards it gives them.
@@ -121,8 +121,8 @@ export interface KayConfig {
   lints?: LintLevels | undefined
   // What signs form stamps, links to private files and the flash cookie when the app has no `session()`: at least 32 random characters, read from the environment as `secret: process.env.KAY_SECRET`. `KAY_SECRET` alone does the same, and a `session()` secret takes its place. Without any, a key of the process signs them, which a restart changes and other replicas do not share.
   secret?: string | undefined
-  // Lets an editor see drafts on the live site: a visitor in preview mode sees every draft, and pages render for them alone, past prerendered and cached copies.
-  preview?: PreviewConfig | undefined
+  // Lets an editor see drafts on the live site, `false` for none: a visitor in preview mode sees every draft, and pages render for them alone, past prerendered and cached copies.
+  preview?: PreviewConfig | false | undefined
   // Where `files` from `kay/server` keeps what it stores: `diskFiles('data/files')` by default, `s3Files()` for a bucket, or memory under `bun test`.
   storage?: FileStore | undefined
   // Where queued jobs, schedule locks and rate limit counts live for every queue, schedule and limit naming no store of its own: `sqliteData('data/app.sqlite')`, or `{ jobs, rates }` of your own, Redis say. They stay in `data/jobs.sqlite` and in memory by default.

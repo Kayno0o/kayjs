@@ -7,7 +7,10 @@ import { check, configCheckOptions } from '../src/check'
 import { pages } from '../src/server'
 import { probeHealth } from '../src/server/lifecycle'
 import { liveLimits } from '../src/server/live'
+import { clientAddress, trustProxy } from '../src/server/protection'
+import { hostedStatus, readRedirects } from '../src/server/redirects'
 import { remoteImages, remoteLimits, remotePatterns } from '../src/server/remote'
+import { securityHeaders } from '../src/server/security'
 
 const ROUTES = 'tests/fixtures/production/src/routes'
 
@@ -143,5 +146,56 @@ describe('requestIdHeader', () => {
   it('refuses a name that is no header', async () => {
     for (const name of ['', 'two words', 'a:b'])
       await expect(pages({ routes, prebuilt: false, requestIdHeader: name })).rejects.toThrow('requestIdHeader is')
+  })
+})
+
+describe('redirects with a status', () => {
+  it('answer 301 or 302 when asked, and keep 308 and 307 otherwise', async () => {
+    const app = await pages({ routes: ROUTES, prebuilt: false, redirects: { '/a': { to: '/contact', status: 301 }, '/b': { to: '/contact', status: 302 }, '/c': '/contact', '/d': { to: '/contact', permanent: false }, '/e': { to: '/contact', permanent: true, status: 301 }, '/f/*': { to: '/contact?x=*', status: 302 } } })
+    const statusOf = async (path: string) => (await app.handle(new Request(`http://localhost${path}`))).status
+
+    expect(await Promise.all(['/a', '/b', '/c', '/d', '/e', '/f/1'].map(statusOf))).toEqual([301, 302, 308, 307, 301, 302])
+  })
+
+  it('refuses a status kay does not answer with, or one contradicting permanent', () => {
+    expect(() => readRedirects({ '/a': { to: '/b', status: 303 as never } })).toThrow('the redirect from /a has status 303')
+    expect(() => readRedirects({ '/a': { to: '/b', permanent: false, status: 301 } })).toThrow('has permanent: false and status 301, which disagree')
+    expect(() => readRedirects({ '/a': { to: '/b', permanent: true, status: 307 } })).toThrow('which disagree')
+  })
+
+  it('are listed by kay routes and written to _redirects as named, else as 301 and 302', () => {
+    expect(hostedStatus('/a', { to: '/b', status: 302 })).toBe(302)
+    expect(hostedStatus('/a', { to: '/b', status: 308 })).toBe(308)
+    expect(hostedStatus('/a', '/b')).toBe(301)
+    expect(hostedStatus('/a', { to: '/b', permanent: false })).toBe(302)
+  })
+})
+
+describe('options that also take false', () => {
+  it('reads proxy: false as no proxy, whatever the request forwards', () => {
+    const request = new Request('http://localhost/', { headers: { 'x-forwarded-for': '9.9.9.9' } })
+
+    expect(clientAddress(request, undefined, true)).toBe('9.9.9.9')
+    expect(clientAddress(request, undefined, false)).not.toBe('9.9.9.9')
+    expect(() => trustProxy(new Elysia(), false)).not.toThrow()
+  })
+
+  it('reads preview: false as no preview, serving none of its routes', async () => {
+    const withPreview = await pages({ routes: ROUTES, prebuilt: false, preview: { secret: 'a'.repeat(40) } })
+    const without = await pages({ routes: ROUTES, prebuilt: false, preview: false })
+    const draft = async (app: typeof without) => app.handle(new Request('http://localhost/_kay/draft', { method: 'POST' }))
+
+    expect((await draft(withPreview)).status).not.toBe(404)
+    expect((await draft(without)).status).toBe(404)
+  })
+
+  it('leaves a page without a policy when its security.csp is false, even with a report-only one', () => {
+    const security = { reportOnly: { 'img-src': ['\'none\''] } }
+    const headers = securityHeaders({ security }, [{ csp: false }])!
+
+    expect(headers['content-security-policy']).toBeUndefined()
+    expect(headers['content-security-policy-report-only']).toContain('img-src \'none\'')
+    expect(securityHeaders({ security }, [{ csp: { 'img-src': ['https://a.example'] } }])!['content-security-policy']).toContain('https://a.example')
+    expect(securityHeaders({}, [{ csp: { 'img-src': ['https://a.example'] } }, { csp: false }])!['content-security-policy']).toBeUndefined()
   })
 })

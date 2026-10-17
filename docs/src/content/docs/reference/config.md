@@ -52,7 +52,7 @@ Every option is optional. The tables give each option's default. The full refere
 | `api` | The directory of API modules, `src/api` by default. See [API routes](/guides/api-routes) |
 | `publicCache` | How long the browser keeps a public file without asking again, as globs on the served path: `{ '/fonts/**': '365d' }`. Files it leaves out revalidate. See [Styling and assets](/essentials/styling-and-assets#public-files) |
 | `publicDir` | The directory of files served as they are at their path, `public` by default. See [Styling and assets](/essentials/styling-and-assets#public-files) |
-| `redirects` | Old paths sent to new ones with a 308, or a 307 with `permanent: false`. See [Routing](/essentials/routing) |
+| `redirects` | Old paths sent to new ones with a 308, a 307 with `permanent: false`, or the 301, 302, 307 or 308 that `status` names. See [Routing](/essentials/routing) |
 | `rewrite` | A function returning the path to serve a request from, or `undefined` to serve it as it came. The browser keeps its URL |
 | `base` | Where the site is mounted when it is not at its host's root, such as `/docs`. Unset by default. See [Static export and base path](/guides/static-export#mount-the-site-under-a-path) |
 | `trailingSlash` | `never` (the default) redirects `/about/` to `/about`, `always` the other way, `ignore` serves both. See [Trailing slashes](/guides/static-export#trailing-slashes) |
@@ -66,7 +66,7 @@ Every option is optional. The tables give each option's default. The full refere
 | --- | --- |
 | `content` | The module exporting the collections, `src/content.config.ts` by default. See [Content](/guides/content) |
 | `markdown` | `highlight`, `headingLinks`, `readingSpeed` and `imageSizes` for every collection, which a collection's own option overrides. See [Content](/guides/content) |
-| `preview` | Lets an editor see drafts on the live site. `secret` signs the preview links, at least 32 random characters. `maxAge` is how long a visitor stays in preview mode, an hour by default |
+| `preview` | Lets an editor see drafts on the live site, `false` for none. `secret` signs the preview links, at least 32 random characters. `maxAge` is how long a visitor stays in preview mode, an hour by default |
 | `storage` | Where `files` keeps uploads: `diskFiles()` by default, or `s3Files()`. See [File storage](/guides/file-storage) |
 | `store` | Where jobs, schedule locks and rate limit counts live for everything naming no store of its own: `sqliteData('data/app.sqlite')`, or `{ jobs, rates }` of your own. See [Background jobs](/guides/background-jobs) |
 | `i18n` | `locales`, `defaultLocale`, and optionally `prefixDefault` or per-locale `domains`, and `paths` translating a page's path per locale. See [Internationalization](/guides/i18n) |
@@ -90,7 +90,7 @@ Every option is optional. The tables give each option's default. The full refere
 | Option | Effect |
 | --- | --- |
 | `security` | The CSP and security headers every response carries, or `false` for none. See [Security](/guides/security) |
-| `proxy` | How many proxies sit in front (`true` for one, a number for more), or `{ header }` naming the header they set. `trusted` lists the public ranges they reach the server from. See [Trust a proxy](/guides/security#trust-a-proxy) |
+| `proxy` | How many proxies sit in front (`true` for one, a number for more, `false` for none), or `{ header }` naming the header they set. `trusted` lists the public ranges they reach the server from. See [Trust a proxy](/guides/security#trust-a-proxy) |
 | `compress` | Compresses responses rendered per request. On in production; `false` when a proxy or CDN does it |
 | `secret` | What signs form stamps, links to private files and the flash cookie when the app has no `session()`. At least 32 random characters; `KAY_SECRET` when left out. A `session()` secret takes its place |
 | `health` | The route a load balancer polls, `/_kay/health` by default. `{ path, check, timeout }` renames it and fails it with 503 when `check` returns false, throws or takes longer than `timeout` (5 seconds by default). `false` serves none |

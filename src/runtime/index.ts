@@ -408,8 +408,8 @@ export type PageSearch = false | { weight?: number }
 export type Lastmod = Date | string | number
 
 export interface PageSecurity {
-  // Sources added to the site's Content-Security-Policy directives, `{ 'script-src': ['https://cdn.example.com'] }`, a directive the policy lacks starting from the one it falls back to; `false` leaves a directive out.
-  csp?: Record<string, string[] | false>
+  // Sources added to the site's Content-Security-Policy directives, `{ 'script-src': ['https://cdn.example.com'] }`, a directive the policy lacks starting from the one it falls back to; `false` leaves a directive out, and as the whole value the page, with its layouts, sends no policy at all.
+  csp?: Record<string, string[] | false> | false
   // Headers merged over the site's, one given `false` not sent: `{ 'cross-origin-embedder-policy': 'require-corp' }` with the site's `cross-origin-opener-policy: same-origin` isolates the page.
   headers?: Record<string, string | false>
 }

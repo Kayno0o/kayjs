@@ -4,8 +4,10 @@ import { KayError } from '../compiler/errors'
 import { noteRedirect } from './dev-notes'
 import { requestUrl } from './request-url'
 
-// A path moved elsewhere, by its old path: `'/blog/:slug': '/posts/:slug'`, a `*` carrying the rest of the path. Permanent, a 308, unless it says otherwise.
-export type Redirects = Record<string, string | { to: string, permanent?: boolean }>
+// A path moved elsewhere, by its old path: `'/blog/:slug': '/posts/:slug'`, a `*` carrying the rest of the path. Permanent, a 308, unless it says otherwise: `permanent: false` for a 307, or `status` for a 301 or 302 that older clients and some crawlers expect, a 307 or a 308.
+export type Redirects = Record<string, string | { to: string, permanent?: boolean, status?: RedirectStatus }>
+
+export type RedirectStatus = 301 | 302 | 307 | 308
 
 const PARAM = /^:([A-Z_$][\w$]*)$/i
 const QUERY_OR_HASH = /[?#].*$/
@@ -20,13 +22,42 @@ interface Redirect {
   // The router's name for each param the old path names.
   names: Map<string, string>
   to: string
-  status: 307 | 308
+  status: RedirectStatus
+}
+
+const STATUSES = new Set<unknown>([301, 302, 307, 308])
+const PERMANENT = new Set<unknown>([301, 308])
+
+// The status a redirect answers with: its `status`, else a 308 or, with `permanent: false`, a 307. A `status` that is none of 301, 302, 307 and 308, or that contradicts `permanent`, is refused.
+export function redirectStatus(from: string, target: Redirects[string]): RedirectStatus {
+  const { permanent, status }: { permanent?: boolean, status?: RedirectStatus } = typeof target === 'string' ? {} : target
+
+  if (status === undefined)
+    return permanent === false ? 307 : 308
+
+  if (!STATUSES.has(status))
+    throw new KayError('redirect-invalid', `kay: the redirect from ${from} has status ${String(status)}; it answers 301, 302, 307 or 308`)
+
+  if (permanent !== undefined && permanent !== PERMANENT.has(status))
+    throw new KayError('redirect-invalid', `kay: the redirect from ${from} has permanent: ${String(permanent)} and status ${String(status)}, which disagree; set one of them`)
+
+  return status
+}
+
+// What `_redirects` for a static host says: the status the config names, else 301 for a permanent redirect and 302 for the rest, as those hosts answer.
+export function hostedStatus(from: string, target: Redirects[string]): RedirectStatus {
+  const status = redirectStatus(from, target)
+
+  if (typeof target !== 'string' && target.status !== undefined)
+    return status
+
+  return status === 308 ? 301 : 302
 }
 
 // Each redirect read and checked, so a target naming a param its old path lacks stops the server rather than redirecting to `:slug`.
 export function readRedirects(redirects: Redirects): Redirect[] {
   return Object.entries(redirects).map(([from, target]) => {
-    const { to, permanent = true } = typeof target === 'string' ? { to: target } : target
+    const to = typeof target === 'string' ? target : target.to
 
     if (!from.startsWith('/'))
       throw new KayError('redirect-invalid', `kay: the redirect from ${from} needs a path starting with /`)
@@ -56,7 +87,7 @@ export function readRedirects(redirects: Redirects): Redirect[] {
         throw new KayError('redirect-invalid', `kay: the redirect from ${from} goes to ${to}, whose ${part} its path has none of`)
     }
 
-    return { path, names, to, status: permanent ? 308 : 307 }
+    return { path, names, to, status: redirectStatus(from, target) }
   })
 }
 

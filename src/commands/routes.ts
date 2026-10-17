@@ -25,6 +25,7 @@ import { registerLoader } from '../server/loader'
 import { SERVICE_WORKER } from '../server/offline'
 import { reachesServerIsland } from '../server/prerender'
 import { PREVIEW_ROUTE } from '../server/preview'
+import { redirectStatus } from '../server/redirects'
 import { apiRoutePath, endpointPath, ROUTE_METHODS, routeMounts, scanEndpoints, scanRoutes } from '../server/routes'
 import { ROBOTS, SITEMAP } from '../server/site-paths'
 import { CSP_REPORTS } from '../server/violations'
@@ -178,9 +179,9 @@ function unlistedServers(root: string, config: KayConfig): string[] {
 
 function redirectRoutes(config: KayConfig): Listed[] {
   return Object.entries(config.redirects ?? {}).map(([from, target]) => {
-    const { to, permanent = true } = typeof target === 'string' ? { to: target } : target
+    const to = typeof target === 'string' ? target : target.to
 
-    return { methods: 'GET', path: from, kind: 'redirect', by: `${permanent ? 308 : 307} to ${to}` }
+    return { methods: 'GET', path: from, kind: 'redirect', by: `${redirectStatus(from, target)} to ${to}` }
   })
 }
 
@@ -208,7 +209,7 @@ function kayRoutes(root: string, config: KayConfig): Listed[] {
     kay(ERROR_REPORTS, 'browser error reports', 'POST'),
     kay(LIVE_ROUTE, 'live values', 'POST'),
     ...typeof config.security === 'object' && config.security.reports === true ? [kay(CSP_REPORTS, 'CSP violation reports', 'POST')] : [],
-    ...config.preview ? [kay(PREVIEW_ROUTE, 'preview mode')] : [],
+    ...config.preview !== undefined && config.preview !== false ? [kay(PREVIEW_ROUTE, 'preview mode')] : [],
     ...mcpAt === undefined ? [] : [kay(mcpAt, 'MCP endpoint', 'POST'), kay(RESOURCE_METADATA, 'MCP sign-in metadata'), kay(`${RESOURCE_METADATA}${mcpAt}`, 'MCP sign-in metadata')],
     ...openapi !== undefined && openapi.dev !== true ? [kay(openApiPaths(openapi).document, 'OpenAPI document'), ...openapi.reference === true ? [kay(openApiPaths(openapi).reference, 'API reference')] : []] : [],
     ...config.site === undefined ? [] : [kay(SITEMAP, 'sitemap, unless the app serves it'), kay(ROBOTS, 'robots.txt, unless the app serves it')],

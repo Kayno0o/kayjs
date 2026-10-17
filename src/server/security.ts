@@ -86,9 +86,10 @@ export function securityHeaders(options: SecurityOptions, pages: PageSecurity[] 
   if (reportTo !== undefined)
     headers['reporting-endpoints'] = `${CSP_ENDPOINT}="${reportTo}"`
 
-  const added = pages.flatMap(page => page.csp ? [page.csp] : [])
+  const added = pages.flatMap(page => page.csp === undefined || page.csp === false ? [] : [page.csp])
+  const enforced = csp !== false && !pages.some(page => page.csp === false)
 
-  if (csp !== false) {
+  if (enforced) {
     const directives = policy([csp ?? {}], hashes, styles, reportTo, options.islands, added)
     const frames = frameOptions(directives.get('frame-ancestors'))
 
@@ -101,7 +102,7 @@ export function securityHeaders(options: SecurityOptions, pages: PageSecurity[] 
   }
 
   if (reportOnly)
-    headers['content-security-policy-report-only'] = serialized(policy([csp === false || csp === undefined ? {} : csp, reportOnly], hashes, styles, reportTo, options.islands, added))
+    headers['content-security-policy-report-only'] = serialized(policy([enforced ? csp ?? {} : {}, reportOnly], hashes, styles, reportTo, options.islands, added))
 
   return withHeaders(headers, [options.security?.headers ?? {}, ...pageHeaders])
 }

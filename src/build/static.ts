@@ -21,6 +21,7 @@ import { localeSettings } from '../server/i18n'
 import { limiter } from '../server/limit'
 import { applyPageHooks, assetFiles } from '../server/page-hook'
 import { publicFiles, servedPublicly } from '../server/public'
+import { hostedStatus } from '../server/redirects'
 import { withoutSlash } from '../server/routes'
 import { siteOrigin } from '../server/seo'
 import { cachedCopies, pruneCopies } from './compressed'
@@ -219,7 +220,7 @@ function pageFiles(path: string): string[] {
 
 // A static host answers no redirect, so each one without params becomes a page sending the browser on; all of them also go to `_redirects`, which hosts such as Netlify and Cloudflare Pages read.
 async function writeRedirects(out: string, redirects: Redirects, base: string, origin: string): Promise<string[]> {
-  const entries = Object.entries(redirects).map(([from, target]) => ({ from, ...typeof target === 'string' ? { to: target, permanent: true } : { to: target.to, permanent: target.permanent ?? true } }))
+  const entries = Object.entries(redirects).map(([from, target]) => ({ from, to: typeof target === 'string' ? target : target.to, status: hostedStatus(from, target) }))
 
   if (entries.length === 0)
     return []
@@ -229,7 +230,7 @@ async function writeRedirects(out: string, redirects: Redirects, base: string, o
   for (const { from, to } of entries.filter(entry => !PARAM_OR_REST.test(entry.from)))
     written.push(...await writeRefresh(out, from, joinBase(base, to), origin))
 
-  const lines = entries.map(({ from, to, permanent }) => `${joinBase(base, from)} ${joinBase(base, to).replace(REST, ':splat')} ${permanent ? 301 : 302}`)
+  const lines = entries.map(({ from, to, status }) => `${joinBase(base, from)} ${joinBase(base, to).replace(REST, ':splat')} ${status}`)
 
   await Bun.write(join(out, '_redirects'), `${lines.join('\n')}\n`)
 

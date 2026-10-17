@@ -99,7 +99,7 @@ export function GET({ params }: EndpointContext<{ slug: string }>) {
 
 ### Redirect old paths
 
-`redirects` in kay.config.ts sends old paths elsewhere, with a 308, or a 307 when `permanent` is false:
+`redirects` in kay.config.ts sends old paths elsewhere, with a 308, a 307 when `permanent` is false, or the status `status` names, 301, 302, 307 or 308, for older clients and crawlers that expect a 301:
 
 ```ts
 export default defineConfig({
@@ -107,6 +107,7 @@ export default defineConfig({
     '/blog/:slug': '/posts/:slug',
     '/docs/*': '/guide/*',
     '/sale': { to: 'https://shop.example.com/sale', permanent: false },
+    '/old': { to: '/new', status: 301 },
   },
 })
 ```
@@ -294,7 +295,7 @@ export function GET({ params }: EndpointContext<{ slug: string }>) {
 
 ### Redirects
 
-`redirects` in kay.config.ts sends old paths elsewhere, with a 308, or a 307 when `permanent` is false:
+`redirects` in kay.config.ts sends old paths elsewhere, with a 308, a 307 when `permanent` is false, or the status `status` names, 301, 302, 307 or 308, for older clients and crawlers that expect a 301:
 
 ```ts
 export default defineConfig({
@@ -302,6 +303,7 @@ export default defineConfig({
     '/blog/:slug': '/posts/:slug',
     '/docs/*': '/guide/*',
     '/sale': { to: 'https://shop.example.com/sale', permanent: false },
+    '/old': { to: '/new', status: 301 },
   },
 })
 ```
