@@ -339,7 +339,7 @@ kay env
 
 `kay env` lists the environment variables the project declares, without running the server entry. Each has its source, its type, whether it is required (`always`, `production` or `optional`) and its default.
 
-It reads the `defineEnv` schemas in the modules under `src`, `publicEnv`, each library in `extensions`, and kay's own `PORT`, `HOST`, `SITE_URL` and `ORIGIN`. A module that does not load is named as not read. See [Environment variables](/essentials/data-loading#environment-variables).
+It reads the `defineEnv` schemas in the modules under `src`, `publicEnv`, each library in `extensions`, and kay's own `PORT`, `HOST`, `SITE_URL`, `ORIGIN` and `KAY_SECRET`. A module that does not load is named as not read. See [Environment variables](/essentials/data-loading#environment-variables).
 
 The modules under `src` are imported, so their top-level code runs.
 

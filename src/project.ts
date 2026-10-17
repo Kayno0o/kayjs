@@ -111,7 +111,7 @@ export function modeOf(options: { dev?: boolean | undefined, prebuilt?: boolean 
 
 // Whether pages register the service worker: never in development, which serves one unregistering itself instead.
 export function offlineOf(config: Pick<KayConfig, 'offline'>, mode: Pick<Mode, 'dev'>): boolean {
-  return config.offline !== undefined && !mode.dev
+  return config.offline !== undefined && config.offline !== false && !mode.dev
 }
 
 type RenderConfig = Pick<KayConfig, 'lang' | 'serverTiming' | 'prefetch' | 'onError' | 'base' | 'images' | 'offline'>

@@ -47,6 +47,18 @@ describe('service worker', () => {
     expect(headers.get('cache-control')).toBe('no-cache')
   })
 
+  it('stays off with offline: false from a JS config', async () => {
+    const app = await pages({ routes: ROUTES, prebuilt: false, site: 'https://x.example', offline: false })
+    const page = await app.handle(new Request('http://localhost/about'))
+    const { text, settings, headers } = await worker(app)
+
+    expect(await page.text()).not.toContain('serviceWorker')
+    expect(page.headers.get('content-security-policy')).not.toContain(registerHash(''))
+    expect(headers.get('content-security-policy')).not.toContain(registerHash(''))
+    expect(settings).toBeUndefined()
+    expect(text).toContain('self.registration.unregister()')
+  })
+
   it('registers a worker under the base keeping the build\'s files and the pages listed, its hash in the policy', async () => {
     const app = await pages({ routes: ROUTES, prebuilt: false, site: 'https://x.example', base: '/repo', offline: { pages: ['/', '/about'], fallback: '/about' } })
     const page = await app.handle(new Request('http://localhost/about'))
@@ -99,7 +111,6 @@ describe('service worker', () => {
       await rm(dir, { recursive: true, force: true })
     }
   })
-})
 
   // Runs the worker against a fake cache and network, visiting `path` once online and once offline, and returns what the offline visit got.
   async function visit(script: string, path: string, online: Map<string, Response>): Promise<{ status: number, body: string }> {
@@ -202,3 +213,4 @@ describe('service worker', () => {
       expect(settings!.pages).toEqual(['/repo/', '/repo/about/'])
     })
   })
+})

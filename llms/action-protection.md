@@ -66,7 +66,7 @@ export default guard(async ({ request, headers, deny }) => {
 - Several limits all apply, each counting every attempt it is meant to count whichever refuses it, the longest wait the one told: `rateLimit: [{ max: 30, window: '10m' }, { max: 5, window: '10m', count: 'succeeded' }]` slows a script hammering the form and lets five messages through, each limit counting under its place in the list.
 - The client is the address the request came from, or the one the proxies in front passed on once `proxy` says how to read it (see [Behind a proxy](proxy-and-security.md#behind-a-proxy)).
 - An IPv6 client counts as its /64 block, which one host or home network holds.
-- Counts live in the process unless `store` names a shared one, for at most 100,000 windows in all, the oldest dropped past that.
+- Counts live in the process unless `store` names a shared one, for at most 10,000 windows per limit, the expired ones dropped first and the oldest past that.
 - `rateLimit: { max: 5, window: '1m', store: sqliteRates('data/rates.sqlite') }`, `sqliteRates` from `kay/server`, counts every process of the machine opening that file together, which stores each key pseudonymised, hashed with a salt it keeps and keyed by the session's, the app's (`secret`, `KAY_SECRET`) or the preview's secret once one is set.
 - `RateStore`, a `hit(key, windowMs, weight)` method adding `weight` (one unless given) to the count and giving `{ count, resetAt }` and, for a limit counting what went through, a `peek(key)` giving the open window without counting or `undefined`, is the shape of an app's own.
 

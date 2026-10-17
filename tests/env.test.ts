@@ -84,7 +84,7 @@ describe('kay env', () => {
     expect(row('MAP_KEY')).toEqual({ name: 'MAP_KEY', source: 'publicEnv in kay.config.ts', type: 'number', required: false, default: 1 })
     expect(row('SITE')).toEqual({ name: 'SITE', source: 'publicEnv in kay.config.ts', type: 'string (uri)', required: false })
     expect(row('ENTRY_ONLY')).toBeUndefined()
-    expect(listed.variables.filter(variable => variable.source === 'kay').map(variable => variable.name)).toEqual(['PORT', 'HOST', 'SITE_URL', 'ORIGIN'])
+    expect(listed.variables.filter(variable => variable.source === 'kay').map(variable => variable.name)).toEqual(['PORT', 'HOST', 'SITE_URL', 'ORIGIN', 'KAY_SECRET'])
     expect(listed.unread.map(({ file }) => file)).toEqual(['src/broken.ts'])
     expect(listed.unread[0]!.error).toContain('missing')
   })

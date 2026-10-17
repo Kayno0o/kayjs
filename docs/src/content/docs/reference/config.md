@@ -38,7 +38,7 @@ Every option is optional. The tables give each option's default. The full refere
 | `head` | Tags every page's head carries, written as a `head` block compiles them; the CSP lets their inline scripts through. See [Head and SEO](/essentials/head-and-seo) |
 | `favicon` | A square image of 512 px or more, or a square SVG, served as the favicon and the manifest icons. `false` serves none |
 | `manifest` | The web manifest: `shortName`, `themeColor`, `backgroundColor`, `display`, `orientation`, `startUrl`, `scope`, `shortcuts`, and a `maskable` image served as its maskable icons |
-| `offline` | `true`, or what to keep: a service worker keeping the build's files and some pages for offline visitors. Off by default |
+| `offline` | `true`, or what to keep: a service worker keeping the build's files and some pages for offline visitors. Off by default, as `false` is. Pages are kept under the path `trailingSlash` writes them at |
 | `search` | `true` indexes the pages `kay build` renders, for `searchResults` to search in the browser. Off by default. See [Site search](/guides/search) |
 | `lang` | The `lang` of the `html` element when `i18n` is not set, `en` by default |
 

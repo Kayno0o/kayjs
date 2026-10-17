@@ -105,7 +105,7 @@ An island hydrates as soon as the page loads. Put `hydrate` on its tag, in a sta
 Comments(postId={post.id} hydrate="visible")
 ```
 
-`hydrate="visible"` waits until the island scrolls near the viewport. `hydrate="idle"` waits until the browser is idle.
+`hydrate="load"`, the default, hydrates the island as soon as the page loads. `hydrate="visible"` waits until the island scrolls near the viewport. `hydrate="idle"` waits until the browser is idle.
 
 A click on an island that is still loading is replayed once it hydrates, so the visitor loses nothing.
 
