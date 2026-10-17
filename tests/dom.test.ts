@@ -1,7 +1,7 @@
+import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
-import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { kay } from '../src/build/plugin'
 import { compileKay } from '../src/compiler'
 import { patch } from '../src/runtime/dev-patch'
@@ -2158,6 +2158,15 @@ describe('a stream an island starts', () => {
     'main.kay': `---\nimport { signal } from 'kay'\nimport Listener from './listener.kay'\n\nconst shown = signal(true)\n---\nbutton.hide(onClick={() => shown.set(false)}) Hide\nif shown()\n  Listener\n`,
     'listener.kay': `---\nimport { listen } from 'kay'\nimport { quiet } from './page.kay'\n\nasync function start() {\n  ${records}.push(await quiet())\n}\n\nlisten(window, 'keydown', () => void start())\n---\np Listening\n`,
   })
+  const retargeted = site({
+    'page.kay': PAGE,
+    'main.kay': `---\nimport { signal } from 'kay'\nimport Listener from './listener.kay'\n\nconst shown = signal(true)\n---\nbutton.hide(onClick={() => shown.set(false)}) Hide\nif shown()\n  Listener\n`,
+    'listener.kay': `---\nimport { listen, signal } from 'kay'\nimport { quiet } from './page.kay'\n\nconst target = signal<EventTarget>(window)\n\nasync function start() {\n  ${records}.push(await quiet())\n}\n\nlisten(target(), 'keydown', () => void start())\n---\nbutton.move(onClick={() => target.set(document)}) Move\n`,
+  })
+  const awaiting = site({
+    'page.kay': PAGE,
+    'main.kay': `---\nimport { signal } from 'kay'\nimport { quiet } from './page.kay'\n\nconst shown = signal(true)\n\nasync function start() {\n  await Promise.resolve();\n  ${records}.push(await quiet())\n}\n---\nbutton.hide(onClick={() => shown.set(false)}) Hide\nif shown()\n  button.start(onClick={() => void start()}) Start\n`,
+  })
   // Answers a call with a stream that says one value and then nothing, as `quiet` does.
   const streaming = () => spyOn(globalThis, 'fetch').mockImplementation((async () => {
     return new Response(new ReadableStream({ start: controller => void controller.enqueue(new TextEncoder().encode('data: [0]\n\n')) }), { headers: { 'content-type': 'text/event-stream' } })
@@ -2205,6 +2214,52 @@ describe('a stream an island starts', () => {
       await settle()
       await settle()
       expect(streams().map(stream => stream.status())).toEqual(['closed'])
+    }
+    finally {
+      fetchStub.mockRestore()
+      await dispose()
+    }
+  })
+
+  it('keeps a listen callback under the same owner after a signal target moves it to another target', async () => {
+    ;(globalThis as unknown as { streams: unknown[] }).streams = []
+
+    const fetchStub = streaming()
+    const { root, dispose } = await retargeted()
+
+    try {
+      root.querySelector<HTMLButtonElement>('button.move')!.click()
+      await settle()
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'a' }))
+      await settle()
+      await settle()
+      expect(streams().map(stream => stream.status())).toEqual(['open'])
+
+      root.querySelector<HTMLButtonElement>('button.hide')!.click()
+      await settle()
+      await settle()
+      expect(streams().map(stream => stream.status())).toEqual(['closed'])
+    }
+    finally {
+      fetchStub.mockRestore()
+      await dispose()
+    }
+  })
+
+  it('leaves a stream started after an await in a handler open when its block goes, as the browser has no async context to find the owner by', async () => {
+    ;(globalThis as unknown as { streams: unknown[] }).streams = []
+
+    const fetchStub = streaming()
+    const { root, dispose } = await awaiting()
+
+    try {
+      root.querySelector<HTMLButtonElement>('button.start')!.click()
+      await settle()
+      await settle()
+      await settle()
+      expect(streams().map(stream => stream.status())).toEqual(['open'])
+      await dispose()
+      expect(streams().map(stream => stream.status())).toEqual(['open'])
     }
     finally {
       fetchStub.mockRestore()
