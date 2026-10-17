@@ -8,11 +8,11 @@ import { fileTree, pathTree } from '../docs/src/file-tree'
 import { loadComponents, loadLibraries } from '../docs/src/libraries'
 import { pageWeight } from '../docs/src/page-weight'
 import { PALETTES, paletteStylesheet, themeCss } from '../docs/src/palettes'
-import { LLMS_GUIDES, loadReference } from '../docs/src/reference'
+import { loadReference } from '../docs/src/reference'
 import { partOf } from '../docs/src/sections'
 import { palette, pickTheme, scheme, THEME_SCRIPT, THEMES } from '../docs/src/theme'
+import { brokenLinks, LINK } from '../scripts/links'
 import { compileKay, formatDiagnostic } from '../src/compiler'
-import { renderMarkdown } from '../src/content/markdown'
 import { formatKay } from '../src/format'
 import { sendValue } from '../src/runtime/send'
 
@@ -23,17 +23,11 @@ const SHIKI_ALIAS = /^\s*(--shiki-[\w-]+):/gm
 const llms = await Bun.file(join(root, 'llms.txt')).text()
 const docs = (await readdir(join(root, 'llms'))).filter(name => name.endsWith('.md')).sort()
 const LISTED = /^- \[[^\]]+\]\(llms\/([\w-]+\.md)\): \S/gm
-// A link to a page of the site in Markdown or a ReadMore, anchor left out: `](/essentials/routing#layouts)`, `href="/llms/server"`.
-const SITE_LINK = /(?:\]\(|href=")(\/[\w/-]*?)\/?(#[\w-]*)?[)"]/g
-// Code blocks and spans, whose links are examples rather than links of the site.
-const CODE = /```[\s\S]*?```|`[^`\n]*`/g
 const KAY_BLOCK = /```kay\n([\s\S]*?)```/g
 const pagesDir = join(root, 'docs/src/content/docs')
 const pageBlocks = (await Promise.all([...new Bun.Glob('**/*.md').scanSync(pagesDir)].toSorted().map(async file => [...(await Bun.file(join(pagesDir, file)).text()).matchAll(KAY_BLOCK)].map((match, index) => [`${file} #${index + 1}`, match[1]!] as const)))).flat()
-const LINK = /\]\(((?:llms\/)?[\w-]+\.md)?(#[\w-]+)?\)/g
 const CARD_LINK = /ModuleCard\([^)]*\bhref="([^"]+)"/g
 const FRONTMATTER_PATH = /^path: (.+)$/m
-const HOME_LINK = /href[=:] ?["'](\/[\w/-]*?)\/?(?:#([\w-]+))?["']/g
 const FENCE = /^```[\s\S]+?^```/gm
 const FRONTMATTER = /^---\n[\s\S]*?\n---\n/
 const BLANK_LINE = /\n\s*\n/
@@ -94,53 +88,7 @@ describe('the documentation site', () => {
   })
 
   it('resolves every internal link and anchor of llms/, the docs content, the home page and llms.txt to a page the site serves', async () => {
-    const docsRoot = join(root, 'docs/src/content')
-    const files = [...new Bun.Glob('**/*.md').scanSync(docsRoot)]
-    const served = new Map<string, Set<string> | undefined>([['/', undefined], ['/llms', undefined]])
-    const headings = async (markdown: string) => new Set((await renderMarkdown(markdown)).headings.map(heading => heading.id))
-
-    for (const file of files.filter(file => file.startsWith('docs/')))
-      served.set(`/${file.slice('docs/'.length, -'.md'.length)}`, await headings(await Bun.file(join(docsRoot, file)).text()))
-
-    for (const component of await loadComponents())
-      served.set(`/ui/${component.slug}`, await headings(component.body))
-
-    for (const name of docs)
-      served.set(`/llms/${name.slice(0, -'.md'.length)}`, await headings(await Bun.file(join(root, 'llms', name)).text()))
-
-    for (const library of await loadLibraries())
-      served.set(`/llms/${library.slug}`, await headings(library.body))
-
-    for (const guide of LLMS_GUIDES)
-      served.set(`/${guide.slug}`, served.get(`/llms/${guide.topic}`))
-
-    served.set('/llms.txt', await headings(llms))
-
-    const broken: string[] = []
-    const resolve = (from: string, path: string, anchor: string | undefined) => {
-      if (!served.has(path) || (anchor !== undefined && !served.get(path)?.has(anchor)))
-        broken.push(`${from}: ${path}${anchor === undefined ? '' : `#${anchor}`}`)
-    }
-
-    // llms.txt and llms/: links between the Markdown files, which the site serves as pages.
-    for (const file of ['llms.txt', ...docs.map(name => `llms/${name}`)]) {
-      const own = file === 'llms.txt' ? '/llms.txt' : `/${file.slice(0, -'.md'.length)}`
-
-      for (const [, path, anchor] of (await Bun.file(join(root, file)).text()).matchAll(LINK))
-        resolve(file, path === undefined ? own : `/llms/${path.replace(/^llms\//, '').slice(0, -'.md'.length)}`, anchor?.slice(1))
-    }
-
-    // The docs content: links to pages of the site, outside code.
-    for (const file of files) {
-      for (const [, path, anchor] of (await Bun.file(join(docsRoot, file)).text()).replace(CODE, '').matchAll(SITE_LINK))
-        resolve(file, path!, anchor?.slice(1))
-    }
-
-    // The home page: its cards, features and buttons.
-    const home = await Bun.file(join(root, 'docs/src/routes/(docs)/index.kay')).text()
-
-    for (const [, path, anchor] of home.matchAll(HOME_LINK))
-      resolve('the home page', path!, anchor)
+    const broken = await brokenLinks()
 
     expect(broken).toEqual([])
   })

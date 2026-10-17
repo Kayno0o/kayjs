@@ -73,3 +73,20 @@ export function trimArchive(archive: string, limit = ARCHIVE_LIMIT): string {
 
   return `${[intro, ...releases].join('').trimEnd()}\n\n${RELEASES_NOTE.replace(BEFORE, `before ${boundaryVersion(oldestKept)}`)}\n`
 }
+
+// The text of every page a release rewrites, by path: the unreleased section named after `version`, then the oldest releases moved to each archive and each archive trimmed. Pure, so a release can check the result before it writes any of it.
+export function releasePages(read: (path: string) => string, version: string): Map<string, string> {
+  const pages = new Map<string, string>()
+
+  for (const path of WHATS_NEW)
+    pages.set(path, stampUnreleased(read(path), version))
+
+  for (const [page, archive] of ARCHIVES) {
+    const moved = archiveOldest(pages.get(page) ?? read(page), read(archive))
+
+    pages.set(page, moved.page)
+    pages.set(archive, trimArchive(moved.archive))
+  }
+
+  return pages
+}
