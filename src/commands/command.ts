@@ -2,6 +2,7 @@
 import type { ParseArgsOptionsConfig } from 'node:util'
 import type { CheckDiagnostic } from '../check'
 import type { Paint } from '../compiler/frame'
+import type { KayConfig } from '../config'
 import { Console } from 'node:console'
 import { existsSync, realpathSync, statSync } from 'node:fs'
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
@@ -38,6 +39,11 @@ export interface Command {
   normalize?: (args: string[]) => string[]
   // `refuse` prints why the arguments do not go together, then the usage, and answers the exit code.
   run: (parsed: Parsed, refuse: (reason?: string) => number) => Promise<number> | number
+}
+
+// A command a library adds to `kay` through its extension's `commands`, run in the project of the current directory, which it is given with its config.
+export interface KayCommand extends Omit<Command, 'run'> {
+  run: (parsed: Parsed, refuse: (reason?: string) => number, project: { root: string, config: KayConfig }) => Promise<number> | number
 }
 
 // Runs a command on its arguments, or prints the usage: to stdout for `--help`, to stderr for an option or argument the command does not take.

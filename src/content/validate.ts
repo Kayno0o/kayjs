@@ -10,6 +10,8 @@ export interface ContentProblem {
   file: string
   line: number
   message: string
+  // The lint it is, for one `lints` sets the level of.
+  code?: string | undefined
 }
 
 // Every entry of a collection that does not compile or match its schema, reported together.

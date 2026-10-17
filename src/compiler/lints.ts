@@ -16,6 +16,7 @@ export const LINT_GROUPS = {
   performance: 'What makes a page shift as it loads or load more than it shows.',
   seo: 'What search engines and social networks read off a public site: warnings once `site` or `seo` is set, or the site is exported with `--static`, and nothing otherwise.',
   security: 'What anyone may reach on a site asking for guards.',
+  i18n: 'Translations a person has yet to check.',
   deprecated: 'Old forms a minor replaced, which `kay upgrade` rewrites and a later minor stops reporting.',
 } as const
 
@@ -317,6 +318,14 @@ export const LINTS = {
     summary: 'With `mcp`, an API route with an inline handler whose `detail` sets neither `tool` nor `hide`. Before 1.51 every API route was an MCP tool unless hidden, and an API route is one only when it sets `detail: { tool: true }` now, as an action sets `tool`: the route stays in the OpenAPI document and an agent no longer finds it. Add `tool` to the routes an agent should call, and `tool: false` to the others to silence this. No fix is safe, as adding it to every route offers the ones the app never meant to.',
     wrong: '// kay.config.ts sets mcp: true\nexport default api().get(\'/:id\', ({ params }) => find(params.id))',
     right: 'export default api().get(\'/:id\', ({ params }) => find(params.id), { detail: { tool: \'Read a note by its id\' } })',
+  },
+  'draft-message': {
+    level: 'warn',
+    group: 'i18n',
+    site: true,
+    summary: 'With `i18n`, a message whose line in its locale\'s file ends on a `// draft` comment, as a machine translation is written: it is served as any message, and waits for a person to check it. Delete the comment once checked, or run `kay i18n accept <locale>` for every draft of the locale; `lints: { \'draft-message\': \'deny\' }` holds a release until they are.',
+    wrong: '// src/messages/fr.ts\nexport default defineMessages({\n  nav: { about: \'À propos\' }, // draft\n})',
+    right: '// src/messages/fr.ts\nexport default defineMessages({\n  nav: { about: \'À propos\' },\n})',
   },
   'hidden-tool': {
     level: 'warn',

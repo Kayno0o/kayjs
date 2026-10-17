@@ -27,6 +27,8 @@ This needs Bun to know the registry first, see [Installation](/getting-started/i
 | `kay upgrade [dir]` | Move kay and its libraries to the latest version and rewrite the old forms |
 | `kay routes [dir]` | List every route the project serves, and the file serving it |
 | `kay env [dir]` | List the environment variables the project, its libraries and kay declare |
+| `kay i18n missing [dir]` | List what each locale lacks against the default one |
+| `kay i18n accept <locale> [dir]` | Accept a locale's draft messages |
 | `kay explain [lint\|error\|group]` | List the lints and the errors, or a group's, or explain one |
 | `kay fmt [paths]` | Format `.kay` files |
 | `kay lint [args]` | Run ESLint with the types it reads for `.kay` files |
@@ -340,6 +342,19 @@ It reads the `defineEnv` schemas in the modules under `src`, `publicEnv`, each l
 
 The modules under `src` are imported, so their top-level code runs.
 
+## kay i18n
+
+```sh
+kay i18n missing
+kay i18n accept fr
+```
+
+`kay i18n missing` lists what each locale lacks against the default one. It names the message keys missing from a locale, a library's included, and the entries a localized collection has in the default locale but not in that one. `--locale fr` shows one locale. `--format json` prints the same as one line of JSON.
+
+A message whose line ends on `// draft` is a draft, written by a machine and waiting for a person. `kay check` warns of each one. `kay i18n accept fr` deletes every draft comment in `src/messages/fr.ts` once you have checked them.
+
+A library can add commands of its own. `kay i18n` alone lists every `i18n` command, and `kay --help` lists each library's under its name.
+
 ## kay routes
 
 ```sh
@@ -429,12 +444,13 @@ Colour only goes to a terminal, and not under `NO_COLOR` or `TERM=dumb`. `FORCE_
 
 ## Output for tools
 
-`kay build`, `kay routes`, `kay env`, `kay explain`, `kay fmt` and `kay migrate` take `--format json`, as `kay check` does. Stdout then holds one JSON document on one line, and what the app's own code prints goes to stderr. The exit code is the one the text output gives.
+`kay build`, `kay routes`, `kay env`, `kay i18n missing`, `kay explain`, `kay fmt` and `kay migrate` take `--format json`, as `kay check` does. Stdout then holds one JSON document on one line, and what the app's own code prints goes to stderr. The exit code is the one the text output gives.
 
 | Command | Document |
 | --- | --- |
 | `kay build` | `{ errors, warnings, problems }`, then `failed`, `built`, `exported` and `compiled` as the build ran, see [The build document](#the-build-document) |
 | `kay routes` | `{ routes, unlisted }`, each route with its `methods`, `path`, `kind` and `file` |
+| `kay i18n missing` | `{ locales }`, each locale with its missing `messages` keys and its missing `entries` by collection |
 | `kay env` | `{ variables, unread }`, each variable with its `name`, `source`, `type`, `required` and `default` |
 | `kay explain` | `{ groups, lints, errorGroups, errors }`, or for one lint its `summary` and its `wrong` and `right` examples |
 | `kay fmt` | `{ errors, warnings, problems, written, changed }` |

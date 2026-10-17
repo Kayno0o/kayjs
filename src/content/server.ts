@@ -16,7 +16,7 @@ import { importModule } from '../server/bundle'
 import { hostLocale, stateFor } from '../server/i18n'
 import { projectSource } from '../server/source'
 import { claimFeed } from './claims'
-import { registerCollections } from './edit'
+import { entries, registerCollections } from './edit'
 import { feedXml } from './feed'
 import { isCollection } from './index'
 import { loadEntries, manifestFile, pruneContentCache, setContentPlace } from './load'
@@ -208,4 +208,25 @@ function onHost(origin: string, host: string): string {
   url.host = host
 
   return url.href.replace(TRAILING_SLASH, '')
+}
+
+// The slugs each localized collection holds in each locale, drafts included, keyed by the name the content config exports it under, then by locale.
+export async function localizedSlugs(root: string, config?: string): Promise<Map<string, Map<string, Set<string>>>> {
+  const found = new Map<string, Map<string, Set<string>>>()
+
+  for (const [name, collection] of await namedCollections(root, config)) {
+    if (collection.options.localized !== true)
+      continue
+
+    const byLocale = new Map<string, Set<string>>()
+
+    for (const { slug, locale } of await entries(name)) {
+      if (locale !== undefined)
+        byLocale.set(locale, (byLocale.get(locale) ?? new Set()).add(slug))
+    }
+
+    found.set(name, byLocale)
+  }
+
+  return found
 }

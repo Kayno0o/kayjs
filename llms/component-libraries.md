@@ -97,6 +97,10 @@ export function authPages({ prefix = '/auth' } = {}): KayExtension {
 - `env` is a `defineEnv`-shaped schema of the variables the library reads, which `kay env` lists with the app's own, so a deploy script knows them with nothing wired in the app; it is not enforced at boot, and a field with `requiredInProduction: true` marks what production needs.
 - `transformPage` rewrites each prerendered page before it is written: see [Page hooks](prerendering.md#page-hooks).
 - `editor` names a `.kay` island, `${import.meta.dir}/editor.kay`, that every page renders last in edit mode but the pages its own `routes` serve, its stylesheets linked after the page's, and carried by `kay build --compile`: see [A CMS editing on the page](content-cms.md#preview-mode).
+- `commands` adds commands to `kay`, by a name of one word or more, `{ 'i18n translate': `${import.meta.dir}/translate.ts` }`: each module, absolute or relative to the project root, default-exports a `KayCommand` from `kay/library`, `{ usage, options, positionals, run(parsed, refuse, { root, config }) }`, `usage` its line after `kay ` and `options` as `node:util`'s `parseArgs` takes them; `refuse(reason)` prints the reason and the usage and answers 1, and `run` answers the exit code.
+  - It runs in the project of the current directory, loaded only when run and when `kay --help` lists it under the library's name; `kay i18n` lists those under `i18n`.
+  - A name kay has (`check`, `i18n missing`), one under a kay command that takes arguments (`check foo`), or one two extensions give stops the command, naming both.
+  - `missingTranslations(root, config)` and `writeDraftMessages(root, config, locale, messages)` from `kay/library` give such a command what each locale lacks and write messages as drafts (see [Locales](locales.md#messages)).
 - `devTool: { module }` names a browser module, `${import.meta.dir}/devTool.ts`, that adds a tab to the dev tool every dev page carries, with no declaration in the app: see [A tab for a library](#a-tab-for-a-library).
 
 #### A tab for a library

@@ -1,7 +1,6 @@
 // What `kay check` finds across the project beside each file's compile and type errors, shared with the editor, which reports it on save.
 import type { Subprocess } from 'bun'
 import type { CheckDiagnostic, CheckOptions } from '.'
-import type { I18nConfig, KayExtension } from '../config'
 import type { CollectionFeed } from '../content/claims'
 import type { ComponentUse } from '../content/server'
 import type { ContentProblem } from '../content/validate'
@@ -13,7 +12,7 @@ import { fileURLToPath } from 'node:url'
 import { findKayFiles, findProjectFiles, writeIfChanged } from '../build/files'
 import { promotedChecks } from '../compiler'
 import { moduleChecks } from '../compiler/fence-checks'
-import { isLaunchLint, isLint, isLintGroup, LEVELS, lintLevels } from '../compiler/lints'
+import { isLaunchLint, isLint, isLintGroup, LEVELS, lintLevel, lintLevels } from '../compiler/lints'
 import { CONFIG_FILE } from '../config'
 import { FEEDS_MARKER, PROBLEMS_MARKER, USES_MARKER } from '../content/claims'
 import { projectPaths } from '../project'
@@ -70,7 +69,7 @@ export function configProblems(root: string, options: CheckOptions, types: Shado
 
 // The collections, the messages, what the server refuses when it boots and the lints of the project's scripts, reported after the type errors.
 export async function projectProblems(root: string, options: CheckOptions, content: ContentChecks, memory?: ProbeMemory): Promise<CheckDiagnostic[]> {
-  const [messages, boot, modules] = await Promise.all([checkMessages(root, options.i18n, options.extensions, memory), bootProblems(resolve(root), options, content.feeds), moduleLints(root, options)])
+  const [messages, boot, modules] = await Promise.all([checkMessages(root, options, memory), bootProblems(resolve(root), options, content.feeds), moduleLints(root, options)])
 
   return [...content.problems, ...messages, ...boot, ...modules]
 }
@@ -165,11 +164,11 @@ export function stopProbes(): void {
 }
 
 function problemsOf(root: string, problems: ContentProblem[] = []): CheckDiagnostic[] {
-  return problems.map(problem => ({ file: resolve(root, problem.file), line: problem.line, column: 1, message: problem.message }))
+  return problems.map(problem => ({ file: resolve(root, problem.file), line: problem.line, column: 1, message: problem.message, ...problem.code !== undefined && { code: problem.code } }))
 }
 
-// Each locale's messages against the default locale's.
-async function checkMessages(root: string, config: I18nConfig | undefined, extensions: KayExtension[] = [], memory?: ProbeMemory): Promise<CheckDiagnostic[]> {
+// Each locale's messages against the default locale's, and the drafts they hold.
+async function checkMessages(root: string, { i18n: config, extensions = [], lints }: CheckOptions, memory?: ProbeMemory): Promise<CheckDiagnostic[]> {
   if (!config)
     return []
 
@@ -178,7 +177,14 @@ async function checkMessages(root: string, config: I18nConfig | undefined, exten
   if ('failed' in read)
     return [{ file: join(root, CONFIG_FILE), line: 1, column: 1, message: read.failed }]
 
-  return problemsOf(root, read.marked(PROBLEMS_MARKER))
+  const drafts = lintLevel('draft-message', lints)
+
+  return problemsOf(root, read.marked(PROBLEMS_MARKER)).flatMap((problem) => {
+    if (problem.code !== 'draft-message')
+      return [problem]
+
+    return drafts === 'allow' ? [] : [{ ...problem, severity: drafts === 'warn' ? 'warning' : 'error', help: 'check it, then delete its `// draft` comment, or run `kay i18n accept <locale>` for every draft of the locale' } satisfies CheckDiagnostic]
+  })
 }
 
 // The collections' entries that fail to compile or to match their schema, the components their entries use and the feeds they serve.

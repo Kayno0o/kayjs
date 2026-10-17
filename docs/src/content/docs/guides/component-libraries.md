@@ -78,6 +78,7 @@ An extension may set these fields. Only `name` is required.
 - `transformPage`: rewrites each prerendered page before it is written.
 - `editor`: a `.kay` island rendered last on every page in edit mode.
 - `devTool`: a browser module adding a tab to the dev tool.
+- `commands`: commands added to `kay`, such as `kay i18n translate`. Each names a module whose default export is a `KayCommand` from `kay/library`. It runs in the project of the current directory and gets its root and config.
 
 Type the result `KayExtension<typeof plugin>` when it has a `server`, so the plugin's locals reach the app's types.
 

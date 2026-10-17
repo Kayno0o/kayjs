@@ -8,6 +8,7 @@ import { PROBLEMS_MARKER } from '../content/claims'
 import { flattenMessages, isPlural, MESSAGE_TAG } from '../runtime/i18n'
 import { buildingWithoutEnv } from '../server/env-state'
 import { extensionMessageFiles, messagesFile } from '../server/i18n'
+import { draftMessages } from '../server/message-drafts'
 import { FILES_MARKER, loadedFiles } from './loaded'
 
 const PLACEHOLDER = /\{(\w+)\}/g
@@ -27,48 +28,23 @@ export async function messageProblems(root: string, config: I18nConfig, extensio
   const read = new Map<string, { file: string, entries: Map<string, Entry> }>()
 
   for (const locale of config.locales) {
-    const path = messagesFile(root, config, locale)
-    const file = relative(root, path)
-    const libraries = extensionMessageFiles(root, extensions, locale).filter(existsSync)
-    const own = existsSync(path)
+    const catalog = await localeCatalog(root, config, extensions, locale)
 
-    // An extension's catalog stands in for an app with no text of its own in that locale.
-    if (!own && libraries.length === 0) {
-      problems.push({ file, line: 1, message: `is missing: i18n lists ${locale}, so its messages go here, export default defineMessages({ ... })` })
+    if ('problem' in catalog) {
+      problems.push(catalog.problem)
 
       continue
     }
 
-    const tree = own ? (await import(path) as { default?: unknown }).default : {}
+    const { file, source, own, entries } = catalog
 
-    if (typeof tree !== 'object' || tree === null) {
-      problems.push({ file, line: 1, message: 'must export its messages by default: export default defineMessages({ ... })' })
-
-      continue
-    }
-
-    const source = own ? await Bun.file(path).text() : ''
-    const messages = flattenMessages(tree as MessageTree)
-
-    for (const key of messages.keys()) {
+    for (const key of own) {
       if (key.split('.').includes(''))
         problems.push({ file, line: lineOf(source, key), message: `names a message ${key}, with an empty part; a key may not hold a dot` })
     }
 
-    const entries = new Map<string, Entry>()
-
-    for (const catalog of libraries) {
-      const libraryTree = (await import(catalog) as { default?: unknown }).default
-      const librarySource = await Bun.file(catalog).text()
-
-      if (typeof libraryTree === 'object' && libraryTree !== null) {
-        for (const [key, message] of flattenMessages(libraryTree as MessageTree))
-          entries.set(key, { message, file: relative(root, catalog), source: librarySource })
-      }
-    }
-
-    for (const [key, message] of messages)
-      entries.set(key, { message, file, source })
+    for (const { key, line } of draftMessages(source))
+      problems.push({ file, line, message: `gives ${key} as a draft, which no one has checked yet`, code: 'draft-message' })
 
     read.set(locale, { file, entries })
   }
@@ -133,6 +109,68 @@ export async function messageProblems(root: string, config: I18nConfig, extensio
   }
 
   return problems
+}
+
+// The keys each locale but the default lacks, with the default locale's message for each; a locale with no catalog at all lacks every key.
+export async function missingMessages(root: string, config: I18nConfig, extensions: KayExtension[] = []): Promise<Map<string, Map<string, Message>>> {
+  const reference = await localeCatalog(root, config, extensions, config.defaultLocale)
+  const missing = new Map<string, Map<string, Message>>()
+
+  if ('problem' in reference)
+    return missing
+
+  for (const locale of config.locales) {
+    if (locale === config.defaultLocale)
+      continue
+
+    const catalog = await localeCatalog(root, config, extensions, locale)
+    const lacked = new Map<string, Message>()
+
+    for (const [key, { message }] of reference.entries) {
+      if ('problem' in catalog || !catalog.entries.has(key))
+        lacked.set(key, message)
+    }
+
+    missing.set(locale, lacked)
+  }
+
+  return missing
+}
+
+// A locale's messages as the server reads them, the app's laid over its extensions', each with the catalog it comes from, and the keys of the app's own file; or why there are none to read.
+async function localeCatalog(root: string, config: I18nConfig, extensions: KayExtension[], locale: string): Promise<{ file: string, source: string, own: string[], entries: Map<string, Entry> } | { problem: ContentProblem }> {
+  const path = messagesFile(root, config, locale)
+  const file = relative(root, path)
+  const libraries = extensionMessageFiles(root, extensions, locale).filter(existsSync)
+  const own = existsSync(path)
+
+  // An extension's catalog stands in for an app with no text of its own in that locale.
+  if (!own && libraries.length === 0)
+    return { problem: { file, line: 1, message: `is missing: i18n lists ${locale}, so its messages go here, export default defineMessages({ ... })` } }
+
+  const tree = own ? (await import(path) as { default?: unknown }).default : {}
+
+  if (typeof tree !== 'object' || tree === null)
+    return { problem: { file, line: 1, message: 'must export its messages by default: export default defineMessages({ ... })' } }
+
+  const source = own ? await Bun.file(path).text() : ''
+  const messages = flattenMessages(tree as MessageTree)
+  const entries = new Map<string, Entry>()
+
+  for (const catalog of libraries) {
+    const libraryTree = (await import(catalog) as { default?: unknown }).default
+    const librarySource = await Bun.file(catalog).text()
+
+    if (typeof libraryTree === 'object' && libraryTree !== null) {
+      for (const [key, message] of flattenMessages(libraryTree as MessageTree))
+        entries.set(key, { message, file: relative(root, catalog), source: librarySource })
+    }
+  }
+
+  for (const [key, message] of messages)
+    entries.set(key, { message, file, source })
+
+  return { file, source, own: [...messages.keys()], entries }
 }
 
 // Every placeholder of a message, a plural's forms together, its `count` included.
