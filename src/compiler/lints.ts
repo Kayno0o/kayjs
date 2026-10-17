@@ -535,10 +535,10 @@ export function isLint(code: string | undefined): code is LintName {
   return code !== undefined && Object.hasOwn(LINTS, code)
 }
 
-// The minor, as `[major, minor]`, a version or a `1.46` names, or undefined for what is neither.
 // Set by `kay upgrade` for the checks it runs, to the version the app came from: a lint about a change of default speaks to an app crossing it, and only then.
 export const UPGRADE_FROM = 'KAY_UPGRADE_FROM'
 
+// The minor, as `[major, minor]`, a version or a `1.46` names, or undefined for what is neither.
 export function minorOf(version: string): [number, number] | undefined {
   const found = MINOR.exec(version)
 
