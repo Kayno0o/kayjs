@@ -1,0 +1,36 @@
+--- server
+import { action } from 'kay'
+
+type Who = { locals: { user?: string } }
+
+const user = (ctx: Who) => ctx.locals.user
+
+export const perUser = action(() => 'ok', { rateLimit: { max: 1, window: '1m', key: user } })
+
+export const empty = action(() => 'ok', { rateLimit: { max: 1, window: '1m', key: () => '' } })
+
+export const throws = action(() => 'ok', {
+  rateLimit: {
+    max: 1,
+    window: '1m',
+    key: () => {
+      throw new Error('no user')
+    },
+  },
+})
+
+export const rejects = action(() => 'ok', { rateLimit: { max: 1, window: '1m', key: async () => Promise.reject(new Error('no user')) } })
+
+export const notText = action(() => 'ok', { rateLimit: { max: 1, window: '1m', key: (() => 42) as never } })
+
+export const long = action(() => 'ok', { rateLimit: { max: 1, window: '1m', key: ctx => ctx.request.headers.get('x-key') ?? '' } })
+
+export const counted = action((ctx) => {
+  (ctx.locals as { user?: string }).user = 'someone else'
+
+  return 'ok'
+}, { rateLimit: { max: 1, window: '1m', count: 'succeeded', key: user } })
+
+export const inLocale = action(() => 'ok', { rateLimit: { max: 1, window: '1m', key: ctx => `locale:${ctx.locale}` } })
+---
+h1 Rate keys

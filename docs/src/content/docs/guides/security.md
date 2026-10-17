@@ -127,6 +127,16 @@ export const contact = action(schema, send, {
 
 It counts every attempt, valid or not. Add `count: 'succeeded'` to count only the posts that went through, so typos lock no one out. An IPv6 client counts as its /64 block.
 
+### Counting a person, not an address
+
+`key` counts a post under something other than the client's address, such as the signed-in person, so each has their own allowance from any address and many behind one address do not share one.
+
+```ts
+rateLimit: { max: 20, window: '1m', key: async ctx => ctx.locals.session.get('userId') }
+```
+
+It takes `request`, `locale`, `cookies`, `locals` and `client`, and gives a text or a promise of one. The limit counts before the guards run, so `locals` holds what the app's `derive` adds, such as `session`, and not what a guard sets. When the key gives `undefined`, an empty text or something else than a text, or throws, the client's address counts instead, so a failing key never lifts the limit.
+
 The refusal carries `Retry-After`, and the form shows when to try again. Several limits can apply at once, as a list, and the longest wait is the one told.
 
 Counts live in the process. For several processes on one machine, share a file store.

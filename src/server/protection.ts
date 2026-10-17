@@ -2,7 +2,7 @@ import type { Server } from 'bun'
 import type { Elysia, TSchema } from 'elysia'
 import type { BlockList } from 'node:net'
 import type { ProxyConfig } from '../config'
-import type { ActionRateLimit, RateLimit, RateStore, RateWindow, ServerAction } from '../runtime/action'
+import type { ActionRateLimit, RateKeyContext, RateLimit, RateStore, RateWindow, ServerAction } from '../runtime/action'
 import type { Duration } from '../runtime/duration'
 import { KayError } from '../compiler/errors'
 import { honeypotField, minTimeOf, STAMP_FIELD } from '../runtime/action'
@@ -233,7 +233,7 @@ export function wasChallenged(request: Request): boolean {
 
 // Why a post must not reach the handler, `PRETEND` for a bot to answer as if it went through, or undefined when it may.
 // `plain` is a post the browser sent itself, which a form posting to the action always sends with its stamp; a call from kay's script may come from an island's form, which renders none.
-export async function protectionRefusal(action: ServerAction<TSchema, unknown>, request: Request, body: unknown, form: boolean, server: Server<unknown> | null | undefined, plain = form): Promise<ProtectionRefusal | typeof PRETEND | undefined> {
+export async function protectionRefusal(action: ServerAction<TSchema, unknown>, request: Request, body: unknown, form: boolean, server: Server<unknown> | null | undefined, plain = form, keyContext?: () => Omit<RateKeyContext, 'client'>): Promise<ProtectionRefusal | typeof PRETEND | undefined> {
   const { honeypot, messages } = action.protection ?? {}
   const field = honeypotField(action.protection)
   const fields = typeof body === 'object' && body !== null ? body as Record<string, unknown> : {}
@@ -295,7 +295,7 @@ export async function protectionRefusal(action: ServerAction<TSchema, unknown>, 
   // Every limit counts the attempt, whichever refuses it, and the longest wait is the one to tell.
   for (const { name, limit } of limits) {
     const store = limit.store ?? memoryOf(name)
-    const key = limitKey(name, client)
+    const key = await actionKey(name, limit, request, client, keyContext)
     // A limit on the posts that went through only reads its count here; the handler's success adds to it.
     const own = limit.count === 'succeeded' ? reached(await store.peek!(key), limit.max) : waitFor(await store.hit(key, windowMs(limit)), limit.max)
 
@@ -311,7 +311,7 @@ export async function protectionRefusal(action: ServerAction<TSchema, unknown>, 
   return { status: 429, field: '', message: typeof message === 'string' ? message : message(wait), headers: { 'retry-after': String(wait) } }
 }
 
-// Counts a post whose handler went through against the action's limits on those.
+// Counts a post whose handler went through against the action's limits on those, under the keys the refusal check counted it by.
 export async function countSucceeded(action: ServerAction<TSchema, unknown>, request: Request, server: Server<unknown> | null | undefined): Promise<void> {
   const limits = actionLimits(action).filter(({ limit }) => limit.count === 'succeeded')
 
@@ -321,7 +321,53 @@ export async function countSucceeded(action: ServerAction<TSchema, unknown>, req
   const client = clientAddress(request, server)
 
   for (const { name, limit } of limits)
-    await (limit.store ?? memoryOf(name)).hit(limitKey(name, client), windowMs(limit))
+    await (limit.store ?? memoryOf(name)).hit(await actionKey(name, limit, request, client, undefined), windowMs(limit))
+}
+
+// The most characters of a custom key kept as it is, a longer one is hashed: a store keeps a key whole.
+const MAX_KEY_LENGTH = 256
+// The key each limit counted a request under, so the count after the handler follows the one before it, whatever the handler changed.
+const countedKeys = new WeakMap<Request, Map<ActionRateLimit, string>>()
+const warnedKeys = new WeakSet<ActionRateLimit>()
+
+// What the limit counts the request under: its `key`'s text, else the client's address; an empty text, one that is not a text or a key that throws counts the address, so the limit stays.
+async function actionKey(name: string, limit: ActionRateLimit, request: Request, client: string, context: (() => Omit<RateKeyContext, 'client'>) | undefined): Promise<string> {
+  let kept = countedKeys.get(request)
+  const known = kept?.get(limit)
+
+  if (known !== undefined)
+    return known
+
+  if (!limit.key || !context)
+    return limitKey(name, client)
+
+  let identity: string | undefined
+
+  try {
+    const given: unknown = await limit.key({ ...context(), client })
+
+    identity = typeof given === 'string' && given !== '' ? given : undefined
+
+    if (given !== undefined && identity === undefined && !warnedKeys.has(limit)) {
+      warnedKeys.add(limit)
+      kayLog('warn', `the rateLimit key of ${name} gave ${typeof given === 'string' ? 'an empty text' : typeof given}, where it takes a non-empty text or undefined: the client's address counts instead`)
+    }
+  }
+  catch (error) {
+    if (!warnedKeys.has(limit)) {
+      warnedKeys.add(limit)
+      kayLog('warn', `the rateLimit key of ${name} threw, so the client's address counts instead`, error)
+    }
+  }
+
+  const counted = identity === undefined ? limitKey(name, client) : `${name}\nkey:${identity.length > MAX_KEY_LENGTH ? new Bun.CryptoHasher('sha256').update(identity).digest('base64url') : identity}`
+
+  if (!kept)
+    countedKeys.set(request, kept = new Map<ActionRateLimit, string>())
+
+  kept.set(limit, counted)
+
+  return counted
 }
 
 // Seconds until the window closes once `max` posts went through in it, or undefined while fewer did.

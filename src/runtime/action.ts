@@ -73,7 +73,16 @@ export interface RateLimit {
   store?: RateStore | undefined
 }
 
+// What a rate limit's `key` reads of the request it counts: the cookies, the app's `derive` values as `locals` and the client's address, which the count falls back to.
+// An action's runs before its guards and the app's `resolve` hooks, so `locals` holds what `derive` adds, a `session` say, and not what a guard sets.
+export type RateKeyContext = Pick<RequestContext, 'request' | 'locale' | 'cookies' | 'locals'> & { client: string }
+
+// What counts a request: a person's id, an API token, an account. Nothing, an empty text or a failure counts the client's address, so a limit never lifts.
+export type RateKey = (ctx: RateKeyContext) => string | undefined | Promise<string | undefined>
+
 export interface ActionRateLimit extends RateLimit {
+  // What the limit counts a post under, in place of the client's address: `key: ctx => ctx.locals.user?.id`, so a person has their own allowance from any address and many of them behind one address do not share one. Without it, or when it gives `undefined`, the client's address.
+  key?: RateKey | undefined
   // `'succeeded'` counts only the posts whose handler returned without `ctx.fail` or an error, so typos and a failing mail server lock no one out; every attempt counts unless given. Posts arriving together all read the count before any adds to it, so a burst may pass `max` by a few: pair it with a limit on every attempt.
   count?: 'succeeded' | undefined
 }

@@ -3,7 +3,7 @@ import type { Elysia, TSchema, ValidationError } from 'elysia'
 import type { Server } from 'elysia/universal'
 import type { KayConfig } from '../config'
 import type { GuardContext, Locals, RouteParams } from '../runtime'
-import type { ActionContext, ServerAction } from '../runtime/action'
+import type { ActionContext, RateKeyContext, ServerAction } from '../runtime/action'
 import type { Locale } from '../runtime/i18n'
 import type { BodyLimit } from './body'
 import type { CookieJar } from './cookies'
@@ -195,7 +195,7 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], m
           // A call may send a form's fields, read as a plain form post's are.
           const asForm = !call || isFormCall(context.request)
           // In the request's locale, so a refusal worded by a function can read `t()`.
-          const refusal = await inLocale(context.request, options, async () => protectionRefusal(value, context.request, context.body, asForm, context.server, !call))
+          const refusal = await inLocale(context.request, options, async () => protectionRefusal(value, context.request, context.body, asForm, context.server, !call, keyed(value) ? () => rateKeyContext(context.request, { ...context }, options) : undefined))
 
           if (refusal === PRETEND)
             throw new Refusal(pretended(value, context.request))
@@ -246,6 +246,23 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], m
   }
 
   return { limits, tools }
+}
+
+function keyed(action: ServerAction<TSchema, unknown>): boolean {
+  return [action.protection?.rateLimit ?? []].flat().some(limit => limit.key !== undefined)
+}
+
+// What an action's rate limit `key` reads, before the guards ran: the cookies, the locale and what the app's `derive` hooks added.
+// The context is passed as a copy: Elysia reads the cookies and headers of every request to a route whose hook hands it on as it is.
+function rateKeyContext(request: Request, locals: object, options: ActionOptions): Omit<RateKeyContext, 'client'> {
+  return {
+    request,
+    locale: contextLocale(options),
+    get cookies() {
+      return cookieJar(request).cookies
+    },
+    locals: locals as Locals,
+  }
 }
 
 // A post over the action's body limit, answered as a refused one is, with a message for the whole form; another site's is refused as such.
