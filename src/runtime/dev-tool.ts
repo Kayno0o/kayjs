@@ -28,9 +28,10 @@ const copyResets = new WeakMap<HTMLButtonElement, ReturnType<typeof setTimeout>>
 const BUILT_EVENT = 'kay-dev-built'
 // A path segment, kay's `(group)`, `[param]`, `[[optional]]` and `[...rest]` names included.
 const SEGMENT = String.raw`(?:\([\w@.+=-]+\)|\[{1,2}(?:\.{3})?[\w-]+\]{1,2}|[\w@.+=-])+`
+const SOURCE_EXTENSION = String.raw`(?:[cm]?[jt]sx?|css)`
 
-// A `.kay` file a problem names, with its line and column when it gives them, not one inside a URL.
-const KAY_POSITION = new RegExp(String.raw`(?<![\w@.+=:/\\)\]-])(?:[A-Za-z]:)?[\\/]?(?:${SEGMENT}[\\/])*${SEGMENT}\.kay(?::\d+(?::\d+)?)?(?!\.?\w)`, 'g')
+// A source file a problem names, with its line and column when it gives them, not one inside a URL nor a URL of kay's own: a `.kay` file named alone, a script or stylesheet once a folder or a line tells it from a word like Node.js.
+const SOURCE_POSITION = new RegExp(String.raw`(?<![\w@.+=:/\\)\]-])(?![\\/]_kay[\\/])(?:(?:[A-Za-z]:)?[\\/]?(?:${SEGMENT}[\\/])*${SEGMENT}\.kay|(?:[A-Za-z]:)?[\\/]?(?:${SEGMENT}[\\/])+${SEGMENT}\.${SOURCE_EXTENSION}|${SEGMENT}\.${SOURCE_EXTENSION}(?=:\d))(?::\d+(?::\d+)?)?(?!\.?\w)`, 'g')
 const OPENED_POSITION = /^(.+\.\w+)(?::(\d+))?(?::(\d+))?$/
 // A value the Head tab gives a copy button, as a link.
 const WEB_URL = /^https?:\/\//i
@@ -1742,7 +1743,10 @@ function headTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
 
         const text = [problem.message, problem.note, problem.help === undefined ? undefined : `help: ${problem.help}`].filter(Boolean).join('\n')
 
-        element.append(tool.icon(error ? 'circle-x' : 'triangle-alert'), tool.make('pre', 'mono', text))
+        const pre = tool.make('pre', 'mono')
+
+        pre.append(...withPositions(text, tool))
+        element.append(tool.icon(error ? 'circle-x' : 'triangle-alert'), pre)
         list.append(filterable(element, text, true))
       }
 
@@ -3064,12 +3068,12 @@ function panelMarkdown(panel: Element, title: string): string {
   return lines.reduce((text, line, index) => index === 0 ? line : `${text}${BULLET.test(line) && BULLET.test(lines[index - 1]!) ? '\n' : '\n\n'}${line}`, '')
 }
 
-// The text with each `.kay` file it names, with or without a position, as a button opening it once the inspector says how.
+// The text with each source file it names, with or without a position, as a button opening it once the inspector says how.
 function withPositions(text: string, tool: DevTool): Node[] {
   const nodes: Node[] = []
   let last = 0
 
-  for (const match of text.matchAll(KAY_POSITION)) {
+  for (const match of text.matchAll(SOURCE_POSITION)) {
     const [source] = match
 
     nodes.push(textNode(text.slice(last, match.index)), positionButton(tool, source))

@@ -52,7 +52,7 @@ const INSPECTOR_SOURCE = resolve(import.meta.dir, '../runtime/dev-inspector.ts')
 const A11Y_SOURCE = resolve(import.meta.dir, '../runtime/dev-a11y.ts')
 // What the inspector sends, which a page of another site cannot without a preflight nothing answers.
 const OPEN_HEADER = 'x-kay-dev'
-const POSITION = /^(.+\.(?:kay|[cm]?[jt]sx?)):(\d+):(\d+)$/
+const POSITION = /^(.+\.(?:kay|[cm]?[jt]sx?|css)):(\d+):(\d+)$/
 const BACKSLASH = /\\/g
 const BRACKETS = /^\[|\]$/g
 const LOCAL_NAME = /(?:^|\.)localhost$/
@@ -249,7 +249,7 @@ export function errorPageScripts(): string {
   return liveReload() + DEV_BOOT + devToolScripts()
 }
 
-// Opens the `.kay` or script file at the position the inspector or an error page names, in the editor `editorCommand` finds; with none, the terminal prints the position.
+// Opens the `.kay`, script or stylesheet at the position the inspector or an error page names, in the editor `editorCommand` finds; with none, the terminal prints the position.
 export async function openInEditor(root: string, request: Request): Promise<Response> {
   if (request.headers.get(OPEN_HEADER) === null || isCrossSite(request))
     return new Response(null, { status: 403 })

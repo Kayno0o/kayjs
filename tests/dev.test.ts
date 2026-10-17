@@ -1708,6 +1708,7 @@ describe.concurrent('kay dev', () => {
     await Bun.write(join(root, 'record.ts'), `import { existsSync } from 'node:fs'\nif (existsSync(${JSON.stringify(seen)})) process.exit(1)\nawait Bun.write(${JSON.stringify(seen)}, JSON.stringify(process.argv.slice(2)))\n`)
     await Bun.write(join(root, '.env'), 'PORT=0\n')
     await Bun.write(join(root, 'src/routes/index.kay'), 'main\n  h1 Home\n')
+    await Bun.write(join(root, 'src/app.css'), 'h1 { color: red }\n')
     // Over any the shell set, which would win over a `.env` value.
     const editor = process.env.KAY_EDITOR
 
@@ -1741,6 +1742,8 @@ describe.concurrent('kay dev', () => {
       // A script's position too, as an error page names, the recording editor failing this time.
       expect((await open('../outside.ts:1:1')).status).toBe(404)
       expect(await (await open('record.ts:2:1')).json()).toEqual({ opened: false, failed: true })
+      // A stylesheet the dev tool names, the editor still failing.
+      expect(await (await open('src/app.css:1:1')).json()).toEqual({ opened: false, failed: true })
       // A page of another site that renamed itself to this machine's address sends its own name as the Host.
       expect((await fetch(url, { headers: { host: 'rebound.example' } })).status).toBe(421)
       expect((await fetch(url, { headers: { host: 'app.localhost' } })).status).toBe(200)

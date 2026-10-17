@@ -380,6 +380,14 @@ describe('the dev tool', () => {
     expect([...shadow().querySelectorAll('.problem button.position')].map(position => position.textContent)).toEqual(['src/routes/todos/[id].kay:3:4', 'src/routes/(site)/[[page]].kay:12', 'src/routes/[...rest].kay'])
   })
 
+  it('finds the scripts and stylesheets a problem names by a folder or a line, but no word like Node.js nor a URL of kay\'s own', async () => {
+    tool = startDevTool()
+    console.error('[kay] at load (src/lib/db.ts:12:5), C:\\app\\src\\x.tsx:3, styles.css:4, src/app.css, Node.js, /_kay/entry-1.js:2:1, https://cdn.example/x.js:1:1 and lib.mjs')
+    await Bun.sleep(0)
+
+    expect([...shadow().querySelectorAll('.problem button.position')].map(position => position.textContent)).toEqual(['src/lib/db.ts:12:5', 'C:\\app\\src\\x.tsx:3', 'styles.css:4', 'src/app.css'])
+  })
+
   it('opens each .kay file a problem names once an opener is set, saying why it could not', async () => {
     const opened: string[] = []
 
