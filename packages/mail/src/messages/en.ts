@@ -37,7 +37,9 @@ export default defineMessages({
       'yourCode': 'Your code:',
       'orTypeCode': 'Or type this code where you asked for it:',
       'linkWorks': 'The link works for {duration}.',
-      'codeWorks': 'The code works for 10 minutes, typed where you asked for it.',
+      'codeWorks': 'The code works for {duration}, typed where you asked for it.',
+      'codeLasts': '10 minutes',
+      'once': ', once',
       'review': 'See where your account is signed in, and end what you do not know:',
       'verify-email': {
         subject: 'Confirm your email for {site}',

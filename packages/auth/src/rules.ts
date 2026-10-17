@@ -48,7 +48,7 @@ export interface CredentialRules {
     min?: number | undefined
     // 128 by default: Argon2id has no ceiling of its own.
     max?: number | undefined
-    // An extra rule on top of the length ones, returning a problem code or a message for what it refuses, such as `p => /\d/.test(p) ? undefined : 'Add a digit.'`. A message is shown as it is by the prebuilt pages unless the code has an `auth.fields.password.<code>` message.
+    // An extra rule on top of the length ones, returning a problem code or a message for what it refuses, such as `p => /\d/.test(p) ? undefined : 'Add a digit.'`. The prebuilt pages show what it returns as it is.
     check?: ((password: string) => string | undefined) | undefined
   } | undefined
   username?: {
@@ -67,6 +67,10 @@ export interface ResolvedRules {
 
 export const DEFAULT_RULES: ResolvedRules = { password: { min: PASSWORD_MIN_LENGTH, max: PASSWORD_MAX_LENGTH }, username: { min: USERNAME_MIN_LENGTH, max: USERNAME_MAX_LENGTH } }
 
+// What the prebuilt pages' forms take at most, so a ceiling above never meets a refusal from the form first.
+const FORM_PASSWORD_MAX = 1024
+const FORM_USERNAME_MAX = 128
+
 function limit(value: number | undefined, fallback: number, name: string): number {
   if (value === undefined)
     return fallback
@@ -82,6 +86,12 @@ export function resolveRules(rules: CredentialRules = {}): ResolvedRules {
   const password = { min: limit(rules.password?.min, PASSWORD_MIN_LENGTH, 'password.min'), max: limit(rules.password?.max, PASSWORD_MAX_LENGTH, 'password.max'), check: rules.password?.check }
   const username = { min: limit(rules.username?.min, USERNAME_MIN_LENGTH, 'username.min'), max: limit(rules.username?.max, USERNAME_MAX_LENGTH, 'username.max') }
 
+  if (password.max > FORM_PASSWORD_MAX)
+    throw new Error(`kayjs-auth: rules.password.max is ${password.max}, over the ${FORM_PASSWORD_MAX} the prebuilt pages post`)
+
+  if (username.max > FORM_USERNAME_MAX)
+    throw new Error(`kayjs-auth: rules.username.max is ${username.max}, over the ${FORM_USERNAME_MAX} the prebuilt pages post`)
+
   if (password.min > password.max)
     throw new Error(`kayjs-auth: rules.password.min is ${password.min}, over rules.password.max ${password.max}`)
 
@@ -91,9 +101,14 @@ export function resolveRules(rules: CredentialRules = {}): ResolvedRules {
   return { password, username }
 }
 
+// An already resolved set, such as the core's, is used as it is.
+function resolved(rules: CredentialRules): ResolvedRules {
+  return rules === DEFAULT_RULES || (typeof rules.password?.min === 'number' && typeof rules.password.max === 'number' && typeof rules.username?.min === 'number' && typeof rules.username.max === 'number') ? rules as ResolvedRules : resolveRules(rules)
+}
+
 // The rules an app set, over the defaults when none are given: an island passes `features().rules` it was handed, or the object the app gave `createAuth`.
 export function passwordProblem(password: string, rules: CredentialRules = DEFAULT_RULES): PasswordProblem | undefined {
-  const { min, max, check } = resolveRules(rules).password
+  const { min, max, check } = resolved(rules).password
 
   if (password.length < min)
     return 'too-short'
@@ -108,7 +123,7 @@ export function passwordProblem(password: string, rules: CredentialRules = DEFAU
 
 export function usernameProblem(username: string, rules: CredentialRules = DEFAULT_RULES): UsernameProblem | undefined {
   const name = normalizeUsername(username)
-  const { min, max } = resolveRules(rules).username
+  const { min, max } = resolved(rules).username
 
   if (name.length < min || name.length > max)
     return 'length'

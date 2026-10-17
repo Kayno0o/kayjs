@@ -158,7 +158,7 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   defaultRoles?: NoInfer<Role>[] | undefined
   // How long a session lives unseen when its sign-in asked to be remembered, `remember: true`: seconds or a string such as '90d', 90 days by default. The other lifetimes are the session plugin's own: its `maxAge` without a choice, its `browserMaxAge` for `remember: false`, and its `absoluteMaxAge` from the sign-in however much it is used, "remember me" included.
   rememberMaxAge?: Duration | undefined
-  // The password and username rules, over the defaults of 10 to 128 characters and 2 to 32: `{ password: { min: 12, check: p => /\\d/.test(p) ? undefined : 'Add a digit.' }, username: { min: 3, max: 16 } }`. The server, the prebuilt pages and `features().rules` all follow them, and an island passes the same object, or `features().rules`, to `passwordProblem` and `usernameProblem` from `@kaynooo/kayjs-auth/rules`.
+  // The password and username rules, over the defaults of 10 to 128 characters and 2 to 32: `{ password: { min: 12, check: p => /\d/.test(p) ? undefined : 'Add a digit.' }, username: { min: 3, max: 16 } }`. The server, the prebuilt pages and `features().rules` all follow them, and an island passes the same object, or `features().rules`, to `passwordProblem` and `usernameProblem` from `@kaynooo/kayjs-auth/rules`.
   rules?: CredentialRules | undefined
   // The app's page listing where the user is signed in, linked from new sign-in mails: `/account/sessions`.
   sessionsPage?: string | undefined

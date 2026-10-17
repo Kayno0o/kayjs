@@ -22,8 +22,8 @@ const tokenOf = (mail: { url?: string | undefined }) => new URL(mail.url!).searc
 
 describe('lifetime words', () => {
   test('uses the largest unit that fills the time, in the language', () => {
-    expect([lifetime(86_400, 'en'), lifetime(7 * 86_400, 'en'), lifetime(3600, 'en'), lifetime(90 * 60, 'en'), lifetime(900, 'en'), lifetime(45, 'en')]).toEqual(['1 day', '7 days', '1 hour', '90 minutes', '15 minutes', '45 seconds'])
-    expect([lifetime(86_400, 'fr'), lifetime(3600, 'fr'), lifetime(600, 'fr')].map(words => words.replace(/\s/g, ' '))).toEqual(['1 jour', '1 heure', '10 minutes'])
+    expect([lifetime(86_400, 'en'), lifetime(7 * 86_400, 'en'), lifetime(3600, 'en'), lifetime(90 * 60, 'en'), lifetime(900, 'en'), lifetime(45, 'en')]).toEqual(['24 hours', '7 days', '1 hour', '90 minutes', '15 minutes', '45 seconds'])
+    expect([lifetime(86_400, 'fr'), lifetime(3600, 'fr'), lifetime(600, 'fr')].map(words => words.replace(/\s/g, ' '))).toEqual(['24 heures', '1 heure', '10 minutes'])
     expect(lifetime(600, 'not a locale')).toBe('10 minutes')
   })
 })
@@ -39,8 +39,8 @@ describe('email.expires', () => {
     const verify = mails.find(mail => mail.kind === 'verify-email')!
     const reset = mails.find(mail => mail.kind === 'reset-password')!
 
-    expect(verify.text).toContain('The link works for 1 day. The code works for 10 minutes')
-    expect(verify.html).toContain('The link works for 1 day.')
+    expect(verify.text).toContain('The link works for 24 hours. The code works for 10 minutes')
+    expect(verify.html).toContain('The link works for 24 hours.')
     expect(reset.text).toContain('The link works for 1 hour.')
   })
 
@@ -117,6 +117,7 @@ describe('email.expires', () => {
 
   test('a bad lifetime fails at boot naming it', () => {
     expect(() => setup({ expires: { 'verify-email': 'a week' as Duration } })).toThrow('kayjs-auth: email.expires.verify-email is \'a week\'')
+    expect(() => setup({ expires: { verify: '1d' } as never })).toThrow('kayjs-auth: email.expires.verify is no link or code')
     expect(() => setup({ expires: { 'magic-link': 0 } })).toThrow('kayjs-auth: email.expires.magic-link is 0')
   })
 })

@@ -19,6 +19,9 @@ const link: AuthMail = {
   code: '482913',
 }
 
+// Number formatting puts a no-break space before the unit.
+const SPACES = /\s/g
+
 const notice: AuthMail = { ...link, kind: 'new-sign-in', locale: 'en', url: 'https://site.test/sessions', code: undefined }
 
 const mail = mailer({ from: 'Site <site@site.test>', queue: { name: 'auth-mail' } })
@@ -42,6 +45,14 @@ describe('authMailer', () => {
     expect(html).not.toContain('kayjs-auth\'s own html')
     expect(text).toContain('Confirmez ada@example.com comme adresse de votre compte Site.')
     expect(text).toContain('482913')
+  })
+
+  it('words the lifetimes kayjs-auth was set to, in the mail\'s language, and the defaults when it sends none', async () => {
+    const set = await authMailer(mail.render).send({ ...link, expires: { link: 7 * 86_400, code: 20 * 60 } })
+    const magic = await authMailer(mail.render).send({ ...link, kind: 'magic-link', locale: 'en', expires: { link: 7200, code: 300 } })
+
+    expect(set.html.replace(SPACES, ' ')).toContain('Le lien est valable 7 jours. Le code est valable 20 minutes, saisi là où vous l\'avez demandé.')
+    expect(magic.html.replace(SPACES, ' ')).toContain('The link works for 2 hours, once. The code works for 5 minutes, typed where you asked for it.')
   })
 
   it('writes the detail a mail is about, and only the code when there is no link', async () => {

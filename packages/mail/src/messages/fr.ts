@@ -36,7 +36,9 @@ export default defineMessages({
       'yourCode': 'Votre code :',
       'orTypeCode': 'Ou saisissez ce code là où vous l\'avez demandé :',
       'linkWorks': 'Le lien est valable {duration}.',
-      'codeWorks': 'Le code est valable 10 minutes, saisi là où vous l\'avez demandé.',
+      'codeWorks': 'Le code est valable {duration}, saisi là où vous l\'avez demandé.',
+      'codeLasts': '10 minutes',
+      'once': ', une seule fois',
       'review': 'Voyez où votre compte est connecté, et mettez fin à ce que vous ne reconnaissez pas :',
       'verify-email': {
         subject: 'Confirmez votre adresse pour {site}',

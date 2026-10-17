@@ -36,6 +36,10 @@ const TOKEN_LIFETIMES: Record<TokenType, number> = {
 // The lifetimes the `expires` option sets over the defaults, in seconds, a bad one failing at boot naming it.
 export function tokenLifetimes(expires: EmailOptions['expires']): Record<TokenType, number> {
   const lifetimes = { ...TOKEN_LIFETIMES }
+  const unknown = Object.keys(expires ?? {}).find(key => !(key in TOKEN_LIFETIMES))
+
+  if (unknown !== undefined)
+    throw new Error(`kayjs-auth: email.expires.${unknown} is no link or code of kayjs-auth`)
 
   for (const type of Object.keys(lifetimes) as TokenType[]) {
     const wanted = expires?.[type]
@@ -492,7 +496,9 @@ async function issue(state: RequestState, record: UserRecord, type: LinkType, em
 
   const { locale, templates } = writing(mail, [record.locale, ...state.languages])
 
-  await mail.mailer.send({ to: email, kind: type, site: core.site, locale, ...content, ...templates[type]({ site: core.site, email, locale, ...content, expires: lifetimesOf(mail, type, content) }) })
+  const expires = lifetimesOf(mail, type, content)
+
+  await mail.mailer.send({ to: email, kind: type, site: core.site, locale, ...content, expires, ...templates[type]({ site: core.site, email, locale, ...content, expires }) })
 }
 
 // The token's user, once the token is spent; a link for an address the account no longer has is spent for nothing.

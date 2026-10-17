@@ -34,6 +34,8 @@ export interface AuthMail {
   html: string
   url?: string | undefined
   code?: string | undefined
+  // How many seconds its link and its code work, for the ones it carries.
+  expires?: { link?: number, code?: number } | undefined
   // The organization an invitation is to, or the provider, passkey, token or new address an event is about.
   detail?: string | undefined
 }
