@@ -31,6 +31,18 @@ function refused(status: number, reason: string): ActionError {
   return new ActionError(status, reason, { '': reason })
 }
 
+// What a failed upload throws: the reason for a refusal worded for the editor, else the failure as it was.
+// The editor checked the size against the rules before sending, so a 413 past it can only be kay's body limit, which words nothing about the file; no wording of the message is read to tell the two apart, and with no rules to check against the route's own words are shown.
+export function uploadFailure(error: unknown, file: File, limits: UploadRules | undefined): unknown {
+  if (error instanceof ApiError && error.status === 413 && limits)
+    return refused(413, tooLargeForServer(file.name, file.size))
+
+  if (error instanceof ApiError && (error.status === 413 || error.status === 415 || error.status === 400))
+    return refused(error.status, error.message)
+
+  return error
+}
+
 // Uploads a file where a file field's upload goes for `collection`, and answers the path the site serves it at; throws when the upload fails, saying why when the type or the size is refused.
 export async function uploadFile(collection: string, file: File, progress?: (share: number) => void): Promise<string> {
   if (file.size === 0)
@@ -51,13 +63,6 @@ export async function uploadFile(collection: string, file: File, progress?: (sha
     return answer.path
   }
   catch (error) {
-    // Past the check above, the route's own 413 cannot happen, so one is kay's body limit, which says only that the body is too large; with no rules to check against the route's words are shown.
-    if (error instanceof ApiError && error.status === 413 && limits)
-      throw refused(413, tooLargeForServer(file.name, file.size))
-
-    if (error instanceof ApiError && (error.status === 413 || error.status === 415 || error.status === 400))
-      throw refused(error.status, error.message)
-
-    throw error
+    throw uploadFailure(error, file, limits)
   }
 }
