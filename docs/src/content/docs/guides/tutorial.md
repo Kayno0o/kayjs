@@ -222,7 +222,7 @@ h1 Books
 BookFilter(books={books})
 ```
 
-The props a page passes an island travel to the browser as data, so they must be serializable. `kay check` refuses a function there.
+The props a page passes an island travel to the browser as data, so they must be serializable. `kay check` refuses a function there, except an action.
 
 They are also written into the page source, where anyone can read them. Pass the island the fields it shows, not a whole database row: `kay check` warns about a field named like a secret, such as `passwordHash` or `token`, with `secret-prop`.
 

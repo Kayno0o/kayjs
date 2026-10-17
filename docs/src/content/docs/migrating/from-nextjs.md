@@ -111,7 +111,7 @@ button(onClick={() => count++}) Clicked {count()} times
 
 `kay build` lists every island and the first thing that made it one.
 
-As in Next.js, props to an island are serialized, so a page cannot pass one a function. Props can be objects, arrays, strings, numbers, booleans, dates, maps and sets. See [Islands](/essentials/islands).
+As in Next.js, props to an island are serialized, so a page cannot pass one a function, except an action. Props can be objects, arrays, strings, numbers, booleans, dates, maps and sets. See [Islands](/essentials/islands).
 
 ## Hooks and state
 
