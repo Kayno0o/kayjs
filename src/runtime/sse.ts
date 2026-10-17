@@ -47,7 +47,7 @@ export async function parseEvents<End>(body: ReadableStream<Uint8Array>, signal:
           event = ''
           data = []
 
-          if (ended !== undefined) {
+          if (ended != null) {
             await reader.cancel()
 
             return ended
