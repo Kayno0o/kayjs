@@ -38,8 +38,12 @@ describe('an API handler in the request\'s locale', () => {
     expect(await read(sites.mounted, '/api/words', { 'accept-language': 'en' })).toEqual(ENGLISH)
   })
 
-  // Needs #905, which has `requestLocale` split the Referer's path without the base on it.
-  it.todo('reads the locale of the page it was called from under a base')
+  it('reads the locale of the page it was called from under a base', async () => {
+    expect(await read(sites.mounted, '/api/words', { referer: `${ORIGIN}/blog/fr/x` })).toEqual(FRENCH)
+    expect(await read(sites.mounted, '/api/words', { 'accept-language': 'fr', 'referer': `${ORIGIN}/blog/x` })).toEqual(ENGLISH)
+    // A path that only starts like the base is no page of the site.
+    expect(await read(sites.mounted, '/api/words', { 'accept-language': 'fr', 'referer': `${ORIGIN}/blogger/en/x` })).toEqual(FRENCH)
+  })
 
   it('falls to the visitor\'s preference with no usable Referer, another origin\'s and a malformed one included', async () => {
     const site = sites.plain

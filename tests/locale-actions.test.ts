@@ -39,7 +39,7 @@ async function redirectedFrom(app: Elysia, variant: Variant, page: string, how: 
 
 describe('an action posted from a localized page', () => {
   for (const base of ['', '/app']) {
-    for (const trailingSlash of ['never', 'always'] as const) {
+    for (const trailingSlash of ['never', 'always', 'ignore'] as const) {
       for (const prefixDefault of [false, true]) {
         for (const dev of [false, true]) {
           const variant = { base, trailingSlash, prefixDefault, dev }
@@ -78,6 +78,21 @@ describe('an action posted from a localized page', () => {
     expect(await post('http://localhost/app/%65n/x')).toBe('/app/dashboard')
     expect(await post('http://localhost/app/english/x')).toBe('/app/dashboard')
     expect(await post('http://localhost/en/app/x')).toBe('/app/dashboard')
+  })
+})
+
+describe('an action posted with kay_back', () => {
+  it('runs in the locale of the page it names under a base, over the Referer', async () => {
+    const variant: Variant = { base: '/app', trailingSlash: 'never', prefixDefault: false, dev: false }
+    const app = await serve(variant)
+    const action = actionOf(await (await app.handle(new Request('http://localhost/'))).text(), '/app')
+    const post = async (back: string, referer: string) => (await app.handle(new Request(`http://localhost${action}?kay_back=${encodeURIComponent(back)}`, { method: 'POST', headers: { referer, origin: 'http://localhost' }, body: new FormData() }))).headers.get('location')
+
+    expect(await post('/app/en/x', 'http://localhost/app/x')).toBe('/app/en/dashboard')
+    expect(await post('/app/x', 'http://localhost/app/en/x')).toBe('/app/dashboard')
+    // A target on another host, or one only starting like the base, does not make the locale.
+    expect(await post('//evil.example/app/en/x', 'http://localhost/app/x')).toBe('/app/dashboard')
+    expect(await post('/apple/en/x', 'http://localhost/app/x')).toBe('/app/dashboard')
   })
 })
 
