@@ -143,11 +143,84 @@ With a mailer, it signs no one in until the address is verified. It answers a he
 
 Set `email: { requireVerified: false }` to sign in at once. It answers `'taken'` for a held address, which tells anyone which addresses have an account.
 
+### Guests
+
+`signInAsGuest()` signs the browser in as a new user with no email and no password. The app keeps their cart or drafts before they sign up.
+
+```kay
+--- server
+export const start = action(async ctx => {
+  await ctx.locals.auth.signInAsGuest()
+
+  return ctx.redirect('/')
+})
+---
+form(action={start})
+  button Continue as a guest
+```
+
+When the guest registers, the account keeps their id, so the app's data stays theirs. `user.guest` is `true` until then. A guest whose session ends is left in the store, and `listUsers` shows them.
+
+`signUp: false` in `createAuth` closes self-service accounts. `register` and `signInAsGuest` answer `'closed'`. Make users yourself with `auth.createUser({ email, password, roles })`.
+
+### Breached passwords
+
+`breachedPasswords: true` refuses a new password that Have I Been Pwned lists, as `errors.password: 'breached'`. It runs on `register`, `resetPassword` and `changePassword`.
+
+Only the first five characters of the password's SHA-1 leave the server. A check that fails or takes over three seconds lets the password through, so an outage never stops anyone registering.
+
+A function `(password) => boolean` checks against a list of your own instead.
+
 ## Account changes
 
 Changing what protects the account takes a `proof`. That covers `changePassword`, `changeEmail`, `deleteAccount`, the second factor, passkeys, linked providers and tokens. A proof is `{ password }`, `{ code }` from the authenticator or a recovery code, or `{ passkey }`.
 
 With two-factor on, `changeEmail`, `disableTwoFactor`, `regenerateRecoveryCodes`, `passkeyRegistrationOptions` and `linkProvider` refuse the password alone. They take the code or a passkey.
+
+## Two-factor
+
+Two-factor asks for a code from an authenticator app after the password. It takes two steps to turn on.
+
+`setUpTwoFactor(proof)` answers a secret and an `otpauth://` URI. Draw the URI with kayjs-ui's `QrCode`. `enableTwoFactor(code)` turns it on once the authenticator gives a right code, and answers ten recovery codes. Show them once.
+
+```kay
+--- server
+import { s } from 'kay'
+
+export const enable = action(s.Object({ code: s.String({ maxLength: 20 }) }), async ({ code }, ctx) => {
+  const result = await ctx.locals.auth.enableTwoFactor(code)
+
+  if (!result.ok)
+    return ctx.fail(400, { error: result.error })
+
+  return { recoveryCodes: result.recoveryCodes }
+})
+---
+form(action={enable})
+  input(name="code" inputmode="numeric" autocomplete="one-time-code")
+  button Turn on
+```
+
+From then on, every way of signing in stops at the two-factor page. `verifyTwoFactor(code)` finishes it with an authenticator code or a recovery code. A recovery code works once.
+
+`regenerateRecoveryCodes(proof)` makes a new set, `recoveryCodesLeft()` counts the unused ones, and `disableTwoFactor(proof)` turns the factor off.
+
+## Bearer tokens
+
+A bearer token lets a device or a script call your API with `Authorization: Bearer <token>`. `createToken(proof, label, options)` makes one from a signed-in session. The token is shown once, as only its digest is stored.
+
+```ts
+const result = await auth.createToken({ password }, 'Deploy script', { scopes: ['posts:read'], expiresIn: 60 * 60 * 24 * 30 })
+
+if (result.ok)
+  console.log(result.token)
+```
+
+`scopes` limits what the token reaches, from the `scopes` you declare in `createAuth`. `expiresIn` is in seconds. A token never makes another token.
+
+`tokens()` lists the user's tokens and `revokeToken(id)` revokes one. A password change, a reset and `signOutEverywhere` end them all.
+
+For a flow you gate yourself, such as pairing a device, `auth.issueToken(userId, label)` makes a token on the server with no proof.
 
 ## Your own profile fields
 
@@ -231,6 +304,96 @@ import { auth } from '../../auth'
 export default auth.guard({ require: 'editor' })
 ```
 
+## Events and the audit log
+
+`onEvent` hears what happens to an account, such as a sign-in, a failed sign-in, a role granted or a ban.
+
+```ts
+createAuth({
+  // ...
+  audit: true,
+  onEvent: (event, user, detail, context) => {
+    if (event === 'sign-in-failed')
+      console.warn(user.email, detail, context.ip)
+  },
+})
+```
+
+`context` is `{ ip, userAgent, actor }`. `actor` is the admin when an admin did it.
+
+With `audit: true`, the same events are kept in the store for a year. Pass `audit: { maxAge }` in seconds to change it. `auth.auditLog({ before, limit })` gives the signed-in user their own, newest first. Pass the last entry of a page as `before` for the next one.
+
+`describeAuditEntry(entry, { locale })` words an entry for a person, such as `Role editor granted`, in English or French.
+
+A deleted user's entries stay, but nothing in them leads back to the person.
+
+## Admin
+
+`admin: 'admin'` names who may manage users. It takes any requirement a guard takes. Without it, every method below answers `{ ok: false, error: 'forbidden' }`.
+
+```ts
+const found = await auth.listUsers({ search: 'ada', limit: 20 })
+
+if (found.ok) {
+  await auth.grantRole(found.users[0].id, 'editor')
+  await auth.banUser(found.users[0].id, { reason: 'Spam', until: new Date('2030-01-01') })
+}
+```
+
+- `listUsers({ search, offset, limit })` gives the users newest first, with `total`. `getUser(id)` gives one.
+- `grantRole(id, role)` and `revokeRole(id, role)` take a role your `roles` option declares.
+- `banUser(id, { reason, until })` bars the user from signing in and signs them out everywhere. `until` leaves it for good when left out. `unbanUser(id)` lifts it. An admin cannot ban themselves or another admin.
+- `deleteUser(id)` deletes the user as `deleteAccount` does.
+- `impersonate(id)` signs the admin in as the user. `impersonator()` gives the admin, to show a banner, and `stopImpersonating()` signs back in as themselves.
+- `adminAuditLog({ userId, before, limit })` reads everyone's audit log, or one user's.
+
+Changing a user needs a sign-in or `reprove()` under ten minutes old. Otherwise the method answers `'stale'`. Reading users takes no such proof.
+
+## Organizations
+
+Organizations are teams or workspaces that users belong to, with roles of their own in each.
+
+```ts
+createAuth({
+  // ...
+  organizations: {
+    roles: { owner: ['admin'], admin: ['member'], member: [] },
+    owner: 'owner',
+    manage: 'admin',
+    defaultRoles: ['member'],
+    invitationPage: '/invitation',
+  },
+})
+```
+
+Whoever creates an organization holds `owner`. The last owner cannot leave or lose the role. `manage` is the role that renames, invites and removes members. It is `owner` by default.
+
+```ts
+const made = await auth.createOrganization({ name: 'Acme' })
+
+if (made.ok)
+  await auth.invite(made.membership.organization.id, 'grace@example.com', ['member'])
+```
+
+- `organizations()` lists the user's memberships and `organization(ref)` gives one, by id or slug.
+- `members(ref)`, `setMemberRoles(ref, userId, roles)`, `removeMember(ref, userId)` and `leaveOrganization(ref)` manage who is in it.
+- `updateOrganization(ref, { name, slug })` renames it and `deleteOrganization(ref)` deletes it. Only owners delete.
+
+`invite(ref, email, roles?)` mails a link to `invitationPage` with `?invitation=<id>`. It needs a mailer. The page reads `invitation(id)` and posts to an action calling `acceptInvitation(id)`. Only an account verified at the invited address joins.
+
+`myInvitations()` lists those open to the user, and `declineInvitation(id)` turns one down. `invitations(ref)` and `revokeInvitation(ref, id)` are for managers.
+
+`auth.memberOf('admin')` is a requirement met by a member holding that role in the organization the route's `org` param names.
+
+```ts
+// src/routes/orgs/[org]/_guard.ts
+import { auth } from '../../../auth'
+
+export default auth.guard({ redirect: '/login', require: auth.memberOf('admin') })
+```
+
+An action scopes what it touches by `ctx.params.org`, never by its input.
+
 ## OAuth
 
 Each entry of `oauth` adds `/auth/<name>` and `/auth/<name>/callback`. Register `url` plus the callback path at the provider.
@@ -299,8 +462,56 @@ createAuth({
 
 The agents can only ask for the scopes you declare. The new tables are created by `db.sync()` if you use Postgres or SQLite.
 
+## Limits
+
+Attempts are counted in the store, so every process shares them. They are counted per client address and per account.
+
+`limits` overrides any of `DEFAULT_LIMITS`, each `{ max, window }` with `window` in seconds.
+
+```ts
+createAuth({
+  // ...
+  limits: { register: { max: 3, window: 60 * 60 } },
+})
+```
+
+Behind a proxy, kay reads the client address through `proxy` in `kay.config.ts`. A plain Elysia app passes `proxy: { hops: 1 }` to `createAuth` instead, or every client counts as the proxy.
+
+## Stores
+
+`memoryStore()` is for tests and trying things out. `pgStore(db)` keeps users in Postgres, or in a SQLite file when the `Database` opens a `sqlite://` URL.
+
+Any object with the `AuthStore` methods is a store. Each method is sync or async.
+
+Some methods are optional, such as `prune`. kayjs-auth calls `prune` at most once an hour, without making a request wait. The built-in stores then delete expired links, codes, invitations and sessions. A store without `prune` keeps them until your app deletes them.
+
+If your store picks its own ids, `users.create(user)` answers the user as stored.
+
+## Testing
+
+`testSite` signs in through the site's own forms and stays signed in.
+
+```ts
+import { testSite } from 'kay/test'
+import { signIn } from '../src/routes/login.kay'
+
+const site = await testSite()
+await site.submit(signIn, { identifier: 'ada@example.com', password: 'correct horse battery' }, { from: '/login' })
+```
+
+The prebuilt pages' actions import as `@kaynooo/kayjs-auth/pages/<page>.kay`, such as `import { password } from '@kaynooo/kayjs-auth/pages/sign-in.kay'`.
+
+To send a signed-in request by hand, `await auth.sessionCookie(userId)` gives the `Cookie` header of a new session for that user.
+
+```ts
+const cookie = await auth.sessionCookie(user.id)
+const response = await app.handle(new Request('http://localhost/account', { headers: { cookie } }))
+```
+
+Each `testSite` keeps its own cookies. `memoryStore()` keeps each test's users apart. A mailer that pushes into an array gives the test the links it would have mailed.
+
 ## In the dev tool
 
 Under `kay dev`, the dev tool has an Auth tab with nothing to set up. It shows who is signed in, how, and their roles, with a Sign out button.
 
-<ReadMore href="/llms/kayjs-auth">Two-factor, bearer tokens, API gates, roles, limits, account changes and the store contract are in the full kayjs-auth reference.</ReadMore>
+<ReadMore href="/llms/kayjs-auth">Every option, error code, passkeys, API gates, roles and the full store contract are in the kayjs-auth reference.</ReadMore>
