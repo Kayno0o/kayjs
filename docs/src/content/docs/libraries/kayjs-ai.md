@@ -87,7 +87,7 @@ Messages take only the roles `user` and `assistant`. The system prompt goes in t
 ```kay
 ---
 import Chat from '@kaynooo/kayjs-ai/chat.kay'
-import { reply } from '../routes/assistant.kay'
+import { reply } from '../routes/reply.kay'
 ---
 Chat(action={reply} label="Assistant")
 ```
@@ -100,9 +100,9 @@ Put this in a component of your own, such as `assistant.kay`, and use that compo
 - A screen reader hears each finished turn once, not word by word.
 - Images in a reply are not shown. A model that read a hostile page could point an image at a link carrying your visitor's conversation.
 
-Every label is a prop, so you can write them in your language: `placeholder`, `sendLabel`, `stopLabel`, `retryLabel`, `thinkingLabel`, `stoppedLabel` and `errorMessage`. `initial` gives messages to start with.
+Every label is a prop, so you can write them in your language: `placeholder`, `sendLabel`, `stopLabel`, `retryLabel`, `thinkingLabel`, `stoppedLabel` and `errorMessage`. A refusal from the action, such as a rate limit's message, shows instead of `errorMessage`. `initial` gives messages to start with.
 
-The chat posts the whole history with each message. Keep `content` and `maxItems` short in the action's schema, and add a rate limit.
+The chat posts its last 20 messages with each one; the `keep` prop changes that. Keep `maxItems` in the action's schema at least as high as `keep`, bound `content`, and add a rate limit.
 
 <ReadMore href="/llms/kayjs-ai-chat">The props, the markup and the rules for passing the action.</ReadMore>
 

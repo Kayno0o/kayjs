@@ -24,6 +24,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
     fakeAi.reply(['Here is **bold** and ', '![pixel](https://evil.test/p.png) a [link](https://example.com).'])
     await page.fill('textarea', 'Hello')
     await page.click('button[type="submit"]')
+    await page.waitFor('[data-pending]', { gone: true })
     await page.waitFor('.kai-chat-turn[data-role="assistant"] strong', { text: 'bold' })
 
     expect(await page.text('.kai-chat-turn[data-role="user"]')).toBe('Hello')
@@ -36,6 +37,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
     await page.fill('textarea', 'Again')
     await page.press('Enter')
     await page.waitFor('.kai-chat-turn[data-role="assistant"]:nth-of-type(4)', { text: 'Second answer' })
+    await page.waitFor('[data-pending]', { gone: true })
 
     expect(fakeAi.asked.map(asked => asked.messages.map(message => message.role))).toEqual([['user'], ['user', 'assistant', 'user']])
     expect(fakeAi.last()?.messages[1]?.content).toContain('Here is **bold**')
@@ -76,6 +78,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
     expect(await page.text('.kai-chat-note')).toBe('Stopped')
     expect(await page.text('.kai-chat-form button')).toBe('Send')
     expect(await page.count('[role="alert"]')).toBe(0)
+    expect(page.errors).toEqual([])
   })
 
   test('the chat has no accessibility violation, its log and field named', async () => {

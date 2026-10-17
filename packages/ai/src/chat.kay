@@ -1,7 +1,7 @@
 ---
 import type { Action, ActionStream, SanitizeOptions } from 'kay'
 import type { Message } from './types'
-import { effect, sanitizeHtml, signal, untrack } from 'kay'
+import { ActionError, effect, sanitizeHtml, signal, untrack } from 'kay'
 import { markdownHtml } from 'kay/markdown'
 import './chat.css'
 
@@ -16,7 +16,7 @@ interface Turn extends Message {
   stopped?: boolean | undefined
 }
 
-const { action, initial = [], label = 'Chat', placeholder = 'Write a message…', sendLabel = 'Send', stopLabel = 'Stop', retryLabel = 'Try again', thinkingLabel = 'Thinking…', stoppedLabel = 'Stopped', errorMessage = 'The reply failed.', class: className } = props<{
+const { action, initial = [], label = 'Chat', placeholder = 'Write a message…', sendLabel = 'Send', stopLabel = 'Stop', retryLabel = 'Try again', thinkingLabel = 'Thinking…', stoppedLabel = 'Stopped', errorMessage = 'The reply failed.', keep = 20, class: className } = props<{
   // The page's streaming action, `action(schema, ({ messages }) => ask(messages))`; the chat posts the whole history to it and reads the reply as it streams.
   action: Action<{ messages: Message[] }, AsyncIterable<string>>
   // The messages shown to start with.
@@ -31,6 +31,8 @@ const { action, initial = [], label = 'Chat', placeholder = 'Write a message…'
   thinkingLabel?: string | undefined
   // Marks a reply cut short by Stop.
   stoppedLabel?: string | undefined
+  // How many of the latest messages each send posts, so the history never outgrows the action's `maxItems`.
+  keep?: number | undefined
   // Shown when the call is refused or the stream breaks off.
   errorMessage?: string | undefined
   class?: string | undefined
@@ -47,6 +49,7 @@ const partial = signal('')
 const failure = signal<string | undefined>(undefined)
 const busy = () => waiting() || streaming() !== undefined
 let run: AbortController | undefined
+let field: HTMLTextAreaElement | undefined
 let log: HTMLElement | undefined
 let pinned = true
 
@@ -62,7 +65,7 @@ function finish(state: string) {
   partial.set('')
 
   if (text !== '')
-    history.set([...history(), { id: nextId++, role: 'assistant', content: text, stopped: state !== 'done' }])
+    history.set([...history(), { id: nextId++, role: 'assistant', content: text, stopped: state === 'closed' }])
 
   if (state === 'failed')
     failure.set(errorMessage)
@@ -110,7 +113,13 @@ async function send(again = false) {
   waiting.set(true)
 
   try {
-    const stream = await action({ messages: history().map(({ role, content }) => ({ role, content })) }, { signal: mine.signal })
+    const stream = await action({ messages: history().slice(-keep).map(({ role, content }) => ({ role, content })) }, { signal: mine.signal, refresh: false })
+
+    if (mine.signal.aborted) {
+      stream.close()
+
+      return
+    }
 
     stream.on(partial.set)
     streaming.set(stream)
@@ -119,17 +128,32 @@ async function send(again = false) {
     // A call stopped before its first word is not a failure.
     if (!mine.signal.aborted) {
       console.error(error)
-      failure.set(errorMessage)
+
+      // A message the schema refuses would fail every later send, so it leaves the history and goes back to the field.
+      if (error instanceof ActionError && error.status === 422 && !again) {
+        history.set(history().slice(0, -1))
+        draft.set(text)
+      }
+
+      failure.set(error instanceof ActionError && error.status < 500 && error.errors[''] ? error.errors[''] : errorMessage)
     }
   }
   finally {
     waiting.set(false)
+    field?.focus()
   }
 }
 
 function stop() {
-  run?.abort()
-  streaming()?.close()
+  const stream = streaming()
+
+  // Aborting a call whose answer arrived would break the body read; closing the stream is enough then.
+  if (stream === undefined)
+    run?.abort()
+  else
+    stream.close()
+
+  field?.focus()
 }
 
 function keyDown(event: KeyboardEvent) {
@@ -165,7 +189,7 @@ section.kai-chat(class={className} aria-label={label})
           p.kai-chat-text.kai-chat-thinking {thinkingLabel}
         else
           .kai-chat-text(innerHTML={markdown(partial())})
-  p.kai-chat-status(role="status") {busy() ? thinkingLabel : ''}
+  p.kai-chat-status(role="status") {busy() && partial() === '' ? thinkingLabel : ''}
   if failure()
     .kui-notice(role="alert" data-tone="error")
       | {failure()}
@@ -173,7 +197,7 @@ section.kai-chat(class={className} aria-label={label})
       if !busy() && history().at(-1)?.role === 'user'
         button.kui-btn(type="button" onClick={() => void send(true)}) {retryLabel}
   form.kai-chat-form(onSubmit={event => { event.preventDefault(); void send() }})
-    textarea.kui-field-input(bind:value={draft} rows="1" aria-label={label} placeholder={placeholder} onKeyDown={keyDown})
+    textarea.kui-field-input(ref={element => { field = element }} bind:value={draft} rows="1" aria-label={label} placeholder={placeholder} onKeyDown={keyDown})
     if busy()
       button.kui-btn(type="button" onClick={stop}) {stopLabel}
     else
