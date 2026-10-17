@@ -39,7 +39,15 @@ Keys are never reused, so a new avatar is a new file. `files.put(file, { replace
 
 `files.list({ folder })` resolves with each stored file's `key` and `modified`, when it was last written. Use it to find the files nothing references any more. `files.variants(keys)` names the variants made of each key.
 
-<ReadMore href="/llms/files#storing-and-linking">Which types are shown in place, how an SVG is served and the store interface a custom store gives are in the full files reference.</ReadMore>
+### What the browser does with a file
+
+A browser shows a file in place only when that runs nothing: a PNG, JPEG, WebP, GIF or AVIF image, a video, audio, a PDF or plain text. Any other file is sent as a download, under a `sandbox` policy.
+
+So an uploaded HTML page never runs as your site. Nor does a script or a stylesheet, because every file but an image goes out as `application/octet-stream`.
+
+An SVG is sent as a download too, but it keeps its type, so it still shows in an `img`. Every file also has `X-Content-Type-Options: nosniff`.
+
+<ReadMore href="/llms/files#storing-and-linking">The file route's caching and ranges, and how a stored image gets its variants, are in the full files reference.</ReadMore>
 
 ## Private files
 
@@ -51,7 +59,15 @@ The link is signed with the app's `secret` or `KAY_SECRET`. See [Config](/refere
 
 A route of your own can answer with `files.response(key, request)` instead.
 
-<ReadMore href="/llms/files#private-files">How links are signed, and how a script outside the server reads the secret, are in the full files reference.</ReadMore>
+A link is `/_kay/files/<key>?until=<time>&sig=<signature>`. The signature covers the key and the time it expires, so changing either breaks it. A link stays valid for an hour, and `files.url(key, { expires: '1d' })` makes it longer.
+
+The time is rounded up to the next ten minutes at most. Pages rendered a few minutes apart then give the same link, which the browser keeps cached.
+
+The key that signs is made from the session's secret. Without `session()` it comes from `secret` in `kay.config.ts` or `KAY_SECRET`, then from the preview secret. Without any, it is a key made for the process. A restart changes it, several processes do not share it, and a production server warns about it once.
+
+A script that signs a link with no server running reads `KAY_SECRET`.
+
+<ReadMore href="/llms/files#private-files">How a script outside the server reads the secret, and how a private image is resized, are in the full files reference.</ReadMore>
 
 ## Where files go
 

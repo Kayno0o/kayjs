@@ -105,6 +105,8 @@ kay build
 
 Three tables follow. Routes has one row per route, with the gzip scripts and stylesheets it loads. Stages shows how long each step took. Caches shows how many entries each cache gave and how many it had to make.
 
+A route that no page of was prerendered has no built page to measure. Its scripts are an estimate, marked `~` in the table. kay adds the entry and every island its components can reach, through helpers, dynamic imports and aliases. A chunk several islands share counts once. The entry is added as well when a form posts to an action or a server island is deferred.
+
 Each size shows its change since the last build, as `[+3.2 KB]`, or `[new]` for a row the last build did not have. The sizes are kept in `.kay/report.json`.
 
 ## Find the heavy modules

@@ -31,6 +31,12 @@ The page also has `meta(key)`, `canonical()`, `jsonLd()` and `links()`. `find(se
 
 Assert on text through these, not on `page.html`. An island's markup holds hydration markers inside an interpolated text, so `Thanks, {name}!` is not one string there.
 
+`site.sitemap()` resolves with the URLs `/sitemap.xml` lists. Pass another path for a sitemap served elsewhere. It fails when the path does not answer 200.
+
+```ts
+expect(await site.sitemap()).toContain('https://example.com/about')
+```
+
 ## Posting an action
 
 Import the action from its page and `submit` it as a form post without JavaScript. It follows the redirect back, or reads the page a refused post renders.
@@ -62,6 +68,34 @@ An action with `minTime` takes the post as if its form had been open long enough
 An action with `proofOfWork` gets a solved challenge with each post and call. Send your own `x-kay-work` header to override it, `''` for none.
 
 A site made at the top of the file posts as a new client in each test, so a rate limit counts the posts of one test only.
+
+## Websockets and streams
+
+`site.socket(module, path, options)` opens a websocket route of an API module as an island does. `next()` resolves with the oldest message not read yet, and waits for one if there is none.
+
+```ts
+import chat from '../src/api/chat'
+
+const room = site.socket(chat, '/:room', { params: { room: 'general' } })
+
+room.send({ text: 'hello' })
+
+expect(await room.next()).toEqual({ room: 'general', from: 'anonymous', text: 'hello' })
+room.close()
+```
+
+`received` holds every message so far. The first socket starts the site on a free port, and `site.close()` stops it.
+
+`site.stream(module, path, options)` reads an event stream the same way. `finished()` resolves with every value once the stream has ended.
+
+```ts
+const answer = site.stream(chat, '/answer', { method: 'post', body: { prompt: 'two words' } })
+
+expect(await answer.finished()).toEqual(['two\n', 'words\n'])
+expect(answer.status()).toBe('done')
+```
+
+Both take `headers` in their options, to call as a signed-in client.
 
 ## A site under a base
 
@@ -110,6 +144,37 @@ it('opens its panel on a click', async () => {
 })
 ```
 
+## A database for each test file
+
+kay holds no database code. An app that keeps its data with `@kaynooo/pg-orm` gets a database for each test file from its `testDatabase()`. `kay new --template app` writes the setup.
+
+```ts
+// tests/database.ts, listed in bunfig.toml after kay/test/preload
+import process from 'node:process'
+import { testDatabase } from '@kaynooo/pg-orm'
+import { afterAll } from 'bun:test'
+import { Member } from '../src/db/member'
+
+const database = await testDatabase({
+  url: process.env.DATABASE_URL!,
+  migrationsDir: 'migrations',
+  tables: [Member],
+  seed: async (db) => {
+    await db.repo(Member).write.insertOne({ name: 'Ada' })
+  },
+})
+
+process.env.DATABASE_URL = database.url
+
+afterAll(async () => {
+  await database.drop()
+})
+```
+
+Each file gets a copy of the database the migrations build, with what `seed` adds. It is dropped when the file is done. Run `bun test --isolate` so each file reads its own copy. Without it, every file shares one.
+
+The database in `.env.test` need not exist. A SQLite file is made on first use, and a Postgres user only needs `CREATEDB`.
+
 ## Several projects
 
 One test process serves one project. When test files call `testSite({ root })` on different folders, run them with `bun test --parallel`, which gives each file a process of its own.
@@ -151,10 +216,46 @@ it('counts the clicks', async () => {
 })
 ```
 
+The page clicks and types as a user does.
+
+| Call | Does |
+| --- | --- |
+| `click(selector)` | Scrolls to the element, waits until it is visible, still and not covered, and clicks |
+| `fill(selector, text)` | Replaces a field's text, as typing does |
+| `type(text)`, `press(key)` | Type or press a key in the focused element |
+| `text(selector)`, `value(selector)`, `count(selector)` | Read the page at once |
+| `waitFor(selector, { text, gone })` | Waits for an element, or for none |
+| `waitUntil(fn)` | Waits until a function run in the page returns something truthy |
+| `evaluate(fn, ...args)` | Runs a function in the page |
+| `goto`, `back`, `forward`, `reload`, `path()` | Navigate and read where the page is |
+
+The waits give up after 5 seconds, or after `timeout` in their options, and fail naming what they waited for. `evaluate` and `waitUntil` send only the source of the function, so it sees no variable of the test, only its arguments.
+
+`page.view` is the `Bun.WebView` behind the page, for what the helpers leave out, such as `screenshot()` or `cdp()`.
+
+```ts
+await page.view.screenshot()
+await page.view.cdp('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true })
+```
+
+`browse(url)` from `kay/test` opens the same page for a server that is already running, such as one the test started itself.
+
+### Checking accessibility
+
+`page.a11y(selector?)` checks the page as it stands, or only the elements the selector matches, with axe-core, as `kay dev` does. It resolves with the rules the page breaks, and with none when it passes.
+
+```ts
+const broken = await page.a11y()
+
+expect(broken.map(rule => rule.id)).toEqual([])
+```
+
+Each rule has an `id` such as `color-contrast`, an `impact`, `help`, a `helpUrl` and its `nodes`, the elements breaking it as `{ target, html }`.
+
 A page that does not settle in time fails `open()`, naming the files it could not load, such as an island's chunk answering 404. A page whose renderer crashes fails its next call at once, not at the test's timeout.
 
 The browser is `Bun.WebView` on Chrome. Kay finds Chrome on the `PATH`, or reads `BUN_CHROME_PATH`. Use `describe.skipIf(!browserPath())` to skip a suite when there is none.
 
 Chrome's profile lives in the temp directory while the browser runs. Kay closes it a second after the last page closes, and again after the run, when `kay/test/preload` kills every process Chrome started.
 
-<ReadMore href="/llms/testing">Jobs, websockets and streams, mounting one component, per-test databases and every browser helper are in the full testing reference.</ReadMore>
+<ReadMore href="/llms/testing">Running jobs, mounting one component with its props, how the browser is found and closed and every browser helper in detail are in the full testing reference.</ReadMore>

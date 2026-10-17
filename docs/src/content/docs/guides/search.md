@@ -54,9 +54,27 @@ Each hit links a section of a page. A section is the text above its first `h2`, 
 
 A query needs all its words. Each is found as a word or the start of one, with case and accents ignored.
 
-A word in the page's title counts most, then one in a heading, then the text. The browser loads only the part of the index holding the words typed, then the texts of the best hits.
+Each hit has `page`, `heading`, `href`, `snippet` and a `score`. `heading` is `undefined` for the text above the first heading.
 
-<ReadMore href="/llms/sitemap-search-fonts#site-search">How words are cut, which matters for Chinese and Japanese, and how hits are scored are in the full reference.</ReadMore>
+`searchResults(query, { limit })` returns at most `limit` hits, 20 by default. `searchSite(query, options)` from `kay` is the same search as a promise, for a script. Both return no hits on the server.
+
+### How hits are ranked
+
+A section is scored for each word of the query, and the scores add up. A word in the page's title counts most, then one in a heading, then one in the text. A word found whole counts more than one that only starts a longer word. A page's `weight` multiplies its scores.
+
+Hits come best first. Two with the same score keep their order in the site.
+
+The browser loads only the part of the index holding the words typed, then the texts of the best hits.
+
+### Words
+
+A word is a run of letters and digits, with case and accents ignored. A one-letter word is dropped from the query and the index.
+
+Chinese and Japanese have no spaces between words, so a whole run of characters is one word. A query finds a run only by its start. Searching for the first characters of a phrase finds it, and searching for characters from its middle does not.
+
+A zero-width space parts two words, as it does in Thai. Soft hyphens and zero-width joiners join the word they split, in the pages and in the query.
+
+<ReadMore href="/llms/sitemap-search-fonts#site-search">How the index is split and written, and the `lang` option, are in the full reference.</ReadMore>
 
 ## What goes in
 

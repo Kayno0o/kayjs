@@ -135,6 +135,35 @@ A capitalized tag kay cannot read fails too, at its line, rather than showing on
 
 Without a later `>`, a tag such as `<Chart stray` at the end of a body stays text, escaped. A blank line ends the paragraph, so a tag cut by one is text too. A blockquote's `>` markers are not a later `>`, and a tag inside a quote may continue on the next quoted lines.
 
+## Highlighting code
+
+Without a highlighter, a code block is `<pre><code class="language-ts">`. Give the collection a `highlight` function and it returns the whole `<pre>` instead, such as Shiki's `codeToHtml`. It runs when the entries compile, at build time.
+
+```ts
+import { codeToHtml } from 'shiki'
+
+export const posts = collection('content/posts', {
+  schema,
+  highlight: (code, language) => codeToHtml(code, { lang: language ?? 'text', theme: 'github-dark' }),
+})
+```
+
+A fence may name a language the highlighter does not know, so the function falls back for it rather than throwing.
+
+`highlightCode(code, language, { highlight })` from `kay/content` renders one block the same way, for a page that shows a snippet that is no entry. It resolves with HTML that is safe to render.
+
+```kay
+--- server
+import { highlightCode } from 'kay/content'
+import { highlight } from '../highlight'
+
+const snippet = await highlightCode('const a = 1', 'ts', { highlight })
+---
+div(innerHTML={snippet})
+```
+
+`renderMarkdown(text, { highlight })` does the same for a whole text, such as a note, and resolves with `{ html, headings }`. Its HTML is the writer's, so a user's goes through `sanitizeHtml` before it is rendered.
+
 ## Feeds
 
 Give a collection a `feed` and kay serves an RSS feed at its path, built from the newest items. Set `site` in `kay.config.ts` first, because feed links are absolute.
@@ -154,11 +183,29 @@ export const posts = collection('content/posts', {
 })
 ```
 
+Add `format: 'atom'` for an Atom feed. `limit` is how many of the newest items it holds, 20 by default. `description` and `author` fill the feed's header, and Atom needs an author, so it uses the title when you set none. Return `undefined` from `item` to leave an entry out.
+
+A link in a layout lets readers find the feed, and `kay check` accepts it when the path is written out.
+
+```kay
+head
+  link(rel="alternate" type="application/rss+xml" href="/blog/rss.xml" title="Blog")
+```
+
 ## Entries per locale
 
 On a site with `i18n`, `localized: true` keeps each entry in a folder named after its locale. `posts/fr/hello.md` and `posts/en/hello.md` are one entry, slug `hello`, in two languages.
 
 `all()` and `get()` read the request's locale and fall back to the default locale's entry. `entry.locale` says which one was read. The feed is served once per locale.
+
+`entry.translations` lists the locales that have an entry with the slug. Use it for a language switcher that shows only the languages a post exists in.
+
+```kay
+for code of post.translations ?? []
+  a(href={alternate(code)} hreflang={code}) {code}
+```
+
+Either method takes a locale as its last argument. Outside a request, `all()` gives every locale's entries and `get(slug, locale)` reads that locale's entry alone, with no fallback.
 
 ## Collections from a CMS
 
@@ -178,11 +225,46 @@ export const news = collection({
 })
 ```
 
+The loader takes more than `load`.
+
+| Option | Does |
+| --- | --- |
+| `load({ preview })` | Gives the entries as `{ slug, data, body }` or `{ slug, data, html }`. `body` is Markdown, `html` is rendered as it is. `preview` is true in preview mode and in development |
+| `ttl` | How long the entries are served before the next read refreshes them in the background. Without it they are kept until `invalidate()` or a restart |
+| `store` | A `sqliteCache(path)` that keeps them across restarts and lets `invalidate()` reach every process sharing it |
+| `save(entry)`, `remove(entry)` | Write an entry back to the CMS, for a CMS editing the collections |
+
+`data` is read against the schema, with defaults filled in and dates decoded. An entry the schema refuses, or one with no slug or a slug another entry has, fails the read and names every problem. The next read loads again.
+
 `news.invalidate()` refreshes it, and every prerendered page that read it. Call it from a webhook in an API route. That one line is the whole webhook.
 
 `kay build` does not keep a page over a loader on its own, since a loader may read a database and `ttl` refreshes the entries without telling the page. Add `prerender: true` to the page to prerender it anyway. The webhook then refreshes it.
 
-<ReadMore href="/llms/content-cms#loaded-collections">Counting entries and fetching one without running `load`, so a CMS can list a collection cheaply, are in the full content reference.</ReadMore>
+### Counting without loading
+
+A CMS screen that lists collections should not run `load` for every entry just to show a number. Give the loader `count` and `get`, and the CMS helpers `collections()`, `collectionInfo()` and `entries(name, { slug })` call them instead.
+
+```ts
+export const news = collection({
+  name: 'news',
+  load: async () => (await listPosts()).map(toEntry),
+  count: async () => countPosts(),
+  get: async place => toEntry(await findPost(place)),
+  body: false,
+}, { schema })
+```
+
+`count({ preview })` says how many entries `load` would give. `get(place, { preview })` gives the one entry at a place, which is its slug, or the locale and the slug as `fr/launch` in a localized collection, or `undefined`. `body: false` says the entries hold `html` and no Markdown, which an editor reads without loading any.
+
+<ReadMore href="/llms/content-cms#loaded-collections">Every loader option, `create` on a new entry and what a failing read reports are in the full content reference.</ReadMore>
+
+### Caches
+
+Each Markdown entry compiles once, and the result is kept in `.kay/cache/content`. A change to an entry recompiles that entry only. A change to a module the content config imports recompiles every entry when the collection has a highlighter.
+
+A highlighter whose output changes with no change to its source needs that folder cleared. That is a new theme passed in, or a `.kay` or JSON file it reads. Only `.ts` and `.js` modules are watched.
+
+`kay build` compiles every collection into `.kay/client/content`, and production reads that instead of the files.
 
 ## Markdown in an island
 
@@ -224,4 +306,4 @@ These give drafts and files to whoever calls them, so serve them behind a guard 
 
 <ReadMore href="/llms/content-cms#a-cms-editing-the-collections">Paged reads, counting without running a loader, `create: true`, `entryFile`, field markers such as `imageField()` and every failure shape are in the full content reference.</ReadMore>
 
-<ReadMore href="/llms/content">Syntax highlighting, `renderMarkdown`, the caches, atom feeds and the loader options are in the full content reference.</ReadMore>
+<ReadMore href="/llms/content">The Markdown renderer's edge cases, the collection options and the CMS helpers are in the full content reference.</ReadMore>

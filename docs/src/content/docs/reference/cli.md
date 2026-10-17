@@ -108,6 +108,10 @@ kay dev --port 4000 --open
 
 `kay dev` runs `src/server.ts` with `NODE_ENV=development`. An edit to a template, island, loader or API route reloads in the same process. A change it cannot reload that way, such as the config or the entry, starts a new process.
 
+A change to a file at the project root, such as `.env` or `package.json`, starts a new process too, which reads the new values. The server also restarts on its own after 200 reloads, or once it has grown by 64 MiB, since Bun keeps the code of every module it evaluates again.
+
+These changes reload nothing: tests (`tests/`, `test/`, `e2e/`, `__tests__/`, and `*.test.*` and `*.spec.*` files anywhere), root files no server reads such as a README or a LICENSE, and the backup and temporary files an editor writes beside a source. A save that touches `.css` files alone restarts nothing and swaps the stylesheets in the open pages.
+
 Open pages refresh by themselves, an edited island is swapped in place, and a project that fails to compile shows its errors in the browser. Every page carries the [dev tool and inspector](/guides/performance).
 
 | Option | Effect |
@@ -130,6 +134,21 @@ kay dev: http://localhost:3000 (ready in 412 ms)
 
 When another process holds the port, the server moves to the next free one and the ready line says so.
 
+```text
+kay dev: http://localhost:4001 (ready in 412 ms, 4000 was in use)
+```
+
+A server listens on `localhost` only, so a phone on your network cannot reach it. `--host` opens it. When it listens on every address, a second line gives the address of this machine on your network.
+
+```text
+kay dev: http://localhost:3000 (ready in 412 ms)
+kay dev: http://192.168.1.20:3000 on the network
+```
+
+`--inspect` opens Bun's debugger at the same address after every restart, so a debugger reconnects by itself. `kay dev` listens there and passes each connection to the server that is running. The address is printed once, under the ready line, with a link to `debug.bun.sh`. A connection stays open across a reload and closes when the server restarts in a new process.
+
+An address another process holds stops `kay dev`. One past this machine is refused unless `--host` is given too.
+
 In a terminal, `o` opens the address, `r` restarts the server, `c` clears the screen and `q` or Ctrl+C quits. Piped, or under `--format json`, no key is read.
 
 The dev server answers 421 to a request whose `Host` is not `localhost`, a `*.localhost` name, an IP address or the site's host. Put any other name, such as a tunnel's, in `KAY_DEV_HOSTS`, comma-separated and without ports.
@@ -138,7 +157,29 @@ The dev server answers 421 to a request whose `Host` is not `localhost`, a `*.lo
 KAY_DEV_HOSTS=dev.example.com bunx kay dev --host
 ```
 
-<ReadMore href="/llms/dev-server">What `kay dev` reloads and restarts on, what it closes after an edit, the network address line, `--inspect` rules and every `--format json` event.</ReadMore>
+### Events for tools
+
+Under `--format json`, each line is one JSON object on stdout with an `event` and a `time`. The server's own output goes to stderr.
+
+```json
+{"event":"ready","time":"2026-10-14T14:02:30.000Z","url":"http://localhost:3000","ms":412}
+{"event":"restart","time":"2026-10-14T14:02:40.000Z","changed":["src/server.ts"],"ms":412}
+```
+
+| Event | Fields |
+| --- | --- |
+| `ready` | `url`, `ms`, `inUse` when the port moved, `network` under `--host` |
+| `restart` | `changed` (the files), `ms`, `url`, and `reloaded: true` for a reload in the same process |
+| `styles` | `changed`, `ms`, for a stylesheet swap |
+| `exit` | `code`, when the server exits on its own |
+| `debugger` | `url`, under `--inspect` |
+| `no-browser` | `command`, when `--open` found no browser |
+| `builder-exit` | The process building the client exited, and each change starts it again |
+| `error` | An error from [`.kay/dev/errors.json`](#errors-without-a-browser), with its fields |
+
+`--quiet` leaves out the `restart` and `styles` events as it leaves out their lines.
+
+<ReadMore href="/llms/dev-server">What `kay dev` closes after an edit, how islands swap in place, the keys in a terminal and the dev tool's tabs.</ReadMore>
 
 ### Errors without a browser
 
@@ -392,7 +433,7 @@ Colour only goes to a terminal, and not under `NO_COLOR` or `TERM=dumb`. `FORCE_
 
 | Command | Document |
 | --- | --- |
-| `kay build` | `{ errors, warnings, problems }`, then `failed`, `built`, `exported` and `compiled` as the build ran |
+| `kay build` | `{ errors, warnings, problems }`, then `failed`, `built`, `exported` and `compiled` as the build ran, see [The build document](#the-build-document) |
 | `kay routes` | `{ routes, unlisted }`, each route with its `methods`, `path`, `kind` and `file` |
 | `kay env` | `{ variables, unread }`, each variable with its `name`, `source`, `type`, `required` and `default` |
 | `kay explain` | `{ groups, lints, errorGroups, errors }`, or for one lint its `summary` and its `wrong` and `right` examples |
@@ -400,5 +441,22 @@ Colour only goes to a terminal, and not under `NO_COLOR` or `TERM=dumb`. `FORCE_
 | `kay migrate` | `{ written, kept, copied, notes }` |
 
 A command that cannot run, such as on a directory that does not exist, prints `{ errors: 1, warnings: 0, problems: [{ severity, code: null, message }] }`. Paths are relative to the current directory.
+
+### The build document
+
+`kay build --format json` adds a key for each stage that ran.
+
+| Key | Holds |
+| --- | --- |
+| `failed` | `{ stage }`, when a stage stopped the build |
+| `built` | `islands`, `stylesheets`, `prerendered`, `entries`, `ms`, `sizes`, `routes`, `stages` and `caches` |
+| `exported` | `{ pages, files, dir, ms }`, under `--static` |
+| `compiled` | `{ executable, ms }`, under `--compile` |
+
+`sizes` has the `raw` and `gzip` bytes of the entry and of each island, with `modules` under `--analyze`. Each island says `why` it is one.
+
+`routes` has each route's `js` and `css` gzip bytes and the `islands` its pages render. It also has `pages` prerendered and `kept`, the pages the build kept on its own. For a route rendered per request it gives the `stop` that decided so, and `estimated` when its scripts are a guess, see [What a page weighs](/guides/performance#what-a-page-weighs). `stages` is a list of `{ name, ms }`, and `caches` of `{ name, cached, made }`.
+
+Code that ends the process mid-build leaves the problems so far, with one saying it ended and the stage.
 
 <ReadMore href="/llms/project#commands">Every field of the build document, and how a build that ends the process is reported.</ReadMore>
