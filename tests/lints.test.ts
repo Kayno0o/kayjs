@@ -686,8 +686,9 @@ describe('deprecated-ui-prop', () => {
       expect(found(`Carousel(slides={[]} ${autoplay})`)).toEqual([])
   })
 
-  it('flags the danger variant of a ConfirmDelete without a fix, as it has no tone for the icon', () => {
-    expect(found('ConfirmDelete(message="Sure?" failure="No" onConfirm={go} variant="danger")')).toEqual([{ at: 'variant="danger"', fix: undefined }])
+  it('fixes the danger variant of a ConfirmDelete to solid, the icon taking its danger tone, unless a tone is written', () => {
+    expect(found('ConfirmDelete(message="Sure?" failure="No" onConfirm={go} variant="danger")')).toEqual([{ at: 'variant="danger"', fix: ['variant="danger"->variant="solid"'] }])
+    expect(found('ConfirmDelete(message="Sure?" failure="No" onConfirm={go} variant="danger" tone="neutral")')).toEqual([{ at: 'variant="danger"', fix: undefined }])
     expect(found('ConfirmDelete(message="Sure?" failure="No" onConfirm={go} variant="ghost")')).toEqual([])
     expect(found('ConfirmDelete(message="Sure?" failure="No" onConfirm={go} tone="neutral")')).toEqual([])
   })

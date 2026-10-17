@@ -27,4 +27,13 @@ ConfirmDelete(message="Its verdicts go with it." failure="Could not remove" onCo
 ConfirmDelete(message="Unshare it?" failure="Could not unshare" onConfirm={onDelete} ask="inline" trigger="button" label="Unshare" class="unshare")
 ConfirmDelete(message="Forget it?" failure="Could not forget" onConfirm={onDelete} ask="inline" trigger="link" label="Forget" class="forget")
 ConfirmDelete(message="Save without your own IP?" failure="Could not save" success="Saved" onConfirm={onDelete} tone="neutral" trigger="button" label="Save" class="save")
+ConfirmDelete(message="Tone?" failure="Could not" onConfirm={onDelete}  class="v-plain")
+ConfirmDelete(message="Tone?" failure="Could not" onConfirm={onDelete} variant="solid" class="v-solid")
+ConfirmDelete(message="Tone?" failure="Could not" onConfirm={onDelete} variant="ghost" class="v-ghost")
+ConfirmDelete(message="Tone?" failure="Could not" onConfirm={onDelete} variant="inline" class="v-inline")
+ConfirmDelete(message="Tone?" failure="Could not" onConfirm={onDelete} variant="danger" class="v-danger")
+ConfirmDelete(message="Tone?" failure="Could not" onConfirm={onDelete} tone="neutral" class="n-plain")
+ConfirmDelete(message="Tone?" failure="Could not" onConfirm={onDelete} tone="neutral" variant="solid" class="n-solid")
+ConfirmDelete(message="Tone?" failure="Could not" onConfirm={onDelete} tone="neutral" variant="ghost" class="n-ghost")
+ConfirmDelete(message="Tone?" failure="Could not" onConfirm={onDelete} trigger="button" variant="ghost" class="n-button")
 Toaster

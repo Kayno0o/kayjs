@@ -33,7 +33,7 @@ const { message, onConfirm, failure, success, refused, tone = 'danger', trigger 
   cancelLabel?: string | undefined
   // The icon trigger's size and look, `size` sizing the cancel button too when asking inline; the button trigger takes the tone's look.
   size?: 'xs' | 'sm' | 'md' | 'lg' | undefined
-  // The icon trigger's form, as an IconButton's; `danger` is deprecated.
+  // The icon trigger's form, as an IconButton's, which then takes the tone as its own: danger-coloured by default, neutral for `tone="neutral"`. Without it the icon stays neutral. `danger` is deprecated.
   variant?: 'solid' | 'ghost' | 'inline' | 'danger' | undefined
   // Goes on the trigger.
   class?: string | undefined
@@ -89,7 +89,7 @@ if trigger === 'button'
 else if trigger === 'link'
   button.kui-confirm-delete-link(type="button" hidden={ask === 'inline' && open()} class={className} onClick={start}) {triggerLabel()}
 else
-  IconButton(icon={danger() ? 'delete' : 'success'} label={triggerLabel()} size={size} variant={variant} hidden={ask === 'inline' && open()} class={className} onClick={start})
+  IconButton(icon={danger() ? 'delete' : 'success'} label={triggerLabel()} size={size} variant={variant} tone={variant === undefined ? undefined : tone} hidden={ask === 'inline' && open()} class={className} onClick={start})
 if ask === 'inline'
   if open()
     // Armed by a click, so the focus moves onto the button that deletes.

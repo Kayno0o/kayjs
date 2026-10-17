@@ -104,6 +104,25 @@ describe('ConfirmDelete', () => {
     expect([[...root.querySelectorAll('.kui-toast-message')].at(-1)?.textContent, root.querySelectorAll('dialog')[2]!.open]).toEqual(['Still referenced', true])
   })
 
+  test('hands its tone to the icon trigger once a variant is given, and leaves the default look without one', async () => {
+    const root = await dialogs()
+    const look = (name: string) => {
+      const trigger = root.querySelector<HTMLElement>(`.kui-icon-btn.${name}`)!
+
+      return [trigger.dataset.variant, trigger.dataset.tone]
+    }
+
+    expect(look('v-plain')).toEqual(['solid', 'neutral'])
+    expect(look('v-solid')).toEqual(['solid', 'danger'])
+    expect(look('v-ghost')).toEqual(['ghost', 'danger'])
+    expect(look('v-inline')).toEqual(['inline', 'danger'])
+    expect(look('v-danger')).toEqual(look('v-solid'))
+    expect(look('n-plain')).toEqual(['solid', 'neutral'])
+    expect(look('n-solid')).toEqual(['solid', 'neutral'])
+    expect(look('n-ghost')).toEqual(['ghost', 'neutral'])
+    expect(root.querySelector('.n-button')?.className).toBe('kui-btn kui-btn-danger n-button')
+  })
+
   // A trigger of each kind, the dialog it opens (by its place among the page's) and the confirm button it carries.
   const TRIGGERS = [
     { name: 'a labelled danger button, for a delete known by another name', trigger: '.revoke', dialog: 3, shown: ['BUTTON', 'kui-btn kui-btn-danger revoke', 'Revoke link'], title: 'Confirm Deletion', confirm: ['kui-btn kui-btn-danger', 'Delete'] },
@@ -138,7 +157,7 @@ describe('ConfirmDelete', () => {
     const armed = () => root.querySelector('.kui-confirm-delete-armed')
     const buttons = () => [...armed()?.querySelectorAll('button') ?? []].map(button => [button.textContent || button.getAttribute('aria-label'), button.disabled])
 
-    expect(root.querySelectorAll('dialog')).toHaveLength(6)
+    expect(root.querySelectorAll('dialog')).toHaveLength(15)
 
     click(trigger)
     await settle()
