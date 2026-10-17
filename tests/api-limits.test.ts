@@ -193,5 +193,6 @@ describe('invalid route settings', () => {
   it('refuse a rate limit whose key is no function or whose store has no hit', async () => {
     await expect(boot('rateLimit: { max: 1, window: \'1m\', key: \'ip\' as never }')).rejects.toThrow('key that is not a function')
     await expect(boot('rateLimit: { max: 1, window: \'1m\', store: {} as never }')).rejects.toThrow('store without a hit')
+    await expect(boot('rateLimit: { max: 1, window: \'1m\', store: null as never }')).rejects.toThrow('store without a hit')
   })
 })

@@ -237,7 +237,7 @@ export function checkApiLimit(name: string, limit: ApiRateLimit): void {
   if (limit.key !== undefined && typeof limit.key !== 'function')
     throw new KayError('config-invalid', `kay: the rateLimit of ${name} has a key that is not a function; it takes a function of the request returning the string to count under`)
 
-  if (limit.store !== undefined && typeof limit.store.hit !== 'function')
+  if (limit.store !== undefined && typeof limit.store?.hit !== 'function')
     throw new KayError('config-invalid', `kay: the rateLimit of ${name} has a store without a hit(key, windowMs) method; give it a RateStore`)
 }
 
