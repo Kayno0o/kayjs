@@ -19,9 +19,11 @@ export default api()
 
     throw new Error('boom')
   })
+  .get('/created', async ({ status }) => status(201, { orders: await cached('orders', '1m', () => db.orders, { live: true }) }))
+  .get('/response', async () => new Response(JSON.stringify({ orders: await cached('orders', '1m', () => db.orders, { live: true }) }), { headers: { 'content-type': 'application/json' } }))
   .get('/long', async () => cached('x'.repeat(300), '1m', () => 1, { live: true }))
   .get('/many', async () => {
-    for (let index = 0; index < 5; index++)
+    for (let index = 0; index < 9; index++)
       await cached(`many-${index}-${'y'.repeat(500)}`, '1m', () => 1, { live: true })
 
     return 'many'

@@ -211,7 +211,7 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
           }
 
           // Only an answer the route gave: a refusal or a failure holds no proof, and a guard's refusal never reached the handler.
-          if (!(responseValue instanceof ElysiaCustomStatusResponse) && !(responseValue instanceof Response && !responseValue.ok) && Number(set.status ?? 200) < 400) {
+          if (answerStatus(responseValue, set) < 400) {
             const proof = routeProof(request)
 
             if (proof !== undefined)
@@ -230,6 +230,17 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
   }
 
   return { limits, routeLimits, mounted }
+}
+
+// The status a handler answered with: the one of a `status()` or a Response it returned, else the context's.
+function answerStatus(value: unknown, set: { status?: number | string }): number {
+  if (value instanceof ElysiaCustomStatusResponse)
+    return Number(value.code)
+
+  if (value instanceof Response)
+    return value.status
+
+  return typeof set.status === 'number' ? set.status : 200
 }
 
 // The locale state of each API request, resolved once for its guards, rate limits, handler and error hooks.

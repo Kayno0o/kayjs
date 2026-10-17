@@ -689,13 +689,12 @@ export function resource(module: unknown, path?: string, options?: UrlInput | ((
   const [status, setStatus] = ownSignal<ResourceStatus>('loading')
   const [error, setError] = ownSignal<ResourceFailure | undefined>(undefined)
   let current: AbortController | undefined
-  let asked: ((signal: AbortSignal) => unknown) | undefined
+  let asked: ((signal: AbortSignal, fresh?: boolean) => unknown) | undefined
   let gone = false
   let followed = false
-  const owner = {}
 
-  // A reload made for a change keeps the status, so the value is swapped without a loading state in between.
-  const load = async (read: (signal: AbortSignal) => unknown, quiet = false) => {
+  // A reload made for a change keeps the status, and the value on failure, so it is swapped without a loading state in between; it skips the browser's cache.
+  const load = async (read: (signal: AbortSignal, fresh?: boolean) => unknown, quiet = false) => {
     const controller = new AbortController()
 
     current?.abort()
@@ -706,7 +705,7 @@ export function resource(module: unknown, path?: string, options?: UrlInput | ((
       setStatus('loading')
 
     try {
-      const answer = await read(controller.signal)
+      const answer = await read(controller.signal, quiet)
 
       if (controller.signal.aborted)
         return
@@ -716,7 +715,7 @@ export function resource(module: unknown, path?: string, options?: UrlInput | ((
       setStatus('ready')
     }
     catch (failure) {
-      if (controller.signal.aborted)
+      if (controller.signal.aborted || quiet)
         return
 
       setError({ status: failure instanceof ApiError ? failure.status : 0, message: failure instanceof Error ? failure.message : String(failure) })
@@ -729,7 +728,7 @@ export function resource(module: unknown, path?: string, options?: UrlInput | ((
     followed = proof !== null
 
     try {
-      (await import('./live-cache')).followRoute(owner, proof, () => void load(asked!, true))
+      (await import('./live-cache')).followRoute(load, proof, async () => gone || load(asked!, true))
     }
     catch {}
   }
@@ -742,8 +741,8 @@ export function resource(module: unknown, path?: string, options?: UrlInput | ((
 
       const url = routeUrl(module, path ?? '', (typeof options === 'function' ? options() : options))
 
-      return void load(async (signal) => {
-        const response = await fetch(withBase(url), { headers: { accept: 'application/json' }, signal })
+      return void load(async (signal, fresh) => {
+        const response = await fetch(withBase(url), { headers: { accept: 'application/json' }, signal, ...fresh && { cache: 'reload' } })
         const answer = await readAnswer(response, signal)
 
         if (!response.ok && !signal.aborted)

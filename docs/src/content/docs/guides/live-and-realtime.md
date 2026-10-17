@@ -97,7 +97,7 @@ A tab you cannot see waits and loads the page when you come back. An `invalidate
 
 Read the value in the page's server fence or a layout's. A page that follows a value is rendered for each request, so a static export of it fails. A value that only expires by its `ttl` is not pushed: call `invalidate` when it changes.
 
-A collection follows when you add `live: true` to it. See [Listing and reading entries](/guides/content#showing-edits-in-open-tabs). A page that reads the collection then shows an edit in every open tab, a CMS save included.
+A collection follows when you add `live: true` to it. See [Showing edits in open tabs](/guides/content#showing-edits-in-open-tabs). A page that reads the collection then shows an edit in every open tab, a CMS save included.
 
 A `resource` follows too. If the route's handler reads a `cached` value with `live: true`, the island asks the route again after an `invalidate`, keeping the old value on screen until the new answer arrives. You add nothing to the route or the island, and a route that reads no such value opens no connection.
 

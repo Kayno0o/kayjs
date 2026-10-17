@@ -1,8 +1,9 @@
 import type { LivePage, LiveRequest } from '../src/runtime/live-value'
 import type { TestSite } from '../src/test'
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { existsSync } from 'node:fs'
 import process from 'node:process'
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
+import { Elysia } from 'elysia'
 import { chromium } from 'playwright-core'
 import { invalidate } from '../src/runtime/cache'
 import { CACHE_LIVE_ID } from '../src/runtime/cache-live-id'
@@ -55,6 +56,17 @@ describe('a route a resource reads, following cached values', () => {
     expect((await ask('/api/orders/none')).headers.has(HEADER)).toBe(false)
   })
 
+  it('answers a 2xx status() and a Response of its own with it too', async () => {
+    const created = await ask('/api/orders/created')
+    const own = await ask('/api/orders/response')
+
+    expect(created.status).toBe(201)
+    expect(proofOf(created)!.values.map(([, key]) => key)).toEqual(['orders'])
+    expect(proofOf(own)!.values.map(([, key]) => key)).toEqual(['orders'])
+    // A second answer is its own proof, not a copy of the first.
+    expect(proofOf(await ask('/api/orders/response'))!.at).toBeGreaterThanOrEqual(proofOf(own)!.at)
+  })
+
   it('answers only a GET with it', async () => {
     const response = await ask('/api/orders', { method: 'POST' })
 
@@ -99,6 +111,20 @@ describe('a route a resource reads, following cached values', () => {
 
     expect(changed).toBeGreaterThanOrEqual(page.values[0]![2] as number)
     await feed.close()
+  })
+
+  it('refuses a connection asking for a key whose proof is out of date, with another one valid', async () => {
+    const page = proofOf(await ask('/api/orders'))!
+    const other = proofOf(await ask('/api/orders/mine', { headers: { 'accept': 'application/json', 'x-user': 'ada' } }))!
+    const old = { ...requestOf(other, []).proofs[0]!, at: other.at - 2 * 60 * 60 * 1000 }
+    const request = requestOf(page, ['orders', 'secret'])
+
+    expect((await stream({ ...request, proofs: [...request.proofs, old] })).status).toBe(403)
+
+    const covered = await stream({ ...request, proofs: [...request.proofs, requestOf(other, []).proofs[0]!] })
+
+    expect(covered.status).toBe(200)
+    await covered.body?.cancel()
   })
 
   it('refuses a forged proof, a key it does not cover and a changed one', async () => {
@@ -151,11 +177,31 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a resour
     invalidate('orders')
   }
 
+  // How many connections to refuse before the server accepts one.
+  let refusals = 0
+
   beforeAll(async () => {
-    site = await testSite({ root: ROOT, browser: { path: chrome } })
+    const refuse = new Elysia().onRequest(({ request }) => request.method === 'POST' && new URL(request.url).pathname === '/_kay/live' && refusals-- > 0 ? new Response(null, { status: 403 }) : undefined)
+
+    site = await testSite({ root: ROOT, use: [refuse], browser: { path: chrome } })
   }, 120_000)
 
   afterAll(async () => site?.close())
+
+  it('follows a page and a route together, after the connection was refused once', async () => {
+    refusals = 1
+    change(20)
+
+    await using page = await site.open('/resource-both')
+
+    await page.waitUntil(...shows(20))
+    db.news = ['first', 'fresh']
+    invalidate('latest')
+    await page.waitUntil(() => document.querySelector('p.latest')?.textContent === 'fresh', { timeout: 8000 })
+    change(21)
+    await page.waitUntil(...shows(21))
+    expect(page.errors).toEqual([])
+  }, 30_000)
 
   it('shows an invalidation in every open tab, without the resource turning to loading', async () => {
     change(1)

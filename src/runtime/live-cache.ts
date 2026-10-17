@@ -25,7 +25,7 @@ export const IDLE_MS = 20_000
 interface Route {
   page: LivePage
   reads: Map<string, number>
-  refetch: () => void
+  refetch: () => unknown
 }
 
 // The time the page shown read each key it follows.
@@ -75,7 +75,7 @@ export function followCaches(): void {
 }
 
 // Follows the keys a route's answer carried the proof of for a resource, or lets go of them when `header` is null: called after each answer, which replaces the last, and when the resource is gone.
-export function followRoute(owner: object, header: string | null, refetch: () => void): void {
+export function followRoute(owner: object, header: string | null, refetch: () => unknown): void {
   if (header === null) {
     routes.delete(owner)
     waitingRoutes.delete(owner)
@@ -113,7 +113,7 @@ function stop(): void {
 async function connect(keys: string): Promise<void> {
   const controller = new AbortController()
   const request: LiveRequest = {
-    proofs: [...pagesOf(), ...[...routes.values()].map(route => route.page)].map(page => ({ keys: page.values.map(([id, key]) => [id, key] as [string, string]), at: page.at, sig: page.sig })),
+    proofs: [...new Map([...pagesOf(), ...[...routes.values()].map(route => route.page)].map(page => [page.sig, page])).values()].map(page => ({ keys: page.values.map(([id, key]) => [id, key] as [string, string]), at: page.at, sig: page.sig })),
     watch: (JSON.parse(keys) as string[]).map(key => [CACHE_LIVE_ID, key]),
   }
 
@@ -233,10 +233,10 @@ function changed(key: string, at: number): void {
 
 // A resource asks its route again, once the tab is shown and after a short random wait, for all the invalidations that came meanwhile.
 function askRoute(owner: object, key: string, at: number): void {
-  const waiting = waitingRoutes.get(owner)
+  const pending = waitingRoutes.get(owner)
 
-  if (waiting) {
-    waiting.set(key, at)
+  if (pending) {
+    pending.set(key, at)
 
     return
   }

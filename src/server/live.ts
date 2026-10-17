@@ -31,8 +31,9 @@ const LIMIT = 'kay:live'
 
 // A page's proof and watch list both carry its keys, so this many of the longest fit the request.
 const MAX_CACHE_KEYS = 100
-// A route's proof travels in a header, so all the keys it follows together are at most this long.
-const MAX_ROUTE_KEY_BYTES = 2000
+// A route's proof travels in a header, which a proxy with its default buffer refuses past about 4 KB: each key counts as its encoded length and what the proof adds around it, and all of them are at most this.
+const MAX_ROUTE_KEY_BYTES = 4000
+const ROUTE_KEY_OVERHEAD = 50
 
 // The header a GET route answers with when its handler read keys with `live: true`.
 export const LIVE_HEADER = 'x-kay-live'
@@ -93,10 +94,12 @@ onLiveRead((key) => {
   if (key.length > MAX_KEY_LENGTH || reads.at.size >= MAX_CACHE_KEYS)
     throw new RangeError(`kay: cached('${key.slice(0, 40)}...') with live: true: a key is at most ${MAX_KEY_LENGTH} characters and a page follows at most ${MAX_CACHE_KEYS} keys`)
 
-  if (reads.route && reads.bytes + key.length > MAX_ROUTE_KEY_BYTES)
-    throw new RangeError(`kay: cached('${key.slice(0, 40)}...') with live: true: a route follows at most ${MAX_ROUTE_KEY_BYTES} characters of keys, as its proof travels in a header`)
+  const size = reads.route ? encodeURIComponent(key).length + ROUTE_KEY_OVERHEAD : 0
 
-  reads.bytes += key.length
+  if (reads.route && reads.bytes + size > MAX_ROUTE_KEY_BYTES)
+    throw new RangeError(`kay: cached('${key.slice(0, 40)}...') with live: true: a route follows keys up to about ${MAX_ROUTE_KEY_BYTES} bytes together, as its proof travels in a header`)
+
+  reads.bytes += size
   reads.at.set(key, Date.now())
 
   remember(key)
@@ -355,6 +358,7 @@ export function serveLive(app: Elysia, config?: LiveConfig): void {
 
     const watched: Watched[] = []
     let oldest = Infinity
+    let stale = false
 
     for (const [id, key] of asked.watch) {
       const slot = liveSlot(id)
@@ -369,10 +373,14 @@ export function serveLive(app: Elysia, config?: LiveConfig): void {
 
         watched.push({ id, key, value: () => slotValue(slot, key), watch: listener => watchSlot(slot, key, listener) })
       }
+      // A followed cache key whose proof is out of date: refused, so the tab takes new proofs rather than follow part of what it shows.
+      else if (id === CACHE_LIVE_ID) {
+        stale = true
+      }
     }
 
     // Nothing proven to watch: refused, as a request with a forged proof is.
-    if (watched.length === 0)
+    if (watched.length === 0 || stale)
       return new Response(null, { status: 403 })
 
     const client = clientAddress(request, server)
