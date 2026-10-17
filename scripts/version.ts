@@ -1,6 +1,6 @@
 import process from 'node:process'
 import { $, Glob } from 'bun'
-import { archiveOldest, ARCHIVES, stampUnreleased, WHATS_NEW } from './whats-new'
+import { archiveOldest, ARCHIVES, stampUnreleased, trimArchive, WHATS_NEW } from './whats-new'
 
 // `bun scripts/version.ts patch|minor|major`: kay and every library under packages/ move to one version, committed as `v<version>` and tagged, as `bun pm version` does for one package.
 const LEVELS = ['major', 'minor', 'patch'] as const
@@ -48,7 +48,7 @@ try {
     const moved = archiveOldest(await Bun.file(page).text(), await Bun.file(archive).text())
 
     await Bun.write(page, moved.page)
-    await Bun.write(archive, moved.archive)
+    await Bun.write(archive, trimArchive(moved.archive))
   }))
   // bun.lock records each workspace's version and ranges, which the CI's frozen install compares against.
   await $`bun install`.quiet()

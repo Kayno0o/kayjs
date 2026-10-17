@@ -1,6 +1,6 @@
 import { Glob } from 'bun'
 import { describe, expect, it } from 'bun:test'
-import { archiveOldest, stampUnreleased } from '../scripts/whats-new'
+import { archiveOldest, stampUnreleased, trimArchive } from '../scripts/whats-new'
 
 interface Manifest {
   name: string
@@ -67,6 +67,18 @@ describe('what\'s new', () => {
     expect(archiveOldest(page, archive, 1).page).toContain('## 1.46.0')
     expect(archiveOldest(page, archive, 1).page).not.toContain('## 1.45.0')
     expect(archiveOldest(page.replace(/Releases before.*\n/, ''), archive, 1)).toEqual({ page: page.replace(/Releases before.*\n/, ''), archive })
+  })
+
+  it('drops the oldest releases of an archive over its limit, keeping its newest, and ends on where they are read', () => {
+    const archive = '# Old\n\nWhat each release before 1.47 added.\n\n## 1.46.0\n\n- c\n\n## 1.45.0\n\n- bb\n\n## 1.44.0\n\n- aaaaaaaaaa\n'
+    const trimmed = trimArchive(archive, 190)
+
+    expect(trimArchive(archive, 1000)).toBe(archive)
+    expect(trimmed).toStartWith('# Old\n\nWhat each release before 1.47 added.\n\n## 1.46.0\n\n- c\n\n## 1.45.0\n\n- bb\n\nReleases before 1.45 are in the notes of their releases')
+    expect(trimmed).not.toContain('1.44.0')
+    // Trimmed again, it moves its own last line up rather than writing a second one.
+    expect(trimArchive(trimmed, 1).match(/Releases before/g)).toEqual(['Releases before'])
+    expect(trimArchive(trimmed, 1)).toContain('## 1.46.0\n\n- c\n\nReleases before 1.46')
   })
 })
 
