@@ -1,9 +1,11 @@
 import type { Elysia } from 'elysia'
+import type { Duration } from '../runtime/duration'
 import type { Claim, ServedPaths } from './served-paths'
 import { existsSync } from 'node:fs'
 import { readdir, stat } from 'node:fs/promises'
 import { join, relative, sep } from 'node:path'
 import process from 'node:process'
+import { durationSeconds } from '../runtime/duration'
 
 // For a file served under a name that stays when its content changes.
 export const REVALIDATE = 'public, max-age=0, must-revalidate'
@@ -18,6 +20,7 @@ const LEFT_BEHIND = /\.env(?:\..*)?$|\.(?:bak|old|orig|swp|tmp)$|~$/i
 // The dotfiles a static host reads rather than serves, which a static export keeps.
 const HOST_FILES = new Set(['.htaccess', '.nojekyll'])
 const INDEX = '/index.html'
+const LEADING_SLASH = /^\//
 
 export interface PublicFile {
   path: string
@@ -117,19 +120,29 @@ export function matchesEtag(header: string | null, etag: string): boolean {
 // One route per file found at boot: no file system lookup per request, and no path a request could steer outside the directory.
 // Files keep their names, so browsers revalidate them every time and get a 304 while they are unchanged.
 // The body, or a 304 when the browser already holds the version the ETag names, carrying the same headers.
-export function revalidated(request: Request, etag: string, body: () => BodyInit, headers: Record<string, string> = {}): Response {
+// `cache` replaces the header for a file that may be kept for a while before it is asked about again.
+export function revalidated(request: Request, etag: string, body: () => BodyInit, headers: Record<string, string> = {}, cache = REVALIDATE): Response {
   if (matchesEtag(request.headers.get('if-none-match'), etag))
-    return new Response(null, { status: 304, headers: { ...headers, etag, 'cache-control': REVALIDATE } })
+    return new Response(null, { status: 304, headers: { ...headers, etag, 'cache-control': cache } })
 
-  return new Response(body(), { headers: { ...headers, etag, 'cache-control': REVALIDATE } })
+  return new Response(body(), { headers: { ...headers, etag, 'cache-control': cache } })
+}
+
+// The `cache-control` of each public file the `publicCache` setting names, the first pattern a path matches deciding; a file it leaves out keeps revalidating.
+export function publicCacheRules(setting: Record<string, Duration> | undefined): ((url: string) => string) {
+  const rules = Object.entries(setting ?? {}).map(([pattern, value]) => ({ glob: new Bun.Glob(pattern.replace(LEADING_SLASH, '')), control: `public, max-age=${durationSeconds(value, `publicCache['${pattern}']`)}` }))
+
+  return url => rules.find(rule => rule.glob.match(url.replace(LEADING_SLASH, '')))?.control ?? REVALIDATE
 }
 
 // Registered once every path is claimed, so a path an HTML file was only offered and something claimed since is not served twice.
-export async function servePublic(app: Elysia, served: ServedPaths, files: ClaimedFile[]): Promise<void> {
+export async function servePublic(app: Elysia, served: ServedPaths, files: ClaimedFile[], cacheFor: (url: string) => string = () => REVALIDATE): Promise<void> {
   for (const { path, url } of files.filter(file => served.holds(file.claim))) {
     const { size, mtimeMs } = await stat(path)
     const etag = `W/"${size.toString(36)}-${Math.floor(mtimeMs).toString(36)}"`
 
-    app.get(url, ({ request }) => revalidated(request, etag, () => Bun.file(path)))
+    const cache = cacheFor(url)
+
+    app.get(url, ({ request }) => revalidated(request, etag, () => Bun.file(path), {}, cache))
   }
 }

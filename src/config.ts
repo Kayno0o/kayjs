@@ -30,6 +30,8 @@ export interface KayConfig {
   api?: string | undefined
   // Files served as they are at their path, relative to the root. Defaults to `public`.
   publicDir?: string | undefined
+  // How long a browser keeps a file of `public/` without asking again, by the path it is served at, as a glob: `{ '/fonts/**': '365d', '**/*.png': '30d' }`; the first pattern a path matches decides, and a file none names keeps revalidating through its ETag on every visit. Ignored by `kay dev`, so an edit shows at once.
+  publicCache?: Record<string, Duration> | undefined
   minify?: boolean | undefined
   lang?: string | undefined
   // The origin the site is public at, `https://example.com`: canonical links, social URLs and the sitemap are built from it. `SITE_URL` when left out, else `ORIGIN`, so one build serves each host it is deployed to.

@@ -53,7 +53,7 @@ import { assetFiles } from './page-hook'
 import { loadPrerendered, pageResponder, servePageRoutes } from './page-routes'
 import { DRAFT_BODY_LIMIT, serveDrafts, servePreview } from './preview'
 import { REQUEST_ID_HEADER, requestId, trustProxy } from './protection'
-import { claimPublic, servePublic } from './public'
+import { claimPublic, publicCacheRules, servePublic } from './public'
 import { claimRedirects, readRedirects, serveRedirects } from './redirects'
 import { remoteImages, remotePatterns } from './remote'
 import { reportServerError } from './report'
@@ -394,7 +394,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   if (log !== false && !mode.dev)
     announceStart(app, log, [...prerendered.values()].reduce((count, pages) => count + pages.size, 0))
 
-  await servePublic(app, served, publicServed)
+  await servePublic(app, served, publicServed, mode.dev ? undefined : publicCacheRules(options.publicCache))
   serveRedirects(app, redirects, mode.dev)
 
   const respond = withPageHeaders(pageResponder({ client, renderOptions, prerendered, writes: countWrites(app), settings: i18n?.settings, transforms: pageHooks(options.extensions), pageFile: assetFiles({ clientDir: client.dir, publicDir: paths.public, base, aspects: options.images?.aspects }) }), securityOptions, security)

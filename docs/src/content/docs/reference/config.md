@@ -49,6 +49,7 @@ Every option is optional. The tables give each option's default. The full refere
 | `entry` | The server entry, `src/server.ts` by default. Every command reads it, and `--entry` on a command wins over it. With no file there, kay serves the pages itself |
 | `routes` | The page directory, `src/routes` by default. See [Routing](/essentials/routing) |
 | `api` | The directory of API modules, `src/api` by default. See [API routes](/guides/api-routes) |
+| `publicCache` | How long the browser keeps a public file without asking again, as globs on the served path: `{ '/fonts/**': '365d' }`. Files it leaves out revalidate. See [Styling and assets](/essentials/styling-and-assets#public-files) |
 | `publicDir` | The directory of files served as they are at their path, `public` by default. See [Styling and assets](/essentials/styling-and-assets#public-files) |
 | `redirects` | Old paths sent to new ones with a 308, or a 307 with `permanent: false`. See [Routing](/essentials/routing) |
 | `rewrite` | A function returning the path to serve a request from, or `undefined` to serve it as it came. The browser keeps its URL |

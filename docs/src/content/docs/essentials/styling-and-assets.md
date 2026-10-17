@@ -69,6 +69,16 @@ An HTML file is also served without its `.html`, as a static host does. `public/
 
 Dotfiles, `.env` files and editor backups are neither served nor exported. `.well-known/` is the one dotfile folder that is served. A static export keeps `.htaccess` and `.nojekyll`, which the host reads.
 
+A public file keeps its name when its content changes, so the browser asks the server about it on every visit and gets a 304 while it is unchanged. For files that rarely change, such as fonts, set `publicCache` in `kay.config.ts` to have the browser keep them for a while without asking:
+
+```ts
+export default {
+  publicCache: { '/fonts/**': '365d', '**/*.png': '30d' },
+}
+```
+
+Each key is a glob on the served path and each value a duration. The first glob a file matches decides, and a file none matches keeps revalidating. `kay dev` ignores it, so an edit shows at once.
+
 <ReadMore href="/llms/styles-and-assets">The editor backup extensions that are left out, and how a public file and a page with the same URL conflict.</ReadMore>
 
 ## Imported images

@@ -1,0 +1,5 @@
+--- server
+export const page = { noindex: true, search: false }
+---
+section
+  slot
