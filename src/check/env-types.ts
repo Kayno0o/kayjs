@@ -121,6 +121,7 @@ function environment(patterns: string[], files: string[], api: { mount: string, 
     '  function KayUnmatched<Rest>(rest: Rest & Unmatched<Rest>): void',
     '  function KayHanded<Parameter = UnresolvedParameter, Handed = unknown>(signal: Handed & HandedSignal<Parameter>): [Parameter] extends [unknown] ? Handed : Parameter',
     '  function KayWritable<Written extends Signal<any>>(signal: Written): Written',
+    '  function KayDefault<Value, Fallback>(value: Value, fallback: () => Fallback): Exclude<Value, undefined> | Fallback',
     '}',
     '',
   ].join('\n')

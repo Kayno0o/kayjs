@@ -7,7 +7,7 @@ import type { SignalKind } from './module-signals'
 import type { PropsBinding } from './script'
 import { createRequire } from 'node:module'
 import { parse } from '@babel/parser'
-import { CURRENT, defaultName, HANDED, LOAD, PROPS, VALUES, WRITABLE } from './names'
+import { CURRENT, DEFAULTED, defaultName, HANDED, LOAD, PROPS, VALUES, WRITABLE } from './names'
 
 const LIVE_WRITES = new Set(['set', 'delete'])
 
@@ -590,7 +590,7 @@ class RewriteFinder {
       return
 
     const { name } = local
-    const access = propRead(prop.binding, prop.index, name)
+    const access = propRead(prop.binding, prop.index, name, this.input.check === true)
     const { signal } = prop.binding
 
     // A prop typed `Signal<T>` or `Memo<T>` reads as the script's own signals do.
@@ -823,7 +823,7 @@ function patternIdentifier(pattern: t.Node | null | undefined, name: string): t.
 
 // A renamed or quoted key replaces the local name; an unrenamed one keeps it, so the read stays mapped to the source.
 // A default applies when the prop is `undefined` and runs only then, like a destructuring default.
-function propRead(binding: PropsBinding, index: number, local: string): Rewrite {
+function propRead(binding: PropsBinding, index: number, local: string, check: boolean): Rewrite {
   const quoted = !IDENTIFIER.test(binding.key)
   const text = quoted ? `${PROPS}[${JSON.stringify(binding.key)}]` : `${PROPS}.${binding.key}`
   const access: Rewrite = quoted
@@ -832,6 +832,10 @@ function propRead(binding: PropsBinding, index: number, local: string): Rewrite 
 
   if (!binding.fallback)
     return access
+
+  // Type checking reads it through a call, so the shadow the linter reads holds no ternary of the author's to nest in theirs.
+  if (check)
+    return { before: `${DEFAULTED}${access.before}`, replace: access.replace, after: `${access.after ?? ''}, ${defaultName(index)})` }
 
   return { before: `(${access.before}`, replace: access.replace, after: `${access.after ?? ''} !== undefined ? ${text} : ${defaultName(index)}())` }
 }

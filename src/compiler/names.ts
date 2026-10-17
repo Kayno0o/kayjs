@@ -8,6 +8,9 @@ export const CURRENT = 'KayCurrent'
 export const VALUES = '__values'
 // What type checking wraps a name kay sees no signal made in, assigned, so the type checker asserts it holds one: `KayWritable(theme).set('dark')`.
 export const WRITABLE = 'KayWritable('
+
+// What type checking reads a defaulted prop through, `KayDefault(__props.size, __default_0)`: the same value as the `!== undefined` ternary the output modes write, without a ternary for a lint rule to judge in the shadow.
+export const DEFAULTED = 'KayDefault('
 // What type checking wraps a signal the template hands on whole, a function's argument or a component's prop, so the types report one handed to a parameter that takes anything: `describe(KayHanded(count))`.
 export const HANDED = 'KayHanded('
 // A `case` block's subject, read once for every `when`.
@@ -25,4 +28,4 @@ export function defaultName(index: number): string {
 }
 
 // What the editor leaves out of completions: the names above a completion can reach, and what the generated code imports or declares.
-export const GENERATED_NAME = new RegExp(`^(?:${[PROPS, VALUES, CURRENT, 'kayEvent', 'kayMatched'].join('|')}|${DEFAULT_PREFIX}\\d+|Kay(?:LoopFor|StaticFor|Show|Omit|ComponentClass|Dynamic|TemplateHelpers|Island|IslandBrand|HydrateWhen|Href|Html|Field|FormError|Prop|FunctionProp|Children|IdentityKey|Unmatched|Writable|Handed|PageContext|PrerenderedContext|PageSettings|QueryOf|PageData|JSX|FormAction|RegisterActions|ActionStub|UseHead|Await))$`)
+export const GENERATED_NAME = new RegExp(`^(?:${[PROPS, VALUES, CURRENT, 'kayEvent', 'kayMatched'].join('|')}|${DEFAULT_PREFIX}\\d+|Kay(?:Default|LoopFor|StaticFor|Show|Omit|ComponentClass|Dynamic|TemplateHelpers|Island|IslandBrand|HydrateWhen|Href|Html|Field|FormError|Prop|FunctionProp|Children|IdentityKey|Unmatched|Writable|Handed|PageContext|PrerenderedContext|PageSettings|QueryOf|PageData|JSX|FormAction|RegisterActions|ActionStub|UseHead|Await))$`)

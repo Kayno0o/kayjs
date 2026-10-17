@@ -285,6 +285,22 @@ section({...rest['a']})
 
     expect(messages).toEqual([])
   })
+
+  it('reports no ternary rule on the read of a defaulted prop, at the top level, in a function or in the template', async () => {
+    const head = '---\nconst { digits = 1, flag } = props<{ digits?: number | undefined, flag: boolean }>()\n'
+    const bodies = [
+      'const top = flag ? 0 : digits\n---\np {top}\n',
+      'const a = (x: boolean) => x ? 0 : digits\n---\np {a(true)}\n',
+      'const a = (x: boolean) => {\n  const d = x ? 0 : digits\n  return d\n}\n---\np {a(true)}\n',
+      '---\np {flag ? 0 : digits}\n',
+    ]
+
+    for (const body of bodies) {
+      const { messages } = await lint(head + body, { 'no-nested-ternary': 'error', 'no-unneeded-ternary': 'error', 'no-extra-parens': 'error' })
+
+      expect(messages).toEqual([])
+    }
+  })
 })
 
 describe('kay/eslint over a template slot\'s parameters', () => {
