@@ -77,7 +77,6 @@ export default defineMessages({
   cms: {
     editor: { title: 'Modifier cette page', stop: 'Arrêter de modifier' },
     admin: { entryCount: { one: '{count} entrée', other: '{count} entrées' } },
-    size: { kb: '{size} Ko', mb: '{size} Mo' },
   },
 })
 ```

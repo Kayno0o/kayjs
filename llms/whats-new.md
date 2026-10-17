@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- `sizeText(bytes, locale?)` from `kay/words` writes a size in the page's locale (`1.5 MB`, `1,5 Mo`); kayjs-cms's upload refusals use it, so its `cms.size.*` messages are gone and a size follows the locale on its own ([Locales](locales.md)).
 - `kay add` keeps the runner label a project was scaffolded with when it rewrites the CI workflow, and `deprecated-test-mount` also finds `await import('kay/test')` and `export { mount } from 'kay/test'` ([Project](project.md)).
 - Under a `base`, an action's redirect goes under it for a call from an island and a form the page swap posts as it does for a plain form, so the browser lands on `/app/dashboard` and not `/dashboard`; the app declares nothing ([Actions](actions.md#calling-from-an-island)).
 - kayjs-ui: `MultiSelect` options take `icon` and `disabled` like ChipGroup's and Segmented's, a disabled option staying as it is under All and None ([kayjs-ui](../packages/ui/llms/forms.md)).

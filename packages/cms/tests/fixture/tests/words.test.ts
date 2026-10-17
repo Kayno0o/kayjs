@@ -52,8 +52,8 @@ test('the built editor sends the browser the messages it only reads after the pa
   const built = await testSite({ root: ROOT, browser: true })
 
   try {
-    expect(sent((await built.visit('/fr/admin/page?path=/fr/blog/hello')).html)).toEqual(expect.arrayContaining(['cms.editor.title', 'cms.file.rejected', 'cms.size.kb', 'cms.field.removeItem', 'cms.entry.save']))
-    expect(sent((await built.visit('/fr/admin/collections/posts')).html)).toEqual(expect.arrayContaining(['cms.table.title', 'cms.size.mb']))
+    expect(sent((await built.visit('/fr/admin/page?path=/fr/blog/hello')).html)).toEqual(expect.arrayContaining(['cms.editor.title', 'cms.file.rejected', 'cms.field.removeItem', 'cms.entry.save']))
+    expect(sent((await built.visit('/fr/admin/collections/posts')).html)).toEqual(expect.arrayContaining(['cms.table.title']))
     expect(sent((await built.visit('/fr/admin/uploads')).html)).toEqual(expect.arrayContaining(['cms.uploads.deleteMany', 'cms.uploads.empty']))
     expect(sent((await built.visit('/admin/page?path=/blog/hello')).html)).toEqual([])
   }
@@ -80,7 +80,7 @@ test('the editor reads the locale in the browser: a list item, a button and the 
       data.items.add(new File([new Uint8Array(100 * 1024)], 'huge.png', { type: 'image/png' }))
       document.querySelector('.kcms-file-drop')!.dispatchEvent(new DragEvent('drop', { dataTransfer: data, bubbles: true, cancelable: true }))
     })
-    await products.waitUntil(() => document.querySelector('.kui-toaster')?.textContent?.includes('huge.png pèse 100 Ko, au-delà des 64 Ko permis par envoi') === true)
+    await products.waitUntil(() => document.querySelector('.kui-toaster')?.textContent?.replaceAll(/\s/g, ' ').includes('huge.png pèse 100 ko, au-delà des 64 ko permis par envoi') === true)
     expect(await products.evaluate(() => [...document.querySelectorAll('.kcms-file .kui-btn')].map(button => button.textContent))).toContain('Téléverser')
     expect(products.errors).toEqual([])
     expect(page.errors).toEqual([])

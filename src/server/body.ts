@@ -3,13 +3,10 @@ import type { Server } from 'elysia/universal'
 import type { ByteSize } from '../runtime/byte-size'
 import { KayError } from '../compiler/errors'
 import { byteSize } from '../runtime/byte-size'
-import { formatNumber } from '../runtime/i18n'
 import { requestUrl } from './request-url'
 import { withoutSlash } from './routes'
 
 export const DEFAULT_BODY_LIMIT = 1024 * 1024
-const KB = 1024
-const MB = 1024 * 1024
 const NO_BODY = new Set(['GET', 'HEAD', 'OPTIONS'])
 
 // What an action or an API module lets a request send, the app's limit when it sets none, and its answer to one sending more.
@@ -115,22 +112,4 @@ function checkLimit(size: ByteSize, name: string): number {
     throw new KayError('config-invalid', `kay: ${name} is ${typeof size === 'string' ? `'${size}'` : size}; it takes a whole number of bytes from 1, or a size such as '20kb'`)
 
   return bytes
-}
-
-// `1 MB`, `512 KB`, `200 bytes`: how a refusal tells the visitor the most they may send, in the units another locale writes (`1 Mo`, `200 octets` in French).
-export function sizeText(bytes: number, locale = 'en'): string {
-  if (locale === 'en' || locale.startsWith('en-')) {
-    if (bytes >= MB)
-      return `${Number((bytes / MB).toFixed(1))} MB`
-
-    return bytes >= KB ? `${Math.round(bytes / KB)} KB` : `${bytes} bytes`
-  }
-
-  if (bytes >= MB)
-    return formatNumber(locale, bytes / MB, { style: 'unit', unit: 'megabyte', unitDisplay: 'short', maximumFractionDigits: 1 })
-
-  if (bytes >= KB)
-    return formatNumber(locale, Math.round(bytes / KB), { style: 'unit', unit: 'kilobyte', unitDisplay: 'short' })
-
-  return formatNumber(locale, bytes, { style: 'unit', unit: 'byte', unitDisplay: 'long' })
 }

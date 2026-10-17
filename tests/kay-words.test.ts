@@ -3,9 +3,9 @@ import { join, relative } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it, spyOn } from 'bun:test'
 import { messageProblems } from '../src/check/messages'
+import { sizeText } from '../src/runtime/size-text'
 import { wording } from '../src/runtime/words.server'
 import { pages } from '../src/server'
-import { sizeText } from '../src/server/body'
 import { testSite } from '../src/test'
 import { scratchDir } from './scratch'
 
@@ -191,5 +191,14 @@ describe('the kay.* keys in llms', () => {
 
     for (const kind of ['required', 'tooShort', 'tooLong', 'pattern', 'format', 'tooFewItems', 'tooManyItems', 'tooSmall', 'tooBig', 'type'])
       expect(doc).toContain(`\`${kind}\``)
+  })
+})
+
+describe('sizeText from kay/words', () => {
+  it('writes a size in the page locale, English outside a request', async () => {
+    const { sizeText: inPage } = await import('../src/runtime/words.server')
+
+    expect(inPage(1.5 * 1024 * 1024)).toBe('1.5 MB')
+    expect(inPage(200, 'fr')).toMatch(/^200\soctets$/)
   })
 })

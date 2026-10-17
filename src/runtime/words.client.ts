@@ -1,5 +1,6 @@
 import type { MessageValue, Plural } from './i18n'
 import { pageData } from './page-data'
+import { sizeText as sizeIn } from './size-text'
 
 // What the server writes for a page's islands: the locale and the messages they use. Kept small, as every island of a library reaches it; `kay/i18n` reads the same scripts for `t`.
 interface Payload {
@@ -83,4 +84,9 @@ export function wording(key: string, english: string, params: Record<string, Mes
 
     return typeof value === 'number' ? new Intl.NumberFormat(here).format(value) : String(value)
   })
+}
+
+// `1 MB`, `512 KB`, `200 bytes` as the page's locale writes a size (`1 Mo`, `200 octets`), for a text that names a file's weight or a limit.
+export function sizeText(bytes: number, locale = pageLocale()): string {
+  return sizeIn(bytes, locale)
 }
