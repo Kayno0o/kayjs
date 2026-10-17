@@ -311,7 +311,7 @@ Start `kay dev` first. It writes its address to `.kay/dev/server.json`, and the 
 
 The two latest shots of each page, width and scheme stay next to each other, and the command prints how many pixels changed since the one before, with a diff image beside them where the changed pixels are red. Shoot, edit, shoot again to check an edit moved only what it meant to. Older shots go once the folder holds a few hundred files.
 
-The page's console errors and the errors `kay dev` listed for it come back with the shots. A page that does not finish loading within 10 seconds is shot as it stands, with the reason among the console errors.
+The page's console errors and the errors `kay dev` listed for it come back with the shots. A redirect is followed, and no cookie is sent, so a page behind a sign-in shows the sign-in. A page that does not finish loading within 10 seconds is shot as it stands, with the reason among the console errors.
 
 | Option | Effect |
 | --- | --- |

@@ -19,6 +19,8 @@ export interface BrowserOptions {
   strict?: boolean | undefined
   // A page that does not settle within the timeout, loaded and hydrated, is returned as it stands with the reason in `errors`, instead of failing the call.
   lenient?: boolean | undefined
+  // The colour scheme the page is asked for from its first load, `prefers-color-scheme` and `matchMedia` alike.
+  colorScheme?: 'light' | 'dark' | undefined
 }
 
 export interface WaitOptions {
@@ -444,6 +446,10 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
 
     await live(async () => view.cdp('Runtime.enable'))
     await live(async () => view.cdp('Inspector.enable'))
+
+    if (options.colorScheme !== undefined)
+      await live(async () => view.cdp('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: options.colorScheme }] }))
+
     view.addEventListener('Runtime.exceptionThrown', (event) => {
       const { exceptionDetails } = (event as MessageEvent<{ exceptionDetails: { text: string, exception?: { description?: string } } }>).data
 

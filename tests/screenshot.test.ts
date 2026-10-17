@@ -5,6 +5,7 @@ import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { dev } from '../src/dev'
 import { devAddressFile, readDevAddress, removeDevAddress, writeDevAddress } from '../src/dev/address'
+import { mountedAt } from '../src/dev/base-proxy'
 import { MAX_FILES, pagePath, prune, screenshot, shotName } from '../src/dev/screenshot'
 import { diffPngs } from '../src/dev/screenshot-diff'
 import { McpServer } from '../src/mcp/protocol'
@@ -82,18 +83,53 @@ describe('the page a screenshot is asked for', () => {
     ['a control character', '/a\nb'],
     ['a malformed escape', '/%zz'],
     ['nothing', ''],
+    ['a second slash after the base', '/app//evil.example/x'],
+    ['a backslash after the base', '/app/\\evil.example'],
   ])('refuses %s', (_name, path) => {
     expect(() => pagePath(path, '/app')).toThrow()
   })
 })
 
+describe('the proxy that mounts the site', () => {
+  it('forwards a path under the base to the dev server alone, never to another host', async () => {
+    const seen: string[] = []
+    const upstream = Bun.serve({ hostname: '127.0.0.1', port: 0, fetch: (request) => {
+      seen.push(new URL(request.url).pathname)
+
+      return new Response('ok')
+    } })
+    const other = Bun.serve({ hostname: '127.0.0.1', port: 0, fetch: () => new Response('other host') })
+    const proxy = mountedAt(`http://127.0.0.1:${upstream.port}`, '/app')
+
+    try {
+      const get = async (path: string) => fetch(`${proxy.origin}${path}`)
+
+      expect(await (await get('/app/about')).text()).toBe('ok')
+      expect(seen).toEqual(['/about'])
+      expect((await get('/app')).status).toBe(200)
+      expect(seen.at(-1)).toBe('/')
+      // The dev tool asks for its own files without the base.
+      expect((await get('/_kay/dev/axe.js')).status).toBe(200)
+      expect(seen.at(-1)).toBe('/_kay/dev/axe.js')
+      expect((await get(`/app//127.0.0.1:${other.port}/x`)).status).toBe(400)
+      expect((await fetch(`${proxy.origin}/app/about`, { headers: { host: 'evil.example' } })).status).toBe(400)
+      expect(seen).not.toContain(`//127.0.0.1:${other.port}/x`)
+    }
+    finally {
+      proxy.stop()
+      void upstream.stop(true)
+      void other.stop(true)
+    }
+  })
+})
+
 describe('the file a shot is kept in', () => {
   it('never shares a name between two paths, sizes or schemes, nor leaves the folder', () => {
-    const names = [shotName('/a-b', 375, 'light', undefined, false), shotName('/a/b', 375, 'light', undefined, false), shotName('/a_2Fb', 375, 'light', undefined, false), shotName('/a/b', 1280, 'light', undefined, false), shotName('/a/b', 375, 'dark', undefined, false), shotName('/a/b', 375, 'light', 600, false), shotName('/a/b', 375, 'light', undefined, true), shotName('/', 375, 'light', undefined, false)]
+    const names = [shotName('/a-b', 375, 'light', undefined, false), shotName('/a/b', 375, 'light', undefined, false), shotName('/a_2Fb', 375, 'light', undefined, false), shotName('/a/b', 1280, 'light', undefined, false), shotName('/a/b', 375, 'dark', undefined, false), shotName('/a/b', 375, 'light', 600, false), shotName('/a/b', 375, 'light', undefined, true), shotName('/', 375, 'light', undefined, false), shotName('/index', 375, 'light', undefined, false), shotName('/About', 375, 'light', undefined, false), shotName('/about', 375, 'light', undefined, false)]
 
     expect(new Set(names).size).toBe(names.length)
     expect(names.every(name => !(/[/\\]/).test(name))).toBe(true)
-    expect(shotName('/', 375, 'light', undefined, false)).toBe('index.375.light')
+    expect(shotName('/', 375, 'light', undefined, false)).toBe('_root.375.light')
     expect(shotName(`/${'x'.repeat(5000)}`, 375, 'light', undefined, false).length).toBeLessThan(140)
     expect(shotName(`/${'x'.repeat(5000)}a`, 375, 'light', undefined, false)).not.toBe(shotName(`/${'x'.repeat(5000)}b`, 375, 'light', undefined, false))
   })
@@ -378,6 +414,17 @@ describe.skipIf(skipBrowser)('kay screenshot on a running kay dev', () => {
 
     expect(files.toSorted()).toEqual(['app_2fbox.375.light.diff.png', 'app_2fbox.375.light.png', 'app_2fbox.375.light.prev.png'])
   }, 120_000)
+
+  it('takes a shot before that is cut short for none', async () => {
+    const first = await shot('/box', { widths: [375] })
+
+    await Bun.write(join(root, first.shots[0]!.file), new Uint8Array([137, 80, 78, 71, 13, 10]))
+
+    const again = await shot('/box', { widths: [375] })
+
+    expect(again.shots[0]!.diff).toBeUndefined()
+    expect([...(await file(again.shots[0]!.file).bytes()).subarray(0, 4)]).toEqual(PNG)
+  }, 60_000)
 
   it('brings back the errors the dev server listed for the page', async () => {
     const report = await shot('/throws', { widths: [375] })

@@ -27,7 +27,7 @@ export const MAX_FILES = 240
 // eslint-disable-next-line no-control-regex -- control characters are what it finds
 const CONTROL = /[\u0000-\u001F\u007F\\]/
 const QUERY_OR_HASH = /[?#]/
-const SAFE = /[A-Z0-9-]/i
+const SAFE = /[a-z0-9-]/
 const LEADING_SLASH = /^\//
 const HIDE_DEV_TOOL = 'kay-dev { display: none !important }'
 
@@ -87,18 +87,28 @@ export function pagePath(input: string, base = ''): string {
 
   const pathname = input.split(QUERY_OR_HASH, 1)[0]!
 
-  return base === '' || pathname === base || pathname.startsWith(`${base}/`) ? input : `${base}${input}`
+  const mounted = base === '' || pathname === base || pathname.startsWith(`${base}/`) ? input : `${base}${input}`
+
+  // The proxy takes the base off, and what is left must not read as a host.
+  if (routerPath(mounted, base).startsWith('//'))
+    throw new ShotRefused(`${JSON.stringify(input)} has a second slash after the base`)
+
+  return mounted
 }
 
 // The file name of a page's shot, the page's path made of letters, digits and `-`, anything else as `_` and its hex, so two paths never share one.
 export function shotName(path: string, width: number, scheme: Scheme, height: number | undefined, fullPage: boolean): string {
   let slug = ''
 
-  for (const byte of new TextEncoder().encode(path.replace(LEADING_SLASH, '') || 'index')) {
+  // The root has a name no path can have, as `/index` is a page of its own; capitals are escaped too, for a filesystem that ignores case.
+  for (const byte of new TextEncoder().encode(path.replace(LEADING_SLASH, ''))) {
     const char = String.fromCharCode(byte)
 
     slug += SAFE.test(char) ? char : `_${byte.toString(16).padStart(2, '0')}`
   }
+
+  if (slug === '')
+    slug = '_root'
 
   if (slug.length > 100)
     slug = `${slug.slice(0, 80)}~${Bun.hash(path).toString(16)}`
@@ -136,10 +146,15 @@ export async function screenshot(root: string, input: string, options: ShotOptio
     const report: ShotReport = { url: url.href, status, shots: [], console: [], problems: [] }
 
     for (const width of widths) {
-      const taken = await within(shoot(root, url, path, width, height, scheme, options.fullPage === true), SHOT_MS)
+      const open: { page?: { close: () => void } } = {}
+      const taken = await within(shoot(open, root, url, path, width, height, scheme, options.fullPage === true), SHOT_MS)
 
-      if (taken === undefined)
+      if (taken === undefined) {
+        // The shot goes on in the background, its page closed rather than left to the end of the process.
+        open.page?.close()
+
         throw new ShotRefused(`${url.href} was not shot within ${SHOT_MS / 1000} s at ${width} px, the browser stopped answering`)
+      }
 
       report.shots.push(taken.shot)
       report.console.push(...taken.console.map(line => `${width} px: ${line}`))
@@ -164,13 +179,14 @@ async function reach(url: URL): Promise<number> {
   }
 }
 
-async function shoot(root: string, url: URL, path: string, width: number, height: number | undefined, scheme: Scheme, fullPage: boolean): Promise<{ shot: Shot, console: string[] }> {
-  const page = await browse(url.href, { width, height: height ?? DEFAULT_HEIGHT, timeout: SETTLE_MS, strict: false, lenient: true })
+async function shoot(open: { page?: { close: () => void } }, root: string, url: URL, path: string, width: number, height: number | undefined, scheme: Scheme, fullPage: boolean): Promise<{ shot: Shot, console: string[] }> {
+  const page = await browse(url.href, { width, height: height ?? DEFAULT_HEIGHT, timeout: SETTLE_MS, strict: false, lenient: true, colorScheme: scheme })
+
+  open.page = page
 
   try {
     // The window is taller than the page's viewport by the browser's own bar.
     await page.view.cdp('Emulation.setDeviceMetricsOverride', { width, height: height ?? DEFAULT_HEIGHT, deviceScaleFactor: 1, mobile: false })
-    await page.view.cdp('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: scheme }] })
     // Through DevTools rather than the page's `evaluate`, which waits for a page still loading.
     const total = await within(prepare(page.view, fullPage), PREPARE_MS)
     const cut = fullPage && typeof total === 'number' && total > MAX_HEIGHT
@@ -233,7 +249,10 @@ async function keep(root: string, name: string, png: Uint8Array, shot: { width: 
     before = undefined
   }
 
-  writeFileSync(current, png)
+  const partial = `${current}.${process.pid}`
+
+  writeFileSync(partial, png)
+  renameSync(partial, current)
 
   const { width, height } = await new Bun.Image(png).metadata()
   const kept: Shot = { width: shot.width, scheme: shot.scheme, file: relative(current), size: { width, height }, ...shot.cut && { cut: true } }
@@ -241,7 +260,15 @@ async function keep(root: string, name: string, png: Uint8Array, shot: { width: 
   if (before === undefined)
     return kept
 
-  const compared = await diffPngs(before, png)
+  let compared: Awaited<ReturnType<typeof diffPngs>>
+
+  try {
+    compared = await diffPngs(before, png)
+  }
+  // A shot before that is cut short or no PNG is as good as none.
+  catch {
+    return kept
+  }
 
   writeFileSync(diff, compared.image)
 
