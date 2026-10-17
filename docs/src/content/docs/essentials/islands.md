@@ -35,6 +35,26 @@ input(bind:value={query} aria-label="Search")
 p {matches().length} results
 ```
 
+### Effects outside a component
+
+An effect made while a component renders stops with the component. Code that runs elsewhere, such as a module that keeps a subscription, has no component to stop it. Wrap it in `root`, which gives it an owner of its own.
+
+```ts
+import { effect, onCleanup, root } from 'kay'
+
+const stop = root((dispose) => {
+  effect(() => {
+    const timer = setInterval(poll, count())
+
+    onCleanup(() => clearInterval(timer))
+  })
+
+  return dispose
+})
+```
+
+The effect and its cleanups live until `stop()` is called, and `root` returns what its function returns.
+
 ## See which components are islands
 
 `kay build` lists every island under the JavaScript it ships. Each line gives the first thing that made it one, such as `onClick, line 4` or `bind:value, line 9`.

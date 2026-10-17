@@ -69,6 +69,34 @@ export default defineConfig({
 
 Under `bun test`, files stay in memory, each `testSite` with its own.
 
+### Your own store
+
+`storage` takes any object of `FileStore`, from `kay/server`. It reads, writes and deletes a file by key. Keys are never written twice, so it needs no locking.
+
+```ts
+import type { FileStore } from 'kay/server'
+
+const storage: FileStore = {
+  write: async (key, data) => { await bucket.put(key, data) },
+  read: async key => await bucket.get(key) ?? undefined,
+  delete: async (key) => { await bucket.remove(key) },
+}
+```
+
+`read` resolves with `undefined` when no file has that key. Three members are optional:
+
+- `list(prefix?)` resolves with `{ key, modified? }` for each file under the prefix. `files.list()` needs it.
+- `path(key)` is where a store on this machine's disk keeps a file, which the image route reads in place.
+- `publicUrl` is where the files are reachable over HTTP without kay. A static export links there.
+
+### S3 options
+
+`s3Files` takes Bun's S3 client options too. Use `virtualHostedStyle: true` for a service that wants the bucket in the host name.
+
+```ts
+s3Files({ bucket: 'uploads', endpoint: 'https://s3.example.com', virtualHostedStyle: true })
+```
+
 ## Upload progress
 
 An island calling an action with a file reads `upload.progress()`, from 0 to 1 while the browser sends it.

@@ -93,4 +93,25 @@ An idle queue looks for a job from one worker. A job another process enqueued wa
 
 Set `idlePoll: '1s'` to look every second, or `'30s'` to ask the database less often.
 
-<ReadMore href="/llms/production#background-jobs">Job stores, concurrency, lost jobs and how shutdown waits for runs in progress are in the full production reference.</ReadMore>
+### Your own store
+
+`sqliteJobs` is the default store. To keep jobs in Redis or Postgres, pass `store` an object of `JobStore`, from `kay/server`. Every process of the app opens it, so it must hand each job to one process only.
+
+| Method | Does |
+| --- | --- |
+| `add(job)` | Keeps a new job |
+| `claim(queue, now, until)` | Takes the queue's next due job that no process holds, holding it until `until` |
+| `complete(id)` | Removes a job that ran |
+| `retry(id, runAt, error)` | Runs it again at `runAt` |
+| `fail(id, error)` | Keeps it as failed, out of the queue |
+| `failed(queue)` | Lists the failed jobs |
+| `nextRunAt(queue)` | When the next job may run, so a worker sleeps until then |
+| `lock(name, slot)` | True for the first caller of that name and slot, in any process, so a schedule runs once |
+
+`purge(queue, before)` and `jobs(queue)` are optional. Without `purge`, old failed jobs are listed and removed one by one. Without `jobs`, `remove` works by id only.
+
+```ts
+export const welcomeMails = queue('welcome-mails', sendWelcome, { store: myStore })
+```
+
+<ReadMore href="/llms/production#background-jobs">Concurrency, lost jobs and how shutdown waits for runs in progress are in the full production reference.</ReadMore>

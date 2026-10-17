@@ -18,6 +18,10 @@ Each page is written twice, as `about.html` and `about/index.html`. A host then 
 
 The browser build goes under `_kay/`. The files of `public/` are copied to the root. Every endpoint file, `llms.txt`, the sitemap, `robots.txt`, feeds, favicons and `404.html` are written too, the last from your `_404.kay`.
 
+A redirect from `kay.config.ts` without params becomes a page that sends the browser on. Every redirect is also written to `_redirects`, which hosts such as Netlify and Cloudflare Pages read.
+
+`sw.js` is written too. With `offline` on it is the worker that keeps the site for offline visitors. Without it, it is a worker that removes one an earlier deploy left, so no visitor is served a stale page.
+
 Compressible files also get a `.br` and a `.gz` copy beside them, for a server that sends them as they are, such as nginx with `gzip_static`. Asset names carry a hash, so `_kay/` can be cached forever.
 
 <ReadMore href="/llms/prerendering#static-export">Images, redirects, locales and how the output directory is cleared.</ReadMore>

@@ -59,7 +59,7 @@ Use it before the pages: `new Elysia().use(sessions).use(await pages())`.
 
 ### Choosing a store
 
-With a store, the cookie only carries an id. `memoryStore()` is for development. `sqliteStore(path)` fits one machine. Any object with `get`, `set` and `delete` works as a store.
+With a store, the cookie only carries an id. `memoryStore()` is for development. `sqliteStore(path)` fits one machine. Any object with `get`, `set` and `delete` works as a store, as [Your own store](#your-own-store) shows.
 
 Without a store, the data travels in the cookie. It is sealed, but limited to about 3.5 KB and impossible to revoke. Signing out clears only the browser's copy. Production logs a warning at the first sign-in that says so.
 
@@ -69,19 +69,72 @@ To end every session of one person, call `deleteWhere` on `memoryStore()` or `sq
 await store.deleteWhere(data => data.userId === id)
 ```
 
+### Your own store
+
+A store is an object with three methods, each sync or async. `set` is given `maxAge` in seconds, past which the store may forget the session.
+
+```ts
+import type { SessionStore } from 'kay/server'
+
+const store: SessionStore = {
+  get: async id => JSON.parse(await redis.get(`session:${id}`) ?? 'null') ?? undefined,
+  set: async (id, data, maxAge) => {
+    await redis.set(`session:${id}`, JSON.stringify(data), 'EX', maxAge)
+  },
+  delete: async (id) => {
+    await redis.del(`session:${id}`)
+  },
+}
+```
+
+Add `deleteWhere(match)` to support ending every session of one person. It deletes each session whose data `match` accepts and resolves with how many went.
+
 ### Session lifetime
 
 A session lasts `maxAge` without use, 30 days by default. It never lasts longer than `absoluteMaxAge` from its start or its last `regenerate()`, 90 days by default.
 
 So call `regenerate()` at sign-in, not on every request.
 
+### Remember me
+
+`lifetime()` gives one session its own lifetime in place of `maxAge`. Call it right after `regenerate()`. It takes seconds or a string such as `'90d'`, and never goes past `absoluteMaxAge`.
+
+```ts
+await ctx.locals.session.regenerate()
+await ctx.locals.session.lifetime(input.remember ? '90d' : 'browser')
+```
+
+`'browser'` sends a cookie the browser drops when it closes. The server keeps that session for `browserMaxAge` without use, one day by default.
+
+### Changing the secret
+
+Give `secret` a list to rotate it. The first secret seals new cookies, and every one in the list opens old cookies.
+
+```ts
+session({ secret: [env.SESSION_SECRET, env.OLD_SESSION_SECRET], store })
+```
+
+A cookie sealed by an older secret is sealed again with the first on its next use. Drop the old secret once those cookies have expired.
+
+Form stamps, links to private files and the flash cookie are signed with a key from the first secret too. A rotation refuses the ones already out.
+
 ### The cookie
 
-Over https the cookie is `Secure` and named `__Host-session`, so no other host of the site can set it. Code reading it by hand looks for that name.
+The cookie is `HttpOnly` and `SameSite=Lax`. Over https it is `Secure` and named `__Host-session`, so no other host of the site can set it. Code reading it by hand looks for that name.
+
+`cookie` changes the name from `session`.
+
+To share the session between subdomains, such as `app.example.com` and `auth.example.com`, set `domain` to the visited host or a parent of it. The cookie then loses the `__Host-` prefix, since that prefix forbids a domain.
+
+```ts
+session({ secret: env.SESSION_SECRET, store, domain: 'example.com' })
+```
+
+Every subdomain must share the same secret and store. A value that is no host name, such as `localhost:3000`, throws at boot.
 
 Behind a proxy, every location passes `X-Forwarded-Proto`, websockets included. A request saying `http` reads no session.
 
-<ReadMore href="/llms/server#sessions">Secret rotation, `lifetime()` for "remember me", sharing a session across subdomains, the SQLite store's details and the cookie options are in the full server reference.</ReadMore>
+<ReadMore href="/llms/server#sessions">The SQLite store's details and every session option are in the full server reference.</ReadMore>
 
 ## Signing in and out
 

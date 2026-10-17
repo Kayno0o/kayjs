@@ -139,7 +139,28 @@ rateLimit: { max: 5, window: '1m', store: sqliteRates('data/rates.sqlite') }
 
 `sqliteRates` stores each key hashed, so the file alone cannot be checked against a guessed address.
 
-<ReadMore href="/llms/action-protection#rate-limits">Several limits at once, writing your own store and the exact counting rules.</ReadMore>
+### Your own store
+
+`store` takes a `RateStore`, from `kay`, to count in Redis or a database. `hit` counts one attempt under a key and opens a window when none is open. It answers with the attempts so far, this one included, and when the window closes.
+
+```ts
+import type { RateStore } from 'kay'
+
+const store: RateStore = {
+  hit: async (key, windowMs) => {
+    const count = await redis.incr(key)
+
+    if (count === 1)
+      await redis.pexpire(key, windowMs)
+
+    return { count, resetAt: Date.now() + await redis.pttl(key) }
+  },
+}
+```
+
+`peek(key)` is optional. It reads the open window without counting, which a limit set to `count: 'succeeded'` needs.
+
+<ReadMore href="/llms/action-protection#rate-limits">Several limits at once and the exact counting rules.</ReadMore>
 
 ## Rate limit a guard or an API route
 
@@ -256,5 +277,19 @@ A module without `cors` refuses every other origin. The module's rule is the onl
 ## A post from another site
 
 An action and an API route refuse a post another site sends, from its `Origin` or `Sec-Fetch-Site` header. The refusal is a 403 that says what it saw.
+
+Code on a plain Elysia route that kay does not reach asks for itself. `crossSiteRefused(request)` from `kay/server` is true for a browser's cross-site POST or websocket upgrade. `crossSiteResponse(request, 'request')` is the 403 to answer with, saying what the request sent and what kay took for the site. Pass `'action'` as the second argument for a form post.
+
+```ts
+import { Elysia } from 'elysia'
+import { crossSiteRefused, crossSiteResponse } from 'kay/server'
+
+new Elysia().post('/hook', ({ request }) => {
+  if (crossSiteRefused(request))
+    return crossSiteResponse(request, 'request')
+
+  return handle(request)
+})
+```
 
 If you see it in development, open the site by the address it is served on. Behind a proxy that does not pass the `Host` on, set `site` in `kay.config.ts` to the public address.

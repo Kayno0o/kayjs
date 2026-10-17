@@ -152,6 +152,28 @@ Add `revalidate: '1h'` to `page` to rebuild a prerendered page in the background
 
 <ReadMore href="/llms/prerendering#prerendering">What makes a page keepable, how the run-time check works, and how kept pages treat locales and `trailingSlash`.</ReadMore>
 
+### Changing a page before it is written
+
+A page hook gets each prerendered page as it is about to be written, and returns the HTML to write instead. Put it in `transformPage` of an extension listed in `kay.config.ts`.
+
+```ts
+// kay.config.ts
+import { defineConfig } from 'kay/server'
+
+export default defineConfig({
+  extensions: [{
+    name: 'build-stamp',
+    transformPage: ({ html }) => html.replace('<!--built-->', new Date().toISOString()),
+  }],
+})
+```
+
+The hook is given `path`, `locale` and `html`. It also has `file(url)`, which resolves the file behind a root-relative URL the page links, such as a stylesheet or an image variant, to read its size.
+
+It runs in `kay build`, `--static` included, and again each time the server renders a page afresh, so a page never loses what it added. `kay dev` calls none. Several hooks run in their order, each given the HTML the one before returned.
+
+<ReadMore href="/llms/prerendering#page-hooks">A hook measuring page weight, when it runs and how pages run in parallel.</ReadMore>
+
 ### Server islands
 
 `server` on a component call renders that component on each request, inside a page that is otherwise prerendered. Use it for a form with a fresh token, a greeting or a stock count. The rest of the page is prerendered, with no `prerender` flag needed.
@@ -169,6 +191,14 @@ Reviews(server="defer")
 
 `server` renders the island into the page before it is sent. `server="defer"` sends the page as prerendered, and the browser fetches the island as it nears the screen.
 
+A deferred island shows nothing useful without JavaScript. Add `noscript` with the text of a link, and a visitor without JavaScript gets a link to the page with every island in place.
+
+```kay
+ContactForm(server="defer" noscript="Show the contact form")
+```
+
+Leave it off when the island's content is reachable without it. `noscript` goes only with `server="defer"`.
+
 ## Redirects
 
 Old URLs go in `kay.config.ts`.
@@ -180,6 +210,22 @@ export default defineConfig({
   },
 })
 ```
+
+### Rewrite a request to another path
+
+`rewrite` serves a request from another path, and the browser keeps its URL. Use it to serve one host's pages from a section of your routes.
+
+```ts
+export default defineConfig({
+  rewrite: url => url.hostname === 'shop.example.com'
+    ? `/shop${url.pathname}${url.search}`
+    : undefined,
+})
+```
+
+Return a path starting with one `/`, query included, or `undefined` to serve the request as it came. Anything else answers 500.
+
+The rewritten request goes through the whole app again, guards included, and sees the new path in `ctx.url` and `ctx.params`. kay's own `/_kay/` routes are never rewritten, so they work on every host.
 
 ## Pages from a library
 

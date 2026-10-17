@@ -49,6 +49,25 @@ const disk = sqliteCache('data/cache.sqlite')
 const reviews = await cached('reviews', 86_400, fetchReviews, { store: disk })
 ```
 
+### Your own store
+
+A store is an object of `CacheStore`, from `kay/cache`. Its methods are synchronous, so `invalidate` is done when it returns.
+
+```ts
+import type { CacheStore } from 'kay/cache'
+
+const store: CacheStore = {
+  get: key => rows.get(key),
+  set: (key, text, freshUntil) => rows.set(key, { text, freshUntil }),
+  delete: key => rows.delete(key),
+  keys: () => [...rows.keys()],
+}
+```
+
+`get` returns `{ text, freshUntil }`, where `text` is the value kay serialized and `freshUntil` is a time in ms since the epoch. A store never parses `text`.
+
+Two methods are optional. `dependencies()` reads which keys each value was built from without reading the values, which makes `invalidate` faster. `publish(message)` and `subscribe(listener)` let processes sharing the store tell each other what they invalidated.
+
 <Callout type="note">
 
 The cache lives in the process, and every caller shares the value, so never mutate it. A `sqliteCache` is shared by the processes of one machine.

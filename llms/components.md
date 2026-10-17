@@ -228,6 +228,7 @@ ul
 
 - `effect(fn)` runs once the render is done and again whenever what it read changes.
 - `onMount`, `onCleanup`, `untrack`, `batch`, `root` and `flush` come from `kay` too.
+- `root(fn)` runs `fn(dispose)` under an owner of its own, not attached to the one it was called under: the effects and `onCleanup`s created inside live until `dispose()` is called, and `root` returns what `fn` returns. It is for code with no component to stop it, such as a module-level subscription.
 - A write applies at once; the effects it touches run together in a microtask, or right away through `flush()`.
 - `every(ms, run, { while })` from `kay` runs `run` every `ms` milliseconds while the island lives, and while `while`, read as an effect reads, holds: the timer starts and stops as it turns, never on the server.
 - `every` skips a tick while the promise the last run returned is pending.

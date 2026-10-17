@@ -150,7 +150,7 @@ export default guard(async ({ request, headers, deny }) => {
 })
 ```
 
-- A library or route limiting attempts its own way reads the client as `rateLimit` does: `clientAddress(request, server)` and `rateKey(address)` from `kay/server` give the address, read through the `proxy` setting, and the key a limit counts it under, an IPv6 address's /64 block. A library guarding what kay's actions and API do not reach reads `crossSiteRefused(request, site?)` from `kay/server`, true for a browser's cross-site POST or websocket upgrade that no `api({ cors })` module let in, `site` an extra public URL whose host counts as the request's own.
+- A library or route limiting attempts its own way reads the client as `rateLimit` does: `clientAddress(request, server)` and `rateKey(address)` from `kay/server` give the address, read through the `proxy` setting, and the key a limit counts it under, an IPv6 address's /64 block. A library guarding what kay's actions and API do not reach reads `crossSiteRefused(request, site?)` from `kay/server`, true for a browser's cross-site POST or websocket upgrade that no `api({ cors })` module let in, `site` an extra public URL whose host counts as the request's own; `crossSiteResponse(request, 'action' | 'request', site?)` from `kay/server` is the 403 `Response` for one it refused, headed `Cross-site action refused` or `Cross-site request refused`, saying the `Origin` or `Sec-Fetch-Site` it saw and the origins kay took for the site.
 
 ### Body limit
 

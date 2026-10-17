@@ -235,7 +235,26 @@ export default api()
 
 `publish(room, message)` sends to everyone in the room. Pass `{ except: ws }` to skip the sender.
 
-A room no one is in is gone. Rooms live in the memory of one process by default.
+A room no one is in is gone. Rooms live in the memory of one process by default. To reach every process of the machine, give `rooms` `sqliteRooms(path)`.
+
+```ts
+import { rooms, sqliteRooms } from 'kay/server'
+
+const chats = rooms<{ text: string }, string>({ store: sqliteRooms('data/rooms.sqlite') })
+```
+
+### Your own store
+
+To share rooms through Redis or another server, pass `store` a `RoomStore`, from `kay/server`. It keeps who is in each room and carries messages between processes.
+
+| Method | Does |
+| --- | --- |
+| `add(room, connection, member)` | Records a connection of this process, with its member as JSON |
+| `remove(room, connection)` | Drops it |
+| `members(room)` | The members of a room as JSON, in every process sharing the store |
+| `publish(room, text, recipients)` | Hands a message to the listeners of every process, this one's included |
+| `subscribe(listener)` | Calls the listener with each message published from then on, and returns what stops it |
+| `close()` | Stops what the store runs in the background |
 
 ### Sending a snapshot
 

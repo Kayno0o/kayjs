@@ -18,6 +18,8 @@ Inside a `.kay` file, `signal`, `memo`, `effect`, `onMount`, `onCleanup`, `props
 | Export | Is |
 | --- | --- |
 | `signal`, `memo`, `effect`, `batch`, `untrack`, `onMount`, `onCleanup` | Reactivity |
+| `root` | An owner of its own, so effects created inside live until its `dispose` is called. See [Islands](/essentials/islands#effects-outside-a-component) |
+| `live` | A value the server changes and every page showing it follows. See [Live and realtime](/guides/live-and-realtime#values-the-server-changes) |
 | `watch`, `debounced` | Code running on a change only, handed the value before, and a value once it stops changing |
 | `every` | A timer running while an island lives, and while a condition holds |
 | `listen` | An event listener on `window`, `document` or another target while an island lives |
@@ -32,7 +34,7 @@ Inside a `.kay` file, `signal`, `memo`, `effect`, `onMount`, `onCleanup`, `props
 | `searchResults`, `searchSite` | The site search from an island: following a signal holding the query, or as a promise |
 | `shortcut` | Binds a keyboard shortcut such as `mod+s` for as long as the island lives, on the page or one element. See [Islands](/essentials/islands#keyboard-shortcuts) |
 | `guardLeave` | Warns before leaving a page with unsaved changes |
-| `resource`, `call`, `socket`, `stream`, `dispatch` | Typed reads and calls of API routes, websockets and event streams from islands; `call` throws `ApiError`. See [API routes](/guides/api-routes) |
+| `resource`, `call`, `socket`, `stream`, `dispatch` | Typed reads and calls of API routes, websockets and event streams from islands; `call` throws `ApiError`, which has the route's `status`, 0 when no answer came, and its `answer`. See [API routes](/guides/api-routes) |
 | `publicEnv` | The variables `publicEnv` in the config exposed to islands |
 | `localPath`, `withBase` | A path with the locale prefix or the `base` applied |
 | `sanitizeHtml`, `trustHtml` | Clean untrusted HTML, its options typed `SanitizeOptions`, or mark HTML as safe to render, which a spread's `innerHTML` requires |
@@ -55,7 +57,8 @@ Types include `Component`, `Signal`, `Guard`, `Duration`, `PageContext`, `Endpoi
 | `session`, `memoryStore`, `sqliteStore` | Cookie sessions and their stores. See [Sessions and guards](/guides/sessions-and-guards) |
 | `defineEnv` | Reads `process.env` once against a schema, typed |
 | `rateLimit`, `memoryRates`, `sqliteRates`, `clientAddress`, `rateKey` | Rate limiting, and the key a limit counts an address under |
-| `crossSiteRefused` | Whether a browser's cross-site POST or websocket upgrade should be refused, for code that kay's actions and API do not reach |
+| `crossSiteRefused`, `crossSiteResponse` | Whether a browser's cross-site POST or websocket upgrade should be refused, for code that kay's actions and API do not reach, and the 403 to answer it with. See [Security](/guides/security#a-post-from-another-site) |
+| `toolCall` | Whether a request is a tool call that `/mcp` passed on, and which. See [API routes](/guides/api-routes#telling-a-tool-call-apart) |
 | `workChallenge`, `verifyWork` | Proof of work in a form field your own code checks |
 | `requestId` | The id of a request, on its log lines and its `X-Request-Id` header |
 | `schedule`, `background` | Jobs on a cron or every so long, and background work, in the server's process |
@@ -77,7 +80,8 @@ Types include `BrowserError` and `CspViolation`, the browser errors and CSP viol
 | --- | --- |
 | `kay/content` | `collection`, `paginate`, `renderMarkdown`, `highlightCode`; for a CMS, `bodyHtml`, `MarkdownError`, `collections`, `collectionInfo`, `entries`, `entrySource`, `entryFile`, `saveEntry`, `removeEntry`, `repositoryRoot`, `reference`, `imageField`, `fileField`, `markdownField`. See [Content](/guides/content) |
 | `kay/edit` | `showDraft`, which shows the page with an editor's unsaved entries in edit mode, and the `EditorProps` an extension's `editor` is given. See [Content](/guides/content) |
-| `kay/dev-tool` | The `DevTool` type a library's `devTool` module is given, to add a tab to the dev tool. See [A tab for a library](/llms/component-libraries#a-tab-for-a-library) |
+| `kay/dev-tool` | The `DevTool` type a library's `devTool` module is given, with `make`, `tab`, `button`, `outline`, `hideOutline` and `open`, and the `DevTab` and `DevTabOptions` of `tab`. See [A tab for a library](/llms/component-libraries#a-tab-for-a-library) |
+| `kay/compiler` | `compileKay`, which compiles one `.kay` source, `formatDiagnostic`, which prints a problem it found, and the `Diagnostic`, `CompileOptions` and `CompileResult` types. See [Compiling a component](/llms/check-and-tools#compile-a-component-from-a-tool) |
 | `kay/markdown` | `markdownHtml`, sanitized Markdown on the server and in an island. See [Content](/guides/content#markdown-in-an-island) |
 | `kay/seo` | `siteUrl`, `siteOrigin`, `jsonLd`, `breadcrumbList`. See [Head and SEO](/essentials/head-and-seo) |
 | `kay/i18n` | `t`, `locale`, `locales`, `localeName`, `localize`, `alternate`, `formatNumber`, `formatDate`, `formatRelativeTime`, `relativeTime`, `formatList`, `direction`, `defineMessages`. See [Internationalization](/guides/i18n) |
