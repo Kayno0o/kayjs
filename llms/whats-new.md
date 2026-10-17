@@ -2,7 +2,7 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
-## Unreleased
+## 1.52.0
 
 - A form inside a streamed `await` block is checked and sent by kay as one in the page is ([Streaming](rendering.md#streaming)).
 - kayjs-ai counts a signed-in kayjs-auth user, not their address, with no `visitor` option; `visitor` stays as an override ([kayjs-ai](../packages/ai/llms/limits.md)).
