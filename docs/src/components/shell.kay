@@ -27,8 +27,8 @@ a.skip-link(href="#content") Skip to the content
         a.version(href={RELEASES}) v{nav.version}
         a.repository(href={REPOSITORY} aria-label="kay's repository")
           Icon(icon={BrandGithub})
-        ThemePicker(persist)
-      Search(persist groups={nav.groups} structure={nav.structure} components={nav.components})
+        ThemePicker(persist hydrate="idle")
+      Search(persist hydrate="idle" groups={nav.groups} structure={nav.structure} components={nav.components})
       // Shown once the sidebar folds into a popover.
       Button(class="hidden max-[56rem]:inline-flex" label="Menu" icon="menu" popovertarget="sidebar")
     nav#sidebar.sidebar(popover aria-label="Documentation")
@@ -59,4 +59,4 @@ a.skip-link(href="#content") Skip to the content
       p Built with #[a(href={REPOSITORY}) kay] {nav.version}, under the #[a(href={`${FORGE}/LICENSE`}) MIT license]. #[span(data-page-weight)]
       p See #[a(href={RELEASES}) what changed in each release], or ask a question or report a bug in #[a(href={`${REPOSITORY}/issues`}) the issues].
 CodeCopy(persist)
-Toaster(persist)
+Toaster(persist hydrate="idle")

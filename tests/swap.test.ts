@@ -180,6 +180,13 @@ describe('page swap, on the server', () => {
     expect(child(Player({ persist: 'radio' }))).toContain('data-persist="radio"')
     expect(child(Player({}))).not.toContain('data-persist')
   })
+
+  it('marks a kept island that hydrates when idle or visible with both', () => {
+    const Player = island('player.kay', () => ({ t: '<button>Play</button>' }))
+
+    expect(child(Player({ persist: true, hydrate: 'idle' }))).toContain('data-props="[{}]" data-hydrate="idle" data-persist="player.kay">')
+    expect(child(Player({ persist: 'radio', hydrate: 'visible' }))).toContain('data-hydrate="visible" data-persist="radio"')
+  })
 })
 
 describe('page swap, checking a form in the browser', () => {
