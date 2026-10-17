@@ -72,6 +72,7 @@ describe('the dev tool', () => {
     tool = undefined
     ;(window as { $kayProblems?: unknown }).$kayProblems = []
     sessionStorage.clear()
+    localStorage.clear()
     document.head.innerHTML = ''
     document.documentElement.removeAttribute('aria-busy')
   })
@@ -125,7 +126,7 @@ describe('the dev tool', () => {
     expect(shadow().querySelector<HTMLElement>('.actions')!.hidden).toBe(true)
   })
 
-  it('lists its tabs in a vertical rail that moves by Up and Down, and keeps the size and side it was given for the browser tab', async () => {
+  it('lists its tabs in a vertical rail that moves by Up and Down, and keeps the size it was given for the browser', async () => {
     tool = startDevTool()
     tool.tab({ id: 'other', label: 'Other' })
     await Bun.sleep(0)
@@ -135,7 +136,7 @@ describe('the dev tool', () => {
 
     expect(rail.getAttribute('aria-orientation')).toBe('vertical')
     expect([...rail.querySelectorAll('[role=tab]')].map(tab => tab.id)).toEqual(['problems', 'request', 'head', 'env', 'images', 'performance', 'routes', 'other'].map(id => `kay-dev-tab-${id}`))
-    expect(icons()).toEqual([['Fill the window', 'Fill the window', ''], ['Dock right', 'Dock right', ''], ['Close', 'Close', '']])
+    expect(icons()).toEqual([['Float', 'Float', ''], ['Dock to the bottom', 'Dock to the bottom', ''], ['Dock to the right', 'Dock to the right', ''], ['Fill the window', 'Fill the window', ''], ['Close', 'Close', '']])
 
     key({ key: 'K', code: 'KeyK', altKey: true, shiftKey: true })
     key({ key: 'ArrowDown' }, shadow().activeElement!)
@@ -148,7 +149,7 @@ describe('the dev tool', () => {
 
     shadow().querySelector<HTMLButtonElement>('.icon[aria-label="Fill the window"]')!.click()
     expect(shadow().querySelector('.ui.max')).not.toBeNull()
-    expect(icons()[0]).toEqual(['Restore the size', 'Restore the size', ''])
+    expect(icons()[3]).toEqual(['Restore the size', 'Restore the size', ''])
     tool.stop()
 
     tool = startDevTool()
@@ -159,7 +160,7 @@ describe('the dev tool', () => {
     expect(shadow().querySelector('.ui.max')).toBeNull()
   })
 
-  it('opens on the bar or Alt+Shift+K, moves between tabs by arrow keys, closes on Escape from inside it, and keeps its tab and dock side for the browser tab', async () => {
+  it('opens on the bar or Alt+Shift+K, moves between tabs by arrow keys, closes on Escape from inside it, and keeps its tab for the browser tab and its dock for the browser', async () => {
     tool = startDevTool()
     tool.tab({ id: 'other', label: 'Other' })
     await Bun.sleep(0)
@@ -192,14 +193,57 @@ describe('the dev tool', () => {
     expect(shadow().activeElement?.textContent).toBe('kay')
 
     shadow().querySelector<HTMLButtonElement>('.mark')!.click()
-    shadow().querySelector<HTMLButtonElement>('.icon[aria-label="Dock right"]')!.click()
+    shadow().querySelector<HTMLButtonElement>('.icon[aria-label="Dock to the right"]')!.click()
     tool.stop()
+    sessionStorage.clear()
 
     tool = startDevTool()
     await Bun.sleep(0)
 
-    expect(drawer().hidden).toBe(false)
-    expect(shadow().querySelector('.ui.right')).not.toBeNull()
+    expect(drawer().hidden).toBe(true)
+    expect(shadow().querySelector('.ui.dock-right')).not.toBeNull()
+    expect(shadow().querySelector('.icon[aria-label="Dock to the right"]')!.getAttribute('aria-pressed')).toBe('true')
+  })
+
+  it('docks to the bottom or the right padding the page while open, resizes from the grip the keyboard reaches, and reads a broken layout as the default', async () => {
+    const padding = () => [...document.adoptedStyleSheets].flatMap(sheet => [...sheet.cssRules].map(rule => rule.cssText)).join(' ')
+    const reached = () => [...shadow().querySelectorAll<HTMLElement>('.grip')].filter(grip => grip.tabIndex === 0).map(grip => grip.dataset.edge)
+    const shown = () => [...shadow().querySelectorAll<HTMLElement>('.grip')].filter(grip => grip.hidden === false).map(grip => grip.dataset.edge)
+    const dockTo = (label: string) => shadow().querySelector<HTMLButtonElement>(`.icon[aria-label="${label}"]`)!.click()
+
+    localStorage.setItem('kay-dev-layout', '{"dock":"sideways","corner":"middle","box":{"left":"x"},"bottom":"tall"}')
+    tool = startDevTool()
+    await Bun.sleep(0)
+
+    // A floating drawer resizes from every edge and corner, the keyboard reaching its bottom right corner.
+    expect(shadow().querySelector('.ui.floating')).not.toBeNull()
+    expect(shown()).toEqual(['n', 'e', 's', 'w', 'ne', 'nw', 'se', 'sw'])
+    expect(reached()).toEqual(['se'])
+
+    shadow().querySelector<HTMLButtonElement>('.mark')!.click()
+    dockTo('Dock to the bottom')
+
+    expect(shown()).toEqual(['n'])
+    expect(shadow().querySelector('.grip.n')!.getAttribute('role')).toBe('separator')
+    expect(shadow().querySelector<HTMLElement>('.ui')!.style.getPropertyValue('--dock')).toBe('320px')
+    expect(padding()).toContain('padding-bottom: 320px')
+    expect(shadow().querySelector<HTMLElement>('.size')!.hidden).toBe(true)
+
+    // Up grows a drawer docked at the bottom, never past its smallest height: happy-dom lays nothing out, so the drawer measures 0 high.
+    key({ key: 'ArrowUp' }, shadow().querySelector('.grip.n')!)
+    expect((JSON.parse(localStorage.getItem('kay-dev-layout')!) as { bottom: number }).bottom).toBe(180)
+
+    dockTo('Dock to the right')
+    expect(padding()).toContain('padding-right: 448px')
+    expect(reached()).toEqual(['w'])
+
+    shadow().querySelector<HTMLButtonElement>('.mark')!.click()
+    expect(padding()).not.toContain('padding')
+
+    tool.stop()
+    tool = undefined
+    expect(document.adoptedStyleSheets).toHaveLength(0)
+    expect(sessionStorage.getItem('kay-dev')).not.toContain('dock')
   })
 
   it('dismisses the problems shown for the rest of the browser tab, drops what the page logged as a swap starts, and reads what kay check finds again as it ends', async () => {

@@ -536,9 +536,9 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay dev in
     expect((await heights()).drawer).toBe(short.drawer)
 
     // The maximized drawer fills the window.
-    await shown.evaluate(() => document.querySelector('kay-dev')!.shadowRoot!.querySelector<HTMLElement>('.head .icon')!.click())
+    await shown.evaluate(() => document.querySelector('kay-dev')!.shadowRoot!.querySelector<HTMLElement>('.head .size')!.click())
     expect((await heights()).drawer).toBeGreaterThan((await heights()).limit)
-    await shown.evaluate(() => document.querySelector('kay-dev')!.shadowRoot!.querySelector<HTMLElement>('.head .icon')!.click())
+    await shown.evaluate(() => document.querySelector('kay-dev')!.shadowRoot!.querySelector<HTMLElement>('.head .size')!.click())
 
     // axe-core cannot resolve the drawer's backgrounds (it reports the contrast of each text as undetermined), so the pairs the drawer draws, hovered ones included, are measured here by the WCAG formula; the dark palette is applied by hand, as a browser reporting a dark scheme would.
     for (const scheme of ['light', 'dark']) {
@@ -590,6 +590,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay dev in
           'tab:hover': ['text', 'mantle'],
           'tab selected': ['text', 'surface'],
           'tab count': ['sub', 'mantle'],
+          'dock pressed': ['accent-hi', 'mantle', 'accent-soft'],
           'bar': ['text', 'surface'],
           'bar pressed': ['accent-hi', 'surface', 'accent-soft'],
           'bar pill error': ['error', 'surface', 'error-soft'],
@@ -671,6 +672,79 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay dev in
     }
 
     expect(wide).toEqual([])
+  }, 60_000)
+
+  it('moves the drawer by its head, resizes it by an edge, docks it padding the page, lands the bar in a corner, and opens a new page as it was left', async () => {
+    let shown = await dev.open('/', { strict: false })
+
+    await shown.evaluate(() => localStorage.clear())
+    shown = await dev.open('/', { strict: false })
+
+    // Pointer events at window coordinates (the window is 800 by 600), a drag from `from` to `to` on the element `selector` names in the tool.
+    const drag = async (selector: string, from: [number, number], to: [number, number]) => shown.evaluate(([picked, [x, y], [toX, toY]]: [string, [number, number], [number, number]]) => {
+      const element = document.querySelector('kay-dev')!.shadowRoot!.querySelector<HTMLElement>(picked)!
+      const fire = (type: string, clientX: number, clientY: number) => element.dispatchEvent(new PointerEvent(type, { bubbles: true, composed: true, button: 0, clientX, clientY, pointerId: 1 }))
+
+      fire('pointerdown', x, y)
+      fire('pointermove', (x + toX) / 2, (y + toY) / 2)
+      fire('pointermove', toX, toY)
+      fire('pointerup', toX, toY)
+      // As a browser does after a press and release on one element.
+      element.click()
+    }, [selector, from, to] as [string, [number, number], [number, number]])
+    const rect = async (selector: string) => shown.evaluate((picked: string) => {
+      const { left, top, width, height } = document.querySelector('kay-dev')!.shadowRoot!.querySelector(picked)!.getBoundingClientRect()
+
+      return { left, top, width, height, right: innerWidth - left - width, bottom: innerHeight - top - height }
+    }, selector)
+
+    await shown.evaluate(() => document.querySelector('kay-dev')!.shadowRoot!.querySelector<HTMLButtonElement>('.mark')!.click())
+
+    const start = await rect('.drawer')
+
+    // Moved by its head 100 px right and up, then near the top edge, where it snaps 12 px from it.
+    await drag('.where', [start.left + 300, start.top + 15], [start.left + 400, start.top - 85])
+    expect(await rect('.drawer')).toMatchObject({ left: start.left + 100, top: start.top - 100, width: start.width })
+    await drag('.where', [start.left + 400, start.top - 85], [start.left + 400, 35])
+    expect((await rect('.drawer')).top).toBe(12)
+
+    // The right edge widens it, the top left corner grows it up and left, the bottom right one shrinks it no smaller than 280 by 180.
+    const moved = await rect('.drawer')
+
+    await drag('.grip.e', [moved.left + moved.width - 2, moved.top + 100], [moved.left + moved.width + 48, moved.top + 100])
+    expect((await rect('.drawer')).width).toBe(moved.width + 50)
+    await drag('.grip.se', [moved.left + moved.width + 48, moved.top + moved.height - 2], [0, 0])
+    expect(await rect('.drawer')).toMatchObject({ left: moved.left, top: moved.top, width: 280, height: 180 })
+
+    // A new page opens it where it was left.
+    shown = await dev.open('/', { strict: false })
+    await shown.evaluate(() => document.querySelector('kay-dev')!.shadowRoot!.querySelector<HTMLButtonElement>('.mark')!.click())
+    expect(await rect('.drawer')).toMatchObject({ left: moved.left, top: moved.top, width: 280, height: 180 })
+
+    // Docked to the bottom, it spans the window, pads the page by its height and lifts the bar above it; its top edge resizes it.
+    await shown.evaluate(() => document.querySelector('kay-dev')!.shadowRoot!.querySelector<HTMLButtonElement>('[aria-label="Dock to the bottom"]')!.click())
+
+    const docked = await rect('.drawer')
+
+    expect(docked).toMatchObject({ left: 0, right: 0, bottom: 0, height: 320 })
+    expect(await shown.evaluate(() => getComputedStyle(document.documentElement).paddingBottom)).toBe('320px')
+    expect((await rect('.bar')).bottom).toBe(332)
+    await drag('.grip.n', [200, docked.top + 2], [200, docked.top - 38])
+    expect((await rect('.drawer')).height).toBe(360)
+    expect(await shown.evaluate(() => getComputedStyle(document.documentElement).paddingBottom)).toBe('360px')
+
+    // Closed, the page has its own padding back.
+    await shown.evaluate(() => document.querySelector('kay-dev')!.shadowRoot!.querySelector<HTMLButtonElement>('.mark')!.click())
+    expect(await shown.evaluate(() => getComputedStyle(document.documentElement).paddingBottom)).toBe('0px')
+
+    // The bar dragged to the top right lands 12 px from that corner, and the press opens nothing.
+    const bar = await rect('.bar')
+
+    await drag('.mark', [bar.left + 10, bar.top + 10], [bar.left + 2000, -500])
+    expect(await rect('.bar')).toMatchObject({ top: 12, right: 12 })
+    expect(await shown.evaluate(() => document.querySelector('kay-dev')!.shadowRoot!.querySelector<HTMLElement>('.drawer')!.hidden)).toBe(true)
+
+    await shown.evaluate(() => localStorage.clear())
   }, 60_000)
 })
 

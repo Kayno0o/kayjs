@@ -6,6 +6,8 @@ description: Find what a page costs and what went wrong in it, with the dev tool
 
 Under `kay dev`, every page carries a small bar at the bottom left with a count of the page's problems. Click it, or press Alt+Shift+K, to open the dev tool. Press Escape to close it.
 
+Drag the drawer by its head to move it, and by an edge or a corner to resize it. The buttons in its head dock it to the bottom or the right of the window, where it pads the page so nothing hides under it. Drag the bar to move it to another corner. A new tab opens the tool where you left it.
+
 ```sh
 kay dev --open
 ```

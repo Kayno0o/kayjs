@@ -5,6 +5,7 @@ import type { DevProblem, DevProblems } from './dev-boot'
 
 const HOST = 'kay-dev'
 const STATE_KEY = 'kay-dev'
+const LAYOUT_KEY = 'kay-dev-layout'
 const CHECK_PROBLEMS = 'kay-check-problems'
 const REQUEST = 'kay-dev-request'
 const ROUTES_URL = '/_kay/dev/routes'
@@ -60,7 +61,7 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 .bar > button:hover { background: var(--mantle); }
 .bar > button[aria-pressed=true], .bar > button[aria-expanded=true] { background: var(--accent-soft); }
 .bar > button[aria-pressed=true] { color: var(--accent-hi); }
-.mark { font-weight: 700; letter-spacing: .01em; padding-left: 5px !important; }
+.mark { font-weight: 700; letter-spacing: .01em; padding-left: 5px !important; touch-action: none; }
 .mark svg { width: 20px; height: 20px; flex: none; }
 .pill { display: inline-flex; align-items: center; gap: 4px; padding: 0 7px; border-radius: 999px; font: 600 11px/18px system-ui, sans-serif; font-variant-numeric: tabular-nums; background: var(--mantle); color: var(--sub); white-space: nowrap; }
 .pill.error { background: var(--error-soft); color: var(--error); }
@@ -74,6 +75,26 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 .drawer { position: fixed; bottom: 56px; left: 12px; z-index: 2147483647; display: flex; flex-direction: column; width: min(36rem, calc(100vw - 24px)); height: min(28rem, 60vh); border: 1px solid var(--line); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow); overflow: hidden; container: drawer / inline-size; }
 .right .drawer { left: auto; right: 12px; }
 .max .drawer { width: calc(100vw - 24px); height: calc(100vh - 68px); }
+.top .bar { bottom: auto; top: 12px; }
+.top .drawer { bottom: auto; top: 56px; }
+.ui.dock-bottom .drawer { inset: auto 0 0; width: auto; height: var(--dock); border-width: 1px 0 0; border-radius: 0; }
+.ui.dock-right .drawer { inset: 0 0 0 auto; width: min(var(--dock), 100vw); height: auto; border-width: 0 0 0 1px; border-radius: 0; }
+.dock-bottom.open:not(.top) .bar { bottom: calc(var(--dock) + 12px); }
+.dock-right.open.right .bar { right: calc(var(--dock) + 12px); }
+.floating .head { cursor: move; touch-action: none; }
+.grip { position: absolute; z-index: 1; touch-action: none; }
+.grip.n, .grip.s { left: 10px; right: 10px; height: 6px; cursor: ns-resize; }
+.grip.e, .grip.w { top: 10px; bottom: 10px; width: 6px; cursor: ew-resize; }
+.grip.n, .grip.ne, .grip.nw { top: 0; }
+.grip.s, .grip.se, .grip.sw { bottom: 0; }
+.grip.e, .grip.ne, .grip.se { right: 0; }
+.grip.w, .grip.nw, .grip.sw { left: 0; }
+.grip.ne, .grip.nw, .grip.se, .grip.sw { width: 12px; height: 12px; }
+.grip.ne, .grip.sw { cursor: nesw-resize; }
+.grip.nw, .grip.se { cursor: nwse-resize; }
+.grip:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.dock { display: flex; gap: 2px; padding-right: 6px; margin-right: 2px; border-right: 1px solid var(--line); }
+.dock .icon[aria-pressed=true] { background: var(--accent-soft); color: var(--accent-hi); }
 .head { display: flex; align-items: center; gap: 8px; padding: 6px 6px 6px 10px; border-bottom: 1px solid var(--line); background: var(--mantle); }
 .title { display: flex; align-items: center; gap: 8px; font-weight: 650; min-width: 0; white-space: nowrap; }
 .title svg { width: 20px; height: 20px; flex: none; }
@@ -253,6 +274,8 @@ const ICONS = {
   'minimize-2': 'polyline~points~4 14 10 14 10 20|polyline~points~20 10 14 10 14 4|line~x1~14~x2~21~y1~10~y2~3|line~x1~3~x2~10~y1~21~y2~14',
   'panel-right': 'rect~width~18~height~18~x~3~y~3~rx~2|path~d~M15 3v18',
   'panel-left': 'rect~width~18~height~18~x~3~y~3~rx~2|path~d~M9 3v18',
+  'panel-bottom': 'rect~width~18~height~18~x~3~y~3~rx~2|path~d~M3 15h18',
+  'app-window': 'rect~x~2~y~4~width~20~height~16~rx~2|path~d~M10 4v4|path~d~M2 8h20|path~d~M6 4v4',
   'x': 'path~d~M18 6 6 18|path~d~m6 6 12 12',
   'copy': 'rect~width~14~height~14~x~8~y~8~rx~2~ry~2|path~d~M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2',
   'lock': 'rect~width~18~height~11~x~3~y~11~rx~2~ry~2|path~d~M7 11V7a5 5 0 0 1 10 0v4',
@@ -339,11 +362,52 @@ function pill(tool: Pick<DevTool, 'make' | 'icon'>, text: string, tone?: 'error'
 interface DevState {
   open: boolean
   tab: string
-  side: 'left' | 'right'
-  // The drawer fills the window.
-  max: boolean
   dismissed: string[]
 }
+
+type Dock = 'float' | 'bottom' | 'right'
+type Corner = 'bottom-left' | 'bottom-right' | 'top-left' | 'top-right'
+
+interface Box {
+  left: number
+  top: number
+  width: number
+  height: number
+}
+
+// Where the tool sits and how large, kept for the browser rather than the tab.
+interface DevLayout {
+  dock: Dock
+  // The corner of the bar, which a drawer left where it opens follows.
+  corner: Corner
+  // The floating drawer fills the window.
+  max: boolean
+  // The floating drawer once moved or resized, else where its corner puts it.
+  box?: Box | undefined
+  // The docked drawer's height at the bottom and width at the right.
+  bottom: number
+  right: number
+}
+
+const DOCKS = [['float', 'Float', 'app-window'], ['bottom', 'Dock to the bottom', 'panel-bottom'], ['right', 'Dock to the right', 'panel-right']] as const
+const CORNERS = new Set<string>(['bottom-left', 'bottom-right', 'top-left', 'top-right'])
+// The edges and corners that resize the drawer.
+const GRIPS = ['n', 'e', 's', 'w', 'ne', 'nw', 'se', 'sw'] as const
+// The grip the keyboard reaches for each dock: the corner of a floating drawer, the inner edge of a docked one.
+const KEY_GRIPS: Record<Dock, string> = { float: 'se', bottom: 'n', right: 'w' }
+const ARROWS: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }
+const MIN_WIDTH = 280
+const MIN_HEIGHT = 180
+// What a docked drawer leaves of the page.
+const PAGE_LEFT = 80
+// How near an edge a moved drawer snaps to it, and how far from it it lands.
+const SNAP = 24
+const MARGIN = 12
+// How far the bar's mark moves before a press becomes a drag.
+const DRAG_START = 5
+const KEY_STEP = 16
+// Below this window width the floating drawer spans it, wherever it was left.
+const NARROW = 480
 
 export interface DevTabOptions {
   id: string
@@ -420,6 +484,7 @@ export async function loadDevModules(tool: DevTool, modules: DevToolModule[], lo
 export function startDevTool(doc: Document = document): DevTool {
   const win = doc.defaultView! as Window & { $kayProblems?: DevProblems }
   const state = readState(win)
+  const layout = readLayout(win)
   const host = doc.createElement(HOST)
   const root = host.attachShadow({ mode: 'open' })
   const sheet = new CSSStyleSheet()
@@ -442,17 +507,38 @@ export function startDevTool(doc: Document = document): DevTool {
   const tabList = make('div', 'tabs')
   const rule = make('span', 'sep')
   const content = make('div', 'content')
-  const size = make('button', 'icon')
-  const side = make('button', 'icon')
+  const dock = make('div', 'dock')
+  const docks = DOCKS.map(([value, label, icon]) => {
+    const button = make('button', 'icon')
+
+    button.type = 'button'
+    setIcon(button, label, icon)
+    dock.append(button)
+
+    return { value, button }
+  })
+  const size = make('button', 'icon size')
   const close = make('button', 'icon')
+  const grips = GRIPS.map((edge) => {
+    const grip = make('div', `grip ${edge}`)
+
+    grip.dataset.edge = edge
+    drawer.append(grip)
+
+    return grip
+  })
   const status = make('span', 'sr')
   const tabs: { options: DevTabOptions, button: HTMLButtonElement, panel: HTMLElement, badge: HTMLButtonElement }[] = []
+  // A docked drawer pads the page by its size, so none of the page hides under it.
+  const pageSheet = new CSSStyleSheet()
   const save = () => writeState(win, state)
+  const saveLayout = () => writeLayout(win, layout)
 
   sheet.replaceSync(STYLE)
   root.adoptedStyleSheets = [sheet]
-  ui.classList.toggle('right', state.side === 'right')
-  ui.classList.toggle('max', state.max)
+  doc.adoptedStyleSheets = [...doc.adoptedStyleSheets, pageSheet]
+  dock.setAttribute('role', 'group')
+  dock.setAttribute('aria-label', 'Dock')
   drawer.id = 'kay-dev-drawer'
   drawer.setAttribute('role', 'dialog')
   drawer.setAttribute('aria-label', 'kay dev tools')
@@ -468,10 +554,9 @@ export function startDevTool(doc: Document = document): DevTool {
   title.append(drawing(doc, MARK, '4 5 54 52', ''), 'kay dev tools')
   status.setAttribute('role', 'status')
   size.type = 'button'
-  side.type = 'button'
   close.type = 'button'
   setIcon(close, 'Close', 'x')
-  head.append(title, where, size, side, close)
+  head.append(title, where, dock, size, close)
   body.append(tabList, content)
   drawer.append(head, body)
   bar.append(mark, status)
@@ -484,14 +569,61 @@ export function startDevTool(doc: Document = document): DevTool {
   const showWhere = () => {
     where.textContent = `${win.location.pathname}${win.location.search}`
   }
+  const dockSize = (value: number) => layout.dock === 'bottom' ? clamp(value, MIN_HEIGHT, win.innerHeight - PAGE_LEFT) : clamp(value, MIN_WIDTH, win.innerWidth - PAGE_LEFT)
+  // Lays the bar and drawer out as the layout says, within the window as it is now.
+  const place = () => {
+    const floating = layout.dock === 'float'
+    const docked = floating ? 0 : dockSize(layout.dock === 'bottom' ? layout.bottom : layout.right)
+    // A floating drawer the pointer can move and resize, which a narrow window spans instead.
+    const free = floating && !layout.max && win.innerWidth > NARROW
+    const box = free && layout.box !== undefined ? fitBox(layout.box, win) : undefined
+    const keyGrip = KEY_GRIPS[layout.dock]
+
+    ui.classList.toggle('right', layout.corner.endsWith('right'))
+    ui.classList.toggle('top', layout.corner.startsWith('top'))
+    ui.classList.toggle('floating', free)
+    ui.classList.toggle('max', floating && layout.max)
+    ui.classList.toggle('dock-bottom', layout.dock === 'bottom')
+    ui.classList.toggle('dock-right', layout.dock === 'right')
+    ui.classList.toggle('open', state.open)
+    ui.style.setProperty('--dock', `${docked}px`)
+    drawer.style.left = box === undefined ? '' : `${box.left}px`
+    drawer.style.top = box === undefined ? '' : `${box.top}px`
+    drawer.style.width = box === undefined ? '' : `${box.width}px`
+    drawer.style.height = box === undefined ? '' : `${box.height}px`
+    drawer.style.right = drawer.style.bottom = box === undefined ? '' : 'auto'
+    pageSheet.replaceSync(state.open && !floating ? `html { padding-${layout.dock}: ${docked}px !important; }` : '')
+    size.hidden = !floating
+    setIcon(size, layout.max ? 'Restore the size' : 'Fill the window', layout.max ? 'minimize-2' : 'maximize-2')
+
+    for (const { value, button } of docks)
+      button.setAttribute('aria-pressed', String(layout.dock === value))
+
+    for (const grip of grips) {
+      const edge = grip.dataset.edge!
+      const reached = edge === keyGrip
+
+      grip.hidden = floating ? !free : !reached
+      grip.tabIndex = reached ? 0 : -1
+
+      if (reached) {
+        grip.setAttribute('role', 'separator')
+        grip.setAttribute('aria-label', 'Resize the dev tools, arrow keys')
+        grip.setAttribute('aria-orientation', edge === 'n' ? 'horizontal' : 'vertical')
+        grip.setAttribute('aria-valuenow', String(Math.round(edge === 'n' ? drawer.offsetHeight : drawer.offsetWidth)))
+      }
+      else {
+        for (const name of ['role', 'aria-label', 'aria-orientation', 'aria-valuenow'])
+          grip.removeAttribute(name)
+      }
+    }
+  }
   const render = () => {
     const current = tabs.find(tab => tab.options.id === state.tab) ?? tabs[0]
 
     drawer.hidden = !state.open
     mark.setAttribute('aria-expanded', String(state.open))
-    ui.classList.toggle('max', state.max)
-    setIcon(size, state.max ? 'Restore the size' : 'Fill the window', state.max ? 'minimize-2' : 'maximize-2')
-    setIcon(side, state.side === 'left' ? 'Dock right' : 'Dock left', state.side === 'left' ? 'panel-right' : 'panel-left')
+    place()
     showWhere()
 
     for (const tab of tabs) {
@@ -603,18 +735,123 @@ export function startDevTool(doc: Document = document): DevTool {
     return element
   }
 
-  mark.onclick = () => state.open ? closeDrawer() : openTab(undefined)
+  // A press on the mark that moves past a few pixels drags the bar, landing it in the nearest corner, and opens nothing.
+  let dragged = false
+
+  mark.onpointerdown = (event) => {
+    if (event.button !== 0)
+      return
+
+    const start = bar.getBoundingClientRect()
+
+    dragged = false
+    follow(event, mark, (dx, dy) => {
+      if (!dragged && Math.hypot(dx, dy) < DRAG_START)
+        return
+
+      dragged = true
+      bar.style.left = `${start.left + dx}px`
+      bar.style.top = `${start.top + dy}px`
+      bar.style.right = bar.style.bottom = 'auto'
+    }, () => {
+      if (!dragged)
+        return
+
+      // The click that ends the press comes next, in this same task; a drag ended elsewhere gets none, and must not swallow the next one.
+      win.setTimeout(() => {
+        dragged = false
+      })
+
+      const box = bar.getBoundingClientRect()
+
+      layout.corner = `${box.top + box.height / 2 < win.innerHeight / 2 ? 'top' : 'bottom'}-${box.left + box.width / 2 < win.innerWidth / 2 ? 'left' : 'right'}`
+      bar.style.left = bar.style.top = bar.style.right = bar.style.bottom = ''
+      saveLayout()
+      place()
+    })
+  }
+  mark.onclick = () => {
+    if (dragged)
+      return
+
+    if (state.open)
+      closeDrawer()
+    else
+      openTab(undefined)
+  }
   close.onclick = () => closeDrawer(true)
   size.onclick = () => {
-    state.max = !state.max
-    save()
-    render()
+    layout.max = !layout.max
+    saveLayout()
+    place()
   }
-  side.onclick = () => {
-    state.side = state.side === 'left' ? 'right' : 'left'
-    ui.classList.toggle('right', state.side === 'right')
-    save()
-    render()
+
+  for (const { value, button } of docks) {
+    button.onclick = () => {
+      layout.dock = value
+      saveLayout()
+      place()
+    }
+  }
+
+  // The head of a floating drawer moves it, snapping it to an edge near where it is let go.
+  head.onpointerdown = (event) => {
+    if (event.button !== 0 || !ui.classList.contains('floating') || (event.target as Element).closest('button') !== null)
+      return
+
+    const start = boxOf(drawer)
+    // A press that does not move leaves a drawer that was never moved where its corner puts it.
+    let moved = false
+
+    event.preventDefault()
+    follow(event, head, (dx, dy) => {
+      moved = true
+      layout.box = fitBox({ ...start, left: start.left + dx, top: start.top + dy }, win)
+      place()
+    }, () => {
+      if (!moved)
+        return
+
+      layout.box = snapped(fitBox(layout.box ?? start, win), win)
+      saveLayout()
+      place()
+    })
+  }
+
+  // Each edge and corner resizes the drawer as the pointer moves it; the one the keyboard reaches resizes it by arrow keys.
+  const resizeFrom = (edge: string) => {
+    const start = boxOf(drawer)
+
+    return (dx: number, dy: number) => {
+      if (layout.dock === 'bottom')
+        layout.bottom = dockSize(start.height - dy)
+      else if (layout.dock === 'right')
+        layout.right = dockSize(start.width - dx)
+      else
+        layout.box = fitBox(resized(start, edge, dx, dy), win)
+
+      place()
+    }
+  }
+
+  for (const grip of grips) {
+    grip.onpointerdown = (event) => {
+      if (event.button !== 0)
+        return
+
+      event.preventDefault()
+      follow(event, grip, resizeFrom(grip.dataset.edge!), saveLayout)
+    }
+    grip.onkeydown = (event) => {
+      const arrow = ARROWS[event.key]
+
+      if (arrow === undefined)
+        return
+
+      event.preventDefault()
+      resizeFrom(grip.dataset.edge!)(arrow[0] * KEY_STEP, arrow[1] * KEY_STEP)
+      saveLayout()
+    }
   }
 
   // Up and Down, Home and End move between the tabs, as a vertical tab list's do.
@@ -695,6 +932,7 @@ export function startDevTool(doc: Document = document): DevTool {
 
   swaps.observe(doc.documentElement, { attributeFilter: ['aria-busy'] })
   win.addEventListener('popstate', showWhere, { signal: listening.signal })
+  win.addEventListener('resize', place, { signal: listening.signal })
   showWhere()
   listening.signal.addEventListener('abort', () => swaps.disconnect())
 
@@ -719,6 +957,7 @@ export function startDevTool(doc: Document = document): DevTool {
       request?.stop()
       win.removeEventListener('keydown', onKeyDown, true)
       listening.abort()
+      doc.adoptedStyleSheets = doc.adoptedStyleSheets.filter(other => other !== pageSheet)
       host.remove()
     },
   }
@@ -2496,7 +2735,7 @@ function a11yTargets(doc: Document, text: string): Element[] {
 }
 
 function readState(win: Window): DevState {
-  const fallback: DevState = { open: false, tab: 'problems', side: 'left', max: false, dismissed: [] }
+  const fallback: DevState = { open: false, tab: 'problems', dismissed: [] }
 
   try {
     return { ...fallback, ...JSON.parse(win.sessionStorage.getItem(STATE_KEY) ?? '{}') as Partial<DevState> }
@@ -2512,6 +2751,114 @@ function writeState(win: Window, state: DevState): void {
     win.sessionStorage.setItem(STATE_KEY, JSON.stringify(state))
   }
   catch {}
+}
+
+function readLayout(win: Window): DevLayout {
+  const fallback: DevLayout = { dock: 'float', corner: 'bottom-left', max: false, bottom: 320, right: 448 }
+  let read: Partial<DevLayout>
+
+  try {
+    read = JSON.parse(win.localStorage.getItem(LAYOUT_KEY) ?? '{}') as Partial<DevLayout>
+  }
+  catch {
+    return fallback
+  }
+
+  return {
+    dock: DOCKS.some(([dock]) => dock === read.dock) ? read.dock! : fallback.dock,
+    corner: CORNERS.has(String(read.corner)) ? read.corner! : fallback.corner,
+    max: read.max === true,
+    box: isBox(read.box) ? read.box : undefined,
+    bottom: typeof read.bottom === 'number' ? read.bottom : fallback.bottom,
+    right: typeof read.right === 'number' ? read.right : fallback.right,
+  }
+}
+
+// Per browser, unlike the rest of the state: a new tab opens the tool where the last one left it.
+function writeLayout(win: Window, layout: DevLayout): void {
+  try {
+    win.localStorage.setItem(LAYOUT_KEY, JSON.stringify(layout))
+  }
+  catch {}
+}
+
+function isBox(value: unknown): value is Box {
+  return typeof value === 'object' && value !== null && (['left', 'top', 'width', 'height'] as const).every(key => Number.isFinite((value as Record<string, unknown>)[key]))
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max)
+}
+
+function boxOf(element: Element): Box {
+  const { left, top, width, height } = element.getBoundingClientRect()
+
+  return { left, top, width, height }
+}
+
+// A box at least the drawer's smallest size, inside the window.
+function fitBox(box: Box, win: Window): Box {
+  const width = clamp(box.width, MIN_WIDTH, win.innerWidth)
+  const height = clamp(box.height, MIN_HEIGHT, win.innerHeight)
+
+  return { width, height, left: clamp(box.left, 0, win.innerWidth - width), top: clamp(box.top, 0, win.innerHeight - height) }
+}
+
+// A box near an edge of the window lands its margin from it.
+function snapped(box: Box, win: Window): Box {
+  return { ...box, left: snapAxis(box.left, box.width, win.innerWidth), top: snapAxis(box.top, box.height, win.innerHeight) }
+}
+
+function snapAxis(start: number, size: number, room: number): number {
+  if (start < SNAP)
+    return MARGIN
+
+  return room - start - size < SNAP ? room - size - MARGIN : start
+}
+
+// The box as an edge or corner, `n`, `e`, `s`, `w` or two of them, moves by an offset, the opposite side staying put.
+function resized(start: Box, edge: string, dx: number, dy: number): Box {
+  const box = { ...start }
+
+  if (edge.includes('e'))
+    box.width = start.width + dx
+
+  if (edge.includes('w')) {
+    box.width = Math.max(MIN_WIDTH, start.width - dx)
+    box.left = start.left + start.width - box.width
+  }
+
+  if (edge.includes('s'))
+    box.height = start.height + dy
+
+  if (edge.includes('n')) {
+    box.height = Math.max(MIN_HEIGHT, start.height - dy)
+    box.top = start.top + start.height - box.height
+  }
+
+  return box
+}
+
+// Calls `move` with the pointer's offset from where it went down until it lifts, then `done`.
+function follow(event: PointerEvent, element: HTMLElement, move: (dx: number, dy: number) => void, done: () => void): void {
+  const { clientX, clientY, pointerId } = event
+  const moving = new AbortController()
+
+  try {
+    element.setPointerCapture(pointerId)
+  }
+  catch {
+    // A pointer the browser no longer tracks, as a synthetic one: moves still reach the element while over it.
+  }
+
+  element.addEventListener('pointermove', next => move(next.clientX - clientX, next.clientY - clientY), { signal: moving.signal })
+
+  for (const type of ['pointerup', 'pointercancel']) {
+    element.addEventListener(type, () => {
+      moving.abort()
+      done()
+    }, { signal: moving.signal })
+  }
 }
 
 // An island's slot lays out as its contents, so its box is theirs.

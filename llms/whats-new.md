@@ -5,6 +5,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 ## Unreleased
 
 - An `await` block takes an async iterable, such as an async generator or a model's reply, and renders `then` again with each part it yields, on the server as the page streams and in an island ([A value that arrives in parts](rendering.md#a-value-that-arrives-in-parts)).
+- The dev tool's drawer moves by its head, resizes by any edge or corner, and docks to the bottom or the right of the window, padding the page while open; the bar drags to any corner, and the layout is kept for the browser, so a new tab opens the tool as it was left ([Dev server](dev-server.md)).
 - The dev tool's Images tab gives copies of one image drawn alike one row with their count, outlining each on hover, rounds the density to two decimals, and its panels wrap long values instead of scrolling sideways ([Dev server](dev-server.md)).
 
 ## 1.51.2
