@@ -211,19 +211,19 @@ function onHost(origin: string, host: string): string {
   return url.href.replace(TRAILING_SLASH, '')
 }
 
-// The keys pairing each localized collection's entries (their slugs unless they set a `translationKey`) in each locale, drafts included, keyed by the name the content config exports it under, then by locale.
-export async function localizedSlugs(root: string, config?: string): Promise<Map<string, Map<string, Set<string>>>> {
-  const found = new Map<string, Map<string, Set<string>>>()
+// Each localized collection's entries in each locale, drafts included, as their slug under the key pairing them with their translations (the slug unless they set a `translationKey`); keyed by the name the content config exports it under, then by locale.
+export async function localizedSlugs(root: string, config?: string): Promise<Map<string, Map<string, Map<string, string>>>> {
+  const found = new Map<string, Map<string, Map<string, string>>>()
 
   for (const [name, collection] of await namedCollections(root, config)) {
     if (collection.options.localized !== true)
       continue
 
-    const byLocale = new Map<string, Set<string>>()
+    const byLocale = new Map<string, Map<string, string>>()
 
     for (const entry of await entries(name)) {
       if (entry.locale !== undefined)
-        byLocale.set(entry.locale, (byLocale.get(entry.locale) ?? new Set()).add(translationKey(entry)))
+        byLocale.set(entry.locale, (byLocale.get(entry.locale) ?? new Map()).set(translationKey(entry), entry.slug))
     }
 
     found.set(name, byLocale)

@@ -4,7 +4,7 @@ import type { Message } from '../runtime/i18n'
 import { missingMessages } from '../check/messages'
 import { localizedSlugs } from '../content/server'
 
-// What a locale lacks against the default locale: the keys of its messages, with the default locale's message for each, and the slugs each localized collection has in the default locale and not in it.
+// What a locale lacks against the default locale: the keys of its messages, with the default locale's message for each, and the slugs each localized collection has in the default locale and not in it, an entry counting as present when a translation shares its slug or its `translationKey`.
 export interface MissingTranslations {
   messages: Record<string, Message>
   entries: Record<string, string[]>
@@ -21,7 +21,7 @@ export async function missingTranslations(root: string, config: Pick<KayConfig, 
   const missing: Record<string, MissingTranslations> = {}
 
   for (const locale of i18n.locales.filter(code => code !== i18n.defaultLocale)) {
-    const entries = [...slugs].map(([name, byLocale]) => [name, [...byLocale.get(i18n.defaultLocale) ?? []].filter(slug => !byLocale.get(locale)?.has(slug))] as const)
+    const entries = [...slugs].map(([name, byLocale]) => [name, [...byLocale.get(i18n.defaultLocale) ?? []].filter(([key]) => !byLocale.get(locale)?.has(key)).map(([, slug]) => slug)] as const)
 
     missing[locale] = { messages: Object.fromEntries(messages.get(locale) ?? []), entries: Object.fromEntries(entries.filter(([, lacked]) => lacked.length > 0)) }
   }

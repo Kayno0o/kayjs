@@ -201,6 +201,17 @@ describe('kay i18n', () => {
     expect(await missingTranslations(root, {})).toEqual({})
   })
 
+  it('names a missing entry by the default locale\'s slug, not its translationKey, and counts a translation under another slug as present', async () => {
+    const root = await project({
+      ...site,
+      'src/content/news/en/hello.md': '---\ntitle: Hello\nslug: hello-world\ntranslationKey: hello\n---\n',
+      'src/content/news/fr/hello.md': '---\ntitle: Bonjour\nslug: bonjour\ntranslationKey: hello\n---\n',
+    })
+
+    expect((await kay(['i18n', 'missing', 'fr'], root)).stdout).toBe('fr lacks 1 message: lib.bye\nfr lacks 1 entry of news: launch\n')
+    expect((await kay(['i18n', 'missing', 'de'], root)).stdout).toContain('de lacks 2 entries of news: hello-world, launch')
+  })
+
   it('fails when the default locale\'s messages do not read, rather than saying a locale lacks nothing', async () => {
     const root = await project({ ...site, 'kay.config.ts': `export default { favicon: false, i18n: ${JSON.stringify(i18n)} }\n`, 'src/messages/en.ts': 'export default 1\n' })
 
