@@ -4,7 +4,7 @@ import type { Unit } from './translation'
 import process from 'node:process'
 import { localizedEntry, missingTranslations, writeDraftEntry, writeDraftMessages } from 'kay/library'
 import { splitMarkdown } from './split'
-import { estimateTokens, translateUnits } from './translation'
+import { estimateTokens, pluralCategories, translateUnits } from './translation'
 
 type Path = (string | number)[]
 
@@ -19,8 +19,6 @@ const TRANSLATED_KINDS = new Set(['text', 'textarea', 'markdown'])
 
 interface MessageUnit extends Unit {
   key: string
-  // The plural form the text is, or nothing for a plain message.
-  form?: string
 }
 
 interface EntryPlan {
@@ -104,7 +102,7 @@ async function translateLocale({ root, config, locale, from, dryRun, signal }: R
     }
   }
 
-  const units = messageUnits(messages)
+  const units = messageUnits(messages, locale)
 
   if (messages.length === 0 && plans.length === 0 && failures.length === 0) {
     console.log(`${locale} lacks nothing`)
@@ -228,12 +226,19 @@ function fieldNames(plan: EntryPlan): string[] {
   return [...plan.paths.map(path => path.join('.')), ...plan.body.length > 0 ? ['body'] : []]
 }
 
+// The forms a plural message needs in a locale, each with the source text it translates: the categories the locale picks between, and a `zero` the source has whatever the locale, from the source's form of that name or else its `other`.
+function pluralForms(message: Exclude<Message, string>, locale: string): [string, string][] {
+  const forms = new Set([...message.zero === undefined ? [] : ['zero'], ...pluralCategories(locale)])
+
+  return [...forms].map(form => [form, message[form as keyof typeof message] ?? message.other])
+}
+
 // The texts of the messages: a plural's forms are one text each, numbered so that no key is ever put in a prompt.
-function messageUnits(messages: [string, Message][]): MessageUnit[] {
+function messageUnits(messages: [string, Message][], locale: string): MessageUnit[] {
   const units: MessageUnit[] = []
 
   for (const [key, message] of messages) {
-    for (const [form, text] of typeof message === 'string' ? [[undefined, message] as const] : Object.entries(message))
+    for (const [form, text] of typeof message === 'string' ? [[undefined, message] as const] : pluralForms(message, locale))
       units.push({ id: String(units.length + 1), text, kind: 'message', key, ...form !== undefined && { form } })
   }
 
