@@ -148,11 +148,12 @@ describe('the inspector', () => {
     }
   })
 
-  it('lists the islands with the values their signals hold now in their tab, polling only while it shows, the bar counting them after each page swap', async () => {
+  it('lists the islands with the values their signals hold now, their props size and hydration time in their tab, polling only while it shows, the bar counting them after each page swap', async () => {
     document.body.innerHTML = '<p>static</p>'
     const values = new Map<Element, unknown[]>()
 
     ;(globalThis as { $kaySignals?: (element: HTMLElement) => unknown[] | undefined }).$kaySignals = element => values.get(element)
+    ;(globalThis as { $kayHydrationMs?: (element: HTMLElement) => number | undefined }).$kayHydrationMs = element => values.has(element) ? 1.234 : undefined
     const inspector = start()
 
     try {
@@ -161,7 +162,7 @@ describe('the inspector', () => {
       expect(badge()?.hidden).toBe(true)
 
       document.documentElement.setAttribute('aria-busy', 'true')
-      document.body.innerHTML = '<slot data-component="src/islands/counter.kay"><button>1</button></slot><slot data-component="src/islands/late.kay"></slot>'
+      document.body.innerHTML = '<slot data-component="src/islands/counter.kay" data-props="{&quot;n&quot;:&quot;é&quot;}"><button>1</button></slot><slot data-component="src/islands/late.kay"></slot>'
       document.documentElement.removeAttribute('aria-busy')
       values.set(document.querySelector('slot')!, [1, { open: true }])
       await Bun.sleep(0)
@@ -173,7 +174,7 @@ describe('the inspector', () => {
 
       const panel = host().querySelector('#kay-dev-islands')!
 
-      expect(panel.textContent).toBe('src/islands/counter.kayhydrated#11number#2{"open":true}objectsrc/islands/late.kaynot hydrated')
+      expect(panel.textContent).toBe('src/islands/counter.kayprops 10 Bhydrated in 1.2 ms#11number#2{"open":true}objectsrc/islands/late.kaynot hydrated')
 
       // Unchanged, the rows stay, and a click or a selection in them with them.
       const row = panel.firstChild

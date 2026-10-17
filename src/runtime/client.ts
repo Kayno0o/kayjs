@@ -37,6 +37,8 @@ const reported = new Set<string>()
 // Set in development: renders an island noting its signals, for an edited version of it to take their values back.
 let rendering: (<T>(element: HTMLElement, run: () => T, values?: unknown[]) => T) | undefined
 const signalsOf = new WeakMap<HTMLElement, () => unknown[]>()
+// How long each island's last hydration or render took, in development, for the inspector.
+const hydrationMs = new WeakMap<HTMLElement, number>()
 
 // What a page on the code the last `kay dev` server started with swaps in rather than reloading: the chunks of each island an edit changed, by island, its own first.
 export interface HotSwap {
@@ -245,17 +247,20 @@ function noted<T>(element: HTMLElement, run: () => T): T {
   return rendering ? rendering(element, run) : run()
 }
 
-// Development: `kay dev`'s page script calls `$kayHot` with the islands an edit changed, which swap in, keeping their signals, rather than the page reloading; its inspector reads their values through `$kaySignals`.
+// Development: `kay dev`'s page script calls `$kayHot` with the islands an edit changed, which swap in, keeping their signals, rather than the page reloading; its inspector reads their values through `$kaySignals`, and how long each took to hydrate through `$kayHydrationMs`.
 export function enableHotSwap(registry: IslandRegistry): void {
   rendering = (element, run, values) => {
+    const started = performance.now()
     const recorded = recordSignals(run, values)
 
+    hydrationMs.set(element, performance.now() - started)
     signalsOf.set(element, recorded.values)
 
     return recorded.result
   }
   ;(globalThis as { $kayHot?: (swap: HotSwap) => Promise<boolean> }).$kayHot = async swap => hotSwap(registry, swap)
   ;(globalThis as { $kaySignals?: (element: HTMLElement) => unknown[] | undefined }).$kaySignals = element => signalsOf.get(element)?.()
+  ;(globalThis as { $kayHydrationMs?: (element: HTMLElement) => number | undefined }).$kayHydrationMs = element => hydrationMs.get(element)
 }
 
 // Resolves false when the page must reload instead: a new chunk holding code the page already runs, as a changed shared module, would run beside its old copy.

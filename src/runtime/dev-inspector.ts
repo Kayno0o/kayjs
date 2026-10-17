@@ -11,10 +11,12 @@ const OPEN_HEADER = 'x-kay-dev'
 const REFRESH_MS = 500
 const MAX_VALUE = 120
 const MESSAGE_MS = 4000
+const encoder = new TextEncoder()
 
-// Set by the hot swap in development: the values an island's signals hold now, in the order its script creates them.
+// Set by the hot swap in development: the values an island's signals hold now, in the order its script creates them, and how long it took to hydrate.
 interface InspectedWindow {
   $kaySignals?: (island: HTMLElement) => unknown[] | undefined
+  $kayHydrationMs?: (island: HTMLElement) => number | undefined
 }
 
 // What the dev server did with a position the inspector asked it to open.
@@ -166,8 +168,14 @@ export function startInspector(tool: DevTool, doc: Document = document): Inspect
     if (panel.hidden !== false)
       return
 
-    const rows = found.map(island => ({ island, component: island.dataset.component ?? '?', values: win.$kaySignals?.(island)?.map(value => [formatted(value), typeOf(value)] as const) }))
-    const text = JSON.stringify(rows.map(({ component, values }) => [component, values]))
+    const rows = found.map(island => ({
+      island,
+      component: island.dataset.component ?? '?',
+      values: win.$kaySignals?.(island)?.map(value => [formatted(value), typeOf(value)] as const),
+      hydration: hydrationText(win.$kayHydrationMs?.(island)),
+      props: island.dataset.props === undefined ? undefined : encoder.encode(island.dataset.props).length,
+    }))
+    const text = JSON.stringify(rows.map(({ component, values, hydration, props }) => [component, values, hydration, props]))
 
     if (shown?.text === text && shown.islands.length === found.length && shown.islands.every((island, index) => island === found[index]))
       return
@@ -181,14 +189,19 @@ export function startInspector(tool: DevTool, doc: Document = document): Inspect
       return
     }
 
-    panel.replaceChildren(...rows.map(({ island, component, values }) => {
+    panel.replaceChildren(...rows.map(({ island, component, values, hydration, props }) => {
       const card = tool.make('div', 'island')
       const top = tool.make('div', 'top')
       const name = tool.make('button', 'name', component)
 
       name.type = 'button'
       name.onclick = () => void openFrom(island, `${component}:1:1`)
-      top.append(name, tool.make('span', 'grow'), values === undefined ? tool.make('span', 'pill', 'not hydrated') : tool.make('span', 'pill ok', 'hydrated'))
+      top.append(name, tool.make('span', 'grow'))
+
+      if (props !== undefined)
+        top.append(tool.make('span', 'chip', `props ${sizeText(props)}`))
+
+      top.append(values === undefined ? tool.make('span', 'pill', 'not hydrated') : tool.make('span', 'pill ok', hydration === undefined ? 'hydrated' : `hydrated in ${hydration}`))
       card.append(top)
       card.onpointerenter = () => show(island, component)
       card.onpointerleave = hide
@@ -263,6 +276,16 @@ export function startInspector(tool: DevTool, doc: Document = document): Inspect
 }
 
 // What a signal holds, as a word: its type, `function` and `element` apart.
+// The time an island took to hydrate, to a tenth of a millisecond under 10.
+function hydrationText(ms: number | undefined): string | undefined {
+  return ms === undefined ? undefined : `${ms < 10 ? ms.toFixed(1) : Math.round(ms)} ms`
+}
+
+// The props the server wrote on an island, as the bytes of its attribute.
+function sizeText(bytes: number): string {
+  return bytes < 1024 ? `${bytes} B` : `${(bytes / 1024).toFixed(1)} KB`
+}
+
 function typeOf(value: unknown): string {
   if (value === null)
     return 'null'

@@ -366,6 +366,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('kay dev in 
     await page.click('button.extra')
     await page.locator('#kay-dev-islands', { hasText: /extra\.kay.*#1false/ }).waitFor()
     expect(await page.textContent('#kay-dev-islands')).toMatch(/counter\.kay.*#10number#2""string/)
+    expect(await page.textContent('#kay-dev-islands')).toMatch(/counter\.kay(?:props \d+ B)?hydrated in \d+(?:\.\d)? ms#1/)
   }, 60_000)
 
   it('reloads the open page into the error page when an edit does not compile, and back once it does', async () => {

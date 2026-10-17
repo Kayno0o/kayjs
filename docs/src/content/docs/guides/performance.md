@@ -36,7 +36,7 @@ Each tab answers one question about the page in view. A tab with a red or amber 
 | Images | Each image's variant, format, size and what it is drawn at |
 | Performance | The Web Vitals of the load and the weight of the page |
 | i18n | The page's locale, its copies and the message keys no locale has |
-| Islands | Each island and the values its signals hold now |
+| Islands | Each island, its props size, how long it took to hydrate and the values its signals hold now |
 
 A library can add a tab of its own, with nothing to declare in the app. kayjs-auth shows who is signed in, kayjs-mail lists the mails sent to the outbox, and kayjs-cms toggles edit mode.
 
