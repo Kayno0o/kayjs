@@ -2,11 +2,6 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
-## 1.52.3
-
-- Claude Code lists an app's MCP tools: a list or a read in the 2026-07-28 revision says how long a client keeps it, `ttlMs` and `cacheScope`, as that revision requires ([API routes](api-routes.md#mcp)).
-
-## 1.52.2
 ## Unreleased
 
 - `kay doctor` tries the port on `HOST` or else `localhost`, passes `PORT=0` as the system's pick, and reads a manifest again once when it is being written ([kay doctor](check-and-tools.md)).
@@ -25,10 +20,16 @@ What each release of kay and its libraries adds, newest first, each feature with
 - kayjs-cms lists those paths at `<prefix>/not-found`, with where visitors came from and a redirect line to copy ([Redirects](routing.md#redirects)).
 - The dev tool's filters update a group's count, Head's hreflang alternates have a copy button, and a copy's outcome is announced to a screen reader ([dev server](dev-server.md)).
 - `cached(key, ttl, load, { live: true })` has every open page that read the key show it afresh when `invalidate` drops it, with no socket or polling ([live data](api-from-islands.md#following-cached-values)).
+- `kay build` keeps the chunks of the last 3 builds beside the new one, so a tab opened before a deploy still finds them ([a deploy under open tabs](production.md#a-deploy-under-open-tabs)).
+- An island's markup names its chunk (`data-chunk`), so a page no longer loads a loader for every island of the app: the docs' 128 islands weigh 2 KB gzip less on every page ([Build and start](build-and-start.md)). Island markup now carries `data-chunk`, so a test matching a `<slot>` exactly changes, and markup from `renderToString` has none and hydrates nothing.
+- A page no longer loads a runtime module only other pages' islands use: the action runtime or the image variants stay with the islands importing them, and the docs' entry drops from 21.0 to 15.4 KB gzip ([Build and start](build-and-start.md)).
+
+## 1.52.3
+
+- Claude Code lists an app's MCP tools: a list or a read in the 2026-07-28 revision says how long a client keeps it, `ttlMs` and `cacheScope`, as that revision requires ([API routes](api-routes.md#mcp)).
 
 ## 1.52.2
 
-- `kay build` keeps the chunks of the last 3 builds beside the new one, so a tab opened before a deploy still finds them ([a deploy under open tabs](production.md#a-deploy-under-open-tabs)).
 - A page with a `--- server` fence passes an island an action, `Chat(action={reply})` with no wrapper ([actions](actions.md#pass-an-action-to-an-island)).
 - `island-action` reports an action handed to an island that never types a prop as one ([actions](actions.md#pass-an-action-to-an-island)).
 - `secret-prop` warns of a secret-looking field, as `user.passwordHash`, handed to an island ([islands](islands.md#props-to-an-island)).
@@ -37,12 +38,6 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `deprecated-api-tool` is reported by `kay upgrade` of an app from before 1.51 alone: an app turning `mcp` on since gets no warning for routes that do not opt in ([Checks](checks.md)).
 - A stream an action answers with to a leaving row's handler or a `listen` callback closes with its island too ([actions from islands](api-from-islands.md)).
 - A streamed `await` part's island cleans up still in the page ([Streaming](rendering.md#streaming)).
-
-## 1.52.1
-## Unreleased
-
-- An island's markup names its chunk (`data-chunk`), so a page no longer loads a loader for every island of the app: the docs' 128 islands weigh 2 KB gzip less on every page ([Build and start](build-and-start.md)). Island markup now carries `data-chunk`, so a test matching a `<slot>` exactly changes, and markup from `renderToString` has none and hydrates nothing.
-- A page no longer loads a runtime module only other pages' islands use: the action runtime or the image variants stay with the islands importing them, and the docs' entry drops from 21.0 to 15.4 KB gzip ([Build and start](build-and-start.md)).
 
 ## 1.52.1
 
