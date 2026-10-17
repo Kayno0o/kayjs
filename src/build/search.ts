@@ -30,13 +30,15 @@ const TITLE_WEIGHT = 12
 const HEADING_WEIGHT = 10
 const PAGE_WEIGHT = 6
 const TEXT_WEIGHT = 2
+// A word of a title or heading counts up to this much more as it makes up more of it: `kay mcp` before `An API route is an MCP tool only when...`, a heading staying below a title.
+const FOCUS_WEIGHT = 1.5
 // A word repeated in a text counts a little more, up to four times.
 const REPEAT_WEIGHT = 0.5
 const REPEATS = 4
 
-const SKIPPED = 'script, style, template, noscript, nav, footer, svg, [data-search="false"]'
-// Block elements part words; an inline one such as `code` sits inside a sentence.
-const BLOCKS = 'p, li, dt, dd, td, th, tr, br, div, pre, blockquote, section, article, figcaption, h1, h2, h3, h4, h5, h6'
+const SKIPPED = 'script, style, template, noscript, nav, footer, svg, button, [data-search="false"]'
+// Block elements part words, as does a button left out between two; an inline one such as `code` sits inside a sentence.
+const BLOCKS = 'p, li, dt, dd, td, th, tr, br, div, pre, blockquote, section, article, figcaption, button, h1, h2, h3, h4, h5, h6'
 const ENTITY = /&(?:#(\d+)|#x([\da-f]+)|([a-z]+\d*));/gi
 // The named entities a page may hold: HTML's own, Latin-1's from `nbsp` (U+00A0) on, and typography's.
 const LATIN_1 = 'nbsp iexcl cent pound curren yen brvbar sect uml copy ordf laquo not shy reg macr deg plusmn sup2 sup3 acute micro para middot cedil sup1 ordm raquo frac14 frac12 frac34 iquest Agrave Aacute Acirc Atilde Auml Aring AElig Ccedil Egrave Eacute Ecirc Euml Igrave Iacute Icirc Iuml ETH Ntilde Ograve Oacute Ocirc Otilde Ouml times Oslash Ugrave Uacute Ucirc Uuml Yacute THORN szlig agrave aacute acirc atilde auml aring aelig ccedil egrave eacute ecirc euml igrave iacute icirc iuml eth ntilde ograve oacute ocirc otilde ouml divide oslash ugrave uacute ucirc uuml yacute thorn yuml'
@@ -172,20 +174,19 @@ export async function writeSearchIndex(clientDir: string, pages: SearchPage[]): 
 // Each word of a section with what it is worth there, the best place it is found deciding.
 function sectionScores(section: SearchSection, page: string, top: boolean, weight: number): Map<string, number> {
   const scores = new Map<string, number>()
-  const add = (text: string | undefined, worth: (count: number) => number) => {
+  const add = (text: string | undefined, worth: (count: number, share: number) => number) => {
+    const words = searchWords(text ?? '').filter(word => word.length >= MIN_WORD)
     const counts = new Map<string, number>()
 
-    for (const word of searchWords(text ?? '')) {
-      if (word.length >= MIN_WORD)
-        counts.set(word, (counts.get(word) ?? 0) + 1)
-    }
+    for (const word of words)
+      counts.set(word, (counts.get(word) ?? 0) + 1)
 
     for (const [word, count] of counts)
-      scores.set(word, Math.max(scores.get(word) ?? 0, worth(count)))
+      scores.set(word, Math.max(scores.get(word) ?? 0, worth(count, count / words.length)))
   }
 
-  add(page, () => top ? TITLE_WEIGHT : PAGE_WEIGHT)
-  add(section.heading, () => HEADING_WEIGHT)
+  add(page, (_, share) => (top ? TITLE_WEIGHT : PAGE_WEIGHT) + FOCUS_WEIGHT * share)
+  add(section.heading, (_, share) => HEADING_WEIGHT + FOCUS_WEIGHT * share)
   add(section.text, count => TEXT_WEIGHT + REPEAT_WEIGHT * (Math.min(count, REPEATS) - 1))
 
   for (const [word, score] of scores)

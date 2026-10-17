@@ -207,15 +207,15 @@ ul
 - The index holds the pages the build renders, those with `prerender`, a content collection's pages among them; a page rendered per request is not in it.
 - A page a guard covers, or that `requireGuards` refuses, one with `noindex`, and one setting `search: false` in its `page` are left out.
 - `search: { weight: 0.5 }` makes a page's words count half as much, its hits after the others'.
-- Each page is read from its `main`, or its `body` without one, leaving out `nav`, `footer`, `script`, `style`, `svg` and any element marked `data-search="false"`.
+- Each page is read from its `main`, or its `body` without one, leaving out `nav`, `footer`, `script`, `style`, `svg`, `button` and any element marked `data-search="false"`.
 - It is split into sections: the text above its first `h2` to `h4`, then each of those with the text under it, linked by the heading's `id`.
 - A link inside the heading to itself is left out when it shows only `#`, `¶`, `§` or nothing visible, and the heading's own text kept as written, `C#` included.
 - Soft hyphens, zero-width joiners and non-joiners join the word they split, in the pages and the query alike, while a zero-width space parts two words, as in Thai.
 - A section is titled by the page's `h1`, or its `title` without one, and each `href` ends in a slash under `trailingSlash: 'always'`.
 - A query needs every word it holds, found as a word or the start of one, with case and accents ignored and words of one letter dropped.
 - A word is a run of letters and digits, so a language written without spaces, such as Chinese or Japanese, is indexed by whole runs: a query finds such a run only by its start.
-- A word in the page's title counts most, then in a heading, then in the text.
-- Each hit has `page`, `heading` (undefined above the first heading), `href`, the page's path with the heading's anchor, `snippet`, a line of text around the first word found split into parts marking each word searched for, and `score`.
+- A word in the page's title counts most, then in a heading, then in the text, and a word in a title or heading counts a little more the more of it it makes up, so `kay mcp` comes before a long heading naming MCP.
+- Each hit has `page`, `heading` (undefined above the first heading), `headingParts`, the heading split into parts marking each word searched for, `href`, the page's path with the heading's anchor, `snippet`, a line of text around the first word found split into parts marking each word searched for, and `score`.
 - `{ limit }` returns at most that many hits, 20 by default.
 - `searchSite(query, options)` from `kay` is the same search as a promise, for a script of its own.
 - With `i18n`, each locale gets its own index, and the search reads the one matching the page's `lang`; `{ lang }` picks another.

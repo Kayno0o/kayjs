@@ -43,11 +43,18 @@ export interface SearchHit {
   page: string
   // The heading the text sits under, undefined for the text above the page's first one.
   heading?: string | undefined
+  // The heading split into parts as `snippet` is, each word searched for marked, so a hit found by its heading shows why.
+  headingParts?: SearchPart[] | undefined
   // The page's path, with the heading's anchor: a link rendering it puts it under the site's base.
   href: string
   // About a line of the text around the first word found, each part saying whether it is one searched for.
-  snippet: { text: string, hit: boolean }[]
+  snippet: SearchPart[]
   score: number
+}
+
+export interface SearchPart {
+  text: string
+  hit: boolean
 }
 
 export interface SearchResults {
@@ -125,7 +132,7 @@ export async function searchSite(query: string, options: SearchOptions = {}): Pr
   return best.map(([section, score]) => {
     const { page, heading, href, text } = chunks.get(Math.floor(section / SEARCH_CHUNK))![section % SEARCH_CHUNK]!
 
-    return { page, ...heading !== undefined && { heading }, href, snippet: snippet(text, terms), score }
+    return { page, ...heading !== undefined && { heading, headingParts: marked(heading, wordHits(heading, terms), 0, heading.length) }, href, snippet: snippet(text, terms), score }
   })
 }
 
@@ -197,7 +204,16 @@ function fold(text: string): string {
 }
 
 // About a line around the first word found, each word starting as a term does marked.
-function snippet(text: string, terms: string[]): SearchHit['snippet'] {
+function snippet(text: string, terms: string[]): SearchPart[] {
+  const hits = wordHits(text, terms)
+  const start = Math.max(0, (hits[0]?.[0] ?? 0) - SNIPPET_BEFORE)
+  const end = Math.min(text.length, start + SNIPPET_LENGTH)
+
+  return [...start > 0 ? [{ text: '…', hit: false }] : [], ...marked(text, hits, start, end), ...end < text.length ? [{ text: '…', hit: false }] : []]
+}
+
+// Where each word starting as a term does sits in the text, by the term's length.
+function wordHits(text: string, terms: string[]): [number, number][] {
   // Folding can change a character's length, so each folded character keeps the index of the one it came from.
   let folded = ''
   const from: number[] = []
@@ -219,9 +235,12 @@ function snippet(text: string, terms: string[]): SearchHit['snippet'] {
       hits.push([from[word.index]!, from[word.index + term.length - 1]! + 1])
   }
 
-  const start = Math.max(0, (hits[0]?.[0] ?? 0) - SNIPPET_BEFORE)
-  const end = Math.min(text.length, start + SNIPPET_LENGTH)
-  const parts: SearchHit['snippet'] = start > 0 ? [{ text: '…', hit: false }] : []
+  return hits
+}
+
+// The text from `start` to `end` in parts, the hits within it marked.
+function marked(text: string, hits: [number, number][], start: number, end: number): SearchPart[] {
+  const parts: SearchPart[] = []
   let at = start
 
   for (const [hitStart, hitEnd] of hits) {
@@ -237,9 +256,6 @@ function snippet(text: string, terms: string[]): SearchHit['snippet'] {
 
   if (at < end)
     parts.push({ text: text.slice(at, end), hit: false })
-
-  if (end < text.length)
-    parts.push({ text: '…', hit: false })
 
   return parts
 }

@@ -92,6 +92,7 @@ describe('search', () => {
       { text: 'install', hit: true },
       { text: ' again & again.', hit: false },
     ])
+    expect(hits.map(hit => hit.headingParts)).toEqual([[{ text: 'Install', hit: true }, { text: 'ing the package', hit: false }], undefined])
   })
 
   it('needs every word, as a word or the start of one, and folds a query as it folds the text', async () => {
@@ -279,5 +280,28 @@ describe('the search index', () => {
     expect((await search(dir, 'zero width')).hits).toHaveLength(1)
     expect((await search(dir, 'zerowidth')).hits).toHaveLength(0)
     expect((await search(dir, '\u0645\u06CC\u200C\u062E\u0648\u0627\u0647\u0645')).hits).toHaveLength(1)
+  })
+
+  it('ranks a word higher the more of its title or heading it makes up, a heading staying below a title', async () => {
+    const dir = await index([{
+      path: '/upgrading',
+      html: '<main><h1>Upgrading</h1><h2 id="long">An API route is an MCP tool only when it sets its detail</h2><p>Changed.</p></main>',
+    }, {
+      path: '/cli',
+      html: '<main><h1>CLI</h1><h2 id="mcp">kay mcp</h2><p>Serves the project.</p><h2 id="one">MCP</h2><p>Alone.</p></main>',
+    }, {
+      path: '/guide',
+      html: '<main><h1>The MCP endpoint and every tool an agent may call</h1><p>Agents.</p></main>',
+    }])
+
+    expect((await search(dir, 'mcp')).hits.map(hit => hit.href)).toEqual(['/guide', '/cli#one', '/cli#mcp', '/upgrading#long'])
+  })
+
+  it('leaves out a button\'s label, parting the words around it', async () => {
+    const dir = await index([{ path: '/code', html: '<main><h1>Code</h1><div class="bar"><span>sh</span><button type="button">Copyword</button></div><pre>bunx kay</pre><p>Before<button>Clickword</button>after</p></main>' }])
+
+    expect((await search(dir, 'copyword')).hits).toEqual([])
+    expect((await search(dir, 'clickword')).hits).toEqual([])
+    expect((await search(dir, 'after')).hits[0]!.snippet.map(part => part.text).join('')).toBe('sh bunx kay Before after')
   })
 })

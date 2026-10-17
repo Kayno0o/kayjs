@@ -28,7 +28,7 @@ export function highlight(code: string, language: string | undefined): string {
           {
             type: 'element',
             tagName: 'div',
-            properties: { class: 'code-bar' },
+            properties: { 'class': 'code-bar', 'data-search': 'false' },
             children: [
               { type: 'element', tagName: 'span', properties: {}, children: [{ type: 'text', value: lang === 'text' ? '' : lang }] },
               // The classes copy-button.kay draws CopyButton with; components/code-copy.kay answers the click.

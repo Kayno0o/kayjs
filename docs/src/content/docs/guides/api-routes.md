@@ -106,7 +106,7 @@ Actions that set `tool` are listed too, as `POST` operations.
 
 <ReadMore href="/llms/api-routes#openapi">How params, bodies and responses are described, and what the document leaves out, are in the full API routes reference.</ReadMore>
 
-## Letting an agent call the app
+## Letting an agent call the app over MCP
 
 Set `mcp: true` in kay.config.ts to let an AI agent use your app. Kay serves an MCP endpoint at `/mcp`, and an agent pointed at it can list and call your tools. You write no MCP server.
 

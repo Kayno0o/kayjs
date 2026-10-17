@@ -463,8 +463,8 @@
     @apply line-clamp-2 text-xs text-kui-subtext0;
   }
 
-  .kui-command-palette-snippet :where(mark) {
-    @apply bg-transparent font-semibold text-kui-text;
+  .kui-command-palette-text :where(mark) {
+    @apply bg-transparent font-semibold text-kui-accent;
   }
 
   .kui-command-palette-empty {

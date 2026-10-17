@@ -54,13 +54,13 @@ Each hit links a section of a page. A section is the text above its first `h2`, 
 
 A query needs all its words. Each is found as a word or the start of one, with case and accents ignored.
 
-Each hit has `page`, `heading`, `href`, `snippet` and a `score`. `heading` is `undefined` for the text above the first heading.
+Each hit has `page`, `heading`, `headingParts`, `href`, `snippet` and a `score`. `heading` is `undefined` for the text above the first heading. `headingParts` is the heading in parts, as `snippet` is, so you can mark the words found in it too.
 
 `searchResults(query, { limit })` returns at most `limit` hits, 20 by default. `searchSite(query, options)` from `kay` is the same search as a promise, for a script. Both return no hits on the server.
 
 ### How hits are ranked
 
-A section is scored for each word of the query, and the scores add up. A word in the page's title counts most, then one in a heading, then one in the text. A word found whole counts more than one that only starts a longer word. A page's `weight` multiplies its scores.
+A section is scored for each word of the query, and the scores add up. A word in the page's title counts most, then one in a heading, then one in the text. In a title or a heading, a word counts a little more when it makes up more of it. A search for `mcp` finds a heading `kay mcp` before a long one that names MCP among ten other words. A word found whole counts more than one that only starts a longer word. A page's `weight` multiplies its scores.
 
 Hits come best first. Two with the same score keep their order in the site.
 
@@ -78,7 +78,7 @@ A zero-width space parts two words, as it does in Thai. Soft hyphens and zero-wi
 
 ## What goes in
 
-Each page is read from its `main`, or its `body` without one. Navigation, footers, scripts and anything marked `data-search="false"` stay out.
+Each page is read from its `main`, or its `body` without one. Navigation, footers, scripts, buttons and anything marked `data-search="false"` stay out.
 
 So do pages behind a guard or refused by `requireGuards`, pages with `noindex`, and pages setting `search: false` in their `page`.
 

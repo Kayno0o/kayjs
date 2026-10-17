@@ -111,17 +111,18 @@ export function paletteSections(entries: PaletteEntry[], recent: string[] = [], 
   return recents.length > 0 ? [{ group: RECENT_GROUP, entries: recents }, ...sections] : sections
 }
 
-// A section the site search found, as a link under its page, with the line of text it was found in.
+// A section the site search found, as a link under its page, with the line of text it was found in and its heading's words found marked.
 export interface PaletteHit {
   link: PaletteLink
   snippet: SearchHit['snippet']
+  labelParts?: SearchHit['headingParts']
 }
 
 // The site search's hits as links, but for those leading where one of `matches` already does, with or without a trailing slash; a section under a heading is listed under its page.
 export function paletteHits(hits: SearchHit[], matches: PaletteEntry[]): PaletteHit[] {
   const linked = new Set(matches.filter(isPaletteLink).map(link => withoutSlash(link.href)))
 
-  return hits.filter(hit => !linked.has(withoutSlash(hit.href))).map(hit => ({ link: { label: hit.heading ?? hit.page, group: hit.heading === undefined ? '' : hit.page, href: hit.href }, snippet: hit.snippet }))
+  return hits.filter(hit => !linked.has(withoutSlash(hit.href))).map(hit => ({ link: { label: hit.heading ?? hit.page, group: hit.heading === undefined ? '' : hit.page, href: hit.href }, snippet: hit.snippet, ...hit.headingParts && { labelParts: hit.headingParts } }))
 }
 
 // `recent` with `href` moved to the front, at most `limit` long.

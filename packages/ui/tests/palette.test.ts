@@ -54,16 +54,17 @@ describe('paletteSections', () => {
 })
 
 describe('paletteHits', () => {
-  test('turns each hit into a link, a heading under its page, and drops one an entry already leads to, with or without a trailing slash', () => {
+  test('turns each hit into a link, a heading under its page with its words found, and drops one an entry already leads to, with or without a trailing slash', () => {
     const snippet = [{ text: 'a ', hit: false }, { text: 'signal', hit: true }]
+    const headingParts = [{ text: 'Signal', hit: true }, { text: 's', hit: false }]
     const hits = [
-      { page: 'Islands', heading: 'Signals', href: '/islands/#signals', snippet, score: 3 },
+      { page: 'Islands', heading: 'Signals', headingParts, href: '/islands/#signals', snippet, score: 3 },
       { page: 'Islands', href: '/islands/', snippet, score: 2 },
       { page: 'Forms', href: '/forms', snippet, score: 1 },
     ]
 
     expect(paletteHits(hits, [{ label: 'Islands', group: 'Guides', href: '/islands' }])).toEqual([
-      { link: { label: 'Signals', group: 'Islands', href: '/islands/#signals' }, snippet },
+      { link: { label: 'Signals', group: 'Islands', href: '/islands/#signals' }, snippet, labelParts: headingParts },
       { link: { label: 'Forms', group: '', href: '/forms' }, snippet },
     ])
   })

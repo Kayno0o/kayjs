@@ -31,11 +31,12 @@ const { open = false, onOpenChange, entries, groups = [], recent = [], onRecentC
   class?: string | undefined
 }>()
 
-// A row of the list, numbered the way the arrow keys walk it; a section the site search found carries the line of text it was found in.
+// A row of the list, numbered the way the arrow keys walk it; a section the site search found carries the line of text it was found in, and its heading's words found marked.
 interface Row {
   entry: PaletteEntry
   index: number
   snippet?: SearchHit['snippet'] | undefined
+  labelParts?: SearchHit['headingParts'] | undefined
 }
 
 const id = uid()
@@ -61,7 +62,7 @@ const sections = memo(() => {
 
   const matches = paletteMatches(entries, query(), groups)
   const found = numbered(matches)
-  const hits = paletteHits(site?.hits() ?? [], matches).map(hit => ({ entry: hit.link, index: index++, snippet: hit.snippet }))
+  const hits = paletteHits(site?.hits() ?? [], matches).map(hit => ({ entry: hit.link, index: index++, snippet: hit.snippet, labelParts: hit.labelParts }))
 
   return hits.length > 0 ? [{ group: null, rows: found }, { group: siteSearchLabel, rows: hits }] : [{ group: null, rows: found }]
 })
@@ -179,7 +180,12 @@ dialog.kui-command-palette(ref={element => dialog = element} closedby="any" aria
                   Icon(icon={icon})
                 if row.snippet as snippet
                   span.kui-command-palette-text
-                    span.kui-command-palette-label {row.entry.label}
+                    span.kui-command-palette-label
+                      for part, partIndex of row.labelParts ?? [{ text: row.entry.label, hit: false }] key={partIndex}
+                        if part.hit
+                          mark {part.text}
+                        else
+                          | {part.text}
                     span.kui-command-palette-snippet
                       for part, partIndex of snippet key={partIndex}
                         if part.hit
