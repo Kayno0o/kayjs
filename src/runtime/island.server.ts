@@ -1,7 +1,7 @@
 import type { IslandComponent, IslandOptions } from './checks'
 import type { Html } from './html'
 import type { JSX } from './jsx'
-import { escapeAttribute, quoteAttribute } from './escape'
+import { escapeAttribute, quotedAttribute } from './escape'
 import { withFieldMarks } from './fields'
 import { headMark, setsIslandTitle } from './head'
 import { child, omit } from './html'
@@ -127,11 +127,11 @@ export function island<P extends object>(id: string, component: ((props: P) => J
     try {
       // Detached, as in the browser, where an island reads nothing the page's components provide.
       const { result: html, count } = browserOnly ? { result: '', count: 0 } : withFieldMarks(undefined, () => renderOnServer(() => scope(() => countIds(ids, () => child(component!(given))), true)))
-      const shipped = slots.length === 0 ? '' : ` data-slots=${quoteAttribute(slotsValue(slots, html))}`
+      const shipped = slots.length === 0 ? '' : ` data-slots=${quotedAttribute(slotsValue(slots, html))}`
       // Marks an island whose title the page shows, so the browser leaves it alone while a later one has not hydrated.
       const titled = setsIslandTitle(mark) ? ` ${TITLED_ATTRIBUTE}` : ''
       const lazy = when === 'idle' || when === 'visible' ? ` data-hydrate="${when}"` : ''
-      const markup: Html = { t: `<slot data-component="${escapeAttribute(id)}" data-props=${quoteAttribute(serialized)}${lazy}${titled}${shipped}${browserOnly ? ' data-client' : ''}${count === 0 ? '' : ` data-uid="${escapeAttribute(ids)}"`}${persist === undefined ? '' : ` data-persist="${escapeAttribute(persist)}"`}>${html}</slot>` }
+      const markup: Html = { t: `<slot data-component="${escapeAttribute(id)}" data-props=${quotedAttribute(serialized)}${lazy}${titled}${shipped}${browserOnly ? ' data-client' : ''}${count === 0 ? '' : ` data-uid="${escapeAttribute(ids)}"`}${persist === undefined ? '' : ` data-persist="${escapeAttribute(persist)}"`}>${html}</slot>` }
 
       return markup as unknown as JSX.Element
     }

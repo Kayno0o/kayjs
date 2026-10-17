@@ -94,6 +94,7 @@ describe('kay build --static', () => {
     expect(IMAGE_LINK.test('<img src="/_kay/image?src=%2Fuploads%2Fa.png&amp;w=640">')).toBe(true)
     expect(IMAGE_LINK.test('<img srcset="/a.webp 320w, /_kay/image?src=b&amp;w=640 640w">')).toBe(true)
     expect(IMAGE_LINK.test('<p>Variants are served by <code>/_kay/image?src=...&amp;w=...</code></p>')).toBe(false)
+    expect(IMAGE_LINK.test(`<slot data-component="lightbox.kay" data-props='[{"src":1},"/_kay/image?src=a.png&amp;w=100"]'></slot>`)).toBe(true)
   })
 
   it('caps image densities at the config\'s images.maxDensity, for the islands too', async () => {

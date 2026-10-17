@@ -38,7 +38,7 @@ const PARTS = new Intl.ListFormat('en-GB')
 const KAY_IMPORT = /\bfrom\s+['"]([^'"]+\.kay)['"]/g
 
 // The image route in an attribute, `src`, `srcset` or a style's `url()`: a page whose text only names it, as documentation does, links nothing.
-export const IMAGE_LINK = new RegExp(`="[^"]*${RegExp.escape(IMAGE_ROUTE)}\\?`)
+export const IMAGE_LINK = new RegExp(`=(?:"[^"]*|'[^']*)${RegExp.escape(IMAGE_ROUTE)}\\?`)
 
 // The pages a static export cannot hold, each named: a message for the person building, with no stack to read past.
 export class ExportError extends Error {

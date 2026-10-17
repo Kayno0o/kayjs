@@ -25,8 +25,8 @@ function occurrences(text: string, char: string): number {
   return count
 }
 
-// The value with its quotes, single ones when it holds more double quotes than single, as JSON does, so each of them costs one byte rather than six.
-export function quoteAttribute(text: string): string {
+// The value with its quotes: single ones when it holds more double quotes than single, as serialized JSON does, so each costs one byte rather than six; double ones on a tie.
+export function quotedAttribute(text: string): string {
   if (!text.includes('"') || (text.includes('\'') && occurrences(text, '\'') >= occurrences(text, '"')))
     return `"${escapeAttribute(text)}"`
 
