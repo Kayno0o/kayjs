@@ -1,6 +1,6 @@
 import type { SessionSettings } from 'kay/server'
 import type { Core } from './core'
-import { erase } from './erase'
+import { eraseUser } from './erase'
 import { log } from './log'
 
 // What expired is deleted at most this often.
@@ -50,7 +50,7 @@ async function pruneGuests(core: Core, now: number): Promise<void> {
         try {
           // A guest registered since the list was read is a real account.
           if ((await core.store.users.get(guest.id))?.guest === true) {
-            await erase({ core }, guest)
+            await eraseUser(core, guest)
             deleted++
           }
         }

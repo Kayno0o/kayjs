@@ -23,7 +23,7 @@ export const AuthUsers = defineTable('auth_user', t => ({
   banned_until: t.timestamptz().nullable(),
   ban_reason: t.text().nullable(),
   created_at: t.timestamptz().notNull(),
-})).withIndexes([{ columns: ['created_at'] }])
+})).withIndexes([{ columns: ['created_at'] }, { columns: ['guest', 'created_at'] }])
 
 const userId = () => AuthUsers
 

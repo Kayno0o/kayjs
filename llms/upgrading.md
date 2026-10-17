@@ -34,6 +34,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 - `signInWithPassword(input, { redirect, remember, captcha })`, `register(input, { remember, captcha })`, `requestMagicLink(email, { redirect, remember, captcha })` and `signInWithPasskey(response, { redirect, remember })` take what they used to find in the input (`redirect`, `remember`, `captcha`) or as a positional `redirect` in one object after the credentials. The old forms still work for now and log a warning; when both are given, the options object wins. `kay check` reports them as `deprecated-sign-in-options`, and `kay check --fix` (or `kay upgrade`) moves them, except in a call with a spread or a computed key, which it leaves to you.
 
+### kayjs-auth: `pgStore` indexes guests by creation
+
+- `auth_user` gets an index on `(guest, created_at)`, which the hourly prune of `guests.maxAge` reads through. An app on `db.sync()` gets it at startup; an app on pg-orm migrations runs `bunx pg-orm generate` and applies the migration. Without it, the prune still works, reading through the `created_at` index. A custom `AuthStore` needs nothing. `kay check` cannot see a database schema, so no `deprecated` lint can catch this.
+
 ### kayjs-auth: `onEvent` is `onAuthEvent`, with one object
 
 - `createAuth({ onEvent: (event, user, detail, context) => ... })` is now `onAuthEvent: ({ event, user, context, ...fields }) => ...`: the `detail` string is gone for fields typed per event (`method` and `provider` of a `signed-in`, `role`, `reason`, `organizationId` and `roles`, `client`, `provider`, `name`, `email`, `keptThisOne`). `onEvent` still works for now and logs a warning, and when both are given each hears every event. `kay check` reports it as `deprecated-auth-event`; no fix is offered, as the handler's parameters change with the name, so rewrite it by hand. The audit log is unchanged, its entries keep their `detail`.

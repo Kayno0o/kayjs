@@ -21,6 +21,7 @@ const FILTERS: Record<string, string> = {
   'oauth codes by expiry': 'SELECT 1 FROM "auth_oauth_code" WHERE "expires_at" <= 1',
   'oauth refresh tokens by expiry': 'SELECT 1 FROM "auth_oauth_refresh" WHERE "expires_at" <= 1',
   'oauth clients by age': 'SELECT 1 FROM "auth_oauth_client" WHERE "created_at" < 1',
+  'guests by creation': 'SELECT 1 FROM "auth_user" WHERE "guest" = 1 AND "created_at" < 1',
   'audit by actor': 'SELECT 1 FROM "auth_audit" WHERE "actor_id" = \'a\'',
 }
 
@@ -33,4 +34,15 @@ test.each(Object.entries(FILTERS))('%s reads through an index', async (_name, sq
   const plan = await db.raw<{ detail: string }>(`EXPLAIN QUERY PLAN ${sql}`, [])
 
   expect(plan.map(row => row.detail).join('\n')).toMatch(/USING (COVERING )?INDEX/)
+})
+
+test('the guest prune filter reads through an index leading with guest', async () => {
+  const db = new Database({ url: 'sqlite://:memory:', tables: [...authTables] })
+
+  opened.push(db)
+  await db.sync({ allowDestructive: true })
+
+  const plan = await db.raw<{ detail: string }>('EXPLAIN QUERY PLAN SELECT 1 FROM "auth_user" WHERE "guest" = 1 AND "created_at" < 1', [])
+
+  expect(plan.map(row => row.detail).join('\n')).toMatch(/USING (COVERING )?INDEX \S*guest\S*/)
 })

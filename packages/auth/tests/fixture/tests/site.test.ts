@@ -353,12 +353,15 @@ describe('the prebuilt pages', () => {
     expect(form.html).toContain('Read &lt;b>your&lt;/b> notes')
     expect(form.html).not.toContain('<b>your</b>')
 
-    await ada.submit(create, { label: 'scoped', scopes: ['notes:read'], days: '0', password: PASSWORD } as never, { from: '/auth/account/tokens' })
+    await ada.submit(create, { label: 'scoped', scopes: ['notes:read', 'files.read'], days: '0', password: PASSWORD } as never, { from: '/auth/account/tokens' })
     await ada.submit(create, { label: 'everything', days: '0', password: PASSWORD }, { from: '/auth/account/tokens' })
 
     const listed = (await ada.visit('/auth/account/tokens')).find('[data-token]').map(row => row.text)
 
     expect(listed.find(row => row.includes('scoped'))).toContain('Read <b>your</b> notes')
+    // A dotted code reads its label under the nested key, in the form and the list.
+    expect(form.html).toContain('Read your files')
+    expect(listed.find(row => row.includes('scoped'))).toContain('Read your files')
     expect(listed.find(row => row.includes('everything'))).toContain('Everything')
   })
 

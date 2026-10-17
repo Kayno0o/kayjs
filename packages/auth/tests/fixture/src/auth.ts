@@ -22,7 +22,7 @@ export const auth = createAuth({
   store,
   url: 'http://localhost',
   site: 'Fixture',
-  scopes: ['notes:read'],
+  scopes: ['notes:read', 'files.read'],
   // A run of tests/variants.ts serves the fixture with the app's own credential rules.
   ...process.env.FIXTURE_RULES && { rules: { password: { min: 12, check: (value: string) => DIGIT.test(value) ? undefined : 'Add a digit.' }, username: { min: 3, max: 16 } } },
   pages: {

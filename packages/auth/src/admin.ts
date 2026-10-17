@@ -4,7 +4,7 @@ import type { RequestState } from './state'
 import type { UserRecord } from './store'
 import { clamp } from '@kaynooo/utils'
 import { banned, publicUser } from './core'
-import { erase } from './erase'
+import { eraseLeavingUser } from './erase'
 import { auditEntries, report } from './events'
 import { revokeBearerTokens } from './sessions'
 import { provedLately } from './twoFactor'
@@ -218,7 +218,7 @@ export async function deleteUser(state: RequestState, userId: string): Promise<D
   if (await isAdmin(state, record))
     return { ok: false, error: 'admin' }
 
-  await erase(state, record, { actor })
+  await eraseLeavingUser(state, record, actor)
 
   return { ok: true }
 }

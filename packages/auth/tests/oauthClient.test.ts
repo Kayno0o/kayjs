@@ -288,6 +288,23 @@ describe('githubProvider email', () => {
     expect((await signIn(json([null, 'x', { email: 7, primary: true, verified: true }]), 'user:email')).user.email).toBeNull()
   })
 
+  test('the scope of a form-encoded token answer, comma separated, carries through exchangeCode into readUser', async () => {
+    const calls = mockFetch(({ url }) => {
+      if (url.endsWith('/user/emails'))
+        return json([{ email: 'main@t.co', primary: true, verified: true }])
+
+      return url.endsWith('/login/oauth/access_token')
+        ? new Response('access_token=at&token_type=bearer&scope=read%3Auser%2Cuser%3Aemail', { status: 200, headers: { 'content-type': 'application/x-www-form-urlencoded' } })
+        : json(profile)
+    })
+    const client = createOAuthClient(githubProvider(), CONFIG)
+    const tokens = await client.exchangeCode('c')
+
+    expect(tokens.scope).toBe('read:user,user:email')
+    expect((await client.readUser(tokens)).email).toBe('main@t.co')
+    expect(calls.at(-1)!.url).toBe('https://api.github.com/user/emails')
+  })
+
   test('fetchUser reads the emails by the scopes asked for', async () => {
     mockFetch(({ url }) => url.endsWith('/user/emails') ? json([{ email: 'main@t.co', primary: true, verified: true }]) : json(profile))
 

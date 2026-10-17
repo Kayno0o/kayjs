@@ -37,7 +37,7 @@ describe('discovery', () => {
 
     expect(resource.status).toBe(200)
     expect(resource.headers.get('access-control-allow-origin')).toBe('*')
-    expect(await json(resource)).toEqual({ resource: 'http://localhost/mcp', authorization_servers: ['http://localhost'], bearer_methods_supported: ['header'], resource_name: 'API', scopes_supported: ['notes:read'] })
+    expect(await json(resource)).toEqual({ resource: 'http://localhost/mcp', authorization_servers: ['http://localhost'], bearer_methods_supported: ['header'], resource_name: 'API', scopes_supported: ['notes:read', 'files.read'] })
     expect(await json(await site().fetch('/.well-known/oauth-protected-resource/mcp'))).toMatchObject({ resource: 'http://localhost/mcp' })
   })
 
@@ -57,7 +57,7 @@ describe('discovery', () => {
         grant_types_supported: ['authorization_code', 'refresh_token'],
         code_challenge_methods_supported: ['S256'],
         token_endpoint_auth_methods_supported: ['none'],
-        scopes_supported: ['notes:read'],
+        scopes_supported: ['notes:read', 'files.read'],
         client_id_metadata_document_supported: true,
         authorization_response_iss_parameter_supported: true,
       })

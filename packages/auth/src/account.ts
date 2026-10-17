@@ -7,7 +7,7 @@ import { hashPassword } from '@kaynooo/utils'
 import { lastAdmin } from './admin'
 import { newPasswordProblem } from './breached'
 import { publicUser } from './core'
-import { erase } from './erase'
+import { eraseLeavingUser } from './erase'
 import { notify } from './notify'
 import { normalizeUsername, usernameProblem } from './rules'
 import { endOtherSessions } from './sessions'
@@ -121,7 +121,7 @@ export async function deleteAccount(state: RequestState, proof: Proof, signOut: 
   if (!proved.ok)
     return proved
 
-  await erase(state, proved.record, {})
+  await eraseLeavingUser(state, proved.record)
   await signOut()
 
   return { ok: true }
