@@ -1,0 +1,12 @@
+--- server
+import { action } from 'kay'
+
+export const save = action(() => 'saved')
+
+const done = ctx.succeeded(save)
+---
+h1 Cookies
+form(action={save})
+  button Save
+if done
+  p.done {done.data}

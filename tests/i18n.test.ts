@@ -174,14 +174,14 @@ describe('the default locale prefixed', () => {
     const prefixed = await prefixedSite()
 
     expect(await get('/about?x=1', prefixed, { 'accept-language': 'en-US,en;q=0.9,fr;q=0.5' })).toMatchObject({ status: 307, location: '/en/about?x=1' })
-    expect(await get('/about', prefixed, { 'accept-language': 'en', 'cookie': 'kay-locale=fr' })).toMatchObject({ status: 307, location: '/fr/about' })
+    expect(await get('/about', prefixed, { 'accept-language': 'en', 'cookie': 'kay_locale=fr' })).toMatchObject({ status: 307, location: '/fr/about' })
     expect(await get('/', prefixed, { 'accept-language': 'de' })).toMatchObject({ status: 307, location: '/fr' })
     // Only a visitor following a link of the site chose a locale; a first visit, a crawler or a cache filling stays cacheable.
     const same = { 'sec-fetch-site': 'same-origin' }
 
-    expect((await get('/fr/about', prefixed, same)).cookie).toBe('kay-locale=fr; Path=/; Max-Age=31536000; SameSite=Lax')
+    expect((await get('/fr/about', prefixed, same)).cookie).toBe('kay_locale=fr; Path=/; Max-Age=31536000; SameSite=Lax')
     expect((await get('/fr/about', prefixed)).cookie).toBeNull()
-    expect((await get('/fr/about', prefixed, { ...same, cookie: 'kay-locale=fr' })).cookie).toBeNull()
+    expect((await get('/fr/about', prefixed, { ...same, cookie: 'kay_locale=fr' })).cookie).toBeNull()
     expect((await get('/fr/nope', prefixed, same)).cookie).toBeNull()
   })
 

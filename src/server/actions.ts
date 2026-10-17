@@ -198,7 +198,7 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], m
           const refusal = await inLocale(context.request, options, async () => protectionRefusal(value, context.request, context.body, asForm, context.server, !call, keyed(value) ? () => rateKeyContext(context.request, { ...context }, options) : undefined))
 
           if (refusal === PRETEND)
-            throw new Refusal(pretended(value, context.request))
+            throw new Refusal(pretended(value, context.request, options.base))
 
           // Before the schema reads the input: every attempt counts, a valid one or not.
           if (refusal)
@@ -750,7 +750,7 @@ async function runAction(action: ServerAction<TSchema, unknown>, context: { body
 
     await countGoneThrough(action, request, context.server, options)
 
-    return streams ? streamed(request, jar, headers, answer as AsyncIterable<unknown>, status, options) : succeeded(action, request, jar, headers, answer, status)
+    return streams ? streamed(request, jar, headers, answer as AsyncIterable<unknown>, status, options) : succeeded(action, request, jar, headers, answer, status, options.base)
   }
   catch (error) {
     // Sent on after it went through, as to a thank-you page.
@@ -792,9 +792,9 @@ async function countGoneThrough(action: ServerAction<TSchema, unknown>, request:
 }
 
 // A call gets the result; a plain form post goes back to the page it came from, which reads the result through `ctx.succeeded`.
-function succeeded(action: ServerAction<TSchema, unknown>, request: Request, jar: CookieJar, headers: Headers, result: unknown, status: number): Response {
+function succeeded(action: ServerAction<TSchema, unknown>, request: Request, jar: CookieJar, headers: Headers, result: unknown, status: number, base = ''): Response {
   if (!isCall(request))
-    writeSuccess(jar.cookies, { action: action.url, succeeded: true, data: result }, overHttps(request))
+    writeSuccess(jar.cookies, { action: action.url, succeeded: true, data: result }, overHttps(request), base)
 
   jar.writeTo(headers)
 
@@ -882,8 +882,8 @@ function streamed(request: Request, jar: CookieJar, headers: Headers, source: As
 }
 
 // A bot the honeypot caught sees what a person whose post went through sees, the handler having returned nothing.
-function pretended(action: ServerAction<TSchema, unknown>, request: Request): Response {
-  return succeeded(action, request, cookieJar(request), new Headers(), undefined, 200)
+function pretended(action: ServerAction<TSchema, unknown>, request: Request, base = ''): Response {
+  return succeeded(action, request, cookieJar(request), new Headers(), undefined, 200, base)
 }
 
 // A redirect or a denial goes out with the cookies set so far; anything else was a mistake, answered with a generic 500 since Elysia would send its message.

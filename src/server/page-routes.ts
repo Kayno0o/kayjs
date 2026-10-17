@@ -150,11 +150,11 @@ function localeRedirect(settings: LocaleSettings, request: Request, url: URL): R
 
 // A visitor who followed a link of the site to another locale than the one they had is taken back to it from an unprefixed path; that response is theirs alone.
 // A first visit, a crawler or a cache filling chose nothing, so their responses stay cacheable.
-function remembered(response: Response, request: Request, locale: string): Response {
+function remembered(response: Response, request: Request, locale: string, base = ''): Response {
   if (response.status !== 200 || request.headers.get('sec-fetch-site') !== 'same-origin' || cookieLocale(request) === locale)
     return response
 
-  response.headers.append('set-cookie', localeCookie(locale, overHttps(request)))
+  response.headers.append('set-cookie', localeCookie(locale, overHttps(request), base))
   response.headers.set('cache-control', 'private, no-cache')
 
   return response
@@ -254,7 +254,7 @@ export function servePageRoutes(app: Elysia, { table, served: claims, matchers, 
 
       const response = await runInLocale(state, async () => answeringPage(context.request, async () => answer(own.candidates, context, url)))
 
-      return settings.prefixDefault ? remembered(response, context.request, locale) : response
+      return settings.prefixDefault ? remembered(response, context.request, locale, renderOptions.base) : response
     }
 
     // The context is spread rather than handed over whole, which would make Elysia parse cookies and query for every request.

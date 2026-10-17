@@ -15,7 +15,9 @@ import { requestUrl } from './request-url'
 import { projectSource } from './source'
 
 // Where a visitor's choice of locale is kept, read before their browser's languages.
-export const LOCALE_COOKIE = 'kay-locale'
+export const LOCALE_COOKIE = 'kay_locale'
+// What kay named it before 1.52, read while visitors' cookies of a year are still out there.
+const LEGACY_LOCALE_COOKIE = 'kay-locale'
 const MESSAGES_DIR = 'src/messages'
 
 // The language a site without `lang` is written in.
@@ -292,7 +294,9 @@ export function preferredLocale(settings: LocaleSettings, request: Request): str
 
 // The locale the visitor's cookie keeps, which may name one the site no longer has.
 export function cookieLocale(request: Request): string | undefined {
-  return requestCookies(request).get(LOCALE_COOKIE) ?? undefined
+  const cookies = requestCookies(request)
+
+  return cookies.get(LOCALE_COOKIE) ?? cookies.get(LEGACY_LOCALE_COOKIE) ?? undefined
 }
 
 // The locale an action runs in: its host's, its page's, as the `Referer` or the form names it, or the visitor's preferred one.
@@ -316,8 +320,8 @@ export function acceptedLocale(locales: readonly string[], header: string | null
 }
 
 // Remembers the locale a visitor went to, so an unprefixed path takes them back to it.
-export function localeCookie(locale: string, secure: boolean): string {
-  return `${LOCALE_COOKIE}=${locale}; Path=/; Max-Age=${COOKIE_MAX_AGE}; SameSite=Lax${secure ? '; Secure' : ''}`
+export function localeCookie(locale: string, secure: boolean, base = ''): string {
+  return `${LOCALE_COOKIE}=${locale}; Path=${base || '/'}; Max-Age=${COOKIE_MAX_AGE}; SameSite=Lax${secure ? '; Secure' : ''}`
 }
 
 // A copy of a page path in one locale: the path it is served at, on its own host when locales go by domain, and the key its prerendered file goes by.

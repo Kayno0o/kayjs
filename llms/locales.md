@@ -154,7 +154,7 @@ p {target}
 ### Configuring locales
 
 - `i18n` in kay.config.ts serves every page in each locale, the default one unprefixed and the others under their prefix: `/about` and `/en/about`.
-- `prefixDefault: true` puts the default locale under its prefix too, `/fr/about`; a path without one then redirects with a 307 to the visitor's locale: the one they last went to, kept in the `kay-locale` cookie once they follow a link of the site to it, then the best match of their browser's `Accept-Language`, then the default.
+- `prefixDefault: true` puts the default locale under its prefix too, `/fr/about`; a path without one then redirects with a 307 to the visitor's locale: the one they last went to, kept in the `kay_locale` cookie once they follow a link of the site to it, then the best match of their browser's `Accept-Language`, then the default.
 - Without `prefixDefault` the URL alone decides.
 - `domains: { fr: 'example.fr', en: 'example.com' }` serves each locale on its own host instead, with no prefixes; a host not listed serves the default locale, and every locale needs a host.
 - `domains` and `prefixDefault` do not go together.

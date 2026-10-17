@@ -14,11 +14,13 @@ This page lists what each feature keeps, for a site's privacy notice and for the
 | --- | --- | --- |
 | `session`, `__Host-session` over https | a session the app writes to | 30 days unused, 90 at most, by default |
 | `kay_flash` | an action redirecting with a flash message | 60 seconds |
-| `kay-locale` | a visitor picking a locale | a year |
+| `kay_locale` | a visitor picking a locale | a year |
 | `kay_preview` | `enterPreview()`, for an editor | an hour by default |
 | the name given to `persisted()` | a persisted signal | a year, or its `maxAge` |
 
 The first four are necessary for what the visitor asked, so they need no consent. A persisted signal holds what the app puts in it. A theme or a language is necessary, and anything else waits for consent.
+
+Under a `base`, `kay_flash`, `kay_locale` and `kay_preview` are set for that path alone. Before 1.52 the locale cookie was `kay-locale`; kay still reads it.
 
 ## What the server keeps
 

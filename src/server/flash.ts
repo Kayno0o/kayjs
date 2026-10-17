@@ -46,15 +46,15 @@ export function handedOverFlash(request: Request): Flash | undefined {
 }
 
 // The page the browser goes back to reads it through `ctx.succeeded`, unless it cannot be carried there.
-export function writeSuccess(cookies: CookieMap, success: SuccessFlash, secure = false): void {
-  const refusal = setFlash(cookies, success, secure)
+export function writeSuccess(cookies: CookieMap, success: SuccessFlash, secure = false, base = ''): void {
+  const refusal = setFlash(cookies, success, secure, base)
 
   if (refusal !== undefined)
     kayLog('warn', `what ${success.action} returned cannot reach the page through its cookie: ${refusal}`)
 }
 
 // Sets the cookie, or says why it cannot: too big, or holding what has no encoding.
-function setFlash(cookies: CookieMap, value: SuccessFlash, secure: boolean): string | undefined {
+function setFlash(cookies: CookieMap, value: SuccessFlash, secure: boolean, base: string): string | undefined {
   let encoded: string
 
   try {
@@ -72,9 +72,14 @@ function setFlash(cookies: CookieMap, value: SuccessFlash, secure: boolean): str
   if (encoded.length > MAX_LENGTH)
     return `it takes ${encoded.length} bytes, over the ${MAX_LENGTH} it may`
 
-  cookies.set(FLASH_COOKIE, encoded, { httpOnly: true, sameSite: 'lax', maxAge: 60, path: '/', secure })
+  cookies.set(FLASH_COOKIE, encoded, { httpOnly: true, sameSite: 'lax', maxAge: 60, path: flashPath(base), secure })
 
   return undefined
+}
+
+// The flash goes with the pages of the site, so under a `base` its cookie is that path's alone: another app on the host never meets it, nor deletes it.
+export function flashPath(base: string): string {
+  return base || '/'
 }
 
 // Its shape is checked before a page reads it all the same; one that does not open, forged or sealed before a restart changed the secret, reads as none.

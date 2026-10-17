@@ -40,7 +40,7 @@ import { preferredEncoding, wholeResponse } from './compress'
 import { cookieJar, requestCookies } from './cookies'
 import { A11Y_SCRIPT, DEV_BOOT, devToolScripts, errorPageScripts, liveReload, problemsBlock } from './dev'
 import { noteRedirect } from './dev-notes'
-import { FLASH_COOKIE, handedOverFlash, readFlash } from './flash'
+import { FLASH_COOKIE, flashPath, handedOverFlash, readFlash } from './flash'
 import { formsScript } from './forms'
 import { runGuards } from './guards'
 import { historyScript } from './history'
@@ -597,7 +597,7 @@ function createRendering(context: RequestContext, params: Record<string, unknown
     carried: readOnce,
     writeCookies: () => {
       if (hasFlash(request))
-        jar.cookies.delete(FLASH_COOKIE)
+        jar.cookies.delete({ name: FLASH_COOKIE, path: flashPath(base) })
 
       jar.writeTo(headers)
     },
