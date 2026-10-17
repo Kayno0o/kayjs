@@ -82,11 +82,14 @@ export function rebaseRedirects(app: Elysia, base: string): void {
     if (!(responseValue instanceof Response))
       return undefined
 
-    const targets = REDIRECT_HEADERS.flatMap((name) => {
+    const targets: [string, string][] = []
+
+    for (const name of REDIRECT_HEADERS) {
       const value = responseValue.headers.get(name)
 
-      return value === null ? [] : [[name, joinBase(base, value)] as const]
-    })
+      if (value !== null)
+        targets.push([name, joinBase(base, value)])
+    }
 
     if (targets.length === 0)
       return undefined

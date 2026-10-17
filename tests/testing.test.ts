@@ -388,6 +388,21 @@ describe('kay/test', () => {
   })
 })
 
+describe('testSite under a base', () => {
+  it('throws the redirect of a called action with the base on its location', async () => {
+    const mounted = await testSite({ routes, base: '/app' })
+
+    try {
+      const { promote } = await import(join(import.meta.dir, 'fixtures/site/src/routes/admin/index.kay')) as { promote: Action<{ name: string }, string> }
+
+      await expect(mounted.call(promote, { name: 'bob' })).rejects.toMatchObject({ name: 'ActionRedirect', status: 303, location: '/app/about' })
+    }
+    finally {
+      await mounted.close()
+    }
+  })
+})
+
 describe('testSite in development', () => {
   it('serves its pages as kay dev does with dev: true, and as production otherwise', async () => {
     const dev = await testSite({ routes, dev: true })

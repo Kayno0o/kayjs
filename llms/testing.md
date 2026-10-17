@@ -188,7 +188,7 @@ it('shows why a todo was refused', async () => {
 - Both `visit` and `submit` resolve with `{ url, status, headers, html }`, which also reads the page as a crawler does (see below).
 - `site.call(action, input)` calls an action as an island does, `input` its typed input or a `FormData`, left out for an action with no input or only optional fields: `site.call(signOut)`.
 - `{ from: '/orgs/acme' }` names the page a call is made on, for an action reading its params.
-- `site.call` resolves with the action's result, throws `ActionError` when it fails and `ActionRedirect` with `location` when it redirects.
+- `site.call` resolves with the action's result, throws `ActionError` when it fails and `ActionRedirect` with `location` when it redirects, the path under the site's `base` when it has one.
 - A handler returning an async iterable gives every value once its stream ended, `[1, 2, 3]`, and throws when the stream failed.
 - `site.refusal(action, input)` makes the same call expecting it refused: it resolves with the `ActionError`, `data` typed from the handler, and fails the test when the call went through.
 - `await site.refusal(add, { title: '' })` reads `{ status: 422, errors: { title: 'Write a title' } }`.

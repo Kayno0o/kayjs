@@ -37,6 +37,8 @@ async function redirectedFrom(app: Elysia, variant: Variant, page: string, how: 
   return where?.startsWith(`${variant.base}/`) ? where.slice(variant.base.length) : where
 }
 
+const MOUNTED: Variant = { base: '/app', trailingSlash: 'never', prefixDefault: false, dev: false }
+
 describe('an action posted from a localized page', () => {
   for (const base of ['', '/app']) {
     for (const trailingSlash of ['never', 'always', 'ignore'] as const) {
@@ -65,7 +67,7 @@ describe('an action posted from a localized page', () => {
   }
 
   it('ignores a locale the base or a hostile referer only imitates', async () => {
-    const variant: Variant = { base: '/app', trailingSlash: 'never', prefixDefault: false, dev: false }
+    const variant = MOUNTED
     const app = await serve(variant)
     const html = await (await app.handle(new Request('http://localhost/'))).text()
     const action = actionOf(html, '/app')
@@ -83,7 +85,7 @@ describe('an action posted from a localized page', () => {
 
 describe('an action posted with kay_back', () => {
   it('runs in the locale of the page it names under a base, over the Referer', async () => {
-    const variant: Variant = { base: '/app', trailingSlash: 'never', prefixDefault: false, dev: false }
+    const variant = MOUNTED
     const app = await serve(variant)
     const action = actionOf(await (await app.handle(new Request('http://localhost/'))).text(), '/app')
     const post = async (back: string, referer: string) => (await app.handle(new Request(`http://localhost${action}?kay_back=${encodeURIComponent(back)}`, { method: 'POST', headers: { referer, origin: 'http://localhost' }, body: new FormData() }))).headers.get('location')
@@ -134,7 +136,7 @@ describe('an action\'s redirect under a base', () => {
   }
 
   it('puts a localized page under the base', async () => {
-    const variant: Variant = { base: '/app', trailingSlash: 'never', prefixDefault: false, dev: false }
+    const variant = MOUNTED
     const app = await serve(variant)
 
     for (const how of POSTS) {
@@ -145,7 +147,7 @@ describe('an action\'s redirect under a base', () => {
   })
 
   it('leaves a target that is no path of the site as it is', async () => {
-    const variant: Variant = { base: '/app', trailingSlash: 'never', prefixDefault: false, dev: false }
+    const variant = MOUNTED
     const app = await serve(variant)
 
     for (const how of POSTS) {
@@ -157,8 +159,19 @@ describe('an action\'s redirect under a base', () => {
     }
   })
 
+  it('writes a redirect without the base, so one already carrying it goes under it again', async () => {
+    const variant = MOUNTED
+    const app = await serve(variant)
+
+    for (const how of POSTS) {
+      const { location, redirect } = await redirectTo(app, variant, how, '/app/dashboard')
+
+      expect(location ?? redirect).toBe('/app/app/dashboard')
+    }
+  })
+
   it('puts a lookalike of the base under it, as any other path', async () => {
-    const variant: Variant = { base: '/app', trailingSlash: 'never', prefixDefault: false, dev: false }
+    const variant = MOUNTED
     const app = await serve(variant)
 
     for (const how of POSTS) {
