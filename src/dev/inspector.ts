@@ -31,6 +31,7 @@ interface Link {
   // What the client sent before the server's inspector opened.
   queue: string[]
   closed: boolean
+  releaseMs: number
 }
 
 export interface InspectorProxy {
@@ -41,8 +42,9 @@ export interface InspectorProxy {
   stop: () => Promise<void>
 }
 
+// `releaseMs` is how long a server is given to answer a closed client's connection, which a test shortens.
 // `current` names the socket of the server running now, which a new connection goes to; `pagePort` the port its pages are on, whose origin alone, beside debug.bun.sh, may connect from a page.
-export function inspectorProxy(address: string, current: () => string | undefined, pagePort: () => number | undefined = () => undefined): InspectorProxy {
+export function inspectorProxy(address: string, current: () => string | undefined, pagePort: () => number | undefined = () => undefined, releaseMs = RELEASE_MS): InspectorProxy {
   const url = new URL(address)
   let count = 0
   const inUse = `kay dev: the debugger address ${url.host} is in use`
@@ -52,7 +54,7 @@ export function inspectorProxy(address: string, current: () => string | undefine
     throw new InspectorAddressInUse(inUse)
 
   try {
-    server = serve(url, current, pagePort)
+    server = serve(url, current, pagePort, releaseMs)
   }
   catch (error) {
     if ((error as { code?: unknown }).code === 'EADDRINUSE')
@@ -82,7 +84,7 @@ export function inspectorProxy(address: string, current: () => string | undefine
   }
 }
 
-function serve(url: URL, current: () => string | undefined, pagePort: () => number | undefined): Server<Link> {
+function serve(url: URL, current: () => string | undefined, pagePort: () => number | undefined, releaseMs: number): Server<Link> {
   return Bun.serve<Link>({
     hostname: url.hostname,
     port: Number(url.port),
@@ -103,7 +105,7 @@ function serve(url: URL, current: () => string | undefined, pagePort: () => numb
       if (pathname !== url.pathname)
         return new Response(null, { status: 404 })
 
-      return server.upgrade(request, { data: { queue: [], closed: false } }) ? undefined : new Response(null, { status: 426, headers: { upgrade: 'websocket' } })
+      return server.upgrade(request, { data: { queue: [], closed: false, releaseMs } }) ? undefined : new Response(null, { status: 426, headers: { upgrade: 'websocket' } })
     },
     websocket: {
       idleTimeout: 0,
@@ -124,7 +126,7 @@ function serve(url: URL, current: () => string | undefined, pagePort: () => numb
         client.data.closed = true
 
         if (upstream?.readyState === WebSocket.OPEN)
-          release(upstream)
+          release(upstream, client.data.releaseMs)
       },
     },
   })
@@ -149,7 +151,7 @@ function connect(client: ServerWebSocket<Link>, current: () => string | undefine
     opened = true
 
     if (link.closed) {
-      release(upstream)
+      release(upstream, link.releaseMs)
 
       return
     }
@@ -185,10 +187,12 @@ function retry(client: ServerWebSocket<Link>, current: () => string | undefined,
 }
 
 // Closed once the server answered: closing a connection its inspector is still setting up lets go of the hold a listening server has on its process under Bun 1.4.4, which then exits with code 0 (#285), and a loaded host or a server still starting answers after a second.
-// One paused on a breakpoint does not answer, and is let go of by closing the connection, so it is given up on past RELEASE_MS.
-function release(upstream: WebSocket) {
-  const timer = setTimeout(() => upstream.close(), RELEASE_MS)
+// One paused on a breakpoint does not answer, and is let go of by closing the connection, so it is given up on past `releaseMs`.
+function release(upstream: WebSocket, releaseMs: number) {
+  const timer = setTimeout(() => upstream.close(), releaseMs)
 
+  // A server that ended on its own leaves nothing to close, and no timer to hold the process.
+  upstream.addEventListener('close', () => clearTimeout(timer))
   upstream.addEventListener('message', (event) => {
     if (answered(event.data)) {
       clearTimeout(timer)

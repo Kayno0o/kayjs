@@ -1393,7 +1393,12 @@ describe.concurrent('kay dev', () => {
             answers.set(++id, resolve)
             socket.send(JSON.stringify({ id, method: 'Runtime.evaluate', params: { expression: 'process.pid' } }))
           }),
-          new Promise((_, reject) => socket.readyState === WebSocket.CLOSED ? reject(new Error('the debugger connection is closed')) : socket.addEventListener('close', () => reject(new Error('the debugger connection closed before the server answered')))),
+          new Promise((_, reject) => {
+            if (socket.readyState === WebSocket.CLOSED)
+              reject(new Error('the debugger connection is closed'))
+            else
+              socket.addEventListener('close', () => reject(new Error('the debugger connection closed before the server answered')))
+          }),
         ]),
         closed,
       }
@@ -1480,6 +1485,90 @@ describe.concurrent('kay dev', () => {
     finally {
       await proxy.stop()
       await slow.stop(true)
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it.serial('closes the connection of a server that never answers once the release delay is up, however long it is given', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
+    const unix = join(root, 'inspector.sock')
+    const messages: string[] = []
+    const closes: number[] = []
+    const started = performance.now()
+    // A server paused on a breakpoint: it takes the message and says nothing.
+    const paused = Bun.serve({
+      unix,
+      fetch: (request, server) => server.upgrade(request) ? undefined : new Response(null, { status: 426 }),
+      websocket: {
+        message: (_socket, message) => {
+          messages.push(String(message))
+        },
+        close: () => {
+          closes.push(performance.now() - started)
+        },
+      },
+    })
+    const proxy = inspectorProxy('ws://localhost:0/kay', () => unix, () => undefined, 300)
+
+    try {
+      const client = new WebSocket(proxy.url)
+
+      await new Promise(resolve => client.addEventListener('open', resolve))
+      client.close()
+      await until(() => messages.length === 1)
+      await Bun.sleep(150)
+      expect(closes).toEqual([])
+      await until(() => closes.length === 1, 5000)
+
+      expect(closes[0]).toBeGreaterThan(250)
+    }
+    finally {
+      await proxy.stop()
+      await paused.stop(true)
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it.serial('ignores a frame that is not JSON before the answer, and lets go of the server once', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
+    const unix = join(root, 'inspector.sock')
+    const messages: string[] = []
+    const closes: number[] = []
+    const started = performance.now()
+    const noisy = Bun.serve({
+      unix,
+      fetch: (request, server) => server.upgrade(request) ? undefined : new Response(null, { status: 426 }),
+      websocket: {
+        message: (socket, message) => {
+          messages.push(String(message))
+          socket.send('not json {')
+          setTimeout(() => socket.send(String(message).replace(/"method".*/, '"result":{}}')), 300)
+        },
+        close: () => {
+          closes.push(performance.now() - started)
+        },
+      },
+    })
+    // A delay far past the answer, so only the answer can have closed the connection.
+    const proxy = inspectorProxy('ws://localhost:0/kay', () => unix, () => undefined, 60_000)
+
+    try {
+      const client = new WebSocket(proxy.url)
+
+      await new Promise(resolve => client.addEventListener('open', resolve))
+      client.close()
+      await until(() => messages.length === 1)
+      await Bun.sleep(150)
+      expect(closes).toEqual([])
+      await until(() => closes.length === 1, 5000)
+      await Bun.sleep(100)
+
+      expect(closes).toHaveLength(1)
+      expect(closes[0]).toBeGreaterThan(250)
+    }
+    finally {
+      await proxy.stop()
+      await noisy.stop(true)
       await rm(root, { recursive: true, force: true })
     }
   })
