@@ -4,9 +4,9 @@ order: 9.3
 description: Find what a page costs and what went wrong in it, with the dev tool and inspector under kay dev, and the size report, --analyze and budgets in kay build.
 ---
 
-Under `kay dev`, every page carries a small bar at the bottom left with a count of the page's problems. Click it, or press Alt+Shift+K, to open the dev tool. Press Escape to close it.
+Under `kay dev`, every page carries a small bar, at the bottom left by default, with a count of the page's problems. Click it, or press Alt+Shift+K, to open the dev tool. Press Escape to close it.
 
-Drag the drawer by its head to move it, and by an edge or a corner to resize it. The buttons in its head dock it to the bottom or the right of the window, where it pads the page so nothing hides under it. Drag the bar to move it to another corner. A new tab opens the tool where you left it.
+Drag the drawer by its head to move it, and by an edge or a corner to resize it. With the keyboard, focus its bottom right corner and use the arrow keys. Three buttons in its head let it float or dock it to the bottom or the right of the window. Docked, it pads the page so nothing hides under it. Drag the bar to move it to another corner. A new tab places the tool where you left it. On a window 480 pixels wide or less, the drawer spans the window instead.
 
 ```sh
 kay dev --open

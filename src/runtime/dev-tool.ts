@@ -83,13 +83,13 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 .dock-right.open.right .bar { right: calc(var(--dock) + 12px); }
 .floating .head { cursor: move; touch-action: none; }
 .grip { position: absolute; z-index: 1; touch-action: none; }
-.grip.n, .grip.s { left: 10px; right: 10px; height: 6px; cursor: ns-resize; }
-.grip.e, .grip.w { top: 10px; bottom: 10px; width: 6px; cursor: ew-resize; }
+.grip.n, .grip.s { left: 8px; right: 8px; height: 5px; cursor: ns-resize; }
+.grip.e, .grip.w { top: 8px; bottom: 8px; width: 5px; cursor: ew-resize; }
 .grip.n, .grip.ne, .grip.nw { top: 0; }
 .grip.s, .grip.se, .grip.sw { bottom: 0; }
 .grip.e, .grip.ne, .grip.se { right: 0; }
 .grip.w, .grip.nw, .grip.sw { left: 0; }
-.grip.ne, .grip.nw, .grip.se, .grip.sw { width: 12px; height: 12px; }
+.grip.ne, .grip.nw, .grip.se, .grip.sw { width: 8px; height: 8px; }
 .grip.ne, .grip.sw { cursor: nesw-resize; }
 .grip.nw, .grip.se { cursor: nwse-resize; }
 .grip:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
@@ -114,6 +114,9 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
   .tabs .name { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   .tabs .pill { position: absolute; top: -1px; right: -3px; padding: 0 4px; font-size: 10px; line-height: 14px; }
   .tabs .sep { display: none; }
+}
+@container drawer (max-width: 24rem) {
+  .title .words { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 }
 .content { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }
 .panel { flex: 1; min-width: 0; overflow: auto; padding: 12px 14px 16px; display: grid; align-content: start; gap: 16px; }
@@ -368,6 +371,11 @@ interface DevState {
 type Dock = 'float' | 'bottom' | 'right'
 type Corner = 'bottom-left' | 'bottom-right' | 'top-left' | 'top-right'
 
+interface Room {
+  width: number
+  height: number
+}
+
 interface Box {
   left: number
   top: number
@@ -523,7 +531,6 @@ export function startDevTool(doc: Document = document): DevTool {
     const grip = make('div', `grip ${edge}`)
 
     grip.dataset.edge = edge
-    drawer.append(grip)
 
     return grip
   })
@@ -551,14 +558,14 @@ export function startDevTool(doc: Document = document): DevTool {
   mark.setAttribute('aria-label', 'kay dev tools (Alt+Shift+K)')
   mark.setAttribute('aria-controls', drawer.id)
   mark.append(drawing(doc, MARK, '4 5 54 52', ''), 'kay')
-  title.append(drawing(doc, MARK, '4 5 54 52', ''), 'kay dev tools')
+  title.append(drawing(doc, MARK, '4 5 54 52', ''), make('span', 'words', 'kay dev tools'))
   status.setAttribute('role', 'status')
   size.type = 'button'
   close.type = 'button'
   setIcon(close, 'Close', 'x')
   head.append(title, where, dock, size, close)
   body.append(tabList, content)
-  drawer.append(head, body)
+  drawer.append(head, body, ...grips)
   bar.append(mark, status)
   ui.append(drawer, bar)
   root.append(ui)
@@ -569,22 +576,30 @@ export function startDevTool(doc: Document = document): DevTool {
   const showWhere = () => {
     where.textContent = `${win.location.pathname}${win.location.search}`
   }
-  const dockSize = (value: number) => layout.dock === 'bottom' ? clamp(value, MIN_HEIGHT, win.innerHeight - PAGE_LEFT) : clamp(value, MIN_WIDTH, win.innerWidth - PAGE_LEFT)
+  // The window less its scrollbars, which a fixed element's edges stop at.
+  const room = (): Room => ({ width: doc.documentElement.clientWidth || win.innerWidth, height: doc.documentElement.clientHeight || win.innerHeight })
+  // A narrow window spans the drawer whatever the layout says.
+  const dockOf = (): Dock => win.innerWidth > NARROW ? layout.dock : 'float'
+  const dockSize = (value: number) => dockOf() === 'bottom' ? clamp(value, MIN_HEIGHT, room().height - PAGE_LEFT) : clamp(value, MIN_WIDTH, room().width - PAGE_LEFT)
   // Lays the bar and drawer out as the layout says, within the window as it is now.
+  let padding = ''
+  let maxed: boolean | undefined
   const place = () => {
-    const floating = layout.dock === 'float'
-    const docked = floating ? 0 : dockSize(layout.dock === 'bottom' ? layout.bottom : layout.right)
+    const current = dockOf()
+    const floating = current === 'float'
+    const docked = floating ? 0 : dockSize(current === 'bottom' ? layout.bottom : layout.right)
     // A floating drawer the pointer can move and resize, which a narrow window spans instead.
     const free = floating && !layout.max && win.innerWidth > NARROW
-    const box = free && layout.box !== undefined ? fitBox(layout.box, win) : undefined
-    const keyGrip = KEY_GRIPS[layout.dock]
+    const box = free && layout.box !== undefined ? fitBox(layout.box, room()) : undefined
+    const keyGrip = KEY_GRIPS[current]
+    const sheet = state.open && !floating ? `html { padding-${current}: ${docked}px !important; }` : ''
 
     ui.classList.toggle('right', layout.corner.endsWith('right'))
     ui.classList.toggle('top', layout.corner.startsWith('top'))
     ui.classList.toggle('floating', free)
     ui.classList.toggle('max', floating && layout.max)
-    ui.classList.toggle('dock-bottom', layout.dock === 'bottom')
-    ui.classList.toggle('dock-right', layout.dock === 'right')
+    ui.classList.toggle('dock-bottom', current === 'bottom')
+    ui.classList.toggle('dock-right', current === 'right')
     ui.classList.toggle('open', state.open)
     ui.style.setProperty('--dock', `${docked}px`)
     drawer.style.left = box === undefined ? '' : `${box.left}px`
@@ -592,9 +607,17 @@ export function startDevTool(doc: Document = document): DevTool {
     drawer.style.width = box === undefined ? '' : `${box.width}px`
     drawer.style.height = box === undefined ? '' : `${box.height}px`
     drawer.style.right = drawer.style.bottom = box === undefined ? '' : 'auto'
-    pageSheet.replaceSync(state.open && !floating ? `html { padding-${layout.dock}: ${docked}px !important; }` : '')
     size.hidden = !floating
-    setIcon(size, layout.max ? 'Restore the size' : 'Fill the window', layout.max ? 'minimize-2' : 'maximize-2')
+
+    if (sheet !== padding) {
+      padding = sheet
+      pageSheet.replaceSync(sheet)
+    }
+
+    if (layout.max !== maxed) {
+      maxed = layout.max
+      setIcon(size, layout.max ? 'Restore the size' : 'Fill the window', layout.max ? 'minimize-2' : 'maximize-2')
+    }
 
     for (const { value, button } of docks)
       button.setAttribute('aria-pressed', String(layout.dock === value))
@@ -610,10 +633,13 @@ export function startDevTool(doc: Document = document): DevTool {
         grip.setAttribute('role', 'separator')
         grip.setAttribute('aria-label', 'Resize the dev tools, arrow keys')
         grip.setAttribute('aria-orientation', edge === 'n' ? 'horizontal' : 'vertical')
+        // The height for the top edge, else the width, which the corner's left and right arrows change.
+        grip.setAttribute('aria-valuemin', String(edge === 'n' ? MIN_HEIGHT : MIN_WIDTH))
+        grip.setAttribute('aria-valuemax', String(edge === 'n' ? room().height : room().width))
         grip.setAttribute('aria-valuenow', String(Math.round(edge === 'n' ? drawer.offsetHeight : drawer.offsetWidth)))
       }
       else {
-        for (const name of ['role', 'aria-label', 'aria-orientation', 'aria-valuenow'])
+        for (const name of ['role', 'aria-label', 'aria-orientation', 'aria-valuemin', 'aria-valuemax', 'aria-valuenow'])
           grip.removeAttribute(name)
       }
     }
@@ -671,7 +697,7 @@ export function startDevTool(doc: Document = document): DevTool {
     const library = !CORE_TABS.has(options.id)
     // The tabs of kay come first, then a line, then those of libraries, each in the order they were made.
     const firstLibrary = tabs.findIndex(other => !CORE_TABS.has(other.options.id))
-    const place = library || firstLibrary < 0 ? tabs.length : firstLibrary
+    const at = library || firstLibrary < 0 ? tabs.length : firstLibrary
 
     button.type = 'button'
     button.id = `kay-dev-tab-${options.id}`
@@ -694,12 +720,12 @@ export function startDevTool(doc: Document = document): DevTool {
       tabList.append(button)
     }
     else {
-      tabList.insertBefore(button, tabs[place]?.button ?? rule)
+      tabList.insertBefore(button, tabs[at]?.button ?? rule)
     }
 
     content.append(panel)
-    bar.insertBefore(badge, bar.children[2 + place] ?? null)
-    tabs.splice(place, 0, entry)
+    bar.insertBefore(badge, bar.children[2 + at] ?? null)
+    tabs.splice(at, 0, entry)
     // Once the caller is done setting the tab up, as showing it runs its `shown`.
     queueMicrotask(render)
 
@@ -764,7 +790,7 @@ export function startDevTool(doc: Document = document): DevTool {
 
       const box = bar.getBoundingClientRect()
 
-      layout.corner = `${box.top + box.height / 2 < win.innerHeight / 2 ? 'top' : 'bottom'}-${box.left + box.width / 2 < win.innerWidth / 2 ? 'left' : 'right'}`
+      layout.corner = `${box.top + box.height / 2 < room().height / 2 ? 'top' : 'bottom'}-${box.left + box.width / 2 < room().width / 2 ? 'left' : 'right'}`
       bar.style.left = bar.style.top = bar.style.right = bar.style.bottom = ''
       saveLayout()
       place()
@@ -805,14 +831,17 @@ export function startDevTool(doc: Document = document): DevTool {
 
     event.preventDefault()
     follow(event, head, (dx, dy) => {
+      if (!moved && Math.hypot(dx, dy) < DRAG_START)
+        return
+
       moved = true
-      layout.box = fitBox({ ...start, left: start.left + dx, top: start.top + dy }, win)
+      layout.box = fitBox({ ...start, left: start.left + dx, top: start.top + dy }, room())
       place()
     }, () => {
       if (!moved)
         return
 
-      layout.box = snapped(fitBox(layout.box ?? start, win), win)
+      layout.box = snapped(fitBox(layout.box ?? start, room()), room())
       saveLayout()
       place()
     })
@@ -823,12 +852,14 @@ export function startDevTool(doc: Document = document): DevTool {
     const start = boxOf(drawer)
 
     return (dx: number, dy: number) => {
-      if (layout.dock === 'bottom')
+      const current = dockOf()
+
+      if (current === 'bottom')
         layout.bottom = dockSize(start.height - dy)
-      else if (layout.dock === 'right')
+      else if (current === 'right')
         layout.right = dockSize(start.width - dx)
       else
-        layout.box = fitBox(resized(start, edge, dx, dy), win)
+        layout.box = fitBox(resized(start, edge, dx, dy, room()), room())
 
       place()
     }
@@ -1869,6 +1900,8 @@ function isVector(src: string, base: string): boolean {
 function pageImages(doc: Document, lcp: Element | undefined): ImageInfo[] {
   const win = doc.defaultView!
   const density = win.devicePixelRatio || 1
+  // Chromium reports a zoom's density as a float, 1.2000000476837158 at 120%.
+  const shown = Number(density.toFixed(2))
 
   return [...doc.querySelectorAll('img')].flatMap((image) => {
     const src = image.currentSrc === '' ? image.getAttribute('src') : image.currentSrc
@@ -1896,7 +1929,7 @@ function pageImages(doc: Document, lcp: Element | undefined): ImageInfo[] {
       src,
       variant: imageVariant(src, win.location.origin),
       natural: image.naturalWidth > 0 ? `${image.naturalWidth}x${image.naturalHeight}` : 'not loaded',
-      drawn: `${Math.round(box.width)}x${Math.round(box.height)}${density === 1 ? '' : ` at ${Number(density.toFixed(2))}x`}`,
+      drawn: `${Math.round(box.width)}x${Math.round(box.height)}${shown === 1 ? '' : ` at ${shown}x`}`,
       flags,
       lcp: image === lcp,
     }]
@@ -2062,26 +2095,31 @@ function imagesTab(doc: Document, tool: DevTool, vitals: Vitals, signal: AbortSi
       return
     }
 
-    // Copies of one image drawn alike share a row, as the logo of a header and a footer would.
+    // Copies of one image drawn at one size share a row, as the logo of a header and a footer would, with what is wrong with any of them.
     const copies = new Map<string, ImageInfo[]>()
 
     for (const info of images) {
-      const key = JSON.stringify([info.src, info.variant, info.drawn, info.flags, info.lcp])
+      const key = JSON.stringify([info.src, info.variant, info.drawn])
+      const same = copies.get(key)
 
-      copies.set(key, [...copies.get(key) ?? [], info])
+      if (same === undefined)
+        copies.set(key, [info])
+      else
+        same.push(info)
     }
 
     const rows = [...copies.values()]
 
     for (const same of rows) {
       const info = same[0]!
+      const lcp = same.some(copy => copy.lcp)
       const row = tool.make('div', 'image')
       const thumb = tool.make('img', 'thumb')
       const src = tool.make('div', 'src', info.url)
       const facts = tool.make('div', 'chips')
       const format = tool.make('span', 'chip', 'format...')
       const flags = tool.make('div', 'flags')
-      const label = info.lcp ? 'largest paint' : 'image'
+      const label = lcp ? 'largest paint' : 'image'
 
       formats.push(format)
       thumb.src = info.src
@@ -2089,7 +2127,7 @@ function imagesTab(doc: Document, tool: DevTool, vitals: Vitals, signal: AbortSi
       thumb.loading = 'lazy'
       thumb.decoding = 'async'
 
-      if (info.lcp)
+      if (lcp)
         src.append(pill(tool, 'largest paint', 'accent'))
 
       if (same.length > 1)
@@ -2097,7 +2135,7 @@ function imagesTab(doc: Document, tool: DevTool, vitals: Vitals, signal: AbortSi
 
       facts.append(tool.make('span', 'chip', info.variant), format, tool.make('span', 'chip', info.natural === 'not loaded' ? `not loaded, drawn ${info.drawn}` : `${info.natural} drawn ${info.drawn}`))
 
-      for (const flag of info.flags) {
+      for (const flag of new Set(same.flatMap(copy => copy.flags))) {
         const line = tool.make('div', 'flag')
 
         line.append(tool.icon('triangle-alert'), tool.make('span', '', flag))
@@ -2764,6 +2802,9 @@ function readLayout(win: Window): DevLayout {
     return fallback
   }
 
+  if (typeof read !== 'object' || read === null)
+    return fallback
+
   return {
     dock: DOCKS.some(([dock]) => dock === read.dock) ? read.dock! : fallback.dock,
     corner: CORNERS.has(String(read.corner)) ? read.corner! : fallback.corner,
@@ -2797,16 +2838,16 @@ function boxOf(element: Element): Box {
 }
 
 // A box at least the drawer's smallest size, inside the window.
-function fitBox(box: Box, win: Window): Box {
-  const width = clamp(box.width, MIN_WIDTH, win.innerWidth)
-  const height = clamp(box.height, MIN_HEIGHT, win.innerHeight)
+function fitBox(box: Box, room: Room): Box {
+  const width = clamp(box.width, MIN_WIDTH, room.width)
+  const height = clamp(box.height, MIN_HEIGHT, room.height)
 
-  return { width, height, left: clamp(box.left, 0, win.innerWidth - width), top: clamp(box.top, 0, win.innerHeight - height) }
+  return { width, height, left: clamp(box.left, 0, room.width - width), top: clamp(box.top, 0, room.height - height) }
 }
 
 // A box near an edge of the window lands its margin from it.
-function snapped(box: Box, win: Window): Box {
-  return { ...box, left: snapAxis(box.left, box.width, win.innerWidth), top: snapAxis(box.top, box.height, win.innerHeight) }
+function snapped(box: Box, room: Room): Box {
+  return { ...box, left: snapAxis(box.left, box.width, room.width), top: snapAxis(box.top, box.height, room.height) }
 }
 
 function snapAxis(start: number, size: number, room: number): number {
@@ -2816,24 +2857,26 @@ function snapAxis(start: number, size: number, room: number): number {
   return room - start - size < SNAP ? room - size - MARGIN : start
 }
 
-// The box as an edge or corner, `n`, `e`, `s`, `w` or two of them, moves by an offset, the opposite side staying put.
-function resized(start: Box, edge: string, dx: number, dy: number): Box {
+// The box as an edge or corner, `n`, `e`, `s`, `w` or two of them, moves by an offset, stopping at the window, the opposite side staying put.
+function resized(start: Box, edge: string, dx: number, dy: number, room: Room): Box {
   const box = { ...start }
+  const right = start.left + start.width
+  const bottom = start.top + start.height
 
   if (edge.includes('e'))
-    box.width = start.width + dx
+    box.width = clamp(start.width + dx, MIN_WIDTH, room.width - start.left)
 
   if (edge.includes('w')) {
-    box.width = Math.max(MIN_WIDTH, start.width - dx)
-    box.left = start.left + start.width - box.width
+    box.width = clamp(start.width - dx, MIN_WIDTH, right)
+    box.left = right - box.width
   }
 
   if (edge.includes('s'))
-    box.height = start.height + dy
+    box.height = clamp(start.height + dy, MIN_HEIGHT, room.height - start.top)
 
   if (edge.includes('n')) {
-    box.height = Math.max(MIN_HEIGHT, start.height - dy)
-    box.top = start.top + start.height - box.height
+    box.height = clamp(start.height - dy, MIN_HEIGHT, bottom)
+    box.top = bottom - box.height
   }
 
   return box
@@ -2851,10 +2894,16 @@ function follow(event: PointerEvent, element: HTMLElement, move: (dx: number, dy
     // A pointer the browser no longer tracks, as a synthetic one: moves still reach the element while over it.
   }
 
-  element.addEventListener('pointermove', next => move(next.clientX - clientX, next.clientY - clientY), { signal: moving.signal })
+  element.addEventListener('pointermove', (next) => {
+    if (next.pointerId === pointerId)
+      move(next.clientX - clientX, next.clientY - clientY)
+  }, { signal: moving.signal })
 
-  for (const type of ['pointerup', 'pointercancel']) {
-    element.addEventListener(type, () => {
+  for (const type of ['pointerup', 'pointercancel'] as const) {
+    element.addEventListener(type, (next) => {
+      if (next.pointerId !== pointerId)
+        return
+
       moving.abort()
       done()
     }, { signal: moving.signal })

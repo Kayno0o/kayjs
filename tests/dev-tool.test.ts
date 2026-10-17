@@ -244,6 +244,12 @@ describe('the dev tool', () => {
     tool = undefined
     expect(document.adoptedStyleSheets).toHaveLength(0)
     expect(sessionStorage.getItem('kay-dev')).not.toContain('dock')
+
+    // A layout stored as no object at all.
+    localStorage.setItem('kay-dev-layout', 'null')
+    tool = startDevTool()
+    await Bun.sleep(0)
+    expect(shadow().querySelector('.ui.floating')).not.toBeNull()
   })
 
   it('dismisses the problems shown for the rest of the browser tab, drops what the page logged as a swap starts, and reads what kay check finds again as it ends', async () => {
@@ -1006,7 +1012,7 @@ describe('the dev tool', () => {
     }
   })
 
-  it('gives copies of one image drawn alike one row, outlining each, and rounds the density', async () => {
+  it('gives copies of one image drawn at one size one row, with what is wrong with any of them, outlining each, and rounds the density', async () => {
     const { happyDOM } = window as unknown as { happyDOM: { setURL: (url: string) => void } }
     const { href } = location
     const { devicePixelRatio } = window
@@ -1017,6 +1023,7 @@ describe('the dev tool', () => {
       '<img src="/logo.svg" width="16" height="16" alt="">',
       '<img src="/logo.svg" width="16" height="16" alt="">',
       '<img id="big" src="/logo.svg" width="32" height="32" alt="">',
+      '<img id="lazy" src="/logo.svg" width="16" height="16" loading="lazy" alt="">',
     ].join('')
 
     for (const image of document.querySelectorAll('img')) {
@@ -1025,12 +1032,15 @@ describe('the dev tool', () => {
       Object.defineProperty(image, 'naturalWidth', { value: 150 })
       Object.defineProperty(image, 'naturalHeight', { value: 150 })
       Object.defineProperty(image, 'complete', { value: true })
-      image.getBoundingClientRect = () => ({ width: side, height: side, top: 5000, bottom: 5000 + side, left: 0, right: side, x: 0, y: 0, toJSON: () => ({}) })
+      // The lazy copy is in view, which flags it.
+      const top = image.id === 'lazy' ? 10 : 5000
+
+      image.getBoundingClientRect = () => ({ width: side, height: side, top, bottom: top + side, left: 0, right: side, x: 0, y: 0, toJSON: () => ({}) })
     }
 
     // Chromium's density at a 120% zoom.
     Object.defineProperty(window, 'devicePixelRatio', { value: 1.2000000476837158, configurable: true })
-    const rows = () => [...shadow().querySelectorAll('#kay-dev-images .image')].map(row => `${row.querySelector('.src')!.textContent} | ${[...row.querySelectorAll('.chip')].map(chip => chip.textContent).join(' - ')}`)
+    const rows = () => [...shadow().querySelectorAll('#kay-dev-images .image')].map(row => [row.querySelector('.src')!.textContent, [...row.querySelectorAll('.chip')].map(chip => chip.textContent).join(' - '), ...[...row.querySelectorAll('.flag')].map(flag => flag.textContent)].join(' | '))
     const visible = () => [...shadow().querySelectorAll<HTMLElement>('.outline')].filter(outline => outline.hidden === false).length
 
     try {
@@ -1039,13 +1049,13 @@ describe('the dev tool', () => {
       await Bun.sleep(20)
 
       expect(rows()).toEqual([
-        '/logo.svg3 copies | not resized by kay - format not looked up - 150x150 drawn 16x16 at 1.2x',
+        '/logo.svg4 copies | not resized by kay - format not looked up - 150x150 drawn 16x16 at 1.2x | lazy-loaded but in view, which delays it',
         '/logo.svg | not resized by kay - format not looked up - 150x150 drawn 32x32 at 1.2x',
       ])
-      expect(shadow().querySelector('#kay-dev-images .image')!.getAttribute('aria-label')).toBe('/logo.svg, 3 copies')
+      expect(shadow().querySelector('#kay-dev-images .image')!.getAttribute('aria-label')).toBe('/logo.svg, 4 copies')
 
       shadow().querySelector('#kay-dev-images .image')!.dispatchEvent(new PointerEvent('pointerenter'))
-      expect(visible()).toBe(3)
+      expect(visible()).toBe(4)
     }
     finally {
       Object.defineProperty(window, 'devicePixelRatio', { value: devicePixelRatio, configurable: true })

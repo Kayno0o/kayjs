@@ -638,17 +638,16 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay dev in
     expect(shown.errors).toEqual([])
   }, 60_000)
 
-  it('scrolls no panel sideways, at the default width or a narrow one, whatever the values are', async () => {
-    const shown = await dev.open(`/long?${'query-without-a-break-'.repeat(8)}=1`, { strict: false })
-    const ids = await shown.evaluate(() => [...document.querySelector('kay-dev')!.shadowRoot!.querySelectorAll('[role=tab]')].map(tab => tab.id))
+  it('scrolls no panel sideways, in the default window or a 400 px wide one, whatever the values are', async () => {
     const wide: string[] = []
 
-    await shown.evaluate(() => document.querySelector('kay-dev')!.shadowRoot!.querySelector<HTMLButtonElement>('.bar > button')!.click())
+    for (const width of [undefined, 400]) {
+      const shown = await dev.open(`/long?${'query-without-a-break-'.repeat(8)}=1`, { strict: false, width })
+      const ids = await shown.evaluate(() => [...document.querySelector('kay-dev')!.shadowRoot!.querySelectorAll('[role=tab]')].map(tab => tab.id))
 
-    for (const width of ['', '22rem']) {
-      await shown.evaluate((value: string) => {
-        document.querySelector('kay-dev')!.shadowRoot!.querySelector<HTMLElement>('.drawer')!.style.width = value
-      }, width)
+      expect(await shown.evaluate(() => innerWidth)).toBe(width ?? 800)
+
+      await shown.evaluate(() => document.querySelector('kay-dev')!.shadowRoot!.querySelector<HTMLButtonElement>('.bar > button')!.click())
 
       for (const id of ids) {
         await shown.evaluate((tab: string) => document.querySelector('kay-dev')!.shadowRoot!.getElementById(tab)!.click(), id)
@@ -667,20 +666,27 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay dev in
             return []
 
           return [...panel.querySelectorAll('*')].filter(element => element.getBoundingClientRect().right > edge).slice(0, 3).map(element => `${label} ${element.tagName.toLowerCase()}.${element.className}`)
-        }, `${width || 'default'} ${id}`))
+        }, `${width ?? 'default'} ${id}`))
       }
+
+      // The head keeps its title clear of its buttons, dropping the words when it is too narrow for them.
+      wide.push(...await shown.evaluate((label: string) => {
+        const root = document.querySelector('kay-dev')!.shadowRoot!
+
+        return root.querySelector('.title')!.getBoundingClientRect().right > root.querySelector('.dock')!.getBoundingClientRect().left ? [`${label} head`] : []
+      }, String(width ?? 'default')))
+      // Each dev page holds a live reload stream, and Chromium opens six connections to a host at most.
+      shown.close()
     }
 
     expect(wide).toEqual([])
   }, 60_000)
 
-  it('moves the drawer by its head, resizes it by an edge, docks it padding the page, lands the bar in a corner, and opens a new page as it was left', async () => {
-    let shown = await dev.open('/', { strict: false })
+  it('moves the drawer by its head, resizes it by an edge, docks it padding the page, lands the bar in a corner, and opens again as it was left', async () => {
+    // Opening a page clears the origin's storage, so the layout starts as the default.
+    const shown = await dev.open('/', { strict: false })
 
-    await shown.evaluate(() => localStorage.clear())
-    shown = await dev.open('/', { strict: false })
-
-    // Pointer events at window coordinates (the window is 800 by 600), a drag from `from` to `to` on the element `selector` names in the tool.
+    // Pointer events at window coordinates, a drag from `from` to `to` on the element `selector` names in the tool.
     const drag = async (selector: string, from: [number, number], to: [number, number]) => shown.evaluate(([picked, [x, y], [toX, toY]]: [string, [number, number], [number, number]]) => {
       const element = document.querySelector('kay-dev')!.shadowRoot!.querySelector<HTMLElement>(picked)!
       const fire = (type: string, clientX: number, clientY: number) => element.dispatchEvent(new PointerEvent(type, { bubbles: true, composed: true, button: 0, clientX, clientY, pointerId: 1 }))
@@ -695,7 +701,9 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay dev in
     const rect = async (selector: string) => shown.evaluate((picked: string) => {
       const { left, top, width, height } = document.querySelector('kay-dev')!.shadowRoot!.querySelector(picked)!.getBoundingClientRect()
 
-      return { left, top, width, height, right: innerWidth - left - width, bottom: innerHeight - top - height }
+      const { clientWidth, clientHeight } = document.documentElement
+
+      return { left, top, width, height, right: clientWidth - left - width, bottom: clientHeight - top - height }
     }, selector)
 
     await shown.evaluate(() => document.querySelector('kay-dev')!.shadowRoot!.querySelector<HTMLButtonElement>('.mark')!.click())
@@ -713,12 +721,14 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay dev in
 
     await drag('.grip.e', [moved.left + moved.width - 2, moved.top + 100], [moved.left + moved.width + 48, moved.top + 100])
     expect((await rect('.drawer')).width).toBe(moved.width + 50)
-    await drag('.grip.se', [moved.left + moved.width + 48, moved.top + moved.height - 2], [0, 0])
+    // Past the window, the right edge stops at it and the left one stays put.
+    await drag('.grip.e', [moved.left + moved.width + 48, moved.top + 100], [moved.left + moved.width + 2000, moved.top + 100])
+    expect(await rect('.drawer')).toMatchObject({ left: moved.left, right: 0 })
+    await drag('.grip.se', [(await rect('.drawer')).left + (await rect('.drawer')).width - 2, moved.top + moved.height - 2], [0, 0])
     expect(await rect('.drawer')).toMatchObject({ left: moved.left, top: moved.top, width: 280, height: 180 })
 
-    // A new page opens it where it was left.
-    shown = await dev.open('/', { strict: false })
-    await shown.evaluate(() => document.querySelector('kay-dev')!.shadowRoot!.querySelector<HTMLButtonElement>('.mark')!.click())
+    // A reload opens it where it was left, still open as the browser tab keeps it.
+    await shown.reload()
     expect(await rect('.drawer')).toMatchObject({ left: moved.left, top: moved.top, width: 280, height: 180 })
 
     // Docked to the bottom, it spans the window, pads the page by its height and lifts the bar above it; its top edge resizes it.
@@ -743,8 +753,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay dev in
     await drag('.mark', [bar.left + 10, bar.top + 10], [bar.left + 2000, -500])
     expect(await rect('.bar')).toMatchObject({ top: 12, right: 12 })
     expect(await shown.evaluate(() => document.querySelector('kay-dev')!.shadowRoot!.querySelector<HTMLElement>('.drawer')!.hidden)).toBe(true)
-
-    await shown.evaluate(() => localStorage.clear())
+    shown.close()
   }, 60_000)
 })
 
