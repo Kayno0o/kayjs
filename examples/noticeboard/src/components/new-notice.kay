@@ -8,8 +8,8 @@ import { post } from '../routes/index.kay'
 
 const writing = signal(false)
 ---
-Button#pin-notice(label="Pin a notice" variant="accent" icon="plus" onClick={() => writing.set(true)})
-FormDialog(open={writing()} title="Pin a notice" action={post} submitLabel="Pin it" failure="Could not pin the notice" refused={(data: { error: string }) => data.error} onSaved={() => toast.success('Pinned')} onClose={() => writing.set(false)})
+Button#pin-notice(label="Pin a notice" tone="accent" icon="plus" onClick={() => writing.set(true)})
+FormDialog(open={writing()} title="Pin a notice" action={post} submitLabel="Pin it" failure="Could not pin the notice" refused={(data: { error: string }) => data.error} onSaved={() => toast.success('Pinned')} onOpenChange={open => writing.set(open)})
   FormField(label="Title" name="title" required)
     input(name="title" maxlength="120" required)
   FormField(label="Notice" name="body" required)
