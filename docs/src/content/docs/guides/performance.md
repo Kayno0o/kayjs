@@ -29,7 +29,7 @@ Each tab answers one question about the page in view. A tab with a red or amber 
 | Tab | Shows |
 | --- | --- |
 | Problems | Errors, recovered mismatches, blocked sources, accessibility findings and `kay check` results |
-| Request | The route, layouts, params, locale, guards, redirects and response headers |
+| Request | The route, layouts, params, locale, guards, redirects, response headers and the time the server spent on guards, imports, loads and render |
 | Head | The search result, canonical and hreflang links, social tags and JSON-LD |
 | Routes | Every page, endpoint and API route the server serves |
 | Env | The variables `publicEnv` sends to the browser |

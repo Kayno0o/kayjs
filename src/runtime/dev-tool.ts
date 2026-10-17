@@ -35,6 +35,8 @@ const SOURCE_POSITION = new RegExp(String.raw`(?<![\w@.+=:/\\)\]-])(?![\\/]_kay[
 const OPENED_POSITION = /^(.+\.\w+)(?::(\d+))?(?::(\d+))?$/
 // A value the Head tab gives a copy button, as a link.
 const WEB_URL = /^https?:\/\//i
+// An entry of the `Server-Timing` header kay sends, one of its phases rather than a single load.
+const SERVER_PHASE = /(?:^|,)\s*(guards|import|loads|render)(?:;[^,;]*)*?;dur=(\d+(?:\.\d+)?)/g
 
 type ProblemKind = 'uncaught' | 'kay' | 'policy' | 'a11y' | 'check'
 
@@ -1497,7 +1499,7 @@ function requestTab(doc: Document, tool: DevTool): { stop: () => void } {
     return element
   }
   // What the server recorded of the response: asked for once the page is in view, and dropped if another page's block replaced this one while it was out.
-  const showResponse = async (id: string, block: string, line: HTMLElement, facts: HTMLElement, timing: (total: number) => void, panel: HTMLElement) => {
+  const showResponse = async (id: string, block: string, line: HTMLElement, facts: HTMLElement, timing: (total: number, phases: ServerPhases) => void, panel: HTMLElement) => {
     let recorded: DevResponse | undefined
 
     try {
@@ -1533,7 +1535,7 @@ function requestTab(doc: Document, tool: DevTool): { stop: () => void } {
 
     line.append(pill(tool, `${formatMs(recorded.ms)} on the server`))
     fact('Redirected', ...hops.length === 0 ? [tool.make('span', 'note', 'no')] : hops)
-    timing(recorded.ms)
+    timing(recorded.ms, serverPhases(recorded.headers.find(([name]) => name === 'server-timing')?.[1] ?? ''))
 
     for (const [name, value] of headers)
       table.append(filterable(headerRow(tool, name, value), `${name}: ${value}`))
@@ -1579,8 +1581,8 @@ function requestTab(doc: Document, tool: DevTool): { stop: () => void } {
       chain.append(filterable(item, `${kind} ${file.textContent} ${outcome?.textContent ?? ''}`))
     }
     const timing = tool.make('section', 'group')
-    const scaled = (total?: number) => {
-      const longest = Math.max(total ?? 0, ...request.loads.map(load => load.ms ?? 0))
+    const scaled = (total?: number, phases: ServerPhases = {}) => {
+      const longest = Math.max(total ?? 0, ...Object.values(phases), ...request.loads.map(load => load.ms ?? 0))
       const grid = tool.make('div', 'timing')
       const bar = (ms: number | undefined, className = 'bars') => {
         const track = tool.make('span', className)
@@ -1592,8 +1594,21 @@ function requestTab(doc: Document, tool: DevTool): { stop: () => void } {
         return track
       }
 
+      const phase = (name: keyof ServerPhases, label: string) => {
+        const ms = phases[name]
+
+        if (ms !== undefined)
+          grid.append(tool.make('span', 'note', label), bar(ms), tool.make('span', 'v', formatMs(ms)))
+      }
+
+      phase('guards', 'Guards')
+      phase('import', 'Importing modules')
+      phase('loads', request.loads.length > 1 ? 'Loads, run at once' : 'Loads')
+
       for (const load of request.loads)
         grid.append(positionButton(tool, load.file), bar(load.ms), tool.make('span', 'v', load.ms === undefined ? 'not timed' : formatMs(load.ms)))
+
+      phase('render', 'Render, what a stream sends first')
 
       if (total !== undefined)
         grid.append(tool.make('span', 'note', 'Whole request'), bar(total, 'bars total'), tool.make('span', 'v', formatMs(total)))
@@ -1639,6 +1654,18 @@ function requestTab(doc: Document, tool: DevTool): { stop: () => void } {
   swaps.observe(doc.head, { childList: true })
 
   return { stop: () => swaps.disconnect() }
+}
+
+// The phases of a page's render its `Server-Timing` header gives, in milliseconds.
+type ServerPhases = Partial<Record<'guards' | 'import' | 'loads' | 'render', number>>
+
+function serverPhases(header: string): ServerPhases {
+  const phases: ServerPhases = {}
+
+  for (const [, name, ms] of header.matchAll(SERVER_PHASE))
+    phases[name as keyof ServerPhases] = Number(ms)
+
+  return phases
 }
 
 // What a search result shows of a title before cutting it.

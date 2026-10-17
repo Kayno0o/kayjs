@@ -328,7 +328,11 @@ describe('the dev tool\'s routes served by kay', () => {
       expect((await visit('/members/vip')).request).toBeUndefined()
       expect((await visit('/members/vip', { 'x-banned': '1' })).request).toMatchObject({ status: 403, guards: [{ outcome: expect.stringContaining('denied with 403') }, { outcome: 'did not run' }] })
       expect((await visit('/members/vip', { 'x-member': '1', 'x-vip': '1' })).request).toMatchObject({ guards: [{ outcome: 'passed' }, { outcome: 'passed' }] })
-      expect((await visit('/members', { 'x-member': '1' })).request).toMatchObject({ guards: [{ file: `${routes}/members/_guard.ts`, outcome: 'passed' }] })
+      const member = await visit('/members', { 'x-member': '1' })
+
+      expect(member.request).toMatchObject({ guards: [{ file: `${routes}/members/_guard.ts`, outcome: 'passed' }] })
+      // The dev tool reads the phases off the `Server-Timing` header the server recorded.
+      expect(Object.fromEntries((await recorded(member.request!.id)).headers)['server-timing']).toMatch(/^guards;dur=\d+\.\d, import;dur=\d+\.\d, loads;dur=\d+\.\d, (?:\S+, )*render;dur=\d+\.\d$/)
       expect((await visit('/members/vip', { 'x-member': '1' })).request).toMatchObject({ status: 403, guards: [{ outcome: 'passed' }, { file: `${routes}/members/vip/_guard.ts`, outcome: 'denied with 403: VIPs only' }] })
 
       // A guard that redirects: the page it sends the visitor to knows where they came from, and by which guard.

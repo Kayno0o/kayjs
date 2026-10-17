@@ -523,7 +523,7 @@ describe('the dev tool', () => {
     const bars = () => [...shadow().querySelectorAll<HTMLElement>('#kay-dev-request .timing i')].map(fill => Number.parseFloat(fill.style.width))
     const opened: string[] = []
     let recorded: DevResponse | undefined = {
-      headers: [['x-request-id', 'abc'], ['cache-control', 'no-store'], ['content-type', 'text/html'], ['content-security-policy', 'default-src \'self\'; script-src \'self\' \'sha256-abc\'; img-src *']],
+      headers: [['x-request-id', 'abc'], ['cache-control', 'no-store'], ['content-type', 'text/html'], ['content-security-policy', 'default-src \'self\'; script-src \'self\' \'sha256-abc\'; img-src *'], ['server-timing', 'guards;dur=0.8, import;dur=2.04, loads;dur=42.6, load-0;desc="src/routes/_layout.kay";dur=1.5, load-1;desc="src/routes/items/[id].kay";dur=42.4, render;dur=3.1']],
       ms: 51.2,
       redirects: [{ from: '/members', status: 307, by: 'the guard src/routes/members/_guard.ts' }],
     }
@@ -552,15 +552,18 @@ describe('the dev tool', () => {
       'Redirected: /members (307, by the guard src/routes/members/_guard.ts)',
     ])
     expect(chain()).toEqual(['Guard src/routes/_guard.ts passed', 'Guard src/routes/items/_guard.ts passed', 'Layout src/routes/_layout.kay', 'Page src/routes/items/[id].kay'])
-    expect(timing()).toEqual(['src/routes/_layout.kay 1.5 ms', 'src/routes/items/[id].kay 42 ms', 'Whole request 51 ms'])
-    expect(bars()[0]).toBeCloseTo(1.5 / 51.2 * 100)
-    expect(bars()[1]).toBeCloseTo(42.4 / 51.2 * 100)
-    expect(bars()[2]).toBe(100)
+    // The phases come off the `Server-Timing` header the server recorded, each load as the page's block timed it.
+    expect(timing()).toEqual(['Guards 0.8 ms', 'Importing modules 2.0 ms', 'Loads, run at once 43 ms', 'src/routes/_layout.kay 1.5 ms', 'src/routes/items/[id].kay 42 ms', 'Render, what a stream sends first 3.1 ms', 'Whole request 51 ms'])
+    expect(bars()[0]).toBeCloseTo(0.8 / 51.2 * 100)
+    expect(bars()[3]).toBeCloseTo(1.5 / 51.2 * 100)
+    expect(bars()[4]).toBeCloseTo(42.4 / 51.2 * 100)
+    expect(bars()[6]).toBe(100)
     expect([...shadow().querySelectorAll('#kay-dev-request .headers tr')].map(row => [...row.children].map(cell => cell.textContent))).toEqual([
       ['content-security-policy', 'default-src \'self\';script-src \'self\' \'sha256-abc\';img-src *;'],
       ['cache-control', 'no-store'],
       ['x-request-id', 'abc'],
       ['content-type', 'text/html'],
+      ['server-timing', 'guards;dur=0.8, import;dur=2.04, loads;dur=42.6, load-0;desc="src/routes/_layout.kay";dur=1.5, load-1;desc="src/routes/items/[id].kay";dur=42.4, render;dur=3.1'],
     ])
 
     // The filter keeps the facts and headers it matches.
@@ -593,7 +596,7 @@ describe('the dev tool', () => {
     shadow().querySelector<HTMLButtonElement>('.head .icon[aria-label="Copy this tab as Markdown"]')!.click()
     await Bun.sleep(0)
 
-    expect(copied[1]).toBe(`# Request, ${location.href}\n\nGET ${location.pathname}${location.search} 200 51 ms on the server\n\n## Matched\n\n- Route: /items/:id\n- Params: id = "7"\n- Locale: fr\n- Rendered: on request here, prerendered by kay build for the paths its setting lists\n- Redirected: /members (307, by the guard src/routes/members/_guard.ts)\n\n## Files, outermost first\n\n- Guard src/routes/_guard.ts passed\n- Guard src/routes/items/_guard.ts passed\n- Layout src/routes/_layout.kay\n- Page src/routes/items/[id].kay\n\n## Time on the server\n\n- src/routes/_layout.kay: 1.5 ms\n- src/routes/items/[id].kay: 42 ms\n- Whole request: 51 ms\n\n## Response headers\n\n- content-security-policy: default-src 'self'; script-src 'self' 'sha256-abc'; img-src *;\n- cache-control: no-store\n- x-request-id: abc\n- content-type: text/html`)
+    expect(copied[1]).toBe(`# Request, ${location.href}\n\nGET ${location.pathname}${location.search} 200 51 ms on the server\n\n## Matched\n\n- Route: /items/:id\n- Params: id = "7"\n- Locale: fr\n- Rendered: on request here, prerendered by kay build for the paths its setting lists\n- Redirected: /members (307, by the guard src/routes/members/_guard.ts)\n\n## Files, outermost first\n\n- Guard src/routes/_guard.ts passed\n- Guard src/routes/items/_guard.ts passed\n- Layout src/routes/_layout.kay\n- Page src/routes/items/[id].kay\n\n## Time on the server\n\n- Guards: 0.8 ms\n- Importing modules: 2.0 ms\n- Loads, run at once: 43 ms\n- src/routes/_layout.kay: 1.5 ms\n- src/routes/items/[id].kay: 42 ms\n- Render, what a stream sends first: 3.1 ms\n- Whole request: 51 ms\n\n## Response headers\n\n- content-security-policy: default-src 'self'; script-src 'self' 'sha256-abc'; img-src *;\n- cache-control: no-store\n- x-request-id: abc\n- content-type: text/html\n- server-timing: guards;dur=0.8, import;dur=2.04, loads;dur=42.6, load-0;desc="src/routes/_layout.kay";dur=1.5, load-1;desc="src/routes/items/[id].kay";dur=42.4, render;dur=3.1`)
     expect(shadow().querySelector('.head .icon[aria-label="Copied"]')).not.toBeNull()
 
     // The swap adds the next page's block, then drops this one's.
