@@ -2,7 +2,7 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
-## Unreleased
+## 1.51.1
 
 - A kayjs-ui `Table` stacked as cards on a phone breaks a long value with no space, such as a file path, inside its card instead of widening the page, and its sort buttons are at least 2rem tall to tap ([Table](../docs/src/content/docs/libraries/kayjs-ui.md)).
 - The dev tool's Problems tab has a Copy button that puts every listed problem on the clipboard as plain text, the page URL first, to paste into an LLM ([Dev server](dev-server.md)).
