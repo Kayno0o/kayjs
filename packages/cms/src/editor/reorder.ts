@@ -20,6 +20,19 @@ export function targetOf(direction: Direction, index: number, count: number): nu
   return to < 0 || to >= count ? undefined : to
 }
 
+// The move a key asks for in an item of a list of `count`, `undefined` when it is not one or an inner list already took it.
+// The key is stopped whether or not the item can move, or the item holding this list would.
+export function reorderKey(event: KeyboardEvent, from: number, count: number): { direction: Direction, to: number | undefined } | undefined {
+  const direction = keyDirection(event)
+
+  if (event.defaultPrevented || direction === undefined)
+    return undefined
+
+  event.preventDefault()
+
+  return { direction, to: targetOf(direction, from, count) }
+}
+
 // The items moved: `from` taken out and put back at `to`.
 export function reordered<T>(items: readonly T[], from: number, to: number): T[] {
   const next = [...items]

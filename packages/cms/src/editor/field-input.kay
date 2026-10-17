@@ -17,7 +17,7 @@ import { joinPath } from '../paths'
 import FieldInput from './field-input.kay'
 import FileInput from './file-input.kay'
 import Reorder from './reorder.kay'
-import { followFocus, keyDirection, reordered, targetOf } from './reorder'
+import { followFocus, reordered, reorderKey } from './reorder'
 import { uploadFile } from './upload'
 import './fields.css'
 
@@ -49,16 +49,14 @@ function moveItem(from: number, to: number): void {
 
 // Alt with an arrow in any control of an item moves it, as the buttons beside it do.
 function itemKey(event: KeyboardEvent, from: number): void {
-  const direction = keyDirection(event)
-  const to = direction === undefined ? undefined : targetOf(direction, from, items().length)
-
   // A list inside an item sees the key first: the item holding that list is not moved too.
-  if (event.defaultPrevented || direction === undefined || to === undefined)
+  const move = reorderKey(event, from, items().length)
+
+  if (move?.to === undefined)
     return
 
-  event.preventDefault()
-  moveItem(from, to)
-  followFocus((event.currentTarget as HTMLElement).closest('[data-kcms-row]'), to, direction)
+  moveItem(from, move.to)
+  followFocus((event.currentTarget as HTMLElement).closest('[data-kcms-row]'), move.to, move.direction)
 }
 
 function setJson(next: string): void {

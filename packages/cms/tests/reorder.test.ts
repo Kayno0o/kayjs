@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { keyDirection, reordered, targetOf } from '../src/editor/reorder'
+import { keyDirection, reordered, reorderKey, targetOf } from '../src/editor/reorder'
 
 function key(name: string, held: Partial<Pick<KeyboardEvent, 'altKey' | 'ctrlKey' | 'metaKey' | 'shiftKey'>> = {}): KeyboardEvent {
   return { key: name, altKey: false, ctrlKey: false, metaKey: false, shiftKey: false, ...held } as KeyboardEvent
@@ -37,5 +37,35 @@ describe('keyDirection', () => {
     expect(keyDirection(key('ArrowUp'))).toBeUndefined()
     expect(keyDirection(key('ArrowUp', { altKey: true, shiftKey: true }))).toBeUndefined()
     expect(keyDirection(key('a', { altKey: true }))).toBeUndefined()
+  })
+})
+
+describe('reorderKey', () => {
+  function pressed(name: string, held: Partial<KeyboardEvent> = {}) {
+    const event = { ...key(name, { altKey: true }), defaultPrevented: false, ...held, preventDefault() { this.defaultPrevented = true } }
+
+    return event as KeyboardEvent
+  }
+
+  it('stops the key at either end of the list, where the item cannot move', () => {
+    const first = pressed('ArrowUp')
+    const last = pressed('ArrowDown')
+
+    expect(reorderKey(first, 0, 3)).toEqual({ direction: 'up', to: undefined })
+    expect(first.defaultPrevented).toBe(true)
+    expect(reorderKey(last, 2, 3)).toEqual({ direction: 'down', to: undefined })
+    expect(last.defaultPrevented).toBe(true)
+  })
+
+  it('moves the item otherwise, and leaves other keys and taken ones alone', () => {
+    const middle = pressed('ArrowUp')
+    const plain = pressed('a')
+    const taken = pressed('ArrowUp', { defaultPrevented: true })
+
+    expect(reorderKey(middle, 1, 3)).toEqual({ direction: 'up', to: 0 })
+    expect(middle.defaultPrevented).toBe(true)
+    expect(reorderKey(plain, 1, 3)).toBeUndefined()
+    expect(plain.defaultPrevented).toBe(false)
+    expect(reorderKey(taken, 1, 3)).toBeUndefined()
   })
 })
