@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- The dev tool is redrawn in kay's palette and mark, with an icon and a toned count on each tab, the rail folding to icons when narrow, and new layouts for Problems, Request, Head, Env, Images, Performance, Routes, i18n and Islands; a library's tab takes an `icon`, and `count` a `'warn'` tone, and the bar no longer shows the reload line ([Dev server](dev-server.md), [A tab for a library](component-libraries.md#a-tab-for-a-library)).
 - `shareCard({ title, image })` takes an imported `.svg` as `image`, drawn to cover the card before the title, with its cards written by `kay build` and kept for an executable like `images.card.logo` ([Images](images.md#draw-a-share-card-for-a-page)).
 - The dev tool's Images tab no longer flags an SVG as served more pixels than it is drawn with, as Chromium gives one without a size 150x150 and the same bytes draw at any size; an image whose address ends in `.svg` is exempt, a raster still is flagged ([Dev server](dev-server.md)).
 - `kay check` and the editor warn of an `img` or `input(type="image")` with no `width` and `height`, which shifts the page as it loads (`unsized-image`, in the new `performance` group; [What `kay check` verifies](checks.md#what-kay-check-verifies), [Lints](lints.md)).

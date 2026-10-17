@@ -10,13 +10,15 @@ Under `kay dev`, every page carries a small bar at the bottom left with a count 
 kay dev --open
 ```
 
-The bar turns red when a problem is an error. Production pages never carry the dev tool.
+The bar shows kay's mark and the count of problems, red when one is an error and amber for a warning. Production pages never carry the dev tool.
+
+The drawer follows your system's light or dark theme. Each tab has an icon and a count, red for errors, amber for warnings and plain otherwise. When the drawer is narrow the tab list shrinks to the icons.
 
 The Problems tab has a Copy button. It puts every listed problem on the clipboard as plain text, starting with the page URL, so you can paste them into an LLM. Problems you dismissed are left out.
 
 ## The tabs
 
-Each tab answers one question about the page in view. A tab with a count in the bar needs your attention.
+Each tab answers one question about the page in view. A tab with a red or amber count needs your attention.
 
 | Tab | Shows |
 | --- | --- |
