@@ -13,7 +13,7 @@ import { configuredSite } from '../runtime/site'
 import { FAILURE_HEADER, PAGE_HEADER, REDIRECT_HEADER } from '../runtime/swap'
 import { decodeServerValue, encodeValue } from '../runtime/wire'
 import { boundToPage, isCrossSite, postedFrom, unadmittedCrossSite } from './actions'
-import { MCP_PATH, RESOURCE_METADATA } from './api-modules'
+import { RESOURCE_METADATA } from './api-modules'
 import { answeredAsPage, currentRequest } from './log'
 import { actionOperation, guardRefusal, toolName } from './openapi'
 import { clientAddress, keepRequestId, markAgentCall, requestId, requestServer, wasChallenged } from './protection'
@@ -296,6 +296,8 @@ export interface McpOptions {
   actions: ActionOptions
   // The sign-in metadata paths kay serves: one the app serves itself is left out.
   metadataPaths: string[]
+  // Where the endpoint is served, `/mcp` by default.
+  path: string
 }
 
 // A tool call the endpoint dispatched: which tool it calls, and the address of the client that asked for it.
@@ -417,13 +419,13 @@ interface ResourceOwner {
 }
 
 // The OAuth 2.0 protected resource metadata (RFC 9728) a client finds from the 401's pointer, or at the well-known path of the endpoint: the auth library's answer, which names its authorization server, else a 404 for an app that signs no one in by OAuth.
-function serveResourceMetadata(app: Elysia, name: string, paths: string[]): void {
+function serveResourceMetadata(app: Elysia, name: string, paths: string[], endpoint: string): void {
   const headers = { 'content-type': 'application/json; charset=utf-8', 'access-control-allow-origin': '*' }
 
   for (const route of paths) {
     app.get(route, (served) => {
       const owner = (served as unknown as { auth?: ResourceOwner }).auth
-      const document = owner?.oauthResource?.(MCP_PATH, name)
+      const document = owner?.oauthResource?.(endpoint, name)
       // An origin taken from the request is whatever its Host header said, so no shared cache keeps the document.
       const cache = configuredSite() !== undefined || owner?.oauthFixed?.() === true ? 'public, max-age=300' : 'private, max-age=300'
 
@@ -441,7 +443,7 @@ export function serveMcp(app: Elysia, document: Schema, options: McpOptions): vo
   const mcp = new McpServer(tools, [], undefined, { serverInfo: { name: options.title, title: options.title, version: options.version } })
   const notAllowed = () => new Response(null, { status: 405, headers: { allow: 'POST' } })
 
-  app.post(MCP_PATH, async (served) => {
+  app.post(options.path, async (served) => {
     const { request, server } = served
 
     // A browser page of another site posting here would act with the visitor's cookies.
@@ -482,9 +484,9 @@ export function serveMcp(app: Elysia, document: Schema, options: McpOptions): vo
 
     return new Response(JSON.stringify(reply), { status, headers })
   }, { parse: 'none' })
-  app.get(MCP_PATH, notAllowed)
-  app.delete(MCP_PATH, notAllowed)
-  serveResourceMetadata(app, options.title, options.metadataPaths)
+  app.get(options.path, notAllowed)
+  app.delete(options.path, notAllowed)
+  serveResourceMetadata(app, options.title, options.metadataPaths, options.path)
 }
 
 // An action a library offers a model: what the model reads of it, and the call it makes.

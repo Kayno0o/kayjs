@@ -34,6 +34,43 @@ export const REFERENCE_PATH = `${API_PREFIX}/reference`
 export const MCP_PATH = '/mcp'
 // Where an MCP client finds how to sign in, which the endpoint's 401 points to.
 export const RESOURCE_METADATA = '/.well-known/oauth-protected-resource'
+const SERVED_PATH = /^\/[\w.~-]+(?:\/[\w.~-]+)*$/
+
+export interface McpConfig {
+  // Where the endpoint is served, `/mcp` by default.
+  path?: string | undefined
+}
+
+// The path an MCP endpoint is served at, or undefined while `mcp` is off.
+export function mcpPath(value: boolean | McpConfig | undefined): string | undefined {
+  if (value === undefined || value === false)
+    return undefined
+
+  return value === true || value.path === undefined ? MCP_PATH : servedPath(value.path, 'mcp({ path })')
+}
+
+// The paths the OpenAPI document and its reference page are served at.
+export function openApiPaths(config: { path?: string | undefined, referencePath?: string | undefined } | undefined): { document: string, reference: string } {
+  const document = config?.path === undefined ? OPENAPI_PATH : servedPath(config.path, 'openapi.path')
+  const reference = config?.referencePath === undefined ? REFERENCE_PATH : servedPath(config.referencePath, 'openapi.referencePath')
+
+  if (document === reference)
+    throw new KayError('config-invalid', `kay: openapi.path and openapi.referencePath are both ${document}; give the reference page a path of its own`)
+
+  return { document, reference }
+}
+
+// A path kay serves a route at: absolute, one segment at least, with nothing the router reads as a parameter and nothing under kay's own `/_kay`.
+function servedPath(value: unknown, what: string): string {
+  if (typeof value !== 'string' || !SERVED_PATH.test(value) || value.includes('//') || value.split('/').includes('..') || value.split('/').includes('.'))
+    throw new KayError('config-invalid', `kay: ${what} is ${JSON.stringify(value)}; it takes an absolute path of plain segments without a trailing slash, such as '/tools'`)
+
+  if (value === '/_kay' || value.startsWith('/_kay/'))
+    throw new KayError('config-invalid', `kay: ${what} is ${value}, under /_kay where kay serves its own files; pick another path`)
+
+  return value
+}
+
 const GUARD = '_guard.ts'
 const API_OPTIONS = /\bapi\s*\(\s*\{/
 // Tests, declarations, and files or directories starting with `_`, guards and helpers, are no modules.

@@ -4,6 +4,7 @@ import type { Paint } from '../compiler/frame'
 import type { LintLevels } from '../compiler/lints'
 import type { FaviconConfig, I18nConfig, ImagesConfig, KayConfig, KayExtension, ManifestConfig, SeoConfig } from '../config'
 import type { Duration } from '../runtime/duration'
+import type { McpConfig } from '../server/api-modules'
 import type { EnvSchema } from '../server/env'
 import type { Redirects } from '../server/redirects'
 import type { TypeScope } from './diagnose'
@@ -69,7 +70,7 @@ export interface CheckOptions {
   // Reports each route of the app no guard covers, which the server refuses.
   requireGuards?: boolean | undefined
   // Reports the actions offered as tools that bot protection alone stands before.
-  mcp?: boolean | undefined
+  mcp?: boolean | McpConfig | undefined
   // Whether to report the lints of what a site lacks before it goes public, as `kay build` and `kay check --only seo` do.
   launch?: boolean | undefined
   // Set by `kay build --static`: a static host reads no `SITE_URL` or `ORIGIN` once built, so a missing site is reported.

@@ -8,6 +8,7 @@ import type { HeadTag } from './runtime/head'
 import type { Guard, GuardContext } from './runtime/index'
 import type { Localized } from './runtime/localized'
 import type { JsonLd } from './runtime/seo'
+import type { McpConfig } from './server/api-modules'
 import type { AppStore } from './server/app-store'
 import type { CorsOptions } from './server/cors'
 import type { EnvSchema } from './server/env'
@@ -69,10 +70,10 @@ export interface KayConfig {
   requireGuards?: boolean | undefined
   // Lets other sites' pages call every API module's routes from the browser, as `api({ cors })` does for one: `cors: { origins: ['https://app.example.com'], credentials: true }`. A module setting its own `cors` keeps it, and `api({ cors: false })` keeps a module to its own site.
   cors?: CorsOptions | undefined
-  // Serves an OpenAPI 3.1 document of the API modules' routes at `/api/openapi.json`, read from their schemas, behind the API directory's own `_guard.ts`; `{ reference: true }` adds a page listing them at `/api/reference`, `{ dev: true }` keeps both to `kay dev`.
+  // Serves an OpenAPI 3.1 document of the API modules' routes at `/api/openapi.json`, or at `openapi: { path }`, read from their schemas, behind the API directory's own `_guard.ts`; `{ reference: true }` adds a page listing them at `/api/reference`, or at `referencePath`, `{ dev: true }` keeps both to `kay dev`.
   openapi?: boolean | OpenApiConfig | undefined
-  // Serves an MCP endpoint at `/mcp` over Streamable HTTP, for an agent to call the app: a tool per API route that sets `tool` in its `detail`, and per action that sets `tool` on its protection. A call runs through the same guards, rate limits and `ctx.locals` as a fetch would.
-  mcp?: boolean | undefined
+  // Serves an MCP endpoint at `/mcp` over Streamable HTTP, or at `mcp: { path: '/tools' }`, for an agent to call the app: a tool per API route that sets `tool` in its `detail`, and per action that sets `tool` on its protection. A call runs through the same guards, rate limits and `ctx.locals` as a fetch would.
+  mcp?: boolean | McpConfig | undefined
   // Compresses the pages rendered per request, action results, and any Response the app's routes registered after `pages()` return, with brotli or gzip. On by default when NODE_ENV is production; `false` behind a proxy or CDN that compresses already.
   compress?: boolean | undefined
   // The route a load balancer or a container polls, `/_kay/health` unless `path` names another, or `false` for none.

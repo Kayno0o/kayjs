@@ -24,7 +24,7 @@ import { kayLog } from '../runtime/log'
 import { DRAFT_ROUTE } from '../runtime/swap'
 import { registerActionRoutes } from './actions'
 import { serveApi } from './api'
-import { MCP_PATH, RESOURCE_METADATA, sharedGuards } from './api-modules'
+import { mcpPath, RESOURCE_METADATA, sharedGuards } from './api-modules'
 import { rebaseCss, rebaseRedirects } from './base'
 import { DEFAULT_BODY_LIMIT, limitBodies } from './body'
 import { serveBuildFiles } from './build-files'
@@ -312,21 +312,22 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   claimApi(served, api.mounted, servesOpenApi ? openapi : undefined)
 
   const metadataPaths: string[] = []
+  const mcpAt = mcpPath(options.mcp)
 
-  if (options.mcp === true) {
-    served.claim({ path: MCP_PATH, owner: '`mcp`', kind: 'kay', method: 'ALL' })
+  if (mcpAt !== undefined) {
+    served.claim({ path: mcpAt, owner: '`mcp`', kind: 'kay', method: 'ALL' })
 
     // Offered, not claimed: an app serving its own protected resource metadata keeps it, as it keeps the authorization server one.
-    for (const path of [RESOURCE_METADATA, `${RESOURCE_METADATA}${MCP_PATH}`]) {
+    for (const path of [RESOURCE_METADATA, `${RESOURCE_METADATA}${mcpAt}`]) {
       if (served.offer({ path, owner: '`mcp`', kind: 'kay', method: 'ALL' }))
         metadataPaths.push(path)
     }
   }
 
-  limitBodies(app, options.bodyLimit ?? DEFAULT_BODY_LIMIT, new Map([...actionLimits, ...options.preview ? [[DRAFT_ROUTE, DRAFT_BODY_LIMIT] as const] : [], ...options.mcp === true ? [[MCP_PATH, mcpBodyLimit] as const] : []]), api.limits, api.routeLimits)
+  limitBodies(app, options.bodyLimit ?? DEFAULT_BODY_LIMIT, new Map([...actionLimits, ...options.preview ? [[DRAFT_ROUTE, DRAFT_BODY_LIMIT] as const] : [], ...mcpAt === undefined ? [] : [[mcpAt, mcpBodyLimit] as const]]), api.limits, api.routeLimits)
 
   // The actions that opted in to being tools are in the document beside the routes, and the MCP endpoint reads its tools from it.
-  const document = servesOpenApi || options.mcp === true
+  const document = servesOpenApi || mcpAt !== undefined
     ? openApiDocument(api.mounted, { title: openapi?.title ?? localizedText(options.seo?.name, undefined, locales.settings.defaultLocale) ?? 'API', version: openapi?.version ?? '1.0.0', base, root }, toolActions)
     : undefined
 
@@ -337,8 +338,8 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   if (servesOpenApi && document && openapi !== undefined)
     serveOpenApi(app, document, openapi, await covering(false), actionOptions)
 
-  if (options.mcp === true && document)
-    serveMcp(app, document, { title: (document.info as { title: string }).title, version: (document.info as { version: string }).version, base, guards: await covering(true), actions: actionOptions, metadataPaths })
+  if (mcpAt !== undefined && document)
+    serveMcp(app, document, { title: (document.info as { title: string }).title, version: (document.info as { version: string }).version, base, guards: await covering(true), actions: actionOptions, metadataPaths, path: mcpAt })
 
   serveErrorReports(app, options.onError)
   serveLive(app)

@@ -190,13 +190,14 @@ export default api()
 - Without a `_guard.ts` of the API directory itself, the document is public, guarded modules included.
 - Schemas are read as TypeBox writes them: a model's name or another library's validator documents nothing.
 - An optional param lists the path with and without it, and a wildcard is `{wildcard}`.
-- A module serving `/api/openapi.json`, or `/api/reference` with the page on, stops the server.
+- `openapi: { path: '/spec.json', referencePath: '/docs/api' }` moves the document and the reference page; a path is absolute, of plain segments, without a trailing slash and outside `/_kay`, and the two differ.
+- A module, page or file serving the document's path, or the reference page's with the page on, stops the server.
 - Every operation has an `operationId`: the route's `detail.operationId` as written (`users.list` stays so), else its method and path, `get_notes_id`; a clash gets `_2`. A route answering every method, `.all()`, gets its id with the method as a suffix, `echo_get`, `echo_post`.
 - An action that sets `tool` is a `POST` operation at its URL under the tag `actions`, `x-kay-action` set, its guards in `x-kay-guards`, as the document and the MCP tools say the same. It is called as `action()` calls are, its input encoded as kay writes it, not as a plain JSON body.
 
 ### MCP
 
-- `mcp: true` serves Streamable HTTP at `/mcp`: one JSON-RPC message per `POST`, answered with JSON, `initialize`, `ping`, `tools/list` and `tools/call` only, no resources or prompts. `GET` and `DELETE` answer 405, a notification 202.
+- `mcp: true` serves Streamable HTTP at `/mcp`, or at `mcp: { path: '/tools' }` under the same rules as the OpenAPI paths, its sign-in metadata then at `/.well-known/oauth-protected-resource/tools`: one JSON-RPC message per `POST`, answered with JSON, `initialize`, `ping`, `tools/list` and `tools/call` only, no resources or prompts. `GET` and `DELETE` answer 405, a notification 202.
 - A message that is no JSON-RPC request answers 400, a body over `bodyLimit` 413, a request from another site (`Origin`, `Sec-Fetch-Site`) 403.
 - A tool per action that sets `tool` and per API route whose `detail` sets `tool`, even with `openapi` off; a route that does not is in the OpenAPI document and no tool: absent from `tools/list`, and a `tools/call` naming it is refused as any unknown name is. Before 1.51 every route not hidden was a tool.
 - A route's `detail.tool` is `true`, a description, or `{ name, description }`, as an action's. Its tool is named by `tool.name` else its `operationId` (a route setting only `tool.name` takes it as its `operationId`), made a safe name (`users.list` is `users_list`, a clash `_2`), described by `tool`'s description else its `summary` and `description`, its input one JSON Schema of the path params, query and JSON body, merged by name.

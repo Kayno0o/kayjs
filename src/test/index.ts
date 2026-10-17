@@ -23,7 +23,7 @@ import { openSocket, readEvents, routeUrl, streamRequest } from '../runtime/live
 import { effect, root as reactiveRoot } from '../runtime/reactive'
 import { PAGE_HEADER, WORK_HEADER, WORK_SCRIPT } from '../runtime/swap'
 import { solveWork } from '../runtime/work'
-import { MCP_PATH } from '../server/api-modules'
+import { MCP_PATH, mcpPath } from '../server/api-modules'
 import { servePages } from '../server/app'
 import { basePath, routerPath } from '../server/base'
 import { shutdown } from '../server/lifecycle'
@@ -359,7 +359,7 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
   let rpcId = 0
 
   const rpc = async (method: string, params: object, init: VisitInit = {}): Promise<{ status: number, result: RpcResult }> => {
-    const response = await send(MCP_PATH, { method: 'POST', headers: { 'content-type': 'application/json', 'accept': 'application/json, text/event-stream', ...init.headers }, body: JSON.stringify({ jsonrpc: '2.0', id: ++rpcId, method, params }) })
+    const response = await send(mcpPath(config.mcp) ?? MCP_PATH, { method: 'POST', headers: { 'content-type': 'application/json', 'accept': 'application/json, text/event-stream', ...init.headers }, body: JSON.stringify({ jsonrpc: '2.0', id: ++rpcId, method, params }) })
     const reply = await withNatives(async () => response.json() as Promise<unknown>) as { result?: RpcResult, error?: { message: string } }
 
     if (reply.error)

@@ -4,11 +4,11 @@ import type { ActionOptions } from './actions'
 import type { ApiGuard } from './api-modules'
 import type { LoadedGuard } from './guards'
 import type { ServedPaths } from './served-paths'
-import { basename, relative } from 'node:path'
+import { basename, posix, relative } from 'node:path'
 import { NON_ROOT_TRAILING_SLASH } from '../runtime/base'
 import { escape } from '../runtime/escape'
 import { inLocale, passGuards } from './actions'
-import { API_PREFIX, OPENAPI_PATH, REFERENCE_PATH } from './api-modules'
+import { API_PREFIX, openApiPaths } from './api-modules'
 import { sharedContext } from './render'
 import { apiRoutePath } from './routes'
 import { toolSettings } from './tool-settings'
@@ -17,8 +17,12 @@ export interface OpenApiConfig {
   // The document's `info`, the site's `seo.name` and `1.0.0` by default.
   title?: string | undefined
   version?: string | undefined
+  // Where the document is served, `/api/openapi.json` by default.
+  path?: string | undefined
   // Also serves a page listing the routes, at `/api/reference`.
   reference?: boolean | undefined
+  // Where the reference page is served, `/api/reference` by default.
+  referencePath?: string | undefined
   // Served by `kay dev` alone.
   dev?: boolean | undefined
 }
@@ -110,7 +114,8 @@ function routePaths(module: MountedApi, route: Route): string[] {
 
 // Each module's routes claim their paths, after the document and the reference page when `config` serves them, which a module would hide without a word.
 export function claimApi(served: ServedPaths, modules: MountedApi[], config: OpenApiConfig | undefined): void {
-  const own = new Map<string, string>(config ? [[OPENAPI_PATH, 'its document'], ...config.reference === true ? [[REFERENCE_PATH, 'its reference page'] as const] : []] : [])
+  const paths = openApiPaths(config)
+  const own = new Map<string, string>(config ? [[paths.document, 'its document'], ...config.reference === true ? [[paths.reference, 'its reference page'] as const] : []] : [])
 
   for (const path of own.keys())
     served.claim({ path, owner: '`openapi`', kind: 'kay' })
@@ -121,7 +126,7 @@ export function claimApi(served: ServedPaths, modules: MountedApi[], config: Ope
         served.claim({ path, owner: module.file, kind: 'api', method: route.method.toUpperCase() }, (taken) => {
           const what = taken.kind === 'kay' ? own.get(taken.path) : undefined
 
-          return what === undefined ? `kay: ${taken.owner} and ${module.file} both serve ${path}` : `kay: ${module.file} serves ${path}, where \`openapi\` serves ${what}; move the route, or turn ${path === OPENAPI_PATH ? '`openapi` off' : 'the reference page off'}`
+          return what === undefined ? `kay: ${taken.owner} and ${module.file} both serve ${path}` : `kay: ${module.file} serves ${path}, where \`openapi\` serves ${what}; move the route, or turn ${path === paths.document ? '`openapi` off' : 'the reference page off'}`
         })
       }
     }
@@ -403,12 +408,14 @@ export function serveOpenApi(app: Elysia, document: Schema, config: OpenApiConfi
   const json = JSON.stringify(document)
   const admitted = async (context: { request: Request }, answer: () => Response) => (await guardRefusal(guards, context, options)) ?? answer()
 
-  app.get(OPENAPI_PATH, async context => admitted(context, () => new Response(json, { headers: { 'content-type': 'application/json; charset=utf-8' } })))
+  const paths = openApiPaths(config)
+
+  app.get(paths.document, async context => admitted(context, () => new Response(json, { headers: { 'content-type': 'application/json; charset=utf-8' } })))
 
   if (config.reference === true) {
-    const html = referencePage(document)
+    const html = referencePage(document, posix.relative(posix.dirname(paths.reference), paths.document))
 
-    app.get(REFERENCE_PATH, async context => admitted(context, () => new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } })))
+    app.get(paths.reference, async context => admitted(context, () => new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } })))
   }
 }
 
@@ -420,7 +427,7 @@ function schemaBlock(described: object): string {
 }
 
 // Every route with what it takes and answers, as plain HTML that needs no script or style the site's policy would have to allow.
-function referencePage(document: Schema): string {
+function referencePage(document: Schema, href: string): string {
   const info = document.info as { title: string, version: string }
   const sections = Object.entries(document.paths as Record<string, Record<string, Operation>>).flatMap(([path, methods]) => Object.entries(methods).map(([method, operation]) => {
     const parts = [
@@ -436,5 +443,5 @@ function referencePage(document: Schema): string {
     return `<section>${parts.join('')}</section>`
   }))
 
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escape(info.title)} API</title></head><body><h1>${escape(info.title)} <small>${escape(info.version)}</small></h1><p><a href="openapi.json">OpenAPI document</a></p>${sections.join('')}</body></html>`
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escape(info.title)} API</title></head><body><h1>${escape(info.title)} <small>${escape(info.version)}</small></h1><p><a href="${escape(href)}">OpenAPI document</a></p>${sections.join('')}</body></html>`
 }

@@ -14,7 +14,7 @@ export async function mcpRoutes(options: CheckOptions, { apiModules }: ServedPro
   const stale = lintLevel('deprecated-api-tool', options.lints)
   const contradicted = lintLevel('hidden-tool', options.lints)
 
-  if (options.mcp !== true || (stale === 'allow' && contradicted === 'allow'))
+  if (options.mcp === undefined || options.mcp === false || (stale === 'allow' && contradicted === 'allow'))
     return []
 
   const found: CheckDiagnostic[] = []

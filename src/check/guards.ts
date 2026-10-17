@@ -61,7 +61,7 @@ export async function unguardedRoutes(options: CheckOptions, { routes, endpoints
 export async function unguardedTools(options: CheckOptions, { routes }: ServedProject): Promise<CheckDiagnostic[]> {
   const level = lintLevel('unguarded-tool', options.lints)
 
-  if (options.mcp !== true || level === 'allow')
+  if (options.mcp === undefined || options.mcp === false || level === 'allow')
     return []
 
   const guarded = new Map<string, boolean>()
