@@ -1,0 +1,50 @@
+--- server
+import { ask } from '@kaynooo/kayjs-ai'
+import { action, s } from 'kay'
+import { done, testing } from '../testing'
+import { wipe } from './locked/_actions.kay'
+
+export const addNote = action(s.Object({ title: s.String({ minLength: 3, maxLength: 100, error: 'Too short' }) }), ({ title }) => {
+  done.push(`addNote:${title}`)
+
+  return { id: 1, title }
+})
+
+export const refuses = action(s.Object({}), (_input, ctx) => ctx.fail(409, { reason: 'full' }))
+
+export const sendsAway = action(s.Object({}), (_input, ctx) => ctx.redirect('/'))
+
+export const breaks = action(s.Object({}), () => {
+  throw new Error('boom secret')
+})
+
+export const slow = action(s.Object({}), async () => {
+  await Bun.sleep(150)
+  done.push('slow')
+
+  return 'slow done'
+})
+
+export const limited = action(s.Object({}), () => 'counted', { rateLimit: { max: 1, window: '1m' } })
+
+export const vetoed = action(s.Object({}), () => 'vetoed', { tool: false })
+
+export const upload = action(s.Object({ photo: s.File() }), () => 'stored')
+
+const tools = [addNote, refuses, sendsAway, breaks, slow, limited, wipe]
+
+export const converse = action(s.Object({ prompt: s.String({ maxLength: 200 }), maxSteps: s.Optional(s.Integer({ minimum: 1, maximum: 10 })), offer: s.Optional(s.Array(s.String({ maxLength: 40 }), { maxItems: 10 })) }), async ({ prompt, maxSteps, offer }) => {
+  const reply = ask(prompt, { tools: offer === undefined ? tools : tools.filter(tool => offer.includes(tool.url.slice(tool.url.lastIndexOf('/') + 1))), maxSteps, provider: testing.provider })
+
+  return { text: await reply, calls: await reply.calls, finish: await reply.finish, usage: await reply.usage }
+})
+
+export const watch = action(s.Object({ prompt: s.String({ maxLength: 200 }) }), ({ prompt }) => ask(prompt, { tools: [addNote, slow], provider: testing.provider }).progress())
+
+export const refusedTools = action(s.Object({ which: s.UnionEnum(['vetoed', 'upload']) }), ({ which }) => {
+  ask('x', { tools: [which === 'vetoed' ? vetoed : upload] })
+
+  return 'unreachable'
+})
+---
+p Tools

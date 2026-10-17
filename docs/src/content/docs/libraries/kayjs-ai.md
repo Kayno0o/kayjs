@@ -112,7 +112,7 @@ The chat posts its last 20 messages with each one; the `keep` prop changes that.
 - `for await (const text of reply)` gives the text so far, again and again.
 - `reply.deltas()` gives only the new pieces.
 - `await reply.usage` gives the token counts when the reply is over.
-- `await reply.finish` says why it ended: `stop`, `length` when the `maxTokens` cap cut it, or `filtered`.
+- `await reply.finish` says why it ended: `stop`, `length` when the `maxTokens` cap cut it, `filtered`, or `steps` when the model was still calling tools after `maxSteps`.
 - `reply.stop()` cancels the request. The reply then resolves to the text that came so far, not an error.
 
 A long answer cut by `maxTokens` still resolves as text, so check `finish` when that matters.
@@ -122,6 +122,36 @@ kay sets no timeout on the request. A provider that stalls keeps the reply open 
 `ask` also takes `model`, `maxTokens` (4096 by default), `temperature` and a `signal`.
 
 <ReadMore href="/llms/kayjs-ai-asking">Every variable, how the provider is picked, and the options of `ask`.</ReadMore>
+
+## Let the model call your actions
+
+Give `ask` some of your actions as tools, and the model can use them. Passing an action is how you allow it: the model gets those actions and no others.
+
+```kay
+--- server
+import { s } from 'kay'
+import { ask } from '@kaynooo/kayjs-ai'
+
+export const addNote = action(s.Object({ title: s.String({ minLength: 3, maxLength: 100 }) }), ({ title }) => saveNote(title), { tool: 'Adds a note to the visitor\'s list' })
+
+export const assistant = action(s.Object({ messages: s.Array(s.Object({ role: s.UnionEnum(['user', 'assistant']), content: s.String({ maxLength: 4000 }) }), { minItems: 1, maxItems: 40 }) }), ({ messages }) => ask(messages, { tools: [addNote], maxSteps: 4 }).progress())
+---
+p Assistant
+```
+
+The model reads each action's name, its `tool` description and its schema. When it calls one, kay runs it as the visitor who asked. The action keeps its guards, its validation and its rate limits, so a guarded action is refused for an anonymous visitor, as it is on a form.
+
+A call that goes wrong is not an exception. The model is told what failed, such as a field the schema refused or an unknown tool name, and can try again. What an action threw is never shown to it.
+
+`ask` then runs a loop: it calls the model, runs its tools, hands back the results and asks again, until the model answers in plain text. `maxSteps` caps the requests it makes, 5 by default. If the model still wants tools on the last one, the reply ends with `finish` set to `steps`.
+
+The visitor leaving stops the loop. A tool already running finishes, but nothing more is called.
+
+`ask` with tools must run while kay answers a request, in a page, an action or a handler, because the tools run as that visitor. A background job has none.
+
+To show the calls in a chat, read `reply.progress()`. It gives the text so far and every tool call, again with each change, and an action can return it to stream both to the island. Each call is `{ id, name, input, status, result }`, its status `running`, then `done` or `failed`. `await reply.calls` gives the final list.
+
+<ReadMore href="/llms/kayjs-ai-tools">What the model is told for each kind of failure, the limits, and how to test it.</ReadMore>
 
 ## Limit what visitors spend
 
@@ -197,6 +227,6 @@ expect(await ask('Hi')).toBe('It works')
 expect(fakeAi.last()?.messages).toEqual([{ role: 'user', content: 'Hi' }])
 ```
 
-`fakeAi.fail(error)` makes the next ask fail, and `fakeAi.clear()` forgets everything. With nothing scripted, the fake answers `Fake reply to:` followed by your last message. In development the fake answers too, until a provider is configured.
+`fakeAi.reply({ calls: [{ name: 'add_note', input: { title: 'Milk' } }] })` makes the model call a tool, and the next script answers once the results are back. `fakeAi.fail(error)` makes the next ask fail, and `fakeAi.clear()` forgets everything. With nothing scripted, the fake answers `Fake reply to:` followed by your last message. In development the fake answers too, until a provider is configured.
 
 <ReadMore href="/llms/kayjs-ai-testing-and-errors">Scripting the fake, every error kind, and building a provider by hand.</ReadMore>

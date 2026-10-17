@@ -1,4 +1,4 @@
-import type { Finish, Piece, Provider } from './types'
+import type { Finish, Piece, Provider, ProviderMessage } from './types'
 import { AiError } from './errors'
 import { json, postEvents } from './http'
 
@@ -41,6 +41,21 @@ function usageOf(value: unknown): Piece[] {
   return [{ usage: { ...typeof input === 'number' ? { inputTokens: input } : {}, ...typeof output === 'number' ? { outputTokens: output } : {} } }]
 }
 
+// A turn as the API takes it: the calls an assistant made ride on its message, and each result is a message of its own.
+function turnsOf(message: ProviderMessage): object[] {
+  if (message.results !== undefined)
+    return message.results.map(({ id, content }) => ({ role: 'tool', tool_call_id: id, content }))
+
+  if (message.calls === undefined)
+    return [{ role: message.role, content: message.content }]
+
+  return [{
+    role: 'assistant',
+    content: message.content === '' ? null : message.content,
+    tool_calls: message.calls.map(({ id, name, arguments: raw }) => ({ id, type: 'function', function: { name, arguments: raw } })),
+  }]
+}
+
 // An OpenAI chat completions server: OpenAI itself, Ollama, and the many that speak its API.
 export function openai({ baseUrl = OPENAI_URL, apiKey, model }: OpenAiOptions = {}): Provider {
   const root = baseUrl.replace(TRAILING_SLASHES, '')
@@ -50,7 +65,7 @@ export function openai({ baseUrl = OPENAI_URL, apiKey, model }: OpenAiOptions = 
     name: 'openai',
     model,
     async* stream(request, signal) {
-      const messages = [...request.system === undefined ? [] : [{ role: 'system', content: request.system }], ...request.messages]
+      const messages = [...request.system === undefined ? [] : [{ role: 'system', content: request.system }], ...request.messages.flatMap(turnsOf)]
       const body = {
         model: request.model,
         messages,
@@ -58,9 +73,12 @@ export function openai({ baseUrl = OPENAI_URL, apiKey, model }: OpenAiOptions = 
         stream_options: { include_usage: true },
         // OpenAI's reasoning models refuse the older name, and the servers imitating it know no other.
         [official ? 'max_completion_tokens' : 'max_tokens']: request.maxTokens,
+        ...request.tools === undefined || request.tools.length === 0 ? {} : { tools: request.tools.map(({ name, description, inputSchema }) => ({ type: 'function', function: { name, description, parameters: inputSchema } })) },
         ...request.temperature === undefined ? {} : { temperature: request.temperature },
       }
       let finished = false
+      // Tool calls arrive in pieces keyed by their index, the id and name first and the arguments after; some servers send one whole.
+      const calls = new Map<number, { id: string, name: string, arguments: string }>()
 
       for await (const { data } of postEvents('openai', `${root}/chat/completions`, apiKey === undefined ? {} : { authorization: `Bearer ${apiKey}` }, body, signal, apiKey)) {
         if (data === '[DONE]')
@@ -72,14 +90,40 @@ export function openai({ baseUrl = OPENAI_URL, apiKey, model }: OpenAiOptions = 
         if (failure !== undefined && failure !== null)
           throw failureOf(failure)
 
-        const choice = (chunk.choices as { delta?: { content?: unknown }, finish_reason?: unknown }[] | undefined)?.[0]
+        const choice = (chunk.choices as { delta?: { content?: unknown, tool_calls?: unknown }, finish_reason?: unknown }[] | undefined)?.[0]
         const text = choice?.delta?.content
+
+        if (Array.isArray(choice?.delta?.tool_calls)) {
+          for (const piece of choice.delta.tool_calls as { index?: unknown, id?: unknown, function?: { name?: unknown, arguments?: unknown } }[]) {
+            if (typeof piece !== 'object' || piece === null)
+              continue
+
+            const index = typeof piece.index === 'number' ? piece.index : calls.size
+            const call = calls.get(index) ?? { id: '', name: '', arguments: '' }
+
+            if (typeof piece.id === 'string')
+              call.id = piece.id
+
+            if (typeof piece.function?.name === 'string')
+              call.name += piece.function.name
+
+            if (typeof piece.function?.arguments === 'string')
+              call.arguments += piece.function.arguments
+
+            calls.set(index, call)
+          }
+        }
 
         if (typeof text === 'string' && text !== '')
           yield { text }
 
         if (typeof choice?.finish_reason === 'string') {
           finished = true
+
+          for (const [, call] of [...calls].sort(([a], [b]) => a - b))
+            yield { toolUse: call }
+
+          calls.clear()
 
           yield { finish: FINISHES[choice.finish_reason] ?? 'stop' }
         }

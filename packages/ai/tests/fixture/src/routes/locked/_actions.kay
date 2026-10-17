@@ -1,0 +1,10 @@
+--- server
+import { action, s } from 'kay'
+import { done } from '../../testing'
+
+export const wipe = action(s.Object({ confirm: s.Boolean() }), () => {
+  done.push('wipe')
+
+  return { wiped: true }
+})
+---

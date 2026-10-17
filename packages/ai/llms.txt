@@ -9,6 +9,7 @@
 - Nothing is sent until the reply is first read, so an `await ask()` an island's server render skips bills nothing. A reader leaving early, the visitor leaving the page, or `options.signal` aborts the provider request.
 - Messages are `user` and `assistant` only; the system prompt goes in `options.system`. A history a visitor posts can never carry a system prompt, and a `system` role throws.
 - Under `bun test` `ask()` always answers from `fakeAi`, whatever keys the environment holds; in development it does until `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` or `AI_BASE_URL` is set. Production with none of them throws.
+- `ask(messages, { tools: [addNote, bookSlot] })` lets the model call those actions, and only those: passing one is its opt-in. Each call runs as the visitor through the whole app (guards, validation, rate limits), a failure goes back to the model as an error result, and a loop of at most `maxSteps` requests (5) runs until the model answers. It needs the request being answered, so call it from a page, an action or a handler, not a job.
 - No model id is built in: set `AI_MODEL` (required in production) or pass `{ model }`.
 - A failure is an `AiError` with a `kind`; nothing retries by itself. A rate limit carries `retryAfter` in seconds. A reply cut by `maxTokens` still resolves as text: read `await reply.finish` (`length`) to tell.
 - A chat for a site is `Chat` from `@kaynooo/kayjs-ai/chat.kay`, rendered from a component of the app's own that imports the streaming action (a page with a server fence cannot pass it), styled by kayjs-ui's `theme.css`: see the chat topic.
@@ -48,4 +49,5 @@ The rest is split by topic, each file read whole with one command:
 - [Chat island](llms/chat.md): `Chat(action={reply})`, its props, behaviour, markdown and the rules for passing it the action
 - [Limits and the token budget](llms/limits.md): `ai({ limit, budget, visitor })`, the stores, when tokens count, the `limited` error and a failing store
 - [`kay i18n translate`](llms/translating.md): filling a locale's missing messages and localized entries as drafts, the checks on the model's reply, how an entry is marked, a run stopped half way
+- [Actions as tools](llms/tools.md): `tools`, `maxSteps`, what the model is told when a call goes wrong, `reply.progress()` and `reply.calls` for a chat to show the calls
 - [The fake, errors and providers](llms/testing-and-errors.md): scripting `fakeAi` in tests, `AiError` kinds, building a provider by hand

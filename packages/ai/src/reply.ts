@@ -1,5 +1,9 @@
-import type { Finish, Piece, Reply, Usage } from './types'
+import type { Finish, Piece, Progress, Reply, ToolCall, Usage } from './types'
 import { AiError } from './errors'
+
+function snapshot(call: ToolCall): ToolCall {
+  return { ...call, input: { ...call.input } }
+}
 
 // A reply over what `open` yields once first read, with `signals` stopping it when any aborts.
 // The text is kept as it comes, so any number of readers (`await`, `for await`, `usage`) share one provider request.
@@ -10,6 +14,9 @@ export function createReply(open: (signal: AbortSignal) => AsyncIterable<Piece>,
   const counted = Promise.withResolvers<Usage | undefined>()
   const ending = Promise.withResolvers<Finish | undefined>()
   const total: Partial<Usage> = {}
+  const calls: ToolCall[] = []
+  // Counts each change to the text or to a call, which `progress()` reads from.
+  let version = 0
   let reason: Finish | undefined
   let started = false
   let ended = false
@@ -28,12 +35,26 @@ export function createReply(open: (signal: AbortSignal) => AsyncIterable<Piece>,
   const pump = async () => {
     try {
       for await (const piece of open(controller.signal)) {
-        if ('text' in piece)
+        if ('text' in piece) {
           deltas.push(piece.text)
-        else if ('usage' in piece)
+          version++
+        }
+        else if ('usage' in piece) {
           Object.assign(total, piece.usage)
-        else
+        }
+        else if ('tool' in piece) {
+          const at = calls.findIndex(call => call.id === piece.tool.id)
+
+          if (at === -1)
+            calls.push(piece.tool)
+          else
+            calls[at] = piece.tool
+
+          version++
+        }
+        else if ('finish' in piece) {
           reason = piece.finish
+        }
 
         notify()
       }
@@ -137,6 +158,47 @@ export function createReply(open: (signal: AbortSignal) => AsyncIterable<Piece>,
     }
   }
 
+  const progress = (): AsyncIterator<Progress> => {
+    start()
+
+    let seen = 0
+    let closed = false
+
+    return {
+      async next() {
+        for (;;) {
+          if (closed)
+            return { done: true, value: undefined }
+
+          if (seen < version) {
+            seen = version
+
+            return { done: false, value: { text: deltas.join(''), calls: calls.map(snapshot) } }
+          }
+
+          if (ended) {
+            closed = true
+
+            if (failure !== undefined)
+              throw failure.error
+
+            return { done: true, value: undefined }
+          }
+
+          await new Promise<void>((resolve) => {
+            waiters.add(resolve)
+          })
+        }
+      },
+      return: async () => {
+        closed = true
+        stop()
+
+        return Promise.resolve({ done: true, value: undefined })
+      },
+    }
+  }
+
   return {
     async then(onFulfilled, onRejected) {
       start()
@@ -151,6 +213,16 @@ export function createReply(open: (signal: AbortSignal) => AsyncIterable<Piece>,
     },
     [Symbol.asyncIterator]: () => read(true),
     deltas: () => ({ [Symbol.asyncIterator]: () => read(false) }),
+    progress: () => ({ [Symbol.asyncIterator]: progress }),
+    get calls() {
+      start()
+
+      return (async () => {
+        await ending.promise
+
+        return calls.map(snapshot)
+      })()
+    },
     get usage() {
       start()
 

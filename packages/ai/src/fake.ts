@@ -1,22 +1,32 @@
-import type { Message, Piece, Provider, ProviderRequest } from './types'
+import type { Piece, Provider, ProviderMessage, ProviderRequest, ToolSpec } from './types'
 import process from 'node:process'
 
 // What a fake reply was asked: the request a provider would have been sent.
 export interface Asked {
-  messages: Message[]
+  messages: ProviderMessage[]
+  // The tools the model was offered, absent when it was offered none.
+  tools?: ToolSpec[] | undefined
   system: string | undefined
   model: string
   maxTokens: number
   temperature: number | undefined
 }
 
-export type Script = string | string[] | ((asked: Asked) => string | string[])
+// A step of the model that calls tools, after the text it says first: a string `input` is sent as the arguments as they are, to see what a model garbling its JSON does.
+export interface Calls {
+  text?: string | string[] | undefined
+  calls: { name: string, input?: unknown, id?: string | undefined }[]
+}
+
+type Scripted = string | string[] | Calls
+
+export type Script = Scripted | ((asked: Asked) => Scripted)
 
 export interface Fake extends Provider {
   // Every ask the fake answered, oldest first.
   readonly asked: readonly Asked[]
   last: () => Asked | undefined
-  // The next ask read is answered with this (scripts go to asks in the order they are read, not made): a text, split into words, or the pieces as they should come; a function reads what was asked. Scripts are used in order, then the default reply returns.
+  // The next ask read is answered with this (scripts go to asks in the order they are read, not made): a text, split into words, the pieces as they should come, or `{ text?, calls }` to call tools (a tool loop reads one script per step); a function reads what was asked. Scripts are used in order, then the default reply returns.
   reply: (script: Script) => void
   // The next ask fails with this error.
   fail: (error: Error) => void
@@ -71,7 +81,7 @@ function createFake(): Fake {
       scripts.length = 0
     },
     async* stream(request: ProviderRequest, signal): AsyncGenerator<Piece> {
-      const question: Asked = { ...request, messages: structuredClone(request.messages) }
+      const question: Asked = { ...request, messages: structuredClone(request.messages), tools: request.tools === undefined ? undefined : structuredClone(request.tools) }
 
       asked.push(question)
 
@@ -81,9 +91,11 @@ function createFake(): Fake {
         throw script
 
       const chosen = typeof script === 'function' ? script(question) : script
-      const parts = typeof chosen === 'string' ? pieces(chosen) : chosen
+      const calls = typeof chosen === 'object' && !Array.isArray(chosen) ? chosen.calls : []
+      const said = typeof chosen === 'object' && !Array.isArray(chosen) ? chosen.text ?? [] : chosen
+      const parts = typeof said === 'string' ? pieces(said) : said
       const pace = process.env.NODE_ENV === 'development' ? DEV_PACE_MS : 0
-      const input = request.messages.reduce((sum, message) => sum + tokens(message.content), 0) + tokens(request.system ?? '')
+      const input = request.messages.reduce((sum, message) => sum + tokens(message.content) + (message.results ?? []).reduce((all, result) => all + tokens(result.content), 0), 0) + tokens(request.system ?? '')
 
       yield { usage: { inputTokens: input } }
 
@@ -93,6 +105,9 @@ function createFake(): Fake {
 
         yield { text }
       }
+
+      for (const [index, { name, input, id }] of calls.entries())
+        yield { toolUse: { id: id ?? `fake_${index + 1}`, name, arguments: typeof input === 'string' ? input : JSON.stringify(input ?? {}) } }
 
       yield { usage: { outputTokens: tokens(parts.join('')) } }
       yield { finish: 'stop' }

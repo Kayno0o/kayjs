@@ -19,9 +19,9 @@ it('asks for the summary', async () => {
 })
 ```
 
-- `fakeAi.reply(script)`: the next ask answers with a text (streamed word by word), an array of pieces, or a function of what was asked returning either. Scripts are used in order; with none left the reply is `Fake reply to: <the last user message>`.
+- `fakeAi.reply(script)`: the next ask answers with a text (streamed word by word), an array of pieces, `{ text?, calls: [{ name, input }] }` to call tools, or a function of what was asked returning any of them. A tool loop reads one script per step; a string `input` is sent as the raw arguments, so `'{"title": '` plays a model garbling its JSON. Scripts are used in order; with none left the reply is `Fake reply to: <the last user message>`.
 - `fakeAi.fail(error)`: the next ask throws it, an `AiError` say.
-- `fakeAi.asked` and `fakeAi.last()`: every ask answered, `{ messages, system, model, maxTokens, temperature }`, recorded when the reply is read. `fakeAi.clear()` forgets asks and scripts.
+- `fakeAi.asked` and `fakeAi.last()`: every ask answered, `{ messages, tools, system, model, maxTokens, temperature }`, recorded when the reply is read. `tools` are those offered (`{ name, description, inputSchema }`, absent when none); a message carries `calls` when the assistant called tools and `results` when it is the turn answering them. `fakeAi.clear()` forgets asks and scripts.
 - The fake reports a usage of about four characters per token, and in development paces its pieces so a page visibly streams.
 - `site.call(action, input)` on an action returning the reply gives its snapshots.
 
@@ -44,6 +44,6 @@ Messages name the provider and what it said, with the key hidden if the provider
 
 ## Providers by hand
 
-`openai({ baseUrl, apiKey, model })` and `anthropic({ apiKey, baseUrl, model })` build the providers the environment would, for `ask(..., { provider })`: a second model from another server, or a test against a local fake server speaking either API's SSE. A `Provider` is `{ name, model?, stream(request, signal) }`, `stream` an async iterable of `{ text }` and `{ usage }` pieces that stops when `signal` aborts.
+`openai({ baseUrl, apiKey, model })` and `anthropic({ apiKey, baseUrl, model })` build the providers the environment would, for `ask(..., { provider })`: a second model from another server, or a test against a local fake server speaking either API's SSE. A `Provider` is `{ name, model?, stream(request, signal) }`, `stream` an async iterable of `{ text }`, `{ usage }`, `{ finish }` and, when `request.tools` are offered, `{ toolUse: { id, name, arguments } }` pieces (`arguments` the raw JSON text the model wrote) that stops when `signal` aborts.
 
 OpenAI's own server gets `max_completion_tokens`; any other base URL gets `max_tokens`, the name the servers imitating the API know. Both request `stream_options.include_usage`.
