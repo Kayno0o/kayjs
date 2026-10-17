@@ -594,7 +594,7 @@ function problemsTab(doc: Document, tool: DevTool, state: DevState, save: () => 
   const tab = tool.tab({ id: 'problems', label: 'Problems', summary: count => `${count} problem${count === 1 ? '' : 's'}`, announce: true })
   const actions = tool.make('div', 'actions')
   const clear = tool.make('button', 'tool', 'Dismiss all')
-  const copy = tool.make('button', 'tool', 'Copy')
+  const copy = tool.make('button', 'tool')
   const empty = tool.make('div', 'empty', 'No problems on this page.')
   const groups = new Map(Object.entries(KINDS).map(([kind, label]) => {
     const section = tool.make('section', 'group')
@@ -703,7 +703,7 @@ function problemsTab(doc: Document, tool: DevTool, state: DevState, save: () => 
   }
 
   clear.onclick = () => dismiss([...shown.keys()])
-  copy.onclick = async () => copyText(copy, copiedProblems(win.location.href, [...shown.values()]), 'Copy')
+  copy.onclick = async () => copyText(copy, copiedProblems(win.location.href, [...shown.values()]))
 
   // What `kay check` finds now, as the page carries it: a swap brings the block of the code the server runs.
   const readChecks = () => {
@@ -2019,11 +2019,11 @@ async function answerErrorPage(tool: DevTool, target: HTMLButtonElement): Promis
     return
   }
 
-  await copyText(target, target.ownerDocument.getElementById(copied!)?.textContent ?? '', 'Copy')
+  await copyText(target, target.ownerDocument.getElementById(copied!)?.textContent ?? '')
 }
 
 // Writes the text to the clipboard and says so on the button for a moment, or that it failed, without a dialog.
-async function copyText(button: HTMLButtonElement, text: string, label: string): Promise<void> {
+async function copyText(button: HTMLButtonElement, text: string): Promise<void> {
   try {
     await button.ownerDocument.defaultView!.navigator.clipboard.writeText(text)
     button.textContent = 'Copied'
@@ -2034,7 +2034,7 @@ async function copyText(button: HTMLButtonElement, text: string, label: string):
 
   clearTimeout(copyResets.get(button))
   copyResets.set(button, setTimeout(() => {
-    button.textContent = label
+    button.textContent = 'Copy'
   }, COPIED_MS))
 }
 
