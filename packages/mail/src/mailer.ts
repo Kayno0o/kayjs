@@ -1,5 +1,6 @@
 import type { EnqueueOptions, FailedJob, KayExtension, QueueOptions } from 'kay/server'
 import type { Relay } from './preview'
+import type { SmtpOverrides } from './smtp'
 import type { Address, Delivery, Envelope, Mail, Message, Transport } from './types'
 import process from 'node:process'
 import { Elysia } from 'elysia'
@@ -9,7 +10,7 @@ import { defineEnv, queue, renderLocale, renderToString } from 'kay/server'
 import parseAddresses from 'nodemailer/lib/addressparser'
 import { log } from './log'
 import { addressOf, outbox, PREVIEW_ROUTES } from './outbox'
-import { checkKey, smtp } from './smtp'
+import { checkKey, checkOptions, smtp } from './smtp'
 import { htmlToText } from './text'
 
 // The development pages' routes, which read `./preview` on the first request to one: a plugin that registers its routes at once, so it mounts as any other, with handlers that hand the request to the pages once they are loaded. Each is registered by its method and path, as the pages do, since a catch-all would lose to the page fallback's `GET /*`.
@@ -51,6 +52,8 @@ export interface MailerOptions {
   to?: Address | Address[] | undefined
   // Where mails go: the outbox in development and under `bun test`, else SMTP configured from the environment.
   transport?: Transport | undefined
+  // The SMTP built from the environment, with these over what it sets: the name it greets the server with (the sender's domain by default), `timeout`, `maxConnections` and `rateLimit`. Options left out keep the environment's and smtp()'s defaults; it takes none with a `transport`, which is not built from the environment.
+  smtp?: SmtpOverrides | undefined
   // The language mails are written in unless one names its own: the locale their component renders `t()` in, and the `<html lang>` of the document. The site's default locale (the request's, while one runs) when left out.
   lang?: string | undefined
   // The queue `enqueue` hands mails to, `mail` unless named, retried as kay's queues are.
@@ -211,8 +214,13 @@ function smtpEnv({ optional = false, hasFrom = false, listed = false }: { option
   })
 }
 
+// The options a value was given for, so one left out or undefined never replaces what the environment sets.
+function defined<T extends object>(options: T): Partial<T> {
+  return Object.fromEntries(Object.entries(options).filter(([, value]) => value !== undefined)) as Partial<T>
+}
+
 // SMTP from `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_RATE_LIMIT`, `SMTP_DKIM_*`, `SMTP_FROM` and `MAIL_TO`, read as the server boots, which stops naming each one missing or refused unless the mailer is `optional`.
-function fromEnvironment(from: Address | undefined, fromName: string | undefined, optional: boolean): { transport: Transport, from: Address, to: string | undefined, server: string, missing: () => string[] } {
+function fromEnvironment(from: Address | undefined, fromName: string | undefined, optional: boolean, overrides: SmtpOverrides = {}): { transport: Transport, from: Address, to: string | undefined, server: string, missing: () => string[] } {
   const env = defineEnv(smtpEnv({ optional, hasFrom: from !== undefined }))
 
   // Optional both, so reading them never throws under `kay build`, and a server given one without the other stops as it boots.
@@ -233,7 +241,7 @@ function fromEnvironment(from: Address | undefined, fromName: string | undefined
   const missing = () => [...env.SMTP_HOST === undefined ? ['SMTP_HOST'] : [], ...from === undefined && env.SMTP_FROM === undefined ? ['SMTP_FROM'] : []]
 
   // Built on the first mail, as `kay build` runs without the server's environment and leaves a missing variable to throw where it is read.
-  const opened = () => transport ??= smtp({ host: env.SMTP_HOST, port: env.SMTP_PORT, insecure: env.SMTP_INSECURE, user: env.SMTP_USER, pass: env.SMTP_PASS, rateLimit: env.SMTP_RATE_LIMIT, name: domainOf(sender()), dkim: dkimKey === undefined ? undefined : { domain: env.SMTP_DKIM_DOMAIN ?? domainOf(sender())!, selector: env.SMTP_DKIM_SELECTOR!, privateKey: dkimKey } })
+  const opened = () => transport ??= smtp({ host: env.SMTP_HOST, port: env.SMTP_PORT, insecure: env.SMTP_INSECURE, user: env.SMTP_USER, pass: env.SMTP_PASS, rateLimit: env.SMTP_RATE_LIMIT, name: domainOf(sender()), ...defined(overrides), dkim: dkimKey === undefined ? undefined : { domain: env.SMTP_DKIM_DOMAIN ?? domainOf(sender())!, selector: env.SMTP_DKIM_SELECTOR!, privateKey: dkimKey } })
 
   return {
     transport: {
@@ -256,7 +264,7 @@ function fromEnvironment(from: Address | undefined, fromName: string | undefined
 // The environment's SMTP, which the development pages send a mail over when asked: read on the first ask, so a server never asking reads none of it.
 function relay(options: MailerOptions): Relay {
   let settings: ReturnType<typeof fromEnvironment> | undefined
-  const read = () => settings ??= fromEnvironment(options.from, options.fromName, true)
+  const read = () => settings ??= fromEnvironment(options.from, options.fromName, true, options.smtp)
 
   return {
     missing: () => read().missing(),
@@ -282,8 +290,16 @@ export function mailExtension(from: string | (() => Promise<Mailer>)): KayExtens
 
 // Sends mails written as `.kay` components, html or text: over SMTP in production, to the outbox in development and tests. Using it in the server runs the queue `enqueue` fills, and under `kay dev` lists the outbox at `/_kay/mail`.
 export function mailer(options: MailerOptions = {}): Mailer {
+  if (options.smtp !== undefined) {
+    if (options.transport !== undefined)
+      throw new Error('kayjs-mail: mailer() takes `smtp` or `transport`, not both: `smtp` adjusts the SMTP built from the environment, which a `transport` replaces; give the options to smtp() instead')
+
+    // Even where mails go to the outbox, so a broken option fails in development rather than in production.
+    checkOptions(options.smtp, 'mailer({ smtp })')
+  }
+
   const whom = (addresses: string[]): string => options.logRecipients ? addresses.join(', ') : counted(addresses)
-  const configured = options.transport === undefined && delivering() === 'smtp' ? fromEnvironment(options.from, options.fromName, options.optional === true) : undefined
+  const configured = options.transport === undefined && delivering() === 'smtp' ? fromEnvironment(options.from, options.fromName, options.optional === true, options.smtp) : undefined
   const transport = options.transport ?? configured?.transport ?? outbox
   // A custom transport sends in production too, where `kay@localhost` as the sender fails SPF and lands in spam without an error.
   const senderless = options.transport !== undefined && delivering() === 'smtp' && options.from === undefined && (process.env.SMTP_FROM ?? '') === ''

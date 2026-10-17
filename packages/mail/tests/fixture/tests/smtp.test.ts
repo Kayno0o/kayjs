@@ -199,3 +199,125 @@ describe('smtp', () => {
     }
   })
 })
+
+describe('mailer({ smtp })', () => {
+  const production = { NODE_ENV: 'production', SMTP_HOST: '127.0.0.1', SMTP_INSECURE: 'true', SMTP_FROM: 'site@env.test' }
+
+  // Runs `run` with the environment a production server has, restoring it after.
+  async function inProduction(port: number, run: () => Promise<unknown>, extra: Record<string, string> = {}): Promise<void> {
+    const saved = { ...process.env }
+
+    Object.assign(process.env, production, { SMTP_PORT: String(port) }, extra)
+
+    try {
+      await run()
+    }
+    finally {
+      process.env = saved
+    }
+  }
+
+  it('keeps the environment\'s setup untouched without it, the greeting the sender\'s domain', async () => {
+    await inProduction(server.port, async () => mailer({ queue: { name: 'smtp-none' } }).send({ to: 'bob@example.com', subject: 'Env only', text: 'Hi' }))
+
+    expect(server.greetings.at(-1)).toBe('env.test')
+  })
+
+  it('merges its name over the environment\'s, which still sets the rest', async () => {
+    await inProduction(server.port, async () => mailer({ queue: { name: 'smtp-name' }, smtp: { name: 'mail.example.com' } }).send({ to: 'bob@example.com', subject: 'Named', text: 'Hi' }))
+
+    expect(server.greetings.at(-1)).toBe('mail.example.com')
+    expect(server.received.at(-1)?.from).toBe('<site@env.test>')
+  })
+
+  it('adds only the options it names, an undefined one leaving the environment\'s name', async () => {
+    await inProduction(server.port, async () => mailer({ queue: { name: 'smtp-undefined' }, smtp: { name: undefined, maxConnections: 2 } }).send({ to: 'bob@example.com', subject: 'Partial', text: 'Hi' }))
+
+    expect(server.greetings.at(-1)).toBe('env.test')
+  })
+
+  it('caps the connections the pool opens', async () => {
+    const own = startSmtp()
+
+    try {
+      await inProduction(own.port, async () => {
+        const mail = mailer({ queue: { name: 'smtp-pool' }, smtp: { maxConnections: 1 } })
+
+        await Promise.all([1, 2, 3].map(async n => mail.send({ to: 'bob@example.com', subject: `Pooled ${n}`, text: 'Hi' })))
+      })
+
+      expect(own.received).toHaveLength(3)
+      expect(own.connections.opened).toBe(1)
+    }
+    finally {
+      own.stop()
+    }
+  })
+
+  it('gives up on a server staying silent after its timeout, the environment\'s default being 10 seconds', async () => {
+    const silent = Bun.listen({ hostname: '127.0.0.1', port: 0, socket: { data: () => undefined } })
+
+    try {
+      const started = performance.now()
+
+      await inProduction(silent.port, async () => {
+        const mail = mailer({ queue: { name: 'smtp-timeout' }, smtp: { timeout: '1s' } })
+
+        await expect(mail.send({ to: 'bob@example.com', subject: 'Slow', text: 'Hi' })).rejects.toThrow()
+      })
+
+      expect(performance.now() - started).toBeLessThan(5000)
+    }
+    finally {
+      silent.stop(true)
+    }
+  })
+
+  it('refuses a name, a timeout or a count that cannot be used where the mailer is made, whatever the environment', () => {
+    expect(() => mailer({ smtp: { name: '' } })).toThrow('mailer({ smtp })\'s name is ""')
+    expect(() => mailer({ smtp: { name: 'example.com\r\nMAIL FROM:<a@b.c>' } })).toThrow('mailer({ smtp })\'s name is')
+    expect(() => mailer({ smtp: { name: 'two words' } })).toThrow('mailer({ smtp })\'s name is')
+    expect(() => mailer({ smtp: { timeout: 0 } })).toThrow('mailer({ smtp })\'s timeout is 0; it takes a positive duration')
+    expect(() => mailer({ smtp: { timeout: -5 } })).toThrow('takes a positive duration')
+    expect(() => mailer({ smtp: { timeout: '-1m' as '1m' } })).toThrow('takes a positive duration')
+    expect(() => mailer({ smtp: { maxConnections: 0 } })).toThrow('mailer({ smtp })\'s maxConnections is 0')
+    expect(() => mailer({ smtp: { rateLimit: -1 } })).toThrow('rateLimit is -1')
+    expect(() => smtp({ host: '127.0.0.1', name: ' ' })).toThrow('smtp()\'s name is')
+  })
+
+  it('refuses an explicit transport next to it, with or without the environment', async () => {
+    const transport = { send: async () => ({ accepted: [], rejected: [] }) }
+
+    expect(() => mailer({ transport, smtp: { name: 'mail.example.com' } })).toThrow('takes `smtp` or `transport`, not both')
+
+    await inProduction(server.port, async () => {
+      expect(() => mailer({ transport, smtp: { name: 'mail.example.com' }, queue: { name: 'smtp-both' } })).toThrow('not both')
+    })
+  })
+
+  it('leaves an explicit transport the environment is not read for alone', async () => {
+    const before = server.received.length
+    const sent: string[] = []
+
+    await inProduction(server.port, async () => {
+      const mail = mailer({ transport: { send: async (m) => {
+        sent.push(m.subject)
+
+        return { accepted: [], rejected: [] }
+      } }, queue: { name: 'smtp-transport' } })
+
+      await mail.send({ to: 'bob@example.com', subject: 'Custom', text: 'Hi' })
+    })
+
+    expect(sent).toEqual(['Custom'])
+    expect(server.received).toHaveLength(before)
+
+    // Without the environment either: the transport is used as it is.
+    await mailer({ transport: { send: async (m) => {
+      sent.push(m.subject)
+
+      return { accepted: [], rejected: [] }
+    } }, from: 'a@b.test', queue: { name: 'smtp-transport-dev' } }).send({ to: 'bob@example.com', subject: 'No env', text: 'Hi' })
+    expect(sent).toEqual(['Custom', 'No env'])
+  })
+})

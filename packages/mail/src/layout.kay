@@ -2,10 +2,13 @@
 import type { JSX } from 'kay'
 import { CARD_PADDING_X } from './card'
 import { darkStyle } from './dark'
+import Image from './image.kay'
 import { ghostTable, msoFonts } from './mso'
 import settings from './settings'
 
-const { preheader, footer } = props<{ preheader?: string | undefined, footer?: JSX.Element }>()
+// `header` sits above the card and replaces the settings' `logo`, which every mail wears when it gives none.
+const { preheader, header, footer } = props<{ preheader?: string | undefined, header?: JSX.Element, footer?: JSX.Element }>()
+const { logo } = settings
 const [open, close] = ghostTable(settings.width)
 // Invisible characters filling the inbox preview past the preheader, which clients would otherwise fill with the mail's first lines.
 const filler = '\u034F\u200C\u00A0'.repeat(100)
@@ -19,6 +22,16 @@ table(class="km-bg" role="presentation" width="100%" cellpadding="0" cellspacing
         div(style="display:none;mso-hide:all;max-height:0;max-width:0;overflow:hidden;opacity:0" aria-hidden="true") {preheader}{filler}
       {open}
       table(role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style={`max-width:${settings.width}px;margin:0 auto`})
+        if header || logo
+          tr
+            td(align="center" style="padding:0 0 20px")
+              if header
+                | {header}
+              else if logo?.href
+                a(href={logo.href} style="text-decoration:none")
+                  Image(src={logo.src} alt={logo.alt} width={logo.width} height={logo.height})
+              else if logo
+                Image(src={logo.src} alt={logo.alt} width={logo.width} height={logo.height})
         tr
           td(class="km-surface km-text" align="left" bgcolor={settings.surface} style={`background:${settings.surface};border:1px solid ${settings.border};border-radius:${settings.radius};padding:32px ${CARD_PADDING_X}px;font-family:${settings.font};color:${settings.text}`})
             slot

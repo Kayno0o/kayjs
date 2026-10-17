@@ -1,0 +1,9 @@
+---
+import Image from '@kaynooo/kayjs-mail/image.kay'
+import Layout from '@kaynooo/kayjs-mail/layout.kay'
+import Paragraph from '@kaynooo/kayjs-mail/paragraph.kay'
+---
+Layout
+  @header
+    Image(src="https://fixture.test/own.png" alt="Own header" width={80})
+  Paragraph Branded

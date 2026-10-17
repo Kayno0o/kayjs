@@ -60,6 +60,14 @@ On a port other than 465 a server not offering STARTTLS is refused, at the first
 
 Each mail sent is logged with its subject and how many recipients it went to at which domains. Set `mailer({ logRecipients: true })` to name them in full. DKIM signing and a rate limit have variables of their own.
 
+What the environment has no variable for goes in `mailer({ smtp })`, merged over the SMTP it builds: `name` (the name the client greets the server with, the sender's domain by default), `timeout` (seconds or a string such as `'30s'`, 10 seconds by default), `maxConnections` (5 by default) and `rateLimit`. An option left out keeps the default.
+
+A name, a timeout or a count that cannot be used stops the boot. `smtp` cannot go with a `transport`, which replaces the SMTP: give them to `smtp()` instead.
+
+```ts
+export const mail = mailer({ smtp: { timeout: '30s', maxConnections: 2 } })
+```
+
 <ReadMore href="/llms/kayjs-mail-writing-and-sending">Every variable, DKIM signing, the rate limit and a mailer that boots without SMTP set up.</ReadMore>
 
 ## Writing a mail
@@ -80,6 +88,10 @@ Layout(preheader="Your account is ready")
   Paragraph Confirm your address to start.
   Button(href={url}) Confirm my address
 ```
+
+`Layout` shows its `@header` above the card, a logo say. To put the same logo on every mail, the built-in auth and contact ones included, set `logo` in the settings instead: `{ ...defaults, logo: { src: 'https://example.com/logo.png', alt: 'Example', width: 120 } }`, with an optional `height` and `href`.
+
+A `@header` replaces it for one mail, and an empty one shows nothing. The text part writes the logo's `alt`.
 
 It also ships `Code`, `Divider`, `Image`, `Link`, and `Row` with `Column` for columns that stack on a phone. They hold in Outlook for Windows.
 

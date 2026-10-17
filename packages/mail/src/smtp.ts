@@ -31,6 +31,11 @@ export interface SmtpSettings {
   dkim?: DkimSettings | undefined
 }
 
+// What the environment does not set, which `mailer({ smtp })` gives the SMTP built from it.
+export type SmtpOverrides = Pick<SmtpSettings, 'name' | 'timeout' | 'maxConnections' | 'rateLimit'>
+
+// A domain name or an address literal: the greeting is written into the conversation, so a line break or a space in it would add commands.
+const GREETING = /^[\w.\-:[\]]{1,255}$/
 const DEFAULT_PORT = 465
 const DEFAULT_TIMEOUT_MS = 10_000
 // How long connections stay open after the last mail went: a burst reuses them, and a script still ends soon after its last mail.
@@ -62,9 +67,20 @@ export function nodemailerMessage(mail: Mail) {
   }
 }
 
-function positiveInteger(name: string, value: number | undefined): void {
+function positiveInteger(what: string, name: string, value: number | undefined): void {
   if (value !== undefined && (!Number.isInteger(value) || value < 1))
-    throw new Error(`kayjs-mail: smtp()'s ${name} is ${value}; it takes a whole number of at least 1`)
+    throw new Error(`kayjs-mail: ${what}'s ${name} is ${value}; it takes a whole number of at least 1`)
+}
+
+// Throws naming `what` for a name, a timeout or a count that cannot be used, so one fails where it is given rather than at the first mail.
+export function checkOptions(settings: SmtpOverrides, what: string): number | undefined {
+  if (settings.name !== undefined && !GREETING.test(settings.name))
+    throw new Error(`kayjs-mail: ${what}'s name is ${JSON.stringify(settings.name)}; it takes a domain name, such as the sending domain`)
+
+  positiveInteger(what, 'maxConnections', settings.maxConnections)
+  positiveInteger(what, 'rateLimit', settings.rateLimit)
+
+  return settings.timeout === undefined ? undefined : durationSeconds(settings.timeout, `${what}'s timeout`, 'kayjs-mail') * 1000
 }
 
 // Sends over SMTP, connecting on the first mail rather than when made, so a module making one at import never opens a socket.
@@ -72,14 +88,11 @@ export function smtp(settings: SmtpSettings): Transport {
   if ((settings.user === undefined) !== (settings.pass === undefined))
     throw new Error('kayjs-mail: SMTP_USER and SMTP_PASS go together: set both, or neither for a server that needs no login')
 
-  positiveInteger('maxConnections', settings.maxConnections)
-  positiveInteger('rateLimit', settings.rateLimit)
-
   if (settings.dkim !== undefined)
     checkKey(settings.dkim.privateKey, 'smtp()\'s dkim.privateKey')
 
   // Read now, so a timeout that is no duration fails where the transport is made rather than at its first mail.
-  const wait = settings.timeout === undefined ? DEFAULT_TIMEOUT_MS : durationSeconds(settings.timeout, 'smtp()\'s timeout', 'kayjs-mail') * 1000
+  const wait = checkOptions(settings, 'smtp()') ?? DEFAULT_TIMEOUT_MS
   let transporter: Promise<Awaited<ReturnType<typeof open>>> | undefined
   let sending = 0
   let idle: ReturnType<typeof setTimeout> | undefined
