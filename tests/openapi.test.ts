@@ -1,7 +1,7 @@
-import { afterAll, describe, expect, it } from 'bun:test'
 import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
+import { afterAll, describe, expect, it } from 'bun:test'
 import { testSite } from '../src/test'
 
 const CLI = resolve('src/cli.ts')
