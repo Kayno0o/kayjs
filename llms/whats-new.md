@@ -91,13 +91,4 @@ What each release of kay and its libraries adds, newest first, each feature with
 - An action whose handler is an `async function*`, or returns any async iterable, streams each value to the island calling it: the call resolves with a typed `ActionStream` (`last()`, `status()`, `on()`, `close()`), the action's guards, schema, rate limits and cross-site check running first, while a plain form post and an MCP tool call get the last value and `site.call` every value ([Streaming actions](api-from-islands.md#streaming-actions)).
 - A rate limit counts a weight: `limit.hit(key, undefined, tokens)` and a `RateStore`'s `hit(key, windowMs, weight)` add several at once, so `max` caps tokens or bytes rather than attempts ([Action protection](action-protection.md#limits-outside-an-action)).
 
-## 1.51.2
-
-- The dev tool is redrawn in kay's palette and mark, with an icon and a toned count on each tab, the rail folding to icons when narrow, and new layouts for Problems, Request, Head, Env, Images, Performance, Routes, i18n and Islands; a library's tab takes an `icon`, and `count` a `'warn'` tone, and the bar no longer shows the reload line ([Dev server](dev-server.md), [A tab for a library](component-libraries.md#a-tab-for-a-library)).
-- `shareCard({ title, image })` takes an imported `.svg` as `image`, drawn to cover the card before the title, with its cards written by `kay build` and kept for an executable like `images.card.logo` ([Images](images.md#draw-a-share-card-for-a-page)).
-- The dev tool's Images tab no longer flags an SVG as served more pixels than it is drawn with, as Chromium gives one without a size 150x150 and the same bytes draw at any size; an image whose address ends in `.svg` is exempt, a raster still is flagged ([Dev server](dev-server.md)).
-- `kay check` and the editor warn of an `img` or `input(type="image")` with no `width` and `height`, which shifts the page as it loads (`unsized-image`, in the new `performance` group; [What `kay check` verifies](checks.md#what-kay-check-verifies), [Lints](lints.md)).
-- A valueless Markdown component tag with no later `>` stays text inside a blockquote too, as outside one: the quote's `>` markers no longer count as its close ([Content](content.md#components-in-markdown)).
-- A component reading a slot anywhere but as a bare `{slot}`, in an attribute, a ternary, an `if` test or an `if ... as` alias, hydrates on the server's markup instead of logging `island ... did not match its server markup` and rendering again, as kayjs-ui's `Table` with an `@empty` slot and no rows did.
-
-Releases before 1.51 are in [What's new, older releases](whats-new-archive.md).
+Releases before 1.52 are in [What's new, older releases](whats-new-archive.md).
