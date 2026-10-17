@@ -18,7 +18,10 @@ async function deliver(error: unknown, request: Request | undefined, onError: No
   }
   // A failing reporter is logged, never left to crash the process as an unhandled rejection.
   catch (failure) {
-    logMessage('error', 'onError failed', failure, request)
+    if (request === undefined)
+      kayLog('error', 'onError failed', failure)
+    else
+      logMessage('error', 'onError failed', failure, request)
   }
 }
 
@@ -29,10 +32,11 @@ export function useAppOnError(onError: KayConfig['onError']): void {
   appOnError = onError
 }
 
-// Logs an error met outside any request, a scheduled or background job or an `onStop` hook, and hands it to the app's `onError` with no request.
-export function reportBackgroundError(message: string, error: unknown): void {
+// Logs an error met outside any request, a scheduled, background or queued job or an `onStop` hook, and hands it to the app's `onError` with no request.
+// Resolves once `onError` returned and never rejects, for a caller about to exit to await.
+export async function reportBackgroundError(message: string, error: unknown): Promise<void> {
   kayLog('error', message, error)
 
   if (appOnError)
-    void deliver(error, undefined, appOnError)
+    await deliver(error, undefined, appOnError)
 }

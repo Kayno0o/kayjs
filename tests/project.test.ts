@@ -84,7 +84,7 @@ describe('setupPages', () => {
 describe('clientOptionsOf', () => {
   it('minifies kay build\'s browser build unless the config says not to, and maps and swaps islands in development', () => {
     expect(clientOptionsOf({ base: '/docs/' }, { dev: false, underKayDev: false }, { exported: true })).toMatchObject({ minify: true, base: '/docs', sourcemap: false, hot: false, inspect: false, exported: true })
-    expect(clientOptionsOf({ minify: false }, { dev: false, underKayDev: false }, {}).minify).toBe(false)
+    expect(clientOptionsOf({ minify: false }, { dev: false, underKayDev: false }, {})).toMatchObject({ minify: false, sourcemap: 'external' })
     expect(clientOptionsOf({ publicEnv: s.Object({ API: s.String() }) }, { dev: true, underKayDev: true })).toMatchObject({ minify: false, publicEnv: true, sourcemap: true, hot: true, inspect: true })
   })
 })

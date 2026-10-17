@@ -25,7 +25,7 @@ To try a build before deploying, run `kay start`. It runs the last build on your
 
 ## One executable
 
-`--compile` writes a single executable holding the server, its pages and the client build. It needs neither Bun nor the project where it runs.
+`--compile` writes a single executable holding the server, its pages and the client build. It needs neither Bun nor the project where it runs. It embeds no source maps, so an error an island reports reaches `onError` with the browser's minified frames.
 
 ```sh
 kay build --compile server

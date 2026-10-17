@@ -168,7 +168,7 @@ export async function shutdown(app: AnyElysia, force = false): Promise<void> {
       await hook.fn(app)
     }
     catch (error) {
-      reportBackgroundError('an onStop hook failed', error)
+      await reportBackgroundError('an onStop hook failed', error)
       process.exitCode = 1
     }
   }

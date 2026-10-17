@@ -12,10 +12,11 @@ import type { FileDiagnostic } from './transform'
 import { existsSync } from 'node:fs'
 import { mkdir, rm } from 'node:fs/promises'
 import { builtinModules } from 'node:module'
-import { join, relative, resolve } from 'node:path'
+import { basename, join, relative, resolve } from 'node:path'
 import { formatDiagnostic } from '../compiler'
 import { buildFailure, errorCodeOf, KayError, raisedMark } from '../compiler/errors'
 import { projectPaths } from '../project'
+import { kayLog } from '../runtime/log'
 import { apiStubs, apiTrees } from '../server/api-modules'
 import { rebaseCss } from '../server/base'
 import { fromManifest, MANIFEST, PRERENDERED_DIR, writeManifest } from '../server/client'
@@ -173,7 +174,9 @@ async function keepMaps(root: string, maps: string[]): Promise<void> {
     try {
       await keepBundleMap(map, root, dir)
     }
-    catch {}
+    catch (error) {
+      kayLog('warn', `the source map of ${basename(map)} could not be kept, so island errors from it report minified frames`, error)
+    }
   }
 }
 

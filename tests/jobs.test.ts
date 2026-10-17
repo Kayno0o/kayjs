@@ -640,11 +640,14 @@ describe('queue', () => {
     const warned = spyOn(console, 'warn').mockImplementation(() => undefined)
     const tries: number[] = []
     const gaveUp: unknown[] = []
+    const tracked: unknown[] = []
     const flaky = queue('flaky', (n: number) => {
       tries.push(n)
 
       throw new Error('mail server down')
     }, { store: memoryJobs(), attempts: 3, backoff: '10s', onFailed: (n, error) => void gaveUp.push([n, (error as Error).message]) })
+
+    useAppOnError((error, request) => void tracked.push([(error as Error).message, request]))
 
     try {
       await flaky.enqueue(1)
@@ -661,6 +664,7 @@ describe('queue', () => {
 
       expect(tries).toEqual([1, 1, 1])
       expect(gaveUp).toEqual([[1, 'mail server down']])
+      expect(tracked).toEqual([['mail server down', undefined]])
       expect(await flaky.failed()).toEqual([{ id: expect.any(String), payload: 1, attempts: 3, error: 'mail server down' }])
       expect(logged).toHaveBeenCalledWith(expect.stringMatching(/^kay: a job of queue\('flaky'\) failed 3 times and is kept as failed\nError: mail server down\n/))
       expect(warned.mock.calls).toEqual([
@@ -672,6 +676,7 @@ describe('queue', () => {
       expect(await flaky.drain()).toBe(0)
     }
     finally {
+      useAppOnError(undefined)
       setSystemTime()
       logged.mockRestore()
       warned.mockRestore()

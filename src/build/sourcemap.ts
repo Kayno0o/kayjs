@@ -106,6 +106,8 @@ export async function keepBundleMap(mapFile: string, root: string, mapsDir: stri
   const bundle = await Bun.file(mapFile).json() as BundleMap
 
   bundle.sources = bundle.sources.map(source => relative(root, resolve(dirname(mapFile), source)))
+  // The server maps positions only: the sources would double each map.
+  delete bundle.sourcesContent
   await mkdir(mapsDir, { recursive: true })
   await Bun.write(join(mapsDir, basename(mapFile)), JSON.stringify(bundle))
   await rm(mapFile, { force: true })

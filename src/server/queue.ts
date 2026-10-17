@@ -10,6 +10,7 @@ import { kayLog } from '../runtime/log'
 import { openSqlite } from '../runtime/sqlite.server'
 import { appStore } from './app-store'
 import { onReload } from './reload'
+import { reportBackgroundError } from './report'
 
 // A job as a store keeps it, its payload as devalue text.
 export interface StoredJob {
@@ -385,7 +386,7 @@ export function queue<Payload>(name: string, handler: (payload: Payload) => unkn
       }
 
       await store().fail(job.id, message)
-      kayLog('error', `a job of queue('${name}') failed ${job.attempts} times and is kept as failed`, error)
+      await reportBackgroundError(`a job of queue('${name}') failed ${job.attempts} times and is kept as failed`, error)
       await reportFailed(job, error)
     }
 

@@ -13,6 +13,8 @@ const CHUNK_NAME = /^[\w.-]+\.js$/
 // A report holds at most this many lines to map, and the server keeps this many maps decoded.
 const MAX_FRAMES = 60
 const MAX_LOADED = 32
+// A line this long is no frame of a real stack, and the pattern reading it backtracks.
+const MAX_LINE = 1000
 
 // Maps the frames of a browser's stack to `.kay` lines with the source maps `kay build` kept in `dir`, never served; a frame no map covers stays as it was.
 export function browserStackMapper(dir: string): (stack: string) => Promise<string> {
@@ -27,13 +29,18 @@ export function browserStackMapper(dir: string): (stack: string) => Promise<stri
 
     let map = loaded.get(name)
 
-    if (!map) {
+    // Read again, a map used last stays.
+    if (map) {
+      loaded.delete(name)
+    }
+    else {
       if (loaded.size >= MAX_LOADED)
         loaded.delete(loaded.keys().next().value!)
 
       map = read(join(dir, `${name}.map`))
-      loaded.set(name, map)
     }
+
+    loaded.set(name, map)
 
     return map
   }
@@ -42,7 +49,7 @@ export function browserStackMapper(dir: string): (stack: string) => Promise<stri
     const lines = stack.split('\n')
 
     for (const [at, text] of lines.slice(0, MAX_FRAMES).entries()) {
-      const frame = FRAME.exec(text)
+      const frame = text.length > MAX_LINE ? null : FRAME.exec(text)
 
       if (!frame)
         continue

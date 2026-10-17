@@ -146,7 +146,7 @@ function scheduledRun(label: string, slotMs: number, job: () => unknown, options
       await job()
     }
     catch (error) {
-      reportBackgroundError(`the job scheduled ${label} failed`, error)
+      await reportBackgroundError(`the job scheduled ${label} failed`, error)
     }
   }
 }
@@ -171,7 +171,7 @@ export function background(work: (signal: AbortSignal) => unknown) {
         }
         catch (error) {
           if (!started.signal.aborted) {
-            reportBackgroundError('a background job failed', error)
+            await reportBackgroundError('a background job failed', error)
           }
         }
       })()
