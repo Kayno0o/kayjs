@@ -335,7 +335,7 @@ describe('the dev tool', () => {
         listeners.set(type, listener)
       }
     }
-    const answer = (async () => new Response('<html></html>', { headers: { 'content-type': 'text/html' } })) as typeof fetch
+    const answer = (async () => new Response('<html></html>', { headers: { 'content-type': 'text/html' } })) as unknown as typeof fetch
 
     globalThis.fetch = answer
     window.fetch = answer
