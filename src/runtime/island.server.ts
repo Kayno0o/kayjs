@@ -13,7 +13,7 @@ import { renderOnServer, scope } from './reactive'
 import { SLOT_END, SLOT_START } from './static-slots'
 import { countIds } from './uid'
 import { islandPrefix, pageIds } from './uid.server'
-import { ACTION_PREFIX, encodeValue, unsendable } from './wire'
+import { ACTION_PREFIX, ACTION_TYPE, encodeValue, unsendable } from './wire'
 
 // Island roots render synchronously, so a counter is enough to tell whether a component already sits inside one.
 let depth = 0
@@ -75,6 +75,9 @@ export function insideIsland(): boolean {
   return depth > 0
 }
 
+// How devalue writes an action in props: a node of its own type.
+const ACTION_NODE = `["${ACTION_TYPE}",`
+
 export class IslandPropsError extends Error {
   override name = 'IslandPropsError'
 }
@@ -88,7 +91,7 @@ export function noteMessage(key: string): void {
 // A client-only one, `client` or rendered with `hydrate="client"`, leaves the slot empty for the browser to render into, and inside another island renders nothing.
 // Browsers lay a slot out as `display: contents`, so the island sits in a flex or grid parent as its own markup would, with no stylesheet to ship.
 // `messages` are the keys its source passes `t()` as they are written, which it may only look up once in the browser. `lives` are the live values it imports, which the page proves though only the browser may read them.
-export function island<P extends object>(id: string, component: ((props: P) => JSX.Element) | undefined, messages: readonly string[] = [], client = false, why = 'is interactive', lives: readonly unknown[] = []): IslandComponent<P> {
+export function island<P extends object>(id: string, component: ((props: P) => JSX.Element) | undefined, messages: readonly string[] = [], client = false, why = 'is interactive', lives: readonly unknown[] = [], takesActions = false): IslandComponent<P> {
   const render = (props: P & IslandOptions) => {
     const when = props.hydrate
     const kept = props.persist === false || props.persist === '' || props.persist === true ? undefined : props.persist
@@ -113,6 +116,11 @@ export function island<P extends object>(id: string, component: ((props: P) => J
     const slots = withFieldMarks(undefined, () => staticSlots(own))
     const given = slots.length === 0 ? own : withSlots(own, slots)
     const serialized = serializeProps(`${id} ${why}`, own, slots)
+
+    // The browser revives an action only for an island whose chunk installs the reviver, which the compiler does for one typing a prop as an action.
+    if (!takesActions && serialized.includes(ACTION_NODE))
+      throw new IslandPropsError(`${id} ${why}, so it renders as an island: it is passed an action but does not type a prop as one, so the browser could not read it; import \`Action\` from 'kay' in its script, as the type of that prop`)
+
     // The browser counts the island's ids from it again as it hydrates.
     const ids = islandPrefix()
 
@@ -149,7 +157,7 @@ export function island<P extends object>(id: string, component: ((props: P) => J
 
 // A static component that passes an island what only an island sends, a function, a block taking parameters or an instance of a class, renders as an island itself, sending its own props instead; one passing only data stays static.
 export function promote<P extends object>(id: string, render: (props: P) => JSX.Element, hydrated: (props: P) => JSX.Element, messages: readonly string[] = []): (props: P) => JSX.Element {
-  const asIsland = island(id, hydrated, messages, false, 'passes an island what only an island sends')
+  const asIsland = island(id, hydrated, messages, false, 'passes an island what only an island sends', [], true)
 
   return (props) => {
     if (depth > 0)

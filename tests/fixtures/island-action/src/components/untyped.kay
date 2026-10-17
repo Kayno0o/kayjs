@@ -1,0 +1,9 @@
+---
+import { signal } from 'kay'
+
+const { run } = props<{ run: unknown }>()
+const shown = signal(false)
+---
+button.show(type="button" onClick={() => shown.set(true)}) Show
+if shown()
+  p.untyped {typeof run}

@@ -251,7 +251,9 @@ class ModuleShell {
       kayHelpers.push(fence ? 'registerActions' : 'actionStub')
 
     // An island typing a prop as an action may be passed one by a page, which arrives as its URL: the island's chunk is what brings the code building the stub, so an app without one ships none.
-    const takesActions = mode === 'dom' && this.kind === 'island' && script.imports.some(binding => binding.source === 'kay' && ACTION_TYPES.has(binding.imported))
+    this.takesActions = this.kind === 'island' && script.imports.some(binding => binding.source === 'kay' && ACTION_TYPES.has(binding.imported))
+
+    const takesActions = mode === 'dom' && this.takesActions
 
     if (takesActions)
       kayHelpers.push('reviveActions')
@@ -385,7 +387,7 @@ class ModuleShell {
     else if (this.kind === 'twin')
       b.add(`\nexport default ((props: never) => KayInsideIsland() ? KayHydrated(props) : ${name}(props)) as typeof ${name}\n`)
     else if (this.kind === 'island')
-      b.add(`\nexport default KayIsland(${JSON.stringify(this.options.island)}, ${name}${this.genericComponent ? ' as never' : ''}${islandMessages(src, this.options.client, this.options.output === 'html' ? this.options.lives : undefined)})${this.genericIslandType()}\n`)
+      b.add(`\nexport default KayIsland(${JSON.stringify(this.options.island)}, ${name}${this.genericComponent ? ' as never' : ''}${islandMessages(src, this.options.client, this.options.output === 'html' ? this.options.lives : undefined, this.takesActions)})${this.genericIslandType()}\n`)
   }
 
   private get wrapped(): boolean {
@@ -419,6 +421,9 @@ class ModuleShell {
   private settingType(name: PageSettingName): string | undefined {
     return this.server?.page?.settings.has(name) ? `typeof ${PAGE}.${name}` : undefined
   }
+
+  // Whether the island types a prop as an action, so the server lets it be passed one.
+  private takesActions = false
 
   private get genericComponent(): boolean {
     return this.file.typeParameters !== undefined && this.server === undefined
@@ -877,8 +882,11 @@ function typeParameterNames(parameters: string): string[] {
 }
 
 // The message keys an island's source names, as the third argument to `island()`, or nothing for an island naming none; the live values it imports go last.
-export function islandMessages(source: string, client = false, lives: string[] = []): string {
+export function islandMessages(source: string, client = false, lives: string[] = [], takesActions = false): string {
   const keys = [...new Set(Array.from(source.matchAll(MESSAGE_KEY), match => match[2]!))]
+
+  if (takesActions)
+    return `, ${JSON.stringify(keys)}, ${client}, undefined, [${lives.join(', ')}], true`
 
   if (lives.length > 0)
     return `, ${JSON.stringify(keys)}, ${client}, undefined, [${lives.join(', ')}]`

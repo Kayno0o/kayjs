@@ -1,5 +1,5 @@
-import * as parser from '@babel/parser'
 import { describe, expect, it, spyOn } from 'bun:test'
+import * as parser from '@babel/parser'
 import { compileKay, componentName } from '../src/compiler'
 import { moduleSignals } from '../src/compiler/module-signals'
 import { CURRENT, defaultName, GENERATED_NAME, PROPS } from '../src/compiler/names'
@@ -151,6 +151,9 @@ describe('control flow', () => {
     expect(compileKay(typed, 'src/caller.kay', { output: 'dom' }).tsx).toContain('KayReviveActions()')
     expect(compileKay(typed, 'src/caller.kay', { output: 'html' }).tsx).not.toContain('KayReviveActions')
     expect(compileKay(untyped, 'src/caller.kay', { output: 'dom' }).tsx).not.toContain('KayReviveActions')
+    // The server lets an island be passed an action only when it types a prop as one.
+    expect(compileKay(typed, 'src/caller.kay', { output: 'html' }).tsx).toContain('KayIsland("src/caller.kay", Caller, [], false, undefined, [], true)')
+    expect(compileKay(untyped, 'src/caller.kay', { output: 'html' }).tsx).toContain('KayIsland("src/caller.kay", Caller)')
   })
 
   it('reports a match with no when line in every output, which once crashed the html one', () => {

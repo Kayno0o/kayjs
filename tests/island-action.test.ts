@@ -1,8 +1,8 @@
 import type { Action } from '../src/runtime'
+import { afterAll, describe, expect, it } from 'bun:test'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import process from 'node:process'
-import { afterAll, describe, expect, it } from 'bun:test'
 import { chromium } from 'playwright-core'
 import { actionStub, reviveActions } from '../src/runtime/action'
 import { child } from '../src/runtime/html'
@@ -98,6 +98,14 @@ describe('the wire of an action', () => {
 
     expect(() => child(Dialog({ run: actionStub('') }))).toThrow(IslandPropsError)
     expect(() => child(Dialog({ run: (greet as unknown as { with: (fields: object) => unknown }).with({ name: 'Ann' }) }))).toThrow('with()')
+  })
+
+  it('names the fix at render, in production, for an island passed an action it does not type a prop as', async () => {
+    const response = await site.fetch('/untyped')
+
+    expect(response.status).toBe(500)
+    expect(() => child(island('untyped.kay', (_props: { run: unknown }) => null)({ run: greet }))).toThrow('import `Action` from \'kay\'')
+    expect(() => child(island('typed.kay', (_props: { run: unknown }) => null, [], false, undefined, [], true)({ run: greet }))).not.toThrow()
   })
 
   it('does not take any function for an action', () => {
