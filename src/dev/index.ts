@@ -11,6 +11,7 @@ import process from 'node:process'
 import { ASSET_EXTENSIONS, KAY_DIR, testWorker } from '../build/assets'
 import { CONFIG_FILE, loadConfig } from '../config'
 import { projectPaths, savedPublicDir } from '../project'
+import { removeDevAddress, writeDevAddress } from './address'
 import { startClientBuilder } from './client'
 import { inspectorProxy } from './inspector'
 import { CONFIG_REFUSED, REFUSE } from './refuse'
@@ -273,6 +274,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     }
 
     address = url
+    writeDevAddress(root, url)
   }
 
   // Settled once the first types write, which tells a config that does not load, is over.
@@ -709,6 +711,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
 
     clearTimeout(timer)
     stopWatching()
+    removeDevAddress(root)
     await restarting
     typesAgain = false
     child?.kill()

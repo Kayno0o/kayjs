@@ -23,6 +23,7 @@ This needs Bun to know the registry first, see [Installation](/getting-started/i
 | `kay build [dir]` | Check the project and bundle the browser code for production |
 | `kay start [dir]` | Serve the last build as production does |
 | `kay render <url> [dir]` | Print what the server answers for one URL, without starting it on a port |
+| `kay screenshot <path> [dir]` | Shoot a page of the running `kay dev` in a headless Chrome |
 | `kay check [dir]` | Type-check the project, `.kay` files included |
 | `kay upgrade [dir] [--dry-run]` | Move kay and its libraries to the latest version and rewrite the old forms |
 | `kay routes [dir]` | List every route the project serves, and the file serving it |
@@ -189,6 +190,8 @@ Under `--format json`, each line is one JSON object on stdout with an `event` an
 
 `.kay/dev/errors.json` lists the errors the dev server met, for a reader that never opens the browser, such as a coding agent running `kay dev` in the background.
 
+While it runs, `kay dev` also writes its address to `.kay/dev/server.json`, for [`kay screenshot`](#kay-screenshot) and the `screenshot` tool.
+
 ```json
 {
   "errors": [
@@ -293,6 +296,30 @@ A redirect prints `kay render: 302 Found, to /login` on stderr and exits 0. A st
 | `--entry <file>` | Runs that server entry instead, relative to the current directory |
 
 <ReadMore href="/llms/check-and-tools">Full URLs and hosts, `base`, the timeouts and how the temporary build is cleaned up.</ReadMore>
+
+## kay screenshot
+
+```sh
+kay screenshot /admin/posts            # 375 and 1280 px wide
+kay screenshot /admin/posts --width 375 --scheme dark
+kay screenshot /admin/posts --full-page
+```
+
+`kay screenshot` opens a page of the project's running `kay dev` in a headless Chrome or Chromium and writes a PNG under `.kay/screenshots/`. It shows what the HTML does not: a control off screen at phone width, a table that stacks badly, the dark scheme. Chrome comes from `BUN_CHROME_PATH`, else the first one on the `PATH`.
+
+Start `kay dev` first. It writes its address to `.kay/dev/server.json`, and the command refuses to run when no `kay dev` of the project is alive. The path is the one a visitor types, a locale prefix included. A site with a `base` gets it added when the path lacks it, and the page is opened as a proxy in front of the site would serve it. A path that names another host, or that climbs out with `..`, is refused before any browser starts.
+
+The two latest shots of each page, width and scheme stay next to each other, and the command prints how many pixels changed since the one before, with a diff image beside them where the changed pixels are red. Shoot, edit, shoot again to check an edit moved only what it meant to. Older shots go once the folder holds a few hundred files.
+
+The page's console errors and the errors `kay dev` listed for it come back with the shots. A page that does not finish loading within 10 seconds is shot as it stands, with the reason among the console errors.
+
+| Option | Effect |
+| --- | --- |
+| `--width <px>` | The window's width, 200 to 3840; repeat it for more. 375 and 1280 by default |
+| `--height <px>` | The window's height, 200 to 8000. 800 by default |
+| `--scheme light\|dark` | The colour scheme the page is asked for. `light` by default |
+| `--full-page` | The whole page instead of the window, cut at 8000 px |
+| `--format text\|json` | `json` prints the url, status, shots, console errors and the dev server's problems as one document |
 
 ## kay check
 
@@ -433,6 +460,7 @@ Another client takes the same command in its MCP config, such as `.mcp.json` at 
 | `routes` | `kay routes --format json` |
 | `explain` | The lints and error codes, or with `name` one lint, error code or group |
 | `render` | `kay render` on `url`, with `method`, `body`, `headers` and `cookies` |
+| `screenshot` | `kay screenshot` on `path`, with `width`, `height`, `scheme` and `fullPage`. Answers the document, then an image per shot; `diff: true` adds the diff image against the shot before |
 | `dev_errors` | The errors a running `kay dev` met, from [`.kay/dev/errors.json`](#errors-without-a-browser) |
 
 The resources are `kay://llms.txt`, the index to start from, and one `kay://llms/<file>.md` for each guide of kay's `llms/`.

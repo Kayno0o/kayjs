@@ -5,6 +5,7 @@ import { isAbsolute, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { KAY_DIR } from '../build/assets'
 import { isLintGroup, LINT_GROUPS } from '../compiler/lints'
+import { MAX_HEIGHT, MAX_WIDTH, MIN_SIZE } from '../dev/screenshot-limits'
 import { DEV_ERRORS_FILE } from '../server/dev-errors'
 
 const CLI = join(import.meta.dir, '..', 'cli.ts')
@@ -128,6 +129,59 @@ function tools(root: string): Tool[] {
         const status: Content = { type: 'text', text: `kay render exited ${result.code}\n${result.stderr}`.trim() }
 
         return { content: [renderedBody(result), status], isError: result.code !== 0 }
+      },
+    },
+    {
+      name: 'screenshot',
+      title: 'Screenshot a page',
+      description: 'Shoots a page of the running `kay dev` server in a headless Chrome and returns PNGs, to see what the HTML does not tell: a control off screen at phone width, a stacked table, the dark scheme. By default two shots, 375 and 1280 px wide. Answers `{ url, status, shots, console, problems }` first, then an image per shot: `console` holds the page\'s console errors and why it did not settle, `problems` what `kay dev` listed for the page. Each shot is kept in `.kay/screenshots/` with the one before it, and `diff: true` adds an image of what changed since that one (changed pixels red) - shoot, edit, shoot again to check the edit moved only what it meant to. Needs `kay dev` running and Chrome or Chromium (`BUN_CHROME_PATH`).',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          path: { type: 'string', description: 'The page\'s path as a visitor types it, such as `/admin/posts` or `/fr/about?page=2`; a site\'s `base` is added when missing. Only pages of the dev server are shot.' },
+          width: { type: 'integer', minimum: MIN_SIZE, maximum: MAX_WIDTH, description: 'The window\'s width in pixels, for one shot instead of the 375 and 1280 pair.' },
+          height: { type: 'integer', minimum: MIN_SIZE, maximum: MAX_HEIGHT, description: 'The window\'s height in pixels, 800 by default.' },
+          scheme: { type: 'string', enum: ['light', 'dark'], description: 'The colour scheme the page is asked for, light by default.' },
+          fullPage: { type: 'boolean', description: `The whole page rather than the window, cut at ${MAX_HEIGHT} px.` },
+          diff: { type: 'boolean', description: 'Add the diff image against the previous shot of the same page, width and scheme, when there is one.' },
+        },
+        required: ['path'],
+        additionalProperties: false,
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      run: async (args) => {
+        const { path } = args
+
+        // A value that began with `-` would be read as an option.
+        if (typeof path !== 'string' || !path.startsWith('/'))
+          throw new Error('path takes a path such as /about')
+
+        const numbers = (['width', 'height'] as const).flatMap((name) => {
+          const value = args[name]
+
+          if (value === undefined)
+            return []
+
+          if (typeof value !== 'number' || !Number.isInteger(value))
+            throw new Error(`${name} takes a whole number of pixels`)
+
+          return [`--${name}=${value}`]
+        })
+        const scheme = optionalString(args.scheme, 'scheme')
+        const result = await kay(['screenshot', path, '--format', 'json', ...numbers, ...scheme === undefined ? [] : [`--scheme=${scheme}`], ...args.fullPage === true ? ['--full-page'] : []])
+
+        if (result.code !== 0)
+          return { content: [{ type: 'text', text: result.stderr.trim() || `kay screenshot exited ${result.code}` }], isError: true }
+
+        const report = JSON.parse(result.stdout) as { shots: { file: string, diff?: { file: string } }[] }
+        const images: Content[] = []
+
+        for (const shot of report.shots) {
+          for (const file of [shot.file, ...args.diff === true && shot.diff !== undefined ? [shot.diff.file] : []])
+            images.push({ type: 'image', data: (await Bun.file(join(root, file)).bytes()).toBase64(), mimeType: 'image/png' })
+        }
+
+        return { content: [{ type: 'text', text: result.stdout.trim() }, ...images], structuredContent: report }
       },
     },
     {

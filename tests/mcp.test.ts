@@ -343,7 +343,7 @@ describe.concurrent('kay mcp', () => {
     const { result } = await agent.request('tools/list')
     const tools = result?.tools as { name: string, inputSchema: { type: string }, annotations: object }[]
 
-    expect(tools.map(tool => tool.name)).toEqual(['check', 'routes', 'explain', 'render', 'dev_errors'])
+    expect(tools.map(tool => tool.name)).toEqual(['check', 'routes', 'explain', 'render', 'screenshot', 'dev_errors'])
     expect(tools.every(tool => tool.inputSchema.type === 'object' && 'readOnlyHint' in tool.annotations)).toBe(true)
   })
 

@@ -50,7 +50,7 @@ To build a site, read [Build a site](llms/site.md) first: one page walking throu
 - [Project setup and scaffolding](llms/project.md): `kay.config.ts`, tsconfig, editor setup, `kay new` and `kay add`, migrating from Astro
 - [The dev server](llms/dev-server.md): `kay dev`, its error page and dev tool
 - [Building and starting](llms/build-and-start.md): `kay build`, one executable, a static export, `kay start`
-- [Check, inspect and tool commands](llms/check-and-tools.md): `kay check`, `kay render <url>` printing what a page renders without a server, `kay routes`, `kay env`, `kay upgrade`, `kay explain`, `kay fmt`, `kay lsp`, and `kay mcp`, serving kay's tools and these guides to an agent, and `kay/compiler`, compiling a `.kay` source from a tool
+- [Check, inspect and tool commands](llms/check-and-tools.md): `kay check`, `kay render <url>` printing what a page renders without a server, `kay screenshot <path>` shooting a page of `kay dev`, `kay routes`, `kay env`, `kay upgrade`, `kay explain`, `kay fmt`, `kay lsp`, and `kay mcp`, serving kay's tools and these guides to an agent, and `kay/compiler`, compiling a `.kay` source from a tool
 - [Running in production](llms/production.md): request logs, tracing and Server-Timing, health checks and graceful shutdown, cron and background jobs
 - [Proxies, security headers and compression](llms/proxy-and-security.md): running behind a proxy, security headers and CSP, compression
 - [Upgrading](llms/upgrading.md): what each recent minor release of kay and its libraries breaks, and what an app changes to move to it

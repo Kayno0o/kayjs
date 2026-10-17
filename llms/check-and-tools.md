@@ -29,6 +29,15 @@ kay render /about
 kay render /account --cookie session=…
 ```
 
+### Screenshot a page
+
+`kay screenshot <path>` shoots a page of the project's running `kay dev` in a headless Chrome or Chromium (`BUN_CHROME_PATH`, else the PATH) and writes PNGs under `.kay/screenshots/`, 375 and 1280 px wide by default, for a layout the HTML does not show:
+
+```sh
+kay screenshot /admin/posts
+kay screenshot /admin/posts --width 375 --scheme dark --full-page
+```
+
 ### Give an agent kay's tools
 
 `kay mcp` serves the project in the current directory as an MCP server over stdio, for an agent to call instead of running `kay` in a shell. It needs nothing in the app: the agent's client starts it from the project's root, where kay is installed.
@@ -43,7 +52,7 @@ Another client takes the same command in its MCP config, such as `.mcp.json` at 
 { "mcpServers": { "kay": { "command": "bunx", "args": ["kay", "mcp"] } } }
 ```
 
-The tools are `check` (`paths`, `only`, `denyWarnings`), `routes`, `explain` (a lint or an error code, `name`), `render` (`url`, `method`, `body`, `headers`, `cookies`) and `dev_errors`; the resources are `kay://llms.txt` and one `kay://llms/<file>.md` per guide, each listing its sections. See [Commands](project.md#commands).
+The tools are `check` (`paths`, `only`, `denyWarnings`), `routes`, `explain` (a lint or an error code, `name`), `render` (`url`, `method`, `body`, `headers`, `cookies`), `screenshot` (`path`, `width`, `height`, `scheme`, `fullPage`, `diff`) and `dev_errors`; the resources are `kay://llms.txt` and one `kay://llms/<file>.md` per guide, each listing its sections. See [Commands](project.md#commands).
 
 ### Format the templates
 
@@ -109,9 +118,15 @@ kay fmt --check
   - An import it adds goes in the fence the name is used from, the server fence for server code and the component script otherwise, made if missing.
   - Renaming a server value renames its reads in the template, and renaming a destructured prop renames it in every parent passing it.
   - It runs the project's `kay.config.ts`, and the modules it imports, as soon as a `.kay` file is opened, as `bun` would: open only a project you trust, as with its `package.json` scripts.
+- `kay screenshot <path> [dir] [--width <px>]... [--height <px>] [--scheme light|dark] [--full-page] [--format text|json]`:
+  - Needs `kay dev` running in the project (it writes `.kay/dev/server.json`, `{ url, pid }`, and removes it on exit; a dead pid is ignored) and Chrome or Chromium; it says so, naming `BUN_CHROME_PATH`, otherwise.
+  - `path` is what a visitor types, a locale prefix and a query included; a site's `base` is added when the path is not under it, and the page is opened through a proxy of the command's own that takes it off, as a proxy in front of the site does. A path that does not start with one `/`, holds a `..` segment (also percent-encoded), a backslash or a control character, or names another host is refused before the browser starts.
+  - Widths 375 and 1280 by default, 200 to 3840; `--height` 200 to 8000, 800 by default; `--full-page` shoots the whole page, cut at 8000 px. The window is exact: a device metrics override replaces the browser's bar. `kay-dev`'s badge is hidden.
+  - Each shot is `.kay/screenshots/<path>.<width>[x<height>].<scheme>[.full].png`, the path written in letters, digits and `-` with `_` and the hex of anything else. The one before goes to `.prev.png` and `.diff.png` marks the changed pixels red on the faded new shot, with the count, ratio and bounding box of the changes (a different size is compared on the larger canvas, a tolerance of 8 per channel ignoring anti-aliasing). Beyond 240 files the oldest go.
+  - The document (`--format json`, else one line per shot): `url`, the dev server's `status`, `shots` (`width`, `scheme`, `file`, `size`, `cut`, `previous`, `diff`), `console` (the page's console errors and uncaught exceptions, and `kay: timed out after ...` when it did not load and hydrate within 10 s, in which case it is shot as it stands) and `problems` (the entries of `.kay/dev/errors.json` for the page, and a boot or compile failure). A status of 400 or above is a result, not a failure.
 - `kay mcp [--stdio]`:
   - Serve the project in the current directory to an agent as an MCP server over stdio (newline-delimited JSON-RPC), in both the revision that opens with `initialize` (`2025-11-25` and earlier) and `2026-07-28`, whose requests carry their version in `_meta`; it needs no setup in the app and prints nothing but protocol on stdout.
-  - Tools, each with an input schema: `check` runs `kay check --format json` and answers its document, taking `paths` (files or directories inside the project to report on, `.` for all of it; the project is checked whole either way), `only` (a lint group) and `denyWarnings`; `routes` answers `kay routes --format json`; `explain` lists the lints and error codes, or explains the lint, error code or group in `name`; `render` runs `kay render` on `url` with `method`, `body`, `headers` (`name: value`) and `cookies` (`name=value`), answering the body (an image or a blob, unchanged, when it is not text), then the status line, headers and server log, as an error result for a status of 400 or above; `dev_errors` reads `.kay/dev/errors.json` (see `kay dev`), an empty list when `kay dev` has met nothing.
+  - Tools, each with an input schema: `check` runs `kay check --format json` and answers its document, taking `paths` (files or directories inside the project to report on, `.` for all of it; the project is checked whole either way), `only` (a lint group) and `denyWarnings`; `routes` answers `kay routes --format json`; `explain` lists the lints and error codes, or explains the lint, error code or group in `name`; `render` runs `kay render` on `url` with `method`, `body`, `headers` (`name: value`) and `cookies` (`name=value`), answering the body (an image or a blob, unchanged, when it is not text), then the status line, headers and server log, as an error result for a status of 400 or above; `screenshot` runs `kay screenshot --format json` and answers its document, then each shot's PNG as an image, and the diff image of each too with `diff: true`; `dev_errors` reads `.kay/dev/errors.json` (see `kay dev`), an empty list when `kay dev` has met nothing.
   - Each tool runs the command in a child process of its own, so a call pays what the command costs, a `check` as long as `kay check`; a problem found is a result, a command that could not run an error result (`isError`). Calls run one at a time, in the order they came, and a command that is stopped (timeout, client gone) takes what it started along.
   - Resources: `kay://llms.txt`, and `kay://llms/<file>.md` for each file of `llms/`, with the file's title and the headings of its sections as description; only those are readable.
   - Register it with `claude mcp add kay -- bunx kay mcp`, or as `{ "mcpServers": { "kay": { "command": "bunx", "args": ["kay", "mcp"] } } }` in a client's JSON config.

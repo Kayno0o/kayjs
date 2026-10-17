@@ -17,6 +17,8 @@ export interface BrowserOptions {
   timeout?: number | undefined
   // The page's next call fails once it logs a problem kay recovers from in production, such as an island that did not match its server markup; `false` leaves it in `errors`.
   strict?: boolean | undefined
+  // A page that does not settle within the timeout, loaded and hydrated, is returned as it stands with the reason in `errors`, instead of failing the call.
+  lenient?: boolean | undefined
 }
 
 export interface WaitOptions {
@@ -95,6 +97,8 @@ const CRASHED = Symbol('crashed')
 // The files the page failed to load, such as the scripts that would hydrate its islands: refused, or a script answered as another type, which the browser does not run.
 const FAILED_FILES = `performance.getEntriesByType('resource').flatMap(entry => { const path = new URL(entry.name).pathname; return entry.responseStatus >= 400 ? [path + ' answered ' + entry.responseStatus] : (path.endsWith('.js') || path.endsWith('.mjs')) && entry.contentType && !entry.contentType.includes('javascript') ? [path + ' answered as ' + entry.contentType] : [] })`
 const FAILED_WAIT_MS = 1000
+// What the message of a wait that ran out of time starts with.
+const UNSETTLED = 'kay: timed out after'
 // Loaded, no page swap in flight, and every island hydrating on load done: `_$k` is set on an island once hydrated.
 const SETTLED = `document.readyState === 'complete' && !document.documentElement.hasAttribute('aria-busy') && [...document.querySelectorAll('${ISLAND}:not([data-hydrate=visible]):not([data-hydrate=idle])')].every(island => island._$k)`
 
@@ -291,7 +295,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
       }
 
       if (Date.now() > until)
-        throw new Error(`kay: timed out after ${wait}ms waiting for ${wanted}${failure === undefined ? '' : `, last throwing ${failure instanceof Error ? failure.message : String(failure)}`}`, failure === undefined ? undefined : { cause: failure })
+        throw new Error(`${UNSETTLED} ${wait}ms waiting for ${wanted}${failure === undefined ? '' : `, last throwing ${failure instanceof Error ? failure.message : String(failure)}`}`, failure === undefined ? undefined : { cause: failure })
 
       await Bun.sleep(POLL_MS)
     }
@@ -332,7 +336,16 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
       const target = new URL(path, origin)
 
       origin = target.origin
-      await live(async () => view.navigate(target.href))
+
+      // A lenient page that does not finish loading, a stalled image holding its load event, is not waited on past the timeout.
+      if (options.lenient === true) {
+        if (await within(live(async () => view.navigate(target.href)), timeout) === TIMED_OUT)
+          throw new Error(`${UNSETTLED} ${timeout}ms waiting for ${target.pathname} to load`)
+      }
+      else {
+        await live(async () => view.navigate(target.href))
+      }
+
       await settle(SETTLED, `${target.pathname} to load and hydrate its islands`)
     }),
     path: async () => serial(async () => inView<string>('location.pathname + location.search')),
@@ -438,7 +451,16 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
     })
     // Pages share one browser, whose cookies and storage outlive a page. Named one by one, as `all` takes Chrome 2 to 5 s a page, the rest under a millisecond.
     await live(async () => view.cdp('Storage.clearDataForOrigin', { origin, storageTypes: STORAGE_TYPES }))
-    await page.goto(url)
+
+    try {
+      await page.goto(url)
+    }
+    catch (error) {
+      if (options.lenient !== true || !(error instanceof Error) || !error.message.startsWith(UNSETTLED))
+        throw error
+
+      errors.push(error.message)
+    }
   }
   catch (error) {
     // The profile Bun made is noted while the browser still answers, should the blank page have failed.
