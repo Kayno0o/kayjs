@@ -385,6 +385,7 @@ describe('compiling Markdown', () => {
     await expect(compileMarkdown('a\n> <Chart stray\n> b >\n', 1)).rejects.toMatchObject({ code: 'markdown-invalid' })
     expect((await compileMarkdown('> > <Chart a="1" />\n', 1)).segments).toContainEqual({ component: 'Chart', props: { a: '1' }, children: [], line: 1 })
     expect((await compileMarkdown('> <Chart a="1"\n> b="2" />\n', 1)).segments).toContainEqual({ component: 'Chart', props: { a: '1', b: '2' }, children: [], line: 1 })
+    expect((await compileMarkdown('> <Chart a="x\n  y"\ncontinued />\n', 1)).segments).toContainEqual({ component: 'Chart', props: { a: 'x\n  y', continued: true }, children: [], line: 1 })
     expect((await compileMarkdown('> <Chart a="1">\n>\n> in\n>\n> </Chart>\n', 1)).segments).toContainEqual({ component: 'Chart', props: { a: '1' }, children: ['\n<p>in</p>\n'], line: 1 })
   })
 

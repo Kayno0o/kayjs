@@ -55,7 +55,7 @@ const FENCE_OPEN = /^ {0,3}(`{3,}|~{3,})/
 const FENCE_CLOSE = /^ {0,3}(`{3,}|~{3,})\s*$/
 // The markers opening a blockquote line: up to three spaces, then each `>` with an optional space.
 const BLOCKQUOTE_MARKERS = / {0,3}(?:> ?)*/y
-const QUOTED_LINE_START = /\n {0,3}(?:> ?)*/g
+const QUOTED_LINE_START = /\n {0,3}(?:> ?)+/g
 const INDENTED = /^(?: {4}|\t)/
 const BLANK = /^\s*$/
 const ATTRIBUTE_NAME = /^[A-Z_][\w:-]*/i
