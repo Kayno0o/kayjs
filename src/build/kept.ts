@@ -75,7 +75,7 @@ async function place(from: string, to: string): Promise<void> {
 
 // Called before a build replaces the output: sets aside, as hard links, the files of the build in place that no earlier kept build holds.
 // A run that did not finish leaves the output without its manifest, or with the last build waiting aside (`aside`): what was set aside then is still right, so it stays.
-// One that failed after its manifest was written leaves a set-aside folder and an output nobody served: the files it holds join what was set aside.
+// One that failed after its manifest was written leaves an output nobody served, whose chunks no page links to: it stages nothing, as does the first build after an upgrade, which has no record of a served one.
 export async function setAsideKept(output: string, aside: string): Promise<void> {
   if (existsSync(aside) || !existsSync(join(output, MANIFEST)))
     return
