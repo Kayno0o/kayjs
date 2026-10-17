@@ -24,8 +24,8 @@ const { drafts, entry, field, path } = props<{ drafts: Drafts, entry: EntryRef, 
 // The components the app gives its own field kinds, `src/cms/fields/<kind>.kay` each, bundled with the editor.
 const kinds = import.meta.glob<Component<CustomFieldProps>>('/src/cms/fields/*.kay', { eager: true, import: 'default' })
 
-// The hint to add a component is for the author running the site, not for an editor on a deployed one.
-const development = process.env.NODE_ENV !== 'production'
+// The hint to add a component is for the author running the site, not for an editor on a deployed one: only a development server, where the island's build defines the same `NODE_ENV`, shows it, so the server render and the island agree whatever `NODE_ENV` a server started without.
+const development = process.env.NODE_ENV === 'development'
 
 const jsonIssue = signal<string>()
 

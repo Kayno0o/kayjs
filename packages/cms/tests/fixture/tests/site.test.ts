@@ -429,22 +429,43 @@ test('a field kind the app adds is edited by its component, given the value and 
 })
 
 test('a kind with no component falls back to JSON and names the file to add', async () => {
-  const page = await site.visit('/admin/collections/products/mug')
-
-  expect(page.find('[data-kcms-path="mood"] textarea')).toHaveLength(1)
-  expect(page.find('[data-kcms-path="mood"]')[0]?.text).toContain('No editor for the mood kind: add src/cms/fields/mood.kay')
-})
-
-test('the hint to add a component shows in development and test, not in production', async () => {
   const before = process.env.NODE_ENV
 
-  process.env.NODE_ENV = 'production'
+  process.env.NODE_ENV = 'development'
 
   try {
     const page = await site.visit('/admin/collections/products/mug')
 
     expect(page.find('[data-kcms-path="mood"] textarea')).toHaveLength(1)
-    expect(page.find('[data-kcms-path="mood"]')[0]?.text).not.toContain('No editor for the mood kind')
+    expect(page.find('[data-kcms-path="mood"]')[0]?.text).toContain('No editor for the mood kind: add src/cms/fields/mood.kay')
+  }
+  finally {
+    if (before === undefined)
+      delete process.env.NODE_ENV
+    else
+      process.env.NODE_ENV = before
+  }
+})
+
+test('the hint to add a component shows in development alone, not in production or with no NODE_ENV', async () => {
+  const before = process.env.NODE_ENV
+  const hinted = async (environment: string | undefined) => {
+    if (environment === undefined)
+      delete process.env.NODE_ENV
+    else
+      process.env.NODE_ENV = environment
+
+    const page = await site.visit('/admin/collections/products/mug')
+
+    expect(page.find('[data-kcms-path="mood"] textarea')).toHaveLength(1)
+
+    return page.find('[data-kcms-path="mood"]')[0]?.text.includes('No editor for the mood kind') === true
+  }
+
+  try {
+    expect(await hinted('development')).toBe(true)
+    expect(await hinted('production')).toBe(false)
+    expect(await hinted(undefined)).toBe(false)
   }
   finally {
     if (before === undefined)
