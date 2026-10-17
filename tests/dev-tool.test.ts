@@ -963,7 +963,7 @@ describe('the dev tool', () => {
     }
   })
 
-  it('never flags an SVG as served more pixels than it is drawn with, still flags a raster, and still flags an SVG without width and height', async () => {
+  it('never flags an SVG as served more pixels than it is drawn with, by its name or the content type its fetch answered, still flags a raster, and still flags an SVG without width and height', async () => {
     const { happyDOM } = window as unknown as { happyDOM: { setURL: (url: string) => void } }
     const { href } = location
 
@@ -976,6 +976,8 @@ describe('the dev tool', () => {
       '<img id="upper" src="/LOGO%2ESVG" width="16" height="16" alt="">',
       '<img id="png" src="/logo.png" width="16" height="16" alt="">',
       '<img id="decoy" src="/logo.png?file=a.svg" width="16" height="16" alt="">',
+      '<img id="served" src="/mark?v=1#x" width="16" height="16" alt="">',
+      '<img id="raster" src="/photo" width="16" height="16" alt="">',
     ].join('')
 
     for (const image of document.querySelectorAll('img')) {
@@ -988,6 +990,9 @@ describe('the dev tool', () => {
     }
 
     const fetching = spyOn(window, 'fetch').mockImplementation((async () => new Response(null, { headers: { 'content-type': 'image/svg+xml' } })) as unknown as typeof window.fetch)
+    // Resource Timing keeps the content type without the hash; the dev tool never asks the app's own handler again.
+    const types: Record<string, string> = { 'http://localhost/mark?v=1': 'image/svg+xml; charset=utf-8', 'http://localhost/photo': 'image/png' }
+    const timing = spyOn(window.performance, 'getEntriesByName').mockImplementation(((name: string) => name in types ? [{ contentType: types[name] }] : []) as unknown as typeof window.performance.getEntriesByName)
     const flags = () => [...shadow().querySelectorAll('#kay-dev-images .image')].map(row => [row.querySelector('.src')?.textContent, ...[...row.querySelectorAll('.flag')].map(flag => flag.textContent)].join(' | '))
 
     try {
@@ -1003,9 +1008,12 @@ describe('the dev tool', () => {
         '/LOGO%2ESVG',
         '/logo.png | served 88 times the pixels it is drawn with, give it a smaller width or `sizes`',
         '/logo.png?file=a.svg | served 88 times the pixels it is drawn with, give it a smaller width or `sizes`',
+        '/mark?v=1#x',
+        '/photo | served 88 times the pixels it is drawn with, give it a smaller width or `sizes`',
       ])
     }
     finally {
+      timing.mockRestore()
       fetching.mockRestore()
       document.body.innerHTML = ''
       happyDOM.setURL(href)

@@ -1,0 +1,3 @@
+main
+  h1 Dev tool
+  img(src="/mark.png" width="16" height="16" loading="eager" alt="")

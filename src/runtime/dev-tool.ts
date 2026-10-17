@@ -1888,16 +1888,19 @@ function imageVariant(src: string, origin: string): string {
   return 'not resized by kay'
 }
 
-// Whether an image is an SVG by its address: a path ending in `.svg`, whatever its query or hash. The browser gives an SVG without a size a natural size of 150x150, and an SVG draws at any size from the same bytes, so its natural size says nothing about what was served.
-function isVector(src: string, base: string): boolean {
-  const url = parseUrl(src, base)
+// Whether an image is an SVG: a path ending in `.svg` whatever its query or hash, else the content type its fetch answered, as Resource Timing kept it, since asking again could run the app's own handler. The browser gives an SVG without a size a natural size of 150x150, and an SVG draws at any size from the same bytes, so its natural size says nothing about what was served.
+function isVector(src: string, win: Window & typeof globalThis): boolean {
+  const url = parseUrl(src, win.location.href)
 
   if (url === undefined)
     return false
 
-  const path = decodedPath(url)
+  if (decodedPath(url).toLowerCase().endsWith('.svg'))
+    return true
 
-  return path.toLowerCase().endsWith('.svg')
+  url.hash = ''
+
+  return win.performance.getEntriesByName(url.href, 'resource').some(entry => 'contentType' in entry && typeof entry.contentType === 'string' && entry.contentType.split(';')[0]!.trim().toLowerCase() === 'image/svg+xml')
 }
 
 // Every image of the page with what it is, what it is drawn at and what is wrong with it; `lcp` is the element the browser reported as the largest paint.
@@ -1918,7 +1921,7 @@ function pageImages(doc: Document, lcp: Element | undefined): ImageInfo[] {
     const served = image.naturalWidth * image.naturalHeight
     const needed = box.width * box.height * density * density
 
-    if (served > 0 && needed > 0 && served > needed * OVERSIZED && !isVector(src, win.location.href))
+    if (served > 0 && needed > 0 && served > needed * OVERSIZED && !isVector(src, win))
       flags.push(`served ${Math.round(served / needed)} times the pixels it is drawn with, give it a smaller width or \`sizes\``)
 
     if (!image.hasAttribute('width') || !image.hasAttribute('height'))

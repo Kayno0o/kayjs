@@ -1365,13 +1365,19 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
   }, 60_000)
 })
 
-describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the dev tool under a policy refusing inline styles', () => {
-  it('draws, moves and docks, styled through its adopted sheet and the CSSOM alone', async () => {
-    const dev = await testSite({ routes: 'tests/fixtures/title/src/routes', browser: { path }, dev: true, security: { csp: { 'style-src': ['\'self\''] } } })
+describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the dev tool on its own fixture', () => {
+  let dev: TestSite
+
+  beforeAll(async () => {
+    dev = await testSite({ routes: 'tests/fixtures/dev-tool/src/routes', browser: { path }, dev: true, security: { csp: { 'style-src': ['\'self\''] } } })
+  }, 60_000)
+
+  afterAll(async () => dev?.close())
+
+  it('draws, moves and docks under a policy refusing inline styles, styled through its adopted sheet and the CSSOM alone', async () => {
+    const view = await dev.open('/')
 
     try {
-      const view = await dev.open('/')
-
       await view.waitUntil(() => document.querySelector('kay-dev')?.shadowRoot?.querySelector('.bar') !== null)
 
       // The policy holds: a style attribute the page adds is refused.
@@ -1431,7 +1437,28 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the dev to
       expect(drawn.violations).toEqual([])
     }
     finally {
-      await dev.close()
+      view.close()
+    }
+  }, 60_000)
+
+  it('tells an SVG served under another name by the content type its fetch answered, not flagging it as oversized', async () => {
+    const view = await dev.open('/')
+
+    try {
+      await view.evaluate(() => document.querySelector('kay-dev')!.shadowRoot!.querySelector<HTMLButtonElement>('#kay-dev-tab-images')!.click())
+      await view.waitUntil(() => document.querySelector('kay-dev')!.shadowRoot!.querySelector('#kay-dev-images .image')?.textContent.includes('150x150') === true)
+
+      const row = await view.evaluate(() => {
+        const image = document.querySelector('kay-dev')!.shadowRoot!.querySelector('#kay-dev-images .image')!
+
+        return [image.querySelector('.src')!.textContent, [...image.querySelectorAll('.chip')].map(chip => chip.textContent).find(chip => chip.includes('drawn')), [...image.querySelectorAll('.flag')].map(flag => flag.textContent)]
+      })
+
+      // Chromium draws an SVG without a size at 150x150, 88 times the pixels of 16x16.
+      expect(row).toEqual(['/mark.png', '150x150 drawn 16x16', []])
+    }
+    finally {
+      view.close()
     }
   }, 60_000)
 })
