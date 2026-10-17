@@ -677,6 +677,17 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 
+  it('types an await block\'s then alias as each part of an async iterable, and as what a promise resolves to', async () => {
+    const root = await scratchProject({ 'src/routes/index.kay': '--- server\nasync function* count() {\n  yield 1\n}\n\nconst parts = count()\nconst done = Promise.resolve(\'a\')\n---\n// kay-allow uncaught-await\nawait parts then n\n  p {n.toFixed(1)} {n.length}\n// kay-allow uncaught-await\nawait done then text\n  p {text.length} {text.toFixed(1)}\n' })
+
+    try {
+      expect((await check(root)).map(d => [d.line, d.code])).toEqual([[11, 'TS2339'], [14, 'TS2551']])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('checks a project whose tsconfig only extends kay\'s, its .kay files and modules alike', async () => {
     const root = await scratchProject({
       'tsconfig.json': '{ "extends": "kay/tsconfig.json" }\n',

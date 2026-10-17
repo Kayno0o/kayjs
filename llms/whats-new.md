@@ -2,6 +2,10 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
+## Unreleased
+
+- An `await` block takes an async iterable, such as an async generator or a model's reply, and renders `then` again with each part it yields, on the server as the page streams and in an island ([A value that arrives in parts](rendering.md#a-value-that-arrives-in-parts)).
+
 ## 1.51.2
 
 - The dev tool is redrawn in kay's palette and mark, with an icon and a toned count on each tab, the rail folding to icons when narrow, and new layouts for Problems, Request, Head, Env, Images, Performance, Routes, i18n and Islands; a library's tab takes an `icon`, and `count` a `'warn'` tone, and the bar no longer shows the reload line ([Dev server](dev-server.md), [A tab for a library](component-libraries.md#a-tab-for-a-library)).

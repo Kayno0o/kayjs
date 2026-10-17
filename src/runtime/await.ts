@@ -7,6 +7,6 @@ export function Await<T>(props: AwaitProps<T>): JSX.Element {
   return fragment((parent) => {
     const [start, end] = markers(parent)
 
-    awaited(null, start, end, () => props.value, props.pending && (() => props.pending!()), value => props.ready(value as Awaited<T>), props.failed && (error => props.failed!(error)))
+    awaited(null, start, end, () => props.value, props.pending && (() => props.pending!()), value => props.ready(value as never), props.failed && (error => props.failed!(error)))
   })
 }

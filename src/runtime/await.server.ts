@@ -4,11 +4,12 @@ import type { JSX } from './jsx'
 import { child } from './html'
 import { insideIsland } from './island.server'
 import { getOwner, runWithOwner } from './reactive'
+import { isSnapshots } from './snapshots'
 
-// A block whose value was still pending when the page rendered, streamed in once it settles.
+// A block whose value was still pending when the page rendered, streamed in once it settles, or as each part of an async iterable comes.
 export interface PendingBlock {
   id: string
-  value: Promise<unknown>
+  value: Promise<unknown> | AsyncIterable<unknown>
   ready: (value: never) => unknown
   failed?: ((error: unknown) => unknown) | undefined
 }
@@ -80,13 +81,15 @@ export function collectDeferred<T>(render: () => T): { result: T, deferred: Pend
 // Typed as the browser build is, which `kay check` reads templates against.
 export function Await<T>(props: AwaitProps<T>): JSX.Element {
   const value = props.value
+  const parts = isSnapshots(value)
 
-  if (!(value instanceof Promise))
-    return props.ready(value as Awaited<T>)
+  if (!parts && !(value instanceof Promise))
+    return props.ready(value as never)
 
-  // Inside a block that is itself streamed nothing streams, and an island hydrates its pending block and settles it in the browser; the server takes the promise either way, so a rejection crashes nothing.
+  // Inside a block that is itself streamed nothing streams, and an island hydrates its pending block and settles it in the browser; the server takes a promise either way, so a rejection crashes nothing, and leaves an iterable unread.
   if (deferred === undefined || insideIsland()) {
-    void Promise.allSettled([value])
+    if (!parts)
+      void Promise.allSettled([value])
 
     return props.pending?.()
   }

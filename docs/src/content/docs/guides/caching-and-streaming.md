@@ -130,6 +130,33 @@ Kay holds any promise that fails with nothing awaiting it, in your own code too,
 
 `defer()` from `kay` is no longer needed, though code that still calls it keeps working.
 
+### A value that arrives in parts
+
+An `await` block also takes an async iterable, such as an async generator. Each value it yields is the whole so far. The `then` block renders it in place of the last one.
+
+```kay
+--- server
+async function* reply() {
+  let text = ''
+
+  for await (const word of words())
+    yield text += word
+}
+
+const answer = reply()
+---
+await answer
+  p Thinking
+then text
+  p {text}
+catch
+  p The reply was cut short
+```
+
+The first part goes out at once. After that, kay sends at most one part every 50 ms, always the latest, and always the last one. In an island the block updates at most once a frame.
+
+When the visitor leaves the page, kay stops the iterable, so a generator's `finally` runs.
+
 <Callout type="warning">
 
 Status, headers and cookies are sent before the first block, so a streamed block cannot redirect or set them.

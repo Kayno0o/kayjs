@@ -183,6 +183,38 @@ catch
 - The response stays open until the last value settles, an empty comment going out every 5 seconds meanwhile, so neither Bun, which closes a connection idle for 10 seconds by default, nor a proxy in front closes it under a slow value.
 - In an island, the server sends the pending block and the browser renders the rest once the value settles.
 
+#### A value that arrives in parts
+
+An async iterable, such as an async generator or a model's reply, streams in part by part: each value it yields is the whole so far, which `then` renders in place of the last.
+
+```kay
+--- server
+async function* reply() {
+  let text = ''
+
+  for await (const word of words())
+    yield text += word
+}
+
+const answer = reply()
+---
+await answer
+  p Thinking
+then text
+  p {text}
+catch
+  p The reply was cut short
+```
+
+- The page goes out with the pending block, then each part as the whole block again: the first at once, then at most one every 50 ms, the latest of those that came meanwhile, and always the last.
+- `then` gets each part, typed as the iterable's element; an iterable ending with no value removes the pending block.
+- A throw renders `catch` in place of what was shown; without `catch` it is logged and the parts shown so far stay.
+- A `then` block that throws stops reading the iterable, reported, never showing `catch`.
+- An `await` inside `then` shows its pending block until the last part, whose blocks stream as any do.
+- A visitor leaving the page stops the iterable (`return()`), so a generator's `finally` runs and a request it made can be aborted.
+- In an island, the block renders again with each part, at most once a frame; a newer value given to the block, or the block going away, stops the older iterable.
+- `renderToString` renders the last part.
+
 ### Rendering to a string
 
 `renderToString(Component, props)` from `kay/server` renders a component outside a page, for a mail, a feed or a file, and resolves with its markup:

@@ -5,6 +5,7 @@ import { rebasedAttribute } from './base'
 import { imageSource } from './image'
 import { FAILED, ISLAND, PART_END, PART_START } from './markers'
 import { catchError, createSignal, getOwner, hydrationEnded, hydrationStarted, memo, onCleanup, renderEffect, reportError, root, runWithOwner, scope, unrecorded, untrack } from './reactive'
+import { isSnapshots, readSnapshots } from './snapshots'
 import { freshPrefix, withIds } from './uid'
 import { safeUrl } from './url'
 import { attributeName, attributeValue, classText, eachChild, elementName, handlerName, merge, spreadAttributes, styleText } from './values'
@@ -1079,7 +1080,10 @@ function moveRows(parent: Node, kept: Row[], next: Row[], after: Node | null): v
   }
 }
 
-// An `await` block: the pending block while the value is a promise, then the `then` or `catch` block once it settles; a plain value renders `then` at once.
+// An iterable's parts render at most this often in an island, about once a frame.
+const FRAME_MS = 16
+
+// An `await` block: the pending block while the value is a promise, then the `then` or `catch` block once it settles; a plain value renders `then` at once, and an async iterable renders `then` again with each part, at most once a frame.
 export function awaited(element: Node | null, start: Node | null, end: Node | null, value: () => unknown, pending: (() => unknown) | undefined, ready: (value: unknown) => unknown, failed: ((error: unknown) => unknown) | undefined): void {
   const block = blockIn(new Region(element, start, end))
   let version = 0
@@ -1089,7 +1093,9 @@ export function awaited(element: Node | null, start: Node | null, end: Node | nu
     const own = ++version
 
     untrack(() => {
-      if (!(settled instanceof Promise)) {
+      const parts = isSnapshots(settled)
+
+      if (!parts && !(settled instanceof Promise)) {
         unrecorded(() => swap(block, () => ready(settled)))
 
         return
@@ -1112,12 +1118,29 @@ export function awaited(element: Node | null, start: Node | null, end: Node | nu
           runWithOwner(parent, () => unrecorded(() => swap(block, render, true)))
       }
 
+      // A part whose `then` block throws is a bug in the page, reported rather than shown as `catch`, and the iterable is not read further.
+      let broken = false
+      const reader = parts
+        ? readSnapshots(settled, FRAME_MS, (value) => {
+          try {
+            land(() => ready(value))
+          }
+          catch (error) {
+            broken = true
+            reader!.stop()
+            reportError(error)
+          }
+        })
+        : undefined
+
+      onCleanup(() => reader?.stop())
+
       // A `then` block that throws while rendering is not the promise failing, so it stays out of the catch.
       const settle = async () => {
-        let result: unknown
+        let result: { value: unknown } | undefined
 
         try {
-          result = await settled
+          result = reader ? await reader.done : { value: await settled }
         }
         catch (error) {
           if (failed)
@@ -1128,7 +1151,11 @@ export function awaited(element: Node | null, start: Node | null, end: Node | nu
           return
         }
 
-        land(() => ready(result))
+        if (broken)
+          return
+
+        // An iterable ending with no value leaves nothing in place of its pending block.
+        land(result ? () => ready(result.value) : () => null)
       }
 
       void settle()

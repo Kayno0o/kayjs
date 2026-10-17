@@ -157,7 +157,7 @@ Each line is one of the following; deeper indentation nests children under the l
 | `@name` | Directly under a component: passes the indented block as its `name` prop. |
 | `@name(a, b)` | The same, as a function of its parameters the component calls. |
 | `head` | At the top level: its `title`, `meta`, `link`, `style`, `script` and `base` children go in the document head, and `html` sets the attributes of `<html>`. |
-| `await value` / `then name` / `catch error` | Renders the indented block under `await` until `value` settles; see [Streaming](rendering.md#streaming). |
+| `await value` / `then name` / `catch error` | Renders the indented block under `await` until `value` settles, or `then` again with each part of an async iterable; see [Streaming](rendering.md#streaming). |
 | `try` / `catch error` | Renders the `catch` block instead when the `try` block throws; see [Error fallbacks](islands.md#error-fallbacks). |
 | `error title` / `error` | Inside `form(action={add})`: `p.error` with the message a refused post gave `title`, or the form's own, which the field or the form is described by; nothing otherwise. See [Actions](actions.md). |
 | `const name = value` | Names a value for the lines after it at its indentation and their children, computed once per render of its block; in an island it follows what it reads as a memo does, redrawing only what reads it. `const { a, b } = value` destructures. A name the template already sees, `let` and reassignment are errors. |

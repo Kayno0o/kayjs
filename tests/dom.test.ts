@@ -912,6 +912,117 @@ describe('blocks', () => {
       await dispose()
     }
   })
+
+  // An iterable the test feeds by hand through `globalThis.feeds`, noting whether it was told to stop.
+  const FEED = 'interface Feed { push: (value: string) => void, end: () => void, fail: (error: Error) => void, stopped: boolean }\n\nfunction feed(): AsyncIterable<string> {\n  const queue: (IteratorResult<string> | Error)[] = []\n  let wake = () => {}\n  const state: Feed = { push: value => { queue.push({ value, done: false }); wake() }, end: () => { queue.push({ value: undefined, done: true }); wake() }, fail: error => { queue.push(error); wake() }, stopped: false }\n  const feeds = ((globalThis as { feeds?: Feed[] }).feeds ??= [])\n\n  feeds.push(state)\n\n  return { [Symbol.asyncIterator]: () => ({\n    next: async () => {\n      while (queue.length === 0)\n        await new Promise<void>(resolve => wake = resolve)\n\n      const item = queue.shift()!\n\n      if (item instanceof Error)\n        throw item\n\n      return item\n    },\n    return: async () => { state.stopped = true; return { value: undefined, done: true } },\n  }) }\n}\n'
+  const feeds = () => (globalThis as unknown as { feeds: { push: (value: string) => void, end: () => void, fail: (error: Error) => void, stopped: boolean }[] }).feeds
+  // Past the 16 ms an island waits between two parts.
+  const frame = async () => Bun.sleep(30)
+
+  const mount19b = site({
+    'main.kay': `---\nimport { signal } from 'kay'\n\n${FEED}\nconst source = signal(feed())\n---\nbutton.next(onClick={() => source.set(feed())}) Next\nawait source()\n  p.wait Waiting\nthen text\n  p.text {text}\ncatch error\n  p.failed {(error as Error).message}\n`,
+  })
+
+  it('render an await block given an async iterable again with each part, the latest of those coming within a frame', async () => {
+    (globalThis as { feeds?: unknown[] }).feeds = []
+
+    const { root, dispose } = await mount19b()
+
+    try {
+      const [first] = feeds()
+
+      expect(root.querySelector('p.wait')).not.toBeNull()
+      first!.push('a')
+      first!.push('ab')
+      await settle()
+      expect(root.querySelector('p.text')!.textContent).toBe('a')
+      first!.push('abc')
+      await settle()
+      expect(root.querySelector('p.text')!.textContent).toBe('a')
+      await frame()
+      expect(root.querySelector('p.text')!.textContent).toBe('abc')
+      first!.push('abcd')
+      first!.end()
+      await settle()
+      expect(root.querySelector('p.text')!.textContent).toBe('abcd')
+      expect(first!.stopped).toBe(false)
+    }
+    finally {
+      await dispose()
+    }
+  })
+
+  it('stop reading an iterable once the block is given another value, and once it goes away', async () => {
+    (globalThis as { feeds?: unknown[] }).feeds = []
+
+    const { root, dispose } = await mount19b()
+    const [first] = feeds()
+
+    try {
+      first!.push('old')
+      await frame()
+      root.querySelector('button')!.click()
+      await settle()
+      expect(first!.stopped).toBe(true)
+      expect(root.querySelector('p.wait')).not.toBeNull()
+      first!.push('late')
+      feeds()[1]!.push('new')
+      await frame()
+      expect(root.querySelector('p.text')!.textContent).toBe('new')
+    }
+    finally {
+      await dispose()
+    }
+
+    expect(feeds()[1]!.stopped).toBe(true)
+  })
+
+  it('show the catch block of an iterable that throws after its parts, and nothing in place of one that ends with none', async () => {
+    (globalThis as { feeds?: unknown[] }).feeds = []
+
+    const { root, dispose } = await mount19b()
+
+    try {
+      feeds()[0]!.push('a')
+      await frame()
+      feeds()[0]!.fail(new Error('Cut'))
+      await settle()
+      expect(root.querySelector('p.failed')!.textContent).toBe('Cut')
+      root.querySelector('button')!.click()
+      await settle()
+      feeds()[1]!.end()
+      await settle()
+      expect(root.querySelector('p')).toBeNull()
+    }
+    finally {
+      await dispose()
+    }
+  })
+
+  const mount19c = site({
+    'main.kay': `---\n${FEED}\nconst source = feed()\n---\nawait source then text\n  p.text {text.length > 1 ? (null as unknown as string).length : text}\ncatch\n  p.failed Failed\n`,
+  })
+
+  it('report a part whose then block throws rather than show the catch block, and stop reading its iterable', async () => {
+    (globalThis as { feeds?: unknown[] }).feeds = []
+
+    const errors = spyOn(console, 'error').mockImplementation(() => undefined)
+    const { root, dispose } = await mount19c()
+
+    try {
+      feeds()[0]!.push('a')
+      await frame()
+      feeds()[0]!.push('ab')
+      await frame()
+      expect(errors).toHaveBeenCalledTimes(1)
+      expect(feeds()[0]!.stopped).toBe(true)
+      expect(root.querySelector('p.failed')).toBeNull()
+    }
+    finally {
+      errors.mockRestore()
+      await dispose()
+    }
+  })
 })
 
 describe('transitions', () => {
