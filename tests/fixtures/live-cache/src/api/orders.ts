@@ -14,6 +14,39 @@ export default api()
 
     return status(404, 'gone')
   })
+  // Refusals answered by name, through the context's status or a `status()`.
+  .get('/named-set', async ({ set }) => {
+    await cached('orders', '1m', () => db.orders, { live: true })
+    set.status = 'Bad Request'
+
+    return 'no'
+  })
+  .get('/named-status', async ({ status }) => {
+    await cached('orders', '1m', () => db.orders, { live: true })
+
+    return status('Not Found', 'gone')
+  })
+  .get('/named-ok', async ({ set }) => {
+    set.status = 'Created'
+
+    return { orders: await cached('orders', '1m', () => db.orders, { live: true }) }
+  })
+  .get('/set-number', async ({ set }) => {
+    await cached('orders', '1m', () => db.orders, { live: true })
+    set.status = 418
+
+    return 'tea'
+  })
+  .get('/redirect', async ({ redirect }) => {
+    await cached('orders', '1m', () => db.orders, { live: true })
+
+    return redirect('/api/orders')
+  })
+  .get('/own-error', async () => {
+    await cached('orders', '1m', () => db.orders, { live: true })
+
+    return new Response('no', { status: 503 })
+  })
   .get('/throws', async () => {
     await cached('orders', '1m', () => db.orders, { live: true })
 

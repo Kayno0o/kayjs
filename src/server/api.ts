@@ -11,7 +11,7 @@ import type { LoadedGuard } from './guards'
 import type { MountedApi } from './openapi'
 import type { ApiRateLimit } from './protection'
 import type { Span } from './trace'
-import { Cookie, Elysia, ElysiaCustomStatusResponse, ElysiaFile } from 'elysia'
+import { Cookie, Elysia, ElysiaCustomStatusResponse, ElysiaFile, StatusMap } from 'elysia'
 import { KayError } from '../compiler/errors'
 import { TRAILING_SLASH } from '../runtime/base'
 import { API_MOUNT } from '../runtime/live'
@@ -232,15 +232,23 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
   return { limits, routeLimits, mounted }
 }
 
+// A status as a number: Elysia accepts its names (`'Bad Request'`) too, and a name it does not know counts as a failure.
+function statusCode(status: number | string): number {
+  if (typeof status === 'number')
+    return status
+
+  return StatusMap[status as keyof typeof StatusMap] ?? (Number.isNaN(Number(status)) ? 500 : Number(status))
+}
+
 // The status a handler answered with: the one of a `status()` or a Response it returned, else the context's.
 function answerStatus(value: unknown, set: { status?: number | string }): number {
   if (value instanceof ElysiaCustomStatusResponse)
-    return Number(value.code)
+    return statusCode(value.code as number | string)
 
   if (value instanceof Response)
     return value.status
 
-  return typeof set.status === 'number' ? set.status : 200
+  return set.status === undefined ? 200 : statusCode(set.status)
 }
 
 // The locale state of each API request, resolved once for its guards, rate limits, handler and error hooks.

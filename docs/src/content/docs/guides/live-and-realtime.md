@@ -99,7 +99,7 @@ Read the value in the page's server fence or a layout's. A page that follows a v
 
 A collection follows when you add `live: true` to it. See [Showing edits in open tabs](/guides/content#showing-edits-in-open-tabs). A page that reads the collection then shows an edit in every open tab, a CMS save included.
 
-A `resource` follows too. If the route's handler reads a `cached` value with `live: true`, the island asks the route again after an `invalidate`, keeping the old value on screen until the new answer arrives. You add nothing to the route or the island, and a route that reads no such value opens no connection.
+A `resource` follows too. If the route's handler reads a `cached` value with `live: true`, the island asks the route again after an `invalidate`, keeping the old value on screen until the new answer arrives. If that quiet request fails, the old value stays, so a route that now fails for good, such as a 404 after its row was deleted, keeps showing what it showed. You add nothing to the route or the island, and a route that reads no such value opens no connection.
 
 <ReadMore href="/llms/api-from-islands#following-cached-values">The proof, the first event after a reconnect, refresh timing and the limits are in the full API routes reference.</ReadMore>
 

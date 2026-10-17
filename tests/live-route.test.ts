@@ -90,6 +90,29 @@ describe('a route a resource reads, following cached values', () => {
     expect(proofOf(signedIn)!.values.map(([, key]) => key)).toEqual(['secret'])
   })
 
+  it('writes nothing on a refusal answered by name, a number set on the context, or a Response of its own', async () => {
+    for (const path of ['/api/orders/named-set', '/api/orders/named-status', '/api/orders/set-number', '/api/orders/own-error'])
+      expect((await ask(path)).headers.has(HEADER)).toBe(false)
+
+    expect((await ask('/api/orders/named-set')).status).toBe(400)
+    expect((await ask('/api/orders/named-status')).status).toBe(404)
+    expect((await ask('/api/orders/set-number')).status).toBe(418)
+  })
+
+  it('answers a 2xx status set by name with the proof', async () => {
+    const response = await ask('/api/orders/named-ok')
+
+    expect(response.status).toBe(201)
+    expect(proofOf(response)!.values.map(([, key]) => key)).toEqual(['orders'])
+  })
+
+  it('answers a redirect, whose proof a following fetch never sees, as the target gives its own', async () => {
+    const response = await ask('/api/orders/redirect')
+
+    expect(response.status).toBe(302)
+    expect(response.headers.get('location')).toBe('/api/orders')
+  })
+
   it('gives a visitor the proof of what the handler read for them only', async () => {
     const anonymous = await ask('/api/orders/mine')
     const member = await ask('/api/orders/mine', { headers: { 'accept': 'application/json', 'x-user': 'ada' } })
