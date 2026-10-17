@@ -287,6 +287,15 @@ describe('the dev tool', () => {
 
       expect(listed('This page')).toEqual(['/shop?page=2'])
 
+      // Over plain HTTP the browser hides the server timing, so the script's note of the fetch's address and start hides it.
+      Object.assign(window, { $kayReloads: [[new URL('/shop?page=2', location.href).href, now + 100]] })
+      observed.report('resource', [
+        at('/shop?page=2', { startTime: now + 110 }),
+        at('/shop?page=2', { startTime: now + 400 }),
+      ])
+
+      expect(listed('This page')).toEqual(['/shop?page=2', '/shop?page=2'])
+
       // An app fetch 10 ms before a swap stays in the page it came from, the swap's own page fetch goes in the swap's, and so do the actions and islands started in that gap.
       await swap('/next', start => [
         at('/api/data', { startTime: start - 10 }),
@@ -296,7 +305,7 @@ describe('the dev tool', () => {
       ])
 
       expect(listed('This page')).toEqual(['/next'])
-      expect(listed('Before')).toEqual(['/shop?page=2', '/api/data', '/_kay/action/src/routes/shop.kay/save', `/shop?${ISLAND_PARAM}=1`])
+      expect(listed('Before')).toEqual(['/shop?page=2', '/shop?page=2', '/api/data', '/_kay/action/src/routes/shop.kay/save', `/shop?${ISLAND_PARAM}=1`])
 
       // A fetch reported once the swap ended is matched by its address as well.
       observed.report('resource', [

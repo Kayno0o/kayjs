@@ -25,6 +25,7 @@ const MAX_FETCHES = 300
 const SWAP_SLACK_MS = 20
 // The Server-Timing entry dev.ts answers the live reload's fetches with.
 const LIVE_RELOAD_TIMING = 'kay-live-reload'
+const RELOAD_START_MS = 50
 // The addresses the dev tool fetched itself, which the Network tab leaves out.
 const OWN_FETCHES = new Set<string>()
 const DEV_PATH = /\/_kay\/dev\//
@@ -1700,7 +1701,9 @@ interface Navigation {
 function networkTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
   const win = doc.defaultView!
   // The live reload script's fetches of the page, which the dev server answers with a Server-Timing entry only they carry.
+  // `serverTiming` is only exposed in a secure context, so the script also notes the address and time of each fetch for a page over plain HTTP.
   const reloadFetch = (fetched: PerformanceResourceTiming) => fetched.serverTiming?.some(timing => timing.name === LIVE_RELOAD_TIMING) === true
+    || ((win as Window & { $kayReloads?: [string, number][] }).$kayReloads?.some(([href, started]) => href === fetched.name && fetched.startTime >= started && fetched.startTime - started <= RELOAD_START_MS) === true)
   let draw: () => void = () => undefined
   const tab = tool.tab({ id: 'network', label: 'Network', icon: 'network', shown: () => draw() })
   const content = tool.make('div', 'stack')
