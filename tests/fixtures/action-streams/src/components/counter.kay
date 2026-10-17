@@ -1,0 +1,21 @@
+---
+import type { ActionStream } from 'kay'
+import { signal } from 'kay'
+import { count, endless } from '../routes/index.kay'
+
+const answer = signal<ActionStream<number> | undefined>(undefined)
+
+async function start() {
+  answer.set(await count({ to: 3 }))
+}
+
+async function forever() {
+  answer.set(await endless())
+}
+---
+button.start(type="button" onClick={start}) Start
+button.forever(type="button" onClick={forever}) Forever
+button.stop(type="button" onClick={() => answer()?.close()}) Stop
+p.last {String(answer()?.last() ?? '')}
+p.status {answer()?.status() ?? 'none'}
+p.pending {String(count.pending() || endless.pending())}

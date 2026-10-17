@@ -56,6 +56,24 @@ export default api()
   )
 ```
 
+### Stream an action's answer
+
+An action whose handler is an `async function*`, or returns any async iterable, answers a call with each value as it comes:
+
+```kay
+--- server
+import { s } from 'kay'
+import { complete } from '../data'
+
+export const reply = action(s.Object({ prompt: s.String({ maxLength: 2000 }) }), async function* ({ prompt }) {
+  let text = ''
+
+  for await (const piece of complete(prompt))
+    yield text += piece
+})
+---
+```
+
 ### Keep a value current on every open page
 
 `live(initial)` in a module of the project is a value the server changes and every page reading it follows, with no API module, route or stream written:
@@ -191,6 +209,16 @@ button(onClick={() => messages.send({ text: text() })}) Send
 - The source is read once the browser reads the response and stopped when it goes away.
 - A source that throws ends the stream as failed, the error logged and handed to `onError`.
 - A comment line every 5 seconds keeps a quiet stream open past Bun's `idleTimeout` and a proxy's.
+
+### Streaming actions
+
+- A handler returning an async iterable answers a call from an island with server-sent events: `await reply({ prompt })` resolves once the first value is there with an `ActionStream<T>` from `kay`, typed from what it yields, whose `last()`, `status()`, `on()` and `close()` read as `stream()`'s do; it never reconnects.
+- Guards, the schema, `rateLimit`, the cross-site check and the bot protections run before the handler, and what the iterable throws before its first value, a `ctx.redirect`, a `ctx.deny` or an error, answers as the handler's would, the call throwing `ActionError` or redirecting; the cookies it set by then go out with the stream.
+- A throw past the first value is logged, `onError` included, and ends the stream `failed`.
+- `pending()` stays true until the stream ends; once it ran to its end the page refreshes, unless `refresh: false`, and `succeeded()` reads its last value.
+- `close()` stops the handler's iterable, its `finally` running, as does the visitor going away, or to another page by the next value; a stream outlives the island that called, so one closing first calls `close()` in `onCleanup`.
+- `on()` added right after the call resolves gets every value, `last()` only the latest: a reply yields the text so far rather than the piece added, so `last()` is all an island reads.
+- A plain form post, a page swap's post and an MCP tool call read the iterable to its end and get its last value, as from a handler returning it: `ctx.succeeded(reply)?.data`.
 
 ### Live values
 

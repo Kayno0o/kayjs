@@ -1,0 +1,8 @@
+--- server
+import { action } from 'kay'
+
+export const secret = action(async function* () {
+  yield 'secret'
+})
+---
+h1 Members

@@ -5,8 +5,8 @@ import { checkLiveWrites, LIVE_ROUTE, liveSlot, PROOF_LIFETIME_MS, slotValue, wa
 import { currentServerScope } from '../runtime/reactive'
 import { encodeValue, unsendable } from '../runtime/wire'
 import { isCrossSite } from './actions'
-import { eventStream, StreamRefused } from './api'
 import { readCapped } from './errors'
+import { eventStream, StreamRefused } from './event-stream'
 import { clientAddress, overLimit } from './protection'
 import { signedText, signText } from './stamp'
 

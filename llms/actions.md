@@ -112,6 +112,21 @@ if add.error('title') as message
 button(onClick={save} disabled={add.pending()}) Add
 ```
 
+### Stream an answer to an island
+
+A handler returning an async iterable streams each value to the island calling it (see [Streaming actions](api-from-islands.md#streaming-actions)):
+
+```kay
+---
+import type { ActionStream } from 'kay'
+import { count } from '../routes/index.kay'
+
+const answer = signal<ActionStream<number> | undefined>(undefined)
+---
+button(onClick={async () => answer.set(await count({ to: 10 }))}) Count
+p {answer()?.last()}
+```
+
 ### Show a change before the server answers
 
 `optimistic` writes the signals at once and puts them back if the call fails:

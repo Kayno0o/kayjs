@@ -1,0 +1,77 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+import { seen } from '../seen'
+
+export const count = action(t.Object({ to: t.Number({ minimum: 0, maximum: 5, error: 'Too many' }) }), async function* ({ to }) {
+  for (let at = 1; at <= to; at++)
+    yield at
+}, { tool: true })
+
+export const dated = action(async function* () {
+  yield { at: new Date(0), tags: new Map([['a', 1]]) }
+})
+
+export const empty = action(async function* () {})
+
+export const breaksEarly = action(async function* () {
+  throw new Error('early')
+})
+
+export const breaksLate = action(async function* () {
+  yield 1
+  throw new Error('late')
+})
+
+export const endless = action(async function* () {
+  seen.started++
+
+  try {
+    for (let at = 0; ; at++) {
+      yield at
+      await Bun.sleep(5)
+    }
+  }
+  finally {
+    seen.stopped++
+  }
+})
+
+export const limited = action(async function* () {
+  yield 'ok'
+}, { rateLimit: { max: 1, window: '1m' } })
+
+export const baked = action(async function* (ctx) {
+  ctx.cookies.set('baked', 'yes', { path: '/' })
+  yield 'baked'
+})
+
+export const language = action(async function* (ctx) {
+  yield ctx.locale
+})
+
+export const sendsAway = action(async function* (ctx) {
+  ctx.redirect('/done')
+  yield 'never'
+})
+
+export const refuses = action(t.Object({ full: t.Boolean() }), async ({ full }, ctx) => {
+  if (full)
+    return ctx.fail(409, 'Full')
+
+  return (async function* () {
+    yield 'room'
+  })()
+})
+
+const done = ctx.succeeded(count)
+--- script
+import Counter from '../components/counter.kay'
+---
+h1 Streams
+if done
+  p.done Last: {done.data}
+form(action={count})
+  input(field="to")
+  button Count
+Counter

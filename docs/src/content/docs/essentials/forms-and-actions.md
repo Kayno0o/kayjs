@@ -245,6 +245,45 @@ controller.abort()
 
 The server may still have run a call that was already sent, so the page refreshes as after any other, unless `refresh: false`.
 
+### Streaming an answer
+
+A handler can send its answer in parts, such as a model's reply as it is written. Make it an `async function*` and `yield` each value.
+
+```kay
+--- server
+import { s } from 'kay'
+import { complete } from '../data'
+
+export const reply = action(s.Object({ prompt: s.String({ maxLength: 2000 }) }), async function* ({ prompt }) {
+  let text = ''
+
+  for await (const piece of complete(prompt))
+    yield text += piece
+})
+---
+```
+
+An island calling it gets a stream once the first value is there. `last()` reads the latest value, `status()` tells whether it is still open, and `close()` stops it.
+
+```kay
+---
+import type { ActionStream } from 'kay'
+import { reply } from '../routes/chat.kay'
+
+const answer = signal<ActionStream<string> | undefined>(undefined)
+---
+button(onClick={async () => answer.set(await reply({ prompt: 'Hello' }))}) Ask
+p {answer()?.last()}
+```
+
+Yield the whole text so far, not just the new piece. Then `last()` is all the island needs.
+
+Guards, the schema and rate limits run before the first value, as for any call. A refusal throws an `ActionError`. `reply.pending()` stays true until the stream ends.
+
+`close()` stops the handler's loop on the server. So does the visitor leaving. A stream outlives the island that started it, so an island that goes away first calls `close()` in `onCleanup`.
+
+A form posted without JavaScript waits for the end and gets the last value, through `ctx.succeeded(reply)`. In a test, `site.call(reply, input)` gives every value.
+
 ## Fixed fields
 
 A button that always posts the same values, such as a row's move-up arrow, needs no hidden inputs. `with` gives the action with its fields fixed. The form carries them without JavaScript too.

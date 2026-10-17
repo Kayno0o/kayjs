@@ -2,6 +2,7 @@ import type { Static, t, TSchema } from 'elysia'
 import type { ErrorStatus, RouteParams } from './checks'
 import type { Duration } from './duration'
 import type { RequestContext } from './index'
+import type { EventReader, StreamStatus } from './live'
 import { withBase } from './base'
 import { durationSeconds } from './duration'
 import { escapeAttribute } from './escape'
@@ -34,6 +35,10 @@ export const FILE_MARK = '$kayFile'
 const FILE_TYPE = 'KayFile'
 const SPACES = /\s+/
 const HTTP_PROTOCOLS = new Set(['http:', 'https:'])
+const EVENT_STREAM = /^text\/event-stream\b/i
+
+// Where the stream a streaming action answered a call with says how it ended, once it did.
+export const SETTLED = Symbol.for('kay.streamSettled')
 
 // The `x-kay-action` of a call whose input is a form's fields rather than encoded.
 export const FORM_CALL = 'form'
@@ -157,6 +162,16 @@ export interface Failure<Data> {
 }
 
 export type Success<Output> = Exclude<Output, Failure<unknown>>
+
+// What a call to a handler returning an async iterable resolves with: its values read as they come, typed.
+export type ActionStream<T> = EventReader<T>
+
+// What a call resolves with: a stream for a handler returning an async iterable, else what it returned.
+export type Answer<Output> = Output extends AsyncIterable<infer Value> ? ActionStream<Value> : Output
+
+// What a plain form post reads back: the last value of an async iterable, which is undefined when it gave none.
+export type Final<Output> = Output extends AsyncIterable<infer Value> ? Value | undefined : Output
+
 // Unknown for an action of any output, so any action passes where `Action<never, unknown>` is expected.
 export type FailureData<Output> = unknown extends Output ? unknown : Output extends Failure<infer Data> ? Data : never
 
@@ -182,7 +197,7 @@ export interface FormSuccess<Output> {
   data: Output
 }
 
-export type SuccessOf<Target> = Target extends Action<never, unknown> ? FormSuccess<Awaited<ReturnType<Target>>> : never
+export type SuccessOf<Target> = Target extends Action<never, unknown> ? FormSuccess<Final<Success<ResultOf<Target>>>> : never
 
 // How a post to an action went: a refusal, or what its handler returned.
 export type Outcome
@@ -221,18 +236,18 @@ export interface TrackedCall<Input, Result> {
 
 // Called from the browser it posts its input and resolves with the handler's result; `form(action={...})` posts to `url`.
 export interface Action<Input, Output, Honeypot extends string = never> {
-  (input: Input, options?: CallOptions): Promise<Success<Output>>
+  (input: Input, options?: CallOptions): Promise<Answer<Success<Output>>>
   // A form's fields, read as a plain form post reads them: `add(new FormData(form))`. Last, so `infer` and the editor read the typed input above, while `Parameters<typeof add>` reads this one.
-  (form: FormData, options?: CallOptions): Promise<Success<Output>>
+  (form: FormData, options?: CallOptions): Promise<Answer<Success<Output>>>
   // Whether a call this page made is still in flight, read reactively: `button(disabled={add.pending()})`.
   readonly pending: () => boolean
   // A handle for the calls of one island, one row or one button: `const save = add.track()`, then `await save(input)` resolves with `{ ok, data }` or the refusal, and `save.pending()` reads only its own calls.
-  readonly track: () => TrackedCall<Input, CallResult<Success<Output>, FailureData<Output>>>
+  readonly track: () => TrackedCall<Input, CallResult<Answer<Success<Output>>, FailureData<Output>>>
   // How much of the last call carrying files the browser sent, from 0 to 1, while it uploads; undefined otherwise: `progress(value={upload.progress()})`.
   readonly progress: () => number | undefined
   // How the form post the page renders for went, refused, as `ctx.failed` reads it; in an island, how its last call went, read reactively.
   readonly failed: () => FormFailure<Input, FailureData<Output>, Honeypot> | undefined
-  readonly succeeded: () => FormSuccess<Success<Output>> | undefined
+  readonly succeeded: () => FormSuccess<Final<Success<Output>>> | undefined
   // This action for a form to post with fixed fields, as hidden inputs would carry them: `form(action={move.with({ id, to: 2 })})`. They travel in the form's action URL, so the form needs no inputs for them and posts them with or without JavaScript.
   // eslint-disable-next-line ts/method-signature-style
   with(fields: Partial<Input>): Action<Input, Output, Honeypot>
@@ -290,7 +305,7 @@ export function actionUrl(moduleId: string, name: string): string {
 }
 
 // What an action with no input takes: no fields, so `add()` calls it.
-export type NoInputAction<Output, Honeypot extends string = never> = ServerAction<EmptySchema, Output, Honeypot> & ((input?: undefined, options?: CallOptions) => Promise<Success<Output>>)
+export type NoInputAction<Output, Honeypot extends string = never> = ServerAction<EmptySchema, Output, Honeypot> & ((input?: undefined, options?: CallOptions) => Promise<Answer<Success<Output>>>)
 
 // An empty object schema built by hand: `t.Object({})` would carry Elysia into the islands importing this module, and TypeBox reads a schema by this symbol.
 type EmptySchema = ReturnType<typeof t.Object<Record<never, never>>>
@@ -596,6 +611,8 @@ function callable(url: () => string): { call: (input: never, options?: CallOptio
     let undo: (() => void) | undefined
     let posted = false
     let sent = false
+    // A stream keeps the call in flight until it ends.
+    let streaming = false
     // Started before the caller goes on, so a navigation it starts next supersedes the refresh rather than the other way round; a site with `navigation: false` shows a call's effects itself.
     const refreshPage = () => {
       if (options?.refresh !== false && !left())
@@ -610,6 +627,20 @@ function callable(url: () => string): { call: (input: never, options?: CallOptio
       }, left)
 
       posted = true
+
+      if (isActionStream(data)) {
+        streaming = true
+        void streamEnded(data, (done) => {
+          if (done) {
+            called(page, { action: url(), succeeded: true, data: untrack(data.last) })
+            refreshPage()
+          }
+
+          shift(-1)
+        })
+
+        return data
+      }
 
       called(page, { action: url(), succeeded: true, data })
       refreshPage()
@@ -631,7 +662,9 @@ function callable(url: () => string): { call: (input: never, options?: CallOptio
       throw error
     }
     finally {
-      shift(-1)
+      if (!streaming)
+        shift(-1)
+
       setProgress(undefined)
     }
   }
@@ -655,16 +688,34 @@ function callable(url: () => string): { call: (input: never, options?: CallOptio
   }
 }
 
+function isActionStream(value: unknown): value is ActionStream<unknown> & { [SETTLED]: Promise<StreamStatus> } {
+  return typeof value === 'object' && value !== null && SETTLED in value
+}
+
+// Hands `then` whether the stream ran to its end, once it ended, failed or was closed.
+async function streamEnded(stream: { [SETTLED]: Promise<StreamStatus> }, then: (done: boolean) => void): Promise<void> {
+  then(await stream[SETTLED] === 'done')
+}
+
 // A handle with a pending count of its own over `call`, whose refusals of this action it answers as results.
 function tracked(call: (input: never, options?: CallOptions) => Promise<unknown>, url: () => string): TrackedCall<never, unknown> {
   const [inFlight, setInFlight] = ownSignal(0)
   const shift = (by: number) => setInFlight(untrack(inFlight) + by)
 
   const run = async (input: unknown, options?: CallOptions) => {
+    let streaming = false
+
     shift(1)
 
     try {
-      return { ok: true, data: await call(input as never, options) }
+      const data = await call(input as never, options)
+
+      if (isActionStream(data)) {
+        streaming = true
+        void streamEnded(data, () => shift(-1))
+      }
+
+      return { ok: true, data }
     }
     catch (error) {
       if (!(error instanceof ActionError) || error instanceof ActionRedirect || refusedAt.get(error) !== url())
@@ -673,7 +724,8 @@ function tracked(call: (input: never, options?: CallOptions) => Promise<unknown>
       return { ok: false, status: error.status, errors: error.errors, data: error.data }
     }
     finally {
-      shift(-1)
+      if (!streaming)
+        shift(-1)
     }
   }
 
@@ -780,6 +832,10 @@ export async function readActionResponse<Output>(response: Response, action: str
 
     throw new ActionRedirect(response.status, target)
   }
+
+  // Loaded only once an action streams, so a page calling none does not carry it.
+  if (response.ok && EVENT_STREAM.test(response.headers.get('content-type') ?? ''))
+    return (await import('./action-stream')).actionStream(response, left) as Output
 
   const body = await response.text()
 

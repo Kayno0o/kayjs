@@ -202,6 +202,10 @@ export function markAgentCall(request: Request): void {
   agentCalls.add(request)
 }
 
+export function isAgentCall(request: Request): boolean {
+  return agentCalls.has(request)
+}
+
 // The agent's calls that a guard refused with 401, which is the sign-in challenge; a 401 the called route answered is its own.
 const challenges = new WeakSet<Request>()
 

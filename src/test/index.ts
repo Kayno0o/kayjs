@@ -2,7 +2,7 @@ import type { AnyElysia } from 'elysia'
 import type { ClientOptions } from '../build/client'
 import type { Action, ActionError, ActionProtection, FailureData, ResultOf, Success } from '../runtime/action'
 import type { Duration } from '../runtime/duration'
-import type { EventReader, NodeAt, Optional, SocketOf, SocketOptions, SocketPath, StreamMethod, StreamOf, StreamOptions, StreamPath } from '../runtime/live'
+import type { EventReader, NodeAt, Optional, SocketOf, SocketOptions, SocketPath, StreamMethod, StreamOf, StreamOptions, StreamPath, StreamStatus } from '../runtime/live'
 import type { PagesOptions } from '../server/app'
 import type { ClientBuild } from '../server/client'
 import type { BrowserOptions, TestPage } from './browser'
@@ -16,7 +16,7 @@ import { clientDir, inOutput, testWorker } from '../build/assets'
 import { buildClient } from '../build/client'
 import { withConfig } from '../config'
 import { clientOptionsOf, PRODUCTION, resolveProject } from '../project'
-import { encodeCall, minTimeOf, readActionResponse, STAMP_FIELD } from '../runtime/action'
+import { encodeCall, minTimeOf, readActionResponse, SETTLED, STAMP_FIELD } from '../runtime/action'
 import { joinBase } from '../runtime/base'
 import { durationSeconds } from '../runtime/duration'
 import { openSocket, readEvents, routeUrl, streamRequest } from '../runtime/live'
@@ -78,6 +78,9 @@ export interface VisitInit {
 // A text field, or a file input's `File`.
 export type FormValue = string | Blob
 
+// What a call gives back: every value of a handler returning an async iterable, else what it returned.
+type Tested<Output> = Success<Output> extends infer Value ? Value extends AsyncIterable<infer Item> ? Item[] : Value : never
+
 type InputOf<Target> = Target extends Action<infer Input, unknown> ? Input : never
 // A call to an action whose fields are all optional, or that takes none, may leave its input out.
 type CallArguments<Target> = object extends InputOf<Target> ? [input?: InputOf<Target> | FormData, init?: VisitInit & { from?: string }] : [input: InputOf<Target> | FormData, init?: VisitInit & { from?: string }]
@@ -89,7 +92,8 @@ export interface TestSite {
   // A post to an action with `minTime` goes through as if its form had been open long enough; `openedFor` sends one as if open that long instead, `0` as if just opened.
   submit: <Input, Honeypot extends string = never>(action: Action<Input, unknown, Honeypot>, fields: Partial<Record<Extract<keyof Input, string> | Honeypot | typeof STAMP_FIELD, FormValue | FormValue[] | undefined>>, init?: VisitInit & { from?: string | Visit, openedFor?: Duration | 0 }) => Promise<Visit>
   // The call an island makes, with its input or a form's fields: the result, an `ActionError` thrown, or an `ActionRedirect` when it redirects. `from` names the page it is made on, whose params the action reads.
-  call: <Target extends Action<never, unknown>>(action: Target, ...call: CallArguments<Target>) => Promise<Success<ResultOf<Target>>>
+  // A handler returning an async iterable gives every value once the stream ended, and throws when it failed.
+  call: <Target extends Action<never, unknown>>(action: Target, ...call: CallArguments<Target>) => Promise<Tested<ResultOf<Target>>>
   // A call expected to be refused, as `call` makes it: the `ActionError` with its status, errors and typed data; one that went through fails the test, and any other error is thrown.
   refusal: <Target extends Action<never, unknown>>(action: Target, input: InputOf<Target> | FormData, init?: VisitInit & { from?: string }) => Promise<ActionError<FailureData<ResultOf<Target>>>>
   // The site's MCP endpoint, as an agent calls it: `mcp: true` serves it. Calls carry the cookies so far and the headers given, such as an `Authorization` bearer token.
@@ -344,7 +348,9 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
     if (init.from !== undefined)
       sent[PAGE_HEADER] = shown(init.from)
 
-    return readActionResponse<Success<ResultOf<typeof action>>>(await send(action.url, { method: 'POST', headers: { ...sent, ...workHeaders(action), ...init.headers }, body }), action.url)
+    const answer = await readActionResponse<unknown>(await send(action.url, { method: 'POST', headers: { ...sent, ...workHeaders(action), ...init.headers }, body }), action.url)
+
+    return (isStream(answer) ? await streamedValues(answer, action.url) : answer) as Tested<ResultOf<typeof action>>
   }
 
   interface RpcResult { tools?: McpTool[], isError?: boolean, content?: { text: string }[], structuredContent?: Record<string, unknown> }
@@ -505,6 +511,23 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
 }
 
 // Keeps every message a client receives, for a test to read in order.
+function isStream(value: unknown): value is EventReader<unknown> & { [SETTLED]: Promise<StreamStatus> } {
+  return typeof value === 'object' && value !== null && SETTLED in value
+}
+
+async function streamedValues(stream: EventReader<unknown> & { [SETTLED]: Promise<StreamStatus> }, url: string): Promise<unknown[]> {
+  const values: unknown[] = []
+
+  stream.on(value => void values.push(value))
+
+  const status = await stream[SETTLED]
+
+  if (status !== 'done')
+    throw new Error(`kay: the stream ${url} answered ${status} after ${values.length} values`)
+
+  return values
+}
+
 function inbox<T>(client: Pick<EventReader<T>, 'on'>): { received: T[], next: () => Promise<T> } {
   const received: T[] = []
   const waiting: ((value: T) => void)[] = []

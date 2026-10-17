@@ -24,12 +24,13 @@ import { routerPath } from './base'
 import { sizeText } from './body'
 import { importModule } from './bundle'
 import { cookieJar } from './cookies'
+import { eventBody } from './event-stream'
 import { fieldMessage, validated } from './field-errors'
 import { handOver, submittedValues, writeSuccess } from './flash'
 import { requiredGuards, runGuards, unguarded } from './guards'
 import { requestLocale, stateFor } from './i18n'
 import { answeringRequest } from './log'
-import { countSucceeded, markChallenge, PRETEND, protectionRefusal, requestId } from './protection'
+import { countSucceeded, isAgentCall, markChallenge, PRETEND, protectionRefusal, requestId } from './protection'
 import { sharedContext } from './render'
 import { reportServerError } from './report'
 import { requestUrl } from './request-url'
@@ -677,9 +678,13 @@ async function runAction(action: ServerAction<TSchema, unknown>, context: { body
     if (isFailure(result))
       return await failed(request, headers, jar.cookies, { action: action.url, status: result.status, values: submittedValues(context.body), errors: typeof result.data === 'string' ? { '': result.data } : {}, data: result.data }, context.server, back)
 
+    // A call reads a stream as it comes; a plain form post or an agent gets its last value, as a handler returning it would.
+    const streams = isAsyncIterable(result) && isCall(request) && !isAgentCall(request)
+    const answer = isAsyncIterable(result) ? await (streams ? started(result, request.signal) : lastOf(result)) : result
+
     await countGoneThrough(action, request, context.server, options)
 
-    return succeeded(action, request, jar, headers, result, status)
+    return streams ? streamed(request, jar, headers, answer as AsyncIterable<unknown>, status, options) : succeeded(action, request, jar, headers, answer, status)
   }
   catch (error) {
     // Sent on after it went through, as to a thank-you page.
@@ -727,6 +732,67 @@ function succeeded(action: ServerAction<TSchema, unknown>, request: Request, jar
   headers.set(redirectHeader(request), backTo(request))
 
   return new Response(null, { status: 303, headers })
+}
+
+function isAsyncIterable(value: unknown): value is AsyncIterable<unknown> {
+  return typeof value === 'object' && value !== null && Symbol.asyncIterator in value
+}
+
+async function lastOf(source: AsyncIterable<unknown>): Promise<unknown> {
+  let last: unknown
+
+  for await (const value of source)
+    last = value
+
+  return last
+}
+
+// The iterable with its first value read, so what it throws or stops with before one answers as the handler would; it is stopped when the client goes away before reading on.
+async function started(source: AsyncIterable<unknown>, signal: AbortSignal): Promise<AsyncIterable<unknown>> {
+  const iterator = source[Symbol.asyncIterator]()
+  const stop = () => void iterator.return?.()
+
+  let first: IteratorResult<unknown> | undefined
+
+  signal.addEventListener('abort', stop, { once: true })
+
+  try {
+    first = await iterator.next()
+  }
+  catch (error) {
+    signal.removeEventListener('abort', stop)
+
+    throw error
+  }
+
+  return {
+    [Symbol.asyncIterator]: () => ({
+      next: async () => {
+        const next = first ?? await iterator.next()
+
+        first = undefined
+
+        if (next.done === true)
+          signal.removeEventListener('abort', stop)
+
+        return next
+      },
+      return: async (value?: unknown) => {
+        signal.removeEventListener('abort', stop)
+
+        return await iterator.return?.(value) ?? { done: true, value }
+      },
+    }),
+  }
+}
+
+// A call to a handler returning an async iterable gets its values as server-sent events, `readActionResponse` reading them as a stream; a throw past the first value ends it as failed.
+function streamed(request: Request, jar: CookieJar, headers: Headers, source: AsyncIterable<unknown>, status: number, { onError }: ActionOptions): Response {
+  jar.writeTo(headers)
+  headers.set('content-type', 'text/event-stream; charset=utf-8')
+  headers.set('cache-control', 'no-cache')
+
+  return new Response(eventBody(source, error => reportServerError(error, request, onError)), { status, headers })
 }
 
 // A bot the honeypot caught sees what a person whose post went through sees, the handler having returned nothing.

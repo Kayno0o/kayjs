@@ -1,7 +1,6 @@
 import type { Context } from 'elysia'
 import type { Locals } from '../runtime'
 import type { ActionTool } from '../runtime/action'
-import type { EventStream } from '../runtime/live'
 import type { ActionOptions } from './actions'
 import type { ApiModule } from './api-modules'
 import type { BodyLimit } from './body'
@@ -12,12 +11,11 @@ import type { Span } from './trace'
 import { Cookie, Elysia, ElysiaCustomStatusResponse, ElysiaFile } from 'elysia'
 import { KayError } from '../compiler/errors'
 import { TRAILING_SLASH } from '../runtime/base'
-import { API_MOUNT, END_EVENT, ERROR_EVENT } from '../runtime/live'
-import { kayLog } from '../runtime/log'
-import { encodeValue, unsendable } from '../runtime/wire'
+import { API_MOUNT } from '../runtime/live'
 import { admitCrossSite, crossSiteRefused, crossSiteResponse, guardsFirst, inLocale, passGuards } from './actions'
 import { importModule } from './bundle'
 import { corsAdmits, corsResponse, corsRule, dropOwnGrant, grantedByKay, preflight, varyByOrigin, withCors, withoutOwnGrant } from './cors'
+import { streamReporters } from './event-stream'
 import { loadGuard, requiredGuards } from './guards'
 import { answeringRequest, statusOf } from './log'
 import { requestId } from './protection'
@@ -27,9 +25,6 @@ import { requestUrl } from './request-url'
 import { carriedNames, carryContext } from './security'
 import { answered, failed, SERVER_SPAN, startSpan } from './trace'
 
-// Bun closes a connection idle for 10 s by default, and proxies after a minute or so: a comment line now and then keeps a quiet stream open.
-const HEARTBEAT_MS = 5000
-const HEARTBEAT = new TextEncoder().encode(':\n\n')
 // What a body Elysia streams, awaits or asks for its response has: a generator, a thenable, an object with `toResponse()`.
 const STREAMED = ['next', 'then', 'toResponse']
 const TEXT = { 'content-type': 'text/plain; charset=utf-8' }
@@ -40,9 +35,6 @@ const CORS = Symbol.for('kay.cors')
 
 // The requests the guards of their module let through, whose later errors are no refused input.
 const admitted = new WeakSet<Request>()
-
-// Where a failing event stream reports its error: logged, and handed to `onError` once the route answering with it is known.
-const streamReporters = new WeakMap<Response, { report: (error: unknown) => void }>()
 
 // The span of each API request in flight.
 const spans = new WeakMap<Request, Span>()
@@ -393,82 +385,4 @@ export function api(options: ApiOptions = {}): Elysia<'', { decorator: Empty, st
     Object.defineProperty(instance, CORS, { value: corsRule(options.cors) })
 
   return instance as unknown as Elysia<'', { decorator: Empty, store: Empty, derive: Empty, resolve: ApiLocals }>
-}
-
-// Thrown by a source that cannot serve its stream after all: the stream closes with no end or error event, which a browser takes as a drop and opens again after its backoff.
-export class StreamRefused extends Error {
-  override name = 'StreamRefused'
-}
-
-// Answers with a server-sent event per value `source` gives, which `stream()` reads typed in an island: values cross as island props do, Dates, Maps and Sets included.
-// The source is read one value per value the browser takes, and stopped when it goes away; a source that throws ends the stream as failed, the error logged.
-export function eventStream<T>(source: AsyncIterable<T> | Iterable<T>): EventStream<T> {
-  let iterator: AsyncIterator<T> | Iterator<T> | undefined
-  let heartbeat: ReturnType<typeof setInterval> | undefined
-  let cancelled = false
-  const encoder = new TextEncoder()
-  const reporter = { report: (error: unknown) => kayLog('error', 'an event stream failed', error) }
-
-  const finish = (controller: ReadableStreamDefaultController<Uint8Array>, event: string) => {
-    clearInterval(heartbeat)
-    controller.enqueue(encoder.encode(`event: ${event}\ndata:\n\n`))
-    controller.close()
-  }
-
-  const response = new Response(new ReadableStream<Uint8Array>({
-    async pull(controller) {
-      if (!iterator) {
-        iterator = Symbol.asyncIterator in source ? source[Symbol.asyncIterator]() : source[Symbol.iterator]()
-        heartbeat = setInterval(() => controller.enqueue(HEARTBEAT), HEARTBEAT_MS)
-      }
-
-      try {
-        const next = await iterator.next()
-
-        if (cancelled)
-          return
-
-        if (next.done)
-          finish(controller, END_EVENT)
-        else
-          controller.enqueue(encoder.encode(`data: ${encodeEvent(next.value)}\n\n`))
-      }
-      catch (error) {
-        if (cancelled)
-          return
-
-        if (error instanceof StreamRefused) {
-          clearInterval(heartbeat)
-          controller.close()
-
-          return
-        }
-
-        reporter.report(error)
-        void iterator.return?.()
-        finish(controller, ERROR_EVENT)
-      }
-    },
-    // Not awaited: an async generator waiting on its next value only returns once it has one, which a quiet feed may never give.
-    cancel() {
-      cancelled = true
-      clearInterval(heartbeat)
-      void iterator?.return?.()
-    },
-  }, { highWaterMark: 0 }), { headers: { 'content-type': 'text/event-stream; charset=utf-8', 'cache-control': 'no-cache' } })
-
-  streamReporters.set(response, reporter)
-
-  return response as EventStream<T>
-}
-
-function encodeEvent(value: unknown): string {
-  try {
-    return encodeValue(value)
-  }
-  catch (error) {
-    const reason = unsendable(error)
-
-    throw reason === undefined ? error : new TypeError(`kay: a value the event stream sent cannot reach the browser: ${reason}`)
-  }
 }
