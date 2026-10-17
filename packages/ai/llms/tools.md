@@ -27,6 +27,7 @@ p Assistant
 - The visitor leaving, `reply.stop()`, `options.signal` or a reader leaving early end the loop: a call already running finishes (an action cannot be cancelled) and its result is dropped, and no further call is run and no further request made.
 - A provider failing in any step fails the reply with its `AiError`.
 - A provider that reports no token count for a step leaves it out of the sum.
+- With `ai({ budget })` the tokens of every step count, and the reply holds `maxTokens` times `maxSteps` against the budget while it runs ([limits](limits.md)).
 
 ## What the model is told when a call goes wrong
 

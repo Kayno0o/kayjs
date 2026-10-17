@@ -5,7 +5,8 @@ import { join } from 'node:path'
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test'
 import { testSite } from 'kay/test'
 import { encodeCall } from '../../../src/runtime/action'
-import { ask, fakeAi } from '../src'
+import { ai, ask, fakeAi } from '../src'
+import { forgetCounts } from '../src/limits'
 import { converse } from '../src/loop'
 import { createReply } from '../src/reply'
 import { done } from './fixture/src/testing'
@@ -196,6 +197,27 @@ describe('what the model gets back when a call goes wrong', () => {
     expect(done).toHaveLength(16)
     expect(outcome.calls.at(-1)).toMatchObject({ status: 'failed', result: 'Too many tool calls in one step' })
     expect(outcome.calls.map(call => call.id)).toEqual(Array.from({ length: 17 }, (_, index) => `fake_${index + 1}`))
+  })
+})
+
+describe('the token budget', () => {
+  afterEach(() => {
+    ai()
+    forgetCounts()
+  })
+
+  it('counts the tokens of every step of a loop, not of its last request alone', async () => {
+    ai({ budget: { tokens: 20, window: '1m' } })
+    // Each step answers 60 characters, 15 tokens: neither passes the budget, the two together do.
+    fakeAi.reply({ text: 'y'.repeat(60), calls: [{ name: 'add_note', input: { title: 'Milk' } }] })
+    fakeAi.reply('x'.repeat(60))
+
+    expect((await conversation()).usage!.outputTokens).toBe(30)
+
+    const refused = await site.refusal(conversing, { prompt: 'go again' })
+
+    expect(refused.status).toBe(429)
+    expect(fakeAi.asked).toHaveLength(2)
   })
 })
 

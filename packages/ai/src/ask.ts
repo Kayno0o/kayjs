@@ -73,9 +73,6 @@ export function ask(prompt: string | Message[], options: AskOptions = {}): Reply
 
   const offered = offer(options.tools)
 
-  if (!visitor)
-    throw new Error('kayjs-ai: tools run as the visitor, so ask() with tools needs the request being answered; call it from a page, an action or a handler kay is answering')
-
   if (!answering)
     throw new Error('kayjs-ai: tools run as the visitor, so ask() with tools needs the request being answered; call it from a page, an action or a handler kay is answering')
 
