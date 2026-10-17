@@ -313,7 +313,7 @@ Start `kay dev` first. It writes its address to `.kay/dev/server-<pid>.json`, an
 
 The two latest shots of each page, width and scheme stay next to each other, and the command prints how many pixels changed since the one before, with a diff image beside them where the changed pixels are red. Shoot, edit, shoot again to check an edit moved only what it meant to. Older shots go once the folder holds a few hundred files. A shot too large to compare with the last, over 12 million pixels, is kept without a diff.
 
-The page's console errors and the errors `kay dev` listed for it come back with the shots. A redirect is followed. No cookie is sent unless you give one with `--cookie`, so a page behind a sign-in shows the sign-in until you pass its session. A page that does not finish loading within 10 seconds is shot as it stands, with the reason among the console errors.
+The page's console errors and the errors `kay dev` listed for it come back with the shots. A redirect is followed. No cookie is sent unless you give one with `--cookie`, so a page behind a sign-in shows the sign-in until you pass its session. A cookie is an argument, so `ps` lists it while the command runs: pass the session of a development database, not a real one. A page that does not finish loading within 10 seconds is shot as it stands, with the reason among the console errors.
 
 | Option | Effect |
 | --- | --- |

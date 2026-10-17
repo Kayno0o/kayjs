@@ -440,6 +440,14 @@ describe('withRedirect in a config that tempts it', () => {
     expect(withRedirect('export default defineConfig({\n  redirects: shared,\n})\n', '/o', '/n')).toBeUndefined()
     expect(withRedirect('export default defineConfig({\n  \'redirects\': {\n    \'/a\': \'/b\',\n  },\n})\n', '/o', '/n')).toContain('\'redirects\': {\n    \'/o\': \'/n\',')
   })
+
+  it('finds a quoted redirects key far from its colon', () => {
+    const gap = `${' '.repeat(80)}// the old paths\n  /* and more */ `
+    const added = withRedirect(`export default defineConfig({\n  'redirects'${gap}: {\n    '/a': '/b',\n  },\n})\n`, '/o', '/n')!
+
+    expect(added).toContain(`: {\n    '/o': '/n',\n    '/a': '/b',`)
+    expect(added.match(/redirects/g)).toHaveLength(1)
+  })
 })
 
 describe('suggestions under trailingSlash always', () => {

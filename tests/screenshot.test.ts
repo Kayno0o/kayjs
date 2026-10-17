@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, rmSync, symlinkSync, utimesSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, rmSync, symlinkSync, utimesSync } from 'node:fs'
 import { mkdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
@@ -236,6 +236,26 @@ describe('prune with a file that vanishes', () => {
 })
 
 describe('keeping a shot', () => {
+  it('takes over a stale lock, once, and leaves nothing of it', async () => {
+    const root = await scratchDir('shots-stale-')
+
+    try {
+      const dir = join(root, SCREENSHOTS_DIR)
+
+      mkdirSync(dir, { recursive: true })
+      await Bun.write(join(dir, 'old.lock'), '1')
+      utimesSync(join(dir, 'old.lock'), 1000, 1000)
+
+      const shots = await Promise.all([1, 2, 3].map(async () => keep(root, 'old', image(40, 40), { width: 40, scheme: 'light', cut: false })))
+
+      expect(shots.every(shot => shot.size.width === 40)).toBe(true)
+      expect(readdirSync(dir).filter(name => name.includes('.lock'))).toEqual([])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('makes no diff beyond the pixels it caps, and none leaves a lock behind when two shoot one page', async () => {
     const root = await scratchDir('shots-keep-')
     const big = image(3500, 3500)

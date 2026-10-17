@@ -7,8 +7,7 @@ const TARGET = /^(?:\/|https?:\/\/)/
 const EMPTY_OBJECT = /^\s*\}/
 const IDENTIFIER_START = /[\w$]/
 const CONTROL = /\p{Cc}/u
-const KEY_COLON = /^\s*:/
-const COLON_BRACE = /^\s*:\s*\{/
+const WHITESPACE = /\s/
 const PARAM_SEGMENT = /:[A-Z_$][\w$]*/gi
 const REGEX_SPECIALS = /[.*+?^${}()|[\]\\]/g
 
@@ -72,7 +71,7 @@ function redirectsOf(config: string, from: number): number | 'other' | undefined
           at++
       }
 
-      if (depth === 1 && config.slice(start + 1, at) === 'redirects' && KEY_COLON.test(config.slice(at + 1, at + 40)))
+      if (depth === 1 && config.slice(start + 1, at) === 'redirects' && keyColonAt(config, at + 1))
         return after(config, at + 1)
     }
     else if (char === '{' || char === '[' || char === '(') {
@@ -90,11 +89,49 @@ function redirectsOf(config: string, from: number): number | 'other' | undefined
   return undefined
 }
 
-function after(config: string, at: number): number | 'other' {
-  const rest = config.slice(at)
-  const colon = COLON_BRACE.exec(rest)
+// The offset past the whitespace and comments from `at`.
+function skipTrivia(config: string, at: number): number {
+  for (;;) {
+    if (WHITESPACE.test(config[at] ?? '')) {
+      at++
+    }
+    else if (config.startsWith('//', at)) {
+      const end = config.indexOf('\n', at)
 
-  return colon === null ? 'other' : at + colon[0].length
+      if (end === -1)
+        return config.length
+
+      at = end
+    }
+    else if (config.startsWith('/*', at)) {
+      const end = config.indexOf('*/', at + 2)
+
+      if (end === -1)
+        return config.length
+
+      at = end + 2
+    }
+    else {
+      return at
+    }
+  }
+}
+
+// Whether a `:` follows at `at`, past any whitespace and comments.
+function keyColonAt(config: string, at: number): boolean {
+  return config[skipTrivia(config, at)] === ':'
+}
+
+// The offset after the `{` of a `: {` at `at`, `'other'` when the value is no object literal.
+function after(config: string, at: number): number | 'other' {
+  const colon = skipTrivia(config, at)
+
+  if (config[colon] !== ':')
+    return 'other'
+
+  const brace = skipTrivia(config, colon + 1)
+
+  return config[brace] === '{' ? brace + 1 : 'other'
 }
 
 // `config` with the redirect added to its `redirects` object, or to a new one in the config object; undefined when there is no literal object to add to.

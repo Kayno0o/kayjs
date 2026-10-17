@@ -1,5 +1,5 @@
 import type { DevError } from '../server/dev-errors'
-import { mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import process from 'node:process'
 import { KAY_DIR, testWorker } from '../build/assets'
@@ -250,24 +250,50 @@ async function locked<T>(file: string, run: () => Promise<T>): Promise<T> {
       if ((error as NodeJS.ErrnoException).code !== 'EEXIST')
         return run()
 
-      try {
-        const held = statSync(lock, { throwIfNoEntry: false })
-
-        if (held !== undefined && Date.now() - held.mtimeMs > LOCK_STALE_MS)
-          rmSync(lock, { force: true })
-      }
-      catch {}
+      takeOverStale(lock)
 
       await Bun.sleep(LOCK_POLL_MS)
     }
   }
 
+  const refresh = setInterval(() => {
+    try {
+      const now = new Date()
+
+      utimesSync(lock, now, now)
+    }
+    catch {}
+  }, LOCK_STALE_MS / 3)
+
   try {
     return await run()
   }
   finally {
+    clearInterval(refresh)
     rmSync(lock, { force: true })
   }
+}
+
+// Moves a stale lock aside by renaming it, which only one of several waiters seeing it can do, and puts it back when it turns out to be a fresh one taken since.
+function takeOverStale(lock: string): void {
+  try {
+    const held = statSync(lock, { throwIfNoEntry: false })
+
+    if (held === undefined || Date.now() - held.mtimeMs <= LOCK_STALE_MS)
+      return
+
+    const aside = `${lock}.${process.pid}.stale`
+
+    renameSync(lock, aside)
+
+    const moved = statSync(aside, { throwIfNoEntry: false })
+
+    if (moved !== undefined && Date.now() - moved.mtimeMs <= LOCK_STALE_MS && !statSync(lock, { throwIfNoEntry: false }))
+      renameSync(aside, lock)
+    else
+      rmSync(aside, { force: true })
+  }
+  catch {}
 }
 
 // Writes the shot beside the one before it, which becomes `.prev`, and the diff between them.
