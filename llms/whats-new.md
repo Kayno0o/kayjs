@@ -7,6 +7,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - Claude Code lists an app's MCP tools: a list or a read in the 2026-07-28 revision says how long a client keeps it, `ttlMs` and `cacheScope`, as that revision requires ([API routes](api-routes.md#mcp)).
 
 ## 1.52.2
+## Unreleased
 
 - `onError` gets the errors of `schedule`, `background` and queue jobs and `onStop` hooks, with no request, and an island's stack is mapped to `.kay` lines in production ([Error reporting](routing.md#error-reporting), [Error fallbacks](islands.md#error-fallbacks)).
 - kayjs-cms: `cms({ collections })` arranges a form (field order, rows of columns, hidden fields) and a list (columns, row actions), and the screens' parts, `createEntryForm`, `entryScreen` and `listScreen` are exported to build an entry screen of your own ([screens](../packages/cms/llms/screens.md)).
@@ -16,19 +17,22 @@ What each release of kay and its libraries adds, newest first, each feature with
 - A tab opened before a deploy reloads itself, the scroll kept and what was typed left alone, on the next island it fails to load; production answers carry `x-kay-build` ([a deploy under open tabs](production.md#a-deploy-under-open-tabs)).
 - kayjs-cms: a list of `imageField()` or `fileField()` takes several files dropped or picked at once, one item per file ([kayjs-cms](../packages/cms/llms.txt)).
 - `unreachable-tooltip` no longer takes an `aria-label` on a role-less `span` or `div` as a fix, and leaves an expression `tabindex` or an element whose only text is its tooltip alone ([checks](checks.md)); kayjs-ui's TooltipHost describes the element it shows for with `aria-describedby`.
+- `kay doctor` and an MCP `doctor` tool check Bun, kay and library versions, the config, the environment, the port and `.kay` in one report, with a fix beside each failure ([tools](check-and-tools.md)).
+- The dev tool's Not found tab lists the paths production found nothing at, and turns one into a redirect with a click ([dev server](dev-server.md)).
+- kayjs-cms lists those paths at `<prefix>/not-found`, with where visitors came from and a redirect line to copy ([Redirects](routing.md#redirects)).
+- The dev tool's filters update a group's count, Head's hreflang alternates have a copy button, and a copy's outcome is announced to a screen reader ([dev server](dev-server.md)).
+- `cached(key, ttl, load, { live: true })` has every open page that read the key show it afresh when `invalidate` drops it, with no socket or polling ([live data](api-from-islands.md#following-cached-values)).
+
+## 1.52.2
+
 - A page with a `--- server` fence passes an island an action, `Chat(action={reply})` with no wrapper ([actions](actions.md#pass-an-action-to-an-island)).
 - `island-action` reports an action handed to an island that never types a prop as one ([actions](actions.md#pass-an-action-to-an-island)).
 - `secret-prop` warns of a secret-looking field, as `user.passwordHash`, handed to an island ([islands](islands.md#props-to-an-island)).
 - `kay screenshot` and an MCP `screenshot` tool shoot a page of `kay dev`, with a diff, and `--cookie` shoots one behind a session ([tools](check-and-tools.md#screenshot-a-page)).
-- `kay doctor` and an MCP `doctor` tool check Bun, kay and library versions, the config, the environment, the port and `.kay` in one report, with a fix beside each failure ([tools](check-and-tools.md)).
 - `kay not-found` lists the paths production found nothing at, with a target, and writes the redirect ([Redirects](routing.md#redirects)).
-- The dev tool's Not found tab lists the paths production found nothing at, and turns one into a redirect with a click ([dev server](dev-server.md)).
-- kayjs-cms lists those paths at `<prefix>/not-found`, with where visitors came from and a redirect line to copy ([Redirects](routing.md#redirects)).
 - `deprecated-api-tool` is reported by `kay upgrade` of an app from before 1.51 alone: an app turning `mcp` on since gets no warning for routes that do not opt in ([Checks](checks.md)).
-- The dev tool's filters update a group's count, Head's hreflang alternates have a copy button, and a copy's outcome is announced to a screen reader ([dev server](dev-server.md)).
 - A stream an action answers with to a leaving row's handler or a `listen` callback closes with its island too ([actions from islands](api-from-islands.md)).
 - A streamed `await` part's island cleans up still in the page ([Streaming](rendering.md#streaming)).
-- `cached(key, ttl, load, { live: true })` has every open page that read the key show it afresh when `invalidate` drops it, with no socket or polling ([live data](api-from-islands.md#following-cached-values)).
 
 ## 1.52.1
 
