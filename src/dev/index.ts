@@ -516,7 +516,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
       reloadAnswer = undefined
     }
   }
-  // The server never reads the generated types, only the editor and `kay check` do, so it starts before they are rewritten.
+  // The server never reads the generated types, only the editor and `kay check` do, so it starts before they are rewritten; an edited config is the exception, as the types tell its entry.
   // The client builds while the last server stops and the next one boots, which waits for it only once it asks.
   const restart = async () => {
     const files = [...touched]

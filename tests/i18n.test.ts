@@ -400,6 +400,9 @@ describe('locale detection', () => {
     expect(from('http://elsewhere.example/en/about', { 'accept-language': 'en' })).toBe('en')
     // A post from the page a refused post answered, whose form names it.
     expect(requestLocale(settings, new Request('http://localhost/_kay/action/x', { headers: { referer: 'http://localhost/_kay/action/x' } }), 'http://localhost/en/about')).toBe('en')
+    // Under a base the locale follows it, and a page outside it names none.
+    expect(requestLocale(settings, new Request('http://localhost/_kay/action/x'), 'http://localhost/app/en/about', '/app')).toBe('en')
+    expect(requestLocale(settings, new Request('http://localhost/_kay/action/x'), 'http://localhost/en/about', '/app')).toBe('fr')
   })
 
   it('falls back to the default locale\'s message, then fails on a key no locale has, which production shows as itself', () => {

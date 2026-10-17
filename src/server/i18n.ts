@@ -310,7 +310,8 @@ export function requestLocale(settings: LocaleSettings, request: Request, refere
     const { pathname } = new URL(referer)
     const path = routerPath(pathname, base)
     // A page outside the base is none of this site's.
-    const { locale } = path === pathname && base !== '' ? { locale: undefined } : splitLocale(settings, path)
+    const outside = base !== '' && path === pathname
+    const locale = outside ? undefined : splitLocale(settings, path).locale
 
     if (locale !== undefined)
       return locale
