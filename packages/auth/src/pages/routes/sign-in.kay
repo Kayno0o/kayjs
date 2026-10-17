@@ -82,7 +82,7 @@ Panel(title={t('auth.signIn.title')})
         input(name="code" inputmode="numeric" autocomplete="one-time-code" required)
       if codeError
         Message(text={failure(codeError)})
-      Button(type="submit" variant="accent" label={t('auth.signIn.codeSubmit')})
+      Button(type="submit" tone="accent" label={t('auth.signIn.codeSubmit')})
   form.flex.flex-col.gap-3(action={password})
     input(type="hidden" name="redirect" value={redirect})
     FormField(label={t('auth.signIn.identifier')} required)
@@ -97,7 +97,7 @@ Panel(title={t('auth.signIn.title')})
       Captcha(widget={features.captcha} challenge={captchaSignIn.challenge})
     if signInError
       Message(text={signInError})
-    Button(type="submit" variant="accent" label={t('auth.signIn.submit')})
+    Button(type="submit" tone="accent" label={t('auth.signIn.submit')})
     if features.email
       a(href={localize(`${prefix}/reset-password`)}) {t('auth.signIn.forgot')}
   if features.passkeys

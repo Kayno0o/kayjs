@@ -73,4 +73,4 @@ else
         Proof(user={user})
         if refused
           Message(text={failure(refused)})
-        Button(type="submit" variant="danger" label={t('auth.account.data.confirmDelete')})
+        Button(type="submit" tone="danger" label={t('auth.account.data.confirmDelete')})

@@ -111,7 +111,7 @@ PageSection(title={t('auth.account.twoFactor.title')})
         Button(type="submit" label={t('auth.account.twoFactor.regenerate')})
       form.flex.flex-col.gap-3(action={disable})
         Proof(user={user} secondFactor)
-        Button(type="submit" variant="danger" label={t('auth.account.twoFactor.disable')})
+        Button(type="submit" tone="danger" label={t('auth.account.twoFactor.disable')})
     else if setupUri
       p {t('auth.account.twoFactor.scan')}
       QrCode(value={setupUri} label={t('auth.account.twoFactor.qr')} size={192})
@@ -122,12 +122,12 @@ PageSection(title={t('auth.account.twoFactor.title')})
         input(type="hidden" name="uri" value={setupUri})
         FormField(label={t('auth.code')} required)
           input(name="code" inputmode="numeric" autocomplete="one-time-code" required)
-        Button(type="submit" variant="accent" label={t('auth.account.twoFactor.enable')})
+        Button(type="submit" tone="accent" label={t('auth.account.twoFactor.enable')})
     else
       form.flex.flex-col.gap-3(action={setUp})
         p {t('auth.account.twoFactor.intro')}
         Proof(user={user})
-        Button(type="submit" variant="accent" label={t('auth.account.twoFactor.setUp')})
+        Button(type="submit" tone="accent" label={t('auth.account.twoFactor.setUp')})
 if features.passkeys
   PageSection(title={t('auth.account.passkeys.title')})
     .flex.flex-col.gap-3
@@ -146,7 +146,7 @@ if features.passkeys
             Proof(user={user})
             if removeRefused?.id === passkey.id
               Message(text={failure(removeRefused.error)})
-            Button(type="submit" variant="danger" label={t('auth.account.passkeys.remove')} aria-label={`${t('auth.account.passkeys.remove')}: ${passkey.name}`})
+            Button(type="submit" tone="danger" label={t('auth.account.passkeys.remove')} aria-label={`${t('auth.account.passkeys.remove')}: ${passkey.name}`})
       else
         EmptyState(title={t('auth.account.passkeys.none')})
       PasskeyAdd(user={user} label={t('auth.account.passkeys.add')} nameLabel={t('auth.account.passkeys.name')} passwordLabel={t('auth.proof.password')} codeLabel={t('auth.proof.code')} unsupported={t('auth.account.passkeys.unsupported')} failed={t('auth.account.passkeys.failed')} errors={passkeyErrors})

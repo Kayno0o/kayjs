@@ -61,7 +61,7 @@ section.kcms-entry(ref={element => box = element})
     if drafts.changed(entry)
       .kcms-entry-actions
         Button(label={wording('cms.entry.reset', 'Reset')} disabled={saving()} onClick={() => drafts.reset(entry)})
-        Button(label={saving() ? wording('cms.entry.saving', 'Saving…') : wording('cms.entry.save', 'Save')} variant="accent" busy={saving()} onClick={save})
+        Button(label={saving() ? wording('cms.entry.saving', 'Saving…') : wording('cms.entry.save', 'Save')} tone="accent" busy={saving()} onClick={save})
   if source.status() === 'failed'
     p.kcms-entry-failure {wording('cms.entry.loadFailure', 'Could not load this entry: {message}', { message: source.error()?.message ?? '' })}
   else if source.value() as answer

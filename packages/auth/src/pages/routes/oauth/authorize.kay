@@ -60,5 +60,5 @@ Panel(title={t('auth.consent.title')})
     form.flex.flex-wrap.gap-3(action={decide})
       for field of Object.entries(outcome.fields) key={field[0]}
         input(type="hidden" name={field[0]} value={field[1]})
-      Button(type="submit" name="decision" value="allow" variant="accent" label={t('auth.consent.allow')})
+      Button(type="submit" name="decision" value="allow" tone="accent" label={t('auth.consent.allow')})
       Button(type="submit" name="decision" value="deny" label={t('auth.consent.deny')})

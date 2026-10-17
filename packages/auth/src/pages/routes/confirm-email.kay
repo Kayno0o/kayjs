@@ -30,6 +30,6 @@ Panel(title={t('auth.confirmEmail.title')})
       p {t('auth.confirmEmail.intro')}
       if error
         Message(text={failure(error)})
-      Button(type="submit" variant="accent" label={t('auth.confirmEmail.submit')})
+      Button(type="submit" tone="accent" label={t('auth.confirmEmail.submit')})
   else
     Message(text={failure('link')})

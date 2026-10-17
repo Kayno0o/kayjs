@@ -49,7 +49,7 @@ Panel(title={t('auth.twoFactor.title')})
         input(name="code" autocomplete="one-time-code" autocapitalize="off" spellcheck="false" required)
       if error
         Message(text={failure(error)})
-      Button(type="submit" variant="accent" label={t('auth.twoFactor.submit')})
+      Button(type="submit" tone="accent" label={t('auth.twoFactor.submit')})
     if features.passkeys
       PasskeyTwoFactor(label={t('auth.twoFactor.passkey')} failed={failure('invalid')})
   else

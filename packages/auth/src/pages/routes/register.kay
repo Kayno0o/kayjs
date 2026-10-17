@@ -69,6 +69,6 @@ Panel(title={t('auth.register.title')})
         Captcha(widget={features.captcha} challenge={captcha.challenge})
       if error
         Message(text={error})
-      Button(type="submit" variant="accent" label={t('auth.register.submit')})
+      Button(type="submit" tone="accent" label={t('auth.register.submit')})
   p.text-center
     | {t('auth.register.haveAccount')} #[a(href={localize(`${prefix}/sign-in?redirect=${encodeURIComponent(redirect)}`)}) {t('auth.register.signIn')}]

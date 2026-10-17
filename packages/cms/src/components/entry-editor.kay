@@ -82,7 +82,7 @@ form.kcms-entry-editor(novalidate onSubmit={event => { event.preventDefault(); v
         ConfirmDelete(message={wording('cms.entry.deleteMessage', 'Delete this entry? This cannot be undone.')} failure={wording('cms.save.deleteFailure', 'Could not delete')} trigger="button" onConfirm={remove})
       if drafts.changed(ref)
         Button(label={wording('cms.entry.reset', 'Reset')} disabled={saving()} onClick={() => drafts.reset(ref)})
-      Button(type="submit" label={saving() ? wording('cms.entry.saving', 'Saving…') : entry ? wording('cms.entry.save', 'Save') : wording('cms.entry.create', 'Create')} variant="accent" busy={saving()})
+      Button(type="submit" label={saving() ? wording('cms.entry.saving', 'Saving…') : entry ? wording('cms.entry.save', 'Save') : wording('cms.entry.create', 'Create')} tone="accent" busy={saving()})
   if !entry
     FormField(label={wording('cms.entry.slug', 'Slug')} hint={collection.kind === 'folder' ? wording('cms.entry.slugHint', 'The file\'s path in the collection\'s folder, with / between folders') : undefined} required)
       TextInput(value={slug()} onInput={text => slug = text} required)

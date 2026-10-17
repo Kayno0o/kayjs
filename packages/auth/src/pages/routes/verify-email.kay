@@ -57,7 +57,7 @@ Panel(title={t('auth.verify.title')})
         p {t('auth.verify.intro')}
         if refused
           Message(text={failure(refused)})
-      Button(type="submit" variant="accent" label={t('auth.verify.submit')})
+      Button(type="submit" tone="accent" label={t('auth.verify.submit')})
   else if pending?.type === 'verify'
     form.flex.flex-col.gap-3(action={code})
       p {t('auth.verify.codeIntro', { email: pending.email })}
@@ -65,7 +65,7 @@ Panel(title={t('auth.verify.title')})
         input(name="code" inputmode="numeric" autocomplete="one-time-code" required)
       if codeError
         Message(text={failure(codeError)})
-      Button(type="submit" variant="accent" label={t('auth.verify.submit')})
+      Button(type="submit" tone="accent" label={t('auth.verify.submit')})
   else if user?.email && !user.emailVerified
     form.flex.flex-col.gap-3(action={resend})
       p {t('auth.verify.unverified', { email: user.email })}
