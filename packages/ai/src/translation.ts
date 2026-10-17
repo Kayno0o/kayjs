@@ -29,7 +29,8 @@ const PLACEHOLDER = /\{(\w+)\}/g
 // Where a browser may read a tag, and a comment, CDATA section, doctype or instruction, which hide what follows them from the check.
 const TAG_START = /<\/?[A-Z][\w-]*\b/gi
 const MARKUP_START = /<[!?]/g
-const ATTRIBUTE = /([^\s=/"'<>]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+)))?/g
+// HTML whitespace is these five characters only: JS `\s` also matches a no-break space, which a browser reads as part of a value.
+const ATTRIBUTE = /([^\t\n\f\r =/"'<>]+)(?:[\t\n\f\r ]*=[\t\n\f\r ]*(?:"([^"]*)"|'([^']*)'|([^\t\n\f\r "'>]+)))?/g
 const TAG_NAME = /^<\/?[\w-]+/
 // The attributes whose value is text a reader sees: a translation may change them, every other attribute is kept exactly.
 const VISIBLE_ATTRIBUTES = new Set(['title', 'alt', 'placeholder', 'aria-label'])

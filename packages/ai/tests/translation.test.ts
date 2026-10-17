@@ -102,6 +102,17 @@ it('compares a tag split over lines, and the markup that is not a tag', () => {
   expect(unitProblem(message('a < b and c > d'), 'a < b et c > d')).toBeUndefined()
 })
 
+it('reads attributes with HTML whitespace only, so no-break space cannot hide a quote', () => {
+  const source = message('<a title="Home">x</a>')
+
+  for (const space of ['\u00A0', '\u000B', '\uFEFF', '\u3000']) {
+    for (const quote of ['"', '\''])
+      expect(unitProblem(source, `<a title=${space}${quote}> <img src=x onerror=alert(1)> ${quote}>x</a>`)).toBe('changes the tags of the source')
+  }
+
+  expect(unitProblem(source, '<a title= "Accueil">x</a>')).toBeUndefined()
+})
+
 it('asks for the visible attributes to be translated', () => {
   expect(systemPrompt('en', 'fr')).toContain('title, alt, aria-label')
 })
