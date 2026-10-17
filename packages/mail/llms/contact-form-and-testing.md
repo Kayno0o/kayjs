@@ -64,7 +64,7 @@ export default { name: 'Ada', url: 'https://example.com/confirm' } satisfies Par
 
 ## Other transports
 
-`transport` takes any `{ send(mail) }` resolving with a `Delivery`, such as a provider's HTTP API. `smtp({ host, port, insecure, user, pass, name, timeout, maxConnections, rateLimit, dkim: { domain, selector, privateKey } })` is the SMTP one, for settings read some other way. `outbox` is a transport too, for a staging server that must never send.
+`transport` takes any `{ send(mail) }` resolving with a `Delivery`, such as a provider's HTTP API. `smtp({ host, port, insecure, user, pass, name, timeout, maxConnections, rateLimit, dkim: { domain, selector, privateKey } })` is the SMTP one, for settings read some other way. `outbox` is a transport too, for a staging server that must never send. In production a custom `transport` still needs a sender, `from` or `SMTP_FROM`, or the boot stops naming both (an `optional` mailer throws `MailNotConfigured` per send); development and tests keep `kay@localhost`.
 
 ## kayjs-auth
 

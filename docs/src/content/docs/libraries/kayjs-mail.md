@@ -216,6 +216,8 @@ export const mail = mailer({
 })
 ```
 
+In production a mailer with a custom `transport` still needs a sender, `from` or `SMTP_FROM`, or the boot stops naming both. Development and tests keep sending from `kay@localhost`.
+
 `smtp({ host, port, user, pass })` is the SMTP transport, for settings read some other way. `outbox` is a transport too, for a staging server that must never send.
 
 ## A contact form

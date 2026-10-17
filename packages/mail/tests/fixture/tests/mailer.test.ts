@@ -339,6 +339,34 @@ describe('configuration', () => {
     expect(() => mailer({ from: 'site@example.com' })).toThrow('SMTP_HOST')
   })
 
+  it('stops a production boot on a custom transport with no sender, naming from and SMTP_FROM, while development and tests keep the fallback', async () => {
+    const custom: Transport = { send: async () => ({ accepted: [], rejected: [] }) }
+
+    process.env.NODE_ENV = 'production'
+    delete process.env.SMTP_FROM
+
+    expect(() => mailer({ transport: custom, queue: { name: 'senderless-a' } })).toThrow(/`from`[\s\S]*SMTP_FROM/)
+    expect(() => mailer({ transport: custom, from: 'site@example.com', queue: { name: 'senderless-b' } })).not.toThrow()
+
+    process.env.SMTP_FROM = 'site@example.com'
+    expect(() => mailer({ transport: custom, queue: { name: 'senderless-c' } })).not.toThrow()
+
+    delete process.env.SMTP_FROM
+
+    const optional = mailer({ transport: custom, optional: true, queue: { name: 'senderless-d' } })
+
+    expect(optional.configured).toBe(false)
+    await expect(optional.send({ to: 'a@example.com', subject: 'S', text: 'T' })).rejects.toThrow('SMTP_FROM must be set to send mail')
+
+    for (const env of ['development', 'test']) {
+      process.env.NODE_ENV = env
+
+      const sent = await mailer({ transport: custom, queue: { name: `senderless-${env}` } }).render({ to: 'a@example.com', subject: 'S', text: 'T' })
+
+      expect(sent.from).toBe('kay@localhost')
+    }
+  })
+
   it('lets an optional mailer boot without its settings, each send then throwing MailNotConfigured before anything is queued', async () => {
     process.env.NODE_ENV = 'production'
     delete process.env.SMTP_HOST

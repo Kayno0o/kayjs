@@ -286,6 +286,18 @@ export function mailer(options: MailerOptions = {}): Mailer {
   const whom = (addresses: string[]): string => options.logRecipients ? addresses.join(', ') : counted(addresses)
   const configured = options.transport === undefined && delivering() === 'smtp' ? fromEnvironment(options.from, options.fromName, options.optional === true) : undefined
   const transport = options.transport ?? configured?.transport ?? outbox
+  // A custom transport sends in production too, where `kay@localhost` as the sender fails SPF and lands in spam without an error.
+  const senderless = options.transport !== undefined && delivering() === 'smtp' && options.from === undefined && (process.env.SMTP_FROM ?? '') === ''
+
+  if (senderless && options.optional !== true) {
+    try {
+      defineEnv(s.Object({ SMTP_FROM: s.String({ pattern: SENDER }) }))
+    }
+    catch (error) {
+      throw new Error(`kayjs-mail: a mailer with a custom transport needs a sender in production: set \`from\` in mailer() or SMTP_FROM\n${error instanceof Error ? error.message : String(error)}`, { cause: error })
+    }
+  }
+
   const sender = (): Address => configured?.from ?? options.from ?? named(process.env.SMTP_FROM === undefined || process.env.SMTP_FROM === '' ? 'kay@localhost' : process.env.SMTP_FROM, options.fromName)
 
   // The message's own, else the mailer's; undefined when it names none and the mailer has none to give.
@@ -303,7 +315,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
 
   // Before rendering, so a mail that cannot go is neither rendered nor queued to fail every retry.
   const ready = (message: Envelope): void => {
-    const missing = [...configured?.missing() ?? [], ...recipients(message) === undefined ? ['MAIL_TO'] : []]
+    const missing = [...configured?.missing() ?? [], ...senderless ? ['SMTP_FROM'] : [], ...recipients(message) === undefined ? ['MAIL_TO'] : []]
 
     if (missing.length > 0)
       throw new MailNotConfigured(missing)
@@ -441,5 +453,5 @@ export function mailer(options: MailerOptions = {}): Mailer {
   })
 
   // A getter, since `kay build` leaves a missing variable to throw where it is read.
-  return Object.defineProperty(sending, 'configured', { get: () => (configured?.missing() ?? []).length === 0 }) as Mailer
+  return Object.defineProperty(sending, 'configured', { get: () => (configured?.missing() ?? []).length === 0 && !senderless }) as Mailer
 }
