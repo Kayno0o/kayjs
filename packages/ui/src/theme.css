@@ -1671,7 +1671,7 @@
   }
 
   .kui-tab-nav-link {
-    @apply -mb-px inline-flex shrink-0 items-center gap-1 border-b-2 border-transparent px-4 py-2 text-sm text-kui-subtext0 transition-colors hover:text-kui-text disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:text-kui-subtext0;
+    @apply -mb-px shrink-0 border-b-2 border-transparent px-4 py-2 text-sm text-kui-subtext0 transition-colors hover:text-kui-text;
 
     &:where([aria-current='page']) {
       @apply border-kui-accent text-kui-accent;
@@ -1688,7 +1688,7 @@
   }
 
   .kui-tabs-tab {
-    @apply -mb-px shrink-0 border-b-2 border-transparent px-4 py-2 text-sm text-kui-subtext0 transition-colors hover:text-kui-text;
+    @apply -mb-px inline-flex shrink-0 items-center gap-1 border-b-2 border-transparent px-4 py-2 text-sm text-kui-subtext0 transition-colors hover:text-kui-text disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:text-kui-subtext0;
 
     &:where([aria-selected='true']) {
       @apply border-kui-accent text-kui-accent;

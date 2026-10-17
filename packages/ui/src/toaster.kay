@@ -8,6 +8,10 @@ import IconButton from './icon-button.kay'
 import { dismissToast, holdToasts, toasts } from './toast'
 import { wording } from 'kay/words'
 
+function toneOf(item: { tone?: string | undefined, type: ToastType }): string {
+  return item.tone ?? (item.type === 'error' ? 'danger' : item.type)
+}
+
 const ICONS: Record<ToastType, IconSlot> = { error: 'alert', success: 'success', info: 'info' }
 
 const { dismissLabel = wording('ui.toaster.dismissLabel', 'Dismiss notification') } = props<{
@@ -39,15 +43,15 @@ effect(() => {
 // Screen readers hear a toast from regions kept in the page, which a message joining reads out: a live region shown only as it fills, as the toaster is, is often not read.
 if owns()
   .kui-toaster-live(role="status")
-    for item of toasts().filter(item => item.tone !== 'danger') key={item.id}
+    for item of toasts().filter(item => toneOf(item) !== 'danger') key={item.id}
       span {item.message}
   .kui-toaster-live(role="alert")
-    for item of toasts().filter(item => item.tone === 'danger') key={item.id}
+    for item of toasts().filter(item => toneOf(item) === 'danger') key={item.id}
       span {item.message}
   // Holding still while the pointer is on the toasts or focus is in them, as timed content must let itself be paused.
   .kui-toaster(ref={element => toaster.set(element)} popover="manual" onPointerEnter={() => holdToasts('pointer', true)} onPointerLeave={() => holdToasts('pointer', false)} onFocusIn={() => holdToasts('focus', true)} onFocusOut={event => toaster()?.contains(event.relatedTarget as Node | null) || holdToasts('focus', false)})
     for item of toasts() key={item.id}
-      .kui-toast(data-tone={item.tone} data-type={item.type})
+      .kui-toast(data-tone={toneOf(item)} data-type={item.type})
         Icon(icon={ICONS[item.type]} class="kui-toast-icon")
         p.kui-toast-message {item.message}
         IconButton(icon="close" label={dismissLabel} size="sm" variant="inline" class="kui-toast-dismiss" onClick={() => dismissToast(item.id)})

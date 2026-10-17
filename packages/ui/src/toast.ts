@@ -9,7 +9,8 @@ export type ToastType = 'error' | 'success' | 'info'
 export interface Toast {
   id: number
   message: string
-  tone: ToastTone
+  // A toast pushed by hand with only a `type` takes its tone from it.
+  tone?: ToastTone | undefined
   // Deprecated: use `tone`.
   type: ToastType
 }

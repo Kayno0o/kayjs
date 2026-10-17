@@ -28,7 +28,7 @@ function toggled(event: Event) {
   onOpenChange?.(now)
 }
 ---
-// A native disclosure, so it folds without script and a static page can hold it.
+// A native disclosure, so it folds without script; the toggle listener makes it an island, which only reports the change.
 details.kui-collapsible-section({...rest} open={open} data-boxed={boxed || undefined} class={className} onToggle={toggled})
   summary.kui-collapsible-section-summary
     span.kui-heading-section.kui-collapsible-section-title {title}
