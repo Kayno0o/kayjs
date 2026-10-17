@@ -36,7 +36,7 @@ kay has [page swaps](/essentials/islands#page-navigation) of its own. It adds wh
 
 - **Bun only**, 1.4.3 or later. The server needs Bun, not Node, Deno or an edge runtime. A site built with `kay build --static` is plain files any host serves.
 - **Its own registry.** kay and its libraries are on kay's Forgejo registry, not on npm. Point Bun at it once, as [Installation](/getting-started/installation) shows. A search on npm does not find them.
-- **A young ecosystem.** Few integrations exist beyond kay's libraries: [kayjs-ui](/libraries/kayjs-ui), [kayjs-auth](/libraries/kayjs-auth), [kayjs-mail](/libraries/kayjs-mail) and [kayjs-cms](/libraries/kayjs-cms). Answers are in these docs, not across the web. Coding agents learn kay from [llms.txt](/llms.txt), not from their training.
+- **A young ecosystem.** Few integrations exist beyond kay's libraries: [kayjs-ui](/libraries/kayjs-ui), [kayjs-auth](/libraries/kayjs-auth), [kayjs-mail](/libraries/kayjs-mail), [kayjs-cms](/libraries/kayjs-cms) and [kayjs-ai](/libraries/kayjs-ai). Answers are in these docs, not across the web. Coding agents learn kay from [llms.txt](/llms.txt), not from their training.
 - **No JSX components to reuse.** React, Vue and Svelte components do not run in `.kay`, and their component libraries have no kay version. A plain browser library, such as a map or a chart, runs inside an island.
 - **Its own file format.** Editors read `.kay` through `kay lsp`, in VS Code or any LSP editor. Tools that only know HTML, JSX or Svelte files do not.
 - **It moves fast.** A minor version can carry a breaking change. [Upgrading](/guides/upgrading) lists each with what to change. A major is kept for a rewrite.

@@ -13,6 +13,15 @@ export const dated = action(async function* () {
   yield { at: new Date(0), tags: new Map([['a', 1]]) }
 })
 
+// A model's reply, which is awaited as a text and read as parts: awaiting it in the runner would drain it to the last.
+export const thenable = action(() => ({
+  then: (resolve: (text: string) => void) => void resolve('drained'),
+  async* [Symbol.asyncIterator]() {
+    yield 'one'
+    yield 'one two'
+  },
+}))
+
 export const empty = action(async function* () {})
 
 export const breaksEarly = action(async function* () {

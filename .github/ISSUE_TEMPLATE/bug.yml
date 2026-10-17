@@ -12,6 +12,7 @@ body:
         - kayjs-ui
         - kayjs-mail
         - kayjs-cms
+        - kayjs-ai
         - editor extension
     validations:
       required: true

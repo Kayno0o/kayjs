@@ -1,0 +1,7 @@
+{
+  "name": "kayjs-ai-fixture",
+  "private": true,
+  "dependencies": {
+    "@kaynooo/kayjs-ai": "link:../.."
+  }
+}

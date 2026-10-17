@@ -74,6 +74,8 @@ export const reply = action(s.Object({ prompt: s.String({ maxLength: 2000 }) }),
 ---
 ```
 
+A handler returns the iterable as it is, from a plain arrow function: an `async` handler returning one that is also a thenable, such as kayjs-ai's `ask()` reply, awaits it, and the call gets its text alone.
+
 ### Keep a value current on every open page
 
 `live(initial)` in a module of the project is a value the server changes and every page reading it follows, with no API module, route or stream written:

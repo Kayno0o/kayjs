@@ -78,7 +78,7 @@ describe('the documentation site', () => {
     const libraries = await loadLibraries()
     const ui = libraries.find(library => library.slug === 'kayjs-ui')!
 
-    expect(libraries.filter(library => library.data.source === 'llms.txt').map(library => library.slug)).toEqual(['kayjs-auth', 'kayjs-cms', 'kayjs-mail', 'kayjs-ui'])
+    expect(libraries.filter(library => library.data.source === 'llms.txt').map(library => library.slug)).toEqual(['kayjs-ai', 'kayjs-auth', 'kayjs-cms', 'kayjs-mail', 'kayjs-ui'])
     // The topic files an index lists are pages of their own, the links between them links between pages.
     expect(libraries.find(library => library.slug === 'kayjs-auth-setup')!.data).toMatchObject({ library: 'kayjs-auth', source: 'llms/setup.md' })
     expect(libraries.find(library => library.slug === 'kayjs-auth')!.body).toContain('](/llms/kayjs-auth-setup)')

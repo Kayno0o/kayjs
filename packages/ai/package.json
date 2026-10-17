@@ -1,0 +1,57 @@
+{
+  "name": "@kaynooo/kayjs-ai",
+  "type": "module",
+  "version": "1.51.2",
+  "description": "Call an LLM from kay apps with no SDK and no streaming code: Anthropic and OpenAI-compatible providers over HTTP, replies that stream into await blocks and actions, and a scripted fake in development and tests",
+  "author": "Kaynooo <https://github.com/Kayno0o>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Kayno0o/kayjs",
+    "directory": "packages/ai"
+  },
+  "bugs": {
+    "url": "https://github.com/Kayno0o/kayjs/issues"
+  },
+  "publishConfig": {
+    "registry": "https://git.kaynooo.fr/api/packages/kaynooo/npm/"
+  },
+  "exports": {
+    "./add": "./src/add.ts",
+    ".": {
+      "types": "./types/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "files": [
+    "LICENSE",
+    "README.md",
+    "llms",
+    "llms.txt",
+    "src",
+    "types"
+  ],
+  "engines": {
+    "bun": ">=1.4.3"
+  },
+  "scripts": {
+    "prepare": "$npm_execpath ../../scripts/link-fixture.ts",
+    "check": "$npm_execpath check",
+    "build:types": "rm -rf types && bun ../../src/tsgo.ts -p tsconfig.build.json",
+    "prepack": "bun run build:types",
+    "postpack": "rm -rf types",
+    "prelint": "bun run --cwd ../.. build:eslint",
+    "lint": "keslint --cache",
+    "prelint:fix": "bun run --cwd ../.. build:eslint",
+    "lint:fix": "keslint --fix --cache",
+    "test": "bun test"
+  },
+  "peerDependencies": {
+    "kay": "~1.51.0"
+  },
+  "devDependencies": {
+    "@kaynooo/eslint": "^7.0.4",
+    "@types/bun": "^1.4.3",
+    "typescript": "^6.0.3"
+  }
+}

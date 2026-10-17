@@ -17,6 +17,7 @@ const fixture = join(import.meta.dir, 'fixtures/action-streams/src')
 const actions = await import(join(fixture, 'routes/index.kay')) as {
   count: Action<{ to: number }, AsyncIterable<number>>
   dated: Action<Record<never, never>, AsyncIterable<{ at: Date, tags: Map<string, number> }>>
+  thenable: Action<Record<never, never>, AsyncIterable<string>>
   empty: Action<Record<never, never>, AsyncIterable<never>>
   breaksEarly: Action<Record<never, never>, AsyncIterable<never>>
   breaksLate: Action<Record<never, never>, AsyncIterable<number>>
@@ -71,6 +72,12 @@ describe('an action returning an async iterable', () => {
     const values: number[] = await site.call(actions.count, { to: 3 })
 
     expect(values).toEqual([1, 2, 3])
+  })
+
+  it('streams a return that is also a thenable as the iterable it is, typed as one', async () => {
+    const values: string[] = await site.call(actions.thenable)
+
+    expect(values).toEqual(['one', 'one two'])
   })
 
   it('types a call as a stream of its values, and what a plain form post reads back as the last one', () => {

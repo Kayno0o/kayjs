@@ -171,6 +171,9 @@ export type Success<Output> = Exclude<Output, Failure<unknown>>
 // What a call to a handler returning an async iterable resolves with: its values read as they come, typed.
 export type ActionStream<T> = EventReader<T>
 
+// What a handler's return settles to: an async iterable stays one even when it is also a thenable, as a model's reply is, which `Awaited` would read as its text.
+export type Settled<Output> = Output extends AsyncIterable<unknown> ? Output : Awaited<Output>
+
 // What a call resolves with: a stream for a handler returning an async iterable, else what it returned.
 export type Answer<Output> = Output extends AsyncIterable<infer Value> ? ActionStream<Value> : Output
 
@@ -320,8 +323,8 @@ const emptySchema = () => ({ [Symbol.for('TypeBox.Kind')]: 'Object', type: 'obje
 
 // Declares a server action in a page's `--- server` fence: Elysia validates the input against `schema` before `handler` runs.
 // Without a schema the action takes no input, as with an empty object schema, and its handler gets the context alone.
-export function action<Output, const Honeypot extends string = never>(handler: (ctx: ActionContext) => Output | Promise<Output>, protection?: ActionProtection<Honeypot>): NoInputAction<Awaited<Output>, Honeypot>
-export function action<Schema extends TSchema, Output, const Honeypot extends string = never>(schema: Schema, handler: (input: Static<Schema>, ctx: ActionContext) => Output | Promise<Output>, protection?: ActionProtection<Honeypot>): ServerAction<Schema, Awaited<Output>, Honeypot>
+export function action<Output, const Honeypot extends string = never>(handler: (ctx: ActionContext) => Output | Promise<Output>, protection?: ActionProtection<Honeypot>): NoInputAction<Settled<Output>, Honeypot>
+export function action<Schema extends TSchema, Output, const Honeypot extends string = never>(schema: Schema, handler: (input: Static<Schema>, ctx: ActionContext) => Output | Promise<Output>, protection?: ActionProtection<Honeypot>): ServerAction<Schema, Settled<Output>, Honeypot>
 export function action(first: unknown, second?: unknown, third?: ActionProtection<string>): unknown {
   if (typeof first === 'function') {
     const handler = first as (ctx: ActionContext) => unknown

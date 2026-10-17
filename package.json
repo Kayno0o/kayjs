@@ -219,6 +219,7 @@
     "@happy-dom/global-registrator": "^21.0.3",
     "@iconify-json/tabler": "^1.2.42",
     "@kaynooo/eslint": "^7.0.4",
+    "@kaynooo/kayjs-ai": "workspace:*",
     "@kaynooo/kayjs-auth": "workspace:*",
     "@kaynooo/kayjs-cms": "workspace:*",
     "@kaynooo/kayjs-mail": "workspace:*",

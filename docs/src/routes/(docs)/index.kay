@@ -264,6 +264,12 @@ head
               h3
                 a(href="/libraries/kayjs-cms") kayjs-cms
               p Content edited on the page it renders, and screens listing, adding and publishing each collection's entries, saved as Forgejo commits.
+        Card.library(bare)
+          .library-body
+            header.library-head
+              h3
+                a(href="/libraries/kayjs-ai") kayjs-ai
+              p Call an LLM with no SDK: ask() streams into await blocks and actions, over Anthropic or any OpenAI-compatible server, and a fake answers in tests.
     section.home-section(aria-labelledby="docs")
       h2#docs The documentation
       p.section-lede Pages written for people, by section. Agents read #[a(href="/llms.txt") llms.txt], the index of the full reference.

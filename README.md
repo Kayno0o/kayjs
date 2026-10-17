@@ -40,7 +40,7 @@ In production the server serves what `kay build` wrote and bundles nothing at bo
 | Command | Does |
 | --- | --- |
 | `kay new <dir> [--template blank\|server\|site\|app] [--with <features>] [--without <features>] [--host forgejo\|github] [-y] [--kay <dependency>]` | scaffold a project that checks, builds and runs: one bare page, a server run as one executable, a static site, or an app with sessions and members in SQLite (Postgres with `--with postgres`) through pg-orm; in a terminal with none of these options it asks for a preset, then for each feature; `--with` and `--without` change the preset's features, `--host` picks the Forgejo or GitHub CI workflow, by default from the `origin` remote, `-y` takes the server preset without asking, `--kay` sets its `kay` dependency |
-| `kay add <features> [dir] [--no-install]` | add `kay new` features (or `mail`, `cms`) to an existing project, stopping with the edit to make by hand when a file is not what `kay new` wrote |
+| `kay add <features> [dir] [--no-install]` | add `kay new` features (or `ai`, `mail`, `cms`) to an existing project, stopping with the edit to make by hand when a file is not what `kay new` wrote |
 | `kay dev [dir] [--entry <file>] [--port <port>] [--host[=<address>]] [--inspect[=<address>]] [--open] [--format text\|json]` | run the server, restarting on change, errors shown in the browser |
 | `kay build [dir] [-p tsconfig.json] [--no-check] [--analyze]` | bundle the browser code for production while checking the project as `kay check` does, keeping the last build when either fails; `--no-check` skips the check |
 | `kay build [dir] --compile <file> [--entry <file>]` | the same, plus the server and everything it serves in one executable, `--entry` naming the server entry |

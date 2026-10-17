@@ -1,0 +1,45 @@
+# kayjs-ai
+
+> An LLM called from kay apps with no SDK and no streaming code: `ask()` over Anthropic or any OpenAI-compatible server (OpenAI, Ollama) through their HTTP APIs, a reply that streams into `await` blocks and into streaming actions as it is, and a scripted fake answering in development and tests.
+
+## Rules that are easy to get wrong
+
+- `ask()` runs on the server, where the key lives: call it in a `--- server` fence, an action, a job or an API route. An island importing it fails `kay build`, which is how the key stays out of the browser. Reach it from an island through an action.
+- The reply is a thenable async iterable, not a Promise: `await ask(...)` is the full text, `for await` gives snapshots (the text so far), and an `await` block or a handler returning it streams. Return it from a plain arrow, `({ messages }) => ask(messages)`: an `async` handler returning it awaits it and the answer is the full text only.
+- Nothing is sent until the reply is first read, so an `await ask()` an island's server render skips bills nothing. A reader leaving early, the visitor leaving the page, or `options.signal` aborts the provider request.
+- Messages are `user` and `assistant` only; the system prompt goes in `options.system`. A history a visitor posts can never carry a system prompt, and a `system` role throws.
+- Under `bun test` `ask()` always answers from `fakeAi`, whatever keys the environment holds; in development it does until `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` or `AI_BASE_URL` is set. Production with none of them throws.
+- No model id is built in: set `AI_MODEL` (required in production) or pass `{ model }`.
+- A failure is an `AiError` with a `kind`; nothing retries by itself. A rate limit carries `retryAfter` in seconds.
+
+## Setup
+
+`kay add ai` installs the package and lists it in `kay.config.ts`; `ask` works without that, which only makes `kay env` list the variables.
+
+```ts
+// kay.config.ts
+import { ai } from '@kaynooo/kayjs-ai'
+
+export default defineConfig({ extensions: [ai()] })
+```
+
+```kay
+--- server
+import { ask } from '@kaynooo/kayjs-ai'
+
+const answer = ask('Say hello', { system: 'Be brief' })
+---
+await answer
+  p Thinking
+then text
+  p {text}
+catch
+  p The reply was cut short
+```
+
+## Topics
+
+The rest is split by topic, each file read whole with one command:
+
+- [Environment, ask() and its reply](llms/asking.md): the variables, picking a provider, `ask()`'s options, the reply, `await` blocks and streaming actions
+- [The fake, errors and providers](llms/testing-and-errors.md): scripting `fakeAi` in tests, `AiError` kinds, building a provider by hand

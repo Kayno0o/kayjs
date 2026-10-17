@@ -175,6 +175,30 @@ it('adds the extension of a library to kay.config.ts and writes its files', asyn
   }
 })
 
+it('adds kayjs-ai as its extension alone, with no file', async () => {
+  const dir = join(await mkdtemp(join(tmpdir(), 'kay-add-')), 'app')
+
+  try {
+    await createProject(dir, { kay: '^1.0.0', features: PRESETS.server.features })
+    await mkdir(join(dir, 'node_modules/@kaynooo'), { recursive: true })
+    await symlink(join(repo, 'packages/ai'), join(dir, 'node_modules/@kaynooo/kayjs-ai'))
+
+    const manifest = await Bun.file(join(dir, 'package.json')).json() as { dependencies: Record<string, string> }
+
+    manifest.dependencies['@kaynooo/kayjs-ai'] = '~1.0.0'
+    await writeFile(join(dir, 'package.json'), JSON.stringify(manifest))
+
+    const result = await addFeatures(dir, ['ai'], { install: false })
+
+    expect(result.written).toEqual(['kay.config.ts'])
+    expect(result.notes).toEqual([expect.stringContaining('AI_MODEL')])
+    expect(await Bun.file(join(dir, 'kay.config.ts')).text()).toContain('extensions: [ai()],')
+  }
+  finally {
+    await rm(join(dir, '..'), { recursive: true, force: true })
+  }
+})
+
 it('puts an extension first in an existing list, and refuses a config without defineConfig', () => {
   const extension = { import: 'import { cms } from \'@kaynooo/kayjs-cms\'', expression: 'cms()' }
 

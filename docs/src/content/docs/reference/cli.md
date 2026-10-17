@@ -85,13 +85,14 @@ kay: accents needs tailwind: add --with tailwind, or drop it with --without acce
 kay add tailwind,accents
 kay add auth
 kay add mail
+kay add ai
 ```
 
 `kay add` gives an existing project the files and edits `kay new --with` would have written, then runs `bun install`. A feature that needs another is refused with the command that adds both, such as `kay add server,auth`.
 
 Before it writes anything, it checks that each file it changes is still what `kay new` wrote. A file you changed stops it with `kay add: nothing was written` and the lines to add by hand. A file you deleted is not written back.
 
-`mail` and `cms` add the libraries `@kaynooo/kayjs-mail` and `@kaynooo/kayjs-cms`, and list them in the `extensions` of `kay.config.ts`. That config has to be a plain `defineConfig({ ... })`.
+`ai`, `mail` and `cms` add the libraries `@kaynooo/kayjs-ai`, `@kaynooo/kayjs-mail` and `@kaynooo/kayjs-cms`, and list them in the `extensions` of `kay.config.ts`. That config has to be a plain `defineConfig({ ... })`.
 
 | Option | Effect |
 | --- | --- |

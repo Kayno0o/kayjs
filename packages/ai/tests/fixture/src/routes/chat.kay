@@ -1,0 +1,7 @@
+--- server
+import { ask } from '@kaynooo/kayjs-ai'
+import { s } from 'kay'
+
+export const reply = action(s.Object({ messages: s.Array(s.Object({ role: s.UnionEnum(['user', 'assistant']), content: s.String({ maxLength: 4000 }) }), { minItems: 1, maxItems: 50 }) }), ({ messages }) => ask(messages))
+---
+p Chat

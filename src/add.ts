@@ -34,8 +34,8 @@ export interface LibraryFeature {
   notes?: readonly string[] | undefined
 }
 
-// The libraries that register features: `kay add mail` adds their packages, the first of which is asked what to write through its `/add` module. A kayjs package takes kay's own minor, any other the range kay itself uses.
-export const LIBRARIES: Record<string, string[]> = { mail: ['@kaynooo/kayjs-mail'], cms: ['@kaynooo/kayjs-cms', '@kaynooo/kayjs-ui', '@iconify-json/tabler'] }
+// The libraries that register features: `kay add ai` adds their packages, the first of which is asked what to write through its `/add` module. A kayjs package takes kay's own minor, any other the range kay itself uses.
+export const LIBRARIES: Record<string, string[]> = { ai: ['@kaynooo/kayjs-ai'], mail: ['@kaynooo/kayjs-mail'], cms: ['@kaynooo/kayjs-cms', '@kaynooo/kayjs-ui', '@iconify-json/tabler'] }
 
 export interface AddResult {
   written: string[]

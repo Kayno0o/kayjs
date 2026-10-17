@@ -4,6 +4,8 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- `@kaynooo/kayjs-ai` calls an LLM with no SDK: `ask()` over Anthropic or any OpenAI-compatible server returns a reply that `await`s as the text and streams as snapshots into an `await` block or an action's answer, and `fakeAi` answers in development and tests (`kay add ai`, [kayjs-ai](../docs/src/content/docs/libraries/kayjs-ai.md)).
+- An action returning a thenable async iterable, such as a model's reply, streams it instead of waiting for its end, and its call is typed as the stream ([Streaming actions](api-from-islands.md#streaming-actions)).
 - An `await` block takes an async iterable, such as an async generator or a model's reply, and renders `then` again with each part it yields, on the server as the page streams and in an island ([A value that arrives in parts](rendering.md#a-value-that-arrives-in-parts)).
 - The dev tool's drawer moves by its head, resizes by any edge or corner, and docks to the bottom or the right of the window, padding the page while open; the bar drags to any corner, and the layout is kept for the browser, so a new tab opens the tool as it was left ([Dev server](dev-server.md)).
 - The dev tool's Images tab gives copies of one image drawn alike one row with their count, outlining each on hover, rounds the density to two decimals, no longer flags an SVG served under a name not ending in `.svg` as oversized, reading its content type off Resource Timing, and its panels wrap long values instead of scrolling sideways ([Dev server](dev-server.md)).

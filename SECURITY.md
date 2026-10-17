@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-Security fixes go into the latest minor release of kay and its libraries (kayjs-auth, kayjs-ui, kayjs-mail, kayjs-cms), as a patch. They all share one version, so upgrading to the latest one picks up every fix.
+Security fixes go into the latest minor release of kay and its libraries (kayjs-auth, kayjs-ui, kayjs-mail, kayjs-cms, kayjs-ai), as a patch. They all share one version, so upgrading to the latest one picks up every fix.
 
 ## Reporting a vulnerability
 

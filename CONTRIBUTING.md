@@ -25,7 +25,7 @@ The repository's `.npmrc` already points the `@kaynooo` scope at its registry. T
 ## Layout
 
 - `src/`: the framework: compiler, server, island runtime, CLI, language server.
-- `packages/`: the libraries (kayjs-auth, kayjs-ui, kayjs-mail, kayjs-cms), each with its own tests, `llms.txt` and ESLint config.
+- `packages/`: the libraries (kayjs-auth, kayjs-ui, kayjs-mail, kayjs-cms, kayjs-ai), each with its own tests, `llms.txt` and ESLint config.
 - `llms.txt` and `llms/`: the full reference, dense, written for coding agents.
 - `docs/`: the documentation site, plain prose for people, built with kay itself.
 - `examples/`: the tutorial's app and an app using every library.
@@ -67,7 +67,7 @@ Every feature should ask the least of the app using it: the fewest declarations 
 
 ## Commits
 
-Commit titles follow [Conventional Commits](https://www.conventionalcommits.org): `type(scope): title`, with `!` after the scope for a breaking change. A library's scope is its name (`auth`, `ui`, `mail`, `cms`). The title says what changed as an app sees it:
+Commit titles follow [Conventional Commits](https://www.conventionalcommits.org): `type(scope): title`, with `!` after the scope for a breaking change. A library's scope is its name (`auth`, `ui`, `mail`, `cms`, `ai`). The title says what changed as an app sees it:
 
 ```
 fix(session): a running server reopens its sqlite session file once deleted or replaced

@@ -687,7 +687,9 @@ async function runAction(action: ServerAction<TSchema, unknown>, context: { body
   }
 
   try {
-    const result = await action.handler(context.body, ctx)
+    // An async iterable is taken as it is, as awaiting one that is also a thenable, a model's reply, would read it to its end before it could stream.
+    const returned = action.handler(context.body, ctx)
+    const result = isAsyncIterable(returned) ? returned : await returned
 
     // A string passed to `ctx.fail` is the form's message, read where a rate limit's is.
     if (isFailure(result))

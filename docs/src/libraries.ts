@@ -17,7 +17,7 @@ export interface ComponentPage {
 const ROOT = join(import.meta.dir, '../..')
 const PACKAGES = join(ROOT, 'node_modules/@kaynooo')
 const USAGE = join(import.meta.dir, 'content/ui')
-const LIBRARIES = ['kayjs-auth', 'kayjs-cms', 'kayjs-mail', 'kayjs-ui']
+const LIBRARIES = ['kayjs-ai', 'kayjs-auth', 'kayjs-cms', 'kayjs-mail', 'kayjs-ui']
 const TITLE = /^# (.+)\n+/
 // The summary under the title, a quote in llms.txt, is the page's first paragraph.
 const INTRO = /^> /

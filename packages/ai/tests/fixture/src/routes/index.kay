@@ -1,0 +1,11 @@
+--- server
+import { ask } from '@kaynooo/kayjs-ai'
+
+const answer = ask('Say hello', { system: 'Be brief' })
+---
+await answer
+  p.pending Thinking
+then text
+  p.answer {text}
+catch
+  p.failed The reply was cut short
