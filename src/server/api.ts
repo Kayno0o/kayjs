@@ -70,7 +70,9 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
     mounted.push({ ...module, instance })
     const cors = (instance as { [CORS]?: CorsRule })[CORS]
 
-    limits.set(module.mount, { bytes: (instance as { [BODY_LIMIT]?: number })[BODY_LIMIT], refuse: cors ? request => corsResponse(cors, request, tooLarge()) : tooLarge })
+    const bytes = (instance as { [BODY_LIMIT]?: number | (() => number) })[BODY_LIMIT]
+
+    limits.set(module.mount, { bytes: typeof bytes === 'function' ? bytes() : bytes, refuse: cors ? request => corsResponse(cors, request, tooLarge()) : tooLarge })
 
     const guards = requiredGuards(await Promise.all(module.guards.map(async ({ file }) => loadGuard({ file, special: {} }))), module, {}, options.requireGuards)
     const methods = [...new Set(instance.routes.map(route => route.method.toUpperCase()).filter(method => method !== 'OPTIONS' && method !== 'WS'))]
@@ -366,8 +368,8 @@ type ApiLocals = { [Key in keyof Locals]: Locals[Key] }
 type Empty = Record<never, never>
 
 export interface ApiOptions {
-  // The most bytes a request to the module's routes may send, in place of the app's `bodyLimit`.
-  bodyLimit?: number | undefined
+  // The most bytes a request to the module's routes may send, in place of the app's `bodyLimit`; a function is read once the server mounts the module, after the config's extensions ran.
+  bodyLimit?: number | (() => number) | undefined
   // Lets other sites' pages call the module's routes from the browser: `cors: { origins: ['https://app.example.com'], credentials: true }`.
   cors?: CorsOptions | undefined
   // Runs none of the guards above the module, as a page's `guards: false` does; read from the `api({ guards: false })` call as written.

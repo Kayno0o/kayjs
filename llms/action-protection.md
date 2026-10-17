@@ -156,7 +156,7 @@ export default guard(async ({ request, headers, deny }) => {
 ### Body limit
 
 - A request to an action or an API route sends at most `bodyLimit` bytes, 1 MB unless kay.config.ts sets another: `bodyLimit: 4 * 1024 * 1024`.
-- An action raises or lowers it for itself, `action(schema, handler, { bodyLimit: 20 * 1024 * 1024 })`, and an API module for its routes, `api({ bodyLimit })`.
+- An action raises or lowers it for itself, `action(schema, handler, { bodyLimit: 20 * 1024 * 1024 })`, and an API module for its routes, `api({ bodyLimit })`, a number or a function kay reads when it mounts the module (a library reading its own settings).
 - A bigger request is refused before anything reads it, from its `Content-Length`, or, sent in chunks without one, as soon as it passes the limit.
 - A plain form post goes back to its page with `errors['']` saying the most it may send, an island's call throws `ActionError` with status 413 and that error, and an API route answers 413.
 - Bun's own cap, 128 MB unless `new Elysia({ serve: { maxRequestBodySize } })` sets another, holds whatever `bodyLimit` says, and it alone limits the app's own routes.

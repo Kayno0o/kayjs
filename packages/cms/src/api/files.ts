@@ -7,7 +7,8 @@ import { emptyFile, tooLarge } from '../upload-text'
 import { uploadBodyLimit, uploadFolder, uploadRefusal, uploadRules } from '../uploads'
 
 // Stores an upload public, in a folder named for its collection, and answers the path a page renders it from, which the field keeps.
-export default api({ bodyLimit: uploadBodyLimit() })
+// Read when kay mounts the route, as `cms()` has run by then and an import before it does not throw.
+export default api({ bodyLimit: uploadBodyLimit })
   .onError(({ error, status }) => error instanceof UnknownCollection ? status(404, error.message) : undefined)
   // What the pickers offer and the size an upload may have, so a file the server would refuse is not offered.
   .get('/rules', () => uploadRules())
