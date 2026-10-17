@@ -49,7 +49,7 @@ export default defineConfig({
 })
 ```
 
-Every page, action and guard can now read `ctx.locals.auth`, typed. A `prefix` or `home` given to `authPages` reaches `createAuth({ pages: true })` too, so give them once. `pages: true` serves the prebuilt pages under `/auth`, such as `/auth/sign-in`, `/auth/register` and `/auth/account`.
+Every page, action and guard can now read `ctx.locals.auth`, typed. A `prefix` or `home` given to `authPages` reaches `createAuth({ pages: true })` too, so give them once. A `prefix` that differs from the one in `createAuth({ pages })` stops the server at start, and a differing `home` logs a warning naming both, `createAuth`'s winning. `pages: true` serves the prebuilt pages under `/auth`, such as `/auth/sign-in`, `/auth/register` and `/auth/account`.
 
 A file of yours at the same path, such as `src/routes/auth/sign-in.kay`, replaces that page.
 

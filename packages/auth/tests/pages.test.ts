@@ -1,9 +1,10 @@
 import type { AnyElysia } from 'elysia'
 import type { Mail } from '../src/mail'
-import { afterEach, describe, expect, setSystemTime, test } from 'bun:test'
+import { afterEach, describe, expect, setSystemTime, spyOn, test } from 'bun:test'
 import { Elysia } from 'elysia'
 import { session } from 'kay/server'
 import { createAuth } from '../src/auth'
+import { log } from '../src/log'
 import { memoryStore } from '../src/memoryStore'
 import { discordProvider, githubProvider } from '../src/oauth/providers'
 import { authExtension, authPages } from '../src/pages'
@@ -60,8 +61,26 @@ describe('authPages and createAuth share the prefix and home', () => {
 
   test('createAuth keeps its own home, and the same prefix given in both places is the one prefix', async () => {
     expect(await loaded({ prefix: '/account' }, make, { home: '/dashboard' })).toMatchObject({ prefix: '/account', home: '/dashboard' })
-    expect(await loaded({ prefix: '/account', home: '/dashboard' }, make, { prefix: '/account', home: '/panel' })).toMatchObject({ prefix: '/account', home: '/panel' })
     expect(await loaded({ prefix: '/account' }, make, { prefix: '/account' })).toMatchObject({ prefix: '/account' })
+  })
+
+  test('a home given differently to createAuth and authPages logs a warning naming both and createAuth keeps its own, a home given alike or once logs none', async () => {
+    const warn = spyOn(log, 'warn').mockImplementation(() => undefined)
+
+    try {
+      expect(await loaded({ prefix: '/account', home: '/dashboard' }, make, { prefix: '/account', home: '/panel' })).toMatchObject({ prefix: '/account', home: '/panel' })
+      expect(warn).toHaveBeenCalledTimes(1)
+      expect(String(warn.mock.calls[0]![0])).toContain('authPages({ home: \'/dashboard\' }) and createAuth({ pages: { home: \'/panel\' } }) differ')
+
+      await loaded({ home: '/panel' }, make, { home: '/panel' })
+      await loaded({}, make, { home: '/panel' })
+      await loaded({ prefix: '/account', home: '/dashboard' }, make, { prefix: '/account' })
+      await loaded({ home: '/dashboard' }, make, true)
+      expect(warn).toHaveBeenCalledTimes(1)
+    }
+    finally {
+      warn.mockRestore()
+    }
   })
 
   test('a prefix in createAuth that authPages does not serve stops the server, also when authPages gave none', async () => {

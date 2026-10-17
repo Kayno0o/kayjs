@@ -1315,6 +1315,8 @@ function pagesHandle(core: Core, options: { pages?: boolean | AuthPagesConfig | 
 
       if (own.home === undefined && given.home !== undefined)
         pages.home = given.home
+      else if (own.home !== undefined && given.home !== undefined && own.home !== given.home)
+        log.warn(`kayjs-auth: authPages({ home: '${given.home}' }) and createAuth({ pages: { home: '${own.home}' } }) differ, and createAuth's wins: users go to '${own.home}'. Give home once, or the same in both`)
 
       if (own.prefix !== undefined || given.prefix === undefined || given.prefix === pages.prefix)
         return
