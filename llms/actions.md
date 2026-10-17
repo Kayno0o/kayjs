@@ -318,6 +318,7 @@ form(action={add})
 - When the handler or a guard redirects, the browser goes there, swapping the page in as a link would, and the call never resolves.
 - A leave guard keeping the visitor on the page settles the call instead, throwing `ActionRedirect`, so `pending()` clears; a call made on a page the visitor has left since throws it too, taking them nowhere.
 - Outside a browser, as in a test, a redirect throws `ActionRedirect` from `kay` with `location`.
+- Under a `base`, a redirect to a path of the site goes under it however the action was posted or called, so `ctx.redirect('/dashboard')` lands on `/app/dashboard`, and `location` is the path under the base.
 
 ```kay
 ---

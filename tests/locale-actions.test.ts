@@ -33,7 +33,7 @@ async function redirectedFrom(app: Elysia, variant: Variant, page: string, how: 
 
   const where = response.headers.get('location') ?? response.headers.get('x-kay-redirect')
 
-  // Only a plain post's `location` is put under the base.
+  // Every way of reading the redirect has the base on it.
   return where?.startsWith(`${variant.base}/`) ? where.slice(variant.base.length) : where
 }
 
@@ -78,5 +78,80 @@ describe('an action posted from a localized page', () => {
     expect(await post('http://localhost/app/%65n/x')).toBe('/app/dashboard')
     expect(await post('http://localhost/app/english/x')).toBe('/app/dashboard')
     expect(await post('http://localhost/en/app/x')).toBe('/app/dashboard')
+  })
+})
+
+// The same action posted the three ways, with the target it redirects to, under each way a site is served.
+async function redirectTo(app: Elysia, variant: Variant, how: Post, to: string, path = '/to'): Promise<{ location: string | null, redirect: string | null }> {
+  const html = await (await app.handle(new Request(`http://localhost${path}`))).text()
+  const action = actionOf(html, variant.base)
+  const from = `http://localhost${variant.base}${path}`
+  const sent: Record<string, string> = { form: { referer: from }, swap: { 'referer': from, 'x-kay-action': 'form', 'x-kay-navigate': '1', 'x-kay-page': from }, island: { 'x-kay-action': '1', 'x-kay-page': from, 'content-type': 'application/json' } }[how]
+  const form = new FormData()
+
+  form.set('to', to)
+
+  const response = await app.handle(new Request(`http://localhost${action}`, { method: 'POST', headers: { origin: 'http://localhost', ...sent }, body: how === 'island' ? JSON.stringify([{ to: 1 }, to]) : form }))
+
+  return { location: response.headers.get('location'), redirect: response.headers.get('x-kay-redirect') }
+}
+
+describe('an action\'s redirect under a base', () => {
+  for (const base of ['', '/app']) {
+    for (const trailingSlash of ['never', 'always', 'ignore'] as const) {
+      for (const dev of [false, true]) {
+        const variant: Variant = { base, trailingSlash, prefixDefault: false, dev }
+
+        it(`goes under the base whichever way it is read, base ${base || 'unset'}, trailingSlash ${trailingSlash}, ${dev ? 'dev' : 'production'}`, async () => {
+          const app = await serve(variant)
+          const slash = trailingSlash === 'always' ? '/' : ''
+
+          for (const how of POSTS) {
+            const { location, redirect } = await redirectTo(app, variant, how, `/dashboard${slash}?x=1#top`, `/to${slash}`)
+
+            // A plain form is answered with `location`, a call or the swap with `x-kay-redirect`, and each names the page under the base.
+            expect(how === 'form' ? location : redirect).toBe(`${base}/dashboard${slash}?x=1#top`)
+            expect(how === 'form' ? redirect : location).toBeNull()
+          }
+        })
+      }
+    }
+  }
+
+  it('puts a localized page under the base', async () => {
+    const variant: Variant = { base: '/app', trailingSlash: 'never', prefixDefault: false, dev: false }
+    const app = await serve(variant)
+
+    for (const how of POSTS) {
+      const { location, redirect } = await redirectTo(app, variant, how, '/en/dashboard')
+
+      expect(location ?? redirect).toBe('/app/en/dashboard')
+    }
+  })
+
+  it('leaves a target that is no path of the site as it is', async () => {
+    const variant: Variant = { base: '/app', trailingSlash: 'never', prefixDefault: false, dev: false }
+    const app = await serve(variant)
+
+    for (const how of POSTS) {
+      for (const target of ['https://other.example/x', 'http://localhost/dashboard', '//evil.example/x']) {
+        const { location, redirect } = await redirectTo(app, variant, how, target)
+
+        expect(location ?? redirect).toBe(target)
+      }
+    }
+  })
+
+  it('puts a lookalike of the base under it, as any other path', async () => {
+    const variant: Variant = { base: '/app', trailingSlash: 'never', prefixDefault: false, dev: false }
+    const app = await serve(variant)
+
+    for (const how of POSTS) {
+      for (const target of ['/apple', '/app2/x', '/']) {
+        const { location, redirect } = await redirectTo(app, variant, how, target)
+
+        expect(location ?? redirect).toBe(`/app${target}`)
+      }
+    }
   })
 })

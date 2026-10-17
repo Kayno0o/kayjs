@@ -148,7 +148,7 @@ A handler that throws is logged, and the form shows `Something went wrong on our
 
 ## Redirecting after success
 
-`ctx.redirect()` in the handler sends the browser elsewhere. Write it as `return ctx.redirect()`, as in a guard.
+`ctx.redirect()` in the handler sends the browser elsewhere. Write it as `return ctx.redirect()`, as in a guard. Under a `base` the path goes under it however the action was posted or called.
 
 Without a redirect the post goes back to the page. There `add.succeeded()` holds what the handler returned, for that one render.
 

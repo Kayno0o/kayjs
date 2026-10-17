@@ -1,0 +1,10 @@
+--- server
+import { s } from 'kay'
+
+export const go = action(s.Object({ to: s.String() }), (input, ctx) => {
+  ctx.redirect(input.to)
+})
+---
+form(action={go})
+  input(name="to")
+  button Go

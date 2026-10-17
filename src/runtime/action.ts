@@ -896,7 +896,7 @@ async function goTo(target: string): Promise<boolean> {
     return navigation.current !== before || (!released && navigation.released)
   }
 
-  const url = new URL(withBase(target), location.href)
+  const url = new URL(target, location.href)
 
   if (!await mayLeave(url))
     return false
