@@ -66,7 +66,7 @@ In a title or a heading, a word counts a little more when it makes up more of it
 
 A word found whole counts more than one that only starts a longer word, and the less of that word you typed, the less it counts: `island` finds a page titled Islands nearly as well as a heading naming an island.
 
-A page whose sections often hold a word is about it, so each of its sections counts a little more for that word. This lifts the guide about a topic above a page naming it once, but never above a heading naming it. A page's `weight` multiplies its scores.
+A page whose sections often hold a word is about it, so a match in the text of its sections counts a little more. This lifts the guide about a topic above a page naming it once, but never above a heading or a title naming it. A page's `weight` multiplies its scores.
 
 Hits come best first. Two with the same score keep their order in the site.
 

@@ -32,7 +32,7 @@ const PAGE_WEIGHT = 6
 const TEXT_WEIGHT = 2
 // A word of a title or heading counts up to this much more as it makes up more of it: `kay mcp` before `An API route is an MCP tool only when...`, a heading staying below a title.
 const FOCUS_WEIGHT = 1.5
-// A word counts up to this much more in every section of a page the more of its sections hold it, so the page about it comes before one naming it once, below any heading naming it.
+// A word found in a section's text counts up to this much more the more of its page's other sections hold it, so the page about it comes before one naming it once; a heading or title is left as it is.
 const TOPIC_WEIGHT = 2
 // A word repeated in a text counts a little more, up to four times.
 const REPEAT_WEIGHT = 0.5
@@ -110,6 +110,7 @@ export async function writeSearchIndex(clientDir: string, pages: SearchPage[]): 
     for (const { sections, weight } of read) {
       const scored = sections.map(section => sectionScores(section, sections[0]!.page, section === sections[0]))
       const holding = new Map<string, number>()
+      const filled = scored.filter(({ own }) => own.size > 0).length
 
       for (const { own } of scored) {
         for (const word of own)
@@ -119,7 +120,8 @@ export async function writeSearchIndex(clientDir: string, pages: SearchPage[]): 
       for (const [index, { scores }] of scored.entries()) {
         for (const [word, score] of scores) {
           const postings = words.get(word) ?? []
-          const topic = TOPIC_WEIGHT * (holding.get(word) ?? 0) / sections.length
+          // In steps of a half, as finer ones would grow the index for no order they change.
+          const topic = score < HEADING_WEIGHT && filled > 1 ? Math.round(TOPIC_WEIGHT * 2 * ((holding.get(word) ?? 1) - 1) / filled) / 2 : 0
 
           postings.push(all.length, Math.round((score + topic) * weight * 10) / 10)
           words.set(word, postings)

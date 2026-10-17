@@ -221,7 +221,7 @@ ul
 - A word is a run of letters and digits, so a language written without spaces, such as Chinese or Japanese, is indexed by whole runs: a query finds such a run only by its start.
 - A word in the page's title counts most, then in a heading, then in the text, and a word in a title or heading counts a little more the more of it it makes up, so `kay mcp` comes before a long heading naming MCP.
 - A word only starting a longer one counts less the less of it the query holds, so `island` finds the page titled Islands before a heading naming an island.
-- A word counts up to 2 more in every section of a page the more of its sections hold it, lifting the page about it above one naming it once, below any heading naming it.
+- A word found in a section's text counts up to 2 more the more of its page's other sections hold it, lifting the page about it above one naming it once; a heading or title match is left as is, and `island` and `islands` count apart.
 - Each hit has `page`, `heading` (undefined above the first heading), `headingParts`, the heading split into parts marking each word searched for, `href`, the page's path with the heading's anchor, `snippet`, a line of text around the first word found split into parts marking each word searched for, `more`, how many more words searched for its text holds past the snippet, and `score`.
 - `{ limit }` returns at most that many hits, 20 by default.
 - `searchSite(query, options)` from `kay` is the same search as a promise, for a script of its own.
