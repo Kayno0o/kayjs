@@ -2,4 +2,4 @@
 import type { DevIconName, DevTab, DevTabOptions, DevTool as Tool } from './dev-tool'
 
 export type { DevIconName, DevTab, DevTabOptions }
-export type DevTool = Pick<Tool, 'make' | 'tab' | 'button' | 'outline' | 'hideOutline' | 'open'>
+export type DevTool = Pick<Tool, 'make' | 'icon' | 'tab' | 'button' | 'outline' | 'hideOutline' | 'open'>

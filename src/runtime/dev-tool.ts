@@ -112,8 +112,6 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 .link { color: var(--accent); text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--accent) 45%, transparent); text-underline-offset: 2px; }
 .link:hover { text-decoration-color: currentColor; }
 .good { color: var(--ok); }
-.poor { color: var(--error); }
-.needs { color: var(--warn); }
 .value { white-space: pre-wrap; word-break: break-all; }
 .facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 7px 16px; margin: 0; }
 .facts dt { color: var(--sub); }
@@ -236,6 +234,7 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 const SVG = 'http://www.w3.org/2000/svg'
 
 // Icons of Lucide 0.469.0 (https://lucide.dev), under the ISC licence: Copyright (c) for portions of Lucide are held by Cole Bemis 2013-2022 as part of Feather (MIT), all other copyright (c) for Lucide are held by Lucide Contributors 2022.
+// Permission to use, copy, modify, and/or distribute this software for any purpose with or without fee is hereby granted, provided that the above copyright notice and this permission notice appear in all copies. THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 // Each is a 24 by 24 drawing as its nodes, `tag~attribute~value~...` joined by `|`.
 const ICONS = {
   'circle-x': 'circle~cx~12~cy~12~r~10|path~d~m15 9-6 6|path~d~m9 9 6 6',
@@ -303,7 +302,6 @@ function setIcon(button: HTMLButtonElement, label: string, name: DevIconName): v
   button.setAttribute('aria-label', label)
 }
 
-// The tabs kay makes itself; those a library adds sit under a line.
 // The icon a count's tone puts in the bar's badge.
 const TONE_ICONS = { error: 'circle-x', warn: 'triangle-alert' } as const satisfies Record<'error' | 'warn', DevIconName>
 const RATING_TONES = { good: 'ok', needs: 'warn', poor: 'error' } as const
@@ -323,6 +321,7 @@ function worstTone(bad: string[]): 'error' | 'warn' | undefined {
   return bad.length > 0 ? 'warn' : undefined
 }
 
+// The tabs kay makes itself; those a library adds sit under a line.
 const CORE_TABS = new Set(['problems', 'request', 'head', 'env', 'images', 'performance', 'routes', 'i18n', 'islands'])
 
 // A small rounded label, tinted by what it counts or says, with an icon before it when given.
@@ -696,6 +695,7 @@ export function startDevTool(doc: Document = document): DevTool {
 
   swaps.observe(doc.documentElement, { attributeFilter: ['aria-busy'] })
   win.addEventListener('popstate', showWhere, { signal: listening.signal })
+  showWhere()
   listening.signal.addEventListener('abort', () => swaps.disconnect())
 
   const tool: DevTool = {
@@ -1192,13 +1192,14 @@ function meter(tool: DevTool, length: number, limit?: number): HTMLElement {
   const over = limit !== undefined && length > limit
   const element = tool.make('span', over ? 'meter over' : 'meter')
   const track = tool.make('span', 'track')
-  const fill = tool.make('i')
 
   if (limit === undefined) {
     element.append(tool.make('span', 'n', `${length} characters`))
 
     return element
   }
+
+  const fill = tool.make('i')
 
   fill.style.width = `${Math.min(100, length / limit * 100)}%`
   track.append(fill)
@@ -1834,6 +1835,8 @@ function imagesTab(doc: Document, tool: DevTool, vitals: Vitals, signal: AbortSi
       formats.push(format)
       thumb.src = info.src
       thumb.alt = ''
+      thumb.loading = 'lazy'
+      thumb.decoding = 'async'
 
       if (info.lcp)
         src.append(pill(tool, 'largest paint', 'accent'))

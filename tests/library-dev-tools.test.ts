@@ -59,6 +59,8 @@ describe('the libraries\' dev tool tabs', () => {
     document.head.innerHTML = '<meta name="kay-base" content="/shop">'
     tool = startDevTool()
     authDevTool(tool)
+    expect(shadow().querySelector('#kay-dev-tab-auth svg')).not.toBeNull()
+    expect(shadow().querySelector('#kay-dev-tab-auth svg')!.innerHTML).not.toBe(shadow().querySelector('#kay-dev-tab-problems svg')!.innerHTML)
     shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-auth')!.click()
     await Bun.sleep(0)
     expect(panel('auth').textContent).toContain('Nobody is signed in.')
@@ -92,6 +94,8 @@ describe('the libraries\' dev tool tabs', () => {
 
     tool = startDevTool()
     mailDevTool(tool)
+    expect(shadow().querySelector('#kay-dev-tab-mail svg')).not.toBeNull()
+    expect(shadow().querySelector('#kay-dev-tab-mail svg')!.innerHTML).not.toBe(shadow().querySelector('#kay-dev-tab-problems svg')!.innerHTML)
     await Bun.sleep(5)
     shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-mail')!.click()
     await Bun.sleep(0)
@@ -160,6 +164,8 @@ describe('the libraries\' dev tool tabs', () => {
 
     tool = startDevTool()
     cmsDevTool(tool)
+    expect(shadow().querySelector('#kay-dev-tab-cms svg')).not.toBeNull()
+    expect(shadow().querySelector('#kay-dev-tab-cms svg')!.innerHTML).not.toBe(shadow().querySelector('#kay-dev-tab-problems svg')!.innerHTML)
     shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-cms')!.click()
     await Bun.sleep(0)
     expect(panel('cms').textContent).toContain('You are not in edit mode.')

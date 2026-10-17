@@ -379,6 +379,47 @@ describe('the dev tool', () => {
     expect('$kayBuilt' in window).toBe(false)
   })
 
+  it('gives a tab its icon, the default one when it names none, and tones its count', () => {
+    tool = startDevTool()
+
+    const plain = tool.tab({ id: 'plain', label: 'Plain', summary: count => `${count} plain` })
+    const named = tool.tab({ id: 'named', label: 'Named', icon: 'mail', summary: count => `${count} named` })
+    const icon = (id: string) => shadow().querySelector(`#kay-dev-tab-${id} svg`)!.innerHTML
+
+    plain.count(2, 'warn')
+    named.count(1, 'error')
+
+    expect(icon('plain')).toBe(tool.icon('puzzle').innerHTML)
+    expect(icon('named')).toBe(tool.icon('mail').innerHTML)
+    expect(shadow().querySelector('#kay-dev-tab-plain .count')!.className).toBe('count pill warn')
+    expect(shadow().querySelector('#kay-dev-tab-named .count')!.className).toBe('count pill error')
+
+    const badges = [...shadow().querySelectorAll('.bar > button:not([hidden]) .pill')].map(badge => `${badge.className} ${badge.textContent}`)
+
+    expect(badges).toContain('pill warn 2 plain')
+    expect(badges).toContain('pill error 1 named')
+  })
+
+  it('shows the page\'s path in the head, and follows a swap', async () => {
+    const { happyDOM } = window as unknown as { happyDOM: { setURL: (url: string) => void } }
+    const { href } = location
+
+    happyDOM.setURL('http://localhost/docs?page=2')
+    tool = startDevTool()
+
+    try {
+      expect(shadow().querySelector('.head .where')!.textContent).toBe('/docs?page=2')
+
+      happyDOM.setURL('http://localhost/next')
+      window.dispatchEvent(new PopStateEvent('popstate'))
+
+      expect(shadow().querySelector('.head .where')!.textContent).toBe('/next')
+    }
+    finally {
+      happyDOM.setURL(href)
+    }
+  })
+
   it('shows what served the page, its route, files, params, status and loads, and reads the next page\'s as a swap brings it', async () => {
     const block = (request: object) => {
       const script = document.createElement('script')
@@ -1030,17 +1071,14 @@ describe('the dev tool', () => {
 
       // The HTML is sized from the document the browser holds, not fetched again; two unhashed files whose names end in 8 letters stay two, and an island hashed in letters only is still one.
       expect(fetched.sort()).toEqual(['/_kay/_layout-1.css', '/_kay/counter-def45678.js', '/_kay/dev/sizes', '/_kay/entry-abc12345.js', '/_kay/lib-calendar.js', '/_kay/lib-original.js', '/_kay/page-swap-aa11bb22.js', '/_kay/search-tbghfygg.js'])
-      const js = size(files['/_kay/entry-abc12345.js']!, files['/_kay/counter-def45678.js']!, files['/_kay/page-swap-aa11bb22.js']!, files['/_kay/search-tbghfygg.js']!, files['/_kay/lib-calendar.js']!, files['/_kay/lib-original.js']!)
-
-      expect(weights().slice(1)).toEqual([
+      expect(weights().slice(1, -1)).toEqual([
         size(files['/_kay/_layout-1.css']!),
         size(files['/_kay/entry-abc12345.js']!),
         size(files['/_kay/counter-def45678.js']!, files['/_kay/search-tbghfygg.js']!),
         size(files['/_kay/page-swap-aa11bb22.js']!, files['/_kay/lib-calendar.js']!, files['/_kay/lib-original.js']!),
-        expect.any(String),
       ])
-      expect(weights()[0]).toMatch(/^\d/)
-      expect(js).toMatch(/\d/)
+      expect(weights()[0]).toMatch(/^\d+(\.\d)? (B|KB)$/)
+      expect(weights().at(-1)).toMatch(/^\d+(\.\d)? (B|KB)$/)
       expect(shadow().querySelector('#kay-dev-performance')!.textContent).toContain('Dev sizes: not minified')
 
       // The last build's sizes for the route, with their age, the estimate marked.
