@@ -25,6 +25,7 @@ FileDrop(
       if previews().length > 0
         .mt-4.flex.flex-wrap.justify-center.gap-2
           for preview of previews() key={preview.url}
+            // kay-allow unsized-image
             img.size-20.rounded.object-cover(
               src={preview.url}
               alt={preview.name}

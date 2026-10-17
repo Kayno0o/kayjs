@@ -8,4 +8,5 @@ img({...image('/logo.svg')} alt="Logo")
 img.plain(src={hero} sizes="50vw" alt="Plain")
 img.sized(src={hero} width="500" alt="Sized")
 img.own(src={hero} srcset="/a.png 1x" alt="Own")
+// kay-allow unsized-image
 img.other(src={'/logo.svg'} alt="Other")

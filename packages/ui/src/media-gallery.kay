@@ -161,6 +161,7 @@ else
               track(kind="captions" src={item.captions} default)
         else
           button.kui-media-gallery-zoom(type="button" aria-label={item.title ? `${openLabel}: ${item.title}` : openLabel} onClick={() => zoomed.set(true)})
+            // kay-allow unsized-image
             img.kui-media-gallery-frame(src={item.preview} alt={item.title ?? ''})
       if items.length > 1
         IconButton(icon="chevron" label={previousLabel} variant="ghost" class="kui-media-gallery-step" data-side="previous" onClick={() => step(-1)})
@@ -172,6 +173,7 @@ else
       .kui-media-gallery-strip(ref={element => strip = element})
         for item, position of items key={item.key}
           button.kui-media-gallery-thumb(type="button" aria-current={position === active() ? 'true' : undefined} aria-label={item.title ?? named(position)} onClick={() => go(position)})
+            // kay-allow unsized-image
             img.kui-media-gallery-thumb-image(src={item.thumb} alt="" loading="lazy" decoding="async")
             if item.kind === 'video'
               Icon(icon="play" class="kui-media-gallery-play")
@@ -183,6 +185,7 @@ else
               if item.captions
                 track(kind="captions" src={item.captions} default)
           else
+            // kay-allow unsized-image
             img.kui-media-gallery-full(src={item.full ?? item.preview} alt={item.title ?? ''})
         if items.length > 1
           IconButton(icon="chevron" label={previousLabel} variant="ghost" class="kui-media-gallery-step" data-side="previous" onClick={() => step(-1)})

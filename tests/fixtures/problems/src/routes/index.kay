@@ -1,2 +1,2 @@
-img(src="/a.png")
+img(src="/a.png" width="1" height="1")
 p <b>

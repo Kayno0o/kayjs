@@ -26,6 +26,7 @@ const ground = () => stringToHexColor(name)
 // The picture, or the name's initial on a colour seeded by the name when there is none or it fails to load.
 span.kui-avatar({...rest} data-size={size} role={label ? 'img' : undefined} aria-label={label} class={className})
   if src && !failed()
+    // kay-allow unsized-image
     img.kui-avatar-image(src={src} alt="" onError={() => failed.set(true)})
   else
     span.kui-avatar-initial(aria-hidden="true" style={`background-color: ${ground()}; color: ${isDark(ground()) ? '#fff' : '#000'}`}) {[...name.trim()][0]}

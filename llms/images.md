@@ -172,6 +172,7 @@ img(src={hero} sizes="(min-width: 60rem) 50vw, 100vw" alt="The workshop")
 - Since any URL of a listed host may be asked for, a new query each time, at most 500 originals are kept, up to about 13 GB on disk at 25 MB each plus the variants made of them, the least recently used going first with their variants, and one client starts at most 30 downloads a minute, the route answering 429 past them.
 - The variants are served from the site, so the CSP's `img-src` needs no entry for the host.
 - `images.maxDensity` in `kay.config.ts` sets the most pixels per CSS pixel an image loads at, 2 by default, at least 1; `Infinity` leaves the browser's choice.
+- `kay check` warns (`unsized-image`) of an `img` with neither `width` and `height` nor a spread, such as `image()`'s, that may carry them; an imported raster image is sized and left alone, an SVG or a path is not.
 - The browser lays the image out from its `width` and `height`, so only the variant it picks changes; a `sizes` holding `auto` is left as written.
 - `processImage(file, options)` from `kay/server` resizes and encodes an image a user uploaded for the app to store: `await processImage(file, { width: 200, height: 200, fit: 'cover' })` squares it to a 200px WebP, its middle kept; without `fit` it fits inside the box, never enlarged, one side alone keeping its shape.
 - `format` is `webp`, `jpeg` or `png`, `quality` 80 by default; it gives `{ bytes, width, height, type }`.

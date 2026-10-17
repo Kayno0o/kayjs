@@ -3,6 +3,7 @@ import type { GenerateOptions } from './codegen'
 import type { LintName } from './lints'
 import type { PageSettingName } from './page-settings'
 import type { ImportBinding, ScriptAnalysis, ServerAnalysis } from './script'
+import { RESIZABLE } from '../runtime/image'
 import { LOCALE_ATTRIBUTES } from '../runtime/root'
 import { WIDGET_ROLES } from './aria'
 import { childBlocks, FIELD_ATTRIBUTE, FIELD_ELEMENTS, isHead, isSlot, serverIslandOf, templateFacts } from './ast'
@@ -95,6 +96,8 @@ class Validator {
   private readonly src: string
   private readonly forms: Map<Node, Span>
   private foreign = false
+  // The names bound to an imported PNG, JPEG, WebP, GIF or AVIF, whose size kay writes on the `img` showing them.
+  private sizedImports = new Set<string>()
 
   constructor(private readonly file: KayFile, private readonly options: ValidateOptions) {
     this.src = file.source
@@ -102,6 +105,8 @@ class Validator {
   }
 
   run(script: ScriptAnalysis, server: ServerAnalysis | undefined): Diagnostic[] {
+    this.sizedImports = new Set([...script.imports, ...(server?.imports ?? [])].filter(binding => binding.imported === 'default' && !binding.typeOnly && RESIZABLE.test(binding.source)).map(binding => binding.local))
+
     if (server && this.options.includeServer !== false) {
       for (const [binding, first] of sharedImports(script, server).conflicts)
         this.error(binding.span, `\`${binding.local}\` is imported twice, once in each fence, and not the same way`, { related: [{ ...first.span, label: 'first imported here' }], help: 'import it once' })
@@ -430,6 +435,9 @@ class Validator {
     if (required && !names.has(required[0]))
       this.lint(at, required[0] === 'alt' ? 'missing-alt' : 'missing-title', required[1], { help: required[2] })
 
+    if (this.unsized(element, names))
+      this.lint(at, 'unsized-image', `This \`${element.name}\` has no \`width\` and \`height\`, so the page shifts as it loads`, { help: 'write both, as the image\'s own size: only their ratio matters, CSS sets how large it is drawn; `// kay-allow unsized-image` keeps an image whose box CSS already reserves' })
+
     if (element.name === 'input' && type?.kind === 'static' && type.text === 'image' && !names.has('alt'))
       this.lint(at, 'missing-alt', 'An image button needs `alt`', { help: 'name what it does' })
 
@@ -441,6 +449,22 @@ class Validator {
       this.lint(at, 'unreachable-click', `This \`${element.name}\` reacts to \`onClick\` but is out of reach of the keyboard and screen readers`, { help: 'use a `button`, or give it a widget\'s `role`, such as `button` or `option`, along with a `tabindex` and a key handler; `// kay-allow unreachable-click` keeps a click a keyboard has another way to, such as a backdrop Escape also closes' })
     else
       this.lint(at, 'unannounced-click', `This \`${element.name}\` reacts to \`onClick\` but its \`role\` names no widget, so screen readers do not announce it as one`, { help: 'use a `button`, or a widget\'s `role`, such as `button` or `option`; `// kay-allow unannounced-click` keeps a click a keyboard has another way to, such as a backdrop Escape also closes' })
+  }
+
+  // An `img` or image button that reserves no room for itself. A spread was left alone by the caller, as `image()` gives its size.
+  private unsized(element: ElementNode, names: Set<string>): boolean {
+    if (names.has('width') && names.has('height'))
+      return false
+
+    if (element.name === 'input')
+      return element.attributes.some(attribute => attribute.kind === 'static' && this.text(attribute.name) === 'type' && attribute.text === 'image')
+
+    if (element.name !== 'img')
+      return false
+
+    const src = element.attributes.find(attribute => attribute.kind === 'expression' && this.text(attribute.name) === 'src')
+
+    return src?.kind !== 'expression' || !this.sizedImports.has(this.text(src.expression).trim())
   }
 
   private text(span: Span): string {

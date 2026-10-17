@@ -1716,15 +1716,15 @@ describe.concurrent('kay check, URLs written out besides links', () => {
       'a(href="/files/123e4567") bad',
       'a(href={`/posts/${n}`}) ok',
       'a(href="/blog/anything") ok',
-      'img(src="/logo.png" alt="")',
-      'img(src="/missing.png" alt="")',
+      'img(src="/logo.png" width="1" height="1" alt="")',
+      'img(src="/missing.png" width="1" height="1" alt="")',
       'link(rel="stylesheet" href="/nope.css")',
       'link(rel="alternate" type="application/rss+xml" href="/feed.xml")',
       'link(rel="icon" href="/favicon.ico")',
       'form(action="/nowhere")',
       'form(action="/")',
       'form(action="/logout" method="post")',
-      'img(src="/_kay/image?src=a.png&w=640" alt="")',
+      'img(src="/_kay/image?src=a.png&w=640" width="1" height="1" alt="")',
       'button(onClick={go}) {String(fine)}',
       'form(action="/search" method="GET")',
       'link(rel="manifest" href="/manifest.fr.webmanifest")',
@@ -2178,7 +2178,7 @@ describe.concurrent('kay check, unused code', () => {
   it('prints one group\'s lints alone with --only, failing on them alone', async () => {
     const root = await scratchProject({
       'kay.config.ts': 'export default { seo: { name: \'Example\' }, favicon: false }\n',
-      'src/routes/index.kay': 'img(src="/a.png")\n',
+      'src/routes/index.kay': 'img(src="/a.png" width="1" height="1")\n',
     })
 
     try {
@@ -2201,7 +2201,7 @@ describe.concurrent('kay check, unused code', () => {
       expect(served).not.toContain('missing-site')
       expect(await build('--static')).toContain('warning[missing-site]')
       expect((await runCheck(root, '--only', 'a11y')).output.match(/^\w+\[[\w-]+\]/gm)).toEqual(['error[missing-alt]'])
-      expect(await runCheck(root, '--only', 'nope')).toEqual({ code: 1, output: 'kay check: --only takes a group of lints, `code`, `a11y`, `forms`, `islands`, `seo`, `security`, `deprecated`, not `nope`\n', report: '' })
+      expect(await runCheck(root, '--only', 'nope')).toEqual({ code: 1, output: 'kay check: --only takes a group of lints, `code`, `a11y`, `forms`, `islands`, `performance`, `seo`, `security`, `deprecated`, not `nope`\n', report: '' })
     }
     finally {
       await rm(root, { recursive: true, force: true })
@@ -2228,7 +2228,7 @@ describe.concurrent('kay check, unused code', () => {
 
   it('prints the problems as workflow commands a CI annotates the diff with, or as one JSON document, failing alike', async () => {
     const root = await scratchProject({
-      'src/list.kay': '---\nconst { todos } = props<{ todos: { id: number, title: string }[] }>()\n---\nfor todo, i of todos key={i}\n  a(href={`/todos/${todo.id}`}) {todo.title}\nimg(src="/a.png")\n',
+      'src/list.kay': '---\nconst { todos } = props<{ todos: { id: number, title: string }[] }>()\n---\nfor todo, i of todos key={i}\n  a(href={`/todos/${todo.id}`}) {todo.title}\nimg(src="/a.png" width="1" height="1")\n',
     })
     const file = relative(process.cwd(), join(root, 'src/list.kay'))
 
@@ -2258,7 +2258,7 @@ describe.concurrent('kay check, unused code', () => {
   })
 
   it('tells why a check could not run in its format too, and annotates a file from the repository\'s root', async () => {
-    const root = await scratchProject({ 'kay.config.ts': 'export default {\n', 'src/a.kay': 'img(src="/a.png")\n' })
+    const root = await scratchProject({ 'kay.config.ts': 'export default {\n', 'src/a.kay': 'img(src="/a.png" width="1" height="1")\n' })
     const config = join(root, 'kay.config.ts')
 
     try {
@@ -2285,8 +2285,8 @@ describe.concurrent('kay check, unused code', () => {
 
   it('reports the problems of the files and directories named alone, the project still checked as a whole', async () => {
     const root = await scratchProject({
-      'src/a.kay': 'img(src="/a.png")\n',
-      'src/b/c.kay': 'img(src="/c.png")\n',
+      'src/a.kay': 'img(src="/a.png" width="1" height="1")\n',
+      'src/b/c.kay': 'img(src="/c.png" width="1" height="1")\n',
       'src/d.ts': 'export const d: number = \'d\'\n',
     })
     const codes = async (...paths: string[]) => (await runCheck(root, '--format', 'json', ...paths.map(path => join(root, path)))).report
@@ -2304,7 +2304,7 @@ describe.concurrent('kay check, unused code', () => {
   })
 
   it('reads the paths named from the current directory, through symlinks, and refuses one outside the project', async () => {
-    const root = await scratchProject({ 'src/a.kay': 'img(src="/a.png")\n', 'src/b.kay': 'img(src="/b.png")\n', '..foo/c.kay': 'img(src="/c.png")\n' })
+    const root = await scratchProject({ 'src/a.kay': 'img(src="/a.png" width="1" height="1")\n', 'src/b.kay': 'img(src="/b.png" width="1" height="1")\n', '..foo/c.kay': 'img(src="/c.png" width="1" height="1")\n' })
     const link = `${root}-link`
     const files = async (result: Promise<{ report: string }>) => (JSON.parse((await result).report) as { problems: { file: string }[] }).problems.map(problem => basename(problem.file))
     const inRoot = async (...args: string[]) => kay(['check', ...args, '--format', 'json'], { cwd: root })
@@ -2353,7 +2353,7 @@ describe.concurrent('kay check, unused code', () => {
 
     try {
       expect(await watch.report()).toMatchObject({ errors: 0 })
-      await Bun.write(join(root, 'src/a.kay'), 'img(src="/a.png")\n')
+      await Bun.write(join(root, 'src/a.kay'), 'img(src="/a.png" width="1" height="1")\n')
       expect(await watch.report()).toMatchObject({ errors: 1 })
       await Bun.write(join(root, 'src/a.kay'), 'p a\n')
       expect(await watch.report()).toMatchObject({ errors: 0 })
@@ -2365,7 +2365,7 @@ describe.concurrent('kay check, unused code', () => {
   })
 
   it('reads kay.config.ts again on every check with --watch, an edit to it or a mistake in it included', async () => {
-    const root = await scratchProject({ 'kay.config.ts': 'export default { lints: { \'missing-alt\': \'allow\' } }\n', 'src/a.kay': 'img(src="/a.png")\n' })
+    const root = await scratchProject({ 'kay.config.ts': 'export default { lints: { \'missing-alt\': \'allow\' } }\n', 'src/a.kay': 'img(src="/a.png" width="1" height="1")\n' })
     const watch = watchChecks(root)
 
     try {
@@ -2410,10 +2410,10 @@ describe.concurrent('kay check, unused code', () => {
     try {
       expect(await watch.report()).toMatchObject({ errors: 0 })
       await Bun.write(join(root, 'crash'), '')
-      await Bun.write(join(root, 'src/a.kay'), 'img(src="/a.png")\n')
+      await Bun.write(join(root, 'src/a.kay'), 'img(src="/a.png" width="1" height="1")\n')
       expect(await watch.report()).toMatchObject({ errors: 1, problems: [{ code: null, message: 'the check stopped with exit code 9 before reporting' }] })
       await Bun.write(join(root, 'crash'), 'kill')
-      await Bun.write(join(root, 'src/a.kay'), 'img(src="/b.png")\n')
+      await Bun.write(join(root, 'src/a.kay'), 'img(src="/b.png" width="1" height="1")\n')
       expect(await watch.report()).toMatchObject({ errors: 1, problems: [{ code: null, message: 'the check died of SIGKILL before reporting' }] })
       await rm(join(root, 'crash'))
       await Bun.write(join(root, 'src/a.kay'), 'p a\n')
@@ -2440,7 +2440,7 @@ describe.concurrent('kay check, unused code', () => {
       await printed(1, 'with no problems')
       expect(output.split(CLEAR).length).toBe(2)
       expect(output.indexOf(CLEAR)).toBeLessThan(output.indexOf('with no problems'))
-      await Bun.write(join(root, 'src/a.kay'), 'img(src="/a.png")\n')
+      await Bun.write(join(root, 'src/a.kay'), 'img(src="/a.png" width="1" height="1")\n')
       await printed(1, 'missing-alt')
       expect(output.split(CLEAR).length).toBe(3)
       expect(output.lastIndexOf(CLEAR)).toBeLessThan(output.indexOf('missing-alt'))

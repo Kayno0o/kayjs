@@ -28,6 +28,7 @@ The editor shows each problem of an open file with the same message, note and he
 - With `i18n`, every `t()` key and placeholder in every locale.
 - Island props can be serialized, and no component reads a browser global while it renders.
 - Accessibility basics: `alt`, labels, headings, keyboard access.
+- An `img` with no `width` and `height`, which shifts the page as it loads. An imported PNG, JPEG, WebP, GIF or AVIF gets its size from kay, and so does an image drawn with `image()`. An SVG or a path needs both written, and only their ratio matters.
 - Config the server would refuse at boot, such as two pages serving one path.
 - On a public site, what search engines and social networks read: a `site`, a description, a share image, a favicon.
 
@@ -81,6 +82,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `unguarded-tool` | warn | security | With `mcp`, a tool action with bot protection that no guard covers |
 | `deprecated-api-tool` | warn | deprecated | With `mcp`, an API route that sets neither `detail.tool` nor `hide`: it was a tool before 1.51 and is none now |
 | `hidden-tool` | warn | code | With `mcp`, an API route that sets `hide` and `tool` |
+| `unsized-image` | warn | performance | An `img` with no `width` and `height` |
 | `missing-site` | warn | seo | `seo` with no `site`, on a static export |
 | `missing-description` | warn | seo | No `seo.description` |
 | `missing-share-image` | warn | seo | No share image on any page |

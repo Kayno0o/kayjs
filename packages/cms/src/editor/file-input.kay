@@ -40,6 +40,7 @@ async function upload([file]: File[]): Promise<void> {
 .kcms-file
   if value !== ''
     if image
+      // kay-allow unsized-image
       img.kcms-file-preview(src={value} alt="")
     else
       a.kcms-file-link(href={value}) {value.split('/').at(-1)}

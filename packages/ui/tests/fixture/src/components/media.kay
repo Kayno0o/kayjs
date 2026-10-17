@@ -21,6 +21,7 @@ const items: MediaItem[] = [
 ---
 MediaGallery#gallery(items={items} onIndexChange={onIndexChange})
 ZoomPane#zoom(label="Map")
+  // kay-allow unsized-image
   img(src="/map.png" alt="")
 ImageCropper#cropper(src="/photo.png" ratio={2} onCrop={onCrop})
   @footer(reset)

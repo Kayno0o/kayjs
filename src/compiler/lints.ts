@@ -13,6 +13,7 @@ export const LINT_GROUPS = {
   a11y: 'What keeps a page from a keyboard or a screen reader.',
   forms: 'Fields and the schemas of the actions they post to.',
   islands: 'Keys, signals and what an island renders again.',
+  performance: 'What makes a page shift as it loads or load more than it shows.',
   seo: 'What search engines and social networks read off a public site: warnings once `site` or `seo` is set, or the site is exported with `--static`, and nothing otherwise.',
   security: 'What anyone may reach on a site asking for guards.',
   deprecated: 'Old forms a minor replaced, which `kay upgrade` rewrites and a later minor stops reporting.',
@@ -324,6 +325,13 @@ export const LINTS = {
     summary: 'With `mcp`, an API route with an inline handler whose `detail` sets `tool` and `hide: true`. A hidden route is left out of the OpenAPI document and offered as no tool, so `tool` does nothing there.',
     wrong: 'export default api().get(\'/gate\', () => ok(), { detail: { hide: true, tool: true } })',
     right: 'export default api().get(\'/gate\', () => ok(), { detail: { hide: true } })',
+  },
+  'unsized-image': {
+    level: 'warn',
+    group: 'performance',
+    summary: 'An `img`, or an `input(type="image")`, given neither `width` and `height` nor a spread that may carry them: the page keeps no room for it, so everything below shifts when it loads. An image imported from a PNG, JPEG, WebP, GIF or AVIF file is sized by kay, and `image()` gives its size too; an SVG or a path has to be given one. The ratio is what counts, CSS sets the size it is drawn at.',
+    wrong: 'img(src="/team.png" alt="The team")',
+    right: 'img(src="/team.png" width="1200" height="800" alt="The team")',
   },
   'missing-site': {
     level: 'warn',

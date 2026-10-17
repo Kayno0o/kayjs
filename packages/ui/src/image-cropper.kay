@@ -149,6 +149,7 @@ const area = () => {
 ---
 .kui-image-cropper({...rest} class={className})
   .kui-image-cropper-stage(ref={element => stage = element} role="presentation" onPointerMove={move} onPointerUp={end} onPointerCancel={end})
+    // kay-allow unsized-image
     img.kui-image-cropper-image(ref={element => image = element} src={src} alt={alt} draggable="false" onLoad={loaded})
     if crop().w > 0
       .kui-image-cropper-crop(role="slider" tabindex="0" aria-label={cropLabel} aria-valuetext={described()} aria-valuemin={minSize} aria-valuemax={size()?.width ?? minSize} aria-valuenow={Math.round(crop().w)} style={area()} onPointerDown={event => start(event, 'move')} onKeyDown={keyDown})

@@ -67,6 +67,7 @@ section.kui-carousel({...rest} aria-roledescription="carousel" aria-label={label
   .kui-carousel-viewport(style={`aspect-ratio: ${ratio}`} aria-live={autoplay ? 'off' : 'polite'})
     for slide, position of slides key={slide.src}
       .kui-carousel-slide(role="group" aria-roledescription="slide" aria-label={numbered(slideLabel, position)} aria-hidden={position === active() ? undefined : 'true'} inert={position !== active()} style={`transform: translateX(${(position - active()) * 100}%)`})
+        // kay-allow unsized-image
         img.kui-carousel-image(src={slide.src} alt={slide.alt} loading={position === 0 ? 'eager' : 'lazy'})
   if slides.length > 1
     .kui-carousel-controls

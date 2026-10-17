@@ -19,27 +19,27 @@ const ROWS = '---\nconst { todos } = props<{ todos: { id: number, title: string 
 
 describe('lint levels', () => {
   it('reports a lint at its default level: an error when it denies, a warning when it warns', () => {
-    expect(lints(`${ROWS}img(src="/a.png")\nfor todo, i of todos key={i}\n  a(href={\`/todos/\${todo.id}\`}) {todo.title}\n`)).toEqual([
+    expect(lints(`${ROWS}img(src="/a.png" width="1" height="1")\nfor todo, i of todos key={i}\n  a(href={\`/todos/\${todo.id}\`}) {todo.title}\n`)).toEqual([
       { code: 'missing-alt', severity: 'error', at: 'img' },
       { code: 'positional-key', severity: 'warning', at: 'i' },
     ])
   })
 
   it('takes the level the config gives, allow dropping it', () => {
-    const source = `${ROWS}img(src="/a.png")\nfor todo, i of todos key={i}\n  a(href={\`/todos/\${todo.id}\`}) {todo.title}\n`
+    const source = `${ROWS}img(src="/a.png" width="1" height="1")\nfor todo, i of todos key={i}\n  a(href={\`/todos/\${todo.id}\`}) {todo.title}\n`
 
     expect(lints(source, { lints: { 'missing-alt': 'warn', 'positional-key': 'deny' } }).map(d => d.severity)).toEqual(['warning', 'error'])
     expect(lints(source, { lints: { 'missing-alt': 'allow', 'positional-key': 'allow' } })).toEqual([])
   })
 
   it('takes a group\'s level for each of its lints, a lint\'s own level winning over it', () => {
-    const source = `${ROWS}img(src="/a.png")\niframe(src="/map")\nfor todo, i of todos key={i}\n  a(href={\`/todos/\${todo.id}\`}) {todo.title}\n`
+    const source = `${ROWS}img(src="/a.png" width="1" height="1")\niframe(src="/map")\nfor todo, i of todos key={i}\n  a(href={\`/todos/\${todo.id}\`}) {todo.title}\n`
 
     expect(lints(source, { lints: { 'a11y': 'warn', 'missing-title': 'allow', 'islands': 'allow' } })).toEqual([{ code: 'missing-alt', severity: 'warning', at: 'img' }])
   })
 
   it('allows a lint on the line after a `// kay-allow` comment standing alone, or on the line it ends', () => {
-    const source = '---\nimport { signal } from \'kay\'\n\n// kay-allow constant-signal\nconst a = signal(1)\nconst b = signal(2) // kay-allow constant-signal, missing-alt\nconst c = signal(3)\n---\n// kay-allow missing-alt\nimg(src="/a.png")\nimg(src="/b.png")\np {a()} {b()} {c()}\n'
+    const source = '---\nimport { signal } from \'kay\'\n\n// kay-allow constant-signal\nconst a = signal(1)\nconst b = signal(2) // kay-allow constant-signal, missing-alt\nconst c = signal(3)\n---\n// kay-allow missing-alt\nimg(src="/a.png" width="1" height="1")\nimg(src="/b.png" width="1" height="1")\np {a()} {b()} {c()}\n'
 
     expect(lints(source)).toEqual([
       { code: 'constant-signal', severity: 'warning', at: 'c' },
@@ -48,14 +48,14 @@ describe('lint levels', () => {
   })
 
   it('reports a `// kay-allow` naming no lint, listing the ones there are', () => {
-    const diagnostics = compileKay('// kay-allow missing-alt, missing-alts\nimg(src="/a.png")\n', 'list.kay', { check: true }).diagnostics
+    const diagnostics = compileKay('// kay-allow missing-alt, missing-alts\nimg(src="/a.png" width="1" height="1")\n', 'list.kay', { check: true }).diagnostics
 
     expect(diagnostics.map(d => [d.message, d.code])).toEqual([['Unknown lint `missing-alts`', 'unknown-lint']])
     expect(diagnostics[0]!.help).toContain('`positional-key`')
   })
 
   it('reports nothing outside type checking, so no lint ever stops a page from running', () => {
-    expect(compileKay(`${ROWS}img(src="/a.png")\nfor todo, i of todos key={i}\n  p {todo.id}\n`, 'list.kay', { output: 'html' }).diagnostics).toEqual([])
+    expect(compileKay(`${ROWS}img(src="/a.png" width="1" height="1")\nfor todo, i of todos key={i}\n  p {todo.id}\n`, 'list.kay', { output: 'html' }).diagnostics).toEqual([])
   })
 })
 
@@ -458,22 +458,61 @@ describe('a11y lints', () => {
   })
 })
 
+describe('unsized-image', () => {
+  const only = (source: string, options: CompileOptions = {}) => lints(source, options).filter(d => d.code === 'unsized-image').map(d => `${d.severity} ${d.at}`)
+  const imports = '---\nimport hero from \'./hero.png\'\nimport logo from \'./logo.svg?x\'\nimport photo from \'./photo.JPG?v=2\'\nimport { image } from \'kay/image\'\nconst { url, w, h } = props<{ url: string, w: number, h: number }>()\n---\n'
+
+  it('warns of an img with no width and height, one written as a path or a value from data', () => {
+    expect(only(`${imports}img(src="/public.png" alt="A")\nimg(src={url} alt="B")\n`)).toEqual(['warning img', 'warning img'])
+  })
+
+  it('leaves an imported raster image alone, as kay writes its size, and warns of any other import such as an SVG', () => {
+    expect(only(`${imports}img(src={hero} alt="A")\nimg(src={photo} alt="B")\n`)).toEqual([])
+    expect(only(`${imports}img(src={logo} alt="A")\n`)).toEqual(['warning img'])
+  })
+
+  it('leaves an img with a spread, as image() gives width and height', () => {
+    expect(only(`${imports}img({...image(url, { width: w, height: h })} alt="A")\nimg({...rest} alt="B")\n`)).toEqual([])
+  })
+
+  it('warns of an img with one of the two, and leaves one with both', () => {
+    expect(only(`${imports}img(src="/a.png" width={w} alt="A")\nimg(src="/a.png" height="20" alt="B")\nimg(src="/a.png" width={w} height={h} alt="C")\nimg(src="/a.png" width="1" height="1" alt="D")\n`)).toEqual(['warning img', 'warning img'])
+  })
+
+  it('warns of an image button too, and of no other input', () => {
+    expect(only('input(type="image" src="/go.png" alt="Go")\ninput(type="image" src="/go.png" alt="Go" width="20" height="20")\ninput(type="text" aria-label="T")\n')).toEqual(['warning input'])
+  })
+
+  it('takes its level from the config and a kay-allow comment, and leaves a component named Img', () => {
+    expect(only('Img(src="/a.png")\n')).toEqual([])
+    expect(only('img(src="/a.png" alt="A")\n', { lints: { 'unsized-image': 'deny' } })).toEqual(['error img'])
+    expect(only('img(src="/a.png" alt="A")\n', { lints: { 'unsized-image': 'allow' } })).toEqual([])
+    expect(only('// kay-allow unsized-image\nimg(src="/a.png" alt="A")\n')).toEqual([])
+  })
+
+  it('offers no fix, as an SVG gives a ratio and not the size to draw it at', () => {
+    const diagnostics = compileKay(`${imports}img(src={logo} alt="A")\n`, 'list.kay', { check: true }).diagnostics.filter(d => d.code === 'unsized-image')
+
+    expect(diagnostics.map(d => d.fixes)).toEqual([undefined])
+  })
+})
+
 describe('what a template gets reported for', () => {
   const click = 'onClick={() => undefined}'
   const props = (types: string, names: string) => `---\nconst { ${names} } = props<{ ${types} }>()\n---\n`
   // The code of each report (its message when it has none) and the text it points at.
   const found = (source: string) => compileKay(source, 'list.kay', { check: true }).diagnostics.map(d => `${isLint(d.code) ? d.code : d.message} ${source.slice(d.start, d.end)}`)
   const rows: [string, string, string[]][] = [
-    ['img and iframe', 'img(src="/a.png")\niframe(src="/map")', ['missing-alt img', 'missing-title iframe']],
-    ['alt="" marking decoration', 'img(src="/a.png" alt="")\niframe(src="/map" title="Map")', []],
-    ['image button', 'input(type="image" src="/go.png")\ninput(type="image" src="/go.png" alt="Search")', ['missing-alt input']],
+    ['img and iframe', 'img(src="/a.png" width="1" height="1")\niframe(src="/map")', ['missing-alt img', 'missing-title iframe']],
+    ['alt="" marking decoration', 'img(src="/a.png" width="1" height="1" alt="")\niframe(src="/map" title="Map")', []],
+    ['image button', 'input(type="image" src="/go.png" width="1" height="1")\ninput(type="image" src="/go.png" width="1" height="1" alt="Search")', ['missing-alt input']],
     ['click out of keyboard reach', `.card(${click})\nli(${click}) x\nbutton(${click}) ok\na(href="/" ${click}) ok`, [`unreachable-click .card(${click})`, 'unreachable-click li']],
     ['click with a role', `li(role="option" ${click}) x`, []],
     ['fields with no label', 'input(name="email")\nselect(name="size")\ntextarea#bio\ninput(id="age")\ninput(placeholder="Search")', ['missing-label input', 'missing-label select', 'missing-label textarea', 'missing-label input', 'missing-label input']],
     ['fields labelled', ['label Email\n  input(name="email")', 'label(for="bio") Bio\ntextarea#bio', 'input(id="age")\nlabel(for="age") Age', 'input(aria-label="Search")\ninput(title="Search")\ninput(aria-labelledby="heading")\nh2#heading Search', 'input(type="hidden" name="id")\ninput(type="submit" value="Send")\ninput(type="button" value="Go")', 'input(name="website" aria-hidden="true" tabindex="-1")\n.trap(hidden)\n  input(name="phone")'].join('\n'), []],
     ['a label that may be elsewhere', `${props('name: string', 'name')}input(id={name})\nField(label="Email")\n  input(name="email")`, []],
-    ['buttons and links with nothing to announce', 'button\n  svg\na(href="/")\n  img(src="/logo.png" alt="")\nbutton(type="submit")', ['empty-control button', 'empty-control a', 'empty-control button']],
-    ['buttons and links announcing', ['button Save', 'button(aria-label="Close")\n  svg', 'a(href="/")\n  img(src="/logo.png" alt="Home")', 'a(name="top")'].join('\n'), []],
+    ['buttons and links with nothing to announce', 'button\n  svg\na(href="/")\n  img(src="/logo.png" width="1" height="1" alt="")\nbutton(type="submit")', ['empty-control button', 'empty-control a', 'empty-control button']],
+    ['buttons and links announcing', ['button Save', 'button(aria-label="Close")\n  svg', 'a(href="/")\n  img(src="/logo.png" width="1" height="1" alt="Home")', 'a(name="top")'].join('\n'), []],
     ['a button whose text is an expression', `${props('count: number', 'count')}button {count}`, []],
     ['headings skipping a level', 'h1 Shop\nh3 Shoes\nh4 Boots\nh2 Hats\nh4 Caps', ['skipped-heading h3', 'skipped-heading h4']],
     ['headings in each branch of an if', `${props('open: boolean', 'open')}h1 Shop\nif open\n  h2 Open\nelse\n  h2 Closed\nh3 Hours`, []],

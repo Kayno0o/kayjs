@@ -68,6 +68,7 @@ kay lint --cache
   - A heading follows the one before it by at most a level, each branch of an `if` following the heading before the block (`skipped-heading`).
 - An element with a `{...spread}` is not checked, nor one hidden with `aria-hidden="true"` or `hidden`, such as a honeypot field.
 - A field among a component's children or with an id written as an expression is left alone, its label maybe elsewhere.
+- An `img`, or an `input(type="image")`, has `width` and `height`, or a spread that may carry them, as `image()` gives (`unsized-image`, a warning): without them the page keeps no room for it and shifts as it loads. An image imported from a PNG, JPEG, WebP, GIF or AVIF file is sized by kay already; an SVG or a path is not. There is no quick fix: write the image's own size, as only its ratio matters and CSS sets how large it is drawn. `// kay-allow unsized-image` keeps an image whose box CSS reserves.
 - These are reported by `kay check`, the editor and `kay build`, and in `kay dev`'s dev tool, the page still running meanwhile.
 - ARIA and HTML as their specs define them:
   - An `aria-*` attribute ARIA has, the quick fix writing the closest for a misspelt one (`unknown-aria`).
