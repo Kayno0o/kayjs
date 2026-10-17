@@ -280,12 +280,12 @@ export async function bundleIslands(root: string, islands: Map<string, string>, 
   const api = apiStubs(trees)
   const registry = [...islands].map(([id, file]) => `  ${JSON.stringify(id)}: () => import(${JSON.stringify(file)}),`).join('\n')
 
-  // `hydrate` re-runs over a root whose markup was swapped in after load; a block a streamed page sends later calls it as `$kayHydrate`.
+  // `hydrate` re-runs over a root whose markup was swapped in after load; a block a streamed page sends later calls it as `$kayHydrate`, after `$kayHydrate.dispose` took the islands it replaces.
   const publicEnv = options.publicEnv ? `${options.base ?? ''}${PUBLIC_ENV_PATH}` : undefined
 
   await Bun.write(bootFile, [
     ...publicEnv !== undefined ? [`import kayPublicEnv from ${JSON.stringify(publicEnv)}`] : [],
-    `import { ${[...navigation ? ['disposeIslands'] : [], ...options.hot ? ['enableHotSwap'] : [], 'hydrateIslands', ...options.hot && navigation ? ['refreshForEdit'] : [], ...navigation ? ['startNavigation'] : []].join(', ')} } from 'kay/client'`,
+    `import { ${['disposeIslands', ...options.hot ? ['enableHotSwap'] : [], 'hydrateIslands', ...options.hot && navigation ? ['refreshForEdit'] : [], ...navigation ? ['startNavigation'] : []].join(', ')} } from 'kay/client'`,
     ...options.i18n ? ['import \'kay/i18n\''] : [],
     ...options.search ? ['import { arrive } from \'kay/arrival\''] : [],
     '',
@@ -306,7 +306,7 @@ export async function bundleIslands(root: string, islands: Map<string, string>, 
     ...options.search ? ['  await hydrated', '  void arrive(location.search, at)', '  addEventListener(\'hashchange\', () => void arrive(location.search, scrollY))'] : ['  return hydrated'],
     '})',
     '',
-    ';(globalThis as { $kayHydrate?: unknown }).$kayHydrate = Object.assign(hydrate, { ready })',
+    ';(globalThis as { $kayHydrate?: unknown }).$kayHydrate = Object.assign(hydrate, { ready, dispose: disposeIslands })',
     '',
   ].join('\n'))
 

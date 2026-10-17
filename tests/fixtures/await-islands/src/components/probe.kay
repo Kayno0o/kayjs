@@ -1,0 +1,12 @@
+---
+const { text } = props<{ text: string }>()
+
+// Counted on the body, which a test reads: how many probes mounted and how many were cleaned up.
+function count(name: 'mounted' | 'cleaned') {
+  document.body.dataset[name] = String(Number(document.body.dataset[name] ?? 0) + 1)
+}
+
+onMount(() => count('mounted'))
+onCleanup(() => count('cleaned'))
+---
+button.probe {text}

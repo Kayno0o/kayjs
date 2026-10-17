@@ -1,0 +1,19 @@
+--- server
+async function* parts() {
+  for (const text of ['one', 'two', 'three']) {
+    await Bun.sleep(250)
+    yield text
+  }
+}
+
+const reply = parts()
+--- script
+import Probe from '../components/probe.kay'
+---
+h1 Parts
+// kay-allow uncaught-await
+await reply
+  p.pending Waiting
+  Probe(text="pending")
+then text
+  Probe(text={text})
