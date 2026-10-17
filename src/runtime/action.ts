@@ -11,7 +11,7 @@ import { escapeAttribute } from './escape'
 import { holdInvalid } from './invalid'
 import { leave, leaving, mayLeave, navigation, prefetched } from './navigation'
 import { pageData } from './page-data'
-import { getOwner, onCleanupOf, ownSignal, undoable, untrack } from './reactive'
+import { getOwner, liveOwner, onCleanupOf, ownSignal, undoable, untrack } from './reactive'
 import { sendValue } from './send'
 import { FAILURE_HEADER, PAGE_HEADER, REDIRECT_HEADER, WORK_HEADER, WORK_SCRIPT } from './swap'
 import { decodeServerValue, decodeValue, setActionReviver, unflattenValue } from './wire'
@@ -634,7 +634,7 @@ function callable(url: () => string): { call: (input: never, options?: CallOptio
     const visits = navigation.visits
     const left = () => navigation.visits !== visits
     // The island calling, from its setup or a handler, whose end ends a stream the call answers with; else the page, as long as no other path is shown.
-    const caller: Caller = { owner: getOwner(), arrivals: navigation.arrivals }
+    const caller: Caller = { owner: liveOwner(getOwner()), arrivals: navigation.arrivals }
 
     shift(1)
     called(page, null)
@@ -716,7 +716,7 @@ function callable(url: () => string): { call: (input: never, options?: CallOptio
   }
 }
 
-// A stream ends with the block or island that started it, a `persist` island's living on across pages; one started under no owner, from a `listen` callback or after an `await` in a handler say, ends once a path other than the call's is shown, which a swap that fails or gives way to another does not do.
+// A stream ends with the block or island that started it, or the one around it when that went already as the call was made, as a handler on an element leaving has; a `persist` island's living on across pages. One started under no owner, after an `await` in a handler say, ends once a path other than the call's is shown, which a swap that fails or gives way to another does not do.
 function closeWithCaller(stream: ActionStream<unknown> & Settles, caller: Caller | undefined): void {
   if (caller?.owner) {
     const { owner } = caller

@@ -259,6 +259,14 @@ export function onCleanupOf(node: Owner, fn: () => void): void {
     (node.cleanups ??= []).push(fn)
 }
 
+// `node`, or the nearest owner above it still alive: a handler on an element playing its leave phase is bound under a block that was disposed already.
+export function liveOwner(node: Owner | undefined): Owner | undefined {
+  while (node?.state === DISPOSED)
+    node = node.owner
+
+  return node
+}
+
 export function runWithOwner<T>(parent: Owner | undefined, fn: () => T): T {
   const previous = owner
 

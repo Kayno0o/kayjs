@@ -2146,6 +2146,45 @@ describe('actions called from the browser', () => {
   })
 })
 
+describe('a stream an island starts', () => {
+  const PAGE = '--- server\nimport { action } from \'kay\'\n\nexport const quiet = action(async function* () {\n  yield 0\n})\n---\np Page\n'
+  const records = '(globalThis as unknown as { streams: { status: () => string }[] }).streams'
+  const leaving = site({
+    'page.kay': PAGE,
+    'main.kay': `---\nimport { signal } from 'kay'\nimport { quiet } from './page.kay'\n\nconst rows = signal([1])\n\nasync function go() {\n  if (rows().length > 0) {\n    rows.set([])\n\n    return\n  }\n\n  ${records}.push(await quiet())\n}\n---\nfor row of rows() key={row}\n  button(transition="fade" style="transition-duration: 200ms" onClick={go}) Go\n`,
+  })
+  // Answers a call with a stream that says one value and then nothing, as `quiet` does.
+  const streaming = () => spyOn(globalThis, 'fetch').mockImplementation((async () => {
+    return new Response(new ReadableStream({ start: controller => void controller.enqueue(new TextEncoder().encode('data: [0]\n\n')) }), { headers: { 'content-type': 'text/event-stream' } })
+  }) as unknown as typeof fetch)
+  const streams = () => (globalThis as unknown as { streams: { status: () => string }[] }).streams
+
+  it('closes with the island when a handler on a row playing its leave phase started it', async () => {
+    ;(globalThis as unknown as { streams: unknown[] }).streams = []
+
+    const fetchStub = streaming()
+    const { root, dispose } = await leaving()
+
+    try {
+      const button = root.querySelector('button')!
+
+      button.click()
+      await settle()
+      expect(button.isConnected).toBe(true)
+      button.click()
+      await settle()
+      await settle()
+      expect(streams().map(stream => stream.status())).toEqual(['open'])
+      await dispose()
+      expect(streams().map(stream => stream.status())).toEqual(['closed'])
+    }
+    finally {
+      fetchStub.mockRestore()
+      await dispose()
+    }
+  })
+})
+
 describe('a form posting an action with fixed fields from an island', () => {
   const mountFixed = site({
     'page.kay': '--- server\nimport { t } from \'elysia\'\nimport { action } from \'kay\'\n\nexport const move = action(t.Object({ id: t.Integer(), to: t.Integer() }), ({ id }) => id)\n---\np Page\n',
