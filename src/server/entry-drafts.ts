@@ -118,8 +118,9 @@ function withDraftComment(path: string, text: string): string | undefined {
 }
 
 // Creates a file whole or not at all: written aside, then linked into place, which fails when the file exists.
-async function createWhole(file: string, text: string): Promise<void> {
+export async function createWhole(file: string, text: string): Promise<void> {
   const temporary = `${file}.${process.pid}.tmp`
+  const exists = () => new KayError('content-api-misuse', `kay: ${file} exists already, and a translation never overwrites an entry`)
 
   await mkdir(dirname(file), { recursive: true })
 
@@ -131,13 +132,18 @@ async function createWhole(file: string, text: string): Promise<void> {
     const { code } = error as NodeJS.ErrnoException
 
     if (code === 'EEXIST')
-      throw new KayError('content-api-misuse', `kay: ${file} exists already, and a translation never overwrites an entry`)
+      throw exists()
 
     // A filesystem without hard links creates the file exclusively, at the cost of a window where it is half written.
     if (code !== 'EPERM' && code !== 'ENOTSUP' && code !== 'EXDEV')
       throw error
 
-    await writeFile(file, text, { flag: 'wx' })
+    try {
+      await writeFile(file, text, { flag: 'wx' })
+    }
+    catch (again) {
+      throw (again as NodeJS.ErrnoException).code === 'EEXIST' ? exists() : again
+    }
   }
   finally {
     await rm(temporary, { force: true })
