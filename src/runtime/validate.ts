@@ -1,5 +1,6 @@
 import type { TSchema } from 'elysia'
 import { formInput, NUMERIC_FORMATS } from './form'
+import { wording } from './words.client'
 
 // What the server sends of an action's schema, for the forms of a page to be checked before they post: the top-level fields, the keywords the browser checks, and their `error` messages.
 export interface FieldRules {
@@ -90,78 +91,92 @@ function controlOf(form: HTMLFormElement, name: string): HTMLInputElement | HTML
   return control instanceof HTMLInputElement || control instanceof HTMLSelectElement || control instanceof HTMLTextAreaElement ? control : undefined
 }
 
-// The schema's own `error` for a refused field, else Elysia's message for the keyword it fails.
+// The schema's own `error` for a refused field, else the `kay.invalid.*` text of the keyword it fails, which the server words the same way; a site without the key reads Elysia's English.
 function fieldMessage(name: string, field: FieldRules, value: unknown): string | undefined {
   const message = refusal(name, field, value)
 
   if (message !== undefined)
-    return field.error ?? message
+    return field.error ?? wording(message.kind, message.english, message.params)
 
   // An item is named by its index, as the server names it, and refused with its own `error`.
   return field.items && Array.isArray(value) ? value.map((item, index) => fieldMessage(`${name}.${index}`, field.items!, item)).find(found => found !== undefined) : undefined
 }
 
-function refusal(name: string, field: FieldRules, value: unknown): string | undefined {
+// What a field's value fails: the `kay.invalid.*` key the server's refusal of it would use, the limit it names, and Elysia's own summary, which is its English.
+interface Refusal {
+  kind: InvalidKind
+  english: string
+  params?: Record<string, string | number>
+}
+
+type InvalidKind = `kay.invalid.${'required' | 'tooShort' | 'tooLong' | 'pattern' | 'format' | 'tooFewItems' | 'tooManyItems' | 'tooSmall' | 'tooBig' | 'type'}`
+
+function typeRefusal(english: string): Refusal {
+  return { kind: 'kay.invalid.type', english }
+}
+
+function refusal(name: string, field: FieldRules, value: unknown): Refusal | undefined {
   if (field.anyOf)
-    return field.anyOf.some(member => refusal(name, member, value) === undefined) && bounds(field, value) === undefined ? undefined : `Property '${name}' should be one of: ${field.anyOf.map(member => `'${member.format ?? member.type}'`).join(', ')}`
+    return field.anyOf.some(member => refusal(name, member, value) === undefined) && bounds(field, value) === undefined ? undefined : typeRefusal(`Property '${name}' should be one of: ${field.anyOf.map(member => `'${member.format ?? member.type}'`).join(', ')}`)
 
   if (field.const !== undefined)
-    return value === field.const ? undefined : `Expected ${typeof field.const === 'string' ? `'${field.const}'` : String(field.const)}`
+    return value === field.const ? undefined : typeRefusal(`Expected ${typeof field.const === 'string' ? `'${field.const}'` : String(field.const)}`)
 
   switch (field.type) {
     case 'string':
       if (typeof value !== 'string')
-        return 'Expected string'
+        return typeRefusal('Expected string')
 
       if (field.format !== undefined && NUMERIC_FORMATS.has(field.format))
-        return 'Expected string'
+        return typeRefusal('Expected string')
 
       if (field.minLength !== undefined && value.length < field.minLength)
-        return `Expected string length greater or equal to ${field.minLength}`
+        return { kind: value === '' && field.minLength === 1 ? 'kay.invalid.required' : 'kay.invalid.tooShort', english: `Expected string length greater or equal to ${field.minLength}`, params: { min: field.minLength } }
 
       if (field.maxLength !== undefined && value.length > field.maxLength)
-        return `Expected string length less or equal to ${field.maxLength}`
+        return { kind: 'kay.invalid.tooLong', english: `Expected string length less or equal to ${field.maxLength}`, params: { max: field.maxLength } }
 
       if (field.pattern !== undefined && !new RegExp(field.pattern).test(value))
-        return `Expected string to match '${field.pattern}'`
+        return { kind: 'kay.invalid.pattern', english: `Expected string to match '${field.pattern}'` }
 
-      return field.format !== undefined && FORMATS[field.format]?.test(value) === false ? `Property '${name}' should be ${field.format}` : undefined
+      return field.format !== undefined && FORMATS[field.format]?.test(value) === false ? { kind: 'kay.invalid.format', english: `Property '${name}' should be ${field.format}`, params: { format: field.format } } : undefined
     case 'number':
     case 'integer':
       if (typeof value !== 'number' || Number.isNaN(value) || (field.type === 'integer' && !Number.isInteger(value)))
-        return `Expected ${field.type}`
+        return typeRefusal(`Expected ${field.type}`)
 
       return bounds(field, value)
     case 'boolean':
-      return typeof value === 'boolean' ? undefined : 'Expected boolean'
+      return typeof value === 'boolean' ? undefined : typeRefusal('Expected boolean')
     case 'array':
       if (!Array.isArray(value))
-        return 'Expected array'
+        return typeRefusal('Expected array')
 
       if (field.minItems !== undefined && value.length < field.minItems)
-        return `Expected array length to be greater or equal to ${field.minItems}`
+        return { kind: 'kay.invalid.tooFewItems', english: `Expected array length to be greater or equal to ${field.minItems}`, params: { min: field.minItems } }
 
-      return field.maxItems !== undefined && value.length > field.maxItems ? `Expected array length to be less or equal to ${field.maxItems}` : undefined
+      return field.maxItems !== undefined && value.length > field.maxItems ? { kind: 'kay.invalid.tooManyItems', english: `Expected array length to be less or equal to ${field.maxItems}`, params: { max: field.maxItems } } : undefined
     case undefined:
     default:
       return undefined
   }
 }
 
-function bounds(field: FieldRules, value: unknown): string | undefined {
+// An exclusive bound is worded as a type refusal, as the server does.
+function bounds(field: FieldRules, value: unknown): Refusal | undefined {
   if (typeof value !== 'number')
     return undefined
 
   const type = field.type ?? 'number'
 
   if (field.minimum !== undefined && value < field.minimum)
-    return `Expected ${type} to be greater or equal to ${field.minimum}`
+    return { kind: 'kay.invalid.tooSmall', english: `Expected ${type} to be greater or equal to ${field.minimum}`, params: { min: field.minimum } }
 
   if (field.maximum !== undefined && value > field.maximum)
-    return `Expected ${type} to be less or equal to ${field.maximum}`
+    return { kind: 'kay.invalid.tooBig', english: `Expected ${type} to be less or equal to ${field.maximum}`, params: { max: field.maximum } }
 
   if (field.exclusiveMinimum !== undefined && value <= field.exclusiveMinimum)
-    return `Expected ${type} to be greater than ${field.exclusiveMinimum}`
+    return typeRefusal(`Expected ${type} to be greater than ${field.exclusiveMinimum}`)
 
-  return field.exclusiveMaximum !== undefined && value >= field.exclusiveMaximum ? `Expected ${type} to be less than ${field.exclusiveMaximum}` : undefined
+  return field.exclusiveMaximum !== undefined && value >= field.exclusiveMaximum ? typeRefusal(`Expected ${type} to be less than ${field.exclusiveMaximum}`) : undefined
 }

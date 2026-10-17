@@ -14,6 +14,7 @@ import { importModule } from './bundle'
 import { requestCookies } from './cookies'
 import { requestUrl } from './request-url'
 import { projectSource } from './source'
+import { INVALID_PARAMS } from './words'
 
 // Where a visitor's choice of locale is kept, read before their browser's languages.
 export const LOCALE_COOKIE = 'kay_locale'
@@ -353,6 +354,13 @@ export function localeCopies(settings: LocaleSettings | undefined, path: string)
 // The key a prerendered page is kept under: its path, under its locale's segment when locales go by domain and share their paths.
 export function prerenderKey(settings: LocaleSettings | undefined, locale: string | undefined, path: string): string {
   return settings?.hosts && locale !== undefined ? `/${locale}${path === '/' ? '' : path}` : path
+}
+
+// The `kay.invalid.*` messages the request's catalogs word, which the browser's form check reads; a key no catalog has is sent nothing, as the check then reads Elysia's English.
+export function invalidKeys(): string[] {
+  const state = localeState()
+
+  return Object.keys(INVALID_PARAMS).filter(key => state?.messages.has(key) === true || state?.fallback?.has(key) === true)
 }
 
 // The messages a page's islands use, with what the browser needs to build links in its locale; nothing outside a request served in one.

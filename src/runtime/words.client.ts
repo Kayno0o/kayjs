@@ -1,8 +1,7 @@
 import type { MessageValue, Plural } from './i18n'
-import { pageData } from './page-data'
 import { sizeText as sizeIn } from './size-text'
 
-// What the server writes for a page's islands: the locale and the messages they use. Kept small, as every island of a library reaches it; `kay/i18n` reads the same scripts for `t`.
+// What the server writes for a page's islands and checked forms: the locale and the messages they use. Kept small, as every island of a library reaches it, and free of `pageData`, which a lazy chunk reading it would keep in the eager entry; `kay/i18n` reads the same scripts for `t`.
 interface Payload {
   locale?: string
   messages: Record<string, string | Plural>
@@ -10,11 +9,20 @@ interface Payload {
 
 const PAYLOAD = 'script[data-kay-i18n]'
 const PLACEHOLDER = /\{(\w+)\}/g
-const read = new WeakSet<Payload>()
+const read = new WeakSet<Element>()
 const messages = new Map<string, string | Plural>()
 let locale = ''
 // Whether the page was searched for scripts since the last microtask: a render looks up many texts, and one search serves them all.
 let searched = false
+
+function parse(text: string): Payload | undefined {
+  try {
+    return JSON.parse(text) as Payload
+  }
+  catch {
+    return undefined
+  }
+}
 
 function load(): void {
   if (searched)
@@ -25,11 +33,17 @@ function load(): void {
     searched = false
   })
 
-  for (const payload of pageData<Payload>(PAYLOAD)) {
-    if (read.has(payload))
+  for (const script of document.querySelectorAll(PAYLOAD)) {
+    if (read.has(script))
       continue
 
-    read.add(payload)
+    const payload = parse(script.textContent ?? '')
+
+    // A script still streaming does not parse yet: it is read again with the next lookup.
+    if (!payload)
+      continue
+
+    read.add(script)
     locale ||= payload.locale ?? ''
 
     for (const [key, message] of Object.entries(payload.messages))
