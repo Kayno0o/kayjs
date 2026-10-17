@@ -198,10 +198,10 @@ type IsSerializable<T, Seen = never> = T extends Sendable
               : false
 
 // A field named like what a page must not carry: an island's props are written into the page source, so each one is public. Matched on the lowercase name, so `passwordHash`, `API_KEY` and `resetToken` all read.
-type SecretWord = 'password' | 'passwd' | 'secret' | 'token' | 'apikey' | 'api_key' | 'privatekey' | 'private_key' | 'credential' | 'email' | 'otp'
+type SecretWord = 'password' | 'passwd' | 'secret' | 'token' | 'apikey' | 'api_key' | 'privatekey' | 'private_key' | 'credential' | 'email'
 
 // A flag such as `emailVerified` or a count such as `tokenCount` holds no secret.
-type SecretKey<Key extends string, Field> = Lowercase<Key> extends `${string}${SecretWord}${string}` ? [NonNullable<Field>] extends [boolean | number] ? never : Key : never
+type SecretKey<Key extends string, Field> = Lowercase<Key> extends `${string}${SecretWord}${string}` ? 0 extends 1 & Field ? Key : [NonNullable<Field>] extends [boolean | number | Date] ? never : Key : never
 
 // The paths to the secret-looking fields a value holds, in arrays as `rows[].email`; a type seen further up ends there, and eight levels are read at most so a deep type stays cheap.
 type SecretPaths<T, Seen = never, Depth extends unknown[] = [], Prefix extends string = ''> = 0 extends 1 & T

@@ -2166,10 +2166,11 @@ describe.concurrent('kay check, unused code', () => {
       'export const account: Account = { name: \'a\' }',
       'export const tree: Tree = { name: \'a\', children: [] }',
       'export const deep = {} as Deep',
+      'export const dated = { emailVerifiedAt: new Date(), tokenExpires: new Date(), slotProps: { rootPath: \'/\' } }',
     ].join('\n')
 
     async function secrets(page: string): Promise<[number, string | undefined, string][]> {
-      const root = await scratchProject({ 'src/types.ts': types, 'src/components/island.kay': island, 'src/routes/index.kay': `--- server\nimport Island from '../components/island.kay'\nimport { signal } from 'kay'\nimport { account, deep, row, tree } from '../types'\nimport type { Row } from '../types'\n\nconst rows: Row[] = [row]\nconst byId = new Map<number, Row>()\nconst api = { API_KEY: 'x', name: 'n' }\nconst open = signal(0)\n---\n${page}\n` })
+      const root = await scratchProject({ 'src/types.ts': types, 'src/components/island.kay': island, 'src/routes/index.kay': `--- server\nimport Island from '../components/island.kay'\nimport { signal } from 'kay'\nimport { account, dated, deep, row, tree } from '../types'\nimport type { Row } from '../types'\n\nconst rows: Row[] = [row]\nconst byId = new Map<number, Row>()\nconst api = { API_KEY: 'x', name: 'n' }\nconst open = signal(0)\n---\n${page}\n` })
 
       try {
         return (await check(root, { lints: { 'unread-name': 'allow' } })).filter(d => d.file.endsWith('index.kay') && d.code !== undefined).map(d => [d.line, d.code, d.message])
@@ -2203,10 +2204,10 @@ describe.concurrent('kay check, unused code', () => {
       }
     })
 
-    it('stays silent once the fields are picked, flags and counts, a Signal prop, a type deeper than eight levels, and an allowed line', async () => {
-      const found = await secrets('Island(data={{ id: rows[0]!.id, name: \'a\' }})\nIsland(data={{ emailVerified: true, tokenCount: 3 }})\nIsland(data={open})\nIsland(data={deep})\n// kay-allow secret-prop\nIsland(data={row})')
+    it('stays silent once the fields are picked, flags and counts, dates, a type deeper than eight levels, and an allowed line', async () => {
+      const found = await secrets('Island(data={{ id: rows[0]!.id, name: \'a\' }})\nIsland(data={{ emailVerified: true, tokenCount: 3 }})\nIsland(data={deep})\nIsland(data={dated})\n// kay-allow secret-prop\nIsland(data={row})')
 
-      expect(found.filter(([, code]) => code === 'secret-prop')).toEqual([])
+      expect(found).toEqual([])
     })
   })
 

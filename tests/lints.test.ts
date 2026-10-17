@@ -5,7 +5,7 @@ import * as parser from '@babel/parser'
 import { describe, expect, it, spyOn } from 'bun:test'
 import { compileKay } from '../src/compiler'
 import { moduleChecks } from '../src/compiler/fence-checks'
-import { explainLint, isLint, LINT_GROUPS, lintList, LINTS } from '../src/compiler/lints'
+import { explainLint, isLint, LINT_GROUPS, lintList, LINTS, typeLint } from '../src/compiler/lints'
 
 function lints(source: string, options: CompileOptions = {}) {
   return compileKay(source, 'list.kay', { check: true, ...options }).diagnostics.map(d => ({ code: d.code, severity: d.severity, at: source.slice(d.start, d.end) }))
@@ -344,6 +344,16 @@ describe('constant-signal', () => {
     expect(lints(script('const open = signal(false)', 'Child(open={open})'))).toEqual([])
     expect(lints(script('const width = signal(0)\neffect(() => width.set(1))', 'p {width()}'))).toEqual([])
     expect(lints('---\nfunction signal(value: number) {\n  return () => value\n}\n\nconst width = signal(1)\n---\np {width()}\n')).toEqual([])
+  })
+})
+
+describe('secret-prop', () => {
+  it('lists the paths a message carries, noting those tsgo cut', () => {
+    const paths = '"a" | "b[].token"'
+
+    expect(typeLint(`... kayLint: "secret-prop"; kayPath: ${paths} }`, 'data')?.message).toBe('`data.a`, `data.b[].token` would be written into the page')
+    expect(typeLint('... kayLint: "secret-prop"; kayPath: "a" | "b" | ... 12 more ... | "" }', 'data')?.message).toBe('`data.a`, `data.b` and more would be written into the page')
+    expect(typeLint('... kayLint: "secret-prop"; kayPath: "[].email" }', 'rows')?.message).toBe('`rows[].email` would be written into the page')
   })
 })
 
