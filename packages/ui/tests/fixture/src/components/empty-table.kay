@@ -1,0 +1,21 @@
+---
+import type { Column } from '@kaynooo/kayjs-ui'
+import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
+import Table from '@kaynooo/kayjs-ui/table.kay'
+
+interface Planet {
+  id: number
+  name: string
+}
+
+const { selectable = false } = props<{ selectable?: boolean }>()
+const columns: Column<Planet>[] = [{ key: 'name', header: 'Name', cell: true }]
+const rows: Planet[] = []
+---
+Table(columns={columns} rows={rows} rowKey="id" selectable={selectable})
+  @bulk(keys, clear)
+    button.bulk(type="button" onClick={clear}) Clear {keys.length}
+  @cell(planet)
+    strong {planet.name}
+  @empty
+    EmptyState(title="No planets" description="Add one.")

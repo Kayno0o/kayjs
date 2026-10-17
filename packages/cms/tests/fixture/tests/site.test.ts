@@ -415,8 +415,7 @@ const SCREENS = ['/admin', '/admin/collections/posts', '/admin/collections/posts
 // What a 375 px screen gets wrong: it scrolls sideways, a control spills past the screen or its own scrolling table, or one is too short to tap.
 async function phoneProblems(path: string): Promise<string[]> {
   const built = await browser()
-  // strict is off for the empty tables' hydration mismatch, tracked in #821.
-  const page = await built.open(path, { ...PHONE, strict: false })
+  const page = await built.open(path, PHONE)
 
   try {
     await page.waitUntil(() => document.querySelector('h1') !== null)

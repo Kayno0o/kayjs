@@ -146,6 +146,15 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay/test i
     expect(lenient.errors).toEqual([expect.stringContaining('did not match its server markup')])
   }, 30_000)
 
+  it('hydrates an island passing a slot to a component whose for-else tests that slot with an if', async () => {
+    const page = await site.open('/empty-rows')
+
+    await page.click('button.empty-bump')
+    expect(await page.text('button.empty-bump')).toBe('Bumped 1')
+    expect(await page.text('td.empty-cell .empty-note')).toBe('Nothing here')
+    expect(page.errors).toEqual([])
+  }, 30_000)
+
   it('hydrates every island reading a value kept in localStorage on the markup the server rendered, then shows the value', async () => {
     const kept = await site.open('/kept')
 

@@ -1,0 +1,10 @@
+---
+import EmptyRows from './empty-rows.kay'
+import { signal } from 'kay'
+
+const count = signal(0)
+---
+button.empty-bump(onClick={() => count.set(c => c + 1)}) Bumped {count()}
+EmptyRows(rows={[]})
+  @empty
+    p.empty-note Nothing here

@@ -1,0 +1,5 @@
+---
+import EmptyRowsIsland from '../components/empty-rows-island.kay'
+---
+h1 Empty rows
+EmptyRowsIsland

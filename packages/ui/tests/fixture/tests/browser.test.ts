@@ -45,6 +45,15 @@ inBrowser('in the browser', () => {
     expect(page.errors).toEqual([])
   }, 120_000)
 
+  test('Table with no rows hydrates on the markup the server rendered, an @empty slot alone or beside selectable and @bulk', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/empty-table')
+
+    expect(await page.count('.kui-empty-state-title')).toBe(2)
+    expect(page.errors).toEqual([])
+  }, 120_000)
+
   test('Table keeps a long unbroken value inside its stacked card, and its sort button 2rem tall', async () => {
     const site = await shared()
 

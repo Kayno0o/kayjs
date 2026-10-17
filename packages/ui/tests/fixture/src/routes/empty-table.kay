@@ -1,0 +1,8 @@
+---
+import EmptyTable from '../components/empty-table.kay'
+---
+main
+  #plain
+    EmptyTable
+  #picking
+    EmptyTable(selectable)

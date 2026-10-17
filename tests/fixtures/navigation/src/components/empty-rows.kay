@@ -1,0 +1,19 @@
+---
+import type { JSX } from 'kay'
+
+const { rows, empty, noMatch } = props<{ rows: string[], empty?: JSX.Element, noMatch?: JSX.Element }>()
+---
+table.empty-rows
+  tbody
+    for row of rows key={row}
+      tr
+        td {row}
+    else
+      if rows.length > 0 && noMatch
+        tr
+          td.empty-cell
+            | {noMatch}
+      else if empty
+        tr
+          td.empty-cell
+            | {empty}
