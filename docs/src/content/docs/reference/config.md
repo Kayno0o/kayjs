@@ -65,7 +65,7 @@ Every option is optional. The tables give each option's default. The full refere
 | Option | Effect |
 | --- | --- |
 | `content` | The module exporting the collections, `src/content.config.ts` by default. See [Content](/guides/content) |
-| `markdown` | `highlight`, `headingLinks` and `readingSpeed` for every collection, which a collection's own option overrides. See [Content](/guides/content) |
+| `markdown` | `highlight`, `headingLinks`, `readingSpeed` and `imageSizes` for every collection, which a collection's own option overrides. See [Content](/guides/content) |
 | `preview` | Lets an editor see drafts on the live site. `secret` signs the preview links, at least 32 random characters. `maxAge` is how long a visitor stays in preview mode, an hour by default |
 | `storage` | Where `files` keeps uploads: `diskFiles()` by default, or `s3Files()`. See [File storage](/guides/file-storage) |
 | `store` | Where jobs, schedule locks and rate limit counts live for everything naming no store of its own: `sqliteData('data/app.sqlite')`, or `{ jobs, rates }` of your own. See [Background jobs](/guides/background-jobs) |

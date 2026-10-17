@@ -77,7 +77,7 @@ A slug with a slash, like `guides/intro`, needs a catch-all page, `[...slug].kay
 
 An entry can set its own slug with a `slug` field in its frontmatter, so a translated post gets a URL in its own language. It is a path of non-empty parts, with no `.` or `..` part, backslash, `?` or `#`, and two entries may not share one. In a localized collection the slug stays under the locale's folder, and `translations` pairs entries by equal slugs.
 
-Give translations that set their own slugs a `translation` field with the same value, such as `translation: hello`, to pair them. A schema that does not allow extra fields needs `slug` and `translation` listed.
+Give translations that set their own slugs a `translationKey` field with the same value, such as `translationKey: hello`, to pair them. A schema that does not allow extra fields needs `slug` and `translationKey` listed.
 
 ## Pages of a list
 

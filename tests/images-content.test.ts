@@ -269,6 +269,11 @@ describe('Markdown images', () => {
     const { root, restore } = await project({ 'posts/a.md': '---\ntitle: A\n---\n\n![a](./cat.png)\n', 'posts/cat.png': Bun.file(HERO) })
 
     try {
+      const past = new Date(Date.now() - 60_000)
+
+      await utimes(join(root, 'posts/a.md'), past, past)
+      await utimes(join(root, 'posts/cat.png'), past, past)
+
       const [first] = await loadEntries('posts', { live: true })
       const asset = join(clientDir(root), 'assets', first!.images![0]!.url.split('/').at(-1)!)
 
@@ -278,6 +283,10 @@ describe('Markdown images', () => {
       expect(await Bun.file(asset).exists()).toBe(false)
       expect((await loadEntries('posts', { live: true }))[0]!.images).toEqual(first!.images)
       expect(await Bun.file(asset).exists()).toBe(true)
+      // Same size and time: the image is not hashed again, so the old URL is kept.
+      await Bun.write(join(root, 'posts/cat.png'), (await Bun.file(HERO).bytes()).map((byte, index) => index === 100 ? byte ^ 1 : byte))
+      await utimes(join(root, 'posts/cat.png'), past, past)
+      expect((await loadEntries('posts', { live: true }))[0]!.images).toEqual(first!.images)
     }
     finally {
       await restore()
@@ -317,11 +326,11 @@ describe('entry slugs', () => {
     }
   })
 
-  it('pair translations by their translation field when they set one, by slug otherwise', async () => {
-    const closed = Type.Object({ title: Type.String(), slug: Type.Optional(Type.String()), translation: Type.Optional(Type.String()) })
+  it('pair translations by their translationKey field when they set one, by slug otherwise', async () => {
+    const closed = Type.Object({ title: Type.String(), slug: Type.Optional(Type.String()), translationKey: Type.Optional(Type.String()) })
     const { restore } = await project({
-      'posts/en/hello.md': entry('slug: hello-world\ntranslation: hello'),
-      'posts/fr/hello.md': entry('slug: bonjour-le-monde\ntranslation: hello'),
+      'posts/en/hello.md': entry('slug: hello-world\ntranslationKey: hello'),
+      'posts/fr/hello.md': entry('slug: bonjour-le-monde\ntranslationKey: hello'),
       'posts/de/hello.md': entry('slug: hallo-welt'),
       'posts/en/same.md': entry(''),
       'posts/fr/same.md': entry(''),

@@ -136,13 +136,13 @@ function baseOf(): string {
   return place?.base ?? process.cwd()
 }
 
-// The entries `kay build` compiled ahead when there are some, read from their files otherwise; `live` always reads the files, as the build does.
 export interface LoadOptions extends MarkdownSettings {
   // Always read the files, as the build does.
   live?: boolean | undefined
   localized?: boolean | undefined
 }
 
+// The entries `kay build` compiled ahead when there are some, read from their files otherwise.
 export async function loadEntries(dir: string, { highlight, live = false, localized = false, headingLinks = true }: LoadOptions = {}): Promise<RawEntry[]> {
   if (!live) {
     const built = await builtEntries(dir)
@@ -329,9 +329,9 @@ async function importedSource(root: string, configs: (string | undefined)[]): Pr
   return Bun.hash([...hashes].sort(([a], [b]) => a.localeCompare(b)).map(([file, hash]) => `${relative(root, file)}:${hash}`).join('\n')).toString(36)
 }
 
-// What pairs an entry with its translations in a localized collection: its `translation` field when it sets one, else its slug.
+// What pairs an entry with its translations in a localized collection: its `translationKey` field when it sets one, else its slug.
 export function translationKey(entry: { slug: string, data: unknown }): string {
-  const given = typeof entry.data === 'object' && entry.data !== null ? (entry.data as { translation?: unknown }).translation : undefined
+  const given = typeof entry.data === 'object' && entry.data !== null ? (entry.data as { translationKey?: unknown }).translationKey : undefined
 
   return typeof given === 'string' && given !== '' ? given : entry.slug
 }

@@ -50,7 +50,7 @@ export interface Entry<Data> {
   file: string
   // In a localized collection, the locale whose folder holds the entry, the default one's when it stands in for a locale lacking it.
   locale?: string | undefined
-  // In a localized collection, the locales with an entry of this slug, or of the same `translation` field when the entries set one, its own included.
+  // In a localized collection, the locales with an entry of this slug, or of the same `translationKey` field when the entries set one, its own included.
   translations?: readonly string[] | undefined
 }
 

@@ -211,7 +211,7 @@ function onHost(origin: string, host: string): string {
   return url.href.replace(TRAILING_SLASH, '')
 }
 
-// The slugs each localized collection holds in each locale, drafts included, keyed by the name the content config exports it under, then by locale.
+// The keys pairing each localized collection's entries (their slugs unless they set a `translationKey`) in each locale, drafts included, keyed by the name the content config exports it under, then by locale.
 export async function localizedSlugs(root: string, config?: string): Promise<Map<string, Map<string, Set<string>>>> {
   const found = new Map<string, Map<string, Set<string>>>()
 
