@@ -100,3 +100,105 @@ describe('service worker', () => {
     }
   })
 })
+
+  // Runs the worker against a fake cache and network, visiting `path` once online and once offline, and returns what the offline visit got.
+  async function visit(script: string, path: string, online: Map<string, Response>): Promise<{ status: number, body: string }> {
+    const store = new Map<string, Response>()
+    const listeners = new Map<string, (event: unknown) => void>()
+    const cache = {
+      put: async (key: Request | string, response: Response) => {
+        store.set(new URL(typeof key === 'string' ? key : key.url, 'http://localhost').pathname, response)
+      },
+      match: async (key: Request | string) => store.get(new URL(typeof key === 'string' ? key : key.url, 'http://localhost').pathname)?.clone(),
+      add: async (key: string) => {
+        const response = online.get(key)
+
+        if (!response)
+          throw new Error('offline')
+
+        store.set(key, response.clone())
+      },
+      addAll: async () => undefined,
+    }
+    let up = true
+    const sandbox = {
+      self: { addEventListener: (name: string, listener: (event: unknown) => void) => listeners.set(name, listener), skipWaiting: async () => undefined, clients: { claim: async () => undefined }, registration: {} },
+      caches: { open: async () => cache, keys: async () => [], delete: async () => true },
+      location: { origin: 'http://localhost' },
+      fetch: async (request: Request) => {
+        const response = up ? online.get(new URL(request.url).pathname) : undefined
+
+        if (!response)
+          throw new Error('offline')
+
+        return response.clone()
+      },
+      Response,
+      URL,
+    }
+    // The worker is a plain script reading its globals, so it runs as a function taking them.
+    // eslint-disable-next-line no-new-func
+    const run = new Function(...Object.keys(sandbox), script) as (...globals: unknown[]) => void
+
+    run(...Object.values(sandbox))
+
+    const navigate = async () => {
+      let reply: Promise<Response> | undefined
+
+      listeners.get('fetch')!({ request: { method: 'GET', url: `http://localhost${path}`, mode: 'navigate', headers: new Headers() }, respondWith: (response: Promise<Response>) => {
+        reply = response
+      } })
+
+      return reply
+    }
+
+    let waited: Promise<unknown> = Promise.resolve()
+
+    listeners.get('install')!({ waitUntil: (promise: Promise<unknown>) => {
+      waited = promise
+    } })
+    await waited
+    up = false
+
+    const reply = await navigate()
+
+    return reply ? { status: (await reply).status, body: await (await reply).text() } : { status: 0, body: '' }
+  }
+
+  describe('keeps its pages whatever trailingSlash is', () => {
+    it.each([
+      ['always', '/about/', '/about/'],
+      ['always', '/about/', '/about'],
+      ['never', '/about', '/about'],
+      ['ignore', '/about', '/about/'],
+      ['ignore', '/about', '/about'],
+    ] as const)('under %s, serving %s offline when %s is visited', async (trailingSlash, listed, visited) => {
+      for (const offline of [true, { pages: ['/about'] }] satisfies (true | { pages: string[] })[]) {
+        const dir = await mkdtemp(join(tmpdir(), 'kay-sw-'))
+
+        try {
+          const app = new Elysia()
+          const client = { dir, pages: new Map([['/about', { pattern: '/about', file: 'about.html', status: 200, headers: {}, etag: '"a"', renderedAt: 0 }]]) } as unknown as ClientBuild
+
+          await serveServiceWorker(app, new ServedPaths(), { client, offline, base: '', trailingSlash, publicPages: ['/about'] })
+
+          const { settings, text } = await worker(app)
+          const online = new Map([[listed, new Response('about page')]])
+
+          expect(settings!.pages).toEqual([listed])
+          expect(settings!.precache).toContain(listed)
+          expect(await visit(text, visited, online)).toEqual({ status: 200, body: 'about page' })
+        }
+        finally {
+          await rm(dir, { recursive: true, force: true })
+        }
+      }
+    })
+
+    it('under a base', async () => {
+      const app = await pages({ routes: ROUTES, prebuilt: false, site: 'https://x.example', base: '/repo', trailingSlash: 'always', offline: { pages: ['/', '/about'] } })
+      const { settings } = await worker(app)
+
+      expect(settings!.pages).toEqual(['/repo/', '/repo/about/'])
+    })
+  })

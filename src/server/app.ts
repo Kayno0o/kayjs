@@ -379,7 +379,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   const prerendered = await loadPrerendered(client)
   const guarded = new Set(routes.filter(route => route.guards.length > 0).map(route => route.pattern))
 
-  await serveServiceWorker(app, served, { client, offline: offlineOf(options, mode) ? options.offline : undefined, base, lang: options.lang, publicPages: [...client.pages].filter(([, page]) => !guarded.has(page.pattern) && page.islands === undefined && page.stamps === undefined).map(([path]) => path) })
+  await serveServiceWorker(app, served, { client, offline: offlineOf(options, mode) ? options.offline : undefined, base, trailingSlash: options.trailingSlash, lang: options.lang, publicPages: [...client.pages].filter(([, page]) => !guarded.has(page.pattern) && page.islands === undefined && page.stamps === undefined).map(([path]) => path) })
   trackWhileRunning(app, prerendered, client, site, mode, paths.output)
 
   // `kay dev` prints its own.

@@ -155,7 +155,8 @@ export default defineConfig({
 ```
 
 - Every page carries a script registering `/sw.js`, under the site's `base`, once it has loaded; the policy allows it by hash as kay's other inline scripts.
-- Off, nothing is added to a page.
+- Off, nothing is added to a page: `offline: false` is off, as leaving it out is.
+- Pages are kept and matched under the path `trailingSlash` writes them at, `/menu/` with `always`, and a visit to the other form finds the same copy.
 - On its install the worker fetches the build's scripts, stylesheets and fonts, every page `pages` lists, as paths of the site, every prerendered page no guard covers without it, and the `fallback` page.
 - The server warns past 100 prerendered pages, since each visitor downloads them on every deploy.
 - The build's other files, such as images, are kept as they are first loaded.

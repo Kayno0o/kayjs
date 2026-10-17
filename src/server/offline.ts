@@ -1,5 +1,5 @@
 import type { Elysia } from 'elysia'
-import type { OfflineConfig } from '../config'
+import type { OfflineConfig, TrailingSlash } from '../config'
 import type { ClientBuild } from './client'
 import type { ServedPaths } from './served-paths'
 import { readdir } from 'node:fs/promises'
@@ -12,6 +12,7 @@ import { kayLog } from '../runtime/log'
 import { fixedReply } from './compress'
 import { PUBLIC_ENV_PATH } from './env-state'
 import { DEFAULT_LANG } from './i18n'
+import { slashedPath } from './routes'
 
 export const SERVICE_WORKER = '/sw.js'
 // Fetched before the page needs them: what the first offline visit cannot do without.
@@ -19,13 +20,18 @@ const PRECACHED = /\.(?:js|css|woff2?|ttf)$/
 const SKIPPED = /\.(?:br|gz|map)$/
 const BACKSLASH = /\\/g
 // Bumped whenever the worker's own code changes, so every site installs it again.
-const WORKER_VERSION = 2
+const WORKER_VERSION = 3
 // Past this many pages kept by default, the boot says to list the ones worth it.
 const MANY_PAGES = 100
 
 // The worker itself, plain JavaScript for every browser that has one: the build's files from the cache first, pages from the network first with the cached copy or the fallback offline, and kay's routes and the API always from the network.
 const WORKER = `const FILES = new Set(KAY.files)
-const PAGES = new Set(KAY.pages)
+// A page by its path without a trailing slash, to the URL it is kept under: a visit to /menu/ finds the copy of /menu whatever trailingSlash writes.
+const PAGES = new Map(KAY.pages.map(url => [bare(url), url]))
+
+function bare(path) {
+  return path.length > 1 && path.endsWith('/') ? path.slice(0, -1) : path
+}
 
 self.addEventListener('install', (event) => {
   event.waitUntil((async () => {
@@ -121,7 +127,9 @@ async function fromNetwork(request, key) {
 
 async function page(request, url) {
   try {
-    return PAGES.has(url.pathname) && url.search === '' ? await fromNetwork(request, url.pathname) : await fetch(request)
+    const kept = PAGES.get(bare(url.pathname))
+
+    return kept !== undefined && url.search === '' ? await fromNetwork(request, kept) : await fetch(request)
   }
   catch (error) {
     const cache = await caches.open(KAY.cache)
@@ -157,6 +165,8 @@ export interface ServiceWorkerOptions {
   offline: true | OfflineConfig | undefined
   // The site's mount point: the worker is served under it, and controls only what is.
   base: string
+  // How the site writes a page's path, which the pages are kept under.
+  trailingSlash?: TrailingSlash | undefined
   lang?: string | undefined
   // The prerendered pages of routes no guard covers, which every visitor gets alike, by path.
   publicPages: string[]
@@ -186,7 +196,7 @@ async function workerScript(options: ServiceWorkerOptions, offline: true | Offli
     .filter(entry => entry.isFile() && !SKIPPED.test(entry.name) && entry.name !== NOTICES_FILE)
     .map(entry => `${base}${ASSET_PREFIX}${join(entry.parentPath, entry.name).slice(client.dir.length + 1).replace(BACKSLASH, '/')}`)
     .sort()
-  const pages = (config.pages ?? options.publicPages).map(path => `${base}${path}`).sort()
+  const pages = (config.pages ?? options.publicPages).map(path => slashedPath(`${base}${path}`, options.trailingSlash)).sort()
   const rendered = config.pages?.filter(path => client.pages.get(path)?.islands !== undefined) ?? []
 
   // Pages with server islands are not kept offline by default: an island needs the server, and an offline copy would keep one visitor's render.
@@ -197,7 +207,7 @@ async function workerScript(options: ServiceWorkerOptions, offline: true | Offli
   if (config.pages === undefined && pages.length > MANY_PAGES)
     kayLog('warn', `offline keeps every prerendered page, ${pages.length} of them, which each visitor downloads on every deploy; list the ones worth reading offline in offline.pages`)
 
-  const fallback = config.fallback === undefined ? undefined : `${base}${config.fallback}`
+  const fallback = config.fallback === undefined ? undefined : slashedPath(`${base}${config.fallback}`, options.trailingSlash)
   // Changes with the build, its prerendered pages and the worker, so a deploy installs a new one, which drops the old cache.
   const version = Bun.hash(JSON.stringify([WORKER_VERSION, files, pages, fallback, [...client.pages].map(([path, page]) => [path, page.etag])])).toString(36)
   const settings = {
