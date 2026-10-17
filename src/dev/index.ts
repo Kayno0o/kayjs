@@ -89,7 +89,7 @@ const ANSI_STYLE = /\x1B\[[\d;]*m/g
 // Resolves once watching, with a function stopping the watchers and the server.
 export async function dev(projectRoot: string, options: DevOptions = {}): Promise<() => Promise<void>> {
   const root = resolve(projectRoot)
-  const entry = projectPaths(root, options).entry
+  const entry = projectPaths(root, { ...options.config, entry: options.entry ?? options.config?.entry }).entry
   let child: Subprocess<'pipe'> | undefined
   // Spawned ahead of its start line, which it loads kay while it waits for: the first server when the config is to be checked first.
   let waiting: Subprocess<'pipe'> | undefined
@@ -427,7 +427,12 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     return true
   }
   // Chosen again for each process, so a `src/server.ts` written or deleted while running takes over at the next restart.
-  const entryToRun = () => options.entry === undefined && !existsSync(entry) ? PAGES_ENTRY : entry
+  // The config's `entry` comes from the process writing the types, which loads the config; `--entry` wins.
+  const entryToRun = () => {
+    const file = options.entry === undefined ? typesProcess.configuredEntry ?? entry : entry
+
+    return options.entry === undefined && !existsSync(file) ? PAGES_ENTRY : file
+  }
   const spawn = () => {
     const socket = inspector?.socketFor()
 

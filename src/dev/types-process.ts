@@ -1,7 +1,7 @@
 import type { Subprocess } from 'bun'
 import { join } from 'node:path'
 import process from 'node:process'
-import { ANSWER } from './refuse'
+import { ANSWER, ENTRY } from './refuse'
 
 const TYPES = join(import.meta.dir, 'types.ts')
 // How long the process writing the types waits for the next edit before it exits, so a project left alone holds no memory for it.
@@ -13,6 +13,8 @@ export class TypesProcess {
   private lines: AsyncIterator<string> | undefined
   private idle: ReturnType<typeof setTimeout> | undefined
   private closed = false
+  // The server entry the config named at the last write, when no `--entry` did.
+  configuredEntry: string | undefined
 
   constructor(private root: string, private entry: string | undefined) {}
 
@@ -65,6 +67,9 @@ export class TypesProcess {
 
         if (line.done === true)
           break
+
+        if (line.value.startsWith(ENTRY))
+          this.configuredEntry = line.value.slice(ENTRY.length)
 
         // Whatever else the config or a module it imports prints is not an answer.
         if (line.value.startsWith(ANSWER))

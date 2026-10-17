@@ -89,9 +89,9 @@ export interface CheckDiagnostic extends Pick<Diagnostic, 'label' | 'related' | 
 }
 
 export function configCheckOptions(config: KayConfig): CheckOptions {
-  const { routes, publicDir, api, content, redirects, i18n, lang, settings, base, site, shutdownTimeout, budget, lints, extensions, seo, favicon, manifest, images, publicEnv, requireGuards, mcp } = config
+  const { entry, routes, publicDir, api, content, redirects, i18n, lang, settings, base, site, shutdownTimeout, budget, lints, extensions, seo, favicon, manifest, images, publicEnv, requireGuards, mcp } = config
 
-  return { routes, publicDir, api, content, redirects, i18n, lang, settings, base, site, shutdownTimeout, budget, lints, extensions, seo, favicon, manifest, images, publicEnv, requireGuards, mcp }
+  return { entry, routes, publicDir, api, content, redirects, i18n, lang, settings, base, site, shutdownTimeout, budget, lints, extensions, seo, favicon, manifest, images, publicEnv, requireGuards, mcp }
 }
 
 // Type-checks a project, .kay components included, and reports every error at the line and column the user wrote.

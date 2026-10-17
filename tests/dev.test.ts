@@ -696,6 +696,20 @@ describe.concurrent('kay dev', () => {
         await rm(seen, { force: true })
       }
 
+      // The entry kay.config.ts names, `--entry` winning over it.
+      await Bun.write(join(root, 'kay.config.ts'), 'export default { entry: \'src/other.ts\' }\n')
+
+      for (const [args, expected] of [[[root], `other|${root}|${port}`], [[root, '--entry', join(root, 'src/server.ts')], `server|${root}|${port}`]] as const) {
+        const child = Bun.spawn(['bun', cli, 'dev', ...args], { stdout: 'ignore', stderr: 'pipe' })
+
+        await until(() => filled(seen) && readFileSync(seen, 'utf8') === expected, 10_000)
+        child.kill('SIGTERM')
+        expect(await child.exited).toBe(0)
+        await rm(seen, { force: true })
+      }
+
+      await rm(join(root, 'kay.config.ts'))
+
       const refused = Bun.spawn(['bun', cli, 'dev', join(root, 'src/server.ts'), '--entry', 'src/other.ts'], { stdout: 'ignore', stderr: 'pipe' })
 
       expect(await refused.exited).toBe(1)

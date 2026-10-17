@@ -73,6 +73,7 @@ export const app = new Elysia()
 ```
 
 - Exporting `app` lets links and redirects point at the app's own GET routes, such as `/feed.xml`, which `kay check` otherwise reports as served by no page, and types `ctx.locals` (see [Locals](server.md#locals)).
+- An entry other than `src/server.ts` is named once, as `entry: 'src/main.ts'` in `kay.config.ts`, which `kay dev`, `start`, `render`, `check`, `build` and `build --compile` all read; `--entry` on a command wins over it, `kay build --entry` also pointing its check step at that entry.
 - An entry `kay check` does not read registers it instead: `declare module 'kay' { interface Register { app: typeof app } }`.
 
 - Project settings live in an optional `kay.config.ts` at the root, read by `pages()` and every command; options passed to `pages()` or `testSite()` win over it key by key, an `undefined` option leaving the file's value, and in an executable `kay build --compile` wrote, the root, routes and public directory it was built with win over both.

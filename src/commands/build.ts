@@ -44,9 +44,6 @@ export const build: Command = {
     if (!checking && typeof tsconfig === 'string')
       return refuse('-p names the tsconfig the build checks with, so it does not go with --no-check')
 
-    if (entry !== undefined && typeof compile !== 'string')
-      return refuse('--entry names the server an executable runs, so it goes with --compile')
-
     if (values.verify === true && typeof compile !== 'string')
       return refuse('--verify starts the executable --compile writes, so it goes with --compile')
 

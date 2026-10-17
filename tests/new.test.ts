@@ -846,14 +846,6 @@ async function listeningPort(child: Subprocess<'ignore', 'pipe', 'pipe'>): Promi
 }
 
 describe('kay build --compile', () => {
-  it('refuses --entry without --compile, before building anything', async () => {
-    const build = Bun.spawn([process.execPath, join(repo, 'src/cli.ts'), 'build', tmpdir(), '--entry', 'src/server.ts'], { stdout: 'pipe', stderr: 'pipe' })
-    const [report, code] = await Promise.all([new Response(build.stderr).text(), build.exited])
-
-    expect(report).toContain('--entry names the server an executable runs, so it goes with --compile')
-    expect(code).toBe(1)
-  })
-
   it('bundles the server, its pages and the client build into one executable that serves them from anywhere', async () => {
     const { dir } = await scaffoldServerPreset()
 

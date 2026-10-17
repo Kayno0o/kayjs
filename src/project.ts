@@ -51,7 +51,7 @@ export interface ProjectPaths {
   report: string
 }
 
-export function projectPaths(root: string, config: Pick<KayConfig, 'routes' | 'publicDir' | 'api' | 'content'> & { entry?: string | undefined } = {}): ProjectPaths {
+export function projectPaths(root: string, config: Pick<KayConfig, 'routes' | 'publicDir' | 'api' | 'content' | 'entry'> = {}): ProjectPaths {
   const absolute = resolve(root)
 
   return {

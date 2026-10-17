@@ -306,7 +306,7 @@ function withoutModules(report: SizeReport | undefined): SizeReport | undefined 
 }
 
 async function checkStage(project: Project, { tsconfig = 'tsconfig.json', entry }: { tsconfig?: string | undefined, entry?: string | undefined }, exported: boolean): Promise<CheckDiagnostic[]> {
-  return check(project.root, { ...configCheckOptions(project.config), tsconfig, entry: entry === undefined ? undefined : relative(project.root, resolve(project.root, entry)), launch: true, exported })
+  return check(project.root, { ...configCheckOptions(project.config), tsconfig, entry: entry === undefined ? project.config.entry : relative(project.root, resolve(project.root, entry)), launch: true, exported })
 }
 
 // An output set aside earlier is the last good build of a run that was interrupted, and what is in its place now is that run's partial one.

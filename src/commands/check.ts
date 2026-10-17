@@ -232,7 +232,7 @@ function inScope(diagnostic: CheckDiagnostic, scope: string[]): boolean {
 // Prints what `kay check` finds in the project and answers how many it found and how many of those fail it: the errors, and the warnings too with `denyWarnings`.
 // With `fix`, applies the safe fixes first, then checks again and prints what is left; with `only`, prints that group's lints alone; with a `scope`, the problems in those files and directories alone, the project still checked as a whole.
 async function checkProject(root: string, config: KayConfig, tsconfig: string, entry: string | undefined, { denyWarnings, fix, only, since, launch, format, scope, quiet }: { denyWarnings: boolean, fix: boolean, only: LintGroup | undefined, since: string | undefined, launch: boolean, format: ProblemFormat, scope: string[], quiet: boolean }): Promise<{ failing: number, found: number }> {
-  const options = { ...configCheckOptions(config), tsconfig, entry, launch }
+  const options = { ...configCheckOptions(config), tsconfig, entry: entry ?? config.entry, launch }
   const checkScope = async () => (await checkTypes(root, options)).filter(diagnostic => inScope(diagnostic, scope))
   let diagnostics = await checkScope()
 

@@ -184,6 +184,26 @@ describe('kay check', () => {
     }
   })
 
+  it('reads the server entry from entry in kay.config.ts, --entry winning, for check and for the check step of build', async () => {
+    const entry = 'import { Elysia } from \'elysia\'\nimport { pages } from \'kay/server\'\n\nexport const app = new Elysia().derive({ as: \'scoped\' }, () => ({ user: { name: \'Ada\' } })).use(await pages())\n'
+    const page = '--- server\nconst name: string = ctx.locals.user.name\n---\np {name}\n'
+    const root = await scratchProject({ 'src/main.ts': entry, 'src/routes/index.kay': page, 'kay.config.ts': 'export default { entry: \'src/main.ts\' }\n' })
+    const own = await scratchProject({ 'src/main.ts': entry, 'src/routes/index.kay': page })
+
+    try {
+      expect((await runCheck(root)).output).not.toContain('TS2339')
+      expect((await runCheck(root, '--entry', join(root, 'src/missing.ts'))).output).toContain('TS2339')
+      expect((await runCheck(own)).output).toContain('TS2339')
+      expect((await runCheck(own, '--entry', join(own, 'src/main.ts'))).output).not.toContain('TS2339')
+      expect((await kay(['build', root])).output).not.toContain('TS2339')
+      expect((await kay(['build', own])).output).toContain('TS2339')
+      expect((await kay(['build', own, '--entry', join(own, 'src/main.ts')])).output).not.toContain('TS2339')
+    }
+    finally {
+      await Promise.all([rm(root, { recursive: true, force: true }), rm(own, { recursive: true, force: true })])
+    }
+  })
+
   it('refuses a path that is not there, for check and build alike', async () => {
     for (const command of ['check', 'build']) {
       // A path check is given is what to report on, unless it is a project.

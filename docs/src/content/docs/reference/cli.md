@@ -119,7 +119,7 @@ Open pages refresh by themselves, an edited island is swapped in place, and a pr
 
 | Option | Effect |
 | --- | --- |
-| `--entry <file>` | The server entry, when it is not `src/server.ts` |
+| `--entry <file>` | The server entry, when `entry` in `kay.config.ts` does not name it |
 | `--port <port>` | Sets `PORT` for the server, over the shell's and the `.env`'s |
 | `--host[=<address>]` | Listens past this machine: on `0.0.0.0`, or on the address given. Needed in a container publishing its port |
 | `--inspect[=<address>]` | Opens Bun's debugger in the server, at `ws://localhost:6499/kay` by default, the same address after every restart |
@@ -232,7 +232,7 @@ The build runs `kay check` first and keeps the last build when the check or the 
 | --- | --- |
 | `--compile <file>` | Also bundles the server and everything it serves into one executable |
 | `--verify` | With `--compile`, starts the executable and runs its health check, failing the build with the server's output |
-| `--entry <file>` | The server entry to compile |
+| `--entry <file>` | The server entry to compile, and to type the check against |
 | `--static` | Also writes the whole site as static files, see [Static export](/guides/static-export) |
 | `--outdir <dir>` | Where `--static` writes, `dist` by default |
 | `--no-check` | Skips the check |

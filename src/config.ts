@@ -44,6 +44,8 @@ export interface KayConfig {
   favicon?: string | FaviconConfig | false | undefined
   // The web manifest served with the favicon, named after `seo.name` and described by `seo.description`.
   manifest?: ManifestConfig | undefined
+  // The server entry, relative to the root, `src/server.ts` by default: what `kay dev`, `start`, `render`, `check` and `build` run and type against, unless `--entry` names another. With no file there, kay's own server of the pages.
+  entry?: string | undefined
   // A service worker keeping the build's files and some pages for a visitor offline, `true` or what it keeps; off by default, as `false` is.
   offline?: true | OfflineConfig | false | undefined
   // `true` has `kay build` index the text of the pages it renders, which `searchSite()` from `kay` searches in the browser; off by default.

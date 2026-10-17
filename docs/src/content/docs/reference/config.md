@@ -46,6 +46,7 @@ Every option is optional. The tables give each option's default. The full refere
 
 | Option | Effect |
 | --- | --- |
+| `entry` | The server entry, `src/server.ts` by default. Every command reads it, and `--entry` on a command wins over it. With no file there, kay serves the pages itself |
 | `routes` | The page directory, `src/routes` by default. See [Routing](/essentials/routing) |
 | `api` | The directory of API modules, `src/api` by default. See [API routes](/guides/api-routes) |
 | `publicDir` | The directory of files served as they are at their path, `public` by default. See [Styling and assets](/essentials/styling-and-assets#public-files) |
