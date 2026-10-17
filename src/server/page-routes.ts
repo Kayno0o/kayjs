@@ -21,7 +21,7 @@ import { noteRedirect } from './dev-notes'
 import { handedOverFlash } from './flash'
 import { cookieLocale, hostLocale, localeCookie, preferredLocale, prerenderKey, stateFor } from './i18n'
 import { stillKept } from './kept-pages'
-import { answeringRequest } from './log'
+import { answeringPage } from './log'
 import { hookedResponse } from './page-hook'
 import { matchedParams, positionalParams, slashSpelling } from './params'
 import { inPreview, previewRequested, requestDrafts } from './preview'
@@ -230,7 +230,7 @@ export function servePageRoutes(app: Elysia, { table, served: claims, matchers, 
       }
 
       if (!i18n || !settings)
-        return inImplicitLocale(url, context.request, async () => answeringRequest(context.request, async () => answer(own!.candidates, context, url)))
+        return inImplicitLocale(url, context.request, async () => answeringPage(context.request, async () => answer(own!.candidates, context, url)))
 
       // With every locale prefixed, a path without one goes to the visitor's.
       if (locale === undefined) {
@@ -252,7 +252,7 @@ export function servePageRoutes(app: Elysia, { table, served: claims, matchers, 
         return runInLocale(state, async () => renderUnmatched(last.special, context, client, withEditor(last, renderOptions)))
       }
 
-      const response = await runInLocale(state, async () => answeringRequest(context.request, async () => answer(own.candidates, context, url)))
+      const response = await runInLocale(state, async () => answeringPage(context.request, async () => answer(own.candidates, context, url)))
 
       return settings.prefixDefault ? remembered(response, context.request, locale) : response
     }

@@ -391,6 +391,11 @@ function proxyOf(setting: ProxyConfig | number | true | undefined): ProxyConfig 
 }
 
 // Records the app's proxy settings on each request it gets, for `clientAddress` to read them wherever it is called from.
+// The server that received `request`, once the app read it.
+export function requestServer(request: Request): Server<unknown> | undefined {
+  return servers.get(request)
+}
+
 export function trustProxy(app: Elysia, setting: ProxyConfig | number | true | undefined): void {
   const proxy = proxyOf(setting)
 

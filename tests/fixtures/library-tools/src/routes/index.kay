@@ -4,9 +4,9 @@ import { action, s } from 'kay'
 import { actionTool, currentRequest } from 'kay/library'
 import { wipe } from './admin/_actions.kay'
 import { rename } from './items/[id].kay'
-import { addNote, breaks, described, language, named, refuses, sendsAway, signup, solve, upload, vetoed } from './targets/_actions.kay'
+import { addNote, breaks, described, language, named, refuses, sendsAway, limited, signup, solve, upload, vetoed } from './targets/_actions.kay'
 
-const offered = { addNote, breaks, described, language, named, refuses, rename, sendsAway, signup, solve, upload, vetoed, wipe }
+const offered = { addNote, breaks, described, language, limited, named, refuses, rename, sendsAway, signup, solve, upload, vetoed, wipe }
 
 type Offered = keyof typeof offered
 
@@ -20,5 +20,36 @@ export const shape = action(s.Object({ name: s.String() }), ({ name }) => {
 })
 
 export const current = action(() => currentRequest()?.url ?? null)
+
+let afterAnswer: string | null | undefined
+
+// What `currentRequest()` gives once the answer is made, read by `recorded`.
+export const later = action(() => {
+  setTimeout(() => {
+    afterAnswer = currentRequest()?.url ?? null
+  }, 10)
+})
+
+export const recorded = action(() => afterAnswer)
+
+export const unregistered = action(() => {
+  const loose = action(() => 'loose')
+
+  try {
+    actionTool(loose)
+
+    return 'a tool'
+  }
+  catch (error) {
+    return (error as Error).message
+  }
+})
+
+// Two actions sharing one name, told apart by the set the library keeps.
+export const names = action(() => {
+  const taken = new Set<string>()
+
+  return [actionTool(addNote, taken)!.name, actionTool(addNote, taken)!.name, actionTool(addNote)!.name]
+})
 ---
 p#current {currentRequest()?.url}

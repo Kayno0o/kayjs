@@ -45,7 +45,7 @@ import { countWrites } from './kept-pages'
 import { HEALTH_PATH, serveHealth, stopOnSignal } from './lifecycle'
 import { serveLive } from './live'
 import { announceStart, logRequests, pathOf, useLogger } from './log'
-import { mcpBodyLimit, receiveDispatched, serveMcp } from './mcp'
+import { mcpBodyLimit, receiveDispatched, serveMcp, serveToolCallsThrough } from './mcp'
 import { serveServiceWorker } from './offline'
 import { claimApi, openApiDocument, openApiSettings, serveOpenApi } from './openapi'
 import { withPageHeaders } from './page-headers'
@@ -234,10 +234,12 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   if (options.rewrite)
     rewriteRequests(app, options.rewrite, app)
 
-  // After the rewrite, which hands the request served in its place the id it had.
+  // After the rewrite, which hands the request served in its place the id it had, as a tool call dispatched through the app does.
   app.onRequest(({ request, set }) => {
+    receiveDispatched(request)
     set.headers[REQUEST_ID_HEADER] = requestId(request)
   })
+  serveToolCallsThrough(app)
 
   if (base !== '')
     rebaseRedirects(app, base)
@@ -332,8 +334,6 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
 
   if (servesOpenApi && document && openapi !== undefined)
     serveOpenApi(app, document, openapi, await covering(false), actionOptions)
-
-  receiveDispatched(app)
 
   if (options.mcp === true && document)
     serveMcp(app, document, { title: (document.info as { title: string }).title, version: (document.info as { version: string }).version, base, guards: await covering(true), actions: actionOptions, metadataPaths })

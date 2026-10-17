@@ -16,7 +16,7 @@ const mounted = await testSite({ routes, api, islands: false, base: '/shop', tra
 const localized = await testSite({ routes, api, islands: false, i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: 'tests/fixtures/i18n/src/messages' } })
 
 // Imported once a site loads `.kay` modules.
-const { current, run, shape } = await import(join(import.meta.dir, 'fixtures/library-tools/src/routes/index.kay')) as { current: Action<Record<never, never>, string | null>, run: Action<{ name: string, args: Record<string, unknown> }, ToolResult>, shape: Action<{ name: string }, Record<string, unknown> | undefined> }
+const { current, later, names, recorded, run, shape, unregistered } = await import(join(import.meta.dir, 'fixtures/library-tools/src/routes/index.kay')) as { current: Action<Record<never, never>, string | null>, later: Action<Record<never, never>, undefined>, names: Action<Record<never, never>, string[]>, recorded: Action<Record<never, never>, string | null | undefined>, unregistered: Action<Record<never, never>, string>, run: Action<{ name: string, args: Record<string, unknown> }, ToolResult>, shape: Action<{ name: string }, Record<string, unknown> | undefined> }
 const { addNote } = await import(join(import.meta.dir, 'fixtures/library-tools/src/routes/targets/_actions.kay')) as { addNote: Parameters<typeof actionTool>[0] }
 
 afterAll(async () => {
@@ -49,6 +49,21 @@ describe('an action as a tool', () => {
     expect(await site.call(shape, { name: 'upload' })).toBeUndefined()
     expect(await site.call(shape, { name: 'rename' })).toBeUndefined()
     expect(await site.call(shape, { name: 'vetoed' })).toBeUndefined()
+  })
+
+  it('refuses an action no page module exports, as no URL serves it, every time', async () => {
+    expect(await site.call(unregistered)).toContain('actionTool()')
+    expect(await site.call(unregistered)).toContain('actionTool()')
+  })
+
+  it('names an action once per set of names a library keeps', async () => {
+    expect(await site.call(names)).toEqual(['add_note', 'add_note_2', 'add_note'])
+  })
+
+  it('takes the call an api({ cors }) module let in from another site', async () => {
+    const response = await site.fetch('/api/partner', { headers: { 'origin': 'https://partner.example', 'sec-fetch-site': 'cross-site' } })
+
+    expect(((await response.json()) as ToolResult).structuredContent).toMatchObject({ title: 'Milk' })
   })
 
   it('refuses a call for a request a browser sent from another site, whatever its method', async () => {
@@ -111,6 +126,26 @@ describe('an action as a tool', () => {
     expect((await call('language', {}, localized, { 'accept-language': 'en' })).structuredContent).toEqual({ locale: 'en' })
   })
 
+  it('runs in the locale of the page the visitor is on, over their Accept-Language', async () => {
+    const result = await localized.call(run, { name: 'language', args: {} }, { from: '/en/', headers: { 'accept-language': 'fr' } })
+
+    expect(result.structuredContent).toEqual({ locale: 'en' })
+  })
+
+  it('keeps two visitors calling at once apart', async () => {
+    const [open, anonymous] = await Promise.all([call('wipe', { confirm: true }, site, { authorization: 'Bearer open' }), call('wipe', { confirm: true })])
+
+    expect(open.structuredContent).toEqual({ by: 'open' })
+    expect(anonymous.isError).toBe(true)
+  })
+
+  it('counts the rate limit by the visitor, whatever client header the request forges', async () => {
+    const forged = async () => call('limited', {}, site, { 'x-kay-agent-client': crypto.randomUUID() })
+    const calls = [await forged(), await forged(), await forged()]
+
+    expect(calls.map(each => each.isError ?? false)).toEqual([false, false, true])
+  })
+
   it('refuses a call made outside any request, naming the way out', async () => {
     await expect(actionTool(addNote)!.call({ title: 'Milk' })).rejects.toThrow('request')
   })
@@ -128,6 +163,12 @@ describe('the current request', () => {
     const response = await site.fetch('/api/current/tool', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ title: 'Milk' }) })
 
     expect(((await response.json()) as ToolResult).structuredContent).toMatchObject({ title: 'Milk' })
+  })
+
+  it('is none once the answer is made', async () => {
+    await site.call(later)
+    await Bun.sleep(30)
+    expect(await site.call(recorded)).toBeNull()
   })
 
   it('is none outside a request', () => {

@@ -10,13 +10,13 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 import { INVALID_REQUEST, McpServer, PARSE_ERROR } from '../mcp/protocol'
 import { joinBase } from '../runtime/base'
 import { configuredSite } from '../runtime/site'
-import { FAILURE_HEADER, REDIRECT_HEADER } from '../runtime/swap'
+import { FAILURE_HEADER, PAGE_HEADER, REDIRECT_HEADER } from '../runtime/swap'
 import { decodeServerValue, encodeValue } from '../runtime/wire'
-import { boundToPage, isCrossSite, unadmittedCrossSite } from './actions'
+import { boundToPage, isCrossSite, postedFrom, unadmittedCrossSite } from './actions'
 import { MCP_PATH, RESOURCE_METADATA } from './api-modules'
-import { currentRequest } from './log'
+import { answeredAsPage, currentRequest } from './log'
 import { actionOperation, guardRefusal, toolName } from './openapi'
-import { clientAddress, keepRequestId, markAgentCall, requestId, wasChallenged } from './protection'
+import { clientAddress, keepRequestId, markAgentCall, requestId, requestServer, wasChallenged } from './protection'
 import { requestUrl } from './request-url'
 import { sendFrom } from './rewrite'
 import { toolSettings } from './tool-settings'
@@ -31,6 +31,8 @@ interface CallContext {
   server: Server | null
   // What serves the call when no server does, as under `kay/test`.
   fallback: Handle
+  // The page the visitor is on, whose locale a library's call runs in.
+  page?: string | undefined
   // Set when a guard refused the call for want of a sign-in, which the endpoint answers 401.
   challenged: boolean
 }
@@ -193,6 +195,9 @@ async function dispatch(context: CallContext, url: string, init: RequestInit, ac
       headers.set(name, value)
   }
 
+  if (context.page !== undefined)
+    headers.set(PAGE_HEADER, context.page)
+
   headers.set(AGENT, TOKEN)
   headers.set(CLIENT, clientAddress(request, server))
   headers.set(TOOL, tool)
@@ -314,43 +319,41 @@ export function toolCall(request: Request): ToolCall | undefined {
   return request.headers.get(AGENT) === TOKEN && tool !== null ? { tool, client: request.headers.get(CLIENT) ?? '' } : undefined
 }
 
-// What serves each request the app answers, for an action a library calls as a tool to go through the same app.
-const servers = new WeakMap<Request, { server: Server | null, handle: Handle }>()
+// What serves an action a library calls as a tool when no server does, as under `app.handle()`: the app `pages()` built last, as `kay/test` hands each request its own; held weakly, so an app nothing reaches any more goes.
+let fallbackApp: WeakRef<Elysia> | undefined
+
+export function serveToolCallsThrough(app: Elysia): void {
+  fallbackApp = new WeakRef(app)
+}
 
 // Counts a request the endpoint or a library dispatched as the client it came from and drops the marker, so the app never reads it.
-// Installed whether or not the app serves `mcp`, as a library calls actions as tools in-process all the same.
-export function receiveDispatched(app: Elysia): void {
-  const handle: Handle = async request => app.handle(request)
+// Called from the app's request id hook whether or not it serves `mcp`, as a library calls actions as tools in-process all the same, so a request without the headers pays three lookups.
+export function receiveDispatched(request: Request): void {
+  const { headers } = request
 
-  app.onRequest(({ request, server }) => {
-    servers.set(request, { server, handle })
+  if (!headers.has(AGENT) && !headers.has(CLIENT) && !headers.has(TOOL))
+    return
 
-    const { headers } = request
+  const marked = toolCall(request)
+  const address = headers.get(CLIENT)
+  const id = headers.get('x-request-id')
 
-    if (!headers.has(AGENT) && !headers.has(CLIENT) && !headers.has(TOOL))
-      return
+  headers.delete(AGENT)
+  headers.delete(CLIENT)
+  headers.delete(TOOL)
 
-    const marked = toolCall(request)
-    const address = headers.get(CLIENT)
-    const id = headers.get('x-request-id')
+  // A header an outside client sent is dropped with the rest, and counts for nothing.
+  if (marked === undefined)
+    return
 
-    headers.delete(AGENT)
-    headers.delete(CLIENT)
-    headers.delete(TOOL)
+  toolCalls.set(request, marked)
+  markAgentCall(request)
 
-    // A header an outside client sent is dropped with the rest, and counts for nothing.
-    if (marked === undefined)
-      return
+  if (address !== null)
+    sendFrom(request, address)
 
-    toolCalls.set(request, marked)
-    markAgentCall(request)
-
-    if (address !== null)
-      sendFrom(request, address)
-
-    if (id !== null)
-      keepRequestId(request, id)
-  })
+  if (id !== null)
+    keepRequestId(request, id)
 }
 
 // The request id of the message when it asks what only the directory's guard may show: `tools/list`, or a call to a name no tool has, which would tell a name that is a tool from one that is not.
@@ -500,26 +503,31 @@ const libraryTools = new WeakMap<object, LibraryTool | undefined>()
 
 // An action of a page module as a tool, whether or not it set `tool`, which still gives its name and description: passing it is the opt-in, and `tool: false` a veto.
 // None for one taking a file, which a model cannot send, or one of a page with params, which reads them from the page it is posted from.
-export function actionTool(action: ServerAction<TSchema, unknown, string>): LibraryTool | undefined {
-  if (libraryTools.has(action))
-    return libraryTools.get(action)
+// Names are unique per action: a library offering several passes one `taken` set, which tells two `create` of different pages apart as `create_2`.
+export function actionTool(action: ServerAction<TSchema, unknown, string>, taken?: Set<string>): LibraryTool | undefined {
+  const tool = libraryTools.has(action) ? libraryTools.get(action) : libraryTool(action)
 
-  const tool = libraryTool(action)
+  return tool && taken ? { ...tool, name: toolName(tool.name, taken) } : tool
+}
 
-  libraryTools.set(action, tool)
+function libraryTool(action: ServerAction<TSchema, unknown, string>): LibraryTool | undefined {
+  const url = action.url
+
+  // Given at load to an action a page module exports, and empty for one it does not, or read while its module still runs.
+  if (url === '')
+    throw new Error('kay: actionTool() takes an action a page module exports, which the server gives its URL as it loads; call it once the module has loaded')
+
+  const bound = boundToPage(action)
+  const tool = action.protection?.tool === false || bound === true ? undefined : toolFor(action, url)
+
+  // Kept once the app serves the action and knows its page, never before.
+  if (bound !== undefined)
+    libraryTools.set(action, tool)
 
   return tool
 }
 
-function libraryTool(action: ServerAction<TSchema, unknown, string>): LibraryTool | undefined {
-  const url = action.url as string | undefined
-
-  if (url === undefined)
-    throw new Error('kay: actionTool() takes an action a page module exports, which the server gives its URL as it loads')
-
-  if (action.protection?.tool === false || boundToPage(action))
-    return undefined
-
+function toolFor(action: ServerAction<TSchema, unknown, string>, url: string): LibraryTool | undefined {
   const name = url.slice(url.lastIndexOf('/') + 1)
   const settings = toolSettings(action.protection?.tool) ?? {}
   const sentence = name.replace(WORD_START, '$1 $2').toLowerCase()
@@ -534,15 +542,15 @@ function libraryTool(action: ServerAction<TSchema, unknown, string>): LibraryToo
     description: tool.description,
     inputSchema: tool.inputSchema,
     call: async (args, request = currentRequest()) => {
-      const served = request && servers.get(request)
+      const app = fallbackApp?.deref()
 
-      if (!request || !served)
+      if (!request || !app)
         throw new Error(`kay: the ${tool.name} tool was called outside a request kay answers; pass the request it was asked for`)
 
       if (unadmittedCrossSite(request))
         return refusal('Cross-site request refused')
 
-      return tool.call(args, { request, server: served.server, fallback: served.handle, challenged: false })
+      return tool.call(args, { request, server: requestServer(request) ?? null, fallback: async visit => app.handle(visit), challenged: false, page: postedFrom(request) ?? (answeredAsPage(request) ? requestUrl(request).href : undefined) })
     },
   }
 }

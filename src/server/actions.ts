@@ -106,8 +106,8 @@ export interface RouteMatch {
 // Renders the page a refused plain form post came from, with how it failed, through the app the post reached.
 type Back = (request: Request, headers: Headers, flash: Flash, server: Server | null) => Promise<Response>
 
-// The actions of a page with params, which read them from the page they are posted from, so a call no page made cannot run them.
-const pageBound = new WeakSet<object>()
+// Whether each action the app serves belongs to a page with params, which it reads from the page it is posted from, so a call no page made cannot run it.
+const pageBound = new WeakMap<object, boolean>()
 
 // Registers every action the pages and layouts export as a POST route whose body Elysia validates against the action's schema, giving back the body limit of each by its path and the actions that opted in to being MCP tools.
 export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], match: RouteMatch, options: ActionOptions): Promise<{ limits: Map<string, BodyLimit>, tools: DocumentedAction[] }> {
@@ -136,8 +136,7 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], m
 
       const tool = toolSettings(value.protection?.tool)
 
-      if (page.params.length > 0)
-        pageBound.add(value)
+      pageBound.set(value, page.params.length > 0)
 
       if (tool && page.params.length === 0)
         tools.push({ name, url: value.url, schema: value.schema, tool, guards: guards.filter(guard => guard.check !== unguarded).map(guard => guard.file) })
@@ -470,11 +469,12 @@ export function admitCrossSite(request: Request): void {
 
 // Whether a browser on another site sent `request`, which no `api({ cors })` module let in.
 export function unadmittedCrossSite(request: Request): boolean {
-  return isCrossSite(request) && !corsAdmitted.has(request)
+  return crossSiteOnce(request, undefined) && !corsAdmitted.has(request)
 }
 
-export function boundToPage(action: object): boolean {
-  return pageBound.has(action)
+// Undefined until the app serves the action.
+export function boundToPage(action: object): boolean | undefined {
+  return pageBound.get(action)
 }
 
 // What `isCrossSite` answered for a request, as kayjs-auth asks again on every session read of one.
@@ -623,7 +623,7 @@ function isFormCall(request: Request): boolean {
 const postedFromCache = new WeakMap<Request, string | null>()
 
 // The page a post came from on this site: the one its form names when a refused post rendered it, else the one kay's script names, else its `Referer`.
-function postedFrom(request: Request): string | undefined {
+export function postedFrom(request: Request): string | undefined {
   let from = postedFromCache.get(request)
 
   if (from === undefined)

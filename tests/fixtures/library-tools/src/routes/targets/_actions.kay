@@ -30,5 +30,7 @@ export const signup = action(s.Object({ email: s.String(), website: s.Optional(s
 
 export const vetoed = action(s.Object({}), () => 'vetoed', { tool: false })
 
+export const limited = action(s.Object({}), () => 'counted', { rateLimit: { max: 2, window: '1m' } })
+
 export const solve = action(s.Object({}), () => 'solved', { proofOfWork: true })
 ---

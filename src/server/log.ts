@@ -146,6 +146,20 @@ export async function answeringRequest<T>(request: Request, run: () => Promise<T
   }
 }
 
+// The requests answered as pages, whose URL is the page the visitor is on.
+const pages = new WeakSet<Request>()
+
+// Runs kay's answer to a page request, as `answeringRequest` does.
+export async function answeringPage<T>(request: Request, run: () => Promise<T>): Promise<T> {
+  pages.add(request)
+
+  return answeringRequest(request, run)
+}
+
+export function answeredAsPage(request: Request): boolean {
+  return pages.has(request)
+}
+
 // The server's first line, in the format the `log` option of this `pages()` says: where it listens, which kay runs it in which mode, and how many pages its build prerendered.
 export function announceStart(app: Elysia, logger: Exclude<Logger, false>, prerendered: number): void {
   const writeLine = writerFor(logger)
