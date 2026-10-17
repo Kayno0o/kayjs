@@ -36,7 +36,7 @@ const TOKEN_LIFETIMES: Record<TokenType, number> = {
 // The lifetimes the `expires` option sets over the defaults, in seconds, a bad one failing at boot naming it.
 export function tokenLifetimes(expires: EmailOptions['expires']): Record<TokenType, number> {
   const lifetimes = { ...TOKEN_LIFETIMES }
-  const unknown = Object.keys(expires ?? {}).find(key => !(key in TOKEN_LIFETIMES))
+  const unknown = Object.keys(expires ?? {}).find(key => !Object.hasOwn(TOKEN_LIFETIMES, key))
 
   if (unknown !== undefined)
     throw new Error(`kayjs-auth: email.expires.${unknown} is no link or code of kayjs-auth`)

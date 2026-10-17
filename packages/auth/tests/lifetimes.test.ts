@@ -118,6 +118,7 @@ describe('email.expires', () => {
   test('a bad lifetime fails at boot naming it', () => {
     expect(() => setup({ expires: { 'verify-email': 'a week' as Duration } })).toThrow('kayjs-auth: email.expires.verify-email is \'a week\'')
     expect(() => setup({ expires: { verify: '1d' } as never })).toThrow('kayjs-auth: email.expires.verify is no link or code')
+    expect(() => setup({ expires: { constructor: '1d' } as never })).toThrow('kayjs-auth: email.expires.constructor is no link or code')
     expect(() => setup({ expires: { 'magic-link': 0 } })).toThrow('kayjs-auth: email.expires.magic-link is 0')
   })
 })
