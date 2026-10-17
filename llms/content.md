@@ -241,7 +241,7 @@ article
 - A tag in a code span, a fenced code block or an indented one stays text.
 - Attributes take JSON of any depth; quoted text may hold `>` or `}`.
 - A component the collection does not name, a tag left open, or a capitalized tag kay cannot read (stray text after a JSON value, a quote or brace never closed) fails `kay check`, the build and `bodyHtml` at its line (`markdown-invalid`), rather than reaching the page as text; so does a closing tag holding more than its name.
-- In prose, `<` before a capital reads as a tag once it sets an attribute value or a `>` follows it in the paragraph, code spans left out and a blank line ending the paragraph, so `if 1<A then` and `<Chart stray` at the end of a body stay text, escaped: write `&lt;` for a literal one. Attribute text holds no backtick, which opens code.
+- In prose, `<` before a capital reads as a tag once it sets an attribute value or a `>` follows it in the paragraph, code spans and blockquote `>` markers left out and a blank line ending the paragraph, so `if 1<A then` and `<Chart stray` at the end of a body stay text, escaped: write `&lt;` for a literal one. Attribute text holds no backtick, which opens code.
 
 #### Pages from a collection
 

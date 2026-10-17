@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## 1.51.1
 
+- A valueless Markdown component tag with no later `>` stays text inside a blockquote too, as outside one: the quote's `>` markers no longer count as its close ([Content](content.md#components-in-markdown)).
 - A kayjs-ui `Table` stacked as cards on a phone breaks a long value with no space, such as a file path, inside its card instead of widening the page, and its sort buttons are at least 2rem tall to tap ([Table](../docs/src/content/docs/libraries/kayjs-ui.md)).
 - The dev tool's Problems tab has a Copy button that puts every listed problem on the clipboard as plain text, the page URL first, to paste into an LLM ([Dev server](dev-server.md)).
 - A Markdown component tag kay cannot read, such as stray text after a JSON prop or a brace never closed, fails `kay check`, the build and `bodyHtml` with `markdown-invalid` at its line instead of reaching the page as text, as it did already broken, and a JSON prop nests to any depth ([Content](content.md#components-in-markdown)).

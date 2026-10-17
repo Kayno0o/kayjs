@@ -368,13 +368,33 @@ describe('compiling Markdown', () => {
     expect(segments.every(segment => typeof segment === 'string')).toBe(true)
   })
 
+  it.each([
+    ['a quote', 'a\n> <Chart stray\n> b\n'],
+    ['a nested quote', 'a\n> > <Chart stray\n> > b\n'],
+    ['a nested quote with no space', 'a\n>> <Chart stray\n>> b\n'],
+    ['an indented marker', 'a\n   > <Chart stray\n   > b\n'],
+    ['a > in a code span of the quote', 'a\n> <Chart stray `x > y`\n> b\n'],
+  ])('does not read a blockquote marker as the closing > of a valueless tag: %s', async (_name, source) => {
+    const { segments } = await compileMarkdown(source, 1)
+
+    expect(segments.every(segment => typeof segment === 'string')).toBe(true)
+    expect(segments.join('')).toContain('&lt;Chart stray')
+  })
+
+  it('still reads a > after a tag in a quote as its close, and a tag in a quote', async () => {
+    await expect(compileMarkdown('a\n> <Chart stray\n> b >\n', 1)).rejects.toMatchObject({ code: 'markdown-invalid' })
+    expect((await compileMarkdown('> > <Chart a="1" />\n', 1)).segments).toContainEqual({ component: 'Chart', props: { a: '1' }, children: [], line: 1 })
+    expect((await compileMarkdown('> <Chart a="1"\n> b="2" />\n', 1)).segments).toContainEqual({ component: 'Chart', props: { a: '1', b: '2' }, children: [], line: 1 })
+    expect((await compileMarkdown('> <Chart a="1">\n>\n> in\n>\n> </Chart>\n', 1)).segments).toContainEqual({ component: 'Chart', props: { a: '1' }, children: ['\n<p>in</p>\n'], line: 1 })
+  })
+
   it('comes out escaped for a prose-fallback tag, with no live element', async () => {
     expect(await bodyHtml('<A/onfocus=alert(1)')).toBe('<p>&lt;A/onfocus=alert(1)</p>\n')
     expect(await bodyHtml('<A/onfocus=alert(1)\n\n>')).toBe('<p>&lt;A/onfocus=alert(1)</p>\n<blockquote>\n</blockquote>\n')
   })
 
   it('reads hostile valueless tags in linear time', async () => {
-    const units = ['<A `x` ', '<A <B ', '<A/', '<A `']
+    const units = ['<A `x` ', '<A <B ', '<A/', '<A `', '> <A\n', '<A\n>>>>>>>>\n']
     const times: number[] = []
 
     for (const count of [200_000, 400_000]) {

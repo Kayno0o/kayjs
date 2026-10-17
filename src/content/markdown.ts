@@ -53,6 +53,9 @@ const PLACEHOLDER_TAG = /<kay-component n="(\d+)" \/>|<kay-component n="(\d+)">|
 // A fenced code block's opening line, and its closing one, which carries no info string.
 const FENCE_OPEN = /^ {0,3}(`{3,}|~{3,})/
 const FENCE_CLOSE = /^ {0,3}(`{3,}|~{3,})\s*$/
+// The markers opening a blockquote line: up to three spaces, then each `>` with an optional space.
+const BLOCKQUOTE_MARKERS = / {0,3}(?:> ?)*/y
+const QUOTED_LINE_START = /\n {0,3}(?:> ?)*/g
 const INDENTED = /^(?: {4}|\t)/
 const BLANK = /^\s*$/
 const ATTRIBUTE_NAME = /^[A-Z_][\w:-]*/i
@@ -282,6 +285,24 @@ function replaceTags(text: string, startLine: number, components: ExtractedCompo
   }
 
   let lastClose: number | undefined
+  let lineStart = 0
+  let markersEnd = -1
+  let lineBreak = text.indexOf('\n')
+
+  // Whether the line holding the offset opens with a blockquote marker before it, its markers read once however many tags it holds.
+  const quoted = (at: number) => {
+    for (; lineBreak !== -1 && lineBreak < at; lineBreak = text.indexOf('\n', lineBreak + 1)) {
+      lineStart = lineBreak + 1
+      markersEnd = -1
+    }
+
+    if (markersEnd === -1) {
+      BLOCKQUOTE_MARKERS.lastIndex = lineStart
+      markersEnd = lineStart + BLOCKQUOTE_MARKERS.exec(text)![0].length
+    }
+
+    return markersEnd > lineStart && markersEnd <= at
+  }
 
   return outsideCodeSpans(text, (part, offset) => {
     let result = ''
@@ -293,13 +314,14 @@ function replaceTags(text: string, startLine: number, components: ExtractedCompo
       const [start, closing, name] = match
       const line = lineAt(offset + match.index)
       const from = match.index + start.length
-      const end = tagEnd(part, from, `${closing}${name}`, line, () => (lastClose ??= lastCloseOutsideCodeSpans(text)) - offset)
+      const inQuote = quoted(offset + match.index)
+      const end = tagEnd(part, from, `${closing}${name}`, line, inQuote, () => (lastClose ??= lastCloseOutsideCodeSpans(text)) - offset)
 
       // Prose such as `if 1<A then`, setting no attribute and with no `>` after it.
       if (end === -1)
         continue
 
-      result += part.slice(copied, match.index) + placeholder(closing !== '', name!, part.slice(from, end - 1), line, components, open)
+      result += part.slice(copied, match.index) + placeholder(closing !== '', name!, inQuote ? part.slice(from, end - 1).replace(QUOTED_LINE_START, '\n') : part.slice(from, end - 1), line, components, open)
       copied = end
       COMPONENT_TAG.lastIndex = end
     }
@@ -335,10 +357,33 @@ function placeholder(closing: boolean, name: string, inside: string, line: numbe
 }
 
 // Where the component tag whose name ends at `from` ends, past its `>`, quoted text and JSON of any depth read whole.
-// A tag kay cannot read throws rather than reach the page as text, unless it sets no attribute value and no `>` follows it in its block outside code spans (`lastClose`, relative to the text), as prose such as `if 1<A then` reads: then -1.
-function tagEnd(text: string, from: number, tag: string, line: number, lastClose: () => number): number {
+// A tag kay cannot read throws rather than reach the page as text, unless it sets no attribute value and no `>` follows it in its block outside code spans and blockquote markers (`lastClose`, relative to the text), as prose such as `if 1<A then` reads: then -1.
+function tagEnd(text: string, from: number, tag: string, line: number, quoted: boolean, lastClose: () => number): number {
   let at = from
   let valued = false
+
+  // In a blockquote, the markers opening the tag's next lines are not part of it.
+  const space = (start: number): number => {
+    const end = skip(text, WHITESPACE, start)
+
+    if (!quoted)
+      return end
+
+    // Only whitespace was skipped, so the last line break in it is found without scanning the line.
+    let lineStart = end
+
+    while (lineStart > start && text[lineStart - 1] !== '\n')
+      lineStart--
+
+    if (lineStart === start)
+      return end
+
+    BLOCKQUOTE_MARKERS.lastIndex = lineStart
+
+    const marked = lineStart + BLOCKQUOTE_MARKERS.exec(text)![0].length
+
+    return marked > end ? space(marked) : end
+  }
 
   const refuse = (message: string) => {
     if (!valued && lastClose() < from)
@@ -348,7 +393,7 @@ function tagEnd(text: string, from: number, tag: string, line: number, lastClose
   }
 
   for (;;) {
-    at = skip(text, WHITESPACE, at)
+    at = space(at)
 
     const char = text[at]
 
@@ -359,7 +404,7 @@ function tagEnd(text: string, from: number, tag: string, line: number, lastClose
       return at + 1
 
     if (char === '/') {
-      at = skip(text, WHITESPACE, at + 1)
+      at = space(at + 1)
 
       return text[at] === '>' ? at + 1 : refuse('has a / kay cannot read: only />, at its end, closes a tag')
     }
@@ -371,13 +416,13 @@ function tagEnd(text: string, from: number, tag: string, line: number, lastClose
     if (name === undefined)
       return refuse(`has an attribute kay cannot read at ${JSON.stringify(text.slice(at, at + 20))}`)
 
-    at = skip(text, WHITESPACE, at + name.length)
+    at = space(at + name.length)
 
     if (text[at] !== '=')
       continue
 
     valued = true
-    at = skip(text, WHITESPACE, at + 1)
+    at = space(at + 1)
 
     const quote = text[at]
 
@@ -408,15 +453,25 @@ function tagEnd(text: string, from: number, tag: string, line: number, lastClose
   }
 }
 
-// The offset of the last `>` outside code spans, -1 when there is none.
+// The offset of the last `>` outside code spans that is not a blockquote marker, -1 when there is none.
 function lastCloseOutsideCodeSpans(text: string): number {
   let last = -1
 
   outsideCodeSpans(text, (part, offset) => {
-    const close = part.lastIndexOf('>')
+    // Each line is read once, from its last `>` back, so its markers are skipped in one step.
+    for (let close = part.lastIndexOf('>'); close !== -1;) {
+      const lineStart = text.lastIndexOf('\n', offset + close) + 1
 
-    if (close !== -1)
-      last = offset + close
+      BLOCKQUOTE_MARKERS.lastIndex = lineStart
+
+      if (offset + close >= lineStart + BLOCKQUOTE_MARKERS.exec(text)![0].length) {
+        last = offset + close
+
+        return part
+      }
+
+      close = lineStart <= offset ? -1 : part.lastIndexOf('>', lineStart - offset - 1)
+    }
 
     return part
   })

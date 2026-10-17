@@ -133,7 +133,7 @@ A component the collection does not name fails `kay check` and the build. So doe
 
 A capitalized tag kay cannot read fails too, at its line, rather than showing on the page as text. That is a quote or a brace never closed, or text after a JSON value, as in `rows={[1]}}`. JSON values may nest to any depth. In prose, a `<` before a capital letter reads as a tag once it holds an attribute value or a `>` follows it in the paragraph, code spans left out, so write `&lt;` for a literal one.
 
-Without a later `>`, a tag such as `<Chart stray` at the end of a body stays text, escaped. A blank line ends the paragraph, so a tag cut by one is text too.
+Without a later `>`, a tag such as `<Chart stray` at the end of a body stays text, escaped. A blank line ends the paragraph, so a tag cut by one is text too. A blockquote's `>` markers are not a later `>`, and a tag inside a quote may continue on the next quoted lines.
 
 ## Feeds
 
