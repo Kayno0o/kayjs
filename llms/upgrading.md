@@ -13,6 +13,12 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 - `kay check` reports a number literal at those calls as `deprecated-time-ms`, and `kay check --fix` writes the string (`3000` is `'3s'`, `300` is `'300ms'`), also in the script and server fences of a `.kay` file. It does not read a number held in a variable, a call through a name not imported from `kay`, `kay/server` or `@kaynooo/kayjs-cms`, or a `Carousel`'s `autoplay` in a template, so those are rewritten by hand.
 - `bodyLimit` in `kay.config.ts`, an action and `api()`, and in a route's `detail`, takes a size beside bytes, `'20mb'`, `'512kb'`, `'800b'`, as `budget` does. Bytes keep working, so no lint is added.
 
+### kayjs-cms no longer words sizes under `cms.size.*`
+
+- The `cms.size.bytes`, `cms.size.kb` and `cms.size.mb` messages are gone: an upload refusal writes its sizes through `sizeText` from `kay/words`, in the page's locale through Intl (`100 ko`, `1,5 Mo`, `200 octets` in French; `100 KB` in English), so a locale needs no wording for them.
+- An app that translated them deletes the `size` block under `cms` in its `src/messages/<locale>.ts`; it is read by nothing now.
+- `kay check` does not report the unused keys and no lint is possible: it compares a library key only with the English the library words, and a key the library no longer has is skipped as one built at run time or one of a newer library version, so it cannot tell a removed key from those.
+
 ### `kay new --host` is `--forge`, and `kay/test`'s `mount` is `mountComponent`
 
 - `kay new --host forgejo|github` is now `--forge`, as `kay dev --host` is an address; `--host` still works for now and warns. A script calling `kay new` renames the flag. No `deprecated` lint is possible, as a command line is no code `kay check` reads.
