@@ -4,7 +4,7 @@ description: A titled section that folds and unfolds, built on a native disclosu
 
 <Demo name="collapsible-section/basic" />
 
-It is a native `details` element, so it folds without script, though its change listener makes it an island. `open={false}` starts it folded, and `onOpenChange(open)` runs when the reader folds or unfolds it, for a page keeping the state.
+It is a native `details` element, so it folds without script and a static page can hold it. `open={false}` starts it folded. It takes no `onOpenChange`, as a listener would make it an island on every page: a page that keeps the state listens to the native `toggle` event of its `details` in an island of its own.
 
 ## Boxed, with meta
 

@@ -1,6 +1,5 @@
 ---
 import { signal } from 'kay'
-import CollapsibleSection from '@kaynooo/kayjs-ui/collapsible-section.kay'
 import Dialog from '@kaynooo/kayjs-ui/dialog.kay'
 import Popover from '@kaynooo/kayjs-ui/popover.kay'
 import SidePanel from '@kaynooo/kayjs-ui/side-panel.kay'
@@ -11,7 +10,6 @@ const { mode, calls } = props<{ mode: 'new' | 'old' | 'both', calls: string[] }>
 const dialog = signal(true)
 const panel = signal(true)
 const popover = signal(false)
-const section = signal(true)
 ---
 button#shut-dialog(onClick={() => dialog.set(false)}) Shut dialog
 button#shut-panel(onClick={() => panel.set(false)}) Shut panel
@@ -50,5 +48,3 @@ else
     @trigger(attributes)
       button#popover-trigger({...attributes}) Trigger
     p Popover body
-CollapsibleSection#section(title="Section" open={section()} onOpenChange={shown => { calls.push(`section onOpenChange ${shown}`); section.set(shown) }})
-  p Section body

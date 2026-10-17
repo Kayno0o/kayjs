@@ -83,24 +83,3 @@ describe('Popover', () => {
     expect(calls).toEqual(['popover onOpenChange true'])
   })
 })
-
-describe('CollapsibleSection', () => {
-  test('tells onOpenChange(open) when folded and unfolded, and says nothing for the state it started in', async () => {
-    const { root, calls } = await disclosures('new')
-    const section = root.querySelector<HTMLDetailsElement>('#section')!
-
-    await settle()
-
-    expect(calls.filter(call => call.startsWith('section'))).toEqual([])
-
-    section.open = false
-    section.dispatchEvent(new Event('toggle'))
-    await settle()
-
-    section.open = true
-    section.dispatchEvent(new Event('toggle'))
-    await settle()
-
-    expect(calls.filter(call => call.startsWith('section'))).toEqual(['section onOpenChange false', 'section onOpenChange true'])
-  })
-})
