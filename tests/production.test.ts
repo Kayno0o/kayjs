@@ -58,8 +58,8 @@ async function isolated(script: string): Promise<unknown> {
   return JSON.parse(out)
 }
 
-async function refusalOf(...args: Parameters<typeof protectionRefusal>): Promise<ProtectionRefusal | undefined> {
-  return await protectionRefusal(...args) as ProtectionRefusal | undefined
+async function refusalOf(action: Parameters<typeof protectionRefusal>[0], request: Request, body: unknown, form: boolean, server: null, plain?: boolean): Promise<ProtectionRefusal | undefined> {
+  return await protectionRefusal(action, request, { body, form, server, plain }) as ProtectionRefusal | undefined
 }
 
 // Bun's own timeout per test is 5 s: a test waiting here sets a longer one, so this error shows first.

@@ -99,6 +99,6 @@ describe('an app store without peek', () => {
     const action = { url: '/_kay/a', protection: { rateLimit: { max: 1, window: '1m', count: 'succeeded' } } }
 
     setupStore({ rates })
-    await expect(protectionRefusal(action as never, new Request('http://localhost/_kay/a', { method: 'POST' }), {}, false, null)).rejects.toThrow('peek')
+    await expect(protectionRefusal(action as never, new Request('http://localhost/_kay/a', { method: 'POST' }), { body: {}, form: false, server: null })).rejects.toThrow('peek')
   })
 })

@@ -6,6 +6,7 @@ import type { FaviconConfig, I18nConfig, ImagesConfig, KayConfig, KayExtension, 
 import type { Duration } from '../runtime/duration'
 import type { McpConfig } from '../server/api-modules'
 import type { EnvSchema } from '../server/env'
+import type { OpenApiConfig } from '../server/openapi'
 import type { Redirects } from '../server/redirects'
 import type { TypeScope } from './diagnose'
 import type { ShadowFile } from './shadow'
@@ -71,6 +72,8 @@ export interface CheckOptions {
   requireGuards?: boolean | undefined
   // Reports the actions offered as tools that bot protection alone stands before.
   mcp?: boolean | McpConfig | undefined
+  // Where the OpenAPI document and its reference page are served, which links to them are checked against.
+  openapi?: boolean | OpenApiConfig | undefined
   // Whether to report the lints of what a site lacks before it goes public, as `kay build` and `kay check --only seo` do.
   launch?: boolean | undefined
   // Set by `kay build --static`: a static host reads no `SITE_URL` or `ORIGIN` once built, so a missing site is reported.
@@ -90,9 +93,9 @@ export interface CheckDiagnostic extends Pick<Diagnostic, 'label' | 'related' | 
 }
 
 export function configCheckOptions(config: KayConfig): CheckOptions {
-  const { entry, routes, publicDir, api, content, redirects, i18n, lang, settings, base, site, shutdownTimeout, budget, lints, extensions, seo, favicon, manifest, images, publicEnv, requireGuards, mcp } = config
+  const { entry, routes, publicDir, api, content, redirects, i18n, lang, settings, base, site, shutdownTimeout, budget, lints, extensions, seo, favicon, manifest, images, publicEnv, requireGuards, mcp, openapi } = config
 
-  return { entry, routes, publicDir, api, content, redirects, i18n, lang, settings, base, site, shutdownTimeout, budget, lints, extensions, seo, favicon, manifest, images, publicEnv, requireGuards, mcp }
+  return { entry, routes, publicDir, api, content, redirects, i18n, lang, settings, base, site, shutdownTimeout, budget, lints, extensions, seo, favicon, manifest, images, publicEnv, requireGuards, mcp, openapi }
 }
 
 // Type-checks a project, .kay components included, and reports every error at the line and column the user wrote.

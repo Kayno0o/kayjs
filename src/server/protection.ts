@@ -233,6 +233,12 @@ export function checkApiLimit(name: string, limit: ApiRateLimit): void {
     throw new KayError('config-invalid', `kay: the rateLimit of ${name} has a max of ${limit.max}; it takes a whole number of at least 1`)
 
   durationSeconds(limit.window, `the rateLimit window of ${name}`)
+
+  if (limit.key !== undefined && typeof limit.key !== 'function')
+    throw new KayError('config-invalid', `kay: the rateLimit of ${name} has a key that is not a function; it takes a function of the request returning the string to count under`)
+
+  if (limit.store !== undefined && typeof limit.store.hit !== 'function')
+    throw new KayError('config-invalid', `kay: the rateLimit of ${name} has a store without a hit(key, windowMs) method; give it a RateStore`)
 }
 
 // Seconds until the next attempt may go through, or undefined while under the limit.
@@ -264,8 +270,16 @@ export function wasChallenged(request: Request): boolean {
 }
 
 // Why a post must not reach the handler, `PRETEND` for a bot to answer as if it went through, or undefined when it may.
-// `plain` is a post the browser sent itself, which a form posting to the action always sends with its stamp; a call from kay's script may come from an island's form, which renders none.
-export async function protectionRefusal(action: ServerAction<TSchema, unknown>, request: Request, body: unknown, form: boolean, server: Server<unknown> | null | undefined, plain = form, keyContext?: () => Omit<RateKeyContext, 'client'>): Promise<ProtectionRefusal | typeof PRETEND | undefined> {
+// `form` is a post filled in as a form, `plain` one the browser sent itself, which a form posting to the action always sends with its stamp; a call from kay's script may come from an island's form, which renders none.
+export interface RefusalInput {
+  body: unknown
+  form: boolean
+  server: Server<unknown> | null | undefined
+  plain?: boolean | undefined
+  keyContext?: (() => Omit<RateKeyContext, 'client'>) | undefined
+}
+
+export async function protectionRefusal(action: ServerAction<TSchema, unknown>, request: Request, { body, form, server, plain = form, keyContext }: RefusalInput): Promise<ProtectionRefusal | typeof PRETEND | undefined> {
   const { honeypot, messages } = action.protection ?? {}
   const field = honeypotField(action.protection)
   const fields = typeof body === 'object' && body !== null ? body as Record<string, unknown> : {}

@@ -82,7 +82,7 @@ Three more keys tune it. `headers` limits the request headers allowed. `expose` 
 
 The module's `cors` is the only place that grants. If a route sets `Access-Control-Allow-Origin`, `Access-Control-Allow-Credentials` or `Access-Control-Expose-Headers` itself, kay replaces them with the module's. It drops them for an origin the module does not list. A route that needs another rule goes in a module of its own.
 
-`cors` in kay.config.ts is the default of every module that sets none, so an app opening its whole API says it once. A module with its own `cors` keeps it, and `api({ cors: false })` keeps a module to its own site.
+`cors` in kay.config.ts is the default of every module that sets none, one a library or an extension supplies included, so an app opening its whole API says it once. A module with its own `cors` keeps it, and `api({ cors: false })` keeps a module to its own site.
 
 ```ts
 // kay.config.ts

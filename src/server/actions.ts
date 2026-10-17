@@ -175,6 +175,9 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], m
 
       pageBound.set(value, page.params.length > 0)
 
+      // Read once, as the rate limits' `key` hooks are fixed by the registration.
+      const keyedLimit = keyed(value)
+
       if (tool && page.params.length === 0)
         tools.push({ name, url: value.url, schema: value.schema, tool, guards: guards.filter(guard => guard.check !== unguarded).map(guard => guard.file) })
 
@@ -200,7 +203,7 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], m
           // A call may send a form's fields, read as a plain form post's are.
           const asForm = !call || isFormCall(context.request)
           // In the request's locale, so a refusal worded by a function can read `t()`.
-          const refusal = await inLocale(context.request, options, async () => protectionRefusal(value, context.request, context.body, asForm, context.server, !call, keyed(value) ? () => rateKeyContext(context.request, { ...context }, options) : undefined))
+          const refusal = await inLocale(context.request, options, async () => protectionRefusal(value, context.request, { body: context.body, form: asForm, server: context.server, plain: !call, keyContext: keyedLimit ? () => rateKeyContext(context.request, { ...context }, options) : undefined }))
 
           if (refusal === PRETEND)
             throw new Refusal(pretended(value, context.request, options.base))

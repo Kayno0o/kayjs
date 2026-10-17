@@ -89,8 +89,8 @@ describe('a rate limit with a key', () => {
     } } } } as never
     const context = () => ({ request: new Request('http://localhost/'), locale: 'en', cookies: new Bun.CookieMap(''), locals: {} }) as never
 
-    expect(await protectionRefusal(limited, new Request('http://localhost/'), {}, false, null, false, context)).toBeUndefined()
-    expect(await protectionRefusal(limited, new Request('http://localhost/'), {}, false, null, false, context)).toMatchObject({ status: 429 })
+    expect(await protectionRefusal(limited, new Request('http://localhost/'), { body: {}, form: false, server: null, plain: false, keyContext: context })).toBeUndefined()
+    expect(await protectionRefusal(limited, new Request('http://localhost/'), { body: {}, form: false, server: null, plain: false, keyContext: context })).toMatchObject({ status: 429 })
     expect(seen.length).toBe(2)
   })
 })

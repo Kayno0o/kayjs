@@ -1703,6 +1703,21 @@ describe.concurrent('kay check, what the server refuses at boot', () => {
       await rm(root, { recursive: true, force: true })
     }
   })
+
+  it('lets a link to the OpenAPI document and reference page through where openapi moved them', async () => {
+    const root = await scratchProject({
+      'src/routes/index.kay': 'a(href="/spec.json") Spec\na(href="/docs/api") Reference\na(href="/api/openapi.json") Old\n',
+    })
+
+    try {
+      const unserved = (await check(root, { openapi: { path: '/spec.json', reference: true, referencePath: '/docs/api' }, lints: { seo: 'allow' } })).filter(d => d.code !== undefined).map(d => [d.line, d.message])
+
+      expect(unserved).toEqual([[3, expect.stringContaining('No page, public file or app route serves /api/openapi.json')]])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
 })
 
 describe('kay check, string fields an action leaves unbounded', () => {

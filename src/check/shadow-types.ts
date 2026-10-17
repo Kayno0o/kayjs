@@ -27,7 +27,7 @@ import { htmlFallbacks, publicFiles } from '../server/public'
 import { redirectProblems } from '../server/redirects'
 import { extensionEditor, patternShapes, routeMounts, scanEndpoints, scanRoutes, servedPaths } from '../server/routes'
 import { ownFile } from './diagnose'
-import { ASSET_TYPES, environmentTypes, KAY_PATHS, packageTypes } from './env-types'
+import { ASSET_TYPES, environmentTypes, kayPaths, packageTypes } from './env-types'
 import { CONTENT_CHECK, EXPORTS_CHECK, exportsCheck, SETTINGS_CHECK, settingsCheck } from './generated'
 import { unguardedRoutes, unguardedTools } from './guards'
 import { islandOnlyComponents } from './island-only'
@@ -379,7 +379,7 @@ async function servedProject(root: string, options: CheckOptions, problems: Chec
 
 // Each redirect whose target on the site nothing serves; what kay serves itself counts, whether or not the project turns it on.
 function redirectChecks(root: string, options: CheckOptions, { routes, publicPaths, endpoints }: ServedProject): CheckDiagnostic[] {
-  const served = [...routes.flatMap(route => patternShapes(route.pattern)), ...publicPaths.map(file => file.url), ...KAY_PATHS, ...endpoints.filter(endpoint => endpoint.params.length === 0).map(endpoint => endpoint.pattern)]
+  const served = [...routes.flatMap(route => patternShapes(route.pattern)), ...publicPaths.map(file => file.url), ...kayPaths(options), ...endpoints.filter(endpoint => endpoint.params.length === 0).map(endpoint => endpoint.pattern)]
 
   return redirectProblems(options.redirects ?? {}, served).map(message => ({ file: join(root, CONFIG_FILE), line: 1, column: 1, message }))
 }

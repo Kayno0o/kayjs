@@ -164,7 +164,7 @@ export default api()
 - An origin is a scheme and a host, a port if any, `capacitor://localhost` for an app's web view included.
 - The module's rule alone grants: `Access-Control-Allow-Origin`, `-Allow-Credentials` and `-Expose-Headers` a route sets itself, on `set.headers` or on a `Response` it returns, a `fetch()` result passed on included, are replaced by the rule's, or dropped for an origin it does not list. A route needing another rule goes in a module of its own.
 - A module without `cors` answers no preflight and keeps refusing.
-- `cors` in kay.config.ts takes the same options and is the rule of every module that sets none; a module setting its own keeps it, and `api({ cors: false })` keeps a module to its own site.
+- `cors` in kay.config.ts takes the same options and is the rule of every module that sets none, one a library or an extension supplies included; a module setting its own keeps it, and `api({ cors: false })` keeps a module to its own site.
 
 ### Limits
 

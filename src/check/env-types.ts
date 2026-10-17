@@ -10,7 +10,7 @@ import { TS_FILE, TSX_FILE } from '../build/files'
 import { componentName } from '../compiler'
 import { CONFIG_FILE } from '../config'
 import { projectPaths } from '../project'
-import { OPENAPI_PATH, REFERENCE_PATH } from '../server/api-modules'
+import { OPENAPI_PATH, openApiPaths, REFERENCE_PATH } from '../server/api-modules'
 import { FAVICON_PATHS } from '../server/favicon'
 import { DEFAULT_LANG, extensionMessageFiles, localePattern, localePrefixes, messagesFile } from '../server/i18n'
 import { HEALTH_PATH } from '../server/lifecycle'
@@ -24,7 +24,23 @@ const PARAM_SEGMENT = /:([^/]+)/g
 const LOCALE_MANIFESTS = `\`/manifest.\${string}.webmanifest\``
 
 // What kay serves itself, whether or not the project turns it on.
-export const KAY_PATHS = [SITEMAP, ROBOTS, ...FAVICON_PATHS, HEALTH_PATH, OPENAPI_PATH, REFERENCE_PATH]
+const KAY_PATHS = [SITEMAP, ROBOTS, ...FAVICON_PATHS, HEALTH_PATH]
+
+// The paths of the OpenAPI document and its reference page, where `openapi` moved them; an invalid path is the boot's to refuse, so the defaults stand for it here.
+function openApiServed(openapi: CheckOptions['openapi']): string[] {
+  try {
+    const { document, reference } = openApiPaths(typeof openapi === 'object' ? openapi : undefined)
+
+    return [document, reference]
+  }
+  catch {
+    return [OPENAPI_PATH, REFERENCE_PATH]
+  }
+}
+
+export function kayPaths(options: CheckOptions): string[] {
+  return [...KAY_PATHS, ...openApiServed(options.openapi)]
+}
 const UNWRITABLE = /[%?#]/
 // What a browser percent-encodes in a path it is given: spaces, controls and anything outside ASCII.
 const NOT_IN_URL = /[^\x21-\x7E]+/g
@@ -79,7 +95,7 @@ export async function environmentTypes(root: string, options: CheckOptions, serv
   // An endpoint with params is linked to as a template: `/feeds/${string}.json`.
   const endpointPaths = endpoints.map(endpoint => endpoint.params.length === 0 ? JSON.stringify(endpoint.pattern) : `\`${endpoint.pattern.replace(PARAM_SEGMENT, () => `\${string}`)}${endpoint.suffix ?? ''}\``)
 
-  return environment(localized, [...publicPaths.map(file => file.url), ...KAY_PATHS], apiMounts, texts, config, app, content, servers, [...endpointPaths, LOCALE_MANIFESTS])
+  return environment(localized, [...publicPaths.map(file => file.url), ...kayPaths(options)], apiMounts, texts, config, app, content, servers, [...endpointPaths, LOCALE_MANIFESTS])
 }
 
 // Declares the check-only helpers generated code calls, and the routes and public files links are checked against.
