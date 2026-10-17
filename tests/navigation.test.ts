@@ -256,8 +256,11 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
   })
 
   it('fires kay:navigate on document once each swapped page is in place, with its URL, and not on a full load', async () => {
-    await page.goto(origin)
-    await page.evaluate(() => {
+    // A page of its own, as the tests after this one count on the document and the history the shared page holds.
+    const own = await browser.newPage()
+
+    await own.goto(origin)
+    await own.evaluate(() => {
       const seen: string[] = []
 
       ;(window as { kayNavigated?: string[] }).kayNavigated = seen
@@ -265,13 +268,14 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
         seen.push(`${(event as CustomEvent<{ url: string }>).detail.url}|${document.querySelector('h1')?.textContent ?? ''}`)
       })
     })
-    expect(await page.evaluate(() => (window as { kayNavigated?: string[] }).kayNavigated)).toEqual([])
-    await page.click('a.second')
-    await page.locator('h1', { hasText: 'Second' }).waitFor()
-    expect(await page.evaluate(() => (window as { kayNavigated?: string[] }).kayNavigated)).toEqual([`${origin}/second|Second`])
-    await page.goBack()
-    await page.locator('h1', { hasText: 'Home' }).waitFor()
-    expect(await page.evaluate(() => (window as { kayNavigated?: string[] }).kayNavigated)).toEqual([`${origin}/second|Second`, `${origin}/|Home`])
+    expect(await own.evaluate(() => (window as { kayNavigated?: string[] }).kayNavigated)).toEqual([])
+    await own.click('a.second')
+    await own.locator('h1', { hasText: 'Second' }).waitFor()
+    expect(await own.evaluate(() => (window as { kayNavigated?: string[] }).kayNavigated)).toEqual([`${origin}/second|Second`])
+    await own.goBack()
+    await own.locator('h1', { hasText: 'Home' }).waitFor()
+    expect(await own.evaluate(() => (window as { kayNavigated?: string[] }).kayNavigated)).toEqual([`${origin}/second|Second`, `${origin}/|Home`])
+    await own.close()
   })
 
   it('swaps in a streamed page with its blocks in place', async () => {
