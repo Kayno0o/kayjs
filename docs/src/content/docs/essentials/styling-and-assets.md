@@ -134,6 +134,55 @@ import hero from '../hero.jpg'
 img({...image(hero, { aspect: '16/9', sizes: '100vw' })} alt="The workshop")
 ```
 
+### Density and shapes
+
+An image never loads at more than 2 pixels per CSS pixel, so a 3x phone gets what a 2x one does. It looks the same. `images.maxDensity` changes the cap, and `Infinity` leaves the choice to the browser.
+
+`aspect` takes only the shapes `images.aspects` lists, each of which adds a variant per width. The default list is `1/1`, `3/2`, `2/3`, `4/3`, `3/4`, `16/9` and `9/16`.
+
+```ts
+export default defineConfig({
+  images: { maxDensity: 3, aspects: ['1/1', '16/9', '21/9'] },
+})
+```
+
+### Images added at runtime
+
+An uploaded image is no import, so kay does not know where it sits. List the directory by the URL path your app serves it at.
+
+```ts
+export default defineConfig({
+  images: { dirs: { '/uploads/': 'data/uploads' } },
+})
+```
+
+An image `files.put` stored needs no entry. For any other, pass its size to `image()` so kay can make the variants.
+
+```kay
+---
+import { image } from 'kay/image'
+
+const { post } = props<{ post: { photo: string, photoWidth: number, photoHeight: number } }>()
+---
+img({...image(post.photo, { width: post.photoWidth, height: post.photoHeight })} alt="")
+```
+
+Without the size the image keeps its `src` alone.
+
+### Images from another host
+
+An image on a CMS or a CDN is resized too, once its host is in `images.remote`. Each entry is an origin, and its host can start with `*.` for any subdomain.
+
+```ts
+export default defineConfig({
+  images: { remote: ['https://cms.example.com/uploads/', 'https://*.cdn.example.com'] },
+})
+```
+
+`image(url, { width, height })` then works as above. kay downloads the image once and keeps a copy. A host that is not listed is refused, so the route is no open proxy.
+
+List only hosts you trust. kay does not check where a listed name points.
+
 ### Private images
 
 An image the app keeps behind a session, such as one looked up by a database id, goes through the same variants. `images.resolve` gives its file and `images.guard` admits the request.
@@ -177,6 +226,16 @@ While a font loads, kay shows the text in a stand-in sized like it. It reads the
 
 kay adds the fallback right after the family in your stylesheets' `font-family`, `font` and `--font-*` values. The page then barely moves when the font arrives. A stack in an inline `style` attribute is left as you wrote it.
 
+A face can cover only some characters with `unicodeRange`, passed to the `@font-face` as it is. A Fontsource entry takes `subset: ['latin', 'latin-ext']` instead. Each face then gets its subset's range, and a page loads only the files its text needs.
+
+```ts
+export default defineConfig({
+  fonts: [{ fontsource: '@fontsource/inter', subset: ['latin', 'latin-ext'] }],
+})
+```
+
+The fallback is Arial, Times New Roman or Courier New, resized with `size-adjust` and the `ascent-override`, `descent-override` and `line-gap-override` that fit your font. A family with no Latin letters gets none. Where kay does not rewrite the stack, such as a `style` element or an inline attribute, list `"Inter Fallback"` yourself.
+
 <Callout type="note">
 
 Faces load once the page uses them. `preload: true` fetches one with the page, on a Fontsource entry too, but can hold back the first paint on a slow phone.
@@ -200,4 +259,27 @@ The icon sizes to the surrounding text and takes its colour from `currentColor`.
 
 An icon without text beside it needs `role="img"` and an `aria-label`.
 
-<ReadMore href="/llms/images">Worker and wasm details, fixed-width and cropped images, remote and uploaded images, share cards, AVIF settings and runtime icon lookup.</ReadMore>
+### An icon known at runtime
+
+An icon a user picks from a search has no import. Import the set's JSON instead, and `iconProps(set, name)` from `kay/icons` gives the props to spread on an `svg`. It gives `undefined` for a name the set lacks. `iconNames(set)` lists the names.
+
+```ts
+import tabler from '@iconify-json/tabler/icons.json'
+import { iconNames, iconProps } from 'kay/icons'
+
+const found = iconNames(tabler)
+  .filter(name => name.includes('home'))
+  .slice(0, 20)
+  .map(name => ({ name, icon: iconProps(tabler, name)! }))
+```
+
+```kay
+---
+const { icon } = props<{ icon: Record<string, unknown> }>()
+---
+svg({...icon})
+```
+
+Search on the server and send the props to an island. A set imported in an island ships whole to the browser.
+
+<ReadMore href="/llms/images">Fixed-width images, the limits on remote images, share cards, AVIF settings and `processImage`.</ReadMore>

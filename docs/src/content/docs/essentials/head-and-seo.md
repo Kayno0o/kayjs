@@ -126,9 +126,20 @@ head
 
 `shareCard` needs a font listed in `fonts`.
 
-Pass `image` to draw the title over a picture. It can be an imported PNG, JPEG, WebP, GIF or AVIF, or an imported SVG such as a banner kept in the repo: the SVG is drawn to cover the card, cut in the middle if its shape differs, and `kay build` keeps that drawing for an executable. Turn any text in the SVG into paths, as kay draws it without fonts. An SVG from `images.dirs` or `images.remote` is refused.
+Pass `image` to draw the title over a picture, which covers the card and fades into the background below the title. It can be an imported PNG, JPEG, WebP, GIF or AVIF, or an imported SVG such as a banner kept in the repo: the SVG is drawn to cover the card, cut in the middle if its shape differs, and `kay build` keeps that drawing for an executable. Turn any text in the SVG into paths, as kay draws it without fonts. An SVG from `images.dirs` or `images.remote` is refused.
 
-`images.card` in `kay.config.ts` sets the card's `background`, text `color` and `font`. It also takes a square `logo`, drawn at the top left: `images: { card: { logo: 'src/logo.svg' } }`. `kay check` reports a logo that is missing, not square or not an image it can draw.
+To use a photo as the card, `shareImage(hero)` from `kay/image` is the URL of an imported image cut to the 1200x630 card, enlarged when smaller. It takes an image from `images.dirs` or `images.remote` too.
+
+```kay
+---
+import { shareImage } from 'kay/image'
+import hero from '../hero.jpg'
+---
+head
+  meta(property="og:image" content={shareImage(hero)})
+```
+
+`images.card` in `kay.config.ts` sets the card's `background`, text `color` and `font`, as `{ family: 'Inter', weight: 800 }`. It also takes a square `logo`, drawn at the top left: `images: { card: { logo: 'src/logo.svg' } }`. `kay check` reports a logo that is missing, not square or not an image it can draw.
 
 ## Sitemap and robots.txt
 
@@ -181,7 +192,13 @@ export default defineConfig({
 })
 ```
 
-Pages come from the network first. A kept copy answers only when the network fails, then the `fallback` page. Actions and API routes always go to the network.
+Pages come from the network first. A kept copy answers only when the network fails, then the `fallback` page. Without a `fallback`, kay writes a plain page that says the page needs a connection, with status 503.
+
+`pages` and `fallback` are paths of the site. The worker also keeps the other files the build serves, such as images, as they are first loaded, so islands hydrate offline.
+
+It leaves out what should never be stale. Actions, API routes and everything under `/_kay/` go to the network, and so does any request that is not a GET, goes to another site or asks for a range, as a video does. A response is kept only as a full 200, and never when it says `private` or `no-store`.
+
+Each deploy changes the worker, which takes over at once and drops the old cache. Nothing needs clearing by hand. The server warns past 100 prerendered pages, since each visitor downloads them on every deploy.
 
 `kay dev` registers no worker.
 
