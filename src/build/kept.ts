@@ -8,11 +8,14 @@ import { filesUnder } from '../server/compress'
 export const KEPT_BUILDS = 3
 
 // A script or stylesheet the bundler named after its content, or a file under `assets`, which is named after its content too, each with the compressed copies written beside it. What else the client folder holds changes in place: the search manifest, the notices, the image variants.
-const CHUNK = /-[\da-z]{6,}\.(?:js|css)(?:\.br|\.gz)?$/i
+// Bun writes the hash as 8 lowercase base 36 characters, so `my-component.js` is no chunk.
+const CHUNK = /-[\da-z]{8}\.(?:js|css)(?:\.br|\.gz)?$/
 const ASSET = /^assets[/\\]/
 // The build just replaced, until the new one is good and it takes its place among the others, each a folder named after the time it was kept at.
 const STAGING = 'next'
 const BUILD_NAME = /^\d+$/
+// Names the manifest of the last build that was good, which is the one a server served.
+const SERVED = 'served'
 
 function keepable(file: string): boolean {
   return CHUNK.test(file) || ASSET.test(file)
@@ -35,6 +38,29 @@ async function buildsIn(kept: string): Promise<string[]> {
   return (await readdir(kept)).filter(name => BUILD_NAME.test(name)).sort((a, b) => Number(b) - Number(a))
 }
 
+async function manifestHash(output: string): Promise<string | undefined> {
+  const manifest = Bun.file(join(output, MANIFEST))
+
+  return await manifest.exists() ? Bun.hash(await manifest.text()).toString(36) : undefined
+}
+
+async function servedHash(kept: string): Promise<string | undefined> {
+  const file = Bun.file(join(kept, SERVED))
+
+  return await file.exists() ? file.text() : undefined
+}
+
+// Records the build in place as a good one: only its chunks are worth keeping once the next build replaces it.
+async function markServed(output: string): Promise<void> {
+  const hash = await manifestHash(output)
+
+  if (hash === undefined)
+    return
+
+  await mkdir(keptDir(output), { recursive: true })
+  await Bun.write(join(keptDir(output), SERVED), hash)
+}
+
 async function place(from: string, to: string): Promise<void> {
   await mkdir(dirname(to), { recursive: true })
 
@@ -55,6 +81,11 @@ export async function setAsideKept(output: string, aside: string): Promise<void>
     return
 
   const kept = keptDir(output)
+
+  // A build that failed after its manifest was written was never served, and its chunks no page links to.
+  if (await servedHash(kept) !== await manifestHash(output))
+    return
+
   const staging = join(kept, STAGING)
   const dist = join(output, 'dist')
   const older = new Set((await Promise.all((await buildsIn(kept)).map(async name => filesOf(join(kept, name))))).flat())
@@ -70,6 +101,8 @@ export async function setAsideKept(output: string, aside: string): Promise<void>
 // Called once a build is good: puts the files of the earlier builds back beside it, those it did not write itself, and the build set aside becomes the newest kept. The builds past `KEPT_BUILDS` go.
 export async function restoreKept(output: string, now = Date.now()): Promise<void> {
   const kept = keptDir(output)
+
+  await markServed(output)
 
   if (!existsSync(kept))
     return

@@ -1,15 +1,15 @@
 import { existsSync } from 'node:fs'
-import { readdir, rm } from 'node:fs/promises'
+import { mkdir, readdir, rm } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
 import { outputDir } from '../src/build/assets'
 import { buildClient } from '../src/build/client'
-import { KEPT_BUILDS, keptDir } from '../src/build/kept'
+import { KEPT_BUILDS, keptDir, restoreKept, setAsideKept } from '../src/build/kept'
 import { serveBuildFiles } from '../src/server/build-files'
-import { readClient } from '../src/server/client'
-import { fixtureCopy } from './scratch'
+import { MANIFEST, readClient } from '../src/server/client'
+import { fixtureCopy, scratchDir } from './scratch'
 
 const CLI = join(import.meta.dir, '..', 'src', 'cli.ts')
 const COUNTER = 'src/components/counter.kay'
@@ -111,7 +111,7 @@ describe('the chunks of earlier builds', () => {
     expect(await chunkOf(root)).toBe(second)
 
     // The files in the kept folders are the earlier builds' alone: the build in place owns the name it rewrote.
-    const kept = await readdir(keptDir(outputDir(root)))
+    const kept = (await readdir(keptDir(outputDir(root)))).filter(name => (/^\d+$/).test(name))
 
     expect(kept).toHaveLength(1)
     expect(await chunksIn(root)).toContain(first)
@@ -147,6 +147,7 @@ describe('the chunks of earlier builds', () => {
 
     await deploy(root, 'Beta')
     expect(await chunksIn(root)).toContain(first)
+    expect((await served(root, first)).status).toBe(200)
     expect(keptDir(outputDir(root)).startsWith(`${outputDir(root)}/`)).toBe(false)
   }, 120_000)
 
@@ -176,9 +177,15 @@ describe('the chunks of earlier builds', () => {
       expect((await build(root, ...mode)).code).not.toBe(0)
       await Bun.write(page, good)
 
+      // Without the check the failed build stays in place with its chunk, which no server ever served; with it the last good build is put back.
+      const failed = await chunkOf(root)
+
+      expect(failed === second).toBe(mode.length > 0)
+
       const third = await deploy(root, 'Delta', ...mode)
 
       expect(await chunksIn(root)).toEqual(expect.arrayContaining([first, second, third]))
+      expect((await chunksIn(root)).includes(failed)).toBe(mode.length > 0)
     }
   }, 240_000)
 
@@ -210,6 +217,12 @@ describe('the chunks of earlier builds', () => {
     expect(chunks).toHaveLength(KEPT_BUILDS + 1)
     expect(chunks).toContain(last)
     expect(existsSync(join(root, 'app'))).toBe(true)
+
+    // Every chunk of the build in place is a file the executable embeds, by its name.
+    const executable = Buffer.from(await Bun.file(join(root, 'app')).arrayBuffer())
+
+    for (const chunk of chunks)
+      expect(executable.includes(chunk)).toBe(true)
   }, 240_000)
 
   it('are kept by kay build alone: a client build as kay dev and the tests make leaves none aside', async () => {
@@ -221,4 +234,61 @@ describe('the chunks of earlier builds', () => {
     expect(await chunksIn(root)).toHaveLength(1)
     expect(existsSync(keptDir(outputDir(root)))).toBe(false)
   }, 60_000)
+})
+
+// A folder holding an output with a manifest and `dist` files, and the kept folder beside it.
+async function output(dist: Record<string, string>, manifest = '{"build":1}'): Promise<string> {
+  const dir = join(await scratchDir('kay-kept-'), '.kay-out')
+
+  await mkdir(join(dir, 'dist'), { recursive: true })
+  await Bun.write(join(dir, MANIFEST), manifest)
+
+  for (const [name, text] of Object.entries(dist))
+    await Bun.write(join(dir, 'dist', name), text)
+
+  return dir
+}
+
+describe('the kept folders', () => {
+  it('stage the chunks named by Bun\'s hash of a good build when the next one starts, never a hand-named script', async () => {
+    const dir = await output({ 'counter-abcd1234.js': 'a', 'counter-abcd1234.js.br': 'a', 'my-component.js': 'b', 'my-widget-1.css': 'c', 'Counter-ABCD1234.js': 'd', 'assets/logo-xyz.png': 'e' })
+
+    await restoreKept(dir)
+    await setAsideKept(dir, `${dir}-previous`)
+    expect((await readdir(join(keptDir(dir), 'next'), { recursive: true })).sort()).toEqual(['assets', 'assets/logo-xyz.png', 'counter-abcd1234.js', 'counter-abcd1234.js.br'])
+  })
+
+  it('stage nothing of a build that failed after its manifest, which no server served', async () => {
+    const dir = await output({ 'counter-abcd1234.js': 'a' })
+
+    await restoreKept(dir)
+    await Bun.write(join(dir, MANIFEST), '{"build":2}')
+    await Bun.write(join(dir, 'dist', 'counter-efgh5678.js'), 'b')
+    await setAsideKept(dir, `${dir}-previous`)
+    expect(existsSync(join(keptDir(dir), 'next'))).toBe(false)
+  })
+
+  it('give a build kept within the same millisecond as the one before a name of its own', async () => {
+    const dir = await output({ 'new-aaaaaaaa.js': 'n' })
+    const kept = keptDir(dir)
+
+    await Bun.write(join(kept, '5000', 'old-bbbbbbbb.js'), 'o')
+    await Bun.write(join(kept, 'next', 'prev-cccccccc.js'), 'p')
+    await restoreKept(dir, 5000)
+    expect((await readdir(kept)).filter(name => (/^\d+$/).test(name)).sort()).toEqual(['5000', '5001'])
+    expect(await Bun.file(join(kept, '5001', 'prev-cccccccc.js')).text()).toBe('p')
+    expect(await Bun.file(join(dir, 'dist', 'old-bbbbbbbb.js')).text()).toBe('o')
+  })
+
+  it('take a leftover set-aside folder from a killed run as the newest kept build, dropping what the new build rewrote', async () => {
+    const dir = await output({ 'same-dddddddd.js': 'new' })
+    const kept = keptDir(dir)
+
+    await Bun.write(join(kept, 'next', 'same-dddddddd.js'), 'killed')
+    await Bun.write(join(kept, 'next', 'gone-eeeeeeee.js'), 'g')
+    await restoreKept(dir, 7000)
+    expect(existsSync(join(kept, 'next'))).toBe(false)
+    expect(await readdir(join(kept, '7000'))).toEqual(['gone-eeeeeeee.js'])
+    expect(await Bun.file(join(dir, 'dist', 'same-dddddddd.js')).text()).toBe('new')
+  })
 })
