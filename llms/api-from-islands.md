@@ -291,12 +291,12 @@ export default api()
 - A room no one is in is gone.
 - `publish(room, message, { except, to })` sends a message to everyone in the room, but the connection `except` names, such as the sender, or only to the connections joined as the member `to` names, such as a game's host, compared as JSON.
 - It goes out as Elysia sends one, a string as it is and anything else as JSON, not checked against the route's `response`.
-- `coalesce(read, { wait })` gives a function sending a room one snapshot `read(room)` makes when it goes, however many times it is called within `wait` milliseconds, 50 by default: a burst of moves sends the board once, as it stands.
+- `coalesce(read, { wait })` gives a function sending a room one snapshot `read(room)` makes when it goes, however many times it is called within `wait`, a duration, `'50ms'` by default: a burst of moves sends the board once, as it stands.
 - `dispatch(message, handlers)` from `kay` calls the handler a message's `type` names with the message, typed to that variant, and gives what it returns.
 - The handlers cover every type, as the compiler checks, and a type none names, such as one a newer server sends, throws.
 - `dispatch` works on the server's `body` and on what an island's `socket` receives, `messages.on(message => dispatch(message, { ... }))`.
 - Rooms live in the process's memory by default.
-- `rooms({ store: sqliteRooms('data/rooms.sqlite') })` shares them between every process of the machine opening the file, as `sqliteJobs` does: `members` lists those connected to any of them, and a message published in one reaches the others within `poll` milliseconds, 25 by default.
+- `rooms({ store: sqliteRooms('data/rooms.sqlite') })` shares them between every process of the machine opening the file, as `sqliteJobs` does: `members` lists those connected to any of them, and a message published in one reaches the others within `poll`, a duration, `'25ms'` by default.
 - A process listens from its first `join` on, never handed what was published before.
 - A process that stops without its connections leaving, such as one that crashed, has its members dropped once it has not been heard from for 10 seconds; one only stalled that long writes them back on its next heartbeat. A process with no connection joined neither beats nor polls, so an idle one costs the file nothing.
 - `close()` on the store stops its timers and lets go of the file.

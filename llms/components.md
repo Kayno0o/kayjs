@@ -87,7 +87,7 @@ import { debounced, watch } from 'kay'
 const typed = signal('')
 const found = signal<string[]>([])
 
-watch(debounced(typed, 300), async (query) => {
+watch(debounced(typed, '300ms'), async (query) => {
   // Registered before the await: a slower answer to an older query is dropped.
   let stale = false
 
@@ -116,7 +116,7 @@ import { every, listen } from 'kay'
 const seconds = signal(0)
 const key = signal('')
 
-every(1000, () => seconds++)
+every('1s', () => seconds++)
 listen(window, 'keydown', event => key = event.key)
 ---
 p {seconds()}s on the page, last key {key()}
@@ -230,16 +230,16 @@ ul
 - `onMount`, `onCleanup`, `untrack`, `batch`, `root` and `flush` come from `kay` too.
 - `root(fn)` runs `fn(dispose)` under an owner of its own, not attached to the one it was called under: the effects and `onCleanup`s created inside live until `dispose()` is called, and `root` returns what `fn` returns. It is for code with no component to stop it, such as a module-level subscription.
 - A write applies at once; the effects it touches run together in a microtask, or right away through `flush()`.
-- `every(ms, run, { while })` from `kay` runs `run` every `ms` milliseconds while the island lives, and while `while`, read as an effect reads, holds: the timer starts and stops as it turns, never on the server.
+- `every(interval, run, { while })` from `kay` runs `run` every `interval`, a duration such as `'3s'` or `'250ms'`, while the island lives, and while `while`, read as an effect reads, holds: the timer starts and stops as it turns, never on the server.
 - `every` skips a tick while the promise the last run returned is pending.
-- `every(ms, run, { immediate: true })` runs it as the timer starts too, rather than one interval later.
-- `every(3000, refresh, { while: () => issuing })` polls the page, `every(1000, () => now = Date.now())` ticks a clock.
+- `every(interval, run, { immediate: true })` runs it as the timer starts too, rather than one interval later.
+- `every('3s', refresh, { while: () => issuing })` polls the page, `every('1s', () => now = Date.now())` ticks a clock; a bare number is milliseconds still, which `deprecated-time-ms` rewrites.
 - `watch(source, (next, previous) => ...)` from `kay` runs on each change of `source`, a signal or a function reading some, not on its first read: no hand-kept previous value to compare against.
 - `watch` tracks only `source`, never what its callback reads; a read giving the same value runs nothing, and what the callback registers with `onCleanup` stays until its next run.
 - `watch(source, run, { immediate: true })` runs on the first read too, `previous` being `undefined` then.
 - The first read is when the island's effects first run, once its render is done: a write the script makes before then is part of it and runs nothing.
 - What the callback registers with `onCleanup` before an `await` runs at its next run: a flag set there drops a slower answer to an older value.
-- `debounced(source, ms)` from `kay` is a memo giving `source`'s value once it has stopped changing for `ms` milliseconds, starting with its value now: `watch(debounced(typed, 300), lookUp)` looks up as the user pauses, with no `setTimeout` kept by hand.
+- `debounced(source, delay)` from `kay` is a memo giving `source`'s value once it has stopped changing for `delay`, a duration, starting with its value now: `watch(debounced(typed, '300ms'), lookUp)` looks up as the user pauses, with no `setTimeout` kept by hand.
 - `debounced` drops its pending value with the island; on the server it keeps its first value. A `debounced` is read by calling it, as a memo is.
 - `watch` and `debounced` run nothing while the server renders an island, as `effect` does; at a module's top level they run in the server's process too, as `effect` does there.
 - `listen(window, 'keydown', event => ...)` from `kay` listens to an event of `window`, `document` or any other target while the island lives, the handler typed by the target's events and the fourth argument passed to `addEventListener`.

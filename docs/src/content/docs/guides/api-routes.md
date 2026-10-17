@@ -99,7 +99,7 @@ A module limits how often one client calls it. Past the limit a request answers 
 
 ```ts
 export default api({ rateLimit: { max: 60, window: '1m' } })
-  .post('/send', send, { detail: { rateLimit: { max: 5, window: '1m' }, bodyLimit: 4096 } })
+  .post('/send', send, { detail: { rateLimit: { max: 5, window: '1m' }, bodyLimit: '4kb' } })
 ```
 
 A route sets its own limit and its own `bodyLimit` in its `detail`. The module's limit applies to it as well.

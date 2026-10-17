@@ -112,6 +112,16 @@ describe('forgejo', () => {
     await expect(failure).rejects.toThrow('Forgejo did not answer within 0.05 s')
   })
 
+  test('reads the timeout as a duration, and refuses one that is none', async () => {
+    const hanging = async (_input: string | URL | Request, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => reject(init.signal?.reason))
+    })
+    const saver = forgejo({ url: 'https://git.example.com', repo: 'me/site', token: 't0k', timeout: '50ms', fetch: hanging as typeof fetch })
+
+    await expect(saver.save({ ...change, repoPath: 'a.md', text: 'a' })).rejects.toThrow('Forgejo did not answer within 0.05 s')
+    expect(() => forgejo({ url: 'u', repo: 'r', token: 't', timeout: 'soon' as never })).toThrow('kayjs-cms: forgejo timeout is \'soon\'')
+  })
+
   test('throws a proxy\'s plain-text refusal as it came, cut to its first 200 characters', async () => {
     const { saver } = forge({}, new Response('Bad gateway', { status: 502 }))
 

@@ -1,3 +1,4 @@
+import type { Duration } from 'kay'
 import type { Mounted } from 'kay/test'
 import { afterEach, expect, test } from 'bun:test'
 import { mountComponent } from 'kay/test'
@@ -18,7 +19,7 @@ afterEach(() => {
 })
 
 // Mounting waits on real timers, so a carousel is mounted before the clock is faked: its own interval would run in real time. A pointer resting on it then leaving makes it set the interval again, on the fake clock.
-async function carousel(autoplay?: number) {
+async function carousel(autoplay?: Duration) {
   mounted = await mountComponent('src/components/carousel.kay', { autoplay, onIndexChange: (index: number) => turns.push(index) })
 
   const { root } = mounted
@@ -69,6 +70,13 @@ test('follows a slide its parent passes', async () => {
   await clock.settle()
 
   expect([view.shown(), view.current(), turns]).toEqual([['Slide 3 of 3'], 2, []])
+})
+
+test('reads autoplay as a duration, the same turn as the milliseconds it says', async () => {
+  await carousel(`${AUTOPLAY_MS}ms`)
+  await clock.elapse(TWO_TURNS_MS)
+
+  expect(turns.slice(0, 2)).toEqual([1, 2])
 })
 
 test('turns on its own, held while the pointer or the focus is on it, and stops once gone', async () => {

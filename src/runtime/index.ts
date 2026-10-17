@@ -6,6 +6,7 @@ import type { Duration } from './duration'
 import type { Locale } from './i18n'
 import type { PersistStorage } from './persist'
 import type { SignalOptions } from './reactive'
+import { durationMs } from './duration'
 import { keepValue } from './persist'
 import { keepParam } from './query-param'
 import { createSignal, effect, memo, onCleanup, ownSignal, provideContext, readContext, tracking, untrack } from './reactive'
@@ -75,9 +76,10 @@ export interface EveryOptions {
   immediate?: boolean | undefined
 }
 
-// Runs `run` every `ms` milliseconds while the island lives, and while `options.while` holds: `every(3000, refresh, { while: () => issuing })` polls the page until nothing is issuing.
+// Runs `run` every `interval` while the island lives, and while `options.while` holds: `every('3s', refresh, { while: () => issuing })` polls the page until nothing is issuing.
+// A bare number is milliseconds here for now, `deprecated-time-ms` rewrites it to a duration string.
 // Nothing runs while the server renders, and a tick is skipped while the promise the last run returned is pending, so a slow refresh never piles up.
-export function every(ms: number, run: () => unknown, options?: EveryOptions): void {
+export function every(interval: Duration, run: () => unknown, options?: EveryOptions): void {
   effect(() => {
     if (options?.while && !options.while())
       return
@@ -96,7 +98,7 @@ export function every(ms: number, run: () => unknown, options?: EveryOptions): v
         busy = false
       }
     }
-    const timer = setInterval(() => void tick(), ms)
+    const timer = setInterval(() => void tick(), durationMs(interval))
 
     onCleanup(() => clearInterval(timer))
 
@@ -134,14 +136,15 @@ export function watch<T>(source: () => T, run: (next: T, previous: T | undefined
   })
 }
 
-// `source`'s value once it has stopped changing for `ms` milliseconds, starting with its value now: `watch(debounced(typed, 300), lookUp)` looks a name up as the user pauses.
+// `source`'s value once it has stopped changing for `delay`, starting with its value now: `watch(debounced(typed, '300ms'), lookUp)` looks a name up as the user pauses.
+// A bare number is milliseconds here for now, `deprecated-time-ms` rewrites it to a duration string.
 // The pending timer goes with the island; while the server renders, the value stays the one `source` gave first.
-export function debounced<T>(source: () => T, ms: number): Memo<T> {
+export function debounced<T>(source: () => T, delay: Duration): Memo<T> {
   const [settled, write] = createSignal(untrack(source))
 
   effect(() => {
     const next = source()
-    const timer = setTimeout(write, ms, next)
+    const timer = setTimeout(write, durationMs(delay), next)
 
     onCleanup(() => clearTimeout(timer))
   })
@@ -424,6 +427,7 @@ export { localPath, withBase } from './base'
 export type { ApiRoutesOf, AwaitProps, CheckedHref, CheckedHtml, Deferred, ExtensionServersOf, FunctionProp, HandedSignal, HydrateWhen, IdentityKeyed, Inferred, IslandBrand, IslandComponent, IslandOptions, IslandProp, Locals, LocalsOf, Redirect, Register, RouteParams, SafeHtml, TemplateHelpers, Unmatched, UnresolvedParameter } from './checks'
 export { describeField } from './described'
 export type { Duration } from './duration'
+export { durationMs } from './duration'
 export type { PublicEnv, PublicEnvOf } from './env'
 export { publicEnv } from './env'
 export { focusInvalid } from './focus'

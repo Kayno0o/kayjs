@@ -387,7 +387,7 @@ export const contact = action(schema, send, {
   rateLimit: { max: 5, window: '1m' },
   honeypot: 'website',
   minTime: '3s',
-  bodyLimit: 5 * 1024 * 1024,
+  bodyLimit: '5mb',
 })
 ---
 ```

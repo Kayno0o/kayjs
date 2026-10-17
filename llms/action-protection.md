@@ -105,7 +105,7 @@ export default guard(async ({ request, headers, deny }) => {
 - `rateLimit` is given the seconds to wait.
 - `minTime` is given `early` for a post sent too soon or `expired` for a stamp missing, forged or past `maxAge`, as a page from before a restart sends.
 - `proofOfWork` is given `missing`, `expired` or `wrong` as below.
-- `bodyLimit` is given the most bytes a post may send.
+- `bodyLimit` is given the most bytes a post may send, as a number whatever size `bodyLimit` was written as.
 - Each is a string or a function; `serverError` is a string. A function runs in the request's locale, so it may word the refusal with `t()`.
 
 #### Proof of work
@@ -158,8 +158,8 @@ export default guard(async ({ request, headers, deny }) => {
 
 ### Body limit
 
-- A request to an action or an API route sends at most `bodyLimit` bytes, 1 MB unless kay.config.ts sets another: `bodyLimit: 4 * 1024 * 1024`.
-- An action raises or lowers it for itself, `action(schema, handler, { bodyLimit: 20 * 1024 * 1024 })`, and an API module for its routes, `api({ bodyLimit })`, a number or a function kay reads when it mounts the module (a library reading its own settings).
+- A request to an action or an API route sends at most `bodyLimit`, 1 MB unless kay.config.ts sets another: `bodyLimit: '4mb'`, a size as `budget` takes it (`'800b'`, `'512kb'`, `'1.5mb'`) or a number of bytes.
+- An action raises or lowers it for itself, `action(schema, handler, { bodyLimit: '20mb' })`, and an API module for its routes, `api({ bodyLimit })`, a size or a function kay reads when it mounts the module (a library reading its own settings).
 - A bigger request is refused before anything reads it, from its `Content-Length`, or, sent in chunks without one, as soon as it passes the limit.
 - A plain form post goes back to its page with `errors['']` saying the most it may send, an island's call throws `ActionError` with status 413 and that error, and an API route answers 413.
 - Bun's own cap, 128 MB unless `new Elysia({ serve: { maxRequestBodySize } })` sets another, holds whatever `bodyLimit` says, and it alone limits the app's own routes.

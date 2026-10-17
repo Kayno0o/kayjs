@@ -1,3 +1,5 @@
+import type { Duration } from '../runtime/duration'
+import { optionMs } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
 import { openSqlite } from '../runtime/sqlite.server'
 import { onReload } from './reload'
@@ -36,8 +38,8 @@ export interface RoomsOptions {
 }
 
 export interface CoalesceOptions {
-  // How long changes are gathered before the one snapshot goes, in milliseconds: 50 by default.
-  wait?: number | undefined
+  // How long changes are gathered before the one snapshot goes, `'50ms'` by default; a bare number is milliseconds for now, `deprecated-time-ms` rewrites it.
+  wait?: Duration | undefined
 }
 
 export interface Rooms<Message, Member = undefined> {
@@ -127,6 +129,8 @@ export function rooms<Message, Member = undefined>(options: RoomsOptions = {}): 
       store.publish(room, messageText(message), { ...except && { except: idOf(except.raw) }, ...to !== undefined && { to: JSON.stringify(to) } })
     },
     coalesce(read, { wait = DEFAULT_WAIT } = {}) {
+      const delay = optionMs(wait, '`coalesce` wait')
+
       // The rooms a snapshot is on its way to.
       const waiting = new Set<string>()
 
@@ -138,7 +142,7 @@ export function rooms<Message, Member = undefined>(options: RoomsOptions = {}): 
         setTimeout(guarded('sending a room its snapshot', () => {
           waiting.delete(room)
           store.publish(room, messageText(read(room)), {})
-        }), wait)
+        }), delay)
       }
     },
   }
@@ -194,9 +198,10 @@ export function memoryRooms(): RoomStore {
   }
 }
 
-// Rooms kept in a SQLite file every process of the machine opening it shares: a message published in one reaches the members connected to the others, within `poll` milliseconds.
+// Rooms kept in a SQLite file every process of the machine opening it shares: a message published in one reaches the members connected to the others, within `poll`, `'25ms'` by default; a bare number is milliseconds for now, `deprecated-time-ms` rewrites it.
 // A process that stops without leaving, such as one that crashed, has its members dropped once it has not been heard from for 10 seconds; one that was only stalled that long writes its members back once it runs again.
-export function sqliteRooms(path: string, { poll = POLL }: { poll?: number } = {}): RoomStore {
+export function sqliteRooms(path: string, { poll = POLL }: { poll?: Duration } = {}): RoomStore {
+  const pollMs = optionMs(poll, '`sqliteRooms` poll')
   const db = openSqlite(path)
   const self = crypto.randomUUID()
 
@@ -276,7 +281,7 @@ export function sqliteRooms(path: string, { poll = POLL }: { poll?: number } = {
     if (held && listeners.size > 0 && !reading) {
       // Read from now on: what others published before anyone here listened is for the members they had then.
       last = latest.get()?.id ?? 0
-      reading = setInterval(guarded('reading what other processes published to rooms', read), poll)
+      reading = setInterval(guarded('reading what other processes published to rooms', read), pollMs)
       reading.unref()
     }
     else if (!(held && listeners.size > 0) && reading) {

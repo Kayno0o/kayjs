@@ -15,7 +15,7 @@ export default defineConfig({
     headers: { 'strict-transport-security': 'max-age=63072000; includeSubDomains' },
   },
   proxy: true,
-  bodyLimit: 4 * 1024 * 1024,
+  bodyLimit: '4mb',
 })
 ```
 
@@ -230,15 +230,15 @@ Both take a `difficulty`, 100,000 by default, and `workChallenge` takes a `maxAg
 
 ## The request body limit
 
-An action or an API route accepts 1 MB at most. A larger request is refused before anything reads it.
+An action or an API route accepts 1 MB at most. A limit is a size, `'4mb'`, `'512kb'` or `'800b'`, or a number of bytes. A larger request is refused before anything reads it.
 
 ```ts
 export default defineConfig({
-  bodyLimit: 4 * 1024 * 1024,
+  bodyLimit: '4mb',
 })
 ```
 
-Raise it for one action in its third argument, `{ bodyLimit: 20 * 1024 * 1024 }`, for an API module with `api({ bodyLimit })`, or for one route with `detail: { bodyLimit }`. A form that takes files usually needs this.
+Raise it for one action in its third argument, `{ bodyLimit: '20mb' }`, for an API module with `api({ bodyLimit })`, or for one route with `detail: { bodyLimit }`. A form that takes files usually needs this.
 
 A form post goes back to its page with a message, an island's call throws an `ActionError` with status 413, and an API route answers 413. Bun's own cap of 128 MB still holds over any `bodyLimit`.
 

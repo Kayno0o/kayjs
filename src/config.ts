@@ -3,6 +3,7 @@ import type { AnyElysia } from 'elysia'
 import type { BudgetConfig } from './build/budget'
 import type { LintLevels } from './compiler/lints'
 import type { Highlighter } from './content/markdown'
+import type { ByteSize } from './runtime/byte-size'
 import type { Duration } from './runtime/duration'
 import type { HeadTag } from './runtime/head'
 import type { Guard, GuardContext } from './runtime/index'
@@ -64,8 +65,8 @@ export interface KayConfig {
   security?: SecurityConfig | false | undefined
   // The proxies in front of the server, `true` for one and a number for that many, which the client's address that rate limits count is read through. Without it, the address the server was reached from is the client, so behind a proxy every visitor counts as that proxy.
   proxy?: ProxyConfig | number | true | undefined
-  // The most bytes a request to an action or an API route may send, 1 MB by default; an action or an `api()` module raises or lowers it for itself. A bigger one answers 413 before it is read.
-  bodyLimit?: number | undefined
+  // The most a request to an action or an API route may send, bytes or a size such as `'4mb'`, 1 MB by default; an action or an `api()` module raises or lowers it for itself. A bigger one answers 413 before it is read.
+  bodyLimit?: ByteSize | undefined
   // Every page, action, endpoint and API module of the app answers 403 unless a `_guard.ts` covers it or it sets `guards: false`, in its `page` or its `api()` options; `kay check` reports each such route. A library's routes keep the guards it gives them.
   requireGuards?: boolean | undefined
   // Lets other sites' pages call every API module's routes from the browser, as `api({ cors })` does for one: `cors: { origins: ['https://app.example.com'], credentials: true }`. A module setting its own `cors` keeps it, and `api({ cors: false })` keeps a module to its own site.

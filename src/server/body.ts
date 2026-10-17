@@ -1,7 +1,9 @@
 import type { Elysia } from 'elysia'
 import type { Server } from 'elysia/universal'
+import type { ByteSize } from '../runtime/byte-size'
 import { KayError } from '../compiler/errors'
 import { formatNumber } from '../runtime/i18n'
+import { byteSize } from '../runtime/byte-size'
 import { requestUrl } from './request-url'
 import { withoutSlash } from './routes'
 
@@ -12,7 +14,7 @@ const NO_BODY = new Set(['GET', 'HEAD', 'OPTIONS'])
 
 // What an action or an API module lets a request send, the app's limit when it sets none, and its answer to one sending more.
 export interface BodyLimit {
-  bytes?: number | undefined
+  bytes?: ByteSize | undefined
   refuse: (request: Request, bytes: number, server: Server | null) => Response | Promise<Response>
 }
 
@@ -47,20 +49,13 @@ function specificity(path: string): number {
 }
 
 // Refuses a request to an action or an API route sending more than its limit, before Elysia reads the body: actions by their path, API modules by the path they are mounted at, and the routes of a module that set their own by their pattern.
-export function limitBodies(app: Elysia, bytes: number, actions: Map<string, BodyLimit>, mounts: Map<string, BodyLimit>, routes: RouteBodyLimit[] = []): void {
-  checkLimit(bytes, 'bodyLimit')
-
+export function limitBodies(app: Elysia, size: ByteSize, actionSizes: Map<string, BodyLimit>, mountSizes: Map<string, BodyLimit>, routeSizes: RouteBodyLimit[] = []): void {
+  const bytes = checkLimit(size, 'bodyLimit')
+  const inBytes = ({ bytes: size, refuse }: BodyLimit, name: string) => ({ bytes: size === undefined ? undefined : checkLimit(size, name), refuse })
+  const actions = new Map([...actionSizes].map(([path, limit]) => [path, inBytes(limit, `the bodyLimit of ${path}`)]))
+  const mounts = new Map([...mountSizes].map(([path, limit]) => [path, inBytes(limit, `the bodyLimit of ${path}`)]))
+  const routes = routeSizes.map(route => ({ ...route, limit: route.limit && inBytes(route.limit, `the bodyLimit of ${route.method} ${route.path}`) }))
   const matchers = routes.map(route => ({ ...route, matcher: routeMatcher(route.path) })).sort((a, b) => specificity(a.path) - specificity(b.path))
-
-  for (const { path, method, limit } of routes) {
-    if (limit?.bytes !== undefined)
-      checkLimit(limit.bytes, `the bodyLimit of ${method} ${path}`)
-  }
-
-  for (const [path, limit] of [...actions, ...mounts]) {
-    if (limit.bytes !== undefined)
-      checkLimit(limit.bytes, `the bodyLimit of ${path}`)
-  }
 
   // Longest first, so `/api/chat` wins over `/api`.
   const prefixes = [...mounts].sort(([a], [b]) => b.length - a.length)
@@ -112,9 +107,14 @@ async function exceeds(request: Request, bytes: number): Promise<boolean> {
   return false
 }
 
-function checkLimit(bytes: number, name: string): void {
-  if (!Number.isInteger(bytes) || bytes < 1)
-    throw new KayError('config-invalid', `kay: ${name} is a number of bytes, a whole number from 1; got ${bytes}`)
+// The bytes a limit stands for, a number or a size such as `'20mb'`; a limit that is no whole number of bytes from 1 throws.
+function checkLimit(size: ByteSize, name: string): number {
+  const bytes = byteSize(size, name)
+
+  if (!Number.isInteger(bytes))
+    throw new KayError('config-invalid', `kay: ${name} is ${typeof size === 'string' ? `'${size}'` : size}; it takes a whole number of bytes from 1, or a size such as '20kb'`)
+
+  return bytes
 }
 
 // `1 MB`, `512 KB`, `200 bytes`: how a refusal tells the visitor the most they may send, in the units another locale writes (`1 Mo`, `200 octets` in French).

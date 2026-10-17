@@ -1,4 +1,5 @@
 import type { Static, t, TSchema } from 'elysia'
+import type { ByteSize } from './byte-size'
 import type { ErrorStatus, RouteParams } from './checks'
 import type { Duration } from './duration'
 import type { RequestContext } from './index'
@@ -140,8 +141,8 @@ export interface ActionProtection<Field extends string = never> {
   minTime?: Duration | MinTimeOptions | undefined
   // A challenge kay's script solves in a worker while the visitor fills the form in, so each post costs CPU: `true`, the difficulty, or options. A post without the solution fails with 422 without reaching the handler, a form posted without JavaScript included unless `minTime` is set too.
   proofOfWork?: boolean | number | ProofOfWorkOptions | undefined
-  // The most bytes a post may send, files included, in place of the app's `bodyLimit`; a bigger one fails with 413 before it is read.
-  bodyLimit?: number | undefined
+  // The most a post may send, files included, bytes or a size such as `'20mb'`, in place of the app's `bodyLimit`; a bigger one fails with 413 before it is read.
+  bodyLimit?: ByteSize | undefined
   // What the visitor reads when one of these refuses a post, in place of kay's English, as a schema's `error` is for a field.
   messages?: ProtectionMessages | undefined
 }

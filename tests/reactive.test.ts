@@ -1233,6 +1233,41 @@ describe('watch', () => {
   })
 })
 
+describe('durations as delays', () => {
+  it('takes every and debounced delays as duration strings, a bare number staying milliseconds', async () => {
+    jest.useFakeTimers()
+
+    try {
+      const typed = signal('a')
+      let runs = 0
+      const { settled, dispose } = root(dispose => ({ settled: debounced(typed, '300ms'), dispose }))
+      const stop = root((dispose) => {
+        every('0.1s', () => runs++)
+
+        return dispose
+      })
+
+      flush()
+      typed.set('b')
+      flush()
+      jest.advanceTimersByTime(99)
+      expect(runs).toBe(0)
+      jest.advanceTimersByTime(1)
+      await Promise.resolve()
+      expect(runs).toBe(1)
+      jest.advanceTimersByTime(199)
+      expect(settled()).toBe('a')
+      jest.advanceTimersByTime(1)
+      expect(settled()).toBe('b')
+      stop()
+      dispose()
+    }
+    finally {
+      jest.useRealTimers()
+    }
+  })
+})
+
 describe('debounced', () => {
   it('takes the value of its source once it stops changing for the delay, starting with its value now', () => {
     jest.useFakeTimers()

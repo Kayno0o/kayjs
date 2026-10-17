@@ -1,6 +1,6 @@
 ---
-import type { JSX } from 'kay'
-import { effect, listen, onCleanup, onMount, signal } from 'kay'
+import type { Duration, JSX } from 'kay'
+import { durationMs, effect, listen, onCleanup, onMount, signal } from 'kay'
 import IconButton from './icon-button.kay'
 import { stepIndex } from './cycle'
 import { wording } from 'kay/words'
@@ -10,8 +10,8 @@ const { slides, index = 0, onIndexChange, autoplay, ratio = '16 / 9', label = wo
   // The slide shown first; a carousel whose parent passes another follows it.
   index?: number | undefined
   onIndexChange?: ((index: number) => void) | undefined
-  // Moves to the next slide every this many milliseconds, held while the pointer or the focus is on the carousel, stopped by its pause button, and never for a visitor asking for reduced motion.
-  autoplay?: number | undefined
+  // Moves to the next slide this often, `'5s'`, held while the pointer or the focus is on the carousel, stopped by its pause button, and never for a visitor asking for reduced motion; a bare number is milliseconds for now, and `kay check` cannot rewrite it in a template.
+  autoplay?: Duration | undefined
   // The slides' aspect ratio, as CSS writes it.
   ratio?: string | undefined
   // Names the carousel for screen readers.
@@ -44,7 +44,7 @@ effect(() => {
   if (!autoplay || paused() || pointed() || focused() || hidden() || matchMedia('(prefers-reduced-motion: reduce)').matches)
     return
 
-  const timer = setInterval(step, autoplay, 1)
+  const timer = setInterval(step, durationMs(autoplay), 1)
 
   onCleanup(() => clearInterval(timer))
 })

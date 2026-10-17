@@ -2,6 +2,7 @@ import type { Context } from 'elysia'
 import type { Locals } from '../runtime'
 import type { ActionTool } from '../runtime/action'
 import type { LocaleState } from '../runtime/locale-state'
+import type { ByteSize } from '../runtime/byte-size'
 import type { ActionOptions } from './actions'
 import type { ApiModule } from './api-modules'
 import type { BodyLimit, RouteBodyLimit } from './body'
@@ -81,7 +82,7 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
     const own = (instance as { [CORS]?: CorsRule | false })[CORS]
     const cors = own === false ? undefined : own ?? appCors
 
-    const bytes = (instance as { [BODY_LIMIT]?: number | (() => number) })[BODY_LIMIT]
+    const bytes = (instance as { [BODY_LIMIT]?: ByteSize | (() => ByteSize) })[BODY_LIMIT]
     const refuse: BodyLimit['refuse'] = cors ? request => corsResponse(cors, request, tooLarge()) : tooLarge
 
     limits.set(module.mount, { bytes: typeof bytes === 'function' ? bytes() : bytes, refuse })
@@ -91,7 +92,7 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
 
     // What a route sets for itself in its `detail`, by the method and path it answers.
     for (const route of instance.routes) {
-      const detail = (route.hooks as { detail?: { bodyLimit?: number, rateLimit?: ApiRateLimit | ApiRateLimit[] } } | undefined)?.detail
+      const detail = (route.hooks as { detail?: { bodyLimit?: ByteSize, rateLimit?: ApiRateLimit | ApiRateLimit[] } } | undefined)?.detail
       const method = route.method.toUpperCase()
       const path = withoutSlash(apiRoutePath(module.mount, route.path))
 
@@ -501,8 +502,8 @@ async function admit(guards: LoadedGuard[], context: { request: Request, params?
 
 declare module 'elysia' {
   interface DocumentDecoration {
-    // The most bytes a request to this route may send, in place of the module's and the app's `bodyLimit`; a bigger one answers 413 before it is read.
-    bodyLimit?: number | undefined
+    // The most a request to this route may send, bytes or a size such as `'20mb'`, in place of the module's and the app's `bodyLimit`; a bigger one answers 413 before it is read.
+    bodyLimit?: ByteSize | undefined
     // At most `max` requests to this route from one client, or from whatever `key` names, every `window`; past that it answers 429 with `Retry-After`. Counted after the module's guards, beside the module's own `rateLimit`.
     rateLimit?: ApiRateLimit | ApiRateLimit[] | undefined
     // Offers the route to agents as an MCP tool when `mcp` is set in kay.config.ts: `true`, its description, or `{ name, description }`, as an action's `tool` is. A route without it is in the OpenAPI document and never offered.
@@ -515,8 +516,8 @@ type ApiLocals = { [Key in keyof Locals]: Locals[Key] }
 type Empty = Record<never, never>
 
 export interface ApiOptions {
-  // The most bytes a request to the module's routes may send, in place of the app's `bodyLimit`; a function is read once the server mounts the module, after the config's extensions ran.
-  bodyLimit?: number | (() => number) | undefined
+  // The most a request to the module's routes may send, bytes or a size such as `'20mb'`, in place of the app's `bodyLimit`; a function is read once the server mounts the module, after the config's extensions ran.
+  bodyLimit?: ByteSize | (() => ByteSize) | undefined
   // Lets other sites' pages call the module's routes from the browser: `cors: { origins: ['https://app.example.com'], credentials: true }`. `false` keeps the module to its own site where the app's `cors` in kay.config.ts opens the others.
   cors?: CorsOptions | false | undefined
   // At most `max` requests to any route of the module from one client, or from whatever `key` names, every `window`; past that they answer 429 with `Retry-After`. Counted after the module's guards.

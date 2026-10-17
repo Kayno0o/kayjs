@@ -1,5 +1,7 @@
+import type { Duration } from 'kay'
 import { mkdir, rm } from 'node:fs/promises'
 import { dirname } from 'node:path'
+import { optionMs } from 'kay/library'
 import { wording } from 'kay/words'
 import { log } from './log'
 
@@ -109,8 +111,8 @@ export interface ForgejoOptions {
   branch?: string | undefined
   // A token allowed to write the repository's contents.
   token: string
-  // How long a save may take, its requests to the forge together, before it fails, in milliseconds: 15 seconds by default. The extra read naming the file's version after a conflict has its own.
-  timeout?: number | undefined
+  // How long a save may take, its requests to the forge together, before it fails: `'15s'` by default; a bare number is milliseconds for now, `deprecated-time-ms` rewrites it. The extra read naming the file's version after a conflict has its own.
+  timeout?: Duration | undefined
   fetch?: typeof fetch | undefined
 }
 
@@ -134,7 +136,8 @@ function commitOperation(text: string | undefined, sha: string | undefined): 'de
 }
 
 // Commits each change through Forgejo's contents API, so the site rebuilds from git and every edit has history.
-export function forgejo({ url, repo, branch, token, timeout = 15_000, fetch: request = fetch }: ForgejoOptions): FileSaver {
+export function forgejo({ url, repo, branch, token, timeout: wait = 15_000, fetch: request = fetch }: ForgejoOptions): FileSaver {
+  const timeout = optionMs(wait, 'forgejo timeout', 'kayjs-cms')
   const api = `${url.replace(TRAILING_SLASHES, '')}/api/v1/repos/${repo}`
   const headers = { 'authorization': `token ${token}`, 'content-type': 'application/json', 'accept': 'application/json' }
 

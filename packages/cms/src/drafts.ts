@@ -1,14 +1,15 @@
+import type { Duration } from 'kay'
 import type { DraftEntry, DraftResult, EntryRef, Issue } from './kay/contract'
 import type { FieldPath } from './markers'
-import { signal } from 'kay'
+import { durationMs, signal } from 'kay'
 import { BODY, entryKey } from './markers'
 import { valueAt, withValueAt } from './paths'
 
 export interface DraftsOptions {
   // Renders the page with these entries in place of the saved ones: kay's `showDraft`.
   show: (entries: DraftEntry[]) => Promise<DraftResult>
-  // How long typing pauses before the page renders again, in milliseconds.
-  delay?: number | undefined
+  // How long typing pauses before the page renders again, `'150ms'` by default; a bare number is milliseconds for now, `deprecated-time-ms` rewrites it.
+  delay?: Duration | undefined
 }
 
 export type Drafts = ReturnType<typeof createDrafts>
@@ -40,7 +41,7 @@ export function createDrafts({ show, delay = 150 }: DraftsOptions) {
 
   function schedule(): void {
     clearTimeout(timer)
-    timer = setTimeout(() => void render(), delay)
+    timer = setTimeout(() => void render(), durationMs(delay))
   }
 
   async function render(): Promise<void> {

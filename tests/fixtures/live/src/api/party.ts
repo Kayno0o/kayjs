@@ -11,7 +11,7 @@ type Sent = typeof said.static | typeof joined.static | typeof score.static
 // Guests join rooms by message, each listed by their name; a burst of bumps goes out as one score.
 const party = rooms<Sent, string>()
 const scores = new Map<string, number>()
-const sendScore = party.coalesce(room => ({ type: 'score', room, score: scores.get(room) ?? 0 }), { wait: 30 })
+const sendScore = party.coalesce(room => ({ type: 'score', room, score: scores.get(room) ?? 0 }), { wait: '30ms' })
 
 export default api()
   .ws('/', {

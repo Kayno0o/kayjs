@@ -1,5 +1,6 @@
 import type { Server } from 'bun'
 import type { Action } from '../src/runtime'
+import type { ByteSize } from '../src/runtime/byte-size'
 import type { ClientBuild } from '../src/server/client'
 import type { LogEntry } from '../src/server/log'
 import type { ProtectionRefusal } from '../src/server/protection'
@@ -1232,7 +1233,7 @@ describe('request body limits', () => {
   // Held in a variable so tsc leaves the .kay import to Bun.
   const NOTES = './fixtures/production/src/routes/notes.kay'
   const MB = 1024 * 1024
-  const serve = async (bodyLimit?: number) => pages({ routes: `${FIXTURE}/src/routes`, api: `${FIXTURE}/src/api`, prebuilt: false, bodyLimit })
+  const serve = async (bodyLimit?: ByteSize) => pages({ routes: `${FIXTURE}/src/routes`, api: `${FIXTURE}/src/api`, prebuilt: false, bodyLimit })
   // Sent in chunks, with no Content-Length to go by.
   const chunked = (size: number) => new ReadableStream<Uint8Array>({
     start(controller) {
@@ -1293,8 +1294,20 @@ describe('request body limits', () => {
     expect(await (await post(MB)).text()).toBe(String(MB))
   })
 
-  it.each([0, -1, 1.5])('refuses a limit of %p, as the server boots', async (bodyLimit) => {
-    await expect(serve(bodyLimit)).rejects.toThrow('kay: bodyLimit')
+  it('reads the limit as a size, in the config, an action and an API module', async () => {
+    const app = await serve('1mb')
+    const post = async (size: number) => app.handle(new Request('http://localhost/api/echo', { method: 'POST', headers: { 'content-type': 'text/plain' }, body: chunked(size) }))
+    const site = await testSite({ routes: `${FIXTURE}/src/routes`, security: false, bodyLimit: '64kb' })
+    const { note } = await import(NOTES) as { note: Action<{ text: string }, number> }
+
+    expect((await post(2 * MB)).status).toBe(413)
+    expect(await (await post(MB)).text()).toBe(String(MB))
+    expect((await site.submit(note, { text: 'a'.repeat(65 * 1024) }, { from: '/notes' })).html).toContain('413 Too large to send; 64 KB at most')
+    expect((await site.submit(note, { text: 'hello' }, { from: '/notes' })).html).toContain('<p class="sent">Sent 5</p>')
+  })
+
+  it.each([0, -1, 1.5, '0kb', '-1kb', '1.5b', '1gb', 'big', ''])('refuses a limit of %p, as the server boots', async (bodyLimit) => {
+    await expect(serve(bodyLimit as ByteSize)).rejects.toThrow('kay: bodyLimit')
   })
 })
 

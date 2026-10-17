@@ -1,3 +1,4 @@
+import type { Duration } from 'kay'
 import type { DraftEntry, DraftResult } from '../src/kay/contract'
 import { describe, expect, it } from 'bun:test'
 import { createDrafts } from '../src/drafts'
@@ -5,10 +6,10 @@ import { BODY } from '../src/markers'
 
 const post: DraftEntry = { collection: 'posts', slug: 'hello', data: { title: 'Hello', tags: ['a'] }, body: '# Hello' }
 
-function setup(answer: (entries: DraftEntry[]) => Promise<DraftResult> = async () => ({})) {
+function setup(answer: (entries: DraftEntry[]) => Promise<DraftResult> = async () => ({}), delay: Duration = 5) {
   const calls: DraftEntry[][] = []
   const drafts = createDrafts({
-    delay: 5,
+    delay,
     show: async (entries) => {
       calls.push(entries)
 
@@ -24,6 +25,14 @@ function setup(answer: (entries: DraftEntry[]) => Promise<DraftResult> = async (
 const settled = async () => Bun.sleep(20)
 
 describe('createDrafts', () => {
+  it('reads the delay as a duration', async () => {
+    const { drafts, calls } = setup(undefined, '5ms')
+
+    drafts.set(post, 'title', 'Hel')
+    await settled()
+    expect(calls).toHaveLength(1)
+  })
+
   it('renders the page once typing pauses, with every changed entry', async () => {
     const { drafts, calls } = setup()
 

@@ -344,6 +344,15 @@ export const LINTS = {
     wrong: '--- server\nimport { createAuth } from \'@kaynooo/kayjs-auth\'\n\nexport const auth = createAuth({ onEvent: (event, user, detail) => log(event, user.id, detail) })\n---\np x',
     right: '--- server\nimport { createAuth } from \'@kaynooo/kayjs-auth\'\n\nexport const auth = createAuth({ onAuthEvent: ({ event, user, ...fields }) => log(event, user.id, fields) })\n---\np x',
   },
+  'deprecated-time-ms': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.52',
+    site: true,
+    summary: 'A bare number of milliseconds in `every(ms, run)`, `debounced(source, ms)`, `rooms.coalesce(read, { wait })`, `sqliteRooms(path, { poll })`, `forgejo({ timeout })` or `createDrafts({ delay })` of kayjs-cms, which take a duration since 1.52 as every other duration of kay does, `\'250ms\'`, `\'3s\'`: a bare number still works for now, as milliseconds. The fix writes the string, in seconds when the number is a whole number of them. A number held in a variable, and a `Carousel`\'s `autoplay` in a template, are not read: write them as a string by hand.',
+    wrong: 'every(3000, refresh)\nwatch(debounced(typed, 300), lookUp)',
+    right: 'every(\'3s\', refresh)\nwatch(debounced(typed, \'300ms\'), lookUp)',
+  },
   'deprecated-test-mount': {
     level: 'warn',
     group: 'deprecated',

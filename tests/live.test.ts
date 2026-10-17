@@ -1146,6 +1146,26 @@ describe('rooms', () => {
       } }
     }
 
+    it('reads coalesce\'s wait and sqliteRooms\'s poll as durations, or as milliseconds when bare', async () => {
+      const bare = rooms<{ text: string }>({ store: sqliteRooms(join(dir, 'durations.sqlite'), { poll: '5ms' }) })
+      const room = rooms<{ text: string }>()
+      const ada = connection()
+      let reads = 0
+      const send = room.coalesce(() => ({ text: String(++reads) }), { wait: '20ms' })
+      const legacy = room.coalesce(() => ({ text: 'legacy' }), { wait: 20 })
+
+      room.join(ada, 'hall')
+      send('hall')
+      send('hall')
+      send('hall')
+      legacy('hall')
+      await until(() => ada.received.length === 2)
+      expect(ada.received).toContain('{"text":"1"}')
+      expect(bare.members('hall')).toEqual([])
+      expect(() => room.coalesce(() => ({ text: '' }), { wait: 'soon' as never })).toThrow('coalesce` wait is \'soon\'')
+      expect(() => sqliteRooms(join(dir, 'bad.sqlite'), { poll: '0ms' })).toThrow('sqliteRooms` poll')
+    })
+
     it('lists the members of every process and reaches them, but the sender or to the member named', async () => {
       const { first, second, close } = processes('reach')
       const [ada, bob, host] = [connection(), connection(), connection()]
