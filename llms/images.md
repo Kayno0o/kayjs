@@ -171,6 +171,8 @@ img(src={hero} sizes="(min-width: 60rem) 50vw, 100vw" alt="The workshop")
 - A download is cut off past 25 MB or 10 seconds, and an image over 50 megapixels is refused with 413, as an upload is.
 - Since any URL of a listed host may be asked for, a new query each time, at most 500 originals are kept, up to about 13 GB on disk at 25 MB each plus the variants made of them, the least recently used going first with their variants, and one client starts at most 30 downloads a minute, the route answering 429 past them.
 - The variants are served from the site, so the CSP's `img-src` needs no entry for the host.
+- `images.widths` in `kay.config.ts` sets the ladder, `[320, 640, 960, 1280, 1920, 2560, 3840]` by default: whole numbers from 1 to 16384, at most 16, in any order; each is a file per image, so a short ladder builds fewer, and the route makes only those, plus the multiples of 16 below the first for an image drawn at a fixed width. `src` is the widest at or under 1280. A list that is empty, too long or holds anything else fails the boot.
+- `image(src, { quality: 90 })` sets the WebP and AVIF quality of that image's variants over `images.quality`, a whole number from 1 to 100; each quality an image is asked for is a file per width of its own (`?q=90` on the route, which refuses any other).
 - `images.maxDensity` in `kay.config.ts` sets the most pixels per CSS pixel an image loads at, 2 by default, at least 1; `Infinity` leaves the browser's choice.
 - `kay check` warns (`unsized-image`) of an `img` with neither `width` and `height` nor a spread, such as `image()`'s, that may carry them; an imported raster image given as `src={name}` is sized and left alone, an SVG, a path or a value from data is not.
 - The browser lays the image out from its `width` and `height`, so only the variant it picks changes; a `sizes` holding `auto` is left as written.
@@ -178,7 +180,7 @@ img(src={hero} sizes="(min-width: 60rem) 50vw, 100vw" alt="The workshop")
 - `format` is `webp`, `jpeg` or `png`, `quality` 80 by default; it gives `{ bytes, width, height, type }`.
 - `imageSize(file)` from `kay/server` reads `{ width, height, format }` from the header.
 - Both take a `Blob`, such as a form's `File`, or bytes, and refuse an image over `maxPixels`, 50 million by default, before decoding it.
-- `images.quality` sets the WebP quality, 80 by default.
+- `images.quality` sets the WebP quality, 80 by default, and the JPEG quality of the share cards `shareCard()` and `shareImage()` draw; a card's quality is part of its URL, so changing it renames the cards.
 - Each variant also comes as an AVIF, a third to a half smaller than the WebP, on the same URL: the route answers it to a browser whose `Accept` names `image/avif`, about 95% of them, and the WebP to any other, with `Vary: Accept` on both.
 - `images.avif: { quality: 60 }` sets its quality, 50 by default, and `images.avif: false` serves WebP alone.
 - `kay build` writes both formats of every imported image's variants, the AVIF taking 25 ms to half a second each, on up to four threads, cached between builds as the WebP is.

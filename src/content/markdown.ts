@@ -41,6 +41,7 @@ export type Highlighter = (code: string, language: string | undefined) => string
 const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/
 // Where a heading and a code block open, each closed by the first `</a></hN>` or `</code></pre>` after it.
 const HEADING_OPEN = /<h([1-6]) id="([^"]*)"><a href="#[^"]*">/g
+const PLAIN_HEADING_OPEN = /<h([1-6]) id="([^"]*)">/g
 const CODE_OPEN = /<pre><code(?: class="language-([^"]*)")?>/g
 const CODE_CLOSE = '</code></pre>'
 // Where a tag naming a component opens: capitalized, as kay components are; lowercase tags stay HTML.
@@ -97,9 +98,9 @@ export function splitFrontmatter(source: string): { frontmatter: string | undefi
 
 // The body as HTML split around its components, headings anchored, and code highlighted when a highlighter is given.
 // Component tags are swapped for placeholder elements first, so Markdown passes them through whatever their attributes hold, and code never holds one.
-export async function compileMarkdown(body: string, bodyLine: number, highlight?: Highlighter): Promise<CompiledMarkdown> {
+export async function compileMarkdown(body: string, bodyLine: number, highlight?: Highlighter, headingLinks = true): Promise<CompiledMarkdown> {
   const { text, components } = extractComponents(body, bodyLine)
-  const { html, headings } = await renderMarkdown(text, { highlight })
+  const { html, headings } = await renderMarkdown(text, { highlight, headingLinks })
 
   return { segments: componentSegments(html, components), headings, words: countWords(html) }
 }
@@ -130,14 +131,15 @@ export interface RenderedMarkdown {
   headings: Heading[]
 }
 
-// Markdown text rendered as a collection's entries are, headings anchored and code highlighted when `highlight` is given, for text the app has at runtime, such as a user's note.
+// Markdown text rendered as a collection's entries are, headings anchored (linked to themselves unless `headingLinks` is false) and code highlighted when `highlight` is given, for text the app has at runtime, such as a user's note.
 // The HTML is the writer's, raw tags included: a user's goes through `sanitizeHtml` before `innerHTML`, and the headings may be ones a user typed as raw tags.
 // The highlighter gets the fence's language as written, so for a user's text it falls back on one it does not know rather than throw.
-export async function renderMarkdown(markdown: string, options: { highlight?: Highlighter | undefined } = {}): Promise<RenderedMarkdown> {
-  const html = withImageDefaults(Bun.markdown.html(markdown, { ...MARKDOWN_OPTIONS, headings: { ids: true, autolink: true } }))
+export async function renderMarkdown(markdown: string, options: { highlight?: Highlighter | undefined, headingLinks?: boolean | undefined } = {}): Promise<RenderedMarkdown> {
+  const links = options.headingLinks !== false
+  const html = withImageDefaults(Bun.markdown.html(markdown, { ...MARKDOWN_OPTIONS, headings: { ids: true, autolink: links } }))
   const headings: Heading[] = []
 
-  for (const { open: [, depth, id], inner } of elements(html, HEADING_OPEN, ([, depth]) => `</a></h${depth}>`))
+  for (const { open: [, depth, id], inner } of elements(html, links ? HEADING_OPEN : PLAIN_HEADING_OPEN, ([, depth]) => links ? `</a></h${depth}>` : `</h${depth}>`))
     headings.push({ depth: Number(depth), id: id!, text: decode(inner.replace(TAGS, '')).trim() })
 
   return { html: options.highlight ? await highlighted(html, options.highlight) : html, headings }

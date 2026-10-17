@@ -44,7 +44,7 @@ An entry has `slug`, `data`, `headings` for a table of contents, and `Content`, 
 
 Entries marked as drafts show in development only. That means under `kay dev`, or when the server's `dev` option is on, whatever `NODE_ENV` says.
 
-An entry also has `words` and `readingTime`, counted from the text the page shows. `readingTime` is in minutes, at 230 words a minute, and never less than 1 for a body with words.
+An entry also has `words` and `readingTime`, counted from the text the page shows. `readingTime` is in minutes, at 230 words a minute (`markdown.readingSpeed` in `kay.config.ts` changes it), and never less than 1 for a body with words.
 
 ```kay
 p {post.readingTime} min read
@@ -74,6 +74,8 @@ article
 ```
 
 A slug with a slash, like `guides/intro`, needs a catch-all page, `[...slug].kay`.
+
+An entry can set its own slug with a `slug` field in its frontmatter, so a translated post gets a URL in its own language. It is a path of non-empty parts, with no `.` or `..` part, backslash, `?` or `#`, and two entries may not share one. In a localized collection the slug stays under the locale's folder, and `translations` pairs entries by equal slugs, so give a translation the slug of its original when you want them paired. A schema that does not allow extra fields needs `slug` listed.
 
 ## Pages of a list
 
@@ -136,6 +138,16 @@ A capitalized tag kay cannot read fails too, at its line, rather than showing on
 Without a later `>`, a tag such as `<Chart stray` at the end of a body stays text, escaped. A blank line ends the paragraph, so a tag cut by one is text too. A blockquote's `>` markers are not a later `>`, and a tag inside a quote may continue on the next quoted lines.
 
 ## Highlighting code
+
+You can set `highlight`, `headingLinks` and `readingSpeed` once for every collection, under `markdown` in `kay.config.ts`. A collection's own option of the same name wins. `headingLinks: false` leaves a heading's text without a link to itself.
+
+```ts
+export default defineConfig({
+  markdown: { highlight, headingLinks: false, readingSpeed: 200 },
+})
+```
+
+Images with a relative path, `![A cat](./cat.png)`, work in the body too, when the file is inside the collection's folder. They load like an imported image, with a `srcset` of the widths in `images.widths`, `width`, `height` and lazy loading. A tag that sets its own `width`, `height`, `srcset` or `sizes`, an SVG, an absolute path or a URL is left as written.
 
 Without a highlighter, a code block is `<pre><code class="language-ts">`. Give the collection a `highlight` function and it returns the whole `<pre>` instead, such as Shiki's `codeToHtml`. It runs when the entries compile, at build time.
 

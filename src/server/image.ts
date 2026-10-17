@@ -12,7 +12,7 @@ import { ASSET_PREFIX } from '../build/assets'
 import { countCache } from '../build/cache'
 import { writeAtomically } from '../build/files'
 import { KayError } from '../compiler/errors'
-import { aspectKey, CARD, croppedSize, cutOrBelow, DEFAULT_ASPECTS, DEFAULT_MAX_DENSITY, FILES_ROUTE, IMAGE_ROUTE, IMAGE_WIDTHS, parseAspect, recordVariants, requestedRemoteVariants, requestedVariants, RESIZABLE, setAspects, setMaxDensity, setRemoteImages, setResolvedImages, SMALL_STEP, variantHeight, variantSuffix } from '../runtime/image'
+import { aspectKey, CARD, croppedSize, cutOrBelow, DEFAULT_ASPECTS, DEFAULT_MAX_DENSITY, FILES_ROUTE, IMAGE_ROUTE, imageWidths, parseAspect, recordVariants, requestedRemoteVariants, requestedVariants, RESIZABLE, setAspects, setImageWidths, setMaxDensity, setRemoteImages, setResolvedImages, SMALL_STEP, variantHeight, variantSuffix } from '../runtime/image'
 import { inLocale, passGuards } from './actions'
 import { AVIF_ENCODER, AVIF_SPEED, DEFAULT_AVIF_QUALITY, encodeAvif } from './avif'
 import { coverImage } from './crop'
@@ -50,8 +50,8 @@ export const VARIANTS_DIR = 'images'
 const ASSETS_PATH = `${ASSET_PREFIX}assets/`
 const IMMUTABLE = 'public, max-age=31536000, immutable'
 const TEXT = { 'content-type': 'text/plain; charset=utf-8' }
-const LADDER = new Set<number>(IMAGE_WIDTHS)
 const REMOTE_URL = /^https?:\/\//i
+const QUALITY = /^\d{1,3}$/
 const WEBP_EXTENSION = /\.webp$/
 // How many imported variants are kept by the URL that asked for them; a URL can be spelled many ways, so past this the lot is dropped.
 const MOST_ANSWERED = 1024
@@ -104,9 +104,10 @@ export async function writeVariant(source: string | Blob | Uint8Array, variant: 
       return
     }
 
+    const level = shape.quality ?? quality
     const image = shape.aspect ? new Bun.Image(await coverImage(file, shape.width, variantHeight(shape.width, shape.aspect))) : new Bun.Image(file).resize(shape.width, undefined, { withoutEnlargement: true })
 
-    await (format === 'avif' ? Bun.write(partial, await encodeAvif(image, quality)) : image.webp({ quality }).write(partial))
+    await (format === 'avif' ? Bun.write(partial, await encodeAvif(image, level)) : image.webp({ quality: level }).write(partial))
   })
 }
 
@@ -133,9 +134,9 @@ export async function writeImageVariants(clientDir: string, quality = DEFAULT_QU
       return
 
     // A width below the ladder a page asked for may be the image's own, written already.
-    const variants = [...IMAGE_WIDTHS.filter(step => step < width), width, ...requestedVariants(name).filter(variant => cutOrBelow(variant, width))]
+    const variants = [...imageWidths().filter(step => step < width), width, ...requestedVariants(name).filter(variant => cutOrBelow(variant, width))]
     // The share card stays a JPEG, which social sites read best.
-    const encodings = variants.flatMap(variant => [{ variant, format: 'webp' as const, level: String(quality) }, ...avif === undefined || variant === 'card' ? [] : [{ variant, format: 'avif' as const, level: `${avif}s${AVIF_SPEED}-${AVIF_ENCODER}` }]])
+    const encodings = variants.flatMap(variant => [{ variant, format: 'webp' as const, level: String(typeof variant === 'object' ? variant.quality ?? quality : quality) }, ...avif === undefined || variant === 'card' ? [] : [{ variant, format: 'avif' as const, level: `${typeof variant === 'object' ? variant.quality ?? avif : avif}s${AVIF_SPEED}-${AVIF_ENCODER}` }]])
     const missing: { variant: number | ImageVariant, format: VariantFormat, target: string, cached: string | undefined }[] = []
 
     await Promise.all(encodings.map(async ({ variant, format, level }) => {
@@ -408,17 +409,30 @@ function requestedVariant(url: URL, own: { width: number, height: number }, allo
       return `Aspect ratio ${crop} is none of ${[...allowed].join(', ')}, which images.aspects lists`
   }
 
+  const asked = url.searchParams.get('q')
+  let quality: number | undefined
+
+  if (asked !== null) {
+    quality = QUALITY.test(asked) ? Number(asked) : undefined
+
+    if (quality === undefined || quality < 1 || quality > 100)
+      return `Quality ${asked} is not a whole number from 1 to 100`
+  }
+
   const width = Number(url.searchParams.get('w'))
   const most = aspect ? croppedSize(own, aspect).width : own.width
+  const steps = imageWidths()
 
   if (!Number.isInteger(width) || (width !== most && !(madeWidth(width) && width < most)))
-    return `Width ${url.searchParams.get('w')} is neither one of ${IMAGE_WIDTHS.join(', ')} or a multiple of ${SMALL_STEP} under ${IMAGE_WIDTHS[0]} below the image's own, nor its own, ${most}`
+    return `Width ${url.searchParams.get('w')} is neither one of ${steps.join(', ')} or a multiple of ${SMALL_STEP} under ${steps[0]} below the image's own, nor its own, ${most}`
 
-  return aspect ? { width, aspect } : { width }
+  return { width, ...aspect && { aspect }, ...quality !== undefined && { quality } }
 }
 
 function madeWidth(width: number): boolean {
-  return LADDER.has(width) || (width > 0 && width < IMAGE_WIDTHS[0] && width % SMALL_STEP === 0)
+  const steps = imageWidths()
+
+  return steps.includes(width) || (width > 0 && width < steps[0]! && width % SMALL_STEP === 0)
 }
 
 // The WebP variant `kay build` wrote for an image route URL naming an imported image, or undefined for any other.
@@ -498,8 +512,8 @@ export function sourceFile(src: string, options: ImageRouteOptions): { path: str
   return undefined
 }
 
-// `images.maxDensity`, `images.aspects`, `images.remote` and whether `images.resolve` is set, checked and set for every image this process renders, served or prerendered; returns the density.
-export function applyImageConfig(images: { maxDensity?: number | undefined, aspects?: string[] | undefined, remote?: string[] | undefined, resolve?: unknown, guard?: unknown } | undefined): number {
+// `images.maxDensity`, `images.widths`, `images.aspects`, `images.remote` and whether `images.resolve` is set, checked and set for every image this process renders, served or prerendered; returns the density.
+export function applyImageConfig(images: { maxDensity?: number | undefined, widths?: number[] | undefined, aspects?: string[] | undefined, remote?: string[] | undefined, resolve?: unknown, guard?: unknown } | undefined): number {
   const maxDensity = images?.maxDensity ?? DEFAULT_MAX_DENSITY
 
   if (images?.guard !== undefined && images.resolve === undefined)
@@ -511,6 +525,7 @@ export function applyImageConfig(images: { maxDensity?: number | undefined, aspe
   const patterns = remotePatterns(images?.remote)
 
   setMaxDensity(maxDensity)
+  setImageWidths(images?.widths)
   setAspects(images?.aspects ?? DEFAULT_ASPECTS)
   setRemoteImages(src => remoteAllowed(src, patterns))
   setResolvedImages(images?.resolve !== undefined)

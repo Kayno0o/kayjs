@@ -9,7 +9,7 @@ import { JSON_FILE } from '../build/files'
 import { KayError } from '../compiler/errors'
 import { kayLog } from '../runtime/log'
 import { isDraft } from './drafts'
-import { contentPlace, entryFiles, parseEntry, slugOf } from './load'
+import { contentPlace, entryFiles, markdownOf, parseEntry, slugOf } from './load'
 import { compileMarkdown, MarkdownError, splitFrontmatter } from './markdown'
 import { dataIssues, decodeEntries, unknownComponents } from './validate'
 
@@ -705,7 +705,7 @@ function draftOf(collection: Collection<unknown>, entry: Omit<SourceEntry, 'draf
 
 async function compiledBody(collection: Collection<unknown>, body: string, report: (message: string) => void): Promise<CompiledMarkdown | undefined> {
   try {
-    const compiled = await compileMarkdown(body, 1, collection.options.highlight)
+    const compiled = await compileMarkdown(body, 1, markdownOf(collection.options).highlight, markdownOf(collection.options).headingLinks)
 
     for (const { component, line } of unknownComponents(compiled.segments, collection.components))
       report(`uses <${component}> on line ${line}, which the collection's components do not name`)

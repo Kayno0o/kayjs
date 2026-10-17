@@ -210,8 +210,9 @@ article
 - `all()` gives every entry in the collection's `sort` order, by slug without one; filter and sort it like any array.
 - `get(slug)` gives one entry or `undefined`.
 - An entry has `slug`, its path in the folder without the extension (`guides/intro`; an `index` file takes its folder's), `data`, `headings` (`{ depth, id, text }` in order, for a table of contents), `Content`, the component rendering its body, `words`, `readingTime` and `file`.
-- `words` counts the words of the rendered text, code blocks and Markdown inside a component's tags included, and a component's own output left out, since it only exists once a page renders; `readingTime` is the minutes at 230 words a minute, at least 1 for a body with words and 0 for an entry with none: `post.readingTime` gives `3`.
+- `words` counts the words of the rendered text, code blocks and Markdown inside a component's tags included, and a component's own output left out, since it only exists once a page renders; `readingTime` is the minutes at `markdown.readingSpeed` words a minute (230 by default), at least 1 for a body with words and 0 for an entry with none: `post.readingTime` gives `3`.
 - A data file's `headings` is empty, its `words` and `readingTime` are 0, and its `Content` renders nothing.
+- A `slug` in an entry's frontmatter, or in a data file, is its slug instead of its path, so a translated post gets its own: a path of non-empty parts, none `.` or `..`, with no backslash, control character, `?` or `#`, else the entry fails the collection at that line. In a localized collection it follows the locale's folder, `fr/hello.md` with `slug: bonjour` is `bonjour` in `fr`, and `translations` still pairs entries by equal slug. A schema that closes its fields lists `slug`; the file keeps its path in `file`.
 - Two files giving one slug, `guides.md` and `guides/index.md`, fail the collection.
 - Entries are the site's own content, trusted: their HTML, links and what a highlighter returns go out as written, unsanitised.
 
@@ -228,6 +229,8 @@ article
 - An entry it refuses, or one that does not parse, fails `kay check` at the field's line, and fails `kay build` and the first load.
 - Headings get ids, deduplicated, and link to themselves.
 - Bare URLs become links.
+- `markdown: { highlight, headingLinks, readingSpeed }` in `kay.config.ts` sets these once for every collection; a collection's option of the same name wins. `headingLinks: false` leaves a heading's text plain, its id kept, and `readingSpeed` is the words a minute `readingTime` counts at, 230 by default.
+- A relative image of an entry's body, `![A cat](./cat.png)` or `<img src="../cat.png">`, that sits inside the collection's folder and is a PNG, JPEG, WebP, GIF or AVIF is built as an asset and rendered as `image()` renders an imported one: a `srcset` of WebP and AVIF variants over `images.widths`, `sizes` of `100vw`, `width` and `height`, and lazy loading. An image the tag sizes itself (`width`, `height`, `srcset` or `sizes`), an animated GIF, an SVG, a URL, an absolute path, a missing file or one outside the folder (a `..` out of it, a symlink) is left as written.
 - `highlight: (code, language) => html` highlights code blocks as entries compile, at build time: it returns the whole `<pre>`, such as Shiki's `codeToHtml`, which the site depends on itself.
 - Without a highlighter, a block renders as `<pre><code class="language-ts">`.
 

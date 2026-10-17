@@ -65,6 +65,7 @@ Every option is optional. The tables give each option's default. The full refere
 | Option | Effect |
 | --- | --- |
 | `content` | The module exporting the collections, `src/content.config.ts` by default. See [Content](/guides/content) |
+| `markdown` | `highlight`, `headingLinks` and `readingSpeed` for every collection, which a collection's own option overrides. See [Content](/guides/content) |
 | `preview` | Lets an editor see drafts on the live site. `secret` signs the preview links, at least 32 random characters. `maxAge` is how long a visitor stays in preview mode, an hour by default |
 | `storage` | Where `files` keeps uploads: `diskFiles()` by default, or `s3Files()`. See [File storage](/guides/file-storage) |
 | `i18n` | `locales`, `defaultLocale`, and optionally `prefixDefault` or per-locale `domains`, and `paths` translating a page's path per locale. See [Internationalization](/guides/i18n) |
@@ -73,7 +74,7 @@ Every option is optional. The tables give each option's default. The full refere
 
 | Option | Effect |
 | --- | --- |
-| `images` | `quality`, `avif`, the share cards' look and logo (`card`), which extra directories (`dirs`) or hosts (`remote`) are resized, and the app's own lookup of private images (`resolve`, `guard`). See [Styling and assets](/essentials/styling-and-assets) |
+| `images` | `quality`, `widths`, `avif`, the share cards' look and logo (`card`), which extra directories (`dirs`) or hosts (`remote`) are resized, and the app's own lookup of private images (`resolve`, `guard`). See [Styling and assets](/essentials/styling-and-assets) |
 | `fonts` | Self-hosted fonts, from files or a Fontsource package |
 | `plugins` | Bun plugins the browser build runs, such as Tailwind's |
 | `budget` | The most JavaScript (`js`) and CSS (`css`) one page may load, compressed, as `'20kb'`. `kay build` warns with `over-budget` for a page over it. Both are off until set. See [Set a budget](/guides/performance#set-a-budget) |

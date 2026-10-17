@@ -1,8 +1,10 @@
 import { resolve } from 'node:path'
 import process from 'node:process'
 import { FILES_MARKER, loadedFiles } from '../check/loaded'
+import { loadConfig } from '../config'
 import { buildingWithoutEnv } from '../server/env-state'
 import { FEEDS_MARKER, PROBLEMS_MARKER, USES_MARKER } from './claims'
+import { setMarkdownDefaults } from './load'
 import { contentProblems } from './server'
 
 // Run by `kay check` in a process of its own, so the project's `.kay` loader never meets the checking process's: prints the content problems as JSON on a marked line, whatever else the content config logs.
@@ -10,6 +12,8 @@ const [root, config, site] = process.argv.slice(2)
 
 // The checking machine lacks the server's environment, as `kay build` does.
 buildingWithoutEnv()
+
+setMarkdownDefaults((await loadConfig(root!)).markdown)
 
 const { problems, uses, feeds, read } = await contentProblems(root!, config === undefined || config === '' ? undefined : config, site === 'site')
 

@@ -156,6 +156,18 @@ export default defineConfig({
 })
 ```
 
+### Widths and quality
+
+An image gets variants at 320, 640, 960, 1280, 1920, 2560 and 3840 pixels, those narrower than the image itself. `images.widths` sets another list: whole numbers from 1 to 16384, at most 16, in any order. A shorter list builds fewer files.
+
+`image(photo, { quality: 90 })` encodes that one image's variants at a quality of its own, for a photograph that shows banding at the default. `images.quality`, 80 by default, is the quality of all the others, and of the JPEG share cards too.
+
+```ts
+export default defineConfig({
+  images: { widths: [480, 960, 1440, 1920], quality: 75 },
+})
+```
+
 ### Images added at runtime
 
 An uploaded image is no import, so kay does not know where it sits. List the directory by the URL path your app serves it at.

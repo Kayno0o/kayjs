@@ -131,6 +131,8 @@ export interface RenderOptions {
   base?: string | undefined
   // `images.maxDensity`, written for the islands when it is not the default.
   maxDensity?: number | undefined
+  // `images.widths`, written for the islands when it is not the default.
+  imageWidths?: readonly number[] | undefined
   // Whether `images.resolve` is set, written for the islands.
   resolvedImages?: boolean | undefined
   // Times the guards, the imports, each load and the render in a `Server-Timing` header, as development always does.
@@ -849,7 +851,7 @@ function kayMetas(options: RenderOptions, hasIslands: boolean): string {
   if (!hasIslands)
     return base
 
-  return `${base}${options.maxDensity !== undefined && options.maxDensity !== DEFAULT_MAX_DENSITY ? `<meta name="kay-max-density" content="${options.maxDensity}">` : ''}${options.resolvedImages === true ? `<meta name="${RESOLVED_META}">` : ''}`
+  return `${base}${options.maxDensity !== undefined && options.maxDensity !== DEFAULT_MAX_DENSITY ? `<meta name="kay-max-density" content="${options.maxDensity}">` : ''}${options.imageWidths === undefined ? '' : `<meta name="kay-image-widths" content="${options.imageWidths.join(',')}">`}${options.resolvedImages === true ? `<meta name="${RESOLVED_META}">` : ''}`
 }
 
 function devScripts(client: ClientBuild): string {

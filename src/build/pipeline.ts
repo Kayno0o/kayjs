@@ -15,6 +15,7 @@ import { check, configCheckOptions } from '../check'
 import { pageSeoLints, unkeptPageLints } from '../check/seo'
 import { lintLevel } from '../compiler/lints'
 import { pageHooks } from '../config'
+import { setMarkdownDefaults } from '../content/load'
 import { writeContentManifests } from '../content/server'
 import { cacheDir, clientOptionsOf, resolveProject } from '../project'
 import { linkVariantFiles } from '../runtime/image'
@@ -361,6 +362,8 @@ async function outputStage(project: Project, exported: boolean, client: ClientBu
   report({ step: 'prerendering' })
 
   // Before prerendering, whose pages read the collections from what it writes.
+  setMarkdownDefaults(config.markdown)
+
   const entries = await writeContentManifests(root, paths.output, config.content)
 
   // A static host has no image route, so pages link the variant files the build writes, and no file route, so stored files where their store serves them.

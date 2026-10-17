@@ -1,6 +1,9 @@
 import { kayLog } from './log'
-// The widths an image is resized to, the only ones the image route makes: a fixed ladder keeps how many files one image can turn into bounded.
+// The widths an image is resized to unless `images.widths` says otherwise, the only ones the image route makes: a fixed ladder keeps how many files one image can turn into bounded.
 export const IMAGE_WIDTHS = [320, 640, 960, 1280, 1920, 2560, 3840] as const
+// The most widths `images.widths` may list, and the widest of them.
+export const MOST_WIDTHS = 16
+export const WIDEST = 16384
 // Below the ladder, the route also makes the multiples of this, for an image drawn at a fixed width: still a bounded number of files, none much wider than drawn.
 export const SMALL_STEP = 16
 // A `sizes` that is one length in pixels; `rem` and `em` follow the font size.
@@ -32,6 +35,7 @@ const LAST_WORD = /\S+$/
 // The density an image is loaded at past which a phone shows no difference, as `images.maxDensity` sets it.
 export const DEFAULT_MAX_DENSITY = 2
 const DENSITY_META = 'meta[name="kay-max-density"]'
+const WIDTHS_META = 'meta[name="kay-image-widths"]'
 
 export const RESOLVED_META = 'kay-resolved-images'
 
@@ -52,10 +56,12 @@ export interface ImageOptions {
   height?: number | undefined
   // The shape it is cut to, its middle kept: `'1/1'` for a square, `'16/9'`. Each variant is cut on the server, so a phone loads none of the pixels cut away; `images.aspects` lists the ones allowed.
   aspect?: string | undefined
+  // The WebP and AVIF quality of this image's variants, 1 to 100, over `images.quality`: `90` for a photograph that shows banding at the default. Each quality an image is asked for adds a file per width, so it is set where the default does not do.
+  quality?: number | undefined
 }
 
-// One file an image is turned into: a width of the ladder, cut to an aspect ratio or not, or the share card.
-export type ImageVariant = { width: number, aspect?: Aspect } | 'card'
+// One file an image is turned into: a width of the ladder, cut to an aspect ratio or not, at a quality of its own or not, or the share card.
+export type ImageVariant = { width: number, aspect?: Aspect, quality?: number } | 'card'
 
 // An aspect ratio in lowest terms, `[16, 9]`.
 export type Aspect = readonly [number, number]
@@ -65,6 +71,8 @@ const sizes = new Map<string, { width: number, height: number }>()
 // The variant `src` falls back to for a browser that ignores `srcset`.
 const FALLBACK_WIDTH = 1280
 let maxDensity: number | undefined
+// The widths `images.widths` sets, on the server; the browser reads them off the page.
+let ladder: readonly number[] | undefined
 // Refuses an aspect `images.aspects` does not list, set with it on the server; the browser checks none.
 let aspectCheck: ((aspect: Aspect, text: string) => void) | undefined
 // The variants of imported images that pages asked for beyond the ladder, by asset name, for `kay build` to write.
@@ -83,6 +91,45 @@ let resolved: boolean | undefined
 // `images.maxDensity` on the server; the browser reads it off the page, where the server wrote it unless it is the default.
 export function setMaxDensity(density: number): void {
   maxDensity = density
+}
+
+// The widths `images.widths` lists, sorted and without repeats; throws for anything but a list of whole numbers from 1 to 16384, at most 16 of them.
+export function parseWidths(widths: unknown): number[] {
+  if (!Array.isArray(widths) || widths.length === 0)
+    throw new Error('images.widths is a list of widths in pixels, such as `[480, 960, 1920]`, with at least one')
+
+  if (widths.length > MOST_WIDTHS)
+    throw new Error(`images.widths lists ${widths.length} widths, at most ${MOST_WIDTHS}: each one adds a file per image`)
+
+  for (const width of widths as unknown[]) {
+    if (typeof width !== 'number' || !Number.isInteger(width) || width < 1 || width > WIDEST)
+      throw new Error(`images.widths holds ${String(width)}: a width is a whole number of pixels from 1 to ${WIDEST}`)
+  }
+
+  return [...new Set(widths as number[])].sort((a, b) => a - b)
+}
+
+// `images.widths` on the server, the default ladder when none is given.
+export function setImageWidths(widths: readonly number[] | undefined): void {
+  ladder = widths === undefined ? undefined : parseWidths(widths)
+}
+
+// The widths the route makes, ascending: `images.widths`, which the browser reads off the page.
+export function imageWidths(): readonly number[] {
+  if (ladder === undefined && typeof document !== 'undefined') {
+    const content = document.querySelector<HTMLMetaElement>(WIDTHS_META)?.content
+
+    if (content !== undefined) {
+      try {
+        ladder = parseWidths(content.split(',').map(Number))
+      }
+      catch {
+        ladder = undefined
+      }
+    }
+  }
+
+  return ladder ?? IMAGE_WIDTHS
 }
 
 export function setResolvedImages(on: boolean): void {
@@ -173,9 +220,9 @@ export function variantHeight(width: number, [aspectWidth, aspectHeight]: Aspect
   return Math.min(most, Math.max(1, Math.round(width * aspectHeight / aspectWidth)))
 }
 
-// A card, a crop, or a width below `width`: the ladder's own widths aside, what a page asks for.
+// A card, a crop, a quality of its own, or a width below `width`: the ladder's own widths aside, what a page asks for.
 export function cutOrBelow(variant: ImageVariant, width: number): boolean {
-  return variant === 'card' || variant.aspect !== undefined || variant.width < width
+  return variant === 'card' || variant.aspect !== undefined || variant.quality !== undefined || variant.width < width
 }
 
 // What a variant's file name ends with, after the image's own name.
@@ -183,7 +230,7 @@ export function variantSuffix(variant: ImageVariant): string {
   if (variant === 'card')
     return '-card.jpg'
 
-  return `-${variant.width}${variant.aspect ? `-${aspectKey(variant.aspect)}` : ''}.webp`
+  return `-${variant.width}${variant.aspect ? `-${aspectKey(variant.aspect)}` : ''}${variant.quality === undefined ? '' : `-q${variant.quality}`}.webp`
 }
 
 // The variants pages asked for of the imported image `name`, beyond its ladder.
@@ -267,11 +314,12 @@ export function image(src: string, options: ImageOptions = {}): ImageProps {
   const aspect = options.aspect === undefined ? undefined : allowedAspect(options.aspect)
   const size = aspect ? croppedSize(own, aspect) : own
   const fixed = FIXED_SIZE.exec(options.sizes ?? '')
-  const widths = fixed ? fixedWidths(Number(fixed[1]), currentMaxDensity(), size.width) : [...IMAGE_WIDTHS.filter(width => width < size.width), size.width]
+  const quality = options.quality === undefined ? undefined : allowedQuality(options.quality)
+  const widths = fixed ? fixedWidths(Number(fixed[1]), currentMaxDensity(), size.width) : [...imageWidths().filter(width => width < size.width), size.width]
 
   return {
-    src: imageUrl(src, widths.findLast(width => width <= FALLBACK_WIDTH) ?? widths[0]!, aspect),
-    srcset: widths.map(width => `${imageUrl(src, width, aspect)} ${width}w`).join(', '),
+    src: imageUrl(src, widths.findLast(width => width <= FALLBACK_WIDTH) ?? widths[0]!, aspect, quality),
+    srcset: widths.map(width => `${imageUrl(src, width, aspect, quality)} ${width}w`).join(', '),
     sizes: cappedSizes(options.sizes ?? '100vw', currentMaxDensity()),
     width: size.width,
     height: size.height,
@@ -288,7 +336,16 @@ function fixedWidths(drawn: number, density: number, most: number): number[] {
 
 // The narrowest width the route makes at or above `width`, past the ladder the image's own.
 function routeWidth(width: number): number {
-  return width < IMAGE_WIDTHS[0] ? Math.max(1, Math.ceil(width / SMALL_STEP)) * SMALL_STEP : IMAGE_WIDTHS.find(step => step >= width) ?? Infinity
+  const steps = imageWidths()
+
+  return width < steps[0]! ? Math.max(1, Math.ceil(width / SMALL_STEP)) * SMALL_STEP : steps.find(step => step >= width) ?? Infinity
+}
+
+export function allowedQuality(quality: number): number {
+  if (!Number.isInteger(quality) || quality < 1 || quality > 100)
+    throw new Error(`kay: image() was given quality ${String(quality)}: a quality is a whole number from 1 to 100`)
+
+  return quality
 }
 
 function allowedAspect(text: string): Aspect {
@@ -434,12 +491,12 @@ export function shareCard(card: ShareCardOptions): string {
   return cardMaker(card.title, card.image)
 }
 
-export function imageUrl(src: string, width: number, aspect?: Aspect): string {
-  return variantUrl(src, aspect ? { width, aspect } : { width })
+export function imageUrl(src: string, width: number, aspect?: Aspect, quality?: number): string {
+  return variantUrl(src, { width, ...aspect && { aspect }, ...quality !== undefined && { quality } })
 }
 
 function variantUrl(src: string, variant: ImageVariant): string {
-  const query = variant === 'card' ? 'card' : `w=${variant.width}${variant.aspect ? `&crop=${aspectKey(variant.aspect)}` : ''}`
+  const query = variant === 'card' ? 'card' : `w=${variant.width}${variant.aspect ? `&crop=${aspectKey(variant.aspect)}` : ''}${variant.quality === undefined ? '' : `&q=${variant.quality}`}`
 
   return serverVariantUrl?.(src, variant) ?? `${IMAGE_ROUTE}?src=${encodeURIComponent(src)}&${query}`
 }
@@ -447,7 +504,7 @@ function variantUrl(src: string, variant: ImageVariant): string {
 // The file of a variant a static export wrote, recording the variants pages ask for beyond the ladder; nothing where the route serves it.
 function recordedVariantUrl(src: string, variant: ImageVariant): string | undefined {
   // A crop, a card or a width below the ladder, which only pages ask for.
-  const asked = cutOrBelow(variant, IMAGE_WIDTHS[0])
+  const asked = cutOrBelow(variant, imageWidths()[0]!)
 
   if (variantFiles && REMOTE.test(src)) {
     requestedRemote.set(src, (requestedRemote.get(src) ?? new Map<string, ImageVariant>()).set(variantSuffix(variant), variant))

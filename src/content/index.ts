@@ -15,7 +15,8 @@ import { child, localLinks } from '../runtime/html'
 import { localeState } from '../runtime/locale-state'
 import { previewing, previewState } from '../runtime/preview'
 import { isDraft } from './drafts'
-import { contentMode, loadEntries } from './load'
+import { sizedImages } from './images'
+import { contentMode, loadEntries, markdownOf } from './load'
 import { compileMarkdown, countWords, MarkdownError } from './markdown'
 import { ContentError, decodeEntries } from './validate'
 
@@ -32,7 +33,6 @@ export const COLLECTION = Symbol.for('kay.collection')
 declare const FEED_PATH: unique symbol
 // Loaded entries are kept until `invalidate()` or a restart unless the loader sets a `ttl`: about thirty years.
 const FOREVER = 1e9
-const WORDS_PER_MINUTE = 230
 
 export interface Entry<Data> {
   // The file's path in the collection without its extension, `guides/intro` for `guides/intro.md`; an `index` file takes its folder's.
@@ -42,7 +42,7 @@ export interface Entry<Data> {
   headings: Heading[]
   // The words of a Markdown entry's rendered text, none for a data file; see `readingTime`.
   words: number
-  // The minutes a Markdown entry takes to read at 230 words a minute, at least 1, 0 for a data file.
+  // The minutes a Markdown entry takes to read at `readingSpeed` words a minute, 230 by default, at least 1, 0 for a data file.
   readingTime: number
   // Renders a Markdown entry's body, the kay components it uses included; renders nothing for a data file.
   Content: Component
@@ -94,8 +94,12 @@ export interface CollectionOptions<Schema extends TSchema> {
   schema: Schema
   // The kay components a Markdown entry may use, by the name it writes them with: `<Callout type="warn">`.
   components?: Record<string, Component<never>> | undefined
-  // Highlights code blocks when the entries compile, at build time, such as with Shiki.
+  // Highlights code blocks when the entries compile, at build time, such as with Shiki; `kay.config.ts`'s `markdown.highlight` unless set here.
   highlight?: Highlighter | undefined
+  // Whether a heading links to itself, `kay.config.ts`'s `markdown.headingLinks` unless set here; on by default.
+  headingLinks?: boolean | undefined
+  // Words a minute `readingTime` counts at, `kay.config.ts`'s `markdown.readingSpeed` unless set here; 230 by default.
+  readingSpeed?: number | undefined
   // Entries left out everywhere but `kay dev` and preview mode: from `all()`, `get()`, prerendering, the sitemap and the feed. A boolean field's name, `'draft'`, leaves out those where it is true, which a CMS then reads and writes.
   draft?: ((entry: Entry<Static<Schema>>) => boolean) | BooleanField<Static<Schema>> | undefined
   // The order `all()` lists entries in; by slug otherwise.
@@ -148,7 +152,7 @@ export function collection<Schema extends TSchema, Components extends Record<str
   const raws = new WeakMap<Entries<Data>, RawEntry[]>()
   const { draft, localized = false } = options
 
-  const decodeEach = (raw: RawEntry[]) => decodeEntries(raw, options.schema, components, localized).map(({ entry, data }) => toEntry<Data>(entry, data as Data, components, localized))
+  const decodeEach = (raw: RawEntry[]) => decodeEntries(raw, options.schema, components, localized).map(({ entry, data }) => toEntry<Data>(entry, data as Data, components, localized, markdownOf(options).readingSpeed))
 
   // Sorts the entries and maps them by slug and locale, setting each one's translations.
   const indexed = (entries: Entry<Data>[]): Entries<Data> => {
@@ -183,7 +187,7 @@ export function collection<Schema extends TSchema, Components extends Record<str
 
   // Validated before `cached` keeps them, so entries the schema refuses are fetched again on the next read.
   const fetchLoaded = async (preview: boolean) => {
-    const raw = await compileLoaded(loader!, preview, options.highlight)
+    const raw = await compileLoaded(loader!, preview, markdownOf(options))
 
     decodeEntries(raw, options.schema, components)
 
@@ -191,7 +195,7 @@ export function collection<Schema extends TSchema, Components extends Record<str
   }
 
   const fromFolder = async () => {
-    loading ??= (async () => decode(await loadEntries(source as string, options.highlight)))()
+    loading ??= (async () => decode(await loadEntries(source as string, markdownOf(options).highlight, false, localized, markdownOf(options).headingLinks)))()
 
     try {
       return await loading
@@ -212,7 +216,7 @@ export function collection<Schema extends TSchema, Components extends Record<str
       let loads = preview.loads.get(key) as Promise<Entries<Data>> | undefined
 
       if (!loads)
-        preview.loads.set(key, loads = (async () => decode(await compileLoaded(loader!, true, options.highlight)))())
+        preview.loads.set(key, loads = (async () => decode(await compileLoaded(loader!, true, markdownOf(options))))())
 
       return loads
     }
@@ -321,7 +325,7 @@ export function collection<Schema extends TSchema, Components extends Record<str
 }
 
 // What a loader gives, compiled as files are: a Markdown body into segments and headings, HTML as one segment; two entries sharing a slug fail the collection.
-async function compileLoaded(loader: ContentLoader, preview: boolean, highlight: Highlighter | undefined): Promise<RawEntry[]> {
+async function compileLoaded(loader: ContentLoader, preview: boolean, markdown: ReturnType<typeof markdownOf>): Promise<RawEntry[]> {
   const given: unknown = await loader.load({ preview })
 
   if (!Array.isArray(given))
@@ -352,7 +356,7 @@ async function compileLoaded(loader: ContentLoader, preview: boolean, highlight:
 
     try {
       const fromHtml = typeof html === 'string' ? { segments: [html], headings: [], words: countWords(html) } : undefined
-      const compiled = typeof body === 'string' ? await compileMarkdown(body, 1, highlight) : fromHtml
+      const compiled = typeof body === 'string' ? await compileMarkdown(body, 1, markdown.highlight, markdown.headingLinks) : fromHtml
 
       entries.push({ slug, file, data, lines: {}, segments: compiled?.segments, headings: compiled?.headings, words: compiled?.words })
     }
@@ -381,7 +385,7 @@ function bySlugThenLocale(a: { slug: string, locale?: string | undefined }, b: {
   return a.locale! < b.locale! ? -1 : 1
 }
 
-function toEntry<Data>(entry: RawEntry, data: Data, components: Record<string, Component<never>>, localized: boolean): Entry<Data> {
+function toEntry<Data>(entry: RawEntry, data: Data, components: Record<string, Component<never>>, localized: boolean, readingSpeed: number): Entry<Data> {
   const segments = entry.segments ?? []
   const split = entry.slug.indexOf('/')
   const words = entry.words ?? 0
@@ -392,7 +396,7 @@ function toEntry<Data>(entry: RawEntry, data: Data, components: Record<string, C
     data,
     headings: entry.headings ?? [],
     words,
-    readingTime: words === 0 ? 0 : Math.max(1, Math.round(words / WORDS_PER_MINUTE)),
+    readingTime: words === 0 ? 0 : Math.max(1, Math.round(words / readingSpeed)),
     Content: () => render(segments, components, entry.file),
     file: entry.file,
   }
@@ -404,7 +408,7 @@ function render(segments: Segment[], components: Record<string, Component<never>
 
   for (const segment of segments) {
     if (typeof segment === 'string') {
-      markup += localLinks(segment)
+      markup += sizedImages(localLinks(segment))
 
       continue
     }

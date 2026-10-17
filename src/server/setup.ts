@@ -10,7 +10,7 @@ import type { Endpoint, Route, RouteMount } from './routes'
 import type { ProjectSource } from './source'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
-import { setContentMode } from '../content/load'
+import { setContentMode, setMarkdownDefaults } from '../content/load'
 import { projectCollections } from '../content/server'
 import { renderOptionsOf } from '../project'
 import { setSite } from '../runtime/site'
@@ -107,6 +107,9 @@ export async function setupPages(project: Project, loadClient: () => ClientBuild
 
     return { ...head, cards: await setupCards({ dir: join(client.dir, '..'), clientDir: client.dir, fonts, config: config.images?.card, logo: config.images?.card?.logo === undefined ? undefined : resolve(root, config.images.card.logo), name: config.seo?.name, defaultLocale: locales.settings.defaultLocale, quality: config.images?.quality, bundled: source.embedded, prebuilt: mode.prebuilt, collect: prerendering }) }
   }
+
+  setMarkdownDefaults(config.markdown)
+
   const [{ head, scripts, styles, cards }, collections] = await Promise.all([headAndCards(), projectCollections(root, config.content)])
 
   // A localized site's links are told of its pages and localized feeds, for the server and the static export alike.

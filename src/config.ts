@@ -2,6 +2,7 @@ import type { BunPlugin } from 'bun'
 import type { AnyElysia } from 'elysia'
 import type { BudgetConfig } from './build/budget'
 import type { LintLevels } from './compiler/lints'
+import type { Highlighter } from './content/markdown'
 import type { Duration } from './runtime/duration'
 import type { HeadTag } from './runtime/head'
 import type { Guard, GuardContext } from './runtime/index'
@@ -90,6 +91,8 @@ export interface KayConfig {
   trailingSlash?: TrailingSlash | undefined
   // The module exporting the project's content collections, `src/content.config.ts` by default; their folders are relative to it.
   content?: string | undefined
+  // How every collection's Markdown compiles; a collection's own option of the same name wins.
+  markdown?: MarkdownConfig | undefined
   // How long a stopping server gives open requests and streams to finish before closing them, seconds or a string such as '30s'; 10 seconds by default.
   shutdownTimeout?: Duration | undefined
   // Swaps the next page in place when a link or a form of the site is followed from a page with islands or forms posting to actions, so islands marked `persist` live on; on by default. `false` loads every page as a plain site does.
@@ -250,13 +253,24 @@ export interface OfflineConfig {
   fallback?: string | undefined
 }
 
+export interface MarkdownConfig {
+  // Highlights code blocks when the entries compile, at build time, such as with Shiki: `(code, language) => html`, the whole `<pre>`.
+  highlight?: Highlighter | undefined
+  // Whether a heading links to its own anchor, on by default; `false` leaves the heading's text plain, with its id.
+  headingLinks?: boolean | undefined
+  // Words a minute an entry's `readingTime` counts at, 230 by default.
+  readingSpeed?: number | undefined
+}
+
 export interface ImagesConfig {
   // Directories of images added at runtime, such as uploads, by the URL path the app serves them at: `{ '/uploads/': 'data/uploads' }`. The image route resizes those as well as imported images, reading them on each request; a directory is relative to the root, or where an executable runs.
   dirs?: Record<string, string> | undefined
   // Hosts whose images are resized too, each an origin and maybe a path, its host maybe starting with `*.` for any subdomain: `['https://cms.example.com/uploads/', 'https://*.cdn.example.com']`. The image route downloads them, keeping a copy it revalidates; a host not listed is refused, so the route is no open proxy.
   remote?: string[] | undefined
-  // WebP quality, 1 to 100. Defaults to 80.
+  // WebP quality, 1 to 100. Defaults to 80. It also sets the quality of the share cards' JPEG; `image(src, { quality })` sets one image's variants.
   quality?: number | undefined
+  // The widths in pixels `image()` resizes to and the route makes, whole numbers from 1 to 16384, at most 16, in any order: `[480, 960, 1440, 1920]`. Defaults to `[320, 640, 960, 1280, 1920, 2560, 3840]`. Each width is a file per image, so a short ladder builds fewer.
+  widths?: number[] | undefined
   // AVIF variants beside the WebP ones, a third to a half smaller, sent to a browser whose `Accept` names `image/avif`: on at quality 50 by default, `false` serves WebP alone. Development and a static export serve WebP.
   avif?: false | { quality?: number } | undefined
   // The most pixels per CSS pixel an image loads at on a denser screen, at least 1. Defaults to 2: a 3x phone loads what a 2x one does, which looks the same; `Infinity` leaves the browser's choice.
