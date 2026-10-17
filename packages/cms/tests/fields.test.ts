@@ -60,6 +60,11 @@ describe('fieldsOf', () => {
     expect(emptyValue(color!)).toBeUndefined()
   })
 
+  it('reads each kind customField refuses as a built-in one, never a custom one', () => {
+    for (const kind of ['text', 'textarea', 'markdown', 'number', 'integer', 'boolean', 'date', 'datetime', 'image', 'file', 'json', 'reference'])
+      expect(fieldsOf({ properties: { pick: { 'type': 'string', 'x-kay': { kind } } } })[0]?.kind).not.toBe('custom')
+  })
+
   it('treats a hint naming a kind that needs more than the hint as the app\'s own', () => {
     expect(fieldsOf({ properties: { pick: { 'type': 'string', 'x-kay': { kind: 'select' } } } })[0]).toMatchObject({ kind: 'custom', name: 'select' })
   })

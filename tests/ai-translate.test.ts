@@ -180,6 +180,22 @@ describe('kay i18n translate: messages', () => {
 })
 
 describe('kay i18n translate: entries', () => {
+  it('leaves a string field of a custom cms kind as it is, and translates the plain ones', async () => {
+    const config = 'import { t } from \'elysia\'\nimport { collection, customField } from \'kay/content\'\n\nexport const palette = collection(\'content/palette\', { schema: t.Object({ title: t.String(), color: customField(\'color\', t.String()), swatches: t.Array(customField(\'color\', t.String())), box: customField(\'box\', t.Object({ label: t.String() })) }), localized: true })\n'
+    const root = await project({ ...noMessages, 'src/content.config.ts': config, 'src/content/palette/en/main.md': '---\ntitle: Main\ncolor: "#ff0000"\nswatches: ["#00ff00"]\nbox:\n  label: Boxed\n---\nBody\n' })
+    const { asked } = await run(root, ['fr'], [{}])
+    const written = await read(root, 'src/content/palette/fr/main.md')
+
+    expect(written).toContain('title: FR Main')
+    expect(written).toContain('#ff0000')
+    expect(written).toContain('#00ff00')
+    expect(written).not.toContain('FR #')
+    expect(asked[0]!.messages[0]!.content).not.toContain('#ff0000')
+    expect(asked[0]!.messages[0]!.content).not.toContain('#00ff00')
+    expect(written).not.toContain('FR Boxed')
+    expect(asked[0]!.messages[0]!.content).not.toContain('Boxed')
+  })
+
   it('writes an entry of a collection with a draft field with that field true, other fields kept', async () => {
     const root = await project({ ...entries, ...noMessages })
     const { code } = await run(root, ['fr'], [{}, {}])

@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs'
-import { afterEach, describe, expect, test } from 'bun:test'
+import { afterEach, describe, expect, spyOn, test } from 'bun:test'
 import { cms } from '../src/extension'
 import { workingTree } from '../src/files'
 
@@ -68,5 +68,31 @@ describe('the dev tool\'s CMS tab', () => {
     delete process.env.KAY_DEV_CODE
 
     expect((await ask()).status).toBe(404)
+  })
+})
+
+describe('cms() missing field kinds', () => {
+  test('warns once the server starts for a custom kind the project has no component for', async () => {
+    const { server } = cms({ files: workingTree() })
+    const { registerCollections } = await import('../../../src/content/edit')
+    const config = await import('./fixture/src/content.config') as Record<string, unknown>
+    const before = registerCollections(Object.entries(config) as Parameters<typeof registerCollections>[0])
+    const cwd = process.cwd()
+    const warned = spyOn(console, 'warn').mockImplementation(() => undefined)
+    const app = (typeof server === 'function' ? await server() : server)!
+
+    try {
+      process.chdir(`${import.meta.dir}/fixture`)
+      app.listen(0)
+      await Bun.sleep(50)
+
+      expect(warned.mock.calls.map(call => String(call[0]))).toEqual(['kayjs-cms: no editor for the mood kind that products uses: add src/cms/fields/mood.kay, until then it is edited as JSON'])
+    }
+    finally {
+      await app.stop()
+      process.chdir(cwd)
+      warned.mockRestore()
+      registerCollections(before)
+    }
   })
 })

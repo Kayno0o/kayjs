@@ -36,8 +36,8 @@ export function cms(options: CmsOptions = {}): KayExtension {
           for (const line of missingKindLines(process.cwd(), await collections({ counts: false })))
             log.warn(line)
         }
-        catch {
-          // The collections' own errors are the pages' to report.
+        catch (error) {
+          log.warn('the collections could not be checked for field kinds with no component', error)
         }
       })
 

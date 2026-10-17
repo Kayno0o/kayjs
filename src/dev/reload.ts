@@ -62,7 +62,13 @@ const imports = new Map<string, Imports>()
 export function planReload({ root, changed, loaded, owned, content, config, entry }: ReloadInput): ReloadPlan {
   const real = realpathOf(root)
   // The components a library ships are modules too: one holding a glob of the app's files, `/src/cms/fields/*.kay` in kayjs-cms, follows a file added to it.
-  const modules = new Set(loaded.filter(file => file.endsWith('.kay') ? !file.startsWith(join(real, '.kay') + sep) : file.startsWith(real + sep) && !NOT_PROJECT.test(file.slice(real.length))))
+  const generated = join(real, '.kay') + sep
+  const modules = new Set(loaded.filter((file) => {
+    if (file.endsWith('.kay'))
+      return !file.startsWith(generated)
+
+    return file.startsWith(real + sep) && !NOT_PROJECT.test(file.slice(real.length))
+  }))
   const contentConfig = content === undefined ? undefined : realpathOf(content.file)
   const folders = (content?.folders ?? []).map(realpathOf)
   const kays = (file: string) => file.endsWith('.kay') || file === contentConfig || owned.some(dir => file.startsWith(dir + sep))
