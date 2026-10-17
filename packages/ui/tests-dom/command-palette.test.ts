@@ -160,7 +160,7 @@ describe('CommandPalette with siteSearch', () => {
     [`/_kay/search/build/0/w-${shard('sorting')}.json`]: { sorting: [1, 10], sort: [1, 2] },
     '/_kay/search/build/0/t-0.json': [
       { page: 'Table', href: '/table', text: 'The table page' },
-      { page: 'Table', heading: 'Sorting', href: '/table#sorting', text: 'Sort the table by a column' },
+      { page: 'Table', heading: 'Sorting', href: '/table#sorting', text: `Sort the table by a column. ${'Then read it. '.repeat(14)}Sort again, or sort once more.` },
     ],
   }
 
@@ -208,6 +208,7 @@ describe('CommandPalette with siteSearch', () => {
 
     expect(labels()).toEqual(['Table', '# In the pages', 'Sorting'])
     expect(root.querySelector('.kui-command-palette-snippet mark')?.textContent).toBe('table')
+    expect(root.querySelector('.kui-command-palette-more')).toBeNull()
 
     press(input()!, 'ArrowDown')
     await settle()
@@ -231,6 +232,7 @@ describe('CommandPalette with siteSearch', () => {
     await until(() => labels().includes('Sorting'))
 
     expect(marked()).toEqual(['Sort'])
+    expect(root.querySelector('.kui-command-palette-more')?.textContent).toBe('2 more matches')
 
     await search(input()!, 'column')
     await until(() => !labels().includes('Sorting'))

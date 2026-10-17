@@ -58,14 +58,14 @@ describe('paletteHits', () => {
     const snippet = [{ text: 'a ', hit: false }, { text: 'signal', hit: true }]
     const headingParts = [{ text: 'Signal', hit: true }, { text: 's', hit: false }]
     const hits = [
-      { page: 'Islands', heading: 'Signals', headingParts, href: '/islands/#signals', snippet, score: 3 },
-      { page: 'Islands', href: '/islands/', snippet, score: 2 },
-      { page: 'Forms', href: '/forms', snippet, score: 1 },
+      { page: 'Islands', heading: 'Signals', headingParts, href: '/islands/#signals', snippet, more: 2, score: 3 },
+      { page: 'Islands', href: '/islands/', snippet, more: 0, score: 2 },
+      { page: 'Forms', href: '/forms', snippet, more: 0, score: 1 },
     ]
 
     expect(paletteHits(hits, [{ label: 'Islands', group: 'Guides', href: '/islands' }])).toEqual([
-      { link: { label: 'Signals', group: 'Islands', href: '/islands/#signals' }, snippet, labelParts: headingParts },
-      { link: { label: 'Forms', group: '', href: '/forms' }, snippet },
+      { link: { label: 'Signals', group: 'Islands', href: '/islands/#signals' }, snippet, more: 2, labelParts: headingParts },
+      { link: { label: 'Forms', group: '', href: '/forms' }, snippet, more: 0 },
     ])
   })
 })

@@ -94,6 +94,7 @@ describe('search', () => {
       { text: 'install', hit: true },
       { text: ' again & again.', hit: false },
     ])
+    expect(hits.map(hit => hit.more)).toEqual([0, 0])
     expect(hits.map(hit => hit.headingParts)).toEqual([[{ text: 'Install', hit: true }, { text: 'ing the package', hit: false }], undefined])
   })
 
@@ -317,10 +318,46 @@ describe('the search index', () => {
       html: '<main><h1>CLI</h1><h2 id="mcp">kay mcp</h2><p>Serves the project.</p><h2 id="one">MCP</h2><p>Alone.</p></main>',
     }, {
       path: '/guide',
-      html: '<main><h1>The MCP endpoint and every tool an agent may call</h1><p>Agents.</p></main>',
+      html: '<main><h1>The MCP endpoint and every tool an agent may call</h1><p>Agents call MCP tools.</p></main>',
     }])
 
     expect((await search(dir, 'mcp')).hits.map(hit => hit.href)).toEqual(['/guide', '/cli#one', '/cli#mcp', '/upgrading#long'])
+  })
+
+  it('ranks the sections of the page about a word before one naming it once, below a heading naming it', async () => {
+    const dir = await index([{
+      path: '/other',
+      html: '<main><h1>Other</h1><p>Once a tool.</p><h2 id="a">Alpha</h2><p>Nothing.</p><h2 id="b">Beta</h2><p>Nothing.</p><h2 id="c">Gamma</h2><p>Nothing.</p></main>',
+    }, {
+      path: '/tools',
+      html: '<main><h1>Agents</h1><p>A tool.</p><h2 id="a">Calling</h2><p>Call a tool.</p><h2 id="b">Naming</h2><p>Name a tool.</p></main>',
+    }, {
+      path: '/named',
+      html: '<main><h1>Named</h1><h2 id="t">Tool</h2><p>Nothing.</p><h2 id="x">Extra</h2><p>Nothing.</p><h2 id="y">More</h2><p>Nothing.</p></main>',
+    }])
+
+    expect((await search(dir, 'tool')).hits.map(hit => hit.href)).toEqual(['/named#t', '/tools', '/tools#a', '/tools#b', '/other'])
+  })
+
+  it('finds a word by most of it nearly as well as by the word itself, a page titled with its plural before a heading naming it', async () => {
+    const dir = await index([{
+      path: '/guide',
+      html: '<main><h1>Guide</h1><h2 id="props">Props to an island</h2><p>Pass objects.</p></main>',
+    }, {
+      path: '/islands',
+      html: '<main><h1>Islands</h1><p>Hydrated parts.</p></main>',
+    }])
+
+    expect((await search(dir, 'island')).hits.map(hit => hit.href)).toEqual(['/islands', '/guide#props'])
+  })
+
+  it('counts the words searched for past the snippet', async () => {
+    const dir = await index([{ path: '/long', html: `<main><h1>Long</h1><p>Needle first. ${'filler '.repeat(40)}needles again, a needle, and a pin.</p></main>` }])
+    const [hit] = (await search(dir, 'needle')).hits
+
+    expect(hit!.snippet.filter(part => part.hit)).toHaveLength(1)
+    expect(hit!.more).toBe(2)
+    expect((await search(dir, 'needle pin')).hits[0]!.more).toBe(3)
   })
 
   it('leaves out a button\'s label, parting the words around it, but for a heading written as one', async () => {

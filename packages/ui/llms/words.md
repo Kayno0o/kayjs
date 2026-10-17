@@ -16,7 +16,7 @@ Every text kayjs-ui shows by default is looked up in the app's catalogs (`src/me
 
 - `ui.barList.*`: `emptyLabel` (`No data yet.`), `empty` (the deprecated name of the same key, still read after `emptyLabel`)
 - `ui.carousel.*`: `dotLabel` (`Go to slide {n}`), `label` (`Carousel`), `nextLabel` (`Next slide`), `pauseLabel` (`Pause`), `playLabel` (`Play`), `previousLabel` (`Previous slide`), `slideLabel` (`Slide {n} of {count}`)
-- `ui.commandPalette.*`: `emptyLabel` (`No results`), `label` (`Search`), `placeholder` (`Search`), `recentLabel` (`Recent`), `resultsLabel` (`{count} results, `1 result` for one`), `siteSearchError` (`The pages could not be searched`), `siteSearchLabel` (`In the pages`)
+- `ui.commandPalette.*`: `emptyLabel` (`No results`), `label` (`Search`), `placeholder` (`Search`), `recentLabel` (`Recent`), `resultsLabel` (`{count} results, `1 result` for one`), `siteSearchError` (`The pages could not be searched`), `siteSearchLabel` (`In the pages`), `siteSearchMore` (`{count} more matches`, `1 more match` for one)
 - `ui.confirmDelete.*`: `cancelLabel` (`Cancel`), `confirmLabel` (`Confirm`), `deleteLabel` (`Delete`), `pendingLabel` (`Deleting…`), `title` (`Confirm Deletion`)
 - `ui.contributionGraph.*`: `label` (`Contributions`)
 - `ui.copyButton.*`: `copiedLabel` (`Copied!`), `failure` (`Could not copy to the clipboard`)

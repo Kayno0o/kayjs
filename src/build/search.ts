@@ -32,6 +32,8 @@ const PAGE_WEIGHT = 6
 const TEXT_WEIGHT = 2
 // A word of a title or heading counts up to this much more as it makes up more of it: `kay mcp` before `An API route is an MCP tool only when...`, a heading staying below a title.
 const FOCUS_WEIGHT = 1.5
+// A word counts up to this much more in every section of a page the more of its sections hold it, so the page about it comes before one naming it once, below any heading naming it.
+const TOPIC_WEIGHT = 2
 // A word repeated in a text counts a little more, up to four times.
 const REPEAT_WEIGHT = 0.5
 const REPEATS = 4
@@ -106,15 +108,24 @@ export async function writeSearchIndex(clientDir: string, pages: SearchPage[]): 
     const all: SearchSection[] = []
 
     for (const { sections, weight } of read) {
-      for (const section of sections) {
-        for (const [word, score] of sectionScores(section, sections[0]!.page, section === sections[0], weight)) {
-          const postings = words.get(word) ?? []
+      const scored = sections.map(section => sectionScores(section, sections[0]!.page, section === sections[0]))
+      const holding = new Map<string, number>()
 
-          postings.push(all.length, score)
+      for (const { own } of scored) {
+        for (const word of own)
+          holding.set(word, (holding.get(word) ?? 0) + 1)
+      }
+
+      for (const [index, { scores }] of scored.entries()) {
+        for (const [word, score] of scores) {
+          const postings = words.get(word) ?? []
+          const topic = TOPIC_WEIGHT * (holding.get(word) ?? 0) / sections.length
+
+          postings.push(all.length, Math.round((score + topic) * weight * 10) / 10)
           words.set(word, postings)
         }
 
-        all.push(section)
+        all.push(sections[index]!)
       }
     }
 
@@ -171,9 +182,10 @@ export async function writeSearchIndex(clientDir: string, pages: SearchPage[]): 
   await Bun.write(join(clientDir, SEARCH_MANIFEST.slice(ASSET_PREFIX.length)), JSON.stringify(manifest))
 }
 
-// Each word of a section with what it is worth there, the best place it is found deciding.
-function sectionScores(section: SearchSection, page: string, top: boolean, weight: number): Map<string, number> {
+// Each word of a section with what it is worth there, the best place it is found deciding, and the words of its own heading and text, its page's title aside.
+function sectionScores(section: SearchSection, page: string, top: boolean): { scores: Map<string, number>, own: Set<string> } {
   const scores = new Map<string, number>()
+  const own = new Set<string>()
   const add = (text: string | undefined, worth: (count: number, share: number) => number) => {
     const words = searchWords(text ?? '').filter(word => word.length >= MIN_WORD)
     const counts = new Map<string, number>()
@@ -189,10 +201,12 @@ function sectionScores(section: SearchSection, page: string, top: boolean, weigh
   add(section.heading, (_, share) => HEADING_WEIGHT + FOCUS_WEIGHT * share)
   add(section.text, count => TEXT_WEIGHT + REPEAT_WEIGHT * (Math.min(count, REPEATS) - 1))
 
-  for (const [word, score] of scores)
-    scores.set(word, Math.round(score * weight * 10) / 10)
+  for (const word of searchWords(`${section.heading ?? ''} ${section.text}`)) {
+    if (word.length >= MIN_WORD)
+      own.add(word)
+  }
 
-  return scores
+  return { scores, own }
 }
 
 // The page's language, its title and its sections: the text above its first `h2` to `h4`, then each of those with the text under it, read from its `main`, or its `body` without one.

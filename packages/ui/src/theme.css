@@ -511,6 +511,10 @@
     @apply line-clamp-2 text-xs text-kui-subtext0;
   }
 
+  .kui-command-palette-more {
+    @apply text-xs text-kui-subtext0;
+  }
+
   .kui-command-palette-text :where(mark) {
     @apply bg-transparent font-semibold text-kui-accent;
   }

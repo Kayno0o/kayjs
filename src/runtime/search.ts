@@ -17,7 +17,7 @@ const MARK = /\p{M}/gu
 // Characters of text kept on either side of the first word found.
 const SNIPPET_BEFORE = 50
 const SNIPPET_LENGTH = 160
-// A word only starting with what was typed counts for less than the word itself.
+// A word only starting with what was typed counts for less than the word itself, the more so the less of it was typed: `island` finds `Islands` nearly as well as `island`.
 const PREFIX_FACTOR = 0.7
 
 export interface SearchManifest {
@@ -49,6 +49,8 @@ export interface SearchHit {
   href: string
   // About a line of the text around the first word found, each part saying whether it is one searched for.
   snippet: SearchPart[]
+  // How many more words searched for the text holds past its snippet.
+  more: number
   score: number
 }
 
@@ -132,7 +134,7 @@ export async function searchSite(query: string, options: SearchOptions = {}): Pr
   return best.map(([section, score]) => {
     const { page, heading, href, text } = chunks.get(Math.floor(section / SEARCH_CHUNK))![section % SEARCH_CHUNK]!
 
-    return { page, ...heading !== undefined && { heading, headingParts: marked(heading, wordHits(heading, terms), 0, heading.length) }, href, snippet: snippet(text, terms), score }
+    return { page, ...heading !== undefined && { heading, headingParts: marked(heading, wordHits(heading, terms), 0, heading.length) }, href, ...snippet(text, terms), score }
   })
 }
 
@@ -153,7 +155,7 @@ async function termScores(dir: string, shards: Set<string>, term: string): Promi
     if (!word.startsWith(term))
       continue
 
-    const factor = word === term ? 1 : PREFIX_FACTOR
+    const factor = word === term ? 1 : PREFIX_FACTOR + (1 - PREFIX_FACTOR) * term.length / word.length
 
     for (let i = 0; i < postings.length; i += 2) {
       const score = postings[i + 1]! * factor
@@ -203,13 +205,16 @@ function fold(text: string): string {
   return text.normalize('NFKD').replace(MARK, '').replace(INVISIBLE, '').toLowerCase()
 }
 
-// About a line around the first word found, each word starting as a term does marked.
-function snippet(text: string, terms: string[]): SearchPart[] {
+// About a line around the first word found, each word starting as a term does marked, and how many such words lie past it.
+function snippet(text: string, terms: string[]): { snippet: SearchPart[], more: number } {
   const hits = wordHits(text, terms)
   const start = Math.max(0, (hits[0]?.[0] ?? 0) - SNIPPET_BEFORE)
   const end = Math.min(text.length, start + SNIPPET_LENGTH)
 
-  return [...start > 0 ? [{ text: '…', hit: false }] : [], ...marked(text, hits, start, end), ...end < text.length ? [{ text: '…', hit: false }] : []]
+  return {
+    snippet: [...start > 0 ? [{ text: '…', hit: false }] : [], ...marked(text, hits, start, end), ...end < text.length ? [{ text: '…', hit: false }] : []],
+    more: hits.filter(([hitStart]) => hitStart >= end).length,
+  }
 }
 
 // Where each word starting as a term does sits in the text, by the term's length.

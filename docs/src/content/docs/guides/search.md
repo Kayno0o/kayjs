@@ -54,13 +54,19 @@ Each hit links a section of a page. A section is the text above its first `h2`, 
 
 A query needs all its words. Each is found as a word or the start of one, with case and accents ignored.
 
-Each hit has `page`, `heading`, `headingParts`, `href`, `snippet` and a `score`. `heading` is `undefined` for the text above the first heading. `headingParts` is the heading in parts, as `snippet` is, so you can mark the words found in it too.
+Each hit has `page`, `heading`, `headingParts`, `href`, `snippet`, `more` and a `score`. `heading` is `undefined` for the text above the first heading. `headingParts` is the heading in parts, as `snippet` is, so you can mark the words found in it too. `more` counts the words found in the text past the snippet.
 
 `searchResults(query, { limit })` returns at most `limit` hits, 20 by default. `searchSite(query, options)` from `kay` is the same search as a promise, for a script. Both return no hits on the server.
 
 ### How hits are ranked
 
-A section is scored for each word of the query, and the scores add up. A word in the page's title counts most, then one in a heading, then one in the text. In a title or a heading, a word counts a little more when it makes up more of it. A search for `mcp` finds a heading `kay mcp` before a long one that names MCP among ten other words. A word found whole counts more than one that only starts a longer word. A page's `weight` multiplies its scores.
+A section is scored for each word of the query, and the scores add up. A word in the page's title counts most, then one in a heading, then one in the text.
+
+In a title or a heading, a word counts a little more when it makes up more of it. A search for `mcp` finds a heading `kay mcp` before a long one that names MCP among ten other words.
+
+A word found whole counts more than one that only starts a longer word, and the less of that word you typed, the less it counts: `island` finds a page titled Islands nearly as well as a heading naming an island.
+
+A page whose sections often hold a word is about it, so each of its sections counts a little more for that word. This lifts the guide about a topic above a page naming it once, but never above a heading naming it. A page's `weight` multiplies its scores.
 
 Hits come best first. Two with the same score keep their order in the site.
 

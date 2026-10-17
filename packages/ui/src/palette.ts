@@ -116,13 +116,14 @@ export interface PaletteHit {
   link: PaletteLink
   snippet: SearchHit['snippet']
   labelParts?: SearchHit['headingParts']
+  more: number
 }
 
 // The site search's hits as links, but for those leading where one of `matches` already does, with or without a trailing slash; a section under a heading is listed under its page.
 export function paletteHits(hits: SearchHit[], matches: PaletteEntry[]): PaletteHit[] {
   const linked = new Set(matches.filter(isPaletteLink).map(link => withoutSlash(link.href)))
 
-  return hits.filter(hit => !linked.has(withoutSlash(hit.href))).map(hit => ({ link: { label: hit.heading ?? hit.page, group: hit.heading === undefined ? '' : hit.page, href: hit.href }, snippet: hit.snippet, ...hit.headingParts && { labelParts: hit.headingParts } }))
+  return hits.filter(hit => !linked.has(withoutSlash(hit.href))).map(hit => ({ link: { label: hit.heading ?? hit.page, group: hit.heading === undefined ? '' : hit.page, href: hit.href }, snippet: hit.snippet, more: hit.more, ...hit.headingParts && { labelParts: hit.headingParts } }))
 }
 
 // `recent` with `href` moved to the front, at most `limit` long.

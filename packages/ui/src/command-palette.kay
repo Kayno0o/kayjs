@@ -7,7 +7,7 @@ import Icon from './icon.kay'
 import { isPaletteLink, paletteHits, paletteMatches, paletteSections, withRecent } from './palette'
 import { wording } from 'kay/words'
 
-const { open = false, onOpenChange, entries, groups = [], recent = [], onRecentChange, hotkey = 'k', siteSearch = false, siteSearchLabel = wording('ui.commandPalette.siteSearchLabel', 'In the pages'), siteSearchError = wording('ui.commandPalette.siteSearchError', 'The pages could not be searched'), label = wording('ui.commandPalette.label', 'Search'), placeholder = wording('ui.commandPalette.placeholder', 'Search'), emptyLabel = wording('ui.commandPalette.emptyLabel', 'No results'), recentLabel = wording('ui.commandPalette.recentLabel', 'Recent'), resultsLabel, class: className } = props<{
+const { open = false, onOpenChange, entries, groups = [], recent = [], onRecentChange, hotkey = 'k', siteSearch = false, siteSearchLabel = wording('ui.commandPalette.siteSearchLabel', 'In the pages'), siteSearchError = wording('ui.commandPalette.siteSearchError', 'The pages could not be searched'), label = wording('ui.commandPalette.label', 'Search'), placeholder = wording('ui.commandPalette.placeholder', 'Search'), emptyLabel = wording('ui.commandPalette.emptyLabel', 'No results'), recentLabel = wording('ui.commandPalette.recentLabel', 'Recent'), resultsLabel, siteSearchMore, class: className } = props<{
   // Shows the palette; the hotkey opens and closes it too, and `onOpenChange` reports every change for a parent driving it.
   open?: boolean | undefined
   onOpenChange?: ((open: boolean) => void) | undefined
@@ -31,6 +31,8 @@ const { open = false, onOpenChange, entries, groups = [], recent = [], onRecentC
   recentLabel?: string | undefined
   // How many rows a query lists, as screen readers hear it.
   resultsLabel?: ((count: number) => string) | undefined
+  // How many more times a section found holds the words searched for, past the line shown.
+  siteSearchMore?: ((count: number) => string) | undefined
   class?: string | undefined
 }>()
 
@@ -40,10 +42,12 @@ interface Row {
   index: number
   snippet?: SearchHit['snippet'] | undefined
   labelParts?: SearchHit['headingParts'] | undefined
+  more?: number | undefined
 }
 
 const id = uid()
 const counted = resultsLabel ?? ((count: number) => wording('ui.commandPalette.resultsLabel', count === 1 ? '1 result' : '{count} results', { count }))
+const countedMore = siteSearchMore ?? ((count: number) => wording('ui.commandPalette.siteSearchMore', count === 1 ? '1 more match' : '{count} more matches', { count }))
 const shown = signal(open)
 const followedRecently = signal<string[]>(recent)
 const query = signal('')
@@ -65,7 +69,7 @@ const sections = memo(() => {
 
   const matches = paletteMatches(entries, query(), groups)
   const found = numbered(matches)
-  const hits = paletteHits(site?.hits() ?? [], matches).map(hit => ({ entry: hit.link, index: index++, snippet: hit.snippet, labelParts: hit.labelParts }))
+  const hits = paletteHits(site?.hits() ?? [], matches).map(hit => ({ entry: hit.link, index: index++, snippet: hit.snippet, labelParts: hit.labelParts, more: hit.more }))
 
   return hits.length > 0 ? [{ group: null, rows: found }, { group: siteSearchLabel, rows: hits }] : [{ group: null, rows: found }]
 })
@@ -195,6 +199,8 @@ dialog.kui-command-palette(ref={element => dialog = element} closedby="any" aria
                           mark {part.text}
                         else
                           | {part.text}
+                    if row.more as more
+                      span.kui-command-palette-more {countedMore(more)}
                 else
                   span.kui-command-palette-label {row.entry.label}
                 if query().trim() && row.entry.group
