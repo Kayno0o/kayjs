@@ -1413,6 +1413,10 @@ export function spread(element: Element, sources: () => readonly object[], conte
       else if (handlerName(name)) {
         continue
       }
+      // A function that is no handler, such as a slot given to the component, has no attribute form.
+      else if (typeof value === 'function' && name !== 'class' && name !== 'style') {
+        continue
+      }
       else if (name === 'class') {
         setClass(element, value)
       }

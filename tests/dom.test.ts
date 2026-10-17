@@ -1827,6 +1827,27 @@ describe('named slots', () => {
   })
 })
 
+describe('an undeclared slot spread onto an element', () => {
+  const mount33 = site({
+    'box.kay': '---\nconst { ...rest } = props<{ [name: string]: unknown }>()\n---\ndiv.box({...rest})\n',
+    'main.kay': '---\nimport Box from \'./box.kay\'\n---\nBox(title="t")\n  @extra\n    p Extra\n',
+  })
+
+  it('leaves out a function value that is no handler, writing no attribute', async () => {
+    const { root, dispose } = await mount33()
+
+    try {
+      const box = root.querySelector('.box')!
+
+      expect(box.getAttribute('title')).toBe('t')
+      expect(box.hasAttribute('extra')).toBe(false)
+    }
+    finally {
+      await dispose()
+    }
+  })
+})
+
 describe('template consts', () => {
   const mount33 = site({
     'main.kay': '---\nimport { signal } from \'kay\'\n\nconst n = signal(1)\n---\nconst double = n * 2\nbutton#up(onClick={() => n.set(c => c + 1)}) {double}\ndiv\n  p\n    const label = \'p\' + n\n    b {label}\n    i(title={label}) {double}\n  span\n    const label = \'s\' + double\n    | {label}\nif n > 1\n  const { big } = { big: n * 10 }\n  em {big}\n',
