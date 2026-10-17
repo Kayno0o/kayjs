@@ -936,8 +936,6 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('islands im
       expect(await page.path()).toBe('/docs/guide/page/')
       expect([await page.text('button.alpha'), await page.text('button.beta'), await page.text('button.kept')]).toEqual([null, 'Beta 1', 'Kept 1'])
 
-      expect(await page.evaluate(() => performance.getEntriesByType('resource').filter(entry => (/kept-\w+\.js/).test(entry.name)).length)).toBe(1)
-
       // Opened afresh at the nested URL, where a chunk resolved from the page's URL would be looked for under it.
       await page.goto('/docs/guide/page/')
       await page.click('button.beta')

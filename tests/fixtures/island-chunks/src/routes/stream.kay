@@ -1,0 +1,12 @@
+--- server
+const reply = Promise.resolve('done')
+--- script
+import Alpha from '../components/alpha.kay'
+---
+h1 Stream
+// kay-allow uncaught-await
+await reply
+  p.pending Waiting
+then text
+  p.text {text}
+  Alpha

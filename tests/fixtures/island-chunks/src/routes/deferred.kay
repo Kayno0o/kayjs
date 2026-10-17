@@ -1,0 +1,5 @@
+--- script
+import Fresh from '../components/fresh.kay'
+---
+h1 Deferred
+Fresh(server="defer")

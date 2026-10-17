@@ -1,0 +1,9 @@
+--- script
+import Alpha from '../components/alpha.kay'
+import Panel from '../components/panel.kay'
+---
+h1 Slots
+Panel
+  Alpha
+Panel(hydrate="client")
+  Alpha

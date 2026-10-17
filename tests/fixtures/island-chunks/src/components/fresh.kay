@@ -1,0 +1,5 @@
+---
+import Alpha from './alpha.kay'
+---
+p.fresh Fresh
+Alpha

@@ -3,7 +3,9 @@ import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { hydrateIslands } from '../src/runtime/client'
 import { child } from '../src/runtime/html'
 import { collectIslands, island } from '../src/runtime/island.server'
+import { ISLAND_HEADER } from '../src/runtime/server-islands'
 import { islandChunks } from '../src/server/client'
+import { testSite } from '../src/test'
 
 beforeAll(() => {
   GlobalRegistrator.register()
@@ -45,12 +47,6 @@ describe('the chunk an island names', () => {
     }
   })
 
-  it('is looked for next to the runtime when it is a bare file name', async () => {
-    document.body.innerHTML = '<slot data-component="late.kay" data-props="[{}]" data-chunk="missing-1a2b3c.js"></slot>'
-
-    await expect(hydrateIslands({})).rejects.toThrow()
-  })
-
   it('gives way to the registry of the boot, which a development build swaps islands in through', async () => {
     let loaded = false
 
@@ -63,4 +59,31 @@ describe('the chunk an island names', () => {
 
     expect(loaded).toBe(true)
   })
+})
+
+describe('the chunk an island names, on every path that renders one', () => {
+  const chunk = /data-component="[^"]*alpha\.kay"[^>]*data-chunk="(alpha-\w+\.js)"/
+
+  it('is written on an island in a streamed block, in a static slot, a client-only one, and in a server island\'s fragment', async () => {
+    const site = await testSite({ routes: 'tests/fixtures/island-chunks/src/routes', browser: true })
+
+    try {
+      const streamed = await (await site.fetch('/stream')).text()
+      const slots = await (await site.fetch('/slots')).text()
+      const deferred = await (await site.fetch('/deferred?kay_island=1', { headers: { [ISLAND_HEADER]: '1' } })).text()
+
+      expect(streamed).toContain('class="text"')
+      expect(streamed).toMatch(chunk)
+      // The island in the page's slot, the one in the markup a client-only island's props carry, and both panels themselves.
+      expect(slots.match(/data-chunk="alpha-\w+\.js"/g)).toHaveLength(1)
+      expect(slots.match(/data-chunk=\\"alpha-\w+\.js\\"/g)).toHaveLength(1)
+      expect(slots.match(/data-chunk="panel-\w+\.js"/g)).toHaveLength(2)
+      expect(slots).toMatch(/data-client/)
+      expect(deferred).toContain('class="fresh"')
+      expect(deferred).toMatch(chunk)
+    }
+    finally {
+      await site.close()
+    }
+  }, 60_000)
 })

@@ -1,0 +1,10 @@
+---
+import type { JSX } from 'kay'
+
+const { children: _children } = props<{ children?: JSX.Element }>()
+const open = signal(true)
+---
+section.panel
+  button.toggle(onClick={() => open.set(!open())}) Toggle
+  if open()
+    slot

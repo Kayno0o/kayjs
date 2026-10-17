@@ -161,7 +161,7 @@ async function fetchServerIsland(registry: IslandRegistry, element: HTMLElement)
 }
 
 // The chunk file the server named in an island's markup sits beside this runtime, so the page's URL and the site's base do not matter.
-// Only a bare file name is imported: an island's markup may come from content, and no other URL may be reached through it.
+// Only a bare file name is imported: an island's markup may come from content, and it can never name another origin or folder.
 const CHUNK_FILE = /^[^/\\:?#%]+\.js$/
 
 async function hydrateIsland(registry: IslandRegistry, element: HTMLElement): Promise<void> {
