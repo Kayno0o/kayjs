@@ -56,7 +56,7 @@ export interface ImageOptions {
   height?: number | undefined
   // The shape it is cut to, its middle kept: `'1/1'` for a square, `'16/9'`. Each variant is cut on the server, so a phone loads none of the pixels cut away; `images.aspects` lists the ones allowed.
   aspect?: string | undefined
-  // The WebP and AVIF quality of this image's variants, 1 to 100, over `images.quality`: `90` for a photograph that shows banding at the default. Each quality an image is asked for adds a file per width, so it is set where the default does not do.
+  // The WebP quality of this image's variants, 1 to 100, over `images.quality`, its AVIF one moving the same step from `images.avif`'s: `90` for a photograph that shows banding at the default. Each quality an image is asked for adds a file per width, so it is set where the default does not do.
   quality?: number | undefined
 }
 

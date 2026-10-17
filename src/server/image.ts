@@ -91,7 +91,17 @@ function acceptsAvif(accept: string | null): boolean {
   }) ?? false
 }
 
-// `source` is a path, or an image already decoded, such as to an uncompressed PNG.
+// The quality a variant is encoded at in a format: its own for WebP, and for AVIF the same step above the AVIF default as it is above the WebP one, as AVIF at the WebP number would be larger than it needs to be.
+export function variantLevel(variant: number | ImageVariant, format: VariantFormat, webp: number, avif: number): number {
+  const own = typeof variant === 'object' ? variant.quality : undefined
+
+  if (format === 'webp')
+    return own ?? webp
+
+  return own === undefined ? avif : Math.min(100, Math.max(1, own + avif - webp))
+}
+
+// `source` is a path, or an image already decoded, such as to an uncompressed PNG. `quality` is the one to encode at, see `variantLevel`.
 export async function writeVariant(source: string | Blob | Uint8Array, variant: number | ImageVariant, target: string, quality = DEFAULT_QUALITY, format: VariantFormat = 'webp'): Promise<void> {
   // Read through Bun.file, which also reaches the files an executable embeds, where Bun.Image given a path does not.
   const file = typeof source === 'string' ? await decodable(Bun.file(source)) : source
@@ -104,10 +114,9 @@ export async function writeVariant(source: string | Blob | Uint8Array, variant: 
       return
     }
 
-    const level = shape.quality ?? quality
     const image = shape.aspect ? new Bun.Image(await coverImage(file, shape.width, variantHeight(shape.width, shape.aspect))) : new Bun.Image(file).resize(shape.width, undefined, { withoutEnlargement: true })
 
-    await (format === 'avif' ? Bun.write(partial, await encodeAvif(image, level)) : image.webp({ quality: level }).write(partial))
+    await (format === 'avif' ? Bun.write(partial, await encodeAvif(image, quality)) : image.webp({ quality }).write(partial))
   })
 }
 
@@ -136,7 +145,7 @@ export async function writeImageVariants(clientDir: string, quality = DEFAULT_QU
     // A width below the ladder a page asked for may be the image's own, written already.
     const variants = [...imageWidths().filter(step => step < width), width, ...requestedVariants(name).filter(variant => cutOrBelow(variant, width))]
     // The share card stays a JPEG, which social sites read best.
-    const encodings = variants.flatMap(variant => [{ variant, format: 'webp' as const, level: String(typeof variant === 'object' ? variant.quality ?? quality : quality) }, ...avif === undefined || variant === 'card' ? [] : [{ variant, format: 'avif' as const, level: `${typeof variant === 'object' ? variant.quality ?? avif : avif}s${AVIF_SPEED}-${AVIF_ENCODER}` }]])
+    const encodings = variants.flatMap(variant => [{ variant, format: 'webp' as const, level: String(variantLevel(variant, 'webp', quality, avif ?? DEFAULT_AVIF_QUALITY)) }, ...avif === undefined || variant === 'card' ? [] : [{ variant, format: 'avif' as const, level: `${variantLevel(variant, 'avif', quality, avif)}s${AVIF_SPEED}-${AVIF_ENCODER}` }]])
     const missing: { variant: number | ImageVariant, format: VariantFormat, target: string, cached: string | undefined }[] = []
 
     await Promise.all(encodings.map(async ({ variant, format, level }) => {
@@ -167,7 +176,7 @@ export async function writeImageVariants(clientDir: string, quality = DEFAULT_QU
     const decoded = await new Bun.Image(await decodable(Bun.file(source))).png({ compressionLevel: 0 }).bytes()
 
     await Promise.all(missing.map(async ({ variant, format, target, cached }) => {
-      await writeVariant(decoded, variant, cached ?? target, format === 'avif' ? avif : quality, format)
+      await writeVariant(decoded, variant, cached ?? target, variantLevel(variant, format, quality, avif ?? DEFAULT_AVIF_QUALITY), format)
       encoded++
 
       if (cached !== undefined)
@@ -339,7 +348,7 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
             await drawing(async () => {
               const decoded = decoding ? await (decoding.png ??= decodable(Bun.file(path), source.immutable ? undefined : MAX_UPLOAD_PIXELS)) : path
 
-              await writeVariant(decoded, variant, cached, format === 'avif' ? options.avif : options.quality, format)
+              await writeVariant(decoded, variant, cached, variantLevel(variant, format, options.quality ?? DEFAULT_QUALITY, options.avif ?? DEFAULT_AVIF_QUALITY), format)
             })
           }
           finally {
@@ -550,7 +559,7 @@ export async function writeRemoteVariants(clientDir: string, remote: RemoteImage
       throw new KayError('image-invalid', `kay: a page links ${src}, which the build could not download: ${original.message}`)
 
     await imageSize(Bun.file(original.path))
-    await writeVariant(original.path, variant, target, quality)
+    await writeVariant(original.path, variant, target, variantLevel(variant, 'webp', quality, DEFAULT_AVIF_QUALITY))
     encoded++
   }
 

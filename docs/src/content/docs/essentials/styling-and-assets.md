@@ -160,7 +160,7 @@ export default defineConfig({
 
 An image gets variants at 320, 640, 960, 1280, 1920, 2560 and 3840 pixels, those narrower than the image itself. `images.widths` sets another list: whole numbers from 1 to 16384, at most 16, in any order. A shorter list builds fewer files.
 
-`image(photo, { quality: 90 })` encodes that one image's variants at a quality of its own, for a photograph that shows banding at the default. `images.quality`, 80 by default, is the quality of all the others, and of the JPEG share cards too.
+`image(photo, { quality: 90 })` encodes that one image's variants at a quality of its own, for a photograph that shows banding at the default. `images.quality`, 80 by default, is the quality of all the others, and of the JPEG share cards too. The AVIF variants move the same step from `images.avif`'s quality, so 90 gives WebP at 90 and AVIF at 60 by default.
 
 ```ts
 export default defineConfig({

@@ -13,7 +13,7 @@ import { logSink, setLogSink } from '../src/runtime/log'
 import { imageSize, pages, processImage } from '../src/server'
 import { AVIF_ENCODER, AVIF_SPEED, AVIF_WORKER_SOURCE, encodeAvif } from '../src/server/avif'
 import { coverImage } from '../src/server/crop'
-import { avifQuality, drawing, serveImages, variantName, writeImageVariants } from '../src/server/image'
+import { avifQuality, drawing, serveImages, variantLevel, variantName, writeImageVariants } from '../src/server/image'
 import { stripImageMetadata } from '../src/server/image-metadata'
 import { decodePng, encodePng } from '../src/server/png'
 import { remoteAllowed, remoteImages, remotePatterns } from '../src/server/remote'
@@ -1043,5 +1043,18 @@ describe('stripImageMetadata', () => {
 
     expect(warnings(() => expect(stripImageMetadata(gif)).toBe(gif))).toEqual([])
     expect(warnings(() => expect(stripImageMetadata(broken)).toBe(broken))).toEqual(['an uploaded image could not be read through, so it is stored as it came, its metadata included'])
+  })
+})
+
+describe('variantLevel', () => {
+  it('keeps an image\'s own quality for WebP and moves AVIF the same step above its default, within 1 to 100', () => {
+    expect(variantLevel(320, 'webp', 80, 50)).toBe(80)
+    expect(variantLevel(320, 'avif', 80, 50)).toBe(50)
+    expect(variantLevel({ width: 320 }, 'avif', 80, 50)).toBe(50)
+    expect(variantLevel({ width: 320, quality: 90 }, 'webp', 80, 50)).toBe(90)
+    expect(variantLevel({ width: 320, quality: 90 }, 'avif', 80, 50)).toBe(60)
+    expect(variantLevel({ width: 320, quality: 100 }, 'avif', 60, 90)).toBe(100)
+    expect(variantLevel({ width: 320, quality: 5 }, 'avif', 80, 50)).toBe(1)
+    expect(variantLevel('card', 'webp', 80, 50)).toBe(80)
   })
 })
