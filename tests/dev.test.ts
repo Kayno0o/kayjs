@@ -1387,10 +1387,14 @@ describe.concurrent('kay dev', () => {
       await new Promise(resolve => socket.addEventListener('open', resolve))
 
       return {
-        pid: async () => new Promise((resolve) => {
-          answers.set(++id, resolve)
-          socket.send(JSON.stringify({ id, method: 'Runtime.evaluate', params: { expression: 'process.pid' } }))
-        }),
+        // A connection ending before the answer fails the test at once, not at its timeout.
+        pid: async () => Promise.race([
+          new Promise((resolve) => {
+            answers.set(++id, resolve)
+            socket.send(JSON.stringify({ id, method: 'Runtime.evaluate', params: { expression: 'process.pid' } }))
+          }),
+          new Promise((_, reject) => socket.addEventListener('close', () => reject(new Error('the debugger connection closed before the server answered')))),
+        ]),
         closed,
       }
     }
@@ -1440,6 +1444,45 @@ describe.concurrent('kay dev', () => {
       await Promise.all([rm(root, { recursive: true, force: true }), rm(spawned, { force: true })])
     }
   }, 60_000)
+
+  it.serial('keeps a closed client\'s connection to a slow server open until it answers, as closing it early ends the server (#285)', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
+    const unix = join(root, 'inspector.sock')
+    const messages: string[] = []
+    const closes: number[] = []
+    const started = performance.now()
+    // A server whose inspector answers a second and a half late, as one on a loaded host.
+    const slow = Bun.serve({
+      unix,
+      fetch: (request, server) => server.upgrade(request) ? undefined : new Response(null, { status: 426 }),
+      websocket: {
+        message: (socket, message) => {
+          messages.push(String(message))
+          setTimeout(() => socket.send(String(message).replace(/"method".*/, '"result":{}}')), 1500)
+        },
+        close: () => {
+          closes.push(performance.now() - started)
+        },
+      },
+    })
+    const proxy = inspectorProxy('ws://localhost:0/kay', () => unix)
+
+    try {
+      const client = new WebSocket(proxy.url)
+
+      await new Promise(resolve => client.addEventListener('open', resolve))
+      client.close()
+      await until(() => messages.length === 1)
+      await until(() => closes.length === 1, 10_000)
+
+      expect(closes[0]).toBeGreaterThan(1400)
+    }
+    finally {
+      await proxy.stop()
+      await slow.stop(true)
+      await rm(root, { recursive: true, force: true })
+    }
+  })
 
   it.serial('lets no page of another site reach the debugger, as Bun\'s inspector does', async () => {
     const proxy = inspectorProxy('ws://localhost:0/kay', () => undefined, () => 3000)

@@ -10,8 +10,6 @@ import { isLoopback, loopbackTaken } from './loopback'
 // A connection the server never opens is given up on past this, its client closed.
 const CONNECT_MS = 10_000
 const RETRY_MS = 50
-// How long the server is given to answer before its connection closes anyway, as one paused on a breakpoint may not.
-const RELEASE_MS = 1000
 // No client asks with an id this high, and none is connected by the time the answer comes.
 const RELEASE_ID = 2 ** 31 - 1
 const RELEASE = JSON.stringify({ id: RELEASE_ID, method: 'Runtime.evaluate', params: { expression: '0' } })
@@ -184,15 +182,12 @@ function retry(client: ServerWebSocket<Link>, current: () => string | undefined,
     setTimeout(() => !client.data.closed && connect(client, current, started), RETRY_MS)
 }
 
-// Closed once the server answered: closing a connection its inspector is still setting up lets go of the hold a listening server has on its process under Bun 1.4.4, which then exits with code 0 (#285).
+// Closed once the server answered, however long that takes: closing a connection its inspector is still setting up lets go of the hold a listening server has on its process under Bun 1.4.4, which then exits with code 0 (#285), and a loaded host or a server still starting answered after a second.
+// One paused on a breakpoint keeps its connection until it runs on or ends.
 function release(upstream: WebSocket) {
-  const timer = setTimeout(() => upstream.close(), RELEASE_MS)
-
   upstream.addEventListener('message', (event) => {
-    if ((JSON.parse(String(event.data)) as { id?: unknown }).id === RELEASE_ID) {
-      clearTimeout(timer)
+    if ((JSON.parse(String(event.data)) as { id?: unknown }).id === RELEASE_ID)
       upstream.close()
-    }
   })
   upstream.send(RELEASE)
 }
