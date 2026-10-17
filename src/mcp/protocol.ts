@@ -70,6 +70,10 @@ const LEGACY_VERSIONS = ['2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05']
 const VERSION_META = 'io.modelcontextprotocol/protocolVersion'
 const SERVER_INFO_META = 'io.modelcontextprotocol/serverInfo'
 const SERVER_INFO = { name: 'kay', title: 'kay', version }
+// The results the revision without a handshake lets a client keep, which must then say for how long and for whom.
+const CACHEABLE = new Set(['server/discover', 'tools/list', 'resources/list', 'resources/templates/list', 'resources/read'])
+// An app's tools change with a deploy and can hang on who calls, through its guards: a client fetches them again each time and shares them with no other credentials.
+const NO_CACHE = { ttlMs: 0, cacheScope: 'private' }
 
 // The longest line read, a request being far shorter; a longer one is refused instead of growing the buffer.
 const MAX_LINE = 4 * 1024 * 1024
@@ -228,7 +232,7 @@ export class McpServer {
     const result = await this.dispatch(method, params)
 
     // Only the revision without a handshake asks for the result's kind and the server's identity.
-    return requested === MODERN_VERSION ? { resultType: 'complete', ...result, _meta: { [SERVER_INFO_META]: this.options.serverInfo ?? SERVER_INFO } } : result
+    return requested === MODERN_VERSION ? { resultType: 'complete', ...result, ...CACHEABLE.has(method) && NO_CACHE, _meta: { [SERVER_INFO_META]: this.options.serverInfo ?? SERVER_INFO } } : result
   }
 
   private async dispatch(method: string, params: Record<string, unknown>): Promise<object> {

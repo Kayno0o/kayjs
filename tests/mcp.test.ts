@@ -317,11 +317,18 @@ describe.concurrent('kay mcp', () => {
     const meta = (protocolVersion: string) => ({ _meta: { 'io.modelcontextprotocol/protocolVersion': protocolVersion, 'io.modelcontextprotocol/clientCapabilities': {} } })
     const { result } = await agent.request('server/discover', meta('2026-07-28'))
 
-    expect(result).toMatchObject({ resultType: 'complete', supportedVersions: ['2026-07-28'], capabilities: { tools: {}, resources: {} }, _meta: { 'io.modelcontextprotocol/serverInfo': { name: 'kay' } } })
+    expect(result).toMatchObject({ resultType: 'complete', supportedVersions: ['2026-07-28'], capabilities: { tools: {}, resources: {} }, ttlMs: 0, cacheScope: 'private', _meta: { 'io.modelcontextprotocol/serverInfo': { name: 'kay' } } })
 
     const list = await agent.request('tools/list', meta('2026-07-28'))
 
-    expect(list.result?.resultType).toBe('complete')
+    expect(list.result).toMatchObject({ resultType: 'complete', ttlMs: 0, cacheScope: 'private' })
+
+    // Every list and read a client may keep says for how long; a ping or a call keeps nothing.
+    for (const [method, params] of [['resources/list', {}], ['resources/templates/list', {}], ['resources/read', { uri: 'kay://llms.txt' }]] as const)
+      expect((await agent.request(method, { ...params, ...meta('2026-07-28') })).result).toMatchObject({ ttlMs: 0, cacheScope: 'private' })
+
+    expect((await agent.request('ping', meta('2026-07-28'))).result?.ttlMs).toBeUndefined()
+    expect((await agent.request('tools/list')).result?.ttlMs).toBeUndefined()
 
     const refused = await agent.request('tools/list', meta('1999-01-01'))
 

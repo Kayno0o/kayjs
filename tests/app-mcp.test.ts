@@ -73,6 +73,13 @@ describe('the endpoint', () => {
     expect((await rpc(site, 'ping')).body.result).toEqual({})
   })
 
+  it('says how long a client of the revision without a handshake keeps its tool list, as Claude Code requires', async () => {
+    const { body } = await rpc(site, 'tools/list', { _meta: { 'io.modelcontextprotocol/protocolVersion': '2026-07-28' } })
+
+    expect(body.result).toMatchObject({ resultType: 'complete', ttlMs: 0, cacheScope: 'private' })
+    expect((await rpc(site, 'tools/list')).body.result?.ttlMs).toBeUndefined()
+  })
+
   it('takes a notification with a 202 and no body', async () => {
     const response = await post(site, { jsonrpc: '2.0', method: 'notifications/initialized' })
 
