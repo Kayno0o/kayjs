@@ -1,6 +1,7 @@
 import type { Finish, Piece, Provider, ProviderMessage } from './types'
 import { AiError } from './errors'
 import { json, postEvents } from './http'
+import { MAX_ARGUMENTS, MAX_STREAMED_CALLS } from './tool-limits'
 
 export interface OpenAiOptions {
   // The server's API root, `https://api.openai.com/v1` by default; Ollama is `http://localhost:11434/v1`.
@@ -77,8 +78,9 @@ export function openai({ baseUrl = OPENAI_URL, apiKey, model }: OpenAiOptions = 
         ...request.temperature === undefined ? {} : { temperature: request.temperature },
       }
       let finished = false
-      // Tool calls arrive in pieces keyed by their index, the id and name first and the arguments after; some servers send one whole.
-      const calls = new Map<number, { id: string, name: string, arguments: string }>()
+      // Tool calls arrive in pieces keyed by their index, the id and name first and the arguments after; some servers send one whole, and one that reuses an index for another id starts another call.
+      const calls = new Map<number, { index: number, id: string, name: string, arguments: string }>()
+      const byIndex = new Map<number, number>()
 
       for await (const { data } of postEvents('openai', `${root}/chat/completions`, apiKey === undefined ? {} : { authorization: `Bearer ${apiKey}` }, body, signal, apiKey)) {
         if (data === '[DONE]')
@@ -98,19 +100,32 @@ export function openai({ baseUrl = OPENAI_URL, apiKey, model }: OpenAiOptions = 
             if (typeof piece !== 'object' || piece === null)
               continue
 
-            const index = typeof piece.index === 'number' ? piece.index : calls.size
-            const call = calls.get(index) ?? { id: '', name: '', arguments: '' }
+            const known = typeof piece.index === 'number' ? byIndex.get(piece.index) : undefined
+            let call = known === undefined ? undefined : calls.get(known)
 
-            if (typeof piece.id === 'string')
+            if (call && typeof piece.id === 'string' && piece.id !== '' && call.id !== '' && call.id !== piece.id)
+              call = undefined
+
+            if (!call) {
+              if (calls.size >= MAX_STREAMED_CALLS)
+                continue
+
+              call = { index: typeof piece.index === 'number' ? piece.index : calls.size, id: '', name: '', arguments: '' }
+              calls.set(calls.size, call)
+
+              if (typeof piece.index === 'number')
+                byIndex.set(piece.index, calls.size - 1)
+            }
+
+            if (typeof piece.id === 'string' && piece.id !== '')
               call.id = piece.id
 
             if (typeof piece.function?.name === 'string')
               call.name += piece.function.name
 
-            if (typeof piece.function?.arguments === 'string')
+            // Past the cap the arguments stop growing, and the loop answers them as too long.
+            if (typeof piece.function?.arguments === 'string' && call.arguments.length <= MAX_ARGUMENTS)
               call.arguments += piece.function.arguments
-
-            calls.set(index, call)
           }
         }
 
@@ -120,10 +135,10 @@ export function openai({ baseUrl = OPENAI_URL, apiKey, model }: OpenAiOptions = 
         if (typeof choice?.finish_reason === 'string') {
           finished = true
 
-          for (const [, call] of [...calls].sort(([a], [b]) => a - b))
-            yield { toolUse: call }
+          yield* [...calls.values()].sort((a, b) => a.index - b.index).map(({ id, name, arguments: raw }) => ({ toolUse: { id, name, arguments: raw } }))
 
           calls.clear()
+          byIndex.clear()
 
           yield { finish: FINISHES[choice.finish_reason] ?? 'stop' }
         }

@@ -1,9 +1,9 @@
 import type { LibraryTool } from 'kay/library'
 import type { Piece, Provider, ProviderMessage, ProviderRequest, ToolCall, ToolOutcome, ToolUse, Usage } from './types'
+import { logFrom } from 'kay'
+import { MAX_ARGUMENTS, MAX_CALLS_PER_STEP, MAX_STREAMED_CALLS } from './tool-limits'
 
-// What a model can make of a step, so a hostile or looping one costs a bounded amount.
-const MAX_CALLS_PER_STEP = 16
-const MAX_ARGUMENTS = 65_536
+const log = logFrom('kayjs-ai')
 const MAX_RESULT = 20_000
 const MAX_NAME = 64
 
@@ -69,8 +69,10 @@ async function run(tools: Map<string, LibraryTool>, use: ToolUse, input: Record<
 
     return { status: result.isError === true ? 'failed' : 'done', result: textOf(result) }
   }
-  catch {
-    // What threw is not for the model to read.
+  catch (error) {
+    // What threw is not for the model to read, but the app's log has it.
+    log.error(`the ${use.name} tool could not run`, error)
+
     return failed('The tool could not run')
   }
 }
@@ -115,7 +117,7 @@ export async function* converse(provider: Provider, base: ProviderRequest, offer
         spoke = true
       }
       else if ('toolUse' in piece) {
-        if (uses.length < MAX_CALLS_PER_STEP + 1)
+        if (uses.length < MAX_STREAMED_CALLS)
           uses.push({ ...piece.toolUse, id: idOf(piece.toolUse.id) })
       }
       else if ('usage' in piece) {
@@ -137,23 +139,33 @@ export async function* converse(provider: Provider, base: ProviderRequest, offer
     if (signal.aborted)
       return
 
-    if (uses.length === 0 || step === maxSteps) {
-      if (uses.length > 0)
-        yield { finish: 'steps' }
-      else if (finish)
+    // A step the provider cut short holds calls that may be half written, which are not run.
+    const cut = finish !== undefined && 'finish' in finish && (finish.finish === 'length' || finish.finish === 'filtered')
+
+    if (uses.length === 0 || cut) {
+      if (finish)
         yield finish
 
       return
     }
 
+    if (step === maxSteps) {
+      yield { finish: 'steps' }
+
+      return
+    }
+
     const results: ToolOutcome[] = []
+    const sent = new Map<string, Record<string, unknown>>()
 
     for (const [index, use] of uses.entries()) {
       const call: ToolCall = { id: use.id, name: use.name, input: {}, status: 'running' }
       const parsed = parseInput(use.arguments)
 
-      if ('input' in parsed)
+      if ('input' in parsed) {
         call.input = parsed.input
+        sent.set(use.id, parsed.input)
+      }
 
       yield { tool: call }
 
@@ -175,6 +187,7 @@ export async function* converse(provider: Provider, base: ProviderRequest, offer
       yield { tool: { ...call, ...ran } }
     }
 
-    messages.push({ role: 'assistant', content: text, calls: uses }, { role: 'user', content: '', results })
+    // What goes back is the arguments as an object, so a provider that parses them never meets the text a model garbled.
+    messages.push({ role: 'assistant', content: text, calls: uses.map(use => ({ ...use, arguments: JSON.stringify(sent.get(use.id) ?? {}) })) }, { role: 'user', content: '', results })
   }
 }

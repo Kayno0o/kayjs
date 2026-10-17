@@ -112,6 +112,33 @@ describe('OpenAI tool calls', () => {
     ])
   })
 
+  it('starts another call when a server reuses an index for another id, and keeps the arguments of each apart', async () => {
+    const server = serve(() => stream(openaiToolEvents(
+      { tool_calls: [{ index: 0, id: 'a', function: { name: 'add_note', arguments: '{"title":"A"}' } }] },
+      { tool_calls: [{ index: 0, id: 'b', function: { name: 'add_note', arguments: '{"title":"B"}' } }] },
+    )).response)
+    const pieces = await collect(openai({ baseUrl: server.url, model: 'm' }).stream(BASE, new AbortController().signal))
+
+    expect(pieces.filter(piece => 'toolUse' in piece).map(piece => 'toolUse' in piece && [piece.toolUse.id, piece.toolUse.arguments])).toEqual([['a', '{"title":"A"}'], ['b', '{"title":"B"}']])
+  })
+
+  it('stops growing the arguments and the calls it keeps past their caps', async () => {
+    const chunk = 'x'.repeat(40_000)
+    const many = Array.from({ length: 40 }, (_, index) => ({ tool_calls: [{ index, id: `c${index}`, function: { name: 'add_note', arguments: '{}' } }] }))
+    const server = serve(() => stream(openaiToolEvents(
+      { tool_calls: [{ index: 100, id: 'big', function: { name: 'add_note', arguments: chunk } }] },
+      { tool_calls: [{ index: 100, function: { arguments: chunk } }] },
+      { tool_calls: [{ index: 100, function: { arguments: chunk } }] },
+      { tool_calls: [{ index: 100, function: { arguments: chunk } }] },
+      ...many,
+    )).response)
+    const uses = (await collect(openai({ baseUrl: server.url, model: 'm' }).stream(BASE, new AbortController().signal))).flatMap(piece => 'toolUse' in piece ? [piece.toolUse] : [])
+
+    expect(uses).toHaveLength(17)
+    expect(uses.find(use => use.id === 'big')!.arguments.length).toBeLessThan(130_000)
+    expect(uses.find(use => use.id === 'big')!.arguments.length).toBeGreaterThan(65_536)
+  })
+
   it('runs the loop against the server: the call, the action as the visitor, and the result sent back', async () => {
     const server = serve((_request, seen) => {
       const first = (seen.body.messages as { role: string }[]).every(message => message.role !== 'tool')
@@ -151,6 +178,15 @@ describe('Anthropic tool use', () => {
   it('leaves out the empty text block of an assistant turn that only called', async () => {
     const server = serve(() => stream(anthropicEvents('ok')).response)
     const request = { ...AFTER, messages: [AFTER.messages[0]!, { ...AFTER.messages[1]!, content: '' }, AFTER.messages[2]!] }
+
+    await collect(anthropic({ apiKey: 'k', baseUrl: server.url, model: 'm' }).stream(request, new AbortController().signal))
+
+    expect((server.seen[0]!.body.messages as { content: { type: string }[] }[])[1]!.content.map(block => block.type)).toEqual(['tool_use', 'tool_use'])
+  })
+
+  it('leaves out an assistant text that is only whitespace, which the API refuses', async () => {
+    const server = serve(() => stream(anthropicEvents('ok')).response)
+    const request = { ...AFTER, messages: [AFTER.messages[0]!, { ...AFTER.messages[1]!, content: '\n ' }, AFTER.messages[2]!] }
 
     await collect(anthropic({ apiKey: 'k', baseUrl: server.url, model: 'm' }).stream(request, new AbortController().signal))
 

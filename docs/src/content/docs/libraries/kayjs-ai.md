@@ -145,6 +145,8 @@ A call that goes wrong is not an exception. The model is told what failed, such 
 
 `ask` then runs a loop: it calls the model, runs its tools, hands back the results and asks again, until the model answers in plain text. `maxSteps` caps the requests it makes, 5 by default. If the model still wants tools on the last one, the reply ends with `finish` set to `steps`.
 
+A model can be talked into things by the text it reads, a visitor's message say. Offer only actions whose worst call you can accept from that visitor, and keep destructive ones out of `tools`.
+
 The visitor leaving stops the loop. A tool already running finishes, but nothing more is called.
 
 `ask` with tools must run while kay answers a request, in a page, an action or a handler, because the tools run as that visitor. A background job has none.

@@ -21,11 +21,12 @@ p Assistant
 
 ## The loop
 
-`ask` requests the provider, runs the tools the model called one after another, sends their results back and requests again, until the model answers without a call or `maxSteps` requests were made (5 by default, a whole number of 1 or more). When the last request still calls tools, those calls are not run and `await reply.finish` is `steps`.
+`ask` requests the provider, runs the tools the model called one after another, sends their results back and requests again, until the model answers without a call or `maxSteps` requests were made (5 by default, a whole number of 1 or more). When the last request still calls tools, those calls are not run and `await reply.finish` is `steps`. A step the provider cut short (`length`, `filtered`) runs none of its calls, which may be half written, and the reply ends with that finish.
 
 - The text of the reply is the text of every step, a blank line between two steps' texts. `usage` is the sum of the steps.
 - The visitor leaving, `reply.stop()`, `options.signal` or a reader leaving early end the loop: a call already running finishes (an action cannot be cancelled) and its result is dropped, and no further call is run and no further request made.
 - A provider failing in any step fails the reply with its `AiError`.
+- A provider that reports no token count for a step leaves it out of the sum.
 
 ## What the model is told when a call goes wrong
 
@@ -39,9 +40,13 @@ Every failure is a result with `failed` set, in words the model can correct from
 | more than 16 calls in one step | the 17th gets `Too many tool calls in one step` and none after it run |
 | schema refused | the action's `{"status":422,"errors":{...}}`, so the model can fix the field |
 | guard refused, rate limited, `ctx.fail`, redirect | the action's answer (`Sign in`, a 429, a redirect sentence) |
-| the action threw | `The tool could not run`, never what it threw |
+| the action threw | `The tool could not run`, never what it threw, which is logged by the app's logger (`kayjs-ai`) |
 
-A result over 20,000 characters is cut. A success is the text kay's MCP tool call returns for the action. Calls of a step run in order, one at a time. A call the model repeats an id for, or leaves it out, gets a new unique id.
+A result over 20,000 characters is cut. A success is the text kay's MCP tool call returns for the action. Calls of a step run in order, one at a time. A call the model repeats an id for, or leaves it out, gets a new unique id. The calls go back to the provider with their arguments as the parsed object (`{}` when they were not one), never the text a model garbled.
+
+## What the model can be made to do
+
+A model reads text an attacker may have written (a page, an email, a visitor's message), and can be talked into calling any action in `tools`. Offer only actions whose worst call is acceptable for the visitor running it, and keep destructive ones out of `tools` or behind a guard that asks for more than a signed-in visitor.
 
 ## Showing the calls
 

@@ -4,6 +4,7 @@ import type { Outcome, Tools } from './helpers/tools'
 import { join } from 'node:path'
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test'
 import { testSite } from 'kay/test'
+import { encodeCall } from '../../../src/runtime/action'
 import { ask, fakeAi } from '../src'
 import { converse } from '../src/loop'
 import { createReply } from '../src/reply'
@@ -11,7 +12,7 @@ import { done } from './fixture/src/testing'
 
 const ROOT = join(import.meta.dir, 'fixture')
 const site = await testSite({ root: ROOT })
-const { converse: conversing, watch } = await import(join(import.meta.dir, 'fixture/src/routes/tools.kay')) as Tools
+const { converse: conversing, watch, refusedTools, upload } = await import(join(import.meta.dir, 'fixture/src/routes/tools.kay')) as Tools
 
 afterAll(async () => site.close())
 beforeEach(() => {
@@ -67,14 +68,15 @@ describe('actions as tools', () => {
     expect(done).toEqual([])
   })
 
-  it('refuses to offer an action that cannot be a tool, before anything is asked', async () => {
+  it('refuses to offer an action that cannot be a tool, naming its place in the list, before anything is asked', async () => {
     for (const which of ['vetoed', 'upload']) {
-      const refused = await site.fetch('/tools', { method: 'POST', headers: { 'content-type': 'application/json', 'x-kay-action': '1', 'origin': 'http://localhost' }, body: JSON.stringify({ which }) })
+      const refused = await site.refusal(refusedTools, { which: which as 'vetoed' })
 
-      expect(refused.status).toBeGreaterThanOrEqual(400)
+      expect(refused.status).toBe(500)
     }
 
     expect(fakeAi.asked).toEqual([])
+    expect(() => ask('x', { tools: [conversing, conversing, upload] })).toThrow('tools[2]')
   })
 
   it('throws outside a request, where there is no visitor to run as', () => {
@@ -104,6 +106,15 @@ describe('what the model gets back when a call goes wrong', () => {
       ['failed', 'The arguments are too long', {}],
     ])
     expect(done).toEqual([])
+  })
+
+  it('sends the model back its calls with the arguments as an object, so a garbled text never reaches a provider that parses them', async () => {
+    fakeAi.reply({ calls: [{ name: 'add_note', input: '{"title": ' }, { name: 'add_note', input: { title: 'Milk' } }, { name: 'add_note', input: 'x'.repeat(70_000) }] })
+    fakeAi.reply('ok')
+
+    await conversation()
+
+    expect(fakeAi.asked[1]!.messages[1]!.calls!.map(call => call.arguments)).toEqual(['{}', '{"title":"Milk"}', '{}'])
   })
 
   it('takes no arguments for an empty string, as a model calling a tool with none writes it', async () => {
@@ -203,6 +214,21 @@ describe('the loop', () => {
     expect(new Set(outcome.calls.map(call => call.id)).size).toBe(2)
   })
 
+  it('runs no call of a step the provider cut short, and ends with why', async () => {
+    fakeAi.reply({ calls: [{ name: 'limited', input: '' }], finish: 'length' })
+    fakeAi.reply('never')
+
+    const outcome = await conversation()
+
+    expect(outcome).toMatchObject({ calls: [], finish: 'length' })
+    expect(fakeAi.asked).toHaveLength(1)
+
+    fakeAi.clear()
+    fakeAi.reply({ calls: [{ name: 'limited', input: '' }], finish: 'filtered' })
+
+    expect(await conversation()).toMatchObject({ calls: [], finish: 'filtered' })
+  })
+
   it('makes one request with maxSteps 1, whatever the model wants', async () => {
     fakeAi.reply({ calls: [{ name: 'add_note', input: { title: 'Milk' } }] })
 
@@ -250,6 +276,24 @@ describe('the loop', () => {
 
 // The loop alone, over tools that are plain functions, for what an action cannot do on cue.
 describe('a visitor leaving mid-loop', () => {
+  it('asks no further once the request being answered aborts while a tool runs', async () => {
+    const controller = new AbortController()
+
+    fakeAi.reply({ calls: [{ name: 'slow' }, { name: 'add_note', input: { title: 'Milk' } }] })
+    fakeAi.reply('never')
+
+    const { headers, body } = encodeCall({ prompt: 'go' })
+    const answer = site.handle(new Request(`http://localhost${conversing.url}`, { method: 'POST', headers: { ...headers, origin: 'http://localhost' }, body, signal: controller.signal }))
+
+    await Bun.sleep(60)
+    controller.abort()
+    await Bun.sleep(250)
+    await expect(answer).resolves.toBeDefined()
+
+    expect(done).toEqual(['slow'])
+    expect(fakeAi.asked).toHaveLength(1)
+  })
+
   const request = new Request('http://localhost/')
 
   function offered(call: () => Promise<{ content: { type: 'text', text: string }[] }>): Offered[] {
@@ -298,16 +342,22 @@ describe('a visitor leaving mid-loop', () => {
     fakeAi.reply({ calls: [{ name: 'work' }] })
     fakeAi.reply('never')
 
-    const reply = open(offered(async () => ({ content: [{ type: 'text', text: 'ok' }] })))
+    const reply = open(offered(async () => {
+      await Bun.sleep(30)
+
+      return { content: [{ type: 'text', text: 'ok' }] }
+    }))
 
     for await (const step of reply.progress()) {
-      if (step.calls.length > 0)
+      if (step.calls.some(call => call.status === 'running'))
         break
     }
 
     await Bun.sleep(20)
 
-    expect(fakeAi.asked.length).toBeLessThanOrEqual(2)
+    // The call being answered finished, and no step followed it.
+    expect(fakeAi.asked).toHaveLength(1)
+    expect(await reply.finish).toBeUndefined()
   })
 
   it('keeps an action that threw outside the reply: what call() throws is a failed result', async () => {

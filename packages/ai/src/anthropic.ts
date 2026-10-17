@@ -1,6 +1,7 @@
 import type { Finish, Piece, Provider, ProviderMessage } from './types'
 import { AiError } from './errors'
 import { json, postEvents } from './http'
+import { MAX_ARGUMENTS, MAX_STREAMED_CALLS } from './tool-limits'
 
 export interface AnthropicOptions {
   apiKey: string
@@ -54,7 +55,7 @@ function turnOf(message: ProviderMessage): { role: string, content: unknown } {
   return {
     role: 'assistant',
     content: [
-      ...message.content === '' ? [] : [{ type: 'text', text: message.content }],
+      ...message.content.trim() === '' ? [] : [{ type: 'text', text: message.content }],
       ...(message.calls ?? []).map(({ id, name, arguments: raw }) => ({ type: 'tool_use', id, name, input: inputOf(raw) })),
     ],
   }
@@ -104,7 +105,7 @@ export function anthropic({ apiKey, baseUrl = ANTHROPIC_URL, model }: AnthropicO
           case 'content_block_start': {
             const block = event.content_block as { type?: unknown, id?: unknown, name?: unknown } | undefined
 
-            if (block?.type === 'tool_use' && typeof event.index === 'number')
+            if (block?.type === 'tool_use' && typeof event.index === 'number' && calls.size < MAX_STREAMED_CALLS)
               calls.set(event.index, { id: typeof block.id === 'string' ? block.id : '', name: typeof block.name === 'string' ? block.name : '', arguments: '' })
 
             break
@@ -118,7 +119,8 @@ export function anthropic({ apiKey, baseUrl = ANTHROPIC_URL, model }: AnthropicO
             if (delta?.type === 'input_json_delta' && typeof delta.partial_json === 'string' && typeof event.index === 'number') {
               const call = calls.get(event.index)
 
-              if (call)
+              // Past the cap the arguments stop growing, and the loop answers them as too long.
+              if (call && call.arguments.length <= MAX_ARGUMENTS)
                 call.arguments += delta.partial_json
             }
 

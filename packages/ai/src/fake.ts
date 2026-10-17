@@ -1,4 +1,4 @@
-import type { Piece, Provider, ProviderMessage, ProviderRequest, ToolSpec } from './types'
+import type { Finish, Piece, Provider, ProviderMessage, ProviderRequest, ToolSpec } from './types'
 import process from 'node:process'
 
 // What a fake reply was asked: the request a provider would have been sent.
@@ -16,6 +16,8 @@ export interface Asked {
 export interface Calls {
   text?: string | string[] | undefined
   calls: { name: string, input?: unknown, id?: string | undefined }[]
+  // Why the step ended, `stop` unless given, such as `length` for a reply cut by the token cap.
+  finish?: Finish | undefined
 }
 
 type Scripted = string | string[] | Calls
@@ -110,7 +112,7 @@ function createFake(): Fake {
         yield { toolUse: { id: id ?? `fake_${index + 1}`, name, arguments: typeof input === 'string' ? input : JSON.stringify(input ?? {}) } }
 
       yield { usage: { outputTokens: tokens(parts.join('')) } }
-      yield { finish: 'stop' }
+      yield { finish: typeof chosen === 'object' && !Array.isArray(chosen) ? chosen.finish ?? 'stop' : 'stop' }
     },
   }
 }

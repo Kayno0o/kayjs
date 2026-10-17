@@ -30,7 +30,7 @@ function offer(actions: readonly ToolAction[]): Offered[] {
   const seen = new Set<ToolAction>()
   const offered: Offered[] = []
 
-  for (const action of actions) {
+  for (const [index, action] of actions.entries()) {
     if (seen.has(action))
       continue
 
@@ -39,7 +39,7 @@ function offer(actions: readonly ToolAction[]): Offered[] {
     const tool = actionTool(action as Parameters<typeof actionTool>[0], taken)
 
     if (!tool)
-      throw new TypeError(`kayjs-ai: tools[${offered.length}] cannot be a tool: an action taking a file, one of a page with params or one with \`tool: false\` is none`)
+      throw new TypeError(`kayjs-ai: tools[${index}] cannot be a tool: an action taking a file, one of a page with params or one with \`tool: false\` is none`)
 
     offered.push({ name: tool.name, description: tool.description, inputSchema: tool.inputSchema, tool })
   }
@@ -72,6 +72,9 @@ export function ask(prompt: string | Message[], options: AskOptions = {}): Reply
     throw new TypeError('kayjs-ai: maxSteps is a whole number of 1 or more')
 
   const offered = offer(options.tools)
+
+  if (!visitor)
+    throw new Error('kayjs-ai: tools run as the visitor, so ask() with tools needs the request being answered; call it from a page, an action or a handler kay is answering')
 
   if (!answering)
     throw new Error('kayjs-ai: tools run as the visitor, so ask() with tools needs the request being answered; call it from a page, an action or a handler kay is answering')
