@@ -68,6 +68,14 @@ describe('pageRows', () => {
     expect([listed.page, listed.pages, listed.rows.map(row => row.slug), asked]).toEqual([3, 3, stock.slice(100).map(entry => entry.slug), [{ offset: 100, limit: PAGE_SIZE }]])
   })
 
+  it('reads and pages by the size it is given', async () => {
+    const { asked, read } = reader()
+    const listed = await pageRows({ ...posts, count: 120 }, '', 2, read, none, 25)
+
+    expect([listed.page, listed.pages, listed.rows.map(row => row.slug).slice(0, 2), asked]).toEqual([2, 5, ['post-25', 'post-26'], [{ offset: 25, limit: 25 }]])
+    expect((await pageRows({ ...posts, count: 120 }, 'post', 3, read, none, 40)).pages).toBe(3)
+  })
+
   it('reads every entry to search their titles, and none of a collection that cannot be read', async () => {
     const { asked, read } = reader()
 

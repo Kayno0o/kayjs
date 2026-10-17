@@ -61,6 +61,16 @@ test('the upload route reads the limit and its envelope, so a file at the limit 
   expect(uploadBodyLimit()).toBe(50 * 1024 * 1024 + 64 * 1024)
 })
 
+test('lists 50 entries a page unless pageSize says otherwise, and refuses one that is no positive whole number', () => {
+  expect(configure({}).pageSize).toBe(50)
+  expect(configure({ pageSize: 20 }).pageSize).toBe(20)
+
+  for (const pageSize of [0, -1, 1.5, Number.NaN, Infinity, '20'])
+    expect(() => configure({ pageSize } as never)).toThrow(/pageSize/)
+
+  configure({})
+})
+
 test('refuses a maxSize that is no positive whole number of bytes as kay.config.ts loads', () => {
   for (const maxSize of [0, -1, Number.NaN, Infinity, 1.5, '0mb', '-1mb', '1.5', 'big', '0.5b', ''])
     expect(() => configure({ uploads: { maxSize } as never })).toThrow(/maxSize/)

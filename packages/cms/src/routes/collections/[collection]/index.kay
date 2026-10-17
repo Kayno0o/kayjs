@@ -14,10 +14,10 @@ import { findCollection, versionOf } from '../../../store'
 
 export const page = { query: s.Object({ q: s.Optional(s.String()), page: s.Optional(s.Integer()) }) }
 
-const { prefix } = settings()
+const { prefix, pageSize } = settings()
 const collection = await findCollection(ctx.params.collection) ?? ctx.notFound()
 const search = ctx.query.q ?? ''
-const listed = await pageRows(collection, search, ctx.query.page ?? 1, async filter => entries(collection.name, filter), versionOf)
+const listed = await pageRows(collection, search, ctx.query.page ?? 1, async filter => entries(collection.name, filter), versionOf, pageSize)
 const url = ctx.url
 ---
 head

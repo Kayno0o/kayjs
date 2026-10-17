@@ -15,6 +15,7 @@ export interface EntryRow {
   version?: string | undefined
 }
 
+// The page size when `cms({ pageSize })` says none.
 export const PAGE_SIZE = 50
 
 // A row per entry, titled by the entry's first one-line text field, else its slug.
@@ -62,9 +63,9 @@ function pageAt(total: number, page: number, size: number): { page: number, page
 
 // A page of the collection's rows: a search reads every entry to match their titles, a plain page its own entries alone.
 // `versionOf` reads the version of a folder entry's file, for the rows of the page shown alone.
-export async function pageRows(collection: CollectionInfo, search: string, page: number, read: (filter: EntryFilter) => Promise<SourceEntry[]>, versionOf: (ref: EntryRef) => Promise<string | undefined>): Promise<{ rows: EntryRow[], page: number, pages: number }> {
+export async function pageRows(collection: CollectionInfo, search: string, page: number, read: (filter: EntryFilter) => Promise<SourceEntry[]>, versionOf: (ref: EntryRef) => Promise<string | undefined>, size = PAGE_SIZE): Promise<{ rows: EntryRow[], page: number, pages: number }> {
   if (collection.problem !== undefined)
-    return pageOf([], 1)
+    return pageOf([], 1, size)
 
   const versioned = async <T extends { rows: EntryRow[] }>(listed: T): Promise<T> => {
     if (collection.kind !== 'folder')
@@ -76,11 +77,11 @@ export async function pageRows(collection: CollectionInfo, search: string, page:
   }
 
   if (search.trim() !== '')
-    return versioned(pageOf(searchRows(rowsOf(collection, await read({})), search), page))
+    return versioned(pageOf(searchRows(rowsOf(collection, await read({})), search), page, size))
 
-  const at = pageAt(collection.count ?? 0, page, PAGE_SIZE)
+  const at = pageAt(collection.count ?? 0, page, size)
 
-  return versioned({ rows: rowsOf(collection, await read({ offset: at.offset, limit: PAGE_SIZE })), page: at.page, pages: at.pages })
+  return versioned({ rows: rowsOf(collection, await read({ offset: at.offset, limit: size })), page: at.page, pages: at.pages })
 }
 
 export function collectionPath(prefix: string, collection: string): string {

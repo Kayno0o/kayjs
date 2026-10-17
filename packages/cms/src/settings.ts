@@ -3,6 +3,7 @@ import type { ByteSize } from 'kay/library'
 import type { FileSaver, Identity } from './files'
 import { byteSize } from 'kay/library'
 import { workingTree } from './files'
+import { PAGE_SIZE } from './listing'
 
 // A guard built when the first request reaches it, so kay.config.ts imports nothing of the app's auth or database: `{ load: async () => (await import('./src/auth')).auth.guard({ require: 'editor' }) }`.
 export interface LazyGuard {
@@ -23,6 +24,8 @@ export interface CmsOptions {
   files?: FileSaver | undefined
   // The types an upload may have, exact or as `image/*`: PNG, JPEG, WebP, GIF, AVIF and PDF by default; `{ types, maxSize }` also sets the most an upload may weigh, in bytes or as `'50mb'`, 20 MB by default, 127.9 MB at most (Bun refuses a request body over 128 MB). The upload route takes that size whatever the app's `bodyLimit` is.
   uploads?: string[] | UploadOptions | undefined
+  // How many entries a collection's list shows on a page, 50 by default.
+  pageSize?: number | undefined
   // Collections whose bodies may hold HTML that runs as the site, such as a `<script>` or an `onclick`, which a save is otherwise refused for.
   rawHtml?: string[] | undefined
   // Who a save the guard let through is committed as, from the guard's context: `async ({ locals }) => ...` reading the signed-in user.
@@ -36,6 +39,7 @@ export interface CmsSettings {
   uploads: string[]
   // The most bytes an upload may weigh.
   maxSize: number
+  pageSize: number
   rawHtml: ReadonlySet<string>
   author: CmsOptions['author']
 }
@@ -56,10 +60,13 @@ const TRAILING_SLASHES = /\/+$/
 
 let current: CmsSettings | undefined
 
-export function configure({ prefix = '/admin', guard, files = workingTree(), uploads, rawHtml = [], author }: CmsOptions): CmsSettings {
+export function configure({ prefix = '/admin', guard, files = workingTree(), uploads, pageSize = PAGE_SIZE, rawHtml = [], author }: CmsOptions): CmsSettings {
+  if (!Number.isInteger(pageSize) || pageSize < 1)
+    throw new Error(`kayjs-cms: \`cms({ pageSize })\` is ${JSON.stringify(pageSize)}; it takes a positive whole number of entries`)
+
   const { types = DEFAULT_UPLOADS, maxSize } = Array.isArray(uploads) ? { types: uploads, maxSize: undefined } : uploads ?? {}
 
-  current = { prefix: prefix.replace(TRAILING_SLASHES, '') || '/', guard: guard === undefined ? undefined : lazily(guard), files, uploads: types, maxSize: uploadSize(maxSize), rawHtml: new Set(rawHtml), author }
+  current = { prefix: prefix.replace(TRAILING_SLASHES, '') || '/', guard: guard === undefined ? undefined : lazily(guard), files, uploads: types, maxSize: uploadSize(maxSize), pageSize, rawHtml: new Set(rawHtml), author }
 
   return current
 }
