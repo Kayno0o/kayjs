@@ -100,14 +100,14 @@ onFormDefaults(() => root, () => {
 // The panel only shows once the browser has opened the popover, so focus moves on its toggle rather than on the click; closing clears the search.
 function toggled(open: boolean) {
   if (open)
-    root?.querySelector<HTMLInputElement>('.kui-multi-select-search, .kui-multi-select-checkbox')?.focus()
+    root?.querySelector<HTMLInputElement>('.kui-multi-select-search, .kui-multi-select-checkbox:not(:disabled)')?.focus()
   else
     query.set('')
 }
 
-// From the search box or the bar, ArrowDown reaches the first option; there the arrows, Home and End move between options, which Tab would walk one by one.
+// From the search box or the bar, ArrowDown reaches the first option; there the arrows, Home and End move between enabled options, which Tab would walk one by one.
 function keyDown(event: KeyboardEvent) {
-  const boxes = [...root?.querySelectorAll<HTMLInputElement>('.kui-multi-select-checkbox') ?? []]
+  const boxes = [...root?.querySelectorAll<HTMLInputElement>('.kui-multi-select-checkbox:not(:disabled)') ?? []]
   const index = boxes.indexOf(event.target as HTMLInputElement)
   let move = MOVES[event.key]
 

@@ -106,10 +106,15 @@ test('a swap from a French page to an English one in edit mode shows the editor 
     }
 
     await page.waitUntil(() => document.querySelector('.kcms-editor-title')?.textContent === 'Modifier cette page')
+    await page.evaluate(() => {
+      (window as unknown as Record<string, boolean>).sameDocument = true
+    })
     await page.evaluate(follow, '/blog/hello')
     await page.click('#swap')
     await page.waitUntil(() => location.pathname === '/blog/hello')
     await page.waitUntil(() => document.querySelector('.kcms-editor-title')?.textContent === 'Edit this page')
+    // Another locale loads the page afresh, which is what keeps the first locale's texts out of the editor.
+    expect(await page.evaluate(() => 'sameDocument' in window)).toBe(false)
     expect(await page.evaluate(title)).toBe('Edit this page')
     expect(await page.evaluate(() => document.querySelector('.kcms-editor-head button')?.textContent)).toBe('Stop editing')
 

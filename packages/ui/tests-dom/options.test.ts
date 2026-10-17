@@ -59,6 +59,24 @@ test('MultiSelect draws an option\'s icon before its label and leaves a disabled
   expect([box(0).checked, box(1).checked, box(2).checked]).toEqual([false, true, false])
 })
 
+test('the arrow keys of MultiSelect go past a disabled option, and a click on it picks nothing', async () => {
+  const root = await options()
+  const boxes = root.querySelectorAll<HTMLInputElement>('#multi .kui-multi-select-checkbox')
+
+  root.querySelector<HTMLElement>('#multi')!.showPopover()
+  await Promise.resolve()
+  boxes[0]!.focus()
+  boxes[0]!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }))
+
+  expect(document.activeElement).toBe(boxes[2]!)
+
+  boxes[1]!.click()
+  await Promise.resolve()
+
+  expect(boxes[1]!.checked).toBe(true)
+  expect(root.querySelector('.kui-multi-select-summary')?.textContent).toBe('Beta')
+})
+
 test('the arrow keys of Tabs go past a disabled tab', async () => {
   const root = await options()
   const first = root.querySelector<HTMLElement>('#tabs [role="tab"]')!
