@@ -9,6 +9,7 @@ import { collectHead, head } from '../src/runtime/head'
 import { child } from '../src/runtime/html'
 import { island, IslandPropsError } from '../src/runtime/island.server'
 import { trustHtml } from '../src/runtime/sanitize'
+import { decodeServerValue } from '../src/runtime/wire'
 import { HYDRATION_SCRIPT } from '../src/server/hydration'
 
 await plugin(kay())
@@ -40,7 +41,7 @@ afterAll(async () => {
 describe('islands', () => {
   it('server-renders static markup with the interactive component as an island root', () => {
     expect(pageHtml).toContain('<h1>Static title</h1>')
-    expect(pageHtml).toContain('<slot data-component="tests/fixtures/islands/counter.kay" data-props="[{&quot;start&quot;:1},2]"><button>Count <!--[-->2<!--]--></button></slot>')
+    expect(pageHtml).toContain(`<slot data-component="tests/fixtures/islands/counter.kay" data-props='[{"start":1},2]'><button>Count <!--[-->2<!--]--></button></slot>`)
     expect(pageHtml).toContain('<p>after</p>')
   })
 
@@ -51,7 +52,7 @@ describe('islands', () => {
   })
 
   it('marks an island hydrating once visible and keeps its hydrate prop out of its props', () => {
-    expect(pageHtml).toContain('data-props="[{&quot;start&quot;:1},5]" data-hydrate="visible">')
+    expect(pageHtml).toContain(`data-props='[{"start":1},5]' data-hydrate="visible">`)
   })
 
   it('names the prop an island cannot serialize, however deep it sits', () => {
@@ -364,6 +365,25 @@ describe('islands', () => {
     expect(document.querySelector('li.product')).toBe(first)
     expect(rows()).toEqual([['product low', '5.00', 'Tea: 5.001 left'], ['product', '18.00', 'Mug: 18.00']])
     expect(issues).toEqual([])
+  })
+
+  it('writes its props in the quote they hold fewer of, reading them back unchanged whatever they carry', () => {
+    const Card = island('card.kay', (_props: { text: string }) => null)
+    const texts = ['plain', 'say "hi"', 'it\'s', `both ' and "`, `'"'"'`, '&quot; &#39; &amp; &lt;', '</slot><script>alert(1)</script>', 'a & b < c > d']
+
+    for (const text of texts) {
+      const html = child(Card({ text }))
+
+      document.body.innerHTML = html
+      expect(decodeServerValue(document.querySelector('slot')!.getAttribute('data-props')!), text).toEqual({ text })
+      expect(document.querySelectorAll('slot'), text).toHaveLength(1)
+      expect(document.querySelector('script'), text).toBeNull()
+    }
+
+    expect(child(Card({ text: 'plain' }))).toContain(`data-props='[{"text":1},"plain"]'`)
+    expect(child(Card({ text: 'it\'s' }))).toContain(`data-props='[{"text":1},"it&#39;s"]'`)
+    expect(child(Card({ text: '\'\'\'\'' }))).toContain(`data-props="[{&quot;text&quot;:1},&quot;''''&quot;]"`)
+    expect(child(island('bare.kay', () => null)({}))).toContain('data-props="[{}]"')
   })
 
   it('hydrates an island whose prop the server vouched for, keeping its markup in a spread and dropping a plain string\'s', async () => {

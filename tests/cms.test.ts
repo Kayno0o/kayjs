@@ -929,7 +929,7 @@ describe('preview mode', () => {
     const edit = await previewCookie(previewUrl('/news', { edit: true }))
     const preview = await previewCookie(previewUrl('/news'))
     const editor = `${FIXTURE}/src/components/draft-editor.kay`
-    const slot = new RegExp(`<slot data-component="${editor}" data-props="[^"]+" data-persist="${editor}"><button class="count">[\\s\\S]*<ul class="edited">(.*)</ul></slot></body></html>$`)
+    const slot = new RegExp(`<slot data-component="${editor}" data-props='[^']+' data-persist="${editor}"><button class="count">[\\s\\S]*<ul class="edited">(.*)</ul></slot></body></html>$`)
     const edited = async (path: string) => slot.exec((await get(path, edit)).html)?.[1]?.replaceAll(HYDRATION_MARK, '')
 
     expect(await edited('/marks/launch')).toBe('<li>news:launch</li>')

@@ -110,7 +110,7 @@ describe('pages', () => {
 
     expect(home.html).toContain('<slot data-component="tests/fixtures/site/src/components/counter.kay"')
     expect(home.html).toContain('window._$K')
-    expect(home.html).toContain('<slot data-component="tests/fixtures/site/src/components/counter.kay" data-props="[{&quot;start&quot;:1},1]"><button class="counter">Clicked <!--[-->1<!--]--></button></slot>')
+    expect(home.html).toContain(`<slot data-component="tests/fixtures/site/src/components/counter.kay" data-props='[{"start":1},1]'><button class="counter">Clicked <!--[-->1<!--]--></button></slot>`)
     expect(home.html.replace(/<slot[\s\S]*<\/slot>/, '')).not.toContain('<!--[-->')
     const entry = (/<script type="module" src="(\/_kay\/[^"]+)"><\/script>/).exec(home.html)?.[1]
 

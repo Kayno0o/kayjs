@@ -39,7 +39,7 @@ describe('Markdown entries', () => {
     expect(html).toContain('<h2 id="getting-started"><a href="#getting-started">Getting started</a></h2>')
     expect(html).toContain('<aside class="callout warn">\n<p>Mind the <strong>gap</strong>.</p>\n</aside>')
     expect(html).toContain('<pre class="highlighted" data-language="ts">const less = 1 &lt; 2\n</pre>')
-    expect(html).toContain('<slot data-component="tests/fixtures/content/src/components/counter.kay" data-props="[{&quot;start&quot;:1},2]"><button>Count <!--[-->2<!--]--></button></slot>')
+    expect(html).toContain(`<slot data-component="tests/fixtures/content/src/components/counter.kay" data-props='[{"start":1},2]'><button>Count <!--[-->2<!--]--></button></slot>`)
     expect(html).toMatch(/<link rel="modulepreload" href="\/_kay\/counter-[\w-]+\.js">/)
     expect((await get('/blog/missing')).status).toBe(404)
   })

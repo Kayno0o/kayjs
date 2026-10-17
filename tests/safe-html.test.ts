@@ -216,7 +216,7 @@ describe('markup across JSON', () => {
   it('goes into an island\'s data-props as the SafeHtml type only for markup vouched for', () => {
     const Card = island('card.kay', (_props: { good: string, bad: string }) => null)
     const html = child(Card({ good: trustHtml('<b>good-prop-1</b>'), bad: '<b>bad-prop-1</b>' }))
-    const props = (/data-props="([^"]*)"/).exec(html)![1]!.replaceAll('&quot;', '"')
+    const props = (/data-props='([^']*)'/).exec(html)![1]!
 
     expect(props.match(/SafeHtml/g)).toHaveLength(1)
     expect(props).toContain('["SafeHtml",')

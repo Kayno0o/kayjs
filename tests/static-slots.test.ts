@@ -41,13 +41,13 @@ function click(element: Element) {
 
 describe('static slots', () => {
   it('renders the children and slots a page passes an island in the page, an island among them its own', () => {
-    expect(pageHtml).toContain('data-slots="{&quot;actions&quot;:0,&quot;children&quot;:1}"')
-    expect(pageHtml).toContain('<!--kay-slot:1--><p class="text">Hello Ada</p><slot data-component="tests/fixtures/slots/counter.kay" data-props="[{&quot;start&quot;:1},1]">')
+    expect(pageHtml).toContain(`data-slots='{"actions":0,"children":1}'`)
+    expect(pageHtml).toContain(`<!--kay-slot:1--><p class="text">Hello Ada</p><slot data-component="tests/fixtures/slots/counter.kay" data-props='[{"start":1},1]'>`)
     // Not rendered by the island, or a client-only one: sent as markup.
-    expect(pageHtml).toContain('data-slots="{&quot;children&quot;:&quot;&lt;p class=\\&quot;hidden\\&quot;>Hidden at first&lt;/p>')
-    expect(pageHtml).toContain('data-slots="{&quot;children&quot;:&quot;&lt;p class=\\&quot;client\\&quot;>Client only&lt;/p>&quot;}" data-client>')
+    expect(pageHtml).toContain(`data-slots='{"children":"&lt;p class=\\"hidden\\">Hidden at first&lt;/p>`)
+    expect(pageHtml).toContain(`data-slots='{"children":"&lt;p class=\\"client\\">Client only&lt;/p>"}' data-client>`)
     // Text alone is data.
-    expect(pageHtml).toContain('data-props="[{&quot;children&quot;:1},&quot;Plain text&quot;]"><span class="label">Plain text</span>')
+    expect(pageHtml).toContain(`data-props='[{"children":1},"Plain text"]'><span class="label">Plain text</span>`)
   })
 
   it('hydrates around the slots it claims, which keep their nodes and the state of an island in them as the island hides and shows them', async () => {
@@ -108,7 +108,7 @@ describe('static slots', () => {
   })
 
   it('renders a static component passing an island a function or a block taking parameters as an island itself, one passing only data staying static', () => {
-    expect(pageHtml).toContain('<slot data-component="tests/fixtures/slots/toolbar.kay" data-props="[{&quot;label&quot;:1},&quot;Tool&quot;]"><div class="toolbar"><button class="pick">')
+    expect(pageHtml).toContain(`<slot data-component="tests/fixtures/slots/toolbar.kay" data-props='[{"label":1},"Tool"]'><div class="toolbar"><button class="pick">`)
     expect(pageHtml).toContain('<slot data-component="tests/fixtures/slots/rows.kay" data-props="[{}]">')
     expect(pageHtml).toContain('<div class="counted"><slot data-component="tests/fixtures/slots/counter.kay"')
   })

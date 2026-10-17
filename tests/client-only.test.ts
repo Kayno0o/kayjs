@@ -52,11 +52,11 @@ afterAll(async () => {
 
 describe('client-only islands', () => {
   it('renders an island importing a package that cannot load without a DOM in the browser only, never loading the package on the server', () => {
-    expect(html).toContain(`<slot data-component="${ids.chart}" data-props="[{&quot;label&quot;:1},&quot;sales&quot;]" data-client></slot>`)
+    expect(html).toContain(`<slot data-component="${ids.chart}" data-props='[{"label":1},"sales"]' data-client></slot>`)
   })
 
   it('leaves the slot of a `--- client` component empty, and its part inside another island', () => {
-    expect(html).toContain(`<slot data-component="${ids.width}" data-props="[{&quot;unit&quot;:1},&quot;em&quot;]" data-client></slot>`)
+    expect(html).toContain(`<slot data-component="${ids.width}" data-props='[{"unit":1},"em"]' data-client></slot>`)
     expect(html).toContain('<section><button class="toggle">0</button><!--[--><!--]--><p class="after">after</p></section>')
   })
 

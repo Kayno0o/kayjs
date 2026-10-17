@@ -1013,7 +1013,7 @@ describe('kay build --compile', () => {
       // Content entries come from what the build compiled, with nothing of src/content beside the executable.
       expect((await get('/notes/first')).text).toContain('<h1>First note</h1><h2 id="read-me"><a href="#read-me">Read me</a></h2>')
       expect((await get('/notes.xml')).text).toContain('<link>https://example.com/notes/first</link>')
-      expect((await get('/tags')).text).toContain('<slot data-component="node_modules/kay-lib/src/tag.kay" data-props="[{&quot;label&quot;:1},&quot;kept&quot;]"><button class="tag">app:kept</button></slot>')
+      expect((await get('/tags')).text).toContain(`<slot data-component="node_modules/kay-lib/src/tag.kay" data-props='[{"label":1},"kept"]'><button class="tag">app:kept</button></slot>`)
       expect((await get('/live-tags')).text).toContain('<button class="tag">app:live</button>')
 
       // A container's health check runs the executable again, asking the server beside it.
