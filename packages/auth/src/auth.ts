@@ -10,7 +10,7 @@ import type { BearerToken, CreateTokenResult, IssueTokenResult, TokenOptions } f
 import type { CaptchaAction, CaptchaOptions } from './captcha'
 import type { AuthSessionData, Core, OAuthApp, Profile, SignedIn, User } from './core'
 import type { ChangeEmailResult, CodeResult, EmailOptions, LinkResult, MailRequestResult, ResetPasswordResult, VerifyEmailResult } from './email'
-import type { AuditCursorInput, AuditEntry, AuthEvent, EventContext } from './events'
+import type { AuditCursorInput, AuditEntry, AuthEvent, AuthEventInfo, EventContext } from './events'
 import type { DataExport } from './export'
 import type { ScopeRequirement } from './gate'
 import type { LimitsOption } from './limits'
@@ -146,7 +146,9 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   guests?: { maxAge: Duration } | undefined
   // What the app keeps about a user, added to their `exportData()` as `app`: their posts, their orders.
   onExport?: ((user: User) => unknown) | undefined
-  // Called with every change to what protects an account, the ones mailed to the user, and with every sign-in, sign-out and failed sign-in of a known account, for an audit log of the app's own.
+  // Called with every change to what protects an account, the ones mailed to the user, and with every sign-in, sign-out and failed sign-in of a known account, for an audit log of the app's own. It gets one object: `event`, `user`, `context` (where from, and who acted when not the user), and the fields of its kind, such as the `role` of a `role-granted` or the `method` of a `signed-in`.
+  onAuthEvent?: ((info: AuthEventInfo) => void | Promise<void>) | undefined
+  /** @deprecated Renamed `onAuthEvent`, which gets one object with the detail's parts as fields: `onEvent` still works for now and logs a warning. */
   onEvent?: ((event: AuthEvent, user: User, detail: string | undefined, context: EventContext) => void | Promise<void>) | undefined
   // Keeps the same events in the store's audit log, for `auditLog()`; `maxAge` seconds or a string such as '365d', a year by default.
   audit?: boolean | { maxAge?: Duration } | undefined
@@ -1299,6 +1301,10 @@ function auditMaxAge(audit: true | { maxAge?: Duration }): number {
 function createCore<Data extends AuthSessionData, Role extends string, Prefix extends string, Scope extends string, OrgRole extends string>(options: AuthOptions<Data, Role, Prefix, Scope, OrgRole>): Core {
   const prefix = options.prefix ?? '/auth'
   const oauth: Core['oauth'] = new Map()
+
+  if (options.onEvent !== undefined)
+    log.warn('createAuth({ onEvent }) is renamed createAuth({ onAuthEvent }), which gets one object: { event, user, context, ...fields }')
+
   const oauthApps = Object.entries(options.oauth ?? {})
   const url = options.url?.replace(TRAILING_SLASH, '')
   const locales = options.email?.locales !== undefined && options.email.locales.length > 0 ? [...options.email.locales] : ['en']
@@ -1352,6 +1358,7 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
     onDelete: options.onDelete,
     guestMaxAge: options.guests === undefined ? undefined : durationSeconds(options.guests.maxAge, 'guests.maxAge', 'kayjs-auth'),
     onExport: options.onExport,
+    onAuthEvent: options.onAuthEvent,
     onEvent: options.onEvent,
     organizations: options.organizations && organizationsCore(options.organizations),
     pruned: { at: 0, running: Promise.resolve() },

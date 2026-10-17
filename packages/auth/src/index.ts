@@ -12,7 +12,7 @@ export type { CaptchaAction, CaptchaCheck, CaptchaOptions, CaptchaRules, Captcha
 export * from './decide'
 export type { Device } from './device'
 export type { ChangeEmailResult, CodedLink, CodeMode, CodeResult, EmailOptions, LinkResult, MailRequestResult, ResetPasswordResult, VerifyEmailResult } from './email'
-export type { ActivityEvent, AuditEntry, AuthEvent, EventContext } from './events'
+export type { ActivityEvent, AuditEntry, AuthEvent, AuthEventInfo, EventContext, EventFields } from './events'
 export type { DataExport } from './export'
 export * from './gate'
 export { DEFAULT_LIMITS } from './limits'

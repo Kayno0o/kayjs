@@ -7,6 +7,8 @@ import { publicUser } from './core'
 import { log } from './log'
 import { PRUNE_EVERY_MS } from './prune'
 
+const OAUTH_PREFIX = 'oauth:'
+
 // The audit log is pruned of what outlived its age at most this often.
 const AUDIT_PAGE_MAX = 200
 
@@ -15,6 +17,49 @@ const AUDIT_PAGE_MAX = 200
 export type ActivityEvent = 'signed-in' | 'signed-out' | 'sign-in-failed' | 'role-granted' | 'role-revoked' | 'banned' | 'unbanned' | 'impersonation-started' | 'impersonation-ended' | 'organization-created' | 'organization-deleted' | 'member-joined' | 'member-left' | 'member-removed' | 'member-roles-changed' | 'oauth-client-approved' | 'oauth-client-revoked'
 
 export type AuthEvent = SecurityEvent | ActivityEvent
+
+// What each event says besides who it happened to and where from, as `onAuthEvent` hears it.
+export interface EventFields {
+  // `method` is how: `password`, `register`, `reset-password`, `magic-link`, `email-code`, `passkey`, `guest` or `oauth`, with the `provider` for the last.
+  'signed-in': { method: string, provider?: string }
+  'signed-out': Record<never, never>
+  // `method` is the attempt that failed: `password`, `passkey` or `two-factor`.
+  'sign-in-failed': { method: string }
+  'role-granted': { role: string }
+  'role-revoked': { role: string }
+  'banned': { reason?: string }
+  'unbanned': Record<never, never>
+  'impersonation-started': Record<never, never>
+  'impersonation-ended': Record<never, never>
+  'organization-created': { organizationId: string }
+  'organization-deleted': { organizationId: string }
+  'member-joined': { organizationId: string, roles: string[] }
+  'member-left': { organizationId: string }
+  'member-removed': { organizationId: string }
+  'member-roles-changed': { organizationId: string, roles: string[] }
+  // `client` is the app's name.
+  'oauth-client-approved': { client: string }
+  'oauth-client-revoked': { client: string }
+  'new-sign-in': Record<never, never>
+  'password-changed': Record<never, never>
+  // `email` is the new address.
+  'email-changed': { email: string }
+  'two-factor-enabled': Record<never, never>
+  'two-factor-disabled': Record<never, never>
+  'recovery-code-used': Record<never, never>
+  'recovery-codes-regenerated': Record<never, never>
+  'provider-linked': { provider: string }
+  'provider-unlinked': { provider: string }
+  'passkey-added': { name?: string }
+  'passkey-removed': { name?: string }
+  'token-created': { name?: string }
+  // `keptThisOne` is whether the session that asked stayed signed in.
+  'signed-out-everywhere': { keptThisOne: boolean }
+  'account-deleted': Record<never, never>
+}
+
+// An event as `onAuthEvent` hears it: the event, who it happened to, where from and its own fields, such as the `role` of a `role-granted`.
+export type AuthEventInfo = { [Event in AuthEvent]: { event: Event, user: User, context: EventContext } & EventFields[Event] }[AuthEvent]
 
 // Where an event came from: the request's address and browser, and who acted when it was not the user, such as an admin.
 export interface EventContext {
@@ -36,20 +81,84 @@ export interface AuditEntry {
   at: Date
 }
 
+// The fields of an event, read off the detail it is kept with in the audit log.
+export function eventFields(event: AuthEvent, detail: string | undefined): EventFields[AuthEvent] {
+  const text = detail === undefined || detail === '' ? undefined : detail
+
+  switch (event) {
+    case 'signed-in':
+      return text?.startsWith(OAUTH_PREFIX) ? { method: 'oauth', provider: text.slice(OAUTH_PREFIX.length) } : { method: text ?? 'unknown' }
+    case 'sign-in-failed':
+      return { method: text ?? 'unknown' }
+    case 'role-granted':
+    case 'role-revoked':
+      return { role: text ?? '' }
+    case 'banned':
+      return text === undefined ? {} : { reason: text }
+    case 'organization-created':
+    case 'organization-deleted':
+    case 'member-left':
+    case 'member-removed':
+      return { organizationId: text ?? '' }
+    case 'member-joined':
+    case 'member-roles-changed': {
+      const [organizationId = '', ...roles] = (text ?? '').split(' ')
+
+      return { organizationId, roles: roles.filter(role => role !== '') }
+    }
+    case 'oauth-client-approved':
+    case 'oauth-client-revoked':
+      return { client: text ?? '' }
+    case 'email-changed':
+      return { email: text ?? '' }
+    case 'provider-linked':
+    case 'provider-unlinked':
+      return { provider: text ?? '' }
+    case 'passkey-added':
+    case 'passkey-removed':
+    case 'token-created':
+      return text === undefined ? {} : { name: text }
+    case 'signed-out-everywhere':
+      return { keptThisOne: text === 'this-one-kept' }
+    case 'signed-out':
+    case 'unbanned':
+    case 'impersonation-started':
+    case 'impersonation-ended':
+    case 'new-sign-in':
+    case 'password-changed':
+    case 'two-factor-enabled':
+    case 'two-factor-disabled':
+    case 'recovery-code-used':
+    case 'recovery-codes-regenerated':
+    case 'account-deleted':
+      return {}
+  }
+}
+
 // The admin acting as the user this browser is signed in as, when one is.
 export async function impersonatorOf(state: RequestState): Promise<string | undefined> {
   return state.via() === 'bearer' ? undefined : (await state.session.get('auth'))?.impersonator?.user
 }
 
-// Hands `event` to the app's `onEvent` and to the audit log when it is kept. A failure is logged, not thrown: what happened is done by then.
+// Hands `event` to the app's `onAuthEvent` and `onEvent` and to the audit log when it is kept. A failure is logged, not thrown: what happened is done by then.
 // While an admin acts as a user, whatever happens is the admin's doing, named as the actor.
 export async function report(state: RequestState, record: UserRecord, event: AuthEvent, detail?: string, by?: UserRecord): Promise<void> {
   const { core } = state
   const impersonator = await impersonatorOf(state)
   const actor = impersonator === undefined ? by : await core.store.users.get(impersonator) ?? by
 
+  const user = publicUser(record)
+  const context: EventContext = { ip: state.address, userAgent: state.userAgent, actor: actor ? publicUser(actor) : null }
+
   try {
-    await core.onEvent?.(event, publicUser(record), detail, { ip: state.address, userAgent: state.userAgent, actor: actor ? publicUser(actor) : null })
+    await core.onAuthEvent?.({ event, user, context, ...eventFields(event, detail) } as AuthEventInfo)
+  }
+  catch (error) {
+    log.error(`onAuthEvent failed for ${event}`, error)
+  }
+
+  try {
+    await core.onEvent?.(event, user, detail, context)
   }
   catch (error) {
     log.error(`onEvent failed for ${event}`, error)

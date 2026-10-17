@@ -286,7 +286,7 @@ function propertyKey(property: t.ObjectProperty | t.ObjectMethod): string | unde
   return property.key.type === 'StringLiteral' ? property.key.value : undefined
 }
 
-const SIGN_IN_CALL = /\b(?:signInWithPassword|requestMagicLink|signInWithPasskey|register)\b/
+const SIGN_IN_CALL = /\b(?:signInWithPassword|requestMagicLink|signInWithPasskey|register|createAuth)\b/
 // What a way of signing in of kayjs-auth took in its input before 1.52, which is its trailing options object now.
 const INPUT_OPTIONS: Record<string, string[]> = { signInWithPassword: ['redirect', 'remember', 'captcha'], register: ['remember', 'captcha'] }
 // The ones whose redirect was a positional argument after the first.
@@ -294,13 +294,25 @@ const POSITIONAL_REDIRECT = new Set(['requestMagicLink', 'signInWithPasskey'])
 
 // A call of kayjs-auth's `signInWithPassword`, `register`, `requestMagicLink` or `signInWithPasskey` in the form of before 1.52: the redirect, remember and captcha in the input or as a positional redirect, where they are the trailing options object now.
 // Read by name, as the `auth` of `ctx.locals.auth` is typed by the app; `register` only on a receiver named `auth`, as it is a common name.
-export function staleSignInCalls(fence: ParsedFence): Diagnostic[] {
+export function staleAuthCalls(fence: ParsedFence): Diagnostic[] {
   if (!SIGN_IN_CALL.test(fence.code))
     return []
 
   const diagnostics: Diagnostic[] = []
 
   eachNode(fence.ast.program, (node) => {
+    const hook = node.type === 'CallExpression' ? staleEventHook(node) : undefined
+
+    if (hook) {
+      diagnostics.push({
+        ...fence.shift(hook),
+        code: 'deprecated-auth-event',
+        message: '`onEvent` of `createAuth` is `onAuthEvent` since 1.52, which gets one object instead of four arguments',
+        help: 'write `onAuthEvent: ({ event, user, context, ...fields }) => ...`: the parts of the old `detail` are fields of the object, such as `role`, `method`, `provider` or `organizationId`',
+        checkOnly: true,
+      })
+    }
+
     if (node.type !== 'CallExpression' || node.callee.type !== 'MemberExpression' || node.callee.computed || node.callee.property.type !== 'Identifier' || node.arguments.some(argument => argument.type === 'SpreadElement'))
       return
 
@@ -328,6 +340,20 @@ export function staleSignInCalls(fence: ParsedFence): Diagnostic[] {
   })
 
   return diagnostics
+}
+
+// The `onEvent` key of the options object a `createAuth(...)` call is given.
+function staleEventHook(call: t.CallExpression): t.Node | undefined {
+  const { callee } = call
+  const named = callee.type === 'Identifier' ? callee.name === 'createAuth' : callee.type === 'MemberExpression' && !callee.computed && callee.property.type === 'Identifier' && callee.property.name === 'createAuth'
+  const options = call.arguments[0]
+
+  if (!named || options?.type !== 'ObjectExpression')
+    return undefined
+
+  const found = options.properties.find((property): property is t.ObjectProperty | t.ObjectMethod => property.type !== 'SpreadElement' && propertyKey(property) === 'onEvent')
+
+  return found?.key
 }
 
 // The name the receiver of a call ends on: `auth` in `auth.x()` and in `ctx.locals.auth.x()`.
@@ -428,5 +454,5 @@ export function moduleChecks(source: string, browser = false): Diagnostic[] {
 }
 
 function checksOf(module: ParsedFence, browser: boolean): Diagnostic[] {
-  return [...cssImportsWithoutText(module), ...staleSignInCalls(module), ...browser ? serverOnlyImports(module) : []]
+  return [...cssImportsWithoutText(module), ...staleAuthCalls(module), ...browser ? serverOnlyImports(module) : []]
 }

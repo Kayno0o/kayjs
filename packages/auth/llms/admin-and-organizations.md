@@ -2,14 +2,16 @@
 
 ## Events and the audit log
 
-`onEvent(event, user, detail, context)` hears every security mail's event above, mailed or not, and these, never mailed:
+`onAuthEvent(info)` hears every security mail's event above, mailed or not, and these, never mailed. `info` is one object, `{ event, user, context, ...fields }`: `context` is `{ ip, userAgent, actor }`, and the fields are the event's own, as below. Switch on `info.event` and the fields are typed.
 
-- `signed-in`, `detail` how: `password`, `register`, `reset-password`, `magic-link`, `email-code`, `oauth:<provider>`, `passkey`, `guest`, or `app` for `auth.signIn`. A sign-in through the second factor is heard once it is answered, with its first factor.
+- `signed-in`, `method` how: `password`, `register`, `reset-password`, `magic-link`, `email-code`, `oauth` with the `provider`, `passkey`, `guest`, or `app` for `auth.signIn`. A sign-in through the second factor is heard once it is answered, with its first factor.
 - `signed-out`.
-- `sign-in-failed`, for an account that exists only: `detail` `password`, `two-factor` or `passkey`.
-- An admin's doing, `actor` the admin: `role-granted` and `role-revoked`, `detail` the role; `banned`, `detail` the reason; `unbanned`; `impersonation-started` and `impersonation-ended`.
-- In an organization, `detail` its id: `organization-created` and `organization-deleted`; `member-joined` and `member-roles-changed`, `detail` the id then the roles given, space-separated; `member-left`; `member-removed`. A manager's doing names them as `actor`.
-- `oauth-client-approved` (first approval of an app, or more scopes) and `oauth-client-revoked`, `detail` the app's name.
+- `sign-in-failed`, for an account that exists only: `method` `password`, `two-factor` or `passkey`.
+- An admin's doing, `actor` the admin: `role-granted` and `role-revoked`, `role`; `banned`, `reason` when given; `unbanned`; `impersonation-started` and `impersonation-ended`.
+- In an organization, `organizationId`: `organization-created` and `organization-deleted`; `member-joined` and `member-roles-changed`, with the `roles` given; `member-left`; `member-removed`. A manager's doing names them as `actor`.
+- `oauth-client-approved` (first approval of an app, or more scopes) and `oauth-client-revoked`, `client` the app's name.
+
+`onEvent(event, user, detail, context)` is the form before 1.52, with the parts of the fields packed in a string (`oauth:<provider>`, `<orgId> <role> <role>`): it still works for now, logs a warning, and `kay check` reports it as `deprecated-auth-event`. The audit log keeps the same string as an entry's `detail`.
 
 `context` is `{ ip, userAgent, actor }`, `actor` the user who acted when it was not the one it happened to, such as an admin. While an admin acts as a user, every event names the admin as `actor`, in the audit log too: an organization created or a member removed, a sign-out everywhere.
 
@@ -24,7 +26,7 @@ With `audit: true`, or `{ maxAge }` as seconds or a string such as `'90d'` (a ye
 - `listUsers({ search, offset, limit })` gives `{ ok: true, users, total }`, newest first, 50 a page by default and 200 at most; `search` matches part of an email or a username whatever its case, or a whole id. `getUser(id)` gives one. Each is a `User` with `createdAt` and `ban`, `{ at, until, reason }` while banned, else null.
 - `grantRole(id, role)` and `revokeRole(id, role)` take a role the `roles` option declares (`unknown-role` otherwise), effective on the user's next request. An admin taking back a role of their own that leaves them no longer an admin is refused (`self`).
 - `banUser(id, { reason, until })` bars the user from signing in, for good or until that date (`until` in the past answers `until`), and signs them out everywhere, bearer tokens revoked. Every sign-in of theirs answers `{ ok: false, error: 'banned' }`, an OAuth one `?error=banned`, and `auth.signIn` throws. An admin cannot ban themselves (`self`) or another admin (`admin`): revoke the role first. `unbanUser(id)` lifts it.
-- `deleteUser(id)` deletes the user as `deleteAccount` does, `onDelete(user)` first, and mails them the `account-deleted` notice when `email` is set and their address is verified. The audit log keeps an `account-deleted` entry with the admin as `actorId`, and `onEvent` gets the admin as `context.actor`. It gives `{ ok: true }`, or `{ ok: false, error }` with `forbidden`, `stale`, `not-found`, `self` or `admin` as for `banUser`.
+- `deleteUser(id)` deletes the user as `deleteAccount` does, `onDelete(user)` first, and mails them the `account-deleted` notice when `email` is set and their address is verified. The audit log keeps an `account-deleted` entry with the admin as `actorId`, and `onAuthEvent` gets the admin as `context.actor`. It gives `{ ok: true }`, or `{ ok: false, error }` with `forbidden`, `stale`, `not-found`, `self` or `admin` as for `banUser`.
 - `impersonate(id)` signs the admin's browser in as the user, keeping the admin's own sign-in; `impersonator()` gives the admin, to show a banner, and `stopImpersonating()` signs them back in as themselves, or out when their own sign-in ended meanwhile. Meanwhile nothing taking a proof passes (`reprove` answers `impersonating`, and the sign-in counts as stale), no new sign-in mail goes out, and the impersonation ends once the admin is signed out everywhere, banned or no longer an admin. Another admin, oneself and a banned user cannot be impersonated. `signOut()` ends both sign-ins.
 - `adminAuditLog({ userId, before, limit })` gives `{ ok: true, entries }`, everyone's audit log or one user's, paged by `before` as `auditLog` is.
 

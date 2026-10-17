@@ -4,7 +4,7 @@ import { escapeHtml as escape } from 'kay/library'
 import { language, pickLocale } from './locale'
 import { log } from './log'
 
-// A change to what protects an account, mailed to its verified address and given to `onEvent`.
+// A change to what protects an account, mailed to its verified address and given to `onAuthEvent`.
 export type SecurityEvent = 'new-sign-in' | 'password-changed' | 'email-changed' | 'two-factor-enabled' | 'two-factor-disabled' | 'recovery-code-used' | 'recovery-codes-regenerated' | 'provider-linked' | 'provider-unlinked' | 'passkey-added' | 'passkey-removed' | 'token-created' | 'signed-out-everywhere' | 'account-deleted'
 
 // What a mail is about: a link to follow, news of a change to the account, an invitation to join an organization, or a registration for an address that has an account already.

@@ -338,20 +338,22 @@ export default auth.guard({ require: 'editor' })
 
 ## Events and the audit log
 
-`onEvent` hears what happens to an account, such as a sign-in, a failed sign-in, a role granted or a ban.
+`onAuthEvent` hears what happens to an account, such as a sign-in, a failed sign-in, a role granted or a ban.
 
 ```ts
 createAuth({
   // ...
   audit: true,
-  onEvent: (event, user, detail, context) => {
-    if (event === 'sign-in-failed')
-      console.warn(user.email, detail, context.ip)
+  onAuthEvent: (info) => {
+    if (info.event === 'sign-in-failed')
+      console.warn(info.user.email, info.method, info.context.ip)
   },
 })
 ```
 
-`context` is `{ ip, userAgent, actor }`. `actor` is the admin when an admin did it.
+It gets one object: `event`, `user`, `context` and the fields of that event, such as the `method` of a sign-in, the `role` of a role granted or the `organizationId` of an organization's. `context` is `{ ip, userAgent, actor }`. `actor` is the admin when an admin did it.
+
+Before 1.52 this was `onEvent(event, user, detail, context)`, with the fields packed in the `detail` string. It still works for now and `kay check` reports it.
 
 With `audit: true`, the same events are kept in the store for a year. Pass `audit: { maxAge: '90d' }`, seconds or a string, to change it. `auth.auditLog({ before, limit })` gives the signed-in user their own, newest first. Pass the last entry of a page as `before` for the next one.
 

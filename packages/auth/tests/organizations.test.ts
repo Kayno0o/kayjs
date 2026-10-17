@@ -1,6 +1,6 @@
 import type { Duration, GuardContext } from 'kay'
 import type { User } from '../src/auth'
-import type { AuthEvent } from '../src/events'
+import type { AuthEvent, AuthEventInfo } from '../src/events'
 import type { Mail } from '../src/mail'
 import type { TestBrowser } from './helpers/app'
 import { afterEach, describe, expect, setSystemTime, test } from 'bun:test'
@@ -17,6 +17,8 @@ afterEach(() => {
 async function setup(options: { invitationPage?: string | undefined, create?: 'admin', invitationMaxAge?: Duration } = {}) {
   const mails: Mail[] = []
   const events: [AuthEvent, string | null, string | undefined, string | undefined][] = []
+  // What `onAuthEvent` hears of the same events: the event, who it happened to, its fields and who acted.
+  const heard: [AuthEvent, string | null, object, string | undefined][] = []
   const app = testApp({
     url: 'https://site.test',
     site: 'Site',
@@ -40,6 +42,10 @@ async function setup(options: { invitationPage?: string | undefined, create?: 'a
     onEvent: (event, user: User, detail, context) => {
       if (ORG_EVENTS.has(event))
         events.push([event, user.email, detail, context.actor?.email ?? undefined])
+    },
+    onAuthEvent: ({ event, user, context, ...fields }: AuthEventInfo) => {
+      if (ORG_EVENTS.has(event))
+        heard.push([event, user.email, fields, context.actor?.email ?? undefined])
     },
   })
   const site = new Elysia()
@@ -84,7 +90,7 @@ async function setup(options: { invitationPage?: string | undefined, create?: 'a
     return to.browser.call('acceptInvitation', invitation.id)
   }
 
-  return { ...app, site, mails, events, person, ada, org, join }
+  return { ...app, site, mails, events, heard, person, ada, org, join }
 }
 
 describe('organizations', () => {
@@ -162,7 +168,7 @@ describe('organizations', () => {
   })
 
   test('the invited user sees their invitations, accepts one, and joins with its roles', async () => {
-    const { ada, org, person, store, events } = await setup()
+    const { ada, org, person, store, events, heard } = await setup()
     const grace = await person('grace@example.com')
     const { invitation } = await ada.browser.callOk('invite', org, 'grace@example.com', ['admin'])
 
@@ -174,6 +180,7 @@ describe('organizations', () => {
     expect((await ada.browser.callOk('members', org)).members).toMatchObject([{ user: { email: 'ada@example.com' }, roles: ['owner'] }, { user: { id: grace.id }, roles: ['admin'] }])
     expect(await store.members!.get(org, grace.id)).toMatchObject({ roles: ['admin'] })
     expect(events.at(-1)).toEqual(['member-joined', 'grace@example.com', `${org} admin`, undefined])
+    expect(heard.at(-1)).toEqual(['member-joined', 'grace@example.com', { organizationId: org, roles: ['admin'] }, undefined])
   })
 
   test('invitationMaxAge takes seconds or a duration string, and a bad one fails naming the option', async () => {
@@ -213,7 +220,7 @@ describe('organizations', () => {
   })
 
   test('a manager gives only roles they hold, to members holding none above theirs, and the last owner stays', async () => {
-    const { ada, org, person, join, events } = await setup()
+    const { ada, org, person, join, events, heard } = await setup()
     const grace = await person('grace@example.com')
     const alan = await person('alan@example.com')
 
@@ -241,6 +248,13 @@ describe('organizations', () => {
       ['member-removed', 'alan@example.com', org, 'grace@example.com'],
       ['member-roles-changed', 'grace@example.com', `${org} owner`, 'ada@example.com'],
       ['member-left', 'ada@example.com', org, undefined],
+    ])
+    expect(heard.filter(([event]) => event !== 'member-joined')).toEqual([
+      ['organization-created', 'ada@example.com', { organizationId: org }, undefined],
+      ['member-roles-changed', 'alan@example.com', { organizationId: org, roles: ['admin'] }, 'grace@example.com'],
+      ['member-removed', 'alan@example.com', { organizationId: org }, 'grace@example.com'],
+      ['member-roles-changed', 'grace@example.com', { organizationId: org, roles: ['owner'] }, 'ada@example.com'],
+      ['member-left', 'ada@example.com', { organizationId: org }, undefined],
     ])
   })
 

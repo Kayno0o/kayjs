@@ -1,6 +1,7 @@
 import type { User } from '../src/auth'
-import type { AuthEvent, EventContext } from '../src/events'
+import type { AuthEvent, AuthEventInfo, EventContext } from '../src/events'
 import { afterEach, describe, expect, setSystemTime, test } from 'bun:test'
+import { eventFields } from '../src/events'
 import { totpCode, totpStep } from '../src/totp'
 import { testApp } from './helpers/app'
 
@@ -101,6 +102,155 @@ describe('events', () => {
 
     expect(await ada.json('/me')).toMatchObject({ email: 'ada@example.com' })
     expect(logged).toContainEqual(['error', expect.stringMatching(/^onEvent failed for /), expect.objectContaining({ message: 'down' }), undefined, 'kayjs-auth'])
+  })
+})
+
+describe('onAuthEvent', () => {
+  function listen(options: Parameters<typeof testApp>[0] = {}) {
+    const heard: AuthEventInfo[] = []
+    const app = testApp({ onAuthEvent: (info) => {
+      heard.push(info)
+    }, ...options })
+    // The event and its fields, who it happened to and where from set aside.
+    const said = () => heard.filter(info => ACTIVITY.has(info.event) || info.event === 'signed-out-everywhere').map(({ event, user: _user, context: _context, ...fields }) => [event, fields])
+
+    return { ...app, heard, said }
+  }
+
+  test('hears one object, with how a sign-in happened and which attempt failed as fields, and where it came from', async () => {
+    const { browser, said, heard } = listen()
+
+    await browser().call('register', { email: 'ada@example.com', password: PASSWORD })
+    await browser().json('/password', from('10.0.0.1', { identifier: 'ada@example.com', password: 'wrong password' }))
+
+    const ada = browser()
+
+    await ada.json('/password', from('10.0.0.2', { identifier: 'ada@example.com', password: PASSWORD }))
+    await ada.fetch('/sign-out', { method: 'POST' })
+    await ada.json('/password', from('10.0.0.2', { identifier: 'ada@example.com', password: PASSWORD }))
+    await ada.fetch('/sign-out-everywhere?keep=1', { method: 'POST' })
+    await ada.fetch('/sign-out-everywhere', { method: 'POST' })
+
+    expect(said()).toEqual([
+      ['signed-in', { method: 'register' }],
+      ['sign-in-failed', { method: 'password' }],
+      ['signed-in', { method: 'password' }],
+      ['signed-out', {}],
+      ['signed-in', { method: 'password' }],
+      ['signed-out-everywhere', { keptThisOne: true }],
+      ['signed-out-everywhere', { keptThisOne: false }],
+    ])
+    expect(heard.find(info => info.event === 'sign-in-failed')).toMatchObject({ user: { email: 'ada@example.com' }, context: { ip: '10.0.0.1', userAgent: 'Firefox', actor: null } })
+  })
+
+  test('hears a failed second factor, and runs beside onEvent, each told once per event', async () => {
+    const legacy: string[] = []
+    const { browser, said, store } = listen({ onEvent: (event, _user, detail) => {
+      legacy.push(`${event} ${detail}`)
+    } })
+    const ada = browser()
+
+    await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
+    const { setup: totp } = await ada.callOk('setUpTwoFactor', { password: PASSWORD })
+
+    await ada.call('enableTwoFactor', await totpCode(totp.secret, totpStep()))
+    await store.users.update((await store.users.findByEmail('ada@example.com'))!.id, { totpLastStep: 0 })
+
+    const phone = browser()
+
+    await phone.post('/password', { identifier: 'ada@example.com', password: PASSWORD })
+    await phone.call('verifyTwoFactor', '000000')
+
+    expect(said().at(-1)).toEqual(['sign-in-failed', { method: 'two-factor' }])
+    expect(legacy.filter(line => line.startsWith('sign-in-failed'))).toEqual(['sign-in-failed two-factor'])
+  })
+
+  test('an onAuthEvent that throws is logged, and neither the sign-in nor onEvent stops', async () => {
+    const legacy: string[] = []
+    const { browser } = testApp({
+      onAuthEvent: () => {
+        throw new Error('down')
+      },
+      onEvent: (event) => {
+        legacy.push(event)
+      },
+    })
+    const ada = browser()
+    const logged: unknown[][] = []
+    const global = globalThis as { [LOG_SINK]?: unknown }
+    const sink = global[LOG_SINK]
+
+    global[LOG_SINK] = (...args: unknown[]) => logged.push(args)
+
+    try {
+      await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
+    }
+    finally {
+      global[LOG_SINK] = sink
+    }
+
+    expect(await ada.json('/me')).toMatchObject({ email: 'ada@example.com' })
+    expect(legacy).toContain('signed-in')
+    expect(logged).toContainEqual(['error', expect.stringMatching(/^onAuthEvent failed for /), expect.objectContaining({ message: 'down' }), undefined, 'kayjs-auth'])
+  })
+
+  test('warns once, when createAuth is given the onEvent it replaces', () => {
+    const logged: unknown[][] = []
+    const global = globalThis as { [LOG_SINK]?: unknown }
+    const sink = global[LOG_SINK]
+
+    global[LOG_SINK] = (...args: unknown[]) => logged.push(args)
+
+    try {
+      testApp({ onEvent: () => undefined })
+      testApp({ onAuthEvent: () => undefined })
+    }
+    finally {
+      global[LOG_SINK] = sink
+    }
+
+    expect(logged.filter(args => args[0] === 'warn' && String(args[1]).includes('onEvent'))).toHaveLength(1)
+  })
+
+  test('reads the fields of every kind of event off its detail', () => {
+    const fields: Record<AuthEvent, [detail: string | undefined, fields: object][]> = {
+      'signed-in': [['password', { method: 'password' }], ['oauth:github', { method: 'oauth', provider: 'github' }], ['guest', { method: 'guest' }]],
+      'signed-out': [[undefined, {}]],
+      'sign-in-failed': [['passkey', { method: 'passkey' }], ['two-factor', { method: 'two-factor' }]],
+      'role-granted': [['editor', { role: 'editor' }]],
+      'role-revoked': [['editor', { role: 'editor' }]],
+      'banned': [['spam', { reason: 'spam' }], [undefined, {}]],
+      'unbanned': [[undefined, {}]],
+      'impersonation-started': [[undefined, {}]],
+      'impersonation-ended': [[undefined, {}]],
+      'organization-created': [['org1', { organizationId: 'org1' }]],
+      'organization-deleted': [['org1', { organizationId: 'org1' }]],
+      'member-joined': [['org1 admin member', { organizationId: 'org1', roles: ['admin', 'member'] }], ['org1 ', { organizationId: 'org1', roles: [] }]],
+      'member-left': [['org1', { organizationId: 'org1' }]],
+      'member-removed': [['org1', { organizationId: 'org1' }]],
+      'member-roles-changed': [['org1 owner', { organizationId: 'org1', roles: ['owner'] }]],
+      'oauth-client-approved': [['Claude Code', { client: 'Claude Code' }]],
+      'oauth-client-revoked': [['Claude Code', { client: 'Claude Code' }]],
+      'new-sign-in': [[undefined, {}]],
+      'password-changed': [[undefined, {}]],
+      'email-changed': [['ada@new.test', { email: 'ada@new.test' }]],
+      'two-factor-enabled': [[undefined, {}]],
+      'two-factor-disabled': [[undefined, {}]],
+      'recovery-code-used': [[undefined, {}]],
+      'recovery-codes-regenerated': [[undefined, {}]],
+      'provider-linked': [['github', { provider: 'github' }]],
+      'provider-unlinked': [['github', { provider: 'github' }]],
+      'passkey-added': [['Laptop', { name: 'Laptop' }]],
+      'passkey-removed': [['Laptop', { name: 'Laptop' }]],
+      'token-created': [['CI', { name: 'CI' }]],
+      'signed-out-everywhere': [['this-one-kept', { keptThisOne: true }], [undefined, { keptThisOne: false }]],
+      'account-deleted': [[undefined, {}]],
+    }
+
+    for (const [event, cases] of Object.entries(fields)) {
+      for (const [detail, expected] of cases)
+        expect(eventFields(event as AuthEvent, detail)).toEqual(expected)
+    }
   })
 })
 

@@ -1,5 +1,5 @@
 import type { User } from '../src/auth'
-import type { AuthEvent, EventContext } from '../src/events'
+import type { AuthEvent, AuthEventInfo, EventContext } from '../src/events'
 import type { Mail } from '../src/mail'
 import { afterEach, describe, expect, setSystemTime, test } from 'bun:test'
 import { testApp } from './helpers/app'
@@ -13,10 +13,14 @@ afterEach(() => {
 
 async function setup(options: Parameters<typeof testApp>[0] = {}) {
   const events: { event: AuthEvent, user: User, detail: string | undefined, context: EventContext }[] = []
+  const heard: AuthEventInfo[] = []
   const app = testApp({
     admin: 'admin',
     onEvent: (event, user, detail, context) => {
       events.push({ event, user, detail, context })
+    },
+    onAuthEvent: (info) => {
+      heard.push(info)
     },
     ...options,
   })
@@ -40,7 +44,14 @@ async function setup(options: Parameters<typeof testApp>[0] = {}) {
   // Who did what to whom, among the admin's events.
   const said = () => events.filter(entry => ADMIN_EVENTS.has(entry.event)).map(entry => [entry.event, entry.user.email, entry.detail, entry.context.actor?.email])
 
-  return { ...app, events, said, member, admin, ada }
+  // The same events as `onAuthEvent` hears them: the event, its fields and who acted.
+  const told = () => heard.filter(info => ADMIN_EVENTS.has(info.event)).map((info) => {
+    const { event, user, context, ...fields } = info
+
+    return [event, user.email, fields, context.actor?.email]
+  })
+
+  return { ...app, events, said, told, member, admin, ada }
 }
 
 describe('admin', () => {
@@ -110,7 +121,7 @@ describe('admin', () => {
   })
 
   test('a role granted or revoked counts on the user\'s next request; only declared roles are given', async () => {
-    const { admin, ada, said } = await setup()
+    const { admin, ada, said, told } = await setup()
 
     expect(await admin.browser.post('/call/grantRole', [ada.id, 'owner'])).toEqual({ ok: false, error: 'unknown-role' })
     expect(await admin.browser.call('grantRole', 'missing', 'editor')).toEqual({ ok: false, error: 'not-found' })
@@ -123,10 +134,11 @@ describe('admin', () => {
 
     expect(await ada.browser.json('/me')).toMatchObject({ roles: [] })
     expect(said()).toEqual([['role-granted', 'ada@example.com', 'editor', 'root@example.com'], ['role-revoked', 'ada@example.com', 'editor', 'root@example.com']])
+    expect(told()).toEqual([['role-granted', 'ada@example.com', { role: 'editor' }, 'root@example.com'], ['role-revoked', 'ada@example.com', { role: 'editor' }, 'root@example.com']])
   })
 
   test('a ban signs the user out everywhere, devices included, and refuses their sign-ins until lifted', async () => {
-    const { admin, ada, browser, said, store } = await setup()
+    const { admin, ada, browser, said, told, store } = await setup()
     const { token } = await ada.browser.callOk('createToken', { password: PASSWORD }, 'Phone')
 
     expect(await admin.browser.post('/ban', { id: ada.id, reason: ' spam ' })).toMatchObject({ ok: true, user: { ban: { reason: 'spam', until: null } } })
@@ -139,6 +151,7 @@ describe('admin', () => {
     expect(await admin.browser.call('unbanUser', ada.id)).toMatchObject({ ok: true, user: { ban: null } })
     expect(await browser().post('/password', { identifier: 'ada@example.com', password: PASSWORD })).toMatchObject({ ok: true })
     expect(said()).toEqual([['banned', 'ada@example.com', 'spam', 'root@example.com'], ['unbanned', 'ada@example.com', undefined, 'root@example.com']])
+    expect(told()).toEqual([['banned', 'ada@example.com', { reason: 'spam' }, 'root@example.com'], ['unbanned', 'ada@example.com', {}, 'root@example.com']])
   })
 
   test('a ban whose reason is blank keeps none', async () => {
@@ -244,7 +257,7 @@ describe('admin', () => {
   })
 
   test('impersonating signs the admin in as the user with no proof to give, and stopping signs them back in as themselves', async () => {
-    const { admin, ada, said, store } = await setup()
+    const { admin, ada, said, told, store } = await setup()
 
     expect(await admin.browser.call('impersonate', ada.id)).toEqual({ ok: true })
     expect(await admin.browser.json('/me')).toMatchObject({ email: 'ada@example.com' })
@@ -260,6 +273,7 @@ describe('admin', () => {
     expect(await admin.browser.call('stopImpersonating')).toBe(false)
     expect(await store.sessions.listByUser(ada.id)).toHaveLength(1)
     expect(said()).toEqual([['impersonation-started', 'ada@example.com', undefined, 'root@example.com'], ['impersonation-ended', 'ada@example.com', undefined, 'root@example.com']])
+    expect(told()).toEqual([['impersonation-started', 'ada@example.com', {}, 'root@example.com'], ['impersonation-ended', 'ada@example.com', {}, 'root@example.com']])
   })
 
   test('another admin, themselves or a banned user cannot be impersonated', async () => {
