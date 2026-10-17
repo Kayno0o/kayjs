@@ -5,6 +5,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 ## Unreleased
 
 - `shareCard({ title, image })` takes an imported `.svg` as `image`, drawn to cover the card before the title, with its cards written by `kay build` and kept for an executable like `images.card.logo` ([Images](images.md#draw-a-share-card-for-a-page)).
+- The dev tool's Images tab no longer flags an SVG as served more pixels than it is drawn with, as Chromium gives one without a size 150x150 and the same bytes draw at any size; an image whose address ends in `.svg` is exempt, a raster still is flagged ([Dev server](dev-server.md)).
 
 ## 1.51.1
 

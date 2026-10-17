@@ -1334,6 +1334,25 @@ function imageVariant(src: string, origin: string): string {
   return 'not resized by kay'
 }
 
+// Whether an image is an SVG by its address: a path ending in `.svg`, whatever its query or hash. The browser gives an SVG without a size a natural size of 150x150, and an SVG draws at any size from the same bytes, so its natural size says nothing about what was served.
+function isVector(src: string, base: string): boolean {
+  const url = parseUrl(src, base)
+
+  if (url === undefined)
+    return false
+
+  let path = url.pathname
+
+  try {
+    path = decodeURIComponent(path)
+  }
+  catch {
+    // A name that is not valid percent-encoding is read as it is.
+  }
+
+  return path.toLowerCase().endsWith('.svg')
+}
+
 // Every image of the page with what it is, what it is drawn at and what is wrong with it; `lcp` is the element the browser reported as the largest paint.
 function pageImages(doc: Document, lcp: Element | undefined): ImageInfo[] {
   const win = doc.defaultView!
@@ -1350,7 +1369,7 @@ function pageImages(doc: Document, lcp: Element | undefined): ImageInfo[] {
     const served = image.naturalWidth * image.naturalHeight
     const needed = box.width * box.height * density * density
 
-    if (served > 0 && needed > 0 && served > needed * OVERSIZED)
+    if (served > 0 && needed > 0 && served > needed * OVERSIZED && !isVector(src, win.location.href))
       flags.push(`served ${Math.round(served / needed)} times the pixels it is drawn with, give it a smaller width or \`sizes\``)
 
     if (!image.hasAttribute('width') || !image.hasAttribute('height'))

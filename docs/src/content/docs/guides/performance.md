@@ -52,7 +52,7 @@ The Head tab shows the head as a search result: the title and description with t
 
 The Images tab lists each image of the page. It shows the variant kay served, its format and size, and the size it is drawn at.
 
-It flags an image served at more than four times the pixels it shows, one with no `width` and `height`, and a lazy-loaded one that is already in view. Hover a row to outline the image on the page.
+It flags an image served at more than four times the pixels it shows (an SVG, found by a name ending in `.svg`, is never flagged for this, as it draws at any size), one with no `width` and `height`, and a lazy-loaded one that is already in view. Hover a row to outline the image on the page.
 
 ## Web Vitals
 

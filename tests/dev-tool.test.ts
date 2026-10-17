@@ -878,6 +878,51 @@ describe('the dev tool', () => {
     }
   })
 
+  it('never flags an SVG as served more pixels than it is drawn with, still flags a raster, and still flags an SVG without width and height', async () => {
+    const { happyDOM } = window as unknown as { happyDOM: { setURL: (url: string) => void } }
+    const { href } = location
+
+    happyDOM.setURL('http://localhost/')
+    document.body.innerHTML = [
+      '<img id="viewbox" src="/_kay/assets/logo.svg" alt="">',
+      '<img id="sized" src="/logo.svg" width="16" height="16" alt="">',
+      '<img id="query" src="/logo.svg?v=2#mark" width="16" height="16" alt="">',
+      '<img id="upper" src="/LOGO%2ESVG" width="16" height="16" alt="">',
+      '<img id="png" src="/logo.png" width="16" height="16" alt="">',
+      '<img id="decoy" src="/logo.png?file=a.svg" width="16" height="16" alt="">',
+    ].join('')
+
+    for (const image of document.querySelectorAll('img')) {
+      Object.defineProperty(image, 'naturalWidth', { value: 150 })
+      Object.defineProperty(image, 'naturalHeight', { value: 150 })
+      Object.defineProperty(image, 'complete', { value: true })
+      image.getBoundingClientRect = () => ({ width: 16, height: 16, top: 5000, bottom: 5016, left: 0, right: 16, x: 0, y: 0, toJSON: () => ({}) })
+    }
+
+    const fetching = spyOn(window, 'fetch').mockImplementation((async () => new Response(null, { headers: { 'content-type': 'image/svg+xml' } })) as unknown as typeof window.fetch)
+    const flags = () => [...shadow().querySelectorAll('#kay-dev-images .image')].map(row => [row.querySelector('.src')?.textContent, ...[...row.querySelectorAll('.flag')].map(flag => flag.textContent)].join(' | '))
+
+    try {
+      tool = startDevTool()
+      shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-images')!.click()
+      await Bun.sleep(20)
+
+      expect(flags()).toEqual([
+        '/_kay/assets/logo.svg | no width and height, so the page shifts as it loads',
+        '/logo.svg',
+        '/logo.svg?v=2#mark',
+        '/LOGO%2ESVG',
+        '/logo.png | served 88 times the pixels it is drawn with, give it a smaller width or `sizes`',
+        '/logo.png?file=a.svg | served 88 times the pixels it is drawn with, give it a smaller width or `sizes`',
+      ])
+    }
+    finally {
+      fetching.mockRestore()
+      document.body.innerHTML = ''
+      happyDOM.setURL(href)
+    }
+  })
+
   it('answers an image the server is not asked about at once, even while every request slot is held by one that hangs', async () => {
     const { happyDOM } = window as unknown as { happyDOM: { setURL: (url: string) => void } }
     const { href } = location
