@@ -87,8 +87,8 @@ export function paletteMatches(entries: PaletteEntry[], query: string, groups: s
     .map(match => match.entry)
 }
 
-// The unfiltered list: the links named in `recent` that still exist, in that order, then every entry under its group, groups in `groups` order and the rest after them as they come.
-export function paletteSections(entries: PaletteEntry[], recent: string[] = [], groups: string[] = []): PaletteSection[] {
+// The unfiltered list: the links named in `recent` that still exist, in that order under the `recentGroup` heading, then every entry under its group, groups in `groups` order and the rest after them as they come.
+export function paletteSections(entries: PaletteEntry[], recent: string[] = [], groups: string[] = [], recentGroup = RECENT_GROUP): PaletteSection[] {
   const byHref = new Map(entries.filter(isPaletteLink).map(entry => [entry.href, entry]))
   const recents = recent.flatMap(href => byHref.get(href) ?? [])
   const rank = groupRank(groups)
@@ -108,7 +108,7 @@ export function paletteSections(entries: PaletteEntry[], recent: string[] = [], 
     .map(([group, members]) => ({ group, entries: members }))
     .sort((a, b) => rank(a.group) - rank(b.group))
 
-  return recents.length > 0 ? [{ group: RECENT_GROUP, entries: recents }, ...sections] : sections
+  return recents.length > 0 ? [{ group: recentGroup, entries: recents }, ...sections] : sections
 }
 
 // A section the site search found, as a link under its page, with the line of text it was found in and its heading's words found marked.

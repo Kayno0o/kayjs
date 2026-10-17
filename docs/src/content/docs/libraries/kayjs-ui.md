@@ -112,6 +112,25 @@ const settings: Settings = { ...defaults, icons: { ...defaults.icons, close } }
 export default settings
 ```
 
+## Languages
+
+The words a component shows by default, `Close`, `Cancel`, `Loading…`, are looked up in your messages before their English. Word them once in `src/messages/<locale>.ts` under `ui`, named for the component and the prop, and every instance reads them.
+
+```ts
+// src/messages/fr.ts
+export default defineMessages({
+  ui: {
+    sidePanel: { closeLabel: 'Fermer' },
+    pagination: { previousLabel: 'Précédent', nextLabel: 'Suivant' },
+    table: { rowCount: { one: '{count} ligne', other: '{count} lignes' } },
+  },
+})
+```
+
+A prop you pass to one component still replaces the message for that component. The months and days a chart draws follow the page's locale too.
+
+<ReadMore href="/llms/kayjs-ui">Every `ui.*` key and its English is in the full kayjs-ui reference.</ReadMore>
+
 ## Components
 
 Actions: [Button](/ui/button), [IconButton](/ui/icon-button), [ConfirmDelete](/ui/confirm-delete), [CopyButton](/ui/copy-button), [Menu](/ui/menu), [Toggle](/ui/toggle).

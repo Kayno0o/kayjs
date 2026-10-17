@@ -5,13 +5,14 @@ import type { ChartSeries } from './plot'
 import { effect, memo, onCleanup, onMount, signal, uid } from 'kay'
 import { chartData, indexAt, labelTimes, positionOf, xAxisOptions } from './chart-axis'
 import { dashSample, SERIES_DASHES, steppedPoint } from './plot'
+import { word } from './words'
 
 const PALETTE = ['var(--kui-chart-1)', 'var(--kui-chart-2)', 'var(--kui-chart-3)', 'var(--kui-chart-4)', 'var(--kui-chart-5)', 'var(--kui-chart-6)']
 
 // Which attribute of each drawn part takes its series' colour.
 const PAINT: Record<string, string> = { line: 'stroke', point: 'stroke', area: 'fill' }
 
-const { labels, series, formatValue = (value: number) => value.toLocaleString(), xLabels = false, legend, options, onRange, rangeHint = 'Shift with the arrow keys picks a span, Enter applies it, Escape drops it', label, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role'> & {
+const { labels, series, formatValue = (value: number) => value.toLocaleString(), xLabels = false, legend, options, onRange, rangeHint = word('lineChart.rangeHint', 'Shift with the arrow keys picks a span, Enter applies it, Escape drops it'), label, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role'> & {
   labels: string[]
   series: ChartSeries[]
   // Formats the y-axis labels, the tooltip's values and the readings screen readers hear.

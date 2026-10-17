@@ -3,8 +3,9 @@ import type { JSX } from 'kay'
 import { effect, listen, onCleanup, onMount, signal } from 'kay'
 import IconButton from './icon-button.kay'
 import { stepIndex } from './cycle'
+import { word } from './words'
 
-const { slides, index = 0, onIndexChange, autoplay, ratio = '16 / 9', label = 'Carousel', previousLabel = 'Previous slide', nextLabel = 'Next slide', pauseLabel = 'Pause', playLabel = 'Play', slideLabel = 'Slide {n} of {count}', dotLabel = 'Go to slide {n}', class: className, ...rest } = props<Omit<JSX.IntrinsicElements['section'], 'class' | 'children'> & {
+const { slides, index = 0, onIndexChange, autoplay, ratio = '16 / 9', label = word('carousel.label', 'Carousel'), previousLabel = word('carousel.previousLabel', 'Previous slide'), nextLabel = word('carousel.nextLabel', 'Next slide'), pauseLabel = word('carousel.pauseLabel', 'Pause'), playLabel = word('carousel.playLabel', 'Play'), slideLabel = word('carousel.slideLabel', 'Slide {n} of {count}'), dotLabel = word('carousel.dotLabel', 'Go to slide {n}'), class: className, ...rest } = props<Omit<JSX.IntrinsicElements['section'], 'class' | 'children'> & {
   slides: readonly { src: string, alt: string }[]
   // The slide shown first; a carousel whose parent passes another follows it.
   index?: number | undefined

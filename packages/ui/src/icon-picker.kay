@@ -6,11 +6,12 @@ import Icon from './icon.kay'
 import IconButton from './icon-button.kay'
 import { onFormDefaults, onFormReset } from './form-reset'
 import { nameOf } from './icon-picker'
+import { word } from './words'
 
 const PAGE_SIZE = 50
 const DEBOUNCE_MS = 200
 
-const { search, value = '', name, onChange, searchLabel = 'Search icons', placeholder = 'Search icons…', gridLabel = 'Icons', searchingLabel = 'Searching…', emptyLabel = 'No icons found.', clearLabel = 'Clear icon selection', moreLabel = 'Show more', class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onChange'> & {
+const { search, value = '', name, onChange, searchLabel = word('iconPicker.searchLabel', 'Search icons'), placeholder = word('iconPicker.placeholder', 'Search icons…'), gridLabel = word('iconPicker.gridLabel', 'Icons'), searchingLabel = word('iconPicker.searchingLabel', 'Searching…'), emptyLabel = word('iconPicker.emptyLabel', 'No icons found.'), clearLabel = word('iconPicker.clearLabel', 'Clear icon selection'), moreLabel = word('iconPicker.moreLabel', 'Show more'), class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onChange'> & {
   // The icons matching `query` from the `offset`th on, at most `limit` of them: typically an action, since a whole icon set is too large to ship. A page of fewer than `limit` is the last. A rejection goes unhandled and leaves the last grid on screen.
   search: (query: string, limit: number, offset: number) => Promise<IconChoice[]>
   // The chosen icon's name, or an empty string for none; a picker whose parent passes another follows it.

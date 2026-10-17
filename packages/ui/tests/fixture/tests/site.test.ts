@@ -618,3 +618,28 @@ test('a CopyButton island ships no HTML to Markdown converter, and MarkdownEdito
     await built.close()
   }
 })
+
+describe('the texts a component shows by default, in the app\'s catalogs', () => {
+  test('read `ui.*` messages in the page\'s locale, keep a prop given over them, and leave the English where a key is missing', async () => {
+    const french = (await visit('/fr/paging')).html
+    const english = (await visit('/paging')).html
+    const first = french.slice(french.indexOf('id="first"'), french.indexOf('id="middle"'))
+
+    expect(first).toContain('aria-label="Pages"')
+    expect(first).toContain('Suivant')
+    expect(english).toContain('aria-label="Pagination"')
+    expect(english.slice(english.indexOf('id="first"'), english.indexOf('id="middle"'))).toContain('Next')
+    // `#middle` gives its own label and arrow texts, which win over the catalog.
+    expect(french).toContain('aria-label="Posts"')
+  })
+
+  test('follow the page\'s locale for the months a chart names and the count a table gives, a plural message included', async () => {
+    const graph = (await visit('/fr/charts')).html
+    const filtered = (await visit('/fr/table?q=a')).html
+
+    expect(graph).toMatch(/class="kui-contribution-month"[^>]*>sept\./)
+    expect((await visit('/charts')).html).toMatch(/class="kui-contribution-month"[^>]*>Sep/)
+    expect(filtered).toContain('Filtrer')
+    expect(filtered).toMatch(/class="kui-table-count" role="status">\d+ lignes?</)
+  })
+})

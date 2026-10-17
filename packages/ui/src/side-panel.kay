@@ -2,8 +2,9 @@
 import type { JSX } from 'kay'
 import { effect } from 'kay'
 import IconButton from './icon-button.kay'
+import { word } from './words'
 
-const { open, title, actions, footer, onClose, closeLabel = 'Close', class: className, ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'title' | 'onClose' | 'closedby' | 'closedBy'> & {
+const { open, title, actions, footer, onClose, closeLabel = word('sidePanel.closeLabel', 'Close'), class: className, ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'title' | 'onClose' | 'closedby' | 'closedBy'> & {
   // Shows the panel as a modal along the edge; the parent sets it back to false in `onClose`.
   open: boolean
   title: string

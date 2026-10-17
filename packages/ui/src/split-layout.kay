@@ -2,10 +2,11 @@
 import type { JSX } from 'kay'
 import { onMount, signal } from 'kay'
 import IconButton from './icon-button.kay'
+import { word } from './words'
 
 const WIDTH = { default: 260, min: 180, max: 560, step: 20 }
 
-const { list, detail, listHead, detailHead, sidebar, sidebarTitle = '', detailOpen = false, sidebarOpen = false, onSidebarClose, resizableList = false, listWidthKey, resizeLabel = 'Resize list', backLabel = 'Back', class: className, style, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'style' | 'children'> & {
+const { list, detail, listHead, detailHead, sidebar, sidebarTitle = '', detailOpen = false, sidebarOpen = false, onSidebarClose, resizableList = false, listWidthKey, resizeLabel = word('splitLayout.resizeLabel', 'Resize list'), backLabel = word('splitLayout.backLabel', 'Back'), class: className, style, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'style' | 'children'> & {
   list: JSX.Element
   detail: JSX.Element
   listHead?: JSX.Element

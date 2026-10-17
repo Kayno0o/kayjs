@@ -1,4 +1,4 @@
-import { formatMonthShort } from '@kaynooo/utils/date'
+import { monthShort } from './words'
 
 // One day of a ContributionGraph.
 export interface ContributionDay {
@@ -23,7 +23,7 @@ export function monthStarts(days: readonly string[]): { column: number, label: s
       continue
 
     month = day.slice(0, 7)
-    starts.push({ column: Math.floor(index / 7), label: formatMonthShort(new Date(`${day}T00:00:00`)) })
+    starts.push({ column: Math.floor(index / 7), label: monthShort(new Date(`${day}T00:00:00`)) })
   }
 
   return starts.filter((start, index) => (starts[index + 1]?.column ?? Infinity) - start.column >= LABEL_COLUMNS)

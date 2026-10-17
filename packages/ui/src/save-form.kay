@@ -5,8 +5,9 @@ import Button from './button.kay'
 import { callAction, formIssues } from './forms'
 import { holdDefaults, onFormReset } from './form-reset'
 import { toast } from './toast'
+import { word } from './words'
 
-const { action, failure, refused, saved, onSaved, onDiscard, dirtyLabel = 'Unsaved changes.', cleanLabel = 'No unsaved change.', savingLabel = 'Saving…', saveLabel = 'Save', discardLabel = 'Discard', class: className } = props<{
+const { action, failure, refused, saved, onSaved, onDiscard, dirtyLabel = word('saveForm.dirtyLabel', 'Unsaved changes.'), cleanLabel = word('saveForm.cleanLabel', 'No unsaved change.'), savingLabel = word('saveForm.savingLabel', 'Saving…'), saveLabel = word('saveForm.saveLabel', 'Save'), discardLabel = word('saveForm.discardLabel', 'Discard'), class: className } = props<{
   // The page's action the form calls with its fields, as FormDialog does.
   action: Action<never, Output>
   // Toasted when the call fails other than on a field.

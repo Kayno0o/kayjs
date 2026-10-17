@@ -7,10 +7,11 @@ import { controlledValue } from './controlled-value'
 import { startRef } from './form-reset'
 import { enterEdit, indentEdit, linkEdit, wrapEdit } from './markdown-edit'
 import { attempt } from './toast'
+import { word } from './words'
 
 const SHORTCUT_MARKERS: Partial<Record<string, string>> = { b: '**', i: '*' }
 
-const { value = '', onInput, onImage, uploadFailure = 'Could not upload the image', placeholder = 'Write markdown…', keysHint = 'Tab indents a list item; Escape then Tab leaves the field.', class: className, ...rest } = props<Omit<JSX.IntrinsicElements['textarea'], 'value' | 'class' | 'children' | 'onInput' | 'onKeyDown' | 'onPaste' | 'onDrop'> & {
+const { value = '', onInput, onImage, uploadFailure = word('markdownEditor.uploadFailure', 'Could not upload the image'), placeholder = word('markdownEditor.placeholder', 'Write markdown…'), keysHint = word('markdownEditor.keysHint', 'Tab indents a list item; Escape then Tab leaves the field.'), class: className, ...rest } = props<Omit<JSX.IntrinsicElements['textarea'], 'value' | 'class' | 'children' | 'onInput' | 'onKeyDown' | 'onPaste' | 'onDrop'> & {
   // The text to start with; an editor whose parent passes other text follows it.
   value?: string | undefined
   // The text after every change, typed or applied by a shortcut, a paste or an upload.
@@ -138,7 +139,7 @@ async function upload(files: File[]): Promise<void> {
     return
 
   await Promise.all(files.map(async (file) => {
-    const placeholder = `![Uploading ${file.name || 'image'}…]()`
+    const placeholder = `![${word('markdownEditor.uploading', 'Uploading {name}…', { name: file.name || 'image' })}]()`
     const { selectionStart, selectionEnd } = el
     const text = `${placeholder}\n`
 

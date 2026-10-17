@@ -4,8 +4,9 @@ import Button from './button.kay'
 import Dialog from './dialog.kay'
 import IconButton from './icon-button.kay'
 import { attempt } from './toast'
+import { word } from './words'
 
-const { message, onConfirm, failure, success, refused, tone = 'danger', trigger = 'icon', ask = 'dialog', label, title, confirmLabel, pendingLabel, cancelLabel = 'Cancel', size, variant, class: className } = props<{
+const { message, onConfirm, failure, success, refused, tone = 'danger', trigger = 'icon', ask = 'dialog', label, title, confirmLabel, pendingLabel, cancelLabel = word('confirmDelete.cancelLabel', 'Cancel'), size, variant, class: className } = props<{
   // The dialog's question; asked inline, the armed pair's name for screen readers and the confirm button's tooltip.
   message: string
   // Deletes, or does what a neutral confirm asks. The dialog stays open, its buttons disabled, until a returned promise settles, and closes once it resolves.
@@ -38,10 +39,10 @@ const { message, onConfirm, failure, success, refused, tone = 'danger', trigger 
 }>()
 
 const danger = () => tone === 'danger'
-const triggerLabel = () => label ?? (danger() ? 'Delete' : 'Confirm')
-const dialogTitle = () => title ?? (danger() ? 'Confirm Deletion' : triggerLabel())
-const confirmText = () => confirmLabel ?? (danger() ? 'Delete' : triggerLabel())
-const pendingText = () => pendingLabel ?? (danger() ? 'Deleting…' : confirmText())
+const triggerLabel = () => label ?? (danger() ? word('confirmDelete.deleteLabel', 'Delete') : word('confirmDelete.confirmLabel', 'Confirm'))
+const dialogTitle = () => title ?? (danger() ? word('confirmDelete.title', 'Confirm Deletion') : triggerLabel())
+const confirmText = () => confirmLabel ?? (danger() ? word('confirmDelete.deleteLabel', 'Delete') : triggerLabel())
+const pendingText = () => pendingLabel ?? (danger() ? word('confirmDelete.pendingLabel', 'Deleting…') : confirmText())
 const look = () => danger() ? 'danger' : 'accent'
 
 const open = signal(false)

@@ -5,8 +5,9 @@ import { effect, memo, persisted, signal } from 'kay'
 import Checkbox from './checkbox.kay'
 import Icon from './icon.kay'
 import { cellText, drawnByBlock, nextSort, resolvedColumn, rowKeyOf, rowLabel, rowsMatching, sortedRows } from './table'
+import { word } from './words'
 
-const { columns: given, rows, rowKey, sort, serverSort = false, onSort, cell, empty, filter, filterLabel = 'Filter', filterPlaceholder, filterParam, countLabel, noMatch, narrow = 'stack', selectable = false, selected, onSelect, bulk, selectAllLabel = 'Select all', selectedLabel, selectRowLabel, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onSelect'> & {
+const { columns: given, rows, rowKey, sort, serverSort = false, onSort, cell, empty, filter, filterLabel = word('table.filterLabel', 'Filter'), filterPlaceholder, filterParam, countLabel, noMatch, narrow = 'stack', selectable = false, selected, onSelect, bulk, selectAllLabel = word('table.selectAllLabel', 'Select all'), selectedLabel, selectRowLabel, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onSelect'> & {
   columns: Column<Row>[]
   rows: Row[]
   rowKey: RowKey<Row>
@@ -58,7 +59,7 @@ effect(() => current.set(sort))
 
 // The rows the filter keeps, all of them without one.
 const kept = memo(() => filter === undefined ? rows : rowsMatching(rows, filter, typed()))
-const counted = countLabel ?? ((count: number) => count === 1 ? '1 row' : `${count} rows`)
+const counted = countLabel ?? ((count: number) => word('table.rowCount', count === 1 ? '1 row' : '{count} rows', { count }))
 const none: unknown[] = []
 const picked = signal(selected ?? none)
 
@@ -74,7 +75,7 @@ const chosenSet = memo(() => new Set(chosen()))
 const visible = memo(() => kept().map(row => rowKeyOf(row, rowKey)))
 const allChosen = memo(() => visible().length > 0 && visible().every(key => chosenSet().has(key)))
 const someChosen = memo(() => visible().some(key => chosenSet().has(key)))
-const countChosen = selectedLabel ?? ((count: number) => `${count} selected`)
+const countChosen = selectedLabel ?? ((count: number) => word('table.selectedLabel', '{count} selected', { count }))
 
 // A row that left `rows` leaves the selection for good, so it is not picked again if it comes back.
 effect(() => {
@@ -151,7 +152,7 @@ function ariaSort(column: Column<Row>): 'ascending' | 'descending' | undefined {
           if selectable
             td.kui-table-cell.kui-table-select-cell
               .kui-table-cell-body
-                Checkbox(checked={chosenSet().has(rowKeyOf(row, rowKey))} aria-label={(selectRowLabel ?? (item => `Select ${rowLabel(item, columns(), rowKey)}`))(row)} onChange={on => pick(rowKeyOf(row, rowKey), on)})
+                Checkbox(checked={chosenSet().has(rowKeyOf(row, rowKey))} aria-label={(selectRowLabel ?? (item => word('table.selectRowLabel', 'Select {row}', { row: rowLabel(item, columns(), rowKey) })))(row)} onChange={on => pick(rowKeyOf(row, rowKey), on)})
           for column of columns() key={column.key}
             td.kui-table-cell(data-align={column.align ?? 'start'} data-numeric={column.numeric ? '' : undefined})
               if narrow === 'stack' && column.header

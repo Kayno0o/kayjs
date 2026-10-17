@@ -6,10 +6,11 @@ import { claim } from './claim'
 import Icon from './icon.kay'
 import IconButton from './icon-button.kay'
 import { dismissToast, holdToasts, toasts } from './toast'
+import { word } from './words'
 
 const ICONS: Record<ToastType, IconSlot> = { error: 'alert', success: 'success', info: 'info' }
 
-const { dismissLabel = 'Dismiss notification' } = props<{
+const { dismissLabel = word('toaster.dismissLabel', 'Dismiss notification') } = props<{
   // Names each toast's close button for screen readers.
   dismissLabel?: string | undefined
 }>()

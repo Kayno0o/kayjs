@@ -1,5 +1,6 @@
 import type { AxisOptions, FixedScaleAxis, LineChartData } from 'chartist'
-import { formatDayMonth, parseDateLabel } from '@kaynooo/utils/date'
+import { parseDateLabel } from '@kaynooo/utils/date'
+import { dayMonth } from './words'
 
 // The most x-axis labels drawn, first and last always among them.
 const MAX_TICKS = 5
@@ -10,7 +11,7 @@ const X_AXIS_OFFSET = 18
 function axisLabel(label: string): string {
   const date = parseDateLabel(label)
 
-  return date && !Number.isNaN(date.getTime()) ? formatDayMonth(date) : label
+  return date && !Number.isNaN(date.getTime()) ? dayMonth(date) : label
 }
 
 // Up to `MAX_TICKS` evenly spread indices, the first and the last included.
@@ -50,7 +51,7 @@ export function xAxisOptions(labels: string[], times: number[] | null, showLabel
       showLabel: true,
       showGrid: false,
       offset: X_AXIS_OFFSET,
-      labelInterpolationFnc: value => formatDayMonth(new Date(Number(value))),
+      labelInterpolationFnc: value => dayMonth(new Date(Number(value))),
     }
   }
 

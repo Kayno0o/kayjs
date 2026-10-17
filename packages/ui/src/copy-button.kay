@@ -3,10 +3,11 @@ import type { JSX } from 'kay'
 import { copy } from '@kaynooo/utils/browser/clipboard'
 import { signal } from 'kay'
 import { attempt } from './toast'
+import { word } from './words'
 
 const COPIED_MS = 2000
 
-const { text, label, html, variant = 'default', copiedLabel = 'Copied!', failure = 'Could not copy to the clipboard', class: className, ...rest } = props<Omit<JSX.IntrinsicElements['button'], 'class' | 'children' | 'onClick' | 'type'> & {
+const { text, label, html, variant = 'default', copiedLabel = word('copyButton.copiedLabel', 'Copied!'), failure = word('copyButton.failure', 'Could not copy to the clipboard'), class: className, ...rest } = props<Omit<JSX.IntrinsicElements['button'], 'class' | 'children' | 'onClick' | 'type'> & {
   text: string
   label: string
   // A rendered version copied alongside `text`, which rich editors paste instead.

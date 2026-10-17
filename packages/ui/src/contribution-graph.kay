@@ -3,8 +3,9 @@ import type { JSX } from 'kay'
 import type { ContributionDay } from './contribution'
 import { monthStarts } from './contribution'
 import { shade } from './shade'
+import { word } from './words'
 
-const { days, color, today, label = 'Contributions', months = false, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
+const { days, color, today, label = word('contributionGraph.label', 'Contributions'), months = false, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
   // Ascending days starting on a Monday, as `gridDays` from `@kaynooo/utils` lists them, each with how full its cell is.
   days: readonly ContributionDay[]
   // The CSS colour the filled cells shade towards.
