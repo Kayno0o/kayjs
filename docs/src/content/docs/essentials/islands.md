@@ -334,7 +334,7 @@ onMount(() => drawMap(center))
 
 `every(interval, run)` runs `run` on a timer while the island lives, `interval` being a duration such as `'1s'`. `every('1s', () => now = Date.now())` ticks a clock.
 
-`listen(window, 'keydown', event => ...)` listens to an event of `window` or `document`. It removes the listener when the island ends.
+`listen(window, 'keydown', event => ...)` listens to an event of `window` or `document`. It removes the listener when the island ends. Call it with an arrow function or read the target as `event.currentTarget`, as the callback has no `this`. An `effect()` or `onCleanup()` inside the callback belongs to the island and builds up with every event, as in an element's handler, so keep them out of it.
 
 <Callout type="warning">
 
