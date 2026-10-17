@@ -1,0 +1,8 @@
+---
+import { shareCard } from 'kay/image'
+import banner from '../banner.svg'
+---
+head
+  title Banner
+  meta(property="og:image" content={shareCard({ title: 'A card on an SVG', image: banner })})
+h1 Banner

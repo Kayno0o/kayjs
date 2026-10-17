@@ -3,18 +3,21 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { inflateSync } from 'node:zlib'
+import { Resvg } from '@resvg/resvg-js'
 import { afterAll, describe, expect, it } from 'bun:test'
-import { clientDir } from '../src/build/assets'
+import { Elysia } from 'elysia'
+import { clientDir, writeAsset } from '../src/build/assets'
 import { bootProblems } from '../src/check/boot'
 import { registerImage, setCardMaker, shareCard } from '../src/runtime/image'
 import { runInLocale } from '../src/runtime/locale-state'
 import { pages } from '../src/server'
-import { setupCards, writeCards } from '../src/server/card'
+import { serveCards, setupCards, writeCards } from '../src/server/card'
 import { fitTitle, TEXT_WIDTH, textWidth } from '../src/server/card-draw'
 import { decodePng } from '../src/server/crop'
 import { readFace } from '../src/server/face'
 import { prepareFonts } from '../src/server/fonts'
 import { fillOutline } from '../src/server/raster'
+import { svgCover } from '../src/server/svg-icon'
 
 const FIXTURE = resolve('tests/fixtures/cards')
 const FONTS = join(FIXTURE, 'src/fonts')
@@ -40,6 +43,14 @@ afterAll(async () => {
 
 async function get(path: string, headers: Record<string, string> = {}): Promise<Response> {
   return app.handle(new Request(`http://localhost${path}`, { headers }))
+}
+
+// The banner fixture's card: blue on the left, red on the right.
+async function expectBanner(jpeg: Uint8Array): Promise<void> {
+  const pixel = await pixelsOf(jpeg)
+  const [left, right] = [pixel(400, 100), pixel(1000, 100)] as [number[], number[]]
+
+  expect([left[0]! < 60, left[2]! > 150, right[0]! > 150, right[2]! < 60]).toEqual([true, true, true, true])
 }
 
 async function cardPath(page: string, server = app): Promise<string> {
@@ -331,7 +342,7 @@ describe('share cards', () => {
 
     expect((await fontless.handle(new Request('http://localhost/plain'))).status).toBe(500)
     expect(() => shareCard({ title: 'Hello' })).toThrow('which lists none')
-    expect(() => shareCard({ title: 'Hello', image: '/logo.svg' })).toThrow('takes a PNG, JPEG, WebP, GIF or AVIF')
+    expect(() => shareCard({ title: 'Hello', image: '/doc.pdf' })).toThrow('takes a PNG, JPEG, WebP, GIF, AVIF or an imported SVG')
     setCardMaker(undefined)
     expect(() => shareCard({ title: 'Hello' })).toThrow('draws on the server')
   })
@@ -428,14 +439,18 @@ describe('share cards', () => {
 
       expect({ code, errors }).toMatchObject({ code: 0 })
 
-      for (const page of ['index.html', 'plain.html']) {
+      for (const page of ['index.html', 'plain.html', 'banner.html']) {
         const html = await Bun.file(join(outdir, page)).text()
         const link = (/<meta property="og:image" content="https:\/\/cards\.example(\/_kay\/images\/card-\w+\.jpg)">/).exec(html)?.[1]
 
         expect(link).toBeDefined()
         expect(html).toContain('<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">')
         expect(await new Bun.Image(Bun.file(join(outdir, link!))).metadata()).toEqual({ width: 1200, height: 630, format: 'jpeg' })
-        expect((await pixelsOf(await Bun.file(join(outdir, link!)).bytes()))(160, 160).every((channel, index) => Math.abs(channel - [255, 0, 0][index]!) < 24)).toBe(true)
+
+        if (page !== 'banner.html')
+          expect((await pixelsOf(await Bun.file(join(outdir, link!)).bytes()))(160, 160).every((channel, index) => Math.abs(channel - [255, 0, 0][index]!) < 24)).toBe(true)
+        else
+          await expectBanner(await Bun.file(join(outdir, link!)).bytes())
       }
     }
     finally {
@@ -513,6 +528,184 @@ describe('share cards of a site with a name per locale', () => {
 
       for (const file of (await readdir(join(client, 'images'))).filter(name => name.startsWith('card-')))
         await rm(join(client, 'images', file), { force: true })
+    }
+  })
+})
+
+describe('share cards on an imported SVG', () => {
+  const banner = join(FIXTURE, 'src/banner.svg')
+  const asset = '/_kay/assets/card-test-banner'
+
+  // The files these tests added to the client build, which the font the cards are drawn in shares.
+  async function clean(dir: string, client: string): Promise<void> {
+    await rm(dir, { recursive: true, force: true })
+
+    for (const sub of ['assets', 'images']) {
+      for (const file of (await readdir(join(client, sub))).filter(name => name.startsWith('card-test-') || (sub === 'images' && name.startsWith('card-'))))
+        await rm(join(client, sub, file), { force: true })
+    }
+  }
+
+  // The card of `image` written at build time, as a JPEG; `image` has to be a file of the client build.
+  async function built(dir: string, client: string, cache: string, images: string[], extra: { bundled?: boolean } = {}): Promise<string[]> {
+    await setupCards({ dir, clientDir: client, fonts: await prepareFonts(process.cwd(), config.fonts, cache), name: 'Cards', collect: true, ...extra })
+
+    const urls = images.map(image => shareCard({ title: 'On a banner', image }))
+
+    await writeCards(client, cache)
+
+    return urls
+  }
+
+  it('draws a card on an SVG with only a viewBox, covered and cut to the card as the PNG of the same picture is', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kay-card-svg-'))
+    const client = clientDir(process.cwd())
+    const cache = join(dir, 'cache')
+
+    try {
+      await Bun.write(join(client, 'assets', 'card-test-banner.svg'), Bun.file(banner))
+      await Bun.write(join(client, 'assets', 'card-test-banner.png'), new Resvg(await Bun.file(banner).text(), { fitTo: { mode: 'width', value: 1200 } }).render().asPng())
+
+      const [svg, png] = await built(dir, client, cache, [`${asset}.svg`, `${asset}.png`])
+      const files = (await readdir(join(client, 'images'))).filter(file => file.startsWith('card-'))
+
+      expect(svg).not.toBe(png)
+      expect(files).toHaveLength(2)
+
+      const [first, second] = await Promise.all(files.map(async file => Bun.file(join(client, 'images', file)).bytes()))
+
+      expect(await new Bun.Image(first!).metadata()).toEqual({ width: 1200, height: 630, format: 'jpeg' })
+      expect(first).toEqual(second)
+      await expectBanner(first!)
+    }
+    finally {
+      await clean(dir, client)
+    }
+  })
+
+  it('serves a card on an SVG a server signed, and refuses one outside the build\'s assets', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kay-card-svg-'))
+    const client = clientDir(process.cwd())
+
+    try {
+      await Bun.write(join(client, 'assets', 'card-test-banner.svg'), Bun.file(banner))
+
+      const cards = await setupCards({ dir, clientDir: client, fonts: await prepareFonts(process.cwd(), config.fonts, dir), name: 'Cards' })
+      const server = new Elysia()
+
+      serveCards(server, cards, { clientDir: client, cacheDir: join(dir, 'cache') })
+
+      const url = shareCard({ title: 'On a banner', image: `${asset}.svg` })
+      const served = await server.handle(new Request(`http://localhost${url}`))
+
+      expect(served.status).toBe(200)
+      await expectBanner(await served.bytes())
+
+      const escaped = shareCard({ title: 'On a banner', image: '/_kay/assets/..%2Fsecret.svg' })
+
+      expect((await server.handle(new Request(`http://localhost${escaped}`))).status).toBe(404)
+    }
+    finally {
+      await clean(dir, client)
+    }
+  })
+
+  it('keeps the build\'s drawing of the SVG for an executable, which fails for a card it holds no drawing of', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kay-card-svg-'))
+    const client = clientDir(process.cwd())
+    const cache = join(dir, 'cache')
+
+    try {
+      await Bun.write(join(client, 'assets', 'card-test-banner.svg'), Bun.file(banner))
+      await built(dir, client, cache, [`${asset}.svg`])
+
+      const drawings = async () => (await readdir(dir)).filter(name => name.startsWith('card-svg-'))
+
+      expect(await drawings()).toHaveLength(1)
+
+      // The executable holds the drawing, not the SVG, and the card is not among the ones built.
+      await rm(join(client, 'assets', 'card-test-banner.svg'))
+      for (const file of (await readdir(join(client, 'images'))).filter(name => name.startsWith('card-')))
+        await rm(join(client, 'images', file), { force: true })
+
+      const cards = await setupCards({ dir, clientDir: client, fonts: await prepareFonts(process.cwd(), config.fonts, dir), name: 'Cards', bundled: true })
+      const server = new Elysia()
+
+      serveCards(server, cards, { clientDir: client, cacheDir: join(dir, 'cache-2') })
+
+      expect((await server.handle(new Request(`http://localhost${shareCard({ title: 'On a banner', image: `${asset}.svg` })}`))).status).toBe(200)
+      expect((await server.handle(new Request(`http://localhost${shareCard({ title: 'On a banner', image: `${asset}-other.svg` })}`))).status).toBe(500)
+
+      // A build no longer asking for the SVG drops its drawing.
+      await setupCards({ dir, clientDir: client, fonts: await prepareFonts(process.cwd(), config.fonts, dir), name: 'Cards', collect: true })
+      await writeCards(client, cache)
+      expect(await drawings()).toEqual([])
+    }
+    finally {
+      await clean(dir, client)
+    }
+  })
+
+  it('renames the cards of a changed SVG', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kay-card-svg-'))
+    const client = clientDir(process.cwd())
+    const cache = join(dir, 'cache')
+    const files = new Map<string, string>()
+
+    try {
+      for (const [name, fill] of [['one', '#00ff00'], ['two', '#00fe00']] as const) {
+        await Bun.write(join(dir, `card-test-${name}.svg`), `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 8"><rect width="8" height="8" fill="${fill}"/></svg>`)
+        files.set(name, await writeAsset(join(dir, `card-test-${name}.svg`), dir, client))
+      }
+
+      const urls = await built(dir, client, cache, [...files.values()])
+
+      expect(new Set(urls).size).toBe(2)
+      expect((await readdir(join(client, 'images'))).filter(file => file.startsWith('card-'))).toHaveLength(2)
+    }
+    finally {
+      await clean(dir, client)
+    }
+  })
+
+  it('refuses an SVG that is not imported, naming what is taken', async () => {
+    await setupCards({ dir: join(clientDir(process.cwd()), '..'), clientDir: clientDir(process.cwd()), fonts: await prepareFonts(process.cwd(), config.fonts, uploads), name: 'Cards' })
+
+    for (const image of ['/uploads/banner.svg', '/_kay/files/abc.svg', 'https://cdn.example/banner.svg?v=2'])
+      expect(() => shareCard({ title: 'Hello', image })).toThrow('an SVG is taken only when imported, not from images.dirs, images.remote or a stored file')
+  })
+
+  it('covers an SVG of any ratio, warns of its text, and refuses one with no size or too far from the card\'s ratio', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kay-card-svg-'))
+    const client = clientDir(process.cwd())
+    const svg = async (name: string, markup: string) => {
+      await Bun.write(join(dir, name), markup)
+
+      return join(dir, name)
+    }
+    const xmlns = 'xmlns="http://www.w3.org/2000/svg"'
+
+    try {
+      for (const viewBox of ['0 0 100 100', '0 0 400 100', '0 0 100 400', '0 0 1200 630']) {
+        const [width, height] = viewBox.split(' ').slice(2).map(Number) as [number, number]
+        const size = await new Bun.Image(await svgCover(await svg('ratio.svg', `<svg ${xmlns} viewBox="${viewBox}"/>`), 'shareCard() image', 1200, 630)).metadata()
+
+        expect(size.width).toBeGreaterThanOrEqual(1200)
+        expect(size.height).toBeGreaterThanOrEqual(629)
+        expect(Math.abs(size.width / size.height - width / height)).toBeLessThan(0.01)
+      }
+
+      const warnings: string[] = []
+
+      await svgCover(await svg('text.svg', `<svg ${xmlns} viewBox="0 0 8 8"><text x="1" y="6">K</text></svg>`), 'shareCard() image', 1200, 630, message => warnings.push(message))
+      expect(warnings).toEqual([`the shareCard() image ${join(dir, 'text.svg')} has text, which kay draws without fonts, so as nothing; turn the text into paths`])
+
+      await expect(svgCover(await svg('sizeless.svg', `<svg ${xmlns}/>`), 'shareCard() image', 1200, 630)).rejects.toThrow('has no viewBox, nor a width and height')
+      await expect(svgCover(await svg('tall.svg', `<svg ${xmlns} viewBox="0 0 10 1000"/>`), 'shareCard() image', 1200, 630)).rejects.toThrow('to cover 1200x630')
+      await expect(svgCover(await svg('broken.svg', 'not an svg'), 'shareCard() image', 1200, 630)).rejects.toThrow('is not an SVG kay can draw')
+    }
+    finally {
+      await clean(dir, client)
     }
   })
 })

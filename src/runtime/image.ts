@@ -228,6 +228,8 @@ function currentMaxDensity(): number {
 
 // What the route resizes, a query after the name allowed.
 export const RESIZABLE = /\.(?:png|jpe?g|webp|gif|avif)(?:\?.*)?$/i
+// An SVG, which only a share card draws, rasterized to cover the card.
+export const SVG_IMAGE = /\.svg(?:\?.*)?$/i
 
 // A file the route resizes or, with `images.resolve` set, any path of the site, which the app looks up with no file extension to go by.
 function resizable(src: string): boolean {
@@ -404,7 +406,7 @@ export function variantFilesLinked(): boolean {
 
 export interface ShareCardOptions {
   title: string
-  // An imported image, or one from `images.dirs` or `images.remote`, covering the card behind the title.
+  // An imported image, an SVG included, or a raster one from `images.dirs` or `images.remote`, covering the card behind the title.
   image?: string | undefined
 }
 
@@ -417,8 +419,11 @@ export function setCardMaker(maker: typeof cardMaker): void {
 
 // The URL of a 1200x630 share card drawn for the page, its title over the image if one is given, for `og:image`: `meta(property="og:image" content={shareCard({ title: post.title, image: post.cover })})` in a `head` block.
 export function shareCard(card: ShareCardOptions): string {
-  if (card.image !== undefined && !RESIZABLE.test(card.image))
-    throw new Error(`kay: shareCard() cannot draw on ${card.image}: it takes a PNG, JPEG, WebP, GIF or AVIF`)
+  if (card.image !== undefined && SVG_IMAGE.test(card.image) && !card.image.startsWith(IMPORTED))
+    throw new Error(`kay: shareCard() cannot draw on ${card.image}: an SVG is taken only when imported, not from images.dirs, images.remote or a stored file`)
+
+  if (card.image !== undefined && !RESIZABLE.test(card.image) && !SVG_IMAGE.test(card.image))
+    throw new Error(`kay: shareCard() cannot draw on ${card.image}: it takes a PNG, JPEG, WebP, GIF, AVIF or an imported SVG`)
 
   if (card.image !== undefined && remoteListed && REMOTE.test(card.image) && !remoteListed(card.image))
     throw new Error(`kay: shareCard() was given ${card.image}, on a host images.remote in kay.config.ts does not list, so the card cannot be drawn on it`)

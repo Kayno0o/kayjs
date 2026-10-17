@@ -2,6 +2,10 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
+## Unreleased
+
+- `shareCard({ title, image })` takes an imported `.svg` as `image`, drawn to cover the card before the title, with its cards written by `kay build` and kept for an executable like `images.card.logo` ([Images](images.md#draw-a-share-card-for-a-page)).
+
 ## 1.51.1
 
 - A valueless Markdown component tag with no later `>` stays text inside a blockquote too, as outside one: the quote's `>` markers no longer count as its close ([Content](content.md#components-in-markdown)).

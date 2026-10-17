@@ -126,6 +126,8 @@ head
 
 `shareCard` needs a font listed in `fonts`.
 
+Pass `image` to draw the title over a picture. It can be an imported PNG, JPEG, WebP, GIF or AVIF, or an imported SVG such as a banner kept in the repo: the SVG is drawn to cover the card, cut in the middle if its shape differs, and `kay build` keeps that drawing for an executable. Turn any text in the SVG into paths, as kay draws it without fonts. An SVG from `images.dirs` or `images.remote` is refused.
+
 `images.card` in `kay.config.ts` sets the card's `background`, text `color` and `font`. It also takes a square `logo`, drawn at the top left: `images: { card: { logo: 'src/logo.svg' } }`. `kay check` reports a logo that is missing, not square or not an image it can draw.
 
 ## Sitemap and robots.txt
