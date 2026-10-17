@@ -4,8 +4,7 @@ import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
 import { s } from 'kay'
 import { wording } from 'kay/words'
 import EntryEditor from '../../../components/entry-editor.kay'
-import { humanize } from '../../../fields'
-import { collectionPath } from '../../../listing'
+import { collectionPath, collectionTitle } from '../../../listing'
 import { settings } from '../../../settings'
 import { entryScreen } from '../../../store'
 
@@ -15,13 +14,14 @@ const { prefix } = settings()
 const screen = await entryScreen({ collection: ctx.params.collection, slug: ctx.params.slug, locale: ctx.query.locale }) ?? ctx.notFound()
 const { collection } = screen
 const entry = collection.problem === undefined ? screen.entry ?? ctx.notFound() : undefined
+const title = collectionTitle(collection)
 const name = ctx.query.locale === undefined ? ctx.params.slug : `${ctx.params.slug} (${ctx.query.locale})`
 ---
 head
-  title {name} - {humanize(collection.name)}
+  title {name} - {title}
 PageSection(title={name} level={1})
   @actions
-    a(href={collectionPath(prefix, collection.name)}) {humanize(collection.name)}
+    a(href={collectionPath(prefix, collection.name)}) {title}
   if entry
     EntryEditor(prefix={prefix} collection={collection} entry={entry})
   else

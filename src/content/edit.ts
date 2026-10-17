@@ -49,6 +49,8 @@ export interface JsonSchema {
 export interface CollectionInfo {
   // The name the content config exports it under, which the page's markers and `showDraft` use too.
   name: string
+  // The collection's `title`, which the screens show instead of the name humanized.
+  title?: string | undefined
   kind: 'folder' | 'loaded'
   // The schema as JSON Schema, a field of a kind kay knows carrying `x-kay: { kind, collection? }`.
   schema: JsonSchema
@@ -213,13 +215,14 @@ export async function collectionInfo(name: string, { counts = true }: { counts?:
 }
 
 async function infoOf(name: string, collection: Collection<unknown>, repoRoot: string, counts = true): Promise<CollectionInfo> {
-  const { draft, localized = false, schema } = collection.options
+  const { draft, localized = false, schema, title } = collection.options
   const dir = collection.dir === undefined ? undefined : folderOf(collection.dir)
   const inRepo = dir === undefined ? undefined : repoPath(repoRoot, dir)
   const { body, count, problem } = counts ? await bodyHeld(name, collection, dir) : { body: false, count: undefined, problem: undefined }
 
   return {
     name,
+    ...title !== undefined && { title },
     kind: dir === undefined ? 'loaded' : 'folder',
     schema: jsonSchema(schema),
     ...body && { body: { kind: 'markdown' } },

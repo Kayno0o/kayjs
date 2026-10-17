@@ -6,9 +6,8 @@ import Pagination from '@kaynooo/kayjs-ui/pagination.kay'
 import { s } from 'kay'
 import { wording } from 'kay/words'
 import EntryTable from '../../../components/entry-table.kay'
-import { humanize } from '../../../fields'
 import { entries } from '../../../kay/content'
-import { newEntryPath, pageRows } from '../../../listing'
+import { collectionTitle, newEntryPath, pageRows } from '../../../listing'
 import { settings } from '../../../settings'
 import { findCollection, versionOf } from '../../../store'
 
@@ -19,10 +18,11 @@ const collection = await findCollection(ctx.params.collection) ?? ctx.notFound()
 const search = ctx.query.q ?? ''
 const listed = await pageRows(collection, search, ctx.query.page ?? 1, async filter => entries(collection.name, filter), versionOf, pageSize)
 const url = ctx.url
+const title = collectionTitle(collection)
 ---
 head
-  title {humanize(collection.name)}
-PageSection(title={humanize(collection.name)} level={1})
+  title {title}
+PageSection(title={title} level={1})
   @actions
     if collection.problem === undefined
       Button(href={newEntryPath(prefix, collection.name)} label={wording('cms.admin.newEntry', 'New entry')} icon="plus" tone="accent")

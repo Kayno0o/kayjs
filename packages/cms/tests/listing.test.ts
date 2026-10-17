@@ -1,6 +1,6 @@
 import type { CollectionInfo, EntryFilter, SourceEntry } from '../src/kay/contract'
 import { describe, expect, it } from 'bun:test'
-import { entryPath, newEntryPath, onPagePath, PAGE_SIZE, pageOf, pageRows, problemId, rowsOf, searchRows } from '../src/listing'
+import { collectionTitle, entryPath, newEntryPath, onPagePath, PAGE_SIZE, pageOf, pageRows, problemId, rowsOf, searchRows } from '../src/listing'
 
 const posts: CollectionInfo = {
   name: 'posts',
@@ -9,6 +9,13 @@ const posts: CollectionInfo = {
   components: [],
   schema: { properties: { published: { type: 'boolean' }, title: { type: 'string' }, summary: { type: 'string' } } },
 }
+
+describe('collectionTitle', () => {
+  it('is the collection\'s own title, else its name humanized', () => {
+    expect(collectionTitle({ name: 'produits', title: 'Produits' })).toBe('Produits')
+    expect(collectionTitle({ name: 'blogPosts' })).toBe('Blog posts')
+  })
+})
 
 describe('rowsOf', () => {
   it('titles each entry by its first text field, else its slug', () => {

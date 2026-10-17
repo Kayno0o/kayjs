@@ -90,6 +90,8 @@ export interface ContentLoader {
 type BooleanField<Data> = { [Name in keyof Data]-?: Data[Name] extends boolean | undefined ? Name : never }[keyof Data] & string
 
 export interface CollectionOptions<Schema extends TSchema> {
+  // The name a CMS screen titles the collection with, `Produits`; the export's name, humanized, when left out. The name still keeps the URLs, the markers and the upload folder.
+  title?: string | undefined
   // What each entry's frontmatter, or a data file's content, holds; an entry it refuses fails `kay check` and the build.
   schema: Schema
   // The kay components a Markdown entry may use, by the name it writes them with: `<Callout type="warn">`.

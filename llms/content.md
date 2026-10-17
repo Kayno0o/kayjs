@@ -221,6 +221,7 @@ article
 - An entry `draft` returns true for shows in development (`kay dev`, or the server's `dev` option, which wins over `NODE_ENV`) and to a visitor in preview mode only.
 - Everywhere else a draft is left out of `all()`, `get()`, prerendering, the sitemap and the feed.
 - `draft: 'draft'`, a boolean field's name, holds back the entries where it is true, which a CMS then reads and publishes by writing false.
+- `title: 'Produits'` is what a CMS titles the collection with, instead of its export's name humanized (`produits` gives `Produits`, `blogPosts` gives `Blog posts`); the name still keeps the URLs, the markers and the upload folder.
 
 #### Markdown files
 

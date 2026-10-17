@@ -49,6 +49,16 @@ In edit mode, kay renders the editor at the end of every page, with the entries 
 
 Once there is a guard, every save needs it, edit mode included, as an edit cookie or link is tied to no user. With a guard, `author` names who a save is committed as, such as the signed-in user.
 
+## Collection titles
+
+The screens title a collection with its export's name, humanized: `blogPosts` shows as "Blog posts". A collection can say its own title with the `title` option, which suits a site that is not in English:
+
+```ts
+export const produits = collection('src/content/produits', { schema, title: 'Produits' })
+```
+
+The name keeps naming the collection's URL, its markers and its upload folder.
+
 ## Field kinds of your own
 
 A field the admin should edit another way, such as a colour or a rating, is declared in the schema with `customField(kind, schema)` from `kay/content`, and edited by `src/cms/fields/<kind>.kay`. There is nothing to register: the editor bundles every file in that folder.

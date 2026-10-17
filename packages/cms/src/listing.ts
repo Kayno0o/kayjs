@@ -1,5 +1,5 @@
 import type { CollectionInfo, EntryFilter, EntryRef, SourceEntry } from './kay/contract'
-import { fieldsOf } from './fields'
+import { fieldsOf, humanize } from './fields'
 
 const UNSAFE_ID = /[^a-z0-9]/giu
 
@@ -82,6 +82,11 @@ export async function pageRows(collection: CollectionInfo, search: string, page:
   const at = pageAt(collection.count ?? 0, page, size)
 
   return versioned({ rows: rowsOf(collection, await read({ offset: at.offset, limit: size })), page: at.page, pages: at.pages })
+}
+
+// What the screens title a collection with: its `title`, else its name humanized.
+export function collectionTitle(collection: Pick<CollectionInfo, 'name' | 'title'>): string {
+  return collection.title ?? humanize(collection.name)
 }
 
 export function collectionPath(prefix: string, collection: string): string {

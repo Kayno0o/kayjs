@@ -199,8 +199,9 @@ describe('the collections a CMS edits', () => {
 
     expect(found.map(each => each.name)).toEqual(['articles', 'news', 'notes', 'pages'])
     expect(found[1]).toEqual({ name: 'news', kind: 'loaded', schema: expect.objectContaining({ type: 'object', required: ['title', 'published', 'tags'] }), body: { kind: 'markdown' }, components: [], localized: false, count: 2 })
-    expect(found[2]).toEqual({ name: 'notes', kind: 'loaded', schema: expect.objectContaining({ type: 'object' }), components: [], localized: true, count: 2 })
+    expect(found[2]).toEqual({ name: 'notes', title: 'Notes de service', kind: 'loaded', schema: expect.objectContaining({ type: 'object' }), components: [], localized: true, count: 2 })
     expect(articles).toMatchObject({ kind: 'folder', body: { kind: 'markdown' }, components: [], localized: true, dir: 'tests/fixtures/cms/src/content/articles', draftField: 'hidden', count: 2 })
+    expect(articles).not.toHaveProperty('title')
     expect(articles).not.toHaveProperty('repoRoot')
     expect(articles.schema.properties).toMatchObject({ author: { 'type': 'string', 'x-kay': { kind: 'reference', collection: 'news' } }, cover: { 'type': 'string', 'x-kay': { kind: 'image' } } })
     expect(JSON.stringify(articles.schema)).not.toContain('"Date"')

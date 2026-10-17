@@ -5,9 +5,8 @@ import CardRow from '@kaynooo/kayjs-ui/card-row.kay'
 import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
 import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
 import { wording } from 'kay/words'
-import { humanize } from '../fields'
 import { collections } from '../kay/content'
-import { collectionPath, problemId } from '../listing'
+import { collectionPath, collectionTitle, problemId } from '../listing'
 import { settings } from '../settings'
 
 const { prefix } = settings()
@@ -26,6 +25,6 @@ PageSection(title={wording('cms.admin.content', 'Content')} level={1})
           span.kcms-sr-only(id={problemId(collection.name)}) {problem}
         else
           span {wording('cms.admin.entryCount', collection.count === 1 ? '1 entry' : '{count} entries', { count: collection.count ?? 0 })}
-      a(href={collectionPath(prefix, collection.name)} data-tooltip={collection.problem} aria-describedby={collection.problem === undefined ? undefined : problemId(collection.name)}) {humanize(collection.name)}
+      a(href={collectionPath(prefix, collection.name)} data-tooltip={collection.problem} aria-describedby={collection.problem === undefined ? undefined : problemId(collection.name)}) {collectionTitle(collection)}
   else
     EmptyState(title={wording('cms.admin.noCollections', 'No collections')} description={wording('cms.admin.noCollectionsHint', 'This site declares no content collection in its content config.')})

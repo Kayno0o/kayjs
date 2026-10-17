@@ -5,7 +5,7 @@ import Button from '@kaynooo/kayjs-ui/button.kay'
 import { resource } from 'kay'
 import { wording } from 'kay/words'
 import entriesApi from '../api/entries'
-import { humanize } from '../fields'
+import { collectionTitle } from '../listing'
 import { BODY } from '../markers'
 import { drafts } from './drafts'
 import EntryFields from './entry-fields.kay'
@@ -56,7 +56,7 @@ async function save(): Promise<void> {
 section.kcms-entry(ref={element => box = element})
   header.kcms-entry-head
     hgroup
-      h3.kcms-entry-title {humanize(entry.collection)}
+      h3.kcms-entry-title {collectionTitle({ name: entry.collection, title: source.value()?.collection.title })}
       p.kcms-entry-slug {entry.locale === undefined ? entry.slug : `${entry.slug} (${entry.locale})`}
     if drafts.changed(entry)
       .kcms-entry-actions
