@@ -65,6 +65,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 - On the prebuilt pages, a magic link, a passkey or a provider sign-in with the box unchecked gave a 30-day session; it now gives the one-day browser session a password does. An app wanting the long session on all of them sets `pages: { remember: 'always' }`, and one wanting the box gone `'always'` or `'never'`. No deprecated lint covers it, as nothing in the app's code is the old form: it is a default.
 - `pages.home` is now where the mailed links, codes, registering, a passkey and a provider land when nothing asked for another page, where they landed on `/`.
 
+### An action's `ActionRedirect.location` carries the `base` under `testSite`
+
+- Under `testSite({ base: '/app' })`, `site.call` rejects with an `ActionRedirect` whose `location` is `/app/dashboard`, where it was `/dashboard`, as the browser now lands under the base too. An assertion on `location` writes the path with the base, or the site is tested without one. No `deprecated` lint is possible, as a test's expected value is no code `kay check` reads.
+
 ## 1.51.0
 
 ### An API route is an MCP tool only when it sets `detail.tool`
