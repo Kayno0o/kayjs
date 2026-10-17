@@ -200,7 +200,7 @@ function redirectsOf(config: string, from: number): number | 'other' | undefined
 
 function after(config: string, at: number): number | 'other' {
   const rest = config.slice(at)
-  const colon = (/^\s*:\s*\{/).exec(rest)
+  const colon = COLON_BRACE.exec(rest)
 
   return colon === null ? 'other' : at + colon[0].length
 }
