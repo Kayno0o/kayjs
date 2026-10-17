@@ -355,11 +355,19 @@ describe.concurrent('kay mcp', () => {
   })
 
   it('answers the doctor\'s checks, a failing one being a result', async () => {
-    const { result } = await agent.request('tools/call', { name: 'doctor', arguments: { port: 65_000 } })
-    const checks = (result?.structuredContent as { checks: { name: string }[] }).checks
+    const busy = Bun.serve({ port: 0, hostname: '0.0.0.0', fetch: () => new Response() })
 
-    expect(checks.map(check => check.name)).toEqual(['bun', 'versions', 'config', 'env', 'port', 'build'])
-    expect(result?.isError).toBeUndefined()
+    try {
+      const { result } = await agent.request('tools/call', { name: 'doctor', arguments: { port: busy.port } })
+      const checks = (result?.structuredContent as { checks: { name: string, ok: boolean }[] }).checks
+
+      expect(checks.map(check => check.name)).toEqual(['bun', 'versions', 'config', 'env', 'port', 'build'])
+      expect(checks.find(check => check.name === 'port')!.ok).toBe(false)
+      expect(result?.isError).toBeUndefined()
+    }
+    finally {
+      await busy.stop(true)
+    }
   })
 
   it('checks the project, or only the files given, a lint being a result and not a failure', async () => {

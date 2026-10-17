@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { dev } from '../src/dev'
 import { devAddressFile, readDevAddress, removeDevAddress, writeDevAddress } from '../src/dev/address'
 import { mountedAt } from '../src/dev/base-proxy'
-import { keep, MAX_FILES, pagePath, prune, screenshot, SCREENSHOTS_DIR, shotName } from '../src/dev/screenshot'
+import { keep, locked, MAX_FILES, pagePath, prune, screenshot, SCREENSHOTS_DIR, shotName } from '../src/dev/screenshot'
 import { diffPngs } from '../src/dev/screenshot-diff'
 import { McpServer } from '../src/mcp/protocol'
 import { projectCapabilities } from '../src/mcp/tools'
@@ -236,6 +236,35 @@ describe('prune with a file that vanishes', () => {
 })
 
 describe('keeping a shot', () => {
+  it('keeps its lock fresh while a replace outlasts the stale window, and lets one waiter in at a time over a stale one', async () => {
+    const root = await scratchDir('shots-held-')
+
+    try {
+      const file = join(root, 'page')
+      const order: string[] = []
+      let inside = 0
+      let most = 0
+      const work = (name: string, ms: number) => async () => {
+        most = Math.max(most, ++inside)
+        order.push(`${name} in`)
+        await Bun.sleep(ms)
+        order.push(`${name} out`)
+        inside--
+      }
+
+      await Bun.write(`${file}.lock`, '1')
+      utimesSync(`${file}.lock`, 1000, 1000)
+      await Promise.all([locked(file, work('a', 600), 300), locked(file, work('b', 50), 300), locked(file, work('c', 50), 300)])
+
+      expect(most).toBe(1)
+      expect(order).toHaveLength(6)
+      expect(readdirSync(root).filter(name => name.includes('.lock'))).toEqual([])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('takes over a stale lock, once, and leaves nothing of it', async () => {
     const root = await scratchDir('shots-stale-')
 

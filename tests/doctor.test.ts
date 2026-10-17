@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { version } from '../package.json'
+import { readManifest, writeManifest } from '../src/server/client'
 import { scratchDir } from './scratch'
 
 const cli = join(import.meta.dir, '../src/cli.ts')
@@ -90,11 +91,22 @@ describe('kay doctor', () => {
     expect(drift.check('versions').fix).toContain('bun update')
   })
 
+  it('finds a library installed above the project, as a workspace hoists it', async () => {
+    const parent = await project({ ...installed('@kaynooo/kayjs', version), ...installed('@kaynooo/kayjs-hoisted', version) })
+    const member = join(parent, 'app')
+
+    await Bun.write(join(member, 'package.json'), '{ "dependencies": { "@kaynooo/kayjs": "x", "@kaynooo/kayjs-hoisted": "x" } }')
+
+    const result = await doctor(member)
+
+    expect(result.check('versions').ok, result.check('versions').message).toBe(true)
+  })
+
   it('fails a listed library that is not installed, and ignores libraries it does not know', async () => {
-    const missing = await doctor(await project({ 'package.json': '{ "dependencies": { "@kaynooo/kayjs-auth": "x", "left-pad": "1.0.0" } }' }))
+    const missing = await doctor(await project({ 'package.json': '{ "dependencies": { "@kaynooo/kayjs-nonexistent": "x", "left-pad": "1.0.0" } }' }))
 
     expect(missing.check('versions').ok).toBe(false)
-    expect(missing.check('versions').message).toContain('@kaynooo/kayjs-auth')
+    expect(missing.check('versions').message).toContain('@kaynooo/kayjs-nonexistent')
     expect(missing.check('versions').message).not.toContain('left-pad')
     expect(missing.check('versions').fix).toContain('bun install')
   })
@@ -121,6 +133,14 @@ describe('kay doctor', () => {
       expect(result.check('env').message).not.toContain('SESSION_SECRET')
       expect(result.check('env').message).not.toContain('PORT')
       expect(result.check('env').fix).toContain('.env')
+    })
+
+    it('sees every schema of a module whose first one is unset, and a variable that is set but refused', async () => {
+      const second = 'import { s } from \'kay\'\nimport { defineEnv } from \'kay/server\'\n\nexport const first = defineEnv(s.Object({ FIRST_KEY: s.String() }))\nexport const second = defineEnv(s.Object({ SECOND_KEY: s.String() }))\n'
+      const result = await doctor(await project({ 'src/env.ts': second }))
+
+      expect(result.check('env').message).toContain('FIRST_KEY')
+      expect(result.check('env').message).toContain('SECOND_KEY')
     })
 
     it('reads a variable from the shell or from the project\'s own .env files, whatever the directory it runs in', async () => {
@@ -193,6 +213,15 @@ describe('kay doctor', () => {
   })
 
   describe('build', () => {
+    it('has kay stamp the manifests it writes with its version', async () => {
+      const root = await scratchDir('doctor-stamp-')
+
+      dirs.push(root)
+      await writeManifest(root, { entryImports: [], islands: {}, styles: {} }, join(root, '.kay/client'))
+      expect((await readManifest(root, join(root, '.kay/client')))!.kay).toBe(version)
+      expect((await doctor(root)).check('build').ok).toBe(true)
+    })
+
     const built = (stamp: object, dir = '.kay/client') => ({ [`${dir}/manifest.json`]: JSON.stringify({ entryImports: [], islands: {}, styles: {}, ...stamp }) })
 
     it('passes a project nothing built and a build by this kay', async () => {

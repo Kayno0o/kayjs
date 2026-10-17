@@ -1,12 +1,13 @@
 import type { Command } from './command'
 import { existsSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import process from 'node:process'
 import { version as runningVersion } from '../../package.json'
 import { bunProblem } from '../bun'
 import { loadConfig } from '../config'
 import { readDevAddress } from '../dev/address'
 import { readManifest } from '../server/client'
+import { buildingWithoutEnv } from '../server/env-state'
 import { formatOption, isPort, printDocument, projectRoot, withStdoutOnStderr } from './command'
 import { listEnv } from './env'
 import { USAGES } from './usages'
@@ -49,6 +50,8 @@ export const doctor: Command = {
     if (root === undefined)
       return 1
 
+    buildingWithoutEnv()
+
     const checks = await withStdoutOnStderr(async () => diagnose(root, typeof values.port === 'string' ? values.port : undefined))
 
     if (format === 'json')
@@ -68,7 +71,7 @@ export async function diagnose(root: string, port?: string): Promise<Check[]> {
   const dotenv = dotenvOf(root)
 
   return [
-    bunCheck(),
+    bunCheck(root),
     versionsCheck(root),
     await configCheck(root),
     await envCheck(root, dotenv),
@@ -77,18 +80,27 @@ export async function diagnose(root: string, port?: string): Promise<Check[]> {
   ]
 }
 
-function bunCheck(): Check {
-  const problem = bunProblem()
+function bunCheck(root: string): Check {
+  const problem = bunProblem({ cwd: root })
 
-  return problem === undefined ? { name: 'bun', ok: true, message: `Bun ${Bun.version}` } : { name: 'bun', ok: false, message: problem, fix: problem.slice(problem.lastIndexOf(': ') + 2) }
+  if (problem === undefined)
+    return { name: 'bun', ok: true, message: `Bun ${Bun.version}` }
+
+  const split = problem.lastIndexOf(': ')
+
+  return { name: 'bun', ok: false, message: problem.slice(0, split), fix: problem.slice(split + 2) }
 }
 
+// The version installed in the project's node_modules or in one above it, where a workspace hoists it.
 function installedVersion(root: string, name: string): string | undefined {
-  try {
-    return (JSON.parse(readFileSync(join(root, 'node_modules', name, 'package.json'), 'utf8')) as { version?: string }).version
-  }
-  catch {
-    return undefined
+  for (let dir = root; ; dir = dirname(dir)) {
+    try {
+      return (JSON.parse(readFileSync(join(dir, 'node_modules', name, 'package.json'), 'utf8')) as { version?: string }).version
+    }
+    catch {}
+
+    if (dirname(dir) === dir)
+      return undefined
   }
 }
 

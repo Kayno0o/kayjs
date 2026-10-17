@@ -237,7 +237,7 @@ async function prepare(view: Bun.WebView, fullPage: boolean): Promise<number | u
 }
 
 // Runs `run` once no other `kay screenshot` replaces the same page's shots, which two at once would mix: one's previous shot would be the other's current.
-async function locked<T>(file: string, run: () => Promise<T>): Promise<T> {
+export async function locked<T>(file: string, run: () => Promise<T>, staleMs = LOCK_STALE_MS): Promise<T> {
   const lock = `${file}${LOCK}`
 
   for (;;) {
@@ -250,7 +250,7 @@ async function locked<T>(file: string, run: () => Promise<T>): Promise<T> {
       if ((error as NodeJS.ErrnoException).code !== 'EEXIST')
         return run()
 
-      takeOverStale(lock)
+      takeOverStale(lock, staleMs)
 
       await Bun.sleep(LOCK_POLL_MS)
     }
@@ -263,7 +263,7 @@ async function locked<T>(file: string, run: () => Promise<T>): Promise<T> {
       utimesSync(lock, now, now)
     }
     catch {}
-  }, LOCK_STALE_MS / 3)
+  }, staleMs / 3)
 
   try {
     return await run()
@@ -275,11 +275,11 @@ async function locked<T>(file: string, run: () => Promise<T>): Promise<T> {
 }
 
 // Moves a stale lock aside by renaming it, which only one of several waiters seeing it can do, and puts it back when it turns out to be a fresh one taken since.
-function takeOverStale(lock: string): void {
+function takeOverStale(lock: string, staleMs: number): void {
   try {
     const held = statSync(lock, { throwIfNoEntry: false })
 
-    if (held === undefined || Date.now() - held.mtimeMs <= LOCK_STALE_MS)
+    if (held === undefined || Date.now() - held.mtimeMs <= staleMs)
       return
 
     const aside = `${lock}.${process.pid}.stale`
@@ -288,7 +288,7 @@ function takeOverStale(lock: string): void {
 
     const moved = statSync(aside, { throwIfNoEntry: false })
 
-    if (moved !== undefined && Date.now() - moved.mtimeMs <= LOCK_STALE_MS && !statSync(lock, { throwIfNoEntry: false }))
+    if (moved !== undefined && Date.now() - moved.mtimeMs <= staleMs && !statSync(lock, { throwIfNoEntry: false }))
       renameSync(aside, lock)
     else
       rmSync(aside, { force: true })

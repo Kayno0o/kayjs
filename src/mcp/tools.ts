@@ -192,9 +192,9 @@ function tools(root: string): Tool[] {
       inputSchema: { type: 'object', properties: { port: { type: 'integer', minimum: 1, maximum: 65_535, description: 'The port to check is free; PORT, else 3000, by default.' } }, additionalProperties: false },
       annotations: READ_ONLY,
       run: async (args) => {
-        const port = args.port === undefined ? undefined : Number(args.port)
+        const port = args.port
 
-        if (port !== undefined && !Number.isInteger(port))
+        if (port !== undefined && (typeof port !== 'number' || !Number.isInteger(port) || port < 1 || port > 65_535))
           throw new Error('port takes a port number')
 
         const result = await kay(['doctor', '--format', 'json', ...port === undefined ? [] : [`--port=${port}`]])
