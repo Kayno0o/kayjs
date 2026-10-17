@@ -450,7 +450,7 @@
     @apply max-w-[40%] shrink-0 truncate text-xs text-kui-subtext0;
   }
 
-  /* A section the site search found: its heading over the line it was found in, the words searched for in the text colour. */
+  /* A section the site search found: its heading over the line it was found in, the words searched for in the accent colour in both. */
   .kui-command-palette-option:has(.kui-command-palette-text) {
     @apply h-auto py-2;
   }

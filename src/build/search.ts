@@ -36,7 +36,7 @@ const FOCUS_WEIGHT = 1.5
 const REPEAT_WEIGHT = 0.5
 const REPEATS = 4
 
-const SKIPPED = 'script, style, template, noscript, nav, footer, svg, button, [data-search="false"]'
+const SKIPPED = 'script, style, template, noscript, nav, footer, svg, [data-search="false"]'
 // Block elements part words, as does a button left out between two; an inline one such as `code` sits inside a sentence.
 const BLOCKS = 'p, li, dt, dd, td, th, tr, br, div, pre, blockquote, section, article, figcaption, button, h1, h2, h3, h4, h5, h6'
 const ENTITY = /&(?:#(\d+)|#x([\da-f]+)|([a-z]+\d*));/gi
@@ -228,6 +228,18 @@ function readPage(page: SearchPage): ReadPage {
     })
     .on(SKIPPED, {
       element: (element) => {
+        skipped++
+        atEnd(element, () => {
+          skipped--
+        })
+      },
+    })
+    .on('button', {
+      // A control's label, but for an accordion's heading written as a button inside it.
+      element: (element) => {
+        if (target !== 'text')
+          return
+
         skipped++
         atEnd(element, () => {
           skipped--

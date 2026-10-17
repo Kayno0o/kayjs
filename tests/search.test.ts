@@ -297,11 +297,12 @@ describe('the search index', () => {
     expect((await search(dir, 'mcp')).hits.map(hit => hit.href)).toEqual(['/guide', '/cli#one', '/cli#mcp', '/upgrading#long'])
   })
 
-  it('leaves out a button\'s label, parting the words around it', async () => {
-    const dir = await index([{ path: '/code', html: '<main><h1>Code</h1><div class="bar"><span>sh</span><button type="button">Copyword</button></div><pre>bunx kay</pre><p>Before<button>Clickword</button>after</p></main>' }])
+  it('leaves out a button\'s label, parting the words around it, but for a heading written as one', async () => {
+    const dir = await index([{ path: '/code', html: '<main><h1>Code</h1><div class="bar"><span>sh</span><button type="button">Copyword</button></div><pre>bunx kay</pre><p>Before<button>Clickword</button>after</p><h3 id="faq"><button aria-expanded="false">Accordion question</button></h3><p>Answerword</p></main>' }])
 
     expect((await search(dir, 'copyword')).hits).toEqual([])
     expect((await search(dir, 'clickword')).hits).toEqual([])
     expect((await search(dir, 'after')).hits[0]!.snippet.map(part => part.text).join('')).toBe('sh bunx kay Before after')
+    expect((await search(dir, 'answerword')).hits.map(hit => [hit.heading, hit.href])).toEqual([['Accordion question', '/code#faq']])
   })
 })

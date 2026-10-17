@@ -155,8 +155,9 @@ describe('CommandPalette with siteSearch', () => {
   const shard = (word: string) => [...word].slice(0, 2).map(char => char.codePointAt(0)!.toString(36)).join('-')
   const files: Record<string, unknown> = {
     '/_kay/search.json': { dir: 'build', langs: { en: 0 } },
-    '/_kay/search/build/0/index.json': { shards: [shard('table')], sections: 2 },
+    '/_kay/search/build/0/index.json': { shards: [shard('table'), shard('sorting')], sections: 2 },
     [`/_kay/search/build/0/w-${shard('table')}.json`]: { table: [0, 2, 1, 1] },
+    [`/_kay/search/build/0/w-${shard('sorting')}.json`]: { sorting: [1, 10], sort: [1, 2] },
     '/_kay/search/build/0/t-0.json': [
       { page: 'Table', href: '/table', text: 'The table page' },
       { page: 'Table', heading: 'Sorting', href: '/table#sorting', text: 'Sort the table by a column' },
@@ -218,6 +219,25 @@ describe('CommandPalette with siteSearch', () => {
 
     expect(dialog.open).toBe(false)
     expect(seen.recent).toEqual([])
+  })
+
+  test('marks the words found in a section\'s heading, and shows a heading with none found as it reads', async () => {
+    const { root, input, labels } = await palette({ siteSearch: true })
+    const marked = () => [...root.querySelectorAll('.kui-command-palette-label mark')].map(mark => mark.textContent)
+
+    press(window, 'k', { ctrlKey: true })
+    await settle()
+    await search(input()!, 'sort')
+    await until(() => labels().includes('Sorting'))
+
+    expect(marked()).toEqual(['Sort'])
+
+    await search(input()!, 'column')
+    await until(() => !labels().includes('Sorting'))
+    await search(input()!, 'table')
+    await until(() => labels().includes('Sorting'))
+
+    expect(marked()).toEqual([])
   })
 
   test('loads nothing without siteSearch', async () => {
