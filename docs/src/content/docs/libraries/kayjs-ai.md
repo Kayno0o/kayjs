@@ -87,9 +87,11 @@ Messages take only the roles `user` and `assistant`. The system prompt goes in t
 - `reply.deltas()` gives only the new pieces.
 - `await reply.usage` gives the token counts when the reply is over.
 - `await reply.finish` says why it ended: `stop`, `length` when the `maxTokens` cap cut it, or `filtered`.
-- `reply.stop()` cancels the request.
+- `reply.stop()` cancels the request. The reply then resolves to the text that came so far, not an error.
 
 A long answer cut by `maxTokens` still resolves as text, so check `finish` when that matters.
+
+kay sets no timeout on the request. A provider that stalls keeps the reply open until your `signal`, `stop()` or the visitor leaving ends it.
 
 `ask` also takes `model`, `maxTokens` (4096 by default), `temperature` and a `signal`.
 
