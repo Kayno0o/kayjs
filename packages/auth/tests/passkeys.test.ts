@@ -11,11 +11,12 @@ afterEach(() => {
   setSystemTime()
 })
 
-async function setup() {
+async function setup(passkeys?: NonNullable<Parameters<typeof testApp>[0]>['passkeys']) {
   const events: { event: AuthEvent, detail: string | undefined }[] = []
   const app = testApp({
     url: 'https://site.test',
     site: 'Site',
+    ...passkeys && { passkeys },
     onEvent: (event, _user, detail) => {
       events.push({ event, detail })
     },
@@ -259,5 +260,67 @@ describe('a passkey as second factor and as proof', () => {
     expect(await ada.call('renamePasskey', id, ' ')).toBe(false)
     expect(await ada.call('renamePasskey', id, 'Work laptop')).toBe(true)
     expect(await ada.call('passkeys')).toMatchObject([{ name: 'Work laptop' }])
+  })
+})
+
+describe('passkey options', () => {
+  test('rpName names the site to the authenticator, the site by default', async () => {
+    const named = await registered(await setup({ rpName: 'Acme Inc' }))
+    const plain = await registered(await setup())
+
+    expect((await named.callOk('passkeyRegistrationOptions', { password: PASSWORD })).options.rp).toEqual({ id: 'site.test', name: 'Acme Inc' })
+    expect((await plain.callOk('passkeyRegistrationOptions', { password: PASSWORD })).options.rp.name).toBe('Site')
+  })
+
+  test('userVerification asks registering and the second factor for it, and sign-in and re-proof always require it', async () => {
+    for (const level of ['required', 'preferred', 'discouraged'] as const) {
+      const app = await setup({ userVerification: level })
+      const ada = await registered(app)
+      const { options } = await ada.callOk('passkeyRegistrationOptions', { password: PASSWORD })
+
+      expect(options.authenticatorSelection?.userVerification).toBe(level)
+      expect((await app.browser().call('passkeySignInOptions')).userVerification).toBe('required')
+    }
+
+    expect((await (await registered(await setup())).callOk('passkeyRegistrationOptions', { password: PASSWORD })).options.authenticatorSelection?.userVerification).toBe('preferred')
+  })
+
+  test('required refuses a passkey made without user verification and a second factor answered without it', async () => {
+    const app = await setup({ userVerification: 'required' })
+    const ada = await registered(app)
+    const { options } = await ada.callOk('passkeyRegistrationOptions', { password: PASSWORD })
+
+    expect(await ada.call('registerPasskey', await authenticator().create(options, { userVerified: false }))).toEqual({ ok: false, error: 'invalid' })
+
+    const { device } = await addPasskey(ada)
+    const user = await app.store.users.findByEmail('ada@example.com')
+
+    await app.store.users.update(user!.id, { totpEnabledAt: new Date() })
+
+    const visitor = app.browser()
+
+    await visitor.post('/password', { identifier: 'ada@example.com', password: PASSWORD })
+
+    const second = await visitor.callOk('twoFactorPasskeyOptions')
+
+    expect(second.options.userVerification).toBe('required')
+    expect(await visitor.call('verifyTwoFactorPasskey', await device.get(second.options, { userVerified: false }))).toEqual({ ok: false, error: 'invalid' })
+  })
+
+  test('discouraged takes a second factor answered without user verification', async () => {
+    const app = await setup({ userVerification: 'discouraged' })
+    const { device } = await addPasskey(await registered(app))
+    const user = await app.store.users.findByEmail('ada@example.com')
+
+    await app.store.users.update(user!.id, { totpEnabledAt: new Date() })
+
+    const visitor = app.browser()
+
+    await visitor.post('/password', { identifier: 'ada@example.com', password: PASSWORD })
+
+    const { options } = await visitor.callOk('twoFactorPasskeyOptions')
+
+    expect(options.userVerification).toBe('discouraged')
+    expect(await visitor.call('verifyTwoFactorPasskey', await device.get(options, { userVerified: false }))).toEqual({ ok: true, redirect: '/' })
   })
 })

@@ -22,6 +22,8 @@ export interface Relying {
   id: string
   name: string
   origins: string[]
+  // How hard registering a passkey and answering a second factor with one ask for the user to be verified, by a PIN or a biometric.
+  userVerification: 'required' | 'preferred' | 'discouraged'
 }
 
 // What a passkey ceremony asks for: a new passkey, a sign-in, the second factor of one, or a re-proof.
@@ -76,7 +78,7 @@ export async function passkeyRegistrationOptions(state: RequestState, proof: Pro
     attestationType: 'none',
     excludeCredentials: (await state.core.store.passkeys.listByUser(record.id)).map(passkey => ({ id: passkey.id, transports: passkey.transports })),
     // Kept on the authenticator, so it signs in without a name typed first.
-    authenticatorSelection: { residentKey: 'required', userVerification: 'preferred' },
+    authenticatorSelection: { residentKey: 'required', userVerification: relying.userVerification },
   })
 
   await park(state, 'register', options.challenge, record.id)
@@ -101,7 +103,7 @@ export async function registerPasskey(state: RequestState, response: Registratio
   let verified: Awaited<ReturnType<typeof verifyRegistrationResponse>>
 
   try {
-    verified = await verifyRegistrationResponse({ response, expectedChallenge: challenge, expectedOrigin: relying.origins, expectedRPID: relying.id, requireUserVerification: false })
+    verified = await verifyRegistrationResponse({ response, expectedChallenge: challenge, expectedOrigin: relying.origins, expectedRPID: relying.id, requireUserVerification: relying.userVerification === 'required' })
   }
   catch {
     return { ok: false, error: 'invalid' }
@@ -249,7 +251,7 @@ export async function verifyTwoFactorPasskey(state: RequestState, response: Auth
 
   const passkey = await store.passkeys.get(response.id)
 
-  if (passkey?.userId !== record.id || !(await check(state.core, passkey, response, challenge, false))) {
+  if (passkey?.userId !== record.id || !(await check(state.core, passkey, response, challenge, relyingParty(state.core).userVerification === 'required'))) {
     await report(state, record, 'sign-in-failed', 'two-factor')
 
     return { ok: false, error: 'invalid' }
@@ -301,7 +303,7 @@ async function userOptions(state: RequestState, record: UserRecord, purpose: 'se
   const options = await generateAuthenticationOptions({
     rpID: relyingParty(state.core).id,
     allowCredentials: passkeys.map(passkey => ({ id: passkey.id, transports: passkey.transports })),
-    userVerification: purpose === 'reprove' ? 'required' : 'preferred',
+    userVerification: purpose === 'reprove' ? 'required' : relyingParty(state.core).userVerification,
   })
 
   await park(state, purpose, options.challenge, record.id)

@@ -168,8 +168,8 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   locate?: ((ip: string) => string | null | undefined | Promise<string | null | undefined>) | undefined
   // Attempts allowed per client address and per account, over `DEFAULT_LIMITS`.
   limits?: LimitsOption | undefined
-  // Passkeys are made for `url`'s host and its origin; `rpId` widens them to a parent domain, `origins` lists every origin the site's pages are served from.
-  passkeys?: { rpId?: string, origins?: string[] } | undefined
+  // Passkeys are made for `url`'s host and its origin; `rpId` widens them to a parent domain, `origins` lists every origin the site's pages are served from, and `rpName` is the name the authenticator shows (`site` by default). `userVerification` is how hard adding a passkey and answering a second factor with one ask for a PIN or a biometric, `'preferred'` by default: signing in with a passkey and re-proving always require it, as a passkey alone is two factors.
+  passkeys?: { rpId?: string, origins?: string[], rpName?: string, userVerification?: 'required' | 'preferred' | 'discouraged' } | undefined
   // A CAPTCHA asked of registering, password sign-in, password resets and magic links: kay's proof of work by default, `proofOfWork({ difficulty })` to tune it, `{ verify: turnstile(secret) }` for a third party's, false for none.
   captcha?: CaptchaOptions | false | undefined
   // Refuses a new password Have I Been Pwned lists, with `true`, or that a check of the app's own finds.
@@ -1312,7 +1312,7 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
     scopes: new Set(options.scopes),
     passkeys: url === undefined
       ? undefined
-      : { id: options.passkeys?.rpId ?? new URL(url).hostname, name: options.site ?? new URL(url).host, origins: options.passkeys?.origins ?? [new URL(url).origin] },
+      : { id: options.passkeys?.rpId ?? new URL(url).hostname, name: options.passkeys?.rpName ?? options.site ?? new URL(url).host, origins: options.passkeys?.origins ?? [new URL(url).origin], userVerification: options.passkeys?.userVerification ?? 'preferred' },
     captcha: options.captcha === false ? undefined : options.captcha ?? proofOfWork(),
     breached: breachedCheck(options.breachedPasswords),
     email: options.email && {

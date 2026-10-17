@@ -275,6 +275,8 @@ A page of your own calls `auth.profile(locale)` and `auth.saveProfile(values)`. 
 
 ## Passkeys in an island
 
+`passkeys: { rpName, userVerification }` in `createAuth` sets the name the authenticator shows, `site` by default, and whether adding a passkey and answering a second factor with one require a PIN or a biometric: `'required'`, `'preferred'` (the default) or `'discouraged'`. Signing in with a passkey and re-proving always require it.
+
 An island asks for a passkey with `@kaynooo/kayjs-auth/browser`. It calls the browser's own WebAuthn methods and ships no library.
 
 `askPasskey(options)` and `makePasskey(options)` take the options an action returned. They answer the JSON the next action takes, or null when the person picked none.
