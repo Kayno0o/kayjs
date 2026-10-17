@@ -416,10 +416,59 @@ test('the unused-uploads screen lists an upload no entry mentions, and deleting 
 test('an image field previews what it holds, takes a drop or a pick, and still a typed path', async () => {
   const page = await site.visit('/admin/collections/products/mug')
 
-  expect(page.find('[data-kcms-path]').map(field => field.attributes['data-kcms-path'])).toEqual(['name', 'photo'])
+  expect(page.find('[data-kcms-path]').map(field => field.attributes['data-kcms-path'])).toEqual(['name', 'photo', 'color', 'mood'])
   expect(page.find('[data-kcms-path="photo"] .kcms-file-drop')).toHaveLength(1)
   expect(page.find('[data-kcms-path="photo"] input[aria-label="Path"]')).toHaveLength(1)
 })
+
+test('a field kind the app adds is edited by its component, given the value and the label', async () => {
+  const page = await site.visit('/admin/collections/products/mug')
+
+  expect(page.find('[data-kcms-path="color"] input[type="color"]').map(input => input.attributes.value)).toEqual(['#ff0000'])
+  expect(page.find('[data-kcms-path="color"]')[0]?.text).toContain('Color')
+})
+
+test('a kind with no component falls back to JSON and names the file to add', async () => {
+  const page = await site.visit('/admin/collections/products/mug')
+
+  expect(page.find('[data-kcms-path="mood"] textarea')).toHaveLength(1)
+  expect(page.find('[data-kcms-path="mood"]')[0]?.text).toContain('No editor for the mood kind: add src/cms/fields/mood.kay')
+})
+
+test('a custom kind\'s value is validated by its schema alone on save', async () => {
+  const refused = await send('POST', 'products/mug', { data: { name: 'Mug', color: 'red' } })
+
+  expect((refused.answer as { issues: { path: string }[] }).issues.map(issue => issue.path)).toEqual(['color'])
+  expect(products[0]?.data.color).toBe('#ff0000')
+  expect((await send('POST', 'products/mug', { data: { name: 'Mug', color: '#00ff00', mood: 'calm' } })).answer).toEqual({ saved: true })
+  expect(products[0]?.data.color).toBe('#00ff00')
+  await send('POST', 'products/mug', { data: { name: 'Mug', color: '#ff0000', mood: 'calm' } })
+})
+
+test('picking a colour in the browser sets the draft and a save writes it', async () => {
+  const built = await browser()
+  const page = await built.open('/admin/collections/products/mug')
+
+  await page.waitUntil(() => document.querySelector('[data-kcms-path="color"] input[type="color"]') !== null)
+  await page.evaluate(() => {
+    const input = document.querySelector<HTMLInputElement>('[data-kcms-path="color"] input[type="color"]')!
+
+    input.value = '#0000ff'
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+  await page.click('.kcms-entry-actions button:last-child')
+
+  for (let waited = 0; products[0]?.data.color !== '#0000ff' && waited < 5000; waited += 50)
+    await Bun.sleep(50)
+
+  try {
+    expect(products[0]?.data.color).toBe('#0000ff')
+    expect(page.errors).toEqual([])
+  }
+  finally {
+    products[0]!.data.color = '#ff0000'
+  }
+}, 60_000)
 
 // A paste as the browser sends it, its files in `clipboardData`.
 async function paste(page: Awaited<ReturnType<typeof site.open>>, selector: string, name: string, type: string, bytes: Uint8Array): Promise<void> {

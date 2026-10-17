@@ -23,7 +23,7 @@ const saving = new Map<string, Promise<void>>()
 // The loads under way by collection: a screen asking for a collection's info and its entry at once shares one run of the loader.
 const loading = new Map<string, Promise<Omit<SourceEntry, 'draft'>[]>>()
 
-// The kinds of string field a CMS edits apart from plain text, as `x-kay: { kind }` in the schema says.
+// The kinds of string field a CMS edits apart from plain text, as `x-kay: { kind }` in the schema says; `customField` names any other kind, which the app's own component edits.
 export type FieldKind = 'image' | 'file' | 'markdown' | 'reference'
 
 // A value an entry's data holds, which an island takes as a prop.
@@ -42,7 +42,7 @@ export interface JsonSchema {
   'enum'?: DataValue[] | undefined
   'default'?: DataValue
   'format'?: string | undefined
-  'x-kay'?: { kind: FieldKind, collection?: string | undefined } | undefined
+  'x-kay'?: { kind: string, collection?: string | undefined } | undefined
   [keyword: string]: DataValue | JsonSchema | JsonSchema[] | Record<string, JsonSchema>
 }
 
@@ -180,6 +180,11 @@ export function fileField(options?: StringOptions): ReturnType<typeof t.String> 
 // A string field holding Markdown, which a CMS edits as it edits a body.
 export function markdownField(options?: StringOptions): ReturnType<typeof t.String> {
   return t.String({ ...options, 'x-kay': { kind: 'markdown' } })
+}
+
+// A field of any schema a CMS edits with the component the app gives the kind, `src/cms/fields/<kind>.kay` in kayjs-cms; the schema alone validates what it saves.
+export function customField<Schema extends TSchema>(kind: string, schema: Schema): Schema {
+  return { ...schema, 'x-kay': { kind } }
 }
 
 // Every collection the content config exports, as a CMS edits it.

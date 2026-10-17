@@ -1,7 +1,8 @@
 ---
+import type { Component } from 'kay'
 import type { Drafts } from '../drafts'
 import type { Field } from '../fields'
-import type { EntryRef } from '../kay/contract'
+import type { CustomFieldProps, EntryRef } from '../kay/contract'
 import Button from '@kaynooo/kayjs-ui/button.kay'
 import FormField from '@kaynooo/kayjs-ui/form-field.kay'
 import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
@@ -20,11 +21,15 @@ import './fields.css'
 
 const { drafts, entry, field, path } = props<{ drafts: Drafts, entry: EntryRef, field: Field, path: string }>()
 
+// The components the app gives its own field kinds, `src/cms/fields/<kind>.kay` each, bundled with the editor.
+const kinds = import.meta.glob<Component<CustomFieldProps>>('/src/cms/fields/*.kay', { eager: true, import: 'default' })
+
 const jsonIssue = signal<string>()
 
 const value = () => drafts.value(entry, path)
 const text = () => value() === undefined || value() === null ? '' : String(value())
 const items = () => Array.isArray(value()) ? value() as unknown[] : []
+const kindOf = (name: string) => Object.hasOwn(kinds, `/src/cms/fields/${name}.kay`) ? kinds[`/src/cms/fields/${name}.kay`] : undefined
 const issue = () => jsonIssue() ?? drafts.issues(entry, path)[0]?.message
 
 function set(next: unknown): void {
@@ -78,6 +83,13 @@ function setJson(next: string): void {
     when 'image', 'file'
       FormField(label={current.label} hint={current.hint} issue={issue()} required={current.required} group)
         FileInput(value={text()} image={current.kind === 'image'} collection={entry.collection} onChange={set})
+    when 'custom'
+      const Kind = kindOf(current.name)
+      if Kind
+        Kind(value={value()} onChange={set} label={current.label} hint={current.hint} issue={issue()} required={current.required})
+      else
+        FormField(label={current.label} hint={wording('cms.field.noKind', 'No editor for the {kind} kind: add src/cms/fields/{kind}.kay. Edited as JSON until then.', { kind: current.name })} issue={issue()} required={current.required})
+          Textarea.kcms-json(rows="4" value={value() === undefined ? '' : JSON.stringify(value(), null, 2)} onChange={setJson})
     when 'json'
       FormField(label={current.label} hint={current.hint ?? 'JSON'} issue={issue()} required={current.required})
         Textarea.kcms-json(rows="4" value={value() === undefined ? '' : JSON.stringify(value(), null, 2)} onChange={setJson})

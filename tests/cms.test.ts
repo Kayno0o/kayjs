@@ -6,8 +6,9 @@ import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { afterEach, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { t } from 'elysia'
+import { TypeCompiler } from 'elysia/type-system'
 import { readClientSources } from '../src/build/client'
-import { collection, collectionInfo, collections, entries, entryFile, entrySource, removeEntry, saveEntry } from '../src/content'
+import { collection, collectionInfo, collections, customField, entries, entryFile, entrySource, removeEntry, saveEntry } from '../src/content'
 import { entryIssues, registerCollections, registerEditSite } from '../src/content/edit'
 import { contentPlace, parseEntry, setContentPlace } from '../src/content/load'
 import { MarkdownError } from '../src/content/markdown'
@@ -203,6 +204,14 @@ describe('the collections a CMS edits', () => {
     expect(articles).not.toHaveProperty('repoRoot')
     expect(articles.schema.properties).toMatchObject({ author: { 'type': 'string', 'x-kay': { kind: 'reference', collection: 'news' } }, cover: { 'type': 'string', 'x-kay': { kind: 'image' } } })
     expect(JSON.stringify(articles.schema)).not.toContain('"Date"')
+  })
+
+  it('reports a custom field kind in the schema beside the schema it wraps, so saves validate by it alone', () => {
+    const color = customField('color', t.String({ pattern: '^#[0-9a-f]{6}$' }))
+
+    expect(JSON.parse(JSON.stringify(color))).toEqual({ 'type': 'string', 'pattern': '^#[0-9a-f]{6}$', 'x-kay': { kind: 'color' } })
+    expect(TypeCompiler.Compile(color).Check('#00ff00')).toBe(true)
+    expect(TypeCompiler.Compile(color).Check('green')).toBe(false)
   })
 
   it('describes one collection by name, running no other collection\'s loader', async () => {

@@ -45,6 +45,25 @@ describe('fieldsOf', () => {
     expect(author).toMatchObject({ kind: 'reference', collection: 'authors' })
   })
 
+  it('reads a kind the app names as a custom one, in a list and a group too, and starts it unset', () => {
+    const [color, palette, theme] = fieldsOf({
+      properties: {
+        color: { 'type': 'string', 'x-kay': { kind: 'color' } },
+        palette: { type: 'array', items: { 'type': 'string', 'x-kay': { kind: 'color' } } },
+        theme: { type: 'object', properties: { accent: { 'type': 'string', 'x-kay': { kind: 'color' } } } },
+      },
+    })
+
+    expect(color).toMatchObject({ kind: 'custom', name: 'color' })
+    expect(palette).toMatchObject({ kind: 'list', item: { kind: 'custom', name: 'color' } })
+    expect(theme).toMatchObject({ kind: 'group', fields: [{ kind: 'custom', name: 'color' }] })
+    expect(emptyValue(color!)).toBeUndefined()
+  })
+
+  it('treats a hint naming a kind that needs more than the hint as the app\'s own', () => {
+    expect(fieldsOf({ properties: { pick: { 'type': 'string', 'x-kay': { kind: 'select' } } } })[0]).toMatchObject({ kind: 'custom', name: 'select' })
+  })
+
   it('picks a union of literals or an enum from a list, keeping numbers as numbers', () => {
     const [status, size] = fieldsOf({
       properties: {

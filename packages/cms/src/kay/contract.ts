@@ -31,3 +31,16 @@ export interface StoredEntry extends SourceEntry {
 export interface DraftResult {
   issues?: Issue[] | undefined
 }
+
+// What the editor gives the component of a field kind an app adds, `src/cms/fields/<kind>.kay`: `const { value, onChange, label } = props<CustomFieldProps>()`.
+export interface CustomFieldProps {
+  // What the entry holds in this field now, `undefined` for a new one.
+  value: unknown
+  // Sets the field's value; the schema validates it when the entry is saved.
+  onChange: (next: unknown) => void
+  label: string
+  hint?: string | undefined
+  // Why the last save refused this field's value.
+  issue?: string | undefined
+  required: boolean
+}

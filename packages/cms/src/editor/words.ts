@@ -16,6 +16,7 @@ export const AFTER_LOAD: readonly string[] = [
   'cms.field.add',
   'cms.field.invalidJson',
   'cms.field.item',
+  'cms.field.noKind',
   'cms.field.removeItem',
   'cms.file.drop',
   'cms.file.dropNow',

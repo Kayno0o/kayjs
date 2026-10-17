@@ -1,0 +1,8 @@
+---
+import type { CustomFieldProps } from '@kaynooo/kayjs-cms'
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+
+const { value, onChange, label, hint, issue, required } = props<CustomFieldProps>()
+---
+FormField(label={label} hint={hint} issue={issue} required={required})
+  input.swatch(type="color" value={typeof value === 'string' ? value : '#000000'} onInput={event => onChange(event.currentTarget.value)})

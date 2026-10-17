@@ -49,6 +49,29 @@ In edit mode, kay renders the editor at the end of every page, with the entries 
 
 Once there is a guard, every save needs it, edit mode included, as an edit cookie or link is tied to no user. With a guard, `author` names who a save is committed as, such as the signed-in user.
 
+## Field kinds of your own
+
+A field the admin should edit another way, such as a colour or a rating, is declared in the schema with `customField(kind, schema)` from `kay/content`, and edited by `src/cms/fields/<kind>.kay`. There is nothing to register: the editor bundles every file in that folder.
+
+```ts
+import { customField } from 'kay/content'
+
+s.Object({ accent: s.Optional(customField('color', s.String({ pattern: '^#[0-9a-f]{6}$' }))) })
+```
+
+```kay
+---
+// src/cms/fields/color.kay
+import type { CustomFieldProps } from '@kaynooo/kayjs-cms'
+
+const { value, onChange, label } = props<CustomFieldProps>()
+---
+label {label}
+  input(type="color" value={typeof value === 'string' ? value : '#000000'} onInput={event => onChange(event.currentTarget.value)})
+```
+
+The component gets `value`, `onChange`, `label`, `hint`, `issue` (why the last save refused the field) and `required`. A save checks the value against the schema alone, so a `pattern` or a union refuses a bad one. A kind with no file is edited as JSON, with a hint naming the file to add.
+
 ## Files and images
 
 An image or file field (`imageField()`, `fileField()` from `kay/content`) takes a file dropped or picked. It is stored through kay's [file storage](/guides/file-storage), and the field keeps the path that serves it.

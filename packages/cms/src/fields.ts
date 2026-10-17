@@ -21,7 +21,11 @@ export type Field
     | FieldBase & { kind: 'reference', collection: string }
     | FieldBase & { kind: 'list', item: Field, numbered: boolean }
     | FieldBase & { kind: 'group', fields: Field[] }
+    // A kind the app names with `customField`, edited by `src/cms/fields/<name>.kay`.
+    | FieldBase & { kind: 'custom', name: string }
 
+// The kinds a schema's `x-kay` hint may name that need nothing beyond the hint; any other name is the app's own.
+const HINTED = new Set(['text', 'textarea', 'markdown', 'number', 'integer', 'boolean', 'date', 'datetime', 'image', 'file', 'json'])
 // A plain string longer than a line or two is edited in a textarea rather than a one-line box.
 const LONG_TEXT = 120
 // The words of a key: `publishedAt` gives `published At`, `seoURL` gives `seo URL`, an acronym keeping its capitals; `_` and `-` only separate.
@@ -55,7 +59,7 @@ export function fieldOf(key: string | number, schema: JsonSchema, required: bool
     return { ...base, kind: 'reference', collection: hint.collection ?? '' }
 
   if (hint !== undefined)
-    return { ...base, kind: hint.kind }
+    return HINTED.has(hint.kind) ? { ...base, kind: hint.kind as Exclude<Field['kind'], 'select' | 'reference' | 'list' | 'group' | 'custom'> } : { ...base, kind: 'custom', name: hint.kind }
 
   const options = choicesOf(inner)
 
@@ -124,6 +128,7 @@ export function emptyValue(field: Field): unknown {
     case 'number':
     case 'integer':
     case 'json':
+    case 'custom':
       return undefined
     case 'list':
       return []
