@@ -9,6 +9,8 @@ export type AiErrorKind
     | 'invalid'
   // The provider could not be reached.
     | 'network'
+  // The provider took longer than the `timeout` of `ask` to answer, or to send the next event: `partial` holds what came.
+    | 'timeout'
   // The stream ended before the provider said the reply was done: `partial` holds what came.
     | 'cut'
   // The provider sent something that is no server-sent event of its API.

@@ -16,18 +16,22 @@ const TRAILING_SLASHES = /\/+$/
 
 const FINISHES: Record<string, Finish> = { length: 'length', content_filter: 'filtered' }
 
-// A mid-stream error by what OpenAI calls it, so an app retrying `unavailable` never loops on one that will not pass.
+const RATE_LIMITED = new Set(['rate_limit_exceeded', 'rate_limit_error', 'requests', 'tokens'])
+const UNAVAILABLE = new Set(['server_error', 'service_unavailable', 'service_unavailable_error', 'overloaded', 'overloaded_error', 'engine_overloaded'])
+const REFUSED_KEY = new Set(['authentication_error', 'invalid_api_key', 'incorrect_api_key', 'invalid_authentication'])
+
+// A mid-stream error by what OpenAI calls it, so an app retrying `unavailable` never loops on one that will not pass; the type and the code are matched whole, never by a part of them.
 function failureOf(failure: { message?: unknown, type?: unknown, code?: unknown }): AiError {
   const said = typeof failure.message === 'string' ? `: ${failure.message.slice(0, 200)}` : ''
-  const kind = `${String(failure.type)} ${String(failure.code)}`
+  const names = [failure.type, failure.code].filter((name): name is string => typeof name === 'string')
 
-  if (kind.includes('rate_limit'))
+  if (names.some(name => RATE_LIMITED.has(name)))
     return new AiError('rate-limited', `openai is rate limiting${said}`)
 
-  if (kind.includes('server_error') || kind.includes('overloaded') || kind.includes('unavailable'))
+  if (names.some(name => UNAVAILABLE.has(name)))
     return new AiError('unavailable', `openai failed mid-reply${said}`)
 
-  if (kind.includes('auth') || kind.includes('invalid_api_key'))
+  if (names.some(name => REFUSED_KEY.has(name)))
     return new AiError('auth', `openai refused the key${said}`)
 
   return new AiError('invalid', `openai refused the request mid-reply${said}`)
@@ -82,7 +86,7 @@ export function openai({ baseUrl = OPENAI_URL, apiKey, model }: OpenAiOptions = 
       const calls = new Map<number, { index: number, id: string, name: string, arguments: string }>()
       const byIndex = new Map<number, number>()
 
-      for await (const { data } of postEvents('openai', `${root}/chat/completions`, apiKey === undefined ? {} : { authorization: `Bearer ${apiKey}` }, body, signal, apiKey)) {
+      for await (const { data } of postEvents('openai', `${root}/chat/completions`, apiKey === undefined ? {} : { authorization: `Bearer ${apiKey}` }, body, request.timeouts, signal, apiKey)) {
         if (data === '[DONE]')
           return
 

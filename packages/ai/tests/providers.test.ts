@@ -237,3 +237,102 @@ describe.each([
     expect(await reply).toBe('Hel')
   })
 })
+
+describe('timeouts', () => {
+  const makers = [
+    ['openai', (url: string) => openai({ baseUrl: url, model: 'm' }), openaiEvents],
+    ['anthropic', (url: string) => anthropic({ apiKey: 'k', baseUrl: url, model: 'm' }), anthropicEvents],
+  ] as const
+
+  it.each(makers)('fails a %s that accepts the request and never answers', async (_name, make) => {
+    const server = serve(async () => new Promise<Response>(() => undefined))
+    const error = await failure(ask('Hi', { provider: make(server.url), timeout: { connect: 50 } }))
+
+    expect(error).toMatchObject({ kind: 'timeout' })
+    expect(error.message).toContain('50 ms')
+  })
+
+  it.each(makers)('fails a %s stream that stops sending, with what came before', async (_name, make, events) => {
+    const server = serve(() => stream(upTo(events('Hel'), 'Hel'), { hold: true }).response)
+    const error = await failure(ask('Hi', { provider: make(server.url), timeout: { idle: 50 } }))
+
+    expect(error).toMatchObject({ kind: 'timeout', partial: 'Hel' })
+  })
+
+  it('cancels the body of a stream that went idle', async () => {
+    const held = stream(upTo(openaiEvents('Hel'), 'Hel'), { hold: true })
+    const server = serve(() => held.response)
+
+    await failure(ask('Hi', { provider: openai({ baseUrl: server.url, model: 'm' }), timeout: { idle: 50 } }))
+    await held.cancelled
+  })
+
+  it('keeps a slow stream alive while chunks keep coming', async () => {
+    const server = serve(() => {
+      const encoder = new TextEncoder()
+      const lines = [...openaiEvents('a', 'b', 'c')].map(event => `${event[0] === undefined ? '' : `event: ${event[0]}\n`}data: ${typeof event[1] === 'string' ? event[1] : JSON.stringify(event[1])}\n\n`)
+      const body = new ReadableStream<Uint8Array>({
+        async start(controller) {
+          for (const line of lines) {
+            controller.enqueue(encoder.encode(line))
+            await Bun.sleep(40)
+          }
+
+          controller.close()
+        },
+      })
+
+      return new Response(body, { headers: { 'content-type': 'text/event-stream' } })
+    })
+
+    expect(await ask('Hi', { provider: openai({ baseUrl: server.url, model: 'm' }), timeout: { idle: 150 } })).toBe('abc')
+  })
+
+  it('is no timeout once the reply is stopped', async () => {
+    const server = serve(async () => new Promise<Response>(() => undefined))
+    const reply = ask('Hi', { provider: openai({ baseUrl: server.url, model: 'm' }), timeout: { connect: 5000 } })
+    const text = (async () => reply)()
+
+    await Bun.sleep(20)
+    reply.stop()
+    expect(await text).toBe('')
+  })
+
+  it('has defaults and rejects a bad value', () => {
+    const provider = openai({ baseUrl: 'http://localhost:1', model: 'm' })
+
+    expect(() => ask('Hi', { provider, timeout: { connect: 0 } })).toThrow('timeout.connect')
+    expect(() => ask('Hi', { provider, timeout: { idle: Number.NaN } })).toThrow('timeout.idle')
+    expect(() => ask('Hi', { provider, timeout: { idle: Number.POSITIVE_INFINITY } })).not.toThrow()
+  })
+
+  it('passes the defaults to a provider', async () => {
+    let seen: unknown
+
+    await ask('Hi', { provider: { name: 'spy', model: 'm', async* stream(request) {
+      seen = request.timeouts
+      yield { text: 'ok' }
+    } } })
+    expect(seen).toEqual({ connect: 30_000, idle: 60_000 })
+  })
+})
+
+describe('an openai error event', () => {
+  const failing = async (error: object) => {
+    const server = serve(() => stream([[undefined, { error }]]).response)
+
+    return failure(ask('Hi', { provider: openai({ baseUrl: server.url, model: 'm' }) }))
+  }
+
+  it('is classified by its exact type or code', async () => {
+    expect(await failing({ type: 'server_error', message: 'x' })).toMatchObject({ kind: 'unavailable' })
+    expect(await failing({ type: 'requests', code: 'rate_limit_exceeded' })).toMatchObject({ kind: 'rate-limited' })
+    expect(await failing({ code: 'invalid_api_key' })).toMatchObject({ kind: 'auth' })
+  })
+
+  it('is no match for a name merely containing one', async () => {
+    expect(await failing({ type: 'invalid_request_error', code: 'unavailable_model_for_account' })).toMatchObject({ kind: 'invalid' })
+    expect(await failing({ type: 'invalid_request_error', code: 'oauth_failure' })).toMatchObject({ kind: 'invalid' })
+    expect(await failing({ type: 'invalid_request_error', code: 'rate_limit_policy_unset' })).toMatchObject({ kind: 'invalid' })
+  })
+})

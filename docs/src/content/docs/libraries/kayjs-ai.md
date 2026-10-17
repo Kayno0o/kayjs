@@ -117,7 +117,7 @@ The chat posts its last 20 messages with each one; the `keep` prop changes that.
 
 A long answer cut by `maxTokens` still resolves as text, so check `finish` when that matters.
 
-kay sets no timeout on the request. A provider that stalls keeps the reply open until your `signal`, `stop()` or the visitor leaving ends it.
+A provider that stalls fails the reply with an `AiError` of kind `timeout`. kay waits 30 seconds for the provider to start answering, and 60 seconds for the next piece of a reply that began. Change either per call with `timeout: { connect: 10_000, idle: 20_000 }`, in milliseconds, or `Infinity` to wait for ever.
 
 `ask` also takes `model`, `maxTokens` (4096 by default), `temperature` and a `signal`.
 
@@ -218,7 +218,7 @@ A run that stops half way leaves whole files. Run it again to translate what is 
 
 ## Errors
 
-A failure throws an `AiError` with a `kind`: `auth`, `rate-limited`, `unavailable`, `invalid`, `network`, `cut`, `protocol` or `limited`. A rate limit has `retryAfter` in seconds. A reply cut halfway has `partial`, the text that came. Nothing is retried for you.
+A failure throws an `AiError` with a `kind`: `auth`, `rate-limited`, `unavailable`, `invalid`, `network`, `timeout`, `cut`, `protocol` or `limited`. A rate limit has `retryAfter` in seconds. A reply cut halfway has `partial`, the text that came. Nothing is retried for you.
 
 ## Test it
 

@@ -1,3 +1,4 @@
+import type { Timeouts } from './types'
 import { parseEvents } from 'kay/library'
 import { AiError } from './errors'
 
@@ -73,16 +74,24 @@ export async function refusal(name: string, response: Response, secret?: string)
 }
 
 // Posts JSON and gives the stream of events back; an answer that is no success throws what the provider said.
-export async function* postEvents(name: string, url: string, headers: Record<string, string>, body: unknown, signal: AbortSignal, secret?: string): AsyncGenerator<ServerEvent> {
+export async function* postEvents(name: string, url: string, headers: Record<string, string>, body: unknown, timeouts: Timeouts, signal: AbortSignal, secret?: string): AsyncGenerator<ServerEvent> {
   let response: Response
+  const connecting = new AbortController()
+  const timer = setTimeout(() => connecting.abort(), timeouts.connect)
 
   try {
-    response = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json', 'accept': 'text/event-stream', ...headers }, body: JSON.stringify(body), signal, redirect: 'error' })
+    response = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json', 'accept': 'text/event-stream', ...headers }, body: JSON.stringify(body), signal: AbortSignal.any([signal, connecting.signal]), redirect: 'error' })
   }
   catch (error) {
     signal.throwIfAborted()
 
+    if (connecting.signal.aborted)
+      throw new AiError('timeout', `${name} did not answer within ${timeouts.connect} ms`, { cause: error })
+
     throw new AiError('network', `${name} could not be reached (${error instanceof Error ? error.message : String(error)})`, { cause: error })
+  }
+  finally {
+    clearTimeout(timer)
   }
 
   if (!response.ok)
@@ -97,23 +106,38 @@ export async function* postEvents(name: string, url: string, headers: Record<str
   if (response.body === null)
     throw new AiError('protocol', `${name} answered with no body`)
 
-  yield* eventsOf(name, response.body, signal)
+  yield* eventsOf(name, response.body, timeouts.idle, signal)
 }
 
 // The events of a body one by one; the body is cancelled as the generator ends, so a reply stopped early stops the provider.
-async function* eventsOf(name: string, body: ReadableStream<Uint8Array>, signal: AbortSignal): AsyncGenerator<ServerEvent> {
+async function* eventsOf(name: string, body: ReadableStream<Uint8Array>, idle: number, signal: AbortSignal): AsyncGenerator<ServerEvent> {
   const stop = new AbortController()
   const queue: ServerEvent[] = []
   let wake: (() => void) | undefined
   let finished = false
   let failure: { error: unknown } | undefined
   const relay = () => stop.abort()
+  let silent = false
+  let watchdog: ReturnType<typeof setTimeout> | undefined
+  // Every chunk starts the wait again, so a provider that keeps sending, a keep-alive comment included, is never cut.
+  const watch = () => {
+    clearTimeout(watchdog)
+    watchdog = setTimeout(() => {
+      silent = true
+      stop.abort()
+    }, idle)
+  }
 
   signal.addEventListener('abort', relay, { once: true })
 
+  watch()
+
   const reading = (async () => {
     try {
-      await parseEvents(body, stop.signal, (event, data) => {
+      await parseEvents(body.pipeThrough(new TransformStream<Uint8Array, Uint8Array>({ transform: (chunk, output) => {
+        watch()
+        output.enqueue(chunk)
+      } })), stop.signal, (event, data) => {
         queue.push({ event, data })
         wake?.()
 
@@ -147,13 +171,17 @@ async function* eventsOf(name: string, body: ReadableStream<Uint8Array>, signal:
       })
     }
 
-    if (failure !== undefined) {
-      signal.throwIfAborted()
+    signal.throwIfAborted()
 
+    if (silent)
+      throw new AiError('timeout', `${name} sent nothing for ${idle} ms mid-reply`)
+
+    if (failure !== undefined) {
       throw new AiError('cut', `${name} dropped the connection mid-reply`, { cause: failure.error })
     }
   }
   finally {
+    clearTimeout(watchdog)
     signal.removeEventListener('abort', relay)
     stop.abort()
     await reading

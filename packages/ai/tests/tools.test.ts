@@ -323,7 +323,7 @@ describe('a visitor leaving mid-loop', () => {
   }
 
   function open(tools: Offered[], steps = 5) {
-    return createReply(signal => converse(fakeAi, { messages: [{ role: 'user', content: 'go' }], system: undefined, model: 'fake', maxTokens: 10, temperature: undefined }, tools, steps, request, signal), [])
+    return createReply(signal => converse(fakeAi, { messages: [{ role: 'user', content: 'go' }], system: undefined, model: 'fake', maxTokens: 10, temperature: undefined, timeouts: { connect: 5000, idle: 5000 } }, tools, steps, request, signal), [])
   }
 
   it('runs no further call and asks nothing more once stopped while a call ran', async () => {
@@ -354,7 +354,7 @@ describe('a visitor leaving mid-loop', () => {
   })
 
   it('asks nothing when it was stopped before the first read', async () => {
-    const reply = createReply(signal => converse(fakeAi, { messages: [{ role: 'user', content: 'go' }], system: undefined, model: 'fake', maxTokens: 10, temperature: undefined }, offered(async () => ({ content: [] })), 5, request, signal), [AbortSignal.abort()])
+    const reply = createReply(signal => converse(fakeAi, { messages: [{ role: 'user', content: 'go' }], system: undefined, model: 'fake', maxTokens: 10, temperature: undefined, timeouts: { connect: 5000, idle: 5000 } }, offered(async () => ({ content: [] })), 5, request, signal), [AbortSignal.abort()])
 
     expect(await reply).toBe('')
     expect(fakeAi.asked).toEqual([])

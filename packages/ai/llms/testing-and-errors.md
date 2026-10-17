@@ -36,6 +36,7 @@ it('asks for the summary', async () => {
 | `unavailable` | 5xx, or an error event such as Anthropic's `overloaded_error` mid-stream |
 | `invalid` | another 4xx: an unknown model, a message it cannot take |
 | `network` | the provider could not be reached |
+| `timeout` | the provider did not answer, or stopped sending mid-reply, for longer than the `timeout` of `ask` |
 | `cut` | the stream ended before the provider said it was done |
 | `limited` | a limit or budget set in `ai()` refused the ask: `retryAfter` and `limit` (`asks`, `budget`, `total`), see [limits](limits.md) |
 | `protocol` | an event that is not JSON of the provider's API, or a server answering JSON instead of streaming |

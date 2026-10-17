@@ -1,5 +1,5 @@
 import type { Offered } from './loop'
-import type { AskOptions, Message, Reply, ToolAction } from './types'
+import type { AskOptions, Message, Reply, Timeouts, ToolAction } from './types'
 import { actionTool, currentRequest } from 'kay/library'
 import { choose } from './config'
 import { guarded } from './limits'
@@ -8,6 +8,8 @@ import { createReply } from './reply'
 
 const DEFAULT_MAX_TOKENS = 4096
 const DEFAULT_MAX_STEPS = 5
+const DEFAULT_CONNECT_TIMEOUT = 30_000
+const DEFAULT_IDLE_TIMEOUT = 60_000
 const ROLES = new Set(['user', 'assistant'])
 
 function messagesOf(prompt: string | Message[]): Message[] {
@@ -23,6 +25,17 @@ function messagesOf(prompt: string | Message[]): Message[] {
 
     return { role: message.role, content: message.content }
   })
+}
+
+function timeoutsOf(timeout: AskOptions['timeout']): Timeouts {
+  const { connect = DEFAULT_CONNECT_TIMEOUT, idle = DEFAULT_IDLE_TIMEOUT } = timeout ?? {}
+
+  for (const [name, value] of [['connect', connect], ['idle', idle]] as const) {
+    if (typeof value !== 'number' || !(value > 0))
+      throw new TypeError(`kayjs-ai: timeout.${name} is a number of milliseconds above 0, or Infinity`)
+  }
+
+  return { connect, idle }
 }
 
 function offer(actions: readonly ToolAction[]): Offered[] {
@@ -59,7 +72,7 @@ export function ask(prompt: string | Message[], options: AskOptions = {}): Reply
 
   const answering = currentRequest()
   const maxTokens = options.maxTokens ?? DEFAULT_MAX_TOKENS
-  const request = { messages, system: options.system, model, maxTokens, temperature: options.temperature }
+  const request = { messages, system: options.system, model, maxTokens, temperature: options.temperature, timeouts: timeoutsOf(options.timeout) }
   const asker = { request: answering, visitor: options.visitor, chars: messages.reduce((sum, message) => sum + message.content.length, options.system?.length ?? 0), maxTokens }
   const signals = [answering?.signal, options.signal]
 

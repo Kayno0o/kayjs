@@ -46,6 +46,13 @@ export interface ProviderRequest {
   model: string
   maxTokens: number
   temperature: number | undefined
+  // Milliseconds a provider may take to answer, and to send the next event once it did; `Infinity` waits for ever.
+  timeouts: Timeouts
+}
+
+export interface Timeouts {
+  connect: number
+  idle: number
 }
 
 // A part of the reply, or the token counts the provider reports as it goes (each field when it knows it).
@@ -76,6 +83,8 @@ export interface AskOptions {
   temperature?: number | undefined
   // Stops the reply when it aborts, as the request being answered does on its own.
   signal?: AbortSignal | undefined
+  // How long to wait, in milliseconds: `connect` for the provider to start answering (30,000 by default), `idle` for the next event of a reply once it began (60,000 by default); a stall past either fails the reply with a `timeout` error, `Infinity` waiting for ever. Each step of a tool loop counts them anew.
+  timeout?: Partial<Timeouts> | undefined
   // Who the limits and budget set in `ai()` count this ask for, in place of the signed-in user its `visitor` names or the address of the request being answered: a job or a test names one.
   visitor?: string | undefined
   // Actions the model may call, each run as the visitor through the whole app, guards, validation and rate limits included; passing one is its opt-in. They need the request being answered, so `ask` with tools called outside one throws.

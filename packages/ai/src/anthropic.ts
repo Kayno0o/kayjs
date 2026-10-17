@@ -94,7 +94,7 @@ export function anthropic({ apiKey, baseUrl = ANTHROPIC_URL, model }: AnthropicO
       // Tool calls arrive as a block opened with the name, then the arguments in pieces.
       const calls = new Map<number, { id: string, name: string, arguments: string }>()
 
-      for await (const { data } of postEvents('anthropic', `${root}/v1/messages`, { 'x-api-key': apiKey, 'anthropic-version': VERSION }, body, signal, apiKey)) {
+      for await (const { data } of postEvents('anthropic', `${root}/v1/messages`, { 'x-api-key': apiKey, 'anthropic-version': VERSION }, body, request.timeouts, signal, apiKey)) {
         const event = json('anthropic', data)
 
         switch (event.type) {

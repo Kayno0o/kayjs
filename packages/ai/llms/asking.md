@@ -21,7 +21,7 @@ ask([{ role: 'user', content: 'Hi' }, { role: 'assistant', content: 'Hello' }, {
 
 `ask(prompt | messages, options?)` returns a `Reply` at once. A prompt is one user message; messages are `{ role: 'user' | 'assistant', content: string }`, other fields dropped.
 
-Options: `system`, `model`, `maxTokens` (4096 by default, as Anthropic requires one), `temperature`, `signal`, `tools` and `maxSteps` ([Actions as tools](tools.md)), and `provider` to ask a provider built by hand.
+Options: `system`, `model`, `maxTokens` (4096 by default, as Anthropic requires one), `temperature`, `signal`, `timeout`, `tools` and `maxSteps` ([Actions as tools](tools.md)), and `provider` to ask a provider built by hand.
 
 ## The reply
 
@@ -30,7 +30,7 @@ Options: `system`, `model`, `maxTokens` (4096 by default, as Anthropic requires 
 - `await reply.usage` is `{ inputTokens, outputTokens }`, or undefined when the provider gave none or the reply failed; it never rejects, and reading it starts the reply.
 - `await reply.finish` is why it ended: `stop`, `length` (the `maxTokens` cap, the text returned as it is), `filtered` (the provider's filter or refusal) or `steps` (the tool loop ran out of `maxSteps` with the model still calling tools); undefined when it failed. Check it when a long answer matters.
 - `reply.stop()` aborts the provider request, what came staying the text of `await`. A stop is not an error: `await` resolves to the partial text.
-- There is no timeout: a provider that stalls holds the reply open until `options.signal`, `stop()` or the visitor leaving ends it.
+- A provider that stalls fails the reply with an `AiError` of kind `timeout`: after 30 s without an answer (`timeout.connect`, in milliseconds), or 60 s without a chunk of the stream once it began (`timeout.idle`; `partial` holds what came). `Infinity` waits for ever; each step of a tool loop counts anew.
 - All readers share one request, which starts on the first read. The request being answered aborting, `options.signal` aborting or a reader leaving early stops it.
 
 ## In a page
