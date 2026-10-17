@@ -95,7 +95,6 @@ export async function pageRows(collection: CollectionInfo, search: string, page:
   return versioned({ rows: rowsOf(collection, await read({ offset: at.offset, limit: size })), page: at.page, pages: at.pages })
 }
 
-// What the screens title a collection with: its `title`, else its name humanized.
 // The rows of an ordered collection in its order, every entry read so a page starts where the order says; each row that can move says which way, unless a search narrows the rows.
 function orderedRows(collection: CollectionInfo, field: string, found: SourceEntry[], search: string): EntryRow[] {
   const sorted = sortOrdered(found, field)
@@ -115,6 +114,7 @@ function orderedRows(collection: CollectionInfo, field: string, found: SourceEnt
   })
 }
 
+// What the screens title a collection with: its `title`, else its name humanized.
 export function collectionTitle(collection: Pick<CollectionInfo, 'name' | 'title'>): string {
   return collection.title ?? humanize(collection.name)
 }

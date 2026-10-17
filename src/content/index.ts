@@ -413,7 +413,7 @@ function byField(field: string): (a: Entry<unknown>, b: Entry<unknown>) => numbe
   const numberAt = (entry: Entry<unknown>) => {
     const value = (entry.data as Record<string, unknown> | undefined)?.[field]
 
-    return typeof value === 'number' && !Number.isNaN(value) ? value : Infinity
+    return typeof value === 'number' && Number.isFinite(value) ? value : Infinity
   }
 
   return (a, b) => {
