@@ -919,12 +919,16 @@ describe('blocks', () => {
   // Past the 16 ms an island waits between two parts.
   const frame = async () => Bun.sleep(30)
 
+  const COUNTED = 'function shown(text: string): string {\n  const counter = globalThis as { renders?: number }\n\n  counter.renders = (counter.renders ?? 0) + 1\n\n  return text\n}\n'
+  const renders = () => (globalThis as { renders?: number }).renders ?? 0
+  const fresh = () => Object.assign(globalThis, { feeds: [], renders: 0 })
+
   const mount19b = site({
-    'main.kay': `---\nimport { signal } from 'kay'\n\n${FEED}\nconst source = signal(feed())\n---\nbutton.next(onClick={() => source.set(feed())}) Next\nawait source()\n  p.wait Waiting\nthen text\n  p.text {text}\ncatch error\n  p.failed {(error as Error).message}\n`,
+    'main.kay': `---\nimport { signal } from 'kay'\n\n${FEED}\n${COUNTED}\nconst source = signal(feed())\n---\nbutton.next(onClick={() => source.set(feed())}) Next\nawait source()\n  p.wait Waiting\nthen text\n  p.text {shown(text)}\n  // kay-allow uncaught-await\n  await Promise.resolve(text.toUpperCase()) then upper\n    p.upper {upper}\ncatch error\n  p.failed {(error as Error).message}\n`,
   })
 
-  it('render an await block given an async iterable again with each part, the latest of those coming within a frame', async () => {
-    (globalThis as { feeds?: unknown[] }).feeds = []
+  it('render an await block given an async iterable again with each part, the latest of those coming within a frame, and not again once it ends on a part shown', async () => {
+    fresh()
 
     const { root, dispose } = await mount19b()
 
@@ -932,19 +936,18 @@ describe('blocks', () => {
       const [first] = feeds()
 
       expect(root.querySelector('p.wait')).not.toBeNull()
+      // Pushed in one go, the first shows at once and the others wait for the frame, the latest of them alone.
       first!.push('a')
       first!.push('ab')
-      await settle()
-      expect(root.querySelector('p.text')!.textContent).toBe('a')
       first!.push('abc')
       await settle()
       expect(root.querySelector('p.text')!.textContent).toBe('a')
       await frame()
       expect(root.querySelector('p.text')!.textContent).toBe('abc')
-      first!.push('abcd')
+      expect(renders()).toBe(2)
       first!.end()
       await settle()
-      expect(root.querySelector('p.text')!.textContent).toBe('abcd')
+      expect(renders()).toBe(2)
       expect(first!.stopped).toBe(false)
     }
     finally {
@@ -952,9 +955,29 @@ describe('blocks', () => {
     }
   })
 
-  it('stop reading an iterable once the block is given another value, and once it goes away', async () => {
-    (globalThis as { feeds?: unknown[] }).feeds = []
+  it('render an await inside a part, settling with each one', async () => {
+    fresh()
 
+    const { root, dispose } = await mount19b()
+
+    try {
+      feeds()[0]!.push('a')
+      await frame()
+      expect(root.querySelector('p.upper')!.textContent).toBe('A')
+      feeds()[0]!.push('ab')
+      feeds()[0]!.end()
+      await frame()
+      expect(root.querySelector('p.upper')!.textContent).toBe('AB')
+    }
+    finally {
+      await dispose()
+    }
+  })
+
+  it('stop reading an iterable once the block is given another value, and once it goes away, logging nothing when its pending part then fails', async () => {
+    fresh()
+
+    const errors = spyOn(console, 'error').mockImplementation(() => undefined)
     const { root, dispose } = await mount19b()
     const [first] = feeds()
 
@@ -965,32 +988,46 @@ describe('blocks', () => {
       await settle()
       expect(first!.stopped).toBe(true)
       expect(root.querySelector('p.wait')).not.toBeNull()
-      first!.push('late')
+      first!.fail(new Error('Aborted'))
       feeds()[1]!.push('new')
       await frame()
       expect(root.querySelector('p.text')!.textContent).toBe('new')
+      expect(root.querySelector('p.failed')).toBeNull()
     }
     finally {
       await dispose()
     }
 
-    expect(feeds()[1]!.stopped).toBe(true)
+    try {
+      expect(feeds()[1]!.stopped).toBe(true)
+      feeds()[1]!.fail(new Error('Aborted'))
+      await settle()
+      expect(errors).not.toHaveBeenCalled()
+    }
+    finally {
+      errors.mockRestore()
+    }
   })
 
-  it('show the catch block of an iterable that throws after its parts, and nothing in place of one that ends with none', async () => {
-    (globalThis as { feeds?: unknown[] }).feeds = []
+  it('show the catch block of an iterable that throws before its first part or after one, and nothing in place of one that ends with none', async () => {
+    fresh()
 
     const { root, dispose } = await mount19b()
 
     try {
-      feeds()[0]!.push('a')
+      feeds()[0]!.fail(new Error('Down'))
+      await settle()
+      expect(root.querySelector('p.failed')!.textContent).toBe('Down')
+      root.querySelector('button')!.click()
+      await settle()
+      feeds()[1]!.push('a')
       await frame()
-      feeds()[0]!.fail(new Error('Cut'))
+      feeds()[1]!.fail(new Error('Cut'))
       await settle()
       expect(root.querySelector('p.failed')!.textContent).toBe('Cut')
       root.querySelector('button')!.click()
       await settle()
-      feeds()[1]!.end()
+      feeds()[2]!.end()
       await settle()
       expect(root.querySelector('p')).toBeNull()
     }
@@ -1003,8 +1040,8 @@ describe('blocks', () => {
     'main.kay': `---\n${FEED}\nconst source = feed()\n---\nawait source then text\n  p.text {text.length > 1 ? (null as unknown as string).length : text}\ncatch\n  p.failed Failed\n`,
   })
 
-  it('report a part whose then block throws rather than show the catch block, and stop reading its iterable', async () => {
-    (globalThis as { feeds?: unknown[] }).feeds = []
+  it('report a part whose then block throws rather than show the catch block, and stop reading its iterable, whatever its pending part does next', async () => {
+    fresh()
 
     const errors = spyOn(console, 'error').mockImplementation(() => undefined)
     const { root, dispose } = await mount19c()
@@ -1016,6 +1053,9 @@ describe('blocks', () => {
       await frame()
       expect(errors).toHaveBeenCalledTimes(1)
       expect(feeds()[0]!.stopped).toBe(true)
+      feeds()[0]!.fail(new Error('Aborted'))
+      await settle()
+      expect(errors).toHaveBeenCalledTimes(1)
       expect(root.querySelector('p.failed')).toBeNull()
     }
     finally {

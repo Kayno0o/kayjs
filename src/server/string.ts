@@ -3,7 +3,7 @@ import { collectDeferred } from '../runtime/await.server'
 import { child, component } from '../runtime/html'
 import { collectIslands } from '../runtime/island.server'
 import { localeState, runInLocale } from '../runtime/locale-state'
-import { isSnapshots } from '../runtime/snapshots'
+import { lastSnapshot } from '../runtime/snapshots'
 import { renderState } from './i18n'
 
 export interface RenderToStringOptions {
@@ -30,7 +30,7 @@ async function settled(view: () => unknown): Promise<string> {
     let value: { value: unknown } | undefined
 
     try {
-      value = await lastOf(block.value)
+      value = await lastSnapshot(block.value)
     }
     catch (error) {
       // With no `catch` block the mail would go out with the content missing, so the render fails instead.
@@ -66,17 +66,4 @@ async function settled(view: () => unknown): Promise<string> {
   }
 
   return result
-}
-
-// What a promise resolves to, or the last part of an iterable, which ends with nothing when it yields none.
-async function lastOf(source: Promise<unknown> | AsyncIterable<unknown>): Promise<{ value: unknown } | undefined> {
-  if (!isSnapshots(source))
-    return { value: await source }
-
-  let last: { value: unknown } | undefined
-
-  for await (const value of source)
-    last = { value }
-
-  return last
 }

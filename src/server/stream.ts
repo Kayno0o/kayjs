@@ -5,7 +5,7 @@ import type { ClientBuild } from './client'
 import { collectDeferred } from '../runtime/await.server'
 import { child } from '../runtime/html'
 import { collectIslands } from '../runtime/island.server'
-import { isSnapshots, readSnapshots } from '../runtime/snapshots'
+import { isSnapshots, lastSnapshot, readSnapshots } from '../runtime/snapshots'
 import { hydrationScript } from './hydration'
 import { messagesScript } from './i18n'
 
@@ -171,13 +171,13 @@ export function streamDocument(shell: string, deferred: PendingBlock[], client: 
   })
 }
 
-// The `then` block once the value resolves, or the `catch` block once it rejects; without one, the pending block just goes away and the error is reported.
+// The `then` block once the value resolves, or with an iterable's last part, or the `catch` block once it rejects; without one, the pending block just goes away and the error is reported.
 // A block that throws while rendering is a bug in the page, not the value failing, so it is reported rather than shown as `catch`.
 export async function settle(block: PendingBlock, cancelled: () => boolean, report: (error: unknown) => void, render: (view: () => unknown, salt?: string) => Rendered = renderStatic): Promise<Rendered> {
-  let value: unknown
+  let value: { value: unknown } | undefined
 
   try {
-    value = await (block.value as Promise<unknown>)
+    value = await lastSnapshot(block.value)
   }
   catch (error) {
     if (!block.failed) {
@@ -191,7 +191,12 @@ export async function settle(block: PendingBlock, cancelled: () => boolean, repo
     return renderOrReport(() => failed(error), report, render, block.id)
   }
 
-  return cancelled() ? EMPTY : renderOrReport(() => block.ready(value as never), report, render, block.id)
+  if (cancelled() || value === undefined)
+    return EMPTY
+
+  const last = value.value
+
+  return renderOrReport(() => block.ready(last as never), report, render, block.id)
 }
 
 // The blocks a part left pending never stream, as the next part replaces them: a promise among them is taken, so its rejection crashes nothing, and an iterable left unread.

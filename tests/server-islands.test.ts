@@ -1,3 +1,4 @@
+import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { gunzipSync } from 'node:zlib'
@@ -11,6 +12,7 @@ import { readManifest } from '../src/server/client'
 import { ExportError } from '../src/server/prerender'
 import { renders } from './fixtures/server-islands/src/renders'
 import { scratchBuild } from './prerendered'
+import { fixtureCopy } from './scratch'
 
 const routes = 'tests/fixtures/server-islands/src/routes'
 const STAMP = /<p class="stamp">(stamp-\d+)<\/p>/g
@@ -139,6 +141,30 @@ describe('server islands', () => {
     }
     finally {
       await build.remove()
+    }
+  })
+
+  it('renders the last part of an async iterable an await block inside one reads', async () => {
+    const copy = await fixtureCopy('server-islands')
+    const copied = join(copy, 'src/routes')
+    const build = await scratchBuild()
+
+    await Bun.write(join(copy, 'src/components/reply.kay'), '---\nasync function* reply() {\n  yield \'Hel\'\n  yield \'Hello\'\n}\n---\n// kay-allow uncaught-await\nawait reply()\n  p.pending Thinking\nthen text\n  p.reply {text}\n')
+    await Bun.write(join(copied, 'reply.kay'), '--- script\nimport Reply from \'../components/reply.kay\'\n---\nh1 Reply\nReply(server)\n')
+
+    try {
+      await build.prerender({ routes: copied })
+
+      const app = await build.serve({ routes: copied, security: false })
+      const html = await (await app.handle(new Request('http://localhost/reply'))).text()
+
+      // In place of the island, not only in what the prerendered stream left after it.
+      expect(html).toContain('<h1>Reply</h1><p class="reply">Hello</p>')
+      expect(html).not.toContain('Thinking')
+    }
+    finally {
+      await build.remove()
+      await rm(copy, { recursive: true, force: true })
     }
   })
 

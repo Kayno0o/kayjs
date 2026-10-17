@@ -3,6 +3,8 @@ import type { ClientBuild } from '../src/server/client'
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
+import { Await } from '../src/runtime/await.server'
+import { readSnapshots } from '../src/runtime/snapshots'
 import { pages, renderToString } from '../src/server'
 import { PART_MS, streamDocument } from '../src/server/stream'
 import { scratchDir } from './scratch'
@@ -77,7 +79,7 @@ describe('an await block given an async iterable', () => {
     async function* stalled(): AsyncGenerator<string> {
       yield 'a'
       yield 'ab'
-      await Bun.sleep(PART_MS * 4)
+      await Bun.sleep(PART_MS * 10)
       yield 'abc'
     }
 
@@ -92,7 +94,25 @@ describe('an await block given an async iterable', () => {
     })
 
     expect(times).toHaveLength(1)
-    expect(times[0]).toBeLessThan(PART_MS * 3)
+    // Well short of the stall, so a busy host still tells the two apart.
+    expect(times[0]).toBeLessThan(PART_MS * 8)
+  })
+
+  it('reads a promise that is also an async iterable as a promise', async () => {
+    const both = Object.assign(Promise.resolve('whole'), { async* [Symbol.asyncIterator]() {
+      yield 'part'
+    } })
+    const { page } = await streamed([block(both)])
+
+    expect(templatesOf(page, 'b')).toEqual(['<p>whole</p>'])
+  })
+
+  it('renders a value whose async iterator getter throws as a plain value', () => {
+    const odd = Object.defineProperty({}, Symbol.asyncIterator, { get: () => {
+      throw new Error('No getter')
+    } })
+
+    expect(Await({ value: odd, ready: () => ({ t: '<p>plain</p>' }) })).toEqual({ t: '<p>plain</p>' })
   })
 
   it('removes the pending block of an iterable that ends with no value', async () => {
@@ -177,6 +197,52 @@ describe('an await block given an async iterable', () => {
     expect(templatesOf(page, 'b')).toEqual(['<!--kay-await:b--><p>0</p><!--/kay-await:b-->'])
     await Bun.sleep(20)
     expect(returned).toBe(true)
+  })
+})
+
+describe('reading the parts of an async iterable', () => {
+  // An iterator noting each call, whose pending `next()` rejects once it is told to return, as one aborting a request does.
+  function aborting(values: string[]): { source: AsyncIterable<string>, calls: string[] } {
+    const calls: string[] = []
+    let abort: ((error: Error) => void) | undefined
+
+    return {
+      calls,
+      source: { [Symbol.asyncIterator]: () => ({
+        next: async () => {
+          calls.push('next')
+
+          if (values.length > 0)
+            return { value: values.shift()!, done: false }
+
+          return new Promise<IteratorResult<string>>((_resolve, reject) => abort = reject)
+        },
+        return: async () => {
+          calls.push('return')
+          abort?.(new Error('Aborted'))
+
+          return { value: undefined, done: true }
+        },
+      }) },
+    }
+  }
+
+  it('ends with nothing once stopped, even when the pending next() then rejects', async () => {
+    const { source } = aborting(['a'])
+    const reader = readSnapshots(source, 0, () => undefined)
+
+    await Bun.sleep(5)
+    reader.stop()
+
+    expect(await reader.done).toBeUndefined()
+  })
+
+  it('asks for no next part once what it showed stopped it', async () => {
+    const { source, calls } = aborting(['a', 'b'])
+    const reader = readSnapshots(source, 0, () => reader.stop())
+
+    expect(await reader.done).toBeUndefined()
+    expect(calls).toEqual(['next', 'return'])
   })
 })
 

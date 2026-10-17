@@ -213,7 +213,8 @@ catch
 - An `await` inside `then` shows its pending block until the last part, whose blocks stream as any do.
 - A visitor leaving the page stops the iterable (`return()`), so a generator's `finally` runs and a request it made can be aborted.
 - In an island, the block renders again with each part, at most once a frame; a newer value given to the block, or the block going away, stops the older iterable.
-- `renderToString` renders the last part.
+- `renderToString` and a server island render the last part.
+- A promise is read as a promise even when it is iterable too; a `ReadableStream` is an async iterable, so each chunk it gives is a part.
 
 ### Rendering to a string
 

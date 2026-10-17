@@ -1137,12 +1137,15 @@ export function awaited(element: Node | null, start: Node | null, end: Node | nu
 
       // A `then` block that throws while rendering is not the promise failing, so it stays out of the catch.
       const settle = async () => {
-        let result: { value: unknown } | undefined
+        let result: { value: unknown, shown?: boolean } | undefined
 
         try {
           result = reader ? await reader.done : { value: await settled }
         }
         catch (error) {
+          if (broken)
+            return
+
           if (failed)
             land(() => failed(error))
           else
@@ -1151,7 +1154,8 @@ export function awaited(element: Node | null, start: Node | null, end: Node | nu
           return
         }
 
-        if (broken)
+        // A last part shown already stays as it is, focus and selection inside it too.
+        if (broken || result?.shown === true)
           return
 
         // An iterable ending with no value leaves nothing in place of its pending block.

@@ -206,10 +206,10 @@ export type FunctionProp<Component> = Component extends IslandBrand ? { kayError
 // What `defer()` returns, a plain promise: an `await` block takes any promise, so nothing marks one.
 export type Deferred<T> = Promise<T>
 
-// What a template's `await` block compiles to: the value, then a function per block.
 // What an `await` block's `then` block takes: what a promise resolves to, or each part of an async iterable.
 export type Settled<T> = T extends AsyncIterable<infer Part> ? Part : Awaited<T>
 
+// What a template's `await` block compiles to: the value, then a function per block.
 export interface AwaitProps<T> {
   value: T
   pending?: (() => JSX.Element) | undefined
