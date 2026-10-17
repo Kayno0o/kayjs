@@ -85,7 +85,7 @@ HEALTHCHECK --interval=30s --timeout=6s CMD ["./server", "--health"]
 CMD ["./server"]
 ```
 
-Its `compose.prod.yaml` publishes the app on `127.0.0.1:3000` alone, for the reverse proxy serving it over HTTPS. The image has no curl, so `./server --health` checks the health route and exits with 0 or 1. It waits as long as `health.timeout` says, but the `HEALTHCHECK --timeout=6s` above cuts it off, so raise that with `health.timeout` when you raise it past 5 s.
+Its `compose.prod.yaml` publishes the app on `127.0.0.1:3000` alone, for the reverse proxy serving it over HTTPS. The image has no curl, so `./server --health` checks the health route and exits with 0 or 1. It waits as long as `health.timeout` says, but the `HEALTHCHECK --timeout=6s` above cuts it off, so raise its `--timeout` yourself when you raise `health.timeout` past 5 s.
 
 If you keep SQLite files, mount a volume the `nobody` user can write. The `app` preset does. Its `compose.prod.yaml` mounts a `data` volume at `/app/data`, and a `migrate` service applies the migrations and hands the file to `nobody` before the app starts.
 
