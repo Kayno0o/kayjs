@@ -322,11 +322,19 @@ export function toolCall(request: Request): ToolCall | undefined {
   return request.headers.get(AGENT) === TOKEN && tool !== null ? { tool, client: request.headers.get(CLIENT) ?? '' } : undefined
 }
 
-// What serves an action a library calls as a tool when no server does, as under `app.handle()`: the app `pages()` built last, as `kay/test` hands each request its own; held weakly, so an app nothing reaches any more goes.
+// What serves an action a library calls as a tool when no server does, as under `app.handle()`: the app that received the request, so several apps built in one process each run their own calls; held weakly, so an app nothing reaches any more goes.
+const answeringApps = new WeakMap<Request, WeakRef<Elysia>>()
+
+// The app `pages()` built last answers a request no app recorded, such as one a hook of another plugin rebuilt.
 let fallbackApp: WeakRef<Elysia> | undefined
 
 export function serveToolCallsThrough(app: Elysia): void {
-  fallbackApp = new WeakRef(app)
+  const held = new WeakRef(app)
+
+  fallbackApp = held
+  app.onRequest(({ request }) => {
+    answeringApps.set(request, held)
+  })
 }
 
 // Counts a request the endpoint or a library dispatched as the client it came from and drops the marker, so the app never reads it.
@@ -546,7 +554,7 @@ function toolFor(action: ServerAction<TSchema, unknown, string>, url: string): L
     description: tool.description,
     inputSchema: tool.inputSchema,
     call: async (args, request = currentRequest()) => {
-      const app = fallbackApp?.deref()
+      const app = ((request && answeringApps.get(request)) ?? fallbackApp)?.deref()
 
       if (!request || !app)
         throw new Error(`kay: the ${tool.name} tool was called outside a request kay answers; pass the request it was asked for`)

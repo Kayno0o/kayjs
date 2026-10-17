@@ -2,7 +2,9 @@ import type { ToolResult } from 'kay/library'
 import type { Action } from '../src/runtime'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'bun:test'
+import { Elysia } from 'elysia'
 import { actionTool, currentRequest } from 'kay/library'
+import { pages } from 'kay/server'
 import { encodeValue } from '../src/runtime/wire'
 import { testSite } from '../src/test'
 
@@ -173,5 +175,22 @@ describe('the current request', () => {
 
   it('is none outside a request', () => {
     expect(currentRequest()).toBeUndefined()
+  })
+})
+
+describe('a tool call with no server, as under app.handle()', () => {
+  // Each app has its own default locale, which a tool call runs in, so a call dispatched into the wrong app shows.
+  async function build(locales: string[]) {
+    return new Elysia().use(await pages({ routes, api, prebuilt: false, security: false, i18n: { locales, defaultLocale: locales[0]!, messages: 'tests/fixtures/i18n/src/messages' } }))
+  }
+
+  it('runs in the app answering the request, whichever app was built last', async () => {
+    const french = await build(['fr', 'en'])
+    const english = await build(['en', 'fr'])
+    const language = async (app: Elysia) => ((await (await app.handle(new Request('http://localhost/api/current/language', { headers: { 'sec-fetch-site': 'same-origin' } }))).json()) as ToolResult).structuredContent
+    const [inFrench, inEnglish] = await Promise.all([language(french), language(english)])
+
+    expect(inFrench).toEqual({ locale: 'fr' })
+    expect(inEnglish).toEqual({ locale: 'en' })
   })
 })

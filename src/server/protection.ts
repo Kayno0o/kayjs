@@ -515,12 +515,12 @@ function proxyOf(setting: ProxyConfig | number | boolean | undefined): ProxyConf
   return typeof setting === 'number' ? { hops: setting } : setting
 }
 
-// Records the app's proxy settings on each request it gets, for `clientAddress` to read them wherever it is called from.
 // The server that received `request`, once the app read it.
 export function requestServer(request: Request): Server<unknown> | undefined {
   return servers.get(request)
 }
 
+// Records the app's proxy settings on each request it gets, for `clientAddress` to read them wherever it is called from.
 export function trustProxy(app: Elysia, setting: ProxyConfig | number | boolean | undefined): void {
   const proxy = proxyOf(setting)
 
