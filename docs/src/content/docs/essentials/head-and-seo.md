@@ -159,6 +159,16 @@ export const page = {
 
 `noindex: true` in a page's `page` object keeps a page out of search engines and the sitemap.
 
+Add rules to the robots file with `robots` in `kay.config.ts`:
+
+```ts
+export default {
+  robots: { disallow: ['/admin'], allow: ['/admin/login'] },
+}
+```
+
+Write each path without the `base` and the locale. kay lists it for every locale of the site, under the mount point, and a site with a domain per locale lists it on each host. A pattern starting with `*`, such as `*.pdf$`, is written as it is. `robots: false` serves no robots file.
+
 A file of the same name in `public/` replaces either generated file.
 
 ## Favicon

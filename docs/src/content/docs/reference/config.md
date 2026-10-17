@@ -35,6 +35,7 @@ Every option is optional. The tables give each option's default. The full refere
 | --- | --- |
 | `site` | The public origin, for canonical links, the sitemap and social URLs. `SITE_URL`, else `ORIGIN`, when left out. See [Head and SEO](/essentials/head-and-seo) |
 | `seo` | What every page's head starts from: `name`, `titleTemplate`, `description`, `image`, `twitter`, `jsonLd`. See [Head and SEO](/essentials/head-and-seo) |
+| `robots` | Paths `/robots.txt` disallows or allows, `{ disallow: ['/admin'] }`, listed for every locale; `false` serves none. See [Head and SEO](/essentials/head-and-seo#sitemap-and-robotstxt) |
 | `head` | Tags every page's head carries, written as a `head` block compiles them; the CSP lets their inline scripts through. See [Head and SEO](/essentials/head-and-seo) |
 | `favicon` | A square image of 512 px or more, or a square SVG, served as the favicon and the manifest icons. `false` serves none |
 | `manifest` | The web manifest: `shortName`, `themeColor`, `backgroundColor`, `display`, `orientation`, `startUrl`, `scope`, `shortcuts`, and a `maskable` image served as its maskable icons |

@@ -235,7 +235,7 @@ describe('kay build --static', () => {
     expect(await Bun.file(join(out, 'humans.txt.bak')).exists()).toBe(false)
     expect(await Bun.file(join(out, '.secret')).exists()).toBe(false)
     expect((await get('/sitemap.xml')).text).toContain('<loc>https://x.example/repo/about</loc>')
-    expect((await get('/robots.txt')).text).toContain('Sitemap: https://x.example/repo/sitemap.xml')
+    expect((await get('/robots.txt')).text).toContain('Disallow: /repo/private\n\nSitemap: https://x.example/repo/sitemap.xml')
     expect((await get('/favicon.svg')).text).toBe(await Bun.file('src/server/favicon.svg').text())
     expect((await get('/about')).text).toContain('<link rel="icon" href="/repo/favicon.svg" type="image/svg+xml">')
 

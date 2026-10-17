@@ -8,6 +8,7 @@ const LINK = /(?:href|src)="([^"]+)"/g
 export default defineConfig({
   site: 'https://x.example',
   base: '/repo',
+  robots: { disallow: ['/private'] },
   // The tests read the linked stylesheets and their files.
   inlineStyles: false,
   // The test serves the remote image from a port of its own.

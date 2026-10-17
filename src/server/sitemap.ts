@@ -1,11 +1,12 @@
 import type { Elysia } from 'elysia'
-import type { KayConfig, TrailingSlash } from '../config'
+import type { KayConfig, RobotsConfig, TrailingSlash } from '../config'
 import type { LocaleSettings } from '../runtime/i18n'
 import type { ServedRoute } from './guards'
 import type { LocaleCopy } from './i18n'
 import type { ServedPaths } from './served-paths'
 import { relative } from 'node:path'
 import process from 'node:process'
+import { KayError } from '../compiler/errors'
 import { escape } from '../runtime/escape'
 import { importModule } from './bundle'
 import { fixedReply } from './compress'
@@ -17,6 +18,7 @@ import { slashedPath } from './routes'
 import { ROBOTS, SITEMAP } from './site-paths'
 
 // Long enough for crawlers, short enough that a new post shows up the same hour without a restart.
+const ROBOTS_PATH = /^[/*][^\r\n]*$/
 const CACHE_MS = 60 * 60 * 1000
 
 export interface SitemapOptions {
@@ -24,6 +26,9 @@ export interface SitemapOptions {
   onError?: KayConfig['onError'] | undefined
   trailingSlash?: TrailingSlash | undefined
   locales?: LocaleSettings | undefined
+  robots?: RobotsConfig | false | undefined
+  // The mount point, which the paths of `robots` go under.
+  base?: string | undefined
 }
 
 // `/sitemap.xml` and `/robots.txt` for a project with a `site`, unless something the app serves already takes that path.
@@ -56,8 +61,37 @@ export function serveSitemap(app: Elysia, served: ServedPaths, routes: ServedRou
     })
   }
 
-  if (served.offer({ path: ROBOTS, owner: 'robots.txt', kind: 'kay', exported: true }))
-    app.get(ROBOTS, ({ request }) => new Response(`User-agent: *\nAllow: /\n\nSitemap: ${settings?.hosts ? `https://${settings.hosts[hostOf(request)!]}` : origin}${SITEMAP}\n`, { headers: { 'content-type': 'text/plain; charset=utf-8' } }))
+  if (options.robots !== false) {
+    const rules = robotsRules(options.robots)
+
+    if (served.offer({ path: ROBOTS, owner: 'robots.txt', kind: 'kay', exported: true }))
+      app.get(ROBOTS, ({ request }) => new Response(robotsTxt(rules, settings?.hosts ? `https://${settings.hosts[hostOf(request)!]}` : origin, settings, hostOf(request), options.base), { headers: { 'content-type': 'text/plain; charset=utf-8' } }))
+  }
+}
+
+interface Rules {
+  allow: string[]
+  disallow: string[]
+}
+
+// A path or a pattern of the file, which a line break would turn into a rule of its own.
+function robotsRules(config: RobotsConfig = {}): Rules {
+  for (const [key, paths] of [['allow', config.allow], ['disallow', config.disallow]] as const) {
+    for (const path of paths ?? []) {
+      if (!ROBOTS_PATH.test(path))
+        throw new KayError('config-invalid', `kay: robots.${key} holds '${path}', which is not a path of the site: it starts with / or * and has no line break`)
+    }
+  }
+
+  return { allow: config.allow ?? [], disallow: config.disallow ?? [] }
+}
+
+// Every rule stands for the copy of its path in each locale the host serves, under the mount point.
+function robotsTxt(rules: Rules, origin: string, settings: LocaleSettings | undefined, locale: string | undefined, base = ''): string {
+  // A pattern starting with `*` matches wherever it falls, so it stays as it is.
+  const lines = (name: string, paths: string[]) => paths.flatMap(path => path.startsWith('*') ? [`${name}: ${path}`] : [...new Set(localeCopies(settings, path).filter(copy => settings?.hosts === undefined || copy.locale === locale).map(copy => `${name}: ${base}${copy.path}`))])
+
+  return `User-agent: *\nAllow: /\n${[...lines('Allow', rules.allow), ...lines('Disallow', rules.disallow)].map(line => `${line}\n`).join('')}\nSitemap: ${origin}${SITEMAP}\n`
 }
 
 // Every page a crawler can reach: a page without params unless it opts out, a page with params for the ones its `sitemap` or `prerender` export lists.

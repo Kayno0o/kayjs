@@ -98,6 +98,8 @@ h1 {post.title}
 
 In production the sitemap is built on the first request and kept for an hour; development builds it per request.
 
+`robots: { disallow: ['/admin'], allow: ['/admin/login'] }` in `kay.config.ts` adds `Disallow` and `Allow` lines below the default `Allow: /`, the `Sitemap:` line staying (each host's own with locales by domain); `robots: false` serves no `robots.txt`. A path starts with `/` and is written without the `base` and the locale, which kay adds: a site served by path lists `/admin` and `/en/admin`, a site by domain lists the asking host's. A pattern starting with `*`, such as `*.pdf$`, is written as it is.
+
 ### Favicon and web manifest
 
 `favicon` in `kay.config.ts` names a square image relative to the root, 512 pixels wide or more for sharp icons (a smaller one is enlarged, with a warning naming it): `favicon: 'src/favicon.png'`.

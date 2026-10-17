@@ -37,6 +37,8 @@ export interface KayConfig {
   // The origin the site is public at, `https://example.com`: canonical links, social URLs and the sitemap are built from it. `SITE_URL` when left out, else `ORIGIN`, so one build serves each host it is deployed to.
   site?: string | undefined
   seo?: SeoConfig | undefined
+  // What `/robots.txt` says besides pointing at the sitemap, or `false` to serve none: `{ disallow: ['/admin'] }`. Needs `site`, as the sitemap does.
+  robots?: RobotsConfig | false | undefined
   // Tags every page's head carries, written as a `head` block compiles them: `[{ tag: 'script', props: { src: '/stats.js', defer: true } }]`, a tag's text as `children`. A layout or the page setting a tag of the same identity wins, and the content security policy lets their inline scripts and styles through.
   head?: HeadTag[] | undefined
   images?: ImagesConfig | undefined
@@ -134,6 +136,14 @@ export interface SeoConfig {
   locale?: Localized | undefined
   // Structured data every page carries, such as the site's `WebSite` or `Organization`.
   jsonLd?: JsonLd[] | undefined
+}
+
+// Paths of the site, written without the mount point and the locale: each is listed for every locale the host serves. One may end in `*` or `$` as robots.txt allows.
+export interface RobotsConfig {
+  // Paths crawlers are asked to leave alone.
+  disallow?: string[] | undefined
+  // Paths allowed inside a disallowed one.
+  allow?: string[] | undefined
 }
 
 export interface PreviewConfig {

@@ -377,7 +377,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
     kayLog('warn', '`seo` is set, but not the origin the site is public at, in kay.config.ts, SITE_URL or ORIGIN: pages get no canonical link or og:url, and the site no sitemap or robots.txt')
 
   if (site !== undefined)
-    serveSitemap(app, served, routes, site, { dev: mode.dev, onError: options.onError, trailingSlash: options.trailingSlash, locales: i18n?.settings })
+    serveSitemap(app, served, routes, site, { dev: mode.dev, onError: options.onError, trailingSlash: options.trailingSlash, locales: i18n?.settings, robots: options.robots, base })
 
   const favicon = faviconSource(root, options.favicon, options.manifest)
 
