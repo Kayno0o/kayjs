@@ -1,14 +1,13 @@
 // Draft entries: a machine's translation of a localized collection's entry waiting for a person, marked in the entry itself.
 import type { KayConfig } from '../config'
 import type { DataValue, JsonSchema } from '../content/edit'
-import { link, mkdir, unlink } from 'node:fs/promises'
-import { dirname } from 'node:path'
+import { link, mkdir, rm, writeFile } from 'node:fs/promises'
+import { dirname, extname } from 'node:path'
 import process from 'node:process'
 import { KayError } from '../compiler/errors'
 import { collectionInfo, entries, entrySource } from '../content/edit'
 import { parseEntry } from '../content/load'
 import { namedCollections } from '../content/server'
-import { writeWhole } from './message-drafts'
 
 const DRAFT_COMMENT = '# draft\n'
 const FRONTMATTER_OPEN = /^---\r?\n/
@@ -52,10 +51,7 @@ export async function localizedEntry(root: string, config: Pick<KayConfig, 'i18n
   if (entry.data === undefined)
     throw new KayError('content-api-misuse', entry.problem ?? `kay: ${collection}/${slug} in ${defaultLocale} holds no fields`)
 
-  const placed = await entrySource(collection, slug, entry.data, { locale: defaultLocale, ...entry.body !== undefined && { body: entry.body } })
-  const file = 'file' in placed ? placed.file.path : undefined
-
-  return { data: entry.data, body: entry.body, schema: info.schema, mark: markOf(info.draftField, file) }
+  return { data: entry.data, body: entry.body, schema: info.schema, mark: markOf(info.draftField, entry.path) }
 }
 
 // How a translation is marked: by the collection's draft field, else by a comment in a file that holds one.
@@ -63,7 +59,7 @@ function markOf(draftField: string | undefined, file: string | undefined): Local
   if (draftField !== undefined)
     return 'field'
 
-  return file?.endsWith('.json') === false ? 'comment' : undefined
+  return extname(file ?? '.json') === '.json' ? undefined : 'comment'
 }
 
 // Writes the translation of an entry into the locale's folder, validated against the collection's schema and marked a draft, as a file that did not exist: an entry the locale already has is never overwritten. Answers the file written, relative to the project root.
@@ -81,7 +77,18 @@ export async function writeDraftEntry(root: string, config: Pick<KayConfig, 'i18
   if ('issues' in placed)
     throw new KayError('content-api-misuse', `kay: ${collection}/${slug} in ${locale} cannot be written: ${placed.issues.map(issue => `${issue.path === '' ? '' : `${issue.path} `}${issue.message}`).join('; ')}`)
 
-  const { absolute, path, text } = placed.file
+  // The translation is written in the format of the entry it translates, which `entrySource` does not know.
+  const [source] = await entries(collection, { locale: defaultLocale, slug })
+  const from = extname(source?.path ?? placed.file.path)
+  const same = from === extname(placed.file.path)
+
+  if (!same && (entry.body !== undefined || (from !== '.yaml' && from !== '.yml')))
+    throw new KayError('content-api-misuse', `kay: ${collection}/${slug} is written as ${from} in ${defaultLocale}, a format a translation cannot be created in`)
+
+  const swapped = (file: string) => file.slice(0, file.length - extname(file).length) + from
+  const absolute = same ? placed.file.absolute : swapped(placed.file.absolute)
+  const path = same ? placed.file.path : swapped(placed.file.path)
+  const text = same ? placed.file.text : `${Bun.YAML.stringify(data, null, 2).trimEnd()}\n`
   const marked = info?.draftField === undefined ? withDraftComment(path, text) : text
 
   if (marked === undefined)
@@ -115,18 +122,24 @@ async function createWhole(file: string, text: string): Promise<void> {
   const temporary = `${file}.${process.pid}.tmp`
 
   await mkdir(dirname(file), { recursive: true })
-  await writeWhole(temporary, text)
 
   try {
+    await Bun.write(temporary, text)
     await link(temporary, file)
   }
   catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'EEXIST')
+    const { code } = error as NodeJS.ErrnoException
+
+    if (code === 'EEXIST')
       throw new KayError('content-api-misuse', `kay: ${file} exists already, and a translation never overwrites an entry`)
 
-    throw error
+    // A filesystem without hard links creates the file exclusively, at the cost of a window where it is half written.
+    if (code !== 'EPERM' && code !== 'ENOTSUP' && code !== 'EXDEV')
+      throw error
+
+    await writeFile(file, text, { flag: 'wx' })
   }
   finally {
-    await unlink(temporary)
+    await rm(temporary, { force: true })
   }
 }

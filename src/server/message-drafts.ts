@@ -3,7 +3,7 @@ import type * as t from '@babel/types'
 import type { KayConfig } from '../config'
 import type { Message } from '../runtime/i18n'
 import { existsSync } from 'node:fs'
-import { mkdir, rename } from 'node:fs/promises'
+import { mkdir, rename, rm } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import process from 'node:process'
 import { parse } from '@babel/parser'
@@ -78,8 +78,16 @@ export async function writeWhole(file: string, text: string): Promise<void> {
   const temporary = `${file}.${process.pid}.tmp`
 
   await mkdir(dirname(file), { recursive: true })
-  await Bun.write(temporary, text)
-  await rename(temporary, file)
+
+  try {
+    await Bun.write(temporary, text)
+    await rename(temporary, file)
+  }
+  catch (error) {
+    await rm(temporary, { force: true })
+
+    throw error
+  }
 }
 
 // How the file breaks and indents its lines, which the lines written follow.

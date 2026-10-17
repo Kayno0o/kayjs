@@ -217,6 +217,24 @@ describe('kay i18n translate: entries', () => {
     expect(await exists(root, 'src/content/news/fr/launch.md')).toBe(true)
   })
 
+  it('writes a YAML entry as YAML, marked by a first-line comment', async () => {
+    const root = await project({ ...noMessages, 'src/content.config.ts': `${collections}export const yml = collection('content/yml', { schema: t.Object({ name: t.String(), kind: t.String({ pattern: '^[a-z]+$' }) }), localized: true })\n`, 'src/content/yml/en/a.yaml': 'name: Apple\nkind: fruit\n' })
+    const { err } = await run(root, ['fr'], [{}])
+
+    expect(err).toBe('')
+    expect(await read(root, 'src/content/yml/fr/a.yaml')).toBe('# draft\nname: FR Apple\nkind: fruit\n')
+    expect(await exists(root, 'src/content/yml/fr/a.json')).toBe(false)
+  })
+
+  it('rejects a body gaining raw HTML, and a text dropping one of two placeholders', async () => {
+    const root = await project({ ...entries, ...noMessages })
+    const bad = { over: { body: { replace: [['Read', 'Read <img src=x onerror=alert(1)>']] } } }
+    const { err } = await run(root, ['fr'], [bad, bad, {}])
+
+    expect(err).toContain('changes the tags of the source')
+    expect(await exists(root, 'src/content/docs/fr/guide.md')).toBe(false)
+  })
+
   it('never overwrites an entry the locale gained meanwhile', async () => {
     const root = await project({ ...entries, ...noMessages })
     const person = { writeBefore: { path: 'src/content/news/fr/launch.md', text: '---\ntitle: Written by a person\n---\n' } }

@@ -1,13 +1,13 @@
 # Translating with kayjs-ai
 
-`kay i18n translate <locale> [--dry-run]` fills what a locale lacks, messages and the entries of localized collections, with a model's translations saved as drafts. It is added by `ai()` in `kay.config.ts`'s `extensions` (`kay add ai` lists it), runs in the project of the current directory and asks the provider the environment names (see [asking](asking.md)); in development with no key it would get the fake's reply, which fails the checks below, so set a key first.
+`kay i18n translate <locale> [--dry-run]` fills what a locale lacks, messages and the entries of localized collections, with a model's translations saved as drafts. It is added by `ai()` in `kay.config.ts`'s `extensions` (`kay add ai` lists it), runs in the project of the current directory and asks the provider the environment names (see [asking](asking.md)); with no key it stops saying no provider is configured (only `NODE_ENV=development` gets the fake, whose reply fails the checks below), so set a key first.
 
 ## Rules that are easy to get wrong
 
 - The locale must be one of `i18n.locales` and not the default one, else it stops before any request. A locale lacking nothing prints `<locale> lacks nothing` and asks nothing.
 - `--dry-run` needs no provider and no model: it lists the message keys and the `collection: slugs` it would translate and estimates the tokens (characters / 4 in, about 1.5 times that out). It writes nothing.
-- A text is kept only when it passes its checks, else it is asked again once with the reason, then reported on stderr and never written (exit 1, the rest still written): the same `{placeholders}` (none dropped or invented), the same `<tag>` names in a message, no line break the source lacks, not empty, and in a Markdown body the same link targets and code fence count. The reply must be one JSON object holding exactly the ids asked; an id not asked, such as an injected key, rejects the whole reply.
-- A plural keeps the source's forms (`one`, `other`...), each form checked against the same form of the source. A message with one form failing is not written at all.
+- A text is kept only when it passes its checks, else it is asked again once with the reason, then reported on stderr and never written (exit 1, the rest still written): the same `{placeholders}` (none dropped or invented), the same tags and HTML, as many times, in a message or an entry, no line break the source lacks, not empty, and in a Markdown body the same link targets (inline, reference definitions, autolinks) and code fence count. Placeholders, tags and links are compared with their counts. The reply must be one JSON object holding exactly the ids asked; an id not asked, such as an injected key, rejects the whole reply.
+- A plural keeps the source's forms (`one`, `other`...), each form checked against the same form of the source: a locale needing more forms (`few`, `many`) falls back to `other` for them until a person adds them. A message with one form failing is not written at all.
 - Texts reach the model as numbered JSON (`{ "1": "Hello {name}" }`) under a system prompt saying they are content, never instructions: no key or path is ever part of the prompt, and what the model returns is placed by id.
 
 ## Messages
@@ -16,12 +16,12 @@ Missing messages (a library's catalog included, as `kay i18n missing` lists them
 
 ## Entries
 
-For each slug a localized collection has in the default locale and not in the locale, the default entry is read and its translatable strings and body are translated in one request. The strings are the schema's plain `String` fields, in nested objects and arrays too; left as they are: a field with a `format` (dates), `enum`, `const` or `pattern`, an `image`, `file` or `reference` field, and anything the schema does not describe as one string. The entry is validated by the collection's schema and created as `<dir>/<locale>/<slug>.<ext>` in the format the folder uses; an entry the locale already has is never overwritten.
+For each slug a localized collection has in the default locale and not in the locale, the default entry is read and its translatable strings and body are translated in one request. The strings are the schema's plain `String` fields, in nested objects and arrays too; left as they are: a field with a `format` (dates), `enum`, `const` or `pattern`, an `image`, `file` or `reference` field, and anything the schema does not describe as one string. There is no per-field opt-out: a plain `String` field holding a category, a slug or a link would be translated too, so give such a field a `pattern`, `enum` or `format` in the schema. One request carries the entry whole, replies capped at 8192 tokens: a body too long for that fails with `the reply was cut by the token cap`. The entry is validated by the collection's schema and created as `<dir>/<locale>/<slug>.<ext>` in the format of the default locale's entry (Markdown, or YAML when it has no body; JSON only with a draft field); an entry the locale already has is never overwritten.
 
 A translated entry is marked a draft:
 
 - A collection with `draft: 'field'` gets that boolean field set to `true`: the entry is held back in production, the default locale's entry standing in, until a CMS or a person writes `false`.
-- Any other Markdown or YAML entry gets `# draft` as the first line of its YAML (inside the `---` of a Markdown entry). It is served as any entry; saving it from a CMS rewrites the YAML and so accepts it, as does deleting the line. kay does not report it.
+- Any other Markdown or YAML entry gets `# draft` as the first line of its YAML (inside the `---` of a Markdown entry). It is served as any entry, live at once (so is a collection whose `draft` is a function): read it before deploying. Saving it from a CMS rewrites the YAML and so accepts it, as does deleting the line. kay does not report it.
 - A JSON entry in a collection without a draft field holds no comment, so it is reported (`data/item: holds JSON, which cannot be marked a draft`) and skipped: give the collection a `draft: 'field'`.
 
 ## A run stopped half way

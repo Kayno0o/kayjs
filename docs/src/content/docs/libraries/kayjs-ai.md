@@ -174,7 +174,7 @@ A translation is kept only when it keeps what the original had. Every `{placehol
 
 Messages are saved with a `// draft` comment, so `kay check` warns until you read them and run `kay i18n accept fr`. An entry of a localized collection is saved in the `fr` folder, and never over an entry that is already there.
 
-If the collection has `draft: 'field'`, that field is set to true, so the entry stays hidden in production until you publish it. Otherwise the entry starts with a `# draft` line in its header, which you delete once you have read it. Saving the entry from a CMS removes it too.
+If the collection has `draft: 'field'`, that field is set to true, so the entry stays hidden in production until you publish it. Otherwise the entry starts with a `# draft` line in its header, which you delete once you have read it. Saving the entry from a CMS removes it too. Such an entry is shown at once, so read it before you deploy.
 
 A run that stops half way leaves whole files. Run it again to translate what is left.
 

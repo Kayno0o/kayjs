@@ -20,6 +20,8 @@ it('checks a text against its source', () => {
   expect(unitProblem(message('Hi'), 'Salut\nencore')).toBe('holds a line break the source has not')
   expect(unitProblem(message('Hi'), 'Salut\u2028encore')).toBe('holds a line break the source has not')
   expect(unitProblem(message('Hi\nthere'), 'Salut\nla')).toBeUndefined()
+  expect(unitProblem(message('{n} and {n}'), '{n}')).toBe('changes how many times a placeholder appears')
+  expect(unitProblem({ id: '1', kind: 'markdown', text: 'x\n\n[r]: /y' }, 'x\n\n[r]: /z')).toBe('changes the link targets or code fences of the source')
   expect(unitProblem(message('Hi'), '  ')).toBe('is empty')
   expect(unitProblem(message('Hi'), 3)).toBe('is not text')
   expect(unitProblem({ id: '1', kind: 'markdown', text: '[a](/x)\n```\ncode\n```' }, '[b](/y)\n```\ncode\n```')).toBe('changes the link targets or code fences of the source')

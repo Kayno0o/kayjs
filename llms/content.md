@@ -283,7 +283,7 @@ article
 - Either takes a locale as last argument; outside a request `all()` gives every locale's entries and `get(slug, locale)` reads that locale's alone, with no fallback.
 - A page prerendering or listing the collection in its sitemap gets each slug once, in every locale.
 - The feed is served once per locale, `/en/blog/rss.xml`, listing only the entries written in it, its links in that locale; with domains each host serves its own at the path.
-- `kay i18n translate <locale>` (kayjs-ai) creates the entries a locale lacks as drafts: the collection's `draft: 'field'` set to `true`, or a `# draft` first line in the entry's YAML when it has none.
+- `kay i18n translate <locale>` (kayjs-ai) creates the entries a locale lacks as drafts: the collection's `draft: '<field>'` field set to `true`, or a `# draft` first line in the entry's YAML when it has none.
 - An entry outside a locale folder fails `kay check` and the build.
 
 #### Caching

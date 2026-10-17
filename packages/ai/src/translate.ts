@@ -111,48 +111,65 @@ async function translateLocale({ root, config, locale, from, dryRun, signal }: R
   let written = 0
   let writtenEntries = 0
 
-  for (const batch of batches(units)) {
-    const result = await translateUnits(batch, { from, into: locale, signal })
-    const ready = completeMessages(messages, batch, result.done)
+  try {
+    for (const batch of batches(units)) {
+      const result = await translateUnits(batch, { from, into: locale, signal })
+      const ready = completeMessages(messages, batch, result.done)
 
-    for (const [id, why] of result.failed)
-      failures.push(`message ${(batch.find(unit => unit.id === id) as MessageUnit).key} ${why}`)
+      for (const [id, why] of result.failed)
+        failures.push(`message ${batch.find(unit => unit.id === id)!.key} ${why}`)
 
-    if (Object.keys(ready).length > 0)
-      written += (await writeDraftMessages(root, config, locale, ready)).length
+      if (Object.keys(ready).length > 0)
+        written += (await writeDraftMessages(root, config, locale, ready)).length
+    }
+
+    for (const plan of plans)
+      writtenEntries += await translateEntry({ root, config, locale, from, signal }, plan, failures)
+  }
+  catch (error) {
+    // What was written stays, each file whole: the summary says how far the run got.
+    failures.push(error instanceof Error ? error.message : String(error))
   }
 
-  for (const plan of plans) {
-    const result = await translateUnits(plan.units, { from, into: locale, signal })
-
-    if (result.failed.size > 0) {
-      failures.push(`${plan.collection}/${plan.slug} ${[...new Set(result.failed.values())].join('; ')}`)
-
-      continue
-    }
-
-    const body = plan.entry.body === undefined ? undefined : result.done.get('body') ?? plan.entry.body
-
-    try {
-      await writeDraftEntry(root, config, plan.collection, locale, plan.slug, { data: translatedData(plan, result.done), body })
-      writtenEntries++
-    }
-    catch (error) {
-      failures.push(`${plan.collection}/${plan.slug}: ${error instanceof Error ? error.message : String(error)}`)
-    }
-  }
-
-  console.log(`Translated ${written} ${written === 1 ? 'message' : 'messages'} and ${writtenEntries} ${writtenEntries === 1 ? 'entry' : 'entries'} into ${locale} as drafts: \`kay check\` lists them, \`kay i18n accept ${locale}\` accepts the messages once checked, and an entry is accepted by saving it from a CMS or removing its \`# draft\` line.`)
+  if (written + writtenEntries > 0)
+    console.log(`Translated ${written} ${written === 1 ? 'message' : 'messages'} and ${writtenEntries} ${writtenEntries === 1 ? 'entry' : 'entries'} into ${locale} as drafts: \`kay check\` lists the messages, \`kay i18n accept ${locale}\` accepts them once checked, and an entry is accepted by saving it from a CMS or removing its \`# draft\` line.`)
 
   for (const failure of failures)
     console.error(`kay i18n translate: ${failure}`)
 
+  if (signal.aborted)
+    return 130
+
   return failures.length === 0 ? 0 : 1
 }
 
-function report(locale: string, from: string, keys: string[], plans: EntryPlan[], units: Unit[], failures: string[]): number {
+// Translates one entry and writes it; answers 1 when written, else 0 with why in `failures`.
+async function translateEntry({ root, config, locale, from, signal }: Pick<Run, 'root' | 'config' | 'locale' | 'from' | 'signal'>, plan: EntryPlan, failures: string[]): Promise<number> {
+  const result = await translateUnits(plan.units, { from, into: locale, signal })
+
+  if (result.failed.size > 0) {
+    failures.push(`${plan.collection}/${plan.slug} ${[...new Set(result.failed.values())].join('; ')}`)
+
+    return 0
+  }
+
+  const body = plan.entry.body === undefined ? undefined : result.done.get('body') ?? plan.entry.body
+
+  try {
+    await writeDraftEntry(root, config, plan.collection, locale, plan.slug, { data: translatedData(plan, result.done), body })
+
+    return 1
+  }
+  catch (error) {
+    failures.push(`${plan.collection}/${plan.slug}: ${error instanceof Error ? error.message : String(error)}`)
+
+    return 0
+  }
+}
+
+function report(locale: string, from: string, keys: string[], plans: EntryPlan[], units: MessageUnit[], failures: string[]): number {
   const all = [...units, ...plans.flatMap(plan => plan.units)]
-  const tokens = estimateTokens(all, from, locale)
+  const tokens = estimateTokens(all, from, locale, batches(units).length + plans.length)
 
   console.log(`${locale}: would translate ${keys.length} ${keys.length === 1 ? 'message' : 'messages'} and ${plans.length} ${plans.length === 1 ? 'entry' : 'entries'}, about ${tokens.input} tokens in and ${tokens.output} out`)
 
@@ -183,15 +200,15 @@ function messageUnits(messages: [string, Message][]): MessageUnit[] {
 }
 
 // The messages whose every text came back checked.
-function completeMessages(messages: [string, Message][], batch: Unit[], done: Map<string, string>): Record<string, Message> {
+function completeMessages(messages: [string, Message][], batch: MessageUnit[], done: Map<string, string>): Record<string, Message> {
   const ready: Record<string, Message> = {}
-  const asked = new Set((batch as MessageUnit[]).map(unit => unit.key))
+  const asked = new Set(batch.map(unit => unit.key))
 
   for (const [key, source] of messages) {
     if (!asked.has(key))
       continue
 
-    const own = (batch as MessageUnit[]).filter(unit => unit.key === key)
+    const own = batch.filter(unit => unit.key === key)
 
     if (!own.every(unit => done.has(unit.id)))
       continue
@@ -208,7 +225,7 @@ function batches(units: MessageUnit[]): MessageUnit[][] {
   let current: MessageUnit[] = []
   let size = 0
 
-  for (const [key, own] of Map.groupBy(units, unit => unit.key)) {
+  for (const own of Map.groupBy(units, unit => unit.key).values()) {
     const chars = own.reduce((sum, unit) => sum + unit.text.length, 0)
 
     if (current.length > 0 && (current.length + own.length > BATCH_UNITS || size + chars > BATCH_CHARS)) {
@@ -219,7 +236,6 @@ function batches(units: MessageUnit[]): MessageUnit[][] {
 
     current.push(...own)
     size += chars
-    void key
   }
 
   if (current.length > 0)
