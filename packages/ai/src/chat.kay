@@ -224,7 +224,7 @@ section.kai-chat(class={className} aria-label={label})
           p.kai-chat-text.kai-chat-thinking {thinkingLabel}
   p.kai-chat-status(role="status") {busy() && partial() === '' && calls().length === 0 ? thinkingLabel : ''}
   if failure()
-    .kui-notice(role="alert" data-tone="error")
+    .kui-notice(role="alert" data-tone="danger")
       | {failure()}
       |
       if !busy() && history().at(-1)?.role === 'user'
