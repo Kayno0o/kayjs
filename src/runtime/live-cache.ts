@@ -17,6 +17,9 @@ const LAST_RETRY_MS = 30_000
 // A refused connection asks the page for a new proof once in this long: a refusal that stays is backed off, not rendered again.
 const REFUSAL_MS = 60_000
 
+// The longest a refresh waits for a swap in progress: one that never clears `aria-busy` (failed or aborted) would otherwise park every later invalidation.
+export const IDLE_MS = 20_000
+
 // The time the page shown read each key it follows.
 let rendered = new Map<string, number>()
 // The connection open, and the keys it asked for.
@@ -246,18 +249,24 @@ async function load(): Promise<void> {
     changed(key, at)
 }
 
-// Resolves once no page swap is in progress.
+// Resolves once no page swap is in progress, or after `IDLE_MS` when one never ends.
 async function idle(): Promise<void> {
   const root = document.documentElement
 
   await new Promise<void>((resolve) => {
+    let giveUp: ReturnType<typeof setTimeout> | undefined
     const observer = new MutationObserver(() => {
-      if (!root.hasAttribute('aria-busy')) {
-        observer.disconnect()
-        resolve()
-      }
+      if (!root.hasAttribute('aria-busy'))
+        finish()
     })
 
+    function finish(): void {
+      observer.disconnect()
+      clearTimeout(giveUp)
+      resolve()
+    }
+
+    giveUp = setTimeout(finish, IDLE_MS)
     observer.observe(root, { attributes: true, attributeFilter: ['aria-busy'] })
   })
 }

@@ -1,14 +1,15 @@
 import type { CacheStore } from '../src/runtime/cache'
 import type { LivePage, LiveRequest } from '../src/runtime/live-value'
 import type { TestSite } from '../src/test'
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import process from 'node:process'
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
 import { chromium } from 'playwright-core'
 import { cached, invalidate, trackStore, untrackStore } from '../src/runtime/cache'
 import { CACHE_LIVE_ID } from '../src/runtime/cache-live-id'
+import { IDLE_MS } from '../src/runtime/live-cache'
 import { liveSlot } from '../src/runtime/live-value'
 import { inLiveReads } from '../src/server/live'
 import { signText } from '../src/server/stamp'
@@ -277,6 +278,14 @@ describe('a page following a cached value', () => {
   })
 })
 
+// Polls a condition on the server side of the test, up to the time a refusal's backoff takes.
+async function waitFor(condition: () => boolean): Promise<void> {
+  for (let waited = 0; !condition() && waited < 15_000; waited += 25)
+    await Bun.sleep(25)
+
+  expect(condition()).toBe(true)
+}
+
 const chrome = browserPath() ?? (existsSync(chromium.executablePath()) ? chromium.executablePath() : undefined)
 
 describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a cached value a page follows, in a browser', () => {
@@ -284,6 +293,7 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a cached
   const connections: string[] = []
   // The pages of `/` asked for, a refusal the connection meets while `refuse` holds, and a response of `/plain` held back until `gate` resolves.
   const loads: string[] = []
+  const latestLoads: string[] = []
   let refuse = false
   let gate: Promise<void> | undefined
 
@@ -306,6 +316,9 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a cached
 
       if (request.method === 'GET' && pathname === '/')
         loads.push(request.url)
+
+      if (request.method === 'GET' && pathname === '/latest')
+        latestLoads.push(request.url)
 
       if (pathname === '/plain')
         await gate
@@ -406,6 +419,51 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a cached
     await page.waitUntil(...shows(9))
     expect(page.errors).toEqual([])
   }, 30_000)
+
+  it('asks for a new proof again on a refusal after a good connection, as the refusal limit starts over', async () => {
+    change(12)
+    refuse = true
+    connections.length = 0
+    loads.length = 0
+    latestLoads.length = 0
+
+    await using page = await site.open('/')
+
+    // The refusal of the first connection loads the page for a new proof; the next one, within the limit, only backs off.
+    await waitFor(() => connections.length >= 2)
+    expect(loads).toHaveLength(2)
+    refuse = false
+    // An accepted connection delivering an event ends the refusals.
+    change(13)
+    await page.waitUntil(...shows(13))
+    refuse = true
+    latestLoads.length = 0
+    // Not a click with a hover, which would prefetch the page a second time.
+    await page.evaluate(() => document.querySelector<HTMLAnchorElement>('a.latest')!.click())
+    await page.waitUntil(() => location.pathname === '/latest')
+    // The page was fetched to be shown, and again for the new proof the refusal of its keys' connection asks for.
+    await waitFor(() => latestLoads.length >= 2)
+    refuse = false
+    expect(page.errors).toEqual([])
+  }, 60_000)
+
+  it('refreshes after a bounded wait when a swap never clears aria-busy', async () => {
+    change(14)
+
+    await using page = await site.open('/')
+
+    await page.waitUntil(...shows(14))
+    // The wait for a swap is bounded by IDLE_MS: a page timer of that length fires at once, and the page is left busy for good.
+    await page.evaluate((bound) => {
+      const original = window.setTimeout.bind(window)
+
+      window.setTimeout = ((handler: TimerHandler, delay?: number, ...rest: unknown[]) => original(handler, delay === bound ? 0 : delay, ...rest)) as typeof window.setTimeout
+      document.documentElement.setAttribute('aria-busy', 'true')
+    }, IDLE_MS)
+    change(15)
+    await page.waitUntil(...shows(15))
+    expect(page.errors).toEqual([])
+  })
 
   it('leaves a link being followed to arrive, as a refresh would supersede it', async () => {
     change(10)
