@@ -406,12 +406,13 @@ describe('the collections a CMS edits', () => {
     })
   })
 
-  it('reads the entries a filter keeps alone, in their order, a folder no other file', async () => {
+  it('reads the entries a filter keeps in full, in their order, and of the other files only the slug they may set', async () => {
     const read = spyOn(Bun, 'file')
 
     try {
       expect(await entries('articles', { slug: 'hello', locale: 'fr' })).toMatchObject([{ slug: 'hello', locale: 'fr', data: { title: 'Bonjour' } }])
-      expect(read.mock.calls.filter(([file]) => String(file).includes('articles'))).toHaveLength(1)
+      // Each file is read for a `slug` of its own; the entry itself is parsed once more.
+      expect(read.mock.calls.filter(([file]) => String(file).includes('articles'))).toHaveLength(3)
     }
     finally {
       read.mockRestore()

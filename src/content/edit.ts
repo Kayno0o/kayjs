@@ -9,7 +9,7 @@ import { JSON_FILE } from '../build/files'
 import { KayError } from '../compiler/errors'
 import { kayLog } from '../runtime/log'
 import { isDraft } from './drafts'
-import { contentPlace, entryFiles, markdownOf, parseEntry, slugOf } from './load'
+import { contentPlace, entryFiles, entrySlug, markdownOf, parseEntry, slugOf } from './load'
 import { compileMarkdown, MarkdownError, splitFrontmatter } from './markdown'
 import { dataIssues, decodeEntries, unknownComponents } from './validate'
 
@@ -316,7 +316,19 @@ async function entryPlace(name: string, dir: string, slug: string, locale: strin
   const files = await folderFiles(name, dir)
   const place = locale === undefined ? slug : `${locale}/${slug}`
 
-  return { files, place, existing: files.find(file => slugOf(file) === place) }
+  const slugs = await Promise.all(files.map(async file => fileSlug(dir, file, locale !== undefined)))
+
+  return { files, place, existing: files.find((_, index) => slugs[index] === place) }
+}
+
+// The slug a folder's file is read as, its own `slug` field included; its path's when it does not parse or sets a bad one, which the collection reports.
+async function fileSlug(dir: string, file: string, localized: boolean): Promise<string> {
+  try {
+    return entrySlug(file, parseEntry(file, await Bun.file(join(dir, file)).text()).data, localized, 1)
+  }
+  catch {
+    return slugOf(file)
+  }
 }
 
 function fileIn(name: string, dir: string, file: string): EntryPath {
@@ -512,7 +524,9 @@ async function folderFiles(name: string, dir: string): Promise<string[]> {
 // The entries of the folder's files the filter keeps, reading those alone.
 async function folderEntries(name: string, dir: string, localized: boolean, filter: EntryFilter): Promise<Omit<SourceEntry, 'draft'>[]> {
   const repoRoot = repositoryRoot()
-  const files = kept((await folderFiles(name, dir)).map(file => ({ slug: slugOf(file), file })), localized, filter)
+  const names = await folderFiles(name, dir)
+  const slugs = await Promise.all(names.map(async file => fileSlug(dir, file, localized)))
+  const files = kept(names.map((file, index) => ({ slug: slugs[index]!, file })), localized, filter)
 
   return Promise.all(files.map(async ({ slug, file }) => {
     const path = repoPath(repoRoot, join(dir, file))

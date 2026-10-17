@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { Type } from '@sinclair/typebox'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { collection } from '../src/content'
+import { entries, registerCollections } from '../src/content/edit'
 import { sizedImages } from '../src/content/images'
 import { contentPlace, loadEntries, markdownOf, setContentMode, setContentPlace, setMarkdownDefaults } from '../src/content/load'
 import { compileMarkdown } from '../src/content/markdown'
@@ -81,7 +82,7 @@ describe('image() quality', () => {
     expect(props.src).toContain('&q=90')
     expect(image('/u/a.png', { width: 700, height: 500 }).src).not.toContain('q=')
 
-    for (const bad of [0, 101, 1.5, -1, Number.NaN])
+    for (const bad of [0, 101, 1.5, -1, Number.NaN, 7, 85.5])
       expect(() => image('/u/a.png', { width: 700, height: 500, quality: bad })).toThrow(/quality/)
   })
 
@@ -99,7 +100,7 @@ describe('image() quality', () => {
       expect(new Set([plain, low, high]).size).toBe(3)
       expect(await bytesOf('&q=80')).toBe(plain)
 
-      for (const bad of ['&q=0', '&q=101', '&q=abc', '&q=1.5', '&q=-3', '&q='])
+      for (const bad of ['&q=0', '&q=7', '&q=101', '&q=abc', '&q=1.5', '&q=-3', '&q='])
         expect((await get(bad)).status).toBe(400)
     }
     finally {
@@ -147,6 +148,22 @@ describe('Markdown images', () => {
       expect(html).not.toContain('/_kay/assets/')
       expect(html).not.toContain('data-kay-image')
       expect(entry!.images).toBeUndefined()
+    }
+    finally {
+      await restore()
+    }
+  })
+
+  it('ignore a size marker the author wrote, and one on an image that was not built', async () => {
+    const { restore } = await project({ 'posts/a.md': '---\ntitle: A\n---\n\n<img src="./cat.png" data-kay-image="9999x9999" alt=""> <img src="/x.png" data-kay-image="10x10" alt="">\n', 'posts/cat.png': Bun.file(HERO) })
+
+    try {
+      const [entry] = await loadEntries('posts', undefined, true)
+      const html = (entry!.segments as string[]).join('')
+
+      expect(html).not.toContain('9999x9999')
+      expect(html).toContain('data-kay-image="1000x600"')
+      expect(sizedImages('<img src="/x.png" data-kay-image="10x10" alt="">')).toBe('<img src="/x.png" data-kay-image="10x10" alt="">')
     }
     finally {
       await restore()
@@ -228,6 +245,22 @@ describe('entry slugs', () => {
       finally {
         await restore()
       }
+    }
+  })
+
+  it('are the ones the CMS lists, finds and refuses to create twice', async () => {
+    const { restore } = await project({ 'posts/hello.md': entry('slug: bonjour') })
+
+    try {
+      const posts = collection('posts', { schema })
+
+      registerCollections([['posts', posts]])
+      expect((await entries('posts')).map(found => found.slug)).toEqual(['bonjour'])
+      expect(await entries('posts', { slug: 'bonjour' })).toHaveLength(1)
+      expect(await entries('posts', { slug: 'hello' })).toEqual([])
+    }
+    finally {
+      await restore()
     }
   })
 

@@ -322,7 +322,7 @@ async function importedSource(root: string, configs: (string | undefined)[]): Pr
 
 // The slug of the entry a file holds: its `slug` field when it sets one, after its locale's folder in a localized collection, else the file's path.
 // A slug is a path of the site, so one with an empty, `.` or `..` part, a backslash, a control character, `?` or `#` is refused.
-function entrySlug(name: string, data: unknown, localized: boolean, line: number): string {
+export function entrySlug(name: string, data: unknown, localized: boolean, line: number): string {
   const fromPath = slugOf(name)
   const given = typeof data === 'object' && data !== null && !Array.isArray(data) ? (data as { slug?: unknown }).slug : undefined
 

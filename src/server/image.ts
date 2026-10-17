@@ -12,7 +12,7 @@ import { ASSET_PREFIX } from '../build/assets'
 import { countCache } from '../build/cache'
 import { writeAtomically } from '../build/files'
 import { KayError } from '../compiler/errors'
-import { aspectKey, CARD, croppedSize, cutOrBelow, DEFAULT_ASPECTS, DEFAULT_MAX_DENSITY, FILES_ROUTE, IMAGE_ROUTE, imageWidths, parseAspect, recordVariants, requestedRemoteVariants, requestedVariants, RESIZABLE, setAspects, setImageWidths, setMaxDensity, setRemoteImages, setResolvedImages, SMALL_STEP, variantHeight, variantSuffix } from '../runtime/image'
+import { aspectKey, CARD, croppedSize, cutOrBelow, DEFAULT_ASPECTS, DEFAULT_MAX_DENSITY, FILES_ROUTE, IMAGE_ROUTE, imageWidths, parseAspect, QUALITY_STEP, recordVariants, requestedRemoteVariants, requestedVariants, RESIZABLE, setAspects, setImageWidths, setMaxDensity, setRemoteImages, setResolvedImages, SMALL_STEP, validQuality, variantHeight, variantSuffix } from '../runtime/image'
 import { inLocale, passGuards } from './actions'
 import { AVIF_ENCODER, AVIF_SPEED, DEFAULT_AVIF_QUALITY, encodeAvif } from './avif'
 import { coverImage } from './crop'
@@ -415,8 +415,8 @@ function requestedVariant(url: URL, own: { width: number, height: number }, allo
   if (asked !== null) {
     quality = QUALITY.test(asked) ? Number(asked) : undefined
 
-    if (quality === undefined || quality < 1 || quality > 100)
-      return `Quality ${asked} is not a whole number from 1 to 100`
+    if (quality === undefined || !validQuality(quality))
+      return `Quality ${asked} is not a multiple of ${QUALITY_STEP} from ${QUALITY_STEP} to 100`
   }
 
   const width = Number(url.searchParams.get('w'))

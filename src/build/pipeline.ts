@@ -18,7 +18,7 @@ import { pageHooks } from '../config'
 import { setMarkdownDefaults } from '../content/load'
 import { writeContentManifests } from '../content/server'
 import { cacheDir, clientOptionsOf, resolveProject } from '../project'
-import { linkVariantFiles } from '../runtime/image'
+import { linkVariantFiles, setImageWidths } from '../runtime/image'
 import { setAvifThreads } from '../server/avif'
 import { basePath } from '../server/base'
 import { writeCards } from '../server/card'
@@ -339,6 +339,8 @@ async function bundleStage(project: Project, exported: boolean, analyze: boolean
 
   // Each AVIF holds a thread for up to a second, while WebP encodes on Bun's own.
   setAvifThreads(Math.min(4, availableParallelism()))
+  // The ladder is set before the first variant is written, as the server sets it for the pages.
+  setImageWidths(config.images?.widths)
   // The prerender may import more images, so the cache is pruned once it has.
   await writeImageVariants(client.dir, config.images?.quality, cacheDir(root, 'variants'), { prune: false, avif, onImage: imageProgress(report) })
 
@@ -361,9 +363,9 @@ async function outputStage(project: Project, exported: boolean, client: ClientBu
   // The collections are read for the pages, so their time counts with them.
   report({ step: 'prerendering' })
 
-  // Before prerendering, whose pages read the collections from what it writes.
   setMarkdownDefaults(config.markdown)
 
+  // Before prerendering, whose pages read the collections from what it writes.
   const entries = await writeContentManifests(root, paths.output, config.content)
 
   // A static host has no image route, so pages link the variant files the build writes, and no file route, so stored files where their store serves them.

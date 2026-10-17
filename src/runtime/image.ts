@@ -73,6 +73,8 @@ const FALLBACK_WIDTH = 1280
 let maxDensity: number | undefined
 // The widths `images.widths` sets, on the server; the browser reads them off the page.
 let ladder: readonly number[] | undefined
+// Whether the page was read for its widths already.
+let widthsRead = false
 // Refuses an aspect `images.aspects` does not list, set with it on the server; the browser checks none.
 let aspectCheck: ((aspect: Aspect, text: string) => void) | undefined
 // The variants of imported images that pages asked for beyond the ladder, by asset name, for `kay build` to write.
@@ -116,7 +118,9 @@ export function setImageWidths(widths: readonly number[] | undefined): void {
 
 // The widths the route makes, ascending: `images.widths`, which the browser reads off the page.
 export function imageWidths(): readonly number[] {
-  if (ladder === undefined && typeof document !== 'undefined') {
+  if (ladder === undefined && !widthsRead && typeof document !== 'undefined') {
+    widthsRead = true
+
     const content = document.querySelector<HTMLMetaElement>(WIDTHS_META)?.content
 
     if (content !== undefined) {
@@ -306,6 +310,7 @@ export function storedSize(src: string): { width: number, height: number } | und
 
 // An imported or stored image, or one from a directory in `images.dirs` or a host in `images.remote` given its size, served as WebP variants at each width of the ladder up to its own; drawn at a fixed width, `sizes: '95px'`, at that width for each density up to `images.maxDensity`.
 export function image(src: string, options: ImageOptions = {}): ImageProps {
+  const wanted = options.quality === undefined ? undefined : allowedQuality(options.quality)
   const own = sizes.get(src) ?? storedSize(src) ?? (options.width !== undefined && options.height !== undefined ? { width: options.width, height: options.height } : undefined)
 
   if (!own || !resizable(src) || unlistedCheck?.(src, 'image()') === true)
@@ -314,12 +319,11 @@ export function image(src: string, options: ImageOptions = {}): ImageProps {
   const aspect = options.aspect === undefined ? undefined : allowedAspect(options.aspect)
   const size = aspect ? croppedSize(own, aspect) : own
   const fixed = FIXED_SIZE.exec(options.sizes ?? '')
-  const quality = options.quality === undefined ? undefined : allowedQuality(options.quality)
   const widths = fixed ? fixedWidths(Number(fixed[1]), currentMaxDensity(), size.width) : [...imageWidths().filter(width => width < size.width), size.width]
 
   return {
-    src: imageUrl(src, widths.findLast(width => width <= FALLBACK_WIDTH) ?? widths[0]!, aspect, quality),
-    srcset: widths.map(width => `${imageUrl(src, width, aspect, quality)} ${width}w`).join(', '),
+    src: imageUrl(src, widths.findLast(width => width <= FALLBACK_WIDTH) ?? widths[0]!, aspect, wanted),
+    srcset: widths.map(width => `${imageUrl(src, width, aspect, wanted)} ${width}w`).join(', '),
     sizes: cappedSizes(options.sizes ?? '100vw', currentMaxDensity()),
     width: size.width,
     height: size.height,
@@ -341,9 +345,16 @@ function routeWidth(width: number): number {
   return width < steps[0]! ? Math.max(1, Math.ceil(width / SMALL_STEP)) * SMALL_STEP : steps.find(step => step >= width) ?? Infinity
 }
 
+// Qualities come in steps, so a visitor asking the route for every one cannot fill the cache.
+export const QUALITY_STEP = 5
+
+export function validQuality(quality: number): boolean {
+  return Number.isInteger(quality) && quality >= QUALITY_STEP && quality <= 100 && quality % QUALITY_STEP === 0
+}
+
 export function allowedQuality(quality: number): number {
-  if (!Number.isInteger(quality) || quality < 1 || quality > 100)
-    throw new Error(`kay: image() was given quality ${String(quality)}: a quality is a whole number from 1 to 100`)
+  if (!validQuality(quality))
+    throw new Error(`kay: image() was given quality ${String(quality)}: a quality is a multiple of ${QUALITY_STEP} from ${QUALITY_STEP} to 100, which bounds the files one image can turn into`)
 
   return quality
 }

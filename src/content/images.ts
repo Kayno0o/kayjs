@@ -17,6 +17,8 @@ const IMG_TAG = /<img\b[^>]*>/gi
 const SRC = /(\ssrc=")([^"]*)(")/i
 const SIZED = /\s(?:width|height|srcset|sizes)\s*=/i
 const MARKER = / data-kay-image="(\d+)x(\d+)"/
+const ANY_MARKER = / data-kay-image(?:=(?:"[^"]*"|'[^']*'|[^\s>]*))?/gi
+const BUILT = /^\/_kay\/assets\//
 const SCHEME = /^(?:[a-z][a-z\d+.-]*:|\/|#)/i
 const QUERY_OR_HASH = /[?#].*$/
 const ENTITIES: Record<string, string> = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': '\'', '&#x27;': '\'' }
@@ -74,16 +76,29 @@ export async function linkImages(segments: Segment[], entryFile: string, folder:
     let last = 0
 
     for (const match of html.matchAll(IMG_TAG)) {
-      const tag = match[0]
+      // A marker the author wrote is no size kay read.
+      const tag = match[0].replace(ANY_MARKER, '')
       const src = SRC.exec(tag)
 
-      if (!src)
+      if (!src) {
+        if (tag !== match[0]) {
+          out += html.slice(last, match.index) + tag
+          last = match.index + match[0].length
+        }
+
         continue
+      }
 
       const linked = await linkedImage(src[2]!, entryDir, folder, root)
 
-      if (!linked)
+      if (!linked) {
+        if (tag !== match[0]) {
+          out += html.slice(last, match.index) + tag
+          last = match.index + match[0].length
+        }
+
         continue
+      }
 
       images.set(linked.file, linked.url)
 
@@ -91,7 +106,7 @@ export async function linkImages(segments: Segment[], entryFile: string, folder:
       const rewritten = tag.replace(SRC, (_, start: string, __, end: string) => `${start}${escapeAttribute(linked.url)}${end}${marked}`)
 
       out += html.slice(last, match.index) + rewritten
-      last = match.index + tag.length
+      last = match.index + match[0].length
     }
 
     return out + html.slice(last)
@@ -120,7 +135,7 @@ export function sizedImages(html: string): string {
     const size = MARKER.exec(tag)
     const src = SRC.exec(tag)
 
-    if (!size || !src)
+    if (!size || !src || !BUILT.test(src[2]!))
       return tag
 
     const props = image(src[2]!.replace(ENTITY, entity => ENTITIES[entity]!), { width: Number(size[1]), height: Number(size[2]) })
