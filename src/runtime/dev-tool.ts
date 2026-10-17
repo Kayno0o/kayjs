@@ -15,6 +15,17 @@ const MODULE_START = 'export default '
 const HEAD_HEADER = 'x-kay-dev'
 const REQUEST_URL = '/_kay/dev/request'
 const SIZES_URL = '/_kay/dev/sizes'
+// The navigations the Network tab keeps: the page's load, then each swap.
+const MAX_NAVIGATIONS = 5
+// The most requests one navigation lists, the rest counted.
+const MAX_FETCHES = 300
+// The addresses the dev tool fetched itself, which the Network tab leaves out.
+const OWN_FETCHES = new Set<string>()
+const DEV_PATH = /\/_kay\/dev\//
+const ACTION_PATH = /\/_kay\/action\//
+const FONT_FILE = /\.(?:woff2?|ttf|otf)$/i
+// server-islands.ts's ISLAND_PARAM, copied as this file imports types only.
+const ISLAND_PARAM = 'kay_island'
 // Shown first among the response headers.
 const FIRST_HEADERS = ['content-security-policy', 'content-security-policy-report-only', 'cache-control']
 const PRERENDER = { 'page': 'prerendered by kay build', 'listed': 'prerendered by kay build for the paths its setting lists', 'server islands': 'prerendered by kay build, its server islands rendered on request' }
@@ -285,6 +296,7 @@ const ICONS = {
   'languages': 'path~d~m5 8 6 6|path~d~m4 14 6-6 2-3|path~d~M2 5h12|path~d~M7 2h1|path~d~m22 22-5-10-5 10|path~d~M14 18h6',
   'boxes': 'path~d~M2.97 12.92A2 2 0 0 0 2 14.63v3.24a2 2 0 0 0 .97 1.71l3 1.8a2 2 0 0 0 2.06 0L12 19v-5.5l-5-3-4.03 2.42Z|path~d~m7 16.5-4.74-2.85|path~d~m7 16.5 5-3|path~d~M7 16.5v5.17|path~d~M12 13.5V19l3.97 2.38a2 2 0 0 0 2.06 0l3-1.8a2 2 0 0 0 .97-1.71v-3.24a2 2 0 0 0-.97-1.71L17 10.5l-5 3Z|path~d~m17 16.5-5-3|path~d~m17 16.5 4.74-2.85|path~d~M17 16.5v5.17|path~d~M7.97 4.42A2 2 0 0 0 7 6.13v4.37l5 3 5-3V6.13a2 2 0 0 0-.97-1.71l-3-1.8a2 2 0 0 0-2.06 0l-3 1.8Z|path~d~M12 8 7.26 5.15|path~d~m12 8 4.74-2.85|path~d~M12 13.5V8',
   'mail': 'rect~width~20~height~16~x~2~y~4~rx~2|path~d~m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7',
+  'network': 'rect~x~16~y~16~width~6~height~6~rx~1|rect~x~2~y~16~width~6~height~6~rx~1|rect~x~9~y~2~width~6~height~6~rx~1|path~d~M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3|path~d~M12 12V8',
   'crosshair': 'circle~cx~12~cy~12~r~10|line~x1~22~x2~18~y1~12~y2~12|line~x1~6~x2~2~y1~12~y2~12|line~x1~12~x2~12~y1~6~y2~2|line~x1~12~x2~12~y1~22~y2~18',
   'maximize-2': 'polyline~points~15 3 21 3 21 9|polyline~points~9 21 3 21 3 15|line~x1~21~x2~14~y1~3~y2~10|line~x1~3~x2~10~y1~21~y2~14',
   'minimize-2': 'polyline~points~4 14 10 14 10 20|polyline~points~20 10 14 10 14 4|line~x1~14~x2~21~y1~10~y2~3|line~x1~3~x2~10~y1~21~y2~14',
@@ -363,7 +375,7 @@ function worstTone(bad: string[]): 'error' | 'warn' | undefined {
 }
 
 // The tabs kay makes itself; those a library adds sit under a line.
-const CORE_TABS = new Set(['problems', 'request', 'head', 'env', 'images', 'performance', 'routes', 'i18n', 'islands'])
+const CORE_TABS = new Set(['problems', 'request', 'network', 'head', 'env', 'images', 'performance', 'routes', 'i18n', 'islands'])
 
 // A small rounded label, tinted by what it counts or says, with an icon before it when given.
 function pill(tool: Pick<DevTool, 'make' | 'icon'>, text: string, tone?: 'error' | 'warn' | 'ok' | 'accent', icon?: DevIconName): HTMLElement {
@@ -1176,6 +1188,7 @@ export function startDevTool(doc: Document = document): DevTool {
 
   problems = problemsTab(doc, tool, state, save, missing)
   request = requestTab(doc, tool)
+  networkTab(doc, tool, listening.signal)
   headTab(doc, tool, listening.signal)
   envTab(doc, tool, listening.signal)
   const vitals = watchVitals(doc.defaultView!, listening.signal)
@@ -1503,7 +1516,7 @@ function requestTab(doc: Document, tool: DevTool): { stop: () => void } {
     let recorded: DevResponse | undefined
 
     try {
-      const response = await doc.defaultView!.fetch(`${REQUEST_URL}?id=${encodeURIComponent(id)}`, { headers: { [HEAD_HEADER]: '1' }, cache: 'no-store' })
+      const response = await ownFetch(doc.defaultView!, `${REQUEST_URL}?id=${encodeURIComponent(id)}`, { headers: { [HEAD_HEADER]: '1' }, cache: 'no-store' })
 
       recorded = response.ok ? await response.json() as DevResponse : undefined
     }
@@ -1668,6 +1681,162 @@ function serverPhases(header: string): ServerPhases {
   return phases
 }
 
+interface Navigation {
+  // The page it showed, empty while a swap brings it.
+  path: string
+  start: number
+  fetches: PerformanceResourceTiming[]
+  more: number
+}
+
+// What the page fetched, by navigation, newest first: its load and the last few swaps, each request with its kind, status, size and time; the dev tool's own requests are left out, and an error status is counted on the tab for the page shown.
+function networkTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
+  const win = doc.defaultView!
+  let draw: () => void = () => undefined
+  const tab = tool.tab({ id: 'network', label: 'Network', icon: 'network', shown: () => draw() })
+  const content = tool.make('div', 'stack')
+  const bar = toolbar(tool, 'Filter by address, kind or status', () => bar.apply(content), true)
+  const here = () => `${win.location.pathname}${win.location.search}`
+  const navigations: Navigation[] = [{ path: here(), start: 0, fetches: [], more: 0 }]
+  const changed = () => {
+    const current = navigations.at(-1)!
+
+    tab.count(current.fetches.filter(fetched => statusOf(fetched) >= 400).length, 'error')
+
+    if (tab.panel.hidden === false)
+      draw()
+  }
+  const add = (fetched: PerformanceResourceTiming) => {
+    if (DEV_PATH.test(fetched.name) || ((fetched.initiatorType === 'fetch' || fetched.initiatorType === 'xmlhttprequest') && OWN_FETCHES.has(fetched.name)))
+      return
+
+    const navigation = navigations.findLast(candidate => candidate.start <= fetched.startTime) ?? navigations[0]!
+
+    if (navigation.fetches.length < MAX_FETCHES)
+      navigation.fetches.push(fetched)
+    else
+      navigation.more++
+  }
+
+  draw = () => {
+    const groups = navigations.toReversed().map((navigation, index) => {
+      const group = tool.make('section', 'group')
+      const heading = tool.make('h3', 'heading', `${index === 0 ? 'This page' : 'Before'}, ${navigation.path === '' ? 'loading' : navigation.path}`)
+      const list = tool.make('div', 'list')
+
+      heading.append(pill(tool, String(navigation.fetches.length + navigation.more)))
+      list.append(...navigation.fetches.toSorted((a, b) => a.startTime - b.startTime).map(fetched => fetchRow(tool, fetched, navigation.start, win)))
+      group.append(heading, navigation.fetches.length === 0 ? tool.make('div', 'note', 'Nothing fetched.') : list)
+
+      if (navigation.more > 0)
+        group.append(tool.make('div', 'note', `${navigation.more} more not listed.`))
+
+      return group
+    })
+
+    content.replaceChildren(...groups, bar.empty)
+    bar.apply(content)
+  }
+
+  const [loaded] = win.performance.getEntriesByType('navigation') as PerformanceResourceTiming[]
+
+  if (loaded !== undefined)
+    add(loaded)
+
+  try {
+    const observer = new win.PerformanceObserver((list) => {
+      for (const fetched of list.getEntries())
+        add(fetched as PerformanceResourceTiming)
+
+      changed()
+    })
+
+    observer.observe({ type: 'resource', buffered: true })
+    signal.addEventListener('abort', () => observer.disconnect())
+  }
+  catch {
+    // A browser without Resource Timing lists the document alone.
+  }
+
+  // A swap opens a navigation as it starts, so the page it fetches lands in it, and names it once it ends.
+  const swaps = new MutationObserver(() => {
+    const busy = doc.documentElement.getAttribute('aria-busy') === 'true'
+    const last = navigations.at(-1)!
+
+    if (busy && last.path !== '') {
+      navigations.push({ path: '', start: win.performance.now(), fetches: [], more: 0 })
+
+      if (navigations.length > MAX_NAVIGATIONS)
+        navigations.shift()
+    }
+    else if (!busy && last.path === '') {
+      last.path = here()
+    }
+
+    changed()
+  })
+
+  swaps.observe(doc.documentElement, { attributes: true, attributeFilter: ['aria-busy'] })
+  signal.addEventListener('abort', () => swaps.disconnect())
+  tab.panel.append(bar.element, content)
+  changed()
+}
+
+// The status a request was answered with, 0 when the browser does not tell, as for another site's answer.
+function statusOf(fetched: PerformanceResourceTiming): number {
+  return 'responseStatus' in fetched && typeof fetched.responseStatus === 'number' ? fetched.responseStatus : 0
+}
+
+// What a request was for: an action, a server island, a page a swap or prefetch fetched, another fetch, or the kind of file the page loaded.
+function fetchKind(fetched: PerformanceResourceTiming, url: URL): string {
+  const type = 'contentType' in fetched && typeof fetched.contentType === 'string' ? fetched.contentType : ''
+
+  if (fetched.entryType === 'navigation')
+    return 'document'
+
+  if (ACTION_PATH.test(url.pathname))
+    return 'action'
+
+  if (url.searchParams.has(ISLAND_PARAM))
+    return 'server island'
+
+  if (fetched.initiatorType === 'fetch' || fetched.initiatorType === 'xmlhttprequest')
+    return type.startsWith('text/html') ? 'page' : 'fetch'
+
+  if (fetched.initiatorType === 'script' || url.pathname.endsWith('.js'))
+    return 'script'
+
+  if (url.pathname.endsWith('.css') || type.startsWith('text/css'))
+    return 'stylesheet'
+
+  if (fetched.initiatorType === 'img' || fetched.initiatorType === 'image' || type.startsWith('image/'))
+    return 'image'
+
+  if (FONT_FILE.test(url.pathname) || type.startsWith('font/'))
+    return 'font'
+
+  return fetched.initiatorType === '' ? 'other' : fetched.initiatorType
+}
+
+// What a request brought, as the bytes on the wire or from the cache; nothing when the browser does not tell, as for another site's answer.
+function fetchedSize(fetched: PerformanceResourceTiming): string[] {
+  if (fetched.transferSize === 0 && fetched.decodedBodySize > 0)
+    return ['from the cache']
+
+  return fetched.encodedBodySize > 0 ? [formatBytes(fetched.encodedBodySize)] : []
+}
+
+function fetchRow(tool: DevTool, fetched: PerformanceResourceTiming, start: number, win: Window): HTMLElement {
+  const url = new URL(fetched.name)
+  const status = statusOf(fetched)
+  const kind = fetchKind(fetched, url)
+  const name = url.origin === win.location.origin ? `${url.pathname}${url.search}` : fetched.name
+  const chips = [kind, ...fetchedSize(fetched), formatMs(fetched.duration), `at ${formatMs(Math.max(0, fetched.startTime - start))}`]
+  const after = [...status === 0 ? [] : [pill(tool, String(status), status >= 400 ? 'error' : 'ok')], copyButton(tool, 'the address', fetched.name)]
+
+  return filterable(entry(tool, 'fetch', { name, after, chips }), `${name} ${kind} ${status}`, status >= 400)
+}
+
 // What a search result shows of a title before cutting it.
 const TITLE_LENGTH = 60
 
@@ -1730,7 +1899,7 @@ function headTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
     let failure: string | undefined
 
     try {
-      const response = await win.fetch(HEAD_URL, { method: 'POST', headers: { 'content-type': 'application/json', [HEAD_HEADER]: '1' }, body: JSON.stringify({ path, head: head.outerHTML }), cache: 'no-store' })
+      const response = await ownFetch(win, HEAD_URL, { method: 'POST', headers: { 'content-type': 'application/json', [HEAD_HEADER]: '1' }, body: JSON.stringify({ path, head: head.outerHTML }), cache: 'no-store' })
 
       if (!response.ok)
         throw new Error(`the server answered ${response.status}`)
@@ -1979,7 +2148,7 @@ function envTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
     let failure: string | undefined
 
     try {
-      const response = await win.fetch(ENV_URL, { cache: 'no-store' })
+      const response = await ownFetch(win, ENV_URL, { cache: 'no-store' })
 
       // The route is there only when `publicEnv` is declared; any other answer is a failure to read it.
       if (response.status !== 404) {
@@ -2460,7 +2629,7 @@ function unaskedFormat(win: Window & typeof globalThis, image: HTMLImageElement,
 // The format and size the server gives an image of kay's routes.
 async function askedFormat(win: Window & typeof globalThis, src: string): Promise<string> {
   try {
-    const response = await win.fetch(src, { method: 'HEAD', headers: { accept: IMAGE_ACCEPT }, cache: 'no-store', signal: AbortSignal.timeout(IMAGE_REQUEST_MS) })
+    const response = await ownFetch(win, src, { method: 'HEAD', headers: { accept: IMAGE_ACCEPT }, cache: 'no-store', signal: AbortSignal.timeout(IMAGE_REQUEST_MS) })
     const type = response.headers.get('content-type') ?? ''
 
     if (!response.ok)
@@ -2495,7 +2664,7 @@ interface BuiltSizes {
 // What the last `kay build` measured for this page's route, which the server reads from the report kept under `.kay`; nothing when no build was made or the route is not in it.
 async function builtSizes(win: Window & typeof globalThis): Promise<BuiltSizes | undefined> {
   try {
-    const response = await win.fetch(`${SIZES_URL}?path=${encodeURIComponent(win.location.pathname)}`, { headers: { [HEAD_HEADER]: '1' }, cache: 'no-store', signal: AbortSignal.timeout(IMAGE_REQUEST_MS) })
+    const response = await ownFetch(win, `${SIZES_URL}?path=${encodeURIComponent(win.location.pathname)}`, { headers: { [HEAD_HEADER]: '1' }, cache: 'no-store', signal: AbortSignal.timeout(IMAGE_REQUEST_MS) })
 
     return response.ok ? ((await response.json()) as { sizes?: BuiltSizes }).sizes : undefined
   }
@@ -2582,7 +2751,7 @@ async function pageWeight(doc: Document): Promise<Weight> {
   }
 
   const sized = async (url: string, accept = '*/*') => {
-    const response = await win.fetch(url, { headers: { accept } })
+    const response = await ownFetch(win, url, { headers: { accept } })
 
     if (!response.ok)
       throw new Error(`${url} answered ${response.status}`)
@@ -2818,7 +2987,7 @@ function routesTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
     const ask = ++asked
 
     try {
-      const response = await win.fetch(ROUTES_URL, { cache: 'no-store' })
+      const response = await ownFetch(win, ROUTES_URL, { cache: 'no-store' })
 
       if (ask !== asked)
         return
@@ -2888,6 +3057,16 @@ function positionButton(tool: DevTool, source: string): HTMLButtonElement {
   }
 
   return position
+}
+
+// A fetch of the dev tool's own, which the Network tab leaves out.
+async function ownFetch(win: Window, url: string, init?: RequestInit): Promise<Response> {
+  const href = URL.parse(url, win.location.href)?.href
+
+  if (href !== undefined)
+    OWN_FETCHES.add(href)
+
+  return win.fetch(url, init)
 }
 
 // Whether the text reached the clipboard of the button's window.

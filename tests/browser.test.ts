@@ -1464,4 +1464,34 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the dev to
       view.close()
     }
   }, 60_000)
+
+  it('lists what the page fetched with its kind and status, counting an error, leaving out the tool\'s own requests', async () => {
+    const view = await dev.open('/')
+
+    try {
+      await view.evaluate(async () => {
+        document.querySelector('kay-dev')!.shadowRoot!.querySelector<HTMLButtonElement>('#kay-dev-tab-network')!.click()
+        await fetch('/nothing-here')
+      })
+      await view.waitUntil(() => document.querySelector('kay-dev')!.shadowRoot!.querySelector('#kay-dev-network')?.textContent.includes('/nothing-here') === true)
+
+      const listed = await view.evaluate(() => {
+        const root = document.querySelector('kay-dev')!.shadowRoot!
+
+        return {
+          rows: [...root.querySelectorAll('#kay-dev-network .fetch')].map(row => `${row.querySelector('.name')!.textContent} ${row.querySelector('.line .pill')?.textContent ?? '-'} ${row.querySelector('.chip')!.textContent}`),
+          count: root.querySelector('#kay-dev-tab-network .count')!.textContent,
+        }
+      })
+
+      expect(listed.rows).toContain('/ 200 document')
+      expect(listed.rows).toContain('/mark.png 200 image')
+      expect(listed.rows).toContain('/nothing-here 404 fetch')
+      expect(listed.rows.filter(row => row.includes('/_kay/dev/'))).toEqual([])
+      expect(listed.count).toBe('1')
+    }
+    finally {
+      view.close()
+    }
+  }, 60_000)
 })

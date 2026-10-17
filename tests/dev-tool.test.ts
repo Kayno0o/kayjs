@@ -150,6 +150,76 @@ describe('the dev tool', () => {
     expect(shadow().querySelector<HTMLElement>('.actions')!.hidden).toBe(true)
   })
 
+  it('lists what the page fetched by navigation, newest first, with kind, status, size and time, leaving out its own requests and counting an error status', async () => {
+    ;(window as unknown as { happyDOM: { setURL: (url: string) => void } }).happyDOM.setURL('http://localhost/shop')
+    const observed = fakeObserver()
+    const at = (path: string, fields: Record<string, unknown>) => ({ name: new URL(path, location.href).href, entryType: 'resource', startTime: 0, duration: 12, transferSize: 300, encodedBodySize: 200, decodedBodySize: 500, responseStatus: 200, contentType: '', initiatorType: 'fetch', ...fields })
+    const groups = () => visible('#kay-dev-network', 'h3')
+    const names = () => visible('#kay-dev-network', '.fetch .name')
+    const rows = () => [...shadow().querySelectorAll('#kay-dev-network .fetch')].filter(row => row.closest('[hidden]') === null).map(row => [row.querySelector('.name')!.textContent, row.querySelector('.line .pill')?.textContent ?? '', row.querySelector('.chips')!.textContent].join(' | '))
+
+    try {
+      tool = startDevTool()
+      shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-network')!.click()
+      observed.report('resource', [
+        at('/_kay/entry-abc12345.js', { initiatorType: 'script', startTime: 5 }),
+        at('/_kay/dev/routes', { startTime: 6 }),
+        at('/fonts/inter.woff2', { initiatorType: 'css', startTime: 7, transferSize: 0 }),
+        at('https://cdn.example/x.js', { initiatorType: 'script', startTime: 8, transferSize: 0, encodedBodySize: 0, decodedBodySize: 0, responseStatus: 0 }),
+      ])
+      await Bun.sleep(0)
+
+      expect(groups()).toEqual([`This page, ${location.pathname}${location.search}3`])
+      expect(rows()).toEqual([
+        '/_kay/entry-abc12345.js | 200 | script200 B12 msat 5.0 ms',
+        '/fonts/inter.woff2 | 200 | fontfrom the cache12 msat 7.0 ms',
+        'https://cdn.example/x.js |  | script12 msat 8.0 ms',
+      ])
+      expect(shadow().querySelector<HTMLElement>('#kay-dev-tab-network .count')!.hidden).toBe(true)
+
+      // A swap opens a navigation of its own, named once it ends; the tool's own fetch of the env is left out, the page's own script for it kept.
+      document.documentElement.setAttribute('aria-busy', 'true')
+      await Bun.sleep(0)
+      const start = performance.now()
+
+      await copiedBy(shadow().querySelector<HTMLButtonElement>('#kay-dev-network .fetch .copy')!)
+      spyOn(window, 'fetch').mockImplementation((async () => new Response('')) as unknown as typeof window.fetch)
+      shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-env')!.click()
+      await Bun.sleep(0)
+      shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-network')!.click()
+      observed.report('resource', [
+        at('/next', { startTime: start + 1, contentType: 'text/html; charset=utf-8' }),
+        at('/_kay/action/src/routes/next.kay/save', { startTime: start + 40, responseStatus: 500, contentType: 'application/json' }),
+        at('/next?kay_island=1', { startTime: start + 50 }),
+        at('/_kay/env.js', { startTime: start + 60 }),
+        at('/_kay/env.js', { initiatorType: 'script', startTime: start + 61 }),
+      ])
+      document.documentElement.removeAttribute('aria-busy')
+      await Bun.sleep(0)
+
+      expect(groups()).toEqual([`This page, ${location.pathname}${location.search}4`, `Before, ${location.pathname}${location.search}3`])
+      expect(names().slice(0, 4)).toEqual(['/next', '/_kay/action/src/routes/next.kay/save', '/next?kay_island=1', '/_kay/env.js'])
+      expect(visible('#kay-dev-network', '.fetch .line .pill').slice(0, 4)).toEqual(['200', '500', '200', '200'])
+      expect(visible('#kay-dev-network', '.fetch .chips > :first-child').slice(0, 4)).toEqual(['page', 'action', 'server island', 'script'])
+      expect(shadow().querySelector('#kay-dev-tab-network .count')?.textContent).toBe('1')
+      expect(shadow().querySelector('#kay-dev-tab-network .count')?.classList.contains('error')).toBe(true)
+
+      // Problems only keeps the error, the filter matches a kind.
+      shadow().querySelector<HTMLButtonElement>('#kay-dev-network .toolbar button')!.click()
+
+      expect(names()).toEqual(['/_kay/action/src/routes/next.kay/save'])
+
+      shadow().querySelector<HTMLButtonElement>('#kay-dev-network .toolbar button')!.click()
+      typeFilter('#kay-dev-network', 'font')
+
+      expect(names()).toEqual(['/fonts/inter.woff2'])
+      expect(groups()).toEqual([`Before, ${location.pathname}${location.search}3`])
+    }
+    finally {
+      delete (window as { PerformanceObserver?: unknown }).PerformanceObserver
+    }
+  })
+
   it('lists its tabs in a vertical rail that moves by Up and Down, and keeps the size it was given for the browser', async () => {
     tool = startDevTool()
     tool.tab({ id: 'other', label: 'Other' })
@@ -159,7 +229,7 @@ describe('the dev tool', () => {
     const icons = () => [...shadow().querySelectorAll<HTMLButtonElement>('.head .icon')].map(button => [button.getAttribute('aria-label'), button.title, button.textContent])
 
     expect(rail.getAttribute('aria-orientation')).toBe('vertical')
-    expect([...rail.querySelectorAll('[role=tab]')].map(tab => tab.id)).toEqual(['problems', 'request', 'head', 'env', 'images', 'performance', 'routes', 'other'].map(id => `kay-dev-tab-${id}`))
+    expect([...rail.querySelectorAll('[role=tab]')].map(tab => tab.id)).toEqual(['problems', 'request', 'network', 'head', 'env', 'images', 'performance', 'routes', 'other'].map(id => `kay-dev-tab-${id}`))
     expect(icons()).toEqual([['Copy this tab as Markdown', 'Copy this tab as Markdown', ''], ['Float', 'Float', ''], ['Dock to the bottom', 'Dock to the bottom', ''], ['Dock to the right', 'Dock to the right', ''], ['Fill the window', 'Fill the window', ''], ['Close', 'Close', '']])
 
     key({ key: 'K', code: 'KeyK', altKey: true, shiftKey: true })
