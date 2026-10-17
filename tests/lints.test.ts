@@ -580,6 +580,9 @@ describe('unsized-image', () => {
 
   it('leaves a stored file, as its key holds the size', () => {
     expect(only(`${imports}img(src={files.url(key)} alt="A")\nimg(src={\`\${base}/a.png\`} alt="B")\n`)).toEqual(['warning img'])
+    // A stored file's URL with more joined to it is judged as a whole expression; a call in its key still is the stored file's URL.
+    expect(only(`${imports}img(src={files.url(key) + '?q'} alt="A")\n`)).toEqual(['warning img'])
+    expect(only(`${imports}img(src={files.url(key(1))} alt="A")\n`)).toEqual([])
   })
 
   it('leaves an img with a spread, as image() gives width and height', () => {

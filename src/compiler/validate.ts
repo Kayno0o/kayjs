@@ -59,8 +59,8 @@ const TRANSITION_PART = 'transition:'
 const TRANSITION_PARTS = new Set(['enter', 'enter-from', 'enter-to', 'leave', 'leave-from', 'leave-to'])
 const LOWERCASE_EVENT = /^on:?([a-z]+)$/
 const WHITESPACE = /\s+/
-// `files.url(key)`: a stored file's URL holds its size, which kay writes on the `img` showing it.
-const STORED_URL = /^[\w.]+\.url\(/
+// `files.url(key)` alone: a stored file's URL holds its size, which kay writes on the `img` showing it, but not once more is joined to it.
+const STORED_URL = /^[\w.]+\.url\((?:[^()]|\([^()]*\))*\)$/
 const COMPOUND_EVENT = /^(dbl|key|mouse|pointer|touch|drag|focus|context|before|after)(click|down|up|press|move|enter|leave|over|out|start|end|cancel|in|menu|input)$/
 const HEAD_TAGS = new Set(['title', 'meta', 'link', 'style', 'script', 'base', 'html'])
 const HEAD_CONTENT = 'A `head` block holds `title`, `meta`, `link`, `style`, `script`, `base` and `html` elements only'
