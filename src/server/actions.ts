@@ -1058,7 +1058,7 @@ async function renderBack(app: Elysia, base: string, request: Request, headers: 
   answer.set('cache-control', 'private, no-store')
   answer.set(FAILURE_HEADER, '1')
 
-  return new Response(swapped ? html : backedForms(html, from).replace(HEAD_START, tag => `${tag}<base href="${escapeAttribute(from.href)}">`), { status: flash.status, headers: answer })
+  return new Response(swapped ? html : backedForms(html, from).replace(HEAD_START, tag => `${tag}<base href="${escapeAttribute(from.href)}"><meta name="kay-posted">`), { status: flash.status, headers: answer })
 }
 
 // Each form posting to an action names the page, so a post refused again renders it again, and one that goes through goes back to it.

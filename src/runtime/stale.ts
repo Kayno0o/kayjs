@@ -1,6 +1,7 @@
 import { dirtyGuard, navigation } from './navigation'
 import { BUILD_HEADER, BUILD_META } from './swap'
 
+const ENTRY_SCRIPT = 'script[type="module"][src*="/_kay/"]:not([src*="/_kay/dev/"])'
 const BUILD_TAG = `meta[name="${BUILD_META}"]`
 
 // Whether the page was rendered for `build`.
@@ -12,10 +13,28 @@ const STORAGE_KEY = 'kay-reloaded'
 // A page is not reloaded again within this time, whatever it still says: a cache in front of the server may keep serving the old page, and replicas on two builds may alternate.
 const REPEAT_MS = 60_000
 
-let probing: Promise<boolean> | undefined
+let reloading: Promise<boolean> | undefined
+let asking: Promise<string | undefined> | undefined
+
+// The build a production server answers now, from the header of a request for the entry chunk this page loaded: a file, so nothing renders, and one that is gone after a deploy still answers 404 with the header.
+async function headed(): Promise<string | undefined> {
+  const entry = document.querySelector<HTMLScriptElement>(ENTRY_SCRIPT)?.src
+
+  if (entry === undefined)
+    return undefined
+
+  const response = await fetch(entry, { method: 'HEAD', cache: 'no-store' })
+
+  return response.headers.get(BUILD_HEADER) ?? undefined
+}
 
 // The build the server answers now: the header every answer of a production server carries, else, for a static host, the build its page for this URL names.
 async function served(): Promise<string | undefined> {
+  const fromHead = await headed()
+
+  if (fromHead !== undefined)
+    return fromHead
+
   const response = await fetch(location.href, { cache: 'no-store', headers: { accept: 'text/html' } })
   const named = response.headers.get(BUILD_HEADER)
 
@@ -28,6 +47,23 @@ async function served(): Promise<string | undefined> {
   const page = new DOMParser().parseFromString(await response.text(), 'text/html')
 
   return page.querySelector(BUILD_TAG)?.getAttribute('content') ?? undefined
+}
+
+// Asked once at a time, whoever needs it.
+async function current(): Promise<string | undefined> {
+  asking ??= (async () => {
+    try {
+      return await served()
+    }
+    catch {
+      return undefined
+    }
+    finally {
+      asking = undefined
+    }
+  })()
+
+  return asking
 }
 
 // Whether a field holds something other than the page rendered it with.
@@ -62,7 +98,8 @@ function unsaved(): boolean {
 function reload(): boolean {
   navigation.stale = true
 
-  if (unsaved())
+  // The document answered a form posted without the page swap, which a reload would post again.
+  if (unsaved() || document.querySelector('meta[name="kay-posted"]'))
     return false
 
   try {
@@ -84,11 +121,16 @@ function reload(): boolean {
   return true
 }
 
-// An answer naming another build than the page's: the next link loads in full, and a page the new build no longer has an answer for, such as an action it dropped, reloads now.
-export function noticed(response: Response): boolean {
+// An answer naming another build than the page's, which the server confirms as its build now since an answer from the HTTP cache may carry an older one: the next link loads in full, and a page the new build no longer has an answer for, such as an action it dropped, reloads now.
+export async function noticed(response: Response): Promise<boolean> {
   const seen = response.headers.get(BUILD_HEADER)
 
   if (seen === null || onPage(seen))
+    return false
+
+  const build = await current()
+
+  if (build === undefined || onPage(build))
     return false
 
   navigation.stale = true
@@ -96,23 +138,18 @@ export function noticed(response: Response): boolean {
   return response.status === 404 && reload()
 }
 
-async function probe(): Promise<boolean> {
-  try {
-    const build = await served()
-
-    return build !== undefined && !onPage(build) && reload()
-  }
-  catch {
-    return false
-  }
-  finally {
-    probing = undefined
-  }
-}
-
 // Whether a deploy replaced this page's build, which a chunk missing now says, and the page is reloading for it. A server that cannot be asked, or one still running the page's build, leaves the failure to be reported.
 export async function reloadIfStale(): Promise<boolean> {
-  probing ??= probe()
+  reloading ??= (async () => {
+    try {
+      const build = await current()
 
-  return probing
+      return build !== undefined && !onPage(build) && reload()
+    }
+    finally {
+      reloading = undefined
+    }
+  })()
+
+  return reloading
 }

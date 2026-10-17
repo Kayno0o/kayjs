@@ -4,6 +4,7 @@ import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test'
+import { Elysia } from 'elysia'
 import { chromium } from 'playwright-core'
 import { BUILD_HEADER } from '../src/runtime/swap'
 import { requestIdHeader } from '../src/server/protection'
@@ -101,6 +102,167 @@ describe('kay dev', () => {
       await site.close()
     }
   })
+})
+
+// A server answering with another build than the page's, for the answers `only` matches, and the requests it saw.
+function forgedBuild() {
+  const forged = { build: undefined as string | undefined, only: undefined as RegExp | undefined, seen: [] as string[] }
+  const plugin = new Elysia()
+    .onRequest(({ request }) => {
+      forged.seen.push(`${request.method} ${new URL(request.url).pathname}${new URL(request.url).search}`)
+    })
+    .mapResponse({ as: 'global' }, ({ request, responseValue }) => {
+      if (forged.build === undefined || !(responseValue instanceof Response) || !(forged.only ?? /./).test(new URL(request.url).pathname + new URL(request.url).search))
+        return undefined
+
+      const headers = new Headers(responseValue.headers)
+
+      headers.set(BUILD_HEADER, forged.build)
+
+      return new Response(request.method === 'HEAD' ? null : responseValue.body, { status: responseValue.status, headers })
+    })
+
+  return { forged, plugin }
+}
+
+describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a page told of another build by an answer', () => {
+  const closers: (() => Promise<void>)[] = []
+
+  // Opens the page once the code that handles a deploy is loaded, and marks it so a reload shows. A site made for a `base` is served under it by a front that takes it off, as the proxy or the static host of a real deploy does.
+  const opened = async (site: Awaited<ReturnType<typeof testSite>>, base = '') => {
+    let front: ReturnType<typeof Bun.serve> | undefined
+    let page: TestPage
+
+    if (base === '') {
+      page = await site.open('/')
+    }
+    else {
+      front = Bun.serve({
+        port: 0,
+        async fetch(request) {
+          const url = new URL(request.url)
+          const headers = new Headers(request.headers)
+
+          headers.set('host', 'localhost')
+
+          if (headers.has('origin'))
+            headers.set('origin', 'http://localhost')
+
+          return site.handle(new Request(new URL(`${url.pathname.slice(base.length) || '/'}${url.search}`, 'http://localhost'), { method: request.method, headers, body: request.body, redirect: 'manual' }))
+        },
+      })
+      page = await browse(`${front.url.origin}${base}/`, { path })
+    }
+
+    await page.waitUntil(() => performance.getEntriesByType('resource').some(entry => entry.name.includes('/stale-')))
+    await page.evaluate(() => {
+      (window as { kayMark?: string }).kayMark = 'kept'
+    })
+    closers.push(async () => {
+      page.close()
+      await front?.stop(true)
+    })
+
+    return page
+  }
+
+  afterEach(async () => {
+    await Promise.all(closers.splice(0).map(async close => close()))
+  })
+
+  for (const base of ['', '/repo']) {
+    describe(base === '' ? 'at the root' : `under base ${base}`, () => {
+      it('asks for the headers of its entry chunk, rendering no page, then loads the next link in full', async () => {
+        const { forged, plugin } = forgedBuild()
+        const site = await testSite({ routes: 'tests/fixtures/navigation/src/routes', browser: { path }, use: [plugin], ...base && { base } })
+
+        try {
+          const page = await opened(site, base)
+
+          forged.build = 'otherbuild'
+          forged.seen.length = 0
+          await page.click('button.bump')
+          await page.waitUntil(() => true)
+
+          const probed = () => forged.seen.filter(request => request.startsWith('HEAD '))
+
+          for (let tries = 0; tries < 100 && probed().length === 0; tries++)
+            await Bun.sleep(50)
+
+          expect(probed()).toHaveLength(1)
+          expect(probed()[0]).toContain('/_kay/')
+          expect(forged.seen.filter(request => request.startsWith('GET ') && request.includes('/stale'))).toEqual([])
+
+          await page.click('a.second')
+          await page.waitFor('h1', { text: 'Second' })
+
+          expect(await page.evaluate(() => (window as { kayMark?: string }).kayMark)).toBeUndefined()
+        }
+        finally {
+          await site.close()
+        }
+      }, 60_000)
+
+      it('keeps swapping when only an action answer, as the HTTP cache may replay it, names another build', async () => {
+        const { forged, plugin } = forgedBuild()
+        const site = await testSite({ routes: 'tests/fixtures/navigation/src/routes', browser: { path }, use: [plugin], ...base && { base } })
+
+        try {
+          const page = await opened(site, base)
+
+          forged.build = 'otherbuild'
+          forged.only = /\/_kay\/action\//
+          forged.seen.length = 0
+          await page.click('button.bump')
+
+          for (let tries = 0; tries < 100 && !forged.seen.some(request => request.startsWith('HEAD ')); tries++)
+            await Bun.sleep(50)
+
+          expect(forged.seen.some(request => request.startsWith('HEAD '))).toBe(true)
+          await page.click('a.second')
+          await page.waitFor('h1', { text: 'Second' })
+
+          expect(await page.evaluate(() => (window as { kayMark?: string }).kayMark)).toBe('kept')
+        }
+        finally {
+          await site.close()
+        }
+      }, 60_000)
+    })
+  }
+
+  it('does not reload a document that was the answer of a native post, which the browser would ask to resubmit', async () => {
+    const { forged, plugin } = forgedBuild()
+    const site = await testSite({ routes: 'tests/fixtures/navigation/src/routes', browser: { path }, use: [plugin] })
+
+    try {
+      const posted = await site.fetch('/_kay/action/tests/fixtures/navigation/src/routes/second.kay/add?kay_back=%2Fsecond', { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded', 'origin': 'http://localhost' }, body: 'title=taken' })
+
+      expect(await posted.text()).toContain('<meta name="kay-posted">')
+      expect((await site.visit('/second')).html).not.toContain('kay-posted')
+
+      const page = await opened(site)
+
+      await page.evaluate(() => {
+        document.head.insertAdjacentHTML('beforeend', '<meta name="kay-posted">')
+      })
+      forged.build = 'otherbuild'
+
+      const reloaded = await page.evaluate(async () => {
+        const entry = performance.getEntriesByType('resource').find(resource => resource.name.includes('/stale-'))!.name
+        const { noticed } = await import(entry) as { noticed: (response: Response) => Promise<boolean> }
+
+        return noticed(new Response(null, { status: 404, headers: { 'x-kay-build': 'otherbuild' } }))
+      })
+
+      expect(reloaded).toBe(false)
+      await Bun.sleep(500)
+      expect(await page.evaluate(() => (window as { kayMark?: string }).kayMark)).toBe('kept')
+    }
+    finally {
+      await site.close()
+    }
+  }, 60_000)
 })
 
 interface Deploy {

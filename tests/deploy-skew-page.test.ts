@@ -49,26 +49,30 @@ describe('a page noticing a deploy', () => {
   })
 
   it('reloads for an action the new build dropped, once, and keeps the next link a full load', async () => {
+    fetched.mockResolvedValue(answer('bbb'))
+
     expect(await skew(answer('bbb', 404))).toBe(true)
     expect(reload).toHaveBeenCalledTimes(1)
     expect(navigation.stale).toBe(true)
     expect(Number(sessionStorage.getItem('kay-reloaded'))).toBeGreaterThan(0)
 
     // The page the reload loaded still says it is the old one, as a cache in front of the server may keep it: no second reload.
-    expect(noticed(answer('bbb', 404))).toBe(false)
+    expect(await noticed(answer('bbb', 404))).toBe(false)
     expect(reload).toHaveBeenCalledTimes(1)
   })
 
   it('only marks the page for an action that still answers, as the new build\'s pages are not this page\'s to swap in', async () => {
+    fetched.mockResolvedValue(answer('bbb'))
+
     expect(await skew(answer('bbb', 200))).toBe(false)
     expect(await skew(answer('bbb', 422))).toBe(false)
     expect(reload).not.toHaveBeenCalled()
     expect(navigation.stale).toBe(true)
   })
 
-  it('leaves an answer of its own build alone', () => {
-    expect(noticed(answer('aaa', 404))).toBe(false)
-    expect(noticed(answer(undefined, 404))).toBe(false)
+  it('leaves an answer of its own build alone', async () => {
+    expect(await noticed(answer('aaa', 404))).toBe(false)
+    expect(await noticed(answer(undefined, 404))).toBe(false)
     expect(navigation.stale).toBeUndefined()
   })
 
