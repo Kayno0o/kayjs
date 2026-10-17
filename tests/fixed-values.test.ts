@@ -1,17 +1,19 @@
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
+import { afterAll, afterEach, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { Elysia } from 'elysia'
+import { probeWait } from '../src/build/verify'
 import { check, configCheckOptions } from '../src/check'
 import { pages } from '../src/server'
 import { liveLimits, remoteLimits } from '../src/server/config-limits'
 import { webpQuality } from '../src/server/image'
 import { probeHealth } from '../src/server/lifecycle'
-import { clientAddress, trustProxy } from '../src/server/protection'
+import { clientAddress, resetRequestIdHeader, trustProxy } from '../src/server/protection'
 import { hostedStatus, readRedirects } from '../src/server/redirects'
 import { remoteImages, remotePatterns } from '../src/server/remote'
 import { securityHeaders } from '../src/server/security'
+import { scratchDir } from './scratch'
 
 const ROUTES = 'tests/fixtures/production/src/routes'
 
@@ -43,6 +45,13 @@ describe('health.timeout', () => {
       await expect(pages({ routes: ROUTES, prebuilt: false, health: { timeout } as never })).rejects.toThrow('health.timeout is')
 
     expect(await probeHealth({ timeout: 0 })).toBe(1)
+  })
+
+  it('makes the build\'s --health wait follow it, 10 s at least', () => {
+    expect(probeWait(undefined)).toBe(10_000)
+    expect(probeWait(false)).toBe(10_000)
+    expect(probeWait({ timeout: '8s' })).toBe(13_000)
+    expect(probeWait({ timeout: '1s' })).toBe(10_000)
   })
 
   it('makes the probe wait as long as the check may', async () => {
@@ -128,6 +137,8 @@ describe('live limits', () => {
 })
 
 describe('requestIdHeader', () => {
+  afterEach(resetRequestIdHeader)
+
   const routes = ROUTES
   const idFrom = async (app: Awaited<ReturnType<typeof pages>>, header: string, headers: Record<string, string> = {}) => (await app.handle(new Request('http://localhost/contact', { headers }))).headers.get(header)
 
@@ -144,6 +155,15 @@ describe('requestIdHeader', () => {
     expect(await idFrom(renamed, 'x-correlation-id', { 'x-request-id': 'edge-8' })).not.toBe('edge-8')
     await expect(pages({ routes, prebuilt: false, requestIdHeader: 'x-other-id' })).rejects.toThrow('a process uses one name')
     expect(await idFrom(await pages({ routes, prebuilt: false }), 'x-correlation-id')).toMatch(/^[\w-]{22}$/)
+  })
+
+  it('can be reset for apps naming another header in one process', async () => {
+    const other = async (name: string) => idFrom(await pages({ routes, prebuilt: false, requestIdHeader: name }), name)
+
+    expect(await other('x-first-id')).toMatch(/^[\w-]{22}$/)
+    await expect(other('x-second-id')).rejects.toThrow('a process uses one name')
+    resetRequestIdHeader()
+    expect(await other('x-second-id')).toMatch(/^[\w-]{22}$/)
   })
 
   it('refuses a name that is no header', async () => {
@@ -189,6 +209,16 @@ describe('options that also take false', () => {
     expect(await seen(false)).not.toBe('9.9.9.9')
   })
 
+  it('reads proxy: false on an app as no proxy, a forwarded address and id both ignored', async () => {
+    const app = new Elysia().use(await pages({ routes: ROUTES, prebuilt: false, proxy: false })).get('/who', ({ request }) => clientAddress(request, undefined))
+    const headers = { 'x-forwarded-for': '9.9.9.9', 'x-real-ip': '9.9.9.9', 'x-request-id': 'edge-1' }
+    const who = await app.handle(new Request('http://localhost/who', { headers }))
+    const page = await app.handle(new Request('http://localhost/contact', { headers }))
+
+    expect(await who.text()).not.toBe('9.9.9.9')
+    expect(page.headers.get('x-request-id')).not.toBe('edge-1')
+  })
+
   it('reads preview: false as no preview, serving none of its routes', async () => {
     const withPreview = await pages({ routes: ROUTES, prebuilt: false, preview: { secret: 'a'.repeat(40) } })
     const without = await pages({ routes: ROUTES, prebuilt: false, preview: false })
@@ -206,6 +236,24 @@ describe('options that also take false', () => {
     expect(headers['content-security-policy-report-only']).toContain('img-src \'none\'')
     expect(securityHeaders({ security }, [{ csp: { 'img-src': ['https://a.example'] } }])!['content-security-policy']).toContain('https://a.example')
     expect(securityHeaders({}, [{ csp: { 'img-src': ['https://a.example'] } }, { csp: false }])!['content-security-policy']).toBeUndefined()
+  })
+})
+
+describe('security.csp: false in a layout', () => {
+  it('sends the pages under it no policy, and the pages beside it the site\'s', async () => {
+    const root = await scratchDir('csp-false-')
+
+    await Promise.all([
+      Bun.write(join(root, 'src/routes/index.kay'), 'h1 Home\n'),
+      Bun.write(join(root, 'src/routes/plain/_layout.kay'), '--- server\nexport const page = { security: { csp: false } }\n---\nslot\n'),
+      Bun.write(join(root, 'src/routes/plain/inner.kay'), 'h1 Inner\n'),
+    ])
+
+    const app = await pages({ routes: join(root, 'src/routes'), prebuilt: false })
+    const policy = async (path: string) => (await app.handle(new Request(`http://localhost${path}`))).headers.get('content-security-policy')
+
+    expect(await policy('/')).toContain('default-src')
+    expect(await policy('/plain/inner')).toBeNull()
   })
 })
 

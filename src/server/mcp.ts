@@ -201,6 +201,7 @@ async function dispatch(context: CallContext, url: string, init: RequestInit, ac
   headers.set(AGENT, TOKEN)
   headers.set(CLIENT, clientAddress(request, server))
   headers.set(TOOL, tool)
+  // The in-process channel to the visit, independent of `requestIdHeader`, which only names the header on the wire.
   headers.set('x-request-id', requestId(request))
 
   // The agent going away stops the call, as a browser leaving stops a post.
@@ -338,6 +339,7 @@ export function receiveDispatched(request: Request): void {
 
   const marked = toolCall(request)
   const address = headers.get(CLIENT)
+  // The same channel, read back whatever `requestIdHeader` names.
   const id = headers.get('x-request-id')
 
   headers.delete(AGENT)

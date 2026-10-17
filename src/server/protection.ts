@@ -75,6 +75,11 @@ export function requestIdHeader(): string {
   return idHeader
 }
 
+// Forgets the name set, for tests that boot apps naming different headers in one process.
+export function resetRequestIdHeader(): void {
+  idHeader = DEFAULT_ID_HEADER
+}
+
 export function setRequestIdHeader(name: string | undefined): void {
   checkRequestIdHeader(name)
 

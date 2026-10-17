@@ -18,7 +18,7 @@ describe('kay routes', () => {
       'import { Elysia } from \'elysia\'\n',
       'const lib = { name: \'lib\', api: { dir: \'lib/api\', prefix: \'lib\' }, server: new Elysia().get(\'/hooked\', () => 1) }',
       'const built = { name: \'built\', server: () => new Elysia() }\n',
-      'export default { requireGuards: true, publicEnv: {}, extensions: [lib, built, { name: \'modular\', serverModule: { path: \'./plugin\' } }], i18n: { locales: [\'en\', \'fr\'], defaultLocale: \'en\', paths: { \'/about\': { fr: \'/a-propos\' } } }, redirects: { \'/old\': \'/\', \'/tmp\': { to: \'/\', permanent: false } } }\n',
+      'export default { requireGuards: true, publicEnv: {}, extensions: [lib, built, { name: \'modular\', serverModule: { path: \'./plugin\' } }], i18n: { locales: [\'en\', \'fr\'], defaultLocale: \'en\', paths: { \'/about\': { fr: \'/a-propos\' } } }, redirects: { \'/old\': \'/\', \'/tmp\': { to: \'/\', permanent: false }, \'/gone\': { to: \'/\', status: 301 } } }\n',
     ]
 
     await Promise.all([
@@ -84,6 +84,7 @@ describe('kay routes', () => {
         'GET | /hooked | plugin | the extension lib',
         'GET | /old | redirect | 308 to /',
         'GET | /tmp | redirect | 307 to /',
+        'GET | /gone | redirect | 301 to /',
         'GET | /_kay/health | kay | health check',
         'GET | /_kay/env.js | kay | public environment',
         'GET | /_kay/* | kay | build files',

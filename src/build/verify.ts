@@ -2,10 +2,12 @@ import type { HealthConfig } from '../config'
 import { readdir, readlink } from 'node:fs/promises'
 import process from 'node:process'
 import { KayError } from '../compiler/errors'
-import { HEALTH_PATH } from '../server/lifecycle'
+import { HEALTH_PATH, healthTimeoutMs } from '../server/lifecycle'
 
 const START_TIMEOUT_MS = 30_000
 const PROBE_TIMEOUT_MS = 10_000
+// What `--health` may take beyond its own wait for the route, to start and exit.
+const PROBE_MARGIN_MS = 5_000
 const OWNERSHIP_RETRY_MS = 500
 const POLL_MS = 50
 const STOP_TIMEOUT_MS = 5_000
@@ -28,12 +30,17 @@ export interface VerifyOptions {
   ownershipChecked?: () => void
 }
 
+// The longest `--health` may take: 10 s, or `health.timeout` and a margin when the app raises it past that.
+export function probeWait(health: HealthConfig | false | undefined): number {
+  return Math.max(PROBE_TIMEOUT_MS, (health === false ? 0 : healthTimeoutMs(health)) + PROBE_MARGIN_MS)
+}
+
 // Starts the executable on a free port as a deploy would, waits until its health route answers 200, runs it again as `--health` the way a container's health check does, then stops it.
 // A server that exits before it answers fails with its own output, one that never answers within 30 s with what it printed so far.
 // An answer only counts when the socket answering it belongs to the server's own process group (where /proc says so, on Linux) and the server is still running a moment later, as another process that took the port between picking it and the server binding it would answer for a server that then exits.
 // The server runs in a group of its own, which is stopped whole: nothing it spawned outlives the verify, an interrupted build included, as the group no longer gets the terminal's signals.
 export async function verifyExecutable(executable: string, root: string, health: HealthConfig | false | undefined, options: VerifyOptions = {}): Promise<number> {
-  const { startTimeoutMs = START_TIMEOUT_MS, probeTimeoutMs = PROBE_TIMEOUT_MS } = options
+  const { startTimeoutMs = START_TIMEOUT_MS, probeTimeoutMs = probeWait(health) } = options
   const started = performance.now()
   const port = String(await freePort())
   // HOST is pinned to loopback, where the readiness check and `--health` ask, whatever the build's shell or the project's .env exports.
