@@ -3,7 +3,6 @@
 
 import type { Owner } from './reactive'
 import { rebasedAttribute } from './base'
-import { imageSource } from './image'
 import { FAILED, ISLAND, PART_END, PART_START } from './markers'
 import { activeOwner, catchError, createSignal, getOwner, hydrationEnded, hydrationStarted, memo, onCleanup, renderEffect, reportError, root, runWithOwner, scope, unrecorded, untrack } from './reactive'
 import { isSnapshots, readSnapshots } from './snapshots'
@@ -40,9 +39,6 @@ export class HydrationMismatch extends Error {
 }
 
 const TAG_END = /[\s>]/
-// What `img(src={hero})` sets, its size left alone when the template gives one.
-const IMAGE_SOURCE = ['src', 'srcset', 'sizes']
-const SIZED_IMAGE = ['src', 'srcset', 'sizes', 'width', 'height']
 const VOID_PROPERTIES = new Set(['value', 'checked', 'selected', 'muted', 'indeterminate'])
 const CONTENT_PROPERTIES = new Set(['innerHTML', 'textContent', 'innerText'])
 // Events handled by one listener on the document, as most pages bind them on many elements at once.
@@ -1266,14 +1262,6 @@ export function attribute(element: Element, name: string, value: unknown, writte
     element.setAttribute(name, '')
   else
     element.setAttribute(name, safeUrl(name, rebasedAttribute(name, name === 'href' && !written && element.localName === 'a' ? localizeHref(given) : given)))
-}
-
-// An `img` source, with the variants, `sizes` and size of an imported image; a later source clears what an earlier one set.
-export function image(element: Element, src: unknown, sized: boolean, sizes?: unknown): void {
-  const props = imageSource(src, sized, sizes) as Record<string, unknown>
-
-  for (const name of sized ? IMAGE_SOURCE : SIZED_IMAGE)
-    attribute(element, name, props[name])
 }
 
 // A property where the element has one, such as an input's `value`; an attribute otherwise.

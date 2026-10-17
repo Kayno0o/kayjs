@@ -1,0 +1,12 @@
+--- script
+import PlainFour from '../components/plain-four.kay'
+import PlainOne from '../components/plain-one.kay'
+import PlainThree from '../components/plain-three.kay'
+import PlainTwo from '../components/plain-two.kay'
+---
+h1 Home
+a.failing-link(href="/failing") Failing
+PlainOne
+PlainTwo
+PlainThree
+PlainFour

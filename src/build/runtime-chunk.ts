@@ -3,6 +3,7 @@ import type { CacheSlot } from './cache'
 import { readdirSync, statSync } from 'node:fs'
 import { dirname, join, resolve, sep } from 'node:path'
 import { countCache, readCacheEntry, writeCacheEntry } from './cache'
+import { directImports } from './direct-imports'
 import { fileStamp, settledBefore } from './files'
 import { compilerFingerprint } from './transform'
 
@@ -27,6 +28,8 @@ const OWN_CHUNK = new Set(['kay/markdown', 'kay/internal/title'])
 const RELATIVE = /^\.\.?\//
 const EXTENSIONS = ['.ts', '.tsx', '/index.ts']
 const ALL = '*'
+// Changes with what the search keeps in the anchor, which a cached answer of an earlier one must not stand for.
+const SEARCH_VERSION = 'shared-names-6'
 
 export interface RuntimeChunk {
   // Where the module resolves `kay` from, the entry's.
@@ -150,7 +153,7 @@ export interface RuntimeSearchCache {
 // Bundles `entry` with kay's runtime left out, then each lazy runtime module with its siblings left out, to learn what of the runtime the client build uses where.
 // Undefined when the build fails, which the real one then reports.
 export async function runtimeChunk(entry: string, options: { plugins: BunPlugin[], define: Record<string, string>, external: string[], islands?: string[] | undefined, cache?: RuntimeSearchCache | undefined }): Promise<RuntimeChunk | undefined> {
-  const slot = options.cache && { file: options.cache.file, key: Bun.hash([compilerFingerprint(), JSON.stringify(options.define), options.external.join(), options.plugins.map(plugin => plugin.name).join(), RUNTIME_DIR, options.cache.key].join('\0')).toString(36) }
+  const slot = options.cache && { file: options.cache.file, key: Bun.hash([compilerFingerprint(), JSON.stringify(options.define), options.external.join(), options.plugins.map(plugin => plugin.name).join(), RUNTIME_DIR, SEARCH_VERSION, options.cache.key].join('\0')).toString(36) }
   const known = slot && await readCacheEntry<Remembered>(slot)
   const fresh = known !== undefined && Object.entries(known.inputs).every(([file, stamp]) => fileStamp(file) === stamp)
 
@@ -198,8 +201,27 @@ async function searchRuntime(entry: string, options: { plugins: BunPlugin[], def
   if (!outer.success)
     return undefined
 
-  for (const output of outer.outputs)
-    importedNames(await output.text(), used, specifier => KAY_SPECIFIER.test(specifier) && !OWN_CHUNK.has(specifier))
+  const perEntry: Map<string, Set<string>>[] = []
+  let entryNames: Map<string, Set<string>> | undefined
+
+  for (const output of outer.outputs) {
+    const own = new Map<string, Set<string>>()
+    const entryPoint = outer.metafile!.outputs[output.path]?.entryPoint
+
+    importedNames(await output.text(), own, specifier => KAY_SPECIFIER.test(specifier) && !OWN_CHUNK.has(specifier))
+    mergeNames(used, own)
+
+    if (entryPoint === undefined)
+      continue
+
+    perEntry.push(own)
+
+    if (resolve(entryPoint) === resolve(entry))
+      entryNames = own
+  }
+
+  // What the anchor holds, so every page loads it: the rest is loaded with the islands that import it.
+  const shared = sharedNames(entryNames, perEntry, used)
 
   const roots = (await Promise.all([...used.keys()].map(specifierFile))).filter(file => file !== undefined)
   const { eager, lazy } = await reach(roots)
@@ -228,13 +250,45 @@ async function searchRuntime(entry: string, options: { plugins: BunPlugin[], def
 
     // What a lazy module takes from one loaded up front goes in the chunk with the rest; the rest of what it takes stays lazy with it.
     for (const output of inner.outputs)
-      importedNames(await output.text(), used, specifier => eager.has(specifier))
+      importedNames(await output.text(), shared, specifier => eager.has(specifier))
   }
 
   // The files of the output directory, the entry's and its boot module, are written again by every build: the key holds what they say.
   const inputs = Object.keys(outer.metafile!.inputs).map(input => resolve(input)).filter(file => !file.startsWith(dirname(entry) + sep))
 
-  return { chunk: { dir: dirname(entry), anchor: anchorModule(used), lazy }, inputs }
+  return { chunk: { dir: dirname(entry), anchor: anchorModule(shared), lazy }, inputs }
+}
+
+function mergeNames(into: Map<string, Set<string>>, from: Map<string, Set<string>>): void {
+  for (const [specifier, names] of from) {
+    let all = into.get(specifier)
+
+    if (!all)
+      into.set(specifier, all = new Set())
+
+    for (const name of names)
+      all.add(name)
+  }
+}
+
+// The names every page pays for: those the entry imports, and those at least half of the entry points import. A name fewer import stays with them, in a chunk they share, so a page loads no runtime module only other pages' islands use.
+function sharedNames(entry: Map<string, Set<string>> | undefined, perEntry: Map<string, Set<string>>[], used: Map<string, Set<string>>): Map<string, Set<string>> {
+  const shared = new Map<string, Set<string>>()
+  const threshold = Math.ceil(perEntry.length / 2)
+
+  for (const [specifier, names] of used) {
+    const kept = new Set<string>()
+
+    for (const name of names) {
+      if (name === ALL || entry?.get(specifier)?.has(name) === true || perEntry.filter(imports => imports.get(specifier)?.has(name) === true).length >= threshold)
+        kept.add(name)
+    }
+
+    if (kept.size > 0 || names.size === 0)
+      shared.set(specifier, kept)
+  }
+
+  return shared
 }
 
 // Held where nothing can tree-shake it away, so every entry point reaches each of them through this module; behind a function, as a module importing this one may not have run yet.
@@ -265,12 +319,16 @@ export function anchorModule(used: Map<string, Set<string>>): string {
 }
 
 // Serves the module every entry point imports, `boot` in it when given; kay's plugin has each lazy runtime module import it too, as it ships the files they point at.
-export function runtimeAnchor(chunk: RuntimeChunk, boot?: string): BunPlugin {
+export function runtimeAnchor(chunk: RuntimeChunk, boot?: string, direct = false): BunPlugin {
   return {
     name: 'kay-runtime-chunk',
     setup(build) {
       build.onResolve({ filter: new RegExp(`^${RegExp.escape(ANCHOR)}$`) }, () => ({ path: ANCHOR, namespace: ANCHOR_NAMESPACE }))
-      build.onLoad({ filter: ANY_PATH, namespace: ANCHOR_NAMESPACE }, () => ({ contents: boot !== undefined && boot !== '' ? `${chunk.anchor}import ${JSON.stringify(boot)}\n` : chunk.anchor, loader: 'ts', resolveDir: chunk.dir }))
+      build.onLoad({ filter: ANY_PATH, namespace: ANCHOR_NAMESPACE }, async () => {
+        const anchor = direct ? await directImports(chunk.anchor) : chunk.anchor
+
+        return { contents: boot !== undefined && boot !== '' ? `${anchor}import ${JSON.stringify(boot)}\n` : anchor, loader: 'ts', resolveDir: chunk.dir }
+      })
     },
   }
 }

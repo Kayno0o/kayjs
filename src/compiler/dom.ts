@@ -9,12 +9,12 @@ import { addBindWrite, bindRead, END_MARKER, escapeStaticAttribute, escapeText, 
 import { SUBJECT } from './names'
 import { bindEvent } from './validate'
 
-// The `kay/dom` helpers browser output calls, each imported under a `Kay` name.
-const DOM_HELPERS = ['append', 'attempt', 'attribute', 'awaited', 'branches', 'close', 'component', 'componentClass', 'dynamic', 'effect', 'errorParagraph', 'fragment', 'holdSubmits', 'image', 'insert', 'listen', 'listenSubmit', 'loop', 'markers', 'memo', 'merge', 'omit', 'property', 'ref', 'rowKey', 'setClass', 'setStyle', 'spread', 'spreadAttributes', 'template', 'text', 'transition', 'untrack']
+// The `kay/dom` helpers browser output calls, each imported under a `Kay` name; `image` is in a module of its own, as the image runtime weighs on a page with no image.
+const DOM_HELPERS = ['append', 'attempt', 'attribute', 'awaited', 'branches', 'close', 'component', 'componentClass', 'dynamic', 'effect', 'errorParagraph', 'fragment', 'holdSubmits', 'insert', 'listen', 'listenSubmit', 'loop', 'markers', 'memo', 'merge', 'omit', 'property', 'ref', 'rowKey', 'setClass', 'setStyle', 'spread', 'spreadAttributes', 'template', 'text', 'transition', 'untrack']
 const TRANSITION_PART = 'transition:'
 
 export function domHelperImport(): string {
-  return `import { ${DOM_HELPERS.map(helper => `${helper} as ${helperName(helper)}`).join(', ')} } from 'kay/dom'\n`
+  return `import { ${DOM_HELPERS.map(helper => `${helper} as ${helperName(helper)}`).join(', ')} } from 'kay/dom'\nimport { image as ${helperName('image')} } from 'kay/dom-image'\n`
 }
 
 // A node of a template, so the code can reach the ones it binds: through `firstChild` and `nextSibling`, and past a dynamic part through its end marker.

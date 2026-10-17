@@ -1,0 +1,5 @@
+--- script
+import Failing from '../components/failing.kay'
+---
+h1 Failing page
+Failing

@@ -1553,3 +1553,26 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the dev to
     }
   }, 60_000)
 })
+
+describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a runtime chunk only some islands use', () => {
+  it('is loaded with the island needing it, also on a page swapped to', async () => {
+    const site = await testSite({ routes: 'tests/fixtures/runtime-chunks/src/routes', browser: { path } })
+
+    try {
+      const page = await site.open('/')
+
+      await page.click('button.plain-one')
+      expect(await page.text('button.plain-one')).toBe('one 1')
+
+      await page.click('a.failing-link')
+      await page.waitFor('h1', { text: 'Failing page' })
+      await page.click('button.failing')
+      await page.waitFor('button.failing', { text: 'Fail refused' })
+
+      expect(page.errors).toEqual([])
+    }
+    finally {
+      await site.close()
+    }
+  }, 60_000)
+})

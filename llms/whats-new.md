@@ -35,8 +35,13 @@ What each release of kay and its libraries adds, newest first, each feature with
 - A streamed `await` part's island cleans up still in the page ([Streaming](rendering.md#streaming)).
 
 ## 1.52.1
+## Unreleased
 
 - An island's markup names its chunk (`data-chunk`), so a page no longer loads a loader for every island of the app: the docs' 128 islands weigh 2 KB gzip less on every page ([Build and start](build-and-start.md)). Island markup now carries `data-chunk`, so a test matching a `<slot>` exactly changes, and markup from `renderToString` has none and hydrates nothing.
+- A page no longer loads a runtime module only other pages' islands use: the action runtime or the image variants stay with the islands importing them, and the docs' entry drops from 23.2 to 19.1 KB gzip ([Build and start](build-and-start.md)).
+
+## 1.52.1
+
 - `collection(..., { order: 'position' })` orders a collection by a number field, and kayjs-cms moves its entries up or down by writing it ([Content](content.md)).
 - `collection(..., { title })` names a collection on the kayjs-cms screens ([Content](content.md)).
 - kayjs-cms: every image preview has the same square box, and a list item carries no required asterisk. kayjs-ui: a grouped `FormField`'s legend keeps its layout under an app's own `legend` styles ([kayjs-cms](../packages/cms/llms.txt)).

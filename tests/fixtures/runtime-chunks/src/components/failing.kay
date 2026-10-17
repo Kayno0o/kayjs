@@ -1,0 +1,15 @@
+---
+import { ActionError, signal } from 'kay'
+
+const message = signal('')
+
+function fail() {
+  try {
+    throw new ActionError(400, 'refused')
+  }
+  catch (error) {
+    message.set(error instanceof ActionError ? String(error.body) : 'other')
+  }
+}
+---
+button.failing(onClick={fail}) Fail {message()}

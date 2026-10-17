@@ -98,6 +98,10 @@
       "types": "./types/runtime/dom.d.ts",
       "default": "./src/runtime/dom.ts"
     },
+    "./dom-image": {
+      "types": "./types/runtime/dom-image.d.ts",
+      "default": "./src/runtime/dom-image.ts"
+    },
     "./arrival": {
       "types": "./types/runtime/arrival.d.ts",
       "default": "./src/runtime/arrival.ts"

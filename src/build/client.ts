@@ -344,7 +344,7 @@ export async function bundleIslands(root: string, islands: Map<string, string>, 
   // Bun resolves packages' `development` export condition unless NODE_ENV is defined as production, which would ship a package's dev build; a build for development, not NODE_ENV, asks for theirs.
   const define: Record<string, string> = { 'KAY_BROWSER': 'true', 'process.env.NODE_ENV': JSON.stringify(options.hot === true ? 'development' : 'production'), ...options.exported === true && { KAY_STATIC_EXPORT: 'true' }, 'KAY_VISIBLE_MARGIN': JSON.stringify(rootMargin(options.hydration?.visible, '200px', 'visible')), 'KAY_NEAR_MARGIN': JSON.stringify(rootMargin(options.hydration?.serverIslands, '100% 0px', 'serverIslands')) }
   const external = publicEnv !== undefined ? [publicEnv] : []
-  const plugins = (anchor?: string, anchored?: ReadonlySet<string>) => [withoutStyles(), api, kay({ target: 'dom', root, cacheDir: projectPaths(root).cache, settings: options.settings, anchor, anchored, inspect: options.inspect, api: trees, external }), ...options.plugins ?? []]
+  const plugins = (anchor?: string, anchored?: ReadonlySet<string>, direct?: boolean) => [withoutStyles(), api, kay({ target: 'dom', root, cacheDir: projectPaths(root).cache, settings: options.settings, anchor, anchored, direct, inspect: options.inspect, api: trees, external }), ...options.plugins ?? []]
 
   await Bun.write(entryFile, `import ${JSON.stringify(bootFile)}\n`)
 
@@ -373,7 +373,7 @@ export async function bundleIslands(root: string, islands: Map<string, string>, 
     define,
     naming: { entry: '[name]-[hash].[ext]', chunk: '[name]-[hash].[ext]' },
     external,
-    plugins: chunk ? [runtimeAnchor(chunk, options.hot ? undefined : bootFile), ...plugins(ANCHOR, chunk.lazy)] : plugins(),
+    plugins: chunk ? [runtimeAnchor(chunk, options.hot ? undefined : bootFile, !options.hot), ...plugins(ANCHOR, chunk.lazy, !options.hot)] : plugins(),
     throw: false,
   } satisfies Bun.BuildConfig
   const since = raisedMark()

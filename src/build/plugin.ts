@@ -10,6 +10,7 @@ import { KayError } from '../compiler/errors'
 import { RESIZABLE } from '../runtime/image'
 import { imageHeader } from '../server/image-format'
 import { ASSET_FILE, clientDir, RENDER_OUTPUT, writeAsset } from './assets'
+import { directImports } from './direct-imports'
 import { scriptLoader } from './files'
 import { expandGlobs } from './glob'
 import { iconModule, iconNames, installedIconSets } from './icons'
@@ -37,6 +38,8 @@ export interface KayPluginOptions {
   // A browser build's API trees, whose modules islands get as stubs, and the modules it leaves to the page, which a worker's bundle takes as the islands do.
   api?: RouteMount[] | undefined
   external?: string[] | undefined
+  // Points an import of names from `kay` at the runtime modules holding them: see direct-imports.ts.
+  direct?: boolean | undefined
 }
 
 // A static component imports its `?island` twin, the build of it that renders inside islands, as a module of its own.
@@ -191,10 +194,12 @@ export function kayPlugin(options: KayPluginOptions, workers: string[]): BunPlug
 
       const anchoring = (path: string, contents: string) => options.anchored?.has(path) === true ? `${contents}\nimport ${JSON.stringify(options.anchor)}\n` : contents
 
+      const pointed = async (contents: string) => options.direct === true ? directImports(contents) : contents
+
       const load = async (file: string) => {
         const source = await Bun.file(withoutTwin(file)).text()
 
-        const contents = await shippingFiles(expandGlobs(await transformKayCached(source, file, { target, hydratable: options.hydratable ?? true, root: options.root, cacheDir: options.cacheDir, inspect: options.inspect }), withoutTwin(file), root, 'ts'), withoutTwin(file), 'ts')
+        const contents = await pointed(await shippingFiles(expandGlobs(await transformKayCached(source, file, { target, hydratable: options.hydratable ?? true, root: options.root, cacheDir: options.cacheDir, inspect: options.inspect }), withoutTwin(file), root, 'ts'), withoutTwin(file), 'ts'))
 
         return { contents: options.anchor !== undefined && options.anchor !== '' ? `${contents}\nimport ${JSON.stringify(options.anchor)}\n` : contents, loader: 'ts' as const }
       }
@@ -248,7 +253,7 @@ export function kayPlugin(options: KayPluginOptions, workers: string[]): BunPlug
       build.onLoad({ filter: projectScript }, async ({ path }) => {
         const source = await Bun.file(path).text()
         const loader = scriptLoader(path)
-        const contents = anchoring(path, await shippingFiles(liveIds(expandGlobs(source, path, root, loader), path, realRoot, loader === 'tsx' || loader === 'jsx', build.config?.target !== 'browser'), path, loader))
+        const contents = anchoring(path, await pointed(await shippingFiles(liveIds(expandGlobs(source, path, root, loader), path, realRoot, loader === 'tsx' || loader === 'jsx', build.config?.target !== 'browser'), path, loader)))
 
         return contents === source && build.config !== undefined ? undefined : { contents, loader }
       })
@@ -260,7 +265,7 @@ export function kayPlugin(options: KayPluginOptions, workers: string[]): BunPlug
             return undefined
 
           const source = await Bun.file(path).text()
-          const contents = anchoring(path, await shippingFiles(source, path, scriptLoader(path)))
+          const contents = anchoring(path, await pointed(await shippingFiles(source, path, scriptLoader(path))))
 
           return contents === source ? undefined : { contents, loader: scriptLoader(path) }
         })
