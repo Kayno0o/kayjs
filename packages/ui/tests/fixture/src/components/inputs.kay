@@ -6,7 +6,7 @@ import MultiSelect from '@kaynooo/kayjs-ui/multi-select.kay'
 import RangeInput from '@kaynooo/kayjs-ui/range-input.kay'
 
 // What the test reads back: each change, set of files and action, as it happened.
-const { onRange, onPlanets, onFiles, onAction, paste = false } = props<{ onRange: (value: RangeValue) => void, onPlanets: (value: string[]) => void, onFiles: (names: string[]) => void, onAction: (name: string) => void, paste?: boolean }>()
+const { onRange, onPlanets, onFiles, onReject, onAction, paste = false } = props<{ onRange: (value: RangeValue) => void, onPlanets: (value: string[]) => void, onFiles: (names: string[]) => void, onReject?: ((names: string[]) => void) | undefined, onAction: (name: string) => void, paste?: boolean }>()
 
 const PLANETS = ['mercury', 'venus', 'earth', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune', 'pluto'] as const
 const planets = PLANETS.map(planet => ({ value: planet, label: planet[0]!.toUpperCase() + planet.slice(1) }))
@@ -25,7 +25,7 @@ const items: MenuEntry[] = [
 ---
 RangeInput#range(label="Hours" min={0} max={24} onChange={onRange})
 MultiSelect(id="planets" label="Planets" name="planet" options={planets} onChange={pickPlanets})
-FileDrop#drop(accept="image/*, .svg" paste={paste} onFiles={files => onFiles(files.map(file => file.name))})
+FileDrop#drop(accept="image/*, .svg" paste={paste} onFiles={files => onFiles(files.map(file => file.name))} onReject={files => onReject?.(files.map(file => file.name))})
   @content(zone)
     button#pick(type="button" onClick={zone.open}) {zone.dragging() ? 'Drop it' : 'Pick'}
 Menu(items={items} label="Actions" icon="plus" class="row-actions")

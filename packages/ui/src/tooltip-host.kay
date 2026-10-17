@@ -1,14 +1,19 @@
 ---
-import { effect, onCleanup, signal } from 'kay'
+import type { Duration } from 'kay'
+import { durationMs, effect, onCleanup, signal } from 'kay'
 import { claim } from './claim'
 
 // An element carries its tooltip as `data-tooltip`, and where it sits as `data-tooltip-placement`, a CSS `position-area`, `top` by default.
 const CARRIER = '[data-tooltip]'
 // The anchor name theme.css's `.kui-tooltip` positions against.
 const ANCHOR = '--kui-tooltip-anchor'
-const SHOW_DELAY_MS = 80
-// Long enough for the pointer to cross the gap onto the tooltip, which stays while hovered.
-const HIDE_DELAY_MS = 150
+
+const { showDelay = '80ms', hideDelay = '150ms' } = props<{
+  // How long the pointer or focus rests on an element before its tooltip shows.
+  showDelay?: Duration | undefined
+  // How long a tooltip lingers once the pointer leaves, long enough by default for it to cross the gap onto the tooltip, which stays while hovered.
+  hideDelay?: Duration | undefined
+}>()
 
 const aimed = signal<{ element: HTMLElement, text: string } | null>(null)
 let at: HTMLElement | null = null
@@ -38,12 +43,12 @@ function onto(next: HTMLElement | null) {
   const text = next?.dataset.tooltip
 
   if (!next || !text) {
-    timer = setTimeout(() => aimed.set(null), HIDE_DELAY_MS)
+    timer = setTimeout(() => aimed.set(null), durationMs(hideDelay))
 
     return
   }
 
-  timer = setTimeout(() => aimed.set({ element: next, text }), SHOW_DELAY_MS)
+  timer = setTimeout(() => aimed.set({ element: next, text }), durationMs(showDelay))
 }
 
 function focused(event: FocusEvent) {

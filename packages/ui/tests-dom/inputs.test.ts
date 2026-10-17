@@ -6,13 +6,14 @@ import { click } from './dom'
 
 let mounted: Mounted | undefined
 // What the fixture reported, and whether the menu still showed as each action ran.
-const seen: { range: RangeValue[], planets: string[][], files: string[][], actions: [string, boolean][] } = { range: [], planets: [], files: [], actions: [] }
+const seen: { range: RangeValue[], planets: string[][], files: string[][], rejected: string[][], actions: [string, boolean][] } = { range: [], planets: [], files: [], rejected: [], actions: [] }
 
 afterEach(() => {
   mounted?.unmount()
   seen.range = []
   seen.planets = []
   seen.files = []
+  seen.rejected = []
   seen.actions = []
 })
 
@@ -21,6 +22,7 @@ async function inputs(paste = false) {
     onRange: (value: RangeValue) => seen.range.push(value),
     onPlanets: (value: string[]) => seen.planets.push(value),
     onFiles: (names: string[]) => seen.files.push(names),
+    onReject: (names: string[]) => seen.rejected.push(names),
     onAction: (name: string) => seen.actions.push([name, document.querySelector('.kui-menu')!.matches(':popover-open')]),
     paste,
   })
@@ -207,6 +209,18 @@ describe('FileDrop', () => {
 
     expect(seen.files).toEqual([['moon.png']])
     expect(zone.hasAttribute('data-dragging')).toBe(false)
+  })
+
+  test('hands onReject the files that miss accept and, without multiple, the matching ones beyond the first', async () => {
+    const root = await inputs()
+    const zone = root.querySelector('#drop')!
+    const dataTransfer = { types: ['Files'], files: files('notes.txt', 'moon.png', 'logo.svg') }
+
+    zone.dispatchEvent(Object.assign(new Event('drop', { bubbles: true, cancelable: true }), { dataTransfer }))
+    await settle()
+
+    expect(seen.files).toEqual([['moon.png']])
+    expect(seen.rejected).toEqual([['notes.txt', 'logo.svg']])
   })
 
   test('stays lit while the files move onto its own content, and goes dark once they leave it', async () => {

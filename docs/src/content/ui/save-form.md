@@ -46,7 +46,7 @@ A Checkbox, Toggle, ChipGroup or Segmented still waiting on the promise of its `
 
 Leaving with unsaved changes asks, as `guardLeave` does. That covers a link of the app, going back, a reload and closing the tab, but not while a save is under way.
 
-Ctrl+S, or Cmd+S on macOS, saves from any field of the form. It uses the key that types an S whatever the layout.
+Ctrl+S, or Cmd+S on macOS, saves from any field of the form. It uses the key that types an S whatever the layout. `shortcut="ctrl+enter"` binds other keys, written as kay's `shortcut` takes them, and `shortcut={false}` binds none.
 
 ## Screen readers and texts
 

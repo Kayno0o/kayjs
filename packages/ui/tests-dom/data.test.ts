@@ -1,7 +1,7 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, describe, expect, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
-import { click } from './dom'
+import { click, clock } from './dom'
 
 let mounted: Mounted | undefined
 const selected: string[] = []
@@ -11,8 +11,8 @@ afterEach(() => {
   selected.length = 0
 })
 
-async function data(src = '/favicon.png') {
-  mounted = await mountComponent('src/components/data.kay', { onSelect: (key: string) => selected.push(key), src })
+async function data(src = '/favicon.png', copiedFor?: string) {
+  mounted = await mountComponent('src/components/data.kay', { onSelect: (key: string) => selected.push(key), src, copiedFor })
 
   return mounted.root
 }
@@ -96,6 +96,26 @@ describe('CopyButton', () => {
     expect(written).toEqual([{ 'text/plain': 'https://kaynooo.fr', 'text/html': '<b>kaynooo.fr</b>' }])
     expect(root.querySelector('#copy')?.textContent).toBe('Copied!')
     expect(root.querySelector('#copy + [role="status"]')?.textContent).toBe('Copied!')
+  })
+
+  test('says it copied for as long as copiedFor, two seconds by default', async () => {
+    clipboardWith()
+
+    for (const [copiedFor, lasts] of [[undefined, 2000], ['500ms', 500], ['1s', 1000]] as const) {
+      const root = await data('/favicon.png', copiedFor)
+
+      clock.start()
+      click(root.querySelector('#copy'))
+      await clock.elapse(10)
+      await clock.settle()
+      expect(root.querySelector('#copy')?.textContent).toBe('Copied!')
+      await clock.elapse(lasts - 100)
+      expect(root.querySelector('#copy')?.textContent).toBe('Copied!')
+      await clock.elapse(200)
+      expect(root.querySelector('#copy')?.textContent).toBe('Copy link')
+      clock.stop()
+      mounted?.unmount()
+    }
   })
 
   test('toasts a copy the browser refused, and keeps its label', async () => {

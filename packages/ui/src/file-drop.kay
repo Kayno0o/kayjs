@@ -14,7 +14,7 @@ const { accept, multiple = false, paste = false, disabled = false, compact = fal
   compact?: boolean | undefined
   // The files picked, dropped or pasted: one unless `multiple`, and never an empty list.
   onFiles: (files: File[]) => void
-  // The files dropped or picked that miss `accept`, so the page can say why they were left out; never called for pasted files, which may be anything on the clipboard.
+  // The files dropped or picked that were left out, those missing `accept` and, without `multiple`, the matching ones beyond the first, so the page can say why; never called for pasted files, which may be anything on the clipboard.
   onReject?: ((files: File[]) => void) | undefined
   // What the zone shows: `@content(zone)`, where `zone.open()` opens the picker and `zone.dragging()` reads whether files hover the zone.
   content: (zone: { open: () => void, dragging: () => boolean }) => JSX.Element
@@ -39,8 +39,8 @@ function take(files: Iterable<File>, reporting = true): boolean {
   if (disabled)
     return false
 
-  if (reporting && matching.length < all.length)
-    onReject?.(all.filter(file => !matching.includes(file)))
+  if (reporting && taken.length < all.length)
+    onReject?.(all.filter(file => !taken.includes(file)))
 
   if (taken.length === 0)
     return false

@@ -12,8 +12,8 @@ afterEach(() => {
   toggles.length = 0
 })
 
-async function popovers() {
-  mounted = await mountComponent('src/components/popovers.kay', { onToggle: (open: boolean) => toggles.push(open) })
+async function popovers(delays: { showDelay?: string, hideDelay?: string } = {}) {
+  mounted = await mountComponent('src/components/popovers.kay', { onToggle: (open: boolean) => toggles.push(open), ...delays })
 
   clock.start()
 
@@ -106,6 +106,34 @@ test('keeps a tooltip while the pointer crosses onto it, and Escape closes it un
   expect(tooltip.matches(':popover-open')).toBe(false)
 
   await over(button.querySelector('svg')!)
+
+  expect(tooltip.matches(':popover-open')).toBe(false)
+})
+
+test('waits as long as showDelay says before showing, and as hideDelay says before hiding', async () => {
+  const root = await popovers({ showDelay: '400ms', hideDelay: '1s' })
+  const button = root.querySelector<HTMLElement>('#delete')!
+  const tooltip = root.querySelector<HTMLElement>('.kui-tooltip')!
+
+  button.dispatchEvent(new Event('pointerover', { bubbles: true }))
+  await clock.elapse(300)
+  await clock.settle()
+
+  expect(tooltip.matches(':popover-open')).toBe(false)
+
+  await clock.elapse(200)
+  await clock.settle()
+
+  expect(tooltip.matches(':popover-open')).toBe(true)
+
+  document.body.dispatchEvent(new Event('pointerover', { bubbles: true }))
+  await clock.elapse(900)
+  await clock.settle()
+
+  expect(tooltip.matches(':popover-open')).toBe(true)
+
+  await clock.elapse(200)
+  await clock.settle()
 
   expect(tooltip.matches(':popover-open')).toBe(false)
 })

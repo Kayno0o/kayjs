@@ -7,7 +7,7 @@ import { holdDefaults, onFormReset } from './form-reset'
 import { toast } from './toast'
 import { wording } from 'kay/words'
 
-const { action, failure, refused, saved, onSaved, onDiscard, dirtyLabel = wording('ui.saveForm.dirtyLabel', 'Unsaved changes.'), cleanLabel = wording('ui.saveForm.cleanLabel', 'No unsaved change.'), savingLabel = wording('ui.saveForm.savingLabel', 'Saving…'), saveLabel = wording('ui.saveForm.saveLabel', 'Save'), discardLabel = wording('ui.saveForm.discardLabel', 'Discard'), class: className } = props<{
+const { action, failure, refused, saved, onSaved, onDiscard, dirtyLabel = wording('ui.saveForm.dirtyLabel', 'Unsaved changes.'), cleanLabel = wording('ui.saveForm.cleanLabel', 'No unsaved change.'), savingLabel = wording('ui.saveForm.savingLabel', 'Saving…'), saveLabel = wording('ui.saveForm.saveLabel', 'Save'), discardLabel = wording('ui.saveForm.discardLabel', 'Discard'), shortcut: saveKeys = 'mod+s', class: className } = props<{
   // The page's action the form calls with its fields, as FormDialog does.
   action: Action<never, Output>
   // Toasted when the call fails other than on a field.
@@ -26,6 +26,8 @@ const { action, failure, refused, saved, onSaved, onDiscard, dirtyLabel = wordin
   savingLabel?: string | undefined
   saveLabel?: string | undefined
   discardLabel?: string | undefined
+  // The keys that save, `mod+s` (Ctrl or Cmd with S) by default; `false` binds none. Written as kay's `shortcut` takes them.
+  shortcut?: string | false | undefined
   class?: string | undefined
 }>()
 
@@ -151,8 +153,8 @@ function discard() {
   check()
 }
 
-// Ctrl or Cmd with S saves, the browser's own save dialog kept away even when there is nothing to save.
-shortcut('mod+s', () => form?.requestSubmit(), { on: () => form })
+// Ctrl or Cmd with S saves unless `shortcut` says otherwise, the browser's own save dialog kept away even when there is nothing to save.
+shortcut(() => saveKeys || null, () => form?.requestSubmit(), { on: () => form })
 ---
 form.kui-save-form(class={className} ref={element => form = element} onSubmit={submit} onInput={checkSoon} onChange={checkSoon})
   .kui-form-grid

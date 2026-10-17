@@ -6,7 +6,7 @@ import SaveForm from '@kaynooo/kayjs-ui/save-form.kay'
 import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
 
 // `save` stands in for the server: it answers the saved name, the messages a schema refusal carries, or throws for a call that failed outright.
-const { save, onSaved, onDiscard } = props<{ save: (input: { name: string }) => Promise<string | { errors: Record<string, string> }>, onSaved: (name: string) => void, onDiscard: () => void }>()
+const { save, onSaved, onDiscard, shortcut } = props<{ save: (input: { name: string }) => Promise<string | { errors: Record<string, string> }>, onSaved: (name: string) => void, onDiscard: () => void, shortcut?: string | false | undefined }>()
 
 const pending = signal(false)
 const extra = signal(false)
@@ -28,7 +28,7 @@ const rename = Object.assign(async (form: FormData) => {
 }, { pending, url: '/_kay/action/form/rename' }) as unknown as Action<{ name: string }, string | Failure<never>>
 ---
 button#more(onClick={() => extra.set(true)}) More
-SaveForm(action={rename} failure="Could not save" saved="Saved." onSaved={onSaved} onDiscard={onDiscard})
+SaveForm(action={rename} failure="Could not save" saved="Saved." onSaved={onSaved} onDiscard={onDiscard} shortcut={shortcut})
   FormField(label="Name" name="name")
     input#name(name="name" value="Ada")
   textarea#notes(name="notes")

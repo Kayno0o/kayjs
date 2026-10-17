@@ -15,8 +15,8 @@ afterEach(() => {
 
 type Answer = string | { errors: Record<string, string> }
 
-async function saveForm(save: (input: { name: string }) => Promise<Answer>) {
-  mounted = await mountComponent('src/components/save-form.kay', { save, onSaved: (name: string) => saved.push(name), onDiscard: () => discarded++ })
+async function saveForm(save: (input: { name: string }) => Promise<Answer>, shortcut?: string | false) {
+  mounted = await mountComponent('src/components/save-form.kay', { save, onSaved: (name: string) => saved.push(name), onDiscard: () => discarded++, shortcut })
 
   return mounted.root
 }
@@ -289,6 +289,40 @@ describe('SaveForm', () => {
     await settle()
 
     expect(saved).toEqual(['Grace', 'Hopper'])
+  })
+
+  test('saves on the shortcut it is given instead of Ctrl+S, and on none with false', async () => {
+    const root = await saveForm(async input => input.name, 'ctrl+enter')
+
+    type(root, 'Grace')
+    await settle()
+
+    const plain = new KeyboardEvent('keydown', { key: 's', ctrlKey: true, bubbles: true, cancelable: true })
+
+    root.querySelector('#name')!.dispatchEvent(plain)
+    await settle()
+
+    expect(plain.defaultPrevented).toBe(false)
+    expect(saved).toEqual([])
+
+    root.querySelector('#name')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true, cancelable: true }))
+    await settle()
+
+    expect(saved).toEqual(['Grace'])
+    mounted?.unmount()
+
+    const off = await saveForm(async input => input.name, false)
+
+    type(off, 'Hopper')
+    await settle()
+
+    const event = new KeyboardEvent('keydown', { key: 's', ctrlKey: true, bubbles: true, cancelable: true })
+
+    off.querySelector('#name')!.dispatchEvent(event)
+    await settle()
+
+    expect(event.defaultPrevented).toBe(false)
+    expect(saved).toEqual(['Grace'])
   })
 
   test('Ctrl on the physical S key of a layout typing another letter saves nothing', async () => {

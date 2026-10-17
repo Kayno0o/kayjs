@@ -1,10 +1,11 @@
 ---
+import type { Duration } from 'kay'
 import { signal } from 'kay'
 import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
 import Popover from '@kaynooo/kayjs-ui/popover.kay'
 import TooltipHost from '@kaynooo/kayjs-ui/tooltip-host.kay'
 
-const { onToggle } = props<{ onToggle: (open: boolean) => void }>()
+const { onToggle, showDelay, hideDelay } = props<{ onToggle: (open: boolean) => void, showDelay?: Duration | undefined, hideDelay?: Duration | undefined }>()
 
 const open = signal(false)
 ---
@@ -14,4 +15,4 @@ Popover(id="menu" open={open()} placement="top-end" onOpenChange={shown => { ope
     IconButton#trigger({...attributes} icon="chevron" label="Menu")
   p#inside Inside
 IconButton#delete(icon="delete" label="Delete" data-tooltip-placement="bottom")
-TooltipHost
+TooltipHost(showDelay={showDelay} hideDelay={hideDelay})
