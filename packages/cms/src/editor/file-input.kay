@@ -2,8 +2,7 @@
 import Button from '@kaynooo/kayjs-ui/button.kay'
 import FileDrop from '@kaynooo/kayjs-ui/file-drop.kay'
 import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
-import { attempt } from '@kaynooo/kayjs-ui'
-import { toast } from '@kaynooo/kayjs-ui'
+import { attempt, toast } from '@kaynooo/kayjs-ui'
 import { uploadFile, uploadRules } from './upload'
 
 // An image or file field: the path of an upload dropped or picked, or one typed.
