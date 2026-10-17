@@ -64,6 +64,7 @@ describe('search', () => {
       Bun.write(join(root, 'src/routes/index.kay'), `--- server\nimport { t } from 'kay/i18n'\n\n${PRERENDER}\n---\nh1 Welcome home\np {t('hello')}\nh2#install Installing the package\np Run bun add to install it, then install again &amp; again.\nscript var hidden = 'scriptword'\nh3#deps Dépendances\np Nothing else is needed, no other dépendance.\ndiv(data-search="false") Skippedword\n`),
       Bun.write(join(root, 'src/routes/guide.kay'), `--- server\nexport const page = { prerender: true, search: { weight: 0.5 } }\n---\nh1 Guide\np How to install the package, slowly.\n`),
       Bun.write(join(root, 'src/routes/hidden.kay'), `--- server\nexport const page = { prerender: true, search: false }\n---\nh1 Hidden\np Secretword\n`),
+      Bun.write(join(root, 'src/routes/notes/[slug].kay'), `--- server\nexport const page = {\n  prerender: [{ slug: 'loud' }, { slug: 'quiet' }, { slug: 'gone' }],\n  search: (params: Record<string, string>) => params.slug === 'gone' ? false : params.slug === 'quiet' ? { weight: 0.2 } : undefined,\n}\n\nconst { slug } = ctx.params\n---\nh1 Note {slug}\np Quokka facts.\n`),
       Bun.write(join(root, 'src/routes/private.kay'), `--- server\nexport const page = { prerender: true, noindex: true }\n---\nh1 Private\np Noindexword\n`),
       Bun.write(join(root, 'src/routes/admin/_guard.ts'), 'import { guard } from \'kay\'\n\nexport default guard(({ deny }) => deny(403))\n'),
       Bun.write(join(root, 'src/routes/admin/index.kay'), `--- server\n${PRERENDER}\n---\nh1 Admin\np Guardedword\n`),
@@ -108,6 +109,10 @@ describe('search', () => {
   it('leaves out what a page keeps from it: scripts, navigation, data-search="false", and pages that are guarded, noindex or set search: false', async () => {
     for (const word of ['scriptword', 'menu', 'skippedword', 'secretword', 'noindexword', 'guardedword'])
       expect((await search(client, word)).hits).toEqual([])
+  })
+
+  it('lets a dynamic route weigh each of its pages, or leave one out, through a function of the params', async () => {
+    expect((await search(client, 'quokka')).hits.map(hit => hit.href)).toEqual(['/notes/loud', '/notes/quiet'])
   })
 
   it('keeps an index per language, searched by the page\'s lang', async () => {

@@ -14,6 +14,8 @@ export const page = {
       return { section: section!, page: page! }
     })
   },
+  // The changelog pages name nearly every feature, so a guide about one comes before them.
+  search: (params: Record<string, string>) => LLMS_GUIDES.some(guide => guide.slug === `${params.section}/${params.page}`) ? { weight: 0.3 } : undefined,
 }
 
 const slug = `${ctx.params.section}/${ctx.params.page}`

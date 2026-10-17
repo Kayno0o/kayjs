@@ -396,9 +396,11 @@ export interface PageSettings {
   security?: PageSecurity
   // `true` loads the page fully from any link or form of the site, past the page swap: a page whose scripts expect a fresh document.
   reload?: true
-  // With `search` on in kay.config.ts, `false` leaves the page out of the index, and `weight` multiplies what its words count, 1 by default.
-  search?: false | { weight?: number }
+  // With `search` on in kay.config.ts, `false` leaves the page out of the index, and `weight` multiplies what its words count, 1 by default; a function of the params of each page weighs them apart, returning one or nothing.
+  search?: PageSearch | ((params: Record<string, string>) => PageSearch | undefined | Promise<PageSearch | undefined>)
 }
+
+export type PageSearch = false | { weight?: number }
 
 export type Lastmod = Date | string | number
 

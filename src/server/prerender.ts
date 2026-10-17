@@ -230,7 +230,8 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
 
         if (response.status === 200 && !auto) {
           const noindex = chainSetting(chain, 'noindex') === true
-          const search = chainSetting(chain, 'search') as PageSettings['search']
+          const setting = chainSetting(chain, 'search') as PageSettings['search']
+          const search = typeof setting === 'function' ? await setting(params) : setting
 
           options.rendered?.push({ path: copy.path, file: route.file, locale: copy.locale, html, noindex, sitemap: pageSetting(module, 'sitemap') !== undefined, search: noindex || search === false || guardedPage(route, config.requireGuards) ? false : search?.weight ?? 1 })
         }

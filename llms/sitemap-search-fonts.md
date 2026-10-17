@@ -211,6 +211,7 @@ ul
 - The index holds the pages the build renders, those with `prerender`, a content collection's pages among them; a page rendered per request is not in it.
 - A page a guard covers, or that `requireGuards` refuses, one with `noindex`, and one setting `search: false` in its `page` are left out.
 - `search: { weight: 0.5 }` makes a page's words count half as much, its hits after the others'.
+- `search` may be a function of the page's params, as `prerender` lists them, returning `false`, `{ weight }` or nothing: `search: params => params.slug === 'changelog' ? { weight: 0.3 } : undefined` weighs one page of a dynamic route apart from the rest.
 - Each page is read from its `main`, or its `body` without one, leaving out `nav`, `footer`, `script`, `style`, `svg`, a `button` but for one inside a heading, as an accordion's, and any element marked `data-search="false"`.
 - It is split into sections: the text above its first `h2` to `h4`, then each of those with the text under it, linked by the heading's `id`.
 - A link inside the heading to itself is left out when it shows only `#`, `¶`, `§` or nothing visible, and the heading's own text kept as written, `C#` included.

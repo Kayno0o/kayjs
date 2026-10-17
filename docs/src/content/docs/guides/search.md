@@ -91,6 +91,20 @@ export const page = { prerender: true, search: { weight: 0.5 } }
 h1 Changelog
 ```
 
+A route with params serves many pages, so `search` can also be a function of the params of each page, as `prerender` lists them. It returns `false`, a `weight`, or nothing for a page that keeps the default.
+
+```kay
+--- server
+export const page = {
+  prerender: [{ slug: 'intro' }, { slug: 'changelog' }, { slug: 'draft' }],
+  search: params => params.slug === 'draft' ? false : params.slug === 'changelog' ? { weight: 0.3 } : undefined,
+}
+
+const { slug } = ctx.params
+---
+h1 {slug}
+```
+
 With [locales](/guides/i18n), each locale gets its own index, and the search reads the one matching the page's language.
 
 The index is written by `kay build`, so `kay dev` has none. Run `kay build` then `kay start` to try it.

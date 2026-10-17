@@ -179,7 +179,7 @@ export default (value: string) =>
 | `guards` | `false` only, to run none of the `_guard.ts` files above; on a layout, above its actions alone | [Server](server.md) |
 | `security` | `{ csp, headers }` added to the site's security headers for the page's responses | [Production](proxy-and-security.md#security-headers) |
 | `reload` | `true` to load the page fully from any link or form, past the page swap | [Islands](islands.md) |
-| `search` | `false` to leave the page out of the site search, `{ weight }` to scale what its words count | [Head](sitemap-search-fonts.md#site-search) |
+| `search` | `false` to leave the page out of the site search, `{ weight }` to scale what its words count, or a function of the params of each page returning either | [Head](sitemap-search-fonts.md#site-search) |
 
 - A page or a layout whose `page` has `layouts: false` among its keys is wrapped by none of the layouts above it.
 - `export const page = { layouts: false }` gives a page none at all, a layout starts the chain afresh, so a section can drop the site's header.
