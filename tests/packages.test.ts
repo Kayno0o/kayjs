@@ -69,6 +69,17 @@ describe('what\'s new', () => {
     expect(archiveOldest(page.replace(/Releases before.*\n/, ''), archive, 1)).toEqual({ page: page.replace(/Releases before.*\n/, ''), archive })
   })
 
+  it('moves the oldest releases while Unreleased alone is over the limit, keeping the newest release, and names a patch boundary in full', () => {
+    const page = '# New\n\nIntro.\n\n## Unreleased\n\n- uuuuuuuuuuuuuuuuuuuuuuuu\n\n## 1.51.2\n\n- c\n\n## 1.51.1\n\n- bb\n\n## 1.51.0\n\n- aaaaaaaaaa\n\nReleases before 1.51 are in [Old](old.md).\n'
+    const archive = '# Old\n\nWhat each release before 1.51 added.\n\n## 1.50.0\n\n- z\n'
+    const moved = archiveOldest(page, archive, 10)
+
+    expect(moved.page).toBe('# New\n\nIntro.\n\n## Unreleased\n\n- uuuuuuuuuuuuuuuuuuuuuuuu\n\n## 1.51.2\n\n- c\n\nReleases before 1.51.2 are in [Old](old.md).\n')
+    expect(moved.archive).toBe('# Old\n\nWhat each release before 1.51.2 added.\n\n## 1.51.1\n\n- bb\n\n## 1.51.0\n\n- aaaaaaaaaa\n\n## 1.50.0\n\n- z\n')
+    // The patch boundary reads back: a second run moves nothing.
+    expect(archiveOldest(moved.page, moved.archive, 10)).toEqual(moved)
+  })
+
   it('drops the oldest releases of an archive over its limit, keeping its newest, and ends on where they are read', () => {
     const archive = '# Old\n\nWhat each release before 1.47 added.\n\n## 1.46.0\n\n- c\n\n## 1.45.0\n\n- bb\n\n## 1.44.0\n\n- aaaaaaaaaa\n'
     const trimmed = trimArchive(archive, 190)

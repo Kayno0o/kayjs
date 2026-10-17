@@ -8,13 +8,17 @@ export const PAGE_LIMIT = 20_000
 const ARCHIVE_LIMIT = 24_000
 
 const SECTION = /^(?=## )/m
-const BEFORE = /before \d+\.\d+/
+const BEFORE = /before \d+\.\d+(?:\.\d+)?/
 const NOTE = /\n\n(Releases before [^\n]*)\n$/
-const VERSION_HEADING = /^## (\d+\.\d+)/
+const PATCH_ZERO = /\.0$/
+const VERSION_HEADING = /^## (\d+\.\d+(?:\.\d+)?)/
 
 const UNRELEASED = /^## Unreleased$/m
 // The last line of an archive whose oldest releases were dropped.
 const RELEASES_NOTE = 'Releases before 0.0 are in the notes of their releases, at https://git.kaynooo.fr/kaynooo/kayjs/releases.'
+
+// A minor release is named by its minor, a patch one by its full version, so the line reads back to the release it stops at.
+const boundaryVersion = (version: string) => version.replace(PATCH_ZERO, '')
 
 // Names the `## Unreleased` section after the version being released; a page without one is left as it is.
 export function stampUnreleased(text: string, version: string): string {
@@ -29,7 +33,10 @@ export function archiveOldest(page: string, archive: string, limit = PAGE_LIMIT)
   const releases = sections.map(section => note === undefined || section !== last ? section : section.replace(`\n${note}\n`, ''))
   const moved: string[] = []
 
-  while (releases.length > 1 && Buffer.byteLength([intro, ...releases, note ?? ''].join('')) > limit)
+  // The newest release stays, beside `## Unreleased` when the page has one, however far over the limit that leaves it.
+  const kept = releases.findIndex(section => VERSION_HEADING.test(section)) + 1
+
+  while (releases.length > Math.max(kept, 1) && Buffer.byteLength([intro, ...releases, note ?? ''].join('')) > limit)
     moved.unshift(releases.pop()!)
 
   const oldestKept = VERSION_HEADING.exec(releases.at(-1) ?? '')?.[1]
@@ -38,7 +45,7 @@ export function archiveOldest(page: string, archive: string, limit = PAGE_LIMIT)
     return { page, archive }
 
   const [archiveIntro, ...archived] = archive.split(SECTION)
-  const boundary = (text: string) => text.replace(BEFORE, `before ${oldestKept}`)
+  const boundary = (text: string) => text.replace(BEFORE, `before ${boundaryVersion(oldestKept)}`)
 
   return {
     page: `${[intro, ...releases].join('').trimEnd()}\n\n${boundary(note)}\n`,
@@ -64,5 +71,5 @@ export function trimArchive(archive: string, limit = ARCHIVE_LIMIT): string {
   if (!dropped || oldestKept === undefined)
     return archive
 
-  return `${[intro, ...releases].join('').trimEnd()}\n\n${RELEASES_NOTE.replace(BEFORE, `before ${oldestKept}`)}\n`
+  return `${[intro, ...releases].join('').trimEnd()}\n\n${RELEASES_NOTE.replace(BEFORE, `before ${boundaryVersion(oldestKept)}`)}\n`
 }
