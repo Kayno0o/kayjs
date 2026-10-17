@@ -51,7 +51,7 @@ function specificity(path: string): number {
 // Refuses a request to an action or an API route sending more than its limit, before Elysia reads the body: actions by their path, API modules by the path they are mounted at, and the routes of a module that set their own by their pattern.
 export function limitBodies(app: Elysia, size: ByteSize, actionSizes: Map<string, BodyLimit>, mountSizes: Map<string, BodyLimit>, routeSizes: RouteBodyLimit[] = []): void {
   const bytes = checkLimit(size, 'bodyLimit')
-  const inBytes = ({ bytes: size, refuse }: BodyLimit, name: string) => ({ bytes: size === undefined ? undefined : checkLimit(size, name), refuse })
+  const inBytes = ({ bytes: own, refuse }: BodyLimit, name: string) => ({ bytes: own === undefined ? undefined : checkLimit(own, name), refuse })
   const actions = new Map([...actionSizes].map(([path, limit]) => [path, inBytes(limit, `the bodyLimit of ${path}`)]))
   const mounts = new Map([...mountSizes].map(([path, limit]) => [path, inBytes(limit, `the bodyLimit of ${path}`)]))
   const routes = routeSizes.map(route => ({ ...route, limit: route.limit && inBytes(route.limit, `the bodyLimit of ${route.method} ${route.path}`) }))

@@ -2492,6 +2492,9 @@ describe.concurrent('kay check, unused code', () => {
       'src/a.ts': 'import { debounced, every as tick, signal } from \'kay\'\n\nconst typed = signal(\'\')\n\ntick(3000, () => undefined)\nexport const settled = debounced(typed, 300)\n',
       'src/b.kay': '---\nimport { every } from \'kay\'\nimport { rooms, sqliteRooms } from \'kay/server\'\n\nevery(1_500, () => undefined, { immediate: true })\nconst party = rooms({ store: sqliteRooms(\'a.sqlite\', { poll: 10 }) })\nparty.coalesce(() => 1, { wait: 20 })\n---\np x\n',
       'src/c.ts': 'import * as cms from \'@kaynooo/kayjs-cms\'\nimport { createDrafts, forgejo } from \'@kaynooo/kayjs-cms\'\n\nforgejo({ url: \'u\', repo: \'r\', token: \'t\', timeout: 30_000 })\ncms.createDrafts({ show: async () => ({}), delay: 250 })\nvoid createDrafts\n',
+      'src/g.kay': '--- server\nimport * as server from \'kay/server\'\n\nserver.sqliteRooms(\'x.sqlite\', { poll: 10 })\n---\np x\n',
+      // A number no duration string could say is left alone.
+      'src/h.ts': 'import { every } from \'kay\'\n\nevery(1e-7, () => undefined)\n',
       // Strings, a number in a variable, zero and a name that is not kay\'s are left alone.
       'src/d.ts': 'import { debounced, every } from \'kay\'\n\nconst wait = 300\n\nevery(\'3s\', () => undefined)\ndebounced(() => 1, wait)\ndebounced(() => 1, 0)\n',
       'src/timers.ts': 'export function every(ms: number, run: () => void): void {\n  setInterval(run, ms)\n}\n',
@@ -2502,9 +2505,10 @@ describe.concurrent('kay check, unused code', () => {
     try {
       const { output } = await runCheck(root)
 
-      expect(output.match(/deprecated-time-ms/g)).toHaveLength(7)
+      expect(output.match(/deprecated-time-ms/g)).toHaveLength(8)
       expect(output).not.toContain('src/d.ts')
       expect(output).not.toContain('src/e.ts')
+      expect(output).not.toContain('src/h.ts')
       expect(output).not.toContain('f.d.ts')
       await runCheck(root, '--fix')
       expect(await Bun.file(join(root, 'src/a.ts')).text()).toContain('tick(\'3s\', () => undefined)\nexport const settled = debounced(typed, \'300ms\')')
@@ -2513,6 +2517,8 @@ describe.concurrent('kay check, unused code', () => {
       expect(component).toContain('every(\'1500ms\'')
       expect(component).toContain('{ poll: \'10ms\' }')
       expect(component).toContain('{ wait: \'20ms\' }')
+      expect(await Bun.file(join(root, 'src/g.kay')).text()).toContain('{ poll: \'10ms\' }')
+      expect(await Bun.file(join(root, 'src/h.ts')).text()).toContain('every(1e-7,')
       expect(await Bun.file(join(root, 'src/c.ts')).text()).toContain('timeout: \'30s\' })\ncms.createDrafts({ show: async () => ({}), delay: \'250ms\' })')
       expect((await runCheck(root)).output).not.toContain('deprecated-time-ms')
     }

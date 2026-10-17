@@ -22,6 +22,11 @@ describe('durations', () => {
       expect(() => optionMs(value, 'wait', 'kayjs-cms')).toThrow(/^kayjs-cms: wait is '.*'; it takes a positive duration/)
   })
 
+  it('keeps the seconds of a fractional minute, hour or day exact, as headers carry them', () => {
+    expect(['8.7m', '17.1m', '2.3h', '34.3m'].map(value => durationSeconds(value, 'ttl'))).toEqual([522, 1026, 8280, 2058])
+    expect(['1001ms', '1.1s', '8.7m'].map(value => optionMs(value, 'wait'))).toEqual([1001, 1100, 522_000])
+  })
+
   it('refuses what is no positive duration, naming the option', () => {
     for (const value of [0, -5, Number.NaN, Number.POSITIVE_INFINITY, '0m', '-5m', '5', '5 m', '5min', '5M', 'm', '', null, undefined])
       expect(() => durationSeconds(value, 'ttl')).toThrow(/^kay: ttl is .+; it takes a positive duration, seconds or a string such as '5m', '12h' or '30d'$/)

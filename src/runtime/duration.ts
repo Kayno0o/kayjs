@@ -1,16 +1,18 @@
 // A length of time: seconds as a number, or a number with its unit, `'250ms'`, `'30s'`, `'5m'`, `'12h'`, `'30d'` or `'2w'`.
-export type Duration = number | `${number}${DurationUnit}`
+export type Duration = number | `${number}${'ms' | keyof typeof UNIT_SECONDS}`
 
-type DurationUnit = keyof typeof UNIT_MS
-
-const UNIT_MS = { ms: 1, s: 1000, m: 60_000, h: 3_600_000, d: 86_400_000, w: 604_800_000 }
+const UNIT_SECONDS = { s: 1, m: 60, h: 3600, d: 86_400, w: 604_800 }
 
 export const DURATION_TEXT = /^(\d+(?:\.\d+)?)(ms|[smhdw])$/
+
+function inSeconds(amount: number, unit: string): number {
+  return unit === 'ms' ? amount / 1000 : amount * UNIT_SECONDS[unit as keyof typeof UNIT_SECONDS]
+}
 
 // The seconds a positive duration stands for; `what` names the option in the error anything else throws, and `owner` the package whose option it is.
 export function durationSeconds(value: unknown, what: string, owner = 'kay'): number {
   const text = typeof value === 'string' ? DURATION_TEXT.exec(value) : null
-  const parsed = text ? Number(text[1]) * UNIT_MS[text[2] as DurationUnit] / 1000 : Number.NaN
+  const parsed = text ? inSeconds(Number(text[1]), text[2]!) : Number.NaN
   const seconds = typeof value === 'number' ? value : parsed
 
   if (!Number.isFinite(seconds) || seconds <= 0)
@@ -27,10 +29,15 @@ export function durationMs(value: number | string): number {
 
   const text = DURATION_TEXT.exec(value)
 
-  return text ? Number(text[1]) * UNIT_MS[text[2] as DurationUnit] : Number.NaN
+  return text ? Math.round(text[2] === 'ms' ? Number(text[1]) : inSeconds(Number(text[1]), text[2]!) * 1000) : Number.NaN
 }
 
 // The same for a server or library option: a bare number is milliseconds as before, a string must be a positive duration or it throws naming the option.
 export function optionMs(value: number | string, what: string, owner = 'kay'): number {
-  return typeof value === 'number' ? value : durationSeconds(value, what, owner) * 1000
+  if (typeof value === 'number')
+    return value
+
+  durationSeconds(value, what, owner)
+
+  return durationMs(value)
 }

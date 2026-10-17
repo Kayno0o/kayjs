@@ -10,7 +10,7 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 ### Time options take a duration, and `bodyLimit` a size
 
 - `every(ms, run)`, `debounced(source, ms)`, `rooms.coalesce(read, { wait })`, `sqliteRooms(path, { poll })`, kayjs-cms's `forgejo({ timeout })` and `createDrafts({ delay })` and kayjs-ui's `Carousel` `autoplay` take a `Duration` (`'3s'`, `'250ms'`, with the new `ms` unit valid wherever a duration is) instead of milliseconds. A bare number still works for now and still means milliseconds, so nothing changes until the form goes; a string is read as a duration and a bad one throws naming the option.
-- `kay check` reports a number literal at those calls as `deprecated-time-ms`, and `kay check --fix` writes the string (`3000` is `'3s'`, `300` is `'300ms'`), also in the script of a `.kay` file. It does not read a number held in a variable, a call through a name not imported from `kay`, `kay/server` or `@kaynooo/kayjs-cms`, or a `Carousel`'s `autoplay` in a template, so those are rewritten by hand.
+- `kay check` reports a number literal at those calls as `deprecated-time-ms`, and `kay check --fix` writes the string (`3000` is `'3s'`, `300` is `'300ms'`), also in the script and server fences of a `.kay` file. It does not read a number held in a variable, a call through a name not imported from `kay`, `kay/server` or `@kaynooo/kayjs-cms`, or a `Carousel`'s `autoplay` in a template, so those are rewritten by hand.
 - `bodyLimit` in `kay.config.ts`, an action and `api()`, and in a route's `detail`, takes a size beside bytes, `'20mb'`, `'512kb'`, `'800b'`, as `budget` does. Bytes keep working, so no lint is added.
 
 ### `kay new --host` is `--forge`, and `kay/test`'s `mount` is `mountComponent`

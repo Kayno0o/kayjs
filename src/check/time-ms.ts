@@ -5,6 +5,7 @@ import { findProjectFiles } from '../build/files'
 import { lintLevel } from '../compiler/lints'
 import { positionAt } from '../compiler/mapping'
 import { parseKay } from '../compiler/parser'
+import { DURATION_TEXT } from '../runtime/duration'
 
 const SOURCE_FILE = /(?:(?<!\.d)\.tsx?|\.kay)$/
 const CMS_PACKAGE = '@kaynooo/kayjs-cms'
@@ -24,7 +25,7 @@ const FUNCTIONS: Record<string, Record<string, Site>> = {
 const COALESCE: Site = { at: 1, key: 'wait' }
 
 // The bare milliseconds that `every`, `debounced`, `rooms.coalesce({ wait })`, `sqliteRooms({ poll })`, `forgejo({ timeout })` and `createDrafts({ delay })` took before 1.52 made them durations, as a number literal at the call is written.
-// The project's own TypeScript files and the scripts of its components are read, and only the calls of a name imported from the module that exports it, `coalesce` being any call on a file importing `rooms`; a number held in a variable or written in a template, such as a `Carousel`'s `autoplay`, is not read.
+// The project's own TypeScript files and the script and server fences of its components are read, and only the calls of a name imported from the module that exports it, `coalesce` being any call on a file importing `rooms`; a number held in a variable or written in a template, such as a `Carousel`'s `autoplay`, is not read.
 export async function timeMilliseconds(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
   const level = lintLevel('deprecated-time-ms', options.lints)
 
@@ -35,104 +36,102 @@ export async function timeMilliseconds(root: string, options: CheckOptions): Pro
 
   for (const file of await findProjectFiles(root, SOURCE_FILE, { project: true, ownOnly: true })) {
     const source = await Bun.file(file).text()
-    let code = source
-    let base = 0
+    const parsed = file.endsWith('.kay') ? parseKay(source) : undefined
+    const spans = parsed ? [parsed.script, parsed.server].filter(span => span !== undefined) : [{ start: 0, end: source.length }]
 
-    if (file.endsWith('.kay')) {
-      const { script } = parseKay(source)
+    for (const { start: base, end } of spans) {
+      const code = source.slice(base, end)
 
-      if (!script)
+      if (!code.includes('kay'))
         continue
 
-      code = source.slice(script.start, script.end)
-      base = script.start
-    }
+      let ast: t.File
 
-    if (!code.includes('kay'))
-      continue
-
-    let ast: t.File
-
-    try {
-      ast = parse(code, { sourceType: 'module', plugins: ['typescript', 'jsx'], errorRecovery: true })
-    }
-    catch {
-      continue
-    }
-
-    const locals = new Map<string, Site>()
-    const namespaces = new Map<string, Record<string, Site>>()
-    let rooms = false
-
-    for (const statement of ast.program.body) {
-      const functions = statement.type === 'ImportDeclaration' ? FUNCTIONS[statement.source.value] : undefined
-
-      if (statement.type !== 'ImportDeclaration' || statement.importKind === 'type' || functions === undefined)
+      try {
+        ast = parse(code, { sourceType: 'module', plugins: ['typescript', 'jsx'], errorRecovery: true })
+      }
+      catch {
         continue
+      }
 
-      for (const specifier of statement.specifiers) {
-        if (specifier.type === 'ImportNamespaceSpecifier') {
-          namespaces.set(specifier.local.name, functions)
-        }
-        else if (specifier.type === 'ImportSpecifier' && specifier.importKind !== 'type') {
-          const imported = specifier.imported.type === 'Identifier' ? specifier.imported.name : specifier.imported.value
+      const locals = new Map<string, Site>()
+      const namespaces = new Map<string, Record<string, Site>>()
+      let rooms = false
 
-          if (functions[imported])
-            locals.set(specifier.local.name, functions[imported])
+      for (const statement of ast.program.body) {
+        const functions = statement.type === 'ImportDeclaration' ? FUNCTIONS[statement.source.value] : undefined
 
-          if (imported === 'rooms' && statement.source.value === 'kay/server')
-            rooms = true
+        if (statement.type !== 'ImportDeclaration' || statement.importKind === 'type' || functions === undefined)
+          continue
+
+        for (const specifier of statement.specifiers) {
+          if (specifier.type === 'ImportNamespaceSpecifier') {
+            namespaces.set(specifier.local.name, functions)
+          }
+          else if (specifier.type === 'ImportSpecifier' && specifier.importKind !== 'type') {
+            const imported = specifier.imported.type === 'Identifier' ? specifier.imported.name : specifier.imported.value
+
+            if (functions[imported])
+              locals.set(specifier.local.name, functions[imported])
+
+            if (imported === 'rooms' && statement.source.value === 'kay/server')
+              rooms = true
+          }
         }
       }
-    }
 
-    if (locals.size === 0 && namespaces.size === 0 && !rooms)
-      continue
+      if (locals.size === 0 && namespaces.size === 0 && !rooms)
+        continue
 
-    const memberSite = (object: t.Node, name: string): Site | undefined => {
-      if (object.type === 'Identifier' && namespaces.has(object.name))
-        return namespaces.get(object.name)![name]
+      const memberSite = (object: t.Node, name: string): Site | undefined => {
+        if (object.type === 'Identifier' && namespaces.has(object.name))
+          return namespaces.get(object.name)![name]
 
-      return rooms && name === 'coalesce' ? COALESCE : undefined
-    }
+        return rooms && name === 'coalesce' ? COALESCE : undefined
+      }
 
-    walk(ast, (node) => {
-      if (node.type !== 'CallExpression')
-        return
+      walk(ast, (node) => {
+        if (node.type !== 'CallExpression')
+          return
 
-      const callee = node.callee
-      let site: Site | undefined
+        const callee = node.callee
+        let site: Site | undefined
 
-      if (callee.type === 'Identifier')
-        site = locals.get(callee.name)
-      else if (callee.type === 'MemberExpression' && !callee.computed && callee.property.type === 'Identifier')
-        site = memberSite(callee.object, callee.property.name)
+        if (callee.type === 'Identifier')
+          site = locals.get(callee.name)
+        else if (callee.type === 'MemberExpression' && !callee.computed && callee.property.type === 'Identifier')
+          site = memberSite(callee.object, callee.property.name)
 
-      if (site === undefined)
-        return
+        if (site === undefined)
+          return
 
-      const argument = node.arguments[site.at]
-      const value = site.key === undefined || argument?.type !== 'ObjectExpression'
-        ? argument
-        : argument.properties.find((property): property is t.ObjectProperty => property.type === 'ObjectProperty' && !property.computed && !property.shorthand && (property.key.type === 'Identifier' ? property.key.name === site.key : property.key.type === 'StringLiteral' && property.key.value === site.key))?.value
+        const argument = node.arguments[site.at]
+        const value = site.key === undefined || argument?.type !== 'ObjectExpression'
+          ? argument
+          : argument.properties.find((property): property is t.ObjectProperty => property.type === 'ObjectProperty' && !property.computed && !property.shorthand && (property.key.type === 'Identifier' ? property.key.name === site.key : property.key.type === 'StringLiteral' && property.key.value === site.key))?.value
 
-      // Zero or less is no duration a string could say, and a number held elsewhere is not read.
-      if (value?.type !== 'NumericLiteral' || !(value.value > 0))
-        return
+        // Zero or less is no duration a string could say, and a number held elsewhere is not read.
+        if (value?.type !== 'NumericLiteral' || !(value.value > 0))
+          return
 
-      const text = value.value % 1000 === 0 ? `${value.value / 1000}s` : `${value.value}ms`
+        const text = value.value % 1000 === 0 ? `${value.value / 1000}s` : `${value.value}ms`
 
-      found.push({
-        file,
-        ...positionAt(source, base + value.start!),
-        end: base + value.end!,
-        message: `${String(value.extra?.raw ?? value.value)} is milliseconds here, and these options take a duration since 1.52, as every other duration of kay does`,
-        help: `write '${text}'`,
-        code: 'deprecated-time-ms',
-        severity: level === 'warn' ? 'warning' : 'error',
-        fixes: [{ title: `Write '${text}'`, edits: [{ start: base + value.start!, end: base + value.end!, text: `'${text}'` }], safe: true }],
+        // An exponent or a tiny fraction is no duration a string could say.
+        if (!DURATION_TEXT.test(text))
+          return
+
+        found.push({
+          file,
+          ...positionAt(source, base + value.start!),
+          end: base + value.end!,
+          message: `${String(value.extra?.raw ?? value.value)} is milliseconds here, and these options take a duration since 1.52, as every other duration of kay does`,
+          help: `write '${text}'`,
+          code: 'deprecated-time-ms',
+          severity: level === 'warn' ? 'warning' : 'error',
+          fixes: [{ title: `Write '${text}'`, edits: [{ start: base + value.start!, end: base + value.end!, text: `'${text}'` }], safe: true }],
+        })
       })
-    })
+    }
   }
 
   return found
