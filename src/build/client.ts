@@ -125,7 +125,7 @@ function rootMargin(value: string | undefined, fallback: string, what: string): 
     return fallback
 
   if (!ROOT_MARGIN.test(value))
-    throw new Error(`kay: \`hydration.${what}\` is ${JSON.stringify(value)}; it takes one to four lengths in px or %, such as '200px' or '100% 0px'`)
+    throw new KayError('config-invalid', `kay: \`hydration.${what}\` is ${JSON.stringify(value)}; it takes one to four lengths in px or %, such as '200px' or '100% 0px'`)
 
   return value
 }
