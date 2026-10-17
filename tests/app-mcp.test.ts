@@ -1,6 +1,6 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { join, relative } from 'node:path'
 import process from 'node:process'
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
 import { writeShadowTypes } from '../src/check'
 import { bootProblems } from '../src/check/boot'
@@ -172,9 +172,11 @@ describe('the tools', () => {
       'breaks',
       'create_note',
       'delete_notes_id',
+      'draft_note',
       'get_notes_binary',
       'get_notes_described',
       'get_notes_id',
+      'get_notes_paged',
       'get_notes_search',
       'get_notes_who',
       'get_notes_words',
@@ -239,6 +241,17 @@ describe('the tools', () => {
     expect(result.data).toMatchObject({ limit: 20, ratio: 0.5, label: 'all', open: true, total: 3, paging: { size: 4, after: 1 } })
     expect((await site.mcp.call('listing', { total: '3', limit: '5', ratio: '2.5', paging: { size: 4, after: 1 }, either: 1 })).data).toMatchObject({ limit: 5, ratio: 2.5, total: 3 })
     expect((await site.mcp.call('listing', { total: 3, limit: 500, paging: { after: 1 }, either: 1 })).isError).toBe(true)
+  })
+
+  it('leaves a route\'s defaulted query and body fields out of required, and a path param in', async () => {
+    const tools = await site.mcp.tools()
+    const paged = tools.find(tool => tool.name === 'get_notes_paged')!
+    const draft = tools.find(tool => tool.name === 'draft_note')!
+
+    expect(paged.inputSchema).toMatchObject({ required: ['after'], properties: { limit: { type: 'integer', default: 20 } } })
+    expect(draft.inputSchema).toMatchObject({ required: ['title'], properties: { copies: { type: 'integer', default: 1 } } })
+    expect((await site.mcp.call('get_notes_paged', { after: 1 })).data).toEqual({ limit: 20 })
+    expect((await site.mcp.call('draft_note', { title: 'x' })).data).toEqual({ title: 'x', copies: 1 })
   })
 
   it('reads a route\'s path, query and body into one schema, naming it by its operation id', async () => {

@@ -145,7 +145,7 @@ export default api()
   })
 ```
 
-Here `GET /api/notes/{id}` is the tool `get_notes_id`. Its input is built from the schemas the route already declares.
+Here `GET /api/notes/{id}` is the tool `get_notes_id`. Its input is built from the schemas the route already declares. A number is described as a number, and a body or query field with a `default` is not required, as a call that leaves it out gets the default.
 
 Just like an action, `tool: true` keeps the route's own summary as the description, and `tool: { name, description }` sets both. Without a name, the tool takes the route's `detail.operationId`, or its method and path. Anything but letters, digits and `_` in the name becomes `_`.
 

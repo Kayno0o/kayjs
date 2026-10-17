@@ -100,7 +100,8 @@ function toolOf(path: string, method: string, operation: Operation, id: string, 
   const place = (name: string, where: 'path' | 'query' | 'body', schema: unknown, needed: boolean) => {
     properties[name] ??= schema
 
-    if (needed)
+    // A query or body field with a default is filled in when a call leaves it out, so it is not asked for.
+    if (needed && (where === 'path' || !(typeof schema === 'object' && schema !== null && 'default' in schema)))
       required.add(name)
 
     places.set(name, (places.get(name) ?? new Set()).add(where))
@@ -112,8 +113,7 @@ function toolOf(path: string, method: string, operation: Operation, id: string, 
   }
 
   for (const [name, schema] of Object.entries((body?.properties ?? {}) as Record<string, unknown>))
-    // A body field with a default is filled in when a call leaves it out, so it is not asked for.
-    place(name, 'body', schema, ((body?.required ?? []) as string[]).includes(name) && !(typeof schema === 'object' && schema !== null && 'default' in schema))
+    place(name, 'body', schema, ((body?.required ?? []) as string[]).includes(name))
 
   const get = method === 'get'
   const inputSchema = { type: 'object', properties, ...required.size > 0 && { required: [...required] } }

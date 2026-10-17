@@ -350,7 +350,7 @@ function schemaOf(schema: unknown): unknown {
 
 // A union of the numeric text a form sends and the number it stands for is that number alone.
 function withoutNumericText(members: Schema[]): Schema[] {
-  const isText = (member: Schema) => member.type === 'string' && NUMERIC_TEXT.has(member.format)
+  const isText = (member: Schema) => member.type === 'string' && member.default === 0 && NUMERIC_TEXT.has(member.format)
 
   return members.length === 2 && members.some(isText) && members.some(member => member.type === 'integer' || member.type === 'number') ? members.filter(member => !isText(member)) : members
 }
