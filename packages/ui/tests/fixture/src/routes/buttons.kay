@@ -20,19 +20,28 @@ main
     Button#tone-accent(label="Accent" tone="accent" size="lg")
     Button#ghost-danger(label="Ghost" variant="ghost" tone="danger" size="xs")
     Button#inline-plain(label="Inline" variant="inline")
+    // kay-allow deprecated-ui-prop
     Button#old-default(label="Old default" variant="default")
+    // kay-allow deprecated-ui-prop
     Button#old-accent(label="Old accent" variant="accent")
+    // kay-allow deprecated-ui-prop
     Button#old-danger(label="Old danger" variant="danger")
+    // kay-allow deprecated-ui-prop
     Button#new-wins(label="Both" variant="danger" tone="accent")
+    // kay-allow deprecated-ui-prop
     Button#neutral-wins(label="Neutral" variant="accent" tone="neutral")
+    // kay-allow deprecated-ui-prop
     CopyButton#copy-old(text="x" label="Copy" variant="accent")
     CopyButton#copy-new(text="x" label="Copy" variant="ghost" tone="danger" size="sm")
     IconButton#icon-tone(icon="delete" label="Delete" variant="ghost" tone="danger")
     IconButton#icon-accent(icon="plus" label="Add" tone="accent")
+    // kay-allow deprecated-ui-prop
     IconButton#icon-old-danger(icon="delete" label="Old" variant="danger")
+    // kay-allow deprecated-ui-prop
     IconButton#icon-new-wins(icon="delete" label="Wins" variant="danger" tone="neutral")
   #notices
     Notice#notice-danger(tone="danger" label="Refused")
+    // kay-allow deprecated-ui-prop
     Notice#notice-error(tone="error" label="Refused")
     Notice#notice-default(label="Saved")
   #toasts

@@ -83,6 +83,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `deprecated-api-tool` | warn | deprecated | With `mcp`, an API route that sets neither `detail.tool` nor `hide`: it was a tool before 1.51 and is none now |
 | `deprecated-provider-url` | warn | deprecated | `discordProvider({ apiBase })` of kayjs-auth, now `discordProvider({ url })` |
 | `deprecated-test-mount` | warn | deprecated | `mount` imported from `kay/test`, now `mountComponent` |
+| `deprecated-ui-prop` | warn | deprecated | A kayjs-ui prop or value renamed in 1.52, such as `variant="danger"`, now `tone="danger"` |
 | `draft-message` | warn | i18n | A message marked `// draft`, which no one has checked yet |
 | `hidden-tool` | warn | code | With `mcp`, an API route that sets `hide` and `tool` |
 | `unsized-image` | warn | performance | An `img` with no `width` and `height` |

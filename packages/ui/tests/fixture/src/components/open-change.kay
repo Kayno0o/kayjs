@@ -27,19 +27,25 @@ if mode === 'new'
       button#popover-trigger({...attributes}) Trigger
     p Popover body
 else if mode === 'old'
+  // kay-allow deprecated-ui-prop
   Dialog#dialog(open={dialog()} title="Dialog" onClose={event => { calls.push(`dialog onClose ${event.type}`); dialog.set(false) }})
     p Dialog body
+  // kay-allow deprecated-ui-prop
   SidePanel#panel(open={panel()} title="Panel" onClose={event => { calls.push(`panel onClose ${event.type}`); panel.set(false) }})
     p Panel body
+  // kay-allow deprecated-ui-prop
   Popover(id="popover" open={popover()} onToggle={shown => { calls.push(`popover onToggle ${shown}`); popover.set(shown) }})
     @trigger(attributes)
       button#popover-trigger({...attributes}) Trigger
     p Popover body
 else
+  // kay-allow deprecated-ui-prop
   Dialog#dialog(open={dialog()} title="Dialog" onOpenChange={shown => { calls.push(`dialog onOpenChange ${shown}`); dialog.set(shown) }} onClose={() => calls.push('dialog onClose')})
     p Dialog body
+  // kay-allow deprecated-ui-prop
   SidePanel#panel(open={panel()} title="Panel" onOpenChange={shown => { calls.push(`panel onOpenChange ${shown}`); panel.set(shown) }} onClose={() => calls.push('panel onClose')})
     p Panel body
+  // kay-allow deprecated-ui-prop
   Popover(id="popover" open={popover()} onOpenChange={shown => { calls.push(`popover onOpenChange ${shown}`); popover.set(shown) }} onToggle={() => calls.push('popover onToggle')})
     @trigger(attributes)
       button#popover-trigger({...attributes}) Trigger

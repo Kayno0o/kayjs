@@ -11,5 +11,6 @@ const items: MenuEntry[] = [
 ]
 ---
 Menu(id="by-tone" items={items} label="By tone" icon="plus" tone="danger")
+// kay-allow deprecated-ui-prop
 Menu(id="by-variant" items={items} label="By variant" icon="plus" variant="danger")
 Menu(id="plain" items={items} label="Plain" icon="plus")

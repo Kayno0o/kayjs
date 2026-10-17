@@ -8,5 +8,5 @@ const friend = editing<{ id: number, name: string }, { name: string }>()
 for one of friends key={one.id}
   button(id={`edit-${one.id}`} type="button" onClick={() => friend.edit(one)}) Edit {one.name}
 button#add(type="button" onClick={() => friend.create({ name: 'New friend' })}) Add
-Dialog#friend(open={friend.open()} title={friend.row() ? 'Edit friend' : 'Add friend'} onClose={friend.close})
+Dialog#friend(open={friend.open()} title={friend.row() ? 'Edit friend' : 'Add friend'} onOpenChange={shown => { if (!shown) friend.close() }})
   p#name {friend.row()?.name ?? friend.draft()?.name}

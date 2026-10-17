@@ -11,8 +11,10 @@ const save = Object.assign(async () => 'saved', { pending: signal(false), url: '
 ---
 button#open(onClick={() => open.set(true)}) Open
 if both
+  // kay-allow deprecated-ui-prop
   FormDialog(open={open()} title="Save" action={save} submitLabel="Save" failure="Could not save" onOpenChange={shown => { closes.push(`onOpenChange ${shown}`); open.set(shown) }} onClose={() => closes.push('onClose')})
     input#name(name="name" value="Ada")
 else
+  // kay-allow deprecated-ui-prop
   FormDialog(open={open()} title="Save" action={save} submitLabel="Save" failure="Could not save" onClose={() => { closes.push('onClose'); open.set(false) }})
     input#name(name="name" value="Ada")

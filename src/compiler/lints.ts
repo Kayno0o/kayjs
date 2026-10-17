@@ -337,6 +337,14 @@ export const LINTS = {
     wrong: 'import { mount, settle } from \'kay/test\'',
     right: 'import { mountComponent, settle } from \'kay/test\'',
   },
+  'deprecated-ui-prop': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.52',
+    summary: 'A kayjs-ui component given a prop or value 1.52 renamed: `onClose` or `onToggle` for `onOpenChange`, `variant="accent"` or `"danger"` for `tone`, `variant="default"` for `"solid"`, `tone="error"` for `"danger"`, `empty` for `emptyLabel`. The old form still works for now. The fix writes the new one, except for the `onClose` of a Dialog or a SidePanel, whose handler takes the new state.',
+    wrong: '---\nimport Button from \'@kaynooo/kayjs-ui/button.kay\'\n---\nButton(variant="danger") Delete',
+    right: '---\nimport Button from \'@kaynooo/kayjs-ui/button.kay\'\n---\nButton(tone="danger") Delete',
+  },
   'draft-message': {
     level: 'warn',
     group: 'i18n',

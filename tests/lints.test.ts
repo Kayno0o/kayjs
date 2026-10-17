@@ -586,3 +586,44 @@ describe('server-only-import', () => {
     ])
   })
 })
+
+describe('deprecated-ui-prop', () => {
+  const imports = 'import Button from \'@kaynooo/kayjs-ui/button.kay\'\nimport Notice from \'@kaynooo/kayjs-ui/notice.kay\'\nimport Popover from \'@kaynooo/kayjs-ui/popover.kay\'\nimport Dialog from \'@kaynooo/kayjs-ui/dialog.kay\'\nimport BarList from \'@kaynooo/kayjs-ui/bar-list.kay\'\nimport Menu from \'@kaynooo/kayjs-ui/menu.kay\'\n'
+  const page = (template: string) => `---\n${imports}---\n${template}\n`
+  const found = (template: string) => {
+    const source = page(template)
+    const result = compileKay(source, 'list.kay', { check: true })
+
+    return result.diagnostics.filter(d => d.code === 'deprecated-ui-prop').map(d => ({ at: source.slice(d.start, d.end), fix: d.fixes?.[0]?.edits.map(edit => `${source.slice(edit.start, edit.end)}->${edit.text}`) }))
+  }
+
+  it('flags an old value and fixes it', () => {
+    expect(found('Button(variant="danger") Delete')).toEqual([{ at: 'variant="danger"', fix: ['variant="danger"->tone="danger"'] }])
+    expect(found('Button(variant="default") Ok')).toEqual([{ at: 'variant="default"', fix: ['variant="default"->variant="solid"'] }])
+    expect(found('Notice(tone="error") Oops')).toEqual([{ at: 'tone="error"', fix: ['tone="error"->tone="danger"'] }])
+    expect(found('Menu(variant="danger" label="x")')).toEqual([{ at: 'variant="danger"', fix: ['variant="danger"->variant="solid" tone="danger"'] }])
+  })
+
+  it('renames an old prop', () => {
+    expect(found('Popover(onToggle={go})')).toEqual([{ at: 'onToggle={go}', fix: ['onToggle->onOpenChange'] }])
+    expect(found('BarList(empty="none" items={[]})')).toEqual([{ at: 'empty="none"', fix: ['empty->emptyLabel'] }])
+  })
+
+  it('offers no fix where the handler changes or a tone is already written', () => {
+    expect(found('Dialog(onClose={go})')).toEqual([{ at: 'onClose={go}', fix: undefined }])
+    expect(found('Button(variant="accent" tone="danger") Ok')).toEqual([{ at: 'variant="accent"', fix: undefined }])
+    expect(found('BarList(empty="a" emptyLabel="b" items={[]})')).toEqual([{ at: 'empty="a"', fix: undefined }])
+  })
+
+  it('leaves the new forms, other components and other values alone', () => {
+    expect(found('Button(tone="danger" variant="ghost") Ok')).toEqual([])
+    expect(found('Button(variant={kind}) Ok')).toEqual([])
+    expect(found('Popover(onOpenChange={go})')).toEqual([])
+    expect(found('button(variant="danger") Ok')).toEqual([])
+    expect(found('Other(variant="danger")')).toEqual([])
+  })
+
+  it('is silenced by kay-allow', () => {
+    expect(found('// kay-allow deprecated-ui-prop\nButton(variant="danger") Delete')).toEqual([])
+  })
+})
