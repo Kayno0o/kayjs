@@ -2,7 +2,8 @@ import type { HealthConfig } from '../config'
 import { readdir, readlink } from 'node:fs/promises'
 import process from 'node:process'
 import { KayError } from '../compiler/errors'
-import { HEALTH_PATH, healthTimeoutMs } from '../server/lifecycle'
+import { healthTimeoutMs } from '../server/config-limits'
+import { HEALTH_PATH } from '../server/lifecycle'
 
 const START_TIMEOUT_MS = 30_000
 const PROBE_TIMEOUT_MS = 10_000
