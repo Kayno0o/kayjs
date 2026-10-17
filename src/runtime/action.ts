@@ -711,10 +711,20 @@ function callable(url: () => string): { call: (input: never, options?: CallOptio
   }
 }
 
-// A stream ends with the island that started it, a `persist` island's living on across pages; one started under no island, from a listener on the window say, ends once a path other than the call's is shown, which a swap that fails or gives way to another does not do.
+// A stream ends with the block or island that started it, a `persist` island's living on across pages; one started under no owner, from a `listen` callback or after an `await` in a handler say, ends once a path other than the call's is shown, which a swap that fails or gives way to another does not do.
 function closeWithCaller(stream: ActionStream<unknown> & Settles, caller: Caller | undefined): void {
   if (caller?.owner) {
-    onCleanupOf(caller.owner, stream.close)
+    const { owner } = caller
+
+    onCleanupOf(owner, stream.close)
+
+    // One per call, so an island answering many clicks with a stream does not keep every one until it goes.
+    stream[SETTLED](() => {
+      const at = owner.cleanups?.indexOf(stream.close) ?? -1
+
+      if (at !== -1)
+        owner.cleanups!.splice(at, 1)
+    })
   }
   else if (caller && navigation.arrivals !== caller.arrivals) {
     stream.close()

@@ -282,7 +282,7 @@ Yield the whole text so far, not just the new piece. Then `last()` is all the is
 
 Guards, the schema and rate limits run before the first value, as for any call. A refusal throws an `ActionError`. `reply.pending()` stays true until the stream ends.
 
-`close()` stops the handler's loop on the server. So does the visitor leaving. A stream started while the island sets up or from one of its event handlers closes when the island goes away, so a `persist` island's stays open across pages. An effect running again closes the stream it started. One started outside any island closes when the visitor goes to another path.
+`close()` stops the handler's loop on the server. So does the visitor leaving. A stream started while the island sets up or from an element's event handler closes with the enclosing block or component, so a `persist` island's stays open across pages. An effect running again closes the stream it started. One started under no owner, from a `listen` callback or after an `await` in a handler, closes when the visitor goes to another path.
 
 A bot caught by a `pretend` protection gets `undefined` back, not a stream, since the handler never ran.
 

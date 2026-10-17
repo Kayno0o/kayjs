@@ -244,7 +244,6 @@ export function readContext(key: symbol): { found: boolean, value?: unknown } {
 }
 
 // The owner now, read where a call is not worth a function in every page's entry: a listener binds the owner it was made under.
-
 export { owner as activeOwner }
 
 // The owner now, for a block rendered later to read what was provided where it was declared.
