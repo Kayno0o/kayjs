@@ -55,7 +55,11 @@ An image or file field (`imageField()`, `fileField()` from `kay/content`) takes 
 
 An image pasted or dropped into a Markdown body is uploaded the same way and embedded where the cursor is. A refused upload shows a message and leaves the text as it was.
 
-A file field takes PNG, JPEG, WebP, GIF, AVIF and PDF files. Set `uploads` to list others, such as `['image/*', 'application/pdf']`. The file picker offers only those types, and a file over 20 MB or of another type is refused with its type or size in the message.
+A file field takes PNG, JPEG, WebP, GIF, AVIF and PDF files. Set `uploads` to list others, such as `['image/*', 'application/pdf']`. The file picker offers only those types, and a file over the size limit or of another type is refused with its type or size in the message, an empty one too.
+
+An upload may weigh 20 MB by default. `uploads: { types, maxSize }` sets either, `maxSize` in bytes or as a string such as `'50mb'`, for a site of videos or large PDFs, or `'2mb'` for a portfolio that wants less; a part left out keeps its default.
+
+The upload route takes `maxSize` whatever the app's `bodyLimit` is, so nothing else is raised. The editor refuses an oversized file before sending it, and the server stays the one that decides. A size that is zero, negative or not a whole number of bytes stops `kay.config.ts` from loading.
 
 Replacing or removing a file leaves the old upload stored. The unused-uploads screen at `<prefix>/uploads` lists the uploads no entry mentions, and deletes only the ones you confirm, and only with a `guard`.
 

@@ -317,7 +317,31 @@ test('the editor is told the types and the size an upload may have', async () =>
   expect(rules.accept.split(',')).toContain('application/pdf')
   expect(rules.images.split(',')).not.toContain('application/pdf')
   expect(rules.images).not.toContain('svg')
-  expect(rules.maxBytes).toBe(20 * 1024 * 1024)
+  expect(rules.maxBytes).toBe(64 * 1024)
+})
+
+test('an upload exactly at uploads.maxSize is stored, one byte over refused by the server whatever the editor checks, an empty one too', async () => {
+  const post = async (size: number) => {
+    const form = new FormData()
+
+    form.append('file', new File([new Uint8Array(size)], 'big.pdf', { type: 'application/pdf' }))
+
+    return site.fetch('/api/cms/files/products', { method: 'POST', body: form })
+  }
+
+  expect((await post(64 * 1024)).status).toBe(200)
+
+  const over = await post(64 * 1024 + 1)
+
+  expect(over.status).toBe(413)
+  expect(await over.text()).toBe('big.pdf is 64 KB, over the 64 KB an upload may be')
+  // Past the route's body limit, refused before the body is read.
+  expect((await post(1024 * 1024)).status).toBe(413)
+
+  const empty = await post(0)
+
+  expect(empty.status).toBe(400)
+  expect(await empty.text()).toBe('big.pdf is empty')
 })
 
 test('the unused-uploads screen lists an upload no entry mentions, and deleting one removes it, a referenced one staying', async () => {

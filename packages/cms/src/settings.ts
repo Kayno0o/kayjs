@@ -1,10 +1,17 @@
 import type { Guard, GuardContext } from 'kay'
+import type { ByteSize } from 'kay/library'
 import type { FileSaver, Identity } from './files'
+import { byteSize } from 'kay/library'
 import { workingTree } from './files'
 
 // A guard built when the first request reaches it, so kay.config.ts imports nothing of the app's auth or database: `{ load: async () => (await import('./src/auth')).auth.guard({ require: 'editor' }) }`.
 export interface LazyGuard {
   load: () => Guard | Promise<Guard>
+}
+
+export interface UploadOptions {
+  types?: string[] | undefined
+  maxSize?: ByteSize | undefined
 }
 
 export interface CmsOptions {
@@ -14,8 +21,8 @@ export interface CmsOptions {
   guard?: Guard | LazyGuard | undefined
   // Where a folder entry's file goes: `forgejo(...)` on a deployed site, the working tree by default, for `kay dev`.
   files?: FileSaver | undefined
-  // The types an upload may have, exact or as `image/*`: PNG, JPEG, WebP, GIF, AVIF and PDF by default.
-  uploads?: string[] | undefined
+  // The types an upload may have, exact or as `image/*`: PNG, JPEG, WebP, GIF, AVIF and PDF by default; `{ types, maxSize }` also sets the most an upload may weigh, in bytes or as `'50mb'`, 20 MB by default. The upload route takes that size whatever the app's `bodyLimit` is.
+  uploads?: string[] | UploadOptions | undefined
   // Collections whose bodies may hold HTML that runs as the site, such as a `<script>` or an `onclick`, which a save is otherwise refused for.
   rawHtml?: string[] | undefined
   // Who a save the guard let through is committed as, from the guard's context: `async ({ locals }) => ...` reading the signed-in user.
@@ -27,20 +34,40 @@ export interface CmsSettings {
   guard: Guard | undefined
   files: FileSaver
   uploads: string[]
+  // The most bytes an upload may weigh.
+  maxSize: number
   rawHtml: ReadonlySet<string>
   author: CmsOptions['author']
 }
 
 const DEFAULT_UPLOADS = ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/avif', 'application/pdf']
 
+// A photo straight off a phone fits; kay's own limit of 1 MB would not.
+export const DEFAULT_MAX_SIZE = 20 * 1024 * 1024
+
 const TRAILING_SLASHES = /\/+$/
 
 let current: CmsSettings | undefined
 
-export function configure({ prefix = '/admin', guard, files = workingTree(), uploads = DEFAULT_UPLOADS, rawHtml = [], author }: CmsOptions): CmsSettings {
-  current = { prefix: prefix.replace(TRAILING_SLASHES, '') || '/', guard: guard === undefined ? undefined : lazily(guard), files, uploads, rawHtml: new Set(rawHtml), author }
+export function configure({ prefix = '/admin', guard, files = workingTree(), uploads, rawHtml = [], author }: CmsOptions): CmsSettings {
+  const { types = DEFAULT_UPLOADS, maxSize } = Array.isArray(uploads) ? { types: uploads, maxSize: undefined } : uploads ?? {}
+
+  current = { prefix: prefix.replace(TRAILING_SLASHES, '') || '/', guard: guard === undefined ? undefined : lazily(guard), files, uploads: types, maxSize: uploadSize(maxSize), rawHtml: new Set(rawHtml), author }
 
   return current
+}
+
+// The bytes `uploads.maxSize` stands for, whole and positive, else the default; a size that is none throws as kay.config.ts loads.
+function uploadSize(maxSize: ByteSize | undefined): number {
+  if (maxSize === undefined)
+    return DEFAULT_MAX_SIZE
+
+  const bytes = byteSize(maxSize, '`cms({ uploads: { maxSize } })`')
+
+  if (!Number.isInteger(bytes))
+    throw new Error(`kayjs-cms: \`cms({ uploads: { maxSize } })\` is ${JSON.stringify(maxSize)}, which is ${bytes} bytes; it takes a whole number of bytes`)
+
+  return bytes
 }
 
 // A guard that loads on its first call, and tries again after a load that failed.

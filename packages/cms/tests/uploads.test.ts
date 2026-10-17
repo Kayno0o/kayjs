@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test'
 import { configure } from '../src/settings'
-import { uploadRefusal, uploadRules } from '../src/uploads'
+import { emptyFile, tooLarge } from '../src/upload-text'
+import { uploadBodyLimit, uploadRefusal, uploadRules } from '../src/uploads'
 
 test('takes images and PDFs by default, read off the name as storage serves them, whatever type they were sent as', () => {
   configure({})
@@ -31,4 +32,43 @@ test('offers the picker the types uploads takes, an image field the image ones a
 
   configure({ uploads: ['application/pdf'] })
   expect(uploadRules()).toMatchObject({ accept: 'application/pdf', images: 'application/pdf' })
+})
+
+test('reads uploads as a list of types, or as types and maxSize, each part optional', () => {
+  const defaults = 'image/png,image/jpeg,image/webp,image/gif,image/avif,application/pdf'
+
+  configure({ uploads: ['application/pdf'] })
+  expect(uploadRules()).toMatchObject({ accept: 'application/pdf', maxBytes: 20 * 1024 * 1024 })
+
+  configure({ uploads: { types: ['application/pdf'] } })
+  expect(uploadRules()).toMatchObject({ accept: 'application/pdf', maxBytes: 20 * 1024 * 1024 })
+
+  configure({ uploads: { maxSize: '50mb' } })
+  expect(uploadRules()).toMatchObject({ accept: defaults, maxBytes: 50 * 1024 * 1024 })
+
+  configure({ uploads: { types: ['video/*'], maxSize: 1500 } })
+  expect(uploadRules()).toMatchObject({ accept: 'video/*', maxBytes: 1500 })
+
+  configure({ uploads: {} })
+  expect(uploadRules()).toMatchObject({ accept: defaults, maxBytes: 20 * 1024 * 1024 })
+
+  configure({ uploads: { maxSize: '1.5mb' } })
+  expect(uploadRules().maxBytes).toBe(1.5 * 1024 * 1024)
+})
+
+test('the upload route reads the limit and its envelope, so a file at the limit gets in', () => {
+  configure({ uploads: { maxSize: '50mb' } })
+  expect(uploadBodyLimit()).toBe(50 * 1024 * 1024 + 64 * 1024)
+})
+
+test('refuses a maxSize that is no positive whole number of bytes as kay.config.ts loads', () => {
+  for (const maxSize of [0, -1, Number.NaN, Infinity, 1.5, '0mb', '-1mb', '1.5', 'big', '0.5b', ''])
+    expect(() => configure({ uploads: { maxSize } as never })).toThrow(/maxSize/)
+})
+
+test('words a refusal for size and emptiness once, for the editor and the server', () => {
+  expect(tooLarge('movie.mp4', 70 * 1024 * 1024, 50 * 1024 * 1024)).toBe('movie.mp4 is 70 MB, over the 50 MB an upload may be')
+  expect(tooLarge('', 2048, 1024)).toBe('The file is 2 KB, over the 1 KB an upload may be')
+  expect(tooLarge('a.pdf', 600, 500)).toBe('a.pdf is 600 bytes, over the 500 bytes an upload may be')
+  expect(emptyFile('')).toBe('The file is empty')
 })

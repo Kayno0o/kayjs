@@ -1,13 +1,12 @@
 import { ActionError, ApiError, call } from 'kay'
 import filesApi from '../api/files'
+import { emptyFile, tooLarge } from '../upload-text'
 
 export interface UploadRules {
   accept: string
   images: string
   maxBytes: number
 }
-
-const MEGABYTE = 1024 * 1024
 
 let rules: Promise<UploadRules | undefined> | undefined
 
@@ -27,10 +26,6 @@ async function load(): Promise<UploadRules | undefined> {
   }
 }
 
-function megabytes(bytes: number): string {
-  return `${Math.round(bytes / MEGABYTE * 10) / 10} MB`
-}
-
 // Throws an `ActionError` holding the reason, which `attempt` toasts in place of its generic failure.
 function refused(status: number, reason: string): ActionError {
   return new ActionError(status, reason, { '': reason })
@@ -40,8 +35,11 @@ function refused(status: number, reason: string): ActionError {
 export async function uploadFile(collection: string, file: File, progress?: (share: number) => void): Promise<string> {
   const limits = await uploadRules()
 
+  if (file.size === 0)
+    throw refused(400, emptyFile(file.name))
+
   if (limits && file.size > limits.maxBytes)
-    throw refused(413, `${file.name || 'The file'} is ${megabytes(file.size)}, over the ${megabytes(limits.maxBytes)} an upload may be`)
+    throw refused(413, tooLarge(file.name, file.size, limits.maxBytes))
 
   const form = new FormData()
 
@@ -53,11 +51,8 @@ export async function uploadFile(collection: string, file: File, progress?: (sha
     return answer.path
   }
   catch (error) {
-    if (error instanceof ApiError && error.status === 413)
-      throw refused(413, `${file.name || 'The file'} is ${megabytes(file.size)}, over what an upload may be`)
-
-    if (error instanceof ApiError && error.status === 415)
-      throw refused(415, error.message)
+    if (error instanceof ApiError && (error.status === 413 || error.status === 415 || error.status === 400))
+      throw refused(error.status, error.message)
 
     throw error
   }

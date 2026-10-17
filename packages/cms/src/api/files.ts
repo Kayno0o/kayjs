@@ -3,15 +3,24 @@ import { api, files } from 'kay/server'
 import { deleteUnusedUploads } from '../orphans'
 import { settings } from '../settings'
 import { collectionNamed, UnknownCollection } from '../store'
-import { UPLOAD_LIMIT, uploadFolder, uploadRefusal, uploadRules } from '../uploads'
+import { emptyFile, tooLarge } from '../upload-text'
+import { uploadBodyLimit, uploadFolder, uploadRefusal, uploadRules } from '../uploads'
 
 // Stores an upload public, in a folder named for its collection, and answers the path a page renders it from, which the field keeps.
-export default api({ bodyLimit: UPLOAD_LIMIT })
+export default api({ bodyLimit: uploadBodyLimit() })
   .onError(({ error, status }) => error instanceof UnknownCollection ? status(404, error.message) : undefined)
   // What the pickers offer and the size an upload may have, so a file the server would refuse is not offered.
   .get('/rules', () => uploadRules())
   .post('/:collection', async ({ params, body, status }) => {
     const collection = await collectionNamed(params.collection)
+
+    if (body.file.size === 0)
+      return status(400, emptyFile(body.file.name))
+
+    // Authoritative: the editor checks the size too, but a client that skips it reaches here.
+    if (body.file.size > settings().maxSize)
+      return status(413, tooLarge(body.file.name, body.file.size, settings().maxSize))
+
     const refusal = uploadRefusal(body.file)
 
     if (refusal !== undefined)
