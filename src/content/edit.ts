@@ -3,13 +3,14 @@ import type { DraftEntry, DraftIssue } from '../runtime/edit'
 import type { Collection, Entry } from './index'
 import type { CompiledMarkdown } from './markdown'
 import { existsSync } from 'node:fs'
+import { stat } from 'node:fs/promises'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import { t } from 'elysia'
 import { JSON_FILE } from '../build/files'
 import { KayError } from '../compiler/errors'
 import { kayLog } from '../runtime/log'
 import { isDraft } from './drafts'
-import { contentPlace, entryFiles, entrySlug, markdownOf, parseEntry, slugOf } from './load'
+import { contentPlace, entryFiles, entrySlug, markdownOf, parseEntry, slugOf, STAMP_SETTLED_MS } from './load'
 import { compileMarkdown, MarkdownError, splitFrontmatter } from './markdown'
 import { dataIssues, decodeEntries, unknownComponents } from './validate'
 
@@ -321,10 +322,38 @@ async function entryPlace(name: string, dir: string, slug: string, locale: strin
   return { files, place, existing: files.find((_, index) => slugs[index] === place) }
 }
 
+// The slugs read from files, kept while a file's size and time hold, so a lookup in a large folder reads none that did not change.
+const fileSlugs = new Map<string, { stamp: string, slug: string }>()
+
 // The slug a folder's file is read as, its own `slug` field included; its path's when it does not parse or sets a bad one, which the collection reports.
 async function fileSlug(dir: string, file: string, localized: boolean): Promise<string> {
+  const path = join(dir, file)
+  const key = `${localized}:${path}`
+
   try {
-    return entrySlug(file, parseEntry(file, await Bun.file(join(dir, file)).text()).data, localized, 1)
+    const { mtimeMs, size } = await stat(path)
+    const stamp = `${mtimeMs}:${size}`
+    const kept = fileSlugs.get(key)
+
+    if (kept?.stamp === stamp)
+      return kept.slug
+
+    const slug = slugRead(file, await Bun.file(path).text(), localized)
+
+    // A file written a moment ago may be written again within the clock's grain, so it is read again until it settles.
+    if (Date.now() - mtimeMs > STAMP_SETTLED_MS)
+      fileSlugs.set(key, { stamp, slug })
+
+    return slug
+  }
+  catch {
+    return slugOf(file)
+  }
+}
+
+function slugRead(file: string, source: string, localized: boolean): string {
+  try {
+    return entrySlug(file, parseEntry(file, source).data, localized, 1)
   }
   catch {
     return slugOf(file)
@@ -719,7 +748,8 @@ function draftOf(collection: Collection<unknown>, entry: Omit<SourceEntry, 'draf
 
 async function compiledBody(collection: Collection<unknown>, body: string, report: (message: string) => void): Promise<CompiledMarkdown | undefined> {
   try {
-    const compiled = await compileMarkdown(body, 1, markdownOf(collection.options).highlight, markdownOf(collection.options).headingLinks)
+    const { highlight, headingLinks } = markdownOf(collection.options)
+    const compiled = await compileMarkdown(body, 1, highlight, headingLinks)
 
     for (const { component, line } of unknownComponents(compiled.segments, collection.components))
       report(`uses <${component}> on line ${line}, which the collection's components do not name`)

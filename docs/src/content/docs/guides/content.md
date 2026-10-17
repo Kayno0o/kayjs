@@ -75,7 +75,9 @@ article
 
 A slug with a slash, like `guides/intro`, needs a catch-all page, `[...slug].kay`.
 
-An entry can set its own slug with a `slug` field in its frontmatter, so a translated post gets a URL in its own language. It is a path of non-empty parts, with no `.` or `..` part, backslash, `?` or `#`, and two entries may not share one. In a localized collection the slug stays under the locale's folder, and `translations` pairs entries by equal slugs, so give a translation the slug of its original when you want them paired. A schema that does not allow extra fields needs `slug` listed.
+An entry can set its own slug with a `slug` field in its frontmatter, so a translated post gets a URL in its own language. It is a path of non-empty parts, with no `.` or `..` part, backslash, `?` or `#`, and two entries may not share one. In a localized collection the slug stays under the locale's folder, and `translations` pairs entries by equal slugs.
+
+Give translations that set their own slugs a `translation` field with the same value, such as `translation: hello`, to pair them. A schema that does not allow extra fields needs `slug` and `translation` listed.
 
 ## Pages of a list
 
@@ -139,7 +141,7 @@ Without a later `>`, a tag such as `<Chart stray` at the end of a body stays tex
 
 ## Highlighting code
 
-You can set `highlight`, `headingLinks` and `readingSpeed` once for every collection, under `markdown` in `kay.config.ts`. A collection's own option of the same name wins. `headingLinks: false` leaves a heading's text without a link to itself.
+You can set `highlight`, `headingLinks`, `readingSpeed` and `imageSizes` once for every collection, under `markdown` in `kay.config.ts`. A collection's own option of the same name wins. `headingLinks: false` leaves a heading's text without a link to itself.
 
 ```ts
 export default defineConfig({
@@ -147,7 +149,9 @@ export default defineConfig({
 })
 ```
 
-Images with a relative path, `![A cat](./cat.png)`, work in the body too, when the file is inside the collection's folder. They load like an imported image, with a `srcset` of the widths in `images.widths`, `width`, `height` and lazy loading. A tag that sets its own `width`, `height`, `srcset` or `sizes`, an SVG, an absolute path or a URL is left as written.
+Images with a relative path, `![A cat](./cat.png)`, work in the body too, when the file is inside the collection's folder. They load like an imported image, with a `srcset` of the widths in `images.widths`, `width`, `height` and lazy loading.
+
+Their `sizes` is `100vw`, which `imageSizes` in `markdown` or on a collection changes, and a tag's own `sizes="..."` wins for that image. A tag that sets its own `width`, `height` or `srcset`, an SVG, an absolute path or a URL is left as written.
 
 Without a highlighter, a code block is `<pre><code class="language-ts">`. Give the collection a `highlight` function and it returns the whole `<pre>` instead, such as Shiki's `codeToHtml`. It runs when the entries compile, at build time.
 

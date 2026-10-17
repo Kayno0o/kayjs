@@ -16,7 +16,7 @@ import { localeState } from '../runtime/locale-state'
 import { previewing, previewState } from '../runtime/preview'
 import { isDraft } from './drafts'
 import { sizedImages } from './images'
-import { contentMode, loadEntries, markdownOf } from './load'
+import { contentMode, loadEntries, markdownOf, translationKey } from './load'
 import { compileMarkdown, countWords, MarkdownError } from './markdown'
 import { ContentError, decodeEntries } from './validate'
 
@@ -50,7 +50,7 @@ export interface Entry<Data> {
   file: string
   // In a localized collection, the locale whose folder holds the entry, the default one's when it stands in for a locale lacking it.
   locale?: string | undefined
-  // In a localized collection, the locales with an entry of this slug, its own included.
+  // In a localized collection, the locales with an entry of this slug, or of the same `translation` field when the entries set one, its own included.
   translations?: readonly string[] | undefined
 }
 
@@ -100,6 +100,8 @@ export interface CollectionOptions<Schema extends TSchema> {
   headingLinks?: boolean | undefined
   // Words a minute `readingTime` counts at, `kay.config.ts`'s `markdown.readingSpeed` unless set here; 230 by default.
   readingSpeed?: number | undefined
+  // The `sizes` of the relative images in the entries' Markdown, `kay.config.ts`'s `markdown.imageSizes` unless set here; `100vw` by default. An image's own `sizes` attribute wins.
+  imageSizes?: string | undefined
   // Entries left out everywhere but `kay dev` and preview mode: from `all()`, `get()`, prerendering, the sitemap and the feed. A boolean field's name, `'draft'`, leaves out those where it is true, which a CMS then reads and writes.
   draft?: ((entry: Entry<Static<Schema>>) => boolean) | BooleanField<Static<Schema>> | undefined
   // The order `all()` lists entries in; by slug otherwise.
@@ -137,6 +139,8 @@ interface Entries<Data> {
   bySlug: Map<string, Entry<Data>>
   // A localized collection's entries by locale, then slug.
   byLocale: Map<string, Map<string, Entry<Data>>>
+  // A localized collection's entries by locale, then the key pairing them with their translations.
+  paired: Map<string, Map<string, Entry<Data>>>
 }
 
 // A folder of Markdown files, or of JSON and YAML data files, read against a schema: `collection('src/content/posts', { schema })`; or the entries a loader gives, `collection({ name: 'posts', load }, { schema })`.
@@ -152,11 +156,16 @@ export function collection<Schema extends TSchema, Components extends Record<str
   const raws = new WeakMap<Entries<Data>, RawEntry[]>()
   const { draft, localized = false } = options
 
-  const decodeEach = (raw: RawEntry[]) => decodeEntries(raw, options.schema, components, localized).map(({ entry, data }) => toEntry<Data>(entry, data as Data, components, localized, markdownOf(options).readingSpeed))
+  const decodeEach = (raw: RawEntry[]) => {
+    const { readingSpeed, imageSizes } = markdownOf(options)
+
+    return decodeEntries(raw, options.schema, components, localized).map(({ entry, data }) => toEntry<Data>(entry, data as Data, components, localized, readingSpeed, imageSizes))
+  }
 
   // Sorts the entries and maps them by slug and locale, setting each one's translations.
   const indexed = (entries: Entry<Data>[]): Entries<Data> => {
     const byLocale = new Map<string, Map<string, Entry<Data>>>()
+    const paired = new Map<string, Map<string, Entry<Data>>>()
 
     entries.sort(options.sort ?? bySlugThenLocale)
 
@@ -167,14 +176,15 @@ export function collection<Schema extends TSchema, Components extends Record<str
       const slugs = byLocale.get(entry.locale) ?? new Map<string, Entry<Data>>()
 
       byLocale.set(entry.locale, slugs.set(entry.slug, entry))
+      paired.set(entry.locale, (paired.get(entry.locale) ?? new Map<string, Entry<Data>>()).set(translationKey(entry), entry))
     }
 
     for (const entry of entries) {
       if (localized)
-        entry.translations = [...byLocale].filter(([, slugs]) => slugs.has(entry.slug)).map(([locale]) => locale).sort()
+        entry.translations = [...paired].filter(([, keys]) => keys.has(translationKey(entry))).map(([locale]) => locale).sort()
     }
 
-    return { list: entries, bySlug: new Map(entries.map(entry => [entry.slug, entry])), byLocale }
+    return { list: entries, bySlug: new Map(entries.map(entry => [entry.slug, entry])), byLocale, paired }
   }
 
   const decode = (raw: RawEntry[]): Entries<Data> => {
@@ -195,7 +205,7 @@ export function collection<Schema extends TSchema, Components extends Record<str
   }
 
   const fromFolder = async () => {
-    loading ??= (async () => decode(await loadEntries(source as string, markdownOf(options).highlight, false, localized, markdownOf(options).headingLinks)))()
+    loading ??= (async () => decode(await loadEntries(source as string, { ...markdownOf(options), localized })))()
 
     try {
       return await loading
@@ -296,16 +306,16 @@ export function collection<Schema extends TSchema, Components extends Record<str
     options: options as CollectionOptions<TSchema>,
     components: components as Components,
     all: async (locale) => {
-      const { list, byLocale } = await loaded()
+      const { list, paired } = await loaded()
       const wanted = localized ? locale ?? localeState()?.locale : undefined
 
       if (wanted === undefined)
         return editableEntries(name, list.filter(entry => !hidden(entry)))
 
-      const own = byLocale.get(wanted)
+      const own = paired.get(wanted)
       const fallback = localeState()?.settings.defaultLocale
 
-      return editableEntries(name, list.filter(entry => !hidden(entry) && (entry.locale === wanted || (entry.locale === fallback && shown(own?.get(entry.slug)) === undefined))))
+      return editableEntries(name, list.filter(entry => !hidden(entry) && (entry.locale === wanted || (entry.locale === fallback && shown(own?.get(translationKey(entry))) === undefined))))
     },
     get: async (slug, locale) => {
       const { bySlug, byLocale } = await loaded()
@@ -385,7 +395,7 @@ function bySlugThenLocale(a: { slug: string, locale?: string | undefined }, b: {
   return a.locale! < b.locale! ? -1 : 1
 }
 
-function toEntry<Data>(entry: RawEntry, data: Data, components: Record<string, Component<never>>, localized: boolean, readingSpeed: number): Entry<Data> {
+function toEntry<Data>(entry: RawEntry, data: Data, components: Record<string, Component<never>>, localized: boolean, readingSpeed: number, imageSizes: string | undefined): Entry<Data> {
   const segments = entry.segments ?? []
   const split = entry.slug.indexOf('/')
   const words = entry.words ?? 0
@@ -397,18 +407,18 @@ function toEntry<Data>(entry: RawEntry, data: Data, components: Record<string, C
     headings: entry.headings ?? [],
     words,
     readingTime: words === 0 ? 0 : Math.max(1, Math.round(words / readingSpeed)),
-    Content: () => render(segments, components, entry.file),
+    Content: () => render(segments, components, entry.file, imageSizes),
     file: entry.file,
   }
 }
 
 // The markup of the segments, each component called as a template calls it: its props, and what it wraps as `children`.
-function render(segments: Segment[], components: Record<string, Component<never>>, file: string): Html {
+function render(segments: Segment[], components: Record<string, Component<never>>, file: string, imageSizes: string | undefined): Html {
   let markup = ''
 
   for (const segment of segments) {
     if (typeof segment === 'string') {
-      markup += sizedImages(localLinks(segment))
+      markup += sizedImages(localLinks(segment), imageSizes)
 
       continue
     }
@@ -423,7 +433,7 @@ function render(segments: Segment[], components: Record<string, Component<never>
     const props = children.length === 0
       ? segment.props
       : { ...segment.props, get children() {
-        return render(children, components, file)
+        return render(children, components, file, imageSizes)
       } }
 
     markup += child(component(props))

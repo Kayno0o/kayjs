@@ -5,7 +5,7 @@ import type { ContentProblem } from './validate'
 import { mkdir, readdir, rm, stat } from 'node:fs/promises'
 import { join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
-import { writeAsset } from '../build/assets'
+import { clientDir, writeAsset, writtenAsset } from '../build/assets'
 import { pruneCache, touchCacheFile } from '../build/cache'
 import { resolveFrom, scriptLoader, transpilerFor, writeAtomically } from '../build/files'
 import { KayError } from '../compiler/errors'
@@ -31,6 +31,8 @@ export interface RawEntry {
   words?: number | undefined
   // The relative images its body links, which the build wrote as assets.
   images?: LinkedImage[] | undefined
+  // The relative images its body names that were not there yet, relative to the project root.
+  missingImages?: string[] | undefined
 }
 
 // Under `.kay/client`, beside the build's other output, and embedded with it in an executable.
@@ -45,7 +47,7 @@ const BACKSLASH = /\\/g
 const BAD_SLUG = /[\\?#\0-\x1F\x7F]/
 const TOP_LEVEL_FIELD = /^["']?([\w$-]+)["']?\s*:/
 // Bumped whenever what an entry compiles to changes shape, so no cache from before is read.
-const CACHE_VERSION = 5
+const CACHE_VERSION = 6
 
 // What the cache holds for one entry, in a file named after the entry's path: the compile it is the result of, the file's size and time when it was read, and its content's hash, which stands in for reading it while the stamp holds.
 interface CachedEntry {
@@ -56,7 +58,7 @@ interface CachedEntry {
   hash: string
   entry: RawEntry
 }
-const STAMP_SETTLED_MS = 2000
+export const STAMP_SETTLED_MS = 2000
 const LEGACY_CACHE_FILE = /^[\da-z]+\.json$/
 const ENTRY_CACHE_FILE = /\.entry\.json$/
 const sweptCaches = new Set<string>()
@@ -68,6 +70,7 @@ export interface MarkdownSettings {
   highlight?: Highlighter | undefined
   headingLinks?: boolean | undefined
   readingSpeed?: number | undefined
+  imageSizes?: string | undefined
 }
 
 export const DEFAULT_READING_SPEED = 230
@@ -82,13 +85,13 @@ export function setMarkdownDefaults(settings: MarkdownSettings | undefined): voi
 }
 
 // A collection's Markdown settings over the config's.
-export function markdownOf(options: MarkdownSettings): { highlight: Highlighter | undefined, headingLinks: boolean, readingSpeed: number } {
+export function markdownOf(options: MarkdownSettings): { highlight: Highlighter | undefined, headingLinks: boolean, readingSpeed: number, imageSizes: string | undefined } {
   const readingSpeed = options.readingSpeed ?? defaults.readingSpeed ?? DEFAULT_READING_SPEED
 
   if (!(Number.isFinite(readingSpeed) && readingSpeed > 0))
     throw new KayError('content-api-misuse', `kay: readingSpeed is ${readingSpeed}: it is a number of words a minute above 0`)
 
-  return { highlight: options.highlight ?? defaults.highlight, headingLinks: options.headingLinks ?? defaults.headingLinks ?? true, readingSpeed }
+  return { highlight: options.highlight ?? defaults.highlight, headingLinks: options.headingLinks ?? defaults.headingLinks ?? true, readingSpeed, imageSizes: options.imageSizes ?? defaults.imageSizes }
 }
 
 let place: { root: string, base: string, config?: string | undefined } | undefined
@@ -134,7 +137,13 @@ function baseOf(): string {
 }
 
 // The entries `kay build` compiled ahead when there are some, read from their files otherwise; `live` always reads the files, as the build does.
-export async function loadEntries(dir: string, highlight?: Highlighter, live = false, localized = false, headingLinks = true): Promise<RawEntry[]> {
+export interface LoadOptions extends MarkdownSettings {
+  // Always read the files, as the build does.
+  live?: boolean | undefined
+  localized?: boolean | undefined
+}
+
+export async function loadEntries(dir: string, { highlight, live = false, localized = false, headingLinks = true }: LoadOptions = {}): Promise<RawEntry[]> {
   if (!live) {
     const built = await builtEntries(dir)
 
@@ -320,6 +329,13 @@ async function importedSource(root: string, configs: (string | undefined)[]): Pr
   return Bun.hash([...hashes].sort(([a], [b]) => a.localeCompare(b)).map(([file, hash]) => `${relative(root, file)}:${hash}`).join('\n')).toString(36)
 }
 
+// What pairs an entry with its translations in a localized collection: its `translation` field when it sets one, else its slug.
+export function translationKey(entry: { slug: string, data: unknown }): string {
+  const given = typeof entry.data === 'object' && entry.data !== null ? (entry.data as { translation?: unknown }).translation : undefined
+
+  return typeof given === 'string' && given !== '' ? given : entry.slug
+}
+
 // The slug of the entry a file holds: its `slug` field when it sets one, after its locale's folder in a localized collection, else the file's path.
 // A slug is a path of the site, so one with an empty, `.` or `..` part, a backslash, a control character, `?` or `#` is refused.
 export function entrySlug(name: string, data: unknown, localized: boolean, line: number): string {
@@ -341,11 +357,25 @@ export function entrySlug(name: string, data: unknown, localized: boolean, line:
   return locale === -1 ? fromPath : `${fromPath.slice(0, locale)}/${given}`
 }
 
-// Whether the images an entry linked are still the files they were built from, writing their assets again when the build's folder lost them.
+// Whether the images an entry linked are still the files they were built from, and none it named has appeared since, writing their assets again when the build's folder lost them.
+// A file whose size and time are as they were is not hashed again, only looked for among the assets.
 async function imagesCurrent(entry: RawEntry, root: string): Promise<boolean> {
-  for (const { file, url } of entry.images ?? []) {
+  for (const file of entry.missingImages ?? []) {
+    if (await Bun.file(join(root, file)).exists())
+      return false
+  }
+
+  const dist = clientDir(root)
+
+  for (const { file, url, stamp } of entry.images ?? []) {
     try {
-      if (await writeAsset(join(root, file), root) !== url)
+      const path = join(root, file)
+      const { mtimeMs, size } = await stat(path)
+
+      if (stamp === `${mtimeMs}:${size}` && await Bun.file(writtenAsset(url, dist)).exists())
+        continue
+
+      if (await writeAsset(path, root, dist) !== url)
         return false
     }
     catch {
@@ -372,7 +402,7 @@ async function compileEntry(name: string, file: string, source: string, highligh
     return { slug, file, data, lines }
 
   const compiled = await compileMarkdown(body, bodyLine!, highlight, where.headingLinks)
-  const { segments, images } = await linkImages(compiled.segments, where.path, where.folder, where.root)
+  const { segments, images, missing } = await linkImages(compiled.segments, where.path, where.folder, where.root)
 
   return {
     slug,
@@ -382,7 +412,8 @@ async function compileEntry(name: string, file: string, source: string, highligh
     segments,
     headings: compiled.headings,
     words: compiled.words,
-    ...images.length > 0 && { images: images.map(({ file: image, url }) => ({ file: relative(where.root, image).split(sep).join('/'), url })) },
+    ...images.length > 0 && { images: images.map(({ file: image, ...rest }) => ({ file: relative(where.root, image).split(sep).join('/'), ...rest })) },
+    ...missing.length > 0 && { missingImages: missing.map(image => relative(where.root, image).split(sep).join('/')) },
   }
 }
 

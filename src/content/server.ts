@@ -20,7 +20,7 @@ import { claimFeed } from './claims'
 import { entries, registerCollections } from './edit'
 import { feedXml } from './feed'
 import { isCollection } from './index'
-import { loadEntries, manifestFile, markdownOf, pruneContentCache, setContentPlace } from './load'
+import { loadEntries, manifestFile, markdownOf, pruneContentCache, setContentPlace, translationKey } from './load'
 import { ContentError, decodeEntries } from './validate'
 
 // A component a Markdown entry writes, with the props it gives, for `kay check` to type them.
@@ -78,7 +78,7 @@ export async function writeContentManifests(root: string, clientBase: string, co
     if (collection.dir === undefined)
       continue
 
-    const entries = await loadEntries(collection.dir, markdownOf(collection.options).highlight, true, collection.options.localized === true, markdownOf(collection.options).headingLinks)
+    const entries = await loadEntries(collection.dir, { ...markdownOf(collection.options), live: true, localized: collection.options.localized === true })
 
     decodeEntries(entries, collection.options.schema, collection.options.components ?? {}, collection.options.localized)
     await Bun.write(manifestFile(clientBase, collection.dir), JSON.stringify(entries))
@@ -113,7 +113,7 @@ export async function contentProblems(root: string, config?: string, site = true
     read.push(resolve(dirname(read[0]!), collection.dir))
 
     try {
-      const entries = await loadEntries(collection.dir, markdownOf(collection.options).highlight, true, collection.options.localized === true, markdownOf(collection.options).headingLinks)
+      const entries = await loadEntries(collection.dir, { ...markdownOf(collection.options), live: true, localized: collection.options.localized === true })
 
       for (const entry of entries)
         uses.push(...componentUses(name, collection.components, entry.file, entry.segments ?? []))
@@ -221,9 +221,9 @@ export async function localizedSlugs(root: string, config?: string): Promise<Map
 
     const byLocale = new Map<string, Set<string>>()
 
-    for (const { slug, locale } of await entries(name)) {
-      if (locale !== undefined)
-        byLocale.set(locale, (byLocale.get(locale) ?? new Set()).add(slug))
+    for (const entry of await entries(name)) {
+      if (entry.locale !== undefined)
+        byLocale.set(entry.locale, (byLocale.get(entry.locale) ?? new Set()).add(translationKey(entry)))
     }
 
     found.set(name, byLocale)

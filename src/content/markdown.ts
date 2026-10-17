@@ -41,7 +41,6 @@ export type Highlighter = (code: string, language: string | undefined) => string
 const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/
 // Where a heading and a code block open, each closed by the first `</a></hN>` or `</code></pre>` after it.
 const HEADING_OPEN = /<h([1-6]) id="([^"]*)"><a href="#[^"]*">/g
-const PLAIN_HEADING_OPEN = /<h([1-6]) id="([^"]*)">/g
 const CODE_OPEN = /<pre><code(?: class="language-([^"]*)")?>/g
 const CODE_CLOSE = '</code></pre>'
 // Where a tag naming a component opens: capitalized, as kay components are; lowercase tags stay HTML.
@@ -136,11 +135,22 @@ export interface RenderedMarkdown {
 // The highlighter gets the fence's language as written, so for a user's text it falls back on one it does not know rather than throw.
 export async function renderMarkdown(markdown: string, options: { highlight?: Highlighter | undefined, headingLinks?: boolean | undefined } = {}): Promise<RenderedMarkdown> {
   const links = options.headingLinks !== false
-  const html = withImageDefaults(Bun.markdown.html(markdown, { ...MARKDOWN_OPTIONS, headings: { ids: true, autolink: links } }))
+  // Always rendered with anchors, which tell Markdown's headings from raw `<h2 id>` tags; they are taken off after when `headingLinks` is false.
+  let html = withImageDefaults(Bun.markdown.html(markdown, { ...MARKDOWN_OPTIONS, headings: { ids: true, autolink: true } }))
   const headings: Heading[] = []
+  let plain = ''
+  let last = 0
 
-  for (const { open: [, depth, id], inner } of elements(html, links ? HEADING_OPEN : PLAIN_HEADING_OPEN, ([, depth]) => links ? `</a></h${depth}>` : `</h${depth}>`))
+  for (const { open, inner, end } of elements(html, HEADING_OPEN, ([, depth]) => `</a></h${depth}>`)) {
+    const [, depth, id] = open
+
     headings.push({ depth: Number(depth), id: id!, text: decode(inner.replace(TAGS, '')).trim() })
+    plain += `${html.slice(last, open.index)}<h${depth} id="${id}">${inner}</h${depth}>`
+    last = end
+  }
+
+  if (!links)
+    html = plain + html.slice(last)
 
   return { html: options.highlight ? await highlighted(html, options.highlight) : html, headings }
 }

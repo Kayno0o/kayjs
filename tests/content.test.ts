@@ -136,7 +136,7 @@ describe('the compile cache of entries', () => {
       await Bun.write(join(cache, 'abc123.json'), '{}')
       setContentPlace(root, root)
 
-      const titles = async () => (await loadEntries('posts', undefined, true)).map(entry => (entry.data as { title: string }).title)
+      const titles = async () => (await loadEntries('posts', { live: true })).map(entry => (entry.data as { title: string }).title)
 
       expect(await titles()).toEqual(['A', 'B'])
 
@@ -171,7 +171,7 @@ describe('the compile cache of entries', () => {
       await utimes(join(root, 'posts/settled.md'), old, old)
       setContentPlace(root, root)
 
-      const titles = async () => (await loadEntries('posts', undefined, true)).map(found => (found.data as { title: string }).title)
+      const titles = async () => (await loadEntries('posts', { live: true })).map(found => (found.data as { title: string }).title)
 
       expect(await titles()).toEqual(['One', 'One'])
 
@@ -654,7 +654,7 @@ describe('Markdown outside collections', () => {
     let mark = 'old'
     // The highlighter's source is the same in both runs, standing for one that calls a helper the config imports.
     const highlight = (code: string) => `<pre data-by="${mark}">${code}</pre>`
-    const loaded = async () => (await loadEntries('posts', highlight, true)).flatMap(entry => entry.segments ?? []).join()
+    const loaded = async () => (await loadEntries('posts', { highlight, live: true })).flatMap(entry => entry.segments ?? []).join()
 
     try {
       setContentPlace(dir, dir, join(dir, 'content.config.ts'))

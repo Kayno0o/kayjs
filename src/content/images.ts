@@ -1,6 +1,7 @@
 // Relative images in a Markdown body: linked to the built assets when the entry compiles, and given their srcset and sizes when it renders, as `image()` gives an imported one.
 import type { Segment } from './markdown'
 import { realpathSync } from 'node:fs'
+import { stat } from 'node:fs/promises'
 import { dirname, resolve, sep } from 'node:path'
 import { writeAsset } from '../build/assets'
 import { escapeAttribute } from '../runtime/escape'
@@ -11,11 +12,16 @@ import { imageHeader } from '../server/image-format'
 export interface LinkedImage {
   file: string
   url: string
+  // The file's time and size when it was linked, which stand in for hashing it while they hold.
+  stamp?: string | undefined
 }
 
 const IMG_TAG = /<img\b[^>]*>/gi
 const SRC = /(\ssrc=")([^"]*)(")/i
-const SIZED = /\s(?:width|height|srcset|sizes)\s*=/i
+const SIZED = /\s(?:width|height|srcset)\s*=/i
+const SIZES_ATTRIBUTE = /\ssizes\s*=/i
+// An author's `sizes` kay reads: double-quoted, as the attribute is nearly always written.
+const OWN_SIZES = /\ssizes="([^"]*)"/i
 const MARKER = / data-kay-image="(\d+)x(\d+)"/
 const ANY_MARKER = / data-kay-image(?:=(?:"[^"]*"|'[^']*'|[^\s>]*))?/gi
 const BUILT = /^\/_kay\/assets\//
@@ -29,7 +35,7 @@ function insideOf(dir: string, path: string): boolean {
 }
 
 // The built asset a relative `src` names, or undefined for a URL, an absolute path, a file outside the collection's folder, a missing one or one kay does not resize.
-async function linkedImage(src: string, entryDir: string, folder: string, root: string): Promise<{ file: string, url: string, width: number, height: number, animated: boolean } | undefined> {
+async function linkedImage(src: string, entryDir: string, folder: string, root: string, missing: Set<string>): Promise<{ file: string, url: string, stamp: string, width: number, height: number, animated: boolean } | undefined> {
   const decoded = src.replace(ENTITY, entity => ENTITIES[entity]!)
 
   if (decoded === '' || SCHEME.test(decoded) || decoded.includes('\0') || decoded.includes('\\'))
@@ -58,17 +64,23 @@ async function linkedImage(src: string, entryDir: string, folder: string, root: 
       return undefined
 
     const { width, height, animated } = await imageHeader(Bun.file(file))
+    const { mtimeMs, size } = await stat(file)
 
-    return { file, url: await writeAsset(file, root), width, height, animated }
+    return { file, url: await writeAsset(file, root), stamp: `${mtimeMs}:${size}`, width, height, animated }
   }
   catch {
+    // A file not there yet is linked once it is, which the entry's cache looks for.
+    if (!file.includes('\0') && !await Bun.file(file).exists())
+      missing.add(file)
+
     return undefined
   }
 }
 
 // The segments with each relative image of their HTML pointed at its built asset, and marked with its size for `sizedImages` when it can be resized; the images linked, for the entry's cache.
-export async function linkImages(segments: Segment[], entryFile: string, folder: string, root: string): Promise<{ segments: Segment[], images: LinkedImage[] }> {
-  const images = new Map<string, string>()
+export async function linkImages(segments: Segment[], entryFile: string, folder: string, root: string): Promise<{ segments: Segment[], images: LinkedImage[], missing: string[] }> {
+  const images = new Map<string, LinkedImage>()
+  const missing = new Set<string>()
   const entryDir = dirname(entryFile)
 
   const link = async (html: string): Promise<string> => {
@@ -89,7 +101,7 @@ export async function linkImages(segments: Segment[], entryFile: string, folder:
         continue
       }
 
-      const linked = await linkedImage(src[2]!, entryDir, folder, root)
+      const linked = await linkedImage(src[2]!, entryDir, folder, root, missing)
 
       if (!linked) {
         if (tag !== match[0]) {
@@ -100,9 +112,9 @@ export async function linkImages(segments: Segment[], entryFile: string, folder:
         continue
       }
 
-      images.set(linked.file, linked.url)
+      images.set(linked.file, { file: linked.file, url: linked.url, stamp: linked.stamp })
 
-      const marked = linked.animated || SIZED.test(tag) ? '' : ` data-kay-image="${linked.width}x${linked.height}"`
+      const marked = linked.animated || SIZED.test(tag) || (SIZES_ATTRIBUTE.test(tag) && !OWN_SIZES.test(tag)) ? '' : ` data-kay-image="${linked.width}x${linked.height}"`
       const rewritten = tag.replace(SRC, (_, start: string, __, end: string) => `${start}${escapeAttribute(linked.url)}${end}${marked}`)
 
       out += html.slice(last, match.index) + rewritten
@@ -123,11 +135,11 @@ export async function linkImages(segments: Segment[], entryFile: string, folder:
 
   const linked = await walk(segments)
 
-  return { segments: linked, images: [...images].map(([file, url]) => ({ file, url })) }
+  return { segments: linked, images: [...images.values()], missing: [...missing] }
 }
 
 // The HTML with each image `linkImages` marked given the `srcset`, `sizes`, `width` and `height` `image()` gives, so it loads the width its screen needs.
-export function sizedImages(html: string): string {
+export function sizedImages(html: string, sizes = '100vw'): string {
   if (!html.includes('data-kay-image'))
     return html
 
@@ -138,13 +150,15 @@ export function sizedImages(html: string): string {
     if (!size || !src || !BUILT.test(src[2]!))
       return tag
 
-    const props = image(src[2]!.replace(ENTITY, entity => ENTITIES[entity]!), { width: Number(size[1]), height: Number(size[2]) })
+    const own = OWN_SIZES.exec(tag)
+    const props = image(src[2]!.replace(ENTITY, entity => ENTITIES[entity]!), { width: Number(size[1]), height: Number(size[2]), sizes: own ? own[1]!.replace(ENTITY, entity => ENTITIES[entity]!) : sizes })
 
     if (props.srcset === undefined)
       return tag.replace(MARKER, '')
 
     return tag
       .replace(MARKER, '')
+      .replace(OWN_SIZES, '')
       .replace(SRC, (_, start: string, __, end: string) => `${start}${escapeAttribute(props.src)}${end} srcset="${escapeAttribute(props.srcset!)}" sizes="${escapeAttribute(props.sizes!)}" width="${props.width}" height="${props.height}"`)
   })
 }

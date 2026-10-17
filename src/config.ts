@@ -268,6 +268,8 @@ export interface MarkdownConfig {
   headingLinks?: boolean | undefined
   // Words a minute an entry's `readingTime` counts at, 230 by default.
   readingSpeed?: number | undefined
+  // The `sizes` of the relative images in Markdown bodies, `100vw` unless set: how wide they show, such as `(min-width: 60rem) 40rem, 100vw`. An image's own `sizes` attribute wins.
+  imageSizes?: string | undefined
 }
 
 export interface ImagesConfig {
