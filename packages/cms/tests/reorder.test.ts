@@ -42,9 +42,16 @@ describe('keyDirection', () => {
 
 describe('reorderKey', () => {
   function pressed(name: string, held: Partial<KeyboardEvent> = {}) {
-    const event = { ...key(name, { altKey: true }), defaultPrevented: false, ...held, preventDefault() { this.defaultPrevented = true } }
+    const event = {
+      ...key(name, { altKey: true }),
+      defaultPrevented: false,
+      ...held,
+      preventDefault() {
+        this.defaultPrevented = true
+      },
+    }
 
-    return event as KeyboardEvent
+    return event
   }
 
   it('stops the key at either end of the list, where the item cannot move', () => {
