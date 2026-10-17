@@ -1,0 +1,7 @@
+--- server
+import { reply } from './chat.kay'
+--- script
+import Chat from '@kaynooo/kayjs-ai/chat.kay'
+---
+h1 Hostile
+Chat(action={reply} label="Hostile" tableLabel={'Tab"le <x> & more'})

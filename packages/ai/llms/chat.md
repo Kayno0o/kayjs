@@ -34,7 +34,7 @@ Chat(action={reply} label="Assistant")
 - `keep`: how many of the latest messages each send posts (20), so a long chat stays under the schema's `maxItems`. The history posted opens on a user message, so an assistant one at its start, such as a greeting in `initial`, is left out; turns without text are not counted.
 - `initial`: `Message[]` shown to start with and sent with the first message.
 - `label`: names the chat, its message list and its field for screen readers (`Chat`).
-- Texts, in English by default: `placeholder`, `sendLabel`, `stopLabel`, `retryLabel`, `thinkingLabel` (read out while the first words are awaited), `stoppedLabel` (marks a reply cut by Stop), `tableLabel` (names a table of a reply, `Table`), `errorMessage`.
+- Texts, in English by default: `placeholder`, `sendLabel`, `stopLabel`, `retryLabel`, `thinkingLabel` (read out while the first words are awaited), `stoppedLabel` (marks a reply cut by Stop), `tableLabel` (names a table of a reply, `Table`; a reply with several numbers them `Table 1`, `Table 2`), `errorMessage`.
 - `toolDetails` (true): each tool call opens to its arguments and result, as plain text. `false` shows the name and status only. `runningLabel`, `doneLabel`, `failedLabel`, `argumentsLabel` and `resultLabel` word the status and the two parts (`Running`, `Done`, `Failed`, `Arguments`, `Result`). The name is the tool's, such as `add_note`.
 - `class` on the section.
 
@@ -45,5 +45,5 @@ Chat(action={reply} label="Assistant")
 - A refused call or a stream that breaks off shows the refusal's message when the action gave one, else `errorMessage`, in a `kui-notice` alert with a retry button, when no word of the reply came, asking again with the same history, no second copy of the message; what a broken stream had delivered stays.
 - The log is `role="log"`; the turn being written is `aria-hidden` and a hidden status line says `thinkingLabel`, so a screen reader hears each finished turn once, not word by word. The log scrolls with the reply unless the visitor scrolled up.
 - Tool calls: `ul.kai-chat-calls` before `.kai-chat-text` in the turn, one `li.kai-chat-call[data-status]` per call (`running`, `done`, `failed`) with `.kai-chat-call-name` and `.kai-chat-call-status`, and a `details` holding `pre.kai-chat-call-code` for the arguments and result. A turn that only called tools joins the history without text and is not posted back, since a provider refuses an empty message. Results are what the model was told, shown as is: keep a result you would not show the visitor out of the actions you offer, or set `toolDetails={false}`.
-- A table of a reply sits in `.kai-chat-table`, a focusable `region` that scrolls sideways when the table is wider than its bubble; cells keep their words whole.
+- A table of a reply sits in `.kai-chat-table`, a focusable `group` named by `tableLabel` that scrolls sideways when the table is wider than its bubble; cells keep their words whole.
 - Markup: `.kai-chat` holds `.kai-chat-log` (turns `.kai-chat-turn[data-role]`, the pending one `[data-pending]`, text in `.kai-chat-text`) and `.kai-chat-form`; override them in the app's CSS.

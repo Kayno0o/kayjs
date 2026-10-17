@@ -11,6 +11,10 @@ import './chat.css'
 const REPLY: SanitizeOptions = { tags: ['table', 'thead', 'tbody', 'tr', 'th', 'td'] }
 // How close to the end of the log the visitor must be for new text to keep it scrolled down.
 const PINNED_PX = 48
+const ATTRIBUTE_UNSAFE = /[&"<]/g
+const ENTITIES: Record<string, string> = { '&': '&amp;', '"': '&quot;', '<': '&lt;' }
+
+const attribute = (text: string) => text.replace(ATTRIBUTE_UNSAFE, char => ENTITIES[char]!)
 
 interface Turn extends Message {
   id: number
@@ -38,7 +42,7 @@ const { action, initial = [], label = 'Chat', placeholder = 'Write a message…'
   stoppedLabel?: string | undefined
   // How many of the latest messages each send posts, so the history never outgrows the action's `maxItems`; the history posted opens on a user message, so an assistant one at its start is left out.
   keep?: number | undefined
-  // Names a table of a reply, which scrolls sideways inside its bubble when it is wider.
+  // Names a table of a reply, which scrolls sideways inside its bubble when it is wider; a reply with several numbers them, `Table 1`, `Table 2`.
   tableLabel?: string | undefined
   // Whether each tool call opens to its arguments and result, shown as plain text; false shows its name and status only.
   toolDetails?: boolean | undefined
@@ -83,16 +87,21 @@ function show(value: string | Progress) {
   calls.set(value.calls)
 }
 
-// A table is wrapped, once sanitized, in a box that scrolls sideways and takes the keyboard's focus, except in the turn being written, which is hidden from screen readers.
+// A table is wrapped, once sanitized, in a box that scrolls sideways and takes the keyboard's focus, except in the turn being written, which is hidden from screen readers. Several tables of one reply are numbered, so no two groups share a name.
 function markdown(text: string, scrollable = true) {
   const html = sanitizeHtml(markdownHtml(text), REPLY)
+  const tables = html.split('<table>').length - 1
 
-  if (!html.includes('<table'))
+  if (tables === 0)
     return html
 
-  const label = tableLabel.replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;')
+  let count = 0
 
-  return trustHtml(html.replaceAll('<table>', `<div class="kai-chat-table"${scrollable ? ` tabindex="0" role="region" aria-label="${label}"` : ''}><table>`).replaceAll('</table>', '</table></div>'))
+  return trustHtml(html.replaceAll('<table>', () => {
+    count++
+
+    return `<div class="kai-chat-table"${scrollable ? ` tabindex="0" role="group" aria-label="${attribute(tables === 1 ? tableLabel : `${tableLabel} ${count}`)}"` : ''}><table>`
+  }).replaceAll('</table>', '</table></div>'))
 }
 
 // A message the schema refuses would fail every later send, so it leaves the history and goes back to the field, ahead of what the visitor typed since.

@@ -253,6 +253,32 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
     expect(await page.a11y('.kai-chat')).toEqual([])
   })
 
+  test('a hostile table label stays one attribute, and several tables get numbered names that no other reply repeats as a landmark', async () => {
+    const page = await site.open('/hostile')
+    const table = '| a | b |\n| --- | --- |\n| 1 | 2 |'
+
+    fakeAi.reply(`${table}\n\nBetween\n\n${table}`)
+    fakeAi.reply(table)
+    await page.fill('textarea', 'Two tables')
+    await page.press('Enter')
+    await page.waitFor('[data-pending]', { gone: true })
+    await page.waitFor('.kai-chat-table')
+    await page.fill('textarea', 'One table')
+    await page.press('Enter')
+    await page.waitFor('.kai-chat-turn[data-role="assistant"]:nth-of-type(4) .kai-chat-table')
+    await page.waitFor('[data-pending]', { gone: true })
+
+    const boxes = await page.evaluate(() => [...document.querySelectorAll('.kai-chat-table')].map(box => ({ label: box.getAttribute('aria-label'), role: box.getAttribute('role'), attributes: box.getAttributeNames().sort().join(',') })))
+
+    expect(boxes).toEqual([
+      { label: 'Tab"le <x> & more 1', role: 'group', attributes: 'aria-label,class,role,tabindex' },
+      { label: 'Tab"le <x> & more 2', role: 'group', attributes: 'aria-label,class,role,tabindex' },
+      { label: 'Tab"le <x> & more', role: 'group', attributes: 'aria-label,class,role,tabindex' },
+    ])
+    expect(await page.count('.kai-chat-text x')).toBe(0)
+    expect(await page.a11y('.kai-chat')).toEqual([])
+  })
+
   test('the log follows a reply while the visitor is at its end, and leaves them where they scrolled to', async () => {
     const atEnd = () => {
       const log = document.querySelector<HTMLElement>('[role="log"]')!

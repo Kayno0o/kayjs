@@ -102,7 +102,7 @@ A page, with or without a `server` fence, hands the action straight to `Chat`. T
 - A message the action's schema refuses (422) goes back to the field, also when it was a retry, and the refusal's message shows.
 - Images in a reply are not shown. A model that read a hostile page could point an image at a link carrying your visitor's conversation.
 
-Every label is a prop, so you can write them in your language: `placeholder`, `sendLabel`, `stopLabel`, `retryLabel`, `thinkingLabel`, `stoppedLabel`, `tableLabel` and `errorMessage`. The action may also `ctx.fail`. A refusal from the action, such as a rate limit's message, shows instead of `errorMessage`. `initial` gives messages to start with.
+Every label is a prop, so you can write them in your language: `placeholder`, `sendLabel`, `stopLabel`, `retryLabel`, `thinkingLabel`, `stoppedLabel`, `tableLabel` (a reply with several tables numbers them) and `errorMessage`. The action may also `ctx.fail`. A refusal from the action, such as a rate limit's message, shows instead of `errorMessage`. `initial` gives messages to start with.
 
 The chat posts its last 20 messages with each one; the `keep` prop changes that, and what is posted always opens on one of the visitor's, so an assistant greeting in `initial` is never the first message. Keep `maxItems` in the action's schema at least as high as `keep`, bound `content`, and add a rate limit.
 
