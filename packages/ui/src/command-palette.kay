@@ -5,9 +5,9 @@ import { effect, memo, searchResults, shortcut, signal, uid } from 'kay'
 import { stepIndex } from './cycle'
 import Icon from './icon.kay'
 import { isPaletteLink, paletteHits, paletteMatches, paletteSections, withRecent } from './palette'
-import { word } from './words'
+import { wording } from 'kay/words'
 
-const { open = false, onOpenChange, entries, groups = [], recent = [], onRecentChange, hotkey = 'k', siteSearch = false, siteSearchLabel = word('commandPalette.siteSearchLabel', 'In the pages'), siteSearchError = word('commandPalette.siteSearchError', 'The pages could not be searched'), label = word('commandPalette.label', 'Search'), placeholder = word('commandPalette.placeholder', 'Search'), emptyLabel = word('commandPalette.emptyLabel', 'No results'), recentLabel = word('commandPalette.recentLabel', 'Recent'), resultsLabel, class: className } = props<{
+const { open = false, onOpenChange, entries, groups = [], recent = [], onRecentChange, hotkey = 'k', siteSearch = false, siteSearchLabel = wording('ui.commandPalette.siteSearchLabel', 'In the pages'), siteSearchError = wording('ui.commandPalette.siteSearchError', 'The pages could not be searched'), label = wording('ui.commandPalette.label', 'Search'), placeholder = wording('ui.commandPalette.placeholder', 'Search'), emptyLabel = wording('ui.commandPalette.emptyLabel', 'No results'), recentLabel = wording('ui.commandPalette.recentLabel', 'Recent'), resultsLabel, class: className } = props<{
   // Shows the palette; the hotkey opens and closes it too, and `onOpenChange` reports every change for a parent driving it.
   open?: boolean | undefined
   onOpenChange?: ((open: boolean) => void) | undefined
@@ -43,7 +43,7 @@ interface Row {
 }
 
 const id = uid()
-const counted = resultsLabel ?? ((count: number) => word('commandPalette.resultsLabel', count === 1 ? '1 result' : '{count} results', { count }))
+const counted = resultsLabel ?? ((count: number) => wording('ui.commandPalette.resultsLabel', count === 1 ? '1 result' : '{count} results', { count }))
 const shown = signal(open)
 const followedRecently = signal<string[]>(recent)
 const query = signal('')

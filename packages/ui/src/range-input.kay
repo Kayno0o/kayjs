@@ -4,7 +4,7 @@ import type { RangeValue } from './range'
 import { effect, untrack } from 'kay'
 import { onFormReset, startRef } from './form-reset'
 import { rangeFrom } from './range'
-import { word } from './words'
+import { wording } from 'kay/words'
 
 const { value = [null, null], min, max, step, label, fromLabel, toLabel, unit, onChange, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
   // The bounds to start with; a pair whose parent passes another follows it.
@@ -62,8 +62,8 @@ const highRef = startRef<HTMLInputElement>((element) => {
 onFormReset(() => low, commit)
 ---
 .kui-range-input({...rest} role="group" aria-label={label} class={className})
-  input.kui-field-input.kui-range-input-box(ref={lowRef} type="number" inputmode="decimal" aria-label={fromLabel ?? word('rangeInput.fromLabel', '{label} from', { label })} placeholder={min?.toString()} min={min} max={max} step={step} value={value[0] ?? ''} onChange={commit})
+  input.kui-field-input.kui-range-input-box(ref={lowRef} type="number" inputmode="decimal" aria-label={fromLabel ?? wording('ui.rangeInput.fromLabel', '{label} from', { label })} placeholder={min?.toString()} min={min} max={max} step={step} value={value[0] ?? ''} onChange={commit})
   span.kui-range-input-separator(aria-hidden="true") -
-  input.kui-field-input.kui-range-input-box(ref={highRef} type="number" inputmode="decimal" aria-label={toLabel ?? word('rangeInput.toLabel', '{label} to', { label })} placeholder={max?.toString()} min={min} max={max} step={step} value={value[1] ?? ''} onChange={commit})
+  input.kui-field-input.kui-range-input-box(ref={highRef} type="number" inputmode="decimal" aria-label={toLabel ?? wording('ui.rangeInput.toLabel', '{label} to', { label })} placeholder={max?.toString()} min={min} max={max} step={step} value={value[1] ?? ''} onChange={commit})
   if unit
     span.kui-range-input-unit {unit}

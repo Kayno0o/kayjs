@@ -1,16 +1,12 @@
-import type { MessageValue } from 'kay/i18n'
-import { pageLocale, wording } from 'kay/words'
+import { pageLocale } from 'kay/words'
 
-// A text a component shows by default: the message at `ui.<key>` in the app's catalogs, else its English; a prop given to the component replaces both.
-export function word(key: string, english: string, params?: Record<string, MessageValue>): string {
-  return wording(`ui.${key}`, english, params)
-}
+const ENGLISH = /^en(?:-|$)/
 
-// The page's locale for the dates a chart draws, `en` keeping the day-first English (`5 Jan`) it always drew.
+// The page's locale for the dates a chart draws, every `en` keeping the day-first English (`5 Jan`) it always drew.
 function dateLocale(): string {
   const page = pageLocale()
 
-  return page === 'en' ? 'en-GB' : page
+  return ENGLISH.test(page) ? 'en-GB' : page
 }
 
 // `5 Jan` in the page's locale.

@@ -9,6 +9,7 @@ Every text kayjs-ui shows by default is looked up in the app's catalogs (`src/me
 - CommandPalette's `recentLabel` names the heading the recently followed links sit under.
 - ContributionGraph's month names and the day and month a LineChart draws on its axis follow the page's locale; `en` keeps `5 Jan`.
 - Rating's `{value}` and `{max}` and RangeInput's `{label}` fill the messages of the same name.
+- ContactForm's labels read kayjs-mail's `mail.contact.form.*` messages instead, and MarkdownEditor's `Uploading name…` marker, a placeholder in the text until the upload ends, stays English.
 - Texts the app's data owns, a `failure`, a `message` or a `label` it passes, are the app's to word.
 
 ## The keys
@@ -24,7 +25,7 @@ Every text kayjs-ui shows by default is looked up in the app's catalogs (`src/me
 - `ui.imageCropper.*`: `cropLabel` (`Crop area: arrows move it, Shift and the arrows resize it`), `cropText` (`{w} by {h} pixels at {x}, {y}`)
 - `ui.lineChart.*`: `rangeHint` (`Shift with the arrow keys picks a span, Enter applies it, Escape drops it`)
 - `ui.loadMore.*`: `failureLabel` (`Could not load more.`), `loadingLabel` (`Loading more…`), `retryLabel` (`Try again`)
-- `ui.markdownEditor.*`: `keysHint` (`Tab indents a list item; Escape then Tab leaves the field.`), `placeholder` (`Write markdown…`), `uploadFailure` (`Could not upload the image`), `uploading` (`Uploading {name}…`)
+- `ui.markdownEditor.*`: `keysHint` (`Tab indents a list item; Escape then Tab leaves the field.`), `placeholder` (`Write markdown…`), `uploadFailure` (`Could not upload the image`)
 - `ui.mediaGallery.*`: `closeLabel` (`Close`), `empty` (`No media.`), `itemLabel` (`Media {n}`), `nextLabel` (`Next`), `openLabel` (`Open full size`), `previousLabel` (`Previous`)
 - `ui.multiSelect.*`: `allLabel` (`All`), `emptyLabel` (`No match`), `noneLabel` (`None`), `placeholder` (`Any`), `searchLabel` (`Search`), `selectedLabel` (`{count} selected`)
 - `ui.pagination.*`: `label` (`Pagination`), `nextLabel` (`Next`), `previousLabel` (`Previous`)

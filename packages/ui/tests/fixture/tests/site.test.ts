@@ -633,6 +633,20 @@ describe('the texts a component shows by default, in the app\'s catalogs', () =>
     expect(french).toContain('aria-label="Posts"')
   })
 
+  test('send the browser the messages an island only reads after the page loaded', async () => {
+    // The islands are built, so the page sends the messages its islands name in their source.
+    const built = await testSite({ root: ROOT, browser: true })
+
+    try {
+      const payload = (/<script type="application\/json" data-kay-i18n>(.*?)<\/script>/).exec((await built.visit('/fr/table')).html)?.[1]
+
+      expect(Object.keys((JSON.parse(payload!) as { messages: object }).messages)).toEqual(expect.arrayContaining(['ui.table.rowCount', 'ui.table.filterLabel']))
+    }
+    finally {
+      await built.close()
+    }
+  })
+
   test('follow the page\'s locale for the months a chart names and the count a table gives, a plural message included', async () => {
     const graph = (await visit('/fr/charts')).html
     const filtered = (await visit('/fr/table?q=a')).html

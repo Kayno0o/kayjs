@@ -2,9 +2,9 @@
 import type { JSX } from 'kay'
 import type { BarListRow } from './plot'
 import { memo } from 'kay'
-import { word } from './words'
+import { wording } from 'kay/words'
 
-const { rows, onSelect, empty = word('barList.empty', 'No data yet.'), class: className, ...rest } = props<Omit<JSX.IntrinsicElements['ul'], 'class' | 'children' | 'onSelect'> & {
+const { rows, onSelect, empty = wording('ui.barList.empty', 'No data yet.'), class: className, ...rest } = props<Omit<JSX.IntrinsicElements['ul'], 'class' | 'children' | 'onSelect'> & {
   rows: Row[]
   // Makes every row a button handing back the row it was pressed on.
   onSelect?: ((row: Row) => void) | undefined

@@ -3,7 +3,7 @@ import type { CropHandle, CropRect } from '@kaynooo/utils/browser/canvas'
 import type { JSX } from 'kay'
 import { createCenteredCrop, moveCrop, pointerToNatural, resizeCrop } from '@kaynooo/utils/browser/canvas'
 import { effect, onCleanup, onMount, signal, untrack } from 'kay'
-import { word } from './words'
+import { wording } from 'kay/words'
 
 interface ImageSize { width: number, height: number }
 
@@ -13,7 +13,7 @@ const KEY_STEP = 0.01
 const KEY_STEP_LARGE = 0.1
 const DIRECTIONS: Partial<Record<string, [number, number]>> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }
 
-const { src, ratio = 1, minSize = 32, grid = false, alt = '', cropLabel = word('imageCropper.cropLabel', 'Crop area: arrows move it, Shift and the arrows resize it'), cropText = word('imageCropper.cropText', '{w} by {h} pixels at {x}, {y}'), onCrop, onLoad, footer, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
+const { src, ratio = 1, minSize = 32, grid = false, alt = '', cropLabel = wording('ui.imageCropper.cropLabel', 'Crop area: arrows move it, Shift and the arrows resize it'), cropText = wording('ui.imageCropper.cropText', '{w} by {h} pixels at {x}, {y}'), onCrop, onLoad, footer, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
   src: string
   // Width over height the crop is locked to; a change centres the crop again.
   ratio?: number | undefined

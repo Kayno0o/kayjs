@@ -2,7 +2,7 @@ import { join } from 'node:path'
 import { expect, test } from 'bun:test'
 
 const ROOT = join(import.meta.dir, '..')
-const WORD = /\bword\('([\w.]+)'/g
+const WORD = /\bwording\('ui\.([\w.]+)'/g
 const LISTED = /`ui\.(\w+)\.\*`: (.*)/g
 const PROP = /`(\w+)` \(/g
 

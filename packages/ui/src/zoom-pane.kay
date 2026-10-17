@@ -4,14 +4,14 @@ import type { Plate } from './zoom'
 import { onCleanup, onMount, signal } from 'kay'
 import IconButton from './icon-button.kay'
 import { fitted, held, MOST, movedBy, NOTCH_ZOOM, wheelZoom, zoomedAt } from './zoom'
-import { word } from './words'
+import { wording } from 'kay/words'
 
 // How far a press may wander before it is a drag rather than a click, so what stands on the plate stays clickable.
 const SLOP = 3
 // How far one arrow press moves the plate, in pixels.
 const KEY_STEP = 40
 
-const { label, most = MOST, tools = true, zoomInLabel = word('zoomPane.zoomInLabel', 'Zoom in'), zoomOutLabel = word('zoomPane.zoomOutLabel', 'Zoom out'), fitLabel = word('zoomPane.fitLabel', 'Fit'), class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'role' | 'tabindex'> & {
+const { label, most = MOST, tools = true, zoomInLabel = wording('ui.zoomPane.zoomInLabel', 'Zoom in'), zoomOutLabel = wording('ui.zoomPane.zoomOutLabel', 'Zoom out'), fitLabel = wording('ui.zoomPane.fitLabel', 'Fit'), class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'role' | 'tabindex'> & {
   // Names the view for screen readers, since what it holds is a picture rather than words.
   label: string
   // How far in it may be taken, as a multiple of fitted.

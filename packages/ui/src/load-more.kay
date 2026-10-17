@@ -2,9 +2,9 @@
 import type { InfiniteList } from './infinite-list'
 import Button from './button.kay'
 import WhenVisible from './when-visible.kay'
-import { word } from './words'
+import { wording } from 'kay/words'
 
-const { list, margin, loadingLabel = word('loadMore.loadingLabel', 'Loading more…'), failureLabel = word('loadMore.failureLabel', 'Could not load more.'), retryLabel = word('loadMore.retryLabel', 'Try again') } = props<{
+const { list, margin, loadingLabel = wording('ui.loadMore.loadingLabel', 'Loading more…'), failureLabel = wording('ui.loadMore.failureLabel', 'Could not load more.'), retryLabel = wording('ui.loadMore.retryLabel', 'Try again') } = props<{
   // The list this draws the end of, from `infiniteList`.
   list: InfiniteList<unknown>
   // How far outside the scroll box counts as in view already, in pixels: see WhenVisible.

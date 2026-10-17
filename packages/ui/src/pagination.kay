@@ -2,9 +2,9 @@
 import type { JSX } from 'kay'
 import type { PagedList } from './pagination'
 import { currentPage, openSteps, pageHref, pageItems } from './pagination'
-import { word } from './words'
+import { wording } from 'kay/words'
 
-const { of, page, pages, offset, limit, more, url, param, siblings = 1, label = word('pagination.label', 'Pagination'), previousLabel = word('pagination.previousLabel', 'Previous'), nextLabel = word('pagination.nextLabel', 'Next'), class: className, ...rest } = props<Omit<JSX.IntrinsicElements['nav'], 'class' | 'children'> & ({
+const { of, page, pages, offset, limit, more, url, param, siblings = 1, label = wording('ui.pagination.label', 'Pagination'), previousLabel = wording('ui.pagination.previousLabel', 'Previous'), nextLabel = wording('ui.pagination.nextLabel', 'Next'), class: className, ...rest } = props<Omit<JSX.IntrinsicElements['nav'], 'class' | 'children'> & ({
   // A page kay's `paginate()` gave, which links each page at its own path: `Pagination(of={list})`.
   of: PagedList
   page?: never

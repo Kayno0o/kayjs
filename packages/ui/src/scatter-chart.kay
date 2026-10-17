@@ -3,9 +3,9 @@ import type { JSX } from 'kay'
 import type { ScatterAxis, ScatterPoint } from './plot'
 import { memo } from 'kay'
 import { axisExtent, axisPercent, dotSize } from './plot'
-import { word } from './words'
+import { wording } from 'kay/words'
 
-const { points, x = {}, y = {}, quadrant, corners, onSelect, empty = word('scatterChart.empty', 'No data yet.'), label, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['figure'], 'class' | 'children' | 'onSelect'> & {
+const { points, x = {}, y = {}, quadrant, corners, onSelect, empty = wording('ui.scatterChart.empty', 'No data yet.'), label, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['figure'], 'class' | 'children' | 'onSelect'> & {
   points: Point[]
   x?: ScatterAxis | undefined
   y?: ScatterAxis | undefined

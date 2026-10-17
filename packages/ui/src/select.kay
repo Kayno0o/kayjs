@@ -3,9 +3,9 @@ import type { JSX } from 'kay'
 import { untrack } from 'kay'
 import { controlledValue } from './controlled-value'
 import { startRef } from './form-reset'
-import { word } from './words'
+import { wording } from 'kay/words'
 
-const { value, options, onChange, submit = false, emptyOption, loading = false, loadingLabel = word('select.loadingLabel', 'Loading…'), class: className, ...rest } = props<Omit<JSX.IntrinsicElements['select'], 'value' | 'options' | 'class' | 'children' | 'onChange'> & {
+const { value, options, onChange, submit = false, emptyOption, loading = false, loadingLabel = wording('ui.select.loadingLabel', 'Loading…'), class: className, ...rest } = props<Omit<JSX.IntrinsicElements['select'], 'value' | 'options' | 'class' | 'children' | 'onChange'> & {
   // One of the options' values, or the empty string once there is an `emptyOption`.
   value: Value | (Empty extends string | true ? '' : never)
   options: readonly { value: Value, label: string }[]

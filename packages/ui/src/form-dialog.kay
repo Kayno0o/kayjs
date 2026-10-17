@@ -4,10 +4,10 @@ import { effect, signal, uid } from 'kay'
 import Button from './button.kay'
 import Dialog from './dialog.kay'
 import { callAction, formIssues } from './forms'
-import { word } from './words'
+import { wording } from 'kay/words'
 
 
-const { open, title, action, submitLabel, savingLabel = word('formDialog.savingLabel', 'Saving…'), cancelLabel = word('formDialog.cancelLabel', 'Cancel'), failure, refused, onSaved, onClose, extra, id, class: className } = props<{
+const { open, title, action, submitLabel, savingLabel = wording('ui.formDialog.savingLabel', 'Saving…'), cancelLabel = wording('ui.formDialog.cancelLabel', 'Cancel'), failure, refused, onSaved, onClose, extra, id, class: className } = props<{
   // Shows the dialog; the parent sets it back to false in `onClose`.
   open: boolean
   title: string
