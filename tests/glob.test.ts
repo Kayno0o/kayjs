@@ -34,6 +34,10 @@ describe('import.meta.glob', () => {
     expect([...globFiles(['../cards/*.kay'], importer, FIXTURE).keys()]).toEqual(['../cards/one.kay', '../cards/two.kay'])
   })
 
+  it('matches nothing in a folder that does not exist yet', () => {
+    expect([...globFiles(['/src/not-yet/*.kay'], join(FIXTURE, 'src/routes/index.kay'), FIXTURE)]).toEqual([])
+  })
+
   it('renders the components a page globs, their stylesheets in its own', async () => {
     const app = await pages({ routes: 'tests/fixtures/glob/src/routes', prebuilt: false })
     const html = await (await app.handle(new Request('http://localhost/'))).text()

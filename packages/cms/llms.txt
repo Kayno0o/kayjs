@@ -65,7 +65,7 @@ label {label}
   input(type="color" value={typeof value === 'string' ? value : '#000000'} onInput={event => onChange(event.currentTarget.value)})
 ```
 
-- The kind's name is the file's name in `src/cms/fields/`: the editor bundles every file there, so adding one needs no config, and `kay dev` restarts for it.
+- The kind's name is the file's name in `src/cms/fields/`: the editor bundles every file there, so adding one needs no config. A new file is picked up when the dev server restarts.
 - The component gets `CustomFieldProps`: `value` (`undefined` while unset), `onChange(next)`, `label`, `hint`, `issue` (why the last save refused it) and `required`. It renders in the admin form and in the editor on the page, in a list or a group too.
 - A save validates the value by the schema given to `customField` alone, so a `pattern`, a range or a union refuses a bad value as for any field; `customField` keeps the schema's own type.
 - A kind with no file there is edited as JSON, with a hint naming the file to add.
@@ -73,8 +73,7 @@ label {label}
 
 ## API
 
-
-- `fieldsOf(schema)`: the form fields of a collection's JSON Schema, in order, each `{ key, label, required, hint, kind }`. Kinds: `text`, `textarea` (a string whose `maxLength` is over 120), `markdown`, `number`, `integer`, `boolean`, `date`, `datetime`, `image`, `file`, `json` (any shape without a control), `select` (an enum or a union of literals, with `options`), `reference` (with `collection`), `list` (with `item`) and `group` (with `fields`) and `custom` (with `name`, a kind the app's `customField` names). kay's `x-kay: { kind }` hint wins over the type. A nullable field is optional.
+- `fieldsOf(schema)`: the form fields of a collection's JSON Schema, in order, each `{ key, label, required, hint, kind }`. Kinds: `text`, `textarea` (a string whose `maxLength` is over 120), `markdown`, `number`, `integer`, `boolean`, `date`, `datetime`, `image`, `file`, `json` (any shape without a control), `select` (an enum or a union of literals, with `options`), `reference` (with `collection`), `list` (with `item`) and `group` (with `fields`), and `custom` (with `name`, a kind the app's `customField` names). kay's `x-kay: { kind }` hint wins over the type. A nullable field is optional.
 - `emptyValue(field)`: what a new list item starts as.
 - `parseMarker(value, body?)`, `formatMarker(marker)`, `entryKey(ref)`: read and write kay's markers.
 - `fieldsAt(node)`: the fields rendered at a node, innermost first.

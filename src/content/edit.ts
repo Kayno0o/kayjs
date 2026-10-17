@@ -115,6 +115,7 @@ export interface EditSite {
 }
 
 const MARKDOWN = /\.md$/
+const KIND_NAME = /^[\w-]+$/
 const YAML_FILE = /\.ya?ml$/
 const SLASHES = /[\\/]/
 const CRLF = /\r\n/g
@@ -184,6 +185,9 @@ export function markdownField(options?: StringOptions): ReturnType<typeof t.Stri
 
 // A field of any schema a CMS edits with the component the app gives the kind, `src/cms/fields/<kind>.kay` in kayjs-cms; the schema alone validates what it saves.
 export function customField<Schema extends TSchema>(kind: string, schema: Schema): Schema {
+  if (!KIND_NAME.test(kind))
+    throw new KayError('content-api-misuse', `kay: customField(${JSON.stringify(kind)}) names a kind outside letters, digits, - and _, which no src/cms/fields/<kind>.kay file can have`)
+
   return { ...schema, 'x-kay': { kind } }
 }
 

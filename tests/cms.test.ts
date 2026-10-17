@@ -212,6 +212,8 @@ describe('the collections a CMS edits', () => {
     expect(JSON.parse(JSON.stringify(color))).toEqual({ 'type': 'string', 'pattern': '^#[0-9a-f]{6}$', 'x-kay': { kind: 'color' } })
     expect(TypeCompiler.Compile(color).Check('#00ff00')).toBe(true)
     expect(TypeCompiler.Compile(color).Check('green')).toBe(false)
+    expect(() => customField('a/b', t.String())).toThrow('names a kind outside letters')
+    expect(() => customField('', t.String())).toThrow('names a kind outside letters')
   })
 
   it('describes one collection by name, running no other collection\'s loader', async () => {

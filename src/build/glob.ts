@@ -1,4 +1,5 @@
 import type * as t from '@babel/types'
+import { existsSync } from 'node:fs'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import { parse } from '@babel/parser'
 import { KayError } from '../compiler/errors'
@@ -37,6 +38,10 @@ export function globFiles(patterns: string[], importer: string, root: string): M
     const base = magic === -1 ? dirname(full) : segments.slice(0, magic).join(sep) || sep
 
     GLOBBED.add(base)
+
+    // A folder not made yet holds no file; `kay dev` still sees it appear through `GLOBBED`.
+    if (!existsSync(base))
+      continue
 
     const searchesModules = pattern.includes('node_modules')
 

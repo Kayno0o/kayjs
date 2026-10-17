@@ -25,7 +25,8 @@ export type Field
     | FieldBase & { kind: 'custom', name: string }
 
 // The kinds a schema's `x-kay` hint may name that need nothing beyond the hint; any other name is the app's own.
-const HINTED = new Set(['text', 'textarea', 'markdown', 'number', 'integer', 'boolean', 'date', 'datetime', 'image', 'file', 'json'])
+type Hinted = Exclude<Field['kind'], 'select' | 'reference' | 'list' | 'group' | 'custom'>
+const HINTED = new Set<string>(['text', 'textarea', 'markdown', 'number', 'integer', 'boolean', 'date', 'datetime', 'image', 'file', 'json'] satisfies Hinted[])
 // A plain string longer than a line or two is edited in a textarea rather than a one-line box.
 const LONG_TEXT = 120
 // The words of a key: `publishedAt` gives `published At`, `seoURL` gives `seo URL`, an acronym keeping its capitals; `_` and `-` only separate.
@@ -59,7 +60,7 @@ export function fieldOf(key: string | number, schema: JsonSchema, required: bool
     return { ...base, kind: 'reference', collection: hint.collection ?? '' }
 
   if (hint !== undefined)
-    return HINTED.has(hint.kind) ? { ...base, kind: hint.kind as Exclude<Field['kind'], 'select' | 'reference' | 'list' | 'group' | 'custom'> } : { ...base, kind: 'custom', name: hint.kind }
+    return HINTED.has(hint.kind) ? { ...base, kind: hint.kind as Hinted } : { ...base, kind: 'custom', name: hint.kind }
 
   const options = choicesOf(inner)
 

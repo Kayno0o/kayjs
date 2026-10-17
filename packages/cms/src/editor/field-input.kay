@@ -88,7 +88,7 @@ function setJson(next: string): void {
       if Kind
         Kind(value={value()} onChange={set} label={current.label} hint={current.hint} issue={issue()} required={current.required})
       else
-        FormField(label={current.label} hint={wording('cms.field.noKind', 'No editor for the {kind} kind: add src/cms/fields/{kind}.kay. Edited as JSON until then.', { kind: current.name })} issue={issue()} required={current.required})
+        FormField(label={current.label} hint={[current.hint, wording('cms.field.noKind', 'No editor for the {kind} kind: add src/cms/fields/{kind}.kay. Edited as JSON until then.', { kind: current.name })].filter(Boolean).join(' ')} issue={issue()} required={current.required})
           Textarea.kcms-json(rows="4" value={value() === undefined ? '' : JSON.stringify(value(), null, 2)} onChange={setJson})
     when 'json'
       FormField(label={current.label} hint={current.hint ?? 'JSON'} issue={issue()} required={current.required})
