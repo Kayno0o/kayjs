@@ -481,11 +481,11 @@ function toolbar(tool: DevTool, help: string, rerun: () => void, problems = fals
         const own = [...group.querySelectorAll<HTMLElement>('[data-filter]')]
 
         if (own.length > 0)
-          group.hidden = own.every(row => row.hidden)
+          group.hidden = own.every(row => row.hidden === true)
       }
 
       empty.textContent = only && typed === '' ? 'No problems.' : 'Nothing matches the filter.'
-      empty.hidden = rows.length === 0 || rows.some(row => !row.hidden)
+      empty.hidden = rows.length === 0 || rows.some(row => row.hidden === false)
     },
   }
 }
@@ -2703,7 +2703,10 @@ function routesTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
   let notes: string[] = []
   // A restart while a fetch is out asks again; the latest answer wins.
   let asked = 0
-  const render = () => {
+  let render: () => void = () => undefined
+  const bar = toolbar(tool, 'Filter by path or file', () => render())
+
+  render = () => {
     const typed = bar.input.value.trim().toLowerCase()
     const shown = routes.filter(route => typed === '' || route.path.toLowerCase().includes(typed) || route.file.toLowerCase().includes(typed) || (route.owner ?? '').toLowerCase().includes(typed))
     const sections = Object.entries(ROUTE_KINDS).flatMap(([kind, label]) => {
@@ -2754,8 +2757,6 @@ function routesTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
     }
   }
   const tab = tool.tab({ id: 'routes', label: 'Routes', icon: 'route', shown: () => void list() })
-
-  const bar = toolbar(tool, 'Filter by path or file', render)
 
   tab.panel.append(bar.element, body)
   win.addEventListener(BUILT_EVENT, () => {
