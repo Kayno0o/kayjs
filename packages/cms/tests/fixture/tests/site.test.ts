@@ -258,8 +258,6 @@ test('the on-page editor shows each issue of a refused save once, the body\'s be
   await page.waitUntil(() => document.querySelector('.kcms-editor [data-kcms-body] textarea') !== null)
   await page.click(body)
   await page.type('<script>alert(1)</script>')
-  // The draft renders after typing pauses, which would replace the issues of a save asked for before.
-  await Bun.sleep(500)
   await page.waitUntil(() => document.querySelector('.kcms-editor .kcms-entry-actions button:last-child') !== null)
   await page.click('.kcms-editor .kcms-entry-actions button:last-child')
   await page.waitUntil(() => document.querySelector('.kcms-editor')?.textContent?.includes('would run as the site') === true)

@@ -34,12 +34,15 @@ export function createDrafts({ show, delay = 150 }: DraftsOptions) {
   const rendering = signal(false)
   let timer: ReturnType<typeof setTimeout> | undefined
   let latest = 0
+  // Set by a save's refusal, so a render scheduled before it leaves those issues be; the next edit clears it.
+  let reported = false
 
   function changed(): DraftEntry[] {
     return [...current().entries()].filter(([key, entry]) => entry !== saved.get(key)).map(([, entry]) => entry)
   }
 
   function schedule(): void {
+    reported = false
     clearTimeout(timer)
     timer = setTimeout(() => void render(), durationMs(delay))
   }
@@ -53,7 +56,9 @@ export function createDrafts({ show, delay = 150 }: DraftsOptions) {
       const result = await show(changed())
 
       if (call === latest) {
-        issues.set(result.issues ?? [])
+        if (!reported)
+          issues.set(result.issues ?? [])
+
         failure.set(undefined)
       }
     }
@@ -167,6 +172,7 @@ export function createDrafts({ show, delay = 150 }: DraftsOptions) {
     },
     // Shows the issues a save was refused with, as a render's are shown.
     report(refusals: readonly Issue[]): void {
+      reported = true
       issues.set(refusals)
     },
     // The schema's refusals of the last render or save, of the entry or of one of its fields.

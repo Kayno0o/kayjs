@@ -11,6 +11,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 - `kay doctor` tries the port on `HOST` or else `localhost`, passes `PORT=0` as the system's pick, and reads a manifest again once when it is being written ([kay doctor](check-and-tools.md)).
 - A production build keeps the runtime split per island for a file that also imports `kay` as a namespace or default beside import text in a template literal or a comment, which it used to rewrite.
+- kayjs-cms: in the on-page editor, the issues of a refused save stay shown when a draft render was pending, until the next edit ([kayjs-cms](../packages/cms/llms.txt)).
 - `onError` gets the errors of `schedule`, `background` and queue jobs and `onStop` hooks, with no request, and an island's stack is mapped to `.kay` lines in production ([Error reporting](routing.md#error-reporting), [Error fallbacks](islands.md#error-fallbacks)).
 - kayjs-cms: `cms({ collections })` arranges a form (field order, rows of columns, hidden fields) and a list (columns, row actions), and the screens' parts, `createEntryForm`, `entryScreen` and `listScreen` are exported to build an entry screen of your own ([screens](../packages/cms/llms/screens.md)).
 - A page of many rules, Markdown pages included, links a copy of the stylesheet cut to the classes it names instead of every component's rules, loaded before a page swap paints ([styles](styles-and-assets.md#link-or-inline-the-stylesheets)).

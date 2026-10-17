@@ -213,4 +213,22 @@ describe('saving', () => {
 
     expect(drafts.issues(post, '').map(issue => issue.message)).toEqual(['hello already exists'])
   })
+
+  it('keeps the issues of a refused save through a render scheduled before it, until the next edit renders', async () => {
+    const { drafts, calls } = setup()
+    const refusal = { collection: 'posts', slug: 'hello', path: '', message: 'would run as the site' }
+
+    drafts.set(post, 'title', 'Hel')
+    drafts.report([refusal])
+    await settled()
+
+    expect(calls).toHaveLength(1)
+    expect(drafts.issues(post, '').map(issue => issue.message)).toEqual(['would run as the site'])
+
+    drafts.set(post, 'title', 'Hell')
+    await settled()
+
+    expect(calls).toHaveLength(2)
+    expect(drafts.issues(post, '')).toEqual([])
+  })
 })
