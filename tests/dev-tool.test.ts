@@ -61,7 +61,8 @@ describe('the dev tool', () => {
 
   const shadow = () => document.querySelector('kay-dev')!.shadowRoot!
   const problems = () => [...shadow().querySelectorAll('.problem')].map(problem => [problem.classList.contains('error') ? 'error' : 'warn', problem.querySelector('pre')!.textContent])
-  const groups = () => [...shadow().querySelectorAll<HTMLElement>('.group')].filter(group => group.hidden === false).map(group => group.querySelector('h3')!.textContent)
+  const groups = () => [...shadow().querySelectorAll<HTMLElement>('#kay-dev-problems .group')].filter(group => group.hidden === false).map(group => `${group.querySelector('h3')!.firstChild!.textContent} (${group.querySelector('h3 .pill')!.textContent})`)
+  const dismissAll = () => [...shadow().querySelectorAll<HTMLButtonElement>('.actions button')].find(button => button.textContent === 'Dismiss all')!
   const bar = () => [...shadow().querySelectorAll('.bar > button')].filter(button => (button as HTMLElement).hidden === false).map(button => button.textContent)
   const drawer = () => shadow().querySelector<HTMLElement>('[role=dialog]')!
   const key = (init: KeyboardEventInit, target: EventTarget = document.body) => target.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, composed: true, ...init }))
@@ -88,9 +89,9 @@ describe('the dev tool', () => {
 
     expect(problems()).toEqual([['error', 'island a.kay did not match its server markup'], ['warn', 'the persisted signal note could not be kept'], ['error', check]])
     expect(groups()).toEqual(['Recovered by kay (2)', 'kay check (1)'])
-    expect(shadow().querySelector('.problem .note:not([hidden])')?.textContent).toBe('2 times')
+    expect(shadow().querySelector('.problem > .pill:not([hidden])')?.textContent).toBe('2 times')
     expect(bar()).toEqual(['kay', '3 problems'])
-    expect(shadow().querySelector('.bar > button.error')?.textContent).toBe('3 problems')
+    expect(shadow().querySelector('.bar > button .pill.error')?.textContent).toBe('3 problems')
     expect(shadow().querySelector('[role=status]')?.textContent).toBe('3 problems')
   })
 
@@ -163,9 +164,9 @@ describe('the dev tool', () => {
     tool.tab({ id: 'other', label: 'Other' })
     await Bun.sleep(0)
 
-    // Styled by an adopted sheet alone, which a policy without inline styles allows.
+    // Styled by an adopted sheet and the sizes of its bars set through the CSSOM, which a policy without inline styles allows.
     expect(shadow().adoptedStyleSheets).toHaveLength(1)
-    expect(shadow().querySelector('style, [style]')).toBeNull()
+    expect(shadow().querySelector('style')).toBeNull()
 
     expect(drawer().hidden).toBe(true)
 
@@ -207,7 +208,7 @@ describe('the dev tool', () => {
     console.warn('[kay] first')
     await Bun.sleep(0)
 
-    shadow().querySelector<HTMLButtonElement>('.actions button')!.click()
+    dismissAll().click()
     expect(problems()).toEqual([])
     expect(bar()).toEqual(['kay'])
 
@@ -232,7 +233,7 @@ describe('the dev tool', () => {
     await Bun.sleep(0)
     document.documentElement.setAttribute('aria-busy', 'true')
     await Bun.sleep(0)
-    expect(shadow().querySelector<HTMLElement>('.problem .note')!.hidden).toBe(true)
+    expect(shadow().querySelector<HTMLElement>('.problem > .pill')!.hidden).toBe(true)
 
     document.head.innerHTML = problemsBlock(['error[unread-prop]: a prop nothing reads'])
     document.documentElement.removeAttribute('aria-busy')
@@ -369,41 +370,13 @@ describe('the dev tool', () => {
     document.body.innerHTML = ''
   })
 
-  it('says on the bar what kay dev just rebuilt and how long it took, on the page it reloaded for the time left, never a build long past, then fades', async () => {
-    const built = () => shadow().querySelector<HTMLElement>('.bar .built')!
-    const announce = (data: object) => window.dispatchEvent(new CustomEvent('kay-dev-built', { detail: JSON.stringify(data) }))
-
+  it('says nothing on the bar of a rebuild, and keeps no state of one for the page', async () => {
     tool = startDevTool()
-    expect(built().getAttribute('role')).toBe('status')
-    expect(built().textContent).toBe('')
+    window.dispatchEvent(new CustomEvent('kay-dev-built', { detail: JSON.stringify({ id: 'a', at: Date.now(), changed: 'src/routes/index.kay', ms: 58 }) }))
 
-    // The first build the page hears of, as the next.
-    announce({ id: 'a', at: Date.now(), changed: 'src/routes/index.kay', ms: 58 })
-    expect(built().textContent).toBe('src/routes/index.kay: restarted in 58 ms')
-    announce({ id: 'a2', at: Date.now(), changed: 'src/routes/index.kay', ms: 31, reloaded: true })
-    expect(built().textContent).toBe('src/routes/index.kay: reloaded in 31 ms')
-    announce({ id: 'b', at: Date.now(), changed: 'src/app.css', ms: 24, styles: true })
-    expect(built().textContent).toBe('src/app.css: stylesheets swapped in 24 ms')
-    expect(document.activeElement).toBe(document.body)
-
-    // A page opened long after a build says nothing of it.
-    tool.stop()
-    Object.assign(window, { $kayBuilt: JSON.stringify({ id: 'c', at: Date.now() - 60_000, changed: 'src/old.ts', ms: 9 }) })
-    tool = startDevTool()
-    expect(built().textContent).toBe('')
-
-    // The page a build reloaded, whose live reload script heard of it first, says it for the time left.
-    tool.stop()
-    Object.assign(window, { $kayBuilt: JSON.stringify({ id: 'd', at: Date.now() - 3800, changed: 'src/name.ts', ms: 412 }) })
-    tool = startDevTool()
-    expect(built().textContent).toBe('src/name.ts: restarted in 412 ms')
-    expect(built().classList.contains('fading')).toBe(false)
-
-    await Bun.sleep(300)
-    expect(built().classList.contains('fading')).toBe(true)
-    await Bun.sleep(500)
-    expect(built().textContent).toBe('')
-    delete (window as { $kayBuilt?: string }).$kayBuilt
+    expect(shadow().querySelector('.built')).toBeNull()
+    expect(bar()).toEqual(['kay'])
+    expect('$kayBuilt' in window).toBe(false)
   })
 
   it('shows what served the page, its route, files, params, status and loads, and reads the next page\'s as a swap brings it', async () => {
@@ -417,6 +390,14 @@ describe('the dev tool', () => {
       return script
     }
     const facts = () => [...shadow().querySelectorAll('#kay-dev-request dt')].map(term => `${term.textContent}: ${[...term.nextElementSibling!.children].map(line => line.textContent).join(' / ') || term.nextElementSibling!.textContent}`)
+    const line = () => [...shadow().querySelector('#kay-dev-request .reqline')!.children].map(part => part.textContent)
+    const chain = () => [...shadow().querySelectorAll('#kay-dev-request .chain li')].map(item => [...item.children].map(part => part.textContent).filter(Boolean).join(' '))
+    const timing = () => {
+      const grid = shadow().querySelector<HTMLElement>('#kay-dev-request .timing')
+
+      return grid === null ? [] : [...grid.children].map(part => part.textContent).filter((_, index) => index % 3 !== 1).reduce<string[]>((rows, part, index) => index % 2 === 0 ? [...rows, part] : [...rows.slice(0, -1), `${rows.at(-1)} ${part}`], [])
+    }
+    const bars = () => [...shadow().querySelectorAll<HTMLElement>('#kay-dev-request .timing i')].map(fill => Number.parseFloat(fill.style.width))
     const opened: string[] = []
     let recorded: DevResponse | undefined = {
       headers: [['x-request-id', 'abc'], ['cache-control', 'no-store'], ['content-type', 'text/html'], ['content-security-policy', 'default-src \'self\'; script-src \'self\' \'sha256-abc\'; img-src *']],
@@ -438,23 +419,28 @@ describe('the dev tool', () => {
     await Bun.sleep(0)
 
     expect(asked).toEqual(['/_kay/dev/request?id=abc'])
+    expect(line()).toEqual(['GET', `${location.pathname}${location.search}`, '200', '51 ms on the server'])
     expect(facts()).toEqual([
       'Route: /items/:id',
-      'Status: 200',
-      'Page: src/routes/items/[id].kay',
-      'Layouts: src/routes/_layout.kay',
       'Params: id = "7"',
       'Locale: fr',
       'Rendered: on request here, prerendered by kay build for the paths its setting lists',
-      'Guards: src/routes/_guard.tspassed / src/routes/items/_guard.tspassed',
-      'Loads, 44 ms: src/routes/_layout.kay1.5 ms / src/routes/items/[id].kay42 ms',
-      'Server time: 51 ms',
-      'Redirected from: /members (307, by the guard src/routes/members/_guard.ts)',
-      'Headers: content-security-policy:default-src \'self\';script-src \'self\' \'sha256-abc\';img-src *; / cache-control: no-store / x-request-id: abc / content-type: text/html',
+      'Redirected: /members (307, by the guard src/routes/members/_guard.ts)',
+    ])
+    expect(chain()).toEqual(['Guard src/routes/_guard.ts passed', 'Guard src/routes/items/_guard.ts passed', 'Layout src/routes/_layout.kay', 'Page src/routes/items/[id].kay'])
+    expect(timing()).toEqual(['src/routes/_layout.kay 1.5 ms', 'src/routes/items/[id].kay 42 ms', 'Whole request 51 ms'])
+    expect(bars()[0]).toBeCloseTo(1.5 / 51.2 * 100)
+    expect(bars()[1]).toBeCloseTo(42.4 / 51.2 * 100)
+    expect(bars()[2]).toBe(100)
+    expect([...shadow().querySelectorAll('#kay-dev-request .headers tr')].map(row => [...row.children].map(cell => cell.textContent))).toEqual([
+      ['content-security-policy', 'default-src \'self\';script-src \'self\' \'sha256-abc\';img-src *;'],
+      ['cache-control', 'no-store'],
+      ['x-request-id', 'abc'],
+      ['content-type', 'text/html'],
     ])
 
     // A policy reads a directive to a line.
-    expect([...shadow().querySelectorAll('.facts .directive')].map(line => line.textContent)).toEqual(['default-src \'self\';', 'script-src \'self\' \'sha256-abc\';', 'img-src *;'])
+    expect([...shadow().querySelectorAll('.headers .directive')].map(line => line.textContent)).toEqual(['default-src \'self\';', 'script-src \'self\' \'sha256-abc\';', 'img-src *;'])
 
     // The swap adds the next page's block, then drops this one's.
     recorded = undefined
@@ -464,15 +450,19 @@ describe('the dev tool', () => {
     await Bun.sleep(0)
     await Bun.sleep(0)
 
-    expect(facts()).toEqual(['Route: none matched', 'Status: 404 Not Found', 'Page: src/routes/_404.kay', 'Layouts: none', 'Params: none', 'Locale: en', 'Rendered: not known, a guard refused the request', 'Guards: src/routes/_guard.tsdenied with 403', 'Loads: none', 'Response: not recorded by the server'])
-    expect(shadow().querySelector('#kay-dev-request dd .error')?.textContent).toBe('404 Not Found')
+    expect(line()).toEqual(['GET', `${location.pathname}${location.search}`, '404 Not Found'])
+    expect(facts()).toEqual(['Route: none matched', 'Params: none', 'Locale: en', 'Rendered: not known, a guard refused the request', 'Response: not recorded by the server'])
+    expect(chain()).toEqual(['Guard src/routes/_guard.ts denied with 403', 'Page src/routes/_404.kay'])
+    expect(timing()).toEqual([])
+    expect(shadow().querySelector('#kay-dev-request .reqline .pill')?.textContent).toBe('404 Not Found')
+    expect(shadow().querySelector('#kay-dev-request .reqline .pill')?.classList.contains('error')).toBe(true)
 
     tool.setOpener(async (source) => {
       opened.push(source)
 
       return undefined
     })
-    shadow().querySelector<HTMLButtonElement>('#kay-dev-request button.position')!.click()
+    shadow().querySelector<HTMLButtonElement>('#kay-dev-request .chain li:last-child button.position')!.click()
     await Bun.sleep(0)
 
     expect(opened).toEqual(['src/routes/_404.kay:1:1'])
@@ -490,7 +480,7 @@ describe('the dev tool', () => {
       return script
     }
     const panel = () => shadow().querySelector('#kay-dev-i18n')
-    const links = () => [...panel()!.querySelectorAll('a')].map(link => `${link.textContent} ${link.getAttribute('href')}${link.getAttribute('aria-current') === null ? '' : ' current'}`)
+    const links = () => [...panel()!.querySelectorAll('.locale-chip')].map(link => `${link.textContent}${link.getAttribute('href') === null ? '' : ` ${link.getAttribute('href')}`}${link.getAttribute('aria-current') === null ? '' : ' current'}`)
     const count = () => shadow().querySelector('#kay-dev-tab-i18n .count')?.textContent
 
     document.head.append(block({ ...PAGE, locale: 'en' }))
@@ -501,23 +491,23 @@ describe('the dev tool', () => {
     console.error('[kay] no locale has the message "nav.home"; production shows the key itself')
     document.head.replaceChildren(block({ ...PAGE, locale: 'en', locales: [{ locale: 'en', href: '/docs/about' }, { locale: 'fr', href: '/docs/fr/a-propos' }] }))
     tool = startDevTool()
-    expect(links()).toEqual(['en /docs/about current', 'fr /docs/fr/a-propos'])
+    expect(links()).toEqual(['en current', 'fr /docs/fr/a-propos'])
     expect(panel()!.textContent).toContain('nav.home')
     expect(count()).toBe('1')
 
     console.error('[kay] no locale has the message "nav.home"; production shows the key itself')
     console.error('[kay] no locale has the message "a\\"b"; production shows the key itself')
     await Bun.sleep(0)
-    expect(panel()!.querySelectorAll('.error')).toHaveLength(2)
+    expect(panel()!.querySelectorAll('.missing li')).toHaveLength(2)
     expect(panel()!.textContent).toContain('a"b')
 
     document.head.replaceChildren(block({ ...PAGE, locale: 'fr', locales: [{ locale: 'en', href: '/docs/about' }, { locale: 'fr', href: '/docs/fr/a-propos' }] }))
     await Bun.sleep(0)
-    expect(links()).toEqual(['en /docs/about', 'fr /docs/fr/a-propos current'])
+    expect(links()).toEqual(['en /docs/about', 'fr current'])
 
     document.documentElement.setAttribute('aria-busy', 'true')
     await Bun.sleep(0)
-    expect(panel()!.querySelectorAll('.error')).toHaveLength(0)
+    expect(panel()!.querySelectorAll('.missing li')).toHaveLength(0)
     expect(count()).toBe('0')
   })
 
@@ -542,6 +532,7 @@ describe('the dev tool', () => {
 
     const rows = () => [...shadow().querySelectorAll('#kay-dev-routes .route')].map(row => [...row.children].map(cell => cell.textContent).join(' | '))
     const filter = () => shadow().querySelector<HTMLInputElement>('#kay-dev-routes input')!
+    const sections = () => [...shadow().querySelectorAll('#kay-dev-routes .group')].map(group => `${group.querySelector('h3')!.firstChild!.textContent} (${group.querySelector('h3 .pill')!.textContent})`)
 
     try {
       tool = startDevTool()
@@ -549,10 +540,10 @@ describe('the dev tool', () => {
       await Bun.sleep(0)
 
       expect(fetched).toEqual(['/_kay/dev/routes'])
-      expect(groups()).toEqual(['Pages (3)', 'API (1)', 'Served by kay (1)'])
+      expect(sections()).toEqual(['Pages (3)', 'API (1)', 'Served by kay (1)'])
       expect(rows()).toEqual(['GET | /broken |  | src/routes/broken.kay', 'GET | /items/:id |  | src/routes/items/[id].kay', 'GET | /fr/a-propos | fr | src/routes/about.kay', 'POST | /api/stock/:id |  | src/api/stock.ts', 'GET | /manifest.webmanifest |  | the web app manifest'])
       expect([...shadow().querySelectorAll<HTMLAnchorElement>('#kay-dev-routes a')].map(link => link.getAttribute('href'))).toEqual(['/broken', '/fr/a-propos', '/manifest.webmanifest'])
-      expect(shadow().querySelector('#kay-dev-routes > div > .note')?.textContent).toContain('no sitemap or robots.txt')
+      expect(shadow().querySelector('#kay-dev-routes > .list > .note')?.textContent).toContain('no sitemap or robots.txt')
       expect(shadow().querySelector('#kay-dev-routes [aria-current=page] .path')?.textContent).toBe('/broken')
 
       filter().value = 'ABOUT'
@@ -613,11 +604,13 @@ describe('the dev tool', () => {
       expect(asked[0]!.path).toBe('/')
       expect(asked[0]!.head).toContain('Home | Shop')
       expect(text('.problem pre')).toEqual(['The description of `/` runs 200 characters\nhelp: shorten it'])
-      expect(text('.snippet div')).toEqual(['https://shop.example/', 'Home | Shop', 'The shop'])
-      expect(panel().querySelector('.facts')!.textContent).toBe('TitleHome | Shop (11 characters)DescriptionThe shop (8 of 160 characters)Canonicalhttps://shop.example/Alternatesfr: https://shop.example/frRobotsnoindexSitemaplisted')
-      expect(text('h3')).toEqual(['Open Graph (2)', 'Twitter (1)', 'JSON-LD (2)'])
-      expect(panel().querySelector<HTMLImageElement>('img.card')!.src).toBe('http://localhost:3000/_kay/card?title=Home')
-      expect(text('.json')).toEqual(['{\n  "@type": "WebSite"\n}'])
+      expect(text('.serp span:not(.cap)')).toEqual(['https://shop.example/', 'Home | Shop', 'The shop'])
+      expect(panel().querySelector('.facts')!.textContent).toBe('TitleHome | Shop11 / 60DescriptionThe shop8 / 160Canonicalhttps://shop.example/Alternatesfr: https://shop.example/frRobotsnoindexSitemaplisted')
+      expect(text('.meter.over')).toEqual([])
+      expect(text('h3')).toEqual(['Tags', 'Open Graph2', 'Twitter1', 'JSON-LD2'])
+      expect(panel().querySelector<HTMLImageElement>('.preview img.card')!.src).toBe('http://localhost:3000/_kay/card?title=Home')
+      expect(text('.json summary')).toEqual(['WebSite'])
+      expect(text('.json pre')).toEqual(['{\n  "@type": "WebSite"\n}'])
       expect(panel().querySelector('.error')?.textContent).toContain('Not valid JSON')
       expect(shadow().querySelector('#kay-dev-tab-head .count')?.textContent).toBe('1')
 
@@ -628,9 +621,10 @@ describe('the dev tool', () => {
       await Bun.sleep(0)
 
       expect(asked).toHaveLength(2)
-      expect(text('.snippet div')).toEqual(['http://localhost:3000/', 'About', 'No description'])
+      expect(text('.serp span:not(.cap)')).toEqual(['http://localhost:3000/', 'About', 'No description'])
       expect(panel().querySelector('.facts')!.textContent).toContain('Sitemapnone, the site has no origin')
       expect(panel().querySelector('img.card')).toBeNull()
+      expect(panel().querySelector('.preview:not(.serp)')!.textContent).toContain('No og:image or twitter:image tag.')
       expect(text('.problem')).toEqual([])
       expect(shadow().querySelector<HTMLElement>('#kay-dev-tab-head .count')!.hidden).toBe(true)
 
@@ -641,7 +635,7 @@ describe('the dev tool', () => {
       await Bun.sleep(0)
 
       expect(panel().querySelector('.empty')?.textContent).toBe('Could not check the head: the server answered 500')
-      expect(text('.snippet div')[1]).toBe('Again')
+      expect(text('.serp span:not(.cap)')[1]).toBe('Again')
       expect(panel().querySelector('.error')?.textContent).toBe('The social card image is not a valid URL: http://')
     }
     finally {
@@ -709,13 +703,13 @@ describe('the dev tool', () => {
 
       return app.handle(new Request(`http://localhost${url}`))
     }) as unknown as typeof window.fetch)
-    const flag = (value: Element) => {
-      if (value.querySelector('.secret'))
+    const flag = (row: Element) => {
+      if (row.querySelector('.flag'))
         return ' (flagged)'
 
-      return value.querySelector('.note') ? ' (noted)' : ''
+      return row.querySelector('.soft') ? ' (noted)' : ''
     }
-    const rows = () => [...shadow().querySelectorAll('#kay-dev-env dt')].map(term => `${term.textContent} = ${term.nextElementSibling!.querySelector('.mono')!.textContent}${flag(term.nextElementSibling!)}`)
+    const rows = () => [...shadow().querySelectorAll('#kay-dev-env .envrow')].map(row => `${row.querySelector('.name')!.textContent} = ${row.querySelector('.val')!.textContent}${flag(row)}`)
 
     try {
       happyDOM.setURL('http://localhost/')
@@ -818,7 +812,7 @@ describe('the dev tool', () => {
 
       return new Response(null, { headers: { 'content-type': url.includes('logo') ? 'image/webp' : type, 'content-length': photo ? '2500000' : '45000' } })
     }) as unknown as typeof window.fetch)
-    const rows = () => [...shadow().querySelectorAll('#kay-dev-images .image')].map(row => [...row.children].map(child => child.textContent).join(' | '))
+    const rows = () => [...shadow().querySelectorAll('#kay-dev-images .image')].map(row => [`${row.querySelector('.src')!.firstChild!.textContent}${row.querySelector('.src .pill') === null ? '' : ' (largest paint)'}`, [...row.querySelectorAll('.chip')].map(chip => chip.textContent).join(' - '), ...[...row.querySelectorAll('.flag')].map(flag => flag.textContent)].join(' | '))
 
     try {
       tool = startDevTool()
@@ -830,15 +824,15 @@ describe('the dev tool', () => {
       expect(asked).toEqual(['HEAD http://localhost/_kay/image?src=%2F_kay%2Fassets%2Fhero.jpg&w=1280', 'HEAD http://localhost/_kay/images/logo-320-1x1.webp', 'HEAD http://localhost/_kay/images/100%.webp', 'HEAD http://localhost/_kay/images/gone.webp', 'HEAD http://localhost/_kay/images/hung.webp'])
       expect(signals.every(signal => signal instanceof AbortSignal)).toBe(true)
       expect(rows()).toEqual([
-        '/_kay/image?src=%2F_kay%2Fassets%2Fhero.jpg&w=1280 | 1280w, resized on request - avif, 43.9 KB - served 1280x1280, drawn 640x360 at 2x - largest contentful paint',
-        '/photo.jpg | not resized by kay - format not looked up, as kay does not serve it - served 4000x4000, drawn 300x225 at 2x | served 59 times the pixels it is drawn with, give it a smaller width or `sizes`',
-        '/_kay/images/logo-320-1x1.webp | 320w, cut 1x1, written by kay build - webp, 43.9 KB - served 160x160, drawn 80x80 at 2x | no width and height, so the page shifts as it loads | lazy-loaded but in view, which delays it',
-        'https://cdn.example/a.png | not resized by kay - on another host - served 10x10, drawn 10x10 at 2x',
-        '/_kay/images/100%.webp | not resized by kay - avif, 43.9 KB - served 10x10, drawn 10x10 at 2x',
-        'http:// | not resized by kay - format unknown - served 10x10, drawn 10x10 at 2x',
-        '/_kay/images/gone.webp | not resized by kay - the server answered 404 - served 10x10, drawn 10x10 at 2x',
-        '/_kay/images/hung.webp | not resized by kay - format... - served 10x10, drawn 10x10 at 2x',
-        '/_kay/images/unloaded.webp | not resized by kay - not loaded - served not loaded, drawn 10x10 at 2x',
+        '/_kay/image?src=%2F_kay%2Fassets%2Fhero.jpg&w=1280 (largest paint) | 1280w, resized on request - avif, 43.9 KB - 1280x1280 drawn 640x360 at 2x',
+        '/photo.jpg | not resized by kay - format not looked up, as kay does not serve it - 4000x4000 drawn 300x225 at 2x | served 59 times the pixels it is drawn with, give it a smaller width or `sizes`',
+        '/_kay/images/logo-320-1x1.webp | 320w, cut 1x1, written by kay build - webp, 43.9 KB - 160x160 drawn 80x80 at 2x | no width and height, so the page shifts as it loads | lazy-loaded but in view, which delays it',
+        'https://cdn.example/a.png | not resized by kay - on another host - 10x10 drawn 10x10 at 2x',
+        '/_kay/images/100%.webp | not resized by kay - avif, 43.9 KB - 10x10 drawn 10x10 at 2x',
+        'http:// | not resized by kay - format unknown - 10x10 drawn 10x10 at 2x',
+        '/_kay/images/gone.webp | not resized by kay - the server answered 404 - 10x10 drawn 10x10 at 2x',
+        '/_kay/images/hung.webp | not resized by kay - format... - 10x10 drawn 10x10 at 2x',
+        '/_kay/images/unloaded.webp | not resized by kay - not loaded - not loaded, drawn 10x10 at 2x',
       ])
       expect(shadow().querySelector('#kay-dev-tab-images .count')?.textContent).toBe('3')
 
@@ -957,7 +951,7 @@ describe('the dev tool', () => {
       shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-images')!.click()
       await Bun.sleep(20)
 
-      const formats = [...shadow().querySelectorAll('#kay-dev-images .image .facts-line')].map(line => line.textContent)
+      const formats = [...shadow().querySelectorAll('#kay-dev-images .image .chips')].map(line => line.textContent)
 
       expect(fetching).toHaveBeenCalledTimes(4)
       expect(formats.slice(0, 4).every(text => text?.includes('format...'))).toBe(true)
@@ -1010,7 +1004,8 @@ describe('the dev tool', () => {
 
       return new Response(files[new URL(url, 'http://localhost').pathname])
     }) as unknown as typeof window.fetch)
-    const facts = () => [...shadow().querySelectorAll('#kay-dev-performance dt')].map(term => `${term.textContent}: ${term.nextElementSibling!.firstChild!.textContent}`)
+    const vitalTiles = () => [...shadow().querySelectorAll('#kay-dev-performance .vital')].map(tile => `${tile.querySelector('.name')!.textContent}: ${tile.querySelector('.num')!.textContent} ${tile.querySelector('.pill')?.textContent ?? ''}`.trim())
+    const weights = () => [...shadow().querySelectorAll('#kay-dev-performance .weight > .v')].map(value => value.textContent)
     const size = (...texts: string[]) => {
       const bytes = texts.reduce((sum, text) => sum + Bun.gzipSync(text).length, 0)
 
@@ -1024,35 +1019,38 @@ describe('the dev tool', () => {
       shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-performance')!.click()
       await Bun.sleep(30)
 
-      expect(facts().slice(0, 3)).toEqual(['LCP: 3000 ms - needs improvement', 'CLS: 0.120 - needs improvement', 'INP: no interaction yet'])
-      expect(shadow().querySelector('#kay-dev-performance dd .note')?.textContent).toBe(' (good up to 2500 ms, poor past 4000 ms)')
+      expect(vitalTiles()).toEqual(['LCP: 3000ms needs work', 'CLS: 0.120 needs work', 'INP: no interaction yet'])
+      expect(shadow().querySelector('#kay-dev-performance .vital .tick')?.textContent).toBe('2.5 s')
 
       // Interactions: the slowest of each, the worst taken; a later report moves the open tab.
       observed.report('event', [{ interactionId: 1, duration: 80 }, { interactionId: 1, duration: 120 }, { interactionId: 2, duration: 240 }, { duration: 900 }, { interactionId: 3, duration: 800, target: shadow().host }])
 
-      expect(facts()[2]).toBe('INP: 240 ms - needs improvement')
+      expect(vitalTiles()[2]).toBe('INP: 240ms needs work')
       expect(shadow().querySelector('#kay-dev-tab-performance .count')?.textContent).toBe('3')
 
       // The HTML is sized from the document the browser holds, not fetched again; two unhashed files whose names end in 8 letters stay two, and an island hashed in letters only is still one.
       expect(fetched.sort()).toEqual(['/_kay/_layout-1.css', '/_kay/counter-def45678.js', '/_kay/dev/sizes', '/_kay/entry-abc12345.js', '/_kay/lib-calendar.js', '/_kay/lib-original.js', '/_kay/page-swap-aa11bb22.js', '/_kay/search-tbghfygg.js'])
-      expect(facts().slice(3)).toEqual([
-        expect.stringMatching(/^HTML: \d/),
-        `CSS: ${size(files['/_kay/_layout-1.css']!)}`,
-        `JS: ${size(files['/_kay/entry-abc12345.js']!, files['/_kay/counter-def45678.js']!, files['/_kay/page-swap-aa11bb22.js']!, files['/_kay/search-tbghfygg.js']!, files['/_kay/lib-calendar.js']!, files['/_kay/lib-original.js']!)}`,
-        `Entry: ${size(files['/_kay/entry-abc12345.js']!)}`,
-        `Island chunks: ${size(files['/_kay/counter-def45678.js']!, files['/_kay/search-tbghfygg.js']!)}`,
-        `Other chunks: ${size(files['/_kay/page-swap-aa11bb22.js']!, files['/_kay/lib-calendar.js']!, files['/_kay/lib-original.js']!)}`,
-        'JS: ~5.0 KB',
-        'CSS: 256 B',
+      const js = size(files['/_kay/entry-abc12345.js']!, files['/_kay/counter-def45678.js']!, files['/_kay/page-swap-aa11bb22.js']!, files['/_kay/search-tbghfygg.js']!, files['/_kay/lib-calendar.js']!, files['/_kay/lib-original.js']!)
+
+      expect(weights().slice(1)).toEqual([
+        size(files['/_kay/_layout-1.css']!),
+        size(files['/_kay/entry-abc12345.js']!),
+        size(files['/_kay/counter-def45678.js']!, files['/_kay/search-tbghfygg.js']!),
+        size(files['/_kay/page-swap-aa11bb22.js']!, files['/_kay/lib-calendar.js']!, files['/_kay/lib-original.js']!),
+        expect.any(String),
       ])
+      expect(weights()[0]).toMatch(/^\d/)
+      expect(js).toMatch(/\d/)
       expect(shadow().querySelector('#kay-dev-performance')!.textContent).toContain('Dev sizes: not minified')
 
       // The last build's sizes for the route, with their age, the estimate marked.
-      const built = [...shadow().querySelectorAll('#kay-dev-performance dl')].at(-1)!.textContent
+      const built = shadow().querySelector('#kay-dev-performance .build')!.textContent
       const text = shadow().querySelector('#kay-dev-performance')!.textContent
 
-      expect(built).toBe('JS~5.0 KBCSS256 B')
-      expect(text).toContain('Route /, server build made 2 h ago')
+      expect(built).toContain('JS ~5.0 KB')
+      expect(built).toContain('CSS 256 B')
+      expect(text).toContain('Last kay build, 2 h ago')
+      expect(text).toContain('Route /, server build')
       expect(text).toContain('~ marks an estimate')
       expect(shadow().querySelector('#kay-dev-performance')!.textContent).toContain('Measured on the load of /.')
 

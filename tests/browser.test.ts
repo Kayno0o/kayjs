@@ -409,7 +409,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay dev in
     expect((await logged(shown)).map(problem => problem.slice(0, 20))).toEqual(['island tests/fixture', 'the persisted signal'])
 
     // Dismissed, they stay so for the browser tab, a new one showing.
-    await shown.evaluate(() => document.querySelector('kay-dev')!.shadowRoot!.querySelector<HTMLButtonElement>('.actions button')!.click())
+    await shown.evaluate(() => [...document.querySelector('kay-dev')!.shadowRoot!.querySelectorAll<HTMLButtonElement>('button.tool')].find(button => button.textContent === 'Dismiss all')!.click())
 
     expect(await shown.evaluate(() => document.querySelector('kay-dev')!.shadowRoot!.querySelectorAll('.problem pre').length)).toBe(0)
 
@@ -463,9 +463,10 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay dev in
 
     const [html, files] = await shown.evaluate(() => {
       const panel = document.querySelector('kay-dev')!.shadowRoot!.querySelector('#kay-dev-performance')!
-      const facts = [...panel.querySelectorAll('dt')].find(term => term.textContent === 'HTML')!
+      const names = [...panel.querySelectorAll('.weight > span:not(.bars):not(.v):not(.files):not(.rule)')]
+      const html = names.find(name => name.textContent === 'HTML')!
 
-      return [facts.nextElementSibling!.textContent, [...panel.querySelectorAll('.note.mono')].map(note => note.textContent.split(' '))] as const
+      return [html.nextElementSibling!.nextElementSibling!.textContent, [...panel.querySelectorAll('.weight .files')].flatMap(note => note.textContent.split(', ').map(file => file.split(' ')))] as const
     })
     const bytes = (text: string) => {
       const [value, unit] = text.split(' ')
@@ -581,25 +582,45 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay dev in
         }
         // The text colour, then the backgrounds under it, from the page down.
         const pairs: Record<string, string[]> = {
-          'title': ['muted', 'surface'],
-          'icon': ['muted', 'surface'],
-          'icon:hover': ['fg', 'bg'],
-          'tool': ['muted', 'bg'],
-          'tool:hover': ['fg', 'bg'],
-          'tab': ['muted', 'surface'],
-          'tab:hover': ['muted', 'bg'],
-          'tab selected': ['fg', 'bg'],
-          'count': ['fg', 'surface', 'accent-soft'],
-          'count selected': ['fg', 'bg', 'accent-soft'],
-          'count error': ['bg', 'error'],
-          'mark': ['accent', 'bg'],
-          'bar button:hover': ['fg', 'bg', 'surface'],
-          'mark pressed': ['accent', 'bg', 'accent-soft'],
-          'heading': ['muted', 'bg'],
-          'problem': ['fg', 'bg', 'surface'],
-          'problem error': ['error', 'bg'],
-          'problem warn': ['warn', 'bg'],
-          'route current': ['fg', 'bg', 'accent-soft'],
+          'title': ['text', 'mantle'],
+          'where': ['sub', 'mantle'],
+          'icon': ['sub', 'mantle'],
+          'icon:hover': ['text', 'surface'],
+          'tab': ['sub', 'mantle'],
+          'tab:hover': ['text', 'mantle'],
+          'tab selected': ['text', 'surface'],
+          'tab count': ['sub', 'mantle'],
+          'bar': ['text', 'surface'],
+          'bar pressed': ['accent-hi', 'surface', 'accent-soft'],
+          'bar pill error': ['error', 'surface', 'error-soft'],
+          'bar pill warn': ['warn', 'surface', 'warn-soft'],
+          'pill': ['sub', 'surface', 'mantle'],
+          'pill error': ['error', 'surface', 'error-soft'],
+          'pill warn': ['warn', 'surface', 'warn-soft'],
+          'pill ok': ['ok', 'surface', 'ok-soft'],
+          'pill accent': ['accent-hi', 'surface', 'accent-soft'],
+          'tool': ['text', 'surface'],
+          'tool:hover': ['accent-hi', 'surface'],
+          'heading': ['sub', 'surface'],
+          'note': ['sub', 'surface'],
+          'link': ['accent', 'surface'],
+          'chip': ['sub', 'surface'],
+          'problem': ['text', 'surface', 'canvas'],
+          'problem error icon': ['error', 'surface', 'canvas'],
+          'problem warn icon': ['warn', 'surface', 'canvas'],
+          'method': ['accent-hi', 'surface', 'accent-soft'],
+          'request line': ['text', 'surface', 'canvas'],
+          'serp title': ['accent', 'surface', 'canvas'],
+          'serp description': ['sub', 'surface', 'canvas'],
+          'meter over': ['warn', 'surface'],
+          'env flag': ['warn', 'surface', 'warn-soft'],
+          'image flag': ['warn', 'surface'],
+          'vital': ['text', 'surface', 'canvas'],
+          'vital tick': ['sub', 'surface', 'canvas'],
+          'build': ['text', 'surface', 'accent-soft'],
+          'route current': ['text', 'surface', 'accent-soft'],
+          'route current path': ['accent', 'surface', 'accent-soft'],
+          'locale chip': ['accent', 'surface'],
         }
 
         const found = Object.entries(pairs).map(([name, [fg, ...layers]]) => [name, ratio(fg!, ...layers)] as const).filter(([, value]) => value < 4.5).map(([name, value]) => `${picked} ${name} ${value.toFixed(2)}`)

@@ -78,6 +78,16 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('kay dev in 
     stop = await dev(root)
     browser = await chromium.launch({ headless: true, executablePath })
     page = await browser.newPage()
+    await page.addInitScript(() => {
+      (window as unknown as { builtSays: string[] }).builtSays = []
+      addEventListener('kay-dev-built', (event) => {
+        const build = JSON.parse((event as CustomEvent<string>).detail) as { changed: string, reloaded?: boolean, styles?: boolean, ms: number }
+
+        const did = build.styles === true ? 'stylesheets swapped' : 'restarted'
+
+        ;(window as unknown as { builtSays: string[] }).builtSays.push(`${build.changed}: ${build.reloaded === true ? 'reloaded' : did} in ${build.ms} ms`)
+      })
+    })
   }, 60_000)
 
   afterAll(async () => {
@@ -146,8 +156,8 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('kay dev in 
     await page.locator('p.static', { hasText: 'Hello' }).waitFor({ timeout: 30_000 })
     await Bun.write(join(root, 'src/greeting.ts'), 'export const greeting = \'Welcome\'\n')
     await page.locator('p.static', { hasText: 'Welcome' }).waitFor({ timeout: 30_000 })
-    // The dev tool's bar says what reloaded the server.
-    await page.locator('kay-dev .bar .built', { hasText: /^src\/greeting\.ts: reloaded in \d+ ms$/ }).waitFor()
+    // The live reload script announces what reloaded the server.
+    await page.waitForFunction(() => (window as unknown as { builtSays: string[] }).builtSays.some(text => (/^src\/greeting\.ts: reloaded in \d+ ms$/).test(text)))
 
     expect(await sameDocument()).toBe(true)
     expect(await page.textContent('.solo button.count')).toBe('Pressed 3')
@@ -218,7 +228,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('kay dev in 
     await rm(join(root, '.port'))
     await Bun.write(join(root, 'src/app.css'), 'p.static { color: rgb(0, 0, 255) }\n')
     await until(async () => await color() === 'rgb(0, 0, 255)')
-    await page.locator('kay-dev .bar .built', { hasText: /^src\/app\.css: stylesheets swapped in \d+ ms$/ }).waitFor()
+    await page.waitForFunction(() => (window as unknown as { builtSays: string[] }).builtSays.some(text => (/^src\/app\.css: stylesheets swapped in \d+ ms$/).test(text)))
 
     expect(await sameDocument()).toBe(true)
     expect(existsSync(join(root, '.port'))).toBe(false)
@@ -352,10 +362,10 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('kay dev in 
     expect(JSON.parse(await Bun.file(join(root, '.opened')).text())).toEqual(['-g', `${join(root, 'src/routes/index.kay')}:8:1`])
 
     await page.locator('kay-dev .bar > button', { hasText: /islands?$/ }).click()
-    await page.locator('#kay-dev-islands', { hasText: 'src/components/extra.kay#1 true' }).waitFor()
+    await page.locator('#kay-dev-islands', { hasText: /extra\.kay.*#1true/ }).waitFor()
     await page.click('button.extra')
-    await page.locator('#kay-dev-islands', { hasText: 'src/components/extra.kay#1 false' }).waitFor()
-    expect(await page.textContent('#kay-dev-islands')).toContain('src/components/counter.kay#1 0#2 ""')
+    await page.locator('#kay-dev-islands', { hasText: /extra\.kay.*#1false/ }).waitFor()
+    expect(await page.textContent('#kay-dev-islands')).toMatch(/counter\.kay.*#10number#2""string/)
   }, 60_000)
 
   it('reloads the open page into the error page when an edit does not compile, and back once it does', async () => {
@@ -379,8 +389,8 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('kay dev in 
 
     await Bun.write(join(root, 'src/live.ts'), 'import { live } from \'kay\'\n\nexport const visitors = live(0)\nexport const rooms = live((id: string) => id)\n')
 
-    // The dev tool's bar says when the edit reached the server; the value it held is kept, so the next write counts on from it.
-    await page.locator('kay-dev .bar .built', { hasText: /^src\/live\.ts: reloaded in \d+ ms$/ }).waitFor({ timeout: 30_000 })
+    // The live reload script announces when the edit reached the server; the value it held is kept, so the next write counts on from it.
+    await page.waitForFunction(() => (window as unknown as { builtSays: string[] }).builtSays.some(text => (/^src\/live\.ts: reloaded in \d+ ms$/).test(text)), undefined, { timeout: 30_000 })
 
     expect(await bump()).toBe(2)
     await page.locator('p.online', { hasText: '2 online' }).waitFor({ timeout: 10_000 })

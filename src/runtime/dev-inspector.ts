@@ -36,8 +36,8 @@ export interface Inspector {
 export function startInspector(tool: DevTool, doc: Document = document): Inspector {
   const win = doc.defaultView! as Window & InspectedWindow
   const host = tool.root.host
-  const inspect = tool.button('Inspect', 'Inspect an element: click it to open its line')
-  const islandsTab = tool.tab({ id: 'islands', label: 'Islands', summary: count => `${count} island${count === 1 ? '' : 's'}`, shown: () => watch(true), hidden: () => watch(false) })
+  const inspect = tool.button('Inspect', 'Inspect an element: click it to open its line', 'crosshair')
+  const islandsTab = tool.tab({ id: 'islands', label: 'Islands', icon: 'boxes', summary: count => `${count} island${count === 1 ? '' : 's'}`, shown: () => watch(true), hidden: () => watch(false) })
   const panel = islandsTab.panel
   let inspecting = false
   // What the panel shows: rebuilt only when it changed, so a click, a selection or the focus inside it survives the refresh.
@@ -48,7 +48,6 @@ export function startInspector(tool: DevTool, doc: Document = document): Inspect
   let pointer: { x: number, y: number } | undefined
 
   inspect.setAttribute('aria-pressed', 'false')
-  panel.classList.add('mono')
 
   const show = (target: Element, text: string) => tool.outline([target], text)
   const hide = () => tool.hideOutline()
@@ -167,7 +166,7 @@ export function startInspector(tool: DevTool, doc: Document = document): Inspect
     if (panel.hidden !== false)
       return
 
-    const rows = found.map(island => ({ island, component: island.dataset.component ?? '?', values: win.$kaySignals?.(island)?.map(formatted) }))
+    const rows = found.map(island => ({ island, component: island.dataset.component ?? '?', values: win.$kaySignals?.(island)?.map(value => [formatted(value), typeOf(value)] as const) }))
     const text = JSON.stringify(rows.map(({ component, values }) => [component, values]))
 
     if (shown?.text === text && shown.islands.length === found.length && shown.islands.every((island, index) => island === found[index]))
@@ -183,25 +182,34 @@ export function startInspector(tool: DevTool, doc: Document = document): Inspect
     }
 
     panel.replaceChildren(...rows.map(({ island, component, values }) => {
-      const row = tool.make('div', 'row')
-      const name = tool.make('button', 'link', component)
+      const card = tool.make('div', 'island')
+      const top = tool.make('div', 'top')
+      const name = tool.make('button', 'name', component)
 
       name.type = 'button'
       name.onclick = () => void openFrom(island, `${component}:1:1`)
-      row.append(name)
-      row.onpointerenter = () => show(island, component)
-      row.onpointerleave = hide
-
-      if (values === undefined)
-        row.append(tool.make('div', 'note', 'not hydrated'))
-
-      for (const [index, value] of (values ?? []).entries())
-        row.append(tool.make('div', 'value', `#${index + 1} ${value}`))
+      top.append(name, tool.make('span', 'grow'), values === undefined ? tool.make('span', 'pill', 'not hydrated') : tool.make('span', 'pill ok', 'hydrated'))
+      card.append(top)
+      card.onpointerenter = () => show(island, component)
+      card.onpointerleave = hide
 
       if (values?.length === 0)
-        row.append(tool.make('div', 'note', 'no signals'))
+        card.append(tool.make('span', 'note', 'no signals'))
 
-      return row
+      if (values !== undefined && values.length > 0) {
+        const table = tool.make('table', 'signals')
+
+        for (const [index, [value, type]] of values.entries()) {
+          const row = tool.make('tr')
+
+          row.append(tool.make('td', '', `#${index + 1}`), tool.make('td', 'value', value), tool.make('td', '', type))
+          table.append(row)
+        }
+
+        card.append(table)
+      }
+
+      return card
     }))
   }
 
@@ -252,6 +260,17 @@ export function startInspector(tool: DevTool, doc: Document = document): Inspect
       inspect.remove()
     },
   }
+}
+
+// What a signal holds, as a word: its type, `function` and `element` apart.
+function typeOf(value: unknown): string {
+  if (value === null)
+    return 'null'
+
+  if (value instanceof Element)
+    return 'element'
+
+  return Array.isArray(value) ? 'array' : typeof value
 }
 
 function formatted(value: unknown): string {

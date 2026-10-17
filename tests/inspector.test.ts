@@ -173,7 +173,7 @@ describe('the inspector', () => {
 
       const panel = host().querySelector('#kay-dev-islands')!
 
-      expect(panel.textContent).toBe('src/islands/counter.kay#1 1#2 {"open":true}src/islands/late.kaynot hydrated')
+      expect(panel.textContent).toBe('src/islands/counter.kayhydrated#11number#2{"open":true}objectsrc/islands/late.kaynot hydrated')
 
       // Unchanged, the rows stay, and a click or a selection in them with them.
       const row = panel.firstChild
@@ -183,7 +183,7 @@ describe('the inspector', () => {
 
       values.set(document.querySelector('slot')!, [2, { open: false }])
       await Bun.sleep(600)
-      expect(panel.textContent).toContain('#1 2#2 {"open":false}')
+      expect(panel.textContent).toContain('#12number#2{"open":false}')
 
       opened.length = 0
       panel.querySelector('button')!.click()
@@ -194,7 +194,7 @@ describe('the inspector', () => {
       await Bun.sleep(0)
       values.set(document.querySelector('slot')!, [3, { open: false }])
       await Bun.sleep(600)
-      expect(panel.textContent).toContain('#1 2#2')
+      expect(panel.textContent).toContain('#12number#2')
     }
     finally {
       inspector.stop()

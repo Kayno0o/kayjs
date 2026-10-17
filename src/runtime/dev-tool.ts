@@ -21,9 +21,6 @@ const PRERENDER = { 'page': 'prerendered by kay build', 'listed': 'prerendered b
 const MAX_DISMISSED = 200
 // How long an error page's copy button says it copied.
 const COPIED_MS = 1500
-// How long the bar says what `kay dev` rebuilt, then how long it fades.
-const BUILT_MS = 4000
-const FADE_MS = 400
 // The event the live reload script fires for each restart or stylesheet swap `kay dev` announces.
 const BUILT_EVENT = 'kay-dev-built'
 // A path segment, kay's `(group)`, `[param]`, `[[optional]]` and `[...rest]` names included.
@@ -45,132 +42,299 @@ const KINDS: Record<ProblemKind, string> = {
 }
 
 const STYLE = `
-:host { all: initial; --bg: #fff; --surface: #f5f5f7; --fg: #1c1c22; --muted: #6a6a76; --border: #e2e2e8; --accent: #6d28d9; --accent-soft: rgb(109 40 217 / 10%); --on-accent: #fff; --error: #c4262e; --warn: #9a5b00; --ok: #1a7f37; --shadow: 0 8px 28px rgb(0 0 0 / 18%); color-scheme: light; }
+:host { all: initial; --canvas: #f8fafc; --mantle: #e8edf4; --surface: #fff; --line: #dde3ec; --sub: #566173; --text: #17202e; --accent: #1565a0; --accent-hi: #0f4c7a; --on-accent: #fff; --orange: #9c4a0a; --ok: #2f6b3a; --warn: #7a4f0f; --error: #a63227; --accent-soft: color-mix(in srgb, var(--accent) 11%, transparent); --ok-soft: color-mix(in srgb, var(--ok) 13%, transparent); --warn-soft: color-mix(in srgb, var(--warn) 14%, transparent); --error-soft: color-mix(in srgb, var(--error) 13%, transparent); --shadow: 0 10px 32px rgb(23 32 46 / 18%), 0 1px 3px rgb(23 32 46 / 10%); color-scheme: light; }
 @media (prefers-color-scheme: dark) {
-  :host { --bg: #1b1b21; --surface: #25252d; --fg: #ececf1; --muted: #a2a2ae; --border: #36363f; --accent: #a78bfa; --accent-soft: rgb(167 139 250 / 16%); --on-accent: #1b1b21; --error: #ff7a7a; --warn: #f2b450; --ok: #5fd68a; --shadow: 0 8px 28px rgb(0 0 0 / 50%); color-scheme: dark; }
+  :host { --canvas: #17202e; --mantle: #121a26; --surface: #1c2737; --line: #2a3a55; --sub: #9ba6b5; --text: #eef2f7; --accent: #4cb3ea; --accent-hi: #8fd0f5; --on-accent: #17202e; --orange: #f0954a; --ok: #8fd19e; --warn: #e8b46a; --error: #f2968c; --shadow: 0 10px 32px rgb(0 0 0 / 50%), 0 1px 3px rgb(0 0 0 / 40%); color-scheme: dark; }
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
-button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.ui { font: 13px/1.45 system-ui, sans-serif; color: var(--fg); text-align: left; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; text-align: left; }
+button:focus-visible, a:focus-visible, input:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ui { font: 13px/1.45 system-ui, sans-serif; color: var(--text); text-align: left; }
 .mono { font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
-.bar { position: fixed; bottom: 12px; left: 12px; z-index: 2147483647; display: flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid var(--border); border-radius: 999px; background: var(--bg); box-shadow: var(--shadow); }
-.right .bar { left: auto; right: 12px; }
-.bar > button { padding: 3px 10px; border-radius: 999px; white-space: nowrap; }
-.bar > button:hover { background: var(--surface); }
-.bar > button[aria-pressed=true], .bar > button[aria-expanded=true] { background: var(--accent-soft); }
+svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-.mark { font-weight: 700; color: var(--accent); letter-spacing: .02em; }
-.built:empty { padding: 0; }
-.built { max-width: min(28rem, calc(100vw - 160px)); padding: 3px 10px 3px 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); transition: opacity ${FADE_MS}ms; }
-.built.fading { opacity: 0; }
-@media (prefers-reduced-motion: reduce) { .built { transition: none; } }
+.bar { position: fixed; bottom: 12px; left: 12px; z-index: 2147483647; display: flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); box-shadow: var(--shadow); max-width: calc(100vw - 24px); }
+.right .bar { left: auto; right: 12px; }
+.bar > button { display: flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
+.bar > button:hover { background: var(--mantle); }
+.bar > button[aria-pressed=true], .bar > button[aria-expanded=true] { background: var(--accent-soft); }
+.bar > button[aria-pressed=true] { color: var(--accent-hi); }
+.mark { font-weight: 700; letter-spacing: .01em; padding-left: 5px !important; }
+.mark svg { width: 20px; height: 20px; flex: none; }
+.pill { display: inline-flex; align-items: center; gap: 4px; padding: 0 7px; border-radius: 999px; font: 600 11px/18px system-ui, sans-serif; font-variant-numeric: tabular-nums; background: var(--mantle); color: var(--sub); white-space: nowrap; }
+.pill.error { background: var(--error-soft); color: var(--error); }
+.pill.warn { background: var(--warn-soft); color: var(--warn); }
+.pill.ok { background: var(--ok-soft); color: var(--ok); }
+.pill.accent { background: var(--accent-soft); color: var(--accent-hi); }
+.pill svg.i { width: 12px; height: 12px; }
+.bar .pill { font-size: 12px; }
 .error { color: var(--error); }
 .warn { color: var(--warn); }
-.drawer { position: fixed; bottom: 52px; left: 12px; z-index: 2147483647; display: flex; flex-direction: column; width: min(36rem, calc(100vw - 24px)); height: min(28rem, 60vh); border: 1px solid var(--border); border-radius: 10px; background: var(--bg); box-shadow: var(--shadow); overflow: hidden; }
+.drawer { position: fixed; bottom: 56px; left: 12px; z-index: 2147483647; display: flex; flex-direction: column; width: min(36rem, calc(100vw - 24px)); height: min(28rem, 60vh); border: 1px solid var(--line); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow); overflow: hidden; container: drawer / inline-size; }
 .right .drawer { left: auto; right: 12px; }
-.max .drawer { width: calc(100vw - 24px); height: calc(100vh - 64px); }
-.head { display: flex; align-items: center; gap: 2px; padding: 4px 6px 4px 12px; border-bottom: 1px solid var(--border); background: var(--surface); }
-.title { flex: 1; font-weight: 600; color: var(--muted); }
+.max .drawer { width: calc(100vw - 24px); height: calc(100vh - 68px); }
+.head { display: flex; align-items: center; gap: 8px; padding: 6px 6px 6px 10px; border-bottom: 1px solid var(--line); background: var(--mantle); }
+.title { display: flex; align-items: center; gap: 8px; font-weight: 650; min-width: 0; white-space: nowrap; }
+.title svg { width: 20px; height: 20px; flex: none; }
+.where { flex: 1; min-width: 0; color: var(--sub); font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.icon { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 7px; color: var(--sub); }
+.icon:hover { background: var(--surface); color: var(--text); }
 .body { display: flex; flex: 1; min-height: 0; }
-.tabs { display: flex; flex-direction: column; gap: 2px; flex: none; padding: 6px; border-right: 1px solid var(--border); background: var(--surface); overflow-y: auto; }
-.tabs button { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 4px 8px; border-radius: 6px; color: var(--muted); text-align: left; white-space: nowrap; }
-.tabs button:hover { background: var(--bg); }
-.tabs button[aria-selected=true] { background: var(--bg); color: var(--fg); box-shadow: 0 0 0 1px var(--border); }
-.tabs .count { padding: 0 6px; border-radius: 999px; background: var(--accent-soft); color: var(--fg); font-size: 11px; }
-.tabs .count.error { background: var(--error); color: var(--bg); }
+.tabs { display: flex; flex-direction: column; gap: 1px; flex: none; width: 10.5rem; padding: 6px; border-right: 1px solid var(--line); background: var(--mantle); overflow-y: auto; }
+.tabs button { display: grid; grid-template-columns: 16px 1fr auto; align-items: center; gap: 9px; padding: 5px 8px; border-radius: 7px; color: var(--sub); white-space: nowrap; }
+.tabs button:hover { background: color-mix(in srgb, var(--surface) 60%, transparent); color: var(--text); }
+.tabs button[aria-selected=true] { background: var(--surface); color: var(--text); font-weight: 600; box-shadow: 0 0 0 1px var(--line); }
+.tabs button[aria-selected=true] svg { color: var(--accent); }
+.tabs .sep { flex: none; height: 1px; margin: 5px 4px; background: var(--line); }
+@container drawer (max-width: 30rem) {
+  .tabs { width: auto; }
+  .tabs button { grid-template-columns: 16px; position: relative; padding: 7px; }
+  .tabs .name { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .tabs .pill { position: absolute; top: -1px; right: -3px; padding: 0 4px; font-size: 10px; line-height: 14px; }
+  .tabs .sep { display: none; }
+}
 .content { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }
-.tool { padding: 4px 8px; border-radius: 6px; color: var(--muted); }
-.tool:hover { background: var(--bg); color: var(--fg); }
-.icon { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 6px; color: var(--muted); }
-.icon:hover { background: var(--bg); color: var(--fg); }
-.icon svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
-.panel { flex: 1; overflow: auto; padding: 10px; }
-.actions { display: flex; justify-content: flex-end; margin-bottom: 8px; }
-.empty { color: var(--muted); padding: 8px 2px; }
-.group + .group { margin-top: 14px; }
-.heading { margin: 0 0 6px; font: 600 11px/1.4 system-ui, sans-serif; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
-.problem { margin: 0 0 8px; padding: 8px 10px; border-left: 3px solid var(--warn); border-radius: 4px; background: var(--surface); }
-.problem pre { margin: 0; white-space: pre-wrap; word-break: break-word; }
-.meta { float: right; display: flex; align-items: center; gap: 6px; margin: -4px -6px 0 8px; }
-.position { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+.panel { flex: 1; min-width: 0; overflow: auto; padding: 12px 14px 16px; display: grid; align-content: start; gap: 16px; }
+.panel > * { min-width: 0; }
+.group { display: grid; gap: 8px; }
+.heading { display: flex; align-items: center; gap: 8px; margin: 0; font: 650 11px/1.4 system-ui, sans-serif; letter-spacing: .07em; text-transform: uppercase; color: var(--sub); }
+.grow { flex: 1; }
+.actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.tool { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--text); font-size: 12px; }
+.tool:hover { border-color: var(--accent); color: var(--accent-hi); }
+.tool:disabled { opacity: .6; cursor: default; }
+.position { color: var(--accent); text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--accent) 45%, transparent); text-underline-offset: 2px; font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.position:hover { text-decoration-color: currentColor; }
 .position:disabled { color: inherit; text-decoration: none; cursor: text; }
-.problem.error { border-left-color: var(--error); }
-.problem.error, .problem.warn { color: var(--fg); }
-.row { padding: 6px 4px 8px; border-bottom: 1px solid var(--border); }
-.row:last-child { border-bottom: 0; }
-.link { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
-.value { white-space: pre-wrap; word-break: break-all; }
-.directive { padding-left: 1.5em; overflow-wrap: anywhere; }
-.note { color: var(--muted); }
-.outline { position: fixed; z-index: 2147483646; pointer-events: none; border: 2px solid var(--accent); border-radius: 2px; background: var(--accent-soft); }
-.facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 14px; margin: 0; }
-.facts dt { color: var(--muted); }
-.facts dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
-.facts dd > div + div { margin-top: 2px; }
-.ms { margin-left: 8px; color: var(--muted); }
-.filter { flex: 1; padding: 4px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--fg); font: inherit; }
-.filter:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.route { display: grid; grid-template-columns: 4.5em minmax(0, 1fr) auto; gap: 2px 10px; align-items: baseline; padding: 5px 4px; border-bottom: 1px solid var(--border); }
-.route:last-child { border-bottom: 0; }
-.route[aria-current] { background: var(--accent-soft); border-radius: 4px; }
-.route .method { color: var(--muted); }
-.route .path { overflow-wrap: anywhere; }
-.route .file { grid-column: 2 / -1; color: var(--muted); }
-.secret { color: var(--warn); }
+.empty { color: var(--sub); padding: 6px 0; }
+.note { color: var(--sub); }
+.link { color: var(--accent); text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--accent) 45%, transparent); text-underline-offset: 2px; }
+.link:hover { text-decoration-color: currentColor; }
 .good { color: var(--ok); }
 .poor { color: var(--error); }
 .needs { color: var(--warn); }
-.image { padding: 6px 4px; border-bottom: 1px solid var(--border); }
-.image:last-child { border-bottom: 0; }
-.image:hover { background: var(--accent-soft); border-radius: 4px; }
-.image .src { overflow-wrap: anywhere; }
-.image .facts-line { color: var(--muted); }
-.image .flag { color: var(--warn); }
+.value { white-space: pre-wrap; word-break: break-all; }
+.facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 7px 16px; margin: 0; }
+.facts dt { color: var(--sub); }
+.facts dd { margin: 0; min-width: 0; overflow-wrap: anywhere; display: grid; gap: 3px; justify-items: start; }
+.facts .meter { justify-self: stretch; }
+.chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.chip { font: 11.5px/18px ui-monospace, SFMono-Regular, Menlo, monospace; padding: 0 6px; border-radius: 5px; border: 1px solid var(--line); color: var(--sub); white-space: nowrap; }
+.row { padding: 8px 0; border-top: 1px solid var(--line); }
+.row:first-child { border-top: 0; }
+.problem { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; gap: 4px 10px; padding: 9px 8px 9px 10px; border: 1px solid var(--line); border-radius: 9px; background: var(--canvas); }
+.problem > svg { margin-top: 2px; }
+.problem.error, .problem.warn { color: var(--text); }
+.problem.error > svg { color: var(--error); }
+.problem.warn > svg { color: var(--warn); }
+.problem pre { margin: 0; white-space: pre-wrap; word-break: break-word; }
+.problem > .pill { grid-column: 2; justify-self: start; }
+.problem .dismiss { grid-row: 1; grid-column: 3; width: 24px; height: 24px; margin: -3px -2px 0 0; }
+.list { display: grid; gap: 8px; }
+.reqline { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--canvas); }
+.reqline .path { font: 600 13px ui-monospace, SFMono-Regular, Menlo, monospace; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.method { font: 700 10.5px/18px ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .04em; padding: 0 6px; border-radius: 5px; background: var(--accent-soft); color: var(--accent-hi); }
+.chain { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.chain li { display: grid; grid-template-columns: 5.5rem minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 4px 0; }
+.chain .k { color: var(--sub); font-size: 12px; }
+.chain .d { padding-left: calc(var(--depth, 0) * 14px); display: flex; align-items: center; gap: 6px; min-width: 0; overflow-wrap: anywhere; }
+.chain .d::before { content: ''; width: 8px; height: 8px; border: 1.5px solid var(--accent); border-radius: 2px; flex: none; }
+.timing { display: grid; grid-template-columns: max-content minmax(0, 1fr) 4.2rem; align-items: center; gap: 6px 12px; }
+.bars { height: 8px; border-radius: 4px; background: var(--mantle); overflow: hidden; }
+.bars i { display: block; height: 100%; border-radius: 4px; background: var(--accent); }
+.bars.total i { background: var(--orange); }
+.v { text-align: right; font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; font-variant-numeric: tabular-nums; color: var(--sub); }
+.headers, .kv { width: 100%; border-collapse: collapse; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.headers td, .kv td { padding: 4px 0; border-top: 1px solid var(--line); vertical-align: top; overflow-wrap: anywhere; }
+.headers td:first-child, .kv td:first-child { color: var(--sub); white-space: nowrap; padding-right: 14px; width: 1%; }
+.headers .directive { display: block; }
+.previews { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 10px; }
+.preview { display: grid; gap: 4px; align-content: start; padding: 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--canvas); min-width: 0; }
+.preview .cap { font: 650 10.5px system-ui, sans-serif; letter-spacing: .07em; text-transform: uppercase; color: var(--sub); margin-bottom: 4px; }
+.serp .site { font-size: 12px; color: var(--sub); overflow-wrap: anywhere; }
+.serp .t { color: var(--accent); font-size: 16px; line-height: 1.3; overflow-wrap: anywhere; }
+.serp .d { color: var(--sub); font-size: 12.5px; overflow-wrap: anywhere; }
+.card { display: block; max-width: 100%; border: 1px solid var(--line); border-radius: 6px; }
+.meter { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 4px 10px; }
+.meter .track { height: 5px; border-radius: 3px; background: var(--mantle); overflow: hidden; }
+.meter .track i { display: block; height: 100%; border-radius: 3px; background: var(--ok); }
+.meter.over .track i { background: var(--warn); }
+.meter .n { font: 11.5px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--sub); font-variant-numeric: tabular-nums; }
+.meter.over .n { color: var(--warn); }
+.json summary { cursor: pointer; font-size: 12.5px; }
+.json pre, pre.json { margin: 6px 0 0; padding: 10px; border-radius: 8px; background: var(--canvas); border: 1px solid var(--line); white-space: pre-wrap; word-break: break-word; }
+.envrow { font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; display: grid; grid-template-columns: minmax(0, 13rem) minmax(0, 1fr); gap: 4px 14px; padding: 8px 0; border-top: 1px solid var(--line); }
+.envrow .name { overflow-wrap: anywhere; }
+.envrow .val { overflow-wrap: anywhere; color: var(--sub); }
+.envrow .flag { grid-column: 1 / -1; display: flex; gap: 8px; padding: 8px 10px; border-radius: 8px; background: var(--warn-soft); color: var(--warn); font: 12.5px/1.45 system-ui, sans-serif; }
+.envrow .flag svg { margin-top: 1px; }
+.envrow .soft { grid-column: 1 / -1; color: var(--sub); font: 12px system-ui, sans-serif; }
+.image { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 4px 12px; padding: 10px 6px; border-top: 1px solid var(--line); border-radius: 6px; }
+.image:hover { background: var(--accent-soft); }
 .image:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-.snippet { margin: 0 0 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
-.snippet .site { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
-.snippet .title { margin: 2px 0; color: var(--accent); font-size: 16px; }
-.snippet .description { color: var(--muted); }
-.card { display: block; max-width: 100%; margin-top: 6px; border: 1px solid var(--border); border-radius: 6px; }
-.json { margin: 4px 0 0; white-space: pre-wrap; word-break: break-word; }
-.label { position: fixed; z-index: 2147483647; pointer-events: none; padding: 2px 6px; border-radius: 4px; background: var(--accent); color: var(--on-accent); white-space: nowrap; }
+.thumb { grid-row: span 3; width: 52px; height: 40px; border-radius: 6px; border: 1px solid var(--line); background: var(--mantle); object-fit: contain; }
+.image .src { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; overflow-wrap: anywhere; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.image .flags { display: grid; gap: 3px; }
+.image .flag { display: flex; gap: 6px; align-items: flex-start; color: var(--warn); font-size: 12.5px; }
+.image .flag svg { margin-top: 2px; width: 14px; height: 14px; }
+.vitals { display: grid; grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr)); gap: 10px; }
+.vital { display: grid; gap: 6px; padding: 10px 12px 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--canvas); align-content: start; }
+.vital .top { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; }
+.vital .name { font: 650 11px system-ui, sans-serif; letter-spacing: .07em; color: var(--sub); }
+.vital .num { font: 600 20px/1.1 system-ui, sans-serif; font-variant-numeric: tabular-nums; }
+.vital .num small { font-size: 12px; color: var(--sub); font-weight: 500; margin-left: 2px; }
+.scalebox { position: relative; padding-bottom: 14px; margin-top: 4px; }
+.scale { display: flex; height: 6px; border-radius: 3px; overflow: hidden; }
+.scale i { height: 100%; }
+.scale .g { background: color-mix(in srgb, var(--ok) 55%, transparent); }
+.scale .n { background: color-mix(in srgb, var(--warn) 55%, transparent); }
+.scale .p { background: color-mix(in srgb, var(--error) 55%, transparent); }
+.scalebox .mk { position: absolute; top: -1px; width: 3px; height: 8px; margin-left: -1.5px; border-radius: 2px; background: var(--text); box-shadow: 0 0 0 2px var(--canvas); }
+.scalebox .tick { position: absolute; bottom: 0; transform: translateX(-50%); font: 10px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--sub); }
+.vital .note { font-size: 12px; }
+.weight { display: grid; grid-template-columns: max-content minmax(0, 1fr) 4.4rem; align-items: center; gap: 6px 12px; }
+.weight .files { grid-column: 2 / -1; margin-top: -3px; font: 11.5px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--sub); overflow-wrap: anywhere; }
+.weight .total { font-weight: 650; }
+.weight .rule { grid-column: 1 / -1; height: 1px; background: var(--line); }
+.build { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; padding: 8px 12px; border-radius: 9px; background: var(--accent-soft); font-size: 12.5px; }
+.build b { font: 600 12px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.search { position: relative; display: flex; align-items: center; }
+.search svg { position: absolute; left: 9px; color: var(--sub); width: 14px; height: 14px; }
+.search input { width: 100%; padding: 6px 10px 6px 30px; border: 1px solid var(--line); border-radius: 8px; background: var(--canvas); color: var(--text); font: 13px system-ui, sans-serif; }
+.route { display: grid; grid-template-columns: 3.6rem minmax(0, 1fr) auto; align-items: center; gap: 2px 10px; padding: 6px; border-top: 1px solid var(--line); }
+.route[aria-current] { background: var(--accent-soft); border-radius: 6px; border-top-color: transparent; }
+.route .method { justify-self: start; }
+.route .path { font: 12.5px ui-monospace, SFMono-Regular, Menlo, monospace; overflow-wrap: anywhere; }
+.route a.path { color: var(--accent); text-decoration: none; }
+.route a.path:hover { text-decoration: underline; }
+.route .file { grid-column: 2 / -1; font: 11.5px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--sub); overflow-wrap: anywhere; }
+.route .locale { font: 11px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--sub); }
+.locales { display: flex; flex-wrap: wrap; gap: 6px; }
+.locale-chip { font: 12px/24px ui-monospace, SFMono-Regular, Menlo, monospace; padding: 0 10px; border-radius: 999px; border: 1px solid var(--line); color: var(--accent); text-decoration: none; }
+.locale-chip[aria-current] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.missing { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.missing li { display: flex; align-items: center; gap: 8px; color: var(--error); }
+.island { display: grid; gap: 8px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--canvas); }
+.island .top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.island .name { font: 600 13px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--accent); }
+.signals { width: 100%; border-collapse: collapse; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.signals td { padding: 3px 0; border-top: 1px solid var(--line); overflow-wrap: anywhere; }
+.signals td:first-child { color: var(--sub); width: 2.5rem; }
+.signals td:last-child { color: var(--sub); text-align: right; padding-left: 10px; }
+.outline { position: fixed; z-index: 2147483646; pointer-events: none; border: 2px solid var(--accent); border-radius: 3px; background: var(--accent-soft); }
+.label { position: fixed; z-index: 2147483647; pointer-events: none; padding: 2px 7px; border-radius: 5px; background: var(--accent); color: var(--on-accent); white-space: nowrap; }
+@media (prefers-reduced-motion: no-preference) {
+  .tabs button, .bar > button, .icon { transition: background-color .12s, color .12s; }
+}
 @media (max-width: 480px) {
   .drawer, .right .drawer, .max .drawer { left: 8px; right: 8px; width: auto; }
-  .max .drawer { height: calc(100vh - 64px); }
-  .tabs { padding: 4px; }
-  .tabs button { gap: 6px; padding: 4px 6px; }
+  .max .drawer { height: calc(100vh - 68px); }
 }
 `
 
 const SVG = 'http://www.w3.org/2000/svg'
-// Strokes on a 16 by 16 grid, one path each.
+
+// Icons of Lucide 0.469.0 (https://lucide.dev), under the ISC licence: Copyright (c) for portions of Lucide are held by Cole Bemis 2013-2022 as part of Feather (MIT), all other copyright (c) for Lucide are held by Lucide Contributors 2022.
+// Each is a 24 by 24 drawing as its nodes, `tag~attribute~value~...` joined by `|`.
 const ICONS = {
-  close: ['M4 4l8 8', 'M12 4l-8 8'],
-  maximize: ['M3 3h10v10H3z'],
-  restore: ['M5 3h8v8', 'M3 5h8v8H3z'],
-  dockLeft: ['M2 3h12v10H2z', 'M6 3v10'],
-  dockRight: ['M2 3h12v10H2z', 'M10 3v10'],
+  'circle-x': 'circle~cx~12~cy~12~r~10|path~d~m15 9-6 6|path~d~m9 9 6 6',
+  'triangle-alert': 'path~d~m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3|path~d~M12 9v4|path~d~M12 17h.01',
+  'server': 'rect~width~20~height~8~x~2~y~2~rx~2~ry~2|rect~width~20~height~8~x~2~y~14~rx~2~ry~2|line~x1~6~x2~6.01~y1~6~y2~6|line~x1~6~x2~6.01~y1~18~y2~18',
+  'scan-search': 'path~d~M3 7V5a2 2 0 0 1 2-2h2|path~d~M17 3h2a2 2 0 0 1 2 2v2|path~d~M21 17v2a2 2 0 0 1-2 2h-2|path~d~M7 21H5a2 2 0 0 1-2-2v-2|circle~cx~12~cy~12~r~3|path~d~m16 16-1.9-1.9',
+  'key-round': 'path~d~M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z|circle~cx~16.5~cy~7.5~r~.5~fill~currentColor',
+  'image': 'rect~width~18~height~18~x~3~y~3~rx~2~ry~2|circle~cx~9~cy~9~r~2|path~d~m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21',
+  'gauge': 'path~d~m12 14 4-4|path~d~M3.34 19a10 10 0 1 1 17.32 0',
+  'route': 'circle~cx~6~cy~19~r~3|path~d~M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15|circle~cx~18~cy~5~r~3',
+  'languages': 'path~d~m5 8 6 6|path~d~m4 14 6-6 2-3|path~d~M2 5h12|path~d~M7 2h1|path~d~m22 22-5-10-5 10|path~d~M14 18h6',
+  'boxes': 'path~d~M2.97 12.92A2 2 0 0 0 2 14.63v3.24a2 2 0 0 0 .97 1.71l3 1.8a2 2 0 0 0 2.06 0L12 19v-5.5l-5-3-4.03 2.42Z|path~d~m7 16.5-4.74-2.85|path~d~m7 16.5 5-3|path~d~M7 16.5v5.17|path~d~M12 13.5V19l3.97 2.38a2 2 0 0 0 2.06 0l3-1.8a2 2 0 0 0 .97-1.71v-3.24a2 2 0 0 0-.97-1.71L17 10.5l-5 3Z|path~d~m17 16.5-5-3|path~d~m17 16.5 4.74-2.85|path~d~M17 16.5v5.17|path~d~M7.97 4.42A2 2 0 0 0 7 6.13v4.37l5 3 5-3V6.13a2 2 0 0 0-.97-1.71l-3-1.8a2 2 0 0 0-2.06 0l-3 1.8Z|path~d~M12 8 7.26 5.15|path~d~m12 8 4.74-2.85|path~d~M12 13.5V8',
+  'mail': 'rect~width~20~height~16~x~2~y~4~rx~2|path~d~m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7',
+  'crosshair': 'circle~cx~12~cy~12~r~10|line~x1~22~x2~18~y1~12~y2~12|line~x1~6~x2~2~y1~12~y2~12|line~x1~12~x2~12~y1~6~y2~2|line~x1~12~x2~12~y1~22~y2~18',
+  'maximize-2': 'polyline~points~15 3 21 3 21 9|polyline~points~9 21 3 21 3 15|line~x1~21~x2~14~y1~3~y2~10|line~x1~3~x2~10~y1~21~y2~14',
+  'minimize-2': 'polyline~points~4 14 10 14 10 20|polyline~points~20 10 14 10 14 4|line~x1~14~x2~21~y1~10~y2~3|line~x1~3~x2~10~y1~21~y2~14',
+  'panel-right': 'rect~width~18~height~18~x~3~y~3~rx~2|path~d~M15 3v18',
+  'panel-left': 'rect~width~18~height~18~x~3~y~3~rx~2|path~d~M9 3v18',
+  'x': 'path~d~M18 6 6 18|path~d~m6 6 12 12',
+  'copy': 'rect~width~14~height~14~x~8~y~8~rx~2~ry~2|path~d~M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2',
+  'lock': 'rect~width~18~height~11~x~3~y~11~rx~2~ry~2|path~d~M7 11V7a5 5 0 0 1 10 0v4',
+  'search': 'circle~cx~11~cy~11~r~8|path~d~m21 21-4.3-4.3',
+  'user-round': 'circle~cx~12~cy~8~r~5|path~d~M20 21a8 8 0 0 0-16 0',
+  'pencil': 'path~d~M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z|path~d~m15 5 4 4',
+  'puzzle': 'path~d~M15.39 4.39a1 1 0 0 0 1.68-.474 2.5 2.5 0 1 1 3.014 3.015 1 1 0 0 0-.474 1.68l1.683 1.682a2.414 2.414 0 0 1 0 3.414L19.61 15.39a1 1 0 0 1-1.68-.474 2.5 2.5 0 1 0-3.014 3.015 1 1 0 0 1 .474 1.68l-1.683 1.682a2.414 2.414 0 0 1-3.414 0L8.61 19.61a1 1 0 0 0-1.68.474 2.5 2.5 0 1 1-3.014-3.015 1 1 0 0 0 .474-1.68l-1.683-1.682a2.414 2.414 0 0 1 0-3.414L4.39 8.61a1 1 0 0 1 1.68.474 2.5 2.5 0 1 0 3.014-3.015 1 1 0 0 1-.474-1.68l1.683-1.682a2.414 2.414 0 0 1 3.414 0z',
+} as const
+
+// The kay mark, the kingfisher without the favicon's tile, on the 54 by 52 box its drawing fills; its beak and eye take the colour of the text around it.
+const MARK = 'path~fill~#1f8fd1~d~M21.5 16A9 9 0 0 1 38.5 16L46.1 25.2L55.3 50.2L48.7 47.4L48.7 54.6L29.4 36.2L24 25.7A9 9 0 0 1 22 22.5Z|path~fill~#1670a8~d~M39.8 22.1L46.1 25.2L55.3 50.2L48.7 47.4L40.5 31.3Z|path~fill~#ef7d2a~d~M22 22.5A9 9 0 0 0 24 25.7L29.4 36.2L48.7 54.6L48.7 47.4L36.3 34L29.1 26.8ZM20 18.4L35.5 19.5L20.5 21.2Z|path~fill~currentColor~d~M21.5 16L17.7 19.5L6.7 26.9L18.8 22.7L22 22.5L25.2 19.4Z|circle~cx~36.5~cy~21.5~r~1.6~fill~#eef2f7|circle~cx~27~cy~16~r~1.5~fill~currentColor'
+
+// The name of an icon a tab or a button can wear.
+export type DevIconName = keyof typeof ICONS
+// What a tab without an icon wears.
+const DEFAULT_ICON: DevIconName = 'puzzle'
+
+// A drawing from its nodes, hidden from screen readers: the control it sits in is named.
+function drawing(doc: Document, nodes: string, viewBox: string, className: string): SVGSVGElement {
+  const svg = doc.createElementNS(SVG, 'svg')
+
+  svg.setAttribute('viewBox', viewBox)
+  svg.setAttribute('aria-hidden', 'true')
+  svg.setAttribute('class', className)
+
+  for (const node of nodes.split('|')) {
+    const [tag, ...attributes] = node.split('~')
+    const element = doc.createElementNS(SVG, tag!)
+
+    for (let index = 0; index < attributes.length; index += 2)
+      element.setAttribute(attributes[index]!, attributes[index + 1]!)
+
+    svg.append(element)
+  }
+
+  return svg
+}
+
+function iconOf(doc: Document, name: string): SVGSVGElement {
+  return drawing(doc, ICONS[name as DevIconName] ?? ICONS[DEFAULT_ICON], '0 0 24 24', 'i')
 }
 
 // An icon button: the drawing with its name for screen readers and as the native tooltip.
-function setIcon(button: HTMLButtonElement, label: string, strokes: string[]): void {
-  const svg = button.ownerDocument.createElementNS(SVG, 'svg')
-
-  svg.setAttribute('viewBox', '0 0 16 16')
-  svg.setAttribute('aria-hidden', 'true')
-
-  for (const stroke of strokes) {
-    const path = button.ownerDocument.createElementNS(SVG, 'path')
-
-    path.setAttribute('d', stroke)
-    svg.append(path)
-  }
-
-  button.replaceChildren(svg)
+function setIcon(button: HTMLButtonElement, label: string, name: DevIconName): void {
+  button.replaceChildren(iconOf(button.ownerDocument, name))
   button.title = label
   button.setAttribute('aria-label', label)
+}
+
+// The tabs kay makes itself; those a library adds sit under a line.
+// The icon a count's tone puts in the bar's badge.
+const TONE_ICONS = { error: 'circle-x', warn: 'triangle-alert' } as const satisfies Record<'error' | 'warn', DevIconName>
+const RATING_TONES = { good: 'ok', needs: 'warn', poor: 'error' } as const
+
+// A guard that did not run is no failure, so it has no tone.
+function guardTone(outcome: string): 'ok' | 'error' | undefined {
+  if (outcome === 'did not run')
+    return undefined
+
+  return outcome === 'passed' ? 'ok' : 'error'
+}
+
+function worstTone(bad: string[]): 'error' | 'warn' | undefined {
+  if (bad.includes('poor'))
+    return 'error'
+
+  return bad.length > 0 ? 'warn' : undefined
+}
+
+const CORE_TABS = new Set(['problems', 'request', 'head', 'env', 'images', 'performance', 'routes', 'i18n', 'islands'])
+
+// A small rounded label, tinted by what it counts or says, with an icon before it when given.
+function pill(tool: Pick<DevTool, 'make' | 'icon'>, text: string, tone?: 'error' | 'warn' | 'ok' | 'accent', icon?: DevIconName): HTMLElement {
+  const element = tool.make('span', tone === undefined ? 'pill' : `pill ${tone}`)
+
+  if (icon !== undefined)
+    element.append(tool.icon(icon))
+
+  element.append(text)
+
+  return element
 }
 
 interface DevState {
@@ -182,21 +346,11 @@ interface DevState {
   dismissed: string[]
 }
 
-// What `kay dev` says of a restart or a reload, or of a stylesheet edit it swapped in without either.
-interface Built {
-  id: string
-  // When it was done, by the clock of the machine `kay dev` runs on, which the browser's often is.
-  at: number
-  changed: string
-  ms: number
-  styles?: boolean
-  // The running server took the change in, where a restart is a new process.
-  reloaded?: boolean
-}
-
 export interface DevTabOptions {
   id: string
   label: string
+  // The tab's icon, by name from kay's set; a puzzle piece without one.
+  icon?: DevIconName
   // What the bar says for a count above zero, as `3 islands`; without it the count shows in the tab only.
   summary?: (count: number) => string
   // Says the bar's text politely to a screen reader as it changes.
@@ -208,16 +362,17 @@ export interface DevTabOptions {
 
 export interface DevTab {
   panel: HTMLElement
-  // The count beside the tab's name and on the bar, `error` coloring both.
-  count: (count: number, tone?: 'error') => void
+  // The count beside the tab's name and on the bar, `error` or `warn` coloring both.
+  count: (count: number, tone?: 'error' | 'warn') => void
 }
 
 export interface DevTool {
   root: ShadowRoot
   make: <K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, text?: string) => HTMLElementTagNameMap[K]
   tab: (options: DevTabOptions) => DevTab
-  // A button of its own on the bar.
-  button: (text: string, label: string) => HTMLButtonElement
+  // A button of its own on the bar, with an icon by name from kay's set before its text.
+  button: (text: string, label: string, icon?: DevIconName) => HTMLButtonElement
+  icon: (name: DevIconName) => SVGSVGElement
   // Outlines elements of the page, `text` beside the first, until `hideOutline`.
   outline: (targets: Element[], text: string) => void
   hideOutline: () => void
@@ -264,7 +419,7 @@ export async function loadDevModules(tool: DevTool, modules: DevToolModule[], lo
 }
 
 export function startDevTool(doc: Document = document): DevTool {
-  const win = doc.defaultView! as Window & { $kayProblems?: DevProblems, $kayBuilt?: string }
+  const win = doc.defaultView! as Window & { $kayProblems?: DevProblems }
   const state = readState(win)
   const host = doc.createElement(HOST)
   const root = host.attachShadow({ mode: 'open' })
@@ -279,18 +434,19 @@ export function startDevTool(doc: Document = document): DevTool {
   }
   const ui = make('div', 'ui')
   const bar = make('div', 'bar')
-  const mark = make('button', 'mark', 'kay')
+  const mark = make('button', 'mark')
   const drawer = make('div', 'drawer')
   const head = make('div', 'head')
-  const title = make('span', 'title', 'kay dev tools')
+  const title = make('span', 'title')
+  const where = make('span', 'where')
   const body = make('div', 'body')
   const tabList = make('div', 'tabs')
+  const rule = make('span', 'sep')
   const content = make('div', 'content')
   const size = make('button', 'icon')
   const side = make('button', 'icon')
   const close = make('button', 'icon')
   const status = make('span', 'sr')
-  const built = make('span', 'built')
   const tabs: { options: DevTabOptions, button: HTMLButtonElement, panel: HTMLElement, badge: HTMLButtonElement }[] = []
   const save = () => writeState(win, state)
 
@@ -303,32 +459,41 @@ export function startDevTool(doc: Document = document): DevTool {
   drawer.setAttribute('aria-label', 'kay dev tools')
   tabList.setAttribute('role', 'tablist')
   tabList.setAttribute('aria-orientation', 'vertical')
+  rule.hidden = true
+  rule.setAttribute('aria-hidden', 'true')
+  tabList.append(rule)
   mark.type = 'button'
   mark.setAttribute('aria-label', 'kay dev tools (Alt+Shift+K)')
   mark.setAttribute('aria-controls', drawer.id)
+  mark.append(drawing(doc, MARK, '4 5 54 52', ''), 'kay')
+  title.append(drawing(doc, MARK, '4 5 54 52', ''), 'kay dev tools')
   status.setAttribute('role', 'status')
-  built.setAttribute('role', 'status')
   size.type = 'button'
   side.type = 'button'
   close.type = 'button'
-  setIcon(close, 'Close', ICONS.close)
-  head.append(title, size, side, close)
+  setIcon(close, 'Close', 'x')
+  head.append(title, where, size, side, close)
   body.append(tabList, content)
   drawer.append(head, body)
-  bar.append(mark, status, built)
+  bar.append(mark, status)
   ui.append(drawer, bar)
   root.append(ui)
   host.setAttribute('data-kay-dev', '')
   doc.documentElement.append(host)
 
+  // The page the tools describe, which a page swap changes without a load.
+  const showWhere = () => {
+    where.textContent = `${win.location.pathname}${win.location.search}`
+  }
   const render = () => {
     const current = tabs.find(tab => tab.options.id === state.tab) ?? tabs[0]
 
     drawer.hidden = !state.open
     mark.setAttribute('aria-expanded', String(state.open))
     ui.classList.toggle('max', state.max)
-    setIcon(size, state.max ? 'Restore the size' : 'Fill the window', state.max ? ICONS.restore : ICONS.maximize)
-    setIcon(side, state.side === 'left' ? 'Dock right' : 'Dock left', state.side === 'left' ? ICONS.dockRight : ICONS.dockLeft)
+    setIcon(size, state.max ? 'Restore the size' : 'Fill the window', state.max ? 'minimize-2' : 'maximize-2')
+    setIcon(side, state.side === 'left' ? 'Dock right' : 'Dock left', state.side === 'left' ? 'panel-right' : 'panel-left')
+    showWhere()
 
     for (const tab of tabs) {
       const selected = tab === current
@@ -367,11 +532,15 @@ export function startDevTool(doc: Document = document): DevTool {
   }
 
   const tab = (options: DevTabOptions): DevTab => {
-    const button = make('button', '', options.label)
-    const count = make('span', 'count')
+    const button = make('button')
+    const count = make('span', 'count pill')
     const panel = make('div', 'panel')
-    const badge = make('button', '')
+    const badge = make('button')
     const entry = { options, button, panel, badge }
+    const library = !CORE_TABS.has(options.id)
+    // The tabs of kay come first, then a line, then those of libraries, each in the order they were made.
+    const firstLibrary = tabs.findIndex(other => !CORE_TABS.has(other.options.id))
+    const place = library || firstLibrary < 0 ? tabs.length : firstLibrary
 
     button.type = 'button'
     button.id = `kay-dev-tab-${options.id}`
@@ -379,7 +548,7 @@ export function startDevTool(doc: Document = document): DevTool {
     button.setAttribute('aria-controls', `kay-dev-${options.id}`)
     button.onclick = () => openTab(options.id)
     count.hidden = true
-    button.append(count)
+    button.append(iconOf(doc, options.icon ?? DEFAULT_ICON), make('span', 'name', options.label), count)
     panel.id = `kay-dev-${options.id}`
     panel.hidden = true
     panel.setAttribute('role', 'tabpanel')
@@ -388,34 +557,48 @@ export function startDevTool(doc: Document = document): DevTool {
     badge.hidden = true
     badge.setAttribute('aria-controls', drawer.id)
     badge.onclick = () => state.open && state.tab === options.id ? closeDrawer() : openTab(options.id)
-    tabList.append(button)
+
+    if (library) {
+      rule.hidden = false
+      tabList.append(button)
+    }
+    else {
+      tabList.insertBefore(button, tabs[place]?.button ?? rule)
+    }
+
     content.append(panel)
-    bar.insertBefore(badge, bar.children[2 + tabs.length] ?? null)
-    tabs.push(entry)
+    bar.insertBefore(badge, bar.children[2 + place] ?? null)
+    tabs.splice(place, 0, entry)
     // Once the caller is done setting the tab up, as showing it runs its `shown`.
     queueMicrotask(render)
 
     return {
       panel,
       count: (value, tone) => {
+        const text = options.summary?.(value) ?? ''
+
         count.hidden = value === 0
         count.textContent = String(value)
-        count.classList.toggle('error', tone === 'error')
+        count.className = tone === undefined ? 'count pill' : `count pill ${tone}`
         badge.hidden = value === 0 || options.summary === undefined
-        badge.textContent = options.summary?.(value) ?? ''
-        badge.className = tone ?? ''
+        badge.replaceChildren(pill({ make, icon: name => iconOf(doc, name) }, text, tone, tone === undefined ? undefined : TONE_ICONS[tone]))
 
         if (options.announce === true)
-          status.textContent = value === 0 ? '' : options.summary?.(value) ?? ''
+          status.textContent = value === 0 ? '' : text
       },
     }
   }
 
-  const button = (text: string, label: string) => {
-    const element = make('button', '', text)
+  const button = (text: string, label: string, icon?: DevIconName) => {
+    const element = make('button')
 
     element.type = 'button'
     element.setAttribute('aria-label', label)
+
+    if (icon !== undefined)
+      element.append(iconOf(doc, icon))
+
+    element.append(text)
     bar.append(element)
 
     return element
@@ -506,45 +689,21 @@ export function startDevTool(doc: Document = document): DevTool {
       box.hidden = true
   }
 
-  // The buttons kay's error pages carry, which need a script and have no other, and what `kay dev` rebuilt.
+  // The buttons kay's error pages carry need a script and have no other.
   const listening = new AbortController()
-  let fading: ReturnType<typeof setTimeout> | undefined
-  let hiding: ReturnType<typeof setTimeout> | undefined
-  let saying: string | undefined
+  // A page swap marks the document busy until the new page is in, and a back or forward step moves without one.
+  const swaps = new MutationObserver(showWhere)
 
-  // Said for the time left since the build, so the page it reloaded says it too and one opened long after does not; the live region stays, emptied, so a screen reader hears each.
-  const sayBuilt = (data: string) => {
-    const build = JSON.parse(data) as Built
-    const left = Math.min(BUILT_MS, BUILT_MS - (Date.now() - build.at))
-
-    if (left <= 0 || build.id === saying)
-      return
-
-    saying = build.id
-    clearTimeout(fading)
-    clearTimeout(hiding)
-    const did = build.styles === true ? 'stylesheets swapped' : 'restarted'
-
-    built.textContent = `${build.changed}: ${build.reloaded === true ? 'reloaded' : did} in ${build.ms} ms`
-    built.classList.remove('fading')
-    fading = setTimeout(() => built.classList.add('fading'), left)
-    hiding = setTimeout(() => {
-      built.textContent = ''
-      saying = undefined
-    }, left + FADE_MS)
-  }
-
-  // The live reload script keeps the last one, which may come before this loaded.
-  win.addEventListener(BUILT_EVENT, event => sayBuilt((event as CustomEvent<string>).detail), { signal: listening.signal })
-
-  if (win.$kayBuilt !== undefined)
-    sayBuilt(win.$kayBuilt)
+  swaps.observe(doc.documentElement, { attributeFilter: ['aria-busy'] })
+  win.addEventListener('popstate', showWhere, { signal: listening.signal })
+  listening.signal.addEventListener('abort', () => swaps.disconnect())
 
   const tool: DevTool = {
     root,
     make,
     tab,
     button,
+    icon: name => iconOf(doc, name),
     outline,
     hideOutline,
     open: async source => opener ? opener(source) : 'no editor here, run kay dev',
@@ -560,8 +719,6 @@ export function startDevTool(doc: Document = document): DevTool {
       request?.stop()
       win.removeEventListener('keydown', onKeyDown, true)
       listening.abort()
-      clearTimeout(fading)
-      clearTimeout(hiding)
       host.remove()
     },
   }
@@ -591,20 +748,23 @@ export function startDevTool(doc: Document = document): DevTool {
 // What kay logged, what nothing caught, what the policy blocked, what the accessibility check and `kay check` found, grouped by kind, each listed once with how often it came; those the page logged leave with it on a page swap.
 function problemsTab(doc: Document, tool: DevTool, state: DevState, save: () => void, missing: MissingMessages): { stop: () => void } {
   const win = doc.defaultView! as Window & { $kayProblems?: DevProblems }
-  const tab = tool.tab({ id: 'problems', label: 'Problems', summary: count => `${count} problem${count === 1 ? '' : 's'}`, announce: true })
+  const tab = tool.tab({ id: 'problems', label: 'Problems', icon: 'triangle-alert', summary: count => `${count} problem${count === 1 ? '' : 's'}`, announce: true })
   const actions = tool.make('div', 'actions')
+  const tally = tool.make('span', 'actions')
   const clear = tool.make('button', 'tool', 'Dismiss all')
   const copy = tool.make('button', 'tool')
   const empty = tool.make('div', 'empty', 'No problems on this page.')
   const groups = new Map(Object.entries(KINDS).map(([kind, label]) => {
     const section = tool.make('section', 'group')
     const heading = tool.make('h3', 'heading', label)
-    const list = tool.make('div', 'mono')
+    const total = tool.make('span', 'pill')
+    const list = tool.make('div', 'list')
 
     section.hidden = true
+    heading.append(total)
     section.append(heading, list)
 
-    return [kind as ProblemKind, { section, heading, list, label }]
+    return [kind as ProblemKind, { section, total, list }]
   }))
   const shown = new Map<string, { problem: DevProblem, kind: ProblemKind, element: HTMLElement, times: HTMLElement, count: number }>()
   const dismissed = new Set(state.dismissed)
@@ -612,19 +772,28 @@ function problemsTab(doc: Document, tool: DevTool, state: DevState, save: () => 
   clear.type = 'button'
   copy.type = 'button'
   copy.title = 'Copy every problem as plain text, to paste into an LLM'
-  actions.append(clear, copy)
+  copy.append(tool.icon('copy'), tool.make('span', '', 'Copy'))
+  actions.append(tally, tool.make('span', 'grow'), copy, clear)
   tab.panel.append(actions, empty, ...[...groups.values()].map(group => group.section))
 
   const update = () => {
     const counts = new Map<ProblemKind, number>()
-    let errors = false
+    let errors = 0
 
     for (const { problem, kind } of shown.values()) {
       counts.set(kind, (counts.get(kind) ?? 0) + 1)
-      errors ||= problem.level === 'error'
+
+      if (problem.level === 'error')
+        errors++
     }
 
-    tab.count(shown.size, errors ? 'error' : undefined)
+    const warnings = shown.size - errors
+
+    tab.count(shown.size, errors > 0 ? 'error' : 'warn')
+    tally.replaceChildren(
+      ...errors > 0 ? [pill(tool, `${errors} error${errors === 1 ? '' : 's'}`, 'error', 'circle-x')] : [],
+      ...warnings > 0 ? [pill(tool, `${warnings} warning${warnings === 1 ? '' : 's'}`, 'warn', 'triangle-alert')] : [],
+    )
     empty.hidden = shown.size > 0
     actions.hidden = shown.size === 0
 
@@ -632,7 +801,7 @@ function problemsTab(doc: Document, tool: DevTool, state: DevState, save: () => 
       const count = counts.get(kind) ?? 0
 
       group.section.hidden = count === 0
-      group.heading.textContent = `${group.label} (${count})`
+      group.total.textContent = String(count)
     }
   }
   const remove = (text: string) => {
@@ -673,18 +842,16 @@ function problemsTab(doc: Document, tool: DevTool, state: DevState, save: () => 
 
     const kind: ProblemKind = check ? 'check' : problem.kind ?? (problem.text.startsWith('a11y ') ? 'a11y' : 'kay')
     const element = tool.make('div', `problem ${problem.level}`)
-    const meta = tool.make('div', 'meta')
-    const times = tool.make('span', 'note')
-    const close = tool.make('button', 'tool', 'Dismiss')
+    const times = tool.make('span', 'pill')
+    const close = tool.make('button', 'icon dismiss')
     const text = tool.make('pre', 'mono')
 
     times.hidden = true
     close.type = 'button'
-    close.setAttribute('aria-label', 'Dismiss this problem')
+    setIcon(close, 'Dismiss this problem', 'x')
     close.onclick = () => dismiss([problem.text])
-    meta.append(times, close)
     text.append(...withPositions(problem.text, tool))
-    element.append(meta, text)
+    element.append(tool.icon(problem.level === 'error' ? 'circle-x' : 'triangle-alert'), text, close, times)
 
     if (kind === 'a11y') {
       element.onpointerenter = () => {
@@ -808,7 +975,7 @@ function i18nTab(doc: Document, tool: DevTool, missing: MissingMessages, signal:
     return
 
   let render: () => void = () => undefined
-  const tab = tool.tab({ id: 'i18n', label: 'i18n', shown: () => render() })
+  const tab = tool.tab({ id: 'i18n', label: 'i18n', icon: 'languages', shown: () => render() })
 
   render = () => {
     const request = read()
@@ -818,29 +985,35 @@ function i18nTab(doc: Document, tool: DevTool, missing: MissingMessages, signal:
 
     const facts = tool.make('dl', 'facts')
     const switcher = tool.make('dd')
-    const keys = tool.make('dd')
+    const chips = tool.make('span', 'locales')
+    const messages = tool.make('section', 'group')
+    const heading = tool.make('h3', 'heading', 'Missing messages')
+    const keys = tool.make('ul', 'missing')
 
     for (const { locale, href } of request.locales) {
-      const link = tool.make('a', locale === request.locale ? 'mono' : 'link', locale)
+      const current = locale === request.locale
+      const chip = current ? tool.make('span', 'locale-chip', locale) : Object.assign(tool.make('a', 'locale-chip', locale), { href })
 
-      link.href = href
-      link.style.marginRight = '12px'
+      if (current)
+        chip.setAttribute('aria-current', 'true')
 
-      if (locale === request.locale)
-        link.setAttribute('aria-current', 'true')
-
-      switcher.append(link)
+      chips.append(chip)
     }
 
-    if (missing.keys.size === 0)
-      keys.append(tool.make('span', 'note', 'none'))
+    switcher.append(chips)
 
-    for (const key of missing.keys)
-      keys.append(tool.make('div', 'error mono', key))
+    for (const key of missing.keys) {
+      const item = tool.make('li')
 
-    facts.append(tool.make('dt', '', 'Locale'), tool.make('dd', 'mono', request.locale), tool.make('dt', '', 'Page in'), switcher, tool.make('dt', '', 'Missing messages'), keys)
+      item.append(tool.icon('circle-x'), key)
+      keys.append(item)
+    }
+
+    heading.append(pill(tool, String(missing.keys.size), missing.keys.size > 0 ? 'error' : undefined))
+    messages.append(heading, missing.keys.size === 0 ? tool.make('span', 'note', 'none') : keys)
+    facts.append(tool.make('dt', '', 'Locale'), tool.make('dd', 'mono', request.locale), tool.make('dt', '', 'Page in'), switcher)
     tab.count(missing.keys.size, missing.keys.size > 0 ? 'error' : undefined)
-    tab.panel.replaceChildren(facts)
+    tab.panel.replaceChildren(facts, messages)
   }
   // A page swap brings the next page's block, and starts with the old page's problems gone.
   const blocks = new MutationObserver((records) => {
@@ -862,13 +1035,20 @@ function i18nTab(doc: Document, tool: DevTool, missing: MissingMessages, signal:
   })
 }
 
-// What served the page: the route it matched, the files that rendered it, its params and status, and how long each load took; read again after each page swap.
+// What served the page: the route it matched, the files that rendered it, outermost first, its params and status, and how long each load took on the scale of the whole request; read again after each page swap.
 function requestTab(doc: Document, tool: DevTool): { stop: () => void } {
-  const tab = tool.tab({ id: 'request', label: 'Request' })
+  const tab = tool.tab({ id: 'request', label: 'Request', icon: 'server' })
   // The block the tab shows now.
   let current: string | undefined
+  const section = (heading: string, ...children: Node[]) => {
+    const element = tool.make('section', 'group')
+
+    element.append(tool.make('h3', 'heading', heading), ...children)
+
+    return element
+  }
   // What the server recorded of the response: asked for once the page is in view, and dropped if another page's block replaced this one while it was out.
-  const showResponse = async (id: string, block: string, fact: (term: string, ...values: (Node | string)[]) => void, lines: (nodes: Node[], none: string) => Node[]) => {
+  const showResponse = async (id: string, block: string, line: HTMLElement, facts: HTMLElement, timing: (total: number) => void, panel: HTMLElement) => {
     let recorded: DevResponse | undefined
 
     try {
@@ -883,6 +1063,13 @@ function requestTab(doc: Document, tool: DevTool): { stop: () => void } {
     if (current !== block)
       return
 
+    const fact = (term: string, ...values: (Node | string)[]) => {
+      const value = tool.make('dd')
+
+      value.append(...values)
+      facts.append(tool.make('dt', '', term), value)
+    }
+
     if (recorded === undefined) {
       fact('Response', tool.make('span', 'note', 'not recorded by the server'))
 
@@ -892,15 +1079,20 @@ function requestTab(doc: Document, tool: DevTool): { stop: () => void } {
     const hops = recorded.redirects.map(hop => tool.make('span', 'mono', `${hop.from} (${hop.status}${hop.by === undefined ? '' : `, by ${hop.by}`})`))
     const rank = (name: string) => !FIRST_HEADERS.includes(name) ? FIRST_HEADERS.length : FIRST_HEADERS.indexOf(name)
     const headers = [...recorded.headers].sort(([a], [b]) => rank(a) - rank(b))
+    const table = tool.make('table', 'headers')
 
-    fact('Server time', formatMs(recorded.ms))
-    fact('Redirected from', ...lines(hops, 'none'))
-    fact('Headers', ...lines(headers.map(([name, value]) => headerLine(tool, name, value)), 'none'))
+    line.append(pill(tool, `${formatMs(recorded.ms)} on the server`))
+    fact('Redirected', ...hops.length === 0 ? [tool.make('span', 'note', 'no')] : hops)
+    timing(recorded.ms)
+
+    for (const [name, value] of headers)
+      table.append(headerRow(tool, name, value))
+
+    panel.append(section('Response headers', headers.length === 0 ? tool.make('span', 'note', 'none') : table))
   }
   const read = () => {
     // A swap adds the next page's block before it drops this one's.
     const block = [...doc.querySelectorAll(`script#${REQUEST}`)].at(-1)?.textContent
-    const facts = tool.make('dl', 'facts')
 
     current = block ?? undefined
 
@@ -911,56 +1103,74 @@ function requestTab(doc: Document, tool: DevTool): { stop: () => void } {
     }
 
     const request = JSON.parse(block) as DevRequest
+    const win = doc.defaultView!
+    const line = tool.make('div', 'reqline')
+    const facts = tool.make('dl', 'facts')
     const fact = (term: string, ...values: (Node | string)[]) => {
       const value = tool.make('dd')
 
       value.append(...values)
       facts.append(tool.make('dt', '', term), value)
     }
-    const lines = (nodes: Node[], none: string) => nodes.length === 0
-      ? [tool.make('span', 'note', none)]
-      : nodes.map((node) => {
-        const line = tool.make('div')
-
-        line.append(node)
-
-        return line
-      })
     const params = Object.entries(request.params)
-    const total = request.loads.reduce((sum, load) => sum + (load.ms ?? 0), 0)
+    const chips = tool.make('span', 'chips')
+    const chain = tool.make('ul', 'chain')
+    const step = (kind: string, file: HTMLElement, depth: number, outcome?: HTMLElement) => {
+      const item = tool.make('li')
+      const where = tool.make('span', 'd')
 
-    fact('Route', request.route === undefined ? tool.make('span', 'note', 'none matched') : tool.make('span', 'mono', request.route))
-    fact('Status', tool.make('span', request.status >= 400 ? 'error' : '', request.error === undefined ? String(request.status) : `${request.status} ${request.error}`))
-    fact('Page', positionButton(tool, request.page))
-    fact('Layouts', ...lines(request.layouts.map(file => positionButton(tool, file)), 'none'))
-    fact('Params', ...lines(params.map(([name, value]) => tool.make('span', 'mono', `${name} = ${JSON.stringify(value)}`)), 'none'))
+      where.style.setProperty('--depth', String(depth))
+      where.append(file)
+      item.append(tool.make('span', 'k', kind), where, outcome ?? tool.make('span'))
+      chain.append(item)
+    }
+    const timing = tool.make('section', 'group')
+    const scaled = (total?: number) => {
+      const longest = Math.max(total ?? 0, ...request.loads.map(load => load.ms ?? 0))
+      const grid = tool.make('div', 'timing')
+      const bar = (ms: number | undefined, className = 'bars') => {
+        const track = tool.make('span', className)
+        const fill = tool.make('i')
 
-    fact('Locale', request.locale)
+        fill.style.width = ms === undefined || longest === 0 ? '0' : `${Math.max(1, ms / longest * 100)}%`
+        track.append(fill)
+
+        return track
+      }
+
+      for (const load of request.loads)
+        grid.append(positionButton(tool, load.file), bar(load.ms), tool.make('span', 'v', load.ms === undefined ? 'not timed' : formatMs(load.ms)))
+
+      if (total !== undefined)
+        grid.append(tool.make('span', 'note', 'Whole request'), bar(total, 'bars total'), tool.make('span', 'v', formatMs(total)))
+
+      timing.hidden = request.loads.length === 0 && total === undefined
+      timing.replaceChildren(tool.make('h3', 'heading', 'Time on the server'), grid)
+    }
     // Read off the page once the guards pass, so a request one refused says nothing of it.
     const refusedByGuard = request.guards.some(guard => guard.outcome !== 'passed' && guard.outcome !== 'did not run')
-
     const rendered = request.prerender === undefined ? 'on request' : `on request here, ${PRERENDER[request.prerender]}`
+    const status = pill(tool, request.error === undefined ? String(request.status) : `${request.status} ${request.error}`, request.status >= 400 ? 'error' : 'ok')
+    const path = tool.make('span', 'path', `${win.location.pathname}${win.location.search}`)
 
+    line.append(tool.make('span', 'method', 'GET'), path, status)
+    fact('Route', request.route === undefined ? tool.make('span', 'note', 'none matched') : tool.make('span', 'mono', request.route))
+    chips.append(...params.map(([name, value]) => tool.make('span', 'chip', `${name} = ${JSON.stringify(value)}`)))
+    fact('Params', params.length === 0 ? tool.make('span', 'note', 'none') : chips)
+
+    fact('Locale', request.locale)
     fact('Rendered', refusedByGuard ? 'not known, a guard refused the request' : rendered)
-    fact('Guards', ...lines(request.guards.map((guard) => {
-      const line = tool.make('span')
 
-      const unpassed = guard.outcome === 'did not run' ? 'note' : 'error'
+    for (const guard of request.guards)
+      step('Guard', positionButton(tool, guard.file), 0, pill(tool, guard.outcome, guardTone(guard.outcome)))
 
-      line.append(positionButton(tool, guard.file), tool.make('span', guard.outcome === 'passed' ? 'ms mono' : unpassed, guard.outcome))
+    for (const [depth, layout] of request.layouts.entries())
+      step('Layout', positionButton(tool, layout), depth)
 
-      return line
-    }), 'none'))
-
-    fact(request.loads.length > 1 ? `Loads, ${formatMs(total)}` : 'Loads', ...lines(request.loads.map((load) => {
-      const line = tool.make('span')
-
-      line.append(positionButton(tool, load.file), tool.make('span', 'ms mono', load.ms === undefined ? 'not timed' : formatMs(load.ms)))
-
-      return line
-    }), 'none'))
-    tab.panel.replaceChildren(facts)
-    void showResponse(request.id, block, fact, lines)
+    step('Page', positionButton(tool, request.page), request.layouts.length)
+    scaled()
+    tab.panel.replaceChildren(line, section('Matched', facts), section('Files, outermost first', chain), timing)
+    void showResponse(request.id, block, line, facts, scaled, tab.panel)
   }
   // A page swap, or the patch a page without one gets, brings the next page's block.
   const swaps = new MutationObserver((records) => {
@@ -974,6 +1184,38 @@ function requestTab(doc: Document, tool: DevTool): { stop: () => void } {
   return { stop: () => swaps.disconnect() }
 }
 
+// What a search result shows of a title before cutting it.
+const TITLE_LENGTH = 60
+
+// A length against the limit search results cut at, the bar full and amber once past it; the length alone when the limit is not known.
+function meter(tool: DevTool, length: number, limit?: number): HTMLElement {
+  const over = limit !== undefined && length > limit
+  const element = tool.make('span', over ? 'meter over' : 'meter')
+  const track = tool.make('span', 'track')
+  const fill = tool.make('i')
+
+  if (limit === undefined) {
+    element.append(tool.make('span', 'n', `${length} characters`))
+
+    return element
+  }
+
+  fill.style.width = `${Math.min(100, length / limit * 100)}%`
+  track.append(fill)
+  element.append(track, tool.make('span', 'n', `${length} / ${limit}${over ? ', cut in results' : ''}`))
+
+  return element
+}
+
+// A JSON-LD block named by its type and what it is about, as `BlogPosting · Bonjour kay`.
+function ldSummary(data: unknown): string {
+  const first = (Array.isArray(data) ? data[0] : data) as { '@type'?: unknown, 'headline'?: unknown, 'name'?: unknown } | null
+  const type = Array.isArray(first?.['@type']) ? (first['@type'] as unknown[]).join(', ') : first?.['@type']
+  const about = first?.headline ?? first?.name
+
+  return [type, about].filter((part): part is string => typeof part === 'string' && part !== '').join(' · ') || 'JSON-LD block'
+}
+
 // A tag of the page's head, by its `name` or `property`.
 function metaContent(head: HTMLHeadElement, key: string): string | undefined {
   const content = head.querySelector(`meta[name="${key}"],meta[property="${key}"]`)?.getAttribute('content')?.trim()
@@ -985,7 +1227,7 @@ function metaContent(head: HTMLHeadElement, key: string): string | undefined {
 function headTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
   const win = doc.defaultView!
   let reread: () => void = () => undefined
-  const tab = tool.tab({ id: 'head', label: 'Head', shown: () => reread() })
+  const tab = tool.tab({ id: 'head', label: 'Head', icon: 'scan-search', shown: () => reread() })
   // A swap while a fetch is out asks again; the latest answer wins.
   let asked = 0
   const read = async () => {
@@ -1027,41 +1269,53 @@ function headTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
     const none = () => tool.make('span', 'note', 'none')
     const problems = server?.problems ?? []
 
-    tab.count(problems.length, problems.some(problem => problem.severity === 'error') ? 'error' : undefined)
+    tab.count(problems.length, problems.some(problem => problem.severity === 'error') ? 'error' : 'warn')
 
     if (failure !== undefined)
       children.push(tool.make('div', 'empty', `Could not check the head: ${failure}`))
 
-    for (const problem of problems) {
-      const element = tool.make('div', `problem ${problem.severity === 'error' ? 'error' : 'warn'}`)
+    if (problems.length > 0) {
+      const list = tool.make('div', 'list')
 
-      element.append(tool.make('pre', '', [problem.message, problem.note, problem.help === undefined ? undefined : `help: ${problem.help}`].filter(Boolean).join('\n')))
-      children.push(element)
+      for (const problem of problems) {
+        const error = problem.severity === 'error'
+        const element = tool.make('div', `problem ${error ? 'error' : 'warn'}`)
+
+        element.append(tool.icon(error ? 'circle-x' : 'triangle-alert'), tool.make('pre', 'mono', [problem.message, problem.note, problem.help === undefined ? undefined : `help: ${problem.help}`].filter(Boolean).join('\n')))
+        list.append(element)
+      }
+
+      children.push(list)
     }
 
-    const snippet = tool.make('div', 'snippet')
+    const snippet = tool.make('div', 'preview serp')
     const clipped = limit !== undefined && description !== undefined && description.length > limit ? `${description.slice(0, limit).trimEnd()}...` : description
+    const previews = tool.make('div', 'previews')
+    const share = tool.make('div', 'preview')
 
     snippet.append(
-      tool.make('div', 'site', canonical ?? href),
-      tool.make('div', 'title', title === '' ? 'No title' : title),
-      tool.make('div', 'description', clipped ?? 'No description'),
+      tool.make('span', 'cap', 'In search results'),
+      tool.make('span', 'site', canonical ?? href),
+      tool.make('span', 't', title === '' ? 'No title' : title),
+      tool.make('span', 'd', clipped ?? 'No description'),
     )
-    children.push(snippet)
+    share.append(tool.make('span', 'cap', 'Share card, og:image'))
+    previews.append(snippet, share)
+    children.push(previews)
 
-    const cut = limit !== undefined && description !== undefined && description.length > limit
-
-    fact('Title', title === '' ? none() : `${title} (${title.length} characters)`)
-    fact('Description', description === undefined ? none() : `${description} (${description.length}${limit === undefined ? '' : ` of ${limit}`} characters${cut ? ', cut in results' : ''})`)
-    fact('Canonical', canonical ?? none())
+    fact('Title', ...title === '' ? [none()] : [title, meter(tool, title.length, TITLE_LENGTH)])
+    fact('Description', ...description === undefined ? [none()] : [description, meter(tool, description.length, limit)])
+    fact('Canonical', canonical === undefined ? none() : tool.make('span', 'mono', canonical))
 
     const alternates = [...head.querySelectorAll('link[rel="alternate"][hreflang]')].map(link => `${link.getAttribute('hreflang')}: ${link.getAttribute('href')}`)
+    const chips = tool.make('span', 'chips')
 
-    fact('Alternates', ...alternates.length === 0 ? [none()] : alternates.map(line => tool.make('div', 'mono', line)))
+    chips.append(...alternates.map(line => tool.make('span', 'chip', line)))
+    fact('Alternates', alternates.length === 0 ? none() : chips)
     fact('Robots', metaContent(head, 'robots') ?? tool.make('span', 'note', 'no tag, indexable'))
 
     if (server !== undefined) {
-      let sitemap: ReturnType<typeof tool.make> | string = server.sitemap === 'listed' ? 'listed' : 'not listed'
+      let sitemap: HTMLElement = server.sitemap === 'listed' ? pill(tool, 'listed', 'ok') : pill(tool, 'not listed')
 
       if (server.sitemap === 'error')
         sitemap = tool.make('span', 'error', `could not be read: ${server.sitemapError ?? 'unknown error'}`)
@@ -1071,27 +1325,39 @@ function headTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
       fact('Sitemap', sitemap)
     }
 
-    children.push(facts)
+    const tags = tool.make('section', 'group')
+
+    tags.append(tool.make('h3', 'heading', 'Tags'), facts)
+    children.push(tags)
 
     for (const [heading, prefix] of [['Open Graph', 'og:'], ['Twitter', 'twitter:']] as const) {
-      const tags = [...head.querySelectorAll('meta')].flatMap((meta) => {
+      const found = [...head.querySelectorAll('meta')].flatMap((meta) => {
         const key = meta.getAttribute('property') ?? meta.getAttribute('name') ?? ''
 
         return key.startsWith(prefix) ? [[key, meta.getAttribute('content') ?? ''] as const] : []
       })
-      const section = tool.make('section', 'group')
-      const list = tool.make('dl', 'facts')
+      const group = tool.make('section', 'group')
+      const table = tool.make('table', 'kv')
+      const title = tool.make('h3', 'heading', heading)
 
-      for (const [key, content] of tags)
-        list.append(tool.make('dt', 'mono', key), tool.make('dd', 'mono', content))
+      for (const [key, content] of found) {
+        const row = tool.make('tr')
 
-      section.append(tool.make('h3', 'heading', `${heading} (${tags.length})`), tags.length === 0 ? tool.make('div', 'note', 'No tags.') : list)
-      children.push(section)
+        row.append(tool.make('td', '', key), tool.make('td', '', content))
+        table.append(row)
+      }
+
+      title.append(pill(tool, String(found.length)))
+      group.append(title, found.length === 0 ? tool.make('div', 'note', 'No tags.') : table)
+      children.push(group)
     }
 
     const image = metaContent(head, 'og:image') ?? metaContent(head, 'twitter:image')
 
-    if (image !== undefined) {
+    if (image === undefined) {
+      share.append(tool.make('span', 'note', 'No og:image or twitter:image tag.'))
+    }
+    else {
       try {
         const url = new URL(image, href)
         const card = tool.make('img', 'card')
@@ -1099,21 +1365,28 @@ function headTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
         // The site's own origin is not the dev server's, so the card is read from here.
         card.src = server?.site !== undefined && url.origin === new URL(server.site).origin ? `${win.location.origin}${url.pathname}${url.search}` : url.href
         card.alt = 'The social card image'
-        children.push(card)
+        share.append(card)
       }
       catch {
-        children.push(tool.make('div', 'error', `The social card image is not a valid URL: ${image}`))
+        share.append(tool.make('div', 'error', `The social card image is not a valid URL: ${image}`))
       }
     }
 
     const blocks = [...head.querySelectorAll('script[type="application/ld+json"]')]
     const ld = tool.make('section', 'group')
+    const ldHeading = tool.make('h3', 'heading', 'JSON-LD')
 
-    ld.append(tool.make('h3', 'heading', `JSON-LD (${blocks.length})`))
+    ldHeading.append(pill(tool, String(blocks.length)))
+    ld.append(ldHeading)
 
     for (const block of blocks) {
       try {
-        ld.append(tool.make('pre', 'json mono', JSON.stringify(JSON.parse(block.textContent ?? ''), null, 2)))
+        const data = JSON.parse(block.textContent ?? '') as unknown
+        const details = tool.make('details', 'json')
+        const summary = tool.make('summary', '', ldSummary(data))
+
+        details.append(summary, tool.make('pre', 'mono', JSON.stringify(data, null, 2)))
+        ld.append(details)
       }
       catch (error) {
         ld.append(tool.make('div', 'error', `Not valid JSON: ${error instanceof Error ? error.message : String(error)}`))
@@ -1193,7 +1466,7 @@ function secretReason(name: string, value: unknown): { reason: string, maybe: bo
 function envTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
   const win = doc.defaultView!
   let reread: () => void = () => undefined
-  const tab = tool.tab({ id: 'env', label: 'Env', shown: () => reread() })
+  const tab = tool.tab({ id: 'env', label: 'Env', icon: 'key-round', shown: () => reread() })
   let asked = 0
   const read = async () => {
     const ask = ++asked
@@ -1238,28 +1511,31 @@ function envTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
     }
 
     const entries = Object.entries(values)
-    const facts = tool.make('dl', 'facts')
+    const list = tool.make('div')
     let flagged = 0
 
     for (const [name, value] of entries) {
       const found = secretReason(name, value)
-      const shown = tool.make('dd')
+      const row = tool.make('div', 'envrow')
 
-      shown.append(tool.make('span', 'mono', typeof value === 'string' ? value : JSON.stringify(value)))
+      row.append(tool.make('span', 'name', name), tool.make('span', 'val', typeof value === 'string' ? value : JSON.stringify(value)))
 
       if (found?.maybe === true) {
-        shown.append(tool.make('div', 'note', `Every visitor reads this: ${found.reason}.`))
+        row.append(tool.make('span', 'soft', `Every visitor reads this: ${found.reason}.`))
       }
       else if (found !== undefined) {
+        const flag = tool.make('span', 'flag')
+
         flagged++
-        shown.append(tool.make('div', 'secret', `Every visitor reads this, and ${found.reason}. Keep a secret in defineEnv, read on the server alone.`))
+        flag.append(tool.icon('lock'), tool.make('span', '', `Every visitor reads this, and ${found.reason}. Keep a secret in defineEnv, read on the server alone.`))
+        row.append(flag)
       }
 
-      facts.append(tool.make('dt', 'mono', name), shown)
+      list.append(row)
     }
 
     tab.count(flagged, flagged > 0 ? 'error' : undefined)
-    tab.panel.replaceChildren(tool.make('div', 'note', `${entries.length} variable${entries.length === 1 ? '' : 's'} sent to every visitor at ${ENV_URL}.`), entries.length === 0 ? tool.make('div', 'empty', 'The app sends no public env: `publicEnv` declares no variable.') : facts)
+    tab.panel.replaceChildren(tool.make('div', 'note', `${entries.length} variable${entries.length === 1 ? '' : 's'} sent to every visitor at ${ENV_URL}.`), entries.length === 0 ? tool.make('div', 'empty', 'The app sends no public env: `publicEnv` declares no variable.') : list)
   }
 
   reread = () => void read()
@@ -1509,7 +1785,7 @@ function imagesTab(doc: Document, tool: DevTool, vitals: Vitals, signal: AbortSi
   const win = doc.defaultView!
   let asked = 0
   let reread: () => void = () => undefined
-  const tab = tool.tab({ id: 'images', label: 'Images', shown: () => reread() })
+  const tab = tool.tab({ id: 'images', label: 'Images', icon: 'image', shown: () => reread() })
   // What the server answered an image with, by address, until the next rebuild; a failed lookup is kept too, so a reread does not send one more request per failing image.
   const answers = new Map<string, Promise<string>>()
   const slots = limiter(IMAGE_REQUESTS)
@@ -1535,8 +1811,9 @@ function imagesTab(doc: Document, tool: DevTool, vitals: Vitals, signal: AbortSi
     const images = pageImages(doc, vitals.lcp?.element?.isConnected === true ? vitals.lcp.element : undefined)
     const body = tool.make('div')
     const formats: HTMLElement[] = []
+    const flagged = images.filter(info => info.flags.length > 0).length
 
-    tab.count(images.reduce((sum, info) => sum + info.flags.length, 0), images.some(info => info.flags.length > 0) ? 'error' : undefined)
+    tab.count(images.reduce((sum, info) => sum + info.flags.length, 0), flagged > 0 ? 'warn' : undefined)
     tool.hideOutline()
 
     if (images.length === 0) {
@@ -1547,27 +1824,39 @@ function imagesTab(doc: Document, tool: DevTool, vitals: Vitals, signal: AbortSi
 
     for (const info of images) {
       const row = tool.make('div', 'image')
-      const format = tool.make('span', '', 'format...')
-      const detail = tool.make('div', 'facts-line')
+      const thumb = tool.make('img', 'thumb')
+      const src = tool.make('div', 'src', info.url)
+      const facts = tool.make('div', 'chips')
+      const format = tool.make('span', 'chip', 'format...')
+      const flags = tool.make('div', 'flags')
       const label = info.lcp ? 'largest paint' : 'image'
 
       formats.push(format)
+      thumb.src = info.src
+      thumb.alt = ''
+
+      if (info.lcp)
+        src.append(pill(tool, 'largest paint', 'accent'))
+
+      facts.append(tool.make('span', 'chip', info.variant), format, tool.make('span', 'chip', info.natural === 'not loaded' ? `not loaded, drawn ${info.drawn}` : `${info.natural} drawn ${info.drawn}`))
+
+      for (const flag of info.flags) {
+        const line = tool.make('div', 'flag')
+
+        line.append(tool.icon('triangle-alert'), tool.make('span', '', flag))
+        flags.append(line)
+      }
+
       row.tabIndex = 0
       row.setAttribute('role', 'group')
       row.setAttribute('aria-label', info.url)
-      row.append(tool.make('div', 'src mono', info.url))
-      detail.append(info.variant, ' - ', format, ` - served ${info.natural}, drawn ${info.drawn}`, ...info.lcp ? [' - ', tool.make('strong', '', 'largest contentful paint')] : [])
-      row.append(detail)
-
-      for (const flag of info.flags)
-        row.append(tool.make('div', 'flag', flag))
-
+      row.append(thumb, src, facts, flags)
       row.onpointerenter = row.onfocus = () => tool.outline([info.image], label)
       row.onpointerleave = row.onblur = () => tool.hideOutline()
       body.append(row)
     }
 
-    tab.panel.replaceChildren(body, tool.make('div', 'note', 'Formats are those the server picks for a browser accepting AVIF and WebP.'))
+    tab.panel.replaceChildren(tool.make('div', 'note', `${images.length} image${images.length === 1 ? '' : 's'}, ${flagged} to look at`), body, tool.make('div', 'note', 'Formats are those the server picks for a browser accepting AVIF and WebP.'))
 
     // An image the server is not asked about answers at once; the others go a few at a time, so a page of many images does not ask the server for all of them at once, and one that hangs holds back one slot only.
     await Promise.all(images.map(async (info, index) => {
@@ -1788,45 +2077,92 @@ async function pageWeight(doc: Document): Promise<Weight> {
   }
 }
 
-// The page's weight and Web Vitals: LCP, CLS and INP each against its good limit as the page is used, and the HTML, CSS and JS gzipped, the island chunks split from the entry.
+// How far past the poor limit a vital's scale reaches.
+const SCALE_PAST_POOR = 1.25
+
+// A vital's value as its digits and its unit, and a limit as a tick under its scale.
+function vitalDigits(name: VitalName, value: number): [string, string] {
+  return name === 'cls' ? [value.toFixed(3), ''] : [String(Math.round(value)), 'ms']
+}
+
+function vitalTick(name: VitalName, limit: number): string {
+  return name !== 'cls' && limit >= 1000 ? `${limit / 1000} s` : String(limit)
+}
+
+// The page's weight and Web Vitals: LCP, CLS and INP each as a tile with its scale, good and poor limits marked, as the page is used, and the HTML, CSS and JS gzipped as bars, the island chunks split from the entry.
 function performanceTab(doc: Document, tool: DevTool, vitals: Vitals, signal: AbortSignal): void {
   let scheduled = false
   let reread: () => void = () => undefined
-  const tab = tool.tab({ id: 'performance', label: 'Performance', shown: () => reread() })
-  const vitalsPanel = tool.make('dl', 'facts')
-  const weightPanel = tool.make('div')
+  const tab = tool.tab({ id: 'performance', label: 'Performance', icon: 'gauge', shown: () => reread() })
+  const vitalsPanel = tool.make('div', 'vitals')
+  const weightPanel = tool.make('section', 'group')
   const loadNote = tool.make('div', 'note')
   let asked = 0
-  const vital = (name: VitalName, label: string, value: number | undefined, format: (value: number) => string, detail?: string) => {
+  const vital = (name: VitalName, label: string, value: number | undefined, detail?: string) => {
     const [good, poor] = VITAL_LIMITS[name]
-    const shown = tool.make('dd')
+    const tile = tool.make('div', 'vital')
+    const top = tool.make('div', 'top')
+    const number = tool.make('span', 'num')
+    const box = tool.make('div', 'scalebox')
+    const scale = tool.make('div', 'scale')
+    const reach = poor * SCALE_PAST_POOR
+    const part = (className: string, from: number, to: number) => {
+      const segment = tool.make('i', className)
+
+      segment.style.width = `${(to - from) / reach * 100}%`
+      scale.append(segment)
+    }
+    const tick = (limit: number) => {
+      const element = tool.make('span', 'tick', vitalTick(name, limit))
+
+      element.style.left = `${limit / reach * 100}%`
+      box.append(element)
+    }
+
+    top.append(tool.make('span', 'name', label))
+    part('g', 0, good)
+    part('n', good, poor)
+    part('p', poor, reach)
+    box.append(scale)
+    tick(good)
+    tick(poor)
 
     if (value === undefined) {
-      shown.append(tool.make('span', 'note', name === 'inp' ? 'no interaction yet' : 'not reported yet'))
+      number.append(tool.make('span', 'note', name === 'inp' ? 'no interaction yet' : 'not reported yet'))
     }
     else {
       const rating = rateVital(name, value)
+      const [digits, unit] = vitalDigits(name, value)
+      const marker = tool.make('span', 'mk')
 
-      shown.append(tool.make('span', rating, `${format(value)} - ${rating === 'needs' ? 'needs improvement' : rating}`), tool.make('span', 'note', ` (good up to ${format(good)}, poor past ${format(poor)})`))
+      marker.style.left = `${Math.min(100, value / reach * 100)}%`
+      box.append(marker)
+      top.append(pill(tool, rating === 'needs' ? 'needs work' : rating, RATING_TONES[rating]))
+      number.append(digits)
 
-      if (detail !== undefined)
-        shown.append(tool.make('div', 'note', detail))
+      if (unit !== '')
+        number.append(tool.make('small', '', unit))
     }
 
-    vitalsPanel.append(tool.make('dt', '', label), shown)
+    tile.append(top, number, box)
+
+    if (detail !== undefined && value !== undefined)
+      tile.append(tool.make('span', 'note', detail))
+
+    vitalsPanel.append(tile)
   }
   const renderVitals = () => {
     const element = vitals.lcp?.element
     const painted = element === undefined ? undefined : `${element.localName}${element.id === '' ? '' : `#${element.id}`}`
     const rated = [vitals.lcp?.ms === undefined ? undefined : rateVital('lcp', vitals.lcp.ms), vitals.inp === undefined ? undefined : rateVital('inp', vitals.inp), rateVital('cls', vitals.cls)]
-    const bad = rated.filter(rating => rating !== undefined && rating !== 'good').length
+    const bad = rated.filter(rating => rating !== undefined && rating !== 'good')
 
     loadNote.textContent = doc.defaultView!.location.pathname === vitals.path ? `Measured on the load of ${vitals.path}.` : `Measured on the load of ${vitals.path}, not on this page: a link swapped it in without a load.`
     vitalsPanel.replaceChildren()
-    vital('lcp', 'LCP', vitals.lcp?.ms, ms => `${Math.round(ms)} ms`, painted === undefined ? undefined : `painted: ${painted}`)
-    vital('cls', 'CLS', vitals.cls, value => value.toFixed(3))
-    vital('inp', 'INP', vitals.inp, ms => `${Math.round(ms)} ms`)
-    tab.count(bad, bad > 0 ? 'error' : undefined)
+    vital('lcp', 'LCP', vitals.lcp?.ms, painted === undefined ? undefined : `painted: ${painted}`)
+    vital('cls', 'CLS', vitals.cls)
+    vital('inp', 'INP', vitals.inp)
+    tab.count(bad.length, worstTone(bad))
   }
   const reload = async () => {
     const ask = ++asked
@@ -1849,37 +2185,47 @@ function performanceTab(doc: Document, tool: DevTool, vitals: Vitals, signal: Ab
     if (ask !== asked)
       return
 
-    const facts = tool.make('dl', 'facts')
+    const grid = tool.make('div', 'weight')
     const total = (files: { bytes: number }[]) => files.reduce((sum, file) => sum + file.bytes, 0)
-    const row = (term: string, text: string, files: { url: string, bytes: number }[] = []) => {
-      const value = tool.make('dd')
+    const rows: [string, number, { url: string, bytes: number }[]][] = [
+      ['HTML', weight.html, []],
+      ['CSS', total(weight.css), weight.css],
+      ...([['Entry', weight.entry], ['Islands', weight.islands], ['Other chunks', weight.other]] as const).flatMap(([name, files]) => files.length === 0 ? [] : [[name, total(files), files] as [string, number, { url: string, bytes: number }[]]]),
+    ]
+    const longest = Math.max(...rows.map(([, bytes]) => bytes))
 
-      value.append(text)
+    for (const [name, bytes, files] of rows) {
+      const track = tool.make('span', 'bars')
+      const fill = tool.make('i')
 
-      for (const file of files)
-        value.append(tool.make('div', 'note mono', `${file.url} ${formatBytes(file.bytes)}`))
+      fill.style.width = `${longest === 0 ? 0 : Math.max(1, bytes / longest * 100)}%`
+      track.append(fill)
+      grid.append(tool.make('span', '', name), track, tool.make('span', 'v', formatBytes(bytes)))
 
-      facts.append(tool.make('dt', '', term), value)
+      if (files.length > 0)
+        grid.append(tool.make('span', 'files', files.map(file => `${file.url} ${formatBytes(file.bytes)}`).join(', ')))
     }
 
-    row('HTML', formatBytes(weight.html))
-    row('CSS', formatBytes(total(weight.css)), weight.css)
-    row('JS', formatBytes(total(weight.entry) + total(weight.islands) + total(weight.other)))
-    row('Entry', formatBytes(total(weight.entry)), weight.entry)
-    row('Island chunks', weight.islands.length === 0 ? 'none loaded' : formatBytes(total(weight.islands)), weight.islands)
-    row('Other chunks', weight.other.length === 0 ? 'none loaded' : formatBytes(total(weight.other)), weight.other)
-    weightPanel.replaceChildren(tool.make('h3', 'heading', 'Weight, gzipped'), facts, tool.make('div', 'note', 'Dev sizes: not minified and with the dev-only code, so `kay build` makes them smaller.'))
+    grid.append(tool.make('span', 'rule'), tool.make('span', 'total', 'Total'), tool.make('span'), tool.make('span', 'v total', formatBytes(rows.reduce((sum, [, bytes]) => sum + bytes, 0))))
+    weightPanel.replaceChildren(tool.make('h3', 'heading', 'Weight, gzipped'), grid, tool.make('div', 'note', 'Dev sizes: not minified and with the dev-only code, so `kay build` makes them smaller.'))
 
     const built = await builtSizes(doc.defaultView!)
 
     if (ask !== asked || built === undefined)
       return
 
-    const production = tool.make('dl', 'facts')
+    const production = tool.make('div', 'build')
     const mark = built.estimated ? '~' : ''
+    const figure = (name: string, bytes: string) => {
+      const element = tool.make('span', '', `${name} `)
 
-    production.append(tool.make('dt', '', 'JS'), tool.make('dd', '', `${mark}${formatBytes(built.js)}`), tool.make('dt', '', 'CSS'), tool.make('dd', '', formatBytes(built.css)))
-    weightPanel.append(tool.make('h3', 'heading', 'Last kay build'), production, tool.make('div', 'note', `Route ${built.route}, ${built.exported ? 'static export' : 'server build'} made ${ago(Date.now() - built.built)}, gzipped, minified and without the dev-only code${built.estimated ? '; ~ marks an estimate, as no page of the route was prerendered, the scripts being what its components can load' : ''}. Build again for sizes of the code as it is now.`))
+      element.append(tool.make('b', '', bytes))
+
+      return element
+    }
+
+    production.append(tool.make('span', '', `Last kay build, ${ago(Date.now() - built.built)}`), figure('JS', `${mark}${formatBytes(built.js)}`), figure('CSS', formatBytes(built.css)))
+    weightPanel.append(production, tool.make('div', 'note', `Route ${built.route}, ${built.exported ? 'static export' : 'server build'}, gzipped, minified and without the dev-only code${built.estimated ? '; ~ marks an estimate, as no page of the route was prerendered, the scripts being what its components can load' : ''}. Build again for sizes of the code as it is now.`))
   }
 
   reread = () => void reload()
@@ -1898,7 +2244,11 @@ function performanceTab(doc: Document, tool: DevTool, vitals: Vitals, signal: Ab
 
   swaps.observe(doc.head, { childList: true })
   signal.addEventListener('abort', () => swaps.disconnect())
-  tab.panel.append(tool.make('h3', 'heading', 'Web Vitals of the page load'), loadNote, vitalsPanel, weightPanel)
+
+  const vitalsSection = tool.make('section', 'group')
+
+  vitalsSection.append(tool.make('h3', 'heading', 'Web Vitals of the page load'), vitalsPanel, loadNote)
+  tab.panel.append(vitalsSection, weightPanel)
   renderVitals()
 }
 
@@ -1907,9 +2257,9 @@ const ROUTE_KINDS: Record<DevRoute['kind'], string> = { page: 'Pages', endpoint:
 // Every route the server serves, filtered as typed, each opening its file, the GET paths no request fills in linking to themselves; fetched as the tab shows and again after each restart, so it lists what the running server serves.
 function routesTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
   const win = doc.defaultView!
-  const actions = tool.make('div', 'actions')
+  const search = tool.make('label', 'search')
   const filter = tool.make('input', 'filter')
-  const body = tool.make('div')
+  const body = tool.make('div', 'list')
   let routes: DevRoute[] = []
   let notes: string[] = []
   // A restart while a fetch is out asks again; the latest answer wins.
@@ -1924,10 +2274,12 @@ function routesTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
         return []
 
       const section = tool.make('section', 'group')
-      const list = tool.make('div', 'mono')
+      const heading = tool.make('h3', 'heading', label)
+      const list = tool.make('div')
 
       list.append(...ofKind.map(route => routeRow(tool, route, win.location.pathname)))
-      section.append(tool.make('h3', 'heading', `${label} (${ofKind.length})`), list)
+      heading.append(pill(tool, String(ofKind.length)))
+      section.append(heading, list)
 
       return [section]
     })
@@ -1962,14 +2314,14 @@ function routesTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
       body.replaceChildren(tool.make('div', 'empty', `Could not list the routes: ${error instanceof Error ? error.message : String(error)}`))
     }
   }
-  const tab = tool.tab({ id: 'routes', label: 'Routes', shown: () => void list() })
+  const tab = tool.tab({ id: 'routes', label: 'Routes', icon: 'route', shown: () => void list() })
 
   filter.type = 'search'
   filter.placeholder = 'Filter by path or file'
   filter.setAttribute('aria-label', 'Filter the routes by path or file')
   filter.oninput = render
-  actions.append(filter)
-  tab.panel.append(actions, body)
+  search.append(tool.icon('search'), filter)
+  tab.panel.append(search, body)
   win.addEventListener(BUILT_EVENT, () => {
     if (tab.panel.hidden === false)
       void list()
@@ -1978,7 +2330,7 @@ function routesTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
 
 function routeRow(tool: DevTool, route: DevRoute, current: string): HTMLElement {
   const row = tool.make('div', 'route')
-  const link = tool.make('a', 'path link', route.path)
+  const link = tool.make('a', 'path', route.path)
   const file = tool.make('div', 'file')
 
   if (route.href === current)
@@ -1992,7 +2344,7 @@ function routeRow(tool: DevTool, route: DevRoute, current: string): HTMLElement 
   else
     file.textContent = route.owner
 
-  row.append(tool.make('span', 'method', route.method), route.href === undefined ? tool.make('span', 'path', route.path) : link, tool.make('span', 'note', route.locale ?? ''), file)
+  row.append(tool.make('span', 'method', route.method), route.href === undefined ? tool.make('span', 'path', route.path) : link, tool.make('span', 'locale', route.locale ?? ''), file)
 
   return row
 }
@@ -2037,19 +2389,21 @@ async function answerErrorPage(tool: DevTool, target: HTMLButtonElement): Promis
   await copyText(target, target.ownerDocument.getElementById(copied!)?.textContent ?? '')
 }
 
-// Writes the text to the clipboard and says so on the button for a moment, or that it failed, without a dialog.
+// Writes the text to the clipboard and says so on the button for a moment, or that it failed, without a dialog; the text sits in the button's own span when it has one, beside its icon.
 async function copyText(button: HTMLButtonElement, text: string): Promise<void> {
+  const label = button.querySelector('span') ?? button
+
   try {
     await button.ownerDocument.defaultView!.navigator.clipboard.writeText(text)
-    button.textContent = 'Copied'
+    label.textContent = 'Copied'
   }
   catch {
-    button.textContent = 'Copy failed'
+    label.textContent = 'Copy failed'
   }
 
   clearTimeout(copyResets.get(button))
   copyResets.set(button, setTimeout(() => {
-    button.textContent = 'Copy'
+    label.textContent = 'Copy'
   }, COPIED_MS))
 }
 
@@ -2155,19 +2509,18 @@ function boundsOf(target: Element): DOMRect {
   return new DOMRect(left, top, Math.max(...boxes.map(box => box.right)) - left, Math.max(...boxes.map(box => box.bottom)) - top)
 }
 
-// A header on one line, except a policy: its directives each get a line, as one wrapped block of hashes hides which is which.
-function headerLine(tool: DevTool, name: string, value: string): HTMLElement {
-  const line = tool.make('div', 'mono', `${name}:`)
+// A header as a row of two cells, except a policy: its directives each get a line, as one wrapped block of hashes hides which is which.
+function headerRow(tool: DevTool, name: string, value: string): HTMLElement {
+  const row = tool.make('tr')
+  const cell = tool.make('td')
   const directives = name.startsWith('content-security-policy') ? value.split(';').map(directive => directive.trim()).filter(directive => directive !== '') : []
 
-  if (directives.length < 2) {
-    line.textContent = `${name}: ${value}`
+  if (directives.length < 2)
+    cell.textContent = value
+  else
+    cell.append(...directives.map(directive => tool.make('span', 'directive', `${directive};`)))
 
-    return line
-  }
+  row.append(tool.make('td', '', name), cell)
 
-  for (const directive of directives)
-    line.append(tool.make('div', 'directive', `${directive};`))
-
-  return line
+  return row
 }
