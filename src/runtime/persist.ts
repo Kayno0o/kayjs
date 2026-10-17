@@ -177,7 +177,7 @@ function saveCookie(name: string, value: unknown, seconds: number): void {
   // `/docs`, not `/docs/`, which a request for `/docs` itself would not send it to.
   const path = withBase('/').replace(TRAILING_SLASH, '') || '/'
 
-  document.cookie = `${name}=${text}; path=${path}; max-age=${Math.max(1, Math.round(seconds))}; samesite=lax${location.protocol === 'https:' ? '; secure' : ''}`
+  document.cookie = `${name}=${text}; path=${path}; max-age=${Math.ceil(seconds)}; samesite=lax${location.protocol === 'https:' ? '; secure' : ''}`
 }
 
 function readLocal(key: string): string | null {
