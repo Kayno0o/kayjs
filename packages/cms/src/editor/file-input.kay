@@ -65,4 +65,7 @@ async function upload([file]: File[]): Promise<void> {
     @content(zone)
       Button(label={label()} busy={sent() !== undefined} onClick={zone.open})
       span.kcms-file-hint {zone.dragging() ? wording('cms.file.dropNow', 'Drop to upload') : wording('cms.file.drop', 'or drop a file here')}
-  TextInput(value={value} placeholder={wording('cms.file.pathHint', 'Or a path the site serves')} aria-label={wording('cms.file.pathLabel', 'Path')} onInput={onChange})
+  // Uploading is how a path is usually set, so typing one waits behind a disclosure.
+  details.kcms-file-path
+    summary {wording('cms.file.pathLabel', 'Path')}
+    TextInput(value={value} placeholder={wording('cms.file.pathHint', 'Or a path the site serves')} aria-label={wording('cms.file.pathLabel', 'Path')} onInput={onChange})

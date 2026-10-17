@@ -114,7 +114,7 @@ A file added while `kay dev` runs is picked up on the next reload. `customField`
 
 ## Files and images
 
-An image or file field (`imageField()`, `fileField()` from `kay/content`) takes a file dropped or picked. It is stored through kay's [file storage](/guides/file-storage), and the field keeps the path that serves it.
+An image or file field (`imageField()`, `fileField()` from `kay/content`) takes a file dropped or picked. It is stored through kay's [file storage](/guides/file-storage), and the field keeps the path that serves it. The path stays behind a collapsed Path control under the preview, for an editor who would rather type one.
 
 An image pasted or dropped into a Markdown body is uploaded the same way and embedded where the cursor is. A refused upload shows a message and leaves the text as it was.
 

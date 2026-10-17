@@ -51,6 +51,17 @@
   font-size: 0.85rem;
 }
 
+.kcms-file-path > summary {
+  width: fit-content;
+  color: var(--color-kui-subtext0);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.kcms-file-path[open] > summary {
+  margin-bottom: 0.5rem;
+}
+
 .kcms-refusal {
   display: grid;
   color: var(--color-kui-error);
