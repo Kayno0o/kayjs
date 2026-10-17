@@ -65,9 +65,12 @@ const trustedRanges = new Map<string, BlockList>()
 const RANGE = /^([^/]+)\/(\d{1,3})$/
 const requestIds = new WeakMap<Request, string>()
 
-// The header a request's id comes in from a trusted proxy and goes out on, every context holding it; `requestIdHeader` in kay.config.ts renames it, set as the server boots.
+// The header a request's id comes in from a trusted proxy and goes out on, every context holding it; `requestIdHeader` in kay.config.ts renames it.
+// It is one name per process, as the helpers that put it on a response see no app: an app that sets none leaves a name another one set, and two apps naming different ones is refused.
 const DEFAULT_ID_HEADER = 'x-request-id'
 const HEADER_NAME = /^[\w!#$%&'*+.^`|~-]+$/
+// Headers the id would overwrite or echo something else through.
+const RESERVED_HEADERS = new Set(['authorization', 'content-length', 'content-type', 'cookie', 'host', 'location', 'set-cookie'])
 let idHeader = DEFAULT_ID_HEADER
 
 export function requestIdHeader(): string {
@@ -76,13 +79,20 @@ export function requestIdHeader(): string {
 
 // Refuses a `requestIdHeader` that is no header's name.
 export function checkRequestIdHeader(name: string | undefined): void {
-  if (name !== undefined && !HEADER_NAME.test(name))
-    throw new KayError('config-invalid', `kay: requestIdHeader is ${JSON.stringify(name)}; it names a header, such as x-correlation-id`)
+  if (name !== undefined && (!HEADER_NAME.test(name) || RESERVED_HEADERS.has(name.toLowerCase())))
+    throw new KayError('config-invalid', `kay: requestIdHeader is ${JSON.stringify(name)}; it names a header of its own, such as x-correlation-id`)
 }
 
 export function setRequestIdHeader(name: string | undefined): void {
   checkRequestIdHeader(name)
-  idHeader = name?.toLowerCase() ?? DEFAULT_ID_HEADER
+
+  if (name === undefined)
+    return
+
+  if (idHeader !== DEFAULT_ID_HEADER && idHeader !== name.toLowerCase())
+    throw new KayError('config-invalid', `kay: requestIdHeader is ${name}, but another app in this process already names ${idHeader}; a process uses one name`)
+
+  idHeader = name.toLowerCase()
 }
 
 // What an id a proxy passed on may hold, so it can neither forge a log line nor swell one.
@@ -542,7 +552,7 @@ export function trustProxy(app: Elysia, setting: ProxyConfig | number | boolean 
 
 // The socket's address, unless it is a proxy on this machine or network the app's `proxy` setting trusts: then the client's address as that proxy passed it on.
 // `proxy` stands in for the app's setting, for a plain Elysia app that `pages()` does not serve.
-export function clientAddress(request: Request, server: Server<unknown> | null | undefined, setting?: ProxyConfig | number | boolean): string {
+export function clientAddress(request: Request, server: Server<unknown> | null | undefined, setting?: ProxyConfig | number | true): string {
   const proxy = proxyOf(setting)
   const address = rewrittenAddress(request) ?? (server ?? servers.get(request))?.requestIP(request)?.address
   const trusted = proxy ?? proxies.get(request)

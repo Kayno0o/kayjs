@@ -22,7 +22,7 @@ export default api().post('/', ({ headers, status }) => {
 
 ### Let an editor see drafts on the live site
 
-`preview` in kay.config.ts takes a secret, and `previewUrl` from `kay/server` gives a signed link to a page, valid an hour:
+`preview` in kay.config.ts (`false` for none) takes a secret, and `previewUrl` from `kay/server` gives a signed link to a page, valid an hour:
 
 ```ts
 import { defineConfig } from 'kay/server'

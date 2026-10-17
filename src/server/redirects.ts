@@ -4,7 +4,7 @@ import { KayError } from '../compiler/errors'
 import { noteRedirect } from './dev-notes'
 import { requestUrl } from './request-url'
 
-// A path moved elsewhere, by its old path: `'/blog/:slug': '/posts/:slug'`, a `*` carrying the rest of the path. Permanent, a 308, unless it says otherwise: `permanent: false` for a 307, or `status` for a 301 or 302 that older clients and some crawlers expect, a 307 or a 308.
+// A path moved elsewhere, by its old path: `'/blog/:slug': '/posts/:slug'`, a `*` carrying the rest of the path. Permanent, a 308, unless it says otherwise: `permanent: false` for a 307, or `status` for a 301 or 302 that older clients and some crawlers expect, which let a browser turn a POST into a GET where 307 and 308 do not.
 export type Redirects = Record<string, string | { to: string, permanent?: boolean, status?: RedirectStatus }>
 
 export type RedirectStatus = 301 | 302 | 307 | 308

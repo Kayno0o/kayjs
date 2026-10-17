@@ -73,12 +73,12 @@ export function variantName(source: string, variant: number | ImageVariant, form
   return inFormat(`${basename(source, extname(source))}${variantSuffix(typeof variant === 'number' ? { width: variant } : variant)}`, format)
 }
 
-// `images.avif` as a quality, or undefined when it is off.
 // The WebP quality of the variants: `images.webp.quality`, else `images.quality`, else the default applied where it is read.
 export function webpQuality(images: { quality?: number | undefined, webp?: { quality?: number | undefined } | undefined } | undefined): number | undefined {
   return images?.webp?.quality ?? images?.quality
 }
 
+// `images.avif` as a quality, or undefined when it is off.
 export function avifQuality(images: { avif?: false | { quality?: number | undefined } | undefined } | undefined): number | undefined {
   return images?.avif === false ? undefined : images?.avif?.quality ?? DEFAULT_AVIF_QUALITY
 }

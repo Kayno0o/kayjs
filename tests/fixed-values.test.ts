@@ -39,7 +39,7 @@ describe('health.timeout', () => {
   })
 
   it('is 5 seconds when unset, and refused when it is no positive duration', async () => {
-    for (const timeout of [0, -1, '5 s', Number.NaN])
+    for (const timeout of [0, -1, '5 s', Number.NaN, '30d'])
       await expect(pages({ routes: ROUTES, prebuilt: false, health: { timeout } as never })).rejects.toThrow('health.timeout is')
 
     expect(await probeHealth({ timeout: 0 })).toBe(1)
@@ -131,21 +131,23 @@ describe('requestIdHeader', () => {
   const routes = ROUTES
   const idFrom = async (app: Awaited<ReturnType<typeof pages>>, header: string, headers: Record<string, string> = {}) => (await app.handle(new Request('http://localhost/contact', { headers }))).headers.get(header)
 
-  it('names the header an id goes out on and comes in from a trusted proxy on', async () => {
+  it('names the header an id goes out on and comes in from a trusted proxy on, one name for the process', async () => {
+    const plain = await pages({ routes, prebuilt: false, proxy: { hops: 1 } })
+
+    expect(await idFrom(plain, 'x-request-id', { 'x-request-id': 'edge-9' })).toBe('edge-9')
+
     const renamed = await pages({ routes, prebuilt: false, proxy: { hops: 1 }, requestIdHeader: 'X-Correlation-Id' })
 
     expect(await idFrom(renamed, 'x-correlation-id')).toMatch(/^[\w-]{22}$/)
     expect(await idFrom(renamed, 'x-request-id')).toBeNull()
     expect(await idFrom(renamed, 'x-correlation-id', { 'x-correlation-id': 'edge-7' })).toBe('edge-7')
     expect(await idFrom(renamed, 'x-correlation-id', { 'x-request-id': 'edge-8' })).not.toBe('edge-8')
-
-    const plain = await pages({ routes, prebuilt: false, proxy: { hops: 1 } })
-
-    expect(await idFrom(plain, 'x-request-id', { 'x-request-id': 'edge-9' })).toBe('edge-9')
+    await expect(pages({ routes, prebuilt: false, requestIdHeader: 'x-other-id' })).rejects.toThrow('a process uses one name')
+    expect(await idFrom(await pages({ routes, prebuilt: false }), 'x-correlation-id')).toMatch(/^[\w-]{22}$/)
   })
 
   it('refuses a name that is no header', async () => {
-    for (const name of ['', 'two words', 'a:b'])
+    for (const name of ['', 'two words', 'a:b', 'Set-Cookie', 'content-type'])
       await expect(pages({ routes, prebuilt: false, requestIdHeader: name })).rejects.toThrow('requestIdHeader is')
   })
 })
@@ -173,12 +175,18 @@ describe('redirects with a status', () => {
 })
 
 describe('options that also take false', () => {
-  it('reads proxy: false as no proxy, whatever the request forwards', () => {
-    const request = new Request('http://localhost/', { headers: { 'x-forwarded-for': '9.9.9.9' } })
+  it('reads proxy: false as no proxy, whatever the request forwards', async () => {
+    const seen = async (proxy: true | false) => {
+      const app = new Elysia()
 
-    expect(clientAddress(request, undefined, true)).toBe('9.9.9.9')
-    expect(clientAddress(request, undefined, false)).not.toBe('9.9.9.9')
-    expect(() => trustProxy(new Elysia(), false)).not.toThrow()
+      trustProxy(app, proxy)
+      app.get('/', ({ request }) => clientAddress(request, undefined))
+
+      return (await app.handle(new Request('http://localhost/', { headers: { 'x-forwarded-for': '9.9.9.9' } }))).text()
+    }
+
+    expect(await seen(true)).toBe('9.9.9.9')
+    expect(await seen(false)).not.toBe('9.9.9.9')
   })
 
   it('reads preview: false as no preview, serving none of its routes', async () => {

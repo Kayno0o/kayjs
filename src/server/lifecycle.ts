@@ -13,6 +13,7 @@ export const HEALTH_PATH = '/_kay/health'
 const DEFAULT_SHUTDOWN_TIMEOUT = 10
 // A check slower than this fails unless `health.timeout` says otherwise, so a hung database never hangs the probe with it.
 const DEFAULT_CHECK_TIMEOUT = 5
+const MAX_TIMER_MS = 2 ** 31 - 1
 
 // Set on `globalThis` while a server watches its parent, so the watch `kay render` preloads, for a server nothing else stops, leaves it the stop.
 const PARENT_WATCHED = Symbol.for('kay.parentWatched')
@@ -62,7 +63,13 @@ export function serveHealth(app: Elysia, lifecycle: Lifecycle, holds: () => bool
 
 // The milliseconds a health check may take, `health.timeout` read once per use: a value that is no positive duration throws naming the option.
 export function healthTimeoutMs(config: HealthConfig | undefined): number {
-  return durationSeconds(config?.timeout ?? DEFAULT_CHECK_TIMEOUT, 'health.timeout') * 1000
+  const ms = durationSeconds(config?.timeout ?? DEFAULT_CHECK_TIMEOUT, 'health.timeout') * 1000
+
+  // A timer past this fires at once.
+  if (ms > MAX_TIMER_MS)
+    throw new Error(`kay: health.timeout is ${String(config?.timeout)}; it takes at most 24 days`)
+
+  return ms
 }
 
 export function shutdownSeconds(timeout: Duration): number {
