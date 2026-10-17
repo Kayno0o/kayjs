@@ -16,9 +16,10 @@ const TARGET = /^(?:\/|https?:\/\/)/
 const EMPTY_OBJECT = /^\s*\}/
 const IDENTIFIER_START = /[\w$]/
 const CONTROL = /\p{Cc}/u
+const KEY_COLON = /^\s*:/
 const COLON_BRACE = /^\s*:\s*\{/
 const PARAM_SEGMENT = /:[A-Z_$][\w$]*/gi
-const REGEX_SPECIALS = /[.+?^${}()|[\]\\]/g
+const REGEX_SPECIALS = /[.*+?^${}()|[\]\\]/g
 const REFERRER_LIMIT = 3
 
 // The paths visitors asked for and found nothing at, most hit first, read from the file the production server keeps.
@@ -143,7 +144,7 @@ function quoted(text: string): string {
 }
 
 // Whether a redirect of the config takes the path: `:name` stands for a segment, a final `*` for the rest.
-function answered(path: string, redirects: string[]): boolean {
+export function answered(path: string, redirects: string[]): boolean {
   return redirects.some((from) => {
     const star = from.endsWith('/*')
     const body = (star ? from.slice(0, -2) : from).replace(REGEX_SPECIALS, '\\$&').replace(PARAM_SEGMENT, '[^/]+')
@@ -180,7 +181,7 @@ function redirectsOf(config: string, from: number): number | 'other' | undefined
           at++
       }
 
-      if (depth === 1 && config.slice(start + 1, at) === 'redirects')
+      if (depth === 1 && config.slice(start + 1, at) === 'redirects' && KEY_COLON.test(config.slice(at + 1, at + 40)))
         return after(config, at + 1)
     }
     else if (char === '{' || char === '[' || char === '(') {

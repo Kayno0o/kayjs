@@ -1,13 +1,30 @@
+import type { MissingPath } from '../src/server/not-found'
+import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
-import { withRedirect } from '../src/commands/not-found'
+import { answered, withRedirect } from '../src/commands/not-found'
 import { pages } from '../src/server'
 import { countedPath, countMissing, missingPaths, missingStore, pageRequested, referrerHost, suggester } from '../src/server/not-found'
 import { scratchDir } from './scratch'
 
 const known = ['/', '/about', '/blog/hello-world', '/blog/second-post', '/news/launch', '/fr/a-propos', '/fr/blog/hello-world']
+
+// The count is written after the answer went out, so a test waits for what it expects to be listed.
+async function counted(path: string): Promise<MissingPath> {
+  for (let attempt = 0; attempt < 100; attempt++) {
+    const found = missingPaths().find(row => row.path === path)
+
+    if (found)
+      return found
+
+    await Bun.sleep(10)
+  }
+
+  throw new Error(`${path} was never counted`)
+}
+
 const settings = { defaultLocale: 'en', locales: ['en', 'fr'], prefixDefault: false }
 
 describe('countedPath', () => {
@@ -209,7 +226,7 @@ describe('countMissing', () => {
     await visit('/wp-login.php')
     await visit('/nothing-registered')
 
-    await Bun.sleep(50)
+    await counted('/nothing-registered')
 
     // Other files of the same run count into the same store.
     const listed = missingPaths().filter(({ path }) => ['/gone', '/fine', '/api/user', '/wp-login.php', '/nothing-registered'].includes(path))
@@ -226,8 +243,49 @@ describe('a served app', () => {
     const response = await app.handle(new Request('http://localhost/missing-page-x/', { headers: { referer: 'https://elsewhere.example/' } }))
 
     expect(response.status).toBe(404)
-    await Bun.sleep(50)
-    expect(missingPaths().find(({ path }) => path === '/missing-page-x')?.referrers).toEqual([{ host: 'elsewhere.example', hits: 1 }])
+    expect((await counted('/missing-page-x')).referrers).toEqual([{ host: 'elsewhere.example', hits: 1 }])
+  })
+
+  it('counts a path under a locale prefix and one with dot segments as the visitor asked for it', async () => {
+    const app = new Elysia().use(await pages({ routes: 'tests/fixtures/i18n/src/routes', prebuilt: false, security: false, i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: 'tests/fixtures/i18n/src/messages' } }))
+
+    expect((await app.handle(new Request('http://localhost/en/page-nobody-has-y'))).status).toBe(404)
+    await app.handle(new Request('http://localhost/a/../page-nobody-has-z'))
+    expect((await counted('/en/page-nobody-has-y')).hits).toBe(1)
+    await counted('/page-nobody-has-z')
+    expect(missingPaths().filter(({ path }) => path.includes('..'))).toEqual([])
+  })
+
+  it('records nothing in development, where only production counts', async () => {
+    const dev = new Elysia().use(await pages({ routes: 'tests/fixtures/routing/src/routes', prebuilt: false, security: false, dev: true }))
+    const production = new Elysia().use(await pages({ routes: 'tests/fixtures/routing/src/routes', prebuilt: false, security: false }))
+
+    await dev.handle(new Request('http://localhost/page-only-dev-sees'))
+    await production.handle(new Request('http://localhost/page-only-production-sees'))
+    await counted('/page-only-production-sees')
+    expect(missingPaths().map(({ path }) => path)).not.toContain('/page-only-dev-sees')
+  })
+
+  it('records nothing while a static export reads the site', async () => {
+    const root = await scratchDir('not-found-static-')
+
+    await Bun.write(join(root, 'src/routes/index.kay'), 'main Home\n')
+    await Bun.write(join(root, 'src/routes/_404.kay'), 'main Gone\n')
+    const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', root, '--no-check', '--static', '--outdir', join(root, 'out')], { env: { PATH: process.env.PATH!, NODE_ENV: 'production' }, stdout: 'pipe', stderr: 'pipe' })
+    const [errors, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
+
+    expect({ code, errors }).toMatchObject({ code: 0 })
+    expect(existsSync(join(root, 'data/not-found.sqlite'))).toBe(false)
+    expect(existsSync(join(process.cwd(), 'data/not-found.sqlite'))).toBe(false)
+  })
+})
+
+describe('answered', () => {
+  it('reads a star outside a trailing /* as a character, not a pattern', () => {
+    expect(answered('/a', ['*foo', '/x*', '/b/:id', '/docs/*'])).toBe(false)
+    expect(answered('/x*', ['/x*'])).toBe(true)
+    expect(answered('/b/7', ['/b/:id'])).toBe(true)
+    expect(answered('/docs/a/b', ['/docs/*'])).toBe(true)
   })
 })
 
@@ -248,6 +306,7 @@ describe('withRedirect', () => {
   it('escapes quotes and leaves a config it cannot read alone', () => {
     expect(withRedirect('export default defineConfig({\n})\n', '/it\'s', '/n')).toContain('\'/it\\\'s\': \'/n\'')
     expect(withRedirect('const redirects = {}\nexport default defineConfig({ redirects })\n', '/o', '/n')).toBeUndefined()
+    expect(withRedirect('export default defineConfig({\n  name: \'redirects\',\n})\n', '/o', '/n')).toContain('\n  redirects: {\n    \'/o\': \'/n\',\n  },')
     expect(withRedirect('export default makeConfig()\n', '/o', '/n')).toBeUndefined()
   })
 })
@@ -360,7 +419,7 @@ describe('routes the counter must not reach', () => {
     for (const path of ['/api/users/42', '/api/set/9', '/api/text/7', '/page-nobody-has-x'])
       await app.handle(new Request(`http://localhost${path}`))
 
-    await Bun.sleep(50)
+    await counted('/page-nobody-has-x')
 
     const paths = missingPaths().map(({ path }) => path)
 
@@ -397,7 +456,6 @@ describe('suggestions under trailingSlash always', () => {
     for (let index = 0; index < 2; index++)
       await app.handle(new Request('http://localhost/ABOUT/'))
 
-    await Bun.sleep(50)
-    expect(missingPaths().find(({ path }) => path === '/ABOUT')?.target).toBe('/about/')
+    expect((await counted('/ABOUT')).target).toBe('/about/')
   })
 })
