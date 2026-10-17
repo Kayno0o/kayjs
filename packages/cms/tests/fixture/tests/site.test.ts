@@ -5,6 +5,7 @@ import { beforeAll, expect, setSystemTime, test } from 'bun:test'
 import { testSite } from 'kay/test'
 import { fileVersion } from '../../../src/files'
 import { BODY, parseMarker } from '../../../src/markers'
+import { entryScreen, listScreen } from '../../../src/screens'
 import { outage, products, shop } from '../src/products'
 import { saved } from '../src/saved'
 
@@ -124,10 +125,63 @@ test('a collection\'s list shows the columns and the row actions its layout name
   const page = await site.visit('/admin/collections/shop')
 
   expect(page.find('.kcms-entries th').map(head => head.text.trim())).toEqual(['Title', 'Price', 'Live', 'Actions'])
-  expect(page.find('.kcms-entries td').map(cell => cell.text.trim())).toEqual(['TitleLamp', 'Price30', 'Live✓', 'Actions', 'TitleVase', 'Price12.5', 'Live', 'Actions'])
+  expect(page.find('.kcms-entries td').map(cell => cell.text.trim())).toEqual(['TitleLamp', 'Price30', 'LiveYes', 'Actions', 'TitleVase', 'Price12.5', 'LiveNo', 'Actions'])
   expect(page.find('.kcms-entries a').map(link => link.text)).toEqual(['Lamp', 'Vase'])
   expect(page.find('.kcms-row-actions button').map(button => button.attributes['aria-label'] ?? button.text)).toEqual(['Delete Lamp', 'Delete Vase'])
   expect((await site.visit('/admin/collections/shop?q=vase')).find('.kcms-entries a').map(link => link.text)).toEqual(['Vase'])
+})
+
+test('an ordered collection whose layout drops the move action still reads each row\'s place, and shows no move button', async () => {
+  const screen = (await listScreen({ collection: 'shop' }))!
+
+  expect(screen.rows.map(row => [row.slug, row.move])).toEqual([['lamp', { up: false, down: true }], ['vase', { up: true, down: false }]])
+  expect((await site.visit('/admin/collections/shop')).find('.kcms-row-actions button').map(button => button.text)).not.toContain('Up')
+  expect((await site.visit('/admin/collections/shop')).find('.kcms-row-actions button').map(button => button.text)).not.toContain('Down')
+})
+
+test('a collection with a problem reads through entryScreen and listScreen as the collection alone, its error kept to the log', async () => {
+  outage.message = 'the database at db.internal:5432 is down'
+
+  try {
+    const listed = (await listScreen({ collection: 'products' }))!
+    const opened = (await entryScreen({ collection: 'products', slug: 'mug' }))!
+
+    expect(listed.collection.problem).toContain('failed to read')
+    expect(listed).toMatchObject({ rows: [], page: 1, pages: 1, prefix: '/admin' })
+    expect(opened.collection.problem).toContain('failed to read')
+    expect(opened.entry).toBeUndefined()
+    expect(JSON.stringify([listed, opened])).not.toContain('db.internal')
+    expect(await listScreen({ collection: 'nope' })).toBeUndefined()
+    expect(await entryScreen({ collection: 'nope', slug: 'mug' })).toBeUndefined()
+  }
+  finally {
+    outage.message = undefined
+  }
+})
+
+test('a part asked for a field the schema lacks throws, naming the schema\'s fields', async () => {
+  const ok = await site.fetch('/parts/name')
+
+  expect(ok.status).toBe(200)
+  expect((await site.visit('/parts/name')).find('[data-kcms-path]').map(field => field.attributes['data-kcms-path'])).toEqual(['name'])
+  expect((await site.fetch('/parts/nope')).status).toBe(500)
+})
+
+test('the extension\'s guard covers an app page standing in for a screen, and the screens themselves', async () => {
+  const denied = { headers: { 'x-deny': '1' } }
+
+  for (const path of ['/admin', '/admin/collections/shop', '/admin/collections/shop/lamp', '/admin/new/shop', '/admin/uploads', '/admin/page?path=/blog/hello'])
+    expect((await site.fetch(path, denied)).status).toBe(403)
+
+  expect((await site.fetch('/admin/collections/shop/lamp')).status).toBe(200)
+  expect((await site.fetch('/api/cms/entries/shop/lamp', denied)).status).toBe(403)
+})
+
+test('an entry\'s Edit on page link goes through the screens, a nested slug escaped once', async () => {
+  const link = (page: Awaited<ReturnType<typeof site.visit>>) => page.find('.kcms-entry-actions a').map(found => [found.text, found.attributes.href])
+
+  expect(link(await site.visit('/admin/collections/posts/hello'))).toEqual([['Edit on page', '/admin/page?path=%2Fblog%2Fhello']])
+  expect(link(await site.visit('/admin/collections/posts/notes/garden'))).toEqual([['Edit on page', '/admin/page?path=%2Fblog%2Fnotes%252Fgarden']])
 })
 
 test('a form is arranged by its layout: the named fields first, a row side by side, a hidden one left out', async () => {
@@ -163,6 +217,30 @@ test('a field the layout hides still says why a save was refused', async () => {
 
   expect(shop.map(item => item.slug)).toEqual(['lamp', 'vase'])
   expect(await page.evaluate(() => [...document.querySelectorAll('.kcms-entry-failure[role=alert], p.kcms-entry-failure')].map(node => node.textContent))).toContain('Property \'sku\' is missing')
+  expect(page.errors).toEqual([])
+}, 60_000)
+
+test('the on-page editor shows each issue of a refused save once, the body\'s beside its field', async () => {
+  saved.length = 0
+
+  const built = await browser()
+  const page = await built.open('/admin/page?path=/blog/hello')
+  const body = '.kcms-editor [data-kcms-body] textarea'
+
+  await page.waitUntil(() => document.querySelector('.kcms-editor [data-kcms-body] textarea') !== null)
+  await page.click(body)
+  await page.type('<script>alert(1)</script>')
+  // The draft renders after typing pauses, which would replace the issues of a save asked for before.
+  await Bun.sleep(500)
+  await page.waitUntil(() => document.querySelector('.kcms-editor .kcms-entry-actions button:last-child') !== null)
+  await page.click('.kcms-editor .kcms-entry-actions button:last-child')
+  await page.waitUntil(() => document.querySelector('.kcms-editor')?.textContent?.includes('would run as the site') === true)
+  await Bun.sleep(200)
+
+  const shown = await page.evaluate(() => (document.querySelector('.kcms-editor')?.textContent?.match(/would run as the site/g) ?? []).length)
+
+  expect(shown).toBe(1)
+  expect(saved).toEqual([])
   expect(page.errors).toEqual([])
 }, 60_000)
 

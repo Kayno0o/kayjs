@@ -1,0 +1,10 @@
+--- server
+import { collectionScreen } from '@kaynooo/kayjs-cms'
+import ShopPart from '../../components/shop-part.kay'
+
+const { field } = ctx.params
+const { prefix, collection } = await collectionScreen('shop') ?? ctx.notFound()
+---
+head
+  title {field}
+ShopPart(prefix={prefix} collection={collection} field={field})

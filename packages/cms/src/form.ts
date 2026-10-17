@@ -74,31 +74,45 @@ function slugLine(entry: StoredEntry): string {
 }
 
 // An entry's form on its own screen, or a new entry's when `entry` is left out: the drafts, the save, publish and delete, and the guard against leaving with edits. Called in a component's script, it is what the default screen runs.
-export function createEntryForm({ prefix, collection, entry, locale }: { prefix: string, collection: ScreenCollection, entry?: StoredEntry | undefined, locale?: string | undefined }): EntryForm {
+// `entry` may be a function returning it, read each time the form needs it: for a screen that stays when the page refreshes in place (a `persist` island) and takes new props, `entry: () => all.entry`, so `stored`, `name` and `subtitle` follow the refreshed entry.
+export function createEntryForm({ prefix, collection, entry, locale }: { prefix: string, collection: ScreenCollection, entry?: StoredEntry | undefined | (() => StoredEntry | undefined), locale?: string | undefined }): EntryForm {
+  const read = typeof entry === 'function' ? entry : () => entry
+  const first = read()
+
   // Looks up what the form reads only once the page has loaded, so the page sends it.
   shipWords()
 
   // Nothing on this screen shows the entry rendered, so a change waits for no draft render.
   const drafts = createDrafts({ show: async () => Promise.resolve({}) })
   // A new entry's draft is kept under no slug until it is saved under the one typed.
-  const ref: EntryRef = { collection: collection.name, slug: entry?.slug ?? '', locale: entry?.locale ?? locale }
-  const slug = signal(entry?.slug ?? '')
+  const ref: EntryRef = { collection: collection.name, slug: first?.slug ?? '', locale: first?.locale ?? locale }
+  const slug = signal(first?.slug ?? '')
   // kay files each entry of a localized collection under one of the site's locales.
   const newLocale = signal(locale ?? collection.locales?.[0] ?? '')
   const saving = signal(false)
 
-  drafts.open({ ...ref, data: entry?.data ?? {}, body: entry?.body }, entry?.version)
+  drafts.open({ ...ref, data: first?.data ?? {}, body: first?.body }, first?.version)
   guardLeave(() => !saving() && drafts.changed(ref))
 
+  // The entry as it is now, the one the form opened with once it is gone.
+  const stored = () => first && (read() ?? first)
   // The entry's own title, its slug beneath when that is not the title; a new entry has neither.
-  const name = entry ? entryTitle(collection, entry) : wording('cms.admin.newEntry', 'New entry')
-  const subtitle = entry && name !== entry.slug ? slugLine(entry) : entry?.locale
+  const nameOf = () => {
+    const now = stored()
+
+    return now ? entryTitle(collection, now) : wording('cms.admin.newEntry', 'New entry')
+  }
+  const subtitleOf = () => {
+    const now = stored()
+
+    return now && nameOf() !== now.slug ? slugLine(now) : now?.locale
+  }
 
   async function save(): Promise<void> {
     saving.set(true)
 
     try {
-      if (entry) {
+      if (first) {
         await saveDraft(drafts, ref)
 
         return
@@ -115,14 +129,23 @@ export function createEntryForm({ prefix, collection, entry, locale }: { prefix:
   }
 
   return {
-    ...formScope(drafts, ref, collection, entry?.problem),
+    ...formScope(drafts, ref, collection),
     prefix,
-    name,
-    subtitle,
+    get problem() {
+      return stored()?.problem
+    },
+    get name() {
+      return nameOf()
+    },
+    get subtitle() {
+      return subtitleOf()
+    },
     slug,
     newLocale,
     saving,
-    stored: entry,
+    get stored() {
+      return stored()
+    },
     isDraft: () => collection.draftField !== undefined && drafts.value(ref, collection.draftField) === true,
     save,
     async publish() {

@@ -39,7 +39,7 @@ export default defineConfig({
 })
 ```
 
-The screens live at `/admin`. Set `prefix` to move them. They stay closed without a `guard`.
+The screens live at `/admin`. Set `prefix` to move them, to `/` if the site is only the screens. They stay closed without a `guard`.
 
 `guard` also takes the built guard itself, `auth.guard({ require: 'editor' })`. Then `kay.config.ts` imports `./src/auth`, and with it the app's database, for every `kay build` and `kay check`.
 
@@ -275,6 +275,8 @@ form(novalidate onSubmit={event => { event.preventDefault(); void form.save() }}
 ```
 
 `EntryField` renders one field by its key in the schema, and throws for a key the schema lacks. `EntryBody` renders the Markdown body and `EntryFields` renders everything as the layout arranges it. `EntryNotices` shows a file that does not parse, a refused save with its Keep my edits button, and the messages of any field the screen does not render. Saves, conflicts, uploads and messages work as on the default screen, and the words come from the same `cms.*` keys.
+
+An island marked `persist` keeps its state when the page refreshes in place and takes new props. Give it `entry: () => all.entry`, with `all` being what `props()` returned, and the title, the slug and the file's problem follow the refreshed entry.
 
 ## In the dev tool
 

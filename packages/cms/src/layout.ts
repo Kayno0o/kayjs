@@ -1,5 +1,6 @@
 import type { Field } from './fields'
 import type { CollectionInfo, CollectionLayout, FormLayout, ListLayout, RowAction } from './kay/contract'
+import { wording } from 'kay/words'
 import { fieldsOf } from './fields'
 
 export const ROW_ACTIONS: readonly RowAction[] = ['move', 'publish', 'editOnPage', 'delete']
@@ -168,7 +169,7 @@ export function cellText(field: Field, value: unknown): string {
     return ''
 
   if (field.kind === 'boolean')
-    return value === true ? '✓' : ''
+    return value === true ? wording('cms.table.yes', 'Yes') : wording('cms.table.no', 'No')
 
   if (field.kind === 'select')
     return clipped(field.options.find(option => Object.is(option.raw, value))?.label ?? String(value))

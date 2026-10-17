@@ -1,5 +1,5 @@
 import type { DevTool } from 'kay/dev-tool'
-
+import { screenPath } from './paths'
 // The dev tool's CMS tab, a browser module kay loads on dev pages: whether this visitor is in edit mode, with a toggle for the page they are on.
 const STATE_URL = '/_kay/cms'
 
@@ -65,13 +65,13 @@ export default function cmsDevTool(tool: DevTool): void {
 
     tab.count(state.editing ? 1 : 0)
     toggle.type = 'button'
-    screens.href = `${base()}${state.prefix}`
+    screens.href = `${base()}${screenPath(state.prefix)}`
     screens.target = '_blank'
     screens.rel = 'noopener'
 
     const press = async () => {
       if (!state.editing) {
-        location.assign(`${base()}${state.prefix}/page?path=${encodeURIComponent(sitePath())}`)
+        location.assign(`${base()}${screenPath(state.prefix, '/page')}?path=${encodeURIComponent(sitePath())}`)
 
         return
       }

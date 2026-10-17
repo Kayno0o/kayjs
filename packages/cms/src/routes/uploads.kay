@@ -6,6 +6,7 @@ import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
 import { wording } from 'kay/words'
 import UnusedUploads from '../components/unused-uploads.kay'
 import { unusedUploads } from '../orphans'
+import { screenPath } from '../paths'
 import { settings } from '../settings'
 
 const { prefix } = settings()
@@ -15,7 +16,7 @@ head
   title {wording('cms.admin.uploads', 'Unused uploads')}
 PageSection(title={wording('cms.admin.uploads', 'Unused uploads')} level={1})
   @actions
-    Button(href={prefix} label={wording('cms.admin.content', 'Content')})
+    Button(href={screenPath(prefix)} label={wording('cms.admin.content', 'Content')})
   if 'blocked' in scan
     EmptyState(title={wording('cms.uploads.blocked', 'Uploads cannot be checked')} description={wording('cms.uploads.blockedHint', '{reasons}. Nothing is listed while an entry or a collection cannot be read, since it may use any upload.', { reasons: scan.blocked.join('; ') })})
   else

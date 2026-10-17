@@ -1,0 +1,12 @@
+---
+import type { ScreenCollection } from '@kaynooo/kayjs-cms'
+import EntryField from '@kaynooo/kayjs-cms/entry-field.kay'
+import { createEntryForm } from '@kaynooo/kayjs-cms/form'
+
+// One field of the shop's form by the name the page asks for, to see what a part does with a name the schema lacks.
+const { prefix, collection, field } = props<{ prefix: string, collection: ScreenCollection, field: string }>()
+
+const form = createEntryForm({ prefix, collection })
+---
+.shop-part
+  EntryField(form={form} name={field})

@@ -2,6 +2,7 @@
 import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
 import TooltipHost from '@kaynooo/kayjs-ui/tooltip-host.kay'
 import { wording } from 'kay/words'
+import { screenPath } from '../paths'
 import { settings } from '../settings'
 import './admin.css'
 
@@ -10,7 +11,7 @@ const { prefix } = settings()
 ---
 .kcms-admin
   header.kcms-admin-head
-    a.kcms-admin-home(href={prefix}) {wording('cms.admin.content', 'Content')}
+    a.kcms-admin-home(href={screenPath(prefix)}) {wording('cms.admin.content', 'Content')}
   main.kcms-admin-main
     slot
 Toaster

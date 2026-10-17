@@ -2,6 +2,11 @@
 
 const INDEX = /^\d+$/
 
+// An address under the prefix the screens are mounted at, which the root prefix `/` adds nothing to: `screenPath('/', '/uploads')` is `/uploads`, `screenPath('/', '')` is `/`.
+export function screenPath(prefix: string, path = ''): string {
+  return `${prefix === '/' ? '' : prefix}${path}` || '/'
+}
+
 export function pathSegments(path: string): string[] {
   return path === '' ? [] : path.split('.')
 }

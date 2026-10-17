@@ -27,7 +27,7 @@ export const products = collection({
   title: 'Our products',
 })
 
-// A loaded collection the config arranges: `sku` is required and hidden from its form.
+// A loaded collection the config arranges: `sku` is required and hidden from its form, and the entries are ordered by `position`, whose list hides the move buttons.
 export const shop = collection({
   name: 'shop',
   load: () => shelf.map(({ slug, data }) => ({ slug, data })),
@@ -38,5 +38,6 @@ export const shop = collection({
     shelf.splice(0, shelf.length, ...shelf.filter(item => item.slug !== entry.slug))
   },
 }, {
-  schema: s.Object({ name: s.String({ minLength: 1 }), price: s.Optional(s.Number()), stock: s.Optional(s.Integer()), live: s.Optional(s.Boolean()), photo: s.Optional(imageField()), sku: s.String({ minLength: 1 }) }),
+  schema: s.Object({ name: s.String({ minLength: 1 }), price: s.Optional(s.Number()), stock: s.Optional(s.Integer()), live: s.Optional(s.Boolean()), photo: s.Optional(imageField()), sku: s.String({ minLength: 1 }), position: s.Optional(s.Integer()) }),
+  order: 'position',
 })

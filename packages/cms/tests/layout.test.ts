@@ -63,8 +63,8 @@ describe('listColumns and cellText', () => {
   test('writes a value as short text', () => {
     const [name, price, , live, photo, kind] = fields as [typeof fields[number], ...typeof fields]
 
-    expect(cellText(live!, true)).toBe('✓')
-    expect(cellText(live!, false)).toBe('')
+    expect(cellText(live!, true)).toBe('Yes')
+    expect(cellText(live!, false)).toBe('No')
     expect(cellText(price!, 12.5)).toBe('12.5')
     expect(cellText(photo!, '/_kay/files/products/a%20b.png')).toBe('a%20b.png')
     expect(cellText(kind!, 'a')).toBe('a')
@@ -151,7 +151,7 @@ describe('rowsOf with columns', () => {
   test('carries the cells of the chosen columns only, never a field\'s value a cell cannot show', () => {
     const [row] = rowsOf(products, [{ slug: 'a', data: { name: 'A', price: 3, live: true, tags: ['x'], title: 'T' }, draft: false }])
 
-    expect(row?.cells).toEqual({ price: '3', live: '✓', title: 'T' })
+    expect(row?.cells).toEqual({ price: '3', live: 'Yes', title: 'T' })
     expect(rowsOf({ ...products, layout: undefined }, [{ slug: 'a', data: { name: 'A' }, draft: false }])[0]?.cells).toBeUndefined()
   })
 })

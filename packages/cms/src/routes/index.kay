@@ -7,6 +7,7 @@ import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
 import { wording } from 'kay/words'
 import { collections } from '../kay/content'
 import { collectionPath, collectionTitle, problemId } from '../listing'
+import { screenPath } from '../paths'
 import { settings } from '../settings'
 
 const { prefix } = settings()
@@ -16,7 +17,7 @@ head
   title {wording('cms.admin.content', 'Content')}
 PageSection(title={wording('cms.admin.content', 'Content')} level={1})
   @actions
-    Button(href={`${prefix}/uploads`} label={wording('cms.admin.uploads', 'Unused uploads')})
+    Button(href={screenPath(prefix, '/uploads')} label={wording('cms.admin.uploads', 'Unused uploads')})
   for collection of listed key={collection.name}
     CardRow
       @right

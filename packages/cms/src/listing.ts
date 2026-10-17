@@ -2,6 +2,7 @@ import type { EntryFilter, EntryRef, ScreenCollection, SourceEntry } from './kay
 import { fieldsOf, humanize } from './fields'
 import { cellText, listColumns } from './layout'
 import { sortOrdered } from './order'
+import { screenPath } from './paths'
 
 const UNSAFE_ID = /[^a-z0-9]/giu
 
@@ -126,7 +127,7 @@ export function collectionTitle(collection: Pick<ScreenCollection, 'name' | 'tit
 }
 
 export function collectionPath(prefix: string, collection: string): string {
-  return `${prefix}/collections/${encodeURIComponent(collection)}`
+  return screenPath(prefix, `/collections/${encodeURIComponent(collection)}`)
 }
 
 export function entryPath(prefix: string, { collection, slug, locale }: EntryRef): string {
@@ -144,10 +145,10 @@ export function problemId(collection: string, key?: string): string {
 }
 
 export function newEntryPath(prefix: string, collection: string): string {
-  return `${prefix}/new/${encodeURIComponent(collection)}`
+  return screenPath(prefix, `/new/${encodeURIComponent(collection)}`)
 }
 
 // Opens the page in edit mode, through the screens' guard.
 export function onPagePath(prefix: string, url: string): string {
-  return `${prefix}/page?path=${encodeURIComponent(url)}`
+  return screenPath(prefix, `/page?path=${encodeURIComponent(url)}`)
 }
