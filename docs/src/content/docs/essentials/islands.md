@@ -120,6 +120,98 @@ Outside a component, write a signal with `cart.set(...)`. A component assigns it
 
 </Callout>
 
+## Animate an element in and out
+
+`transition="fade"` on the element a block shows plays the classes `fade-enter-*` and `fade-leave-*` as it comes and goes.
+
+```kay
+---
+const open = signal(false)
+---
+button(onClick={() => open = !open()}) Toggle
+if open()
+  p(transition="fade") Saved
+```
+
+```css
+.fade-enter-active, .fade-leave-active { transition: opacity 200ms; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
+```
+
+It works on the element of an `if` branch, a `for` row, a `try`'s `catch` or an `await` block. A leaving element stays until its transition ends.
+
+Utility classes need no stylesheet. Give each phase its classes: `li(transition:enter="transition duration-200" transition:enter-from="opacity-0" transition:leave="transition duration-150" transition:leave-to="opacity-0")`.
+
+To share them, export a preset typed `TransitionClasses` from `kay`, and pass it as `li(transition={fade})`.
+
+```ts
+import type { TransitionClasses } from 'kay'
+
+export const fade: TransitionClasses = {
+  enter: 'transition duration-200',
+  enterFrom: 'opacity-0',
+  leave: 'transition duration-150',
+  leaveTo: 'opacity-0',
+}
+```
+
+Visitors who ask for reduced motion see no animation. The server leaves the attributes out of the markup.
+
+<ReadMore href="/llms/islands#transitions">Which element plays, what does not animate, and the errors for a wrong phase.</ReadMore>
+
+## Hand a value down without props
+
+`context(default)` from `kay` makes a value that a component gives to everything it renders, however deep.
+
+```ts
+// src/theme.ts
+import { context } from 'kay'
+
+export const Theme = context<'light' | 'dark'>('light')
+```
+
+A component provides it in its script.
+
+```kay
+---
+import { Theme } from './theme'
+
+Theme.provide('dark')
+---
+slot
+```
+
+Anything it renders reads it with `Theme.use()`. Without a provider above, `use()` gives the default.
+
+```kay
+---
+import { Theme } from './theme'
+
+const theme = Theme.use()
+---
+p(class={theme}) Themed
+```
+
+`use()` reads while the component renders, so read it once in the script. Provide a signal to share a value that changes.
+
+An island reads nothing its page's static components provide. Provide inside the island instead.
+
+## Tie a label to its control
+
+`uid()` from `kay` gives an id unique on the page. It is the same on the server and in the browser, so `for` and `aria-controls` keep matching once the island hydrates.
+
+```kay
+---
+import { uid } from 'kay'
+
+const id = uid()
+const open = signal(false)
+---
+button(aria-controls={id} aria-expanded={open()} onClick={() => open = !open()}) Details
+if open()
+  p(id={id}) More about it
+```
+
 ## Page navigation
 
 A page with an island or a form swaps the next page in without a reload.
@@ -141,7 +233,40 @@ button(onClick={() => navigate('/todos')}) Todos
 
 A link with `data-reload` loads its page fully. So does every link to a page setting `reload: true` in its `page`.
 
-<ReadMore href="/llms/navigation#navigation">How focus moves on back and forward, and the other cases that load a page fully.</ReadMore>
+### Ask before leaving unsaved changes
+
+`guardLeave` from `kay` asks before the page is left while its function returns true.
+
+```kay
+---
+import { guardLeave } from 'kay'
+
+const draft = signal('')
+
+guardLeave(() => draft() !== '')
+---
+textarea(bind:value={draft} aria-label="Draft")
+```
+
+Links, `navigate()` and back and forward wait for the answer. A reload or a closed tab gets the browser's own prompt. Pass `{ confirm: to => ... }` to ask with your own dialog, returning a boolean or a promise of one.
+
+### Prefetching
+
+The `prefetch` setting says when a page is fetched before a click: `moderate` on hover (the default), `conservative` on press, `eager` as soon as it can, `false` never.
+
+A link that changes something on GET, such as a logout, takes `data-no-prefetch`.
+
+```kay
+a(href="/logout" data-no-prefetch) Sign out
+```
+
+### Forms and a full load
+
+A form posting to an action posts without a reload and shows the page the post leads to. A refused post keeps the scroll and the typed values.
+
+With `navigation: false` in `kay.config.ts`, every page loads fully and only pages with islands ship a script. A form then posts as the browser would, and names its page in a `kay_back` query parameter. A refused post renders that page again with the message, and one that goes through goes back to it.
+
+<ReadMore href="/llms/navigation#navigation">How focus moves on back and forward, the other cases that load a page fully, and how a refused post focuses its field.</ReadMore>
 
 ## Browser-only code
 
@@ -228,4 +353,4 @@ const dispose = mount(Panel, document.querySelector('#panel')!, { title: 'Ticket
 
 A mount renders after what the element already holds. Disposing it removes only its own nodes, so several components can share one element.
 
-<ReadMore href="/llms/islands">Transitions, error fallbacks with `try`, context, `uid`, `guardLeave`, the options of `shortcut`, the edge cases of props and persisted state, and the navigation details are in the full islands reference.</ReadMore>
+<ReadMore href="/llms/islands">The edge cases of props and persisted state, the options of `shortcut`, and the navigation details are in the full islands reference.</ReadMore>

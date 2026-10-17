@@ -113,6 +113,35 @@ Card(title="Todos")
   p Body text
 ```
 
+### Blocks that take parameters
+
+A `@name(x)` block is a function the component calls, for a block that needs the component's own data. The component renders it with `slot name(x)`. This is `src/components/list.kay`.
+
+```kay
+---
+import type { JSX } from 'kay'
+
+const { items, row } = props<{
+  items: string[]
+  row: (item: string, index: number) => JSX.Element
+}>()
+---
+ul
+  for item, i of items
+    slot row(item, i)
+```
+
+The parent names the parameters after the block.
+
+```kay
+---
+import List from '../components/list.kay'
+---
+List(items={['Milk', 'Eggs']})
+  @row(item, i)
+    li {i + 1}. {item}
+```
+
 ## Signals
 
 `signal(value)` holds state. Read it by calling it, `{count()}`. Write it by assigning it, `count++`, or with `.set`. Both work in the template and in the script.
@@ -135,6 +164,42 @@ Handed to a parameter typed `unknown` or `any`, as in `String(count)`, a signal 
 
 Assigning works on a signal held in a `const`, an import or a `Signal<boolean>` prop, and on a `let` the script sets to `signal(...)`. For a signal in an object's property, `box.count`, or a `let` set from a function's result, write `.set`. Assigning would replace the property, and `kay check` reports a type error.
 
+## Derived and selected state
+
+`linked(() => source)` is a signal an island can edit, that takes the source's value again whenever the source changes. It suits a prop you edit locally. The edit is dropped once a refresh or the next page brings a new value.
+
+```kay
+---
+import { linked } from 'kay'
+
+const { tiers } = props<{ tiers: string[] }>()
+
+const local = linked(() => tiers)
+---
+button(onClick={() => local = [...local()].reverse()}) Reverse
+ul
+  for tier of local()
+    li {tier}
+```
+
+`selection<Key>()` holds one selected key among many rows, or none. Read it as `selected()`, write it with `selected.set(id)`. `selected.is(id)` re-runs only the two rows a change touches, not every row.
+
+```kay
+---
+import { selection } from 'kay'
+
+const { rows } = props<{ rows: { id: number, name: string }[] }>()
+
+const selected = selection<number>()
+---
+table
+  for row of rows
+    tr(class={{ active: selected.is(row.id) }} onClick={() => selected.set(row.id)})
+      td {row.name}
+```
+
+`linked` and `selection` come from `kay`, so import them.
+
 ## Generic components
 
 Type parameters on the fence line make a component generic. Each use infers them from its props.
@@ -148,4 +213,4 @@ ul
     li {show(item)}
 ```
 
-<ReadMore href="/llms/components">Blocks taking parameters, `linked` and `selection` signals, and shipping components in a package are in the full components reference.</ReadMore>
+<ReadMore href="/llms/components">When `linked` drops an edit, `persist` islands, and shipping components in a package are in the full components reference.</ReadMore>

@@ -140,6 +140,28 @@ Call `trustHtml` where the markup is used, not once for a constant kept for hour
 
 <ReadMore href="/llms/templates">How the vouching travels from the server to the browser, what the server remembers, and what a dropped value logs.</ReadMore>
 
+## Fallback when something throws
+
+A `try` block renders its `catch` block when what it renders throws. One broken widget then does not take the page down.
+
+```kay
+---
+import Chart from './chart.kay'
+
+const { points } = props<{ points: number[] }>()
+---
+try
+  Chart(points={points})
+catch error
+  p.error The chart could not be drawn: {(error as Error).message}
+```
+
+It works on the server and in an island. On the server the error still goes to the log and `onError`, and the page answers 200. In an island, a block that throws while it hydrates or later renders `catch` in its place.
+
+`catch` may leave out the error name. A `try` with no `catch` renders nothing when it throws.
+
+<ReadMore href="/llms/islands#error-fallbacks">How an island reports the error to the server, and what the head keeps.</ReadMore>
+
 ## Comments and slots
 
 `// note` is a comment. `slot` is where a layout or wrapper component renders its children.
