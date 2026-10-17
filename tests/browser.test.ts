@@ -610,6 +610,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay dev in
           'pill accent': ['accent-hi', 'surface', 'accent-soft'],
           'tool': ['text', 'surface'],
           'tool:hover': ['accent-hi', 'surface'],
+          'tool pressed': ['accent-hi', 'surface', 'accent-soft'],
           'heading': ['sub', 'surface'],
           'note': ['sub', 'surface'],
           'link': ['accent', 'surface'],

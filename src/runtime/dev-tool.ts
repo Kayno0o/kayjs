@@ -225,6 +225,11 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 .weight .rule { grid-column: 1 / -1; height: 1px; background: var(--line); }
 .build { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; padding: 8px 12px; border-radius: 9px; background: var(--accent-soft); font-size: 12.5px; }
 .build b { font: 600 12px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.toolbar .search { flex: 1; min-width: min(12rem, 100%); }
+.tool[aria-pressed=true] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-hi); }
+.stack { display: grid; gap: 16px; align-content: start; min-width: 0; }
+.stack > * { min-width: 0; }
 .search { position: relative; display: flex; align-items: center; }
 .search svg { position: absolute; left: 9px; color: var(--sub); width: 14px; height: 14px; }
 .search input { width: 100%; padding: 6px 10px 6px 30px; border: 1px solid var(--line); border-radius: 8px; background: var(--canvas); color: var(--text); font: 13px system-ui, sans-serif; }
@@ -403,6 +408,86 @@ function entry(tool: DevTool, kind: string, parts: EntryParts): HTMLElement {
   row.append(body)
 
   return row
+}
+
+interface Toolbar {
+  element: HTMLElement
+  input: HTMLInputElement
+  // Shown when the filter hides every row.
+  empty: HTMLElement
+  // Hides what the filter or the toggle leave out under `within`, and a group left with no row.
+  apply: (within: Element) => void
+}
+
+// What a filter matches on a row, and whether the "Problems only" toggle keeps it.
+function filterable<T extends HTMLElement>(element: T, text: string, problem = false): T {
+  element.dataset.filter = text.toLowerCase()
+
+  if (problem)
+    element.dataset.problem = ''
+
+  return element
+}
+
+// A section the "Problems only" toggle hides, as it lists no problem.
+function plain<T extends HTMLElement>(element: T): T {
+  element.dataset.plain = ''
+
+  return element
+}
+
+// A tab's filter box, and a "Problems only" toggle when `problems` is given, its help text naming what it matches; it applies to the rows marked by `filterable` under the element passed to `apply`, run again on each keystroke and press.
+function toolbar(tool: DevTool, help: string, rerun: () => void, problems = false): Toolbar {
+  const element = tool.make('div', 'toolbar')
+  const search = tool.make('label', 'search')
+  const input = tool.make('input', 'filter')
+  const toggle = tool.make('button', 'tool', 'Problems only')
+  const empty = tool.make('div', 'empty', 'Nothing matches the filter.')
+
+  input.type = 'search'
+  input.placeholder = help
+  input.setAttribute('aria-label', help)
+  input.oninput = rerun
+  search.append(tool.icon('search'), input)
+  element.append(search)
+  empty.hidden = true
+
+  if (problems) {
+    toggle.type = 'button'
+    toggle.setAttribute('aria-pressed', 'false')
+    toggle.onclick = () => {
+      toggle.setAttribute('aria-pressed', String(toggle.getAttribute('aria-pressed') !== 'true'))
+      rerun()
+    }
+    element.append(toggle)
+  }
+
+  return {
+    element,
+    input,
+    empty,
+    apply: (within) => {
+      const typed = input.value.trim().toLowerCase()
+      const only = toggle.getAttribute('aria-pressed') === 'true'
+      const rows = [...within.querySelectorAll<HTMLElement>('[data-filter]')]
+
+      for (const row of rows)
+        row.hidden = !row.dataset.filter!.includes(typed) || (only && row.dataset.problem === undefined)
+
+      for (const section of within.querySelectorAll<HTMLElement>('[data-plain]'))
+        section.hidden = only
+
+      for (const group of within.querySelectorAll<HTMLElement>('.group')) {
+        const own = [...group.querySelectorAll<HTMLElement>('[data-filter]')]
+
+        if (own.length > 0)
+          group.hidden = own.every(row => row.hidden)
+      }
+
+      empty.textContent = only && typed === '' ? 'No problems.' : 'Nothing matches the filter.'
+      empty.hidden = rows.length === 0 || rows.some(row => !row.hidden)
+    },
+  }
 }
 
 interface DevState {
@@ -1352,6 +1437,8 @@ function i18nTab(doc: Document, tool: DevTool, missing: MissingMessages, signal:
 // What served the page: the route it matched, the files that rendered it, outermost first, its params and status, and how long each load took on the scale of the whole request; read again after each page swap.
 function requestTab(doc: Document, tool: DevTool): { stop: () => void } {
   const tab = tool.tab({ id: 'request', label: 'Request', icon: 'server' })
+  const content = tool.make('div', 'stack')
+  const bar = toolbar(tool, 'Filter facts and headers', () => bar.apply(content))
   // The block the tab shows now.
   let current: string | undefined
   const section = (heading: string, ...children: Node[]) => {
@@ -1381,11 +1468,12 @@ function requestTab(doc: Document, tool: DevTool): { stop: () => void } {
       const value = tool.make('dd')
 
       value.append(...values)
-      facts.append(tool.make('dt', '', term), value)
+      facts.append(filterable(tool.make('dt', '', term), `${term} ${value.textContent}`), filterable(value, `${term} ${value.textContent}`))
     }
 
     if (recorded === undefined) {
       fact('Response', tool.make('span', 'note', 'not recorded by the server'))
+      bar.apply(panel)
 
       return
     }
@@ -1400,9 +1488,10 @@ function requestTab(doc: Document, tool: DevTool): { stop: () => void } {
     timing(recorded.ms)
 
     for (const [name, value] of headers)
-      table.append(headerRow(tool, name, value))
+      table.append(filterable(headerRow(tool, name, value), `${name}: ${value}`))
 
-    panel.append(section('Response headers', headers.length === 0 ? tool.make('span', 'note', 'none') : table))
+    panel.insertBefore(section('Response headers', headers.length === 0 ? tool.make('span', 'note', 'none') : table), bar.empty)
+    bar.apply(panel)
   }
   const read = () => {
     // A swap adds the next page's block before it drops this one's.
@@ -1410,8 +1499,10 @@ function requestTab(doc: Document, tool: DevTool): { stop: () => void } {
 
     current = block ?? undefined
 
+    bar.element.hidden = block === undefined || block === null
+
     if (block === undefined || block === null) {
-      tab.panel.replaceChildren(tool.make('div', 'empty', 'kay served no request block with this page.'))
+      content.replaceChildren(tool.make('div', 'empty', 'kay served no request block with this page.'))
 
       return
     }
@@ -1424,7 +1515,7 @@ function requestTab(doc: Document, tool: DevTool): { stop: () => void } {
       const value = tool.make('dd')
 
       value.append(...values)
-      facts.append(tool.make('dt', '', term), value)
+      facts.append(filterable(tool.make('dt', '', term), `${term} ${value.textContent}`), filterable(value, `${term} ${value.textContent}`))
     }
     const params = Object.entries(request.params)
     const chips = tool.make('span', 'chips')
@@ -1483,8 +1574,9 @@ function requestTab(doc: Document, tool: DevTool): { stop: () => void } {
 
     step('Page', positionButton(tool, request.page), request.layouts.length)
     scaled()
-    tab.panel.replaceChildren(line, section('Matched', facts), section('Files, outermost first', chain), timing)
-    void showResponse(request.id, block, line, facts, scaled, tab.panel)
+    content.replaceChildren(line, section('Matched', facts), section('Files, outermost first', chain), timing, bar.empty)
+    bar.apply(content)
+    void showResponse(request.id, block, line, facts, scaled, content)
   }
   // A page swap, or the patch a page without one gets, brings the next page's block.
   const swaps = new MutationObserver((records) => {
@@ -1492,6 +1584,7 @@ function requestTab(doc: Document, tool: DevTool): { stop: () => void } {
       read()
   })
 
+  tab.panel.append(bar.element, content)
   read()
   swaps.observe(doc.head, { childList: true })
 
@@ -1543,6 +1636,8 @@ function headTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
   const win = doc.defaultView!
   let reread: () => void = () => undefined
   const tab = tool.tab({ id: 'head', label: 'Head', icon: 'scan-search', shown: () => reread() })
+  const content = tool.make('div', 'stack')
+  const bar = toolbar(tool, 'Filter tags and JSON-LD', () => bar.apply(content), true)
   // A swap while a fetch is out asks again; the latest answer wins.
   let asked = 0
   const read = async () => {
@@ -1579,7 +1674,7 @@ function headTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
       const value = tool.make('dd')
 
       value.append(...values)
-      facts.append(tool.make('dt', '', term), value)
+      facts.append(filterable(tool.make('dt', '', term), `${term} ${value.textContent}`), filterable(value, `${term} ${value.textContent}`))
     }
     const none = () => tool.make('span', 'note', 'none')
     const problems = server?.problems ?? []
@@ -1596,8 +1691,10 @@ function headTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
         const error = problem.severity === 'error'
         const element = tool.make('div', `problem ${error ? 'error' : 'warn'}`)
 
-        element.append(tool.icon(error ? 'circle-x' : 'triangle-alert'), tool.make('pre', 'mono', [problem.message, problem.note, problem.help === undefined ? undefined : `help: ${problem.help}`].filter(Boolean).join('\n')))
-        list.append(element)
+        const text = [problem.message, problem.note, problem.help === undefined ? undefined : `help: ${problem.help}`].filter(Boolean).join('\n')
+
+        element.append(tool.icon(error ? 'circle-x' : 'triangle-alert'), tool.make('pre', 'mono', text))
+        list.append(filterable(element, text, true))
       }
 
       children.push(list)
@@ -1605,7 +1702,7 @@ function headTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
 
     const snippet = tool.make('div', 'preview serp')
     const clipped = limit !== undefined && description !== undefined && description.length > limit ? `${description.slice(0, limit).trimEnd()}...` : description
-    const previews = tool.make('div', 'previews')
+    const previews = plain(tool.make('div', 'previews'))
     const share = tool.make('div', 'preview')
 
     snippet.append(
@@ -1640,7 +1737,7 @@ function headTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
       fact('Sitemap', sitemap)
     }
 
-    const tags = tool.make('section', 'group')
+    const tags = plain(tool.make('section', 'group'))
 
     tags.append(tool.make('h3', 'heading', 'Tags'), facts)
     children.push(tags)
@@ -1651,7 +1748,7 @@ function headTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
 
         return key.startsWith(prefix) ? [[key, meta.getAttribute('content') ?? ''] as const] : []
       })
-      const group = tool.make('section', 'group')
+      const group = plain(tool.make('section', 'group'))
       const table = tool.make('table', 'kv')
       const title = tool.make('h3', 'heading', heading)
 
@@ -1659,7 +1756,7 @@ function headTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
         const row = tool.make('tr')
 
         row.append(tool.make('td', '', key), tool.make('td', '', content))
-        table.append(row)
+        table.append(filterable(row, `${key} ${content}`))
       }
 
       title.append(pill(tool, String(found.length)))
@@ -1688,7 +1785,7 @@ function headTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
     }
 
     const blocks = [...head.querySelectorAll('script[type="application/ld+json"]')]
-    const ld = tool.make('section', 'group')
+    const ld = plain(tool.make('section', 'group'))
     const ldHeading = tool.make('h3', 'heading', 'JSON-LD')
 
     ldHeading.append(pill(tool, String(blocks.length)))
@@ -1700,11 +1797,15 @@ function headTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
         const details = tool.make('details', 'json')
         const summary = tool.make('summary', '', ldSummary(data))
 
-        details.append(summary, tool.make('pre', 'mono', JSON.stringify(data, null, 2)))
-        ld.append(details)
+        const json = JSON.stringify(data, null, 2)
+
+        details.append(summary, tool.make('pre', 'mono', json))
+        ld.append(filterable(details, `${summary.textContent} ${json}`))
       }
       catch (error) {
-        ld.append(tool.make('div', 'error', `Not valid JSON: ${error instanceof Error ? error.message : String(error)}`))
+        const text = `Not valid JSON: ${error instanceof Error ? error.message : String(error)}`
+
+        ld.append(filterable(tool.make('div', 'error', text), text, true))
       }
     }
 
@@ -1712,10 +1813,12 @@ function headTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
       ld.append(tool.make('div', 'note', 'None.'))
 
     children.push(ld)
-    tab.panel.replaceChildren(...children)
+    content.replaceChildren(...children, bar.empty)
+    bar.apply(content)
   }
 
   reread = () => void read()
+  tab.panel.append(bar.element, content)
   let scheduled = false
   // A page swap patches the head in place, in many small changes: one read follows them.
   const swaps = new MutationObserver(() => {
@@ -1782,6 +1885,8 @@ function envTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
   const win = doc.defaultView!
   let reread: () => void = () => undefined
   const tab = tool.tab({ id: 'env', label: 'Env', icon: 'key-round', shown: () => reread() })
+  const content = tool.make('div', 'stack')
+  const bar = toolbar(tool, 'Filter by name or value', () => bar.apply(content))
   let asked = 0
   const read = async () => {
     const ask = ++asked
@@ -1811,16 +1916,18 @@ function envTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
     if (ask !== asked)
       return
 
+    bar.element.hidden = values === undefined || Object.keys(values).length === 0
+
     if (failure !== undefined) {
       tab.count(0)
-      tab.panel.replaceChildren(tool.make('div', 'empty', `Could not read the public env: ${failure}`))
+      content.replaceChildren(tool.make('div', 'empty', `Could not read the public env: ${failure}`))
 
       return
     }
 
     if (values === undefined) {
       tab.count(0)
-      tab.panel.replaceChildren(tool.make('div', 'empty', 'This app sends no public env to the browser: kay.config.ts declares no `publicEnv`.'))
+      content.replaceChildren(tool.make('div', 'empty', 'This app sends no public env to the browser: kay.config.ts declares no `publicEnv`.'))
 
       return
     }
@@ -1836,19 +1943,21 @@ function envTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
       if (secret)
         flagged++
 
-      list.append(entry(tool, 'env', {
+      list.append(filterable(entry(tool, 'env', {
         name,
         after: [tool.make('span', 'val', typeof value === 'string' ? value : JSON.stringify(value))],
         issues: secret ? [{ text: `Every visitor reads this, and ${found.reason}. Keep a secret in defineEnv, read on the server alone.`, tone: 'error', icon: 'lock' }] : [],
         note: found?.maybe === true ? `Every visitor reads this: ${found.reason}.` : undefined,
-      }))
+      }), `${name} ${typeof value === 'string' ? value : JSON.stringify(value)}`))
     }
 
     tab.count(flagged, flagged > 0 ? 'error' : undefined)
-    tab.panel.replaceChildren(tool.make('div', 'note', `${entries.length} variable${entries.length === 1 ? '' : 's'} sent to every visitor at ${ENV_URL}.`), entries.length === 0 ? tool.make('div', 'empty', 'The app sends no public env: `publicEnv` declares no variable.') : list)
+    content.replaceChildren(tool.make('div', 'note', `${entries.length} variable${entries.length === 1 ? '' : 's'} sent to every visitor at ${ENV_URL}.`), entries.length === 0 ? tool.make('div', 'empty', 'The app sends no public env: `publicEnv` declares no variable.') : list, bar.empty)
+    bar.apply(content)
   }
 
   reread = () => void read()
+  tab.panel.append(bar.element, content)
   win.addEventListener(BUILT_EVENT, () => {
     if (tab.panel.hidden === false)
       reread()
@@ -2102,6 +2211,8 @@ function imagesTab(doc: Document, tool: DevTool, vitals: Vitals, signal: AbortSi
   let asked = 0
   let reread: () => void = () => undefined
   const tab = tool.tab({ id: 'images', label: 'Images', icon: 'image', shown: () => reread() })
+  const content = tool.make('div', 'stack')
+  const bar = toolbar(tool, 'Filter by address, variant or problem', () => bar.apply(content), true)
   // What the server answered an image with, by address, until the next rebuild; a failed lookup is kept too, so a reread does not send one more request per failing image.
   const answers = new Map<string, Promise<string>>()
   const slots = limiter(IMAGE_REQUESTS)
@@ -2132,8 +2243,10 @@ function imagesTab(doc: Document, tool: DevTool, vitals: Vitals, signal: AbortSi
     tab.count(images.reduce((sum, info) => sum + info.flags.length, 0), flagged > 0 ? 'warn' : undefined)
     tool.hideOutline()
 
+    bar.element.hidden = images.length === 0
+
     if (images.length === 0) {
-      tab.panel.replaceChildren(tool.make('div', 'empty', 'No images on this page.'))
+      content.replaceChildren(tool.make('div', 'empty', 'No images on this page.'))
 
       return
     }
@@ -2159,12 +2272,13 @@ function imagesTab(doc: Document, tool: DevTool, vitals: Vitals, signal: AbortSi
       const thumb = tool.make('img', 'thumb')
       const format = tool.make('span', 'chip', 'format...')
       const label = lcp ? 'largest paint' : 'image'
+      const issues = [...new Set(same.flatMap(copy => copy.flags))]
       const row = entry(tool, 'image', {
         lead: thumb,
         name: info.url,
         after: [...lcp ? [pill(tool, 'largest paint', 'accent')] : [], ...same.length > 1 ? [pill(tool, `${same.length} copies`)] : []],
         chips: [info.variant, format, info.natural === 'not loaded' ? `not loaded, drawn ${info.drawn}` : `${info.natural} drawn ${info.drawn}`],
-        issues: [...new Set(same.flatMap(copy => copy.flags))].map(text => ({ text, tone: 'warn' as const })),
+        issues: issues.map(text => ({ text, tone: 'warn' as const })),
       })
 
       formats.push(format)
@@ -2177,10 +2291,11 @@ function imagesTab(doc: Document, tool: DevTool, vitals: Vitals, signal: AbortSi
       row.setAttribute('aria-label', same.length > 1 ? `${info.url}, ${same.length} copies` : info.url)
       row.onpointerenter = row.onfocus = () => tool.outline(same.map(copy => copy.image), label)
       row.onpointerleave = row.onblur = () => tool.hideOutline()
-      body.append(row)
+      body.append(filterable(row, [info.url, info.variant, ...issues].join(' '), issues.length > 0))
     }
 
-    tab.panel.replaceChildren(tool.make('div', 'note', `${images.length} image${images.length === 1 ? '' : 's'}, ${flagged} to look at`), body, tool.make('div', 'note', 'Formats are those the server picks for a browser accepting AVIF and WebP. Those of images kay does not serve are not looked up, as asking could run the app\'s own handler.'))
+    content.replaceChildren(tool.make('div', 'note', `${images.length} image${images.length === 1 ? '' : 's'}, ${flagged} to look at`), body, bar.empty, tool.make('div', 'note', 'Formats are those the server picks for a browser accepting AVIF and WebP. Those of images kay does not serve are not looked up, as asking could run the app\'s own handler.'))
+    bar.apply(content)
 
     // An image the server is not asked about answers at once; the others go a few at a time, so a page of many images does not ask the server for all of them at once, and one that hangs holds back one slot only.
     await Promise.all(rows.map(async (same, index) => {
@@ -2204,6 +2319,7 @@ function imagesTab(doc: Document, tool: DevTool, vitals: Vitals, signal: AbortSi
   }
 
   reread = () => void read()
+  tab.panel.append(bar.element, content)
   doc.addEventListener('load', schedule, { capture: true, signal })
   doc.addEventListener('error', schedule, { capture: true, signal })
   win.addEventListener(BUILT_EVENT, () => {
@@ -2582,15 +2698,13 @@ const ROUTE_KINDS: Record<DevRoute['kind'], string> = { page: 'Pages', endpoint:
 // Every route the server serves, filtered as typed, each opening its file, the GET paths no request fills in linking to themselves; fetched as the tab shows and again after each restart, so it lists what the running server serves.
 function routesTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
   const win = doc.defaultView!
-  const search = tool.make('label', 'search')
-  const filter = tool.make('input', 'filter')
   const body = tool.make('div', 'list')
   let routes: DevRoute[] = []
   let notes: string[] = []
   // A restart while a fetch is out asks again; the latest answer wins.
   let asked = 0
   const render = () => {
-    const typed = filter.value.trim().toLowerCase()
+    const typed = bar.input.value.trim().toLowerCase()
     const shown = routes.filter(route => typed === '' || route.path.toLowerCase().includes(typed) || route.file.toLowerCase().includes(typed) || (route.owner ?? '').toLowerCase().includes(typed))
     const sections = Object.entries(ROUTE_KINDS).flatMap(([kind, label]) => {
       const ofKind = shown.filter(route => route.kind === kind)
@@ -2641,12 +2755,9 @@ function routesTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
   }
   const tab = tool.tab({ id: 'routes', label: 'Routes', icon: 'route', shown: () => void list() })
 
-  filter.type = 'search'
-  filter.placeholder = 'Filter by path or file'
-  filter.setAttribute('aria-label', 'Filter the routes by path or file')
-  filter.oninput = render
-  search.append(tool.icon('search'), filter)
-  tab.panel.append(search, body)
+  const bar = toolbar(tool, 'Filter by path or file', render)
+
+  tab.panel.append(bar.element, body)
   win.addEventListener(BUILT_EVENT, () => {
     if (tab.panel.hidden === false)
       void list()

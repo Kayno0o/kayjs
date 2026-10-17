@@ -60,6 +60,14 @@ describe('the dev tool', () => {
   let tool: DevTool | undefined
 
   const shadow = () => document.querySelector('kay-dev')!.shadowRoot!
+  // What a tab shows of `selector`, leaving out what the filter hid.
+  const visible = (panel: string, selector: string) => [...shadow().querySelectorAll(`${panel} ${selector}`)].filter(element => element.closest('[hidden]') === null).map(element => element.textContent)
+  const typeFilter = (panel: string, text: string) => {
+    const input = shadow().querySelector<HTMLInputElement>(`${panel} .toolbar input`)!
+
+    input.value = text
+    input.dispatchEvent(new Event('input'))
+  }
   const problems = () => [...shadow().querySelectorAll('.problem')].map(problem => [problem.classList.contains('error') ? 'error' : 'warn', problem.querySelector('pre')!.textContent])
   const groups = () => [...shadow().querySelectorAll<HTMLElement>('#kay-dev-problems .group')].filter(group => group.hidden === false).map(group => `${group.querySelector('h3')!.firstChild!.textContent} (${group.querySelector('h3 .pill')!.textContent})`)
   const dismissAll = () => [...shadow().querySelectorAll<HTMLButtonElement>('.actions button')].find(button => button.textContent === 'Dismiss all')!
@@ -530,6 +538,15 @@ describe('the dev tool', () => {
       ['content-type', 'text/html'],
     ])
 
+    // The filter keeps the facts and headers it matches.
+    typeFilter('#kay-dev-request', 'CACHE')
+
+    expect(visible('#kay-dev-request', '.headers tr')).toEqual(['cache-controlno-store'])
+    expect(visible('#kay-dev-request', '.facts dd')).toEqual([])
+    expect(visible('#kay-dev-request', '.chain li')).toHaveLength(4)
+
+    typeFilter('#kay-dev-request', '')
+
     // A policy reads a directive to a line.
     expect([...shadow().querySelectorAll('.headers .directive')].map(line => line.textContent)).toEqual(['default-src \'self\';', 'script-src \'self\' \'sha256-abc\';', 'img-src *;'])
 
@@ -705,6 +722,30 @@ describe('the dev tool', () => {
       expect(panel().querySelector('.error')?.textContent).toContain('Not valid JSON')
       expect(shadow().querySelector('#kay-dev-tab-head .count')?.textContent).toBe('1')
 
+      // The filter keeps the tags it matches, a group left with none hidden; Problems only keeps the problems and an invalid JSON-LD block.
+      typeFilter('#kay-dev-head', 'og:image')
+
+      expect(visible('#kay-dev-head', '.kv tr')).toEqual(['og:imagehttps://shop.example/_kay/card?title=Home'])
+      expect(visible('#kay-dev-head', 'h3')).toEqual(['Open Graph2'])
+      expect(visible('#kay-dev-head', '.problem')).toEqual([])
+      expect(visible('#kay-dev-head', '.previews')).toHaveLength(1)
+
+      typeFilter('#kay-dev-head', 'nothing like it')
+
+      expect(visible('#kay-dev-head', '.empty')).toEqual(['Nothing matches the filter.'])
+
+      typeFilter('#kay-dev-head', '')
+      shadow().querySelector<HTMLButtonElement>('#kay-dev-head .toolbar button')!.click()
+
+      expect(shadow().querySelector('#kay-dev-head .toolbar button')!.getAttribute('aria-pressed')).toBe('true')
+      expect(visible('#kay-dev-head', '.problem pre')).toEqual(['The description of `/` runs 200 characters\nhelp: shorten it'])
+      expect(visible('#kay-dev-head', 'h3')).toEqual(['JSON-LD2'])
+      expect(visible('#kay-dev-head', '.previews')).toEqual([])
+
+      shadow().querySelector<HTMLButtonElement>('#kay-dev-head .toolbar button')!.click()
+
+      expect(visible('#kay-dev-head', 'h3')).toEqual(['Tags', 'Open Graph2', 'Twitter1', 'JSON-LD2'])
+
       // A swap brings the next page's head, with no origin to list it in.
       answer = { descriptionLength: 160, sitemap: 'none', problems: [] }
       document.head.innerHTML = '<title>About</title>'
@@ -822,6 +863,16 @@ describe('the dev tool', () => {
         'KAY_TEST_PUBLISHABLE_KEY = pk_live_abc',
       ])
       expect(shadow().querySelector('#kay-dev-tab-env .count')?.textContent).toBe('6')
+
+      typeFilter('#kay-dev-env', 'postgres')
+
+      expect(visible('#kay-dev-env', '.env .name')).toEqual(['KAY_TEST_FEED'])
+
+      typeFilter('#kay-dev-env', 'redis')
+
+      expect(visible('#kay-dev-env', '.env .name')).toEqual(['KAY_TEST_REDIS_URL'])
+
+      typeFilter('#kay-dev-env', '')
 
       // No `publicEnv`: nothing reaches the browser, and the tab says so after the restart.
       app = await pages({ routes, dev: true })
@@ -1011,6 +1062,15 @@ describe('the dev tool', () => {
         '/mark?v=1#x',
         '/photo | served 88 times the pixels it is drawn with, give it a smaller width or `sizes`',
       ])
+
+      // Problems only keeps the rows with something wrong, the filter narrowing them further.
+      shadow().querySelector<HTMLButtonElement>('#kay-dev-images .toolbar button')!.click()
+
+      expect(visible('#kay-dev-images', '.image .name')).toEqual(['/_kay/assets/logo.svg', '/logo.png', '/logo.png?file=a.svg', '/photo'])
+
+      typeFilter('#kay-dev-images', 'png')
+
+      expect(visible('#kay-dev-images', '.image .name')).toEqual(['/logo.png', '/logo.png?file=a.svg'])
     }
     finally {
       timing.mockRestore()
