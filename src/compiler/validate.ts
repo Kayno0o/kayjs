@@ -43,6 +43,7 @@ const UI_RULES = new Map<string, UiRule[]>([
   ['copy-button', BUTTON],
   ['icon-button', [BUTTON[2]!]],
   ['menu', [{ prop: 'variant', value: 'danger', to: 'variant="solid" tone="danger"', blockedBy: ['tone'], note: '`variant` names the form and `tone` the meaning', help: 'Write `variant="solid" tone="danger"`' }]],
+  ['confirm-delete', [{ prop: 'variant', value: 'danger', note: 'the icon trigger takes `solid`, `ghost` or `inline`, and ConfirmDelete passes no tone to it', help: 'drop it for the neutral icon, or write `trigger="button"` for the danger button' }]],
   ['notice', [{ prop: 'tone', value: 'error', to: 'tone="danger"', note: '`error` is `danger`', help: 'Write `tone="danger"`' }]],
   ['bar-list', [EMPTY]],
   ['media-gallery', [EMPTY]],

@@ -648,7 +648,7 @@ describe('server-only-import', () => {
 })
 
 describe('deprecated-ui-prop', () => {
-  const imports = 'import Button from \'@kaynooo/kayjs-ui/button.kay\'\nimport Notice from \'@kaynooo/kayjs-ui/notice.kay\'\nimport Popover from \'@kaynooo/kayjs-ui/popover.kay\'\nimport Dialog from \'@kaynooo/kayjs-ui/dialog.kay\'\nimport BarList from \'@kaynooo/kayjs-ui/bar-list.kay\'\nimport Menu from \'@kaynooo/kayjs-ui/menu.kay\'\n'
+  const imports = 'import Button from \'@kaynooo/kayjs-ui/button.kay\'\nimport Notice from \'@kaynooo/kayjs-ui/notice.kay\'\nimport Popover from \'@kaynooo/kayjs-ui/popover.kay\'\nimport Dialog from \'@kaynooo/kayjs-ui/dialog.kay\'\nimport BarList from \'@kaynooo/kayjs-ui/bar-list.kay\'\nimport Menu from \'@kaynooo/kayjs-ui/menu.kay\'\nimport ConfirmDelete from \'@kaynooo/kayjs-ui/confirm-delete.kay\'\n'
   const page = (template: string) => `---\n${imports}---\n${template}\n`
   const found = (template: string) => {
     const source = page(template)
@@ -662,6 +662,12 @@ describe('deprecated-ui-prop', () => {
     expect(found('Button(variant="default") Ok')).toEqual([{ at: 'variant="default"', fix: ['variant="default"->variant="solid"'] }])
     expect(found('Notice(tone="error") Oops')).toEqual([{ at: 'tone="error"', fix: ['tone="error"->tone="danger"'] }])
     expect(found('Menu(variant="danger" label="x")')).toEqual([{ at: 'variant="danger"', fix: ['variant="danger"->variant="solid" tone="danger"'] }])
+  })
+
+  it('flags the danger variant of a ConfirmDelete without a fix, as it has no tone for the icon', () => {
+    expect(found('ConfirmDelete(message="Sure?" failure="No" onConfirm={go} variant="danger")')).toEqual([{ at: 'variant="danger"', fix: undefined }])
+    expect(found('ConfirmDelete(message="Sure?" failure="No" onConfirm={go} variant="ghost")')).toEqual([])
+    expect(found('ConfirmDelete(message="Sure?" failure="No" onConfirm={go} tone="neutral")')).toEqual([])
   })
 
   it('renames an old prop', () => {
