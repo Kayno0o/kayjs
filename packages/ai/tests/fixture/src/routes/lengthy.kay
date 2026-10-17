@@ -1,5 +1,7 @@
----
-import Lengthy from '../components/lengthy.kay'
+--- server
+import { lengthy } from './cases.kay'
+--- script
+import Chat from '@kaynooo/kayjs-ai/chat.kay'
 ---
 h1 Lengthy
-Lengthy
+Chat(action={lengthy} label="Lengthy")

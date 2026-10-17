@@ -1,5 +1,7 @@
----
-import Flaky from '../components/flaky.kay'
+--- server
+import { flaky } from './cases.kay'
+--- script
+import Chat from '@kaynooo/kayjs-ai/chat.kay'
 ---
 h1 Flaky
-Flaky
+Chat(action={flaky} label="Flaky")

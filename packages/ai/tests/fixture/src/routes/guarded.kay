@@ -1,5 +1,7 @@
----
-import Guarded from '../components/guarded.kay'
+--- server
+import { guarded } from './cases.kay'
+--- script
+import Chat from '@kaynooo/kayjs-ai/chat.kay'
 ---
 h1 Guarded
-Guarded
+Chat(action={guarded} label="Guarded")

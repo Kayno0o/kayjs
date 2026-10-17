@@ -1,5 +1,7 @@
----
-import Helper from '../components/helper.kay'
+--- server
+import { helper } from './tools.kay'
+--- script
+import Chat from '@kaynooo/kayjs-ai/chat.kay'
 ---
 h1 Helper
-Helper
+Chat(action={helper} label="Helper")

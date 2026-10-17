@@ -1,6 +1,7 @@
 import type { IslandComponent, IslandOptions } from './checks'
 import type { Html } from './html'
 import type { JSX } from './jsx'
+import { isAction } from './action'
 import { escapeAttribute, quotedAttribute } from './escape'
 import { withFieldMarks } from './fields'
 import { headMark, setsIslandTitle } from './head'
@@ -214,14 +215,14 @@ function serializeProps(what: string, props: object, slots: [string, string][]):
 
     const value = (props as Record<string, unknown>)[key]
 
-    if (typeof value === 'function' || typeof value === 'symbol')
+    if ((typeof value === 'function' && !isAction(value)) || typeof value === 'symbol')
       throw new IslandPropsError(`${what}, so it renders as an island: its \`${key}\` prop is a ${typeof value} and cannot reach the browser; pass it from a component of its own, which then renders as an island in its place`)
 
     plain[key] = value
   }
 
   try {
-    return encodeValue(plain)
+    return encodeValue(plain, true)
   }
   catch (error) {
     const reason = unsendable(error)

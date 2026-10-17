@@ -112,6 +112,21 @@ if add.error('title') as message
 button(onClick={save} disabled={add.pending()}) Add
 ```
 
+### Pass an action to an island
+
+A page or layout with a `--- server` fence passes an action it declares or imports straight to an island prop, as it passes data: `Caller(run={greet})`, or inside an object, `Stream(actions={{ count }})`. The island calls it as if it had imported it: streams, `ActionError`, `pending()` and `error()` work as above, and the prop keeps the action's input and output types (`Action<{ name: string }, string>`).
+
+The island types the prop with `Action` from `kay` (`ServerAction` and `NoInputAction` count too), which has its chunk carry the code reviving it; an island passed an action without one fails in dev, naming the fix, and an app with no such island ships none. The action crosses as its URL, so it must be an export of a route module, declared in the page or imported from another route. `move.with({ id })` and an action no route exports fail the render, naming why; pass the plain action and the fields as the input.
+
+```kay
+--- server
+import { greet } from './greet.kay'
+--- script
+import Caller from '../components/caller.kay'
+---
+Caller(run={greet})
+```
+
 ### Stream an answer to an island
 
 A handler returning an async iterable streams each value to the island calling it (see [Streaming actions](api-from-islands.md#streaming-actions)):

@@ -1,0 +1,7 @@
+--- server
+import { shout } from './other.kay'
+--- script
+import Caller from '../components/caller.kay'
+---
+h1 Two
+Caller(persist run={shout} label="Ann")

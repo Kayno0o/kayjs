@@ -1,0 +1,7 @@
+--- server
+import { greet } from './index.kay'
+--- script
+import Caller from '../components/caller.kay'
+---
+a.next(href="/p2") Next
+Caller(persist run={greet} label="Ann")

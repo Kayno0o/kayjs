@@ -1115,6 +1115,23 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 
+  it('lets a page with a server fence pass an island an action, typed by its input and output', async () => {
+    const root = await scratchProject({
+      'src/components/caller.kay': '---\nimport type { Action } from \'kay\'\n\nconst { run, set } = props<{ run: Action<{ name: string }, string>, set?: { run: Action<{ name: string }, string> } | undefined }>()\n---\nbutton(onClick={() => run({ name: \'a\' })}) Go\n',
+      'src/routes/index.kay': '--- server\nimport { t } from \'elysia\'\nimport { action } from \'kay\'\n\nexport const greet = action(t.Object({ name: t.String() }), ({ name }) => `Hi ${name}`)\nexport const wrong = action(t.Object({ id: t.Number() }), ({ id }) => id)\n--- script\nimport Caller from \'../components/caller.kay\'\n---\nCaller(run={greet})\nCaller(run={greet} set={{ run: greet }})\nCaller(run={wrong})\nCaller(run={greet} set={{ run: wrong }})\n',
+    })
+
+    try {
+      expect((await check(root)).filter(d => d.code?.startsWith('TS')).map(d => [d.file.slice(root.length + 1), d.line, d.code])).toEqual([
+        ['src/routes/index.kay', 12, 'TS2322'],
+        ['src/routes/index.kay', 13, 'TS2322'],
+      ])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('types a literal array or object prop by a generic component\'s other props in a page as in a component, still checking what it sends an island', async () => {
     const use = '---\nimport Table from \'../components/table.kay\'\nimport Pick from \'../components/pick.kay\'\n\nconst planets = [{ id: 1, name: \'Mars\', moons: 2 }]\nconst columns = [{ key: \'name\', header: \'Name\', sortValue: true as const }]\n---\nTable(columns={columns} rows={planets} rowKey="id" filter={[\'name\']})\nTable(columns={[{ key: \'moons\', sortValue: row => row.moons }]} rows={planets} rowKey="id" filter={planets.length > 0 ? [\'moons\'] : []})\nPick(items={[{ id: 1, at: new Date() }]} rows={[{ id: 2, at: new Intl.NumberFormat() }]})\nPick(items={[{ id: 1, at: new Date(), run: () => 1 }]} rows={[]})\nPick(items={[{ id: 1, at: new Date(), get n() { return 1 }, cb: () => 1 }]} rows={[]})\nPick(items={[{ id: 1, at: new Date(), get n() { return 1 }, run() { return 1 } }]} rows={[]})\n'
     const root = await scratchProject({

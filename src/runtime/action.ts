@@ -14,7 +14,7 @@ import { pageData } from './page-data'
 import { getOwner, onCleanupOf, ownSignal, undoable, untrack } from './reactive'
 import { sendValue } from './send'
 import { FAILURE_HEADER, PAGE_HEADER, REDIRECT_HEADER, WORK_HEADER, WORK_SCRIPT } from './swap'
-import { decodeServerValue, decodeValue, unflattenValue } from './wire'
+import { decodeServerValue, decodeValue, setActionReviver, unflattenValue } from './wire'
 
 const ACTION = Symbol.for('kay.action')
 const DAY = 86_400
@@ -388,6 +388,11 @@ export function actionStub(url: string): Action<unknown, unknown> {
     url: { value: url, enumerable: true },
     [ACTION]: { value: true },
   }) as unknown as Action<unknown, unknown>
+}
+
+// Called by the chunk of an island that types a prop as an action, so the props a page passes it revive as callable stubs.
+export function reviveActions(): void {
+  setActionReviver(actionStub)
 }
 
 export function isAction(value: unknown): value is ServerAction<TSchema, unknown> {

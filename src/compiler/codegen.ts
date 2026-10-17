@@ -247,8 +247,17 @@ class ModuleShell {
     if (fence ? fence.exportNames.length > 0 : actions.length > 0)
       kayHelpers.push(fence ? 'registerActions' : 'actionStub')
 
+    // An island typing a prop as an action may be passed one by a page, which arrives as its URL: the island's chunk is what brings the code building the stub, so an app without one ships none.
+    const takesActions = mode === 'dom' && this.kind === 'island' && script.imports.some(binding => binding.source === 'kay' && ACTION_TYPES.has(binding.imported))
+
+    if (takesActions)
+      kayHelpers.push('reviveActions')
+
     if (kayHelpers.length > 0)
       b.add(`import { ${kayHelpers.map(helper => `${helper} as ${helperName(helper)}`).join(', ')} } from 'kay/internal'\n`)
+
+    if (takesActions)
+      b.add(`${helperName('reviveActions')}()\n`)
 
     if (server && !fence) {
       for (const name of actions)
@@ -829,7 +838,10 @@ function lineOf(source: string, offset: number): number {
   return line
 }
 
-type KayHelper = 'formAction' | 'formValue' | 'formChecked' | 'formDescribed' | 'formInvalid' | 'formMarked' | 'formError' | 'formProtection' | 'registerActions' | 'actionStub' | 'autoDefer'
+// The types of `kay` an island types a prop with when a page may pass it an action.
+const ACTION_TYPES = new Set(['Action', 'ServerAction', 'NoInputAction'])
+
+type KayHelper = 'formAction' | 'formValue' | 'formChecked' | 'formDescribed' | 'formInvalid' | 'formMarked' | 'formError' | 'formProtection' | 'registerActions' | 'actionStub' | 'reviveActions' | 'autoDefer'
 
 type Helper = TemplateHelper | 'omit'
 

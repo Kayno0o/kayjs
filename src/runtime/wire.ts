@@ -7,14 +7,51 @@ import { isVouched, vouch } from './safe-html'
 const SAFE_HTML = 'SafeHtml'
 const MARK = '!'
 
-export function encodeValue(value: unknown): string {
-  return stringify(value, { [SAFE_HTML]: markup => typeof markup === 'string' && isVouched(markup, false) && MARK + markup })
+const ACTION_TYPE = 'Action'
+const ACTION_PREFIX = '/_kay/action/'
+const ACTION_MARK = Symbol.for('kay.action')
+
+// `actions` lets a function that is an action through, as island props do, as its URL: anywhere else it stays unsendable.
+export function encodeValue(value: unknown, actions = false): string {
+  return stringify(value, {
+    [SAFE_HTML]: markup => typeof markup === 'string' && isVouched(markup, false) && MARK + markup,
+    ...actions && { [ACTION_TYPE]: sendableAction },
+  })
+}
+
+function sendableAction(value: unknown): string | false {
+  if (typeof value !== 'function' || !(ACTION_MARK in value))
+    return false
+
+  const { url, formUrl } = value as { url?: unknown, formUrl?: unknown }
+
+  if (formUrl !== undefined)
+    throw new TypeError('an action fixing fields with `with()` cannot reach an island: pass the island the plain action and the fields as its input')
+
+  if (typeof url !== 'string' || !url.startsWith(ACTION_PREFIX))
+    throw new TypeError('an action no route module exports has no URL to reach an island by: export it from a page or an endpoint')
+
+  return url
+}
+
+let reviveAction: ((url: string) => unknown) | undefined
+
+// Set by an island typing a prop as an action, whose chunk holds the code building the stubs.
+export function setActionReviver(revive: ((url: string) => unknown) | undefined): void {
+  reviveAction = revive
 }
 
 // The revivers for text the server wrote, island props, action results and event streams: the only text whose `SafeHtml` entries vouch for markup. What the browser sends, a cookie and localStorage are read without them, so no caller can vouch for its own text.
 export const serverWritten: Record<string, Reviver> = {
   // `substring` throws on a payload that is no string, where an array has a `slice`.
   [SAFE_HTML]: (text: string) => vouch(text.substring(1)),
+  // Only a URL under the actions' own path is a stub, whatever the text says.
+  [ACTION_TYPE]: (url: string) => {
+    if (process.env.NODE_ENV !== 'production' && !reviveAction)
+      throw new TypeError('kay: an island was passed an action but does not type a prop as one: import `Action` from \'kay\' in its script, as the type of that prop')
+
+    return typeof url === 'string' && url.startsWith(ACTION_PREFIX) && reviveAction ? reviveAction(url) : malformed(url, ACTION_TYPE)
+  },
 }
 
 export function decodeServerValue(text: string): unknown {

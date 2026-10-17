@@ -2,7 +2,7 @@
 
 ## Rules that are easy to get wrong
 
-- `Chat` is an island, and an island cannot take a function from a page: a page, or a layout, with a `--- server` fence cannot pass the action to it. Render `Chat` from a component of the app's own that imports the action from the route declaring it, and use that component in the page; it becomes the island and `Chat` is part of it.
+- `Chat` is an island, and a page or layout with a `--- server` fence passes it the action straight: `Chat(action={reply})` needs no wrapper component. The action crosses as its URL, so it is an export of a route module, declared in the page or imported from another route.
 - The action must return the reply from a plain arrow, `({ messages }) => ask(messages)`. An `async` handler awaits it and the chat then shows the whole text at once, with no streaming.
 - The action's schema must accept `{ messages: { role: 'user' | 'assistant', content: string }[] }` and nothing the chat does not send. It is posted the whole history on every send, so bound `content` and `maxItems` in the schema, with `maxItems` at least `keep` (20), and `rateLimit` on the action. A message the schema refuses (422) leaves the history and returns to the field, on a retry as on a fresh send, ahead of anything typed since. The action may return `ctx.fail(...)` besides the reply; a string it passes shows as the alert's message, below status 500.
 - The chat styles itself with `kui-` classes and `--color-kui-*` tokens, so the app imports kayjs-ui's `theme.css`. No kayjs-ui component is imported and no icon set is needed.

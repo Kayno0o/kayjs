@@ -1,5 +1,5 @@
 // The compiler's output contract, not API: what generated code imports, free to change with any release.
-export { actionStub, formAction, formChecked, formDescribed, formError, formInvalid, formMarked, formProtection, formValue, isAction, registerActions } from './action'
+export { actionStub, formAction, formChecked, formDescribed, formError, formInvalid, formMarked, formProtection, formValue, isAction, registerActions, reviveActions } from './action'
 export { registerImage } from './image'
 
 // Takes the rejection of a server value an `await` block renders by name right where it is declared, so no later statement of the fence can leave it unhandled; any other promise is held by the server until its block takes it.

@@ -1,5 +1,7 @@
----
-import Assistant from '../components/assistant.kay'
+--- server
+import { reply } from './chat.kay'
+--- script
+import Chat from '@kaynooo/kayjs-ai/chat.kay'
 ---
 h1 Assistant
-Assistant
+Chat(action={reply} label="Assistant")

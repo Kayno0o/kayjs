@@ -143,6 +143,16 @@ describe('control flow', () => {
     expect(compileKay(page, 'src/routes/index.kay', { includeServer: false }).tsx).not.toContain('export const page')
   })
 
+  it('has an island typing a prop as an action revive the actions a page passes it, and no other component', () => {
+    const island = (imports: string) => `---\n${imports}\nimport { signal } from 'kay'\n\nconst { run } = props<{ run: ${imports.includes('Action') ? 'Action<never, string>' : '() => void'} }>()\nconst count = signal(0)\n---\nbutton(onClick={() => run()}) Go`
+    const typed = island('import type { Action } from \'kay\'')
+    const untyped = island('import type { Item } from \'./types\'')
+
+    expect(compileKay(typed, 'src/caller.kay', { output: 'dom' }).tsx).toContain('KayReviveActions()')
+    expect(compileKay(typed, 'src/caller.kay', { output: 'html' }).tsx).not.toContain('KayReviveActions')
+    expect(compileKay(untyped, 'src/caller.kay', { output: 'dom' }).tsx).not.toContain('KayReviveActions')
+  })
+
   it('reports a match with no when line in every output, which once crashed the html one', () => {
     for (const output of ['dom', 'html'] as const)
       expect(compileKay('match s\n', 'test.kay', { output }).diagnostics.map(d => d.message)).toEqual(['`match` has no `when` line'])

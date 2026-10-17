@@ -1,5 +1,7 @@
----
-import Refusing from '../components/refusing.kay'
+--- server
+import { refusing } from './cases.kay'
+--- script
+import Chat from '@kaynooo/kayjs-ai/chat.kay'
 ---
 h1 Refusing
-Refusing
+Chat(action={refusing} label="Refusing")

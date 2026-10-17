@@ -1,5 +1,7 @@
----
-import Greeter from '../components/greeter.kay'
+--- server
+import { reply } from './chat.kay'
+--- script
+import Chat from '@kaynooo/kayjs-ai/chat.kay'
 ---
 h1 Greeter
-Greeter
+Chat(action={reply} label="Greeter" keep={2} initial={[{ role: 'assistant', content: 'Welcome, ask me anything' }, { role: 'user', content: 'Earlier question' }, { role: 'assistant', content: 'Earlier answer' }]})

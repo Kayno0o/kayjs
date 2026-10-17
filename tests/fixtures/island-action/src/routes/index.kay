@@ -1,0 +1,20 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+import { shout } from './other.kay'
+
+export const greet = action(t.Object({ name: t.String({ minLength: 2, error: 'Too short' }) }), ({ name }) => `Hello ${name}`)
+
+export const count = action(t.Object({ to: t.Number() }), async function* ({ to }) {
+  for (let at = 1; at <= to; at++)
+    yield at
+})
+--- script
+import Caller from '../components/caller.kay'
+import Stream from '../components/stream.kay'
+---
+h1 Page
+Caller(run={greet} label="Ann")
+Caller(run={shout} label="Bob")
+Caller(run={greet} label="x")
+Stream(actions={{ count }})

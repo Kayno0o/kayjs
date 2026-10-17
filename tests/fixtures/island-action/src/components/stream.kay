@@ -1,0 +1,9 @@
+---
+import type { Action, ActionStream } from 'kay'
+import { signal } from 'kay'
+
+const { actions } = props<{ actions: { count: Action<{ to: number }, AsyncIterable<number>> } }>()
+const answer = signal<ActionStream<number> | undefined>(undefined)
+---
+button.count(type="button" onClick={async () => answer.set(await actions.count({ to: 3 }))}) Count
+p.last {answer()?.last()}

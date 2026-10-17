@@ -273,3 +273,20 @@ inBrowser('a Segmented busy with a change on a served page', () => {
     expect(page.errors).toEqual([])
   }, 120_000)
 })
+
+inBrowser('a SaveForm passed an action by a page with a server fence', () => {
+  test('calls the action as if the island had imported it, toasting what the page said and what the schema refused', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/save-form-action')
+
+    await page.fill('#name', 'Grace')
+    await page.click('button[type="submit"]')
+    await page.waitFor('.kui-toast-message', { text: 'Saved.' })
+
+    await page.fill('#name', 'G')
+    await page.click('button[type="submit"]')
+    await page.waitFor('.kui-toast-message', { text: 'Two letters at least' })
+    expect(page.errors).toEqual([])
+  }, 120_000)
+})

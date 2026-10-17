@@ -1,0 +1,22 @@
+---
+import type { Action } from 'kay'
+import { ActionError, signal } from 'kay'
+
+const { run, label = 'Go' } = props<{ run: Action<{ name: string }, string>, label?: string }>()
+const answer = signal('')
+
+async function go() {
+  try {
+    answer.set(await run({ name: label }))
+  }
+  catch (error) {
+    if (!(error instanceof ActionError))
+      throw error
+
+    answer.set(`refused: ${error.errors.name}`)
+  }
+}
+---
+button.go(id={`go-${label}`} type="button" onClick={go} disabled={run.pending()}) {label}
+p.answer(id={`answer-${label}`}) {answer()}
+p.url {run.url}

@@ -1,4 +1,5 @@
 import type { AnyElysia, Elysia } from 'elysia'
+import type { Action } from './action'
 import type { Duration } from './duration'
 import type { Component, JSX } from './jsx'
 
@@ -183,19 +184,21 @@ type Visiting<T, Seen> = Seen extends unknown ? [T] extends [Seen] ? [Seen] exte
 
 type IsSerializable<T, Seen = never> = T extends Sendable
   ? true
-  : T extends ((...args: never[]) => unknown) | symbol
-    ? false
-    : true extends Visiting<T, Seen>
-      ? true
-      : T extends ReadonlyMap<infer Key, infer Value>
-        ? [IsSerializable<Key, Seen | T>, IsSerializable<Value, Seen | T>] extends [true, true] ? true : false
-        : T extends ReadonlySet<infer Item>
-          ? IsSerializable<Item, Seen | T>
-          : T extends readonly (infer Item)[]
+  : T extends Action<never, unknown>
+    ? true
+    : T extends ((...args: never[]) => unknown) | symbol
+      ? false
+      : true extends Visiting<T, Seen>
+        ? true
+        : T extends ReadonlyMap<infer Key, infer Value>
+          ? [IsSerializable<Key, Seen | T>, IsSerializable<Value, Seen | T>] extends [true, true] ? true : false
+          : T extends ReadonlySet<infer Item>
             ? IsSerializable<Item, Seen | T>
-            : T extends object
-              ? false extends { [Key in keyof T]-?: IsSerializable<T[Key], Seen | T> }[keyof T] ? false : true
-              : false
+            : T extends readonly (infer Item)[]
+              ? IsSerializable<Item, Seen | T>
+              : T extends object
+                ? false extends { [Key in keyof T]-?: IsSerializable<T[Key], Seen | T> }[keyof T] ? false : true
+                : false
 
 // A field named like what a page must not carry: an island's props are written into the page source, so each one is public. Matched on the lowercase name, so `passwordHash`, `API_KEY` and `resetToken` all read.
 type SecretWord = 'password' | 'passwd' | 'secret' | 'token' | 'apikey' | 'api_key' | 'privatekey' | 'private_key' | 'credential' | 'email'

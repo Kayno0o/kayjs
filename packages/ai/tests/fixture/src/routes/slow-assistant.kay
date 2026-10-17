@@ -1,5 +1,7 @@
----
-import SlowAssistant from '../components/slow-assistant.kay'
+--- server
+import { slow } from './slow.kay'
+--- script
+import Chat from '@kaynooo/kayjs-ai/chat.kay'
 ---
 h1 Slow assistant
-SlowAssistant
+Chat(action={slow})

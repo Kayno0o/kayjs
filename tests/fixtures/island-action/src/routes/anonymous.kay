@@ -1,0 +1,9 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+const local = action(t.Object({ name: t.String() }), ({ name }) => name)
+--- script
+import Caller from '../components/caller.kay'
+---
+Caller(run={local})

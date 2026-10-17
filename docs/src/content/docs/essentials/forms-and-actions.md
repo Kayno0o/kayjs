@@ -207,6 +207,8 @@ form(action={add} onSubmit={submit})
   button(disabled={add.pending()}) Add
 ```
 
+A page with a `server` fence can also hand an action to an island as a prop, such as `Assistant(run={reply})`. The island types that prop with `Action` from `kay`, calls it as if it had imported it, and the prop keeps the action's types. The action must be exported by a page or endpoint, in this page or another one. An action fixed with `.with()` cannot be passed: pass the plain action and give the fields as its input.
+
 In a `catch`, `add.refused(error)` tells a refusal from `ctx.fail` apart from any other error, and types `error.data`.
 
 `focusInvalid()` from `kay` moves focus to the first field marked `aria-invalid`.

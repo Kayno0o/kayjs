@@ -1,5 +1,7 @@
----
-import Held from '../components/held.kay'
+--- server
+import { held } from './cases.kay'
+--- script
+import Chat from '@kaynooo/kayjs-ai/chat.kay'
 ---
 h1 Held
-Held
+Chat(action={held} label="Held")

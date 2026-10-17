@@ -1,5 +1,0 @@
----
-import Chat from '@kaynooo/kayjs-ai/chat.kay'
-import { lengthy } from '../routes/cases.kay'
----
-Chat(action={lengthy} label="Lengthy")

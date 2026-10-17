@@ -1,5 +1,0 @@
----
-import Chat from '@kaynooo/kayjs-ai/chat.kay'
-import { held } from '../routes/cases.kay'
----
-Chat(action={held} label="Held")

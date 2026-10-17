@@ -92,7 +92,7 @@ import { reply } from '../routes/reply.kay'
 Chat(action={reply} label="Assistant")
 ```
 
-Put this in a component of your own, such as `assistant.kay`, and use that component in your page. A page with a `server` fence cannot hand an action to an island, but a component can import it.
+A page, with or without a `server` fence, hands the action straight to `Chat`. The action has to be exported by a page or endpoint.
 
 - Enter sends and Shift+Enter starts a new line.
 - Stop, or Escape in the field, ends the reply. The words that came stay, marked as stopped.
