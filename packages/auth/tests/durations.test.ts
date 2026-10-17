@@ -32,6 +32,42 @@ describe('time options take a Duration', () => {
     expect((await store.sessions.listByUser((await store.users.findByEmail('ada@example.com'))!.id))[0]!.maxAge).toBe(1)
   })
 
+  test('a sub-second guests.maxAge is read as whole seconds, rounded up', async () => {
+    const cutoffs: Date[] = []
+    const base = memoryStore()
+    const store = { ...base, users: { ...base.users, staleGuests: async (createdBefore: Date, limit: number) => {
+      cutoffs.push(createdBefore)
+
+      return base.users.staleGuests!(createdBefore, limit)
+    } } }
+    const { browser } = testApp({ store, guests: { maxAge: 0.4 } })
+    const now = Date.now()
+
+    setSystemTime(now)
+    await browser().json('/me')
+    await new Promise(resolve => setTimeout(resolve, 30))
+
+    expect(cutoffs.map(cutoff => now - cutoff.getTime())).toEqual([1000])
+  })
+
+  test('a sub-second audit.maxAge is read as whole seconds, rounded up', async () => {
+    const cutoffs: Date[] = []
+    const base = memoryStore()
+    const store = { ...base, audit: { ...base.audit!, prune: async (before: Date) => {
+      cutoffs.push(before)
+      await base.audit!.prune(before)
+    } } }
+    const { browser } = testApp({ store, audit: { maxAge: 0.4 } })
+    const now = Date.now()
+
+    setSystemTime(now)
+    await browser().call('register', { email: 'ada@example.com', password: PASSWORD })
+    await new Promise(resolve => setTimeout(resolve, 30))
+
+    expect(cutoffs.length).toBeGreaterThan(0)
+    expect(cutoffs.map(cutoff => now - cutoff.getTime())).toEqual(cutoffs.map(() => 1000))
+  })
+
   test('audit.maxAge takes a string, and a bad one fails at boot naming it', async () => {
     const { browser, store } = testApp({ audit: { maxAge: '1m' } })
     const ada = browser()
