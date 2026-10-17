@@ -13,6 +13,8 @@ import { draftMessages } from '../server/message-drafts'
 import { FILES_MARKER, loadedFiles } from './loaded'
 
 const PLACEHOLDER = /\{(\w+)\}/g
+// The keys kay and its libraries look their texts up under, which a locale may word alone: a site without them reads the English the code holds.
+const LIBRARY_KEY = /^(?:kay|ui|cms)\./
 const SPECIAL = /[.*+?^${}()|[\]\\]/g
 
 // A message as a locale reads it, with the catalog it comes from: the app's, or an extension's the app does not translate.
@@ -104,7 +106,7 @@ export async function messageProblems(root: string, config: I18nConfig, extensio
     }
 
     for (const [key, own] of entries) {
-      if (!reference.entries.has(key))
+      if (!reference.entries.has(key) && !LIBRARY_KEY.test(key))
         problems.push({ file: own.file, line: lineOf(own.source, key), message: `has ${key}, which ${reference.file} lacks, so no \`t()\` can name it` })
     }
   }

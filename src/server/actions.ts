@@ -41,6 +41,7 @@ import { Denied, NotFound, Redirect, stoppers } from './signals'
 import { toolSettings } from './tool-settings'
 import { answered, SERVER_SPAN, traced } from './trace'
 import { visitAs } from './visit'
+import { invalidWord, kayWord } from './words'
 
 export interface GuardedRequest {
   jar: CookieJar
@@ -93,7 +94,6 @@ const pageParams = new WeakMap<Request, RouteParams>()
 const pageUrls = new WeakMap<Request, URL>()
 const TEXT = 'text/plain; charset=utf-8'
 // What a visitor reads when the handler throws and its action words nothing of its own.
-const SERVER_ERROR = 'Something went wrong on our side; try again later'
 // The methods that change nothing, which any page may send anywhere.
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
 // What a post from the site's own pages carries in `Sec-Fetch-Site`; `none` is the user's own doing, such as a bookmark.
@@ -174,7 +174,7 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], m
       if (tool && page.params.length === 0)
         tools.push({ name, url: value.url, schema: value.schema, tool, guards: guards.filter(guard => guard.check !== unguarded).map(guard => guard.file) })
 
-      limits.set(value.url, { bytes: value.protection?.bodyLimit, refuse: async (request, bytes, server) => tooLarge(value, request, bytes, server, back) })
+      limits.set(value.url, { bytes: value.protection?.bodyLimit, refuse: async (request, bytes, server) => inLocale(request, options, async () => tooLarge(value, request, bytes, server, back)) })
       // A span per call, the handler's own spans and the page it renders back nested in it.
       app.post(value.url, async context => traced(`POST ${value.url}`, () => ({ kind: SERVER_SPAN, attributes: { 'http.request.method': 'POST', 'http.route': value.url, 'url.path': value.url, 'kay.request.id': requestId(context.request) } }), async (span) => {
         const response = await answeringRequest(context.request, async () => inLocale(context.request, options, async () => runAction(value, sharedContext(context.request, () => ({ ...context })), options, back, { params: () => readPage(context.request, page, match, options), url: () => cachedPageUrl(context.request, () => guardedPage(context.request, page, match, options)) })))
@@ -226,7 +226,7 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], m
           if (code === 'INVALID_FILE_TYPE') {
             const field = error.property.replace(BODY_PREFIX, '')
 
-            return inLocale(request, options, async () => failed(request, new Headers(), cookieJar(request).cookies, { action: value.url, status: 422, values: submittedValues(body), errors: { [field]: fieldError(value, field) ?? 'Invalid file type' } }, server, back))
+            return inLocale(request, options, async () => failed(request, new Headers(), cookieJar(request).cookies, { action: value.url, status: 422, values: submittedValues(body), errors: { [field]: fieldError(value, field) ?? kayWord('kay.action.invalidFile') } }, server, back))
           }
 
           // Read as unknown: some apps' Elysia types narrow the error to an intersection holding `number`.
@@ -254,7 +254,7 @@ async function tooLarge(action: ServerAction<TSchema, unknown>, request: Request
   if (isCrossSite(request))
     return crossSiteRefusal(request)
 
-  const message = action.protection?.messages?.bodyLimit ?? (most => `Too large to send; ${sizeText(most)} at most`)
+  const message = action.protection?.messages?.bodyLimit ?? (most => kayWord('kay.action.bodyLimit', { size: sizeText(most) }))
 
   return failed(request, new Headers(), cookieJar(request).cookies, { action: action.url, status: 413, values: {}, errors: { '': typeof message === 'string' ? message : message(bytes) } }, server, back)
 }
@@ -761,7 +761,7 @@ async function runAction(action: ServerAction<TSchema, unknown>, context: { body
     // A mistake, or a service the handler relies on gone down: logged as any server error, and told the visitor beside the form they keep, as a refusal is.
     reportServerError(error, request, options.onError)
 
-    return failed(request, headers, jar.cookies, { action: action.url, status: 500, values: submittedValues(context.body), errors: { '': action.protection?.messages?.serverError ?? SERVER_ERROR } }, context.server, back)
+    return failed(request, headers, jar.cookies, { action: action.url, status: 500, values: submittedValues(context.body), errors: { '': action.protection?.messages?.serverError ?? kayWord('kay.action.serverError') } }, context.server, back)
   }
 }
 
@@ -903,6 +903,36 @@ function encodeOrExplain(value: unknown, what: string): string {
   }
 }
 
+// The `kay.invalid.*` text for what an issue refused, Elysia's own summary when the site words none; the limit it names goes in as `{min}` or `{max}`.
+function refusalText(issue: { summary?: string | undefined, schema?: unknown, value?: unknown }): string {
+  const schema = (typeof issue.schema === 'object' && issue.schema !== null ? issue.schema : {}) as { minLength?: number, maxLength?: number, pattern?: string, minimum?: number, maximum?: number }
+  const { value } = issue
+
+  if (value === undefined)
+    return invalidWord('kay.invalid.required', issue.summary)
+
+  if (typeof value === 'string') {
+    if (schema.minLength !== undefined && value.length < schema.minLength)
+      return invalidWord('kay.invalid.tooShort', issue.summary, { min: schema.minLength })
+
+    if (schema.maxLength !== undefined && value.length > schema.maxLength)
+      return invalidWord('kay.invalid.tooLong', issue.summary, { max: schema.maxLength })
+
+    if (schema.pattern !== undefined)
+      return invalidWord('kay.invalid.pattern', issue.summary)
+  }
+
+  if (typeof value === 'number') {
+    if (schema.minimum !== undefined && value < schema.minimum)
+      return invalidWord('kay.invalid.tooSmall', issue.summary, { min: schema.minimum })
+
+    if (schema.maximum !== undefined && value > schema.maximum)
+      return invalidWord('kay.invalid.tooBig', issue.summary, { max: schema.maximum })
+  }
+
+  return invalidWord('kay.invalid.type', issue.summary)
+}
+
 // Input the schema refused: a message per field, the schema's own `error` when it has one, a function `error` called in the request's locale.
 async function refused(action: ServerAction<TSchema, unknown>, error: Readonly<ValidationError>, request: Request, server: Server | null, back: Back): Promise<Response> {
   const errors: Record<string, string> = {}
@@ -912,7 +942,7 @@ async function refused(action: ServerAction<TSchema, unknown>, error: Readonly<V
     const own = 'schema' in issue ? (issue.schema as { error?: unknown }).error : undefined
     const custom = ('path' in issue ? fieldMessage(action.schema, issue.path) : undefined) ?? (typeof own === 'string' ? own : undefined)
 
-    errors[field] ??= custom ?? issue.summary ?? 'Invalid value'
+    errors[field] ??= custom ?? refusalText(issue)
   }
 
   return failed(request, new Headers(), cookieJar(request).cookies, { action: action.url, status: 422, values: submittedValues(error.value), errors }, server, back)

@@ -257,7 +257,7 @@ form(action={add})
 - Each form on it posting to an action names that page in a `kay_back` query parameter, so a post refused again renders the same page, however many times in a row, and one that goes through goes back to it.
 - A handler that throws, a mail server down say, is logged as any server error, `onError` included, and answered as a refusal with status 500.
 - A plain form post then renders its page with the message under the form and what was typed kept, read by `add.error()`, and a call throws `ActionError` with it in `errors['']`.
-- The message is `Something went wrong on our side; try again later` unless the action words its own, `action(schema, handler, { messages: { serverError: 'Not sent; write to hello@example.com instead' } })`, so a handler needs no `try`/`catch` of its own to tell the visitor.
+- The message is `Something went wrong on our side; try again later` unless the site words it as `kay.action.serverError` ([Locales](locales.md#texts-from-kay-and-its-libraries)) or the action words its own, `action(schema, handler, { messages: { serverError: 'Not sent; write to hello@example.com instead' } })`, so a handler needs no `try`/`catch` of its own to tell the visitor.
 - A redirect or a guard's denial thrown is no error.
 
 ### Refused fields and their messages

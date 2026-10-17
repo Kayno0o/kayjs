@@ -98,7 +98,7 @@ export default guard(async ({ request, headers, deny }) => {
 
 #### Refusal messages
 
-- The refusals of these limits, and the one for a post over `bodyLimit`, read in English unless `messages` gives the site's own, as a schema's `error` does for a field: `` messages: { honeypot: 'Laissez ce champ vide', minTime: reason => reason === 'early' ? 'Un instant, puis renvoyez-le' : 'Ce formulaire a expiré, renvoyez-le', rateLimit: wait => `Réessayez dans ${wait} s`, bodyLimit: bytes => `${bytes} octets au plus` } ``.
+- The refusals of these limits, and the one for a post over `bodyLimit`, read in English unless the site words them once for every action under `kay.protection.*` and `kay.action.*` in its catalogs ([Locales](locales.md#texts-from-kay-and-its-libraries)), or `messages` gives an action's own, as a schema's `error` does for a field: `` messages: { honeypot: 'Laissez ce champ vide', minTime: reason => reason === 'early' ? 'Un instant, puis renvoyez-le' : 'Ce formulaire a expiré, renvoyez-le', rateLimit: wait => `Réessayez dans ${wait} s`, bodyLimit: bytes => `${bytes} octets au plus` } ``.
 - `rateLimit` is given the seconds to wait.
 - `minTime` is given `early` for a post sent too soon or `expired` for a stamp missing, forged or past `maxAge`, as a page from before a restart sends.
 - `proofOfWork` is given `missing`, `expired` or `wrong` as below.

@@ -67,6 +67,11 @@
       "browser": "./src/runtime/i18n.client.ts",
       "default": "./src/runtime/i18n.server.ts"
     },
+    "./words": {
+      "types": "./types/runtime/words.server.d.ts",
+      "browser": "./src/runtime/words.client.ts",
+      "default": "./src/runtime/words.server.ts"
+    },
     "./params": {
       "types": "./types/runtime/params.d.ts",
       "default": "./src/runtime/params.ts"

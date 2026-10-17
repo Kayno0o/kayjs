@@ -14,6 +14,7 @@ import { nodeNet } from './builtins'
 import { onReload } from './reload'
 import { rewrittenAddress } from './rewrite'
 import { sharedKey, stampTime } from './stamp'
+import { kayWord } from './words'
 import { proofOfWork, signWork, workRefusal } from './work'
 
 export interface ProtectionRefusal {
@@ -241,7 +242,7 @@ export async function protectionRefusal(action: ServerAction<TSchema, unknown>, 
     if (typeof honeypot === 'object' && honeypot.pretend)
       return PRETEND
 
-    return { status: 422, field, message: messages?.honeypot ?? 'Leave this field empty' }
+    return { status: 422, field, message: messages?.honeypot ?? kayWord('kay.protection.honeypot') }
   }
 
   const minTime = action.protection && minTimesOf(action.protection)
@@ -259,7 +260,7 @@ export async function protectionRefusal(action: ServerAction<TSchema, unknown>, 
 
       // A stamp missing or forged is most often a page from before a restart, which changed the key: expired too.
       const reason = age !== undefined && age < minTime.after ? 'early' : 'expired'
-      const message = messages?.minTime ?? (refusal => refusal === 'early' ? 'Sent too fast; take a moment, then send it again' : 'This form has expired; send it again')
+      const message = messages?.minTime ?? (refusal => kayWord(`kay.protection.minTime.${refusal}`))
 
       return { status: 422, field: '', message: typeof message === 'string' ? message : message(reason) }
     }
@@ -275,12 +276,7 @@ export async function protectionRefusal(action: ServerAction<TSchema, unknown>, 
       return PRETEND
 
     if (reason !== undefined) {
-      const message = messages?.proofOfWork ?? ((refusal) => {
-        if (refusal === 'missing')
-          return 'Turn JavaScript on to send this form'
-
-        return refusal === 'expired' ? 'This form has expired; send it again' : 'This form could not be checked; send it again'
-      })
+      const message = messages?.proofOfWork ?? (refusal => kayWord(`kay.protection.proofOfWork.${refusal}`))
 
       // The fresh challenge kay's script solves to send the post again.
       return { status: 422, field: '', message: typeof message === 'string' ? message : message(reason), headers: { [WORK_HEADER]: signWork(action.url, work.difficulty, work.maxAge) } }
@@ -310,7 +306,7 @@ export async function protectionRefusal(action: ServerAction<TSchema, unknown>, 
   if (wait === undefined)
     return undefined
 
-  const message = messages?.rateLimit ?? (seconds => `Too many attempts; try again in ${seconds} s`)
+  const message = messages?.rateLimit ?? (seconds => kayWord('kay.protection.rateLimit', { seconds }))
 
   return { status: 429, field: '', message: typeof message === 'string' ? message : message(wait), headers: { 'retry-after': String(wait) } }
 }

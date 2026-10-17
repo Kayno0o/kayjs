@@ -1,0 +1,49 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+export const check = action(t.Object({
+  name: t.String({ minLength: 3 }),
+  nick: t.String({ maxLength: 2 }),
+  code: t.String({ pattern: '^x$' }),
+  age: t.Numeric({ minimum: 18 }),
+  own: t.String({ minLength: 3, error: 'Mine' }),
+  req: t.String(),
+}), () => undefined)
+
+export const guarded = action(t.Object({ website: t.Optional(t.String()) }), () => undefined, { honeypot: 'website', rateLimit: { max: 1, window: '1m' }, bodyLimit: 200 })
+
+export const owned = action(t.Object({ website: t.Optional(t.String()) }), () => undefined, { honeypot: 'website', messages: { honeypot: 'Own words' } })
+
+export const boom = action(t.Object({}), () => {
+  throw new Error('down')
+})
+---
+form(action={check})
+  input(field="name")
+  error name
+  input(field="nick")
+  error nick
+  input(field="code")
+  error code
+  input(field="age")
+  error age
+  input(field="own")
+  error own
+  input(field="req")
+  error req
+  button Check
+form(action={guarded})
+  if guarded.error('website') as message
+    p.refused {message}
+  if guarded.error() as message
+    p.whole {message}
+  button Send
+form(action={owned})
+  if owned.error('website') as message
+    p.refused {message}
+  button Send
+form(action={boom})
+  if boom.error() as message
+    p.refused {message}
+  button Boom

@@ -197,6 +197,26 @@ export default defineMessages({
 - Without `i18n`, a site is in its one language, its `lang` (`en` without one): `t()` reads its libraries' catalogs for it, with the app's `src/messages/<lang>.ts` laid over them when it has one, and `kay check` types the keys of both.
 - Without `i18n`, `locale()` is that language, `localize()` gives a path back as written, and no page gets `hreflang` links, so a library's pages read their texts in any app.
 
+### Texts from kay and its libraries
+
+- What a visitor reads that kay or a library wrote, not the app, is looked up in the app's catalogs under `kay.*`, `ui.*` (kayjs-ui) and `cms.*` keys before its English, so one block of `src/messages/<locale>.ts` words them all for the site; a site without the keys reads the English it did.
+- `wording(key, english, params?)` from `kay/words` is that lookup for a library: the message at `key` when a catalog has it, else `english`, `{placeholders}` filled either way, with no failing on a missing key and no request needed; an island's use of it sends the message to the browser. `pageLocale()` from it gives the locale to format a date in.
+- `kay/words` is its own small module, about 0.3 KB gzipped in the browser, so a library's islands do not load all of `kay/i18n` for a label; it reads the page's messages as `t` does, and takes strings, `{placeholders}` and plural forms.
+- A locale may give a `kay.*`, `ui.*` or `cms.*` key the default locale does not: `kay check` leaves those keys out of its comparison, so a French block needs no English twin.
+- A per-action `messages`, a schema's `error` and a component's label prop stay the overrides, and win over the catalog.
+- A schema refusal without an `error` reads `kay.invalid.<kind>`, Elysia's own wording when the site gives none: `required` (nothing sent), `tooShort` (`{min}`), `tooLong` (`{max}`), `pattern`, `tooSmall` (`{min}`), `tooBig` (`{max}`), and `type` for anything else, such as a wrong type or a union no branch fits.
+- The other `kay.*` keys, with their English: `action.serverError` (Something went wrong on our side; try again later), `action.invalidFile` (Invalid file type), `action.bodyLimit` (Too large to send; {size} at most), `protection.honeypot` (Leave this field empty), `protection.minTime.early` (Sent too fast; take a moment, then send it again), `protection.minTime.expired` and `protection.proofOfWork.expired` (This form has expired; send it again), `protection.proofOfWork.missing` (Turn JavaScript on to send this form), `protection.proofOfWork.wrong` (This form could not be checked; send it again), `protection.rateLimit` (Too many attempts; try again in {seconds} s).
+- kayjs-ui's `ui.*` keys are listed in its `llms.txt`.
+
+```ts
+export default defineMessages({
+  kay: {
+    invalid: { required: 'Champ requis', tooShort: 'Au moins {min} caractères' },
+    protection: { rateLimit: 'Trop d\'essais, réessayez dans {seconds} s' },
+  },
+})
+```
+
 ### Helpers
 
 - `t`, `locale`, `locales`, `localeName`, `direction`, `localize`, `alternate`, `formatNumber`, `formatDate`, `formatRelativeTime`, `relativeTime` and `formatList` come from `kay/i18n`, which works anywhere a request is served from: loads, templates, components, islands, actions and guards, and in `renderToString` outside one, in the site's default locale or the one its `locale` option names (see rendering).

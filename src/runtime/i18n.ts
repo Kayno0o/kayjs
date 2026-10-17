@@ -181,6 +181,13 @@ function messageText(translations: Translations, key: string, count: MessageValu
   return message === undefined || typeof message === 'string' ? message : pluralForm(translations.locale, message, count)
 }
 
+// The message at `key` with its placeholders filled, or undefined when no locale has it.
+export function lookup(translations: Translations, key: string, params: Record<string, MessageValue> = {}): string | undefined {
+  const text = messageText(translations, key, params.count)
+
+  return text === undefined ? undefined : fill(translations.locale, text, params)
+}
+
 function fill(locale: string, text: string, params: Record<string, MessageValue>): string {
   return text.replace(PLACEHOLDER, (placeholder, name: string) => name in params ? formatValue(locale, params[name]!) : placeholder)
 }
