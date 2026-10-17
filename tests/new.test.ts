@@ -8,7 +8,8 @@ import { afterAll, describe, expect, it } from 'bun:test'
 import { parse, stringify } from 'devalue'
 import { clientDir, outputDir } from '../src/build/assets'
 import { buildClient } from '../src/build/client'
-import { check, configCheckOptions, TSGO } from '../src/check'
+import { check, configCheckOptions } from '../src/check'
+import { nativeExe } from '../src/compiler/native-typescript'
 import { loadConfig } from '../src/config'
 import { formatFiles } from '../src/format'
 import { createProject, detectHost, FEATURE_NAMES, PRESETS, toggle } from '../src/new'
@@ -65,7 +66,7 @@ let packed: Promise<string> | undefined
 
 async function pack(): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), 'kay-packed-'))
-  const emit = Bun.spawn([TSGO, '-p', join(repo, 'tsconfig.build.json'), '--outDir', join(dir, 'types')], { stdout: 'pipe', stderr: 'pipe' })
+  const emit = Bun.spawn([nativeExe(), '-p', join(repo, 'tsconfig.build.json'), '--outDir', join(dir, 'types')], { stdout: 'pipe', stderr: 'pipe' })
 
   expect(await emit.exited).toBe(0)
 

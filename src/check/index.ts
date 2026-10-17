@@ -20,6 +20,7 @@ import { configProblems, contentChecks, lintConfigTypeError, projectProblems } f
 import { writeShadowTypes } from './shadow-types'
 import { parseTscOutput, resolvedConfig, tsgoCode, tsgoDiagnostic, typecheck } from './tsgo'
 
+export { nativeExe } from '../compiler/native-typescript'
 export { applySafeFixes } from './fixes'
 export { generatedChecks, generatedProblem } from './generated'
 export type { ProbeMemory } from './project'
@@ -27,7 +28,6 @@ export { configProblems, contentChecks, projectProblems, stopProbes } from './pr
 export type { ContentChecks } from './project'
 export { writeShadowTypes } from './shadow-types'
 export type { ShadowTypes } from './shadow-types'
-export { TSGO } from './tsgo'
 
 export interface CheckOptions {
   tsconfig?: string | undefined

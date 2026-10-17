@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { join } from 'node:path'
 import process from 'node:process'
+import { nativePlatformDir } from './native-typescript'
 
 const DECLARED_GLOBAL = /^declare (?:var|function) ([\w$]+)/gm
 const NOT_DEFINED = /^(\S+) is not defined$/
@@ -17,9 +18,7 @@ export function browserGlobals(): ReadonlySet<string> {
   globals = new Set()
 
   try {
-    const compiler = dirname(Bun.resolveSync('typescript7/package.json', import.meta.dir))
-    const platform = dirname(Bun.resolveSync(`@typescript/typescript-${process.platform}-${process.arch}/package.json`, compiler))
-    const lib = readFileSync(join(platform, 'lib', 'lib.dom.d.ts'), 'utf8')
+    const lib = readFileSync(join(nativePlatformDir(), 'lib', 'lib.dom.d.ts'), 'utf8')
     const own = Bun.spawnSync([process.execPath, '-e', 'console.log(JSON.stringify(Object.getOwnPropertyNames(globalThis)))'], { cwd: tmpdir() })
     const bun = new Set(JSON.parse(own.stdout.toString()) as string[])
 

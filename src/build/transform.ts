@@ -9,6 +9,7 @@ import process from 'node:process'
 import { compileKay, formatDiagnostic, ISLAND_TWIN, withoutTwin } from '../compiler'
 import { isInteractive } from '../compiler/codegen'
 import { isErrorCode } from '../compiler/errors'
+import { nativeManifestIfInstalled } from '../compiler/native-typescript'
 import { parseKay } from '../compiler/parser'
 import { analyzeScript } from '../compiler/script'
 import { countCache, pruneCache, readCacheEntry, writeCacheEntry } from './cache'
@@ -49,7 +50,7 @@ export interface Analysis {
 }
 
 // The packages a compile runs through, their versions part of every cache key.
-const COMPILER_PACKAGES = ['@babel/parser/package.json', '@babel/traverse/package.json', '@babel/types/package.json', 'typescript7/package.json']
+const COMPILER_PACKAGES = ['@babel/parser/package.json', '@babel/traverse/package.json', '@babel/types/package.json']
 let fingerprint: string | undefined
 const SCRIPT_FILE = /\.tsx?$/
 // Each file's last analysis in this process, which spares reading its cache entry from disk again while the inputs stay the same.
@@ -259,6 +260,7 @@ export function compilerFingerprint(): string {
       join(import.meta.dir, '../check/shadow.ts'),
       join(import.meta.dir, '../../package.json'),
       ...COMPILER_PACKAGES.map(manifest => Bun.resolveSync(manifest, compilerDir)),
+      ...nativeManifestIfInstalled(),
     ]
 
     for (const file of sources)

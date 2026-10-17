@@ -3,20 +3,16 @@ import type { CheckDiagnostic } from '.'
 import type { TsgoDiagnostic } from './diagnose'
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
-import process from 'node:process'
-import { fileURLToPath } from 'node:url'
 import { readCacheEntry, writeCacheEntry } from '../build/cache'
 import { treeEntries } from '../build/files'
 import { offsetAt } from '../compiler/mapping'
+import { nativeExe, nativeManifest } from '../compiler/native-typescript'
 import { projectPaths } from '../project'
 
 const TSC_LINE = /^(.+?)\((\d+),(\d+)\): (?:error|warning) (TS\d+): (.*)$/
 // An error about the whole run, such as a tsconfig that does not exist.
 const TSC_GLOBAL_LINE = /^error (TS\d+): (.*)$/
-const TSGO_PACKAGE = fileURLToPath(import.meta.resolve('typescript7/package.json'))
 
-// The native compiler of the `typescript7` alias, found as the package's own launcher does: its platform package holds the executable.
-export const TSGO = join(dirname(Bun.resolveSync(`@typescript/typescript-${process.platform}-${process.arch}/package.json`, dirname(TSGO_PACKAGE))), 'lib', process.platform === 'win32' ? 'tsc.exe' : 'tsc')
 // The options that name a place, which do not change what a file's types are.
 const PLACED_OPTIONS = new Set(['rootDirs', 'rootDir', 'paths', 'baseUrl', 'typeRoots', 'outDir', 'declarationDir', 'tsBuildInfoFile', 'configFilePath', 'pathsBasePath'])
 // A filesystem stamps writes off a coarse clock, milliseconds behind on Linux and up to a second on some, so a file written that close before a run counts as written after it.
@@ -54,7 +50,7 @@ export function parseTscOutput(output: string, config: string, root: string): Ch
 
 // The project's tsconfig as tsgo resolves it, its extends, options and root files, or undefined when tsgo cannot read it.
 export async function resolvedConfig(root: string, tsconfig: string): Promise<string | undefined> {
-  const child = Bun.spawn([TSGO, '--showConfig', '-p', tsconfig], { cwd: root, stdout: 'pipe', stderr: 'ignore' })
+  const child = Bun.spawn([nativeExe(), '--showConfig', '-p', tsconfig], { cwd: root, stdout: 'pipe', stderr: 'ignore' })
   const [output, code] = await Promise.all([new Response(child.stdout).text(), child.exited])
 
   return code === 0 ? output : undefined
@@ -65,7 +61,7 @@ export async function resolvedConfig(root: string, tsconfig: string): Promise<st
 export async function typingOptions(root: string, tsconfig: string): Promise<string | undefined> {
   const config = resolve(root, tsconfig)
   const stamps = configStamps(config)
-  const slot = stamps === undefined ? undefined : { file: join(projectPaths(root).cache, 'config', `${Bun.hash(config).toString(36)}.json`), key: JSON.stringify([(await Bun.file(TSGO_PACKAGE).json() as { version: string }).version, stamps]) }
+  const slot = stamps === undefined ? undefined : { file: join(projectPaths(root).cache, 'config', `${Bun.hash(config).toString(36)}.json`), key: JSON.stringify([(await Bun.file(nativeManifest()).json() as { version: string }).version, stamps]) }
   const kept = slot && await readCacheEntry<string>(slot)
 
   if (kept !== undefined)
@@ -148,7 +144,7 @@ export async function typecheck(root: string, tsconfig: string, shown: string | 
   const buildInfo = join(state, 'tsbuildinfo')
   const args = ['--noEmit', '--pretty', 'false', '--noUnusedLocals', '-p', tsconfig, '--incremental', '--tsBuildInfoFile', buildInfo]
   // The resolved config lists the root files, so one added or removed changes it as an edited option does.
-  const slot = shown === undefined ? undefined : { file: join(state, 'clean.json'), key: JSON.stringify([(await Bun.file(TSGO_PACKAGE).json() as { version: string }).version, args, shown]) }
+  const slot = shown === undefined ? undefined : { file: join(state, 'clean.json'), key: JSON.stringify([(await Bun.file(nativeManifest()).json() as { version: string }).version, args, shown]) }
   const last = slot && await readCacheEntry<CleanRun>(slot)
 
   if (last && await stillClean(last, shadowDir))
@@ -156,7 +152,7 @@ export async function typecheck(root: string, tsconfig: string, shown: string | 
 
   const generated = await contentHashes(shadowDir)
   const started = Date.now()
-  const child = Bun.spawn([TSGO, ...args], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
+  const child = Bun.spawn([nativeExe(), ...args], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
   const [output, errors, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
   const read = slot && code === 0 && output === '' && errors === '' ? await filesRead(buildInfo) : undefined
 

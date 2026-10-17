@@ -15,7 +15,7 @@ import { KAY_DIR } from '../build/assets'
 import { findKayFiles, realPath } from '../build/files'
 import { throughNodeModules } from '../build/libraries'
 import { importedSignals } from '../build/signals'
-import { configCheckOptions, configProblems, contentChecks, generatedChecks, generatedProblem, projectProblems, stopProbes, TSGO, writeShadowTypes } from '../check'
+import { configCheckOptions, configProblems, contentChecks, generatedChecks, generatedProblem, projectProblems, stopProbes, writeShadowTypes } from '../check'
 import { diagnoseShadow, reportsTypeErrors, servedByTheApp, servedLocales } from '../check/diagnose'
 import { compileShadow, generatedSpan, layoutQueries, shadowSource, sourceSpan } from '../check/shadow'
 import { programShadows } from '../check/shadow-types'
@@ -23,6 +23,7 @@ import { formatKay } from '../compiler/format'
 import { lintLevels } from '../compiler/lints'
 import { offsetAt, positionAt } from '../compiler/mapping'
 import { GENERATED_NAME } from '../compiler/names'
+import { nativeExe } from '../compiler/native-typescript'
 import { parseKay } from '../compiler/parser'
 import { analyzeScript, analyzeServer } from '../compiler/script'
 import { CONFIG_FILE, loadConfig } from '../config'
@@ -178,7 +179,7 @@ export class KayLanguageServer {
     await this.writeShadows()
     this.watchesFiles = (params.capabilities.workspace as { didChangeWatchedFiles?: { dynamicRegistration?: boolean } } | undefined)?.didChangeWatchedFiles?.dynamicRegistration === true
 
-    const child = Bun.spawn([TSGO, '--lsp', '--stdio'], { cwd: this.root, stdin: 'pipe', stdout: 'pipe', stderr: 'ignore' })
+    const child = Bun.spawn([nativeExe(), '--lsp', '--stdio'], { cwd: this.root, stdin: 'pipe', stdout: 'pipe', stderr: 'ignore' })
     const connection = new Connection(child.stdout, (data) => {
       void child.stdin.write(data)
       void child.stdin.flush()

@@ -1,9 +1,9 @@
 import { mkdir, readdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
-import { TSGO } from '../src/check'
 import { compileKay, formatDiagnostic } from '../src/compiler'
 import { LINTS } from '../src/compiler/lints'
+import { nativeExe } from '../src/compiler/native-typescript'
 import { SCRIPT_GLOBALS, SERVER_GLOBALS } from '../src/compiler/script'
 import { formatKay } from '../src/format'
 
@@ -82,7 +82,7 @@ describe('llms.txt and its docs', () => {
     await Bun.write(join(dir, 'tsconfig.json'), JSON.stringify({ extends: '../../../tsconfig.json', include: ['imports-*.ts'] }))
 
     try {
-      const checked = Bun.spawn([TSGO, '--noEmit', '-p', join(dir, 'tsconfig.json')], { stdout: 'pipe', stderr: 'pipe' })
+      const checked = Bun.spawn([nativeExe(), '--noEmit', '-p', join(dir, 'tsconfig.json')], { stdout: 'pipe', stderr: 'pipe' })
       const output = await new Response(checked.stdout).text()
 
       expect(output).toBe('')
