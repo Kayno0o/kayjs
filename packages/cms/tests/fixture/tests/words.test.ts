@@ -89,3 +89,38 @@ test('the editor reads the locale in the browser: a list item, a button and the 
     await built.close()
   }
 }, 120_000)
+
+test('a swap from a French page to an English one in edit mode shows the editor in English, and back', async () => {
+  const built = await testSite({ root: ROOT, browser: true })
+
+  try {
+    const page = await built.open('/fr/admin/page?path=/fr/blog/hello')
+    const title = () => document.querySelector('.kcms-editor-title')?.textContent
+    const follow = (href: string) => {
+      const link = document.createElement('a')
+
+      link.id = 'swap'
+      link.href = href
+      link.textContent = 'swap'
+      document.body.prepend(link)
+    }
+
+    await page.waitUntil(() => document.querySelector('.kcms-editor-title')?.textContent === 'Modifier cette page')
+    await page.evaluate(follow, '/blog/hello')
+    await page.click('#swap')
+    await page.waitUntil(() => location.pathname === '/blog/hello')
+    await page.waitUntil(() => document.querySelector('.kcms-editor-title')?.textContent === 'Edit this page')
+    expect(await page.evaluate(title)).toBe('Edit this page')
+    expect(await page.evaluate(() => document.querySelector('.kcms-editor-head button')?.textContent)).toBe('Stop editing')
+
+    await page.evaluate(follow, '/fr/blog/hello')
+    await page.click('#swap')
+    await page.waitUntil(() => location.pathname === '/fr/blog/hello')
+    await page.waitUntil(() => document.querySelector('.kcms-editor-title')?.textContent === 'Modifier cette page')
+    expect(await page.evaluate(() => document.querySelector('.kcms-editor-head button')?.textContent)).toBe('Arrêter de modifier')
+    expect(page.errors).toEqual([])
+  }
+  finally {
+    await built.close()
+  }
+}, 120_000)
