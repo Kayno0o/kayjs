@@ -109,6 +109,31 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
     expect(page.errors).toEqual([])
   })
 
+  test('the polite status line says each tool call start and end once while the reply is hidden', async () => {
+    const page = await site.open('/helper')
+
+    await page.evaluate(() => {
+      const heard: string[] = []
+      const line = document.querySelector('.kai-chat-status')!
+
+      new MutationObserver(records => heard.push(...records.flatMap(record => [...record.addedNodes].map(node => node.textContent ?? '')))).observe(line, { childList: true, subtree: true })
+      ;(window as unknown as { heard: string[] }).heard = heard
+    })
+    fakeAi.reply({ text: 'Adding. ', calls: [{ name: 'add_note', input: { title: 'Milk' } }, { name: 'breaks' }] })
+    fakeAi.reply('All done')
+    await page.fill('textarea', 'Add milk')
+    await page.press('Enter')
+    await page.waitFor('[data-pending]', { gone: true })
+    await page.waitFor('.kai-chat-turn[data-role="assistant"]', { text: 'All done' })
+
+    const heard = await page.evaluate(() => (window as unknown as { heard: string[] }).heard)
+
+    expect(await page.evaluate(() => document.querySelector('.kai-chat-status')?.getAttribute('role'))).toBe('status')
+    expect(heard).toContain('Thinking…')
+    expect(heard.filter(text => text.startsWith('add_note'))).toEqual(['add_note: Running', 'add_note: Done'])
+    expect(heard.filter(text => text.startsWith('breaks'))).toEqual(['breaks: Running', 'breaks: Failed'])
+  })
+
   test('a double send posts one message, and Enter while a reply is under way changes nothing but keeps the draft', async () => {
     const page = await site.open('/assistant')
 

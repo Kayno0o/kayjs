@@ -67,6 +67,8 @@ const streaming = signal<ActionStream<string | Progress> | undefined>(undefined)
 const partial = signal('')
 // The tool calls of the reply being written, as last seen.
 const calls = signal<ToolCall[]>([])
+// What the status line said of the calls, one line each and added to it, since a line replaced before the screen reader reads it is lost.
+const spoken = signal<{ id: number, text: string }[]>([])
 const failure = signal<string | undefined>(undefined)
 // The last call was refused and its message taken back, so no message waits for an answer that Try again could ask for.
 const takenBack = signal(false)
@@ -75,6 +77,24 @@ let run: AbortController | undefined
 let field: HTMLTextAreaElement | undefined
 let log: HTMLElement | undefined
 let pinned = true
+const told = new Map<string, string>()
+const statuses = { running: runningLabel, done: doneLabel, failed: failedLabel }
+
+// Says the calls whose status changed since the last snapshot, each as `name: status`.
+function announce(next: ToolCall[]) {
+  const said: { id: number, text: string }[] = []
+
+  for (const call of next) {
+    if (told.get(call.id) === call.status)
+      continue
+
+    told.set(call.id, call.status)
+    said.push({ id: nextId++, text: `${call.name}: ${statuses[call.status]}` })
+  }
+
+  if (said.length > 0)
+    spoken.set([...spoken(), ...said])
+}
 
 function show(value: string | Progress) {
   if (typeof value === 'string') {
@@ -85,6 +105,7 @@ function show(value: string | Progress) {
 
   partial.set(value.text)
   calls.set(value.calls)
+  announce(value.calls)
 }
 
 // A table is wrapped, once sanitized, in a box that scrolls sideways and takes the keyboard's focus, except in the turn being written, which is hidden from screen readers. Several tables of one reply are numbered, so no two groups share a name.
@@ -176,6 +197,8 @@ async function send(again = false) {
   takenBack.set(false)
   partial.set('')
   calls.set([])
+  told.clear()
+  spoken.set([])
   waiting.set(true)
 
   try {
@@ -239,7 +262,7 @@ function scrolled() {
 }
 ---
 section.kai-chat(class={className})
-  // The log is the turns so far; the reply streaming in is hidden from screen readers until it is whole, so the finished turn is announced once, not word by word.
+  // The log is the turns so far; the reply streaming in is hidden from screen readers until it is whole, so the finished turn is announced once, not word by word. The status line says the thinking label, then each tool call as it starts and ends.
   .kai-chat-log(role="log" aria-label={label} tabindex="0" ref={element => { log = element }} onScroll={scrolled})
     for turn of history() key={turn.id}
       article.kai-chat-turn(data-role={turn.role})
@@ -260,7 +283,11 @@ section.kai-chat(class={className})
           .kai-chat-text(innerHTML={markdown(partial(), false)})
         else if calls().length === 0
           p.kai-chat-text.kai-chat-thinking {thinkingLabel}
-  p.kai-chat-status(role="status") {busy() && partial() === '' && calls().length === 0 ? thinkingLabel : ''}
+  .kai-chat-status(role="status" aria-atomic="false")
+    for line of spoken() key={line.id}
+      p {line.text}
+    if busy() && partial() === '' && calls().length === 0
+      p {thinkingLabel}
   if failure()
     .kui-notice(role="alert" data-tone="danger")
       | {failure()}

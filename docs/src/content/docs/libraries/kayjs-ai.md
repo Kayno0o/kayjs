@@ -96,7 +96,7 @@ A page, with or without a `server` fence, hands the action straight to `Chat`. T
 
 - Enter sends and Shift+Enter starts a new line.
 - Stop, or Escape in the field, ends the reply. The words that came stay, marked as stopped. Stopped before the first word, the message goes back to the field.
-- If the call fails, the chat shows an alert and a button to ask again. The message is not sent twice.
+- A screen reader hears each finished turn once, not word by word, and each tool call as it starts and ends.
 - A screen reader hears each finished turn once, not word by word.
 - A table wider than its bubble scrolls sideways inside it, and the keyboard can scroll it.
 - A message the action's schema refuses (422) goes back to the field, also when it was a retry, and the refusal's message shows.
