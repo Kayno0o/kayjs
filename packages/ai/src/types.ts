@@ -1,4 +1,4 @@
-import type { Action } from 'kay'
+import type { Action, Duration } from 'kay'
 
 export interface Message {
   // `system` is not a role here: the prompt that frames the reply goes in `options.system`, so a history posted by a visitor cannot carry one.
@@ -46,7 +46,7 @@ export interface ProviderRequest {
   model: string
   maxTokens: number
   temperature: number | undefined
-  // Milliseconds a provider may take to answer, and to send the next event once it did; `Infinity` waits for ever.
+  // Milliseconds a provider may take to answer, and to send the next chunk once it did.
   timeouts: Timeouts
 }
 
@@ -83,8 +83,8 @@ export interface AskOptions {
   temperature?: number | undefined
   // Stops the reply when it aborts, as the request being answered does on its own.
   signal?: AbortSignal | undefined
-  // How long to wait, in milliseconds: `connect` for the provider to start answering (30,000 by default), `idle` for the next event of a reply once it began (60,000 by default); a stall past either fails the reply with a `timeout` error, `Infinity` waiting for ever. Each step of a tool loop counts them anew.
-  timeout?: Partial<Timeouts> | undefined
+  // How long to wait, as a duration: `connect` for the provider to start answering (`'30s'` by default), `idle` for the next chunk of a reply once it began (`'60s'` by default). A stall past either fails the reply with a `timeout` error. Each step of a tool loop counts them anew.
+  timeout?: { connect?: Duration | undefined, idle?: Duration | undefined } | undefined
   // Who the limits and budget set in `ai()` count this ask for, in place of the signed-in user its `visitor` names or the address of the request being answered: a job or a test names one.
   visitor?: string | undefined
   // Actions the model may call, each run as the visitor through the whole app, guards, validation and rate limits included; passing one is its opt-in. They need the request being answered, so `ask` with tools called outside one throws.

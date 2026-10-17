@@ -1,3 +1,4 @@
+import type { ProviderRequest } from '../src'
 import type { Event } from './helpers/provider'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { AiError, anthropic, ask, openai } from '../src'
@@ -246,7 +247,7 @@ describe('timeouts', () => {
 
   it.each(makers)('fails a %s that accepts the request and never answers', async (_name, make) => {
     const server = serve(async () => new Promise<Response>(() => undefined))
-    const error = await failure(ask('Hi', { provider: make(server.url), timeout: { connect: 50 } }))
+    const error = await failure(ask('Hi', { provider: make(server.url), timeout: { connect: '50ms' } }))
 
     expect(error).toMatchObject({ kind: 'timeout' })
     expect(error.message).toContain('50 ms')
@@ -254,7 +255,7 @@ describe('timeouts', () => {
 
   it.each(makers)('fails a %s stream that stops sending, with what came before', async (_name, make, events) => {
     const server = serve(() => stream(upTo(events('Hel'), 'Hel'), { hold: true }).response)
-    const error = await failure(ask('Hi', { provider: make(server.url), timeout: { idle: 50 } }))
+    const error = await failure(ask('Hi', { provider: make(server.url), timeout: { idle: '50ms' } }))
 
     expect(error).toMatchObject({ kind: 'timeout', partial: 'Hel' })
   })
@@ -263,7 +264,7 @@ describe('timeouts', () => {
     const held = stream(upTo(openaiEvents('Hel'), 'Hel'), { hold: true })
     const server = serve(() => held.response)
 
-    await failure(ask('Hi', { provider: openai({ baseUrl: server.url, model: 'm' }), timeout: { idle: 50 } }))
+    await failure(ask('Hi', { provider: openai({ baseUrl: server.url, model: 'm' }), timeout: { idle: '50ms' } }))
     await held.cancelled
   })
 
@@ -285,12 +286,12 @@ describe('timeouts', () => {
       return new Response(body, { headers: { 'content-type': 'text/event-stream' } })
     })
 
-    expect(await ask('Hi', { provider: openai({ baseUrl: server.url, model: 'm' }), timeout: { idle: 150 } })).toBe('abc')
+    expect(await ask('Hi', { provider: openai({ baseUrl: server.url, model: 'm' }), timeout: { idle: '150ms' } })).toBe('abc')
   })
 
-  it('is no timeout once the reply is stopped', async () => {
+  it('ends without an error when stopped while connecting', async () => {
     const server = serve(async () => new Promise<Response>(() => undefined))
-    const reply = ask('Hi', { provider: openai({ baseUrl: server.url, model: 'm' }), timeout: { connect: 5000 } })
+    const reply = ask('Hi', { provider: openai({ baseUrl: server.url, model: 'm' }), timeout: { connect: '5s' } })
     const text = (async () => reply)()
 
     await Bun.sleep(20)
@@ -298,12 +299,25 @@ describe('timeouts', () => {
     expect(await text).toBe('')
   })
 
-  it('has defaults and rejects a bad value', () => {
+  it('takes durations and rejects a bad value', () => {
     const provider = openai({ baseUrl: 'http://localhost:1', model: 'm' })
 
-    expect(() => ask('Hi', { provider, timeout: { connect: 0 } })).toThrow('timeout.connect')
-    expect(() => ask('Hi', { provider, timeout: { idle: Number.NaN } })).toThrow('timeout.idle')
-    expect(() => ask('Hi', { provider, timeout: { idle: Number.POSITIVE_INFINITY } })).not.toThrow()
+    expect(() => ask('Hi', { provider, timeout: { connect: 0 } })).toThrow('ask({ timeout }).connect')
+    expect(() => ask('Hi', { provider, timeout: { idle: Number.NaN } })).toThrow('ask({ timeout }).idle')
+    expect(() => ask('Hi', { provider, timeout: { idle: Number.POSITIVE_INFINITY } })).toThrow('ask({ timeout }).idle')
+    expect(() => ask('Hi', { provider, timeout: { idle: '2m', connect: 10 } })).not.toThrow()
+  })
+
+  it('passes durations to a provider as milliseconds, capped to what a timer takes', async () => {
+    const seen: unknown[] = []
+    const spy = { name: 'spy', model: 'm', async* stream(request: ProviderRequest) {
+      seen.push(request.timeouts)
+      yield { text: 'ok' }
+    } }
+
+    await ask('Hi', { provider: spy, timeout: { connect: 2, idle: '500ms' } })
+    await ask('Hi', { provider: spy, timeout: { connect: '365d' } })
+    expect(seen).toEqual([{ connect: 2000, idle: 500 }, { connect: 2 ** 31 - 1, idle: 60_000 }])
   })
 
   it('passes the defaults to a provider', async () => {

@@ -117,7 +117,7 @@ The chat posts its last 20 messages with each one; the `keep` prop changes that.
 
 A long answer cut by `maxTokens` still resolves as text, so check `finish` when that matters.
 
-A provider that stalls fails the reply with an `AiError` of kind `timeout`. kay waits 30 seconds for the provider to start answering, and 60 seconds for the next piece of a reply that began. Change either per call with `timeout: { connect: 10_000, idle: 20_000 }`, in milliseconds, or `Infinity` to wait for ever.
+A provider that stalls fails the reply with an `AiError` of kind `timeout`. kay waits 30 seconds for the provider to start answering, and 60 seconds for the next piece of a reply that began. Change either per call with `timeout: { connect: '10s', idle: '20s' }`, a duration as elsewhere in kay.
 
 `ask` also takes `model`, `maxTokens` (4096 by default), `temperature` and a `signal`.
 

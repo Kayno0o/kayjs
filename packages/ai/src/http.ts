@@ -148,6 +148,7 @@ async function* eventsOf(name: string, body: ReadableStream<Uint8Array>, idle: n
       failure = { error }
     }
     finally {
+      clearTimeout(watchdog)
       finished = true
       wake?.()
     }

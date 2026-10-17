@@ -1,6 +1,6 @@
 import type { Offered } from './loop'
 import type { AskOptions, Message, Reply, Timeouts, ToolAction } from './types'
-import { actionTool, currentRequest } from 'kay/library'
+import { actionTool, currentRequest, durationSeconds } from 'kay/library'
 import { choose } from './config'
 import { guarded } from './limits'
 import { converse } from './loop'
@@ -8,8 +8,8 @@ import { createReply } from './reply'
 
 const DEFAULT_MAX_TOKENS = 4096
 const DEFAULT_MAX_STEPS = 5
-const DEFAULT_CONNECT_TIMEOUT = 30_000
-const DEFAULT_IDLE_TIMEOUT = 60_000
+const DEFAULT_CONNECT_TIMEOUT = '30s'
+const DEFAULT_IDLE_TIMEOUT = '60s'
 const ROLES = new Set(['user', 'assistant'])
 
 function messagesOf(prompt: string | Message[]): Message[] {
@@ -27,15 +27,16 @@ function messagesOf(prompt: string | Message[]): Message[] {
   })
 }
 
+// A timer takes at most 2^31 - 1 ms (about 24 days) and fires at once past it.
+const MAX_TIMER_MS = 2 ** 31 - 1
+
 function timeoutsOf(timeout: AskOptions['timeout']): Timeouts {
   const { connect = DEFAULT_CONNECT_TIMEOUT, idle = DEFAULT_IDLE_TIMEOUT } = timeout ?? {}
 
-  for (const [name, value] of [['connect', connect], ['idle', idle]] as const) {
-    if (typeof value !== 'number' || !(value > 0))
-      throw new TypeError(`kayjs-ai: timeout.${name} is a number of milliseconds above 0, or Infinity`)
+  return {
+    connect: Math.min(MAX_TIMER_MS, Math.ceil(durationSeconds(connect, 'ask({ timeout }).connect', 'kayjs-ai') * 1000)),
+    idle: Math.min(MAX_TIMER_MS, Math.ceil(durationSeconds(idle, 'ask({ timeout }).idle', 'kayjs-ai') * 1000)),
   }
-
-  return { connect, idle }
 }
 
 function offer(actions: readonly ToolAction[]): Offered[] {
