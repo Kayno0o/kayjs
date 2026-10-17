@@ -1,6 +1,6 @@
 --- server
 import { formatDate, t } from 'kay/i18n'
-import { schemas } from '../../forms'
+import { schemas, scopeLabel } from '../../forms'
 import Button from '@kaynooo/kayjs-ui/button.kay'
 import CardRow from '@kaynooo/kayjs-ui/card-row.kay'
 import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
@@ -24,7 +24,7 @@ PageSection(title={t('auth.account.clients.title')})
             Button(type="submit" variant="danger" label={t('auth.account.clients.revoke')} aria-label={`${t('auth.account.clients.revoke')}: ${client.name}`})
         .flex.flex-col
           strong {client.name}
-          span.text-kui-muted {(client.scopes ?? [t('auth.account.clients.allScopes')]).join(', ')}
+          span.text-kui-muted {client.scopes ? client.scopes.map(scopeLabel).join(', ') : t('auth.account.clients.allScopes')}
           span.text-kui-muted
             | {t('auth.account.clients.approved', { date: date(client.createdAt) })} · {client.lastUsedAt ? t('auth.account.clients.lastUsed', { date: date(client.lastUsedAt) }) : t('auth.account.clients.neverUsed')}
     else

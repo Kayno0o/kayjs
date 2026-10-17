@@ -6,6 +6,7 @@ import type { AuthFeatures, ProfileProblem } from './index'
 import type en from './messages/en'
 import { t } from 'elysia'
 import { t as message } from 'kay/i18n'
+import { wording } from 'kay/words'
 import { passkeyAssertion, passkeyAttestation } from '../payloads'
 import { PROFILE_MAX_LENGTH } from '../rules'
 
@@ -15,6 +16,11 @@ export type FailureCode = keyof Catalog['errors']
 export type OAuthFailureCode = keyof Catalog['oauth']
 type Fields = Catalog['fields']
 type Problem<Field extends keyof Fields> = keyof Fields[Field]
+
+// A scope as the page shows it: the label the app words under `auth.scopes.<scope>` in its catalogs, else the scope itself.
+export function scopeLabel(scope: string): string {
+  return wording(`auth.scopes.${scope}`, scope)
+}
 
 // Stands for a `minTime` refusal's reason, which kay words before the request's locale is known: `refusal` puts it in the page's language.
 const MIN_TIME = 'kayjs-auth-min-time:'

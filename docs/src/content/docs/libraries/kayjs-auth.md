@@ -479,6 +479,8 @@ That token is one of kayjs-auth's bearer tokens. So `user()`, `via()`, `requireU
 
 The app is asked once. Signing in again skips the consent page until the user revokes the agent, or the agent asks for more than was approved. Users revoke an agent on the account page, under Apps, which ends its access at once.
 
+The consent page lists what the agent asks for by the labels your messages give, `auth: { scopes: { 'posts:read': 'Read your posts' } }` in `src/messages/en.ts` and one entry per language. A scope without a label shows as its code. The token form and the lists of tokens and approved apps on the account page use the same labels.
+
 Nothing is set up. The documents an agent reads, `/.well-known/oauth-authorization-server` and `/.well-known/oauth-protected-resource`, and the endpoints under `/auth/oauth/` are served for you, under your `base` if you have one.
 
 Agents sign in with PKCE, never a client secret. An access token lasts an hour. A refresh token is replaced each time it is used, and expires after 30 days unused.

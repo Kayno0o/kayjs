@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- kayjs-auth: the consent page, the token form and the lists of tokens and approved apps show a scope as the label the app words under `auth.scopes.<scope>` in its messages, its code without one ([kayjs-auth](../packages/auth/llms/oauth-server-and-tokens.md)).
 - kayjs-auth: `passkeys: { rpName, userVerification }` names the site to the authenticator and sets how hard adding a passkey and a passkey second factor ask for a PIN or a biometric ([kayjs-auth](../packages/auth/llms/oauth-passkeys-two-factor.md#passkeys)).
 - kayjs-auth: `guests: { maxAge: '30d' }` deletes the guests older than that who hold no session, calling `onDelete`; without it they are kept as before ([kayjs-auth](../packages/auth/llms/passwords-and-mails.md)).
 - kayjs-auth: `githubProvider({ scopes: ['read:user', 'user:email'] })` reads the primary verified address off `/user/emails`, so a user hiding their email signs up with it; every provider preset takes `{ scopes, params }` and the self-hostable ones a base `url`, GitHub Enterprise's included, Discord's `apiBase` being `url` ([kayjs-auth](../packages/auth/llms/oauth-passkeys-two-factor.md)).

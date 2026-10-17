@@ -130,7 +130,10 @@ async function signIn(site: Site, issuer: string, email: string, mount = { base:
 
   expect(consent.status).toBe(200)
   expect(consent.html).toContain('Claude Code')
-  expect(consent.html).toContain('notes:read')
+  // The app's label, as text: markup in it is escaped, and the raw code is not shown.
+  expect(consent.html).toContain('Read &lt;b>your&lt;/b> notes')
+  expect(consent.html).not.toContain('<b>your</b>')
+  expect(consent.html).not.toContain('notes:read</')
 
   const answered = await site.submit(decide as never, { client_id: clientId, redirect_uri: REDIRECT, code_challenge: CHALLENGE, scope: 'notes:read', state: 'xyz', resource: '', decision: 'allow' } as never, { from: consent })
   const back = new URL(answered.headers.get('location')!)
@@ -157,7 +160,8 @@ describe('signing in', () => {
     const clients = await site().visit('/auth/account/clients')
 
     expect(clients.html).toContain('Claude Code')
-    expect(clients.html).toContain('notes:read')
+    expect(clients.html).toContain('Read &lt;b>your&lt;/b> notes')
+    expect(clients.html).not.toContain('<b>your</b>')
 
     const again = await site().visit(authorize)
 

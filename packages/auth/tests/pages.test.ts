@@ -2,6 +2,7 @@ import type { Mail } from '../src/mail'
 import { afterEach, describe, expect, setSystemTime, test } from 'bun:test'
 import { discordProvider, githubProvider } from '../src/oauth/providers'
 import { authPages } from '../src/pages'
+import { scopeLabel } from '../src/pages/forms'
 import { totpCode, totpStep } from '../src/totp'
 import { testApp, userRecord } from './helpers/app'
 
@@ -214,5 +215,13 @@ describe('exporting a user\'s data', () => {
 
       expect(await browser().call('exportData')).toEqual({ ok: false, error: 'signed-out' })
     })
+  })
+})
+
+describe('scopeLabel', () => {
+  test('a scope no catalog words reads as itself, whatever it holds', () => {
+    expect(scopeLabel('posts:read')).toBe('posts:read')
+    expect(scopeLabel('<img src=x onerror=alert(1)>')).toBe('<img src=x onerror=alert(1)>')
+    expect(scopeLabel('{count}')).toBe('{count}')
   })
 })

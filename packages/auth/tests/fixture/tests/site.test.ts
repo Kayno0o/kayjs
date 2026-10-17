@@ -346,6 +346,20 @@ describe('the prebuilt pages', () => {
     expect((await ada.visit('/auth/account/tokens')).find('#kayjs-auth-token')).toHaveLength(0)
     await ada.submit(revoke, { id: token!.attributes['data-token']! }, { from: '/auth/account/tokens' })
     expect((await ada.visit('/auth/account/tokens')).find('[data-token]')).toHaveLength(0)
+
+    // The app's label for a scope, as text, in the form and the list; a token with no scopes reads as everything.
+    const form = await ada.visit('/auth/account/tokens')
+
+    expect(form.html).toContain('Read &lt;b>your&lt;/b> notes')
+    expect(form.html).not.toContain('<b>your</b>')
+
+    await ada.submit(create, { label: 'scoped', scopes: ['notes:read'], days: '0', password: PASSWORD } as never, { from: '/auth/account/tokens' })
+    await ada.submit(create, { label: 'everything', days: '0', password: PASSWORD }, { from: '/auth/account/tokens' })
+
+    const listed = (await ada.visit('/auth/account/tokens')).find('[data-token]').map(row => row.text)
+
+    expect(listed.find(row => row.includes('scoped'))).toContain('Read <b>your</b> notes')
+    expect(listed.find(row => row.includes('everything'))).toContain('Everything')
   })
 
   test('the data page asks for a proof before offering the download once the sign-in is old', async () => {

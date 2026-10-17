@@ -2,7 +2,7 @@
 import { t } from 'kay/i18n'
 import Message from '../../components/message.kay'
 import Panel from '../../components/panel.kay'
-import { schemas } from '../../forms'
+import { schemas, scopeLabel } from '../../forms'
 import Button from '@kaynooo/kayjs-ui/button.kay'
 
 // Visitors reach this page before signing in, so none of the app's guards run here, whatever they check: one asking for a session would keep an MCP client out.
@@ -56,8 +56,7 @@ Panel(title={t('auth.consent.title')})
         li {t('auth.consent.everything')}
       else
         for scope of outcome.scopes key={scope}
-          li
-            code {scope}
+          li {scopeLabel(scope)}
     form.flex.flex-wrap.gap-3(action={decide})
       for field of Object.entries(outcome.fields) key={field[0]}
         input(type="hidden" name={field[0]} value={field[1]})
