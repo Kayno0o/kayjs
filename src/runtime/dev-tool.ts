@@ -19,8 +19,10 @@ const SIZES_URL = '/_kay/dev/sizes'
 const MAX_NAVIGATIONS = 5
 // The most requests one navigation lists, the rest counted.
 const MAX_FETCHES = 300
-// How long before the dev tool hears of a swap its own fetch may start, as the page calls fetch in the task marking itself busy; and how far a noted fetch's start may be from its note.
+// How long before the dev tool hears of a swap its own fetch may start, as the page calls fetch in the task marking itself busy.
 const SWAP_SLACK_MS = 20
+// The Server-Timing entry dev.ts answers the live reload's fetches with.
+const LIVE_RELOAD_TIMING = 'kay-live-reload'
 // The addresses the dev tool fetched itself, which the Network tab leaves out.
 const OWN_FETCHES = new Set<string>()
 const DEV_PATH = /\/_kay\/dev\//
@@ -1693,9 +1695,9 @@ interface Navigation {
 
 // What the page fetched, by navigation, newest first: its load and the last few swaps, each request with its kind, status, size and time; the dev tool's own requests are left out, and an error status is counted on the tab for the page shown.
 function networkTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
-  const win = doc.defaultView! as Window & typeof globalThis & { $kayDevFetches?: [href: string, at: number][] }
-  // The live reload script's fetches of the page, noted as it starts them.
-  const reloadFetch = (fetched: PerformanceResourceTiming) => win.$kayDevFetches?.some(([href, at]) => href === fetched.name && Math.abs(at - fetched.startTime) < SWAP_SLACK_MS) === true
+  const win = doc.defaultView!
+  // The live reload script's fetches of the page, which the dev server answers with a Server-Timing entry only they carry.
+  const reloadFetch = (fetched: PerformanceResourceTiming) => fetched.serverTiming?.some(timing => timing.name === LIVE_RELOAD_TIMING) === true
   let draw: () => void = () => undefined
   const tab = tool.tab({ id: 'network', label: 'Network', icon: 'network', shown: () => draw() })
   const content = tool.make('div', 'stack')
@@ -1712,17 +1714,41 @@ function networkTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
     if (tab.panel.hidden === false)
       draw()
   }
-  // Whether the request was kept, in the navigation it started in: a swap's own fetch, which starts a moment before the tool hears of the swap, goes in the swap's.
-  const add = (fetched: PerformanceResourceTiming) => {
-    if (DEV_PATH.test(fetched.name) || ((fetched.initiatorType === 'fetch' || fetched.initiatorType === 'xmlhttprequest') && (OWN_FETCHES.has(fetched.name) || reloadFetch(fetched))))
-      return false
-
-    const navigation = navigations.findLast(candidate => candidate.start <= fetched.startTime + SWAP_SLACK_MS) ?? navigations[0]!
-
+  // A page fetch that started a moment before the tool heard of the running swap, which may be the swap's own and is told once the swap names its page.
+  const early: PerformanceResourceTiming[] = []
+  const place = (fetched: PerformanceResourceTiming, navigation: Navigation) => {
     if (navigation.fetches.length < MAX_FETCHES)
       navigation.fetches.push(fetched)
     else
       navigation.more++
+  }
+  const earlyPage = (fetched: PerformanceResourceTiming) => {
+    if (fetched.initiatorType !== 'fetch' && fetched.initiatorType !== 'xmlhttprequest')
+      return false
+
+    const url = new URL(fetched.name)
+
+    return !ACTION_PATH.test(url.pathname) && !url.searchParams.has(ISLAND_PARAM)
+  }
+  // Whether the request was kept, in the navigation it started in: only a swap's own page fetch, which starts a moment before the tool hears of the swap, goes in the swap's, matched by its address.
+  const add = (fetched: PerformanceResourceTiming) => {
+    if (DEV_PATH.test(fetched.name) || ((fetched.initiatorType === 'fetch' || fetched.initiatorType === 'xmlhttprequest') && (OWN_FETCHES.has(fetched.name) || reloadFetch(fetched))))
+      return false
+
+    const swap = navigations.at(-1)!
+    const slack = swap.start > fetched.startTime && swap.start <= fetched.startTime + SWAP_SLACK_MS && earlyPage(fetched)
+
+    if (slack && swap.path === '') {
+      early.push(fetched)
+
+      return false
+    }
+
+    const url = slack ? new URL(fetched.name) : undefined
+    const own = url !== undefined && `${url.pathname}${url.search}` === swap.path
+    const navigation = navigations.findLast(candidate => candidate.start <= fetched.startTime || (own && candidate === swap)) ?? navigations[0]!
+
+    place(fetched, navigation)
 
     return true
   }
@@ -1802,6 +1828,12 @@ function networkTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
     }
     else if (!busy && last.path === '') {
       last.path = here()
+
+      for (const fetched of early.splice(0)) {
+        const url = new URL(fetched.name)
+
+        place(fetched, `${url.pathname}${url.search}` === last.path ? last : navigations.findLast(candidate => candidate !== last && candidate.start <= fetched.startTime) ?? navigations[0]!)
+      }
     }
     else {
       return

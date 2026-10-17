@@ -206,10 +206,11 @@ describe('the dev tool', () => {
         at('/_kay/env.js', { startTime: start + 60 }),
         at('/_kay/env.js', { initiatorType: 'script', startTime: start + 61 }),
       ])
+      ;(window as unknown as { happyDOM: { setURL: (url: string) => void } }).happyDOM.setURL('http://localhost/next')
       document.documentElement.removeAttribute('aria-busy')
       await Bun.sleep(0)
 
-      expect(groups()).toEqual([`This page, ${location.pathname}${location.search}4`, `Before, ${location.pathname}${location.search}4`])
+      expect(groups()).toEqual([`This page, ${location.pathname}${location.search}4`, `Before, /shop4`])
       expect(names().slice(0, 4)).toEqual(['/next', '/_kay/action/src/routes/next.kay/save', `/next?${ISLAND_PARAM}=1`, '/_kay/env.js'])
       expect(visible('#kay-dev-network', '.fetch .line .pill').slice(0, 4)).toEqual(['200', '500', '200', '200'])
       expect(visible('#kay-dev-network', '.fetch .chips > :first-child').slice(0, 4)).toEqual(['page', 'action', 'server island', 'script'])
@@ -225,7 +226,7 @@ describe('the dev tool', () => {
       typeFilter('#kay-dev-network', 'font')
 
       expect(names()).toEqual(['/fonts/inter.woff2'])
-      expect(groups()).toEqual([`Before, ${location.pathname}${location.search}4`])
+      expect(groups()).toEqual([`Before, /shop4`])
 
       // The last 5 navigations are kept.
       typeFilter('#kay-dev-network', '')
@@ -245,6 +246,61 @@ describe('the dev tool', () => {
       expect(groups()[0]).toEndWith('301')
       expect(visible('#kay-dev-network', '.group:first-child .fetch')).toHaveLength(300)
       expect(visible('#kay-dev-network', '.group:first-child > .note')).toEqual(['1 more not listed.'])
+    }
+    finally {
+      delete (window as { PerformanceObserver?: unknown }).PerformanceObserver
+    }
+  })
+
+  it('files a fetch under the navigation it started in, and hides only what the live reload marked', async () => {
+    ;(window as unknown as { happyDOM: { setURL: (url: string) => void } }).happyDOM.setURL('http://localhost/shop?page=2')
+    const observed = fakeObserver()
+    const at = (path: string, fields: Record<string, unknown>) => ({ name: new URL(path, location.href).href, entryType: 'resource', startTime: 0, duration: 12, transferSize: 300, encodedBodySize: 200, decodedBodySize: 500, responseStatus: 200, contentType: '', initiatorType: 'fetch', serverTiming: [], ...fields })
+    const section = (heading: string) => [...shadow().querySelectorAll('#kay-dev-network .group')].find(group => group.querySelector('h3')!.textContent.startsWith(heading))!
+    const listed = (heading: string) => [...section(heading).querySelectorAll('.fetch .name')].map(name => name.textContent)
+    const swap = async (to: string, entries: (start: number) => unknown[]) => {
+      const start = performance.now()
+
+      document.documentElement.setAttribute('aria-busy', 'true')
+      await Bun.sleep(0)
+      observed.report('resource', entries(start))
+      ;(window as unknown as { happyDOM: { setURL: (url: string) => void } }).happyDOM.setURL(`http://localhost${to}`)
+      document.documentElement.removeAttribute('aria-busy')
+      await Bun.sleep(0)
+    }
+
+    try {
+      tool = startDevTool()
+      shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-network')!.click()
+
+      // The live reload's fetch of the page is hidden by what the server answered it with, the app's own fetch of the same address started in the same instant is listed.
+      const now = performance.now()
+
+      observed.report('resource', [
+        at('/shop?page=2', { startTime: now, serverTiming: [{ name: 'kay-live-reload' }] }),
+        at('/shop?page=2', { startTime: now + 1, serverTiming: [{ name: 'other' }] }),
+      ])
+
+      expect(listed('This page')).toEqual(['/shop?page=2'])
+
+      // An app fetch 10 ms before a swap stays in the page it came from, the swap's own page fetch goes in the swap's, and so do the actions and islands started in that gap.
+      await swap('/next', start => [
+        at('/api/data', { startTime: start - 10 }),
+        at('/_kay/action/src/routes/shop.kay/save', { startTime: start - 8 }),
+        at(`/shop?${ISLAND_PARAM}=1`, { startTime: start - 6 }),
+        at('/next', { startTime: start - 4, contentType: 'text/html' }),
+      ])
+
+      expect(listed('This page')).toEqual(['/next'])
+      expect(listed('Before')).toEqual(['/api/data', '/_kay/action/src/routes/shop.kay/save', `/shop?${ISLAND_PARAM}=1`, '/shop?page=2'])
+
+      // A fetch reported once the swap ended is matched by its address as well.
+      observed.report('resource', [
+        at('/next', { startTime: performance.now() - 1 }),
+        at('/api/late', { startTime: performance.now() - 1 }),
+      ])
+
+      expect(listed('This page')).toEqual(['/next', '/next', '/api/late'])
     }
     finally {
       delete (window as { PerformanceObserver?: unknown }).PerformanceObserver

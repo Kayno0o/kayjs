@@ -334,6 +334,12 @@ describe('the dev tool\'s routes served by kay', () => {
       expect(member.request).toMatchObject({ guards: [{ file: `${routes}/members/_guard.ts`, outcome: 'passed' }] })
       // The dev tool reads the phases off the `Server-Timing` header the server recorded.
       expect(Object.fromEntries((await recorded(member.request!.id)).headers)['server-timing']).toMatch(/^guards;dur=\d+\.\d, import;dur=\d+\.\d, loads;dur=\d+\.\d, (?:\S+, )*render;dur=\d+\.\d$/)
+      // The live reload's fetch is told apart by a Server-Timing entry next to the page's own phases, which a fetch without its header never gets.
+      const reloaded = await visit('/members', { 'x-member': '1', 'x-kay-live-reload': '1' })
+
+      expect(reloaded.response.headers.get('server-timing')).toMatch(/^guards;dur=.*render;dur=\d+\.\d, kay-live-reload$/)
+      expect(member.response.headers.get('server-timing')).not.toContain('kay-live-reload')
+      expect((await visit('/login', { 'x-kay-live-reload': '1' })).response.headers.get('server-timing')).toContain('kay-live-reload')
       expect((await visit('/members/vip', { 'x-member': '1' })).request).toMatchObject({ status: 403, guards: [{ outcome: 'passed' }, { file: `${routes}/members/vip/_guard.ts`, outcome: 'denied with 403: VIPs only' }] })
 
       // A guard that redirects: the page it sends the visitor to knows where they came from, and by which guard.

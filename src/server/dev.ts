@@ -52,6 +52,9 @@ const INSPECTOR_SOURCE = resolve(import.meta.dir, '../runtime/dev-inspector.ts')
 const A11Y_SOURCE = resolve(import.meta.dir, '../runtime/dev-a11y.ts')
 // What the inspector sends, which a page of another site cannot without a preflight nothing answers.
 const OPEN_HEADER = 'x-kay-dev'
+const LIVE_RELOAD_HEADER = 'x-kay-live-reload'
+// The entry the live reload's fetches are answered with, copied in dev-tool.ts.
+const LIVE_RELOAD_TIMING = 'kay-live-reload'
 const POSITION = /^(.+\.(?:kay|[cm]?[jt]sx?|css)):(\d+):(\d+)$/
 const BACKSLASH = /\\/g
 const BRACKETS = /^\[|\]$/g
@@ -81,9 +84,9 @@ const LOAD_RETRY_MS = 100
 // Reconnects once the restarted server is up: one running the code this page came from, restarted for a stylesheet, gets the page's stylesheets swapped in, one at a time; one running new code refreshes the page through the swap, which keeps the scroll and the islands whose props did not change, and loads the page fully when the swap cannot apply it, as after a new island. A page with no swap, as under `navigation: false`, keeps the server render it loaded with and applies what changed between it and the new one to the page, through `DEV_PATCH`; it reloads when that cannot be applied, and a server that failed to boot always reloads.
 // The old links go once the new ones loaded, so the page never shows unstyled, and a page that no longer answers as it did reloads instead. A stylesheet edit swaps them the same way without a restart, on a `styles` event.
 // A server restarted for edited islands only also names their new chunks: a page on the code it replaced swaps them in through `$kayHot`, keeping its state, then its stylesheets.
-// Each page fetch it makes is noted in `$kayDevFetches`, which the dev tool's Network tab leaves out.
+// Each page fetch it makes carries `x-kay-live-reload`, which `recordResponses` answers with a `Server-Timing` entry for the dev tool's Network tab to leave out.
 // The id is a meta beside the script, so the script reads the same on every server: a page swap keeps it rather than running a copy that connects again, and a policy allows it by one hash.
-const LIVE_RELOAD_SCRIPT = `<script>(()=>{let b=document.querySelector('meta[name=kay-boot]')?.content,v,s,n=0,q=Promise.resolve();const load=async(k=0)=>{try{(window.$kayDevFetches??=[]).push([location.href,performance.now()]);const r=await fetch(location.href,{cache:'no-store',headers:{accept:'text/html'}});return r.ok&&!r.redirected?new DOMParser().parseFromString(await r.text(),'text/html'):null}catch{return k===${LOAD_RETRIES}?null:(await new Promise(r=>setTimeout(r,${LOAD_RETRY_MS})),load(k+1))}},css=async(d,i)=>{const o=[...document.querySelectorAll('link[rel=stylesheet]')],u=new Set(o.map(l=>l.getAttribute('href')));await Promise.all([...d.querySelectorAll('link[rel=stylesheet]')].map(l=>new Promise(r=>{const k=document.createElement('link'),h=l.getAttribute('href');k.rel='stylesheet';k.dataset.kayDev='';k.href=u.has(h)?h+(h.includes('?')?'&':'?')+'kay-dev='+i:h;k.onload=k.onerror=r;document.head.append(k)})));for(const l of o)l.remove()},on=x=>{x.onerror=()=>{x.close();setTimeout(()=>on(new EventSource(${JSON.stringify(DEV_EVENTS)})),n++<${FAST_RETRIES}?${FAST_RETRY_MS}:Math.min(${SLOW_RETRY_MS},${FAST_RETRY_MS}*2**(n-${FAST_RETRIES})))};x.addEventListener('built',e=>{dispatchEvent(new CustomEvent('kay-dev-built',{detail:e.data}))});x.addEventListener('styles',e=>q=q.then(async()=>{try{const d=await load();if(!d)return location.reload();if(s)s=d;await css(d,e.data)}catch{location.reload()}}));x.addEventListener('boot',e=>(n=0,q=q.then(async()=>{let p=false;const d=e.data,s0=d.indexOf(' '),t=d.indexOf(' ',s0+1),i=d.slice(0,s0),c=t<0?d.slice(s0+1):d.slice(s0+1,t),h=t<0?null:JSON.parse(d.slice(t+1));if(i===b){v??=c;if(!window.$kayRefresh)s??=await load();return}if(c!==v){let ok=false;try{ok=!!h&&String(h.from)===v&&!!window.$kayHot&&await window.$kayHot(h)}catch{}if(!ok){if(c===i)return location.reload();if(window.$kayRefresh){try{await window.$kayRefresh()}catch{return location.reload()}}else p=true}v=c}b=i;try{const d=await load();if(!d)return location.reload();if(p){const m=await import(${JSON.stringify(DEV_PATCH)});if(!s||!m.patch(s,d))return location.reload();s=d}await css(d,i)}catch{location.reload()}})))};on(new EventSource(${JSON.stringify(DEV_EVENTS)}))})()</script>`
+const LIVE_RELOAD_SCRIPT = `<script>(()=>{let b=document.querySelector('meta[name=kay-boot]')?.content,v,s,n=0,q=Promise.resolve();const load=async(k=0)=>{try{const r=await fetch(location.href,{cache:'no-store',headers:{'accept':'text/html','x-kay-live-reload':'1'}});return r.ok&&!r.redirected?new DOMParser().parseFromString(await r.text(),'text/html'):null}catch{return k===${LOAD_RETRIES}?null:(await new Promise(r=>setTimeout(r,${LOAD_RETRY_MS})),load(k+1))}},css=async(d,i)=>{const o=[...document.querySelectorAll('link[rel=stylesheet]')],u=new Set(o.map(l=>l.getAttribute('href')));await Promise.all([...d.querySelectorAll('link[rel=stylesheet]')].map(l=>new Promise(r=>{const k=document.createElement('link'),h=l.getAttribute('href');k.rel='stylesheet';k.dataset.kayDev='';k.href=u.has(h)?h+(h.includes('?')?'&':'?')+'kay-dev='+i:h;k.onload=k.onerror=r;document.head.append(k)})));for(const l of o)l.remove()},on=x=>{x.onerror=()=>{x.close();setTimeout(()=>on(new EventSource(${JSON.stringify(DEV_EVENTS)})),n++<${FAST_RETRIES}?${FAST_RETRY_MS}:Math.min(${SLOW_RETRY_MS},${FAST_RETRY_MS}*2**(n-${FAST_RETRIES})))};x.addEventListener('built',e=>{dispatchEvent(new CustomEvent('kay-dev-built',{detail:e.data}))});x.addEventListener('styles',e=>q=q.then(async()=>{try{const d=await load();if(!d)return location.reload();if(s)s=d;await css(d,e.data)}catch{location.reload()}}));x.addEventListener('boot',e=>(n=0,q=q.then(async()=>{let p=false;const d=e.data,s0=d.indexOf(' '),t=d.indexOf(' ',s0+1),i=d.slice(0,s0),c=t<0?d.slice(s0+1):d.slice(s0+1,t),h=t<0?null:JSON.parse(d.slice(t+1));if(i===b){v??=c;if(!window.$kayRefresh)s??=await load();return}if(c!==v){let ok=false;try{ok=!!h&&String(h.from)===v&&!!window.$kayHot&&await window.$kayHot(h)}catch{}if(!ok){if(c===i)return location.reload();if(window.$kayRefresh){try{await window.$kayRefresh()}catch{return location.reload()}}else p=true}v=c}b=i;try{const d=await load();if(!d)return location.reload();if(p){const m=await import(${JSON.stringify(DEV_PATCH)});if(!s||!m.patch(s,d))return location.reload();s=d}await css(d,i)}catch{location.reload()}})))};on(new EventSource(${JSON.stringify(DEV_EVENTS)}))})()</script>`
 
 export function liveReload(): string {
   return `<meta name="kay-boot" content="${bootId}">${LIVE_RELOAD_SCRIPT}`
@@ -571,6 +574,21 @@ export function recordResponses(app: Elysia, base = ''): void {
       return
 
     const response = responseValue instanceof Response ? responseValue : undefined
+
+    // Resource Timing hides request headers but shows this entry, which the live reload's fetches get next to the page's own phases and the dev tool's Network tab reads.
+    if (request.headers.has(LIVE_RELOAD_HEADER)) {
+      const phases = set.headers['server-timing']
+
+      set.headers['server-timing'] = phases !== undefined && phases !== '' ? `${phases}, ${LIVE_RELOAD_TIMING}` : LIVE_RELOAD_TIMING
+
+      try {
+        response?.headers.append('server-timing', LIVE_RELOAD_TIMING)
+      }
+      catch {
+        // A response with immutable headers, as a redirect built by `Response.redirect`, carries the entry from `set.headers`.
+      }
+    }
+
     const headers = new Headers(response?.headers)
 
     for (const [name, value] of Object.entries(set.headers)) {
