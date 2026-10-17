@@ -1,7 +1,7 @@
-import { existsSync } from 'node:fs'
 import { expect, it } from 'bun:test'
+import { existsSync } from 'node:fs'
 import { ai } from '../src'
-import { estimateTokens, translateUnits, unitProblem } from '../src/translation'
+import { estimateTokens, systemPrompt, translateUnits, unitProblem } from '../src/translation'
 
 const message = (text: string) => ({ id: '1', text, kind: 'message' as const })
 
@@ -45,4 +45,26 @@ it('fences around the JSON reply are tolerated, and the usage of both asks is su
   expect([...result.done]).toEqual([['1', 'Salut']])
   expect(result.inputTokens).toBeGreaterThan(0)
   fakeAi.clear()
+})
+
+it('lets the visible attributes of a tag be translated and holds every other one', () => {
+  const html = (text: string) => message(text)
+
+  expect(unitProblem(html('<a href="/x" title="Home">Go</a>'), '<a href="/x" title="Accueil">Aller</a>')).toBeUndefined()
+  expect(unitProblem(html('<img src="/a.png" alt="A cat">'), '<img src="/a.png" alt="Un chat">')).toBeUndefined()
+  expect(unitProblem(html('<input placeholder=\'Name\' aria-label="Your name">'), '<input placeholder=\'Nom\' aria-label="Votre nom">')).toBeUndefined()
+  expect(unitProblem(html('<a title="a > b">x</a>'), '<a title="a > b, oui">x</a>')).toBeUndefined()
+  expect(unitProblem(html('<a href="/x">Go</a>'), '<a href="/y">Aller</a>')).toBe('changes the tags of the source')
+  expect(unitProblem(html('<img src="/a.png" alt="A">'), '<img src="/b.png" alt="A">')).toBe('changes the tags of the source')
+  expect(unitProblem(html('<img src="/a.png" alt="A">'), '<img src="/a.png" alt="A" onerror="x()">')).toBe('changes the tags of the source')
+  expect(unitProblem(html('<img src="/a.png" alt="A">'), '<img src="/a.png">')).toBe('changes the tags of the source')
+  expect(unitProblem(html('<a title="Home">x</a>'), '<a title="Accueil" style="x:y">x</a>')).toBe('changes the tags of the source')
+  expect(unitProblem(html('<a class="a b" title="T">x</a>'), '<a class="a" title="T">x</a>')).toBe('changes the tags of the source')
+  expect(unitProblem(html('<a title="Home">x</a>'), '<a title="Accueil"><img src=x onerror=y>x</a>')).toBe('changes the tags of the source')
+  expect(unitProblem(html('<a title="Home">x</a>'), '<a title="a"><img src=x onerror=y> b">x</a>')).toBe('changes the tags of the source')
+  expect(unitProblem(html('<a title="Home">x</a>'), '<a title="Accueil"')).toBe('changes the tags of the source')
+})
+
+it('asks for the visible attributes to be translated', () => {
+  expect(systemPrompt('en', 'fr')).toContain('title, alt, aria-label')
 })

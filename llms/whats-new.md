@@ -6,6 +6,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 - A tool's input schema, and the OpenAPI document, describe `s.Integer()` and `s.Numeric()` as a number alone, and a tool's schema no longer requires a field with a `default` ([tools](api-routes.md)).
 - A stale tab believes the build the server named for 5 seconds, and a page an action post came back to as an error page (a 404, a guard's denial) carries `kay-posted` too, so a reload no longer posts it again ([a deploy under open tabs](production.md#a-deploy-under-open-tabs)).
+- kayjs-ai: `kay i18n translate` translates the `title`, `alt`, `aria-label` and `placeholder` of a tag and still holds its other attributes ([translating](../packages/ai/llms/translating.md)).
 - `kay doctor` tries the port on `HOST` or else `localhost`, passes `PORT=0` as the system's pick, and reads a manifest again once when it is being written ([kay doctor](check-and-tools.md)).
 - A production build keeps the runtime split per island for a file that also imports `kay` as a namespace or default beside import text in a template literal or a comment, which it used to rewrite.
 - kayjs-cms: in the on-page editor, the issues of a refused save stay shown when a draft render was pending, until the next edit ([kayjs-cms](../packages/cms/llms.txt)).
