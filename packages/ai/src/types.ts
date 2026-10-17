@@ -41,6 +41,8 @@ export interface AskOptions {
   temperature?: number | undefined
   // Stops the reply when it aborts, as the request being answered does on its own.
   signal?: AbortSignal | undefined
+  // Who the limits and budget set in `ai()` count this ask for, in place of the signed-in user its `visitor` names or the address of the request being answered: a job or a test names one.
+  visitor?: string | undefined
   // Asks this provider instead of the one the environment names, such as `openai({ baseUrl })`.
   provider?: Provider | undefined
 }

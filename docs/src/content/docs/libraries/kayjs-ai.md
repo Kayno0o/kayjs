@@ -123,9 +123,41 @@ kay sets no timeout on the request. A provider that stalls keeps the reply open 
 
 <ReadMore href="/llms/kayjs-ai-asking">Every variable, how the provider is picked, and the options of `ask`.</ReadMore>
 
+## Limit what visitors spend
+
+A public chat lets anyone run up your bill. Set a limit and a token budget in `kay.config.ts`.
+
+```ts
+import { ai } from '@kaynooo/kayjs-ai'
+import { sqliteRates } from 'kay/server'
+
+export default defineConfig({
+  extensions: [ai({
+    limit: { max: 10, window: '1m' },
+    budget: { tokens: 50_000, total: 2_000_000, window: '1d', store: sqliteRates('data/ai.sqlite') },
+  })],
+})
+```
+
+`limit` caps how many questions one visitor asks in a window. `budget.tokens` caps the tokens the answers to one visitor may use, and `budget.total` the tokens used for everyone. `ask` reads these on its own, so nothing changes where you call it.
+
+A visitor is counted by address. To count a signed-in user instead, pass `visitor`, a function from the request to the user's id. In a job with no request, name the visitor with `ask(prompt, { visitor })`, or leave it out: only `total` counts then.
+
+The budget counts tokens, not money, because prices change too often to ship a table. Pick `tokens` from the price of your model.
+
+The count lives in memory and starts over with the server. Give `store` a `sqliteRates(path)` to keep it across restarts and share it between processes. A budget store must be able to `peek`, as both of kay's stores can.
+
+Tokens are added when a reply ends, with the count the provider reports. A reply that goes over the budget while it streams is let finish, and all of it counts. The next question is refused. Questions started at the same moment all pass the check before any of them ends, so set `limit` beside the budget to bound how many can start.
+
+Over a limit, `ask` throws an `AiError` of kind `limited`. It has `retryAfter`, the seconds until the window closes, and `limit`, which says whether it was `asks`, `budget` or `total`. Nothing is sent to the provider. An action that lets it out answers 429 with a `Retry-After` header, as its own `rateLimit` would, and the chat shows `Too many questions; try again in 12 s`. Set `messages.rateLimit` on the action to word it yourself.
+
+If the store fails when the limit is read, the question is refused with kind `unavailable`, so a broken store never leaves the chat unlimited. If it fails when the tokens are added, the answer still goes out and the failure is logged.
+
+<ReadMore href="/llms/kayjs-ai-limits">Every option, when tokens count, and what a failing store does.</ReadMore>
+
 ## Errors
 
-A failure throws an `AiError` with a `kind`: `auth`, `rate-limited`, `unavailable`, `invalid`, `network`, `cut` or `protocol`. A rate limit has `retryAfter` in seconds. A reply cut halfway has `partial`, the text that came. Nothing is retried for you.
+A failure throws an `AiError` with a `kind`: `auth`, `rate-limited`, `unavailable`, `invalid`, `network`, `cut`, `protocol` or `limited`. A rate limit has `retryAfter` in seconds. A reply cut halfway has `partial`, the text that came. Nothing is retried for you.
 
 ## Test it
 

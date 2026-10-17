@@ -107,6 +107,19 @@ export const sendsAway = action(async function* (ctx) {
   yield 'never'
 })
 
+// What a library's limit throws as its stream is first read: an error carrying `Symbol.for('kay.refused')`.
+function libraryLimit() {
+  return Object.assign(new Error('over the limit'), { [Symbol.for('kay.refused')]: { status: 429, retryAfter: 42, message: 'Slow down' } })
+}
+
+export const libraryLimited = action(() => (async function* () {
+  throw libraryLimit()
+})())
+
+export const libraryWorded = action(() => (async function* () {
+  throw libraryLimit()
+})(), { messages: { rateLimit: wait => `Back in ${wait} s` } })
+
 export const refuses = action(t.Object({ full: t.Boolean() }), async ({ full }, ctx) => {
   if (full)
     return ctx.fail(409, 'Full')

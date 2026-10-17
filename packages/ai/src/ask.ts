@@ -1,6 +1,7 @@
 import type { AskOptions, Message, Reply } from './types'
 import { currentRequest } from 'kay/library'
 import { choose } from './config'
+import { guarded } from './limits'
 import { createReply } from './reply'
 
 const DEFAULT_MAX_TOKENS = 4096
@@ -31,5 +32,8 @@ export function ask(prompt: string | Message[], options: AskOptions = {}): Reply
   if (model === undefined)
     throw new Error('kayjs-ai: no model to ask; set AI_MODEL or pass { model }')
 
-  return createReply(signal => provider.stream({ messages, system: options.system, model, maxTokens: options.maxTokens ?? DEFAULT_MAX_TOKENS, temperature: options.temperature }, signal), [currentRequest()?.signal, options.signal])
+  const request = currentRequest()
+  const asker = { request, visitor: options.visitor, chars: messages.reduce((sum, message) => sum + message.content.length, options.system?.length ?? 0) }
+
+  return createReply(signal => guarded(() => provider.stream({ messages, system: options.system, model, maxTokens: options.maxTokens ?? DEFAULT_MAX_TOKENS, temperature: options.temperature }, signal), asker), [request?.signal, options.signal])
 }

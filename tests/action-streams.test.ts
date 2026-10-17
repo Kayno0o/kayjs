@@ -32,6 +32,8 @@ const actions = await import(join(fixture, 'routes/index.kay')) as {
   pretending: Action<{ name: string }, AsyncIterable<string>>
   sendsAway: Action<Record<never, never>, AsyncIterable<string>>
   refuses: Action<{ full: boolean }, AsyncIterable<string>>
+  libraryLimited: Action<Record<never, never>, AsyncIterable<string>>
+  libraryWorded: Action<Record<never, never>, AsyncIterable<string>>
 }
 const { secret } = await import(join(fixture, 'routes/members/index.kay')) as { secret: Action<Record<never, never>, AsyncIterable<string>> }
 const { seen } = await import(join(fixture, 'seen.ts')) as { seen: { started: number, stopped: number, slowStopped: number, quietStopped: number } }
@@ -153,6 +155,18 @@ describe('an action returning an async iterable', () => {
     expect(refusal.status).toBe(409)
     expect(refusal.errors['']).toBe('Full')
     expect(await site.call(actions.refuses, { full: false })).toEqual(['room'])
+  })
+
+  it('answers an error carrying a refusal from a library with its status, Retry-After and words, the action\'s own rate limit wording winning', async () => {
+    const plain = await posted(actions.libraryLimited)
+    const worded = await posted(actions.libraryWorded)
+
+    expect(plain.status).toBe(429)
+    expect(plain.headers.get('retry-after')).toBe('42')
+    expect(await plain.text()).toContain('Slow down')
+    expect(worded.status).toBe(429)
+    expect(worded.headers.get('retry-after')).toBe('42')
+    expect(await worded.text()).toContain('Back in 42 s')
   })
 
   it('counts its rate limit before the first value', async () => {

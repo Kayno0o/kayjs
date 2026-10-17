@@ -76,6 +76,8 @@ export const reply = action(s.Object({ prompt: s.String({ maxLength: 2000 }) }),
 
 A handler returns the iterable as it is, from a plain arrow function: an `async` handler returning one that is also a thenable, such as kayjs-ai's `ask()` reply, awaits it, and the call gets its text alone.
 
+A handler that throws an error carrying `Symbol.for('kay.refused')` as `{ status, retryAfter?, message }` answers that status with `Retry-After` and the message, which the action's `messages.rateLimit` replaces, instead of a 500: how kayjs-ai refuses a visitor over its `limit` or `budget`.
+
 ### Keep a value current on every open page
 
 `live(initial)` in a module of the project is a value the server changes and every page reading it follows, with no API module, route or stream written:

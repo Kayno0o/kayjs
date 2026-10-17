@@ -52,6 +52,39 @@ class Refusal {
   constructor(readonly response: Response | Promise<Response>) {}
 }
 
+// What a library's error carries under `Symbol.for('kay.refused')` to be answered as a refusal rather than a server error: the status, the seconds to wait and the words for the visitor.
+interface Refused {
+  status: number
+  retryAfter?: number | undefined
+  message: string
+}
+
+const REFUSED = Symbol.for('kay.refused')
+
+function refusalOf(error: unknown): Refused | undefined {
+  const refused = typeof error === 'object' && error !== null ? (error as Record<symbol, unknown>)[REFUSED] : undefined
+
+  if (typeof refused !== 'object' || refused === null)
+    return undefined
+
+  const { status, retryAfter, message } = refused as Partial<Refused>
+
+  if (!Number.isInteger(status) || status! < 400 || status! > 599 || typeof message !== 'string')
+    return undefined
+
+  return { status: status!, retryAfter: Number.isFinite(retryAfter) ? retryAfter : undefined, message }
+}
+
+// The action's own wording of a rate limit wins, given the seconds to wait.
+function refusalMessage(action: ServerAction<TSchema, unknown>, { retryAfter, message }: Refused): string {
+  const words = action.protection?.messages?.rateLimit
+
+  if (words === undefined || retryAfter === undefined)
+    return message
+
+  return typeof words === 'string' ? words : words(retryAfter)
+}
+
 // What the guards set on the response, carried to the handler they let through.
 const guarded = new WeakMap<Request, GuardedRequest>()
 // The params of the page each post came from, read by its guards and its action alike.
@@ -714,6 +747,16 @@ async function runAction(action: ServerAction<TSchema, unknown>, context: { body
     // The handler read `ctx.params` of a post from no page of its route.
     if (error instanceof Refusal)
       return error.response
+
+    const refused = refusalOf(error)
+
+    // A library's limit, such as kayjs-ai's, answers like the action's own rate limit.
+    if (refused !== undefined) {
+      if (refused.retryAfter !== undefined)
+        headers.set('retry-after', String(refused.retryAfter))
+
+      return failed(request, headers, jar.cookies, { action: action.url, status: refused.status, values: submittedValues(context.body), errors: { '': refusalMessage(action, refused) } }, context.server, back)
+    }
 
     // A mistake, or a service the handler relies on gone down: logged as any server error, and told the visitor beside the form they keep, as a refusal is.
     reportServerError(error, request, options.onError)

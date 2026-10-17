@@ -13,8 +13,23 @@ export type AiErrorKind
     | 'cut'
   // The provider sent something that is no server-sent event of its API.
     | 'protocol'
+  // The visitor or the chat is over a limit or budget set in `ai()`: `retryAfter` is the seconds until its window closes, `limit` which one.
+    | 'limited'
+
+// Which limit refused an ask: `asks` is `limit`, `budget` the visitor's tokens, `total` the tokens of all visitors.
+export type AiLimit = 'asks' | 'budget' | 'total'
+
+// What kay answers an action with when its handler throws an error carrying this: the status, `Retry-After` and the visitor's words, not a 500.
+const REFUSED = Symbol.for('kay.refused')
+
+const VISITOR_WORDS: Record<AiLimit, string> = {
+  asks: 'Too many questions',
+  budget: 'You have asked enough for now',
+  total: 'The chat is busy right now',
+}
 
 export interface AiErrorDetails {
+  limit?: AiLimit | undefined
   status?: number | undefined
   retryAfter?: number | undefined
   partial?: string | undefined
@@ -26,14 +41,22 @@ export class AiError extends Error {
   readonly kind: AiErrorKind
   readonly status: number | undefined
   readonly retryAfter: number | undefined
+  // Which limit refused the ask, for a `limited` error.
+  readonly limit: AiLimit | undefined
   // The text received before a reply was cut or failed, filled in by the reply.
   partial: string | undefined
+  declare readonly [REFUSED]?: { status: number, retryAfter: number | undefined, message: string }
 
-  constructor(kind: AiErrorKind, message: string, { status, retryAfter, partial, cause }: AiErrorDetails = {}) {
+  constructor(kind: AiErrorKind, message: string, { status, retryAfter, partial, limit, cause }: AiErrorDetails = {}) {
     super(`kayjs-ai: ${message}`, { cause })
     this.kind = kind
     this.status = status
     this.retryAfter = retryAfter
     this.partial = partial
+    this.limit = limit
+
+    if (kind === 'limited') {
+      Object.defineProperty(this, REFUSED, { value: { status: 429, retryAfter, message: `${VISITOR_WORDS[limit ?? 'asks']}; try again${retryAfter === undefined ? ' later' : ` in ${retryAfter} s`}` } })
+    }
   }
 }
