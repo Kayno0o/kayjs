@@ -1765,7 +1765,7 @@
     @apply contents;
   }
 
-  /* A narrow table stacks each row as a card, a line per cell with its header beside it, the labels as wide as the longest up to 40%, and keeps only its sortable headers, as sort buttons. */
+  /* A narrow table stacks each row as a card, a line per cell with its header beside it, the labels as wide as the longest up to 40%, and keeps only its sortable headers, as sort buttons tall enough to tap. */
   @container kui-table (width < 30rem) {
     .kui-table,
     .kui-table :where(thead, tbody, tr),
@@ -1790,11 +1790,11 @@
     }
 
     .kui-table-sort-btn {
-      @apply border border-kui-surface2 px-2 py-0.5;
+      @apply min-h-8 border border-kui-surface2 px-2 py-0.5;
     }
 
     .kui-table-row {
-      @apply grid grid-cols-[fit-content(40%)_1fr] gap-x-4 px-3 py-2;
+      @apply grid grid-cols-[fit-content(40%)_minmax(0,1fr)] gap-x-4 px-3 py-2;
     }
 
     /* Every value starts after its label, whatever its column aligns to in a wide table. */
@@ -1810,8 +1810,9 @@
       @apply block text-left text-kui-micro font-kui-label tracking-kui-label text-kui-subtext0 uppercase;
     }
 
+    /* A long value with no space, such as a file path, breaks inside the card rather than widening it. */
     .kui-table-cell-body {
-      @apply block min-w-0;
+      @apply block min-w-0 [overflow-wrap:anywhere];
 
       &:where(:first-child) {
         @apply col-span-full;

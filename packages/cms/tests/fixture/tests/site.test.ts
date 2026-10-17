@@ -406,3 +406,74 @@ test('a refused upload toasts, and leaves the body as it was', async () => {
   expect(await page.value(body)).toBe(before)
   expect(page.errors).toEqual([])
 }, 60_000)
+
+const PHONE = { width: 375, height: 700 }
+// WCAG 2.5.8's minimum target size.
+const TAP = 24
+const SCREENS = ['/admin', '/admin/collections/posts', '/admin/collections/posts?q=garden', '/admin/collections/posts?q=zzz', '/admin/collections/posts/hello', '/admin/collections/posts/notes/garden', '/admin/new/posts', '/admin/collections/products/mug', '/admin/uploads']
+
+// What a 375 px screen gets wrong: it scrolls sideways, a control spills past the screen or its own scrolling table, or one is too short to tap.
+async function phoneProblems(path: string): Promise<string[]> {
+  const built = await browser()
+  // strict is off for the empty tables' hydration mismatch, tracked in #821.
+  const page = await built.open(path, { ...PHONE, strict: false })
+
+  try {
+    await page.waitUntil(() => document.querySelector('h1') !== null)
+
+    return await page.evaluate((tap) => {
+      const found: string[] = []
+      const width = document.documentElement.clientWidth
+
+      if (document.documentElement.scrollWidth > width)
+        found.push(`page scrolls sideways: ${document.documentElement.scrollWidth} > ${width}`)
+
+      for (const control of document.querySelectorAll<HTMLElement>('main a[href], main button, main input, main select, main textarea')) {
+        const box = control.getBoundingClientRect()
+
+        if (box.width === 0 || box.height === 0 || getComputedStyle(control).visibility === 'hidden')
+          continue
+
+        const name = `${control.tagName.toLowerCase()} "${(control.textContent || control.getAttribute('aria-label') || control.getAttribute('name') || '').trim().slice(0, 30)}"`
+        // A control inside a table that scrolls on its own is reached by scrolling it.
+        const scroller = control.closest('.kui-table-wrap')
+        const limit = scroller === null ? width : scroller.getBoundingClientRect().right
+
+        if (control.matches('button, input:not([type="checkbox"]), select, textarea, a.kui-btn') && box.height < tap)
+          found.push(`${name} is ${Math.round(box.height)} px tall`)
+
+        if (box.left < -1 || box.right > limit + 1)
+          found.push(`${name} spans ${Math.round(box.left)}-${Math.round(box.right)} of ${Math.round(limit)}`)
+      }
+
+      return found
+    }, TAP)
+  }
+  finally {
+    page.close()
+  }
+}
+
+test.each(SCREENS)('%s fits a 375 px phone: no sideways page scroll, every control inside the screen and big enough to tap', async (path) => {
+  expect(await phoneProblems(path)).toEqual([])
+}, 60_000)
+
+test('the unused-uploads screen fits a 375 px phone with an upload to delete', async () => {
+  const form = new FormData()
+
+  form.append('file', new File([PIXEL], 'phone.png', { type: 'image/png' }))
+
+  const built = await browser()
+  const key = ((await (await built.fetch('/api/cms/files/products', { method: 'POST', body: form })).json()) as { path: string }).path.slice('/_kay/files/'.length)
+
+  setSystemTime(new Date(Date.now() + 2 * 24 * 60 * 60 * 1000))
+
+  try {
+    expect((await built.visit('/admin/uploads')).find('.kcms-uploads a').map(link => link.text)).toContain(key)
+    expect(await phoneProblems('/admin/uploads')).toEqual([])
+  }
+  finally {
+    await built.fetch('/api/cms/files/unused/delete', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ keys: [key] }) })
+    setSystemTime()
+  }
+}, 60_000)
