@@ -6,7 +6,7 @@ import process from 'node:process'
 import { loadConfig } from '../config'
 import { buildingWithoutEnv } from '../server/env-state'
 import { answeredBy, missingStore, NOT_FOUND_FILE } from '../server/not-found'
-import { addRedirect, answered, checkRedirect, redirectEntry } from '../server/not-found-config'
+import { addRedirect, checkRedirect, redirectEntry } from '../server/not-found-config'
 import { formatOption, printDocument, printFailure, projectRoot, shellQuote, withStdoutOnStderr } from './command'
 import { USAGES } from './usages'
 

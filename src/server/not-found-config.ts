@@ -8,8 +8,6 @@ const EMPTY_OBJECT = /^\s*\}/
 const IDENTIFIER_START = /[\w$]/
 const CONTROL = /\p{Cc}/u
 const WHITESPACE = /\s/
-const PARAM_SEGMENT = /:[A-Z_$][\w$]*/gi
-const REGEX_SPECIALS = /[.*+?^${}()|[\]\\]/g
 
 // Throws, saying why, when a path and a target are no redirect to add to a config whose redirects are `existing`.
 export function checkRedirect(redirect: string, target: string, existing: ReadonlySet<string>): void {
@@ -31,16 +29,6 @@ export function redirectEntry(from: string, to: string): string {
 
 function quoted(text: string): string {
   return `'${text.replaceAll('\\', '\\\\').replaceAll('\'', '\\\'')}'`
-}
-
-// Whether a redirect of the config takes the path: `:name` stands for a segment, a final `*` for the rest.
-export function answered(path: string, redirects: string[]): boolean {
-  return redirects.some((from) => {
-    const star = from.endsWith('/*')
-    const body = (star ? from.slice(0, -2) : from).replace(REGEX_SPECIALS, '\\$&').replace(PARAM_SEGMENT, '[^/]+')
-
-    return new RegExp(`^${body}${star ? '(?:/.*)?' : ''}$`).test(path)
-  })
 }
 
 // Where the config object's own `redirects` key stands: the offset after its `{`, `'other'` for a value that is no literal, undefined when the key is absent.

@@ -2,8 +2,8 @@ import type { MissingPath } from './not-found'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { isCrossSite } from './actions'
-import { missingStore, NOT_FOUND_FILE } from './not-found'
-import { addRedirect, answered, checkRedirect } from './not-found-config'
+import { answeredBy, missingStore, NOT_FOUND_FILE } from './not-found'
+import { addRedirect, checkRedirect } from './not-found-config'
 
 const HEADER = 'x-kay-dev'
 
@@ -23,9 +23,10 @@ export function devNotFound(root: string, redirects: string[]): DevNotFound {
     return { file: NOT_FOUND_FILE, recorded: false, missing: [] }
 
   const store = missingStore(file, false)
+  const answered = answeredBy(redirects)
 
   try {
-    return { file: NOT_FOUND_FILE, recorded: true, missing: store.list().filter(row => !answered(row.path, redirects)) }
+    return { file: NOT_FOUND_FILE, recorded: true, missing: store.list().filter(row => !answered(row.path)) }
   }
   finally {
     store.close()

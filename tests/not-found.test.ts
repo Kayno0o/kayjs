@@ -7,7 +7,7 @@ import { Elysia } from 'elysia'
 import { pages } from '../src/server'
 import { devNotFound, devRedirect } from '../src/server/dev-not-found'
 import { answeredBy, countedPath, countMissing, knowRedirects, missingPaths, missingStore, pageRequested, referrerHost, suggester, unansweredPaths } from '../src/server/not-found'
-import { answered, withRedirect } from '../src/server/not-found-config'
+import { withRedirect } from '../src/server/not-found-config'
 import { scratchDir } from './scratch'
 
 const known = ['/', '/about', '/blog/hello-world', '/blog/second-post', '/news/launch', '/fr/a-propos', '/fr/blog/hello-world']
@@ -318,12 +318,12 @@ describe('a served app', () => {
   })
 })
 
-describe('answered', () => {
+describe('answeredBy', () => {
   it('reads a star outside a trailing /* as a character, not a pattern', () => {
-    expect(answered('/a', ['*foo', '/x*', '/b/:id', '/docs/*'])).toBe(false)
-    expect(answered('/x*', ['/x*'])).toBe(true)
-    expect(answered('/b/7', ['/b/:id'])).toBe(true)
-    expect(answered('/docs/a/b', ['/docs/*'])).toBe(true)
+    expect(answeredBy(['*foo', '/x*', '/b/:id', '/docs/*'])('/a')).toBe(false)
+    expect(answeredBy(['/x*'])('/x*')).toBe(true)
+    expect(answeredBy(['/b/:id'])('/b/7')).toBe(true)
+    expect(answeredBy(['/docs/*'])('/docs/a/b')).toBe(true)
   })
 })
 

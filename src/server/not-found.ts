@@ -32,7 +32,7 @@ const SCANNED_SEGMENT = /^(?:wp-[\w-]+|xmlrpc|phpmyadmin|pma|cgi-bin|boaform|act
 // What browsers and crawlers ask every site for, which a site without them is not missing a page for.
 const DEFAULT_FILE = /^\/(?:favicon\.ico|robots\.txt|apple-touch-icon[\w-]*\.png)$/
 const PARAM_SEGMENT = /:[A-Z_$][\w$]*/gi
-const REGEX_SPECIALS = /[.+?^${}()|[\]\\]/g
+const REGEX_SPECIALS = /[.*+?^${}()|[\]\\]/g
 
 export interface MissingPath {
   path: string
