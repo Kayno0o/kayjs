@@ -12,32 +12,49 @@ function warnOnce(message: string) {
   log.warn(message)
 }
 
-// Another object over `target` with `name` added, so a store written as a class keeps its methods and `this`.
-function withVerb<T extends object>(target: T, name: string, verb: (...args: never[]) => unknown): T {
-  return Object.create(target, { [name]: { value: verb.bind(target), enumerable: true, writable: true, configurable: true } }) as T
+type Verb = (...args: never[]) => unknown
+
+// A view of `target` whose own methods still run on `target`, so a store written as a class keeps its private fields and state, with `overrides` answering instead of what `target` has under those names.
+function view<T extends object>(target: T, overrides: Record<string, unknown>): T {
+  return new Proxy(target, {
+    get(object, key) {
+      if (typeof key === 'string' && key in overrides)
+        return overrides[key]
+
+      const value: unknown = Reflect.get(object, key, object)
+
+      return typeof value === 'function' ? (value as Verb).bind(object) : value
+    },
+    has: (object, key) => (typeof key === 'string' && key in overrides) || key in object,
+  })
 }
 
-// The store with the verbs of 1.52: `members.delete` and `oauth.grants.upsert`, which 1.51 named `members.remove` and `oauth.grants.put`. A store that has only the old name keeps working, through a copy that leaves the app's object alone; one that has both is used as it is.
+// The store with the verbs of 1.52: `members.delete` and `oauth.grants.upsert`, which 1.51 named `members.remove` and `oauth.grants.put`. A store that has only the old name keeps working, through a view that leaves the app's object alone; one that has both is used as it is.
 export function acceptOldVerbs(store: AuthStore | LegacyAuthStore): AuthStore {
-  const members = store.members as { delete?: unknown, remove?: (...args: never[]) => unknown } | undefined
-  const grants = store.oauth?.grants as { upsert?: unknown, put?: (...args: never[]) => unknown } | undefined
+  const members = store.members as { delete?: unknown, remove?: Verb } | undefined
+  const grants = store.oauth?.grants as { upsert?: unknown, put?: Verb } | undefined
   const oldMembers = members !== undefined && members.delete === undefined && typeof members.remove === 'function'
   const oldGrants = grants !== undefined && grants.upsert === undefined && typeof grants.put === 'function'
 
   if (!oldMembers && !oldGrants)
     return store as AuthStore
 
-  const additions: PropertyDescriptorMap = {}
+  const overrides: Record<string, unknown> = {}
 
   if (oldMembers) {
     warnOnce('store.members.remove is renamed store.members.delete')
-    additions.members = { value: withVerb(members, 'delete', members.remove!), enumerable: true }
+    overrides.members = view(members, { delete: members.remove!.bind(members) })
   }
 
   if (oldGrants) {
     warnOnce('store.oauth.grants.put is renamed store.oauth.grants.upsert')
-    additions.oauth = { value: Object.create(store.oauth!, { grants: { value: withVerb(grants, 'upsert', grants.put!), enumerable: true } }) as object, enumerable: true }
+    overrides.oauth = view(store.oauth!, { grants: view(grants, { upsert: grants.put!.bind(grants) }) })
   }
 
-  return Object.create(store, additions) as AuthStore
+  return view(store, overrides) as AuthStore
+}
+
+// For a test: the next old verb warns again.
+export function forgetWarnings() {
+  warned.clear()
 }

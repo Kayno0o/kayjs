@@ -210,7 +210,7 @@ export interface TokenRecord {
 }
 
 // Where kayjs-auth keeps its data. Every method may answer synchronously or with a promise.
-// One verb per operation: `create` adds a row, `delete` removes one, `upsert` creates or replaces, and `consume` deletes a row and answers it, once only. A `delete` answers whether there was a row when the caller tells the person it was not found (what is owned by a user or an organization), and nothing for the cascading deletes of users and identities, which are idempotent. `use` marks an OAuth code or refresh token spent and keeps the row, so it can tell a reuse: it is not `consume`.
+// One verb per operation: `create` adds a row, `delete` removes one, `upsert` creates or replaces, `consume` deletes a row and answers it once only; `use` marks an OAuth code or refresh token spent and keeps the row, so it can tell a reuse.
 export interface AuthStore {
   users: {
     get: (id: string) => MaybePromise<UserRecord | undefined>

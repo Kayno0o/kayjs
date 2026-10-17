@@ -1,14 +1,15 @@
-import type { AuthStore, MemberRecord, OAuthGrantRecord } from '../src/store'
+import type { AuthStore, LegacyAuthStore, MemberRecord, OAuthGrantRecord } from '../src/store'
 import { afterEach, describe, expect, spyOn, test } from 'bun:test'
 import { log } from '../src/log'
 import { memoryStore } from '../src/memoryStore'
-import { acceptOldVerbs } from '../src/storeVerbs'
+import { acceptOldVerbs, forgetWarnings } from '../src/storeVerbs'
 import { testApp } from './helpers/app'
 
 const PASSWORD = 'correct horse battery'
 
 afterEach(() => {
   spyOn(log, 'warn').mockRestore()
+  forgetWarnings()
 })
 
 // A store written before 1.52: `members.remove` and `oauth.grants.put` in place of `delete` and `upsert`.
@@ -44,6 +45,50 @@ describe('a store with the verbs of 1.51', () => {
     ])
     // The app's object is left as it was written.
     expect('delete' in store.members!).toBe(false)
+  })
+
+  test('a class store with private fields keeps working, its state staying on the app\'s object', async () => {
+    spyOn(log, 'warn').mockImplementation(() => undefined)
+
+    class ClassMembers {
+      #rows = new Map<string, MemberRecord>()
+      calls = 0
+
+      add(record: MemberRecord) {
+        this.calls++
+        this.#rows.set(record.userId, record)
+      }
+
+      get(_organizationId: string, userId: string) {
+        return this.#rows.get(userId)
+      }
+
+      remove(_organizationId: string, userId: string) {
+        return this.#rows.delete(userId)
+      }
+    }
+
+    const members = new ClassMembers()
+    const legacy = { ...memoryStore(), members } as unknown as LegacyAuthStore
+    const accepted = acceptOldVerbs(legacy)
+
+    await accepted.members!.add(member)
+    expect(await accepted.members!.get('o1', 'u1')).toEqual(member)
+    expect(members.calls).toBe(1)
+    expect(await accepted.members!.delete('o1', 'u1')).toBe(true)
+    expect(await accepted.members!.get('o1', 'u1')).toBeUndefined()
+  })
+
+  test('only one old verb: the other group is left as it is', async () => {
+    spyOn(log, 'warn').mockImplementation(() => undefined)
+
+    const { store: grantsOnly } = oldStore()
+    const current = memoryStore()
+    const onlyGrants = acceptOldVerbs({ ...grantsOnly, members: current.members } as unknown as AuthStore)
+
+    expect(onlyGrants.members).toBe(current.members)
+    await onlyGrants.oauth!.grants.upsert(grant)
+    expect((await onlyGrants.oauth!.grants.get('u1', 'c1'))!.clientName).toBe('Agent')
   })
 
   test('a store with the new names is returned as it is and warns of nothing', () => {
