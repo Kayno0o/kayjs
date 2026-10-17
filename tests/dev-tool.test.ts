@@ -61,7 +61,17 @@ describe('the dev tool', () => {
 
   const shadow = () => document.querySelector('kay-dev')!.shadowRoot!
   // What a tab shows of `selector`, leaving out what the filter hid.
-  const visible = (panel: string, selector: string) => [...shadow().querySelectorAll(`${panel} ${selector}`)].filter(element => element.closest('[hidden]') === null).map(element => element.textContent)
+  const visible = (panel: string, selector: string) => [...shadow().querySelectorAll(`${panel} ${selector}`)].filter(element => element.closest('[hidden], [data-filtered]') === null).map(element => element.textContent)
+  // Clicks a copy button, the tab's own in the drawer's head when none is given, and gives what reached the clipboard.
+  const copiedBy = async (button: HTMLButtonElement = shadow().querySelector<HTMLButtonElement>('.head .icon')!) => {
+    let copied = ''
+
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async (text: string) => void (copied = text) } })
+    button.click()
+    await Bun.sleep(0)
+
+    return copied
+  }
   const typeFilter = (panel: string, text: string) => {
     const input = shadow().querySelector<HTMLInputElement>(`${panel} .toolbar input`)!
 
@@ -380,12 +390,12 @@ describe('the dev tool', () => {
     expect([...shadow().querySelectorAll('.problem button.position')].map(position => position.textContent)).toEqual(['src/routes/todos/[id].kay:3:4', 'src/routes/(site)/[[page]].kay:12', 'src/routes/[...rest].kay'])
   })
 
-  it('finds the scripts and stylesheets a problem names by a folder or a line, but no word like Node.js nor a URL of kay\'s own', async () => {
+  it('finds the scripts and stylesheets a problem names by a folder or a line, but no word like Node.js, URL path or URL of kay\'s own', async () => {
     tool = startDevTool()
-    console.error('[kay] at load (src/lib/db.ts:12:5), C:\\app\\src\\x.tsx:3, styles.css:4, src/app.css, Node.js, /_kay/entry-1.js:2:1, https://cdn.example/x.js:1:1 and lib.mjs')
+    console.error('[kay] at load (src/lib/db.ts:12:5), C:\\app\\src\\x.tsx:3, styles.css:4, src/app.css, Node.js, /_kay/entry-1.js:2:1, https://cdn.example/x.js:1:1, GET /assets/app.js 404, /home/me/app/src/y.ts:3:5 and lib.mjs')
     await Bun.sleep(0)
 
-    expect([...shadow().querySelectorAll('.problem button.position')].map(position => position.textContent)).toEqual(['src/lib/db.ts:12:5', 'C:\\app\\src\\x.tsx:3', 'styles.css:4', 'src/app.css'])
+    expect([...shadow().querySelectorAll('.problem button.position')].map(position => position.textContent)).toEqual(['src/lib/db.ts:12:5', 'C:\\app\\src\\x.tsx:3', 'styles.css:4', 'src/app.css', '/home/me/app/src/y.ts:3:5'])
   })
 
   it('opens each .kay file a problem names once an opener is set, saying why it could not', async () => {
@@ -558,7 +568,12 @@ describe('the dev tool', () => {
 
     expect(visible('#kay-dev-request', '.headers tr')).toEqual(['cache-controlno-store'])
     expect(visible('#kay-dev-request', '.facts dd')).toEqual([])
-    expect(visible('#kay-dev-request', '.chain li')).toHaveLength(4)
+    expect(visible('#kay-dev-request', '.chain li')).toEqual([])
+    expect(visible('#kay-dev-request', '.timing')).toEqual([])
+
+    typeFilter('#kay-dev-request', 'layout')
+
+    expect(visible('#kay-dev-request', '.chain li')).toEqual(['Layoutsrc/routes/_layout.kay'])
 
     typeFilter('#kay-dev-request', '')
 
@@ -692,6 +707,8 @@ describe('the dev tool', () => {
       filter().value = 'ABOUT'
       filter().dispatchEvent(new Event('input'))
       expect(rows()).toEqual(['GET | /fr/a-propos | fr | src/routes/about.kay'])
+      expect(await copiedBy(shadow().querySelector<HTMLButtonElement>('#kay-dev-routes .route .copy')!)).toBe(new URL('/fr/a-propos', location.href).href)
+      expect(await copiedBy()).toContain('\n- GET /fr/a-propos')
       filter().value = 'nothing'
       filter().dispatchEvent(new Event('input'))
       expect(shadow().querySelector('#kay-dev-routes .empty')?.textContent).toBe('No route matches the filter.')
@@ -750,6 +767,9 @@ describe('the dev tool', () => {
       expect(text('.serp span:not(.cap)')).toEqual(['https://shop.example/', 'Home | Shop', 'The shop'])
       expect(panel().querySelector('.facts')!.textContent).toBe('TitleHome | Shop11 / 60DescriptionThe shop8 / 160Canonicalhttps://shop.example/Alternatesfr: https://shop.example/frRobotsnoindexSitemaplisted')
       expect(text('.meter.over')).toEqual([])
+      expect(await copiedBy(panel().querySelector<HTMLButtonElement>('.facts .copy')!)).toBe('https://shop.example/')
+      expect(await copiedBy(panel().querySelector<HTMLButtonElement>('.kv .copy')!)).toBe('https://shop.example/_kay/card?title=Home')
+      expect(await copiedBy()).toContain('\n- Canonical: https://shop.example/\n')
       expect(text('h3')).toEqual(['Tags', 'Open Graph2', 'Twitter1', 'JSON-LD2'])
       expect(panel().querySelector<HTMLImageElement>('.preview img.card')!.src).toBe('http://localhost:3000/_kay/card?title=Home')
       expect(text('.json summary')).toEqual(['WebSite'])
@@ -906,6 +926,8 @@ describe('the dev tool', () => {
       typeFilter('#kay-dev-env', 'redis')
 
       expect(visible('#kay-dev-env', '.env .name')).toEqual(['KAY_TEST_REDIS_URL'])
+      expect(await copiedBy(shadow().querySelector<HTMLButtonElement>('#kay-dev-env .env:not([hidden]) .copy')!)).toBe(visible('#kay-dev-env', '.env .val')[0]!)
+      expect(await copiedBy()).not.toContain('KAY_TEST_FEED')
 
       typeFilter('#kay-dev-env', '')
 
@@ -1106,6 +1128,14 @@ describe('the dev tool', () => {
       typeFilter('#kay-dev-images', 'png')
 
       expect(visible('#kay-dev-images', '.image .name')).toEqual(['/logo.png', '/logo.png?file=a.svg'])
+
+      // The tab as Markdown leaves out the rows the filter hides; an address copies whole.
+      const markdown = await copiedBy()
+
+      expect(markdown).toStartWith(`# Images, ${location.href}`)
+      expect(markdown).toContain('\n- /logo.png?file=a.svg\n')
+      expect(markdown).not.toContain('/photo')
+      expect(await copiedBy(shadow().querySelector<HTMLButtonElement>('#kay-dev-images .image:not([hidden]) .copy')!)).toBe(new URL('/logo.png', location.href).href)
     }
     finally {
       timing.mockRestore()
@@ -1296,6 +1326,13 @@ describe('the dev tool', () => {
       expect(text).toContain('Route /, server build')
       expect(text).toContain('~ marks an estimate')
       expect(shadow().querySelector('#kay-dev-performance')!.textContent).toContain('Measured on the load of /.')
+
+      // As Markdown: a bullet per vital with its rating, the weights with their files nested, the total last.
+      const markdown = await copiedBy()
+
+      expect(markdown).toContain('\n- LCP: 3000 ms, needs work\n- CLS: 0.120, needs work\n- INP: 240 ms, needs work\n')
+      expect(markdown).toContain('\n  - /_kay/counter-def45678.js ')
+      expect(markdown).toMatch(/\n- Total: \d+(\.\d)? (B|KB)\n/)
 
       // A link swaps in another page without a load: the vitals say which load they belong to.
       happyDOM.setURL('http://localhost/next')

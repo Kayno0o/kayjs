@@ -30,8 +30,8 @@ const BUILT_EVENT = 'kay-dev-built'
 const SEGMENT = String.raw`(?:\([\w@.+=-]+\)|\[{1,2}(?:\.{3})?[\w-]+\]{1,2}|[\w@.+=-])+`
 const SOURCE_EXTENSION = String.raw`(?:[cm]?[jt]sx?|css)`
 
-// A source file a problem names, with its line and column when it gives them, not one inside a URL nor a URL of kay's own: a `.kay` file named alone, a script or stylesheet once a folder or a line tells it from a word like Node.js.
-const SOURCE_POSITION = new RegExp(String.raw`(?<![\w@.+=:/\\)\]-])(?![\\/]_kay[\\/])(?:(?:[A-Za-z]:)?[\\/]?(?:${SEGMENT}[\\/])*${SEGMENT}\.kay|(?:[A-Za-z]:)?[\\/]?(?:${SEGMENT}[\\/])+${SEGMENT}\.${SOURCE_EXTENSION}|${SEGMENT}\.${SOURCE_EXTENSION}(?=:\d))(?::\d+(?::\d+)?)?(?!\.?\w)`, 'g')
+// A source file a problem names, with its line and column when it gives them, not one inside a URL nor a URL of kay's own: a `.kay` file named alone, a script or stylesheet once a folder or a line tells it from a word like Node.js, and an absolute one, as a URL path reads, only with a line, as a stack trace gives.
+const SOURCE_POSITION = new RegExp(String.raw`(?<![\w@.+=:/\\)\]-])(?![\\/]_kay[\\/])(?:(?:[A-Za-z]:)?[\\/]?(?:${SEGMENT}[\\/])*${SEGMENT}\.kay|(?:${SEGMENT}[\\/])+${SEGMENT}\.${SOURCE_EXTENSION}|(?:[A-Za-z]:)?[\\/]?(?:${SEGMENT}[\\/])*${SEGMENT}\.${SOURCE_EXTENSION}(?=:\d))(?::\d+(?::\d+)?)?(?!\.?\w)`, 'g')
 const OPENED_POSITION = /^(.+\.\w+)(?::(\d+))?(?::(\d+))?$/
 // A value the Head tab gives a copy button, as a link.
 const WEB_URL = /^https?:\/\//i
@@ -130,6 +130,7 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 .panel { flex: 1; min-width: 0; overflow: auto; padding: 12px 14px 16px; display: grid; align-content: start; gap: 16px; }
 .panel > * { min-width: 0; }
 .group { display: grid; gap: 8px; }
+.group[data-filtered] { display: none; }
 .heading { display: flex; align-items: center; gap: 8px; margin: 0; font: 650 11px/1.4 system-ui, sans-serif; letter-spacing: .07em; text-transform: uppercase; color: var(--sub); }
 .grow { flex: 1; }
 .actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
@@ -461,14 +462,7 @@ function copyButton(tool: DevTool, what: string, text: string): HTMLButtonElemen
 
 // Copies `text` from an icon button, its icon and name saying for a moment whether it worked, without a dialog.
 async function copied(button: HTMLButtonElement, text: string, label: string, icon: DevIconName): Promise<void> {
-  let worked = true
-
-  try {
-    await button.ownerDocument.defaultView!.navigator.clipboard.writeText(text)
-  }
-  catch {
-    worked = false
-  }
+  const worked = await toClipboard(button, text)
 
   setIcon(button, worked ? 'Copied' : 'Copy failed', worked ? 'check' : 'x')
   clearTimeout(copyResets.get(button))
@@ -490,6 +484,7 @@ function toolbar(tool: DevTool, help: string, rerun: () => void, problems = fals
   search.append(tool.icon('search'), input)
   element.append(search)
   empty.hidden = true
+  empty.setAttribute('aria-live', 'polite')
 
   if (problems) {
     toggle.type = 'button'
@@ -516,11 +511,14 @@ function toolbar(tool: DevTool, help: string, rerun: () => void, problems = fals
       for (const section of within.querySelectorAll<HTMLElement>('[data-plain]'))
         section.hidden = only
 
+      // A group with no row to match, such as a timing chart, goes while a filter is on; marked rather than hidden, as its tab may hide it for its own reasons.
       for (const group of within.querySelectorAll<HTMLElement>('.group')) {
         const own = [...group.querySelectorAll<HTMLElement>('[data-filter]')]
 
         if (own.length > 0)
           group.hidden = own.every(row => row.hidden === true)
+        else
+          group.toggleAttribute('data-filtered', typed !== '' || only)
       }
 
       empty.textContent = only && typed === '' ? 'No problems.' : 'Nothing matches the filter.'
@@ -1578,7 +1576,7 @@ function requestTab(doc: Document, tool: DevTool): { stop: () => void } {
       where.style.setProperty('--depth', String(depth))
       where.append(file)
       item.append(tool.make('span', 'k', kind), where, outcome ?? tool.make('span'))
-      chain.append(item)
+      chain.append(filterable(item, `${kind} ${file.textContent} ${outcome?.textContent ?? ''}`))
     }
     const timing = tool.make('section', 'group')
     const scaled = (total?: number) => {
@@ -1807,16 +1805,16 @@ function headTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
       const table = tool.make('table', 'kv')
       const title = tool.make('h3', 'heading', heading)
 
-      for (const [key, content] of found) {
+      for (const [key, tagValue] of found) {
         const row = tool.make('tr')
 
-        const value = tool.make('td', '', content)
+        const value = tool.make('td', '', tagValue)
 
-        if (WEB_URL.test(content))
-          value.append(copyButton(tool, `the ${key} URL`, content))
+        if (WEB_URL.test(tagValue))
+          value.append(copyButton(tool, `the ${key} URL`, tagValue))
 
         row.append(tool.make('td', '', key), value)
-        table.append(filterable(row, `${key} ${content}`))
+        table.append(filterable(row, `${key} ${tagValue}`))
       }
 
       title.append(pill(tool, String(found.length)))
@@ -2865,9 +2863,21 @@ function positionButton(tool: DevTool, source: string): HTMLButtonElement {
   return position
 }
 
+// Whether the text reached the clipboard of the button's window.
+async function toClipboard(button: HTMLButtonElement, text: string): Promise<boolean> {
+  try {
+    await button.ownerDocument.defaultView!.navigator.clipboard.writeText(text)
+
+    return true
+  }
+  catch {
+    return false
+  }
+}
+
 // Opens the position an error page's button names, saying why it could not, or copies the error, saying so a moment.
 async function answerErrorPage(tool: DevTool, target: HTMLButtonElement): Promise<void> {
-  const { kayOpen: source, kayCopy: copied } = target.dataset
+  const { kayOpen: source, kayCopy: copiedId } = target.dataset
 
   if (source !== undefined) {
     const failed = await tool.open(withLine(source))
@@ -2877,20 +2887,14 @@ async function answerErrorPage(tool: DevTool, target: HTMLButtonElement): Promis
     return
   }
 
-  await copyText(target, target.ownerDocument.getElementById(copied!)?.textContent ?? '')
+  await copyText(target, target.ownerDocument.getElementById(copiedId!)?.textContent ?? '')
 }
 
 // Writes the text to the clipboard and says so on the button for a moment, or that it failed, without a dialog; the text sits in the button's own span when it has one, beside its icon.
 async function copyText(button: HTMLButtonElement, text: string): Promise<void> {
   const label = button.querySelector('span') ?? button
 
-  try {
-    await button.ownerDocument.defaultView!.navigator.clipboard.writeText(text)
-    label.textContent = 'Copied'
-  }
-  catch {
-    label.textContent = 'Copy failed'
-  }
+  label.textContent = await toClipboard(button, text) ? 'Copied' : 'Copy failed'
 
   clearTimeout(copyResets.get(button))
   copyResets.set(button, setTimeout(() => {
@@ -2928,7 +2932,7 @@ function copiedProblems(url: string, listed: { problem: DevProblem & { text: str
 }
 
 // What the Markdown of a tab leaves out: its controls, drawings, the Head previews that repeat its tags, and what is hidden.
-const UNCOPIED = '.toolbar, .actions, .copy, .dismiss, .previews, .scalebox, img, svg, .rule, [hidden]'
+const UNCOPIED = '.toolbar, .actions, .copy, .dismiss, .previews, .scalebox, img, svg, .rule, [hidden], [data-filtered]'
 // Elements a line of text runs through, rather than blocks of their own.
 const INLINE = new Set(['a', 'b', 'button', 'code', 'i', 'small', 'span', 'strong'])
 const BULLET = /^ *- /

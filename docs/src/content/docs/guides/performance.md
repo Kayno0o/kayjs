@@ -18,13 +18,13 @@ The drawer follows your system's light or dark theme. Each tab has an icon and a
 
 The Problems tab has a Copy button. It puts every listed problem on the clipboard as plain text, starting with the page URL, so you can paste them into an LLM. Problems you dismissed are left out.
 
-The copy button in the drawer's head copies the open tab as Markdown, as it is shown. Most tabs have a filter box, and Head and Images a "Problems only" toggle, so you can narrow a tab before copying it. Addresses, header values and env values have their own copy button.
+The copy button in the drawer's head copies the open tab as Markdown, as it is shown. Request, Head, Routes, Env and Images have a filter box, and Head and Images a "Problems only" toggle, so you can narrow a tab before copying it. Addresses, header values and env values have their own copy button.
 
 A file a tab names is a button: click it to open the file in your editor, at the line when the tab gives one.
 
 ## The tabs
 
-Each tab answers one question about the page in view. A tab with a red or amber count needs your attention.
+Each tab answers one question about the page in view. A tab with a red or amber count needs your attention: Request counts a page answered with an error status, Performance a Web Vital past its good limit.
 
 | Tab | Shows |
 | --- | --- |
