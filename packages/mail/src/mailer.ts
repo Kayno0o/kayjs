@@ -10,7 +10,7 @@ import { defineEnv, queue, renderLocale, renderToString } from 'kay/server'
 import parseAddresses from 'nodemailer/lib/addressparser'
 import { log } from './log'
 import { addressOf, outbox, PREVIEW_ROUTES } from './outbox'
-import { checkKey, checkOptions, smtp } from './smtp'
+import { checkKey, checkOptions, greetingOf, smtp } from './smtp'
 import { htmlToText } from './text'
 
 // The development pages' routes, which read `./preview` on the first request to one: a plugin that registers its routes at once, so it mounts as any other, with handlers that hand the request to the pages once they are loaded. Each is registered by its method and path, as the pages do, since a catch-all would lose to the page fallback's `GET /*`.
@@ -241,7 +241,7 @@ function fromEnvironment(from: Address | undefined, fromName: string | undefined
   const missing = () => [...env.SMTP_HOST === undefined ? ['SMTP_HOST'] : [], ...from === undefined && env.SMTP_FROM === undefined ? ['SMTP_FROM'] : []]
 
   // Built on the first mail, as `kay build` runs without the server's environment and leaves a missing variable to throw where it is read.
-  const opened = () => transport ??= smtp({ host: env.SMTP_HOST, port: env.SMTP_PORT, insecure: env.SMTP_INSECURE, user: env.SMTP_USER, pass: env.SMTP_PASS, rateLimit: env.SMTP_RATE_LIMIT, name: domainOf(sender()), ...defined(overrides), dkim: dkimKey === undefined ? undefined : { domain: env.SMTP_DKIM_DOMAIN ?? domainOf(sender())!, selector: env.SMTP_DKIM_SELECTOR!, privateKey: dkimKey } })
+  const opened = () => transport ??= smtp({ host: env.SMTP_HOST, port: env.SMTP_PORT, insecure: env.SMTP_INSECURE, user: env.SMTP_USER, pass: env.SMTP_PASS, rateLimit: env.SMTP_RATE_LIMIT, name: greetingOf(domainOf(sender())), ...defined(overrides), dkim: dkimKey === undefined ? undefined : { domain: env.SMTP_DKIM_DOMAIN ?? domainOf(sender())!, selector: env.SMTP_DKIM_SELECTOR!, privateKey: dkimKey } })
 
   return {
     transport: {

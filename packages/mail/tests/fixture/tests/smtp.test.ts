@@ -236,6 +236,24 @@ describe('mailer({ smtp })', () => {
     expect(server.greetings.at(-1)).toBe('env.test')
   })
 
+  it('keeps a sender whose domain is no valid greeting sending, with no greeting of its own', async () => {
+    await inProduction(server.port, async () => mailer({ queue: { name: 'smtp-odd' } }).send({ to: 'bob@example.com', subject: 'Odd', text: 'Hi' }), { SMTP_FROM: 'site@bücher.test' })
+
+    expect(server.received.at(-1)?.from).toContain('site@')
+  })
+
+  it('lets its rate limit replace SMTP_RATE_LIMIT', async () => {
+    const started = performance.now()
+
+    await inProduction(server.port, async () => {
+      const mail = mailer({ queue: { name: 'smtp-rate' }, smtp: { rateLimit: 1000, maxConnections: 1 } })
+
+      await Promise.all([1, 2].map(async n => mail.send({ to: 'bob@example.com', subject: `Rate ${n}`, text: 'Hi' })))
+    }, { SMTP_RATE_LIMIT: '1' })
+
+    expect(performance.now() - started).toBeLessThan(900)
+  })
+
   it('caps the connections the pool opens', async () => {
     const own = startSmtp()
 

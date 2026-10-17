@@ -41,6 +41,11 @@ const DEFAULT_TIMEOUT_MS = 10_000
 // How long connections stay open after the last mail went: a burst reuses them, and a script still ends soon after its last mail.
 const IDLE_MS = 1000
 
+// The sender's domain as the greeting, left out when it is none a server would take, so a sender that worked before never stops the first mail.
+export function greetingOf(domain: string | undefined): string | undefined {
+  return domain !== undefined && GREETING.test(domain) ? domain : undefined
+}
+
 // Throws naming `what` unless `key` is a private key, so a broken one fails where it is given rather than at the first mail.
 export function checkKey(key: string, what: string): void {
   try {
