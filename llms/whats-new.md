@@ -19,6 +19,9 @@ What each release of kay and its libraries adds, newest first, each feature with
 - kayjs-ai `Chat`: a wide table scrolls inside its bubble, a 422-refused message returns to the field on a retry too, the history posted never opens on an assistant message, and an action that can `ctx.fail` is accepted ([kayjs-ai](../packages/ai/llms/chat.md)).
 - A stream an event handler got from an action closes with its island, so a `persist` island's stays open across pages ([actions from islands](api-from-islands.md)).
 - A page with a `--- server` fence passes an island an action, `Chat(action={reply})` with no wrapper ([actions](actions.md#pass-an-action-to-an-island)).
+- kayjs-ai `Chat`: a wide table scrolls in its bubble, a retried 422 refills the field, the history never opens on an assistant message, an action that can `ctx.fail` works ([kayjs-ai](../packages/ai/llms/chat.md)).
+- `kay not-found` lists the paths production found nothing at, with a target, and writes the redirect ([Redirects](routing.md#redirects)).
+- An action's stream to an event handler closes with its island, a `persist` island's across pages ([actions from islands](api-from-islands.md)).
 
 Releases before 1.53 are in [What's new, older releases](whats-new-archive.md).
 ## 1.52.0

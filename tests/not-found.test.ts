@@ -1,0 +1,324 @@
+import { join } from 'node:path'
+import process from 'node:process'
+import { describe, expect, it } from 'bun:test'
+import { Elysia } from 'elysia'
+import { withRedirect } from '../src/commands/not-found'
+import { pages } from '../src/server'
+import { countedPath, countMissing, missingPaths, missingStore, referrerHost, suggester } from '../src/server/not-found'
+import { scratchDir } from './scratch'
+
+const known = ['/', '/about', '/blog/hello-world', '/blog/second-post', '/news/launch', '/fr/a-propos', '/fr/blog/hello-world']
+const settings = { defaultLocale: 'en', locales: ['en', 'fr'], prefixDefault: false }
+
+describe('countedPath', () => {
+  it('keeps a path without its trailing slash and its query', () => {
+    expect(countedPath('/old/')).toBe('/old')
+    expect(countedPath('/old//')).toBe('/old')
+    expect(countedPath('/')).toBe('/')
+    expect(countedPath('/caf%C3%A9')).toBe('/caf%C3%A9')
+  })
+
+  it('ignores what scanners ask every site for', () => {
+    for (const path of ['/wp-admin/setup.php', '/wp-login', '/blog/wp-content/x', '/.env', '/app/.env.local', '/.git/config', '/index.PHP', '/%2eenv', '/shell.php/x', '/phpmyadmin/', '/cgi-bin/x', '/db.sql', '/x.asp'])
+      expect(countedPath(path)).toBeUndefined()
+
+    expect(countedPath('/.well-known/security.txt')).toBe('/.well-known/security.txt')
+    expect(countedPath('/envelope')).toBe('/envelope')
+    expect(countedPath('/phpfan')).toBe('/phpfan')
+  })
+
+  it('ignores hostile input rather than storing it', () => {
+    expect(countedPath(`/${'a'.repeat(600)}`)).toBeUndefined()
+    expect(countedPath('/%E0%A4%A')).toBeUndefined()
+    expect(countedPath('/a%00b')).toBeUndefined()
+    expect(countedPath('/a%0Ab')).toBeUndefined()
+    expect(countedPath('/_kay/island/x')).toBeUndefined()
+    expect(countedPath('//evil.example')).toBe('//evil.example')
+  })
+})
+
+describe('referrerHost', () => {
+  it('keeps the host alone', () => {
+    expect(referrerHost('https://Search.Example/results?q=secret#x')).toBe('search.example')
+    expect(referrerHost('http://localhost:3000/a')).toBe('localhost:3000')
+  })
+
+  it('drops what is no web address or too long', () => {
+    expect(referrerHost(null)).toBeUndefined()
+    expect(referrerHost('android-app://com.google/')).toBeUndefined()
+    expect(referrerHost('not a url')).toBeUndefined()
+    expect(referrerHost(`https://${'a'.repeat(300)}.example/`)).toBeUndefined()
+    expect(referrerHost(`https://x.example/${'a'.repeat(3000)}`)).toBeUndefined()
+  })
+})
+
+describe('suggester', () => {
+  const suggest = suggester(known, settings)
+
+  it('finds the same page spelled another way', () => {
+    expect(suggest('/About')).toEqual({ target: '/about', reason: 'spelling' })
+    expect(suggest('/about.html')).toEqual({ target: '/about', reason: 'spelling' })
+    expect(suggest('/blog/Hello-World')).toEqual({ target: '/blog/hello-world', reason: 'spelling' })
+  })
+
+  it('finds the page in another locale', () => {
+    expect(suggest('/fr/about')).toEqual({ target: '/about', reason: 'locale' })
+    expect(suggester(['/', '/fr/contact'], settings)('/contact')).toEqual({ target: '/fr/contact', reason: 'locale' })
+    expect(suggester(['/contact', '/fr/contact'], settings)('/de/contact')).toBeUndefined()
+  })
+
+  it('finds a slug moved under another parent, when only one page has it', () => {
+    expect(suggest('/articles/launch')).toEqual({ target: '/news/launch', reason: 'slug' })
+    expect(suggest('/articles/hello-world')).toBeUndefined()
+    expect(suggest('/blog/hello-world/')).toBeUndefined()
+    expect(suggest('/fr/archive/hello-world')).toEqual({ target: '/fr/blog/hello-world', reason: 'slug' })
+  })
+
+  it('finds a near typo of a slug, when one page is closest', () => {
+    expect(suggest('/blog/secnd-post')).toEqual({ target: '/blog/second-post', reason: 'similar' })
+    expect(suggest('/blog/zzzzzzzz')).toBeUndefined()
+    expect(suggester(['/a/abcdef', '/a/abcdeg'], settings)('/a/abcdeh')).toBeUndefined()
+  })
+
+  it('suggests nothing for the root, an empty site or a path that exists', () => {
+    expect(suggest('/')).toBeUndefined()
+    expect(suggester([])('/x')).toBeUndefined()
+    expect(suggest('/about')).toBeUndefined()
+  })
+
+  it('stays bounded when asked for many near misses', () => {
+    const many = suggester(Array.from({ length: 5000 }, (_, index) => `/p/item-${index}`))
+    const start = performance.now()
+
+    for (let index = 0; index < 200; index++)
+      many(`/p/itm-${index}x`)
+
+    expect(performance.now() - start).toBeLessThan(2000)
+  })
+})
+
+describe('missingStore', () => {
+  const never = () => undefined
+
+  it('counts hits and referrer hosts, most hit first', async () => {
+    const store = missingStore(join(await scratchDir('not-found-'), 'missing.sqlite'))
+
+    store.hit('/a', 'x.example', never)
+    store.hit('/b', undefined, never)
+    store.hit('/b', 'x.example', never)
+    store.hit('/b', 'x.example', never)
+    expect(store.list().map(({ path, hits, referrers }) => ({ path, hits, referrers }))).toEqual([{ path: '/b', hits: 3, referrers: [{ host: 'x.example', hits: 2 }] }, { path: '/a', hits: 1, referrers: [{ host: 'x.example', hits: 1 }] }])
+    store.close()
+  })
+
+  it('keeps its counts across restarts', async () => {
+    const file = join(await scratchDir('not-found-'), 'missing.sqlite')
+    const first = missingStore(file)
+
+    first.hit('/a', 'x.example', never)
+    first.close()
+
+    const second = missingStore(file)
+
+    second.hit('/a', undefined, never)
+    expect(second.list()).toMatchObject([{ path: '/a', hits: 2 }])
+    second.close()
+  })
+
+  it('suggests once, when a path is asked for the second time', async () => {
+    const store = missingStore(join(await scratchDir('not-found-'), 'missing.sqlite'))
+    let asked = 0
+    const suggest = () => {
+      asked++
+
+      return { target: '/new', reason: 'slug' as const }
+    }
+
+    store.hit('/old', undefined, suggest)
+    expect(asked).toBe(0)
+    store.hit('/old', undefined, suggest)
+    store.hit('/old', undefined, suggest)
+    expect(asked).toBe(1)
+    expect(store.list()[0]).toMatchObject({ target: '/new', reason: 'slug' })
+    store.close()
+  })
+
+  it('stays bounded under a flood of distinct paths, keeping the paths hit again', async () => {
+    const store = missingStore(join(await scratchDir('not-found-'), 'missing.sqlite'))
+
+    for (let index = 0; index < 3; index++)
+      store.hit('/popular', 'x.example', never)
+
+    for (let index = 0; index < 1500; index++)
+      store.hit(`/junk-${index}`, `h${index}.example`, never)
+
+    const listed = store.list()
+
+    expect(listed.length).toBe(1000)
+    expect(listed[0]).toMatchObject({ path: '/popular', hits: 3 })
+    expect(listed.flatMap(({ referrers }) => referrers).length).toBeLessThanOrEqual(1001)
+    store.close()
+  })
+
+  it('keeps a few referrer hosts per path', async () => {
+    const store = missingStore(join(await scratchDir('not-found-'), 'missing.sqlite'))
+
+    for (let index = 0; index < 30; index++)
+      store.hit('/a', `h${index}.example`, never)
+
+    store.hit('/a', 'h0.example', never)
+    expect(store.list()[0]!.referrers.length).toBe(8)
+    expect(store.list()[0]!.referrers[0]).toEqual({ host: 'h0.example', hits: 2 })
+    store.close()
+  })
+
+  it('forgets a path with its hosts', async () => {
+    const store = missingStore(join(await scratchDir('not-found-'), 'missing.sqlite'))
+
+    store.hit('/a', 'x.example', never)
+    store.forget('/a')
+    expect(store.list()).toEqual([])
+    store.close()
+  })
+})
+
+describe('countMissing', () => {
+  const served = countMissing(new Elysia(), { known: () => ['/fine', '/news/gone2'] })
+    .get('/gone', () => new Response('Not Found', { status: 404, headers: { 'content-type': 'text/html' } }))
+    .get('/api/user', () => Response.json({ error: 'none' }, { status: 404 }))
+    .get('/fine', () => 'ok')
+    .post('/gone', () => new Response('Not Found', { status: 404 }))
+
+  async function visit(path: string, init: RequestInit = {}) {
+    return served.handle(new Request(`http://localhost${path}`, init))
+  }
+
+  it('counts GET pages answering 404 with the referrer host, not JSON, other methods, other statuses nor scanners', async () => {
+    await visit('/gone?utm=secret#frag', { headers: { referer: 'https://search.example/path?q=private' } })
+    await visit('/gone/')
+    await visit('/gone', { method: 'POST' })
+    await visit('/api/user')
+    await visit('/fine')
+    await visit('/wp-login.php')
+    await visit('/nothing-registered')
+
+    await Bun.sleep(50)
+
+    // Other files of the same run count into the same store.
+    const listed = missingPaths().filter(({ path }) => ['/gone', '/fine', '/api/user', '/wp-login.php', '/nothing-registered'].includes(path))
+
+    expect(listed.map(({ path, hits }) => [path, hits]).sort()).toEqual([['/gone', 2], ['/nothing-registered', 1]])
+    expect(listed.find(({ path }) => path === '/gone')!.referrers).toEqual([{ host: 'search.example', hits: 1 }])
+    expect(JSON.stringify(listed)).not.toContain('private')
+  })
+})
+
+describe('a served app', () => {
+  it('counts its own 404s in production, under a base and with a trailing slash setting', async () => {
+    const app = new Elysia().use(await pages({ routes: 'tests/fixtures/routing/src/routes', prebuilt: false, security: false, base: '/app', trailingSlash: 'always' }))
+    const response = await app.handle(new Request('http://localhost/missing-page-x/', { headers: { referer: 'https://elsewhere.example/' } }))
+
+    expect(response.status).toBe(404)
+    await Bun.sleep(50)
+    expect(missingPaths().find(({ path }) => path === '/missing-page-x')?.referrers).toEqual([{ host: 'elsewhere.example', hits: 1 }])
+  })
+})
+
+describe('withRedirect', () => {
+  it('adds to the redirects the config has, first', () => {
+    expect(withRedirect('export default defineConfig({\n  redirects: {\n    \'/a\': \'/b\',\n  },\n})\n', '/old', '/new')).toBe('export default defineConfig({\n  redirects: {\n    \'/old\': \'/new\',\n    \'/a\': \'/b\',\n  },\n})\n')
+  })
+
+  it('fills an empty redirects object', () => {
+    expect(withRedirect('export default defineConfig({\n  redirects: {},\n})\n', '/old', '/new')).toBe('export default defineConfig({\n  redirects: {\n    \'/old\': \'/new\',\n  },\n})\n')
+  })
+
+  it('opens redirects in the config object', () => {
+    expect(withRedirect('export default defineConfig({\n  base: \'/x\',\n})\n', '/old', '/new')).toBe('export default defineConfig({\n  redirects: {\n    \'/old\': \'/new\',\n  },\n  base: \'/x\',\n})\n')
+    expect(withRedirect('export default { favicon: false }\n', '/o', '/n')).toBe('export default {\n  redirects: {\n    \'/o\': \'/n\',\n  },\nfavicon: false }\n')
+  })
+
+  it('escapes quotes and leaves a config it cannot read alone', () => {
+    expect(withRedirect('export default defineConfig({\n})\n', '/it\'s', '/n')).toContain('\'/it\\\'s\': \'/n\'')
+    expect(withRedirect('const redirects = {}\nexport default defineConfig({ redirects })\n', '/o', '/n')).toBeUndefined()
+    expect(withRedirect('export default makeConfig()\n', '/o', '/n')).toBeUndefined()
+  })
+})
+
+describe('kay not-found', () => {
+  const cli = join(import.meta.dir, '../src/cli.ts')
+
+  async function run(args: string[], cwd: string) {
+    const child = Bun.spawn([process.execPath, cli, ...args], { cwd, env: { PATH: process.env.PATH! }, stdout: 'pipe', stderr: 'pipe' })
+    const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+
+    return { stdout, stderr, code }
+  }
+
+  async function project(): Promise<string> {
+    const root = await scratchDir('not-found-cli-')
+    const store = missingStore(join(root, 'data/not-found.sqlite'))
+
+    await Bun.write(join(root, 'kay.config.ts'), 'export default {\n  favicon: false,\n  redirects: { \'/done\': \'/about\' },\n}\n')
+
+    for (const [path, hits, host] of [['/old', 3, 'a.example'], ['/other', 1, undefined], ['/done', 9, undefined]] as const) {
+      for (let index = 0; index < hits; index++)
+        store.hit(path, host, () => path === '/old' ? { target: '/new', reason: 'slug' } : undefined)
+    }
+
+    store.close()
+
+    return root
+  }
+
+  it('lists the paths most hit first, leaving out those a redirect answers already', async () => {
+    const { stdout, code } = await run(['not-found'], await project())
+
+    expect(code).toBe(0)
+    expect(stdout).toContain('/old  (from a.example)')
+    expect(stdout).toContain('-> /new  (slug) kay not-found --redirect /old')
+    expect(stdout.indexOf('/old')).toBeLessThan(stdout.indexOf('/other'))
+    expect(stdout).not.toContain('/done')
+  })
+
+  it('prints JSON', async () => {
+    const { stdout } = await run(['not-found', '--format', 'json'], await project())
+
+    expect((JSON.parse(stdout) as { missing: { path: string }[] }).missing.map(row => row.path)).toEqual(['/old', '/other'])
+  })
+
+  it('says so when nothing was recorded', async () => {
+    const root = await scratchDir('not-found-cli-')
+
+    await Bun.write(join(root, 'kay.config.ts'), 'export default { favicon: false }\n')
+    expect((await run(['not-found'], root)).stdout).toContain('No missing path recorded')
+  })
+
+  it('writes the suggested redirect into kay.config.ts and forgets the path', async () => {
+    const root = await project()
+    const { stdout, code } = await run(['not-found', '--redirect', '/old'], root)
+
+    expect(code).toBe(0)
+    expect(stdout).toContain('\'/old\': \'/new\',')
+    expect(await Bun.file(join(root, 'kay.config.ts')).text()).toContain('redirects: {\n    \'/old\': \'/new\',')
+    expect((await run(['not-found', '--format', 'json'], root)).stdout).not.toContain('"/old"')
+  })
+
+  it('needs a target when none is suggested, and refuses a bad one or a redirect that exists', async () => {
+    const root = await project()
+
+    expect((await run(['not-found', '--redirect', '/other'], root)).stderr).toContain('/other has no suggested target')
+    expect((await run(['not-found', '--redirect', '/other', '--to', 'about'], root)).code).toBe(1)
+    expect((await run(['not-found', '--redirect', '/done', '--to', '/x'], root)).stderr).toContain('is a redirect already')
+    expect((await run(['not-found', '--to', '/x'], root)).code).toBe(1)
+    expect(await Bun.file(join(root, 'kay.config.ts')).text()).not.toContain('/other')
+  })
+
+  it('adds a redirect to a path nobody recorded, given its target', async () => {
+    const root = await scratchDir('not-found-cli-')
+
+    await Bun.write(join(root, 'kay.config.ts'), 'export default { favicon: false }\n')
+    expect((await run(['not-found', '--redirect', '/legacy/x', '--to', '/blog/x'], root)).code).toBe(0)
+    expect(await Bun.file(join(root, 'kay.config.ts')).text()).toContain('\'/legacy/x\': \'/blog/x\'')
+  })
+})

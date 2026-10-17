@@ -214,6 +214,18 @@ export default defineConfig({
 
 A redirect answers 308, or 307 with `permanent: false`. `status` names another: 301 or 302 for clients and crawlers that expect them.
 
+### Find the old URLs visitors still use
+
+After a site moves, old links keep answering 404. A production server counts the pages visitors asked for and found nothing at, in `data/not-found.sqlite`. It keeps the path, how often it was hit and the host of the page that linked to it, never anything about the visitor.
+
+```sh
+kay not-found
+```
+
+The list starts with the most hit. A path asked for twice also gets a suggestion: the same page in another case or locale, a page with the same slug elsewhere, or a near typo. To turn one into a redirect, run `kay not-found --redirect /old`, or add `--to /new` when there is no suggestion. kay adds the line to `redirects` in `kay.config.ts`.
+
+Requests for `.php`, `.env` and similar files are ignored, as bots send them to every site. The list holds 1,000 paths; the least hit give way to new ones.
+
 ### Rewrite a request to another path
 
 `rewrite` serves a request from another path, and the browser keeps its URL. Use it to serve one host's pages from a section of your routes.

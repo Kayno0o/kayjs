@@ -27,6 +27,7 @@ This needs Bun to know the registry first, see [Installation](/getting-started/i
 | `kay check [dir]` | Type-check the project, `.kay` files included |
 | `kay upgrade [dir] [--dry-run]` | Move kay and its libraries to the latest version and rewrite the old forms |
 | `kay routes [dir]` | List every route the project serves, and the file serving it |
+| `kay not-found [dir]` | List the old URLs visitors hit and found nothing at, and turn one into a redirect |
 | `kay env [dir]` | List the environment variables the project, its libraries and kay declare |
 | `kay i18n missing [locale] [dir]` | List what each locale lacks against the default one |
 | `kay i18n accept <locale> [dir]` | Accept a locale's draft messages |
@@ -389,6 +390,18 @@ A message whose line ends on `// draft` is a draft, written by a machine and wai
 
 A library can add commands of its own. `kay i18n` alone lists every `i18n` command, and `kay --help` lists each library's under its name.
 
+## kay not-found
+
+```sh
+kay not-found
+kay not-found --redirect /old-page
+kay not-found --redirect /old-page --to /new-page
+```
+
+Lists the paths visitors asked for and found nothing at, most hit first, with the hosts they came from and a suggested target. It reads `data/not-found.sqlite`, which the production server writes, or the file `--file` names. A path a `redirects` entry answers already is left out.
+
+`--redirect` adds the path to `redirects` in `kay.config.ts`, going to `--to` or to the suggestion, and removes it from the list. When `kay.config.ts` has no object to add it to, kay prints the line to add by hand. See [Redirects](/essentials/routing#redirects).
+
 ## kay routes
 
 ```sh
@@ -484,6 +497,7 @@ Colour only goes to a terminal, and not under `NO_COLOR` or `TERM=dumb`. `FORCE_
 | Command | Document |
 | --- | --- |
 | `kay build` | `{ errors, warnings, problems }`, then `failed`, `built`, `exported` and `compiled` as the build ran, see [The build document](#the-build-document) |
+| `kay not-found` | `{ missing }`, each with its `path`, `hits`, `referrers`, `target` and `reason` |
 | `kay routes` | `{ routes, unlisted }`, each route with its `methods`, `path`, `kind` and `file` |
 | `kay i18n missing` | `{ locales }`, each locale with its missing `messages` keys and its missing `entries` by collection |
 | `kay env` | `{ variables, unread }`, each variable with its `name`, `source`, `type`, `required` and `default` |

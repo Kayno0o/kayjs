@@ -47,6 +47,7 @@ import { HEALTH_PATH, serveHealth, stopOnSignal } from './lifecycle'
 import { serveLive } from './live'
 import { announceStart, logRequests, pathOf, useLogger } from './log'
 import { mcpBodyLimit, receiveDispatched, serveMcp, serveToolCallsThrough } from './mcp'
+import { countMissing } from './not-found'
 import { serveServiceWorker } from './offline'
 import { claimApi, openApiDocument, openApiSettings, serveOpenApi } from './openapi'
 import { withPageHeaders } from './page-headers'
@@ -71,6 +72,8 @@ import { serveViolationReports } from './violations'
 import { agreeOnWildcards } from './wildcards'
 
 const JSON_EXTENSION = /\.json$/
+// A router path with a param, an optional segment or a catch-all, which names no one page.
+const DYNAMIC_PATH = /[:*?]/
 // The NODE_ENV values kay acts on, anything else running without the production defaults.
 const KNOWN_ENVIRONMENTS = new Set(['development', 'production', 'test'])
 // What the dev tool's Routes tab says when `seo` is set without the origin the site is public at.
@@ -404,6 +407,10 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
 
   await servePublic(app, served, publicServed, mode.dev ? undefined : publicCache)
   serveRedirects(app, redirects, mode.dev)
+
+  // Before the page routes, which a hook registered after them does not reach.
+  if (!mode.dev && !exported)
+    countMissing(app, { known: () => [...client.pages.keys(), ...[...table.paths.keys()].filter(path => !DYNAMIC_PATH.test(path))], settings: i18n?.settings })
 
   const respond = withPageHeaders(pageResponder({ client, renderOptions, prerendered, writes: countWrites(app), settings: i18n?.settings, transforms: pageHooks(options.extensions), pageFile: assetFiles({ clientDir: client.dir, publicDir: paths.public, base, aspects: options.images?.aspects }) }), securityOptions, security)
 
