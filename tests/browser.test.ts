@@ -488,7 +488,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay dev in
     expect(shown.errors).toEqual([])
   }, 60_000)
 
-  it('sizes its drawer to a short panel, and keeps its colours above 4.5:1 in both schemes', async () => {
+  it('keeps one drawer height whatever the tab, and its colours above 4.5:1 in both schemes', async () => {
     const shown = await dev.open('/', { strict: false })
 
     await shown.evaluate(() => document.querySelector('kay-dev')!.shadowRoot!.querySelector<HTMLButtonElement>('.bar > button')!.click())
@@ -503,7 +503,14 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay dev in
       return { drawer: drawer.getBoundingClientRect().height, limit: Math.min(448, innerHeight * 0.6) }
     })
 
-    expect((await heights()).drawer).toBeLessThan((await heights()).limit - 20)
+    const short = await heights()
+
+    expect(short.drawer).toBeCloseTo(short.limit, 0)
+
+    // Another tab, its panel a different length: the drawer does not move.
+    await shown.evaluate(() => document.querySelector('kay-dev')!.shadowRoot!.querySelector<HTMLButtonElement>('#kay-dev-tab-head')!.click())
+    await shown.waitUntil(() => document.querySelector('kay-dev')!.shadowRoot!.querySelector<HTMLElement>('.panel:not([hidden])')!.id === 'kay-dev-head')
+    expect((await heights()).drawer).toBe(short.drawer)
 
     // The maximized drawer fills the window.
     await shown.evaluate(() => document.querySelector('kay-dev')!.shadowRoot!.querySelector<HTMLElement>('.head .icon')!.click())

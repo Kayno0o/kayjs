@@ -68,9 +68,9 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { .built { transition: none; } }
 .error { color: var(--error); }
 .warn { color: var(--warn); }
-.drawer { position: fixed; bottom: 52px; left: 12px; z-index: 2147483647; display: flex; flex-direction: column; width: min(36rem, calc(100vw - 24px)); max-height: min(28rem, 60vh); border: 1px solid var(--border); border-radius: 10px; background: var(--bg); box-shadow: var(--shadow); overflow: hidden; }
+.drawer { position: fixed; bottom: 52px; left: 12px; z-index: 2147483647; display: flex; flex-direction: column; width: min(36rem, calc(100vw - 24px)); height: min(28rem, 60vh); border: 1px solid var(--border); border-radius: 10px; background: var(--bg); box-shadow: var(--shadow); overflow: hidden; }
 .right .drawer { left: auto; right: 12px; }
-.max .drawer { width: calc(100vw - 24px); height: calc(100vh - 64px); max-height: none; }
+.max .drawer { width: calc(100vw - 24px); height: calc(100vh - 64px); }
 .head { display: flex; align-items: center; gap: 2px; padding: 4px 6px 4px 12px; border-bottom: 1px solid var(--border); background: var(--surface); }
 .title { flex: 1; font-weight: 600; color: var(--muted); }
 .body { display: flex; flex: 1; min-height: 0; }
