@@ -1,0 +1,7 @@
+---
+import { resource } from 'kay'
+import orders from '../api/orders'
+
+const answer = resource(orders, '/plain')
+---
+p.answer {answer.value()?.orders ?? 'none'} via {answer.status()}

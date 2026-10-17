@@ -7,6 +7,7 @@ import { decodeServerValue } from './wire'
 // The twin of `readEvents` in live.ts, kept apart so the code every page loads does not carry it: keep the backoffs alike.
 
 // The cached values a page follows (`cached(..., { live: true })`) are kept up to date by the route live values use, `POST /_kay/live`, through a reader of its own: this module stays out of the code every page loads, so it imports nothing of the runtime that code does not already reach.
+// A `resource()` reading a route the same way follows the keys the route's handler read, through the proof its answer carries.
 
 const ROUTE = '/_kay/live'
 const SCRIPT = 'script[data-kay-live]'
@@ -20,8 +21,19 @@ const REFUSAL_MS = 60_000
 // The longest a refresh waits for a swap in progress: one that never clears `aria-busy` (failed or aborted) would otherwise park every later invalidation.
 export const IDLE_MS = 20_000
 
+// What a `resource()` follows: the proof its last answer carried, the time the handler read each key, and the call that asks the route again.
+interface Route {
+  page: LivePage
+  reads: Map<string, number>
+  refetch: () => void
+}
+
 // The time the page shown read each key it follows.
 let rendered = new Map<string, number>()
+// The resources following a route, by their owner.
+const routes = new Map<object, Route>()
+// The invalidations a resource waits to answer, by key: it asks its route once the tab is shown, after a short random wait.
+const waitingRoutes = new Map<object, Map<string, number>>()
 // The connection open, and the keys it asked for.
 let connection: { controller: AbortController, keys: string } | undefined
 let attempt = 0
@@ -59,14 +71,34 @@ export function followCaches(): void {
     due.clear()
   }
 
-  const keys = JSON.stringify([...next.keys()].sort())
+  follow()
+}
+
+// Follows the keys a route's answer carried the proof of for a resource, or lets go of them when `header` is null: called after each answer, which replaces the last, and when the resource is gone.
+export function followRoute(owner: object, header: string | null, refetch: () => void): void {
+  if (header === null) {
+    routes.delete(owner)
+    waitingRoutes.delete(owner)
+  }
+  else {
+    const page = decodeServerValue(decodeURIComponent(header)) as LivePage
+
+    routes.set(owner, { page, reads: new Map(page.values.map(([, key, at]) => [key, at as number])), refetch })
+  }
+
+  follow()
+}
+
+// Moves the connection to the keys followed now, and closes it with the last.
+function follow(): void {
+  const keys = JSON.stringify([...new Set([...rendered.keys(), ...[...routes.values()].flatMap(route => [...route.reads.keys()])])].sort())
 
   if (connection?.keys === keys)
     return
 
   stop()
 
-  if (next.size > 0)
+  if (keys !== '[]')
     void connect(keys)
 }
 
@@ -81,7 +113,7 @@ function stop(): void {
 async function connect(keys: string): Promise<void> {
   const controller = new AbortController()
   const request: LiveRequest = {
-    proofs: pagesOf().map(page => ({ keys: page.values.map(([id, key]) => [id, key] as [string, string]), at: page.at, sig: page.sig })),
+    proofs: [...pagesOf(), ...[...routes.values()].map(route => route.page)].map(page => ({ keys: page.values.map(([id, key]) => [id, key] as [string, string]), at: page.at, sig: page.sig })),
     watch: (JSON.parse(keys) as string[]).map(key => [CACHE_LIVE_ID, key]),
   }
 
@@ -95,7 +127,13 @@ async function connect(keys: string): Promise<void> {
       refused = Date.now()
       void response.body?.cancel()
       stop()
-      await load()
+
+      // The resources ask their routes again for new proofs, and the page for its own.
+      for (const route of routes.values())
+        route.refetch()
+
+      if (rendered.size > 0)
+        await load()
 
       return
     }
@@ -171,6 +209,13 @@ function reconnect(controller: AbortController, keys: string): void {
 
 // A key was invalidated at `at` by the server's clock, the same clock that dated the page's read of it: at or after the read, the page shows what is gone.
 function changed(key: string, at: number): void {
+  for (const [owner, route] of routes) {
+    const read = route.reads.get(key)
+
+    if (read !== undefined && at >= read)
+      askRoute(owner, key, at)
+  }
+
   const read = rendered.get(key)
 
   if (read === undefined || at < read)
@@ -184,6 +229,42 @@ function changed(key: string, at: number): void {
 
   due.set(key, at)
   schedule()
+}
+
+// A resource asks its route again, once the tab is shown and after a short random wait, for all the invalidations that came meanwhile.
+function askRoute(owner: object, key: string, at: number): void {
+  const waiting = waitingRoutes.get(owner)
+
+  if (waiting) {
+    waiting.set(key, at)
+
+    return
+  }
+
+  waitingRoutes.set(owner, new Map([[key, at]]))
+
+  const ask = () => {
+    const wanted = waitingRoutes.get(owner)
+    const route = routes.get(owner)
+
+    waitingRoutes.delete(owner)
+
+    // Not if the resource is gone, or an answer since read what changed.
+    if (wanted && route && [...wanted].some(([name, time]) => time >= (route.reads.get(name) ?? Infinity)))
+      route.refetch()
+  }
+  const shown = () => {
+    if (document.hidden)
+      return
+
+    document.removeEventListener('visibilitychange', shown)
+    setTimeout(ask, Math.random() * JITTER_MS)
+  }
+
+  if (document.hidden)
+    document.addEventListener('visibilitychange', shown)
+  else
+    setTimeout(ask, Math.random() * JITTER_MS)
 }
 
 // A tab nobody looks at loads the page once it is shown again.

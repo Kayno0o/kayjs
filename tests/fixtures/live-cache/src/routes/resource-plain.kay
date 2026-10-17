@@ -1,0 +1,7 @@
+--- server
+import Nav from '../components/nav.kay'
+import PlainResource from '../components/plain-resource.kay'
+---
+Nav
+h1 Resource plain
+PlainResource

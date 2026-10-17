@@ -33,6 +33,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 ## 1.52.3
 
 - Claude Code lists an app's MCP tools: a list or a read in the 2026-07-28 revision says how long a client keeps it, `ttlMs` and `cacheScope`, as that revision requires ([API routes](api-routes.md#mcp)).
+- A `resource()` reading a route whose handler reads a `live` cached key asks the route again after `invalidate`, with nothing written ([live data](api-from-islands.md#following-cached-values)).
 
 ## 1.52.2
 

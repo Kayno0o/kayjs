@@ -97,6 +97,8 @@ A tab you cannot see waits and loads the page when you come back. An `invalidate
 
 Read the value in the page's server fence or a layout's. A page that follows a value is rendered for each request, so a static export of it fails. A value that only expires by its `ttl` is not pushed: call `invalidate` when it changes.
 
+A `resource` follows too. If the route's handler reads a `cached` value with `live: true`, the island asks the route again after an `invalidate`, keeping the old value on screen until the new answer arrives. You add nothing to the route or the island, and a route that reads no such value opens no connection.
+
 <ReadMore href="/llms/api-from-islands#following-cached-values">The proof, the first event after a reconnect, refresh timing and the limits are in the full API routes reference.</ReadMore>
 
 ## Reading a route in an island

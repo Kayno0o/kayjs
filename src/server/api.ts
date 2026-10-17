@@ -22,6 +22,7 @@ import { cookieJar } from './cookies'
 import { corsAdmits, corsResponse, corsRule, dropOwnGrant, grantedByKay, preflight, varyByOrigin, withCors, withoutOwnGrant } from './cors'
 import { streamReporters } from './event-stream'
 import { loadGuard, requiredGuards } from './guards'
+import { inRouteReads, LIVE_HEADER, routeProof } from './live'
 import { answeringRequest, statusOf } from './log'
 import { apiLimitWait, checkApiLimit, requestId } from './protection'
 import { sharedContext } from './render'
@@ -106,7 +107,7 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
     // The handlers and error hooks run in Elysia's call, so each is wrapped to run in the request's locale, as the guards do.
     for (const route of instance.routes) {
       if (typeof route.handler === 'function')
-        route.handler = inRequestLocale(route.handler as Handler, options)
+        route.handler = inRequestLocale(route.handler as Handler, options, route.method === 'GET')
 
       const hooks = route.hooks as { error?: unknown } | undefined
 
@@ -209,6 +210,14 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
               varyByOrigin(cors, responseValue.headers, set.headers)
           }
 
+          // Only an answer the route gave: a refusal or a failure holds no proof, and a guard's refusal never reached the handler.
+          if (!(responseValue instanceof ElysiaCustomStatusResponse) && !(responseValue instanceof Response && !responseValue.ok) && Number(set.status ?? 200) < 400) {
+            const proof = routeProof(request)
+
+            if (proof !== undefined)
+              set.headers[LIVE_HEADER] = proof
+          }
+
           const reporter = responseValue instanceof Response ? streamReporters.get(responseValue) : undefined
 
           if (reporter)
@@ -242,11 +251,14 @@ const WRAPPED = Symbol.for('kay.localized')
 
 // A handler or an error hook that runs in the request's locale, a generator it returns read there too.
 // It reads as the function it wraps, as Elysia infers from its source what the route needs of the context.
-export function inRequestLocale(fn: Handler, options: ActionOptions): Handler {
+// A GET route's handler also runs where the live keys it reads are noted, for the proof its answer carries.
+export function inRequestLocale(fn: Handler, options: ActionOptions, following = false): Handler {
   const original = (fn as { [WRAPPED]?: Handler })[WRAPPED] ?? fn
 
   const wrapped: Handler = function (this: unknown, context, ...rest) {
-    return inApiLocale(context.request, options, () => inStream(original.call(this, context, ...rest), context.request, options))
+    const run = () => inApiLocale(context.request, options, () => inStream(original.call(this, context, ...rest), context.request, options))
+
+    return following ? inRouteReads(context.request, run) : run()
   }
 
   // Elysia tells a generator or an async handler by its `constructor`, and a handler's `name` shows in traces and errors.

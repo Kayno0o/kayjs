@@ -1,0 +1,7 @@
+--- server
+import Nav from '../components/nav.kay'
+import OrdersResource from '../components/orders-resource.kay'
+---
+Nav
+h1 Resource
+OrdersResource

@@ -691,14 +691,19 @@ export function resource(module: unknown, path?: string, options?: UrlInput | ((
   let current: AbortController | undefined
   let asked: ((signal: AbortSignal) => unknown) | undefined
   let gone = false
+  let followed = false
+  const owner = {}
 
-  const load = async (read: (signal: AbortSignal) => unknown) => {
+  // A reload made for a change keeps the status, so the value is swapped without a loading state in between.
+  const load = async (read: (signal: AbortSignal) => unknown, quiet = false) => {
     const controller = new AbortController()
 
     current?.abort()
     current = controller
     asked = read
-    setStatus('loading')
+
+    if (!quiet)
+      setStatus('loading')
 
     try {
       const answer = await read(controller.signal)
@@ -719,6 +724,16 @@ export function resource(module: unknown, path?: string, options?: UrlInput | ((
     }
   }
 
+  // Follows the cached values the route's handler read, from the proof its answer carried, or lets go of them when it carried none.
+  const follow = async (proof: string | null) => {
+    followed = proof !== null
+
+    try {
+      (await import('./live-cache')).followRoute(owner, proof, () => void load(asked!, true))
+    }
+    catch {}
+  }
+
   // The server renders the island loading, as the browser does until the answer comes.
   if (typeof document !== 'undefined') {
     effect(() => {
@@ -734,6 +749,11 @@ export function resource(module: unknown, path?: string, options?: UrlInput | ((
         if (!response.ok && !signal.aborted)
           throw new ApiError(response.status, refusal(answer, response), answer)
 
+        const proof = response.headers.get('x-kay-live')
+
+        if ((proof !== null || followed) && !signal.aborted && !gone)
+          void follow(proof)
+
         return answer
       })
     })
@@ -742,6 +762,9 @@ export function resource(module: unknown, path?: string, options?: UrlInput | ((
   onCleanup(() => {
     gone = true
     current?.abort()
+
+    if (followed)
+      void follow(null)
   })
 
   return { value, status, error, refresh: () => asked === undefined || gone ? undefined : void load(asked) }

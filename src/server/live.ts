@@ -31,6 +31,11 @@ const LIMIT = 'kay:live'
 
 // A page's proof and watch list both carry its keys, so this many of the longest fit the request.
 const MAX_CACHE_KEYS = 100
+// A route's proof travels in a header, so all the keys it follows together are at most this long.
+const MAX_ROUTE_KEY_BYTES = 2000
+
+// The header a GET route answers with when its handler read keys with `live: true`.
+export const LIVE_HEADER = 'x-kay-live'
 // How many keys read with `live: true` are remembered for their last invalidation.
 const MAX_STAMPED = 10_000
 // How many watched keys the eviction passes over before it gives up for now, so a set of watched keys does not make each read scan it whole.
@@ -40,9 +45,14 @@ interface CacheReads {
   // The time the render read each key it follows.
   at: Map<string, number>
   sent: Set<string>
+  // Whether a route's handler reads them, whose proof is a header; the key text read so far.
+  route: boolean
+  bytes: number
 }
 
 const cacheReads = new AsyncLocalStorage<CacheReads>()
+// The reads of each API request in flight, for the hook that answers it.
+const routeReads = new WeakMap<Request, CacheReads>()
 // Least recently read or watched first.
 const stamped = new Set<string>()
 // The last invalidation time of each key a page followed, which a connection sends first: the declaration gives 0 to a key never invalidated.
@@ -50,7 +60,28 @@ const stamps = (live as (initial: (key: string) => number, id: string, name: str
 
 // Runs the render of a request, loads included, so the cached values it reads with `live: true` are the page's to follow.
 export function inLiveReads<T>(run: () => T): T {
-  return cacheReads.run({ at: new Map(), sent: new Set() }, run)
+  return cacheReads.run({ at: new Map(), sent: new Set(), route: false, bytes: 0 }, run)
+}
+
+// Runs a GET route's handler so the live keys it reads are the proof its answer carries, for a `resource()` to follow.
+export function inRouteReads<T>(request: Request, run: () => T): T {
+  const reads: CacheReads = { at: new Map(), sent: new Set(), route: true, bytes: 0 }
+
+  routeReads.set(request, reads)
+
+  return cacheReads.run(reads, run)
+}
+
+// The proof of what a route's handler read, as a header value, or undefined when it read no key with `live: true`.
+export function routeProof(request: Request): string | undefined {
+  const reads = routeReads.get(request)
+
+  routeReads.delete(request)
+
+  if (reads === undefined || reads.at.size === 0)
+    return undefined
+
+  return encodeURIComponent(encodeValue(cachePage([...reads.at])))
 }
 
 onLiveRead((key) => {
@@ -62,6 +93,10 @@ onLiveRead((key) => {
   if (key.length > MAX_KEY_LENGTH || reads.at.size >= MAX_CACHE_KEYS)
     throw new RangeError(`kay: cached('${key.slice(0, 40)}...') with live: true: a key is at most ${MAX_KEY_LENGTH} characters and a page follows at most ${MAX_CACHE_KEYS} keys`)
 
+  if (reads.route && reads.bytes + key.length > MAX_ROUTE_KEY_BYTES)
+    throw new RangeError(`kay: cached('${key.slice(0, 40)}...') with live: true: a route follows at most ${MAX_ROUTE_KEY_BYTES} characters of keys, as its proof travels in a header`)
+
+  reads.bytes += key.length
   reads.at.set(key, Date.now())
 
   remember(key)
@@ -158,11 +193,17 @@ export function liveScript(scope: ServerScope | undefined = currentServerScope()
   for (const [key] of following)
     cache!.sent.add(key)
 
-  const at = Date.now()
-  const values: LivePage['values'] = [...fresh.map(read => [read.id, read.key, read.value] as LivePage['values'][number]), ...following.map(([key, read]) => [CACHE_LIVE_ID, key, read] as LivePage['values'][number])]
-  const page: LivePage = { at, sig: proofOf(values.map(([id, key]) => [id, key]), at), values }
+  const page = cachePage(following, fresh)
 
   return `${LIVE_MARK}${following.length > 0 ? CACHE_MARK : ''}>${encodeValue(page).replaceAll('<', '\\u003c')}</script>`
+}
+
+// The values a page or a route answer holds, with the proof of them.
+function cachePage(following: [string, number][], fresh: { id: string, key: string, value: unknown }[] = []): LivePage {
+  const at = Date.now()
+  const values: LivePage['values'] = [...fresh.map(read => [read.id, read.key, read.value] as LivePage['values'][number]), ...following.map(([key, read]) => [CACHE_LIVE_ID, key, read] as LivePage['values'][number])]
+
+  return { at, sig: proofOf(values.map(([id, key]) => [id, key]), at), values }
 }
 
 interface Watched {
