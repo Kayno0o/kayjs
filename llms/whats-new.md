@@ -8,6 +8,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - The dev tool's Problems tab has a Copy button that puts every listed problem on the clipboard as plain text, the page URL first, to paste into an LLM ([Dev server](dev-server.md)).
 - A Markdown component tag kay cannot read, such as stray text after a JSON prop or a brace never closed, fails `kay check`, the build and `bodyHtml` with `markdown-invalid` at its line instead of reaching the page as text, as it did already broken, and a JSON prop nests to any depth ([Content](content.md#components-in-markdown)).
 - The dev tool drawer keeps one height whatever its open tab, so switching tabs no longer moves its header and tab rail ([Dev server](dev-server.md)).
+- Linting a `.kay` file no longer reports `no-nested-ternary` on a single ternary that reads a prop with a default: kay's read of the default adds no ternary a lint rule can see ([Linting](checks.md#linting)).
 
 ## 1.51.0
 
