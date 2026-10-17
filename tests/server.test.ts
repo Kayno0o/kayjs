@@ -1895,7 +1895,7 @@ describe('special pages', () => {
       expect(inlineScriptHashes({ dev: true })).toContain(`'sha256-${new Bun.CryptoHasher('sha256').update(script).digest('base64')}'`)
       expect((await get('/')).html).not.toContain('$kayProblems')
 
-      expect(timing).toMatch(/^load-0;desc="tests\/fixtures\/site\/src\/routes\/_layout\.kay";dur=\d+\.\d, load-1;desc="tests\/fixtures\/site\/src\/routes\/index\.kay";dur=\d+\.\d, render;dur=\d+\.\d$/)
+      expect(timing).toMatch(/^import;dur=\d+\.\d, loads;dur=\d+\.\d, load-0;desc="tests\/fixtures\/site\/src\/routes\/_layout\.kay";dur=\d+\.\d, load-1;desc="tests\/fixtures\/site\/src\/routes\/index\.kay";dur=\d+\.\d, render;dur=\d+\.\d$/)
       expect((await get('/')).headers.get('server-timing')).toBeNull()
     }
     finally {
@@ -1941,10 +1941,14 @@ function recordingTracer(): { tracer: Tracer, ended: RecordedSpan[] } {
 describe('tracing and timing in production', () => {
   afterAll(() => setTracer(undefined))
 
-  it('times each load in a Server-Timing header when the config asks', async () => {
+  it('times the guards, imports, loads and render in a Server-Timing header when the config asks', async () => {
     const timed = await pages({ routes: 'tests/fixtures/site/src/routes', serverTiming: true })
+    const guarded = await new Elysia().use(auth).use(timed).handle(new Request('http://localhost/admin', { headers: { 'x-user': 'ada' } }))
 
-    expect((await timed.handle(new Request('http://localhost/'))).headers.get('server-timing')).toMatch(/^load-0;desc="tests\/fixtures\/site\/src\/routes\/_layout\.kay";dur=\d+\.\d, load-1;desc="tests\/fixtures\/site\/src\/routes\/index\.kay";dur=\d+\.\d, render;dur=\d+\.\d$/)
+    expect(guarded.status).toBe(200)
+    expect(guarded.headers.get('server-timing')).toMatch(/^guards;dur=\d+\.\d, import;dur=\d+\.\d, loads;dur=\d+\.\d, (?:load-\d;desc="[^"]+";dur=\d+\.\d, )*render;dur=\d+\.\d$/)
+
+    expect((await timed.handle(new Request('http://localhost/'))).headers.get('server-timing')).toMatch(/^import;dur=\d+\.\d, loads;dur=\d+\.\d, load-0;desc="tests\/fixtures\/site\/src\/routes\/_layout\.kay";dur=\d+\.\d, load-1;desc="tests\/fixtures\/site\/src\/routes\/index\.kay";dur=\d+\.\d, render;dur=\d+\.\d$/)
   })
 
   it('hands a tracer a span per page request with one per load and the render in it', async () => {

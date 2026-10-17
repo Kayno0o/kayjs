@@ -144,7 +144,7 @@ Then `await welcomeMails.enqueue({ to: email })` in an action, or `enqueue(paylo
 
 ### Tracing and timing
 
-- `serverTiming: true` in kay.config.ts sends the `Server-Timing` header development sends on every page rendered per request in production too: `load-0;desc="src/routes/_layout.kay";dur=3.1, load-1;desc="src/routes/blog/[slug].kay";dur=12.4, render;dur=1.8`, layouts first.
+- `serverTiming: true` in kay.config.ts sends the `Server-Timing` header development sends on every page rendered per request in production too: `guards;dur=0.4, import;dur=0.2, loads;dur=12.6, load-0;desc="src/routes/_layout.kay";dur=3.1, load-1;desc="src/routes/blog/[slug].kay";dur=12.4, render;dur=1.8`: the guards (on a route that has any), the import of the page's modules and its loads as a whole, which run at once, then each load, layouts first, then the render.
 - Anyone loading the page reads it, page file names included.
 - A prerendered page has none, but one with server islands carries the timings of the loads and render that filled them.
 - `tracer` takes an OpenTelemetry tracer, which kay calls without depending on OpenTelemetry: the app installs `@opentelemetry/api` and an SDK exporting the spans, as `@opentelemetry/sdk-trace-node` with an OTLP exporter, registered before the server starts, then passes `tracer: trace.getTracer('my-site')`.

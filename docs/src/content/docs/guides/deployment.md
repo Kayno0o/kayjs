@@ -166,7 +166,7 @@ export default defineConfig({
 
 Each page request becomes a span named after its route, with one span per load and one for the render inside it. Each action and API request becomes a span too.
 
-`serverTiming: true` sends the same load and render times as a `Server-Timing` header. Development always does. It covers every page rendered per request, and the server islands of a prerendered one.
+`serverTiming: true` sends a `Server-Timing` header with the time of the guards, the module imports, the loads and the render. Development always does. It covers every page rendered per request, and the server islands of a prerendered one.
 
 <ReadMore href="/llms/production#request-logs">The log fields, span attributes and the sink for your own entries are in the full production reference.</ReadMore>
 

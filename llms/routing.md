@@ -212,7 +212,7 @@ The fence's `ctx`:
 #### Loads and timing
 
 - Layout and page loads run in parallel; when several fail, the outermost one decides the response.
-- In development each response carries a `Server-Timing` header with the time of every load and of the render, shown in the browser's network panel.
+- In development each response carries a `Server-Timing` header with the time of the guards, the import of the page's modules, the loads as a whole and each of them, and the render, shown in the browser's network panel.
 - `serverTiming: true` in kay.config.ts sends it in production too (see [Tracing and timing](production.md#tracing-and-timing)).
 
 #### Special pages

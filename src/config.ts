@@ -70,7 +70,7 @@ export interface KayConfig {
   health?: HealthConfig | false | undefined
   // One line per request on stdout, on by default when NODE_ENV is production, `false` for none; `'json'` writes it and kay's own messages as one JSON object each instead, and a function receives them all.
   log?: Logger | undefined
-  // A `Server-Timing` header on each page rendered per request, timing its loads and its render for the browser's network panel: on in development, off otherwise unless set.
+  // A `Server-Timing` header on each page rendered per request, timing its guards, the import of its modules, its loads and its render for the browser's network panel: on in development, off otherwise unless set.
   serverTiming?: boolean | undefined
   // An OpenTelemetry tracer, `trace.getTracer('my-site')` from @opentelemetry/api: a span per page request with one per load and the render in it, and one per API request. None by default, which costs nothing.
   tracer?: Tracer | undefined

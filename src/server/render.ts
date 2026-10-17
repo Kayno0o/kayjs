@@ -93,6 +93,14 @@ interface LoadedRoute {
   // Each load as it settled, which a special page rendering in its place reuses.
   loaded: Map<string, Loaded>
   timings: number[] | undefined
+  // How long the guards, the imports of the chain's modules and all its loads took, timed along with `timings`.
+  phases?: ServerPhases | undefined
+}
+
+interface ServerPhases {
+  guards?: number | undefined
+  imports: number
+  loads: number
 }
 
 // A prerendered page as the server holds it from boot: the brotli copy in memory, which nearly every browser takes, the others as files.
@@ -301,31 +309,39 @@ async function loadRoute(route: ServedRoute, rendering: Rendering, client: Clien
   if (options.dev)
     rendering.matched = route.pattern
 
+  // A prerendered page is stored with its headers and served to everyone, so it carries no one render's timings.
+  const timing = (options.serverTiming === true || options.dev === true) && !options.prerendering
+  const guardsStarted = performance.now()
   const refusal = await refused(route, rendering, client, options)
 
   if (refusal)
     return refusal
 
+  const guards = route.guards.length > 0 ? performance.now() - guardsStarted : undefined
   const { files } = routeChain(route)
   const loaded = new Map<string, Loaded>()
 
   try {
+    const importsStarted = performance.now()
     const modules = await importAll(files, options)
+    const imports = performance.now() - importsStarted
     // Read once the guards let the request through, so a refused query never renders what they protect; the layouts and the page share it.
     const query = chainQuery(files, modules)
 
     if (query !== undefined && !options.prerendering)
       rendering.ctx.query = readQuery(query, rendering.ctx.url)
 
-    // A prerendered page is stored with its headers and served to everyone, so it carries no one render's timings.
-    const timings = (options.serverTiming === true || options.dev === true) && !options.prerendering ? Array.from<number>({ length: files.length }) : undefined
+    const timings = timing ? Array.from<number>({ length: files.length }) : undefined
 
     if (options.dev) {
       rendering.loads = { files, modules, timings }
       rendering.prerender = await willPrerender(route, modules.at(-1)!)
     }
 
-    return { files, modules, data: await runLoads(files, modules, rendering.ctx, loaded, timings), loaded, timings }
+    const loadsStarted = performance.now()
+    const data = await runLoads(files, modules, rendering.ctx, loaded, timings)
+
+    return { files, modules, data, loaded, timings, phases: timing ? { guards, imports, loads: performance.now() - loadsStarted } : undefined }
   }
   catch (error) {
     return renderFailure(error, route.special, rendering, loaded, client, options)
@@ -368,10 +384,10 @@ function settledEmpty(file: string, loaded: Map<string, Loaded>): Record<string,
   return value
 }
 
-// Times the loads and the render since `started` in a `Server-Timing` header, when `serverTiming` asks; development times the loads for the dev tool either way.
-function timed({ files, modules, timings }: LoadedRoute, rendering: Rendering, started: number, options: RenderOptions): void {
-  if (timings && options.serverTiming === true)
-    rendering.headers.set('server-timing', serverTiming(files, modules, timings, performance.now() - started))
+// Times the guards, imports, loads and the render since `started` in a `Server-Timing` header, when `serverTiming` asks; development times the loads for the dev tool either way.
+function timed({ files, modules, timings, phases }: LoadedRoute, rendering: Rendering, started: number, options: RenderOptions): void {
+  if (timings && phases && options.serverTiming === true)
+    rendering.headers.set('server-timing', serverTiming(files, modules, timings, phases, performance.now() - started))
 }
 
 function projectPath(file: string): string {
@@ -399,11 +415,12 @@ async function runLoad(file: string, module: PageModule, ctx: PageContext<Record
   }
 }
 
-// One entry per load, layouts first, then the render; a streamed page's render covers what it sends first.
-function serverTiming(files: string[], modules: PageModule[], timings: number[], render: number): string {
-  const loads = files.flatMap((file, index) => modules[index]!.load ? [`load-${index};desc=${JSON.stringify(projectPath(file)).replace(NOT_ASCII, encodeURIComponent)};dur=${timings[index]!.toFixed(1)}`] : [])
+// The guards (when the route has any), the imports and the loads as a whole, which run at once, then one entry per load, layouts first, then the render; a streamed page's render covers what it sends first.
+function serverTiming(files: string[], modules: PageModule[], timings: number[], { guards, imports, loads }: ServerPhases, render: number): string {
+  const each = files.flatMap((file, index) => modules[index]!.load ? [`load-${index};desc=${JSON.stringify(projectPath(file)).replace(NOT_ASCII, encodeURIComponent)};dur=${timings[index]!.toFixed(1)}`] : [])
+  const phases = [...guards === undefined ? [] : [`guards;dur=${guards.toFixed(1)}`], `import;dur=${imports.toFixed(1)}`, `loads;dur=${loads.toFixed(1)}`]
 
-  return [...loads, `render;dur=${render.toFixed(1)}`].join(', ')
+  return [...phases, ...each, `render;dur=${render.toFixed(1)}`].join(', ')
 }
 
 // What `kay build` rendered, behind the page's guards, revalidated by its ETag.
