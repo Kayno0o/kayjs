@@ -27,7 +27,7 @@ export interface FormRules {
   required: string[]
 }
 
-// The schemas of the actions a page's forms post to, by action path, in one JSON script of the page's head.
+// The schemas of the actions a page's forms post to, by action path, in one JSON script of the page's head, and one more after each streamed block bringing forms the page lacked.
 export const FORMS_SCRIPT = 'script[data-kay-forms]'
 // Elysia's own checks of the formats the browser checks too; any other format is left to the server.
 const FORMATS: Record<string, RegExp> = {
@@ -79,9 +79,14 @@ export function checkForm(form: HTMLFormElement, action: string): boolean {
 }
 
 function formRules(action: string): FormRules | undefined {
-  const script = document.querySelector(FORMS_SCRIPT)
+  for (const script of document.querySelectorAll(FORMS_SCRIPT)) {
+    const rules = (JSON.parse(script.textContent ?? '{}') as Record<string, FormRules>)[action]
 
-  return !script ? undefined : (JSON.parse(script.textContent ?? '{}') as Record<string, FormRules>)[action]
+    if (rules)
+      return rules
+  }
+
+  return undefined
 }
 
 // The first control posting under `name`, the one a message is shown on.

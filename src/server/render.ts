@@ -835,7 +835,7 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
     return `${start}</body></html>`
 
   // A deferred module would wait for the whole stream; an async one hydrates the islands already there as soon as it loads.
-  return streamDocument(shipsEntry ? `${start}<script type="module" async src="${client.entry}"></script>` : start, deferred, client, shipsEntry, error => reportServerError(error, rendering.ctx.request, options.onError))
+  return streamDocument(shipsEntry ? `${start}<script type="module" async src="${client.entry}"></script>` : start, deferred, client, shipsEntry, error => reportServerError(error, rendering.ctx.request, options.onError), { hydration: hasIslands, forms: posts ? forms : undefined, words: checked !== '', locale: hasIslands || (checked !== '' && words.size > 0), dev: options.dev })
 }
 
 function htmlOpen(lang: string, attributes: string): string {

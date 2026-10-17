@@ -1,0 +1,22 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+export const check = action(t.Object({
+  name: t.String({ minLength: 3 }),
+}), () => undefined)
+
+async function* words() {
+  yield 'one'
+  await Bun.sleep(80)
+  yield 'two'
+}
+
+const rows = words()
+---
+p.shell Shell
+await rows then text
+  p {text}
+  form(action={check})
+    input(field="name")
+    button Check

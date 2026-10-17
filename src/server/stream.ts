@@ -1,13 +1,16 @@
+import type { Action } from '../runtime/action'
 import type { PendingBlock } from '../runtime/await.server'
 import type { RenderedIslands } from '../runtime/island.server'
 import type { SnapshotReader } from '../runtime/snapshots'
 import type { ClientBuild } from './client'
+import { collectForms } from '../runtime/action'
 import { collectDeferred } from '../runtime/await.server'
 import { child } from '../runtime/html'
 import { collectIslands } from '../runtime/island.server'
 import { isSnapshots, lastSnapshot, readSnapshots } from '../runtime/snapshots'
+import { formsScript } from './forms'
 import { hydrationScript } from './hydration'
-import { messagesScript } from './i18n'
+import { invalidKeys, messagesScript } from './i18n'
 
 // Swaps every streamed block that arrived in for the pending one between its markers, then hydrates the islands they brought; an outer block that settled first may have taken the markers away already.
 // Both scripts are the same on every page, so a Content-Security-Policy allows them by hash.
@@ -20,6 +23,22 @@ export interface Rendered {
   html: string
   islands: RenderedIslands
   deferred: PendingBlock[]
+  // The actions the forms of a streamed block post to.
+  forms?: Set<Action<never, unknown>>
+}
+
+// What the shell already sent, which a streamed block does not send again.
+export interface Shipped {
+  // The hydration script, which queues the events islands miss before they hydrate.
+  hydration?: boolean
+  // The actions whose schemas the shell's forms script holds.
+  forms?: Set<Action<never, unknown>> | undefined
+  // Whether the `kay.invalid.*` messages went with the locale.
+  words?: boolean
+  // Whether the page's locale went, which the first messages script carries.
+  locale?: boolean
+  // Whether `kay dev` reads the rules again each time.
+  dev?: boolean | undefined
 }
 
 // A static render, as pages and layouts are: only islands carry the markers hydration claims.
@@ -27,6 +46,13 @@ export function renderStatic(view: () => unknown, salt?: string): Rendered {
   const { result: { result: html, islands }, deferred } = collectDeferred(() => collectIslands(() => child(view()), salt))
 
   return { html, islands, deferred }
+}
+
+// A streamed block, whose forms are collected for the stream to send their schemas along as the shell would have.
+function renderBlock(view: () => unknown, salt?: string): Rendered {
+  const { result, forms } = collectForms(() => renderStatic(view, salt))
+
+  return { ...result, forms }
 }
 
 // Bun closes a connection idle for 10 s by default, and proxies after a minute or so: an empty comment now and then keeps a page whose blocks are slow open.
@@ -37,8 +63,14 @@ const KEEP_ALIVE = encoder.encode('<!---->')
 export const PART_MS = 50
 
 // Sends the page up to its last pending block at once, then each block as it settles, in whatever order they do.
-export function streamDocument(shell: string, deferred: PendingBlock[], client: ClientBuild, entryShipped: boolean, report: (error: unknown) => void): ReadableStream<Uint8Array> {
+export function streamDocument(shell: string, deferred: PendingBlock[], client: ClientBuild, entryShipped: boolean, report: (error: unknown) => void, sent: Shipped = {}): ReadableStream<Uint8Array> {
   let shipped = entryShipped
+  let hydrationShipped = sent.hydration ?? entryShipped
+  let wordsShipped = sent.words ?? false
+  let localeShipped = sent.locale ?? entryShipped
+  const formsShipped = new Set(sent.forms)
+  // A page without navigation has no entry to send a form with.
+  const posts = client.entry !== undefined && client.navigation === true
   let swapShipped = false
   // Once the browser goes away, blocks still settling render nothing.
   let cancelled = false
@@ -57,14 +89,38 @@ export function streamDocument(shell: string, deferred: PendingBlock[], client: 
 
         swapShipped = true
 
-        if (rendered.islands.count > 0) {
-          // The first part with islands carries the locale; later ones only the messages they bring.
-          scripts += messagesScript(rendered.islands.messages, !shipped)
+        const fresh = posts ? [...rendered.forms ?? []].filter(form => !formsShipped.has(form)) : []
+        const checked = fresh.length > 0 ? formsScript(new Set(fresh), sent.dev) : ''
 
-          if (!shipped && client.entry !== undefined) {
-            scripts += `${hydrationScript}<script type="module" async src="${client.entry}"></script>`
-            shipped = true
-          }
+        for (const form of fresh)
+          formsShipped.add(form)
+
+        const keys = new Set(rendered.islands.messages)
+
+        // The browser's form check words a refusal as the server does, so the first checked form sends the `kay.invalid.*` messages too.
+        if (checked !== '' && !wordsShipped) {
+          for (const key of invalidKeys())
+            keys.add(key)
+
+          wordsShipped = true
+        }
+
+        scripts += checked
+
+        // The first message of the page carries the locale; later ones only the messages they bring.
+        if (rendered.islands.count > 0 || (checked !== '' && keys.size > 0)) {
+          scripts += messagesScript(keys, !localeShipped)
+          localeShipped = true
+        }
+
+        if (rendered.islands.count > 0 && !hydrationShipped) {
+          scripts += hydrationScript
+          hydrationShipped = true
+        }
+
+        if (!shipped && client.entry !== undefined && (rendered.islands.count > 0 || checked !== '')) {
+          scripts += `<script type="module" async src="${client.entry}"></script>`
+          shipped = true
         }
 
         const html = more ? `<!--kay-await:${id}-->${rendered.html}<!--/kay-await:${id}-->` : rendered.html
@@ -93,7 +149,7 @@ export function streamDocument(shell: string, deferred: PendingBlock[], client: 
           if (cancelled || broken)
             return
 
-          const rendered = renderOrReport(() => block.ready(value as never), report, renderStatic, block.id)
+          const rendered = renderOrReport(() => block.ready(value as never), report, renderBlock, block.id)
 
           // A `then` block that throws is a bug in the page: the iterable is not read further.
           if (rendered === EMPTY) {
@@ -127,7 +183,7 @@ export function streamDocument(shell: string, deferred: PendingBlock[], client: 
           }
 
           const failed = block.failed
-          const rendered = renderOrReport(() => failed(error), report, renderStatic, block.id)
+          const rendered = renderOrReport(() => failed(error), report, renderBlock, block.id)
 
           write(block.id, rendered, false)
           await Promise.all(rendered.deferred.map(send))
@@ -142,7 +198,7 @@ export function streamDocument(shell: string, deferred: PendingBlock[], client: 
           return
 
         // An iterable ending with no value leaves nothing in place of its pending block.
-        const rendered = last ? renderOrReport(() => block.ready(last.value as never), report, renderStatic, block.id) : EMPTY
+        const rendered = last ? renderOrReport(() => block.ready(last.value as never), report, renderBlock, block.id) : EMPTY
 
         write(block.id, rendered, false)
         await Promise.all(rendered.deferred.map(send))
@@ -173,7 +229,7 @@ export function streamDocument(shell: string, deferred: PendingBlock[], client: 
 
 // The `then` block once the value resolves, or with an iterable's last part, or the `catch` block once it rejects; without one, the pending block just goes away and the error is reported.
 // A block that throws while rendering is a bug in the page, not the value failing, so it is reported rather than shown as `catch`.
-export async function settle(block: PendingBlock, cancelled: () => boolean, report: (error: unknown) => void, render: (view: () => unknown, salt?: string) => Rendered = renderStatic): Promise<Rendered> {
+export async function settle(block: PendingBlock, cancelled: () => boolean, report: (error: unknown) => void, render: (view: () => unknown, salt?: string) => Rendered = renderBlock): Promise<Rendered> {
   let value: { value: unknown } | undefined
 
   try {

@@ -1,0 +1,24 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+export const check = action(t.Object({
+  name: t.String({ minLength: 3 }),
+}), () => undefined)
+
+export const other = action(t.Object({
+  title: t.String({ minLength: 2 }),
+}), () => undefined)
+
+const rows = Promise.resolve([1])
+---
+form(action={check})
+  input(field="name")
+  button Check
+await rows then list
+  form(action={check})
+    input(field="name")
+    button Again
+  form(action={other})
+    input(field="title")
+    button Other

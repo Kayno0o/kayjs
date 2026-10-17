@@ -29,8 +29,8 @@ const FRENCH = {
   'kay.invalid.type': 'Valeur invalide',
 }
 
-async function page(path: string, options: { dev?: boolean, i18n?: boolean } = {}): Promise<string> {
-  const app = await servePages(resolveProject(process.cwd(), { routes: `${FIXTURE}/src/routes`, security: false, ...options.i18n !== false && { i18n } }, { dev: options.dev ?? false, prebuilt: false, underKayDev: false }), async () => client)
+async function page(path: string, options: { dev?: boolean, i18n?: boolean, base?: string, trailingSlash?: 'always' } = {}): Promise<string> {
+  const app = await servePages(resolveProject(process.cwd(), { routes: `${FIXTURE}/src/routes`, security: false, ...options.base !== undefined && { base: options.base }, ...options.trailingSlash !== undefined && { trailingSlash: options.trailingSlash }, ...options.i18n !== false && { i18n } }, { dev: options.dev ?? false, prebuilt: false, underKayDev: false }), async () => client)
 
   return (await app.handle(new Request(`http://localhost${path}`))).text()
 }
@@ -62,8 +62,12 @@ describe('the messages a page sends for the browser\'s form check', () => {
     expect(payload(html)?.locale).toBe('fr')
   })
 
-  // A form in a streamed block ships no entry, rules or messages, so the browser's own check runs: kaynooo/kayjs#960.
-  it.todo('brings them on a page whose form is in a streamed block')
+  it('brings them on a page whose form is in a streamed block', async () => {
+    const html = await page('/fr/streamed')
+
+    expect(payload(html)?.messages).toEqual(FRENCH)
+    expect(payload(html)?.locale).toBe('fr')
+  })
 
   it('sends nothing on a page without a form', async () => {
     expect(payload(await page('/fr/plain'))).toBeUndefined()
@@ -72,6 +76,73 @@ describe('the messages a page sends for the browser\'s form check', () => {
   it('sends nothing on a site without i18n', async () => {
     expect(payload(await page('/', { i18n: false }))).toBeUndefined()
   })
+})
+
+const FORMS = /<script type="application\/json" data-kay-forms>(.*?)<\/script>/g
+const ENTRY = /src="(?:\/blog)?\/_kay\/entry\.js"/g
+
+function schemasOf(html: string): string[][] {
+  return [...html.matchAll(FORMS)].map(found => Object.keys(JSON.parse(found[1]!) as object))
+}
+
+// What a form in a streamed block needs is shipped in the stream as the shell would have: kaynooo/kayjs#960.
+describe('a form inside a streamed block', () => {
+  const sites: [string, { base?: string, trailingSlash?: 'always' }][] = [
+    ['', {}],
+    ['/blog', { base: '/blog', trailingSlash: 'always' }],
+  ]
+
+  for (const [prefix, options] of sites) {
+    const path = (route: string) => `${route}${options.trailingSlash === 'always' ? '/' : ''}`
+
+    describe(prefix === '' ? 'on a site at the root' : 'under a base with a trailing slash', () => {
+      it('ships the rules, the locale\'s messages and the entry when only the block holds a form', async () => {
+        const html = await page(path('/fr/streamed'), options)
+        const forms = schemasOf(html)
+
+        expect(forms).toHaveLength(1)
+        expect(forms[0]).toHaveLength(1)
+        expect(forms[0]![0]).toEndWith('/check')
+        // The schemas go by the action's path without the base, as the browser asks for them.
+        expect(forms[0]![0]!.startsWith('/_kay/')).toBe(true)
+        expect(payload(html)).toMatchObject({ locale: 'fr', messages: FRENCH })
+        expect(html.match(ENTRY)).toHaveLength(1)
+        // They come with the block, after the shell.
+        expect(html.indexOf('data-kay-forms')).toBeGreaterThan(html.indexOf('Shell'))
+      })
+
+      it('words nothing on a site without i18n, but still ships the rules and the entry', async () => {
+        const html = await page(path('/streamed'), { ...options, i18n: false })
+
+        expect(schemasOf(html)).toHaveLength(1)
+        expect(payload(html)).toBeUndefined()
+        expect(html.match(ENTRY)).toHaveLength(1)
+      })
+
+      it('sends only what the shell lacks for a block when the shell has a form too', async () => {
+        const html = await page(path('/fr/both'), options)
+        const forms = schemasOf(html)
+
+        // The shell has `check`; the block adds `other` only.
+        expect(forms).toHaveLength(2)
+        expect(forms[0]).toHaveLength(1)
+        expect(forms[1]).toHaveLength(1)
+        expect(forms[1]![0]).toEndWith('/other')
+        expect(html.match(/data-kay-i18n/g)).toHaveLength(1)
+        expect(html.match(ENTRY)).toHaveLength(1)
+      })
+
+      it('ships them once for the parts of an iterable block', async () => {
+        const html = await page(path('/fr/parts'), options)
+
+        expect(html.match(/data-kay-await="/g)!.length).toBeGreaterThan(1)
+        expect(schemasOf(html)).toHaveLength(1)
+        expect(html.match(/data-kay-i18n/g)).toHaveLength(1)
+        expect(html.match(ENTRY)).toHaveLength(1)
+        expect(payload(html)?.messages).toEqual(FRENCH)
+      })
+    })
+  }
 })
 
 describe('the browser\'s form check in the page\'s locale', () => {
@@ -203,6 +274,21 @@ describe('the browser\'s form check in the page\'s locale', () => {
     await Promise.resolve()
     append(document.body, JSON.stringify({ messages: { 'kay.invalid.tooLong': 'Au plus {max} caractères' } }))
     expect(check(fields, schema).long).toBe('Au plus 2 caractères')
+  })
+
+  it('finds the rules of a form in the script a streamed block brought, past the shell\'s', () => {
+    bring(FRENCH)
+
+    const first = action(t.Object({ name: t.String({ minLength: 3 }) }), () => undefined)
+    const second = action(t.Object({ title: t.String({ minLength: 4 }) }), () => undefined)
+
+    ;(first as { url: string }).url = '/first'
+    ;(second as { url: string }).url = '/second'
+    document.head.insertAdjacentHTML('beforeend', formsScript(new Set([first])))
+    document.body.insertAdjacentHTML('beforeend', formsScript(new Set([second])))
+    document.body.insertAdjacentHTML('afterbegin', '<form><input name="title" value="ab"></form>')
+    checkForm(document.querySelector('form')!, '/second')
+    expect(document.querySelector('input')!.validationMessage).toBe('Au moins 4 caractères')
   })
 
   it('checks a form an island rendered after the page loaded as one the page held', () => {
