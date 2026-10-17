@@ -10,6 +10,7 @@ const COMMENTS = /\/\/[^\n]*|\/\*[\s\S]*?\*\//g
 const DRAFT = /^\s*draft\b/
 const IDENTIFIER = /^[A-Z_$][\w$]*$/i
 const INDENT = /^[ \t]*/
+const INDENTED = /^([ \t]+)\S/gm
 const PLURAL_KEYS = new Set(['zero', 'one', 'two', 'few', 'many', 'other'])
 
 // A message as its file writes it: its dotted key, the line its key is on, and the `// draft` comment on that line when there is one.
@@ -24,9 +25,10 @@ export function draftMessages(source: string): { key: string, line: number }[] {
   return writtenMessages(source).filter(message => message.draft !== undefined).map(({ key, line }) => ({ key, line }))
 }
 
-// The source with every `// draft` comment of its messages removed, and how many it removed.
+// The source with every `// draft` comment of its messages removed, and how many it removed: one comment after several messages of a line counts once.
 export function acceptDrafts(source: string): { source: string, accepted: number } {
-  const drafts = writtenMessages(source).flatMap(message => message.draft === undefined ? [] : [message.draft]).toSorted((a, b) => b.start! - a.start!)
+  const comments = new Map(writtenMessages(source).flatMap(message => message.draft === undefined ? [] : [[message.draft.start!, message.draft] as const]))
+  const drafts = [...comments.values()].toSorted((a, b) => b.start! - a.start!)
   let accepted = source
 
   for (const comment of drafts) {
@@ -38,14 +40,23 @@ export function acceptDrafts(source: string): { source: string, accepted: number
   return { source: accepted, accepted: drafts.length }
 }
 
-// Writes `messages`, keyed as `t()` names them, into the locale's messages file, each marked `// draft` at its place in the nesting, the file created when it is missing; a key the file already has is left as written. Answers the keys written.
+// Writes `messages`, keyed as `t()` names them, into the file of a locale `i18n` translates from the default one, each marked `// draft` at its place in the nesting, the file created when it is missing; a key the file already has is left as written. Answers the keys written.
 export async function writeDraftMessages(root: string, config: Pick<KayConfig, 'i18n'>, locale: string, messages: Record<string, Message>): Promise<string[]> {
-  const file = messagesFile(root, config.i18n ?? {}, locale)
+  const { i18n } = config
+
+  if (!i18n)
+    throw new Error('kay: writeDraftMessages writes a locale\'s messages, and kay.config.ts sets no i18n')
+
+  if (!i18n.locales.includes(locale) || locale === i18n.defaultLocale)
+    throw new Error(`kay: writeDraftMessages was given the locale ${JSON.stringify(locale)}, which is not one of those translated from ${i18n.defaultLocale}: ${i18n.locales.filter(code => code !== i18n.defaultLocale).join(', ')}`)
+
+  const file = messagesFile(root, i18n, locale)
   let source = existsSync(file) ? await Bun.file(file).text() : 'import { defineMessages } from \'kay/i18n\'\n\nexport default defineMessages({})\n'
+  const style = styleOf(source)
   const written: string[] = []
 
   for (const [key, message] of Object.entries(messages)) {
-    const next = withMessage(source, key.split('.'), message)
+    const next = withMessage(source, key.split('.'), message, style)
 
     if (next !== source)
       written.push(key)
@@ -58,8 +69,24 @@ export async function writeDraftMessages(root: string, config: Pick<KayConfig, '
   return written
 }
 
+// How the file breaks and indents its lines, which the lines written follow.
+interface Style {
+  newline: string
+  unit: string
+}
+
+function styleOf(source: string): Style {
+  const indents = [...source.matchAll(INDENTED)].map(match => match[1]!)
+  const spaces = indents.filter(indent => !indent.includes('\t')).map(indent => indent.length)
+
+  return {
+    newline: source.includes('\r\n') ? '\r\n' : '\n',
+    unit: indents.some(indent => indent.startsWith('\t')) ? '\t' : ' '.repeat(spaces.length === 0 ? 2 : Math.min(...spaces)),
+  }
+}
+
 // The source with one message added under its key, or as it was when the key is there already, or a part of it is a message rather than a group.
-function withMessage(source: string, parts: string[], message: Message): string {
+function withMessage(source: string, parts: string[], message: Message, style: Style): string {
   let object: t.ObjectExpression | undefined = messagesObject(source)
 
   if (!object)
@@ -69,7 +96,7 @@ function withMessage(source: string, parts: string[], message: Message): string 
     const found: t.ObjectProperty | undefined = object.properties.find((property): property is t.ObjectProperty => property.type === 'ObjectProperty' && keyName(property) === part)
 
     if (!found)
-      return inserted(source, object, entryText(parts.slice(index), message))
+      return inserted(source, object, entryText(parts.slice(index), message, style.unit), style)
 
     if (index === parts.length - 1 || found.value.type !== 'ObjectExpression' || isPluralObject(found.value))
       return source
@@ -81,27 +108,29 @@ function withMessage(source: string, parts: string[], message: Message): string 
 }
 
 // The source with `entry`, lines of text without their indent, added as the object's last property.
-function inserted(source: string, object: t.ObjectExpression, entry: string[]): string {
+function inserted(source: string, object: t.ObjectExpression, entry: string[], { newline, unit }: Style): string {
   const outer = lineIndent(source, object.start!)
   const last = object.properties.at(-1)
 
-  // A one-line object, `{}` or `{ home: 'Accueil' }`, opens on lines of its own so the comment ends one.
+  // A one-line object, `{}` or `{ home: 'Accueil' }`, opens on lines of its own so the comment ends one, what it held kept as written on the first.
   if (object.loc!.start.line === object.loc!.end.line) {
-    const inner = `${outer}  `
-    const kept = object.properties.map(property => `${inner}${source.slice(property.start!, property.end!)},`)
+    const inner = `${outer}${unit}`
+    const held = source.slice(object.start! + 1, object.end! - 1).trim()
+    const comma = last && !followedByComma(source, last.end!, object.end! - 1) ? ',' : ''
+    const kept = held === '' ? [] : [`${inner}${held}${comma}`]
     const added = entry.map(line => `${inner}${line}`)
 
-    return `${source.slice(0, object.start!)}{\n${[...kept, ...added].join('\n')}\n${outer}}${source.slice(object.end!)}`
+    return `${source.slice(0, object.start!)}{${newline}${[...kept, ...added].join(newline)}${newline}${outer}}${source.slice(object.end!)}`
   }
 
-  const inner = last ? lineIndent(source, last.start!) : `${outer}  `
+  const inner = last ? lineIndent(source, last.start!) : `${outer}${unit}`
   const brace = object.end! - 1
   const lineStart = source.lastIndexOf('\n', brace - 1) + 1
   // The closing brace alone on its line takes the entry above it, one sharing a line with the last property after a line break.
   const alone = source.slice(lineStart, brace).trim() === ''
   const at = alone ? lineStart : brace
-  const lines = entry.map(line => `${inner}${line}\n`).join('')
-  const added = alone ? lines : `\n${lines}${outer}`
+  const lines = entry.map(line => `${inner}${line}${newline}`).join('')
+  const added = alone ? lines : `${newline}${lines}${outer}`
   const comma = last && !followedByComma(source, last.end!, brace) ? last.end! : undefined
 
   if (comma === undefined)
@@ -111,13 +140,13 @@ function inserted(source: string, object: t.ObjectExpression, entry: string[]): 
 }
 
 // A message's lines under its key, each group opened for the parts left: `nav: {`, `  home: 'Accueil', // draft`, `},`.
-function entryText(parts: string[], message: Message): string[] {
+function entryText(parts: string[], message: Message, unit: string): string[] {
   const [part, ...rest] = parts
 
   if (rest.length === 0)
     return [`${keyText(part!)}: ${messageText(message)}, // draft`]
 
-  return [`${keyText(part!)}: {`, ...entryText(rest, message).map(line => `  ${line}`), '},']
+  return [`${keyText(part!)}: {`, ...entryText(rest, message, unit).map(line => `${unit}${line}`), '},']
 }
 
 function messageText(message: Message): string {

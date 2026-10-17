@@ -33,7 +33,6 @@ export async function extensionCommands(root: string, own: string[]): Promise<Ex
   const config = await loadConfig(root)
   const commands: ExtensionCommand[] = []
   const clashes: string[] = []
-  const single = new Set(own.filter(name => !name.includes(' ')))
   const groups = new Set(own.filter(name => name.includes(' ')).map(name => name.slice(0, name.indexOf(' '))))
 
   for (const extension of config.extensions ?? []) {
@@ -41,11 +40,15 @@ export async function extensionCommands(root: string, own: string[]): Promise<Ex
       const words = given.trim().split(SPACES)
       const name = words.join(' ')
       const taken = commands.find(command => command.name === name)
+      // A kay command its first words name would take the rest as its arguments.
+      const under = words.slice(0, -1).map((_, index) => words.slice(0, index + 1).join(' ')).find(prefix => own.includes(prefix))
 
-      if (own.includes(name) || groups.has(name))
+      if (name === '')
+        clashes.push(`the extension ${extension.name} adds a command with no name`)
+      else if (own.includes(name) || groups.has(name))
         clashes.push(`the extension ${extension.name} adds the command \`kay ${name}\`, which kay has`)
-      else if (words.length > 1 && single.has(words[0]!))
-        clashes.push(`the extension ${extension.name} adds the command \`kay ${name}\`, which kay's \`kay ${words[0]}\` takes as its arguments`)
+      else if (under !== undefined)
+        clashes.push(`the extension ${extension.name} adds the command \`kay ${name}\`, which kay's \`kay ${under}\` takes as its arguments`)
       else if (taken)
         clashes.push(`the extensions ${taken.extension} and ${extension.name} both add the command \`kay ${name}\``)
       else
@@ -61,8 +64,16 @@ export function matchCommand(commands: ExtensionCommand[], args: string[]): Exte
   return commands.filter(command => command.words.every((word, index) => args[index] === word)).toSorted((a, b) => b.words.length - a.words.length)[0]
 }
 
+// The module's command, or an error naming the module and the extension giving it.
 export async function loadCommand(command: ExtensionCommand): Promise<KayCommand> {
-  const loaded = (await import(command.module) as { default?: KayCommand }).default
+  let loaded: KayCommand | undefined
+
+  try {
+    loaded = (await import(command.module) as { default?: KayCommand }).default
+  }
+  catch (error) {
+    throw new Error(`kay: ${command.module}, which the extension ${command.extension} gives as \`kay ${command.name}\`, does not load: ${error instanceof Error ? error.message : String(error)}`)
+  }
 
   if (typeof loaded?.run !== 'function' || typeof loaded.usage !== 'string')
     throw new Error(`kay: ${command.module}, which the extension ${command.extension} gives as \`kay ${command.name}\`, does not export a command by default: export default { usage, options, positionals, run } satisfies KayCommand`)

@@ -1,5 +1,6 @@
-export { underKayDev } from '../build/assets'
 // What kay's own libraries share with kay, for their server code, not API: free to change with any minor, as every library peers on kay's exact minor.
+
+export { underKayDev } from '../build/assets'
 export type { KayCommand, Parsed } from '../commands/command'
 export { durationSeconds } from '../runtime/duration'
 export { isUrlAttribute, UNSAFE_ATTRIBUTE, UNSAFE_TAGS } from '../runtime/sanitize'

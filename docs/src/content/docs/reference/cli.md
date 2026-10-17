@@ -27,7 +27,7 @@ This needs Bun to know the registry first, see [Installation](/getting-started/i
 | `kay upgrade [dir]` | Move kay and its libraries to the latest version and rewrite the old forms |
 | `kay routes [dir]` | List every route the project serves, and the file serving it |
 | `kay env [dir]` | List the environment variables the project, its libraries and kay declare |
-| `kay i18n missing [dir]` | List what each locale lacks against the default one |
+| `kay i18n missing [locale] [dir]` | List what each locale lacks against the default one |
 | `kay i18n accept <locale> [dir]` | Accept a locale's draft messages |
 | `kay explain [lint\|error\|group]` | List the lints and the errors, or a group's, or explain one |
 | `kay fmt [paths]` | Format `.kay` files |
@@ -349,9 +349,9 @@ kay i18n missing
 kay i18n accept fr
 ```
 
-`kay i18n missing` lists what each locale lacks against the default one. It names the message keys missing from a locale, a library's included, and the entries a localized collection has in the default locale but not in that one. `--locale fr` shows one locale. `--format json` prints the same as one line of JSON.
+`kay i18n missing` lists what each locale lacks against the default one. It names the message keys missing from a locale, a library's included, and the entries a localized collection has in the default locale but not in that one. `kay i18n missing fr` shows one locale. `--format json` prints the same as one line of JSON.
 
-A message whose line ends on `// draft` is a draft, written by a machine and waiting for a person. `kay check` warns of each one. `kay i18n accept fr` deletes every draft comment in `src/messages/fr.ts` once you have checked them.
+A message whose line ends on `// draft` is a draft, written by a machine and waiting for a person. The comment goes on the message's own line: on a group's opening brace it marks nothing. `kay check` warns of each one. `kay i18n accept fr` deletes every draft comment in `src/messages/fr.ts` once you have checked them.
 
 A library can add commands of its own. `kay i18n` alone lists every `i18n` command, and `kay --help` lists each library's under its name.
 

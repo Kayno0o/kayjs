@@ -14,9 +14,9 @@ import { USAGES } from './usages'
 // What each locale lacks against the default locale: message keys, its extensions' included, and the entries of its localized collections.
 export const i18nMissing: Command = {
   usage: USAGES['i18n missing'],
-  options: { locale: { type: 'string' }, format: { type: 'string' } },
-  positionals: 1,
-  run: async ({ values, positionals: [path] }) => {
+  options: { format: { type: 'string' } },
+  positionals: 2,
+  run: async ({ values, positionals: [wanted, path] }) => {
     const format = formatOption('i18n missing', values.format)
 
     if (format === undefined)
@@ -28,7 +28,6 @@ export const i18nMissing: Command = {
       return 1
 
     const { root, config, i18n } = project
-    const wanted = typeof values.locale === 'string' ? values.locale : undefined
 
     if (wanted !== undefined && (!i18n.locales.includes(wanted) || wanted === i18n.defaultLocale)) {
       printFailure('i18n missing', `${wanted} is not one of the locales translated from ${i18n.defaultLocale}: ${i18n.locales.filter(code => code !== i18n.defaultLocale).join(', ')}`, format)

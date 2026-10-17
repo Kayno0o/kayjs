@@ -111,13 +111,13 @@ export async function messageProblems(root: string, config: I18nConfig, extensio
   return problems
 }
 
-// The keys each locale but the default lacks, with the default locale's message for each; a locale with no catalog at all lacks every key.
+// The keys each locale but the default lacks, with the default locale's message for each; a locale with no catalog at all lacks every key, and a default locale without one fails, as nothing says what the others lack.
 export async function missingMessages(root: string, config: I18nConfig, extensions: KayExtension[] = []): Promise<Map<string, Map<string, Message>>> {
   const reference = await localeCatalog(root, config, extensions, config.defaultLocale)
   const missing = new Map<string, Map<string, Message>>()
 
   if ('problem' in reference)
-    return missing
+    throw new Error(`kay: ${reference.problem.file} ${reference.problem.message}`)
 
   for (const locale of config.locales) {
     if (locale === config.defaultLocale)

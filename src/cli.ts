@@ -102,7 +102,7 @@ async function runExtensionCommand(args: string[]): Promise<number> {
     loaded = await loadCommand(command)
   }
   catch (error) {
-    console.error(error)
+    console.error(error instanceof Error ? error.message : String(error))
 
     return 1
   }
@@ -116,7 +116,7 @@ async function runExtensionCommand(args: string[]): Promise<number> {
 async function groupUsage(args: string[], commands: ExtensionCommand[], load: (command: ExtensionCommand) => Promise<{ usage: string }>): Promise<number> {
   const [group, next] = args
   const own = Object.entries(USAGES).filter(([name]) => name.startsWith(`${group} `)).map(([, line]) => line)
-  const added = await Promise.all(commands.filter(command => command.words.length > 1 && command.words[0] === group).map(async command => (await load(command)).usage))
+  const added = await Promise.all(commands.filter(command => command.words.length > 1 && command.words[0] === group).map(async command => usageLine(command, load)))
   const lines = [...own, ...added]
 
   if (lines.length === 0) {
@@ -136,6 +136,18 @@ async function groupUsage(args: string[], commands: ExtensionCommand[], load: (c
   return 1
 }
 
+// A command's usage line, or its name once said on stderr why its module gives none.
+async function usageLine(command: ExtensionCommand, load: (command: ExtensionCommand) => Promise<{ usage: string }>): Promise<string> {
+  try {
+    return (await load(command)).usage
+  }
+  catch (error) {
+    console.error(error instanceof Error ? error.message : String(error))
+
+    return command.name
+  }
+}
+
 // kay's usage, then each extension's commands under its name, when the current directory is a project whose config loads.
 async function fullUsage(): Promise<string> {
   const { extensionCommands, loadCommand } = await import('./commands/extensions')
@@ -144,7 +156,9 @@ async function fullUsage(): Promise<string> {
   try {
     found = await extensionCommands(process.cwd(), NAMES)
   }
-  catch {
+  catch (error) {
+    console.error(`kay: kay.config.ts did not load, so the commands its extensions add are not listed: ${error instanceof Error ? error.message : String(error)}`)
+
     return USAGE
   }
 
@@ -153,14 +167,7 @@ async function fullUsage(): Promise<string> {
 
   const sections = Object.entries(Object.groupBy(found?.commands ?? [], command => command.extension))
   const listed = await Promise.all(sections.map(async ([extension, commands]) => {
-    const lines = await Promise.all(commands!.map(async (command) => {
-      try {
-        return (await loadCommand(command)).usage
-      }
-      catch {
-        return command.name
-      }
-    }))
+    const lines = await Promise.all(commands!.map(async command => usageLine(command, loadCommand)))
 
     return `\n\nFrom ${extension}:\n${lines.map(line => `       kay ${line}`).join('\n')}`
   }))

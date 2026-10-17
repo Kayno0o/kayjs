@@ -14,7 +14,7 @@ export const USAGES = {
   'types': 'types [dir] [--quiet]',
   'fmt': 'fmt [paths...] [--check] [--format text|json] [--quiet]',
   'lint': 'lint [keslint arguments]...',
-  'i18n missing': 'i18n missing [dir] [--locale <locale>] [--format text|json]',
+  'i18n missing': 'i18n missing [locale] [dir] [--format text|json]',
   'i18n accept': 'i18n accept <locale> [dir]',
   'migrate': 'migrate astro [dir] [--out <dir>] [--format text|json] [--quiet]',
   'lsp': 'lsp --stdio',

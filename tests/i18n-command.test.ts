@@ -6,6 +6,7 @@ import { messageProblems } from '../src/check/messages'
 import { projectProblems } from '../src/check/project'
 import { flattenMessages } from '../src/runtime/i18n'
 import { acceptDrafts, draftMessages, writeDraftMessages } from '../src/server/message-drafts'
+import { missingTranslations } from '../src/server/translations'
 import { scratchDir } from './scratch'
 
 const cli = join(import.meta.dir, '../src/cli.ts')
@@ -72,6 +73,15 @@ describe('draft messages', () => {
     expect(accepted).toContain('// draft of a note, on no message')
   })
 
+  it('share one comment when several messages are on its line, accepted once', () => {
+    const grouped = messages('{\n  a: \'A\', b: \'B\', // draft\n  nav: { x: \'X\', y: \'Y\' }, // draft\n}')
+    const { source: accepted, accepted: count } = acceptDrafts(grouped)
+
+    expect(draftMessages(grouped).map(({ key }) => key)).toEqual(['a', 'b', 'nav.x', 'nav.y'])
+    expect(count).toBe(2)
+    expect(accepted).toBe(messages('{\n  a: \'A\', b: \'B\',\n  nav: { x: \'X\', y: \'Y\' },\n}'))
+  })
+
   it('are written into a locale\'s file at their place in the nesting, the rest left as written, and read back as messages', async () => {
     const root = await project({ 'src/messages/fr.ts': messages('{\n  nav: {\n    home: \'Accueil\' // kept\n  },\n  short: { a: \'A\' },\n  // a note\n}') })
     const written = await writeDraftMessages(root, { i18n }, 'fr', { 'nav.about': 'À propos', 'nav.home': 'Maison', 'short.b': 'B', 'deep.er.key': 'Profond', 'items': { one: '{count} article', other: '{count} articles' }, 'it\'s': 'l\'apostrophe\nligne' })
@@ -97,6 +107,32 @@ describe('draft messages', () => {
 
     expect(await Bun.file(join(root, 'src/messages/fr.ts')).text()).toBe(messages('{\n  nav: {\n    home: \'Accueil\', // draft\n  },\n}'))
     expect(await Bun.file(join(root, 'lang/de.ts')).text()).toBe(messages('{\n  greeting: \'Hallo\', // draft\n}'))
+  })
+
+  it('keep a one-line object\'s comments, the file\'s line breaks and its indent', async () => {
+    const root = await project({
+      'src/messages/fr.ts': messages('{ /* c */ a: \'A\' /* d */ }'),
+      'src/messages/de.ts': messages('{\r\n\tnav: {\r\n\t\thome: \'Start\',\r\n\t},\r\n}').replaceAll('\n', '\r\n').replaceAll('\r\r\n', '\r\n'),
+    })
+
+    await writeDraftMessages(root, { i18n }, 'fr', { b: 'B' })
+    await writeDraftMessages(root, { i18n }, 'de', { 'nav.about': 'Über', 'deep.key': 'Tief' })
+
+    expect(await Bun.file(join(root, 'src/messages/fr.ts')).text()).toBe(messages('{\n  /* c */ a: \'A\' /* d */,\n  b: \'B\', // draft\n}'))
+
+    const german = await Bun.file(join(root, 'src/messages/de.ts')).text()
+
+    expect(german).toContain('\t\thome: \'Start\',\r\n\t\tabout: \'Über\', // draft\r\n\t},\r\n\tdeep: {\r\n\t\tkey: \'Tief\', // draft\r\n\t},\r\n}')
+    expect(german.replaceAll('\r\n', '')).not.toContain('\n')
+  })
+
+  it('are written only for a locale i18n translates from the default one', async () => {
+    const root = await project({})
+
+    await Promise.all(['../x', 'it', 'en'].map(async locale => expect(writeDraftMessages(root, { i18n }, locale, { a: 'A' })).rejects.toThrow(`was given the locale ${JSON.stringify(locale)}, which is not one of those translated from en: fr, de`)))
+
+    await expect(writeDraftMessages(root, {}, 'fr', { a: 'A' })).rejects.toThrow('kay.config.ts sets no i18n')
+    expect(await Array.fromAsync(new Bun.Glob('**/*.ts').scan({ cwd: root, dot: true }))).toEqual([])
   })
 
   it('are reported by kay check as draft-message, at their line', async () => {
@@ -133,10 +169,10 @@ describe('kay i18n', () => {
       },
     })
 
-    const text = await kay(['i18n', 'missing', '--locale', 'fr'], root)
+    const text = await kay(['i18n', 'missing', 'fr'], root)
 
     expect(text.stdout).toBe('fr lacks 1 message: lib.bye\nfr lacks 1 entry of news: launch\n')
-    expect((await kay(['i18n', 'missing', '--locale', 'en'], root)).stderr).toContain('en is not one of the locales translated from en: fr, de')
+    expect((await kay(['i18n', 'missing', 'en'], root)).stderr).toContain('en is not one of the locales translated from en: fr, de')
   })
 
   it('accepts every draft of a locale', async () => {
@@ -152,6 +188,29 @@ describe('kay i18n', () => {
     expect((await kay(['i18n', 'accept', 'de'], root)).stderr).toContain('src/messages/de.ts does not exist')
     expect((await kay(['i18n', 'accept', 'it'], root)).stderr).toContain('it is not one of the locales i18n lists: en, fr, de')
     expect((await kay(['i18n', 'accept'], root)).code).toBe(1)
+  })
+
+  it('gives a library what each locale lacks, with the default locale\'s message for each', async () => {
+    const root = await project(site)
+    const config = { i18n, extensions: [{ name: 'kay-lib', messages: './lib/messages' }] }
+
+    expect(await missingTranslations(root, config)).toEqual({
+      fr: { messages: { 'lib.bye': 'Bye' }, entries: { news: ['launch'] } },
+      de: { messages: { 'lib.hello': 'Hello', 'lib.bye': 'Bye', 'nav.home': 'Home', 'nav.about': 'About', 'items': { one: '{count} item', other: '{count} items' } }, entries: { news: ['hello', 'launch'] } },
+    })
+    expect(await missingTranslations(root, {})).toEqual({})
+  })
+
+  it('fails when the default locale\'s messages do not read, rather than saying a locale lacks nothing', async () => {
+    const root = await project({ ...site, 'kay.config.ts': `export default { favicon: false, i18n: ${JSON.stringify(i18n)} }\n`, 'src/messages/en.ts': 'export default 1\n' })
+
+    await expect(missingTranslations(root, { i18n })).rejects.toThrow('kay: src/messages/en.ts must export its messages by default')
+
+    const { stdout, stderr, code } = await kay(['i18n', 'missing', 'fr'], root)
+
+    expect(code).toBe(1)
+    expect(stdout).toBe('')
+    expect(stderr).toContain('src/messages/en.ts must export its messages by default')
   })
 
   it('refuses a site without i18n', async () => {
@@ -175,6 +234,17 @@ describe('kay i18n', () => {
 
     expect(wrong.code).toBe(1)
     expect(wrong.stderr).toContain('kay: i18n has no command nope')
+  })
+
+  it('names a library\'s command module that does not load in one line, and lists the rest', async () => {
+    const root = await project({ ...site, 'lib/translate.ts': 'throw new Error(\'broken module\')\n' })
+    const { stdout, stderr, code } = await kay(['i18n'], root)
+
+    expect(code).toBe(0)
+    expect(stdout).toContain('kay i18n accept <locale> [dir]')
+    expect(stdout).toContain('       kay i18n translate\n')
+    expect(stderr.trim().split('\n')).toHaveLength(1)
+    expect(stderr).toContain('which the extension kay-lib gives as `kay i18n translate`, does not load: broken module')
   })
 })
 
@@ -209,6 +279,9 @@ describe('commands an extension adds', () => {
     expect((await kay(['hello', 'world'], await clash('{ check: \'./lib/hello.ts\' }'))).stderr).toBe('kay: the extension kay-lib adds the command `kay check`, which kay has\n')
     expect((await kay(['hello', 'world'], await clash('{ \'i18n missing\': \'./lib/hello.ts\' }'))).stderr).toBe('kay: the extension kay-lib adds the command `kay i18n missing`, which kay has\n')
     expect((await kay(['hello', 'world'], await clash('{ \'check  foo\': \'./lib/hello.ts\' }'))).stderr).toBe('kay: the extension kay-lib adds the command `kay check foo`, which kay\'s `kay check` takes as its arguments\n')
+    expect((await kay(['hello', 'world'], await clash('{ \'i18n missing foo\': \'./lib/hello.ts\' }'))).stderr).toBe('kay: the extension kay-lib adds the command `kay i18n missing foo`, which kay\'s `kay i18n missing` takes as its arguments\n')
+    expect((await kay(['hello', 'world'], await clash('{ \' \': \'./lib/hello.ts\' }'))).stderr).toBe('kay: the extension kay-lib adds a command with no name\n')
+    expect((await kay(['hello', 'world'], await clash('{ i18n: \'./lib/hello.ts\' }'))).stderr).toBe('kay: the extension kay-lib adds the command `kay i18n`, which kay has\n')
 
     const twice = await kay(['hello', 'world', 'Ada'], await clash('{ \'hello world\': \'./lib/hello.ts\' }', ', { name: \'other-lib\', commands: { \'hello world\': \'./lib/translate.ts\' } }'))
 
@@ -227,5 +300,15 @@ describe('commands an extension adds', () => {
 
     expect(bad.code).toBe(1)
     expect(bad.stderr).toContain('which the extension kay-lib gives as `kay bad`, does not export a command by default')
+  })
+
+  it('leave kay --help listing kay\'s own when the config does not load, saying why in one line', async () => {
+    const root = await project({ 'kay.config.ts': 'throw new Error(\'config broke\')\n' })
+    const { stdout, stderr, code } = await kay(['--help'], root)
+
+    expect(code).toBe(0)
+    expect(stdout).toStartWith('Usage: kay new')
+    expect(stderr.trim().split('\n')).toHaveLength(1)
+    expect(stderr).toContain('kay.config.ts did not load, so the commands its extensions add are not listed: config broke')
   })
 })

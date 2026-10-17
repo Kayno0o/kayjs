@@ -323,7 +323,7 @@ export const LINTS = {
     level: 'warn',
     group: 'i18n',
     site: true,
-    summary: 'With `i18n`, a message whose line in its locale\'s file ends on a `// draft` comment, as a machine translation is written: it is served as any message, and waits for a person to check it. Delete the comment once checked, or run `kay i18n accept <locale>` for every draft of the locale; `lints: { \'draft-message\': \'deny\' }` holds a release until they are.',
+    summary: 'With `i18n`, a message whose own line in its locale\'s file ends on a `// draft` comment (a group\'s opening brace marks none), as a machine translation is written: it is served as any message, and waits for a person to check it. Delete the comment once checked, or run `kay i18n accept <locale>` for every draft of the locale; `lints: { \'draft-message\': \'deny\' }` holds a release until they are.',
     wrong: '// src/messages/fr.ts\nexport default defineMessages({\n  nav: { about: \'À propos\' }, // draft\n})',
     right: '// src/messages/fr.ts\nexport default defineMessages({\n  nav: { about: \'À propos\' },\n})',
   },

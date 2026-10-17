@@ -171,8 +171,8 @@ p {target}
 - Messages live in `src/messages/<locale>.ts`, one file per locale, `messages` in `i18n` naming another directory.
 - Each exports its messages by default through `defineMessages`, nested as you like, a group never holding only keys named like plural forms (`one`, `other`...), which would read as one plural message.
 - The default locale's file is the reference `kay check` holds the others to, and a key a locale lacks falls back to the default locale's text.
-- A message whose line ends on a `// draft` comment is a draft, as a machine translation is written: served as any message, reported by `kay check` (`draft-message`, warn) until a person deletes the comment or runs `kay i18n accept <locale> [dir]`, which deletes every draft comment of that locale's file.
-- `kay i18n missing [dir] [--locale <locale>] [--format text|json]` lists what each locale lacks against the default one: message keys, its libraries' catalogs included, and the slugs a localized collection has in the default locale and not in it, a draft counting as there; `--format json` prints `{ locales: { fr: { messages: [keys], entries: { news: [slugs] } } } }`.
+- A message whose line ends on a `// draft` comment is a draft (the line its key is on: a plural's opening brace counts, a group's does not mark the messages under it), as a machine translation is written: served as any message, reported by `kay check` (`draft-message`, warn) until a person deletes the comment or runs `kay i18n accept <locale> [dir]`, which deletes every draft comment of that locale's file.
+- `kay i18n missing [locale] [dir] [--format text|json]` lists what each locale lacks against the default one: message keys, its libraries' catalogs included, and the slugs a localized collection has in the default locale and not in it, a draft counting as there; `--format json` prints `{ locales: { fr: { messages: [keys], entries: { news: [slugs] } } } }`.
 - A key no locale has, as a computed one may be, fails the render in development and tests, is logged in the browser in development, and shows as itself in production.
 
 ```ts
