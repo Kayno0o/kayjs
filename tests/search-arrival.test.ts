@@ -25,7 +25,7 @@ function mount(html = PAGE): void {
 }
 
 beforeAll(async () => {
-  GlobalRegistrator.register()
+  GlobalRegistrator.register({ url: 'http://localhost/' })
   Element.prototype.scrollIntoView = function scrollIntoView(this: Element) {
     scrolled.push(this)
   }
@@ -148,15 +148,29 @@ describe('what asks for the marking', () => {
   })
 
   it('loads the marking only for a query asking for it or marks to clear, and clears them otherwise', async () => {
+    const at = async (search: string) => {
+      history.replaceState(null, '', `/${search}#a`)
+      await launcher.arrive(search, 0)
+    }
+
     mount()
-    await launcher.arrive('?a=1', 0)
+    await at('?a=1')
     expect(painted()).toEqual([])
 
-    location.hash = '#a'
-    await launcher.arrive('?kay_q=install', 0)
+    await at('?kay_q=install')
     expect(painted()).toEqual(['install', 'install'])
 
-    await launcher.arrive('?a=1', 0)
+    await at('?a=1')
+    expect(painted()).toEqual([])
+  })
+
+  it('marks nothing for a page swapped away from while the marking loaded', async () => {
+    mount()
+    history.replaceState(null, '', '/?kay_q=install#a')
+    const pending = launcher.arrive('?kay_q=install', 0)
+
+    history.replaceState(null, '', '/?a=1#a')
+    await pending
     expect(painted()).toEqual([])
   })
 })

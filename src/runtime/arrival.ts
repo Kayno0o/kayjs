@@ -13,7 +13,11 @@ export async function arrive(search: string, from: number): Promise<void> {
     return
 
   try {
-    (await import('./search-arrival')).markArrival(search, location.hash, from)
+    const { markArrival } = await import('./search-arrival')
+
+    // A page swapped in while the code loaded marks its own words, or none.
+    if (location.search === search)
+      markArrival(search, location.hash, from)
   }
   catch {}
 }
