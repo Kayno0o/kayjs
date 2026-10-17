@@ -6,6 +6,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 - `kay add` keeps the runner label a project was scaffolded with when it rewrites the CI workflow, and `deprecated-test-mount` also finds `await import('kay/test')` and `export { mount } from 'kay/test'` ([Project](project.md)).
 - Under a `base`, an action's redirect goes under it for a call from an island and a form the page swap posts as it does for a plain form, so the browser lands on `/app/dashboard` and not `/dashboard`; the app declares nothing ([Actions](actions.md#calling-from-an-island)).
+- kayjs-ui: `MultiSelect` options take `icon` and `disabled` like ChipGroup's and Segmented's, a disabled option staying as it is under All and None ([kayjs-ui](../packages/ui/llms/forms.md)).
 - `search` in `page` may be a function of the params of each page, returning `false` or `{ weight }`, so a dynamic route weighs or leaves out its pages one by one ([Site search](sitemap-search-fonts.md#site-search)).
 - Site search ranks the sections of the page about a word above a page naming it once, finds `island` in a title saying Islands nearly as well as the word itself, and gives each hit `more`, how many more words searched for its text holds past the snippet ([Site search](sitemap-search-fonts.md#site-search)).
 - kayjs-ui: `CommandPalette` says under a section found how many more times it holds the words searched for, through `siteSearchMore` ([kayjs-ui](../packages/ui/llms/tables-navigation-and-layout.md)).

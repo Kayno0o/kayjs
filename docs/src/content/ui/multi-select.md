@@ -4,7 +4,7 @@ description: A trigger summing up what is picked, opening a popover of checkboxe
 
 <Demo name="multi-select/basic" />
 
-`onChange` hands back the picked values in the options' order, typed like the options' values, so a union of strings needs no cast.
+`onChange` hands back the picked values in the options' order, typed like the options' values, so a union of strings needs no cast. An option may carry an `icon`, drawn before its label, and be `disabled`: it cannot be flipped and stays as it is under All and None.
 
 ## Search and forms
 

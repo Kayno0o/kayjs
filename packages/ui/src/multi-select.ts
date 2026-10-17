@@ -1,6 +1,13 @@
+import type { IconProps } from 'kay/icons'
+import type { IconSlot } from './defaults'
+
 export interface MultiSelectOption<Value extends string = string> {
   value: Value
   label: string
+  // Sits before the label.
+  icon?: IconSlot | IconProps | undefined
+  // Keeps the option as it is: All and None leave it picked or not, and a click cannot flip it.
+  disabled?: boolean | undefined
 }
 
 // The trigger's text: the placeholder, the one label picked, or a count.
@@ -16,9 +23,9 @@ export function pickedLabels<Value extends string>(options: readonly MultiSelect
   return value.map(entry => options.find(option => option.value === entry)?.label ?? entry)
 }
 
-// `value` with every option in `shown` picked, or none of them, the rest left as they were and kept in the options' order.
+// `value` with every enabled option in `shown` picked, or none of them, the rest left as they were and kept in the options' order.
 export function pickedShown<Value extends string>(options: readonly MultiSelectOption<Value>[], value: readonly Value[], shown: readonly MultiSelectOption<Value>[], pick: boolean): Value[] {
-  const affected = new Set(shown.map(option => option.value))
+  const affected = new Set(shown.filter(option => !option.disabled).map(option => option.value))
   const next = new Set(value.filter(entry => !affected.has(entry)))
 
   if (pick) {

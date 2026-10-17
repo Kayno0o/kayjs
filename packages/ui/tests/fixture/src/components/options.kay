@@ -1,5 +1,6 @@
 ---
 import ChipGroup from '@kaynooo/kayjs-ui/chip-group.kay'
+import MultiSelect from '@kaynooo/kayjs-ui/multi-select.kay'
 import Segmented from '@kaynooo/kayjs-ui/segmented.kay'
 import Select from '@kaynooo/kayjs-ui/select.kay'
 import Tabs from '@kaynooo/kayjs-ui/tabs.kay'
@@ -11,6 +12,7 @@ const options = [{ value: 'a', label: 'Alpha', icon: 'plus' as const }, { value:
 ---
 ChipGroup#chips(options={options} value={['a']} label="Chips")
 Segmented#segmented(options={options} value="a" label="Segmented")
+MultiSelect#multi(options={options} value={['b']} label="Multi")
 Select#select(options={options.map(({ value, label, disabled }) => ({ value, label, disabled }))} value="a" aria-label="Select")
 Tabs#tabs(tabs={options} value="a" label="Tabs" onChange={onTab})
   @panel(value)

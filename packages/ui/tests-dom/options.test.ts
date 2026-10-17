@@ -22,6 +22,7 @@ test('every group keeps a disabled option from being picked', async () => {
 
   expect(disabled('#chips input')).toEqual([false, true, false])
   expect(disabled('#segmented input')).toEqual([false, true, false])
+  expect(disabled('#multi input')).toEqual([false, true, false])
   expect(disabled('#select option')).toEqual([false, true, false])
   expect(disabled('#tabs [role="tab"]')).toEqual([false, true, false])
 })
@@ -35,6 +36,27 @@ test('Segmented and Tabs draw an option\'s icon before its label, as ChipGroup d
     expect([first.querySelectorAll('svg.kui-icon').length, first.textContent]).toEqual([1, 'Alpha'])
     expect(root.querySelectorAll(label)[2]!.querySelectorAll('svg').length).toBe(0)
   }
+})
+
+test('MultiSelect draws an option\'s icon before its label and leaves a disabled option as it is under All and None', async () => {
+  const root = await options()
+  const first = root.querySelector('#multi .kui-multi-select-option')!
+  const box = (index: number) => root.querySelectorAll<HTMLInputElement>('#multi .kui-multi-select-checkbox')[index]!
+  const [all, none] = root.querySelectorAll<HTMLButtonElement>('#multi .kui-multi-select-action')
+
+  expect([first.querySelectorAll('svg.kui-icon').length, first.textContent]).toEqual([1, 'Alpha'])
+  expect(root.querySelectorAll('#multi .kui-multi-select-option')[2]!.querySelectorAll('svg').length).toBe(0)
+
+  all!.click()
+  await Promise.resolve()
+
+  expect([box(0).checked, box(1).checked, box(2).checked]).toEqual([true, true, true])
+  expect(root.querySelector('.kui-multi-select-summary')?.textContent).toBe('3 selected')
+
+  none!.click()
+  await Promise.resolve()
+
+  expect([box(0).checked, box(1).checked, box(2).checked]).toEqual([false, true, false])
 })
 
 test('the arrow keys of Tabs go past a disabled tab', async () => {

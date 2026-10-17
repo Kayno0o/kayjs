@@ -1230,6 +1230,14 @@
     }
   }
 
+  .kui-multi-select-option:where(:has(.kui-multi-select-checkbox:disabled)) {
+    @apply cursor-not-allowed bg-transparent opacity-50;
+  }
+
+  .kui-multi-select-icon {
+    @apply size-3.5 shrink-0;
+  }
+
   .kui-multi-select-checkbox {
     @apply size-3.5 shrink-0 accent-kui-accent;
   }

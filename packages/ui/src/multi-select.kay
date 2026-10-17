@@ -141,12 +141,14 @@ function focusLeft(event: FocusEvent) {
       input.kui-field-input.kui-multi-select-search(type="search" data-kui-search placeholder={searchLabel} aria-label={`${searchLabel} ${label}`} value={query()} onInput={event => query.set(event.currentTarget.value)})
     .kui-multi-select-bar
       // Under a search, All and None pick and drop only the options it shows.
-      button.kui-multi-select-action(type="button" disabled={shown().every(option => picked().includes(option.value))} onClick={() => set(pickedShown(options, picked(), shown(), true))}) {allLabel}
-      button.kui-multi-select-action(type="button" disabled={!shown().some(option => picked().includes(option.value))} onClick={() => set(pickedShown(options, picked(), shown(), false))}) {noneLabel}
+      button.kui-multi-select-action(type="button" disabled={shown().every(option => option.disabled || picked().includes(option.value))} onClick={() => set(pickedShown(options, picked(), shown(), true))}) {allLabel}
+      button.kui-multi-select-action(type="button" disabled={!shown().some(option => !option.disabled && picked().includes(option.value))} onClick={() => set(pickedShown(options, picked(), shown(), false))}) {noneLabel}
     .kui-multi-select-options
       for option of shown() key={option.value}
         label.kui-multi-select-option
-          input.kui-multi-select-checkbox(type="checkbox" checked={picked().includes(option.value)} onChange={() => set(toggledValue(options, picked(), option.value))})
+          input.kui-multi-select-checkbox(type="checkbox" checked={picked().includes(option.value)} disabled={option.disabled} onChange={() => set(toggledValue(options, picked(), option.value))})
+          if option.icon
+            Icon(icon={option.icon} class="kui-multi-select-icon")
           span.kui-multi-select-label {option.label}
     // Read out as a search empties the list, which otherwise changes in silence.
     p.kui-multi-select-empty(role="status") {shown().length === 0 ? emptyLabel : ''}
