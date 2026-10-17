@@ -2487,6 +2487,34 @@ describe.concurrent('kay check, unused code', () => {
     }
   })
 
+  it('scopes the rare declarations too: a private method, static block, namespace, switch case, parameter property and object method', async () => {
+    const root = await scratchProject({
+      'src/a.test.ts': 'import * as test from \'kay/test\'\n\nclass A {\n  #run() {\n    var test = { mount() {} }\n\n    test.mount()\n  }\n}\n\nawait test.mount(\'a.kay\')\n',
+      'src/b.test.ts': 'import * as test from \'kay/test\'\n\nclass B {\n  static {\n    var test = { mount() {} }\n\n    test.mount()\n  }\n}\n\nawait test.mount(\'a.kay\')\n',
+      'src/c.test.ts': 'import * as test from \'kay/test\'\n\nnamespace N {\n  const test = { mount() {} }\n\n  test.mount()\n}\n\nawait test.mount(\'a.kay\')\n',
+      'src/d.test.ts': 'import * as test from \'kay/test\'\n\nswitch (Date.now()) {\n  case 1:\n    const test = { mount() {} }\n\n    test.mount()\n}\n\nawait test.mount(\'a.kay\')\n',
+      'src/e.test.ts': 'import * as test from \'kay/test\'\n\nclass E {\n  constructor(private test: { mount: () => void }) {\n    test.mount()\n  }\n}\n\nawait test.mount(\'a.kay\')\n',
+      'src/f.test.ts': 'import * as test from \'kay/test\'\n\nconst f = {\n  run() {\n    var test = { mount() {} }\n\n    test.mount()\n  },\n}\n\nawait test.mount(\'a.kay\')\n',
+    })
+
+    try {
+      const { output } = await runCheck(root)
+
+      expect(output.match(/deprecated-test-mount/g)).toHaveLength(6)
+      await runCheck(root, '--fix')
+
+      for (const name of ['a', 'b', 'c', 'd', 'e', 'f']) {
+        const text = await Bun.file(join(root, `src/${name}.test.ts`)).text()
+
+        expect(text).toMatch(/\n {2,4}test\.mount\(\)\n/)
+        expect(text).toContain('await test.mountComponent(')
+      }
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('reports kay/test\'s mount as mountComponent, an import or a namespace member, and --fix renames it under the name the file uses', async () => {
     const root = await scratchProject({
       'src/a.test.ts': 'import { mount, settle } from \'kay/test\'\n\nawait mount(\'a.kay\')\nawait settle()\n',

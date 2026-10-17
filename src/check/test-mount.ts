@@ -134,6 +134,9 @@ function patternNames(node: t.Node | null | undefined, into: string[] = []): str
   else if (node?.type === 'AssignmentPattern') {
     patternNames(node.left, into)
   }
+  else if (node?.type === 'TSParameterProperty') {
+    patternNames(node.parameter, into)
+  }
 
   return into
 }
@@ -166,6 +169,9 @@ function declare(scope: Scope, node: t.Node | null | undefined, vars: boolean): 
   }
 }
 
+// What a `var` below it belongs to, so it is not hoisted out of it: a function, a method of a class or an object, a static block and a namespace.
+const SCOPE_BOUNDARY = new Set(['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression', 'ObjectMethod', 'ClassMethod', 'ClassPrivateMethod', 'StaticBlock', 'TSModuleBlock'])
+
 // Every `var` below a function body, the nested functions left out.
 function declareVars(scope: Scope, node: t.Node): void {
   declare(scope, node, true)
@@ -175,7 +181,7 @@ function declareVars(scope: Scope, node: t.Node): void {
       continue
 
     for (const child of Array.isArray(value) ? value : [value]) {
-      if (child !== null && typeof child === 'object' && typeof (child as { type?: unknown }).type === 'string' && !(child as t.Node).type.includes('Function') && (child as t.Node).type !== 'ClassMethod')
+      if (child !== null && typeof child === 'object' && typeof (child as { type?: unknown }).type === 'string' && !SCOPE_BOUNDARY.has((child as t.Node).type))
         declareVars(scope, child as t.Node)
     }
   }
@@ -208,9 +214,20 @@ function scopeOf(node: t.Node): Scope | undefined {
       }
     }
   }
-  else if (node.type === 'BlockStatement' || node.type === 'StaticBlock') {
+  else if (node.type === 'BlockStatement' || node.type === 'StaticBlock' || node.type === 'TSModuleBlock') {
+    // A static block and a namespace own their `var`s as a function does.
+    if (node.type !== 'BlockStatement')
+      declareVars(scope, node)
+
     for (const statement of node.body) {
       declare(scope, statement, false)
+    }
+  }
+  else if (node.type === 'SwitchStatement') {
+    for (const switchCase of node.cases) {
+      for (const statement of switchCase.consequent) {
+        declare(scope, statement, false)
+      }
     }
   }
   else if (node.type === 'ForStatement' || node.type === 'ForInStatement' || node.type === 'ForOfStatement') {
