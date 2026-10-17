@@ -2153,6 +2153,11 @@ describe('a stream an island starts', () => {
     'page.kay': PAGE,
     'main.kay': `---\nimport { signal } from 'kay'\nimport { quiet } from './page.kay'\n\nconst rows = signal([1])\n\nasync function go() {\n  if (rows().length > 0) {\n    rows.set([])\n\n    return\n  }\n\n  ${records}.push(await quiet())\n}\n---\nfor row of rows() key={row}\n  button(transition="fade" style="transition-duration: 200ms" onClick={go}) Go\n`,
   })
+  const listening = site({
+    'page.kay': PAGE,
+    'main.kay': `---\nimport { signal } from 'kay'\nimport Listener from './listener.kay'\n\nconst shown = signal(true)\n---\nbutton.hide(onClick={() => shown.set(false)}) Hide\nif shown()\n  Listener\n`,
+    'listener.kay': `---\nimport { listen } from 'kay'\nimport { quiet } from './page.kay'\n\nasync function start() {\n  ${records}.push(await quiet())\n}\n\nlisten(window, 'keydown', () => void start())\n---\np Listening\n`,
+  })
   // Answers a call with a stream that says one value and then nothing, as `quiet` does.
   const streaming = () => spyOn(globalThis, 'fetch').mockImplementation((async () => {
     return new Response(new ReadableStream({ start: controller => void controller.enqueue(new TextEncoder().encode('data: [0]\n\n')) }), { headers: { 'content-type': 'text/event-stream' } })
@@ -2176,6 +2181,29 @@ describe('a stream an island starts', () => {
       await settle()
       expect(streams().map(stream => stream.status())).toEqual(['open'])
       await dispose()
+      expect(streams().map(stream => stream.status())).toEqual(['closed'])
+    }
+    finally {
+      fetchStub.mockRestore()
+      await dispose()
+    }
+  })
+
+  it('closes with the block a listen callback was made in, not before', async () => {
+    ;(globalThis as unknown as { streams: unknown[] }).streams = []
+
+    const fetchStub = streaming()
+    const { root, dispose } = await listening()
+
+    try {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'a' }))
+      await settle()
+      await settle()
+      expect(streams().map(stream => stream.status())).toEqual(['open'])
+
+      root.querySelector<HTMLButtonElement>('button.hide')!.click()
+      await settle()
+      await settle()
       expect(streams().map(stream => stream.status())).toEqual(['closed'])
     }
     finally {

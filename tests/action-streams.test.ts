@@ -414,12 +414,16 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
   })
 
   // A `persist` island survives the swap, so a stream it started stays open with it and closes when a page without it takes its place.
-  for (const [mode, starts] of [['click', 'button.begin'], ['setup', undefined]] as const) {
-    it(`keeps a stream a persist island started from its ${mode === 'click' ? 'click handler' : 'setup'} open across a page swap, closing it once the island goes`, async () => {
+  const origins = { click: 'click handler', setup: 'setup', window: '`listen` callback' }
+
+  for (const [mode, starts] of [['click', 'button.begin'], ['setup', undefined], ['window', undefined]] as const) {
+    it(`keeps a stream a persist island started from its ${origins[mode]} open across a page swap, closing it once the island goes`, async () => {
       const page = await site.open(`/kept/${mode}`, { path })
       const before = seen.quietStopped
 
-      if (starts)
+      if (mode === 'window')
+        await page.press('a')
+      else if (starts)
         await page.click(starts)
 
       await page.waitFor('p.status', { text: 'open' })
@@ -439,17 +443,17 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
   }
 
   it('keeps a stream no island owns open when the swap that began is superseded, closing it once a page is shown', async () => {
-    const page = await site.open('/kept/window', { path })
+    const page = await site.open('/kept/await', { path })
     const before = seen.quietStopped
 
-    await page.press('a')
+    await page.click('button.begin')
     await page.waitFor('p.status', { text: 'open' })
     // The slow page is still being fetched when the visitor asks for this one again.
     await page.click('a.slow')
     await page.click('a.self')
     await Bun.sleep(600)
 
-    expect(await page.path()).toBe('/kept/window')
+    expect(await page.path()).toBe('/kept/await')
     expect(seen.quietStopped).toBe(before)
     expect(await page.text('p.status')).toBe('open')
 

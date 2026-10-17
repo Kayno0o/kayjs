@@ -3,8 +3,8 @@ import type { ActionStream } from 'kay'
 import { listen, onMount, signal } from 'kay'
 import { quiet } from '../routes/index.kay'
 
-// Where the stream starts: from its setup (`setup`), a click on its button (`click`), or a `listen` callback on the window, which runs under no owner (`window`).
-const { mode } = props<{ mode: 'setup' | 'click' | 'window' }>()
+// Where the stream starts: from its setup (`setup`), a click on its button (`click`), a `listen` callback on the window (`window`), or a click handler calling it after an `await`, which runs under no owner (`await`).
+const { mode } = props<{ mode: 'setup' | 'click' | 'window' | 'await' }>()
 const answer = signal<ActionStream<number> | undefined>(undefined)
 
 async function start() {
@@ -21,5 +21,13 @@ listen(window, 'keydown', () => {
     void start()
 })
 ---
-button.begin(type="button" onClick={() => mode === 'click' && start()}) Begin
+button.begin(type="button" onClick={async () => {
+  if (mode === 'await') {
+    await Promise.resolve()
+    void start()
+  }
+  else if (mode === 'click') {
+    void start()
+  }
+}}) Begin
 p.status {answer()?.status() ?? 'none'}

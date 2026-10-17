@@ -9,7 +9,7 @@ import type { SignalOptions } from './reactive'
 import { durationMs } from './duration'
 import { keepValue } from './persist'
 import { keepParam } from './query-param'
-import { createSignal, effect, memo, onCleanup, ownSignal, provideContext, readContext, tracking, untrack } from './reactive'
+import { createSignal, effect, getOwner, memo, onCleanup, ownSignal, provideContext, readContext, runWithOwner, tracking, untrack } from './reactive'
 
 // Writes a value, or what a function makes of the current one.
 export type Setter<T> = (next: T | ((current: T) => T)) => void
@@ -157,14 +157,17 @@ type EventMapOf<T> = T extends Window ? WindowEventMap : T extends Document ? Do
 
 // Listens to `type` events on `target`, `window` or `document` for instance, while the island lives; nothing listens while the server renders.
 // In a `.kay` file the compiler hands `target` over as a function, so `listen(window, ...)` never reads `window` on the server; a `.ts` module writes `listen(() => window, ...)`. A target read from a signal listens to its new value as it changes.
+// The handler runs under the owner `listen` was called in, so a stream it starts closes with that island or block.
 export function listen<T extends EventTarget, K extends keyof EventMapOf<T> & string>(target: T | (() => T | null | undefined), type: K, handler: (event: EventMapOf<T>[K]) => void, options?: boolean | AddEventListenerOptions): void {
+  const owner = getOwner()
+
   effect(() => {
     const at = typeof target === 'function' ? target() : target
 
     if (!at)
       return
 
-    const listener = handler as EventListener
+    const listener = ((event: Event) => runWithOwner(owner, () => handler(event as EventMapOf<T>[K]))) as EventListener
 
     at.addEventListener(type, listener, options)
     onCleanup(() => at.removeEventListener(type, listener, options))

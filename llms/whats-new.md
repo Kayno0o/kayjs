@@ -23,6 +23,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `kay not-found` lists the paths production found nothing at, with a target, and writes the redirect ([Redirects](routing.md#redirects)).
 - An action's stream to an event handler closes with its island, a `persist` island's across pages ([actions from islands](api-from-islands.md)).
 - A stream an action answers with to an event handler (a leaving row's too) closes with its island, so a `persist` island's stays open across pages ([actions from islands](api-from-islands.md)).
+- A stream an action answers with to an event handler (a leaving row's too) or a `listen` callback closes with its island, so a `persist` island's stays open across pages ([actions from islands](api-from-islands.md)).
 
 Releases before 1.53 are in [What's new, older releases](whats-new-archive.md).
 ## 1.52.0
