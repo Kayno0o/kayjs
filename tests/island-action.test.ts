@@ -7,7 +7,7 @@ import { chromium } from 'playwright-core'
 import { actionStub, reviveActions } from '../src/runtime/action'
 import { child } from '../src/runtime/html'
 import { island, IslandPropsError } from '../src/runtime/island.server'
-import { decodeValue, encodeValue, serverWritten, setActionReviver, unflattenValue } from '../src/runtime/wire'
+import { decodeValue, encodeValue, noActionReviver, serverWritten, unflattenValue } from '../src/runtime/wire'
 import { browserPath, testSite } from '../src/test'
 
 const routes = 'tests/fixtures/island-action/src/routes'
@@ -77,7 +77,7 @@ describe('the wire of an action', () => {
   })
 
   it('names the fix when props carrying an action reach an island that does not type a prop as one', () => {
-    setActionReviver(undefined)
+    serverWritten.Action = noActionReviver
     expect(() => decodeValue(encodeValue({ run: greet }, true), serverWritten)).toThrow('import `Action` from \'kay\'')
   })
 

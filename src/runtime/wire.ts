@@ -7,8 +7,8 @@ import { isVouched, vouch } from './safe-html'
 const SAFE_HTML = 'SafeHtml'
 const MARK = '!'
 
-const ACTION_TYPE = 'Action'
-const ACTION_PREFIX = '/_kay/action/'
+export const ACTION_TYPE = 'Action'
+export const ACTION_PREFIX = '/_kay/action/'
 const ACTION_MARK = Symbol.for('kay.action')
 
 // `actions` lets a function that is an action through, as island props do, as its URL: anywhere else it stays unsendable.
@@ -23,25 +23,19 @@ function sendableAction(value: unknown): string | false {
   return typeof value === 'function' && ACTION_MARK in value ? (value as unknown as { url: string }).url : false
 }
 
-let reviveAction: ((url: string) => unknown) | undefined
-
-// Set by an island typing a prop as an action, whose chunk holds the code building the stubs.
-export function setActionReviver(revive: ((url: string) => unknown) | undefined): void {
-  reviveAction = revive
-}
-
 // The revivers for text the server wrote, island props, action results and event streams: the only text whose `SafeHtml` entries vouch for markup. What the browser sends, a cookie and localStorage are read without them, so no caller can vouch for its own text.
 export const serverWritten: Record<string, Reviver> = {
   // `substring` throws on a payload that is no string, where an array has a `slice`.
   [SAFE_HTML]: (text: string) => vouch(text.substring(1)),
-  // Only a URL under the actions' own path is a stub, whatever the text says.
-  [ACTION_TYPE]: (url: string) => {
-    if (process.env.NODE_ENV !== 'production' && !reviveAction)
-      throw new TypeError('kay: an island was passed an action but does not type a prop as one: import `Action` from \'kay\' in its script, as the type of that prop')
-
-    return typeof url === 'string' && url.startsWith(ACTION_PREFIX) && reviveAction ? reviveAction(url) : malformed(url, ACTION_TYPE)
-  },
 }
+
+// The action reviver until an island typing a prop as an action installs the one building stubs (`reviveActions`, action.ts), so the core chunk carries none.
+export function noActionReviver(): never {
+  throw new TypeError('kay: an island was passed an action but does not type a prop as one: import `Action` from \'kay\' in its script, as the type of that prop')
+}
+
+if (process.env.NODE_ENV !== 'production')
+  serverWritten[ACTION_TYPE] = noActionReviver
 
 export function decodeServerValue(text: string): unknown {
   return decodeValue(text, serverWritten)
@@ -211,6 +205,6 @@ export function isIndex(value: unknown, length: number): value is number {
   return Number.isInteger(value) && (value as number) >= 0 && (value as number) < length
 }
 
-function malformed(index: unknown, type?: string): never {
+export function malformed(index: unknown, type?: string): never {
   throw new TypeError(`kay: the devalue text received is malformed at index ${String(index)}${type === undefined ? '' : `, a ${type} kay never sends`}`)
 }

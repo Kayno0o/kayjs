@@ -14,7 +14,7 @@ import { pageData } from './page-data'
 import { getOwner, liveOwner, onCleanupOf, ownSignal, undoable, untrack } from './reactive'
 import { sendValue } from './send'
 import { FAILURE_HEADER, PAGE_HEADER, REDIRECT_HEADER, WORK_HEADER, WORK_SCRIPT } from './swap'
-import { decodeServerValue, decodeValue, setActionReviver, unflattenValue } from './wire'
+import { ACTION_PREFIX, ACTION_TYPE, decodeServerValue, decodeValue, malformed, serverWritten, unflattenValue } from './wire'
 
 const ACTION = Symbol.for('kay.action')
 const DAY = 86_400
@@ -390,9 +390,9 @@ export function actionStub(url: string): Action<unknown, unknown> {
   }) as unknown as Action<unknown, unknown>
 }
 
-// Called by the chunk of an island that types a prop as an action, so the props a page passes it revive as callable stubs.
+// Called by the chunk of an island that types a prop as an action, so the props a page passes it revive as callable stubs: only a URL under the actions' own path is one, whatever the text says.
 export function reviveActions(): void {
-  setActionReviver(actionStub)
+  serverWritten[ACTION_TYPE] = (url: string) => typeof url === 'string' && url.startsWith(ACTION_PREFIX) ? actionStub(url) : malformed(url, ACTION_TYPE)
 }
 
 export function isAction(value: unknown): value is ServerAction<TSchema, unknown> {
