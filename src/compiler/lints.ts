@@ -310,6 +310,14 @@ export const LINTS = {
     wrong: '// kay.config.ts sets mcp: true\nexport const subscribe = action(s.Object({ email: s.String() }), save, { tool: true, honeypot: \'website\' })',
     right: '// src/routes/_guard.ts covers it, or the action keeps tool and drops the honeypot\nexport const subscribe = action(s.Object({ email: s.String() }), save, { tool: true, rateLimit: { max: 5, window: \'1m\' } })',
   },
+  'secret-prop': {
+    level: 'warn',
+    group: 'security',
+    typed: true,
+    summary: 'A value handed to an island holding a field named like a secret (`password`, `token`, `secret`, `apiKey`, `credential`, `email`, `otp`, matched in any case): an island\'s props are written into the page source, so every field of the object reaches anyone who views it. Pick the fields the island shows, such as `user={{ name: user.name }}`; a field meant to be public is allowed with `// kay-allow secret-prop`.',
+    wrong: '---\nimport Profile from \'../components/profile.kay\'\n\nconst user = await db.users.find(1)\n---\nProfile(user={user})',
+    right: '---\nimport Profile from \'../components/profile.kay\'\n\nconst user = await db.users.find(1)\n---\nProfile(user={{ id: user.id, name: user.name }})',
+  },
   'deprecated-api-tool': {
     level: 'warn',
     group: 'deprecated',
@@ -720,8 +728,22 @@ const INCOMPLETE_MATCH = 'IncompleteMatch<'
 const MISSING = /^Argument of type '(.+?)' is not assignable to parameter of type/
 const TRUNCATED = / \| \.\.\. (\d+) more \.\.\. \| /g
 const HANDED_SIGNAL = 'kayLint: "uncalled-signal"'
+const SECRET_PROP = 'kayLint: "secret-prop"'
+const SECRET_PATHS = /kayPath: ((?:"[^"]*"(?: \| )?)+)/
 
-export function typeLint(message: string): TypeLint | undefined {
+// `prop` is the attribute the value is handed as, which the type does not carry.
+export function typeLint(message: string, prop?: string): TypeLint | undefined {
+  if (message.includes(SECRET_PROP)) {
+    const paths = SECRET_PATHS.exec(message)?.[1]?.split(' | ').map(path => `${prop === undefined ? '' : prop + (path.startsWith('"[') ? '' : '.')}${path.slice(1, -1)}`)
+
+    return {
+      code: 'secret-prop',
+      message: paths === undefined ? 'This value holds a field named like a secret, and an island\'s props are written into the page' : `${paths.map(path => `\`${path}\``).join(', ')} would be written into the page`,
+      note: 'an island\'s props are in the page source, where anyone who views it reads them',
+      help: 'hand the island only the fields it shows, `user={{ name: user.name }}`, or allow a public one with `// kay-allow secret-prop`',
+    }
+  }
+
   if (message.includes(HANDED_SIGNAL)) {
     return {
       code: 'uncalled-signal',

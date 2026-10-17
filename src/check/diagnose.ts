@@ -59,11 +59,18 @@ export interface TypeScope {
   libraries: KayLibrary[]
 }
 
+const PROP_BEFORE = /([\w$:-]+)=\{\s*$/
+
+// The attribute a value is handed as, read off the source before it.
+function propBefore(source: string, span: Span | undefined): string | undefined {
+  return span === undefined ? undefined : PROP_BEFORE.exec(source.slice(Math.max(0, span.start - 80), span.start))?.[1]
+}
+
 // A diagnostic in a .kay file's shadow TSX, read at the levels its source gives the lints.
 export function diagnoseShadow(shadow: ShadowFile, diagnostic: TsgoDiagnostic, levelAt: (lint: LintName, offset: number) => LintLevel): Diagnosed | undefined {
   const span = sourceSpan(shadow, diagnostic.start, diagnostic.end, 'loose')
   const offset = span?.start ?? 0
-  const lint = typeLint(diagnostic.message)
+  const lint = typeLint(diagnostic.message, propBefore(shadow.source, span))
 
   // A lint the types find, as `identity-key`.
   if (lint) {

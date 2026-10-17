@@ -7,7 +7,7 @@ import { canMakePasskey, makePasskey, passkeyFailure } from '../../browser'
 import { addPasskey, passkeyOptions } from '../routes/account/security.kay'
 import Proof from './proof.kay'
 
-const { user, label, nameLabel, passwordLabel, codeLabel, unsupported, failed, errors } = props<{ user: User, label: string, nameLabel: string, passwordLabel: string, codeLabel: string, unsupported: string, failed: string, errors: Record<string, string> }>()
+const { user, label, nameLabel, passwordLabel, codeLabel, unsupported, failed, errors } = props<{ user: Pick<User, 'hasPassword' | 'twoFactor'>, label: string, nameLabel: string, passwordLabel: string, codeLabel: string, unsupported: string, failed: string, errors: Record<string, string> }>()
 
 const supported = signal<boolean>()
 const error = signal('')

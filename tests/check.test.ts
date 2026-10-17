@@ -2155,6 +2155,61 @@ describe.concurrent('kay check, unused code', () => {
     }
   })
 
+  describe('secret-prop', () => {
+    const island = '---\nimport { signal } from \'kay\'\n\nconst { data } = props<{ data: unknown }>()\nconst open = signal(0)\n---\nbutton(onClick={() => open.set(open() + 1)}) {JSON.stringify(data)} {open()}\n'
+    const types = [
+      'export interface Row { id: number, email: string, emailVerified: boolean }',
+      'export interface Account { name: string, session?: { token: string } | null }',
+      'export interface Tree { name: string, apiKey?: string, children: Tree[] }',
+      'export type Deep = { l1: { l2: { l3: { l4: { l5: { l6: { l7: { l8: { l9: { l10: { password: string } } } } } } } } } } }',
+      'export const row: Row = { id: 1, email: \'a@b.c\', emailVerified: true }',
+      'export const account: Account = { name: \'a\' }',
+      'export const tree: Tree = { name: \'a\', children: [] }',
+      'export const deep = {} as Deep',
+    ].join('\n')
+
+    async function secrets(page: string): Promise<[number, string | undefined, string][]> {
+      const root = await scratchProject({ 'src/types.ts': types, 'src/components/island.kay': island, 'src/routes/index.kay': `--- server\nimport Island from '../components/island.kay'\nimport { signal } from 'kay'\nimport { account, deep, row, tree } from '../types'\nimport type { Row } from '../types'\n\nconst rows: Row[] = [row]\nconst byId = new Map<number, Row>()\nconst api = { API_KEY: 'x', name: 'n' }\nconst open = signal(0)\n---\n${page}\n` })
+
+      try {
+        return (await check(root, { lints: { 'unread-name': 'allow' } })).filter(d => d.file.endsWith('index.kay') && d.code !== undefined).map(d => [d.line, d.code, d.message])
+      }
+      finally {
+        await rm(root, { recursive: true, force: true })
+      }
+    }
+
+    it('names the path of a secret-looking field, at any depth, in arrays, maps, optional and union fields', async () => {
+      const found = await secrets('Island(data={{ user: { name: \'a\', login: account } }})\nIsland(data={rows})\nIsland(data={byId})\nIsland(data={account})\nIsland(data={api})\nIsland(data={tree})')
+
+      expect(found.map(([line, code, message]) => [line, code, message])).toEqual([
+        [12, 'secret-prop', '`session.token` would be written into the page'],
+        [13, 'secret-prop', '`data[].email` would be written into the page'],
+        [14, 'secret-prop', '`data[].email` would be written into the page'],
+        [15, 'secret-prop', '`data.session.token` would be written into the page'],
+        [16, 'secret-prop', '`data.API_KEY` would be written into the page'],
+        [17, 'secret-prop', '`data.apiKey` would be written into the page'],
+      ])
+    })
+
+    it('reads a static component that hands its props to an island', async () => {
+      const root = await scratchProject({ 'src/components/island.kay': island, 'src/components/card.kay': '---\nimport Island from \'./island.kay\'\n\nconst { user } = props<{ user: { name: string, passwordHash: string } }>()\n---\nIsland(data={user})\n', 'src/routes/index.kay': 'p home\n' })
+
+      try {
+        expect((await check(root)).map(d => [d.file.slice(root.length + 1), d.line, d.code, d.message])).toEqual([['src/components/card.kay', 6, 'secret-prop', '`data.passwordHash` would be written into the page']])
+      }
+      finally {
+        await rm(root, { recursive: true, force: true })
+      }
+    })
+
+    it('stays silent once the fields are picked, flags and counts, a Signal prop, a type deeper than eight levels, and an allowed line', async () => {
+      const found = await secrets('Island(data={{ id: rows[0]!.id, name: \'a\' }})\nIsland(data={{ emailVerified: true, tokenCount: 3 }})\nIsland(data={open})\nIsland(data={deep})\n// kay-allow secret-prop\nIsland(data={row})')
+
+      expect(found.filter(([, code]) => code === 'secret-prop')).toEqual([])
+    })
+  })
+
   it('reports a lint or a level the config names that kay does not have', async () => {
     const root = await scratchProject({ 'src/a.kay': 'p a\n' })
 

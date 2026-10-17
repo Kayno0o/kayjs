@@ -197,8 +197,35 @@ type IsSerializable<T, Seen = never> = T extends Sendable
               ? false extends { [Key in keyof T]-?: IsSerializable<T[Key], Seen | T> }[keyof T] ? false : true
               : false
 
-// Props a static parent passes to an island are serialized for the browser, so they must survive it.
-export type IslandProp<Component, Value> = Component extends IslandBrand ? [IsSerializable<Value>] extends [true] ? unknown : { kayError: 'A layout, or a page with a server fence, sends an island its props serialized: plain objects, arrays, Dates, Maps, Sets, bigints, URLs and RegExps, but no functions, symbols or class instances; a component of its own passing one renders as an island in its place' } : unknown
+// A field named like what a page must not carry: an island's props are written into the page source, so each one is public. Matched on the lowercase name, so `passwordHash`, `API_KEY` and `resetToken` all read.
+type SecretWord = 'password' | 'passwd' | 'secret' | 'token' | 'apikey' | 'api_key' | 'privatekey' | 'private_key' | 'credential' | 'email' | 'otp'
+
+// A flag such as `emailVerified` or a count such as `tokenCount` holds no secret.
+type SecretKey<Key extends string, Field> = Lowercase<Key> extends `${string}${SecretWord}${string}` ? [NonNullable<Field>] extends [boolean | number] ? never : Key : never
+
+// The paths to the secret-looking fields a value holds, in arrays as `rows[].email`; a type seen further up ends there, and eight levels are read at most so a deep type stays cheap.
+type SecretPaths<T, Seen = never, Depth extends unknown[] = [], Prefix extends string = ''> = 0 extends 1 & T
+  ? never
+  : T extends Sendable | ((...args: never[]) => unknown) | symbol
+    ? never
+    : Depth['length'] extends 8
+      ? never
+      : true extends Visiting<T, Seen>
+        ? never
+        : T extends ReadonlyMap<unknown, infer Value>
+          ? SecretPaths<Value, Seen | T, [...Depth, 0], `${Prefix}[]`>
+          : T extends ReadonlySet<infer Item> | readonly (infer Item)[]
+            ? SecretPaths<Item, Seen | T, [...Depth, 0], `${Prefix}[]`>
+            : T extends object
+              ? { [Key in keyof T & string]-?: ([SecretKey<Key, T[Key]>] extends [never] ? never : Joined<Prefix, Key>) | SecretPaths<T[Key], Seen | T, [...Depth, 0], Joined<Prefix, Key>> }[keyof T & string]
+              : never
+
+type Joined<Prefix extends string, Key extends string> = Prefix extends '' ? Key : `${Prefix}.${Key}`
+
+type SecretProp<Value> = [SecretPaths<Value>] extends [never] ? unknown : { kayLint: 'secret-prop', kayPath: SecretPaths<Value> }
+
+// Props a static parent passes to an island are serialized for the browser, so they must survive it, and are public, so they should hold no secret-looking field. `kay check` reports the second as the `secret-prop` lint.
+export type IslandProp<Component, Value> = Component extends IslandBrand ? [IsSerializable<Value>] extends [true] ? SecretProp<Value> : { kayError: 'A layout, or a page with a server fence, sends an island its props serialized: plain objects, arrays, Dates, Maps, Sets, bigints, URLs and RegExps, but no functions, symbols or class instances; a component of its own passing one renders as an island in its place' } : unknown
 
 // A function written in the attribute is checked apart from its value, which a wrapping call would stop a generic component from typing: `0` stands for the attribute.
 export type FunctionProp<Component> = Component extends IslandBrand ? { kayError: 'A layout, or a page with a server fence, sends an island its props serialized: plain objects, arrays, Dates, Maps, Sets, bigints, URLs and RegExps, but no functions, symbols or class instances; a component of its own passing one renders as an island in its place' } : 0
