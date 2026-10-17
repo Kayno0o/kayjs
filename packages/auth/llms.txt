@@ -10,6 +10,7 @@
 - A mailed link opens an app page that shows a button, or the new password's form, posting the token to an action. The page never spends the token on load: mail scanners open links.
 - A sign-in may stop at the second factor. `signInWithPassword`, `signInWithMagicLink`, `resetPassword` and the OAuth callback then answer the `twoFactorPage` as where to go, and the user is signed in once `verifyTwoFactor` gets the code. Redirect to the `redirect` they answer, never to a path of your own.
 - An action that redirects writes `return ctx.redirect(...)`, with the `return`, so `kay check` types `ctx.failed(action)` right.
+- A guest (`signInAsGuest`) costs nothing to mint, so kayjs-auth does not name it to other libraries: kayjs-ai's limits keep counting a guest by address, a signed-in user by id.
 - A link to an OAuth route changes the session on GET: give it `data-no-prefetch`, so a hover starts nothing.
 
 ## Topics

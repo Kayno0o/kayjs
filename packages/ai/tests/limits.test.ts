@@ -148,6 +148,24 @@ describe('ai({ limit })', () => {
     expect((await failure(inside(named('dan', '203.0.113.8'), () => ask('b')))).limit).toBe('asks')
   })
 
+  it('falls through to the user a library named when the visitor hook answers null or an empty string', async () => {
+    const named = (address: string) => {
+      const request = rewrittenRequest(address)
+
+      nameUser(request, () => 'ann')
+
+      return request
+    }
+
+    for (const answer of [null, '', undefined]) {
+      ai({ limit: { max: 1, window: '1m' }, visitor: () => answer as undefined })
+      forgetCounts()
+
+      await inside(named('203.0.113.1'), () => ask('a'))
+      expect((await failure(inside(named('203.0.113.2'), () => ask('b')))).limit).toBe('asks')
+    }
+  })
+
   it('does not run the visitor hook for an ask that names its visitor', async () => {
     ai({ limit: { max: 1, window: '1m' }, visitor: () => {
       throw new Error('hook ran')

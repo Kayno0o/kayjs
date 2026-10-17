@@ -191,6 +191,8 @@ form(action={start})
 
 When the guest registers, the account keeps their id, so the app's data stays theirs. `user.guest` is `true` until then. A guest whose session ends is left in the store, and `listUsers` shows them. `guests: { maxAge: '30d' }` in `createAuth` deletes a guest older than that who has no session left, calling `onDelete` as for any user. Without it guests are kept for good.
 
+A guest costs nothing to make, so kayjs-auth does not name it to other libraries: kayjs-ai's limits count a guest by address, and a signed-in user by id.
+
 `signUp: false` in `createAuth` closes self-service accounts. `register` and `signInAsGuest` answer `'closed'`. Make users yourself with `auth.createUser({ email, password, roles })`.
 
 ### Breached passwords
