@@ -1304,6 +1304,16 @@ function parseUrl(src: string, base: string): URL | undefined {
   }
 }
 
+// A URL's path with its percent-encoding read; a name that is not valid percent-encoding is read as it is.
+function decodedPath(url: URL): string {
+  try {
+    return decodeURIComponent(url.pathname)
+  }
+  catch {
+    return url.pathname
+  }
+}
+
 // What kay's URL for an image says it is: a width of the ladder, a crop, the share card, a file `kay build` wrote, or an image kay did not resize.
 function imageVariant(src: string, origin: string): string {
   const url = parseUrl(src, origin)
@@ -1317,14 +1327,7 @@ function imageVariant(src: string, origin: string): string {
     return url.searchParams.has('card') ? 'share card, 1200x630, resized on request' : `${url.searchParams.get('w') ?? 'original'}w${crop === null ? '' : `, cut ${crop}`}, resized on request`
   }
 
-  let path = url.pathname
-
-  try {
-    path = decodeURIComponent(path)
-  }
-  catch {
-    // A name that is not valid percent-encoding is read as it is.
-  }
+  const path = decodedPath(url)
 
   const file = VARIANT_FILE.exec(path)
 
@@ -1341,14 +1344,7 @@ function isVector(src: string, base: string): boolean {
   if (url === undefined)
     return false
 
-  let path = url.pathname
-
-  try {
-    path = decodeURIComponent(path)
-  }
-  catch {
-    // A name that is not valid percent-encoding is read as it is.
-  }
+  const path = decodedPath(url)
 
   return path.toLowerCase().endsWith('.svg')
 }

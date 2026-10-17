@@ -886,6 +886,7 @@ describe('the dev tool', () => {
     document.body.innerHTML = [
       '<img id="viewbox" src="/_kay/assets/logo.svg" alt="">',
       '<img id="sized" src="/logo.svg" width="16" height="16" alt="">',
+      '<img id="large" src="/large.svg" width="16" height="16" alt="">',
       '<img id="query" src="/logo.svg?v=2#mark" width="16" height="16" alt="">',
       '<img id="upper" src="/LOGO%2ESVG" width="16" height="16" alt="">',
       '<img id="png" src="/logo.png" width="16" height="16" alt="">',
@@ -893,8 +894,10 @@ describe('the dev tool', () => {
     ].join('')
 
     for (const image of document.querySelectorAll('img')) {
-      Object.defineProperty(image, 'naturalWidth', { value: 150 })
-      Object.defineProperty(image, 'naturalHeight', { value: 150 })
+      const natural = image.id === 'large' ? 512 : 150
+
+      Object.defineProperty(image, 'naturalWidth', { value: natural })
+      Object.defineProperty(image, 'naturalHeight', { value: natural })
       Object.defineProperty(image, 'complete', { value: true })
       image.getBoundingClientRect = () => ({ width: 16, height: 16, top: 5000, bottom: 5016, left: 0, right: 16, x: 0, y: 0, toJSON: () => ({}) })
     }
@@ -910,6 +913,7 @@ describe('the dev tool', () => {
       expect(flags()).toEqual([
         '/_kay/assets/logo.svg | no width and height, so the page shifts as it loads',
         '/logo.svg',
+        '/large.svg',
         '/logo.svg?v=2#mark',
         '/LOGO%2ESVG',
         '/logo.png | served 88 times the pixels it is drawn with, give it a smaller width or `sizes`',
