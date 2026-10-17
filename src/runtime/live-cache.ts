@@ -4,6 +4,7 @@ import { CACHE_LIVE_ID } from './cache-live-id'
 import { dirtyGuard, navigation } from './navigation'
 import { decodeServerValue } from './wire'
 
+// The twin of `readEvents` in live.ts, kept apart so the code every page loads does not carry it: keep the backoffs alike.
 // The cached values a page follows (`cached(..., { live: true })`) are kept up to date by the route live values use, `POST /_kay/live`, through a reader of its own: this module stays out of the code every page loads, so it imports nothing of the runtime that code does not already reach.
 
 const ROUTE = '/_kay/live'
@@ -12,12 +13,15 @@ const SCRIPT = 'script[data-kay-live]'
 const JITTER_MS = 750
 const FIRST_RETRY_MS = 1000
 const LAST_RETRY_MS = 30_000
+// A refused connection asks the page for a new proof once in this long: a refusal that stays is backed off, not rendered again.
+const REFUSAL_MS = 60_000
 
 // The time the page shown read each key it follows.
 let rendered = new Map<string, number>()
 // The connection open, and the keys it asked for.
 let connection: { controller: AbortController, keys: string } | undefined
 let attempt = 0
+let refused = 0
 let retry: ReturnType<typeof setTimeout> | undefined
 let timer: ReturnType<typeof setTimeout> | undefined
 let running = false
@@ -41,6 +45,12 @@ export function followCaches(): void {
   }
 
   rendered = next
+
+  if (next.size === 0) {
+    clearTimeout(timer)
+    timer = undefined
+    meanwhile.clear()
+  }
 
   const keys = JSON.stringify([...next.keys()].toSorted())
 
@@ -74,7 +84,8 @@ async function connect(keys: string): Promise<void> {
     const response = await fetch(withBase(ROUTE), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(request), signal: controller.signal })
 
     // The proof is no longer taken, an hour old or from before a restart: the page shown again carries a new one.
-    if (response.status === 403) {
+    if (response.status === 403 && Date.now() - refused > REFUSAL_MS) {
+      refused = Date.now()
       void response.body?.cancel()
       stop()
       await load()

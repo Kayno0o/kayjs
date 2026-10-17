@@ -21,7 +21,7 @@ const PROOF = 'live'
 // What a page carrying live values holds, which a prerendered file cannot: the values and their proof are per request.
 export const LIVE_MARK = '<script type="application/json" data-kay-live'
 // Added to the script of a page that follows cached values, which the entry script looks for.
-export const CACHE_MARK = ' data-kay-cache'
+const CACHE_MARK = ' data-kay-cache'
 const MAX_REQUEST_BYTES = 64 * 1024
 // The keys one connection watches, and the length of a key.
 const MAX_WATCHED = 500
@@ -29,7 +29,8 @@ const MAX_KEY_LENGTH = 256
 const MINUTE_MS = 60_000
 const LIMIT = 'kay:live'
 
-const MAX_CACHE_KEYS = 200
+// A page's proof and watch list both carry its keys, so this many of the longest fit the request.
+const MAX_CACHE_KEYS = 100
 // How many keys read with `live: true` are remembered for their last invalidation.
 const MAX_STAMPED = 10_000
 
@@ -40,9 +41,10 @@ interface CacheReads {
 }
 
 const cacheReads = new AsyncLocalStorage<CacheReads>()
+// Least recently read or watched first.
 const stamped = new Set<string>()
 // The last invalidation time of each key a page followed, which a connection sends first: the declaration gives 0 to a key never invalidated.
-const stamps = (live as (initial: (key: string) => number, id: string, name: string) => { set: (key: string, value: number) => void })((): number => 0, CACHE_LIVE_ID, 'cache')
+const stamps = (live as (initial: (key: string) => number, id: string, name: string) => { set: (key: string, value: number) => void, delete: (key: string) => void })((): number => 0, CACHE_LIVE_ID, 'cache')
 
 // Runs the render of a request, loads included, so the cached values it reads with `live: true` are the page's to follow.
 export function inLiveReads<T>(run: () => T): T {
@@ -60,17 +62,32 @@ onLiveRead((key) => {
 
   reads.at.set(key, Date.now())
 
-  if (!stamped.has(key)) {
-    stamped.add(key)
-
-    for (const old of stamped) {
-      if (stamped.size <= MAX_STAMPED)
-        break
-
-      stamped.delete(old)
-    }
-  }
+  remember(key)
 })
+
+// Keeps a key's invalidation time from now on, whichever process rendered the page: the least recent ones go past the bound, but never one a connection watches.
+function remember(key: string): void {
+  stamped.delete(key)
+  stamped.add(key)
+
+  const slot = liveSlot(CACHE_LIVE_ID)
+
+  for (const old of stamped) {
+    if (stamped.size <= MAX_STAMPED)
+      break
+
+    if ((slot?.listeners.get(old)?.size ?? 0) > 0)
+      continue
+
+    stamped.delete(old)
+    stamps.delete(old)
+  }
+}
+
+// Whether the render in progress read a key with `live: true`, which its page follows.
+export function followsCaches(): boolean {
+  return (cacheReads.getStore()?.at.size ?? 0) > 0
+}
 
 // An invalidation, this process's or another's, tells the pages following what it dropped: each key gets the time, which only grows.
 onKeysInvalidated((matches) => {
@@ -295,6 +312,11 @@ export function serveLive(app: Elysia, config?: LiveConfig): void {
 
       if (slot !== undefined && provenAt !== undefined && (slot.keyed || key === '')) {
         oldest = Math.min(oldest, provenAt)
+
+        // A process that did not render the page, or restarted since, still hears the invalidations of what its proof covers.
+        if (id === CACHE_LIVE_ID)
+          remember(key)
+
         watched.push({ id, key, value: () => slotValue(slot, key), watch: listener => watchSlot(slot, key, listener) })
       }
     }

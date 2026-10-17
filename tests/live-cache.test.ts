@@ -10,6 +10,7 @@ import { chromium } from 'playwright-core'
 import { invalidate, trackStore, untrackStore } from '../src/runtime/cache'
 import { CACHE_LIVE_ID } from '../src/runtime/cache-live-id'
 import { liveSlot } from '../src/runtime/live-value'
+import { signText } from '../src/server/stamp'
 import { browserPath, testSite } from '../src/test'
 import { db } from './fixtures/live-cache/src/data'
 import { Feed, JSON_POST, pagesOf, proofsOf } from './live-helpers'
@@ -160,6 +161,18 @@ describe('a cached value a page follows', () => {
       untrackStore(store)
       await feed.close()
     }
+  })
+
+  it('tells a process that never rendered the key, as another replica or a restart leaves it', async () => {
+    const at = Date.now()
+    const keys: [string, string][] = [[CACHE_LIVE_ID, 'ghost']]
+    const sig = signText('live', `${at}\n${keys.map(key => JSON.stringify(key)).join('\n')}`)
+    const feed = new Feed(await site.fetch('/_kay/live', { ...JSON_POST, body: JSON.stringify({ proofs: [{ keys, at, sig }], watch: keys } satisfies LiveRequest) }))
+
+    expect(await feed.next()).toEqual([[CACHE_LIVE_ID, 'ghost', 0]])
+    invalidate('ghost')
+    expect((await feed.next())[0]![1]).toBe('ghost')
+    await feed.close()
   })
 
   it('sends nothing for a key the proof does not cover, and refuses a forged one', async () => {

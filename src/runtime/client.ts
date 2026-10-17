@@ -101,7 +101,11 @@ let warming = false
 // Loads the code that keeps the cached values the page read with `live: true` up to date, only for a page that carries some.
 async function followCaches(): Promise<void> {
   following = true
-  ;(await import('./live-cache')).followCaches()
+
+  try {
+    (await import('./live-cache')).followCaches()
+  }
+  catch {}
 }
 
 // Hydrates every island the server rendered, loading each component's chunk on demand; resolves once the eager ones are done.

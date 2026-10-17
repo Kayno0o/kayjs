@@ -46,7 +46,7 @@ import { runGuards } from './guards'
 import { historyScript } from './history'
 import { hydrationScript } from './hydration'
 import { DEFAULT_LANG, invalidKeys, messagesScript } from './i18n'
-import { CACHE_MARK, inLiveReads, liveScript } from './live'
+import { followsCaches, inLiveReads, liveScript } from './live'
 import { registerScript } from './offline'
 import { errorPage } from './overlay'
 import { chainSetting, pageSetting } from './page-settings'
@@ -836,7 +836,7 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
   // The entry fetches a deferred server island as it nears the viewport.
   const liveText = liveScript()
   // A page following cached values loads the entry too, which opens the connection telling it they changed.
-  const follows = client.entry !== undefined && liveText.includes(CACHE_MARK)
+  const follows = client.entry !== undefined && followsCaches()
   const shipsEntry = hasIslands || posts || follows || (client.entry !== undefined && scan?.modes.includes('defer') === true)
   const checked = posts ? formsScript(forms, options.dev) : ''
   const scripts = shipsEntry ? islandScripts(client, islands.eager, streamed, hasIslands) + checked + workScript(forms, options.prerendering === true) : ''
