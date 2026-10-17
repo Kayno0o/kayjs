@@ -118,6 +118,43 @@ describe('a store with the verbs of 1.51', () => {
     expect(warned).not.toHaveBeenCalled()
   })
 
+  test('a frozen store, members and oauth keep working and warn once', async () => {
+    const warned = spyOn(log, 'warn').mockImplementation(() => undefined)
+    const { store } = oldStore()
+    const frozen = Object.freeze({ ...store, members: Object.freeze(store.members), oauth: Object.freeze({ ...store.oauth!, grants: Object.freeze(store.oauth!.grants) }) }) as unknown as AuthStore
+    const accepted = acceptOldVerbs(frozen)
+
+    await accepted.members!.add(member)
+    expect(await accepted.members!.delete('o1', 'u1')).toBe(true)
+    await accepted.oauth!.grants.upsert(grant)
+    expect((await accepted.oauth!.grants.get('u1', 'c1'))!.clientName).toBe('Agent')
+    expect(warned).toHaveBeenCalledTimes(2)
+  })
+
+  test('a sealed store and a store with a non-writable members work too', async () => {
+    spyOn(log, 'warn').mockImplementation(() => undefined)
+
+    const { store } = oldStore()
+    const sealed = Object.seal({ ...store })
+    const fixed = Object.defineProperty({ ...store }, 'members', { value: store.members, writable: false, configurable: false, enumerable: true })
+
+    await acceptOldVerbs(sealed).members!.add(member)
+    expect(await acceptOldVerbs(sealed).members!.delete('o1', 'u1')).toBe(true)
+    expect(await acceptOldVerbs(fixed).members!.delete('o1', 'u1')).toBe(false)
+  })
+
+  test('a method read twice is the same function, and a view spreads with its verbs', () => {
+    spyOn(log, 'warn').mockImplementation(() => undefined)
+
+    const { store } = oldStore()
+    const accepted = acceptOldVerbs(store)
+
+    expect(accepted.members!.get).toBe(accepted.members!.get)
+    expect(accepted.members!.delete).toBe(accepted.members!.delete)
+    expect(accepted.oauth!.grants.upsert).toBe(accepted.oauth!.grants.upsert)
+    expect(typeof { ...accepted.members }.delete).toBe('function')
+  })
+
   test('createAuth runs on it: a manager removes a member through members.remove', async () => {
     spyOn(log, 'warn').mockImplementation(() => undefined)
 

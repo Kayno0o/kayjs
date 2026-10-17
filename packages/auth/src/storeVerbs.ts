@@ -14,18 +14,39 @@ function warnOnce(message: string) {
 
 type Verb = (...args: never[]) => unknown
 
-// A view of `target` whose own methods still run on `target`, so a store written as a class keeps its private fields and state, with `overrides` answering instead of what `target` has under those names.
+// A view of `target` whose own methods still run on `target`, so a store written as a class keeps its private fields and state, with `overrides` answering instead of what `target` has under those names. The proxy wraps an empty object rather than `target`, as a frozen or sealed `target` would make the proxy's invariants refuse the overrides; each method is bound once, so reading it twice gives the same function.
 function view<T extends object>(target: T, overrides: Record<string, unknown>): T {
-  return new Proxy(target, {
-    get(object, key) {
-      if (typeof key === 'string' && key in overrides)
-        return overrides[key]
+  const bound = new WeakMap<Verb, Verb>()
 
-      const value: unknown = Reflect.get(object, key, object)
+  const read = (key: string | symbol): unknown => {
+    if (typeof key === 'string' && Object.hasOwn(overrides, key))
+      return overrides[key]
 
-      return typeof value === 'function' ? (value as Verb).bind(object) : value
+    const value: unknown = Reflect.get(target, key, target)
+
+    if (typeof value !== 'function')
+      return value
+
+    const method = value as Verb
+    let result = bound.get(method)
+
+    if (!result) {
+      result = method.bind(target)
+      bound.set(method, result)
+    }
+
+    return result
+  }
+
+  return new Proxy({} as T, {
+    get: (_, key) => read(key),
+    has: (_, key) => (typeof key === 'string' && Object.hasOwn(overrides, key)) || key in target,
+    ownKeys: () => [...new Set([...Reflect.ownKeys(target), ...Object.keys(overrides)])],
+    getOwnPropertyDescriptor: (_, key) => {
+      const own = (typeof key === 'string' && Object.hasOwn(overrides, key)) || Object.hasOwn(target, key)
+
+      return own ? { value: read(key), writable: true, enumerable: typeof key !== 'string' || Object.hasOwn(overrides, key) || Object.getOwnPropertyDescriptor(target, key)?.enumerable === true, configurable: true } : undefined
     },
-    has: (object, key) => (typeof key === 'string' && key in overrides) || key in object,
   })
 }
 
