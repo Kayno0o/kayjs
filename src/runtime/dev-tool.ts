@@ -812,9 +812,10 @@ export function startDevTool(doc: Document = document): DevTool {
     place()
   }
 
-  for (const { value, button } of docks) {
-    button.onclick = () => {
-      layout.dock = value
+  // Through the entry, not a destructured binding: tsgo's declaration emit panics on a property assigned to one.
+  for (const entry of docks) {
+    entry.button.onclick = () => {
+      layout.dock = entry.value
       saveLayout()
       place()
     }
