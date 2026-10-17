@@ -353,6 +353,26 @@ describe('entry slugs', () => {
     }
   })
 
+  it('fail a localized collection when two entries of a locale share a translationKey, or one\'s key is another\'s slug, or a key is not a string', async () => {
+    const closed = Type.Object({ title: Type.String(), slug: Type.Optional(Type.String()), translationKey: Type.Optional(Type.Any()) })
+    const cases: [Record<string, string>, RegExp][] = [
+      [{ 'posts/en/a.md': entry('translationKey: k'), 'posts/en/b.md': entry('translationKey: k') }, /posts\/en\/b\.md:3 translationKey k pairs the entry as posts\/en\/a\.md does/],
+      [{ 'posts/en/a.md': entry('translationKey: b'), 'posts/en/b.md': entry('') }, /translationKey b pairs/],
+      [{ 'posts/en/a.md': entry('translationKey: 12') }, /posts\/en\/a\.md:3 translationKey is not a string/],
+    ]
+
+    for (const [files, message] of cases) {
+      const { restore } = await project(files)
+
+      try {
+        await expect(collection('posts', { schema: closed, localized: true }).all()).rejects.toThrow(message)
+      }
+      finally {
+        await restore()
+      }
+    }
+  })
+
   it('refuse a value that is empty, not a string, or a path with an empty, . or .. part, a backslash, ? or #, naming the line', async () => {
     for (const bad of ['""', '"  "', '123', '/lead', 'trail/', 'a//b', '..', '../x', 'a/./b', 'a\\b', 'a?b', 'a#b', '"a\\u0000b"', '[1]']) {
       const { restore } = await project({ 'posts/a.md': entry(`slug: ${bad}`) })

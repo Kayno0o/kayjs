@@ -37,9 +37,13 @@ export function decodeEntries(entries: RawEntry[], schema: TSchema, components: 
 
   const problems: ContentProblem[] = []
   const decoded: { entry: RawEntry, data: unknown }[] = []
+  const paired = new Map<string, RawEntry>()
 
   for (const entry of entries) {
     const data = withDefaults(entry.data, schema)
+
+    if (localized)
+      pairingProblem(entry, paired, problems)
 
     if (localized && !entry.slug.includes('/'))
       problems.push({ file: entry.file, line: 1, message: 'sits outside a locale folder, where a localized collection keeps each entry: fr/hello.md' })
@@ -70,6 +74,27 @@ export function decodeEntries(entries: RawEntry[], schema: TSchema, components: 
     throw new ContentError(problems)
 
   return decoded
+}
+
+// A localized collection pairs the entries of a locale with their translations by key, so two of one locale cannot share one: a `translationKey` field, else the slug after its locale's folder.
+function pairingProblem(entry: RawEntry, paired: Map<string, RawEntry>, problems: ContentProblem[]): void {
+  const given = typeof entry.data === 'object' && entry.data !== null ? (entry.data as { translationKey?: unknown }).translationKey : undefined
+
+  if (given !== undefined && typeof given !== 'string') {
+    problems.push({ file: entry.file, line: entry.lines.translationKey ?? 1, message: 'translationKey is not a string' })
+
+    return
+  }
+
+  const [locale = '', ...rest] = entry.slug.split('/')
+  const key = given === undefined || given === '' ? rest.join('/') : given
+  const id = `${locale}\0${key}`
+  const taken = paired.get(id)
+
+  if (taken)
+    problems.push({ file: entry.file, line: entry.lines.translationKey ?? 1, message: `translationKey ${key} pairs the entry as ${taken.file} does; rename one` })
+  else
+    paired.set(id, entry)
 }
 
 // Where a draft's data fails the schema, each field by its dotted path, `tags.0`, at most once.
