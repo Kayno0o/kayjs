@@ -1,6 +1,6 @@
-import { expect, it, mock } from 'bun:test'
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { expect, it, mock } from 'bun:test'
 import { scratchDir } from './scratch'
 
 const real = await import('node:fs/promises')
