@@ -621,7 +621,7 @@ describe('the dev tool', () => {
       ] }), { status })
     }) as unknown as typeof window.fetch)
 
-    const rows = () => [...shadow().querySelectorAll('#kay-dev-routes .route')].map(row => [...row.children].map(cell => cell.textContent).join(' | '))
+    const rows = () => [...shadow().querySelectorAll('#kay-dev-routes .route')].map(row => [row.querySelector('.method')!.textContent, row.querySelector('.name')!.textContent, row.querySelector('.line .chip')?.textContent ?? '', row.querySelector('.chips')!.textContent].join(' | '))
     const filter = () => shadow().querySelector<HTMLInputElement>('#kay-dev-routes input')!
     const sections = () => [...shadow().querySelectorAll('#kay-dev-routes .group')].map(group => `${group.querySelector('h3')!.firstChild!.textContent} (${group.querySelector('h3 .pill')!.textContent})`)
 
@@ -635,7 +635,7 @@ describe('the dev tool', () => {
       expect(rows()).toEqual(['GET | /broken |  | src/routes/broken.kay', 'GET | /items/:id |  | src/routes/items/[id].kay', 'GET | /fr/a-propos | fr | src/routes/about.kay', 'POST | /api/stock/:id |  | src/api/stock.ts', 'GET | /manifest.webmanifest |  | the web app manifest'])
       expect([...shadow().querySelectorAll<HTMLAnchorElement>('#kay-dev-routes a')].map(link => link.getAttribute('href'))).toEqual(['/broken', '/fr/a-propos', '/manifest.webmanifest'])
       expect(shadow().querySelector('#kay-dev-routes > .list > .note')?.textContent).toContain('no sitemap or robots.txt')
-      expect(shadow().querySelector('#kay-dev-routes [aria-current=page] .path')?.textContent).toBe('/broken')
+      expect(shadow().querySelector('#kay-dev-routes [aria-current=page] .name')?.textContent).toBe('/broken')
 
       filter().value = 'ABOUT'
       filter().dispatchEvent(new Event('input'))
@@ -795,12 +795,12 @@ describe('the dev tool', () => {
       return app.handle(new Request(`http://localhost${url}`))
     }) as unknown as typeof window.fetch)
     const flag = (row: Element) => {
-      if (row.querySelector('.flag'))
+      if (row.querySelector('.issue'))
         return ' (flagged)'
 
-      return row.querySelector('.soft') ? ' (noted)' : ''
+      return row.querySelector('.note') ? ' (noted)' : ''
     }
-    const rows = () => [...shadow().querySelectorAll('#kay-dev-env .envrow')].map(row => `${row.querySelector('.name')!.textContent} = ${row.querySelector('.val')!.textContent}${flag(row)}`)
+    const rows = () => [...shadow().querySelectorAll('#kay-dev-env .env')].map(row => `${row.querySelector('.name')!.textContent} = ${row.querySelector('.val')!.textContent}${flag(row)}`)
 
     try {
       happyDOM.setURL('http://localhost/')
@@ -903,7 +903,7 @@ describe('the dev tool', () => {
 
       return new Response(null, { headers: { 'content-type': url.includes('logo') ? 'image/webp' : type, 'content-length': photo ? '2500000' : '45000' } })
     }) as unknown as typeof window.fetch)
-    const rows = () => [...shadow().querySelectorAll('#kay-dev-images .image')].map(row => [`${row.querySelector('.src')!.firstChild!.textContent}${row.querySelector('.src .pill') === null ? '' : ' (largest paint)'}`, [...row.querySelectorAll('.chip')].map(chip => chip.textContent).join(' - '), ...[...row.querySelectorAll('.flag')].map(flag => flag.textContent)].join(' | '))
+    const rows = () => [...shadow().querySelectorAll('#kay-dev-images .image')].map(row => [`${row.querySelector('.name')!.textContent}${row.querySelector('.line .pill') === null ? '' : ' (largest paint)'}`, [...row.querySelectorAll('.chip')].map(chip => chip.textContent).join(' - '), ...[...row.querySelectorAll('.issue')].map(flag => flag.textContent)].join(' | '))
 
     try {
       tool = startDevTool()
@@ -993,7 +993,7 @@ describe('the dev tool', () => {
     // Resource Timing keeps the content type without the hash; the dev tool never asks the app's own handler again.
     const types: Record<string, string> = { 'http://localhost/mark?v=1': 'image/svg+xml; charset=utf-8', 'http://localhost/photo': 'image/png' }
     const timing = spyOn(window.performance, 'getEntriesByName').mockImplementation(((name: string) => name in types ? [{ contentType: types[name] }] : []) as unknown as typeof window.performance.getEntriesByName)
-    const flags = () => [...shadow().querySelectorAll('#kay-dev-images .image')].map(row => [row.querySelector('.src')?.textContent, ...[...row.querySelectorAll('.flag')].map(flag => flag.textContent)].join(' | '))
+    const flags = () => [...shadow().querySelectorAll('#kay-dev-images .image')].map(row => [row.querySelector('.line')?.textContent, ...[...row.querySelectorAll('.issue')].map(flag => flag.textContent)].join(' | '))
 
     try {
       tool = startDevTool()
@@ -1048,7 +1048,7 @@ describe('the dev tool', () => {
 
     // Chromium's density at a 120% zoom.
     Object.defineProperty(window, 'devicePixelRatio', { value: 1.2000000476837158, configurable: true })
-    const rows = () => [...shadow().querySelectorAll('#kay-dev-images .image')].map(row => [row.querySelector('.src')!.textContent, [...row.querySelectorAll('.chip')].map(chip => chip.textContent).join(' - '), ...[...row.querySelectorAll('.flag')].map(flag => flag.textContent)].join(' | '))
+    const rows = () => [...shadow().querySelectorAll('#kay-dev-images .image')].map(row => [row.querySelector('.line')!.textContent, [...row.querySelectorAll('.chip')].map(chip => chip.textContent).join(' - '), ...[...row.querySelectorAll('.issue')].map(flag => flag.textContent)].join(' | '))
     const visible = () => [...shadow().querySelectorAll<HTMLElement>('.outline')].filter(outline => outline.hidden === false).length
 
     try {

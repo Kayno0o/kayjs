@@ -622,8 +622,10 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay dev in
           'serp title': ['accent', 'surface', 'canvas'],
           'serp description': ['sub', 'surface', 'canvas'],
           'meter over': ['warn', 'surface'],
-          'env flag': ['warn', 'surface', 'warn-soft'],
-          'image flag': ['warn', 'surface'],
+          'issue error': ['error', 'surface'],
+          'issue warn': ['warn', 'surface'],
+          'issue warn hovered': ['warn', 'surface', 'accent-soft'],
+          'issue error current': ['error', 'surface', 'accent-soft'],
           'vital': ['text', 'surface', 'canvas'],
           'vital tick': ['sub', 'surface', 'canvas'],
           'build': ['text', 'surface', 'accent-soft'],
@@ -1451,7 +1453,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the dev to
       const row = await view.evaluate(() => {
         const image = document.querySelector('kay-dev')!.shadowRoot!.querySelector('#kay-dev-images .image')!
 
-        return [image.querySelector('.src')!.textContent, [...image.querySelectorAll('.chip')].map(chip => chip.textContent).find(chip => chip.includes('drawn')), [...image.querySelectorAll('.flag')].map(flag => flag.textContent)]
+        return [image.querySelector('.line')!.textContent, [...image.querySelectorAll('.chip')].map(chip => chip.textContent).find(chip => chip.includes('drawn')), [...image.querySelectorAll('.issue')].map(flag => flag.textContent)]
       })
 
       // Chromium draws an SVG without a size at 150x150, 88 times the pixels of 16x16.

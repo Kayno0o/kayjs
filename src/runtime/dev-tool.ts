@@ -189,20 +189,21 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 .meter.over .n { color: var(--warn); }
 .json summary { cursor: pointer; font-size: 12.5px; }
 .json pre, pre.json { margin: 6px 0 0; padding: 10px; border-radius: 8px; background: var(--canvas); border: 1px solid var(--line); white-space: pre-wrap; word-break: break-word; }
-.envrow { font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; display: grid; grid-template-columns: minmax(0, 13rem) minmax(0, 1fr); gap: 4px 14px; padding: 8px 0; border-top: 1px solid var(--line); }
-.envrow .name { overflow-wrap: anywhere; }
-.envrow .val { overflow-wrap: anywhere; color: var(--sub); }
-.envrow .flag { grid-column: 1 / -1; display: flex; gap: 8px; padding: 8px 10px; border-radius: 8px; background: var(--warn-soft); color: var(--warn); font: 12.5px/1.45 system-ui, sans-serif; }
-.envrow .flag svg { margin-top: 1px; }
-.envrow .soft { grid-column: 1 / -1; color: var(--sub); font: 12px system-ui, sans-serif; }
-.image { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 4px 12px; padding: 10px 6px; border-top: 1px solid var(--line); border-radius: 6px; }
-.image:hover { background: var(--accent-soft); }
-.image:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-.thumb { grid-row: span 3; width: 52px; height: 40px; border-radius: 6px; border: 1px solid var(--line); background: var(--mantle); object-fit: contain; }
-.image .src { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; overflow-wrap: anywhere; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
-.image .flags { display: grid; gap: 3px; }
-.image .flag { display: flex; gap: 6px; align-items: flex-start; color: var(--warn); font-size: 12.5px; }
-.image .flag svg { margin-top: 2px; width: 14px; height: 14px; }
+.entry { display: flex; gap: 12px; padding: 8px 6px; border-top: 1px solid var(--line); border-radius: 6px; }
+.entry .body { flex: 1; min-width: 0; display: grid; gap: 4px; align-content: start; }
+.entry .line { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.entry .name { min-width: 0; overflow-wrap: anywhere; }
+.entry a.name { color: var(--accent); text-decoration: none; }
+.entry a.name:hover { text-decoration: underline; }
+.entry .val { min-width: 0; overflow-wrap: anywhere; color: var(--sub); }
+.entry .issue { display: flex; gap: 6px; align-items: flex-start; color: var(--warn); font-size: 12.5px; }
+.entry .issue.error { color: var(--error); }
+.entry .issue svg { flex: none; margin-top: 2px; width: 14px; height: 14px; }
+.entry .note { font-size: 12px; }
+.entry[aria-current] { background: var(--accent-soft); border-top-color: transparent; }
+.entry[tabindex]:hover { background: var(--accent-soft); }
+.entry:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.thumb { flex: none; width: 52px; height: 40px; border-radius: 6px; border: 1px solid var(--line); background: var(--mantle); object-fit: contain; }
 .vitals { display: grid; grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr)); gap: 10px; }
 .vital { display: grid; gap: 6px; padding: 10px 12px 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--canvas); align-content: start; }
 .vital .top { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; }
@@ -227,14 +228,6 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 .search { position: relative; display: flex; align-items: center; }
 .search svg { position: absolute; left: 9px; color: var(--sub); width: 14px; height: 14px; }
 .search input { width: 100%; padding: 6px 10px 6px 30px; border: 1px solid var(--line); border-radius: 8px; background: var(--canvas); color: var(--text); font: 13px system-ui, sans-serif; }
-.route { display: grid; grid-template-columns: 3.6rem minmax(0, 1fr) auto; align-items: center; gap: 2px 10px; padding: 6px; border-top: 1px solid var(--line); }
-.route[aria-current] { background: var(--accent-soft); border-radius: 6px; border-top-color: transparent; }
-.route .method { justify-self: start; }
-.route .path { font: 12.5px ui-monospace, SFMono-Regular, Menlo, monospace; overflow-wrap: anywhere; }
-.route a.path { color: var(--accent); text-decoration: none; }
-.route a.path:hover { text-decoration: underline; }
-.route .file { grid-column: 2 / -1; font: 11.5px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--sub); overflow-wrap: anywhere; }
-.route .locale { font: 11px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--sub); }
 .locales { display: flex; flex-wrap: wrap; gap: 6px; }
 .locale-chip { font: 12px/24px ui-monospace, SFMono-Regular, Menlo, monospace; padding: 0 10px; border-radius: 999px; border: 1px solid var(--line); color: var(--accent); text-decoration: none; }
 .locale-chip[aria-current] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
@@ -363,6 +356,53 @@ function pill(tool: Pick<DevTool, 'make' | 'icon'>, text: string, tone?: 'error'
   element.append(text)
 
   return element
+}
+
+interface EntryParts {
+  // Before the rest, as an image's thumbnail.
+  lead?: HTMLElement | undefined
+  name: HTMLElement | string
+  // What follows the name on its line: pills, a value, a copy button.
+  after?: Node[] | undefined
+  // Short facts, a string drawn as a chip.
+  chips?: (HTMLElement | string)[] | undefined
+  // What is wrong, one line each.
+  issues?: { text: string, tone: 'error' | 'warn', icon?: DevIconName }[] | undefined
+  note?: string | undefined
+}
+
+// A row of a list tab, the same in each: its name and what follows it on one line, short facts as chips, what is wrong one line each, then a muted note.
+function entry(tool: DevTool, kind: string, parts: EntryParts): HTMLElement {
+  const row = tool.make('div', `entry ${kind}`)
+  const body = tool.make('div', 'body')
+  const line = tool.make('div', 'line')
+
+  line.append(typeof parts.name === 'string' ? tool.make('span', 'name', parts.name) : parts.name, ...parts.after ?? [])
+  body.append(line)
+
+  if (parts.chips !== undefined && parts.chips.length > 0) {
+    const chips = tool.make('div', 'chips')
+
+    chips.append(...parts.chips.map(chip => typeof chip === 'string' ? tool.make('span', 'chip', chip) : chip))
+    body.append(chips)
+  }
+
+  for (const issue of parts.issues ?? []) {
+    const element = tool.make('div', `issue ${issue.tone}`)
+
+    element.append(tool.icon(issue.icon ?? TONE_ICONS[issue.tone]), tool.make('span', '', issue.text))
+    body.append(element)
+  }
+
+  if (parts.note !== undefined)
+    body.append(tool.make('div', 'note', parts.note))
+
+  if (parts.lead !== undefined)
+    row.append(parts.lead)
+
+  row.append(body)
+
+  return row
 }
 
 interface DevState {
@@ -1791,22 +1831,17 @@ function envTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
 
     for (const [name, value] of entries) {
       const found = secretReason(name, value)
-      const row = tool.make('div', 'envrow')
+      const secret = found !== undefined && !found.maybe
 
-      row.append(tool.make('span', 'name', name), tool.make('span', 'val', typeof value === 'string' ? value : JSON.stringify(value)))
-
-      if (found?.maybe === true) {
-        row.append(tool.make('span', 'soft', `Every visitor reads this: ${found.reason}.`))
-      }
-      else if (found !== undefined) {
-        const flag = tool.make('span', 'flag')
-
+      if (secret)
         flagged++
-        flag.append(tool.icon('lock'), tool.make('span', '', `Every visitor reads this, and ${found.reason}. Keep a secret in defineEnv, read on the server alone.`))
-        row.append(flag)
-      }
 
-      list.append(row)
+      list.append(entry(tool, 'env', {
+        name,
+        after: [tool.make('span', 'val', typeof value === 'string' ? value : JSON.stringify(value))],
+        issues: secret ? [{ text: `Every visitor reads this, and ${found.reason}. Keep a secret in defineEnv, read on the server alone.`, tone: 'error', icon: 'lock' }] : [],
+        note: found?.maybe === true ? `Every visitor reads this: ${found.reason}.` : undefined,
+      }))
     }
 
     tab.count(flagged, flagged > 0 ? 'error' : undefined)
@@ -2121,39 +2156,25 @@ function imagesTab(doc: Document, tool: DevTool, vitals: Vitals, signal: AbortSi
     for (const same of rows) {
       const info = same[0]!
       const lcp = same.some(copy => copy.lcp)
-      const row = tool.make('div', 'image')
       const thumb = tool.make('img', 'thumb')
-      const src = tool.make('div', 'src', info.url)
-      const facts = tool.make('div', 'chips')
       const format = tool.make('span', 'chip', 'format...')
-      const flags = tool.make('div', 'flags')
       const label = lcp ? 'largest paint' : 'image'
+      const row = entry(tool, 'image', {
+        lead: thumb,
+        name: info.url,
+        after: [...lcp ? [pill(tool, 'largest paint', 'accent')] : [], ...same.length > 1 ? [pill(tool, `${same.length} copies`)] : []],
+        chips: [info.variant, format, info.natural === 'not loaded' ? `not loaded, drawn ${info.drawn}` : `${info.natural} drawn ${info.drawn}`],
+        issues: [...new Set(same.flatMap(copy => copy.flags))].map(text => ({ text, tone: 'warn' as const })),
+      })
 
       formats.push(format)
       thumb.src = info.src
       thumb.alt = ''
       thumb.loading = 'lazy'
       thumb.decoding = 'async'
-
-      if (lcp)
-        src.append(pill(tool, 'largest paint', 'accent'))
-
-      if (same.length > 1)
-        src.append(pill(tool, `${same.length} copies`))
-
-      facts.append(tool.make('span', 'chip', info.variant), format, tool.make('span', 'chip', info.natural === 'not loaded' ? `not loaded, drawn ${info.drawn}` : `${info.natural} drawn ${info.drawn}`))
-
-      for (const flag of new Set(same.flatMap(copy => copy.flags))) {
-        const line = tool.make('div', 'flag')
-
-        line.append(tool.icon('triangle-alert'), tool.make('span', '', flag))
-        flags.append(line)
-      }
-
       row.tabIndex = 0
       row.setAttribute('role', 'group')
       row.setAttribute('aria-label', same.length > 1 ? `${info.url}, ${same.length} copies` : info.url)
-      row.append(thumb, src, facts, flags)
       row.onpointerenter = row.onfocus = () => tool.outline(same.map(copy => copy.image), label)
       row.onpointerleave = row.onblur = () => tool.hideOutline()
       body.append(row)
@@ -2633,22 +2654,17 @@ function routesTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
 }
 
 function routeRow(tool: DevTool, route: DevRoute, current: string): HTMLElement {
-  const row = tool.make('div', 'route')
-  const link = tool.make('a', 'path', route.path)
-  const file = tool.make('div', 'file')
+  const name = route.href === undefined ? tool.make('span', 'name', route.path) : Object.assign(tool.make('a', 'name', route.path), { href: route.href })
+  const row = entry(tool, 'route', {
+    name,
+    after: route.locale === undefined ? [] : [tool.make('span', 'chip', route.locale)],
+    chips: [route.owner === undefined ? positionButton(tool, route.file) : route.owner],
+  })
+
+  name.before(tool.make('span', 'method', route.method))
 
   if (route.href === current)
     row.setAttribute('aria-current', 'page')
-
-  if (route.href !== undefined)
-    link.href = route.href
-
-  if (route.owner === undefined)
-    file.append(positionButton(tool, route.file))
-  else
-    file.textContent = route.owner
-
-  row.append(tool.make('span', 'method', route.method), route.href === undefined ? tool.make('span', 'path', route.path) : link, tool.make('span', 'locale', route.locale ?? ''), file)
 
   return row
 }
