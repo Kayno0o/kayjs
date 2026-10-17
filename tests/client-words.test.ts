@@ -139,6 +139,12 @@ describe('the browser\'s form check in the page\'s locale', () => {
     })
   })
 
+  it('words a bound before the type of a number, and an exclusive bound as a type refusal, as the server does', () => {
+    const numbers = t.Object({ whole: t.Integer({ minimum: 1 }), below: t.Number({ exclusiveMaximum: 10 }), plain: t.Integer() })
+
+    expect(check([['whole', '0.5'], ['below', '10'], ['plain', '1.5']], numbers)).toEqual({ whole: '1 ou plus', below: 'Valeur invalide', plain: 'Valeur invalide' })
+  })
+
   it('words an empty field its schema asks one character of as required, as the server does, and keeps a schema\'s own error', () => {
     const own = t.Object({ name: t.String({ minLength: 1 }), nick: t.String({ minLength: 5, error: 'Five at least' }) })
 

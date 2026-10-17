@@ -1,4 +1,5 @@
 import type { TSchema } from 'elysia'
+import type { InvalidWord } from '../server/words'
 import { formInput, NUMERIC_FORMATS } from './form'
 import { wording } from './words.client'
 
@@ -104,20 +105,25 @@ function fieldMessage(name: string, field: FieldRules, value: unknown): string |
 
 // What a field's value fails: the `kay.invalid.*` key the server's refusal of it would use, the limit it names, and Elysia's own summary, which is its English.
 interface Refusal {
-  kind: InvalidKind
+  kind: InvalidWord
   english: string
   params?: Record<string, string | number>
 }
-
-type InvalidKind = `kay.invalid.${'required' | 'tooShort' | 'tooLong' | 'pattern' | 'format' | 'tooFewItems' | 'tooManyItems' | 'tooSmall' | 'tooBig' | 'type'}`
 
 function typeRefusal(english: string): Refusal {
   return { kind: 'kay.invalid.type', english }
 }
 
 function refusal(name: string, field: FieldRules, value: unknown): Refusal | undefined {
-  if (field.anyOf)
-    return field.anyOf.some(member => refusal(name, member, value) === undefined) && bounds(field, value) === undefined ? undefined : typeRefusal(`Property '${name}' should be one of: ${field.anyOf.map(member => `'${member.format ?? member.type}'`).join(', ')}`)
+  if (field.anyOf) {
+    const bound = bounds(field, value)
+
+    if (bound === undefined && field.anyOf.some(member => refusal(name, member, value) === undefined))
+      return undefined
+
+    // A union is summarized by its members, though a bound of its own gives the kind, as the server words it.
+    return { kind: bound?.kind ?? 'kay.invalid.type', english: `Property '${name}' should be one of: ${field.anyOf.map(member => `'${member.format ?? member.type}'`).join(', ')}`, ...bound?.params && { params: bound.params } }
+  }
 
   if (field.const !== undefined)
     return value === field.const ? undefined : typeRefusal(`Expected ${typeof field.const === 'string' ? `'${field.const}'` : String(field.const)}`)
@@ -142,10 +148,11 @@ function refusal(name: string, field: FieldRules, value: unknown): Refusal | und
       return field.format !== undefined && FORMATS[field.format]?.test(value) === false ? { kind: 'kay.invalid.format', english: `Property '${name}' should be ${field.format}`, params: { format: field.format } } : undefined
     case 'number':
     case 'integer':
-      if (typeof value !== 'number' || Number.isNaN(value) || (field.type === 'integer' && !Number.isInteger(value)))
+      if (typeof value !== 'number' || Number.isNaN(value))
         return typeRefusal(`Expected ${field.type}`)
 
-      return bounds(field, value)
+      // A bound a number fails is worded before its type, as the server does.
+      return bounds(field, value) ?? (field.type === 'integer' && !Number.isInteger(value) ? typeRefusal('Expected integer') : undefined)
     case 'boolean':
       return typeof value === 'boolean' ? undefined : typeRefusal('Expected boolean')
     case 'array':

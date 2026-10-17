@@ -17,7 +17,9 @@ let searched = false
 
 function parse(text: string): Payload | undefined {
   try {
-    return JSON.parse(text) as Payload
+    const payload = JSON.parse(text) as Payload | null
+
+    return typeof payload?.messages === 'object' && payload.messages !== null ? payload : undefined
   }
   catch {
     return undefined
