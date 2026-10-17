@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, rmSync, utimesSync } from 'node:fs'
+import { existsSync, readdirSync, rmSync, symlinkSync, utimesSync } from 'node:fs'
 import { mkdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { dev } from '../src/dev'
 import { devAddressFile, readDevAddress, removeDevAddress, writeDevAddress } from '../src/dev/address'
 import { mountedAt } from '../src/dev/base-proxy'
-import { MAX_FILES, pagePath, prune, screenshot, shotName } from '../src/dev/screenshot'
+import { keep, MAX_FILES, pagePath, prune, screenshot, SCREENSHOTS_DIR, shotName } from '../src/dev/screenshot'
 import { diffPngs } from '../src/dev/screenshot-diff'
 import { McpServer } from '../src/mcp/protocol'
 import { projectCapabilities } from '../src/mcp/tools'
@@ -183,6 +183,85 @@ describe('the diff of two shots', () => {
   })
 })
 
+describe('prune with a file that vanishes', () => {
+  it('goes on past a file it cannot read, and leaves a lock alone', async () => {
+    const dir = await scratchDir('shots-vanish-')
+
+    try {
+      for (let index = 0; index < MAX_FILES + 5; index++) {
+        const file = join(dir, `${index}.png`)
+
+        await Bun.write(file, 'x')
+        utimesSync(file, 1000 + index, 1000 + index)
+      }
+
+      symlinkSync(join(dir, 'missing.png'), join(dir, 'dangling.link'))
+      await Bun.write(join(dir, 'page.lock'), '1')
+      prune(dir)
+
+      const left = readdirSync(dir)
+
+      expect(left).toContain('page.lock')
+      expect(left).not.toContain('0.png')
+      expect(left.filter(name => name.endsWith('.png'))).toHaveLength(MAX_FILES)
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('runs after a shot that failed', async () => {
+    const root = await scratchDir('shots-failed-')
+    const dir = join(root, SCREENSHOTS_DIR)
+
+    try {
+      await mkdir(dir, { recursive: true })
+
+      for (let index = 0; index < MAX_FILES + 5; index++) {
+        const file = join(dir, `${index}.png`)
+
+        await Bun.write(file, 'x')
+        utimesSync(file, 1000 + index, 1000 + index)
+      }
+
+      writeDevAddress(root, 'http://localhost:1')
+
+      await expect(screenshot(root, '/')).rejects.toThrow()
+      expect(readdirSync(dir)).toHaveLength(MAX_FILES)
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('keeping a shot', () => {
+  it('makes no diff beyond the pixels it caps, and none leaves a lock behind when two shoot one page', async () => {
+    const root = await scratchDir('shots-keep-')
+    const big = image(3500, 3500)
+
+    try {
+      await keep(root, 'big', big, { width: 3500, scheme: 'light', cut: false })
+
+      const again = await keep(root, 'big', big, { width: 3500, scheme: 'light', cut: false })
+
+      expect(again.diff).toBeUndefined()
+      expect(again.diffSkipped).toBe(true)
+
+      const small = image(40, 40)
+      const both = await Promise.all([keep(root, 'small', small, { width: 40, scheme: 'light', cut: false }), keep(root, 'small', image(40, 40, { x: 0, y: 0, width: 5, height: 5 }), { width: 40, scheme: 'light', cut: false })])
+
+      expect(both.every(shot => shot.size.width === 40)).toBe(true)
+      expect(readdirSync(join(root, SCREENSHOTS_DIR)).filter(name => name.endsWith('.lock'))).toEqual([])
+      expect(existsSync(join(root, SCREENSHOTS_DIR, 'small.png'))).toBe(true)
+      expect(existsSync(join(root, SCREENSHOTS_DIR, 'small.prev.png'))).toBe(true)
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  }, 60_000)
+})
+
 describe('the address of the dev server', () => {
   it('is read while the process that wrote it lives, and only for that process removed', async () => {
     const root = await scratchDir('address-')
@@ -194,9 +273,11 @@ describe('the address of the dev server', () => {
 
       expect(readDevAddress(root)).toBe('http://localhost:3000')
 
-      await Bun.write(devAddressFile(root), JSON.stringify({ url: 'http://localhost:3000', pid: 2 ** 22 + 1 }))
+      await Bun.write(devAddressFile(root, 2 ** 22 + 1), JSON.stringify({ url: 'http://localhost:3001', pid: 2 ** 22 + 1 }))
+      removeDevAddress(root)
 
       expect(readDevAddress(root)).toBeUndefined()
+      expect(existsSync(devAddressFile(root, 2 ** 22 + 1))).toBe(false)
 
       await Bun.write(devAddressFile(root), JSON.stringify({ url: 'ftp://localhost', pid: process.pid }))
 
@@ -205,18 +286,30 @@ describe('the address of the dev server', () => {
       await Bun.write(devAddressFile(root), 'not json')
 
       expect(readDevAddress(root)).toBeUndefined()
-
-      await Bun.write(devAddressFile(root), JSON.stringify({ url: 'http://localhost:3000', pid: 1 }))
-      removeDevAddress(root)
-
-      expect(existsSync(devAddressFile(root))).toBe(true)
-
-      writeDevAddress(root, 'http://localhost:3001')
-      removeDevAddress(root)
-
-      expect(existsSync(devAddressFile(root))).toBe(false)
     }
     finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('keeps one file per process, so the first of two to exit leaves the other\'s address', async () => {
+    const root = await scratchDir('address-two-')
+    const other = Bun.spawn(['sleep', '60'])
+
+    try {
+      await Bun.write(devAddressFile(root, other.pid), JSON.stringify({ url: 'http://localhost:3001', pid: other.pid }))
+      await Bun.sleep(20)
+      writeDevAddress(root, 'http://localhost:3000')
+
+      expect(readDevAddress(root)).toBe('http://localhost:3000')
+
+      removeDevAddress(root)
+
+      expect(readDevAddress(root)).toBe('http://localhost:3001')
+      expect(existsSync(devAddressFile(root, other.pid))).toBe(true)
+    }
+    finally {
+      other.kill()
       await rm(root, { recursive: true, force: true })
     }
   })
@@ -244,7 +337,7 @@ describe('kay screenshot refusing before any browser starts', () => {
   })
 
   it('says so for an address a dead process left', async () => {
-    await Bun.write(devAddressFile(root), JSON.stringify({ url: 'http://localhost:1', pid: 2 ** 22 + 1 }))
+    await Bun.write(devAddressFile(root, 2 ** 22 + 1), JSON.stringify({ url: 'http://localhost:1', pid: 2 ** 22 + 1 }))
 
     const { code, stderr } = await run(root, ['screenshot', '/'], noBrowser)
 
@@ -321,6 +414,7 @@ describe.skipIf(skipBrowser)('kay screenshot on a running kay dev', () => {
     await route('index.kay', 'h1 Home\n')
     await route('box.kay', '--- script\nimport \'./box.css\'\n---\ndiv.box\n')
     await Bun.write(join(root, 'src/routes/box.css'), BOX_CSS(100, '#c00'))
+    await route('who.kay', '--- server\nconst who = ctx.cookies.get(\'session\') ?? \'nobody\'\n---\nh1 {who}\n')
     await route('tall.kay', 'div(style="height: 3000px; background: #eee")\n')
     await route('throws.kay', '--- server\nthrow new Error(\'server boom\')\n---\np Never\n')
     await route('stall.png.ts', 'export async function GET() {\n  await Bun.sleep(120_000)\n\n  return new Response(\'\')\n}\n')
@@ -374,6 +468,20 @@ describe.skipIf(skipBrowser)('kay screenshot on a running kay dev', () => {
     expect(whole.shots[0]!.size.height).toBeGreaterThanOrEqual(3000)
     expect(window.shots[0]!.size.height).toBe(800)
   }, 60_000)
+
+  it('opens the page with the cookies it is given, a visitor with none being a stranger', async () => {
+    const pixels = async (report: Awaited<ReturnType<typeof screenshot>>) => new Response(Bun.file(join(root, report.shots[0]!.file))).arrayBuffer()
+    const stranger = await shot('/who', { widths: [375] })
+    const strangerImage = await pixels(stranger)
+    const known = await shot('/who', { widths: [375], cookies: [{ name: 'session', value: 'ada' }] })
+    const compared = await diffPngs(new Uint8Array(strangerImage), new Uint8Array(await pixels(known)))
+
+    expect(compared.changed).toBeGreaterThan(0)
+
+    const alone = await shot('/who', { widths: [375] })
+
+    expect(alone.shots[0]!.diff!.changed).toBeGreaterThan(0)
+  }, 90_000)
 
   it('asks the page for the dark scheme', async () => {
     const light = await shot('/box', { widths: [375] })

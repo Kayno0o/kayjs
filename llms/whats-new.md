@@ -7,7 +7,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - A page with a `--- server` fence passes an island an action, `Chat(action={reply})` with no wrapper ([actions](actions.md#pass-an-action-to-an-island)).
 - `island-action` reports an action handed to an island that never types a prop as one ([actions](actions.md#pass-an-action-to-an-island)).
 - `secret-prop` warns of a secret-looking field, as `user.passwordHash`, handed to an island ([islands](islands.md#props-to-an-island)).
-- `kay screenshot` and an MCP `screenshot` tool shoot a page of `kay dev`, with a diff ([tools](check-and-tools.md#screenshot-a-page)).
+- `kay screenshot` and an MCP `screenshot` tool shoot a page of `kay dev`, with a diff, and `--cookie` shoots one behind a session ([tools](check-and-tools.md#screenshot-a-page)).
 - `kay not-found` lists the paths production found nothing at, with a target, and writes the redirect ([Redirects](routing.md#redirects)).
 - `deprecated-api-tool` is reported by `kay upgrade` of an app from before 1.51 alone: an app turning `mcp` on since gets no warning for routes that do not opt in ([Checks](checks.md)).
 - A stream an action answers with to a leaving row's handler or a `listen` callback closes with its island too ([actions from islands](api-from-islands.md)).

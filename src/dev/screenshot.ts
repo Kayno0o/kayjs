@@ -8,7 +8,7 @@ import { browse, browserPath } from '../test/browser'
 import { readDevAddress } from './address'
 import { mountedAt } from './base-proxy'
 import { diffPngs } from './screenshot-diff'
-import { checkSize, MAX_HEIGHT, MAX_WIDTH, ShotRefused } from './screenshot-limits'
+import { checkSize, MAX_DIFF_PIXELS, MAX_HEIGHT, MAX_WIDTH, ShotRefused } from './screenshot-limits'
 
 export const SCREENSHOTS_DIR = join(KAY_DIR, 'screenshots')
 export const DEFAULT_WIDTHS = [375, 1280]
@@ -29,6 +29,10 @@ const CONTROL = /[\u0000-\u001F\u007F\\]/
 const QUERY_OR_HASH = /[?#]/
 const SAFE = /[a-z0-9-]/
 const LEADING_SLASH = /^\//
+// A lock file beside a page's shots while one `kay screenshot` replaces them, which another of the same page waits for; one older than this is a dead process's.
+const LOCK = '.lock'
+const LOCK_STALE_MS = 30_000
+const LOCK_POLL_MS = 50
 const HIDE_DEV_TOOL = 'kay-dev { display: none !important }'
 
 export type Scheme = 'light' | 'dark'
@@ -40,6 +44,8 @@ export interface ShotOptions {
   fullPage?: boolean | undefined
   // The mount point of the site, `''` at the root of its host.
   base?: string | undefined
+  // Cookies the page is opened with, to shoot one behind a session.
+  cookies?: { name: string, value: string }[] | undefined
 }
 
 export interface Shot {
@@ -51,6 +57,8 @@ export interface Shot {
   size: { width: number, height: number }
   // Set when the page was taller than `MAX_HEIGHT`.
   cut?: boolean | undefined
+  // Set when the shot before it is too large to compare with, so no diff was made.
+  diffSkipped?: boolean | undefined
   // The shot before this one of the same page and size, and what changed since.
   previous?: string | undefined
   diff?: { file: string, changed: number, ratio: number, box?: { x: number, y: number, width: number, height: number } | undefined } | undefined
@@ -147,7 +155,7 @@ export async function screenshot(root: string, input: string, options: ShotOptio
 
     for (const width of widths) {
       const open: { page?: { close: () => void } } = {}
-      const taken = await within(shoot(open, root, url, path, width, height, scheme, options.fullPage === true), SHOT_MS)
+      const taken = await within(shoot(open, root, url, path, width, height, scheme, options.fullPage === true, options.cookies ?? []), SHOT_MS)
 
       if (taken === undefined) {
         // The shot goes on in the background, its page closed rather than left to the end of the process.
@@ -161,12 +169,12 @@ export async function screenshot(root: string, input: string, options: ShotOptio
     }
 
     report.problems = devProblems(root, routerPath(url.pathname, options.base ?? ''))
-    prune(join(root, SCREENSHOTS_DIR))
 
     return report
   }
   finally {
     mounted?.stop()
+    prune(join(root, SCREENSHOTS_DIR))
   }
 }
 
@@ -179,8 +187,8 @@ async function reach(url: URL): Promise<number> {
   }
 }
 
-async function shoot(open: { page?: { close: () => void } }, root: string, url: URL, path: string, width: number, height: number | undefined, scheme: Scheme, fullPage: boolean): Promise<{ shot: Shot, console: string[] }> {
-  const page = await browse(url.href, { width, height: height ?? DEFAULT_HEIGHT, timeout: SETTLE_MS, strict: false, lenient: true, colorScheme: scheme })
+async function shoot(open: { page?: { close: () => void } }, root: string, url: URL, path: string, width: number, height: number | undefined, scheme: Scheme, fullPage: boolean, cookies: { name: string, value: string }[]): Promise<{ shot: Shot, console: string[] }> {
+  const page = await browse(url.href, { width, height: height ?? DEFAULT_HEIGHT, timeout: SETTLE_MS, strict: false, lenient: true, colorScheme: scheme, cookies })
 
   open.page = page
 
@@ -228,15 +236,55 @@ async function prepare(view: Bun.WebView, fullPage: boolean): Promise<number | u
   }
 }
 
+// Runs `run` once no other `kay screenshot` replaces the same page's shots, which two at once would mix: one's previous shot would be the other's current.
+async function locked<T>(file: string, run: () => Promise<T>): Promise<T> {
+  const lock = `${file}${LOCK}`
+
+  for (;;) {
+    try {
+      writeFileSync(lock, String(process.pid), { flag: 'wx' })
+
+      break
+    }
+    catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST')
+        return run()
+
+      try {
+        const held = statSync(lock, { throwIfNoEntry: false })
+
+        if (held !== undefined && Date.now() - held.mtimeMs > LOCK_STALE_MS)
+          rmSync(lock, { force: true })
+      }
+      catch {}
+
+      await Bun.sleep(LOCK_POLL_MS)
+    }
+  }
+
+  try {
+    return await run()
+  }
+  finally {
+    rmSync(lock, { force: true })
+  }
+}
+
 // Writes the shot beside the one before it, which becomes `.prev`, and the diff between them.
-async function keep(root: string, name: string, png: Uint8Array, shot: { width: number, scheme: Scheme, cut: boolean }): Promise<Shot> {
+export async function keep(root: string, name: string, png: Uint8Array, shot: { width: number, scheme: Scheme, cut: boolean }): Promise<Shot> {
   const dir = join(root, SCREENSHOTS_DIR)
+
+  mkdirSync(dir, { recursive: true })
+
+  return locked(join(dir, name), async () => replace(dir, name, png, shot))
+}
+
+async function replace(dir: string, name: string, png: Uint8Array, shot: { width: number, scheme: Scheme, cut: boolean }): Promise<Shot> {
   const current = join(dir, `${name}.png`)
   const previous = join(dir, `${name}.prev.png`)
   const diff = join(dir, `${name}.diff.png`)
   const relative = (file: string) => join(SCREENSHOTS_DIR, file.slice(dir.length + 1))
 
-  mkdirSync(dir, { recursive: true })
   rmSync(diff, { force: true })
 
   let before: Uint8Array | undefined
@@ -260,6 +308,20 @@ async function keep(root: string, name: string, png: Uint8Array, shot: { width: 
   if (before === undefined)
     return kept
 
+  // Two decoded images and the canvas of the diff are held at once.
+  let earlier: { width: number, height: number }
+
+  try {
+    earlier = await new Bun.Image(before).metadata()
+  }
+  // A shot before that is cut short or no PNG is as good as none.
+  catch {
+    return kept
+  }
+
+  if (Math.max(earlier.width * earlier.height, width * height) > MAX_DIFF_PIXELS)
+    return { ...kept, diffSkipped: true }
+
   let compared: Awaited<ReturnType<typeof diffPngs>>
 
   try {
@@ -277,13 +339,27 @@ async function keep(root: string, name: string, png: Uint8Array, shot: { width: 
 
 // The oldest files go once there are more than a few hundred, so a long session on a large site does not fill the disk.
 export function prune(dir: string): void {
-  try {
-    const files = readdirSync(dir).map(name => ({ name, time: statSync(join(dir, name)).mtimeMs })).toSorted((a, b) => b.time - a.time)
+  let names: string[]
 
-    for (const { name } of files.slice(MAX_FILES))
-      rmSync(join(dir, name), { force: true })
+  try {
+    names = readdirSync(dir).filter(name => !name.endsWith(LOCK))
   }
-  catch {}
+  catch {
+    return
+  }
+
+  const files: { name: string, time: number }[] = []
+
+  for (const name of names) {
+    // A file another shot removed meanwhile is none.
+    const stat = statSync(join(dir, name), { throwIfNoEntry: false })
+
+    if (stat !== undefined)
+      files.push({ name, time: stat.mtimeMs })
+  }
+
+  for (const { name } of files.toSorted((a, b) => b.time - a.time).slice(MAX_FILES))
+    rmSync(join(dir, name), { force: true })
 }
 
 // What `kay dev` listed that concerns the page: its own requests and browser errors, and a failure to boot or compile, which concerns them all.

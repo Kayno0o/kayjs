@@ -6,7 +6,7 @@ export const USAGES = {
   'build': 'build [dir] [--compile <executable> [--verify]] [--entry <file>] [--static] [--outdir <dir>] [--no-check] [--analyze] [--deny-warnings] [-p tsconfig.json] [--format text|github|json] [--quiet]',
   'start': 'start [dir] [--entry <file>] [--port <port>]',
   'render': 'render <url> [dir] [--entry <file>] [--method <method>] [--body <text>] [--header <name: value>]... [--cookie <name=value>]... [-i|--include]',
-  'screenshot': 'screenshot <path> [dir] [--width <px>]... [--height <px>] [--scheme light|dark] [--full-page] [--format text|json]',
+  'screenshot': 'screenshot <path> [dir] [--width <px>]... [--height <px>] [--scheme light|dark] [--full-page] [--cookie <name=value>]... [--format text|json]',
   'check': 'check [dir] [paths...] [-p tsconfig.json] [--entry <file>] [--deny-warnings] [--fix] [--only <group>] [--since <minor>] [--format text|github|json] [--watch] [--quiet]',
   'upgrade': 'upgrade [dir] [--dry-run]',
   'routes': 'routes [dir] [--format text|json]',

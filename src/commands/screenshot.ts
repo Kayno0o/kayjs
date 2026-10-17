@@ -8,11 +8,13 @@ import { formatOption, printDocument, projectRoot } from './command'
 import { USAGES } from './usages'
 
 const WIDTH = /^\d+$/
+// eslint-disable-next-line no-control-regex -- control characters are what it finds
+const UNSAFE_COOKIE = /[;\s\u0000-\u001F\u007F]/
 
 // Shoots a page of the running `kay dev` in a headless Chrome, for what the page's HTML does not tell: how it lays out at phone width, in the dark.
 export const screenshotCommand: Command = {
   usage: USAGES.screenshot,
-  options: { 'width': { type: 'string', multiple: true }, 'height': { type: 'string' }, 'scheme': { type: 'string' }, 'full-page': { type: 'boolean' }, 'format': { type: 'string' } },
+  options: { 'width': { type: 'string', multiple: true }, 'height': { type: 'string' }, 'scheme': { type: 'string' }, 'full-page': { type: 'boolean' }, 'cookie': { type: 'string', multiple: true }, 'format': { type: 'string' } },
   positionals: 2,
   run: async ({ values, positionals: [path, dir] }, refuse) => {
     const format = formatOption('screenshot', values.format)
@@ -36,6 +38,19 @@ export const screenshotCommand: Command = {
         return refuse(`--width and --height take a number of pixels, not ${value}`)
     }
 
+    const cookies: { name: string, value: string }[] = []
+
+    for (const cookie of Array.isArray(values.cookie) ? values.cookie : []) {
+      const at = cookie.indexOf('=')
+      const name = cookie.slice(0, at)
+      const value = cookie.slice(at + 1)
+
+      if (at < 1 || UNSAFE_COOKIE.test(name) || UNSAFE_COOKIE.test(value))
+        return refuse(`--cookie takes name=value, with no \`;\`, space or control character in either, not ${JSON.stringify(cookie)}`)
+
+      cookies.push({ name, value })
+    }
+
     const root = projectRoot('screenshot', dir, format)
 
     if (root === undefined)
@@ -49,7 +64,7 @@ export const screenshotCommand: Command = {
       if (height !== undefined)
         checkSize('--height', Number(height), MAX_HEIGHT)
 
-      const report = await screenshot(root, path, { widths: widths.length === 0 ? undefined : widths.map(Number), height: height === undefined ? undefined : Number(height), scheme, fullPage: values['full-page'] === true, base: await baseOf(root) })
+      const report = await screenshot(root, path, { widths: widths.length === 0 ? undefined : widths.map(Number), height: height === undefined ? undefined : Number(height), scheme, fullPage: values['full-page'] === true, base: await baseOf(root), cookies })
 
       if (format === 'json') {
         printDocument(report)
@@ -60,7 +75,7 @@ export const screenshotCommand: Command = {
       console.log(`${report.url} answered ${report.status}`)
 
       for (const shot of report.shots) {
-        console.log(`${shot.width} px ${shot.scheme}: ${shot.file} (${shot.size.width}x${shot.size.height}${shot.cut ? ', cut' : ''}), ${changedSince(shot)}`)
+        console.log(`${shot.width} px ${shot.scheme}: ${shot.file} (${shot.size.width}x${shot.size.height}${shot.cut ? ', cut' : ''}), ${shot.diffSkipped === true ? 'too large to compare with the last' : changedSince(shot)}`)
       }
 
       for (const line of report.console)

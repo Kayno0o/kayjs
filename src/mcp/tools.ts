@@ -143,6 +143,7 @@ function tools(root: string): Tool[] {
           height: { type: 'integer', minimum: MIN_SIZE, maximum: MAX_HEIGHT, description: 'The window\'s height in pixels, 800 by default.' },
           scheme: { type: 'string', enum: ['light', 'dark'], description: 'The colour scheme the page is asked for, light by default.' },
           fullPage: { type: 'boolean', description: `The whole page rather than the window, cut at ${MAX_HEIGHT} px.` },
+          cookies: { type: 'array', items: { type: 'string' }, description: 'Cookies as `name=value` the page is opened with, to shoot a page behind a session.' },
           diff: { type: 'boolean', description: 'Add the diff image against the previous shot of the same page, width and scheme, when there is one.' },
         },
         required: ['path'],
@@ -168,7 +169,7 @@ function tools(root: string): Tool[] {
           return [`--${name}=${value}`]
         })
         const scheme = optionalString(args.scheme, 'scheme')
-        const result = await kay(['screenshot', path, '--format', 'json', ...numbers, ...scheme === undefined ? [] : [`--scheme=${scheme}`], ...args.fullPage === true ? ['--full-page'] : []])
+        const result = await kay(['screenshot', path, '--format', 'json', ...numbers, ...scheme === undefined ? [] : [`--scheme=${scheme}`], ...args.fullPage === true ? ['--full-page'] : [], ...stringList(args.cookies, 'cookies').map(cookie => `--cookie=${cookie}`)])
 
         if (result.code !== 0)
           return { content: [{ type: 'text', text: result.stderr.trim() || `kay screenshot exited ${result.code}` }], isError: true }
@@ -243,7 +244,11 @@ async function resources(): Promise<Resource[]> {
 
 // Runs `kay` with `args` in `root`, as a child so that what a command prints, exits with or throws cannot reach the protocol on this process's stdout.
 // One call at a time: the next waits for the one before, a failed call included, and its timeout starts when it does.
+// A screenshot only reads the running `kay dev` and writes its own files, so it goes beside the others rather than make them wait up to a minute.
 async function run(root: string, args: string[]): Promise<Run> {
+  if (args[0] === 'screenshot')
+    return spawnKay(root, args)
+
   const before = queue
   let done!: () => void
 

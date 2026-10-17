@@ -21,6 +21,8 @@ export interface BrowserOptions {
   lenient?: boolean | undefined
   // The colour scheme the page is asked for from its first load, `prefers-color-scheme` and `matchMedia` alike.
   colorScheme?: 'light' | 'dark' | undefined
+  // Cookies the page's first load carries, for a site's origin, such as a session's.
+  cookies?: { name: string, value: string }[] | undefined
 }
 
 export interface WaitOptions {
@@ -457,6 +459,9 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
     })
     // Pages share one browser, whose cookies and storage outlive a page. Named one by one, as `all` takes Chrome 2 to 5 s a page, the rest under a millisecond.
     await live(async () => view.cdp('Storage.clearDataForOrigin', { origin, storageTypes: STORAGE_TYPES }))
+
+    for (const { name, value } of options.cookies ?? [])
+      await live(async () => view.cdp('Network.setCookie', { name, value, url: origin, path: '/' }))
 
     try {
       await page.goto(url)
