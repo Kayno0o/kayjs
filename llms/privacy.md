@@ -96,7 +96,7 @@ export async function archive(scan: File) {
 - `kay_flash`: the message an action's redirect shows on the next page, read once; necessary, 60 seconds.
 - `kay-locale`: the locale a visitor picked, on a site with locales; necessary, a year.
 - `kay_preview`: preview mode for an editor, set only by `enterPreview`; necessary, `preview.maxAge`, an hour by default.
-- Each `persisted(name, ...)` signal keeps its value in a cookie of that name for a year, or in `localStorage` with `{ storage: 'local' }`; what it holds is the app's choice, so a preference is necessary and anything else waits for consent.
+- Each `persisted(name, ...)` signal keeps its value in a cookie of that name for a year, or its `maxAge`, or in `localStorage` with `{ storage: 'local' }`; what it holds is the app's choice, so a preference is necessary and anything else waits for consent.
 
 ### What the server keeps
 

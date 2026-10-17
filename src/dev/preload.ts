@@ -65,6 +65,8 @@ Bun.serve = ((given: Parameters<typeof Bun.serve>[0]) => {
     return rejoin(options, calls++)
 
   const asked = askedPort(options)
+  // `--port` and an exported or `.env` `PORT` are the visitor's word on the port, which a busy one is told rather than moved off.
+  const named = asked !== undefined && [process.env.PORT, process.env.BUN_PORT, process.env.NODE_PORT].some(value => value !== undefined && Number(value) === asked)
   const local = 'hostname' in options && options.hostname === 'localhost'
   const first = moved !== undefined && moved[0] === asked ? moved[1] : asked
   let server: Server<unknown> | undefined
@@ -80,6 +82,9 @@ Bun.serve = ((given: Parameters<typeof Bun.serve>[0]) => {
       server = serve(next === asked ? options : { ...options, port: next } as typeof options)
     }
     catch (error) {
+      if ((error as { code?: unknown }).code === 'EADDRINUSE' && named)
+        throw new Error(`kay dev: port ${asked} is in use, and --port or PORT asked for it, so the server was not moved to another`, { cause: error })
+
       if (asked === undefined || tried === PORTS_TRIED || (error as { code?: unknown }).code !== 'EADDRINUSE')
         throw error
     }

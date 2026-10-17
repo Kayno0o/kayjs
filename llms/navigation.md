@@ -124,7 +124,7 @@ const dispose = mount(Panel, document.querySelector('#panel')!, { title: 'Ticket
 
 ### Navigating from code
 
-- `navigate('/todos/1')`, imported from `kay`, goes to a page as a link would, `{ replace: true }` taking the current history entry's place; another site's page loads, so a `?next=` param goes through `localPath()` as a redirect's does, and a `javascript:` URL throws, as it would run in the page; `mailto:`, `tel:` and other schemes go to the browser as a link would. A link or `navigate()` that a redirect takes to another site loads that page fully rather than swapping it in.
+- `navigate('/todos/1')`, imported from `kay`, goes to a page as a link would, `{ replace: true }` taking the current history entry's place, `{ scroll: 'keep' }` leaving the window scrolled where it is instead of going to the top, `{ transition: false }` swapping without a view transition; another site's page loads, so a `?next=` param goes through `localPath()` as a redirect's does, and a `javascript:` URL throws, as it would run in the page; `mailto:`, `tel:` and other schemes go to the browser as a link would. A link or `navigate()` that a redirect takes to another site loads that page fully rather than swapping it in.
 - `navigate({ query: { sort: 'name', page: null } })` goes to the current page with those params set and a null, undefined or empty one dropped, the others and the path kept and the hash left out, keeping the scroll and the focus as `refresh()` does: a filter or a sort picked in place.
 - `refresh()` from `kay` runs the current page's loads again and shows what they return, keeping the scroll, the focus and every island whose props did not change, as a call to an action does by itself once it went through.
 - An island calls `refresh()` once something else changed what the page shows, or polls with it, `every(3000, refresh, { while: () => issuing })`.
@@ -153,6 +153,7 @@ const dispose = mount(Panel, document.querySelector('#panel')!, { title: 'Ticket
 - Such a page still swaps itself in place: a link to it with another query, `navigate({ query })` and `refresh()` on it.
 - The swap prefetches as the speculation rules would, on the timing the `prefetch` setting gives (see [Project setup](project.md#project-setup)), and replaces them, so each page is fetched once: a hovered link's page is kept for 30 seconds and taken as the link is followed.
 - `data-no-prefetch` still opts a link out.
+- A link, or one inside an element, with `data-keep-scroll` swaps without scrolling to the top, and with `data-no-transition` without a view transition, as `navigate()`'s `scroll: 'keep'` and `transition: false` do; going back still restores the position saved.
 - A stylesheet holding `@view-transition { navigation: auto; }` animates the swap where the browser has view transitions, as it animates full loads, the rule standing at the top level or inside an `@media` or `@supports` that holds.
 - A visitor asking for reduced motion (`prefers-reduced-motion: reduce`) gets no animation from the swap whatever the stylesheet says; a full load animates for them unless the rule sits in `@media (prefers-reduced-motion: no-preference)`, as the one `kay new` writes does.
 - `navigation: false` in `kay.config.ts` or `pages()` turns it off: pages load fully, and only pages with islands ship a script.

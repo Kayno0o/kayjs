@@ -25,6 +25,10 @@ export interface Swap {
   intent: Intent
   // Takes the current history entry's place, as `navigate(href, { replace: true })` asks.
   replace?: boolean | undefined
+  // Where the window scrolls to instead of the intent's own, as `navigate(href, { scroll })` or a link in `data-keep-scroll` asks; a traversal keeps the position its entry saved.
+  scroll?: 'top' | 'keep' | undefined
+  // Swaps without a view transition, as `navigate(href, { transition: false })` or a link in `data-no-transition` asks.
+  noTransition?: boolean | undefined
   // The position a traversal's entry saved.
   saved?: [number, number] | undefined
   // The element focused before, found again by id or name once swapped: a traversal sets it between entries of one path, which keep the focus.

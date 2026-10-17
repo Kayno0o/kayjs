@@ -1,0 +1,13 @@
+---
+import Keeper from '../components/keeper.kay'
+---
+head
+  title Scrolled
+h1 Scrolled
+Keeper
+div(style="height: 3000px")
+a.keep-link(href="/second" data-keep-scroll) Keep link
+div(data-keep-scroll data-no-transition)
+  a.group-link(href="/second") Group link
+a.plain-link(href="/second") Plain link
+div(style="height: 200px")

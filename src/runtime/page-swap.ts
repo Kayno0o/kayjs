@@ -166,6 +166,12 @@ function policyOf(swap: Swap): Policy {
   if (policy.scroll === 'saved' && !swap.saved)
     policy.scroll = 'top'
 
+  if (swap.scroll && policy.scroll !== 'saved')
+    policy.scroll = swap.scroll
+
+  if (swap.noTransition)
+    policy.transition = false
+
   return policy
 }
 

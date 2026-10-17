@@ -215,7 +215,7 @@ ul(id={id} hidden={!open()})
 - A persisted value crosses as island props do, Dates, Maps and Sets included.
 - A cookie value over about 3.8 KB encoded is not kept, with a warning; one written by another version of the app, or by hand, that does not decode leaves the default.
 - A value that decodes is not checked against the signal's type, so one whose shape the code relies on is checked before use.
-- The cookie is `SameSite=Lax`, for the site's mount point, kept a year, and `Secure` over https.
+- The cookie is `SameSite=Lax`, for the site's mount point, kept a year unless `maxAge` says otherwise (`persisted('theme', 'light', { maxAge: '30d' })`, a `Duration`, cookie storage only), and `Secure` over https.
 
 ### Transitions
 

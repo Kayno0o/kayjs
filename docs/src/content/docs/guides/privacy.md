@@ -16,7 +16,7 @@ This page lists what each feature keeps, for a site's privacy notice and for the
 | `kay_flash` | an action redirecting with a flash message | 60 seconds |
 | `kay-locale` | a visitor picking a locale | a year |
 | `kay_preview` | `enterPreview()`, for an editor | an hour by default |
-| the name given to `persisted()` | a persisted signal | a year |
+| the name given to `persisted()` | a persisted signal | a year, or its `maxAge` |
 
 The first four are necessary for what the visitor asked, so they need no consent. A persisted signal holds what the app puts in it. A theme or a language is necessary, and anything else waits for consent.
 

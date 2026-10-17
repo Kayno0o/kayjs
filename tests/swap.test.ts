@@ -261,6 +261,25 @@ describe('page swap, checking a form in the browser', () => {
     expect(persisted('cut', 'light')()).toBe('light')
   })
 
+  it('keeps a persisted cookie a year, or as long as maxAge says, and refuses a maxAge that is no duration', () => {
+    const writes: string[] = []
+
+    Object.defineProperty(document, 'cookie', { configurable: true, get: () => '', set: (value: string) => void writes.push(value) })
+
+    try {
+      persisted('year', 'a').set('b')
+      persisted('month', 'a', { maxAge: '30d' }).set('b')
+      persisted('seconds', 'a', { maxAge: 90 }).set('b')
+
+      expect(writes.map(write => (/^(\w+)=.*max-age=(\d+)/).exec(write)!.slice(1))).toEqual([['year', '31536000'], ['month', '2592000'], ['seconds', '90']])
+      expect(() => persisted('none', 'a', { maxAge: '0s' })).toThrow('kay: the maxAge of persisted("none") is \'0s\'')
+      expect(() => persisted('bad', 'a', { maxAge: 'soon' as '1d' })).toThrow('it takes a positive duration')
+    }
+    finally {
+      delete (document as { cookie?: string }).cookie
+    }
+  })
+
   // `bun run check` fails on an `@ts-expect-error` with no error under it, so the type check is what this asserts.
   it('refuses persist and storage on a plain signal, which persisted() took over', () => {
     // @ts-expect-error -- persisted('a', 'x') keeps a value

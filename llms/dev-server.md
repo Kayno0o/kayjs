@@ -18,7 +18,7 @@ kay dev --port 4000 --open
   - Run the server entry of the project in `dir`, the current directory by default, with `NODE_ENV=development`. The entry is `src/server.ts` by default; a file given instead of `dir` is taken as the entry, and `--entry` is relative to the current directory, as `build`'s is.
   - With no entry file, as in a `site` project, a server of kay's own serves the pages on `PORT`, 3000 by default, until a `src/server.ts` is written.
   - `--port` sets `PORT`, over the shell's and the `.env`'s, and a server reading `PORT` listens on it. `HOST` is left out of the app's environment.
-  - A port another process holds moves the server to the next free one, however the server picked it, `--port` included, the ready line naming the port in use, and every restart keeps the port it moved to;
+  - A port another process holds moves the server to the next free one, the ready line naming the port in use, and every restart keeps the port it moved to, unless `--port` or a `PORT` in the environment or `.env` asked for it: the server then fails to start, naming the port, rather than listen elsewhere;
   - A server naming no `hostname` listens on `localhost` alone, so nothing past this machine reaches it, unless `--host` opens it to the network (`--host` alone is `0.0.0.0`, `--host=<address>` one address), as `kay dev` in a container publishing its port needs;
   - A request whose `Host` is not `localhost`, a `*.localhost` name, an IP address or the site's host gets 421, as a page of another site renaming itself to this machine (DNS rebinding) would send it.
   - `--host` adds this machine's own name and `<name>.local` to those hosts. Other names, such as a tunnel's, go in `KAY_DEV_HOSTS`, comma-separated and without ports.

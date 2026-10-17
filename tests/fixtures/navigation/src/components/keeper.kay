@@ -1,0 +1,7 @@
+---
+import { navigate } from 'kay'
+---
+button.keep(onClick={() => navigate('/second', { scroll: 'keep' })}) Keep
+button.plain(onClick={() => navigate('/second')}) Plain
+button.top(onClick={() => navigate({ query: { sort: 'z' } }, { scroll: 'top' })}) Top
+button.still(onClick={() => navigate('/second', { scroll: 'keep', transition: false })}) Still

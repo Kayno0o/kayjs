@@ -10,6 +10,10 @@ import { busyForms, dirtyGuard, dropScrollSave, historyState, leave, mayLeave, n
 export interface NavigateOptions {
   // Replaces the current history entry instead of adding one.
   replace?: boolean | undefined
+  // `'keep'` leaves the window scrolled where it is instead of going to the top, `'top'` goes to the top as a query change does not.
+  scroll?: 'top' | 'keep' | undefined
+  // `false` swaps without a view transition, whatever the stylesheets opt in to.
+  transition?: boolean | undefined
 }
 
 // Query params to set on the current page, a null, undefined or empty one dropped.
@@ -115,7 +119,9 @@ export async function navigate(to: string | { query: QueryChanges }, options: Na
     return
   }
 
-  await follow(url, typeof to === 'string' ? { intent: 'visit', replace: options.replace } : { intent: 'query', replace: options.replace, focused: document.activeElement })
+  const own = { replace: options.replace, scroll: options.scroll, noTransition: options.transition === false }
+
+  await follow(url, typeof to === 'string' ? { intent: 'visit', ...own } : { intent: 'query', ...own, focused: document.activeElement })
 }
 
 // Runs the page's loads again and shows what they return, keeping scroll, focus and every island whose props did not change.
@@ -210,12 +216,12 @@ function onClick(event: MouseEvent): void {
     return
 
   event.preventDefault()
-  void followAsked(url)
+  void followAsked(url, { intent: 'visit', scroll: link.closest('[data-keep-scroll]') ? 'keep' : undefined, noTransition: Boolean(link.closest('[data-no-transition]')) })
 }
 
-async function followAsked(url: URL): Promise<void> {
+async function followAsked(url: URL, swap: Swap): Promise<void> {
   if (await mayLeave(url))
-    await follow(url, { intent: 'visit' })
+    await follow(url, swap)
 }
 
 function onPopState(event: PopStateEvent): void {

@@ -1021,6 +1021,32 @@ describe.concurrent('kay dev', () => {
     }
   })
 
+  it.serial.each([
+    ['--port', (busy: number) => ({ port: busy }), () => 'PORT=0\n'],
+    ['PORT', () => ({}), (busy: number) => `PORT=${busy}\n`],
+  ] as const)('fails rather than moving off a busy port asked for by %s', async (_name, options, dotenv) => {
+    const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
+    const lines: string[] = []
+    const holder = Bun.serve({ port: 0, fetch: () => new Response('holder') })
+    const busy = holder.port!
+
+    await Bun.write(join(root, '.env'), dotenv(busy))
+    await Bun.write(join(root, 'src/server.ts'), `Bun.serve({ port: ${busy}, fetch: () => new Response('ok') })\n`)
+    const stop = await dev(root, { ...options(busy), log: line => lines.push(line) })
+
+    try {
+      await until(() => lines.length === 1)
+      expect(lines[0]).toMatch(/^\d\d:\d\d:\d\d the server exited with code 1, waiting for a change$/)
+      expect(lines.some(line => line.includes('ready'))).toBe(false)
+      expect(await (await fetch(`http://localhost:${busy}`)).text()).toBe('holder')
+    }
+    finally {
+      await holder.stop()
+      await stop()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('names the network address of the first interface no container, bridge or VPN made, on Linux and macOS alike', () => {
     const entry = (address: string, internal = false) => ({ address, netmask: '255.255.255.0', family: 'IPv4' as const, mac: '00:00:00:00:00:00', internal, cidr: `${address}/24` })
 

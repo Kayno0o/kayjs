@@ -47,13 +47,14 @@ kay new my-app --template app --without docker
 | `--template blank\|server\|site\|app` | The preset: one bare static page, an Elysia server (the default), a static site, or a server with sessions and members in SQLite |
 | `--with <features>` | Adds comma-separated [features](#features) to the preset, such as `tailwind,tests` |
 | `--without <features>` | Drops features from the preset |
-| `--host forgejo\|github` | Where the repository lives, which decides the CI workflow |
+| `--forge forgejo\|github` | Where the repository lives, which decides the CI workflow. `--host` still works for now, with a warning |
+| `--runner <label>` | The runner label the CI jobs run on: `debian` on Forgejo and `ubuntu-latest` on GitHub by default |
 | `-y` | Takes the `server` preset without asking |
 | `--quiet` | Prints the summary line only |
 
 In a terminal with none of these options, `kay new` asks for a preset, then for each feature.
 
-Without `--host`, `kay new` reads the `origin` remote. A remote on github.com gets a GitHub Actions workflow in `.github/workflows`. Any other remote, or none, gets a Forgejo workflow in `.forgejo/workflows`.
+Without `--forge`, `kay new` reads the `origin` remote. A remote on github.com gets a GitHub Actions workflow in `.github/workflows`. Any other remote, or none, gets a Forgejo workflow in `.forgejo/workflows`.
 
 Every project gets an `AGENTS.md` for coding agents. It points them at kay's docs for the installed version and names the checks the project's scripts run.
 
@@ -135,7 +136,7 @@ kay dev: http://localhost:3000 (ready in 412 ms)
 14:02:40 src/server.ts: restarted in 412 ms
 ```
 
-When another process holds the port, the server moves to the next free one and the ready line says so.
+When another process holds the port, the server moves to the next free one and the ready line says so. A port given with `--port`, or by `PORT` in the environment or `.env`, is never moved: the server fails to start and names it.
 
 ```text
 kay dev: http://localhost:4001 (ready in 412 ms, 4000 was in use)

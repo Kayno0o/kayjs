@@ -481,6 +481,57 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     await fresh.close()
   })
 
+  it('keeps the scroll and skips the view transition when asked, by navigate() or a link, and goes to the top otherwise', async () => {
+    const fresh = await browser.newPage()
+    const go = async (click: string) => {
+      await fresh.goto(`${origin}/scrolled`)
+      await fresh.evaluate(() => {
+        const counted = window as { kayTransitions?: number, kayAlive?: boolean }
+        const start = document.startViewTransition.bind(document)
+
+        counted.kayAlive = true
+        counted.kayTransitions = 0
+        document.startViewTransition = ((update: () => void) => {
+          counted.kayTransitions!++
+
+          return start(update)
+        }) as typeof document.startViewTransition
+      })
+      await fresh.addStyleTag({ content: '@view-transition { navigation: auto; }' })
+      await fresh.evaluate(() => scrollTo(0, 1200))
+      // Clicked from the page's script, as a real click would scroll the control into view first.
+      await fresh.evaluate(selector => document.querySelector<HTMLElement>(selector)!.click(), click)
+      await fresh.locator('h1', { hasText: 'Second' }).waitFor()
+
+      return fresh.evaluate(() => ({ scroll: scrollY > 1000 ? 'kept' : scrollY, transitions: (window as { kayTransitions?: number }).kayTransitions, swapped: (window as { kayAlive?: boolean }).kayAlive === true }))
+    }
+
+    try {
+      expect(await go('button.plain')).toEqual({ scroll: 0, transitions: 1, swapped: true })
+      expect(await go('button.keep')).toEqual({ scroll: 'kept', transitions: 1, swapped: true })
+
+      // A query change keeps the scroll by itself, and goes to the top when asked.
+      await fresh.goto(`${origin}/scrolled`)
+      await fresh.evaluate(() => scrollTo(0, 1200))
+      await fresh.evaluate(() => document.querySelector<HTMLElement>('button.top')!.click())
+      await fresh.waitForFunction(() => location.search === '?sort=z')
+      await fresh.waitForFunction(() => scrollY === 0)
+
+      expect(await go('button.still')).toEqual({ scroll: 'kept', transitions: 0, swapped: true })
+      expect(await go('a.plain-link')).toEqual({ scroll: 0, transitions: 1, swapped: true })
+      expect(await go('a.keep-link')).toEqual({ scroll: 'kept', transitions: 1, swapped: true })
+      expect(await go('a.group-link')).toEqual({ scroll: 'kept', transitions: 0, swapped: true })
+
+      // Back to the page left restores where it was, whatever kept the scroll going there.
+      await fresh.goBack()
+      await fresh.locator('h1', { hasText: 'Scrolled' }).waitFor()
+      await fresh.waitForFunction(() => scrollY > 1000)
+    }
+    finally {
+      await fresh.close()
+    }
+  })
+
   it('goes back to a jump within the page by scrolling, the page left as it is', async () => {
     await page.goto(origin)
     await page.evaluate(() => {

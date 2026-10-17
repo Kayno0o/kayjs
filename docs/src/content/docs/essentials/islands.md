@@ -122,7 +122,7 @@ export const cart = signal<string[]>([])
 export const theme = persisted('theme', 'light')
 ```
 
-`persisted` keeps its value across pages and visits in a cookie. The server reads the cookie too, so the first paint is right.
+`persisted` keeps its value across pages and visits in a cookie. The server reads the cookie too, so the first paint is right. The cookie lasts a year; pass `{ maxAge: '30d' }` for another time.
 
 Pass `{ storage: 'query' }` to keep a string in the page's URL instead, as `?q=...`. A filter then survives a reload and a shared link.
 
@@ -250,6 +250,8 @@ button(onClick={() => navigate('/todos')}) Todos
 ```
 
 `navigate({ query: { sort: 'name', page: null } })` changes the current page's query in place. The scroll and the focus stay, and a null or empty value drops its param.
+
+`navigate('/todos', { scroll: 'keep' })` goes to the page without scrolling to the top, and `{ transition: false }` swaps it without a view transition. A link does the same with `data-keep-scroll` and `data-no-transition`, which an element around several links can carry.
 
 A link with `data-reload` loads its page fully. So does every link to a page setting `reload: true` in its `page`.
 

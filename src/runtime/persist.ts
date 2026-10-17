@@ -1,5 +1,7 @@
+import type { Duration } from './duration'
 import type { ServerScope } from './reactive'
 import { TRAILING_SLASH, withBase } from './base'
+import { durationSeconds } from './duration'
 import { kayLog } from './log'
 import { createSignal, currentServerScope, isHydrating, untrack, whenHydrated } from './reactive'
 import { sendValue } from './send'
@@ -34,12 +36,13 @@ const COOKIE_NAME = /^[\w!#$%&'*+.^`|~-]+$/
 
 // What a persisted signal reads and keeps, around the signal's own `read`: a cookie the server reads too, so a page renders with it, or localStorage, read once the page has hydrated.
 // A signal kept in the query goes through `keepParam` in `./query-param` instead.
-export function keepValue<T>(key: string, storage: Exclude<PersistStorage, 'query'>, read: () => T, write: (value: T) => void): Persisted<T> {
+export function keepValue<T>(key: string, storage: Exclude<PersistStorage, 'query'>, read: () => T, write: (value: T) => void, maxAge?: Duration): Persisted<T> {
   if (storage === 'cookie' && !COOKIE_NAME.test(key))
     throw new TypeError(`kay: ${JSON.stringify(key)} cannot name a cookie; give persisted() a name of letters, digits and - _ . only`)
 
+  const seconds = maxAge === undefined ? YEAR_SECONDS : durationSeconds(maxAge, `the maxAge of persisted(${JSON.stringify(key)})`)
   const store: Store<T> = storage === 'cookie'
-    ? { request: scope => decoded(scope.cookie(key)), stored: () => decoded(cookie(key)), save: value => saveCookie(key, value) }
+    ? { request: scope => decoded(scope.cookie(key)), stored: () => decoded(cookie(key)), save: value => saveCookie(key, value, seconds) }
     : { stored: () => decoded(readLocal(key)), save: value => saveLocal(key, value), afterHydration: true }
 
   return keep(store, read, write)
@@ -162,7 +165,7 @@ function cookie(name: string): string | undefined {
   return undefined
 }
 
-function saveCookie(name: string, value: unknown): void {
+function saveCookie(name: string, value: unknown, seconds: number): void {
   const text = encodeURIComponent(sendValue(value))
 
   if (text.length + name.length > MAX_COOKIE_BYTES) {
@@ -174,7 +177,7 @@ function saveCookie(name: string, value: unknown): void {
   // `/docs`, not `/docs/`, which a request for `/docs` itself would not send it to.
   const path = withBase('/').replace(TRAILING_SLASH, '') || '/'
 
-  document.cookie = `${name}=${text}; path=${path}; max-age=${YEAR_SECONDS}; samesite=lax${location.protocol === 'https:' ? '; secure' : ''}`
+  document.cookie = `${name}=${text}; path=${path}; max-age=${Math.round(seconds)}; samesite=lax${location.protocol === 'https:' ? '; secure' : ''}`
 }
 
 function readLocal(key: string): string | null {
