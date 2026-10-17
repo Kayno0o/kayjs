@@ -194,7 +194,7 @@ export function kayPlugin(options: KayPluginOptions, workers: string[]): BunPlug
 
       const anchoring = (path: string, contents: string) => options.anchored?.has(path) === true ? `${contents}\nimport ${JSON.stringify(options.anchor)}\n` : contents
 
-      const pointed = async (contents: string) => options.direct === true ? directImports(contents) : contents
+      const pointed = async (contents: string, loader: Bun.JavaScriptLoader = 'ts') => options.direct === true ? directImports(contents, loader) : contents
 
       const load = async (file: string) => {
         const source = await Bun.file(withoutTwin(file)).text()
@@ -253,7 +253,7 @@ export function kayPlugin(options: KayPluginOptions, workers: string[]): BunPlug
       build.onLoad({ filter: projectScript }, async ({ path }) => {
         const source = await Bun.file(path).text()
         const loader = scriptLoader(path)
-        const contents = anchoring(path, await pointed(await shippingFiles(liveIds(expandGlobs(source, path, root, loader), path, realRoot, loader === 'tsx' || loader === 'jsx', build.config?.target !== 'browser'), path, loader)))
+        const contents = anchoring(path, await pointed(await shippingFiles(liveIds(expandGlobs(source, path, root, loader), path, realRoot, loader === 'tsx' || loader === 'jsx', build.config?.target !== 'browser'), path, loader), loader))
 
         return contents === source && build.config !== undefined ? undefined : { contents, loader }
       })
@@ -265,7 +265,7 @@ export function kayPlugin(options: KayPluginOptions, workers: string[]): BunPlug
             return undefined
 
           const source = await Bun.file(path).text()
-          const contents = anchoring(path, await pointed(await shippingFiles(source, path, scriptLoader(path))))
+          const contents = anchoring(path, await pointed(await shippingFiles(source, path, scriptLoader(path)), scriptLoader(path)))
 
           return contents === source ? undefined : { contents, loader: scriptLoader(path) }
         })

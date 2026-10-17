@@ -38,22 +38,35 @@ describe('the runtime modules a page loads', () => {
 })
 
 describe('a runtime module half of the islands use', () => {
-  it('stays in the runtime chunk every page loads, and a small app keeps its one runtime chunk', async () => {
+  // A copy of the fixture, whose four plain islands and one failing one get `extra` more failing ones.
+  async function build(extra: number): Promise<Awaited<ReturnType<typeof buildClient>>> {
     const root = resolve(await fixtureCopy('runtime-chunks'))
 
     dirs.push(root)
     const failing = await Bun.file(join(root, 'src/components/failing.kay')).text()
-    const names = ['two', 'three', 'four', 'five']
+    const names = ['two', 'three', 'four', 'five'].slice(0, extra)
 
     await Promise.all(names.map(async name => Bun.write(join(root, `src/components/failing-${name}.kay`), failing)))
     await Bun.write(join(root, 'src/routes/many.kay'), `--- script\n${names.map(name => `import Failing${name} from '../components/failing-${name}.kay'`).join('\n')}\n---\nh1 Many\n${names.map(name => `Failing${name}`).join('\n')}\n`)
 
-    const client = await buildClient(root)
-    const plain = client.islands['src/components/plain-one.kay']!
+    return buildClient(root)
+  }
+
+  it('stays in the runtime chunk every page loads at half of the islands, and a small app keeps its one runtime chunk', async () => {
+    // Four of eight islands.
+    const client = await build(3)
 
     expect(await chunkText(client, client.entry!)).toContain(ACTION_RUNTIME)
-    expect(plain).toHaveLength(2)
+    expect(client.islands['src/components/plain-one.kay']).toHaveLength(2)
     expect(Object.values(client.islands).filter(chunks => chunks.length !== 2 || chunks[1] !== client.entry)).toEqual([])
+  }, 120_000)
+
+  it('stays with its islands below half of them', async () => {
+    // Three of seven islands.
+    const client = await build(2)
+
+    expect(await chunkText(client, client.entry!)).not.toContain(ACTION_RUNTIME)
+    expect(client.islands['src/components/failing.kay']!.length).toBeGreaterThan(2)
   }, 120_000)
 })
 
@@ -67,6 +80,25 @@ describe('direct imports of the runtime', () => {
     expect(lines[1]).toMatch(/^import \{ registerImage \} from ".*\/runtime\/image\.ts";$/)
     // Not a barrel, and a namespace import takes the whole module.
     expect(lines.slice(2)).toEqual(['import { template } from \'kay/dom\'', 'import * as all from \'kay\'', ''])
+  })
+
+  it('keeps the lines of a statement, leaves import text in a string or a template literal alone, and an import with attributes', async () => {
+    const multiline = await directImports('import {\n  signal,\n  effect,\n} from \'kay\'\nconst after = 1\n')
+
+    expect(multiline.split('\n').length).toBe(6)
+    expect(multiline.split('\n')[4]).toBe('const after = 1')
+
+    const quoted = 'const sample = "import { signal } from \'kay\'"\n'
+
+    expect(await directImports(quoted)).toBe(quoted)
+
+    const templated = 'import { signal } from \'kay\'\nconst sample = `\nimport { effect } from \'kay\'\n`\n'
+
+    expect(await directImports(templated)).toBe(templated)
+
+    const attributes = 'import { signal } from \'kay\' with { type: \'js\' }\n'
+
+    expect(await directImports(attributes)).toBe(attributes)
   })
 
   it('leaves a name the barrel does not export in an import of the barrel', async () => {

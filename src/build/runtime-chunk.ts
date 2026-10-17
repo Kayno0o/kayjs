@@ -28,8 +28,6 @@ const OWN_CHUNK = new Set(['kay/markdown', 'kay/internal/title'])
 const RELATIVE = /^\.\.?\//
 const EXTENSIONS = ['.ts', '.tsx', '/index.ts']
 const ALL = '*'
-// Changes with what the search keeps in the anchor, which a cached answer of an earlier one must not stand for.
-const SEARCH_VERSION = 'shared-names-6'
 
 export interface RuntimeChunk {
   // Where the module resolves `kay` from, the entry's.
@@ -153,7 +151,7 @@ export interface RuntimeSearchCache {
 // Bundles `entry` with kay's runtime left out, then each lazy runtime module with its siblings left out, to learn what of the runtime the client build uses where.
 // Undefined when the build fails, which the real one then reports.
 export async function runtimeChunk(entry: string, options: { plugins: BunPlugin[], define: Record<string, string>, external: string[], islands?: string[] | undefined, cache?: RuntimeSearchCache | undefined }): Promise<RuntimeChunk | undefined> {
-  const slot = options.cache && { file: options.cache.file, key: Bun.hash([compilerFingerprint(), JSON.stringify(options.define), options.external.join(), options.plugins.map(plugin => plugin.name).join(), RUNTIME_DIR, SEARCH_VERSION, options.cache.key].join('\0')).toString(36) }
+  const slot = options.cache && { file: options.cache.file, key: Bun.hash([compilerFingerprint(), JSON.stringify(options.define), options.external.join(), options.plugins.map(plugin => plugin.name).join(), RUNTIME_DIR, await searchSources(), options.cache.key].join('\0')).toString(36) }
   const known = slot && await readCacheEntry<Remembered>(slot)
   const fresh = known !== undefined && Object.entries(known.inputs).every(([file, stamp]) => fileStamp(file) === stamp)
 
@@ -170,6 +168,11 @@ export async function runtimeChunk(entry: string, options: { plugins: BunPlugin[
     await remember(slot, found, started)
 
   return found?.chunk
+}
+
+// What decides the answer besides the inputs it lists: the code of the search itself, which a cached answer of an earlier one must not stand for.
+async function searchSources(): Promise<string> {
+  return String(Bun.hash((await Promise.all([import.meta.path, join(import.meta.dir, 'direct-imports.ts')].map(async file => Bun.file(file).text()))).join('\0')))
 }
 
 async function remember(slot: CacheSlot, found: { chunk: RuntimeChunk, inputs: string[] }, started: number): Promise<void> {
@@ -214,14 +217,15 @@ async function searchRuntime(entry: string, options: { plugins: BunPlugin[], def
     if (entryPoint === undefined)
       continue
 
-    perEntry.push(own)
-
     if (resolve(entryPoint) === resolve(entry))
       entryNames = own
+    else
+      perEntry.push(own)
   }
 
   // What the anchor holds, so every page loads it: the rest is loaded with the islands that import it.
-  const shared = sharedNames(entryNames, perEntry, used)
+  // Without islands as entry points, a development build, the islands are imported by the entry's own code and the runtime chunk holds every name.
+  const shared = perEntry.length === 0 ? used : sharedNames(entryNames, perEntry, used)
 
   const roots = (await Promise.all([...used.keys()].map(specifierFile))).filter(file => file !== undefined)
   const { eager, lazy } = await reach(roots)
@@ -271,16 +275,16 @@ function mergeNames(into: Map<string, Set<string>>, from: Map<string, Set<string
   }
 }
 
-// The names every page pays for: those the entry imports, and those at least half of the entry points import. A name fewer import stays with them, in a chunk they share, so a page loads no runtime module only other pages' islands use.
-function sharedNames(entry: Map<string, Set<string>> | undefined, perEntry: Map<string, Set<string>>[], used: Map<string, Set<string>>): Map<string, Set<string>> {
+// The names every page pays for: those the entry imports, and those at least half of the islands import. A name fewer import stays with them, in a chunk they share, so a page loads no runtime module only other pages' islands use.
+function sharedNames(entry: Map<string, Set<string>> | undefined, perIsland: Map<string, Set<string>>[], used: Map<string, Set<string>>): Map<string, Set<string>> {
   const shared = new Map<string, Set<string>>()
-  const threshold = Math.ceil(perEntry.length / 2)
+  const threshold = Math.max(1, Math.ceil(perIsland.length / 2))
 
   for (const [specifier, names] of used) {
     const kept = new Set<string>()
 
     for (const name of names) {
-      if (name === ALL || entry?.get(specifier)?.has(name) === true || perEntry.filter(imports => imports.get(specifier)?.has(name) === true).length >= threshold)
+      if (name === ALL || entry?.get(specifier)?.has(name) === true || perIsland.filter(imports => imports.get(specifier)?.has(name) === true).length >= threshold)
         kept.add(name)
     }
 

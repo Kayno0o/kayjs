@@ -38,7 +38,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 ## Unreleased
 
 - An island's markup names its chunk (`data-chunk`), so a page no longer loads a loader for every island of the app: the docs' 128 islands weigh 2 KB gzip less on every page ([Build and start](build-and-start.md)). Island markup now carries `data-chunk`, so a test matching a `<slot>` exactly changes, and markup from `renderToString` has none and hydrates nothing.
-- A page no longer loads a runtime module only other pages' islands use: the action runtime or the image variants stay with the islands importing them, and the docs' entry drops from 23.2 to 19.1 KB gzip ([Build and start](build-and-start.md)).
+- A page no longer loads a runtime module only other pages' islands use: the action runtime or the image variants stay with the islands importing them, and the docs' entry drops from 21.0 to 15.4 KB gzip ([Build and start](build-and-start.md)).
 
 ## 1.52.1
 
