@@ -23,6 +23,7 @@ export const KAY_EXPORTS: Record<string, 'free' | 'request' | 'local'> = {
   every: 'free',
   watch: 'free',
   debounced: 'free',
+  durationMs: 'free',
   listen: 'free',
   linked: 'free',
   context: 'free',

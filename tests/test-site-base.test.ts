@@ -71,7 +71,7 @@ describe('testSite under base', () => {
   })
 
   it('calls an action', async () => {
-    await expect(site.call(enter, { name: 'Ada' })).rejects.toMatchObject({ location: '/home' })
+    await expect(site.call(enter, { name: 'Ada' })).rejects.toMatchObject({ location: '/blog/home' })
   })
 
   it('serves the mcp endpoint under the base', async () => {
