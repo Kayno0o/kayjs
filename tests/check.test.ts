@@ -2419,6 +2419,32 @@ describe.concurrent('kay check, unused code', () => {
     }
   })
 
+  it('reports a kayjs-auth store\'s members.remove and grants.put as delete and upsert, and --fix renames the key unless it is a shorthand or the new name is given too', async () => {
+    const root = await scratchProject({
+      'src/store.ts': 'import { memoryStore } from \'@kaynooo/kayjs-auth\'\n\nconst base = memoryStore()\n\nexport const store = { ...base, members: { ...base.members, remove: (a: string, b: string) => base.members!.delete(a, b) }, oauth: { ...base.oauth!, grants: { ...base.oauth!.grants, \'put\'(grant: never) { return base.oauth!.grants.upsert(grant) } } } }\n',
+      'src/other.ts': 'import { memoryStore } from \'@kaynooo/kayjs-auth\'\n\nconst remove = () => true\nconst put = () => undefined\n\nexport const a = { members: { remove }, grants: { put, upsert: put }, files: { put, remove } }\nexport const b = { members: { remove: remove, delete: remove }, other: memoryStore }\n',
+      'src/unrelated.ts': 'export const c = { members: { remove: () => true }, grants: { put: () => undefined } }\n',
+    })
+
+    try {
+      const { output } = await runCheck(root)
+
+      expect(output.match(/deprecated-store-verb/g)).toHaveLength(5)
+      expect(output).not.toContain('src/unrelated.ts')
+      await runCheck(root, '--fix')
+
+      const store = await Bun.file(join(root, 'src/store.ts')).text()
+
+      expect(store).toContain('members: { ...base.members, delete: (a: string, b: string)')
+      expect(store).toContain('upsert(grant: never)')
+      expect(await Bun.file(join(root, 'src/other.ts')).text()).toContain('members: { remove }, grants: { put, upsert: put }')
+      expect((await runCheck(root)).output.match(/deprecated-store-verb/g)).toHaveLength(3)
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('reports the old options of kayjs-auth\'s sign-in methods in .ts and .kay files, and --fix moves them into the trailing options object', async () => {
     const root = await scratchProject({
       'src/a.ts': 'export function a(auth: { signInWithPassword: (input: object, options?: object) => void }, identifier: string, password: string, redirect: string): void {\n  auth.signInWithPassword({ identifier, password, redirect })\n}\n',

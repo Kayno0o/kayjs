@@ -328,6 +328,15 @@ export const LINTS = {
     wrong: 'discordProvider({ apiBase: \'https://proxy.example.com/discord\' })',
     right: 'discordProvider({ url: \'https://proxy.example.com/discord\' })',
   },
+  'deprecated-store-verb': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.52',
+    site: true,
+    summary: 'A custom kayjs-auth store whose `members` object has `remove` or whose `oauth.grants` has `put`, which are `delete` and `upsert` since 1.52, as every other row of the store is deleted by `delete` and written by `create` or `upsert`: the old names still work for now and log a warning. The fix renames the key, also of a method, and is not offered for a shorthand or a store giving both names. Found in the project\'s `.ts` files naming kayjs-auth; a store built some other way, with a computed key or a spread, is not read: rename it by hand.',
+    wrong: 'import type { AuthStore } from \'@kaynooo/kayjs-auth\'\n\nexport const members: AuthStore[\'members\'] = { remove: (organizationId, userId) => drop(organizationId, userId) }',
+    right: 'import type { AuthStore } from \'@kaynooo/kayjs-auth\'\n\nexport const members: AuthStore[\'members\'] = { delete: (organizationId, userId) => drop(organizationId, userId) }',
+  },
   'deprecated-sign-in-options': {
     level: 'warn',
     group: 'deprecated',

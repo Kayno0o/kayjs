@@ -528,6 +528,8 @@ Behind a proxy, kay reads the client address through `proxy` in `kay.config.ts`.
 
 Any object with the `AuthStore` methods is a store. Each method is sync or async.
 
+One verb does one thing in every group: `create` adds a row, `delete` removes one, `upsert` creates or replaces, `consume` deletes a row and answers it once only. A store written before 1.52 with `members.remove` and `oauth.grants.put` still works for now and logs a warning; `kay check --fix` renames them `members.delete` and `oauth.grants.upsert`.
+
 Some methods are optional, such as `prune`. kayjs-auth calls `prune` at most once an hour, without making a request wait. The built-in stores then delete expired links, codes, invitations and sessions. A store without `prune` keeps them until your app deletes them.
 
 If your store picks its own ids, `users.create(user)` answers the user as stored.

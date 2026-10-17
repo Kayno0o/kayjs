@@ -210,6 +210,7 @@ export interface TokenRecord {
 }
 
 // Where kayjs-auth keeps its data. Every method may answer synchronously or with a promise.
+// One verb per operation: `create` adds a row, `delete` removes one, `upsert` creates or replaces, and `consume` deletes a row and answers it, once only. A `delete` answers whether there was a row when the caller tells the person it was not found (what is owned by a user or an organization), and nothing for the cascading deletes of users and identities, which are idempotent. `use` marks an OAuth code or refresh token spent and keeps the row, so it can tell a reuse: it is not `consume`.
 export interface AuthStore {
   users: {
     get: (id: string) => MaybePromise<UserRecord | undefined>
@@ -301,7 +302,7 @@ export interface AuthStore {
     listByUser: (userId: string) => MaybePromise<MemberRecord[]>
     update: (organizationId: string, userId: string, patch: Pick<MemberRecord, 'roles'>) => MaybePromise<MemberRecord | undefined>
     // False when the user is no member.
-    remove: (organizationId: string, userId: string) => MaybePromise<boolean>
+    delete: (organizationId: string, userId: string) => MaybePromise<boolean>
   }
   invitations?: {
     create: (invitation: InvitationRecord) => MaybePromise<void>
@@ -335,7 +336,7 @@ export interface AuthStore {
     grants: {
       get: (userId: string, clientId: string) => MaybePromise<OAuthGrantRecord | undefined>
       // Creates the grant or replaces the one of that user and client, keeping its `createdAt`.
-      put: (grant: OAuthGrantRecord) => MaybePromise<void>
+      upsert: (grant: OAuthGrantRecord) => MaybePromise<void>
       // Records a use, without changing anything else.
       touch: (userId: string, clientId: string, at: Date) => MaybePromise<void>
       // Oldest first.
@@ -375,6 +376,12 @@ export interface AuthStore {
   }
   // Deletes what outlived its use: expired links and codes and invitations, bearer tokens expired long ago, sessions past their lifetime unseen or the session plugin's `absoluteMaxAge` old, and attempt windows that ended. kayjs-auth calls it at most once an hour; a store without it keeps those rows until the app deletes them.
   prune?: (limits: PruneLimits) => MaybePromise<void>
+}
+
+// A store as written before 1.52, with `members.remove` and `oauth.grants.put` in place of `members.delete` and `oauth.grants.upsert`: kayjs-auth still accepts it for now and logs a warning.
+export interface LegacyAuthStore extends Omit<AuthStore, 'members' | 'oauth'> {
+  members?: Omit<NonNullable<AuthStore['members']>, 'delete'> & { remove: (organizationId: string, userId: string) => MaybePromise<boolean> }
+  oauth?: Omit<NonNullable<AuthStore['oauth']>, 'grants'> & { grants: Omit<NonNullable<AuthStore['oauth']>['grants'], 'upsert'> & { put: (grant: OAuthGrantRecord) => MaybePromise<void> } }
 }
 
 export interface PruneLimits {

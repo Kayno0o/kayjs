@@ -357,8 +357,8 @@ export function storeContract(name: string, fresh: () => Promise<AuthStore>) {
 
       expect(await store.members!.get('o1', 'u2')).toBeUndefined()
       expect(await store.invitations!.get('i1')).toMatchObject({ invitedBy: null })
-      expect(await store.members!.remove('o2', 'u1')).toBe(true)
-      expect(await store.members!.remove('o2', 'u1')).toBe(false)
+      expect(await store.members!.delete('o2', 'u1')).toBe(true)
+      expect(await store.members!.delete('o2', 'u1')).toBe(false)
       expect(await store.organizations!.delete('o1')).toBe(true)
       expect(await store.organizations!.delete('o1')).toBe(false)
       expect(await store.members!.listByUser('u1')).toEqual([])
@@ -464,8 +464,8 @@ export function storeContract(name: string, fresh: () => Promise<AuthStore>) {
         expect(await oauth.clients.get('c1')).toEqual({ id: 'c1', name: 'Agent', redirectUris: ['http://127.0.0.1/cb'], createdAt: new Date('2026-01-01T00:00:00Z') })
         expect(await oauth.clients.get('missing')).toBeUndefined()
 
-        await oauth.grants.put({ userId: 'u1', clientId: 'c1', clientName: 'Agent', scopes: ['posts:read'], createdAt: new Date('2026-01-01T00:00:00Z'), lastUsedAt: null })
-        await oauth.grants.put({ userId: 'u1', clientId: 'c1', clientName: 'Agent 2', scopes: null, createdAt: new Date('2027-01-01T00:00:00Z'), lastUsedAt: null })
+        await oauth.grants.upsert({ userId: 'u1', clientId: 'c1', clientName: 'Agent', scopes: ['posts:read'], createdAt: new Date('2026-01-01T00:00:00Z'), lastUsedAt: null })
+        await oauth.grants.upsert({ userId: 'u1', clientId: 'c1', clientName: 'Agent 2', scopes: null, createdAt: new Date('2027-01-01T00:00:00Z'), lastUsedAt: null })
         await oauth.grants.touch('u1', 'c1', new Date('2026-06-01T00:00:00Z'))
 
         expect(await oauth.grants.get('u1', 'c1')).toEqual({ userId: 'u1', clientId: 'c1', clientName: 'Agent 2', scopes: null, createdAt: new Date('2026-01-01T00:00:00Z'), lastUsedAt: new Date('2026-06-01T00:00:00Z') })
@@ -496,8 +496,8 @@ export function storeContract(name: string, fresh: () => Promise<AuthStore>) {
         const oauth = store.oauth!
 
         await store.users.create(userRecord({ id: 'u1' }))
-        await oauth.grants.put({ userId: 'u1', clientId: 'c1', clientName: 'One', scopes: null, createdAt: new Date(), lastUsedAt: null })
-        await oauth.grants.put({ userId: 'u1', clientId: 'c2', clientName: 'Two', scopes: null, createdAt: new Date(), lastUsedAt: null })
+        await oauth.grants.upsert({ userId: 'u1', clientId: 'c1', clientName: 'One', scopes: null, createdAt: new Date(), lastUsedAt: null })
+        await oauth.grants.upsert({ userId: 'u1', clientId: 'c2', clientName: 'Two', scopes: null, createdAt: new Date(), lastUsedAt: null })
         await oauth.refresh.create(refresh('rt1'))
         await oauth.refresh.create(refresh('rt1b', { family: 'f1b' }))
         await oauth.refresh.create(refresh('rt2', { clientId: 'c2', family: 'f2' }))
@@ -533,7 +533,7 @@ export function storeContract(name: string, fresh: () => Promise<AuthStore>) {
 
         await store.users.create(userRecord({ id: 'u1' }))
         await store.users.create(userRecord({ id: 'u2' }))
-        await oauth.grants.put({ userId: 'u1', clientId: 'c1', clientName: 'One', scopes: null, createdAt: at(0), lastUsedAt: null })
+        await oauth.grants.upsert({ userId: 'u1', clientId: 'c1', clientName: 'One', scopes: null, createdAt: at(0), lastUsedAt: null })
         await oauth.codes.create(code('gone-with-user'))
         await oauth.refresh.create(refresh('rt-user'))
         await store.users.delete('u1')
@@ -549,7 +549,7 @@ export function storeContract(name: string, fresh: () => Promise<AuthStore>) {
         await oauth.clients.create({ id: 'stale', name: 'Stale', redirectUris: ['http://127.0.0.1/cb'], createdAt: at(-40) })
         await oauth.clients.create({ id: 'approved', name: 'Approved', redirectUris: ['http://127.0.0.1/cb'], createdAt: at(-40) })
         await oauth.clients.create({ id: 'fresh', name: 'Fresh', redirectUris: ['http://127.0.0.1/cb'], createdAt: at(-1) })
-        await oauth.grants.put({ userId: 'u2', clientId: 'approved', clientName: 'Approved', scopes: null, createdAt: at(-30), lastUsedAt: null })
+        await oauth.grants.upsert({ userId: 'u2', clientId: 'approved', clientName: 'Approved', scopes: null, createdAt: at(-30), lastUsedAt: null })
 
         setSystemTime(at(0))
         await store.prune!({ now: at(0), bearerExpiredBefore: at(-30), sessionMaxAge: 30 * 24 * 3600, sessionAbsoluteMaxAge: 365 * 24 * 3600 })

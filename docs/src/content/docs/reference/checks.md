@@ -82,6 +82,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `unguarded-tool` | warn | security | With `mcp`, a tool action with bot protection that no guard covers |
 | `deprecated-api-tool` | warn | deprecated | With `mcp`, an API route that sets neither `detail.tool` nor `hide`: it was a tool before 1.51 and is none now |
 | `deprecated-provider-url` | warn | deprecated | `discordProvider({ apiBase })` of kayjs-auth, now `discordProvider({ url })` |
+| `deprecated-store-verb` | warn | deprecated | A kayjs-auth store's `members.remove` or `oauth.grants.put`, now `delete` and `upsert` |
 | `deprecated-sign-in-options` | warn | deprecated | `redirect`, `remember` or `captcha` in the input of kayjs-auth's `signInWithPassword` or `register`, or a positional `redirect` of `requestMagicLink` or `signInWithPasskey`: now one trailing options object |
 | `deprecated-auth-event` | warn | deprecated | `createAuth({ onEvent })` of kayjs-auth, now `onAuthEvent`, which gets one object instead of four arguments |
 | `deprecated-time-ms` | warn | deprecated | A bare number of milliseconds in `every`, `debounced`, `rooms.coalesce`, `sqliteRooms` or kayjs-cms's `forgejo` and `createDrafts`, now a duration such as `'3s'` or `'300ms'` |

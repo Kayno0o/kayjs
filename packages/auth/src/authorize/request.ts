@@ -150,7 +150,7 @@ async function approve(state: RequestState, record: UserRecord, checked: Checked
   const granted = held ? together(held.scopes, checked.scopes) : checked.scopes
   const grant: OAuthGrantRecord = { userId: record.id, clientId: checked.client.id, clientName: checked.client.name, scopes: granted, createdAt: held?.createdAt ?? now, lastUsedAt: held?.lastUsedAt ?? null }
 
-  await oauth.grants.put(grant)
+  await oauth.grants.upsert(grant)
   await oauth.codes.create({ digest: digest(code), userId: record.id, clientId: checked.client.id, redirectUri: checked.redirectUri, challenge: checked.challenge, scopes: checked.scopes, family: crypto.randomUUID(), createdAt: now, expiresAt: new Date(now.getTime() + CODE_LIFETIME * 1000), usedAt: null })
 
   if (!held || !approves(held.scopes, checked.scopes))

@@ -337,7 +337,7 @@ export async function removeMember(state: RequestState, ref: string, userId: str
   if (target.roles.includes(config.owner) && await lastOwner(config, store, found.organization.id))
     return { ok: false, error: 'last-owner' }
 
-  await store.members.remove(found.organization.id, userId)
+  await store.members.delete(found.organization.id, userId)
 
   if (self)
     await report(state, found.record, 'member-left', found.organization.id)

@@ -24,7 +24,7 @@ import type { CredentialRules, PasswordProblem } from './rules'
 import type { UserSession } from './sessions'
 import type { SignInOptions } from './signInOptions'
 import type { RequestState } from './state'
-import type { AuthStore, LinkType, SessionRecord, UserRecord } from './store'
+import type { AuthStore, LegacyAuthStore, LinkType, SessionRecord, UserRecord } from './store'
 import type { Proof, ProofFailure, TwoFactorResult, TwoFactorSetup } from './twoFactor'
 import type { Level, PolicyContext, Predicate, Requirement } from './types'
 import { Elysia } from 'elysia'
@@ -65,6 +65,7 @@ import { createRoleHierarchy } from './roles'
 import { PROFILE_MAX_LENGTH, resolveRules } from './rules'
 import { applyLifetime, chooseRemember, listSessions, liveSession, openSession, revokeBearerTokens } from './sessions'
 import { mergeInput, mergePositional } from './signInOptions'
+import { acceptOldVerbs } from './storeVerbs'
 import { challenged, completeSignIn, disableTwoFactor, enableTwoFactor, provedLately, regenerateRecoveryCodes, reprove, setUpTwoFactor, verifyTwoFactor } from './twoFactor'
 
 export type { AuthSessionData, OAuthApp, Profile, User } from './core'
@@ -113,7 +114,7 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   sessions: SessionPlugin<Data>
   // At least 32 characters, from the environment; each use gets its own key derived from it. A list rotates them: the first writes, every one reads.
   secret: string | string[]
-  store: AuthStore
+  store: AuthStore | LegacyAuthStore
   // The site's public origin, such as `https://example.com`: OAuth callbacks are built on it.
   url?: string | undefined
   // Where kayjs-auth's routes live, `/auth` by default: `/auth/discord` starts a Discord sign-in.
@@ -1368,7 +1369,7 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
     oauth.set(name, { app, client: createOAuthClient(app.provider, { clientId: app.clientId, clientSecret: app.clientSecret, redirectUri: `${url}${prefix}/${name}/callback` }) })
 
   const core: Core = {
-    store: options.store,
+    store: acceptOldVerbs(options.store),
     keys: deriveKeys(options.secret),
     url,
     prefix,
@@ -1437,7 +1438,7 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
   return core
 }
 
-function oauthServerOf(options: { oauthServer?: boolean | { fetch?: ((url: string) => Promise<Response>) | undefined } | undefined, store: AuthStore }, pages: Core['pages']): Core['oauthServer'] {
+function oauthServerOf(options: { oauthServer?: boolean | { fetch?: ((url: string) => Promise<Response>) | undefined } | undefined, store: AuthStore | LegacyAuthStore }, pages: Core['pages']): Core['oauthServer'] {
   const wanted = options.oauthServer
 
   if (wanted === false || (wanted === undefined && !(pages && options.store.oauth)))

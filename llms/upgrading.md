@@ -31,6 +31,11 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 ### kayjs-auth: `discordProvider({ apiBase })` is `url`
 
 - `discordProvider({ apiBase })` is now `discordProvider({ url })`, as `gitlabProvider` and `githubProvider` take; `apiBase` still works for now and logs a warning, and production refuses an `http://` one as it does for `url`. `kay check` reports it as `deprecated-provider-url`, and `kay check --fix` (or `kay upgrade`) renames the key.
+
+### kayjs-auth: a custom store's `members.remove` is `delete`, `grants.put` is `upsert`
+
+- A custom `AuthStore` names `members.remove` as `members.delete` and `oauth.grants.put` as `oauth.grants.upsert`, so one verb does one thing in every group (`delete` removes a row, `upsert` creates or replaces it). A store with only the old names still works for now through a copy, and kayjs-auth logs a warning once per name. `kay check` reports an object literal with the old key as `deprecated-store-verb`, and `kay check --fix` (or `kay upgrade`) renames it, except a shorthand, a store giving both names, a computed key or a spread, which are renamed by hand. `memoryStore()` and `pgStore()` already follow. `tokens.consume` and `recoveryCodes.consume` (delete the row and answer it) and `oauth.codes.use` and `oauth.refresh.use` (mark it spent and keep it, to tell a reuse) stay as they are, being different operations, and `delete` keeps answering a boolean where a person is told the row was not found.
+
 ### kayjs-ui names the same prop the same way
 
 - Every disclosure (`Dialog`, `SidePanel`, `FormDialog`, `CommandPalette`, `Popover`) takes `open` and `onOpenChange(open)`. `onClose` on `Dialog`, `SidePanel` and `FormDialog` and `onToggle` on `Popover` still work for now, marked `@deprecated`, and `onOpenChange` wins when both are given. Rename the prop; a `Dialog` or `SidePanel` handler that read the close event now hears `false`.

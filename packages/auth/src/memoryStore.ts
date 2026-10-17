@@ -317,7 +317,7 @@ export function memoryStore(): AuthStore {
       },
       grants: {
         get: (userId, clientId) => copyGrant(oauthGrants.get(grantKey(userId, clientId))),
-        put(grant) {
+        upsert(grant) {
           const key = grantKey(grant.userId, grant.clientId)
 
           oauthGrants.set(key, { ...copyGrant(grant)!, createdAt: oauthGrants.get(key)?.createdAt ?? grant.createdAt })
@@ -454,7 +454,7 @@ export function memoryStore(): AuthStore {
 
         return copyMember(members.get(key))
       },
-      remove: (organizationId, userId) => members.delete(memberKey(organizationId, userId)),
+      delete: (organizationId, userId) => members.delete(memberKey(organizationId, userId)),
     },
     invitations: {
       create(invitation) {

@@ -322,7 +322,7 @@ export function pgStore(db: Database): AuthStore {
       listByOrganization: async organizationId => (await members.read.findMany(q => q.where({ organization_id: organizationId }).orderBy('created_at', 'asc').orderBy('id', 'asc'))).map(row => toMember(row)!),
       listByUser: async userId => (await members.read.findMany(q => q.where({ user_id: userId }).orderBy('created_at', 'asc').orderBy('id', 'asc'))).map(row => toMember(row)!),
       update: async (organizationId, userId, patch) => toMember(await members.write.updateOne({ roles: patch.roles }, { organization_id: organizationId, user_id: userId })),
-      remove: async (organizationId, userId) => await members.write.deleteOne({ organization_id: organizationId, user_id: userId }) !== null,
+      delete: async (organizationId, userId) => await members.write.deleteOne({ organization_id: organizationId, user_id: userId }) !== null,
     },
     invitations: {
       async create(invitation) {
@@ -362,7 +362,7 @@ export function pgStore(db: Database): AuthStore {
       },
       grants: {
         get: async (userId, clientId) => toOAuthGrant(await oauthGrants.read.findOne({ user_id: userId, client_id: clientId })),
-        async put(grant) {
+        async upsert(grant) {
           await oauthGrants.write.upsertOne({ user_id: grant.userId, client_id: grant.clientId, client_name: grant.clientName, scopes: grant.scopes, created_at: grant.createdAt, last_used_at: grant.lastUsedAt }, ['user_id', 'client_id'], ['client_name', 'scopes', 'last_used_at'])
         },
         async touch(userId, clientId, at) {
