@@ -1,0 +1,5 @@
+---
+import Greeter from '../components/greeter.kay'
+---
+h1 Greeter
+Greeter

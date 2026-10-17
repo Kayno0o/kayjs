@@ -1,0 +1,5 @@
+---
+import Chat from '@kaynooo/kayjs-ai/chat.kay'
+import { reply } from '../routes/chat.kay'
+---
+Chat(action={reply} label="Greeter" keep={2} initial={[{ role: 'assistant', content: 'Welcome, ask me anything' }, { role: 'user', content: 'Earlier question' }, { role: 'assistant', content: 'Earlier answer' }]})

@@ -98,11 +98,13 @@ Put this in a component of your own, such as `assistant.kay`, and use that compo
 - Stop, or Escape in the field, ends the reply. The words that came stay, marked as stopped.
 - If the call fails, the chat shows an alert and a button to ask again. The message is not sent twice.
 - A screen reader hears each finished turn once, not word by word.
+- A table wider than its bubble scrolls sideways inside it, and the keyboard can scroll it.
+- A message the action's schema refuses (422) goes back to the field, also when it was a retry, and the refusal's message shows.
 - Images in a reply are not shown. A model that read a hostile page could point an image at a link carrying your visitor's conversation.
 
-Every label is a prop, so you can write them in your language: `placeholder`, `sendLabel`, `stopLabel`, `retryLabel`, `thinkingLabel`, `stoppedLabel` and `errorMessage`. A refusal from the action, such as a rate limit's message, shows instead of `errorMessage`. `initial` gives messages to start with.
+Every label is a prop, so you can write them in your language: `placeholder`, `sendLabel`, `stopLabel`, `retryLabel`, `thinkingLabel`, `stoppedLabel`, `tableLabel` and `errorMessage`. The action may also `ctx.fail`. A refusal from the action, such as a rate limit's message, shows instead of `errorMessage`. `initial` gives messages to start with.
 
-The chat posts its last 20 messages with each one; the `keep` prop changes that. Keep `maxItems` in the action's schema at least as high as `keep`, bound `content`, and add a rate limit.
+The chat posts its last 20 messages with each one; the `keep` prop changes that, and what is posted always opens on one of the visitor's, so an assistant greeting in `initial` is never the first message. Keep `maxItems` in the action's schema at least as high as `keep`, bound `content`, and add a rate limit.
 
 <ReadMore href="/llms/kayjs-ai-chat">The props, the markup and the rules for passing the action.</ReadMore>
 

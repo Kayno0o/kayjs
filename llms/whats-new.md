@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## 1.52.0
 
+- kayjs-ai `Chat`: a wide table scrolls inside its bubble, a message refused with 422 returns to the field on a retry too, the history posted never opens on an assistant message, and an action that can `ctx.fail` is accepted as `action` ([kayjs-ai](../packages/ai/llms/chat.md)).
 - A form inside a streamed `await` block is checked and sent by kay as one in the page is ([Streaming](rendering.md#streaming)).
 - kayjs-ai counts a signed-in kayjs-auth user, not their address, with no `visitor` option; `visitor` stays as an override ([kayjs-ai](../packages/ai/llms/limits.md)).
 - kayjs-ai: a provider that stalls fails the reply with an `AiError` of kind `timeout` after 30 s without an answer or 60 s without a chunk, both set per call by `ask`'s `timeout` ([kayjs-ai](../packages/ai/llms/asking.md)).

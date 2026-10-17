@@ -1,0 +1,5 @@
+---
+import Refusing from '../components/refusing.kay'
+---
+h1 Refusing
+Refusing

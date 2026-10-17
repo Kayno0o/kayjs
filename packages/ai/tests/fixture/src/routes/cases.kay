@@ -1,0 +1,40 @@
+--- server
+import { ask } from '@kaynooo/kayjs-ai'
+import { action } from 'kay'
+import { messages } from '../messages'
+import { refusals } from '../testing'
+
+// A reply action that can also refuse, which Chat's `action` must accept.
+export const guarded = action(messages, ({ messages }, ctx) => messages.at(-1)?.content === 'refuse' ? ctx.fail(403, 'Not today') : ask(messages))
+
+// Answers the statuses the test queued, whatever the schema thinks of the history.
+export const refusing = action(messages, ({ messages }, ctx) => {
+  const status = refusals.shift()
+
+  return status === undefined ? ask(messages) : ctx.fail(status, status === 422 ? 'That message is refused' : undefined)
+})
+
+// A reply whose stream breaks after its first words.
+export const flaky = action(messages, async function* () {
+  yield 'Half a reply'
+  await Bun.sleep(50)
+
+  throw new Error('the stream broke')
+})
+
+// A reply that says nothing for a while, which the visitor stops.
+export const held = action(messages, async function* () {
+  await Bun.sleep(3000)
+  yield 'Late'
+})
+
+// A long reply, then a longer one after a pause, to see whether the log follows it.
+export const lengthy = action(messages, async function* () {
+  const lines = Array.from({ length: 60 }, (_, index) => `Line ${index + 1}`)
+
+  yield lines.join('\n\n')
+  await Bun.sleep(1500)
+  yield `${lines.join('\n\n')}\n\nThe end`
+})
+---
+p Cases

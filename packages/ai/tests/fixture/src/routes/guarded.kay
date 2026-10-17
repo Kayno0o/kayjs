@@ -1,0 +1,5 @@
+---
+import Guarded from '../components/guarded.kay'
+---
+h1 Guarded
+Guarded

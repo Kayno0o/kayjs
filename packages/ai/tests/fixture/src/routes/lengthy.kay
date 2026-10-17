@@ -1,0 +1,5 @@
+---
+import Lengthy from '../components/lengthy.kay'
+---
+h1 Lengthy
+Lengthy

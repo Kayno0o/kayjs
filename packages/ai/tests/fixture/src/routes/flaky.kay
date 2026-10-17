@@ -1,0 +1,5 @@
+---
+import Flaky from '../components/flaky.kay'
+---
+h1 Flaky
+Flaky
