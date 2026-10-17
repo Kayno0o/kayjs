@@ -63,7 +63,7 @@ describe('the challenge a post picks', () => {
     const first = make(60_000)
 
     bring(document.head, { '/send': first, '/other': make(120_000) })
-    bring(document.body, { '/send': first })
+    bring(document.body, { '/send': first.replace(/\.[^.]+/, '.other') })
     expect(await spent()).toBe(first)
   })
 

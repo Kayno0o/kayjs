@@ -174,7 +174,7 @@ describe('server islands', () => {
   const indented = (text: string, by: number) => text.split('\n').map(line => (line === '' ? line : ' '.repeat(by) + line)).join('\n')
   // `nested` puts the form in a block inside the block of the island.
   const rowsKay = (nested: boolean) => PROPS + (nested ? `  // kay-allow uncaught-await\n  await inner\n    p.pending Inside\n  then deeper\n${indented(FORM, 4)}` : indented(FORM, 2))
-  const pageKay = (component: string, mark: string) => `--- server\nimport { t } from 'elysia'\nimport { action } from 'kay'\n\nexport const page = { prerender: true }\nexport const send = action(t.Object({ name: t.String({ minLength: 3 }) }), () => 'sent', { proofOfWork: 50 })\n\nconst show = ctx.url.searchParams.has('show')\n--- script\nimport Rows from '../components/${component}.kay'\n---\nh1 Rows\nRows(${mark}show={show} to={send})\n`
+  const pageKay = (mark: string) => `--- server\nimport { t } from 'elysia'\nimport { action } from 'kay'\n\nexport const page = { prerender: true }\nexport const send = action(t.Object({ name: t.String({ minLength: 3 }) }), () => 'sent', { proofOfWork: 50 })\n\nconst show = ctx.url.searchParams.has('show')\n--- script\nimport Rows from '../components/rows.kay'\n---\nh1 Rows\nRows(${mark}show={show} to={send})\n`
   const FRENCH = 'kay: { invalid: { required: \'Champ requis\', tooShort: \'Au moins {min} caractères\', tooLong: \'Au plus {max} caractères\', pattern: \'Mauvais format\', format: \'Pas au format {format}\', tooFewItems: \'Au moins {min} choix\', tooManyItems: \'Au plus {max} choix\', tooSmall: \'{min} ou plus\', tooBig: \'{max} ou moins\', type: \'Valeur invalide\' } }'
   const messages = (words: string) => `import { defineMessages } from 'kay/i18n'\n\nexport default defineMessages({ title: 'Rows'${words === '' ? '' : `, ${words}`} })\n`
 
@@ -188,8 +188,8 @@ describe('server islands', () => {
           const i18n = french ? { i18n: { locales: ['en', 'fr'], defaultLocale: 'en', messages: join(copy, 'src/messages') } } : {}
 
           await Bun.write(join(copy, 'src/components/rows.kay'), rowsKay(nested))
-          await Bun.write(join(copied, 'rows.kay'), pageKay('rows', 'server '))
-          await Bun.write(join(copied, 'later.kay'), pageKay('rows', 'server="defer" '))
+          await Bun.write(join(copied, 'rows.kay'), pageKay('server '))
+          await Bun.write(join(copied, 'later.kay'), pageKay('server="defer" '))
           await Bun.write(join(copy, 'src/messages/en.ts'), messages(''))
           await Bun.write(join(copy, 'src/messages/fr.ts'), messages(FRENCH))
 
