@@ -353,6 +353,8 @@ describe('secret-prop', () => {
 
     expect(typeLint(`... kayLint: "secret-prop"; kayPath: ${paths} }`, 'data')?.message).toBe('`data.a`, `data.b[].token` would be written into the page')
     expect(typeLint('... kayLint: "secret-prop"; kayPath: "a" | "b" | ... 12 more ... | "" }', 'data')?.message).toBe('`data.a`, `data.b` and more would be written into the page')
+    expect(typeLint('... kayLint: "secret-prop"; kayPath: "a" | "b"; other: ... 3 more ... }', 'data')?.message).toBe('`data.a`, `data.b` would be written into the page')
+    expect(typeLint('... kayLint: "secret-prop"; kayPath: "" | ... 2 more ... }', 'data')?.message).toBe('This value holds a field named like a secret, and an island\'s props are written into the page')
     expect(typeLint('... kayLint: "secret-prop"; kayPath: "[].email" }', 'rows')?.message).toBe('`rows[].email` would be written into the page')
   })
 })

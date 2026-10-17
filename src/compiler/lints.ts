@@ -730,7 +730,7 @@ const TRUNCATED = / \| \.\.\. (\d+) more \.\.\. \| /g
 const HANDED_SIGNAL = 'kayLint: "uncalled-signal"'
 const SECRET_PROP = 'kayLint: "secret-prop"'
 const CUT_PATHS = /\.\.\. \d+ more/
-const SECRET_PATHS = /kayPath: ((?:"[^"]*"(?: \| )?)+)/
+const SECRET_PATHS = /kayPath: ((?:"[^"]*"|\.\.\. \d+ more \.\.\.)(?: \| (?:"[^"]*"|\.\.\. \d+ more \.\.\.))*)/
 
 function secretPath(prop: string | undefined, path: string): string {
   return prop === undefined ? path : `${prop}${path.startsWith('[') ? '' : '.'}${path}`
@@ -740,8 +740,9 @@ function secretPath(prop: string | undefined, path: string): string {
 export function typeLint(message: string, prop?: string): TypeLint | undefined {
   if (message.includes(SECRET_PROP)) {
     const found = SECRET_PATHS.exec(message)?.[1]
-    const paths = found?.split(' | ').filter(path => path.length > 2).map(path => secretPath(prop, path.slice(1, -1)))
-    const cut = CUT_PATHS.test(message)
+    const listed = found?.split(' | ').filter(path => path.startsWith('"') && path.length > 2).map(path => secretPath(prop, path.slice(1, -1)))
+    const paths = listed === undefined || listed.length === 0 ? undefined : listed
+    const cut = found !== undefined && CUT_PATHS.test(found)
 
     return {
       code: 'secret-prop',
