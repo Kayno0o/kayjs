@@ -18,6 +18,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - Fixed values are options now: `health.timeout`, `images.remoteMaxSize`, `live`, `requestIdHeader`, redirect `status`, `false` for `proxy` and `preview` ([config](../docs/src/content/docs/reference/config.md)).
 - Fixed values are options: `health.timeout`, `images.remoteMaxSize`, `live`, `requestIdHeader`, `images.webp`, redirect `status`, `proxy: false` ([config](../docs/src/content/docs/reference/config.md)).
 - `migrate --outdir` and `fonts[].subsets` match `build --outdir` and `weights`; 404 bodies read `Not Found` everywhere.
+- `hydration` margins, a `kay:navigate` event after a swap, `// kay-allow-file`, `kay upgrade --dry-run` ([Islands](islands.md#hydration)).
 - `kay add` keeps the runner label a project was scaffolded with when it rewrites the CI workflow, and `deprecated-test-mount` also finds `await import('kay/test')` and `export { mount } from 'kay/test'` ([Project](project.md)).
 - Under a `base`, an action's redirect goes under it for a call from an island and a form the page swap posts as it does for a plain form, so the browser lands on `/app/dashboard` and not `/dashboard`; the app declares nothing ([Actions](actions.md#calling-from-an-island)).
 - kayjs-ui: `MultiSelect` options take `icon` and `disabled` like ChipGroup's and Segmented's, a disabled option staying as it is under All and None ([kayjs-ui](../packages/ui/llms/forms.md)).

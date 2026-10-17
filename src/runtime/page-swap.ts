@@ -303,6 +303,8 @@ export async function show(page: FetchedPage, hash: string, swap: Swap, isCurren
     takeFormChecks(document)
     navigation.hooks!.hydrate(document.body)
     void navigation.hooks!.arrive?.(target.search, scrollY)
+    // For plain scripts, which no island tells of the swap.
+    document.dispatchEvent(new CustomEvent('kay:navigate', { detail: { url: target.href } }))
   }
 
   if (policy.transition && viewTransitions())

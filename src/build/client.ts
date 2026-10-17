@@ -57,6 +57,8 @@ export interface ClientOptions {
   settings?: Record<string, string> | undefined
   // Swaps pages in place: the entry is built whether or not any component is interactive, for the pages posting forms to actions.
   navigation?: boolean | undefined
+  // How far ahead of the viewport an island marked `hydrate="visible"` starts to hydrate, and a deferred server island starts to load, as CSS root margins; `200px` and `100% 0px` by default.
+  hydration?: { visible?: string | undefined, serverIslands?: string | undefined } | undefined
   // `search` is on: a page opened from a search hit marks the words searched for.
   search?: boolean | undefined
   // The app has locales: the links its islands write go to the page's locale's copy, as the server writes them.
@@ -296,7 +298,7 @@ export async function bundleIslands(root: string, islands: Map<string, string>, 
   ].join('\n'))
 
   // Bun resolves packages' `development` export condition unless NODE_ENV is defined as production, which would ship a package's dev build; a build for development, not NODE_ENV, asks for theirs.
-  const define: Record<string, string> = { 'KAY_BROWSER': 'true', 'process.env.NODE_ENV': JSON.stringify(options.hot === true ? 'development' : 'production'), ...options.exported === true && { KAY_STATIC_EXPORT: 'true' } }
+  const define: Record<string, string> = { 'KAY_BROWSER': 'true', 'process.env.NODE_ENV': JSON.stringify(options.hot === true ? 'development' : 'production'), ...options.exported === true && { KAY_STATIC_EXPORT: 'true' }, 'KAY_VISIBLE_MARGIN': JSON.stringify(options.hydration?.visible ?? '200px'), 'KAY_NEAR_MARGIN': JSON.stringify(options.hydration?.serverIslands ?? '100% 0px') }
   const external = publicEnv !== undefined ? [publicEnv] : []
   const plugins = (anchor?: string, anchored?: ReadonlySet<string>) => [withoutStyles(), api, kay({ target: 'dom', root, cacheDir: projectPaths(root).cache, settings: options.settings, anchor, anchored, inspect: options.inspect, api: trees, external }), ...options.plugins ?? []]
 

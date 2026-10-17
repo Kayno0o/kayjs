@@ -58,6 +58,7 @@ Every option is optional. The tables give each option's default. The full refere
 | `trailingSlash` | `never` (the default) redirects `/about/` to `/about`, `always` the other way, `ignore` serves both. See [Trailing slashes](/guides/static-export#trailing-slashes) |
 | `prefetch` | When the browser fetches a page a link points at: `moderate` on hover (the default), `conservative` on press, `eager` as soon as it can, `false` never. A link with `data-no-prefetch`, a download, `rel="nofollow"` or a path under `/_kay/` or `/api/` is never fetched |
 | `extensions` | What libraries add: their pages and API modules under a prefix, which an app file at the same path replaces, their message catalogs, config laid under the app's, page hooks, a tab for the dev tool, and a CMS's editor rendered in edit mode. See [Routing](/essentials/routing#pages-from-a-library) |
+| `hydration` | How far ahead of the viewport islands start loading, as CSS root margins: `visible` for `hydrate="visible"` (`200px` by default) and `serverIslands` for a deferred server island (`100% 0px`). See [Islands](/essentials/islands#when-to-hydrate) |
 | `navigation` | The in-place page swap, on by default. `false` loads every page fully. See [Islands](/essentials/islands) |
 
 ## Content and i18n

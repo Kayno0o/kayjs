@@ -255,6 +255,25 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     expect(await page.textContent('button.player')).toBe('Played 3')
   })
 
+  it('fires kay:navigate on document once each swapped page is in place, with its URL, and not on a full load', async () => {
+    await page.goto(origin)
+    await page.evaluate(() => {
+      const seen: string[] = []
+
+      ;(window as { kayNavigated?: string[] }).kayNavigated = seen
+      document.addEventListener('kay:navigate', (event) => {
+        seen.push(`${(event as CustomEvent<{ url: string }>).detail.url}|${document.querySelector('h1')?.textContent ?? ''}`)
+      })
+    })
+    expect(await page.evaluate(() => (window as { kayNavigated?: string[] }).kayNavigated)).toEqual([])
+    await page.click('a.second')
+    await page.locator('h1', { hasText: 'Second' }).waitFor()
+    expect(await page.evaluate(() => (window as { kayNavigated?: string[] }).kayNavigated)).toEqual([`${origin}/second|Second`])
+    await page.goBack()
+    await page.locator('h1', { hasText: 'Home' }).waitFor()
+    expect(await page.evaluate(() => (window as { kayNavigated?: string[] }).kayNavigated)).toEqual([`${origin}/second|Second`, `${origin}/|Home`])
+  })
+
   it('swaps in a streamed page with its blocks in place', async () => {
     await page.click('a.later')
     await page.locator('p.answer', { hasText: 'The answer is 42' }).waitFor()

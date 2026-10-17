@@ -19,9 +19,11 @@ interface IslandElement extends HTMLElement {
 }
 
 // Starts loading a `visible` island this far before it scrolls into view.
-const VISIBLE_MARGIN = '200px'
+declare const KAY_VISIBLE_MARGIN: string | undefined
+declare const KAY_NEAR_MARGIN: string | undefined
+const VISIBLE_MARGIN = typeof KAY_VISIBLE_MARGIN === 'undefined' ? '200px' : KAY_VISIBLE_MARGIN
 // Fetches a deferred server island about a screen before it scrolls into view, so a visitor never meets the copy standing in for it.
-const NEAR_MARGIN = '100% 0px'
+const NEAR_MARGIN = typeof KAY_NEAR_MARGIN === 'undefined' ? '100% 0px' : KAY_NEAR_MARGIN
 const SERVER_ISLAND = 'slot[data-kay-server]'
 const IDLE_FALLBACK_MS = 200
 const started = new WeakSet<HTMLElement>()

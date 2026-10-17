@@ -109,6 +109,8 @@ Comments(postId={post.id} hydrate="visible")
 
 `hydrate="load"`, the default, hydrates the island as soon as the page loads. `hydrate="visible"` waits until the island scrolls near the viewport. `hydrate="idle"` waits until the browser is idle.
 
+`hydration: { visible: '640px' }` in `kay.config.ts` changes how early that is, `200px` before the viewport by default, and `hydration.serverIslands` does the same for a deferred server island, a screen ahead by default. Both are CSS root margins.
+
 A click on an island that is still loading is replayed once it hydrates, so the visitor loses nothing.
 
 <ReadMore href="/llms/islands">How many events an island keeps while it loads, and when it drops them.</ReadMore>
@@ -254,6 +256,8 @@ button(onClick={() => navigate('/todos')}) Todos
 `navigate({ query: { sort: 'name', page: null } })` changes the current page's query in place. The scroll and the focus stay, and a null or empty value drops its param.
 
 `navigate('/todos', { scroll: 'keep' })` goes to the page without scrolling to the top, and `{ transition: false }` swaps it without a view transition. A link does the same with `data-keep-scroll` and `data-no-transition`, which an element around several links can carry.
+
+Each swap fires a `kay:navigate` event on `document`, with the page's address in `event.detail.url`, for a plain script to set itself up again. A full load fires none.
 
 A link with `data-reload` loads its page fully. So does every link to a page setting `reload: true` in its `page`.
 
