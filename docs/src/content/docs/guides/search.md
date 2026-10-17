@@ -91,7 +91,7 @@ export const page = { prerender: true, search: { weight: 0.5 } }
 h1 Changelog
 ```
 
-A route with params serves many pages, so `search` can also be a function of the params of each page, as `prerender` lists them. It returns `false`, a `weight`, or nothing for a page that keeps the default.
+A route with params serves many pages, so `search` can also be a function of the params of each page, as `prerender` lists them. It returns `false`, a `weight`, or nothing for a page that keeps the default weight of 1, whatever a layout says. A function in a layout gets the params of each page rendered under it. A weight is a number of 0 or more, and anything else stops the build.
 
 ```kay
 --- server

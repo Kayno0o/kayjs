@@ -1,8 +1,8 @@
 import type { RenderedPage } from '../check/seo'
 import type { ErrorName, ExportProblem } from '../compiler/errors'
 import type { Project } from '../project'
-import type { PageSettings } from '../runtime'
 import type { ClientBuild, PrerenderedPage } from './client'
+import type { ListedParams } from './prerendered'
 import type { Scan, Stop } from './pure-page'
 import type { Route } from './routes'
 import { mkdir } from 'node:fs/promises'
@@ -140,6 +140,10 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
       if (!matched)
         throw new KayError('export-needs-params', `kay: ${file} lists ${JSON.stringify(params)} in prerender, which its matchers refuse, so no request would reach it`)
 
+      // The weight of the page's words, worked out once for the locales it is served in.
+      let weighed: Promise<number | false> | undefined
+      const weight = async () => weighed ??= searchWeight(chainSetting(chain, 'search'), params, file)
+
       // One page per locale, each rendered in it.
       for (const copy of localeCopies(i18n?.settings, path).filter(copy => listedIn(params, copy.locale, i18n?.settings))) {
         // Rendered at the path the server answers it at, which `trailingSlash` spells.
@@ -230,10 +234,9 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
 
         if (response.status === 200 && !auto) {
           const noindex = chainSetting(chain, 'noindex') === true
-          const setting = chainSetting(chain, 'search') as PageSettings['search']
-          const search = typeof setting === 'function' ? await setting(params) : setting
+          const indexed = config.search === true && !noindex && !guardedPage(route, config.requireGuards)
 
-          options.rendered?.push({ path: copy.path, file: route.file, locale: copy.locale, html, noindex, sitemap: pageSetting(module, 'sitemap') !== undefined, search: noindex || search === false || guardedPage(route, config.requireGuards) ? false : search?.weight ?? 1 })
+          options.rendered?.push({ path: copy.path, file: route.file, locale: copy.locale, html, noindex, sitemap: pageSetting(module, 'sitemap') !== undefined, search: indexed ? await weight() : false })
         }
         else if (!auto) {
           options.others?.push({ file: route.file, html })
@@ -349,6 +352,37 @@ function count(problems: number, what: string): string {
 }
 
 // A page's `revalidate` export in seconds, or undefined when it has none.
+// A page's `search` as the index takes it, `false` to leave the page out or the weight its words count.
+async function searchWeight(setting: unknown, params: ListedParams, file: string): Promise<number | false> {
+  let value = setting
+
+  if (typeof setting === 'function') {
+    try {
+      // The params without the symbols kay lists locales under.
+      value = await (setting as (params: Record<string, string>) => unknown)(Object.fromEntries(Object.entries(params)))
+    }
+    catch (error) {
+      throw new KayError('page-settings-invalid', `kay: the \`search\` of ${file} threw for ${JSON.stringify(Object.fromEntries(Object.entries(params)))}: ${error instanceof Error ? error.message : String(error)}`, { cause: error })
+    }
+  }
+
+  if (value === undefined)
+    return 1
+
+  if (value === false)
+    return false
+
+  const weight = typeof value === 'object' && value !== null ? (value as { weight?: unknown }).weight : null
+
+  if (weight === undefined)
+    return 1
+
+  if (typeof weight !== 'number' || !Number.isFinite(weight) || weight < 0)
+    throw new KayError('page-settings-invalid', `kay: the \`search\` of ${file} is ${JSON.stringify(value)}, which is no search setting: it takes \`false\` or \`{ weight }\` with a weight of 0 or more`)
+
+  return weight
+}
+
 function revalidatePeriod(file: string, value: unknown): number | undefined {
   return value === undefined ? undefined : durationSeconds(value, `${file}'s revalidate`)
 }
