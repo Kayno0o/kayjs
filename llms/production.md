@@ -175,7 +175,7 @@ Then `await welcomeMails.enqueue({ to: email })` in an action, or `enqueue(paylo
 - A tab with something typed (a changed field, a file chosen, a `guardLeave` guard holding unsaved changes) is never reloaded under the visitor: it waits for the next navigation, which loads in full.
 - A tab reloads once a minute at most, and not at all without `sessionStorage`, so a cache in front of the server keeping an old page cannot loop it.
 - A static export has no header: the tab reads the entry script of its own page from the host instead. The tab loads the code doing all this ahead, when idle, as a deploy drops it with the other chunks.
-- kay keeps no old build's chunks: an image or a fresh `.kay` holds only its own. The reload is what the old tab does instead.
+- `kay build` keeps the script, stylesheet and asset files of the last 3 builds beside the new one in `.kay/client`, so an old tab finds its chunks for 3 deploys after; a static export and `--compile` carry them too, and a build that changed nothing takes no slot. A fresh `.kay` (a clean CI checkout, an image built from scratch) has none to keep: keep `.kay/client` and `.kay/client-kept` between builds, or rely on the reload above, which is what a tab past the last 3 builds does.
 - A cache or CDN serving the old HTML after a deploy is the one case kay cannot see past: keep HTML pages revalidating, as kay's own pages do.
 
 ### Background jobs

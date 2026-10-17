@@ -120,7 +120,11 @@ Kay handles this without setup. Every answer of a production server names its bu
 
 A tab with something typed in it is not reloaded under the visitor. The next link they follow loads the new page in full instead of swapping it in. The same goes for a tab whose action call or server island was answered by the new build. An action the new build dropped reloads the tab at once.
 
-A tab reloads once a minute at most, so a cache that keeps serving the old page cannot loop it. Static exports work the same way, with the tab reading the build off the host's page. Kay does not keep the old build's files. Keep your HTML pages revalidating in any cache in front of the server, as kay's own pages do.
+A tab reloads once a minute at most, so a cache that keeps serving the old page cannot loop it. Static exports work the same way, with the tab reading the build off the host's page.
+
+Kay also keeps the script, stylesheet and asset files of the last three builds in `.kay/client`, so an old tab keeps working through a few deploys before it needs to reload. This needs the `.kay` folder to survive from one build to the next, as it does on your machine and not on a clean CI checkout: keep `.kay/client` and `.kay/client-kept` between builds there. Static exports and executables carry the kept files too.
+
+Keep your HTML pages revalidating in any cache in front of the server, as kay's own pages do.
 
 ## Health check and shutdown
 

@@ -28,6 +28,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## 1.52.2
 
+- `kay build` keeps the chunks of the last 3 builds beside the new one, so a tab opened before a deploy still finds them ([a deploy under open tabs](production.md#a-deploy-under-open-tabs)).
 - A page with a `--- server` fence passes an island an action, `Chat(action={reply})` with no wrapper ([actions](actions.md#pass-an-action-to-an-island)).
 - `island-action` reports an action handed to an island that never types a prop as one ([actions](actions.md#pass-an-action-to-an-island)).
 - `secret-prop` warns of a secret-looking field, as `user.passwordHash`, handed to an island ([islands](islands.md#props-to-an-island)).

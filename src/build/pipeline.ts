@@ -39,6 +39,7 @@ import { buildClient } from './client'
 import { compileServer } from './compile'
 import { cachedCopies, pruneCopies } from './compressed'
 import { writeCachedFavicons } from './favicons'
+import { restoreKept, setAsideKept } from './kept'
 import { codecWarnings, iconSetPackages, iconSetWarnings, NOTICES_FILE, packagesOf, thirdPartyNotices } from './licenses'
 import { readStoredReport, storedReport, writeStoredReport } from './report'
 import { routeSizes } from './route-sizes'
@@ -129,6 +130,9 @@ async function runBuild(root: string, config: KayConfig, options: BuildOptions):
       throw error
     }
   }
+
+  // The chunks of the last build wait beside the output until this one is good, then come back into it.
+  await setAsideKept(output, previous)
 
   // The last build waits aside until this one is known good, which the check decides beside the browser bundle.
   if (checking)
@@ -232,6 +236,7 @@ async function runBuild(root: string, config: KayConfig, options: BuildOptions):
   }
 
   await rm(previous, { recursive: true, force: true })
+  await restoreKept(output)
 
   if (options.exportTo !== undefined) {
     const stage = performance.now()
