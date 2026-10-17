@@ -157,6 +157,8 @@ The first part goes out at once. After that, kay sends at most one part every 50
 
 When the visitor leaves the page, kay stops the iterable, so a generator's `finally` runs.
 
+The main use is a model's reply. [kayjs-ai](/libraries/kayjs-ai)'s `ask()` gives one, so the text streams into the block with no loop of your own.
+
 <Callout type="warning">
 
 Status, headers and cookies are sent before the first block, so a streamed block cannot redirect or set them.

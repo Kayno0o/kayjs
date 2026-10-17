@@ -86,9 +86,14 @@ Messages take only the roles `user` and `assistant`. The system prompt goes in t
 - `for await (const text of reply)` gives the text so far, again and again.
 - `reply.deltas()` gives only the new pieces.
 - `await reply.usage` gives the token counts when the reply is over.
+- `await reply.finish` says why it ended: `stop`, `length` when the `maxTokens` cap cut it, or `filtered`.
 - `reply.stop()` cancels the request.
 
+A long answer cut by `maxTokens` still resolves as text, so check `finish` when that matters.
+
 `ask` also takes `model`, `maxTokens` (4096 by default), `temperature` and a `signal`.
+
+<ReadMore href="/llms/kayjs-ai-asking">Every variable, how the provider is picked, and the options of `ask`.</ReadMore>
 
 ## Errors
 
@@ -108,3 +113,5 @@ expect(fakeAi.last()?.messages).toEqual([{ role: 'user', content: 'Hi' }])
 ```
 
 `fakeAi.fail(error)` makes the next ask fail, and `fakeAi.clear()` forgets everything. With nothing scripted, the fake answers `Fake reply to:` followed by your last message. In development the fake answers too, until a provider is configured.
+
+<ReadMore href="/llms/kayjs-ai-testing-and-errors">Scripting the fake, every error kind, and building a provider by hand.</ReadMore>

@@ -10,7 +10,7 @@
 - Messages are `user` and `assistant` only; the system prompt goes in `options.system`. A history a visitor posts can never carry a system prompt, and a `system` role throws.
 - Under `bun test` `ask()` always answers from `fakeAi`, whatever keys the environment holds; in development it does until `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` or `AI_BASE_URL` is set. Production with none of them throws.
 - No model id is built in: set `AI_MODEL` (required in production) or pass `{ model }`.
-- A failure is an `AiError` with a `kind`; nothing retries by itself. A rate limit carries `retryAfter` in seconds.
+- A failure is an `AiError` with a `kind`; nothing retries by itself. A rate limit carries `retryAfter` in seconds. A reply cut by `maxTokens` still resolves as text: read `await reply.finish` (`length`) to tell.
 
 ## Setup
 

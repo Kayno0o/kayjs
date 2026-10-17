@@ -1,4 +1,4 @@
-import type { Piece, Reply, Usage } from './types'
+import type { Finish, Piece, Reply, Usage } from './types'
 import { AiError } from './errors'
 
 // A reply over what `open` yields once first read, with `signals` stopping it when any aborts.
@@ -8,7 +8,9 @@ export function createReply(open: (signal: AbortSignal) => AsyncIterable<Piece>,
   const deltas: string[] = []
   const waiters = new Set<() => void>()
   const counted = Promise.withResolvers<Usage | undefined>()
+  const ending = Promise.withResolvers<Finish | undefined>()
   const total: Partial<Usage> = {}
+  let reason: Finish | undefined
   let started = false
   let ended = false
   let failure: { error: unknown } | undefined
@@ -28,8 +30,10 @@ export function createReply(open: (signal: AbortSignal) => AsyncIterable<Piece>,
       for await (const piece of open(controller.signal)) {
         if ('text' in piece)
           deltas.push(piece.text)
-        else
+        else if ('usage' in piece)
           Object.assign(total, piece.usage)
+        else
+          reason = piece.finish
 
         notify()
       }
@@ -49,6 +53,7 @@ export function createReply(open: (signal: AbortSignal) => AsyncIterable<Piece>,
 
       ended = true
       counted.resolve(failure === undefined && total.inputTokens !== undefined && total.outputTokens !== undefined ? { inputTokens: total.inputTokens, outputTokens: total.outputTokens } : undefined)
+      ending.resolve(failure === undefined ? reason : undefined)
       notify()
     }
   }
@@ -150,6 +155,11 @@ export function createReply(open: (signal: AbortSignal) => AsyncIterable<Piece>,
       start()
 
       return counted.promise
+    },
+    get finish() {
+      start()
+
+      return ending.promise
     },
     stop,
   }

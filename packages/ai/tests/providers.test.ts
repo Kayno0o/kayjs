@@ -80,6 +80,21 @@ describe('an OpenAI-compatible provider', () => {
   })
 })
 
+describe('why a reply ended', () => {
+  it('says when the token cap or a filter cut the reply, and still returns its text', async () => {
+    const capped = serve(() => stream([[undefined, { choices: [{ delta: { content: 'hi' }, finish_reason: 'length' }] }], [undefined, '[DONE]']]).response)
+    const filtered = serve(() => stream(anthropicEvents('no').map(([event, data]): Event => event === 'message_delta' ? [event, { type: 'message_delta', delta: { stop_reason: 'refusal' }, usage: { output_tokens: 2 } }] : [event, data])).response)
+    const normal = serve(() => stream(openaiEvents('ok')).response)
+    const first = ask('x', { provider: openai({ baseUrl: capped.url, model: 'm' }) })
+    const second = ask('x', { provider: anthropic({ apiKey: 'k', baseUrl: filtered.url, model: 'm' }) })
+
+    expect(await first).toBe('hi')
+    expect(await first.finish).toBe('length')
+    expect(await second.finish).toBe('filtered')
+    expect(await ask('x', { provider: openai({ baseUrl: normal.url, model: 'm' }) }).finish).toBe('stop')
+  })
+})
+
 describe('Anthropic\'s provider', () => {
   it('asks the Messages API with its key and version headers and streams the text deltas', async () => {
     const server = serve(() => stream(anthropicEvents('Hel', 'lo')).response)
@@ -104,7 +119,7 @@ describe('Anthropic\'s provider', () => {
 describe.each([
   ['openai', (url: string) => openai({ baseUrl: url, model: 'm' }), openaiEvents],
   ['anthropic', (url: string) => anthropic({ apiKey: 'k', baseUrl: url, model: 'm' }), anthropicEvents],
-] as const)('%s failures', (_name, make, events) => {
+] as const)('%s failures', (name, make, events) => {
   const asking = (url: string) => ask('Hi', { provider: make(url) })
 
   it('names a refused key without repeating it', async () => {
@@ -124,6 +139,42 @@ describe.each([
     expect(await failure(asking(seconds.url))).toMatchObject({ kind: 'rate-limited', status: 429, retryAfter: 20 })
     expect((await failure(asking(date.url))).retryAfter).toBeGreaterThan(25)
     expect(await failure(asking(none.url))).toMatchObject({ kind: 'rate-limited', retryAfter: undefined })
+  })
+
+  it('never sends the key to another origin a redirect points at', async () => {
+    const elsewhere = serve(() => stream(events('leaked')).response)
+    const server = serve(() => new Response(null, { status: 307, headers: { location: `${elsewhere.url}/v1/messages` } }))
+
+    expect(await failure(asking(server.url))).toMatchObject({ kind: 'network' })
+    expect(elsewhere.seen).toEqual([])
+  })
+
+  it('hides the key from what the provider echoes back', async () => {
+    const server = serve((_request, { headers }) => Response.json({ error: { message: `Incorrect key ${headers.get('x-api-key') ?? headers.get('authorization')}` } }, { status: 401 }))
+    const error = await failure(ask('Hi', { provider: name === 'anthropic' ? anthropic({ apiKey: 'sk-secret', baseUrl: server.url, model: 'm' }) : openai({ baseUrl: server.url, apiKey: 'sk-secret', model: 'm' }) }))
+
+    expect(error.message).toContain('[key]')
+    expect(error.message).not.toContain('sk-secret')
+  })
+
+  it('reports an out-of-credit 429 as invalid, as waiting does not help', async () => {
+    const server = serve(() => Response.json({ error: { message: 'You exceeded your quota', code: 'insufficient_quota' } }, { status: 429, headers: { 'retry-after': '5' } }))
+
+    expect(await failure(asking(server.url))).toMatchObject({ kind: 'invalid', status: 429, retryAfter: undefined })
+  })
+
+  it('refuses a Retry-After that is no whole seconds or date, or a date gone by', async () => {
+    const fraction = serve(() => new Response('{}', { status: 429, headers: { 'retry-after': '1.5' } }))
+    const past = serve(() => new Response('{}', { status: 429, headers: { 'retry-after': 'Wed, 21 Oct 2015 07:28:00 GMT' } }))
+
+    expect((await failure(asking(fraction.url))).retryAfter).toBeUndefined()
+    expect((await failure(asking(past.url))).retryAfter).toBeUndefined()
+  })
+
+  it('names a server that answers JSON instead of streaming', async () => {
+    const server = serve(() => Response.json({ choices: [] }))
+
+    expect(await failure(asking(server.url))).toMatchObject({ kind: 'protocol' })
   })
 
   it('reports a 500 as unavailable and another 4xx as invalid', async () => {

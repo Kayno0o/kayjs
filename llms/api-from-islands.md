@@ -58,7 +58,7 @@ export default api()
 
 ### Stream an action's answer
 
-An action whose handler is an `async function*`, or returns any async iterable, answers a call with each value as it comes:
+An action whose handler is an `async function*`, or returns any async iterable, answers a call with each value as it comes; a model's reply is the main use, and kayjs-ai's `ask(messages)` returned from the handler is one:
 
 ```kay
 --- server

@@ -1,4 +1,4 @@
-import type { Piece, Provider } from './types'
+import type { Finish, Piece, Provider } from './types'
 import { AiError } from './errors'
 import { json, postEvents } from './http'
 
@@ -12,6 +12,8 @@ export interface AnthropicOptions {
 export const ANTHROPIC_URL = 'https://api.anthropic.com'
 const VERSION = '2023-06-01'
 const TRAILING_SLASHES = /\/+$/
+
+const FINISHES: Record<string, Finish> = { max_tokens: 'length', refusal: 'filtered' }
 
 function count(value: unknown): number | undefined {
   return typeof value === 'number' ? value : undefined
@@ -58,7 +60,7 @@ export function anthropic({ apiKey, baseUrl = ANTHROPIC_URL, model }: AnthropicO
         ...request.temperature === undefined ? {} : { temperature: request.temperature },
       }
 
-      for await (const { data } of postEvents('anthropic', `${root}/v1/messages`, { 'x-api-key': apiKey, 'anthropic-version': VERSION }, body, signal)) {
+      for await (const { data } of postEvents('anthropic', `${root}/v1/messages`, { 'x-api-key': apiKey, 'anthropic-version': VERSION }, body, signal, apiKey)) {
         const event = json('anthropic', data)
 
         switch (event.type) {
@@ -74,10 +76,16 @@ export function anthropic({ apiKey, baseUrl = ANTHROPIC_URL, model }: AnthropicO
 
             break
           }
-          case 'message_delta':
+          case 'message_delta': {
+            const reason = (event.delta as { stop_reason?: unknown } | undefined)?.stop_reason
+
             yield* usageOf(event.usage)
 
+            if (typeof reason === 'string')
+              yield { finish: FINISHES[reason] ?? 'stop' }
+
             break
+          }
           case 'message_stop':
             return
           case 'error':

@@ -18,6 +18,8 @@ export function aiEnv(listed = false) {
   })
 }
 
+const READ = aiEnv()
+
 export interface Chosen {
   provider: Provider
   model: string | undefined
@@ -42,7 +44,7 @@ export function choose(): Chosen {
   if (process.env.NODE_ENV === 'test')
     return { provider: fakeAi, model: fakeAi.model }
 
-  const env = defineEnv(aiEnv())
+  const env = defineEnv(READ)
   const anthropicKey = env.ANTHROPIC_API_KEY
   const openaiKey = env.OPENAI_API_KEY
   const base = env.AI_BASE_URL

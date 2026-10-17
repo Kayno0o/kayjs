@@ -106,6 +106,12 @@ pg-orm's migration history table, `_pgorm_migrations`, is the exception. `app_rw
 
 The password goes into the URL as it is, so keep it to letters and digits. An existing app adopts the roles with [the upgrading steps](/guides/upgrading).
 
+## Secrets
+
+A provider key such as kayjs-ai's `ANTHROPIC_API_KEY`, or kayjs-mail's `SMTP_PASS`, is a secret. Set it as an environment variable of the container, or in a `.env` next to the executable. Never put it in the image or the repository.
+
+`kay env` lists the variables each library reads, and which of them production requires. Compare its output with your compose file before you deploy.
+
 ## Health check and shutdown
 
 `/_kay/health` answers `200 ok` while the server takes requests. Move it, or add a check, in `kay.config.ts`.

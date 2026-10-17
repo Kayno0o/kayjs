@@ -32,14 +32,14 @@ it('asks for the summary', async () => {
 | kind | when |
 | --- | --- |
 | `auth` | 401 or 403: the provider refused the key |
-| `rate-limited` | 429, `retryAfter` from `Retry-After` in seconds or as a date |
+| `rate-limited` | 429, `retryAfter` from `Retry-After` in seconds or as a date; a 429 for no credit left (`insufficient_quota`) is `invalid` |
 | `unavailable` | 5xx, or an error event such as Anthropic's `overloaded_error` mid-stream |
 | `invalid` | another 4xx: an unknown model, a message it cannot take |
 | `network` | the provider could not be reached |
 | `cut` | the stream ended before the provider said it was done |
-| `protocol` | an event that is not JSON of the provider's API |
+| `protocol` | an event that is not JSON of the provider's API, or a server answering JSON instead of streaming |
 
-Messages name the provider and what it said, never the key. Nothing retries: a caller wanting to waits `retryAfter` and asks again. An action letting the error out answers 500 and logs it; catch it to answer the visitor in words.
+Messages name the provider and what it said, with the key hidden if the provider echoes it. Redirects are refused (`network`), so a key never follows one to another origin. Nothing retries: a caller wanting to waits `retryAfter` and asks again. An action letting the error out answers 500 and logs it; catch it to answer the visitor in words.
 
 ## Providers by hand
 

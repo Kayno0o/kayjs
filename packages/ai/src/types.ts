@@ -19,7 +19,10 @@ export interface ProviderRequest {
 }
 
 // A part of the reply, or the token counts the provider reports as it goes (each field when it knows it).
-export type Piece = { text: string } | { usage: Partial<Usage> }
+// Why the reply ended: the model finished (`stop`), hit `maxTokens` (`length`) or was cut by the provider's safety filter or refusal (`filtered`).
+export type Finish = 'stop' | 'length' | 'filtered'
+
+export type Piece = { text: string } | { usage: Partial<Usage> } | { finish: Finish }
 
 export interface Provider {
   readonly name: string
@@ -49,6 +52,8 @@ export interface Reply extends PromiseLike<string>, AsyncIterable<string> {
   deltas: () => AsyncIterable<string>
   // The token counts once the reply ended, or undefined when the provider gave none or the reply failed; never rejects. Reading it starts the reply.
   readonly usage: Promise<Usage | undefined>
+  // Why the reply ended, undefined when it failed or the provider said nothing; a reply stopped by `maxTokens` is `length`, which `await` returns as if it were whole. Never rejects, and reading it starts the reply.
+  readonly finish: Promise<Finish | undefined>
   // Aborts the provider request; what was received stays the text of `await`.
   stop: () => void
 }

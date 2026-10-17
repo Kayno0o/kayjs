@@ -92,6 +92,18 @@ describe('an action returning an async iterable', () => {
     expect([answer, last, wrong].every(read => typeof read === 'function')).toBe(true)
   })
 
+  it('types a call as a stream when the handler returns an iterable that is also a thenable, as a model\'s reply is', () => {
+    const reply = { then: (resolve: (text: string) => void) => void resolve('whole'), async* [Symbol.asyncIterator]() {
+      yield 'part'
+    } }
+    const typed = action(() => reply)
+    const answer = async (): Promise<ActionStream<string>> => typed()
+    // @ts-expect-error the call is a stream, not the text the thenable resolves to
+    const wrong = async (): Promise<string> => typed()
+
+    expect([answer, wrong].every(read => typeof read === 'function')).toBe(true)
+  })
+
   it('answers a call as server-sent events', async () => {
     const response = await posted(actions.count, { to: 1 })
 

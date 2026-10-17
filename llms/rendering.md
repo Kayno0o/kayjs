@@ -185,7 +185,7 @@ catch
 
 #### A value that arrives in parts
 
-An async iterable, such as an async generator or a model's reply, streams in part by part: each value it yields is the whole so far, which `then` renders in place of the last.
+An async iterable, such as an async generator or a model's reply (kayjs-ai's `ask()` returns one), streams in part by part: each value it yields is the whole so far, which `then` renders in place of the last.
 
 ```kay
 --- server

@@ -16,7 +16,7 @@ export interface Fake extends Provider {
   // Every ask the fake answered, oldest first.
   readonly asked: readonly Asked[]
   last: () => Asked | undefined
-  // The next ask is answered with this: a text, split into words, or the pieces as they should come; a function reads what was asked. Scripts are used in order, then the default reply returns.
+  // The next ask read is answered with this (scripts go to asks in the order they are read, not made): a text, split into words, or the pieces as they should come; a function reads what was asked. Scripts are used in order, then the default reply returns.
   reply: (script: Script) => void
   // The next ask fails with this error.
   fail: (error: Error) => void
@@ -34,13 +34,20 @@ function pieces(text: string): string[] {
 }
 
 async function pause(ms: number, signal: AbortSignal): Promise<void> {
-  return new Promise((resolve) => {
-    const timer = setTimeout(resolve, ms)
+  if (signal.aborted)
+    return Promise.resolve()
 
-    signal.addEventListener('abort', () => {
+  return new Promise((resolve) => {
+    let timer: ReturnType<typeof setTimeout> | undefined
+
+    const done = () => {
       clearTimeout(timer)
+      signal.removeEventListener('abort', done)
       resolve()
-    }, { once: true })
+    }
+
+    timer = setTimeout(done, ms)
+    signal.addEventListener('abort', done)
   })
 }
 
@@ -88,6 +95,7 @@ function createFake(): Fake {
       }
 
       yield { usage: { outputTokens: tokens(parts.join('')) } }
+      yield { finish: 'stop' }
     },
   }
 }

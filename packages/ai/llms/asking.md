@@ -28,6 +28,7 @@ Options: `system`, `model`, `maxTokens` (4096 by default, as Anthropic requires 
 - `await reply` is the full text; it throws the `AiError` the provider failed with.
 - `for await (const text of reply)` yields snapshots, each the text so far; `reply.deltas()` yields the pieces alone.
 - `await reply.usage` is `{ inputTokens, outputTokens }`, or undefined when the provider gave none or the reply failed; it never rejects, and reading it starts the reply.
+- `await reply.finish` is why it ended: `stop`, `length` (the `maxTokens` cap, the text returned as it is) or `filtered` (the provider's filter or refusal); undefined when it failed. Check it when a long answer matters.
 - `reply.stop()` aborts the provider request, what came staying the text of `await`.
 - All readers share one request, which starts on the first read. The request being answered aborting, `options.signal` aborting or a reader leaving early stops it.
 

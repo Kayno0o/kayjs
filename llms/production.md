@@ -79,6 +79,11 @@ kay build --compile server --verify
 - It costs the server's startup plus 250 ms, usually well under a second, and `--format json` carries it as `compiled.verifiedMs`.
 - `health: false` leaves no route to ask, so any answer on the port counts and `--health` is not run.
 
+### Set a library's secrets
+
+- A provider key, kayjs-ai's `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`, or kayjs-mail's `SMTP_PASS`, is a production secret: an environment variable of the container or a `.env` beside the executable, never in the image or the repository.
+- `kay env` lists what each library in `extensions` reads and which of it production requires, such as `AI_MODEL`, for a deploy script to compare with the compose file.
+
 ### Run a job on a schedule
 
 `schedule` from `kay/server` is an Elysia plugin taking a cron or a length, and runs in the server's process:
