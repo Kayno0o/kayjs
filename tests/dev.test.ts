@@ -735,6 +735,35 @@ describe.concurrent('kay dev', () => {
     }
   })
 
+  it('starts on the entry kay.config.ts names, and follows an edit of it at once', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
+    const seen = join(root, '.seen')
+    const report = (name: string) => `await Bun.write(${JSON.stringify(seen)}, ${JSON.stringify(name)})\nsetInterval(() => undefined, 1000)\n`
+    const running = () => filled(seen) ? readFileSync(seen, 'utf8') : ''
+    const children: Subprocess[] = []
+
+    await Bun.write(join(root, 'src/server.ts'), report('server'))
+    await Bun.write(join(root, 'src/one.ts'), report('one'))
+    await Bun.write(join(root, 'src/two.ts'), report('two'))
+    await Bun.write(join(root, 'kay.config.ts'), 'export default { entry: \'src/one.ts\' }\n')
+    // No config and no refusal: the first server is the config's entry too, as the command line's is.
+    const stop = await dev(root, { onRestart: child => children.push(child) })
+
+    try {
+      await until(() => running() === 'one')
+      // Every Edit names an entry the one before did not, so a server one edit behind would run the last.
+      for (const [name, file] of [['two', 'src/two.ts'], ['one', 'src/one.ts'], ['server', 'src/server.ts']] as const) {
+        await rm(seen)
+        await Bun.write(join(root, 'kay.config.ts'), `export default { entry: '${file}' }\n`)
+        await until(() => running() === name, 10_000)
+      }
+    }
+    finally {
+      await stop()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('runs the entry as the main module, and a changed .env reaches the next server', async () => {
     const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
     const seen = join(root, '.seen')

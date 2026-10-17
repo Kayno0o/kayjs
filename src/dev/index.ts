@@ -59,6 +59,8 @@ const RELOAD_TIMEOUT_MS = 5000
 const MAX_RELOADS = 200
 // How long stopping waits for the types being written before it kills the process writing them.
 const TYPES_GRACE_MS = 2000
+// How long a restart for an edited config waits for the types to say its entry, a config that does not load being none to wait for.
+const ENTRY_WAIT_MS = 3000
 
 // The root files Bun reads as a process starts.
 const STARTUP_FILE = /^(?:\.env.*|package\.json|bunfig\.toml|tsconfig\.json)$/
@@ -89,7 +91,6 @@ const ANSI_STYLE = /\x1B\[[\d;]*m/g
 // Resolves once watching, with a function stopping the watchers and the server.
 export async function dev(projectRoot: string, options: DevOptions = {}): Promise<() => Promise<void>> {
   const root = resolve(projectRoot)
-  const entry = projectPaths(root, { ...options.config, entry: options.entry ?? options.config?.entry }).entry
   let child: Subprocess<'pipe'> | undefined
   // Spawned ahead of its start line, which it loads kay while it waits for: the first server when the config is to be checked first.
   let waiting: Subprocess<'pipe'> | undefined
@@ -429,6 +430,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   // Chosen again for each process, so a `src/server.ts` written or deleted while running takes over at the next restart.
   // The config's `entry` comes from the process writing the types, which loads the config; `--entry` wins.
   const entryToRun = () => {
+    const entry = projectPaths(root, { ...typesConfig, entry: options.entry ?? typesConfig?.entry }).entry
     const file = options.entry === undefined ? typesProcess.configuredEntry ?? entry : entry
 
     return options.entry === undefined && !existsSync(file) ? PAGES_ENTRY : file
@@ -532,6 +534,24 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     restartAsked = asked && files.length === 0
     building = wantsClient ? buildClient() : undefined
 
+    // The entry is the config's, which the types read: they are written first for an edited config, so the process starts on the entry just saved rather than the one before.
+    // A config that never loads must not hold the restart, so the wait is bounded, and a write ending later with another entry restarts again.
+    const configEdited = files.includes(CONFIG_FILE)
+    let entryWrite: Promise<void> | undefined
+
+    if (configEdited) {
+      if (typesConfig !== undefined)
+        typesConfig = await reloadConfig(root, typesConfig)
+
+      typesFresh = true
+      entryWrite = writeTypes()
+      const gave = Promise.withResolvers<void>()
+      const giveUp = setTimeout(gave.resolve, ENTRY_WAIT_MS)
+
+      await Promise.race([entryWrite, gave.promise])
+      clearTimeout(giveUp)
+    }
+
     const previous = child
     const server = reloadable(files, asked) ? previous : undefined
     // What the reload carries, taken as it is sent: an edit arriving meanwhile belongs to the next one.
@@ -558,10 +578,16 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
       start()
     }
 
-    if (typesConfig !== undefined && files.includes(CONFIG_FILE))
-      typesConfig = await reloadConfig(root, typesConfig)
+    if (entryWrite !== undefined) {
+      void (async () => {
+        await entryWrite
 
-    if (typesRead(files)) {
+        if (!stopping && child !== undefined && entryToRun() !== runningEntry)
+          restartNow()
+      })()
+    }
+
+    if (!configEdited && typesRead(files)) {
       typesFresh ||= files.length === 0 || files.some(file => !file.endsWith('.kay'))
       void writeTypes()
     }
@@ -722,7 +748,8 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   }
 
   // Asked to refuse a config that does not load, the first server waits for the first types: its own boot failure would print the same error again. The process it will run in loads kay meanwhile.
-  if (options.refuseConfig === true)
+  // The same holds while the config is still to be read for its `entry`, which the types do.
+  if (options.refuseConfig === true || (options.config === undefined && options.entry === undefined))
     spawnWaiting()
   else
     start()

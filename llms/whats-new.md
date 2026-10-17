@@ -16,6 +16,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - kayjs-ui: `variant` names a form and `tone` a meaning across `Button`, `IconButton`, `Menu`, `CopyButton` and `Notice` (`danger` replaces `error`), and `Button` takes `size` ([kayjs-ui](../packages/ui/llms/basics.md)).
 - kayjs-ui: every disclosure takes `open` and `onOpenChange(open)`, in place of `onClose` and `onToggle` ([kayjs-ui](../packages/ui/llms/basics.md)).
 - Site search ranks a word higher the more of its title or heading it makes up, leaves `button` labels out of the index but for a heading's own, and gives each hit `headingParts`, its heading with the words found marked ([Site search](sitemap-search-fonts.md#site-search)).
+- `kay dev` follows an edit of `entry` in `kay.config.ts` at once, and `dev()` without a `config` starts on the entry the config names ([Project](project.md)).
 - An action posted from a localized page under a `base` runs in that page's locale, where it ran in the default one ([Locales](locales.md)).
 - kayjs-ui: `CommandPalette` with `siteSearch` marks the words found in each section's heading as in its line of text, both in the accent colour ([kayjs-ui](../packages/ui/llms/tables-navigation-and-layout.md)).
 - A layout's `page` takes `noindex`, `revalidate` and `search` for every page under it, as it takes `security`, the innermost setting winning ([Page settings](routing.md#page-settings)).
