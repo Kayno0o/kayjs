@@ -1,6 +1,36 @@
 # Upgrading, older releases
 
-What each minor release before 1.46 broke, and what an app changed to move to it. The newer releases are in [Upgrading](upgrading.md).
+What each minor release before 1.47 broke, and what an app changed to move to it. The newer releases are in [Upgrading](upgrading.md).
+
+## 1.46.0
+
+### `ctx.locale` is the site's language in actions, guards on actions and API routes without `i18n`
+
+- It was an empty string there and the site's `lang` (English by default) in a page; all of them read the site's `lang`, or with `i18n` the page's locale and for an endpoint the default one, so an `if (!ctx.locale)` in an action or a guard never holds: test `ctx.locale === lang`, or drop it.
+
+### `GuardContext`, `EndpointContext` and `ActionContext` share `RequestContext`
+
+- A hand-built context, a test's mock for a guard or a handler, now needs `request`, `url`, `locale`, `params`, `cookies`, `locals`, `headers`, `redirect`, `notFound` and `deny`; take it from `RequestContext` or cast it.
+- A guard's `redirect` answers 302 to a GET or HEAD, on an API route, an endpoint or an image source's `resolve` and `guard` too, where it answered 303; a post still gets 303.
+- An endpoint that reads `ctx.cookies` goes out, a redirect, denial or 404 included, `Cache-Control: private, no-cache` with `Vary: cookie`, unless it sets its own `cache-control`.
+
+### `invalidatePage` is imported from `kay/cache`
+
+- It sits beside `invalidate` now, and `kay/server` no longer exports it: `import { invalidatePage } from 'kay/cache'`.
+- The rule for what needs an import is in [Components](components.md#imports-kay-adds): `props`, the reactive primitives, a server fence's `action` and `t` need none, everything else comes from `kay`, `kay/server` or its topic's entry.
+
+### A page inlines its small stylesheets by default
+
+- A page whose stylesheets compress under about 14 KB together now carries them as `style` elements in its head in production, `kay build` prerendered pages and `--static` exports included, where it linked them: the bytes of those pages change, and a stylesheet no longer shows as a request. Above the limit nothing changes. No deprecated lint covers it, as nothing in the app's code is the old form: it is a default.
+- An app keeping every page's stylesheets linked sets `inlineStyles: false` in `kay.config.ts`; one that wants them all inlined whatever their size keeps `inlineStyles: true`. A test or a script reading a page's `link rel="stylesheet"` to fetch the file reads the `style` text instead, or sets `inlineStyles: false`.
+
+### kayjs-auth's account layout has no `signOut` action
+
+- The account pages sign out with a post to `/auth/sign-out` (under the `prefix` of `createAuth`), so `import { signOut } from '@kaynooo/kayjs-auth/pages/account/_layout.kay'` in a test or a page fails `kay check`: post to the route instead, `site.fetch('/auth/sign-out', { method: 'POST' })`, or put the button in your own page as a form posting there. No lint can find it: the import already fails `kay check` as a missing export. The plugin now serves `POST ${prefix}/sign-out` itself, ahead of the app's routes, so an app route of its own at that path is shadowed: rename it. [kayjs-auth](../packages/auth/llms.txt)
+
+### The schema builder's old name `t` is gone
+
+- `kay` no longer exports the schema builder as `t`, gone with its `deprecated-schema-name` lint: the schema builder is `s`, `import { s } from 'kay'` or no import in a server fence, and `s.Object(...)` in place of `t.Object(...)`. `kay check --fix` of 1.45 renames it, or rename it by hand, or import Elysia's own `t` from `elysia`.
 
 ## 1.45.0
 
@@ -103,98 +133,4 @@ The rules of kayjs-ui's theme, and of any kay library's exported stylesheet, who
 - `TextInput(type="number")` hands `onInput` and `onChange` a `number | null`, no longer a string: `onInput={value => count.set(Number(value))}` becomes `onInput={count.set}` over a `signal<number | null>`, and `value` takes that number as well as a string.
 - `Select` takes the type of its options' values: a number option hands `onChange` a number, no longer its string, and `value` holds that number, `value={String(id)}` becoming `value={id}`. With `emptyOption`, `onChange` is typed `Value | ''`, so a parent holding the options' union alone widens it to `Kind | ''`.
 
-## 1.43.0
-
-### Markup reaches innerHTML only once vouched for
-
-- A spread sets `innerHTML` only from `sanitizeHtml(...)`, `trustHtml(...)` or an icon import; any other value is dropped, with a warning in development and one log line in production. `div({...{ innerHTML: html }})` becomes `div(innerHTML={sanitizeHtml(html)})` for markup a user wrote, `trustHtml(html)` for markup the app made; `svg({...Home})` keeps drawing.
-- A string derived from vouched markup (`safe + '<b>'`, `.slice()`) is plain again, and only the most recent markup stays vouched: call `trustHtml` where the markup is used, not once for a constant held for hours.
-- The vouch reaches an island through its props, action results, outcomes and event streams only; request input, cookies, `localStorage` or a `fetch` of the app's own JSON bring plain strings.
-- A spread on an element writes attribute names only: a text handler in any case (`ONCLICK: '...'`), `srcdoc` and keys that are no attribute name are dropped, on the server and in islands; function handlers still attach. `dynamic(name, props)` filters the same way and throws unless `name` is a plain element name.
-- Head tags drop handlers, write a `javascript:` URL as `unsafe:javascript:...`, and refuse script text holding `</script>` or `<!--`.
-- A `style` or `script` inside `svg` or `math` (outside `foreignObject`) takes static text only, no `{expr}` or spread: write the text literally or move the `style` out of the `svg`.
-
-### Preview links, stamps and the flash cookie are signed
-
-- `/_kay/preview?secret=...` answers a 403: link with `previewUrl(path, { ttl, edit })` from `kay/server`, or point the CMS at a guarded page calling `enterPreview(ctx)`. The `edit` link taking the secret is gone too.
-- Form stamps, private-file links and the flash cookie (`ctx.succeeded`) are signed with a key derived from the session secret, so the ones issued before the upgrade stop validating once, and rotating the session secret now invalidates them as well.
-- `session()` refuses the placeholder older `kay new` wrote in `.env.example` (`at-least-32-characters-kept-out-of-the-repository`): set a real `SESSION_SECRET`, `bun -e "console.log(crypto.randomUUID() + crypto.randomUUID())"`.
-
-### Personal pages are no longer cached publicly
-
-- A per-request page whose guards, loads or render read the session, `ctx.cookies`, a cookie `persisted` signal or a form post's outcome answers `Cache-Control: private, no-cache` with `Vary: cookie`, redirects included. Prerendered pages keep public caching, and a page setting its own `cache-control` through `ctx.headers` is left alone.
-- Behind a CDN reaching the server from a public address, `proxy.header` is believed only from the ranges listed in `proxy.trusted`; without them every visitor shares one rate-limit key, with a warning once.
-
-### Defaults: compression, lazy images, response headers
-
-- `compress` defaults to on when `NODE_ENV=production`: set `compress: false` behind a proxy or CDN compressing already.
-- Every `img` of a template or Markdown body gets `loading="lazy" decoding="async"` unless it sets `loading`, `fetchpriority` or `decoding`: give an image above the fold `loading="eager"` or `fetchpriority="high"`. HTML snapshots holding images change.
-- Every response carries `Cross-Origin-Resource-Policy: same-site`: an app whose files another site embeds sets `'cross-origin-resource-policy': 'cross-origin'` in its headers.
-- `public/` no longer serves nor copies dotfiles and dot-folders (except `.well-known/`), `.env*` files or backups (`.bak`, `.old`, `.orig`, `.swp`, `.tmp`, a trailing `~`); `kay build --static` keeps `.htaccess` and `.nojekyll`.
-- `images.remote` refuses a `*.` wildcard over a whole top-level domain (`*.com`): list the real hosts.
-
-### Navigation
-
-- `navigate()` throws a `TypeError` on a `javascript:` URL; `mailto:` and `tel:` go to the browser.
-- A link or `navigate()` that a redirect takes to another origin loads that page whole instead of swapping it in.
-- Prefetching skips `/api/*`, `[download]` and `[rel~=nofollow]` links.
-- A page swap focuses and announces the new page, and going back skips an `autofocus` element the visitor already left: focus-sensitive tests may change.
-
-### Stored files
-
-- `/_kay/files/` shows only images, video, audio, PDF and plain text inline; anything else is sent as an `application/octet-stream` attachment under `Content-Security-Policy: sandbox`, so stored `.js` or `.css` no longer runs from there. SVG keeps its type.
-- `Private/...` keys are private in any case, and `files.put` refuses a `folder` spelling `Private` in any case.
-- `files.put` strips EXIF, XMP, IPTC and text chunks from JPEG, PNG and WebP, keeping the colour profile and orientation: `files.put(file, { keepMetadata: true })` keeps them. `files.delete(key)` also deletes the file's image variants and social cards.
-
-### Action and API guards
-
-- An action's guard reads `ctx.url` as the page it was posted from (without `base`, in its served spelling, segments normalised), no longer `/_kay/action/...`: a guard matching `/_kay/action` matches the page's path instead, and `url.pathname.startsWith('/admin')` now covers `/admin`'s actions.
-- A post naming no page of the action's file gets the file's shortest page without params as `url`, else is refused with a 400 when the file reads params.
-- Guards run before validation, so a caller they refuse gets their redirect or denial rather than field errors. On that path `ctx.locals` holds only what `derive` sets, `resolve` running after the schema: a guard reading a user from `resolve` reads it from `derive` instead, as `session()` does.
-
-### `kay dev` listens on localhost only
-
-- `kay dev --host` (or `--host=<address>`) listens beyond it, as a dev server in a container with a published port needs.
-- A request whose `Host` is no localhost, IP or site host answers 421: list a tunnel's name in `KAY_DEV_HOSTS`, comma-separated, without ports.
-- `/_kay/mail` and `/_kay/mail.json` are served only under `kay dev`, not by a server started with `NODE_ENV=development` otherwise.
-
-### Queues and stores
-
-- Failed jobs are deleted after `keepFailed` (30 days by default, the first start purging older ones): `keepFailed: false` keeps them.
-- A job still running after `lostAfter` (10 minutes by default) counts as a failed attempt: a longer job raises `lostAfter`. A job whose process died during each of its `attempts` stays failed rather than rerun.
-- `sqliteRates` stores keyed hashes, so rate counters reset once.
-
-### New lints
-
-- `missing-label` no longer takes a `placeholder` as a label, and covers `meter`, `role="slider"` and `role="meter"`.
-- New warnings: `unannounced-click`, `dangling-aria`, `unreachable-tooltip`, `uncontrolled-autoplay`, `meta-refresh`, `ungrouped-radios`; `kay check --deny-warnings` fails on them.
-
-### kayjs-mail
-
-- Each address is one mailbox: `'a@x.com,b@y.com'`, a `;`, a group or a line break throws; several recipients go as an array, `to: ['a@x.com', 'b@y.com']`. An empty `to` is refused, an empty `cc`, `bcc`, `replyTo` or `from` dropped.
-- STARTTLS is required on every port but 465, even without a password: a relay taking clear text (a local Mailpit, a private network) sets `SMTP_INSECURE=true` or `smtp({ insecure: true })`.
-- Logs name the recipients' count and domains: `mailer({ logRecipients: true })` logs the addresses.
-
-### kayjs-cms
-
-- With `guard` set, every save, publish, delete and upload needs it: edit mode alone reads only.
-- Uploads take the types in `cms({ uploads })`, PNG, JPEG, WebP, GIF, AVIF and PDF by default, else answer 415.
-- A save whose body would run as the site (`<script>`, `<svg>`, `<form>`, inputs, `on*` or `style` attributes, `javascript:` URLs, tags left open) is refused: `cms({ rawHtml: ['collection'] })` opts a collection out.
-- Production refuses to boot without `cms({ files })`: set `files: forgejo({...})`, or `files: workingTree()` where the files persist across deploys.
-- A folder entry's save or delete names the file version it was made from; a custom `FileSaver` checks `change.base` (`null` must not exist, `undefined` writes anyway) and throws `SaveConflict`.
-- A Markdown component attribute named `innerHTML`, or a JSON prop holding an object with a string `t`, fails the build.
-
-### kayjs-ui
-
-- `CopyButton` renders a hidden status span after its button, `Toaster` two status regions before its popover, a filtering `Table` a `p.kui-table-count[role=status]`: a selector counting one element per component may change.
-- `Dialog`'s title is an `h2`, was an `h3`: `level` (2 to 6) sets it.
-- Buttons draw their border with `--color-kui-field-border`, and `overlay1`, `accent`, `accent-hi` and `error` changed: an app overriding the theme's tokens sets `field-border` too, at 3:1 contrast.
-- Toasts last 6 s, 10 s for errors, up from 4 s.
-
-## 1.41.0
-
-### A bare signal name handed on passes the signal
-
-- Before 1.41 a bare name handed to a prop or an argument passed the value. `kay check` reports such a prop or argument typed for the value, with no fix: call the signal there, `open()`.
-- One typed `unknown` or `any`, `String(count)` or `JSON.stringify(count)`, is `uncalled-signal`, a call to an untyped function or `console.log(count)` included: call it there, or write `count as Signal<number>` to hand it on on purpose.
-- A parameter typed `Signal<T>`, `Memo<T>`, a function type or a generic `T` takes the signal.
+Releases before 1.44 are in the notes of their releases, at https://git.kaynooo.fr/kaynooo/kayjs/releases.
