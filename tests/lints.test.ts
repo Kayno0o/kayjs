@@ -135,6 +135,17 @@ describe('deprecated-sign-in-options', () => {
     expect(fixes(page('auth.signInWithPassword({\n  identifier,\n  password,\n  redirect,\n})'))).toEqual([{ safe: true, text: page('auth.signInWithPassword({\n  identifier,\n  password,\n}, { redirect })') }])
   })
 
+  it('merges the old fields into an options argument already there, whose own fields win, and leaves no gap in an emptied input', () => {
+    expect(fixes(page('auth.signInWithPassword({ identifier, password, redirect }, { captcha })'))).toEqual([{ safe: true, text: page('auth.signInWithPassword({ identifier, password }, { redirect, captcha })') }])
+    expect(fixes(page('auth.register({ email, password, remember: true }, { remember: false })'))).toEqual([{ safe: true, text: page('auth.register({ email, password }, { remember: false })') }])
+    expect(fixes(page('auth.signInWithPassword({ identifier, password, redirect }, options)'))).toEqual([{ safe: false, text: page('auth.signInWithPassword({ identifier, password }, { redirect, ...options })') }])
+    expect(fixes(page('auth.signInWithPassword({ identifier, password, redirect }, { ...rest })'))).toEqual([{ safe: false, text: page('auth.signInWithPassword({ identifier, password }, { redirect, ...rest })') }])
+    expect(fixes(page('auth.signInWithPassword({ identifier, password, redirect }, undefined)'))).toEqual([{ safe: true, text: page('auth.signInWithPassword({ identifier, password }, { redirect })') }])
+    expect(fixes(page('auth.signInWithPassword({ redirect })'))).toEqual([{ safe: true, text: page('auth.signInWithPassword({}, { redirect })') }])
+    expect(fixes(page('auth.signInWithPassword({ redirect, remember }, { captcha })'))).toEqual([{ safe: true, text: page('auth.signInWithPassword({}, { redirect, remember, captcha })') }])
+    expect(codes(page('auth.signInWithPassword({ identifier, password }, { redirect }, extra)'))).toEqual([])
+  })
+
   it('leaves a call already in the new form, a register of another receiver and a call with no old field', () => {
     expect(codes(page('ctx.locals.auth.signInWithPassword({ identifier, password }, { redirect })'))).toEqual([])
     expect(codes(page('ctx.locals.auth.signInWithPassword(input)'))).toEqual([])

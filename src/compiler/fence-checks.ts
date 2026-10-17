@@ -375,11 +375,14 @@ function source(code: string, node: t.Node): string {
   return code.slice(node.start!, node.end!)
 }
 
-// `f({ a, redirect })` as `f({ a }, { redirect })`: the moved properties leave the input, the others keep the text around them. Safe unless the input has a spread or a computed key, which may hold one of the moved names the property no longer overrides.
+// `f({ a, redirect })` as `f({ a }, { redirect })`: the moved properties leave the input, the others keep the text around them, and an options argument already there takes them in front of its own properties, which win as they do at run time. Safe unless the input or the options have a spread or a computed key, or the options are not an object literal: a spread may hold one of the moved names the property no longer overrides. A moved field the options also set is dropped, as the options win.
 function inputOptionsEdit(code: string, args: t.CallExpression['arguments'], keys: string[]): CallEdit | undefined {
   const input = args[0]
 
-  if (args.length !== 1 || input?.type !== 'ObjectExpression')
+  const second = args[1]
+  const given = second?.type === 'Identifier' && second.name === 'undefined' ? undefined : second
+
+  if (args.length > 2 || input?.type !== 'ObjectExpression')
     return undefined
 
   const { properties } = input
@@ -400,10 +403,26 @@ function inputOptionsEdit(code: string, args: t.CallExpression['arguments'], key
     first = false
   }
 
-  // What closed the object, from the end of its last property: its trailing comma and line break stay.
-  const closing = code.slice(properties.at(-1)!.end!, input.end!)
+  const movedText = moved.map(property => source(code, property)).join(', ')
+  const safeInput = properties.every(property => property.type === 'ObjectProperty' && !property.computed)
 
-  return { start: input.start!, end: input.end!, text: `${rebuilt}${closing}, { ${moved.map(property => source(code, property)).join(', ')} }`, safe: properties.every(property => property.type === 'ObjectProperty' && !property.computed) }
+  // What closed the object, from the end of its last property: its trailing comma and line break stay. An emptied input is `{}`.
+  const inputText = moved.length === properties.length ? '{}' : `${rebuilt}${code.slice(properties.at(-1)!.end!, input.end!)}`
+
+  if (!given)
+    return { start: input.start!, end: (second ?? input).end!, text: `${inputText}, { ${movedText} }`, safe: safeInput }
+
+  if (given.type === 'ObjectExpression') {
+    const own = given.properties.map(property => source(code, property))
+    const overridden = new Set(given.properties.map(property => property.type === 'ObjectProperty' && !property.computed ? propertyKey(property) : undefined))
+    const carried = moved.filter(property => !overridden.has(propertyKey(property as t.ObjectProperty))).map(property => source(code, property))
+    const safeOptions = given.properties.every(property => property.type === 'ObjectProperty' && !property.computed)
+
+    return { start: input.start!, end: given.end!, text: `${inputText}, { ${[...carried, ...own].join(', ')} }`, safe: safeInput && safeOptions }
+  }
+
+  // A variable may hold `undefined` for a field, which would override the moved one.
+  return { start: input.start!, end: given.end!, text: `${inputText}, { ${movedText}, ...${source(code, given)} }`, safe: false }
 }
 
 // `f(email, redirect, { remember })` as `f(email, { redirect, remember })`.
