@@ -95,7 +95,7 @@ const STORE_SIBLINGS: Record<string, string[]> = {
   grants: ['clients', 'codes', 'refresh'],
 }
 
-// `members` or `grants` when the node is that part of a kayjs-auth store: a property of the literal given as a `store` or held in a variable of that name (or, for `grants`, of its `oauth`), beside the store's other parts, or a variable typed `AuthStore['members']`. An object named the same elsewhere is left alone.
+// `members` or `grants` when the node is that part of a kayjs-auth store: a property of the literal given as a `store` or held in a variable of that name, as the argument of a call too (or, for `grants`, of its `oauth`), beside the store's other parts, or a variable typed `AuthStore['members']`. An object named the same elsewhere is left alone.
 function labelOf(node: t.Node, ancestors: t.Node[], source: string): string | undefined {
   if (node.type === 'VariableDeclarator') {
     const annotation = node.id.type === 'Identifier' && node.id.typeAnnotation ? source.slice(node.id.typeAnnotation.start!, node.id.typeAnnotation.end!) : ''
@@ -118,16 +118,20 @@ function labelOf(node: t.Node, ancestors: t.Node[], source: string): string | un
   return insideStore || beside ? name : undefined
 }
 
-const WRAPPERS = new Set(['TSAsExpression', 'TSSatisfiesExpression', 'TSNonNullExpression', 'ParenthesizedExpression', 'TSTypeAssertion'])
+const WRAPPERS = new Set(['TSAsExpression', 'TSSatisfiesExpression', 'TSNonNullExpression', 'ParenthesizedExpression', 'TSTypeAssertion', 'AwaitExpression'])
 
-// The index of the property or variable that holds the object literal at `ancestors[index]`, past the `as` and `satisfies` around it.
+// The index of the property or variable that holds the object literal at `ancestors[index]`, past the `as` and `satisfies` around it and the call it is an argument of, as `createStore({ ... })` holds its literal.
 function ownerIndex(ancestors: t.Node[], index: number): number {
   let at = index - 1
 
-  while (at >= 0 && WRAPPERS.has(ancestors[at]!.type))
+  while (at >= 0 && (WRAPPERS.has(ancestors[at]!.type) || isArgumentOf(ancestors[at]!, ancestors[at + 1]!)))
     at--
 
   return at
+}
+
+function isArgumentOf(call: t.Node, child: t.Node): boolean {
+  return (call.type === 'CallExpression' || call.type === 'NewExpression') && (call.arguments as t.Node[]).includes(child)
 }
 
 function ownerKey(ancestors: t.Node[], index: number): string | undefined {

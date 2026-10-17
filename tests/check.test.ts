@@ -2424,13 +2424,14 @@ describe.concurrent('kay check, unused code', () => {
       'src/store.ts': 'import { memoryStore } from \'@kaynooo/kayjs-auth\'\n\nconst base = memoryStore()\n\nexport const store = { ...base, members: { ...base.members, remove: (a: string, b: string) => base.members!.delete(a, b) }, oauth: { ...base.oauth!, grants: { ...base.oauth!.grants, \'put\'(grant: never) { return base.oauth!.grants.upsert(grant) } } } }\n',
       'src/other.ts': 'import { memoryStore } from \'@kaynooo/kayjs-auth\'\n\nconst remove = () => true\nconst put = () => undefined\n\nexport const a = { users: {}, members: { remove }, oauth: { codes: {}, grants: { put, upsert: put } } }\nexport const b = { store: { members: { remove: remove, delete: remove } }, other: memoryStore }\nexport const team = { members: { remove: (id: string) => id }, grants: { put: 1 } }\nexport const typed: AuthStore[\'members\'] = { ...memoryStore().members!, remove }\n',
       'src/unrelated.ts': 'export const c = { store: {}, members: { remove: () => true }, grants: { put: () => undefined } }\n',
+      'src/wrapped.ts': 'import { createStore } from \'@kaynooo/kayjs-auth\'\n\nconst store = createStore({ members: { remove: 1 } })\nexport const app = { store: wrap({ oauth: { grants: { put: 1 } } }) }\nexport const later = async () => { const store = await createStore({ members: { remove: 1 } }) }\nconst other = createStore({ members: { remove: 1 } })\nexport const cfg = { store: { cache: wrap({ members: { remove: 1 } }) }, other: [other] }\n',
       'src/nested.ts': 'import { memoryStore } from \'@kaynooo/kayjs-auth\'\n\nconst store = { team: { members: { remove: 1 }, deep: { grants: { put: 1 } } }, list: [{ members: { remove: 1 } }] }\nexport const config = { store: { cache: { members: { remove: 1 } } }, other: memoryStore }\nexport const real = { store: { members: { remove: 1 }, oauth: { grants: { put: 1 } } } }\nexport const wrapped = { store: { members: { remove: 1 } } as const }\n',
     })
 
     try {
       const { output } = await runCheck(root)
 
-      expect(output.match(/deprecated-store-verb/g)).toHaveLength(9)
+      expect(output.match(/deprecated-store-verb/g)).toHaveLength(12)
       expect(output).not.toContain('src/unrelated.ts')
       expect(output.match(/nested\.ts:\d+/g)).toEqual(['nested.ts:5', 'nested.ts:5', 'nested.ts:6'])
       await runCheck(root, '--fix')
@@ -2439,6 +2440,11 @@ describe.concurrent('kay check, unused code', () => {
 
       expect(store).toContain('members: { ...base.members, delete: (a: string, b: string)')
       expect(store).toContain('upsert(grant: never)')
+      expect(await Bun.file(join(root, 'src/wrapped.ts')).text()).toContain('const store = createStore({ members: { delete: 1 } })')
+      expect(await Bun.file(join(root, 'src/wrapped.ts')).text()).toContain('store: wrap({ oauth: { grants: { upsert: 1 } } })')
+      expect(await Bun.file(join(root, 'src/wrapped.ts')).text()).toContain('await createStore({ members: { delete: 1 } })')
+      expect(await Bun.file(join(root, 'src/wrapped.ts')).text()).toContain('const other = createStore({ members: { remove: 1 } })')
+      expect(await Bun.file(join(root, 'src/wrapped.ts')).text()).toContain('cache: wrap({ members: { remove: 1 } })')
       expect(await Bun.file(join(root, 'src/other.ts')).text()).toContain('members: { remove }, oauth: { codes: {}, grants: { put, upsert: put } }')
       expect((await runCheck(root)).output.match(/deprecated-store-verb/g)).toHaveLength(4)
       expect(await Bun.file(join(root, 'src/nested.ts')).text()).toContain('team: { members: { remove: 1 }, deep: { grants: { put: 1 } } }')
