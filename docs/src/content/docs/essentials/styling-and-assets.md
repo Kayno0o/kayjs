@@ -77,7 +77,7 @@ export default {
 }
 ```
 
-Each key is a glob on the served path and each value a duration. The first glob a file matches decides, and a file none matches keeps revalidating. `kay dev` ignores it, so an edit shows at once.
+Each key is a glob on the served path and each value a duration. The first glob a file matches decides, and a file none matches keeps revalidating. `kay dev` ignores it, so an edit shows at once. A static export copies the files, so there the host sets their headers.
 
 <ReadMore href="/llms/styles-and-assets">The editor backup extensions that are left out, and how a public file and a page with the same URL conflict.</ReadMore>
 

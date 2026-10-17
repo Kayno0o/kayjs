@@ -18,9 +18,13 @@ import { reportServerError } from './report'
 import { routeChain, slashedPath } from './routes'
 import { ROBOTS, SITEMAP } from './site-paths'
 
-// Long enough for crawlers, short enough that a new post shows up the same hour without a restart.
 const DATE_ONLY = /^\d{4}-\d\d-\d\d$/
+// A date and time that names its zone, so every host reads it as the same moment.
+const DATE_TIME = /^\d{4}-\d\d-\d\dT\d\d:\d\d(?::\d\d(?:\.\d+)?)?(?:Z|[+-]\d\d:\d\d)$/
 const ROBOTS_PATH = /^[/*][^\r\n]*$/
+// How many `lastmod` calls of a page run at once, as each may read a database.
+const LASTMOD_BATCH = 16
+// Long enough for crawlers, short enough that a new post shows up the same hour without a restart.
 const CACHE_MS = 60 * 60 * 1000
 
 export interface SitemapOptions {
@@ -66,8 +70,20 @@ export function serveSitemap(app: Elysia, served: ServedPaths, routes: ServedRou
   if (options.robots !== false) {
     const rules = robotsRules(options.robots)
 
-    if (served.offer({ path: ROBOTS, owner: 'robots.txt', kind: 'kay', exported: true }))
-      app.get(ROBOTS, ({ request }) => new Response(robotsTxt(rules, settings?.hosts ? `https://${settings.hosts[hostOf(request)!]}` : origin, settings, hostOf(request), options.base), { headers: { 'content-type': 'text/plain; charset=utf-8' } }))
+    // The same for every request to a host, so written once per host.
+    const written = new Map<string | undefined, string>()
+
+    if (served.offer({ path: ROBOTS, owner: 'robots.txt', kind: 'kay', exported: true })) {
+      app.get(ROBOTS, ({ request }) => {
+        const locale = hostOf(request)
+        let body = written.get(locale)
+
+        if (body === undefined)
+          written.set(locale, body = robotsTxt(rules, settings?.hosts ? `https://${settings.hosts[locale!]}` : origin, settings, locale, options.base))
+
+        return new Response(body, { headers: { 'content-type': 'text/plain; charset=utf-8' } })
+      })
+    }
   }
 }
 
@@ -93,22 +109,40 @@ function robotsTxt(rules: Rules, origin: string, settings: LocaleSettings | unde
   // A pattern starting with `*` matches wherever it falls, so it stays as it is.
   const lines = (name: string, paths: string[]) => paths.flatMap(path => path.startsWith('*') ? [`${name}: ${path}`] : [...new Set(localeCopies(settings, path).filter(copy => settings?.hosts === undefined || copy.locale === locale).map(copy => `${name}: ${base}${copy.path}`))])
 
-  return `User-agent: *\nAllow: /\n${[...lines('Allow', rules.allow), ...lines('Disallow', rules.disallow)].map(line => `${line}\n`).join('')}\nSitemap: ${origin}${SITEMAP}\n`
+  const disallowed = lines('Disallow', rules.disallow)
+  // `Allow: /` against `Disallow: /` is a tie that crawlers settle for Allow, so blocking the whole site drops it.
+  const everything = disallowed.includes('Disallow: /') ? '' : 'Allow: /\n'
+
+  return `User-agent: *\n${everything}${[...lines('Allow', rules.allow), ...disallowed].map(line => `${line}\n`).join('')}\nSitemap: ${origin}${SITEMAP}\n`
 }
 
 // A page's `lastmod` for one URL as the sitemap writes it, a W3C date, or nothing when the page has none for it.
 async function lastmodOf(setting: unknown, params: ListedParams, file: string): Promise<string> {
+  // The params without the symbols kay lists locales under.
   const value: unknown = typeof setting === 'function' ? await (setting as (params: Record<string, string>) => unknown)(Object.fromEntries(Object.entries(params))) : setting
 
-  if (value === undefined)
+  if (value === undefined || value === null)
     return ''
 
-  const date = new Date(value as Date | number | string)
+  const invalid = () => new KayError('page-settings-invalid', `kay: ${file}'s lastmod is ${JSON.stringify(value)}, which is no date: it takes a Date, a number of milliseconds, or a string such as '2026-05-06' or '2026-05-06T10:00:00Z'`)
 
-  if ((typeof value === 'object' && !(value instanceof Date)) || Number.isNaN(date.getTime()))
-    throw new KayError('page-settings-invalid', `kay: ${file}'s lastmod is ${JSON.stringify(value)}, which is no date: it takes a Date, a number of milliseconds or a string such as '2026-05-06'`)
+  if (typeof value === 'string' && DATE_ONLY.test(value)) {
+    // A day that does not exist, such as February 31st, rolls over to another when read.
+    if (!new Date(value).toISOString().startsWith(value))
+      throw invalid()
 
-  return `<lastmod>${typeof value === 'string' && DATE_ONLY.test(value) ? value : date.toISOString()}</lastmod>`
+    return `<lastmod>${value}</lastmod>`
+  }
+
+  if (!(value instanceof Date) && typeof value !== 'number' && !(typeof value === 'string' && DATE_TIME.test(value)))
+    throw invalid()
+
+  const date = new Date(value)
+
+  if (Number.isNaN(date.getTime()))
+    throw invalid()
+
+  return `<lastmod>${date.toISOString()}</lastmod>`
 }
 
 // Every page a crawler can reach: a page without params unless it opts out, a page with params for the ones its `sitemap` or `prerender` export lists.
@@ -121,7 +155,14 @@ export async function sitemapXml(routes: ServedRoute[], origin: string, trailing
     const module = modules.at(-1)!
     const sitemap = pageSetting(module, 'sitemap')
     const prerender = pageSetting(module, 'prerender')
-    const listed = async (params: ListedParams[]) => Promise.all(params.map(async value => ({ params: value, modified: await lastmodOf(pageSetting(module, 'lastmod'), value, file) })))
+    const listed = async (params: ListedParams[]) => {
+      const entries: { params: ListedParams, modified: string }[] = []
+
+      for (let from = 0; from < params.length; from += LASTMOD_BATCH)
+        entries.push(...await Promise.all(params.slice(from, from + LASTMOD_BATCH).map(async value => ({ params: value, modified: await lastmodOf(pageSetting(module, 'lastmod'), value, file) }))))
+
+      return entries
+    }
 
     if (chainSetting(modules, 'noindex') === true)
       return []

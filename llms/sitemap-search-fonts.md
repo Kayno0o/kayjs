@@ -96,7 +96,7 @@ const post = await findPost(ctx.params.slug) ?? ctx.notFound()
 h1 {post.title}
 ```
 
-`lastmod` in the same `page` adds a `<lastmod>` to each URL the page lists: a `Date` (written as ISO), a date string such as `'2026-05-06'` (written as it is), or a function of the params of the URL returning one or nothing, async too: `lastmod: async ({ slug }) => (await findPost(slug)).updatedAt`. Every locale's copy of a URL carries it; a value that is no date stops the sitemap with `page-settings-invalid`.
+`lastmod` in the same `page` adds a `<lastmod>` to each URL the page lists: a `Date` (written as ISO), a date string such as `'2026-05-06'` (written as it is), or a function of the params of the URL returning one or nothing, async too: `lastmod: async ({ slug }) => (await findPost(slug)).updatedAt`. Every locale's copy of a URL carries it; a `null` or `undefined` lists the URL with none, and any other value, a day that does not exist or a date and time naming no zone included, stops the sitemap with `page-settings-invalid`. Only the page's own `lastmod` is read, never a layout's. `robots: { disallow: ['/'] }` drops the default `Allow: /`, which would tie with it.
 
 In production the sitemap is built on the first request and kept for an hour; development builds it per request.
 
@@ -141,7 +141,7 @@ export default defineConfig({
 
 - The manifest is named after `seo.name`, `shortName` defaulting to it, and described by `seo.description`.
 - A `name` or `description` written per locale gives each locale reading a text of its own a manifest of its own, `/manifest.fr.webmanifest` beside the default locale's `/manifest.webmanifest`, which that locale's pages link; a locale reading the default locale's text links the default's, and a site writing them once serves one. A site serving its own `/manifest.webmanifest`, a public file or an endpoint, keeps it: kay then serves and links no manifest of a locale. An explicit `shortName` and every path in the manifest, `startUrl` and `scope` included, are the same in all of them, `short_name` otherwise following the locale's `name`.
-- `themeColor` is also every page's `theme-color`, `favicon: false` included.
+- `themeColor` is also every page's `theme-color`, `favicon: false` included, unless `seo.themeColor` sets one.
 - `startUrl` is the page the installed app opens, `scope` by default, else `/`, and `scope` the paths it keeps in its window.
 - `startUrl`, `scope` and each shortcut's `url` (`name`, `shortName`, `description`) are paths of the site, put under `base`.
 - One not starting with a single `/`, or a start page or shortcut outside `scope`, which browsers would ignore, stops the server as it boots.

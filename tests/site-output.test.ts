@@ -49,6 +49,14 @@ describe('publicCache', () => {
     await expect(appWith({ publicCache: { '/x': 'forever' as '1d' }, dev: false })).rejects.toThrow('publicCache[\'/x\']')
   })
 
+  it('refuses a duration that is none in development too', async () => {
+    // A development server that fails to boot serves the reason instead.
+    const html = await (await fetchFrom(await appWith({ publicCache: { '/x': 0 }, dev: true }), '/')).text()
+
+    expect(html).toContain('Boot failed')
+    expect(html).toContain('publicCache[')
+  })
+
   it('applies under a base, whose mount point the proxy takes off', async () => {
     const app = await appWith({ publicCache, base: '/docs', dev: false })
 
@@ -96,6 +104,11 @@ describe('robots', () => {
     expect(await text(app, 'http://x.fr/robots.txt')).toContain('Sitemap: https://x.fr/sitemap.xml\n')
   })
 
+  it('drops the default Allow when everything is disallowed, which would tie with it', async () => {
+    expect(await text(await appWith({ site, robots: { disallow: ['/'] } }))).toBe('User-agent: *\nDisallow: /\n\nSitemap: https://x.example/sitemap.xml\n')
+    expect(await text(await appWith({ site, base: '/docs', robots: { disallow: ['/'] } }))).toContain('Allow: /\nDisallow: /docs/\n')
+  })
+
   it('refuses a rule that is no path, which a line break would make a rule of its own', async () => {
     await expect(appWith({ site, robots: { disallow: ['/a\nAllow: /'] } })).rejects.toThrow('robots.disallow')
     await expect(appWith({ site, robots: { disallow: ['admin'] } })).rejects.toThrow('robots.disallow')
@@ -119,6 +132,23 @@ describe('sitemap lastmod', () => {
     expect(xml).toContain('<url><loc>https://x.example/posts/b</loc><lastmod>2026-05-06</lastmod></url>')
     expect(xml).toContain('<url><loc>https://x.example/posts/c</loc></url>')
     expect(xml).toContain('<url><loc>https://x.example/about</loc></url>')
+  })
+
+  it('lists a URL with none for a null, and stops the sitemap for a value that is no date', async () => {
+    // A page module is imported once per path, so each value gets a copy of its own.
+    const xml = async (lastmod: string) => {
+      const root = await fixtureCopy('site-output')
+
+      await Bun.write(`${root}/src/routes/posts/[slug].kay`, `--- server\nexport const page = { sitemap: [{ slug: 'a' }], lastmod: ${lastmod} }\n---\nh1 Post\n`)
+
+      return (await (await appWith({ routes: `${root}/src/routes`, site })).handle(new Request('http://localhost/sitemap.xml'))).text()
+    }
+
+    expect(await xml('() => null')).toContain('<url><loc>https://x.example/posts/a</loc></url>')
+    expect(await xml('\'2026-05-06T10:00:00+02:00\'')).toContain('<lastmod>2026-05-06T08:00:00.000Z</lastmod>')
+
+    for (const hostile of ['\'2026-02-31\'', '\'2026-5-6\'', '\'2026-05-06T10:00:00\'', 'true', '\'soon\'', '{}', 'Number.NaN'])
+      expect(await xml(hostile)).toBe('Internal Server Error')
   })
 
   it('keeps it with the trailing slash, the base and every locale\'s copy', async () => {

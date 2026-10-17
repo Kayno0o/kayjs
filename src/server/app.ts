@@ -394,7 +394,10 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   if (log !== false && !mode.dev)
     announceStart(app, log, [...prerendered.values()].reduce((count, pages) => count + pages.size, 0))
 
-  await servePublic(app, served, publicServed, mode.dev ? undefined : publicCacheRules(options.publicCache))
+  // Read in development too, so a duration that is none stops it there rather than in production.
+  const publicCache = publicCacheRules(options.publicCache)
+
+  await servePublic(app, served, publicServed, mode.dev ? undefined : publicCache)
   serveRedirects(app, redirects, mode.dev)
 
   const respond = withPageHeaders(pageResponder({ client, renderOptions, prerendered, writes: countWrites(app), settings: i18n?.settings, transforms: pageHooks(options.extensions), pageFile: assetFiles({ clientDir: client.dir, publicDir: paths.public, base, aspects: options.images?.aspects }) }), securityOptions, security)
