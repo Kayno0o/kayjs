@@ -14,7 +14,7 @@ import { ASSET_PREFIX } from '../build/assets'
 import { countCache } from '../build/cache'
 import { SVG_FILE, writeAtomically } from '../build/files'
 import { KayError } from '../compiler/errors'
-import { CARD, CARD_ROUTE, IMPORTED, setCardMaker, SVG_IMAGE, variantFilesLinked, VARIANTS } from '../runtime/image'
+import { CARD, CARD_ROUTE, IMPORTED, setCardMaker, variantFilesLinked, VARIANTS } from '../runtime/image'
 import { localeState } from '../runtime/locale-state'
 import { localizedText } from '../runtime/localized'
 import { nodeCrypto } from './builtins'
@@ -57,7 +57,7 @@ export interface Cards {
   dir: string
   bundled: boolean
   prebuilt: boolean
-  // The built client, where the imported SVGs cards are drawn on are.
+  // The built client, where the imported SVGs cards are drawn on live.
   clientDir: string
   // Changes with anything that changes how a card looks, so a card's file name and URL change with it.
   look: string
@@ -89,6 +89,7 @@ const REMOTE = /^https?:\/\//i
 
 // The setup pages link cards with, and the cards prerendered pages asked for, by file name, for `kay build` to write.
 let current: Cards | undefined
+const svgDrawings = new Map<string, Promise<Uint8Array>>()
 const requested = new Map<string, { title: string, image?: string | undefined, name?: string | undefined }>()
 
 // Settles the face, look and key cards are drawn and signed with, for every card this process links, served or prerendered; a face `images.card.font` names that `fonts` lacks stops the boot.
@@ -124,6 +125,7 @@ export async function setupCards(setup: CardSetup): Promise<Cards> {
 
   if (cards.collect) {
     requested.clear()
+    svgDrawings.clear()
     // An executable carries the key its build made, whether or not a prerendered page linked a card.
     signingKey(cards)
   }
@@ -179,14 +181,14 @@ function svgDrawingName(image: string): string {
 }
 
 function isSvgCard(image: string | undefined): image is string {
-  return image !== undefined && image.startsWith(IMPORTED) && SVG_IMAGE.test(image)
+  return image !== undefined && image.startsWith(IMPORTED) && SVG_FILE.test(image.replace(QUERY, ''))
 }
 
 // An imported SVG rasterized to cover the card. A build keeps that drawing beside the key, as an executable carries no SVG drawer and reads it instead; the name holds the SVG's content, so a changed SVG is drawn again and renames its cards.
 async function cardSvg(cards: Cards, image: string): Promise<Uint8Array> {
   const built = join(cards.dir, svgDrawingName(image))
 
-  if ((cards.bundled || cards.prebuilt || cards.collect) && await Bun.file(built).exists())
+  if ((cards.bundled || cards.prebuilt) && await Bun.file(built).exists())
     return Bun.file(built).bytes()
 
   if (cards.bundled)
@@ -197,12 +199,27 @@ async function cardSvg(cards: Cards, image: string): Promise<Uint8Array> {
   if (file === undefined || !await Bun.file(file).exists())
     throw new KayError('share-card-invalid', `kay: shareCard() was given ${image}, which the build holds no file of`)
 
-  // Imported here alone, as an executable leaves the module out.
-  const { svgCover } = await import('./svg-icon')
-  const drawing = await svgCover(file, 'shareCard() image', CARD.width, CARD.height)
+  if (!cards.collect) {
+    // Imported here alone, as an executable leaves the module out.
+    const { svgCover } = await import('./svg-icon')
 
-  if (cards.collect)
-    await Bun.write(built, drawing)
+    return svgCover(file, 'shareCard() image', CARD.width, CARD.height)
+  }
+
+  // A build draws each SVG once, whatever the drawing an earlier build kept.
+  let drawing = svgDrawings.get(built)
+
+  if (!drawing) {
+    drawing = (async () => {
+      const { svgCover } = await import('./svg-icon')
+      const raster = await svgCover(file, 'shareCard() image', CARD.width, CARD.height)
+
+      await writeAtomically(built, raster)
+
+      return raster
+    })()
+    svgDrawings.set(built, drawing)
+  }
 
   return drawing
 }

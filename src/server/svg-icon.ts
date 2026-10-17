@@ -8,9 +8,9 @@ const ROOT = /<svg\b(?:"[^"]*"|'[^']*'|[^>"'])*>/i
 const TEXT = /<text\b/i
 const SIZE_ATTRIBUTE = /\s(width|height|viewBox)\s*=\s*(?:"([^"]*)"|'([^']*)')/gi
 const PERCENT = /%\s*$/
-// Without system fonts, which resvg would otherwise load on every call, for seconds: text in an icon draws no glyph.
 // Pixels a cover may take, a few times a card's.
 const COVER_PIXELS = 8_000_000
+// Without system fonts, which resvg would otherwise load on every call, for seconds: text in an icon draws no glyph.
 const OPTIONS = { font: { loadSystemFonts: false } }
 
 // Draws the SVG at `file` as a square PNG of each size asked for, once it checked the SVG has a square size to draw at; what it draws poorly goes to `warn`, kay's log by default.
