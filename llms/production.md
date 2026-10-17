@@ -169,12 +169,12 @@ Then `await welcomeMails.enqueue({ to: email })` in an action, or `enqueue(paylo
 
 ### A deploy under open tabs
 
-- Every answer of a production server carries `x-kay-build`, the hash in the file name of the entry chunk its pages load, which changes with any island's code. A page knows its own build from the entry script it loaded; `kay dev` sends none.
+- Every answer of a production server carries `x-kay-build`, a hash of the names of all the client chunks (the entry, the runtime and every island), which changes with any island's code. A page knows its own build from the `kay-build` meta it was rendered with; `kay dev` sends none.
 - A chunk the new build dropped is a 404, so a tab opened before the deploy meets it on the next island it hydrates (`hydrate="visible"`, `"idle"`, a server island) or the next lazy chunk. A tab that failed to load a chunk asks the server for its page once, and when that names another build, reloads the current URL, the browser putting the scroll back. No config.
 - An action call or server island answered by another build marks the tab: its next link, form post or back/forward loads in full instead of swapping pages in. A 404 from another build, as for an action the new build no longer has, reloads at once.
 - A tab with something typed (a changed field, a file chosen, a `guardLeave` guard holding unsaved changes) is never reloaded under the visitor: it waits for the next navigation, which loads in full.
 - A tab reloads once a minute at most, and not at all without `sessionStorage`, so a cache in front of the server keeping an old page cannot loop it.
-- A static export has no header: the tab reads the entry script of its own page from the host instead. The tab loads the code doing all this ahead, when idle, as a deploy drops it with the other chunks.
+- A static export has no header: the tab reads the `kay-build` meta of its own page from the host instead. The tab loads the code doing all this ahead, when idle, as a deploy drops it with the other chunks.
 - `kay build` keeps the script, stylesheet and asset files of the last 3 builds beside the new one in `.kay/client`, so an old tab finds its chunks until it reloads, for 3 deploys after; a static export and `--compile` carry them too, and a build that changed nothing takes no slot. A fresh `.kay` (a clean CI checkout, an image built from scratch) has none to keep: keep `.kay/client` and `.kay/client-kept` between builds, or rely on the reload above, which is what a tab past the last 3 builds does. Builds with other options (`--static`, another `base`) in the same `.kay` each take a slot, and `.kay/client-kept` sits beside the output.
 - A cache or CDN serving the old HTML after a deploy is the one case kay cannot see past: keep HTML pages revalidating, as kay's own pages do.
 

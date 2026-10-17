@@ -1,10 +1,10 @@
 import type { TestPage } from '../src/test'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import process from 'node:process'
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test'
 import { chromium } from 'playwright-core'
-import { BUILD_HEADER, buildOf } from '../src/runtime/swap'
+import { BUILD_HEADER } from '../src/runtime/swap'
 import { requestIdHeader } from '../src/server/protection'
 import { headerCopies, ownHeaders } from '../src/server/security'
 import { browse, browserPath, testSite } from '../src/test'
@@ -13,6 +13,7 @@ import { fixtureCopy } from './scratch'
 const CLI = join(import.meta.dir, '..', 'src', 'cli.ts')
 const path = browserPath() ?? (existsSync(chromium.executablePath()) ? chromium.executablePath() : undefined)
 const ENTRY = /<script type="module"[^>]* src="([^"]+)"/
+const BUILD = /<meta name="kay-build" content="([^"]+)">/
 
 describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a production server naming its build', () => {
   let site: Awaited<ReturnType<typeof testSite>>
@@ -23,10 +24,11 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a producti
 
   afterAll(async () => site?.close())
 
-  it('puts the hash of the entry its pages load on every answer, a missing chunk, a missing action and a 404 page included', async () => {
+  it('puts the build its pages name on every answer, a missing chunk, a missing action and a 404 page included', async () => {
     const page = await site.fetch('/')
-    const entry = ENTRY.exec(await page.text())?.[1]
-    const build = buildOf(entry)
+    const html = await page.text()
+    const entry = ENTRY.exec(html)?.[1]
+    const build = BUILD.exec(html)?.[1]
 
     expect(build).toBeString()
     expect(page.headers.get(BUILD_HEADER)).toBe(build!)

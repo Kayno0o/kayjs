@@ -1,19 +1,20 @@
 import { dirtyGuard, navigation } from './navigation'
-import { BUILD_HEADER, buildOf } from './swap'
+import { BUILD_HEADER, BUILD_META } from './swap'
 
-// Whether the entry chunk this page loaded belongs to `build`.
+const BUILD_TAG = `meta[name="${BUILD_META}"]`
+
+// Whether the page was rendered for `build`.
 function onPage(build: string): boolean {
-  return [...document.scripts].some(script => script.src.includes(`-${build}.`))
+  return document.querySelector(BUILD_TAG)?.getAttribute('content') === build
 }
 
-const ENTRY_SCRIPT = 'script[type="module"][src*="/_kay/"]:not([src*="/_kay/dev/"])'
 const STORAGE_KEY = 'kay-reloaded'
 // A page is not reloaded again within this time, whatever it still says: a cache in front of the server may keep serving the old page, and replicas on two builds may alternate.
 const REPEAT_MS = 60_000
 
 let probing: Promise<boolean> | undefined
 
-// The build the server answers now: the header every answer of a production server carries, else, for a static host, the entry chunk its page for this URL loads.
+// The build the server answers now: the header every answer of a production server carries, else, for a static host, the build its page for this URL names.
 async function served(): Promise<string | undefined> {
   const response = await fetch(location.href, { cache: 'no-store', headers: { accept: 'text/html' } })
   const named = response.headers.get(BUILD_HEADER)
@@ -26,7 +27,7 @@ async function served(): Promise<string | undefined> {
 
   const page = new DOMParser().parseFromString(await response.text(), 'text/html')
 
-  return buildOf(page.querySelector(ENTRY_SCRIPT)?.getAttribute('src') ?? undefined)
+  return page.querySelector(BUILD_TAG)?.getAttribute('content') ?? undefined
 }
 
 // Whether a field holds something other than the page rendered it with.

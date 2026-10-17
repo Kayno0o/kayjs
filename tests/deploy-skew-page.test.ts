@@ -1,8 +1,8 @@
 import type { Mock } from 'bun:test'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, spyOn } from 'bun:test'
 import process from 'node:process'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, spyOn } from 'bun:test'
-import { BUILD_HEADER, buildOf } from '../src/runtime/swap'
+import { BUILD_HEADER } from '../src/runtime/swap'
 
 let skew: typeof import('../src/runtime/build').skew
 let navigation: typeof import('../src/runtime/navigation').navigation
@@ -21,21 +21,7 @@ afterAll(async () => {
   await GlobalRegistrator.unregister()
 })
 
-describe('the build an entry chunk names', () => {
-  it('is the hash in its file name, under any mount point and past a query', () => {
-    expect(buildOf('/_kay/entry-e42sj0jp.js')).toBe('e42sj0jp')
-    expect(buildOf('/repo/_kay/entry-e42sj0jp.js?v=1#x')).toBe('e42sj0jp')
-    expect(buildOf('/_kay/runtime-9a8b7c.js')).toBe('9a8b7c')
-  })
-
-  it('is none for a file the build did not name, or for no entry', () => {
-    expect(buildOf(undefined)).toBeUndefined()
-    expect(buildOf('/_kay/dev/entry.js')).toBeUndefined()
-    expect(buildOf('/app.js')).toBeUndefined()
-  })
-})
-
-// The page loads the entry of build `aaa`; a response names the build the server runs.
+// The page was rendered for build `aaa`; a response names the build the server runs.
 function answer(build: string | undefined, status = 200, body = ''): Response {
   return new Response(body, { status, headers: build === undefined ? {} : { [BUILD_HEADER]: build } })
 }
@@ -46,7 +32,7 @@ describe('a page noticing a deploy', () => {
   const environment = process.env.NODE_ENV
 
   beforeEach(() => {
-    document.head.innerHTML = '<script type="text/plain" src="/_kay/entry-aaa.js"></script>'
+    document.head.innerHTML = '<meta name="kay-build" content="aaa">'
     document.body.innerHTML = ''
     sessionStorage.clear()
     delete navigation.stale
@@ -123,16 +109,16 @@ describe('a page noticing a deploy', () => {
   })
 
   it('reads the build off the page of a static host, which names none in a header', async () => {
-    fetched.mockResolvedValue(answer(undefined, 200, '<html><head><script type="module" src="/repo/_kay/entry-bbb.js"></script></head></html>'))
+    fetched.mockResolvedValue(answer(undefined, 200, '<html><head><meta name="kay-build" content="bbb"></head></html>'))
 
     expect(await reloadIfStale()).toBe(true)
 
     sessionStorage.clear()
-    fetched.mockResolvedValue(answer(undefined, 200, '<html><head><script type="module" src="/repo/_kay/entry-aaa.js"></script></head></html>'))
+    fetched.mockResolvedValue(answer(undefined, 200, '<html><head><meta name="kay-build" content="aaa"></head></html>'))
 
     expect(await reloadIfStale()).toBe(false)
 
-    fetched.mockResolvedValue(answer(undefined, 200, '<h1>A page with no script</h1>'))
+    fetched.mockResolvedValue(answer(undefined, 200, '<h1>A page with no build</h1>'))
 
     expect(await reloadIfStale()).toBe(false)
     expect(reload).toHaveBeenCalledTimes(1)

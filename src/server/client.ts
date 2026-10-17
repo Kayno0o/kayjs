@@ -17,6 +17,8 @@ import { unrebaseCss } from './base'
 export interface ClientManifest {
   // Public URL of the entry chunk that hydrates every island; none when no component is interactive.
   entry?: string
+  // The build every answer of a production server names, a hash of the names of all the client chunks, so it changes with any island's code.
+  build?: string
   // The chunks the entry imports statically, which the browser only discovers once the entry arrives.
   entryImports: string[]
   // Each island's chunk and every chunk it imports statically, by island id.

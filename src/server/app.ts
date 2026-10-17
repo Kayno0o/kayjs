@@ -22,7 +22,7 @@ import { offlineOf } from '../project'
 import { FILES_ROUTE, IMAGE_ROUTE } from '../runtime/image'
 import { localizedText } from '../runtime/localized'
 import { kayLog } from '../runtime/log'
-import { BUILD_HEADER, buildOf, DRAFT_ROUTE } from '../runtime/swap'
+import { BUILD_HEADER, DRAFT_ROUTE } from '../runtime/swap'
 import { registerActionRoutes } from './actions'
 import { serveApi } from './api'
 import { mcpPath, RESOURCE_METADATA, sharedGuards } from './api-modules'
@@ -245,7 +245,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
     rewriteRequests(app, options.rewrite, app)
 
   // The build every answer names, so a page of an older build learns of a deploy from any of them, a 404 for a chunk or an action the new build dropped included.
-  const build = mode.dev ? undefined : buildOf(client.entry)
+  const build = mode.dev ? undefined : client.build
 
   // After the rewrite, which hands the request served in its place the id it had, as a tool call dispatched through the app does.
   app.onRequest(({ request, set }) => {

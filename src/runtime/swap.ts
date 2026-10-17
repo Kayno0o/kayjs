@@ -12,17 +12,12 @@ export const PAGE_HEADER = 'x-kay-page'
 export const WORK_HEADER = 'x-kay-work'
 // Marks a page loaded fully from any link or form, past the swap: one setting `reload: true`.
 export const RELOAD_HEADER = 'x-kay-reload'
-// Names the build a response comes from, on every one a production server answers: the hash in the file name of the entry chunk its pages load, which changes with any island's code.
+// Names the build a response comes from, on every one a production server answers: a hash of the names of all the client chunks, which changes with any island's code, and which its pages name in a `kay-build` meta.
 export const BUILD_HEADER = 'x-kay-build'
 // Where edit mode's `showDraft` posts the entries an editor has not saved, for the page rendered with them.
 export const DRAFT_ROUTE = '/_kay/draft'
 // Marks the data script holding the challenges of the actions a page's forms post to, by action URL.
 export const WORK_SCRIPT = 'data-kay-work'
 
-const ENTRY_HASH = /-([\da-z]+)\.js$/
-const QUERY_OR_HASH = /[?#]/
-
-// The build an entry chunk's URL belongs to: the hash Bun put in its name.
-export function buildOf(entry: string | undefined): string | undefined {
-  return entry === undefined ? undefined : ENTRY_HASH.exec(entry.split(QUERY_OR_HASH, 1)[0]!)?.[1]
-}
+// The meta naming the build a page was rendered for.
+export const BUILD_META = 'kay-build'

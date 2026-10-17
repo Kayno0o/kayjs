@@ -396,7 +396,10 @@ export async function bundleIslands(root: string, islands: Map<string, string>, 
   const inputs = Object.fromEntries(Object.entries(build.metafile!.outputs).map(([output, meta]) => [output.replace(LEADING_DOT_SLASH, ''), meta.inputs]))
   const directives = await islandDirectives(root, build.outputs)
 
-  return { manifest: { ...manifest, navigation, ...directives && { directives } }, inputs, maps: build.outputs.filter(output => output.kind === 'sourcemap').map(output => output.path) }
+  // The names carry the content hashes, so the id changes with the code of the entry, the runtime or any island.
+  const buildId = options.hot ? undefined : Bun.hash(build.outputs.filter(output => JS_OUTPUT.test(output.path)).map(output => basename(output.path)).sort().join('\n')).toString(36).slice(0, 8)
+
+  return { manifest: { ...manifest, navigation, ...buildId !== undefined && { build: buildId }, ...directives && { directives } }, inputs, maps: build.outputs.filter(output => output.kind === 'sourcemap').map(output => output.path) }
 }
 
 // What kay's policy refuses and the islands' chunks or the workers they start need: `'wasm-unsafe-eval'` to compile wasm, `blob:` workers for a package building its worker in memory, as qr-scanner does.
