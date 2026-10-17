@@ -2,7 +2,7 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
-## Unreleased
+## 1.51.2
 
 - The dev tool is redrawn in kay's palette and mark, with an icon and a toned count on each tab, the rail folding to icons when narrow, and new layouts for Problems, Request, Head, Env, Images, Performance, Routes, i18n and Islands; a library's tab takes an `icon`, and `count` a `'warn'` tone, and the bar no longer shows the reload line ([Dev server](dev-server.md), [A tab for a library](component-libraries.md#a-tab-for-a-library)).
 - `shareCard({ title, image })` takes an imported `.svg` as `image`, drawn to cover the card before the title, with its cards written by `kay build` and kept for an executable like `images.card.logo` ([Images](images.md#draw-a-share-card-for-a-page)).
