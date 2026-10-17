@@ -4,6 +4,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ## 1.52.0
 
+### 404 bodies read `Not Found`
+
+- The plain-text 404 body of the image route, the card route, stored files and a page without a 404 page was `Not found` and is now `Not Found`, as endpoints and actions already answered. A test or monitor matching the old text changes it; no lint can see it, as it reads a response.
+
 ### A search hit's `href` carries the words searched for
 
 - `hit.href` from `searchSite` and `searchResults` is now `/path?kay_q=words#anchor`, so a page opened from a hit marks them. An app comparing `hit.href` to a path, or splitting it at `#` only, reads the path from `new URL(hit.href, location.origin).pathname`. A page with a strict `query` schema is not affected, as `kay_q` is left out of `ctx.query`. No `deprecated` lint is possible, as no code `kay check` reads is wrong.
