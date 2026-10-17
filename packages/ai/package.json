@@ -18,6 +18,7 @@
   },
   "exports": {
     "./add": "./src/add.ts",
+    "./chat.kay": "./src/chat.kay",
     ".": {
       "types": "./types/index.d.ts",
       "default": "./src/index.ts"

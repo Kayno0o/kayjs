@@ -1,0 +1,5 @@
+---
+import Chat from '@kaynooo/kayjs-ai/chat.kay'
+import { reply } from '../routes/chat.kay'
+---
+Chat(action={reply} label="Assistant")

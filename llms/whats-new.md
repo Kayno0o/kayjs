@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- `Chat(action={reply})` from `@kaynooo/kayjs-ai/chat.kay` is a chat island over a streaming action: history, the reply streaming in as markdown without images, pending and error states with a retry, Stop, kayjs-ui's look and keyboard and screen-reader use ([kayjs-ai](../docs/src/content/docs/libraries/kayjs-ai.md#a-chat-for-your-site)).
 - `@kaynooo/kayjs-ai` calls an LLM with no SDK: `ask()` over Anthropic or any OpenAI-compatible server returns a reply that `await`s as the text and streams as snapshots into an `await` block or an action's answer, and `fakeAi` answers in development and tests (`kay add ai`, [kayjs-ai](../docs/src/content/docs/libraries/kayjs-ai.md)).
 - An action returning a thenable async iterable, such as a model's reply, streams it instead of waiting for its end, and its call is typed as the stream ([Streaming actions](api-from-islands.md#streaming-actions)).
 - An `await` block takes an async iterable, such as an async generator or a model's reply, and renders `then` again with each part it yields, on the server as the page streams and in an island ([A value that arrives in parts](rendering.md#a-value-that-arrives-in-parts)).

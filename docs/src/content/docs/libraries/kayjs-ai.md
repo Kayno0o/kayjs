@@ -80,6 +80,32 @@ An action keeps its guards, its schema and its rate limits. Each call bills, so 
 
 Messages take only the roles `user` and `assistant`. The system prompt goes in the `system` option, so a visitor can never send one.
 
+## A chat for your site
+
+`Chat` is an island that talks to your action. It keeps the history, streams the reply in as Markdown and has a Stop button. It uses kayjs-ui's look, so import that library's `theme.css` once.
+
+```kay
+---
+import Chat from '@kaynooo/kayjs-ai/chat.kay'
+import { reply } from '../routes/assistant.kay'
+---
+Chat(action={reply} label="Assistant")
+```
+
+Put this in a component of your own, such as `assistant.kay`, and use that component in your page. A page with a `server` fence cannot hand an action to an island, but a component can import it.
+
+- Enter sends and Shift+Enter starts a new line.
+- Stop, or Escape in the field, ends the reply. The words that came stay, marked as stopped.
+- If the call fails, the chat shows an alert and a button to ask again. The message is not sent twice.
+- A screen reader hears each finished turn once, not word by word.
+- Images in a reply are not shown. A model that read a hostile page could point an image at a link carrying your visitor's conversation.
+
+Every label is a prop, so you can write them in your language: `placeholder`, `sendLabel`, `stopLabel`, `retryLabel`, `thinkingLabel`, `stoppedLabel` and `errorMessage`. `initial` gives messages to start with.
+
+The chat posts the whole history with each message. Keep `content` and `maxItems` short in the action's schema, and add a rate limit.
+
+<ReadMore href="/llms/kayjs-ai-chat">The props, the markup and the rules for passing the action.</ReadMore>
+
 ## The reply
 
 - `await reply` is the whole text.

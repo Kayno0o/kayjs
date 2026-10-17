@@ -1,0 +1,17 @@
+--- server
+import { s } from 'kay'
+
+const PACE_MS = 50
+const STEPS = 200
+
+// A reply that says one word and then keeps working until the visitor stops it.
+export const slow = action(s.Object({ messages: s.Array(s.Object({ role: s.UnionEnum(['user', 'assistant']), content: s.String({ maxLength: 4000 }) }), { minItems: 1, maxItems: 50 }) }), async function* () {
+  yield 'Working'
+
+  for (let step = 0; step < STEPS; step++)
+    await Bun.sleep(PACE_MS)
+
+  yield 'Working done'
+})
+---
+p Slow

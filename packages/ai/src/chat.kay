@@ -1,0 +1,180 @@
+---
+import type { Action, ActionStream, SanitizeOptions } from 'kay'
+import type { Message } from './types'
+import { effect, sanitizeHtml, signal, untrack } from 'kay'
+import { markdownHtml } from 'kay/markdown'
+import './chat.css'
+
+// What a reply keeps of markdown: no image, which a model reading a hostile page could point at a URL carrying the conversation, and no task checkbox. Tables stay.
+const REPLY: SanitizeOptions = { tags: ['table', 'thead', 'tbody', 'tr', 'th', 'td'] }
+// How close to the end of the log the visitor must be for new text to keep it scrolled down.
+const PINNED_PX = 48
+
+interface Turn extends Message {
+  id: number
+  // A reply the visitor stopped, or one whose stream broke off, cut where it was.
+  stopped?: boolean | undefined
+}
+
+const { action, initial = [], label = 'Chat', placeholder = 'Write a message…', sendLabel = 'Send', stopLabel = 'Stop', retryLabel = 'Try again', thinkingLabel = 'Thinking…', stoppedLabel = 'Stopped', errorMessage = 'The reply failed.', class: className } = props<{
+  // The page's streaming action, `action(schema, ({ messages }) => ask(messages))`; the chat posts the whole history to it and reads the reply as it streams.
+  action: Action<{ messages: Message[] }, AsyncIterable<string>>
+  // The messages shown to start with.
+  initial?: Message[] | undefined
+  // Names the chat and its message list for screen readers.
+  label?: string | undefined
+  placeholder?: string | undefined
+  sendLabel?: string | undefined
+  stopLabel?: string | undefined
+  retryLabel?: string | undefined
+  // Said, and read out, while the first words of a reply are awaited.
+  thinkingLabel?: string | undefined
+  // Marks a reply cut short by Stop.
+  stoppedLabel?: string | undefined
+  // Shown when the call is refused or the stream breaks off.
+  errorMessage?: string | undefined
+  class?: string | undefined
+}>()
+
+let nextId = 0
+const history = signal<Turn[]>(untrack(() => initial).map(message => ({ ...message, id: nextId++ })))
+const draft = signal('')
+// The call is out and no word of the reply is there yet.
+const waiting = signal(false)
+const streaming = signal<ActionStream<string> | undefined>(undefined)
+// The reply so far, which becomes a turn of the history once the stream ends.
+const partial = signal('')
+const failure = signal<string | undefined>(undefined)
+const busy = () => waiting() || streaming() !== undefined
+let run: AbortController | undefined
+let log: HTMLElement | undefined
+let pinned = true
+
+function markdown(text: string) {
+  return sanitizeHtml(markdownHtml(text), REPLY)
+}
+
+// The reply ended on its own, was stopped or broke off: what arrived joins the history.
+function finish(state: string) {
+  const text = partial()
+
+  streaming.set(undefined)
+  partial.set('')
+
+  if (text !== '')
+    history.set([...history(), { id: nextId++, role: 'assistant', content: text, stopped: state !== 'done' }])
+
+  if (state === 'failed')
+    failure.set(errorMessage)
+}
+
+effect(() => {
+  const stream = streaming()
+
+  if (stream === undefined)
+    return
+
+  const state = stream.status()
+
+  if (state !== 'open')
+    untrack(() => finish(state))
+})
+
+// Keeps the newest text in view unless the visitor scrolled up to read.
+effect(() => {
+  history()
+  partial()
+  waiting()
+
+  if (pinned)
+    queueMicrotask(() => log?.scrollTo({ top: log.scrollHeight }))
+})
+
+async function send(again = false) {
+  const text = draft().trim()
+
+  if (busy() || (!again && text === ''))
+    return
+
+  if (!again) {
+    history.set([...history(), { id: nextId++, role: 'user', content: text }])
+    draft.set('')
+  }
+
+  const mine = new AbortController()
+
+  run = mine
+  pinned = true
+  failure.set(undefined)
+  partial.set('')
+  waiting.set(true)
+
+  try {
+    const stream = await action({ messages: history().map(({ role, content }) => ({ role, content })) }, { signal: mine.signal })
+
+    stream.on(partial.set)
+    streaming.set(stream)
+  }
+  catch (error) {
+    // A call stopped before its first word is not a failure.
+    if (!mine.signal.aborted) {
+      console.error(error)
+      failure.set(errorMessage)
+    }
+  }
+  finally {
+    waiting.set(false)
+  }
+}
+
+function stop() {
+  run?.abort()
+  streaming()?.close()
+}
+
+function keyDown(event: KeyboardEvent) {
+  if (event.key === 'Escape' && busy()) {
+    stop()
+  }
+  else if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
+    event.preventDefault()
+    void send()
+  }
+}
+
+function scrolled() {
+  pinned = log !== undefined && log.scrollHeight - log.scrollTop - log.clientHeight < PINNED_PX
+}
+---
+section.kai-chat(class={className} aria-label={label})
+  // The log is the turns so far; the reply streaming in is hidden from screen readers until it is whole, so the finished turn is announced once, not word by word.
+  .kai-chat-log(role="log" aria-label={label} tabindex="0" ref={element => { log = element }} onScroll={scrolled})
+    for turn of history() key={turn.id}
+      article.kai-chat-turn(data-role={turn.role})
+        // Tool calls and results of the turn go here, before its text.
+        if turn.role === 'user'
+          p.kai-chat-text {turn.content}
+        else
+          .kai-chat-text(innerHTML={markdown(turn.content)})
+          if turn.stopped
+            small.kai-chat-note {stoppedLabel}
+    if busy()
+      article.kai-chat-turn(data-role="assistant" data-pending="" aria-hidden="true")
+        // Tool calls and results of the reply being written go here, before its text.
+        if partial() === ''
+          p.kai-chat-text.kai-chat-thinking {thinkingLabel}
+        else
+          .kai-chat-text(innerHTML={markdown(partial())})
+  p.kai-chat-status(role="status") {busy() ? thinkingLabel : ''}
+  if failure()
+    .kui-notice(role="alert" data-tone="error")
+      | {failure()}
+      |
+      if !busy() && history().at(-1)?.role === 'user'
+        button.kui-btn(type="button" onClick={() => void send(true)}) {retryLabel}
+  form.kai-chat-form(onSubmit={event => { event.preventDefault(); void send() }})
+    textarea.kui-field-input(bind:value={draft} rows="1" aria-label={label} placeholder={placeholder} onKeyDown={keyDown})
+    if busy()
+      button.kui-btn(type="button" onClick={stop}) {stopLabel}
+    else
+      button.kui-btn(type="submit") {sendLabel}

@@ -1,0 +1,5 @@
+---
+import SlowAssistant from '../components/slow-assistant.kay'
+---
+h1 Slow assistant
+SlowAssistant
