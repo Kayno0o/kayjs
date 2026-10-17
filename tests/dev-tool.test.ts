@@ -533,6 +533,7 @@ describe('the dev tool', () => {
 
     expect(asked).toEqual(['/_kay/dev/request?id=abc'])
     expect(line()).toEqual(['GET', `${location.pathname}${location.search}`, '200', '51 ms on the server'])
+    expect(shadow().querySelector<HTMLElement>('#kay-dev-tab-request .count')!.hidden).toBe(true)
     expect(facts()).toEqual([
       'Route: /items/:id',
       'Params: id = "7"',
@@ -594,6 +595,10 @@ describe('the dev tool', () => {
     expect(timing()).toEqual([])
     expect(shadow().querySelector('#kay-dev-request .reqline .pill')?.textContent).toBe('404 Not Found')
     expect(shadow().querySelector('#kay-dev-request .reqline .pill')?.classList.contains('error')).toBe(true)
+    // An error status counts on the tab, as a problem does.
+    expect(shadow().querySelector<HTMLElement>('#kay-dev-tab-request .count')!.hidden).toBe(false)
+    expect(shadow().querySelector('#kay-dev-tab-request .count')?.textContent).toBe('1')
+    expect(shadow().querySelector('#kay-dev-tab-request .count')?.classList.contains('error')).toBe(true)
 
     tool.setOpener(async (source) => {
       opened.push(source)

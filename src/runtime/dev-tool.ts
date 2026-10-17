@@ -1552,6 +1552,7 @@ function requestTab(doc: Document, tool: DevTool): { stop: () => void } {
     bar.element.hidden = block === undefined || block === null
 
     if (block === undefined || block === null) {
+      tab.count(0)
       content.replaceChildren(tool.make('div', 'empty', 'kay served no request block with this page.'))
 
       return
@@ -1609,6 +1610,7 @@ function requestTab(doc: Document, tool: DevTool): { stop: () => void } {
     const path = tool.make('span', 'path', `${win.location.pathname}${win.location.search}`)
 
     line.append(tool.make('span', 'method', 'GET'), path, status)
+    tab.count(request.status >= 400 ? 1 : 0, 'error')
     fact('Route', request.route === undefined ? tool.make('span', 'note', 'none matched') : tool.make('span', 'mono', request.route))
     chips.append(...params.map(([name, value]) => tool.make('span', 'chip', `${name} = ${JSON.stringify(value)}`)))
     fact('Params', params.length === 0 ? tool.make('span', 'note', 'none') : chips)
