@@ -10,7 +10,7 @@ import { transformKay } from '../src/build/transform'
 import { UNCHECKED_TYPES } from '../src/compiler/ast'
 import { collectHead } from '../src/runtime/head'
 import { child, UNDESCRIBED_TYPES } from '../src/runtime/html'
-import { renderToString } from '../src/server/string'
+import { renderLocale, renderToString } from '../src/server/string'
 import { scratchDir } from './scratch'
 
 await plugin(kay())
@@ -491,6 +491,9 @@ describe('renderToString', () => {
     try {
       expect(await renderToString(view, { name: 'Ada' })).toBe('<p lang="en">Hello Ada English only 1,234.5</p>')
       expect(await renderToString(view, { name: 'Ada' }, { locale: 'fr' })).toBe('<p lang="fr">Bonjour Ada English only 1\u202F234,5</p>')
+      expect(await renderLocale()).toBe('en')
+      expect(await renderLocale('fr')).toBe('fr')
+      await expect(renderLocale('de')).rejects.toThrow('none of the site\'s locales')
       await expect(renderToString(view, { name: 'Ada' }, { locale: 'de' })).rejects.toThrow('renderToString renders in de, which is none of the site\'s locales: en, fr')
     }
     finally {

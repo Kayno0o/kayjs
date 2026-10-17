@@ -4,9 +4,8 @@ import type { Address, Delivery, Envelope, Mail, Message, Transport } from './ty
 import process from 'node:process'
 import { Elysia } from 'elysia'
 import { s } from 'kay'
-import { locale } from 'kay/i18n'
 import { escapeHtml as escape, underKayDev } from 'kay/library'
-import { defineEnv, queue, renderToString } from 'kay/server'
+import { defineEnv, queue, renderLocale, renderToString } from 'kay/server'
 import parseAddresses from 'nodemailer/lib/addressparser'
 import { log } from './log'
 import { addressOf, outbox, PREVIEW_ROUTES } from './outbox'
@@ -342,10 +341,10 @@ export function mailer(options: MailerOptions = {}): Mailer {
     }
 
     const unsubscribe = message.unsubscribe === undefined ? {} : unsubscribeHeaders(message.unsubscribe, message.subject)
+    // The locale the component renders `t()` in and the document's `lang`: the message's, else the mailer's, else the site's default or the request's.
     const chosen = message.lang ?? options.lang
+    const rendered = message.view ? await renderLocale(chosen) : chosen ?? 'en'
     const markup = message.view ? await renderToString(message.view, ...[message.props, chosen === undefined ? undefined : { locale: chosen }] as never) : message.html
-    // With no language chosen the component renders in the site's default locale, or the request's, which the html's `lang` reads from a probe rendered the same way.
-    const rendered = chosen ?? (message.view && markup !== undefined ? await renderToString(() => locale() as never) : 'en')
     const html = markup === undefined ? undefined : asDocument(markup, message.subject, rendered)
 
     return {

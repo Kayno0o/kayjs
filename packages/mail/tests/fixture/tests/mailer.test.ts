@@ -90,6 +90,7 @@ describe('rendering', () => {
     expect(inherited.html).toContain('<html lang="fr"')
     expect(overridden.text).toBe('Hello')
     expect(overridden.html).toContain('<html lang="en"')
+    expect((await mailer({ from: 'hello@fixture.test', queue: { name: 'default-lang' } }).render({ to: 'ada@example.com', subject: 'Hi', view: Hello })).html).toContain('<html lang="en"')
   })
 
   it('offers one-click unsubscribe through the headers RFC 8058 names, refusing a URL that is not https', async () => {

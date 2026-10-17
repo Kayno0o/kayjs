@@ -231,4 +231,4 @@ const html = await renderToString(Receipt, { order })
 - Islands render their server markup, with no script to run them, and a `head` block sets nothing.
 - The props argument is left out for a component taking no required prop.
 - `t()`, `locale()` and the formatters from `kay/i18n` read the request's locale while an action or a page runs, and the site's default locale elsewhere, as in a job or a component test.
-- `renderToString(Mail, props, { locale: 'fr' })` renders in the one given, as for a mail in its recipient's language, and refuses a locale the site lacks.
+- `renderToString(Mail, props, { locale: 'fr' })` renders in the one given, as for a mail in its recipient's language, and refuses a locale the site lacks. `renderLocale(locale?)` from `kay/server` answers the locale it would render in: the one given, else the request's, else the site's default.

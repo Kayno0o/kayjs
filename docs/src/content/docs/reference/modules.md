@@ -67,6 +67,7 @@ Types include `Component`, `Signal`, `Guard`, `Duration`, `PageContext`, `Endpoi
 | `enterPreview`, `exitPreview`, `previewUrl` | Preview mode for drafts, edit mode with `{ edit: true }` |
 | `editRequested` | Whether a request is in edit mode |
 | `renderToString` | Renders a component to a string, for mails and feeds |
+| `renderLocale` | The locale `renderToString` renders in: the one given, the request's, else the site's default |
 | `processImage`, `imageSize` | Resize or measure an image |
 | `files`, `diskFiles`, `s3Files`, `memoryFiles` | Stored uploads and their stores. See [File storage](/guides/file-storage) |
 | `shutdown` | Stops the server gracefully |

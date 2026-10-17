@@ -23,6 +23,13 @@ export async function renderToString<P extends object>(view: (props: P) => JSX.E
   return runInLocale(await renderState(options?.locale), render)
 }
 
+// The locale `renderToString` renders in for the same `locale`: the one given, else the request's while one runs, else the site's default; refuses a locale the site lacks.
+export async function renderLocale(locale?: string): Promise<string> {
+  const current = localeState()
+
+  return current !== undefined && locale === undefined ? current.locale : (await renderState(locale)).locale
+}
+
 async function settled(view: () => unknown): Promise<string> {
   const { result: { result: html }, deferred } = collectDeferred(() => collectIslands(() => child(view())))
 
