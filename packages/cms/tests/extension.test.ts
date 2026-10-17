@@ -75,14 +75,15 @@ describe('cms() missing field kinds', () => {
   test('warns once the server starts for a custom kind the project has no component for', async () => {
     const { server } = cms({ files: workingTree() })
     const { registerCollections } = await import('../../../src/content/edit')
+    const { setContentPlace } = await import('../../../src/content/load')
     const config = await import('./fixture/src/content.config') as Record<string, unknown>
     const before = registerCollections(Object.entries(config) as Parameters<typeof registerCollections>[0])
-    const cwd = process.cwd()
     const warned = spyOn(console, 'warn').mockImplementation(() => undefined)
     const app = (typeof server === 'function' ? await server() : server)!
 
     try {
-      process.chdir(`${import.meta.dir}/fixture`)
+      // The working directory is the package's, not the project: the root is the one the content config settled.
+      setContentPlace(`${import.meta.dir}/fixture`, `${import.meta.dir}/fixture/src`)
       app.listen(0)
       await Bun.sleep(50)
 
@@ -90,7 +91,6 @@ describe('cms() missing field kinds', () => {
     }
     finally {
       await app.stop()
-      process.chdir(cwd)
       warned.mockRestore()
       registerCollections(before)
     }

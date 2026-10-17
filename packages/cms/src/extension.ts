@@ -1,6 +1,6 @@
 import type { KayExtension } from 'kay/server'
 import type { CmsOptions } from './settings'
-import { underKayDev } from 'kay/library'
+import { serverRoot, underKayDev } from 'kay/library'
 import { api, editRequested } from 'kay/server'
 import { collections } from './kay/content'
 import { missingKindLines } from './kinds'
@@ -33,7 +33,7 @@ export function cms(options: CmsOptions = {}): KayExtension {
       // Once the server listens, the content config is registered.
       plugin.onStart(async () => {
         try {
-          for (const line of missingKindLines(process.cwd(), await collections({ counts: false })))
+          for (const line of missingKindLines(await serverRoot(), await collections({ counts: false })))
             log.warn(line)
         }
         catch (error) {

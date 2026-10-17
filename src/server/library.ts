@@ -45,3 +45,8 @@ export async function localizedEntry(...args: Parameters<Entries['localizedEntry
 export async function writeDraftEntry(...args: Parameters<Entries['writeDraftEntry']>): ReturnType<Entries['writeDraftEntry']> {
   return (await import('./entry-drafts')).writeDraftEntry(...args)
 }
+
+// The project root the running server serves: where `.kay` sits, and the content config's project, not the working directory a server may be started from.
+export async function serverRoot(): Promise<string> {
+  return (await import('../content/load')).contentPlace().root
+}
