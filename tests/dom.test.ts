@@ -1,7 +1,7 @@
-import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
+import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { kay } from '../src/build/plugin'
 import { compileKay } from '../src/compiler'
 import { patch } from '../src/runtime/dev-patch'

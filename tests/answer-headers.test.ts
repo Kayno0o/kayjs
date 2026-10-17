@@ -1,7 +1,7 @@
 import type { ClientBuild } from '../src/server/client'
-import { beforeAll, describe, expect, it } from 'bun:test'
 import { rm } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
+import { beforeAll, describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
 import { files, memoryFiles, pages } from '../src/server'
 import { serveBuildFiles } from '../src/server/build-files'

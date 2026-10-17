@@ -1,6 +1,6 @@
-import { afterAll, describe, expect, it } from 'bun:test'
 import { rm } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
+import { afterAll, describe, expect, it } from 'bun:test'
 import { buildClient } from '../src/build/client'
 import { directImports } from '../src/build/direct-imports'
 import { kayPlugin } from '../src/build/plugin'

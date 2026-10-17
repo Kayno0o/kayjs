@@ -1,7 +1,7 @@
 import type { Mock } from 'bun:test'
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, spyOn } from 'bun:test'
 import process from 'node:process'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, spyOn } from 'bun:test'
 import { BUILD_HEADER } from '../src/runtime/swap'
 
 let skew: typeof import('../src/runtime/build').skew

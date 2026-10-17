@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'bun:test'
 import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { join } from 'node:path'
+import { describe, expect, it } from 'bun:test'
 import { buildClient } from '../src/build/client'
 import { renderMarkdown } from '../src/content'
 import { sanitizedMarkdown } from '../src/runtime/markdown'

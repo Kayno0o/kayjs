@@ -1,5 +1,5 @@
-import { describe, expect, it, spyOn } from 'bun:test'
 import * as parser from '@babel/parser'
+import { describe, expect, it, spyOn } from 'bun:test'
 import { compileKay, componentName } from '../src/compiler'
 import { moduleSignals } from '../src/compiler/module-signals'
 import { CURRENT, defaultName, GENERATED_NAME, PROPS } from '../src/compiler/names'
