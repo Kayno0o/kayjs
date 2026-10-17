@@ -108,7 +108,7 @@ catch
   p Comments are unavailable
 ```
 
-Without `catch`, a rejection removes the pending block and is logged. Islands inside a streamed block hydrate when it lands. A form inside one is checked and sent by kay as one in the page is, with the page's locale words.
+Without `catch`, a rejection removes the pending block and is logged. Islands inside a streamed block hydrate when it lands. A form inside one is checked and sent by kay as one in the page is, with the page's locale words and its proof-of-work challenge.
 
 An `await` block takes any promise, wherever it came from. A property, a prop or a promise a component made all work the same way.
 

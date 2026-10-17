@@ -1,0 +1,19 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+export const solve = action(t.Object({ name: t.String({ minLength: 3 }) }), () => undefined, { proofOfWork: 50 })
+export const other = action(t.Object({ title: t.String({ minLength: 2 }) }), () => undefined, { proofOfWork: 60 })
+
+const rows = Promise.resolve([1])
+---
+form(action={solve})
+  input(field="name")
+  button Solve
+await rows then list
+  form(action={solve})
+    input(field="name")
+    button Again
+  form(action={other})
+    input(field="title")
+    button Other

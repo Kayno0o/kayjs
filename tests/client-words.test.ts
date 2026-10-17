@@ -11,6 +11,7 @@ import { resetWords } from '../src/runtime/words.client'
 import { servePages } from '../src/server/app'
 import { formsScript } from '../src/server/forms'
 import { INVALID_PARAMS } from '../src/server/words'
+import { workScript } from '../src/server/work'
 
 const FIXTURE = 'tests/fixtures/client-words'
 const I18N = /<script type="application\/json" data-kay-i18n>(.*?)<\/script>/
@@ -140,6 +141,57 @@ describe('a form inside a streamed block', () => {
         expect(html.match(/data-kay-i18n/g)).toHaveLength(1)
         expect(html.match(ENTRY)).toHaveLength(1)
         expect(payload(html)?.messages).toEqual(FRENCH)
+      })
+    })
+  }
+})
+
+const WORK = /<script type="application\/json" data-kay-work>(.*?)<\/script>/g
+
+function challengesOf(html: string): string[][] {
+  return [...html.matchAll(WORK)].map(found => Object.keys(JSON.parse(found[1]!) as object))
+}
+
+// A proof-of-work form in a streamed block posts with its challenge at once: kaynooo/kayjs#963.
+describe('a proof-of-work form inside a streamed block', () => {
+  const sites: [string, { base?: string, trailingSlash?: 'always' }][] = [
+    ['', {}],
+    ['/blog', { base: '/blog', trailingSlash: 'always' }],
+  ]
+
+  for (const [prefix, options] of sites) {
+    const path = (route: string) => `${route}${options.trailingSlash === 'always' ? '/' : ''}`
+
+    describe(prefix === '' ? 'on a site at the root' : 'under a base with a trailing slash', () => {
+      for (const i18n of [true, false]) {
+        it(`ships the challenge with the block when only the block holds the form${i18n ? ' in a locale' : ''}`, async () => {
+          const html = await page(path(i18n ? '/fr/worked' : '/worked'), { ...options, i18n })
+          const works = challengesOf(html)
+
+          expect(works).toHaveLength(1)
+          expect(works[0]).toHaveLength(1)
+          expect(works[0]![0]).toEndWith('/solve')
+          expect(works[0]![0]!.startsWith('/_kay/')).toBe(true)
+          expect(html.indexOf('data-kay-work')).toBeGreaterThan(html.indexOf('Shell'))
+          expect(Object.values(JSON.parse([...html.matchAll(WORK)][0]![1]!) as Record<string, string>)[0]).toMatch(/^[\da-z]+\.[\w-]+\.[\da-f]{64}\./)
+        })
+      }
+
+      it('sends only the challenges the shell lacks when the shell has a form too', async () => {
+        const works = challengesOf(await page(path('/fr/workedboth'), options))
+
+        expect(works).toHaveLength(2)
+        expect(works[0]).toHaveLength(1)
+        expect(works[0]![0]).toEndWith('/solve')
+        expect(works[1]).toHaveLength(1)
+        expect(works[1]![0]).toEndWith('/other')
+      })
+
+      it('ships it once for the parts of an iterable block', async () => {
+        const html = await page(path('/fr/workedparts'), options)
+
+        expect(html.match(/data-kay-await="/g)!.length).toBeGreaterThan(1)
+        expect(challengesOf(html)).toHaveLength(1)
       })
     })
   }
@@ -302,6 +354,21 @@ describe('the browser\'s form check in the page\'s locale', () => {
     document.body.insertAdjacentHTML('afterbegin', '<form><input name="title" value="ab"></form>')
     expect(checkForm(document.querySelector('form')!, '/second')).toBe(false)
     expect(checkForm(document.querySelector('form')!, '/third')).toBe(true)
+  })
+
+  it('solves the challenge a streamed block brought, past the shell\'s and one still streaming', async () => {
+    const { spendWork } = await import('../src/runtime/work.client')
+    const first = action(t.Object({ name: t.String() }), () => undefined, { proofOfWork: 20 })
+    const second = action(t.Object({ title: t.String() }), () => undefined, { proofOfWork: 20 })
+
+    ;(first as { url: string }).url = '/first'
+    ;(second as { url: string }).url = '/second'
+    document.head.insertAdjacentHTML('beforeend', workScript(new Set([first]), false))
+    document.body.insertAdjacentHTML('beforeend', workScript(new Set([second]), false))
+    document.body.insertAdjacentHTML('beforeend', '<script type="application/json" data-kay-work>{"/third":"ab')
+    expect(await spendWork('/second')).toMatch(/\.\d+$/)
+    expect(await spendWork('/first')).toMatch(/\.\d+$/)
+    expect(await spendWork('/missing')).toBeUndefined()
   })
 
   it('checks a form an island rendered after the page loaded as one the page held', () => {

@@ -1,0 +1,13 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+export const solve = action(t.Object({ name: t.String({ minLength: 3 }) }), () => undefined, { proofOfWork: 50 })
+
+const rows = Promise.resolve([1])
+---
+p.shell Shell
+await rows then list
+  form(action={solve})
+    input(field="name")
+    button Solve

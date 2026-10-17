@@ -9,18 +9,21 @@ const solutions = new Map<string, Promise<string | undefined>>()
 // The challenges a post went with: a solution goes through once, so the next post waits for a fresh one.
 const spent = new Set<string>()
 
-// The challenge the page holds for the action at `url`, unless a post spent it.
+// The challenge the page holds for the action at `url`, unless a post spent it: in the script of its head, or one a streamed block brought.
 function challengeOf(url: string): string | undefined {
-  const script = document.querySelector(`script[${WORK_SCRIPT}]`)
+  for (const script of document.querySelectorAll(`script[${WORK_SCRIPT}]`)) {
+    try {
+      const challenge = (JSON.parse(script.textContent ?? '') as Record<string, string | undefined>)[url]
 
-  try {
-    const challenge = script ? (JSON.parse(script.textContent ?? '') as Record<string, string | undefined>)[url] : undefined
+      if (challenge !== undefined && !spent.has(challenge))
+        return challenge
+    }
+    catch {
+      // A script still streaming does not parse yet: the next post reads it whole.
+    }
+  }
 
-    return challenge === undefined || spent.has(challenge) ? undefined : challenge
-  }
-  catch {
-    return undefined
-  }
+  return undefined
 }
 
 async function solving(challenge: string): Promise<string | undefined> {

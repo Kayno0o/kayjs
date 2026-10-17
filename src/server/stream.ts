@@ -11,6 +11,7 @@ import { isSnapshots, lastSnapshot, readSnapshots } from '../runtime/snapshots'
 import { formsScript } from './forms'
 import { hydrationScript } from './hydration'
 import { invalidKeys, messagesScript } from './i18n'
+import { workScript } from './work'
 
 // Swaps every streamed block that arrived in for the pending one between its markers, then hydrates the islands they brought; an outer block that settled first may have taken the markers away already.
 // Both scripts are the same on every page, so a Content-Security-Policy allows them by hash.
@@ -49,10 +50,20 @@ export function renderStatic(view: () => unknown, salt?: string): Rendered {
 }
 
 // A streamed block, whose forms are collected for the stream to send their schemas along as the shell would have.
-function renderBlock(view: () => unknown, salt?: string): Rendered {
+export function renderBlock(view: () => unknown, salt?: string): Rendered {
   const { result, forms } = collectForms(() => renderStatic(view, salt))
 
   return { ...result, forms }
+}
+
+// What a block settled inside a server island sends for its forms, as the shell of a page would: the schemas, the challenges and the words the browser's check uses; the browser merges every such script it finds.
+export function formChecks(forms: Set<Action<never, unknown>> | undefined, dev?: boolean): string {
+  if (!forms || forms.size === 0)
+    return ''
+
+  const checked = formsScript(forms, dev)
+
+  return checked + workScript(forms, false) + (checked === '' ? '' : messagesScript(new Set(invalidKeys()), true))
 }
 
 // Bun closes a connection idle for 10 s by default, and proxies after a minute or so: an empty comment now and then keeps a page whose blocks are slow open.
@@ -91,6 +102,8 @@ export function streamDocument(shell: string, deferred: PendingBlock[], client: 
 
         const fresh = posts ? [...rendered.forms ?? []].filter(form => !formsShipped.has(form)) : []
         const checked = fresh.length > 0 ? formsScript(new Set(fresh), sent.dev) : ''
+        // The challenges the shell lacks go the same way, the browser reading every challenges script.
+        const worked = fresh.length > 0 ? workScript(new Set(fresh), false) : ''
 
         for (const form of fresh)
           formsShipped.add(form)
@@ -105,7 +118,7 @@ export function streamDocument(shell: string, deferred: PendingBlock[], client: 
           wordsShipped = true
         }
 
-        scripts += checked
+        scripts += checked + worked
 
         // The first message of the page carries the locale; later ones only the messages they bring.
         if (rendered.islands.count > 0 || (checked !== '' && keys.size > 0)) {
@@ -118,7 +131,7 @@ export function streamDocument(shell: string, deferred: PendingBlock[], client: 
           hydrationShipped = true
         }
 
-        if (!shipped && client.entry !== undefined && (rendered.islands.count > 0 || checked !== '')) {
+        if (!shipped && client.entry !== undefined && (rendered.islands.count > 0 || checked !== '' || worked !== '')) {
           scripts += `<script type="module" async src="${client.entry}"></script>`
           shipped = true
         }

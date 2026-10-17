@@ -168,6 +168,48 @@ describe('server islands', () => {
     }
   })
 
+  // A prerendered page holds the checks of the forms it rendered, so the block settled per request brings its own: kaynooo/kayjs#963.
+  for (const [name, site] of [['at the root', {}], ['under a base', { base: '/blog', trailingSlash: 'always' as const }]] as const) {
+    it(`ships the form check and the challenge of a form in a block inside one, ${name}`, async () => {
+      const copy = await fixtureCopy('server-islands')
+      const copied = join(copy, 'src/routes')
+      const build = await scratchBuild()
+
+      await Bun.write(join(copy, 'src/components/rows.kay'), '---\nimport type { Action } from \'kay\'\n\nconst { to, show } = props<{ to: Action<{ name: string }, unknown>, show: boolean }>()\nconst rows = Promise.resolve([1])\n---\n// kay-allow uncaught-await\nawait rows\n  p.pending Loading\nthen list\n  if show\n    form(action={to})\n      input(field="name")\n      button Send\n')
+      await Bun.write(join(copied, 'rows.kay'), '--- server\nimport { t } from \'elysia\'\nimport { action } from \'kay\'\n\nexport const page = { prerender: true }\nexport const send = action(t.Object({ name: t.String({ minLength: 3 }) }), () => \'sent\', { proofOfWork: 50 })\n\nconst show = ctx.url.searchParams.has(\'show\')\n--- script\nimport Rows from \'../components/rows.kay\'\n---\nh1 Rows\nRows(server show={show} to={send})\n')
+      await Bun.write(join(copied, 'later.kay'), '--- server\nimport { t } from \'elysia\'\nimport { action } from \'kay\'\n\nexport const page = { prerender: true }\nexport const send = action(t.Object({ name: t.String({ minLength: 3 }) }), () => \'sent\', { proofOfWork: 50 })\n\nconst show = ctx.url.searchParams.has(\'show\')\n--- script\nimport Rows from \'../components/rows.kay\'\n---\nh1 Later\nRows(server="defer" show={show} to={send})\n')
+
+      try {
+        await build.prerender({ routes: copied, ...site })
+
+        const app = await build.serve({ routes: copied, security: false, ...site })
+        const slash = site.base === undefined ? '' : '/'
+        const visit = async (path: string, headers: Record<string, string> = {}) => (await app.handle(new Request(`http://localhost${path.replace('?', `${slash}?`)}`, { headers }))).text()
+        const checked = (html: string) => ({
+          forms: [...html.matchAll(/data-kay-forms>(.*?)<\/script>/g)].map(found => Object.keys(JSON.parse(found[1]!) as object)),
+          works: [...html.matchAll(/data-kay-work>(.*?)<\/script>/g)].map(found => Object.keys(JSON.parse(found[1]!) as object)),
+        })
+
+        // Built without the form, which only this request shows.
+        expect(checked(await Bun.file(join(build.pages, 'rows.html')).text())).toEqual({ forms: [], works: [] })
+
+        for (const html of [await visit('/rows?show=1'), await visit('/later?kay_island=0&show=1', { [ISLAND_HEADER]: '1' })]) {
+          const { forms, works } = checked(html)
+
+          expect(html).toContain('<form')
+          expect(forms).toHaveLength(1)
+          expect(forms[0]![0]).toEndWith('/send')
+          expect(works).toHaveLength(1)
+          expect(works[0]![0]).toEndWith('/send')
+        }
+      }
+      finally {
+        await build.remove()
+        await rm(copy, { recursive: true, force: true })
+      }
+    })
+  }
+
   it('keeps a page holding one out of a static export, naming it', async () => {
     const build = await scratchBuild()
 
