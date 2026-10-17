@@ -3,6 +3,7 @@ import Button from '@kaynooo/kayjs-ui/button.kay'
 import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
 import Notice from '@kaynooo/kayjs-ui/notice.kay'
 import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
+import { underKayDev } from 'kay/library'
 import { wording } from 'kay/words'
 import MissingPaths from '../components/missing-paths.kay'
 import { readMissing } from '../missing'
@@ -11,6 +12,7 @@ import { settings } from '../settings'
 
 const { prefix } = settings()
 const screen = readMissing()
+const hint = underKayDev() ? wording('cms.missing.devHint', 'kay dev counts nothing: the production server records the pages visitors asked for and found nothing at.') : wording('cms.missing.emptyHint', 'The production server records the pages visitors asked for and found nothing at.')
 ---
 head
   title {wording('cms.missing.title', 'Missing pages')}
@@ -23,4 +25,4 @@ PageSection(title={wording('cms.missing.title', 'Missing pages')} level={1})
     Notice(tone="info" label={wording('cms.missing.notice', 'The pages visitors asked for and found nothing at, most visited first, as the production server counted them. Paths a redirect answers are left out. Copy a suggested redirect into the redirects of kay.config.ts, or run kay not-found --redirect with the path.')})
     if screen.total > screen.rows.length
       Notice(tone="warning" label={wording('cms.missing.truncated', 'Showing the {shown} most visited of {total} paths.', { shown: screen.rows.length, total: screen.total })})
-    MissingPaths(rows={screen.rows})
+    MissingPaths(rows={screen.rows} hint={hint})

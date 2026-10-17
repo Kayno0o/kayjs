@@ -6,7 +6,8 @@ import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
 import Table from '@kaynooo/kayjs-ui/table.kay'
 import { wording } from 'kay/words'
 
-const { rows } = props<{ rows: MissingRow[] }>()
+// `hint` says why the list may be empty, which depends on the server's mode.
+const { rows, hint } = props<{ rows: MissingRow[], hint: string }>()
 
 const columns: Column<MissingRow>[] = [
   { key: 'path', header: wording('cms.missing.path', 'Path'), sortValue: true, cell: true },
@@ -27,4 +28,4 @@ Table.kcms-missing(columns={columns} rows={rows} rowKey={row => row.path} sort={
         if row.line as line
           CopyButton(text={line} label={wording('cms.missing.copy', 'Copy redirect')} aria-label={wording('cms.missing.copyLabel', 'Copy the redirect from {path}', { path: row.path })} size="sm" variant="ghost")
   @empty
-    EmptyState(title={wording('cms.missing.empty', 'No missing page recorded')} description={wording('cms.missing.emptyHint', 'The production server records the pages visitors asked for and found nothing at.')})
+    EmptyState(title={wording('cms.missing.empty', 'No missing page recorded')} description={hint})

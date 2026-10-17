@@ -10,6 +10,7 @@ class Refused extends Error {}
 void mock.module('kay/server', () => ({ ...server, editRequested: (request: Request) => request.headers.has('x-edit') }))
 
 const { default: apiGuard } = await import('../src/api/_guard')
+const { default: screenGuard } = await import('../src/routes/_guard')
 const ada = { name: 'Ada', email: 'ada@example.com' }
 
 function context(method: string, path: string, edit: boolean): GuardContext {
@@ -109,5 +110,29 @@ describe('a guard loaded lazily', () => {
     expect(await admitted(context('POST', '/entries/posts/hello', false))).toBe(true)
     expect(await admitted(context('POST', '/entries/posts/hello', false))).toBe(true)
     expect(loads).toBe(2)
+  })
+})
+
+describe('the screens\' guard', () => {
+  const screen = (path: string, headers: Record<string, string> = {}): GuardContext => {
+    const url = new URL(`http://site.test${path}`)
+
+    return { request: new Request(url, { headers }), url, deny: (_code?: number, message?: string) => {
+      throw new Refused(message)
+    } } as unknown as GuardContext
+  }
+
+  test('keeps every screen closed, the missing pages included, while the app gives no guard', async () => {
+    configure({})
+
+    for (const path of ['/admin', '/admin/not-found', '/admin/uploads', '/admin/collections/posts'])
+      await expect(screenGuard(screen(path))).rejects.toThrow('no guard')
+  })
+
+  test('lets in whom the app\'s guard admits', async () => {
+    configure({ guard: ({ request, deny }) => request.headers.has('x-editor') ? undefined : deny(403, 'Editors only') })
+
+    await expect(screenGuard(screen('/admin/not-found'))).rejects.toThrow('Editors only')
+    await expect(Promise.resolve(screenGuard(screen('/admin/not-found', { 'x-editor': '1' })))).resolves.toBeUndefined()
   })
 })

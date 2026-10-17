@@ -1,5 +1,6 @@
 import type { DevTool } from 'kay/dev-tool'
 import { screenPath } from './paths'
+
 // The dev tool's CMS tab, a browser module kay loads on dev pages: whether this visitor is in edit mode, with a toggle for the page they are on.
 const STATE_URL = '/_kay/cms'
 
