@@ -165,6 +165,10 @@ form(action={signIn})
 
 `register({ email, password, username })` creates an account the same way, answering `errors` by field.
 
+Every way of signing in takes what is not a credential in one trailing options object: `signInWithPassword(input, { redirect, remember, captcha })`, `register(input, { remember, captcha })`, `requestMagicLink(email, { redirect, remember, captcha })` and `signInWithPasskey(response, { redirect, remember })`. A `redirect` that is not a path of the site leads home.
+
+Before 1.52 the fields sat in the input, or a `redirect` came as an argument of its own: that still works for now and `kay check --fix` moves them.
+
 With a mailer, it signs no one in until the address is verified. It answers a held address as a free one and mails its holder instead.
 
 Set `email: { requireVerified: false }` to sign in at once. It answers `'taken'` for a held address, which tells anyone which addresses have an account.
@@ -299,8 +303,8 @@ export const register = action(s.Object({
   email: s.String({ maxLength: 254 }),
   password: s.String({ maxLength: 128 }),
   captcha: s.Optional(s.String({ maxLength: 512 })),
-}), async (input, ctx) => {
-  const result = await ctx.locals.auth.register(input)
+}), async ({ captcha, ...input }, ctx) => {
+  const result = await ctx.locals.auth.register(input, { captcha })
 
   if (!result.ok)
     return ctx.fail(400, { error: 'error' in result ? result.error : 'invalid' })

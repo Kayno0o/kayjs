@@ -144,7 +144,7 @@ describe('signing in with a second factor', () => {
 
     const visitor = browser()
 
-    await visitor.call('requestMagicLink', 'ada@example.com', '/account')
+    await visitor.call('requestMagicLink', 'ada@example.com', { redirect: '/account' })
     const token = new URL(mails.at(-1)!.url!).searchParams.get('token')!
 
     expect(await visitor.call('signInWithMagicLink', token)).toEqual({ ok: true, redirect: '/two-factor' })

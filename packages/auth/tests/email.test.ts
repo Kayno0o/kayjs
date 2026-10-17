@@ -404,7 +404,7 @@ describe('magic links', () => {
     await store.users.create(userRecord({ id: 'u1', email: 'ada@example.com' }))
     const ada = browser()
 
-    expect(await ada.call('requestMagicLink', 'ada@example.com', '/account')).toEqual({ ok: true })
+    expect(await ada.call('requestMagicLink', 'ada@example.com', { redirect: '/account' })).toEqual({ ok: true })
 
     const token = tokenOf('magic-link')
 

@@ -43,7 +43,7 @@ describe('emailed codes', () => {
     const { browser, nextCodeMail } = await setup({ 'magic-link': 'code' })
     const ada = browser()
 
-    expect(await ada.call('requestMagicLink', 'ada@example.com', '/account')).toEqual({ ok: true })
+    expect(await ada.call('requestMagicLink', 'ada@example.com', { redirect: '/account' })).toEqual({ ok: true })
 
     const mail = await nextCodeMail('magic-link')
 

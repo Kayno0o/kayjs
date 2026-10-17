@@ -21,6 +21,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 - No lint recognises `ConfirmDelete`'s `variant="danger"` (now `tone="danger"`), a menu action's `danger: true` (now `tone: 'danger'`) or a toast's `type`: rename them by hand, the old forms still work for now.
 - `BarList`, `MediaGallery` and `ScatterChart` name the string they read with nothing to show `emptyLabel`, as `CommandPalette` and `MultiSelect` do; `empty` still works, deprecated, and so does a catalog's `ui.barList.empty`, `ui.mediaGallery.empty` or `ui.scatterChart.empty` key (the new `emptyLabel` key is read first). `Table` and `Widget` keep `empty`, which is content rather than a string.
 
+### kayjs-auth: sign-in methods take one trailing options object
+
+- `signInWithPassword(input, { redirect, remember, captcha })`, `register(input, { remember, captcha })`, `requestMagicLink(email, { redirect, remember, captcha })` and `signInWithPasskey(response, { redirect, remember })` take what they used to find in the input (`redirect`, `remember`, `captcha`) or as a positional `redirect` in one object after the credentials. The old forms still work for now and log a warning; when both are given, the options object wins. `kay check` reports them as `deprecated-sign-in-options`, and `kay check --fix` (or `kay upgrade`) moves them, except in a call with a spread or a computed key, which it leaves to you.
+
 ### `kay dev` does not move a port it was asked for
 
 - A busy port given with `--port`, or by `PORT` in the environment or `.env`, used to move the server to the next free one; the server now fails to start naming the port. Free it, or drop the `PORT` to get the old behaviour. A port the entry names in code still moves. No deprecated lint is possible, as the port is an environment value.

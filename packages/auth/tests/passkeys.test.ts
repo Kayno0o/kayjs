@@ -46,7 +46,7 @@ async function addPasskey(browser: Browser, device = authenticator(), name?: str
 async function passkeySignIn(browser: Browser, device: ReturnType<typeof authenticator>, answer: Parameters<ReturnType<typeof authenticator>['get']>[1] = {}, redirect?: string) {
   const options = await browser.call('passkeySignInOptions')
 
-  return browser.call('signInWithPasskey', await device.get(options, answer), redirect)
+  return browser.call('signInWithPasskey', await device.get(options, answer), { redirect })
 }
 
 describe('registering passkeys', () => {
@@ -142,7 +142,7 @@ describe('signing in with a passkey', () => {
 
     expect(options.allowCredentials).toBeUndefined()
     expect(options.userVerification).toBe('required')
-    expect(await visitor.call('signInWithPasskey', await device.get(options), '//evil.test')).toEqual({ ok: true, redirect: '/' })
+    expect(await visitor.call('signInWithPasskey', await device.get(options), { redirect: '//evil.test' })).toEqual({ ok: true, redirect: '/' })
     expect(await visitor.json('/me')).toMatchObject({ email: 'ada@example.com' })
     expect((await visitor.call('passkeys'))[0]!.lastUsedAt).not.toBeNull()
   })

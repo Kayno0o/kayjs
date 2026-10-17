@@ -286,10 +286,130 @@ function propertyKey(property: t.ObjectProperty | t.ObjectMethod): string | unde
   return property.key.type === 'StringLiteral' ? property.key.value : undefined
 }
 
+const SIGN_IN_CALL = /\b(?:signInWithPassword|requestMagicLink|signInWithPasskey|register)\b/
+// What a way of signing in of kayjs-auth took in its input before 1.52, which is its trailing options object now.
+const INPUT_OPTIONS: Record<string, string[]> = { signInWithPassword: ['redirect', 'remember', 'captcha'], register: ['remember', 'captcha'] }
+// The ones whose redirect was a positional argument after the first.
+const POSITIONAL_REDIRECT = new Set(['requestMagicLink', 'signInWithPasskey'])
+
+// A call of kayjs-auth's `signInWithPassword`, `register`, `requestMagicLink` or `signInWithPasskey` in the form of before 1.52: the redirect, remember and captcha in the input or as a positional redirect, where they are the trailing options object now.
+// Read by name, as the `auth` of `ctx.locals.auth` is typed by the app; `register` only on a receiver named `auth`, as it is a common name.
+export function staleSignInCalls(fence: ParsedFence): Diagnostic[] {
+  if (!SIGN_IN_CALL.test(fence.code))
+    return []
+
+  const diagnostics: Diagnostic[] = []
+
+  eachNode(fence.ast.program, (node) => {
+    if (node.type !== 'CallExpression' || node.callee.type !== 'MemberExpression' || node.callee.computed || node.callee.property.type !== 'Identifier' || node.arguments.some(argument => argument.type === 'SpreadElement'))
+      return
+
+    const { callee } = node
+    const name = (callee.property as t.Identifier).name
+
+    const keys = INPUT_OPTIONS[name]
+
+    if (name === 'register' && receiverName(callee.object) !== 'auth')
+      return
+
+    const edit = keys ? inputOptionsEdit(fence.code, node.arguments, keys) : positionalRedirectEdit(fence.code, name, node.arguments)
+
+    if (!edit)
+      return
+
+    diagnostics.push({
+      ...fence.shift(callee.property),
+      code: 'deprecated-sign-in-options',
+      message: keys ? `\`${name}\` takes ${keys.map(key => `\`${key}\``).join(', ')} in an options object after the input since 1.52, not in the input` : `\`${name}\` takes its redirect in the options object since 1.52, not as an argument of its own`,
+      help: 'move them into one trailing options object: `{ redirect, remember, captcha }`',
+      fixes: [{ title: 'Use the options object', edits: [{ start: fence.offset + edit.start, end: fence.offset + edit.end, text: edit.text }], safe: edit.safe }],
+      checkOnly: true,
+    })
+  })
+
+  return diagnostics
+}
+
+// The name the receiver of a call ends on: `auth` in `auth.x()` and in `ctx.locals.auth.x()`.
+function receiverName(object: t.Node): string | undefined {
+  if (object.type === 'Identifier')
+    return object.name
+
+  return object.type === 'MemberExpression' && !object.computed && object.property.type === 'Identifier' ? object.property.name : undefined
+}
+
+interface CallEdit {
+  start: number
+  end: number
+  text: string
+  safe: boolean
+}
+
+function source(code: string, node: t.Node): string {
+  return code.slice(node.start!, node.end!)
+}
+
+// `f({ a, redirect })` as `f({ a }, { redirect })`: the moved properties leave the input, the others keep the text around them. Safe unless the input has a spread or a computed key, which may hold one of the moved names the property no longer overrides.
+function inputOptionsEdit(code: string, args: t.CallExpression['arguments'], keys: string[]): CallEdit | undefined {
+  const input = args[0]
+
+  if (args.length !== 1 || input?.type !== 'ObjectExpression')
+    return undefined
+
+  const { properties } = input
+  const moved = properties.filter(property => property.type === 'ObjectProperty' && !property.computed && keys.includes(propertyKey(property) ?? ''))
+
+  if (moved.length === 0)
+    return undefined
+
+  // What opened the object, then each kept property after the text that stood between it and the property before it.
+  let rebuilt = code.slice(input.start!, properties[0]!.start!)
+  let first = true
+
+  for (const [index, property] of properties.entries()) {
+    if (moved.includes(property))
+      continue
+
+    rebuilt += `${first ? '' : code.slice(properties[index - 1]!.end!, property.start!)}${source(code, property)}`
+    first = false
+  }
+
+  // What closed the object, from the end of its last property: its trailing comma and line break stay.
+  const closing = code.slice(properties.at(-1)!.end!, input.end!)
+
+  return { start: input.start!, end: input.end!, text: `${rebuilt}${closing}, { ${moved.map(property => source(code, property)).join(', ')} }`, safe: properties.every(property => property.type === 'ObjectProperty' && !property.computed) }
+}
+
+// `f(email, redirect, { remember })` as `f(email, { redirect, remember })`.
+function positionalRedirectEdit(code: string, name: string, args: t.CallExpression['arguments']): CallEdit | undefined {
+  const [first, redirect, options] = args
+
+  if (!POSITIONAL_REDIRECT.has(name) || !first || !redirect || args.length > 3 || redirect.type === 'ObjectExpression')
+    return undefined
+
+  const parts: string[] = []
+
+  if (!(redirect.type === 'Identifier' && redirect.name === 'undefined'))
+    parts.push(redirect.type === 'Identifier' && redirect.name === 'redirect' ? 'redirect' : `redirect: ${source(code, redirect)}`)
+
+  let safe = true
+
+  if (options?.type === 'ObjectExpression') {
+    parts.push(...options.properties.map(property => source(code, property)))
+    safe = options.properties.every(property => property.type === 'ObjectProperty' && !property.computed)
+  }
+  else if (options) {
+    parts.push(`...${source(code, options)}`)
+    safe = false
+  }
+
+  return { start: first.end!, end: args.at(-1)!.end!, text: parts.length === 0 ? '' : `, { ${parts.join(', ')} }`, safe }
+}
+
 // The checks a plain module takes, parsed only when one of them may find something.
 // A module the browser bundle reaches (`browser`) is checked for the names the browser's entries lack as well.
 export function moduleChecks(source: string, browser = false): Diagnostic[] {
-  if (!CSS_BINDING.test(source) && !(browser && source.includes('kay/cache')))
+  if (!CSS_BINDING.test(source) && !(browser && source.includes('kay/cache')) && !SIGN_IN_CALL.test(source))
     return []
 
   const whole = { start: 0, end: source.length }
@@ -308,5 +428,5 @@ export function moduleChecks(source: string, browser = false): Diagnostic[] {
 }
 
 function checksOf(module: ParsedFence, browser: boolean): Diagnostic[] {
-  return [...cssImportsWithoutText(module), ...browser ? serverOnlyImports(module) : []]
+  return [...cssImportsWithoutText(module), ...staleSignInCalls(module), ...browser ? serverOnlyImports(module) : []]
 }

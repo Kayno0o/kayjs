@@ -15,7 +15,7 @@ import FormField from '@kaynooo/kayjs-ui/form-field.kay'
 export const page = { guards: false }
 
 export const password = action(schemas.signIn, async (input, ctx) => {
-  const result = await ctx.locals.auth.signInWithPassword({ identifier: input.identifier, password: input.password, remember: remembered(ctx.locals.auth.features(), input.remember), ...(input.redirect === undefined ? {} : { redirect: input.redirect }), captcha: captchaOf(input) })
+  const result = await ctx.locals.auth.signInWithPassword({ identifier: input.identifier, password: input.password }, { remember: remembered(ctx.locals.auth.features(), input.remember), redirect: input.redirect, captcha: captchaOf(input) })
 
   if (!result.ok)
     return ctx.fail(400, { error: result.error === 'invalid' ? 'credentials' : refusedFor(result.error, input) })
@@ -24,7 +24,7 @@ export const password = action(schemas.signIn, async (input, ctx) => {
 }, guarded)
 
 export const magicLink = action(schemas.magicLink, async (input, ctx) => {
-  const result = await ctx.locals.auth.requestMagicLink(input.email, input.redirect, { captcha: captchaOf(input), remember: remembered(ctx.locals.auth.features(), input.remember) })
+  const result = await ctx.locals.auth.requestMagicLink(input.email, { redirect: input.redirect, captcha: captchaOf(input), remember: remembered(ctx.locals.auth.features(), input.remember) })
 
   return result.ok ? input.email : ctx.fail(400, { error: refusedFor(result.error, input) })
 }, guarded)
@@ -41,7 +41,7 @@ export const emailCode = action(schemas.emailCode, async ({ code }, ctx) => {
 export const passkeyOptions = action(async (ctx) => ctx.locals.auth.passkeySignInOptions())
 
 export const passkey = action(schemas.passkey, async (input, ctx) => {
-  const result = await ctx.locals.auth.signInWithPasskey(input.response, input.redirect, { remember: remembered(ctx.locals.auth.features(), input.remember) })
+  const result = await ctx.locals.auth.signInWithPasskey(input.response, { redirect: input.redirect, remember: remembered(ctx.locals.auth.features(), input.remember) })
 
   return !result.ok ? ctx.fail(400, { error: result.error }) : ctx.redirect(localize(result.redirect))
 })

@@ -77,7 +77,7 @@ describe('where a flow lands when nothing asked for another page', () => {
     await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
     expect(await ada.call('verifyEmail', tokenOf('verify-email'))).toEqual({ ok: true, redirect: '/' })
 
-    await ada.call('requestMagicLink', 'ada@example.com', '/account')
+    await ada.call('requestMagicLink', 'ada@example.com', { redirect: '/account' })
     await take({ kind: 'magic-link' })
     expect(await ada.call('signInWithMagicLink', tokenOf('magic-link'))).toEqual({ ok: true, redirect: '/account' })
     expect(await browser().call('signInWithPassword', { identifier: 'ada@example.com', password: PASSWORD, redirect: '//evil.test' })).toEqual({ ok: true, redirect: '/' })
@@ -146,7 +146,7 @@ describe('the lifetime of a sign-in by emailed code', () => {
 
       await store.users.create(userRecord({ id: `u${index}`, email, emailVerifiedAt: new Date() }))
 
-      await visitor.call('requestMagicLink', email, undefined, remember === undefined ? {} : { remember })
+      await visitor.call('requestMagicLink', email, remember === undefined ? {} : { remember })
 
       const [mail] = await take({ kind: 'magic-link' })
 

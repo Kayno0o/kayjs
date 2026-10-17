@@ -107,7 +107,7 @@ describe('a magic link carries the remember choice', () => {
     const app = await setup({}, { url: 'https://site.test', email: { mailer, links: LINKS } })
     const asker = app.browser()
 
-    await asker.call('requestMagicLink', 'ada@example.com', undefined, remember === undefined ? {} : { remember })
+    await asker.call('requestMagicLink', 'ada@example.com', remember === undefined ? {} : { remember })
 
     const url = new URL(mails.findLast(mail => mail.kind === 'magic-link')!.url!)
 

@@ -14,7 +14,7 @@ import FormField from '@kaynooo/kayjs-ui/form-field.kay'
 export const page = { guards: false }
 
 export const register = action(schemas.register, async (input, ctx) => {
-  const result = await ctx.locals.auth.register({ email: input.email, password: input.password, ...(input.username === undefined ? {} : { username: input.username }), remember: remembered(ctx.locals.auth.features(), input.remember), captcha: captchaOf(input), locale: ctx.locale })
+  const result = await ctx.locals.auth.register({ email: input.email, password: input.password, ...(input.username === undefined ? {} : { username: input.username }), locale: ctx.locale }, { remember: remembered(ctx.locals.auth.features(), input.remember), captcha: captchaOf(input) })
 
   if (!result.ok)
     return ctx.fail(400, 'errors' in result ? { fields: result.errors } : { error: refusedFor(result.error, input) })

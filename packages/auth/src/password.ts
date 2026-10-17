@@ -19,11 +19,11 @@ export interface RegisterInput {
   email: string
   password: string
   username?: string
-  // The CAPTCHA widget's token, when the app asks for one.
+  /** @deprecated Given in the options after the input: `register(input, { captcha })`. */
   captcha?: string | undefined
   // The language the user reads, for their mails; the browser's by default.
   locale?: string | undefined
-  // As for `signInWithPassword`, when registering signs the user in.
+  /** @deprecated Given in the options after the input: `register(input, { remember })`. */
   remember?: boolean | undefined
 }
 
@@ -57,10 +57,11 @@ export interface PasswordSignInInput {
   // An email, or a username when it holds no `@`.
   identifier: string
   password: string
-  // Where to go once signed in, a path on the site; `/` by default.
-  redirect?: string
+  /** @deprecated Given in the options after the input: `signInWithPassword(input, { redirect })`. */
+  redirect?: string | undefined
+  /** @deprecated Given in the options after the input: `signInWithPassword(input, { captcha })`. */
   captcha?: string | undefined
-  // Whether the session lasts `rememberMaxAge` (true) or until the browser closes (false), when the sign-in form asks; kay's own lifetime without it.
+  /** @deprecated Given in the options after the input: `signInWithPassword(input, { remember })`. */
   remember?: boolean | undefined
 }
 

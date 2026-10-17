@@ -72,8 +72,8 @@ describe('a CAPTCHA', () => {
     expect(await ada.post('/password', { identifier: 'ada@example.com', password: PASSWORD, captcha: 'human' })).toMatchObject({ ok: true })
     expect(await ada.call('requestPasswordReset', 'bob@example.com')).toEqual({ ok: false, error: 'captcha' })
     expect(await ada.call('requestPasswordReset', 'bob@example.com', { captcha: 'human' })).toEqual({ ok: true })
-    expect(await ada.call('requestMagicLink', 'bob@example.com', '/', { captcha: 'bot' })).toEqual({ ok: false, error: 'captcha' })
-    expect(await ada.call('requestMagicLink', 'bob@example.com', '/', { captcha: 'human' })).toEqual({ ok: true })
+    expect(await ada.call('requestMagicLink', 'bob@example.com', { redirect: '/', captcha: 'bot' })).toEqual({ ok: false, error: 'captcha' })
+    expect(await ada.call('requestMagicLink', 'bob@example.com', { redirect: '/', captcha: 'human' })).toEqual({ ok: true })
     expect(asked).toEqual(['register:bot', 'register:human', 'sign-in:human', 'reset:human', 'magic-link:bot', 'magic-link:human'])
   })
 
@@ -138,7 +138,7 @@ describe('the proof-of-work CAPTCHA', () => {
     expect(await ada.post('/register', { email: 'ada@example.com', password: PASSWORD, captcha: solveWork(await challengeOf(ada, 'register')) })).toMatchObject({ ok: true })
     expect(await ada.call('requestPasswordReset', 'bob@example.com')).toEqual({ ok: false, error: 'captcha' })
     expect(await ada.call('requestPasswordReset', 'bob@example.com', { captcha: solveWork(await challengeOf(ada, 'reset')) })).toEqual({ ok: true })
-    expect(await ada.call('requestMagicLink', 'bob@example.com', '/', { captcha: solveWork(await challengeOf(ada, 'magic-link')) })).toEqual({ ok: true })
+    expect(await ada.call('requestMagicLink', 'bob@example.com', { redirect: '/', captcha: solveWork(await challengeOf(ada, 'magic-link')) })).toEqual({ ok: true })
 
     // An app often signs a guest in with no form to carry a challenge.
     expect(await browser().call('signInAsGuest')).toMatchObject({ ok: true, user: { guest: true } })
