@@ -1,6 +1,6 @@
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { join, relative } from 'node:path'
 import process from 'node:process'
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
 import { writeShadowTypes } from '../src/check'
 import { bootProblems } from '../src/check/boot'
@@ -180,6 +180,7 @@ describe('the tools', () => {
       'get_notes_words',
       'get_private',
       'language',
+      'listing',
       'refuses',
       'sends_away',
       'signup',
@@ -207,6 +208,37 @@ describe('the tools', () => {
     const tool = (await site.mcp.tools()).find(each => each.name === 'signup')!
 
     expect(tool.inputSchema).toMatchObject({ type: 'object', required: ['email'], properties: { email: { type: 'string' } } })
+  })
+
+  it('describes a defaulted field as JSON alone and leaves it out of required, on both protocol versions', async () => {
+    const versioned = await rpc(site, 'tools/list', { _meta: { 'io.modelcontextprotocol/protocolVersion': '2026-07-28' } })
+    const legacy = await rpc(site, 'tools/list')
+
+    for (const body of [versioned.body, legacy.body]) {
+      const tool = (body.result!.tools as { name: string, inputSchema: { properties: Record<string, Record<string, unknown>>, required: string[] } }[]).find(each => each.name === 'listing')!
+      const { properties, required } = tool.inputSchema
+
+      expect(properties.limit).toEqual({ type: 'integer', minimum: 1, maximum: 100, default: 20 })
+      expect(properties.ratio).toEqual({ type: 'number', default: 0.5 })
+      expect(properties.page).toEqual({ type: 'integer' })
+      expect(properties.label).toEqual({ type: 'string', default: 'all' })
+      expect(properties.open).toEqual({ type: 'boolean', default: true })
+      expect(properties.tags).toMatchObject({ type: 'array', default: [] })
+      expect(properties.paging).toEqual({ type: 'object', properties: { size: { type: 'integer', default: 10 }, after: { type: 'integer' } }, required: ['size', 'after'] })
+      expect(properties.kind!.default).toBe('a')
+      expect(properties.either).toEqual({ anyOf: [{ type: 'integer' }, { type: 'string' }] })
+      expect(required).toEqual(['total', 'paging', 'either'])
+      expect(JSON.stringify(tool.inputSchema)).not.toContain('"format":"integer"')
+      expect(JSON.stringify(tool.inputSchema)).not.toContain('"format":"numeric"')
+    }
+  })
+
+  it('still gives a defaulted field its default when a call leaves it out, and takes the form text over HTTP', async () => {
+    const result = await site.mcp.call('listing', { total: 3, paging: { size: 4, after: 1 }, either: 1 })
+
+    expect(result.data).toMatchObject({ limit: 20, ratio: 0.5, label: 'all', open: true, total: 3, paging: { size: 4, after: 1 } })
+    expect((await site.mcp.call('listing', { total: '3', limit: '5', ratio: '2.5', paging: { size: 4, after: 1 }, either: 1 })).data).toMatchObject({ limit: 5, ratio: 2.5, total: 3 })
+    expect((await site.mcp.call('listing', { total: 3, limit: 500, paging: { after: 1 }, either: 1 })).isError).toBe(true)
   })
 
   it('reads a route\'s path, query and body into one schema, naming it by its operation id', async () => {

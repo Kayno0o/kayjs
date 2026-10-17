@@ -341,9 +341,18 @@ function holdsFile(schema: unknown): boolean {
   return Object.values(schema).some(value => typeof value === 'object' && value !== null && ((value as Schema).format === 'binary' || holdsFile(value)))
 }
 
+const NUMERIC_TEXT = new Set<unknown>(['integer', 'numeric'])
+
 // A route's schema as JSON Schema; one kay cannot read, a model's name or another library's validator, says nothing.
 function schemaOf(schema: unknown): unknown {
   return typeof schema !== 'object' || schema === null || '~standard' in schema ? {} : jsonSchema(schema)
+}
+
+// A union of the numeric text a form sends and the number it stands for is that number alone.
+function withoutNumericText(members: Schema[]): Schema[] {
+  const isText = (member: Schema) => member.type === 'string' && NUMERIC_TEXT.has(member.format)
+
+  return members.length === 2 && members.some(isText) && members.some(member => member.type === 'integer' || member.type === 'number') ? members.filter(member => !isText(member)) : members
 }
 
 // A plain JSON Schema: TypeBox's symbols and Elysia's own marks left out, a bigint as a number.
@@ -379,7 +388,8 @@ function jsonSchema(schema: unknown): unknown {
       if (value.some(member => (member as Schema).type === BYTES))
         return BINARY
 
-      const kept = value.filter(member => (member as Schema).type !== DATE)
+      // `s.Integer()` and `s.Numeric()` also take their text over a form, which the document leaves out: it describes the JSON.
+      const kept = withoutNumericText(value.filter(member => (member as Schema).type !== DATE) as Schema[])
 
       if (kept.length === 1)
         Object.assign(plain, jsonSchema(kept[0]))

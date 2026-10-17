@@ -112,7 +112,8 @@ function toolOf(path: string, method: string, operation: Operation, id: string, 
   }
 
   for (const [name, schema] of Object.entries((body?.properties ?? {}) as Record<string, unknown>))
-    place(name, 'body', schema, ((body?.required ?? []) as string[]).includes(name))
+    // A body field with a default is filled in when a call leaves it out, so it is not asked for.
+    place(name, 'body', schema, ((body?.required ?? []) as string[]).includes(name) && !(typeof schema === 'object' && schema !== null && 'default' in schema))
 
   const get = method === 'get'
   const inputSchema = { type: 'object', properties, ...required.size > 0 && { required: [...required] } }

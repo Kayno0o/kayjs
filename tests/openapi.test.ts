@@ -1,7 +1,7 @@
+import { afterAll, describe, expect, it } from 'bun:test'
 import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
-import { afterAll, describe, expect, it } from 'bun:test'
 import { testSite } from '../src/test'
 
 const CLI = resolve('src/cli.ts')
@@ -39,7 +39,7 @@ describe('the OpenAPI document', () => {
     expect(one.summary).toBe('One item')
     expect(one.tags).toEqual(['catalog'])
     expect(one.parameters).toEqual([
-      { name: 'id', in: 'path', required: true, schema: { anyOf: [{ format: 'numeric', default: 0, type: 'string' }, { type: 'number' }] } },
+      { name: 'id', in: 'path', required: true, schema: { type: 'number' } },
       { name: 'fields', in: 'query', required: false, schema: { type: 'string' } },
     ])
     expect(one.responses).toEqual({
