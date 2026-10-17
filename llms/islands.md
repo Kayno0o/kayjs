@@ -188,8 +188,7 @@ ul(id={id} hidden={!open()})
 
 ### Hydration
 
-- An island hydrates as soon as the page loads, its chunks preloaded.
-- `hydrate="load"`, the default, hydrates it as soon as the page loads.
+- An island hydrates as soon as the page loads, its chunks preloaded; `hydrate="load"` says so, as it is the default.
 - `hydrate="idle"` waits until the browser is idle and `hydrate="visible"` until it scrolls near the viewport, neither preloaded.
 - A click, input or change on an island still loading is replayed once it hydrated and its effects ran, an island that never hydrates holding its last 50 events at most, one whose chunk fails to load dropping them, and a field's consecutive inputs or changes counting as one.
 - Only an island takes `hydrate`, and only from a static parent.

@@ -237,7 +237,7 @@ describe('feeds', () => {
     const feed = (format: 'rss' | 'atom') => ({ path: '/feed.xml', title: 'T', format, item: () => ({ title: 'A', path: '/blog/a', date: new Date('2026-01-02') }) })
 
     it.each(['rss', 'atom'] as const)('under always, in %s and under a base, a localized home too', (format) => {
-      const xml = feedXml([entry], feed(format), 'https://x.example/app', '/fr/', 'always')
+      const xml = feedXml([entry], feed(format), 'https://x.example/app', '/fr', 'always')
 
       expect(xml).toContain('https://x.example/app/blog/a/')
       expect(xml).not.toContain('https://x.example/app/blog/a<')

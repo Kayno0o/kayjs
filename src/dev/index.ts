@@ -831,7 +831,7 @@ async function regenerateTypes(root: string, { entry, config }: DevOptions, refu
 
     const { configCheckOptions, writeShadowTypes } = await import('../check')
 
-    await writeShadowTypes(root, { ...configCheckOptions(config), entry })
+    await writeShadowTypes(root, { ...configCheckOptions(config), entry: entry ?? config.entry })
   }
   catch (error) {
     console.error(error)
