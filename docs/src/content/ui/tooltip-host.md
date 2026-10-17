@@ -4,7 +4,7 @@ description: Renders the tooltip of any element carrying a data-tooltip attribut
 
 <Demo name="tooltip-host/basic" />
 
-Render one `TooltipHost` in the root layout, then add `data-tooltip` to any element. It shows on hover and on keyboard focus. The pointer can cross onto the tooltip to read it, and Escape closes it until the pointer or the focus moves on.
+Render one `TooltipHost` in the root layout, then add `data-tooltip` to any element. It shows on hover and on keyboard focus. The pointer can cross onto the tooltip to read it, and Escape closes it until the pointer or the focus moves on. While a tooltip shows, its element points at it with `aria-describedby`, so a screen reader reads the tooltip too. A tooltip on an element the keyboard never reaches is not read this way, and the `unreachable-tooltip` check says so.
 
 <Callout type="note">
 

@@ -21,10 +21,10 @@ const FILENAME_ALT = /^[\w-]+\.(?:png|jpe?g|gif|webp|avif|svg)$/i
 const WHITESPACE = /\s+/
 // What a screen reader reads a tooltip's text from on an element the keyboard never reaches.
 const DESCRIBING = ['aria-label', 'aria-labelledby', 'aria-describedby']
-// Elements with no role of their own, which ARIA 1.2 forbids naming: a screen reader ignores an `aria-label` on one.
 // The roles that leave an element as bare as having none.
 const ROLELESS = /^\s*(?:none|presentation|generic)\s*$/i
-const UNNAMEABLE = new Set(['span', 'div', 'p', 'b', 'i', 'u', 's', 'em', 'strong', 'small', 'mark', 'code', 'sub', 'sup', 'del', 'ins', 'abbr'])
+// Elements with no role of their own, which ARIA 1.2 forbids naming: a screen reader ignores an `aria-label` on one.
+const UNNAMEABLE = new Set(['span', 'div', 'p', 'b', 'i', 'u', 's', 'em', 'strong', 'small', 'mark', 'code', 'sub', 'sup', 'del', 'ins', 'abbr', 'kbd', 'q', 'cite', 'samp', 'var'])
 // Attributes pointing at other elements by their ids.
 const REFERENCES = ['aria-labelledby', 'aria-describedby']
 // Roles named by a label, as a field is, besides the native fields.
@@ -306,8 +306,11 @@ export function accessibilityLints(file: KayFile): Diagnostic[] {
 
     if (has(element, 'data-tooltip') && !focusable(element) && attribute(element, 'tabindex')?.kind !== 'expression' && !speaksForTooltip(element)) {
       const generic = isUnnameable(element)
+      const base = 'a tooltip shows as the pointer or the focus lands on its element, and the keyboard never lands on this one'
+      const note = generic && has(element, 'aria-label') ? `${base}, and a screen reader ignores an \`aria-label\` on a role-less element` : base
+      const help = `put it on a \`button\` or a link, give the element \`tabindex="0"\`, or say the same in ${generic ? '' : '`aria-label` or '}visible text`
 
-      lint(attribute(element, 'data-tooltip')!.name, 'unreachable-tooltip', `This \`${element.name}\`'s tooltip shows only under the pointer`, { note: generic && has(element, 'aria-label') ? 'a tooltip shows as the pointer or the focus lands on its element, the keyboard never lands on this one, and a screen reader ignores an `aria-label` on a role-less element' : 'a tooltip shows as the pointer or the focus lands on its element, and the keyboard never lands on this one', help: generic ? 'put it on a `button` or a link, give the element `tabindex="0"`, or say the same in visible text' : 'put it on a `button` or a link, give the element `tabindex="0"`, or say the same in `aria-label` or visible text' })
+      lint(attribute(element, 'data-tooltip')!.name, 'unreachable-tooltip', `This \`${element.name}\`'s tooltip shows only under the pointer`, { note, help })
     }
 
     if ((element.name === 'video' || element.name === 'audio') && has(element, 'autoplay') && !has(element, 'controls'))
