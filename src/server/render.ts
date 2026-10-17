@@ -94,7 +94,7 @@ interface LoadedRoute {
   loaded: Map<string, Loaded>
   timings: number[] | undefined
   // How long the guards, the imports of the chain's modules and all its loads took, timed along with `timings`.
-  phases?: ServerPhases | undefined
+  phases: ServerPhases | undefined
 }
 
 interface ServerPhases {
@@ -133,7 +133,7 @@ export interface RenderOptions {
   maxDensity?: number | undefined
   // Whether `images.resolve` is set, written for the islands.
   resolvedImages?: boolean | undefined
-  // Times each load and the render in a `Server-Timing` header, as development always does.
+  // Times the guards, the imports, each load and the render in a `Server-Timing` header, as development always does.
   serverTiming?: boolean | undefined
   // Registers the service worker `offline` turns on.
   offline?: boolean | undefined

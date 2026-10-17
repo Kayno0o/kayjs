@@ -12,6 +12,8 @@ const REFRESH_MS = 500
 const MAX_VALUE = 120
 const MESSAGE_MS = 4000
 const encoder = new TextEncoder()
+// Each island's props attribute with its size, measured again only once it changes, as the tab refreshes twice a second.
+const propsSizes = new WeakMap<HTMLElement, [props: string, bytes: number]>()
 
 // Set by the hot swap in development: the values an island's signals hold now, in the order its script creates them, and how long it took to hydrate.
 interface InspectedWindow {
@@ -173,7 +175,7 @@ export function startInspector(tool: DevTool, doc: Document = document): Inspect
       component: island.dataset.component ?? '?',
       values: win.$kaySignals?.(island)?.map(value => [formatted(value), typeOf(value)] as const),
       hydration: hydrationText(win.$kayHydrationMs?.(island)),
-      props: island.dataset.props === undefined ? undefined : encoder.encode(island.dataset.props).length,
+      props: propsBytes(island),
     }))
     const text = JSON.stringify(rows.map(({ component, values, hydration, props }) => [component, values, hydration, props]))
 
@@ -275,7 +277,6 @@ export function startInspector(tool: DevTool, doc: Document = document): Inspect
   }
 }
 
-// What a signal holds, as a word: its type, `function` and `element` apart.
 // The time an island took to hydrate, to a tenth of a millisecond under 10.
 function hydrationText(ms: number | undefined): string | undefined {
   return ms === undefined ? undefined : `${ms < 10 ? ms.toFixed(1) : Math.round(ms)} ms`
@@ -286,6 +287,25 @@ function sizeText(bytes: number): string {
   return bytes < 1024 ? `${bytes} B` : `${(bytes / 1024).toFixed(1)} KB`
 }
 
+function propsBytes(island: HTMLElement): number | undefined {
+  const props = island.dataset.props
+
+  if (props === undefined)
+    return undefined
+
+  const known = propsSizes.get(island)
+
+  if (known?.[0] === props)
+    return known[1]
+
+  const bytes = encoder.encode(props).length
+
+  propsSizes.set(island, [props, bytes])
+
+  return bytes
+}
+
+// What a signal holds, as a word: its type, `function` and `element` apart.
 function typeOf(value: unknown): string {
   if (value === null)
     return 'null'

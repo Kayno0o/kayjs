@@ -1,3 +1,8 @@
+---
+import Counter from '../components/counter.kay'
+---
 main
   h1 Dev tool
   img(src="/mark.png" width="16" height="16" loading="eager" alt="")
+  Counter
+  a(href="/next") Next

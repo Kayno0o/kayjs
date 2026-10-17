@@ -19,6 +19,8 @@ const SIZES_URL = '/_kay/dev/sizes'
 const MAX_NAVIGATIONS = 5
 // The most requests one navigation lists, the rest counted.
 const MAX_FETCHES = 300
+// How long before the dev tool hears of a swap its own fetch may start, as the page calls fetch in the task marking itself busy; and how far a noted fetch's start may be from its note.
+const SWAP_SLACK_MS = 20
 // The addresses the dev tool fetched itself, which the Network tab leaves out.
 const OWN_FETCHES = new Set<string>()
 const DEV_PATH = /\/_kay\/dev\//
@@ -1691,13 +1693,17 @@ interface Navigation {
 
 // What the page fetched, by navigation, newest first: its load and the last few swaps, each request with its kind, status, size and time; the dev tool's own requests are left out, and an error status is counted on the tab for the page shown.
 function networkTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
-  const win = doc.defaultView!
+  const win = doc.defaultView! as Window & typeof globalThis & { $kayDevFetches?: [href: string, at: number][] }
+  // The live reload script's fetches of the page, noted as it starts them.
+  const reloadFetch = (fetched: PerformanceResourceTiming) => win.$kayDevFetches?.some(([href, at]) => href === fetched.name && Math.abs(at - fetched.startTime) < SWAP_SLACK_MS) === true
   let draw: () => void = () => undefined
   const tab = tool.tab({ id: 'network', label: 'Network', icon: 'network', shown: () => draw() })
   const content = tool.make('div', 'stack')
   const bar = toolbar(tool, 'Filter by address, kind or status', () => bar.apply(content), true)
   const here = () => `${win.location.pathname}${win.location.search}`
   const navigations: Navigation[] = [{ path: here(), start: 0, fetches: [], more: 0 }]
+  // What each navigation's section shows, kept so a new request adds its row rather than redrawing the rest, a focused copy button with it.
+  const drawn = new Map<Navigation, { group: HTMLElement, heading: HTMLElement, list: HTMLElement, empty: HTMLElement, more: HTMLElement, rows: number }>()
   const changed = () => {
     const current = navigations.at(-1)!
 
@@ -1706,35 +1712,57 @@ function networkTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
     if (tab.panel.hidden === false)
       draw()
   }
+  // Whether the request was kept, in the navigation it started in: a swap's own fetch, which starts a moment before the tool hears of the swap, goes in the swap's.
   const add = (fetched: PerformanceResourceTiming) => {
-    if (DEV_PATH.test(fetched.name) || ((fetched.initiatorType === 'fetch' || fetched.initiatorType === 'xmlhttprequest') && OWN_FETCHES.has(fetched.name)))
-      return
+    if (DEV_PATH.test(fetched.name) || ((fetched.initiatorType === 'fetch' || fetched.initiatorType === 'xmlhttprequest') && (OWN_FETCHES.has(fetched.name) || reloadFetch(fetched))))
+      return false
 
-    const navigation = navigations.findLast(candidate => candidate.start <= fetched.startTime) ?? navigations[0]!
+    const navigation = navigations.findLast(candidate => candidate.start <= fetched.startTime + SWAP_SLACK_MS) ?? navigations[0]!
 
     if (navigation.fetches.length < MAX_FETCHES)
       navigation.fetches.push(fetched)
     else
       navigation.more++
+
+    return true
   }
 
   draw = () => {
-    const groups = navigations.toReversed().map((navigation, index) => {
-      const group = tool.make('section', 'group')
-      const heading = tool.make('h3', 'heading', `${index === 0 ? 'This page' : 'Before'}, ${navigation.path === '' ? 'loading' : navigation.path}`)
-      const list = tool.make('div', 'list')
+    for (const [navigation, { group }] of drawn) {
+      if (!navigations.includes(navigation)) {
+        group.remove()
+        drawn.delete(navigation)
+      }
+    }
 
-      heading.append(pill(tool, String(navigation.fetches.length + navigation.more)))
-      list.append(...navigation.fetches.toSorted((a, b) => a.startTime - b.startTime).map(fetched => fetchRow(tool, fetched, navigation.start, win)))
-      group.append(heading, navigation.fetches.length === 0 ? tool.make('div', 'note', 'Nothing fetched.') : list)
+    for (const [index, navigation] of navigations.entries()) {
+      let shown = drawn.get(navigation)
 
-      if (navigation.more > 0)
-        group.append(tool.make('div', 'note', `${navigation.more} more not listed.`))
+      if (shown === undefined) {
+        shown = { group: tool.make('section', 'group'), heading: tool.make('h3', 'heading'), list: tool.make('div', 'list'), empty: tool.make('div', 'note', 'Nothing fetched.'), more: tool.make('div', 'note'), rows: 0 }
+        shown.group.append(shown.heading, shown.empty, shown.list, shown.more)
+        // Newest first: each navigation goes above those before it.
+        content.prepend(shown.group)
+        drawn.set(navigation, shown)
+      }
 
-      return group
-    })
+      shown.heading.replaceChildren(`${index === navigations.length - 1 ? 'This page' : 'Before'}, ${navigation.path === '' ? 'loading' : navigation.path}`, pill(tool, String(navigation.fetches.length + navigation.more)))
 
-    content.replaceChildren(...groups, bar.empty)
+      // In the order they started, which is not the order the browser reports them in once done.
+      for (const fetched of navigation.fetches.slice(shown.rows)) {
+        const row = fetchRow(tool, fetched, navigation.start, win)
+        const after = [...shown.list.children].find(other => Number((other as HTMLElement).dataset.start) > fetched.startTime)
+
+        row.dataset.start = String(fetched.startTime)
+        shown.list.insertBefore(row, after ?? null)
+      }
+
+      shown.rows = navigation.fetches.length
+      shown.empty.hidden = navigation.fetches.length > 0
+      shown.more.hidden = navigation.more === 0
+      shown.more.textContent = `${navigation.more} more not listed.`
+    }
+
     bar.apply(content)
   }
 
@@ -1745,10 +1773,13 @@ function networkTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
 
   try {
     const observer = new win.PerformanceObserver((list) => {
-      for (const fetched of list.getEntries())
-        add(fetched as PerformanceResourceTiming)
+      let kept = false
 
-      changed()
+      for (const fetched of list.getEntries())
+        kept = add(fetched as PerformanceResourceTiming) || kept
+
+      if (kept)
+        changed()
     })
 
     observer.observe({ type: 'resource', buffered: true })
@@ -1758,7 +1789,7 @@ function networkTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
     // A browser without Resource Timing lists the document alone.
   }
 
-  // A swap opens a navigation as it starts, so the page it fetches lands in it, and names it once it ends.
+  // A swap opens a navigation as it starts and names it once it ends.
   const swaps = new MutationObserver(() => {
     const busy = doc.documentElement.getAttribute('aria-busy') === 'true'
     const last = navigations.at(-1)!
@@ -1772,12 +1803,16 @@ function networkTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
     else if (!busy && last.path === '') {
       last.path = here()
     }
+    else {
+      return
+    }
 
     changed()
   })
 
   swaps.observe(doc.documentElement, { attributes: true, attributeFilter: ['aria-busy'] })
   signal.addEventListener('abort', () => swaps.disconnect())
+  content.append(bar.empty)
   tab.panel.append(bar.element, content)
   changed()
 }
@@ -3061,10 +3096,9 @@ function positionButton(tool: DevTool, source: string): HTMLButtonElement {
 
 // A fetch of the dev tool's own, which the Network tab leaves out.
 async function ownFetch(win: Window, url: string, init?: RequestInit): Promise<Response> {
-  const href = URL.parse(url, win.location.href)?.href
-
-  if (href !== undefined)
-    OWN_FETCHES.add(href)
+  // Its own routes are left out by their path already.
+  if (!DEV_PATH.test(url))
+    OWN_FETCHES.add(new URL(url, win.location.href).href)
 
   return win.fetch(url, init)
 }

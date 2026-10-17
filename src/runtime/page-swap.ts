@@ -53,6 +53,7 @@ const CARRIAGE_RETURN = /\r\n?/g
 const SPECULATION = 'script[type="speculationrules"]'
 // The line a page without kay's script carries for Back after a reload, which a swapped-in page leaves to this one.
 const HISTORY = 'script[data-kay-history]'
+const ENTRY_SCRIPT = 'script[type="module"][src]:not([src*="/_kay/dev/"])'
 const REST_LINK = 'link[data-kay-rest]'
 // The head elements a swap leaves to itself rather than merging.
 const UNMERGED = `title,${SPECULATION},${HISTORY}`
@@ -311,8 +312,9 @@ function writeHistory({ history: change }: Policy, target: URL): void {
   }
 }
 
+// The dev tool's scripts lead a page with no islands under `kay dev`, and are no build's entry.
 function entryOf(page: Document): string | undefined {
-  return page.querySelector<HTMLScriptElement>('script[type="module"][src]')?.getAttribute('src') ?? undefined
+  return page.querySelector<HTMLScriptElement>(ENTRY_SCRIPT)?.getAttribute('src') ?? undefined
 }
 
 // What the server streamed after the first part arrives in templates the page's inline script would swap in; here they are put in place before the page is shown.

@@ -1494,4 +1494,26 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the dev to
       view.close()
     }
   }, 60_000)
+
+  it('lists a page swap\'s own fetch under the page it brings', async () => {
+    const view = await dev.open('/')
+
+    try {
+      // The island hydrated, the client script that swaps pages runs.
+      await view.waitUntil(() => (document.querySelector('slot[data-component]') as { _$k?: boolean } | null)?._$k === true)
+      await view.evaluate(() => document.querySelector('kay-dev')!.shadowRoot!.querySelector<HTMLButtonElement>('#kay-dev-tab-network')!.click())
+      await view.click('a[href="/next"]')
+      await view.waitUntil(() => document.querySelector('kay-dev')!.shadowRoot!.querySelector('#kay-dev-network h3')?.textContent.startsWith('This page, /next') === true)
+
+      const sections = await view.evaluate(() => [...document.querySelector('kay-dev')!.shadowRoot!.querySelectorAll('#kay-dev-network .group')].map(group => [group.querySelector('h3')!.firstChild!.textContent, [...group.querySelectorAll('.fetch')].map(row => `${row.querySelector('.name')!.textContent} ${row.querySelector('.chip')!.textContent}`)]))
+
+      expect(sections[0]![0]).toBe('This page, /next')
+      expect(sections[0]![1]).toContain('/next page')
+      expect(sections[1]![0]).toBe('Before, /')
+      expect(sections[1]![1]).toContain('/ document')
+    }
+    finally {
+      view.close()
+    }
+  }, 60_000)
 })

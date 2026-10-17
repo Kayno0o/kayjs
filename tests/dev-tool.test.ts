@@ -8,6 +8,7 @@ import { t } from 'elysia'
 import { startDevTool } from '../src/runtime/dev-tool'
 import { PUBLIC_ENV } from '../src/runtime/env'
 import { reportError } from '../src/runtime/reactive'
+import { ISLAND_PARAM } from '../src/runtime/server-islands'
 import { pages } from '../src/server'
 import { DEV_BOOT, problemsBlock } from '../src/server/dev'
 import { scratchDir } from './scratch'
@@ -177,10 +178,21 @@ describe('the dev tool', () => {
       ])
       expect(shadow().querySelector<HTMLElement>('#kay-dev-tab-network .count')!.hidden).toBe(true)
 
-      // A swap opens a navigation of its own, named once it ends; the tool's own fetch of the env is left out, the page's own script for it kept.
+      // A new request adds its row, the others and a focused copy button staying.
+      const focused = shadow().querySelector<HTMLButtonElement>('#kay-dev-network .fetch .copy')!
+
+      focused.focus()
+      observed.report('resource', [at('/_kay/late.js', { initiatorType: 'script', startTime: 6 })])
+
+      expect(names()).toEqual(['/_kay/entry-abc12345.js', '/_kay/late.js', '/fonts/inter.woff2', 'https://cdn.example/x.js'])
+      expect(focused.isConnected).toBe(true)
+      expect(shadow().activeElement).toBe(focused)
+
+      // A swap opens a navigation of its own, named once it ends, its own fetch in it though it starts just before the tool hears of it; the tool's own fetch of the env is left out, the page's own script for it kept.
+      const start = performance.now()
+
       document.documentElement.setAttribute('aria-busy', 'true')
       await Bun.sleep(0)
-      const start = performance.now()
 
       await copiedBy(shadow().querySelector<HTMLButtonElement>('#kay-dev-network .fetch .copy')!)
       spyOn(window, 'fetch').mockImplementation((async () => new Response('')) as unknown as typeof window.fetch)
@@ -188,17 +200,17 @@ describe('the dev tool', () => {
       await Bun.sleep(0)
       shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-network')!.click()
       observed.report('resource', [
-        at('/next', { startTime: start + 1, contentType: 'text/html; charset=utf-8' }),
+        at('/next', { startTime: start, contentType: 'text/html; charset=utf-8' }),
         at('/_kay/action/src/routes/next.kay/save', { startTime: start + 40, responseStatus: 500, contentType: 'application/json' }),
-        at('/next?kay_island=1', { startTime: start + 50 }),
+        at(`/next?${ISLAND_PARAM}=1`, { startTime: start + 50 }),
         at('/_kay/env.js', { startTime: start + 60 }),
         at('/_kay/env.js', { initiatorType: 'script', startTime: start + 61 }),
       ])
       document.documentElement.removeAttribute('aria-busy')
       await Bun.sleep(0)
 
-      expect(groups()).toEqual([`This page, ${location.pathname}${location.search}4`, `Before, ${location.pathname}${location.search}3`])
-      expect(names().slice(0, 4)).toEqual(['/next', '/_kay/action/src/routes/next.kay/save', '/next?kay_island=1', '/_kay/env.js'])
+      expect(groups()).toEqual([`This page, ${location.pathname}${location.search}4`, `Before, ${location.pathname}${location.search}4`])
+      expect(names().slice(0, 4)).toEqual(['/next', '/_kay/action/src/routes/next.kay/save', `/next?${ISLAND_PARAM}=1`, '/_kay/env.js'])
       expect(visible('#kay-dev-network', '.fetch .line .pill').slice(0, 4)).toEqual(['200', '500', '200', '200'])
       expect(visible('#kay-dev-network', '.fetch .chips > :first-child').slice(0, 4)).toEqual(['page', 'action', 'server island', 'script'])
       expect(shadow().querySelector('#kay-dev-tab-network .count')?.textContent).toBe('1')
@@ -213,7 +225,26 @@ describe('the dev tool', () => {
       typeFilter('#kay-dev-network', 'font')
 
       expect(names()).toEqual(['/fonts/inter.woff2'])
-      expect(groups()).toEqual([`Before, ${location.pathname}${location.search}3`])
+      expect(groups()).toEqual([`Before, ${location.pathname}${location.search}4`])
+
+      // The last 5 navigations are kept.
+      typeFilter('#kay-dev-network', '')
+
+      for (let swap = 0; swap < 5; swap++) {
+        document.documentElement.setAttribute('aria-busy', 'true')
+        await Bun.sleep(0)
+        document.documentElement.removeAttribute('aria-busy')
+        await Bun.sleep(0)
+      }
+
+      expect(groups()).toHaveLength(5)
+
+      // A navigation lists 300 requests and counts the rest.
+      observed.report('resource', Array.from({ length: 301 }, (_, index) => at(`/_kay/chunk-${index}.js`, { initiatorType: 'script', startTime: performance.now() })))
+
+      expect(groups()[0]).toEndWith('301')
+      expect(visible('#kay-dev-network', '.group:first-child .fetch')).toHaveLength(300)
+      expect(visible('#kay-dev-network', '.group:first-child > .note')).toEqual(['1 more not listed.'])
     }
     finally {
       delete (window as { PerformanceObserver?: unknown }).PerformanceObserver
