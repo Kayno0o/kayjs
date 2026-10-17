@@ -91,3 +91,18 @@ describe('wording', () => {
     expect(wording('kay.none', 'Go to {n}')).toBe('Go to {n}')
   })
 })
+
+describe('the kay.* keys in llms', () => {
+  it('lists every text kay words and every kind of schema refusal', async () => {
+    const source = await Bun.file(join(import.meta.dir, '../src/server/words.ts')).text()
+    const doc = await Bun.file(join(import.meta.dir, '../llms/locales.md')).text()
+    const keys = [...source.matchAll(/'kay\.([\w.]+)'/g)].map(match => match[1]!)
+
+    expect(keys.length).toBeGreaterThan(15)
+
+    expect(keys.filter(key => !key.startsWith('invalid.') && !doc.includes(`\`${key}\``))).toEqual([])
+
+    for (const kind of ['required', 'tooShort', 'tooLong', 'pattern', 'tooSmall', 'tooBig', 'type'])
+      expect(doc).toContain(`\`${kind}\``)
+  })
+})

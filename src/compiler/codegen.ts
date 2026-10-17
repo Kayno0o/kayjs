@@ -77,8 +77,8 @@ const BROKEN_SPECIFIER = /^((?:\s*(?:\/\/.*\n|\/\*(?:[^*]|\*(?!\/))*\*\/))*\s*im
 const PRERENDER: PageSettingName = 'prerender'
 // The page's query schema, which types and validates `ctx.query`.
 const QUERY: PageSettingName = 'query'
-// `t('nav.home')` or `T(key="intro")`: a message key an island's source names as it is written.
-const MESSAGE_KEY = /(?:\bt\(\s*|\bT\([^)]*?\bkey=)(['"`])([\w.-]+)\1/g
+// `t('nav.home')`, `wording('ui.close', 'Close')` or `T(key="intro")`: a message key an island's source names as it is written.
+const MESSAGE_KEY = /(?:\b(?:t|wording)\(\s*|\bT\([^)]*?\bkey=)(['"`])([\w.-]+)\1/g
 // The server exports that are no actions: the page's settings, and each under its own name as they were exported before.
 const NOT_ACTIONS = new Set<string>([PAGE, ...PAGE_SETTINGS])
 // A type parameter's name, past the `const`, `in` and `out` modifiers it may carry.

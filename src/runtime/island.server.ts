@@ -6,6 +6,7 @@ import { withFieldMarks } from './fields'
 import { headMark, setsIslandTitle } from './head'
 import { child, omit } from './html'
 import { noteLives } from './live-value'
+import { localeState } from './locale-state'
 import { TITLED_ATTRIBUTE } from './markers'
 import { renderOnServer, scope } from './reactive'
 import { SLOT_END, SLOT_START } from './static-slots'
@@ -92,8 +93,13 @@ export function island<P extends object>(id: string, component: ((props: P) => J
     const own = 'hydrate' in props || 'persist' in props ? omit(props, 'hydrate', 'persist') as P : props
     const browserOnly = client || when === 'client'
 
-    for (const key of messages)
-      noteMessage(key)
+    // A key no catalog has is sent nothing: a library's `wording` falls back to its English.
+    const state = localeState()
+
+    for (const key of messages) {
+      if (state === undefined || state.messages.has(key) || state.fallback?.has(key))
+        noteMessage(key)
+    }
 
     noteLives(lives)
 

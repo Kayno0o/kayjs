@@ -93,7 +93,6 @@ const pageParams = new WeakMap<Request, RouteParams>()
 // The page each guarded post came from, which its guards read as `ctx.url`.
 const pageUrls = new WeakMap<Request, URL>()
 const TEXT = 'text/plain; charset=utf-8'
-// What a visitor reads when the handler throws and its action words nothing of its own.
 // The methods that change nothing, which any page may send anywhere.
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
 // What a post from the site's own pages carries in `Sec-Fetch-Site`; `none` is the user's own doing, such as a bookmark.
@@ -912,6 +911,9 @@ function refusalText(issue: { summary?: string | undefined, schema?: unknown, va
     return invalidWord('kay.invalid.required', issue.summary)
 
   if (typeof value === 'string') {
+    if (value === '' && schema.minLength === 1)
+      return invalidWord('kay.invalid.required', issue.summary)
+
     if (schema.minLength !== undefined && value.length < schema.minLength)
       return invalidWord('kay.invalid.tooShort', issue.summary, { min: schema.minLength })
 

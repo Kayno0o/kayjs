@@ -10,7 +10,7 @@ function plainEnglish(english: string, params: Record<string, MessageValue>): st
   return english.replace(PLACEHOLDER, (placeholder, name: string) => name in params ? String(params[name]) : placeholder)
 }
 
-// The message at `key` when the app's catalogs have it, else `english`, placeholders filled either way: the lookup kay and its libraries word what a visitor reads through, so a site gives `kay.*` or `ui.*` messages only for the texts it translates. Needs no request: outside one it is the English. An island's use of it sends the message to the browser.
+// The message at `key` when the app's catalogs have it, else `english`, placeholders filled either way: the lookup kay and its libraries word what a visitor reads through, so a site gives `kay.*` or `ui.*` messages only for the texts it translates. Needs no request: outside one it is the English. An island's use of it sends the message to the browser, once its source names the key as a literal. Values are strings and numbers.
 export function wording(key: string, english: string, params: Record<string, MessageValue> = {}): string {
   const state = localeState()
   const found = state && lookup(state, key, params)
