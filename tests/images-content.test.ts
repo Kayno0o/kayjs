@@ -1,4 +1,4 @@
-import { mkdtemp, readdir, rm, symlink, utimes } from 'node:fs/promises'
+import { mkdtemp, readdir, rm, stat, symlink, utimes } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
@@ -259,6 +259,47 @@ describe('Markdown images', () => {
 
       expect(after!.images).toHaveLength(1)
       expect((after!.segments as string[]).join('')).toMatch(/src="\/_kay\/assets\/cat-\w+\.png"/)
+    }
+    finally {
+      await restore()
+    }
+  })
+
+  it('link an image that was half copied once it is whole, with the Markdown unchanged', async () => {
+    const { root, restore } = await project({ 'posts/a.md': '---\ntitle: A\n---\n\n![a](./cat.png)\n', 'posts/cat.png': (await Bun.file(HERO).bytes()).slice(0, 12) })
+
+    try {
+      expect((await loadEntries('posts', { live: true }))[0]!.images).toBeUndefined()
+      expect((await loadEntries('posts', { live: true }))[0]!.images).toBeUndefined()
+      await Bun.write(join(root, 'posts/cat.png'), Bun.file(HERO))
+      expect((await loadEntries('posts', { live: true }))[0]!.images).toHaveLength(1)
+    }
+    finally {
+      await restore()
+    }
+  })
+
+  it('keep the new stamp of an image touched with its content as it was, so it is not hashed on each read', async () => {
+    const { root, restore } = await project({ 'posts/a.md': '---\ntitle: A\n---\n\n![a](./cat.png)\n', 'posts/cat.png': Bun.file(HERO) })
+
+    try {
+      const past = new Date(Date.now() - 60_000)
+      const image = join(root, 'posts/cat.png')
+
+      await utimes(join(root, 'posts/a.md'), past, past)
+      await utimes(image, past, past)
+
+      const [first] = await loadEntries('posts', { live: true })
+      const later = new Date(Date.now() - 30_000)
+
+      await utimes(image, later, later)
+
+      const { mtimeMs, size } = await stat(image)
+      const [touched] = await loadEntries('posts', { live: true })
+
+      expect(touched!.images![0]!.url).toBe(first!.images![0]!.url)
+      expect(touched!.images![0]!.stamp).toBe(`${mtimeMs}:${size}`)
+      expect((await loadEntries('posts', { live: true }))[0]!.images![0]!.stamp).toBe(`${mtimeMs}:${size}`)
     }
     finally {
       await restore()

@@ -33,6 +33,8 @@ export interface RawEntry {
   images?: LinkedImage[] | undefined
   // The relative images its body names that were not there yet, relative to the project root.
   missingImages?: string[] | undefined
+  // The relative images its body names that are there but do not read as an image, such as one half copied, with their time and size.
+  unreadableImages?: { file: string, stamp: string }[] | undefined
 }
 
 // Under `.kay/client`, beside the build's other output, and embedded with it in an executable.
@@ -204,17 +206,29 @@ async function compileDirectory(dir: string, highlight: Highlighter | undefined,
       const stamp = `${mtimeMs}:${size}`
 
       // Neither read nor hashed again while its file is as the cache saw it.
-      if (cached?.salt === salt && cached.stamp === stamp && cached.entry.file === file && cached.at - mtimeMs > STAMP_SETTLED_MS && await imagesCurrent(cached.entry, root))
-        return cached.entry
+      if (cached?.salt === salt && cached.stamp === stamp && cached.entry.file === file && cached.at - mtimeMs > STAMP_SETTLED_MS) {
+        const current = await imagesCurrent(cached.entry, root)
+
+        if (current) {
+          if (current !== cached.entry)
+            await writeAtomically(cacheFile, JSON.stringify({ ...cached, entry: current } satisfies CachedEntry))
+
+          return current
+        }
+      }
 
       const source = await Bun.file(path).text()
       const hash = Bun.hash(source).toString(36)
 
       // A file touched with its content as it was keeps its compile, and the stamp that stands in for reading it.
-      if (cached?.salt === salt && cached.hash === hash && cached.entry.file === file && await imagesCurrent(cached.entry, root)) {
-        await writeAtomically(cacheFile, JSON.stringify({ ...cached, stamp, at: Date.now() } satisfies CachedEntry))
+      if (cached?.salt === salt && cached.hash === hash && cached.entry.file === file) {
+        const current = await imagesCurrent(cached.entry, root)
 
-        return cached.entry
+        if (current) {
+          await writeAtomically(cacheFile, JSON.stringify({ ...cached, entry: current, stamp, at: Date.now() } satisfies CachedEntry))
+
+          return current
+        }
       }
 
       try {
@@ -357,33 +371,47 @@ export function entrySlug(name: string, data: unknown, localized: boolean, line:
   return locale === -1 ? fromPath : `${fromPath.slice(0, locale)}/${given}`
 }
 
-// Whether the images an entry linked are still the files they were built from, and none it named has appeared since, writing their assets again when the build's folder lost them.
-// A file whose size and time are as they were is not hashed again, only looked for among the assets.
-async function imagesCurrent(entry: RawEntry, root: string): Promise<boolean> {
+// The entry when the images it linked are still the files they were built from and none it named has appeared or finished copying since, else undefined; writing their assets again when the build's folder lost them.
+// A file whose size and time are as they were is not hashed again, only looked for among the assets; one that changed but hashes to the same URL gives a copy of the entry with its new stamp.
+async function imagesCurrent(entry: RawEntry, root: string): Promise<RawEntry | undefined> {
   for (const file of entry.missingImages ?? []) {
     if (await Bun.file(join(root, file)).exists())
-      return false
+      return undefined
+  }
+
+  for (const { file, stamp } of entry.unreadableImages ?? []) {
+    const found = await stat(join(root, file)).catch(() => undefined)
+
+    if (found === undefined || stamp !== `${found.mtimeMs}:${found.size}`)
+      return undefined
   }
 
   const dist = clientDir(root)
+  const images: LinkedImage[] = []
 
-  for (const { file, url, stamp } of entry.images ?? []) {
+  for (const linked of entry.images ?? []) {
     try {
-      const path = join(root, file)
+      const path = join(root, linked.file)
       const { mtimeMs, size } = await stat(path)
+      const stamp = `${mtimeMs}:${size}`
 
-      if (stamp === `${mtimeMs}:${size}` && await Bun.file(writtenAsset(url, dist)).exists())
+      if (linked.stamp === stamp && await Bun.file(writtenAsset(linked.url, dist)).exists()) {
+        images.push(linked)
+
         continue
+      }
 
-      if (await writeAsset(path, root, dist) !== url)
-        return false
+      if (await writeAsset(path, root, dist) !== linked.url)
+        return undefined
+
+      images.push({ ...linked, stamp })
     }
     catch {
-      return false
+      return undefined
     }
   }
 
-  return true
+  return images.some((image, index) => image !== entry.images![index]) ? { ...entry, images } : entry
 }
 
 function fieldsOf(source: string, name: string, body: string | undefined, frontmatter: string | undefined): Record<string, number> {
@@ -402,7 +430,7 @@ async function compileEntry(name: string, file: string, source: string, highligh
     return { slug, file, data, lines }
 
   const compiled = await compileMarkdown(body, bodyLine!, highlight, where.headingLinks)
-  const { segments, images, missing } = await linkImages(compiled.segments, where.path, where.folder, where.root)
+  const { segments, images, missing, unreadable } = await linkImages(compiled.segments, where.path, where.folder, where.root)
 
   return {
     slug,
@@ -414,6 +442,7 @@ async function compileEntry(name: string, file: string, source: string, highligh
     words: compiled.words,
     ...images.length > 0 && { images: images.map(({ file: image, ...rest }) => ({ file: relative(where.root, image).split(sep).join('/'), ...rest })) },
     ...missing.length > 0 && { missingImages: missing.map(image => relative(where.root, image).split(sep).join('/')) },
+    ...unreadable.length > 0 && { unreadableImages: unreadable.map(({ file: image, stamp }) => ({ file: relative(where.root, image).split(sep).join('/'), stamp })) },
   }
 }
 

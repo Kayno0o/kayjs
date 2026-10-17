@@ -16,6 +16,12 @@ export interface LinkedImage {
   stamp?: string | undefined
 }
 
+// What a body names that cannot be linked yet: files that are not there, and files that are but do not read as an image, with the time and size they had, so a copy that finishes is noticed.
+export interface Unlinked {
+  missing: Set<string>
+  unreadable: Map<string, string>
+}
+
 const IMG_TAG = /<img\b[^>]*>/gi
 const SRC = /(\ssrc=")([^"]*)(")/i
 const SIZED = /\s(?:width|height|srcset)\s*=/i
@@ -35,7 +41,7 @@ function insideOf(dir: string, path: string): boolean {
 }
 
 // The built asset a relative `src` names, or undefined for a URL, an absolute path, a file outside the collection's folder, a missing one or one kay does not resize.
-async function linkedImage(src: string, entryDir: string, folder: string, root: string, missing: Set<string>): Promise<{ file: string, url: string, stamp: string, width: number, height: number, animated: boolean } | undefined> {
+async function linkedImage(src: string, entryDir: string, folder: string, root: string, unlinked: Unlinked): Promise<{ file: string, url: string, stamp: string, width: number, height: number, animated: boolean } | undefined> {
   const decoded = src.replace(ENTITY, entity => ENTITIES[entity]!)
 
   if (decoded === '' || SCHEME.test(decoded) || decoded.includes('\0') || decoded.includes('\\'))
@@ -69,18 +75,24 @@ async function linkedImage(src: string, entryDir: string, folder: string, root: 
     return { file, url: await writeAsset(file, root), stamp: `${mtimeMs}:${size}`, width, height, animated }
   }
   catch {
-    // A file not there yet is linked once it is, which the entry's cache looks for.
-    if (!file.includes('\0') && !await Bun.file(file).exists())
-      missing.add(file)
+    // A file not there yet, or half copied, is linked once it is, which the entry's cache looks for.
+    if (!file.includes('\0')) {
+      const found = await stat(file).catch(() => undefined)
+
+      if (found === undefined)
+        unlinked.missing.add(file)
+      else if (found.isFile())
+        unlinked.unreadable.set(file, `${found.mtimeMs}:${found.size}`)
+    }
 
     return undefined
   }
 }
 
 // The segments with each relative image of their HTML pointed at its built asset, and marked with its size for `sizedImages` when it can be resized; the images linked, for the entry's cache.
-export async function linkImages(segments: Segment[], entryFile: string, folder: string, root: string): Promise<{ segments: Segment[], images: LinkedImage[], missing: string[] }> {
+export async function linkImages(segments: Segment[], entryFile: string, folder: string, root: string): Promise<{ segments: Segment[], images: LinkedImage[], missing: string[], unreadable: { file: string, stamp: string }[] }> {
   const images = new Map<string, LinkedImage>()
-  const missing = new Set<string>()
+  const unlinked: Unlinked = { missing: new Set(), unreadable: new Map() }
   const entryDir = dirname(entryFile)
 
   const link = async (html: string): Promise<string> => {
@@ -101,7 +113,7 @@ export async function linkImages(segments: Segment[], entryFile: string, folder:
         continue
       }
 
-      const linked = await linkedImage(src[2]!, entryDir, folder, root, missing)
+      const linked = await linkedImage(src[2]!, entryDir, folder, root, unlinked)
 
       if (!linked) {
         if (tag !== match[0]) {
@@ -135,7 +147,7 @@ export async function linkImages(segments: Segment[], entryFile: string, folder:
 
   const linked = await walk(segments)
 
-  return { segments: linked, images: [...images.values()], missing: [...missing] }
+  return { segments: linked, images: [...images.values()], missing: [...unlinked.missing], unreadable: [...unlinked.unreadable].map(([file, stamp]) => ({ file, stamp })) }
 }
 
 // The HTML with each image `linkImages` marked given the `srcset`, `sizes`, `width` and `height` `image()` gives, so it loads the width its screen needs.
