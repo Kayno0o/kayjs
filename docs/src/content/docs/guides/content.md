@@ -131,6 +131,8 @@ An interactive component renders as an island. A page rendering an entry's `Cont
 
 A component the collection does not name fails `kay check` and the build. So does an attribute that would put its text on the page as markup, such as `innerHTML`.
 
+A capitalized tag kay cannot read fails too, at its line, rather than showing on the page as text. That is a quote or a brace never closed, or text after a JSON value, as in `rows={[1]}}`. JSON values may nest to any depth.
+
 ## Feeds
 
 Give a collection a `feed` and kay serves an RSS feed at its path, built from the newest items. Set `site` in `kay.config.ts` first, because feed links are absolute.

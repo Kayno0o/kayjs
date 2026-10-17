@@ -302,6 +302,42 @@ describe('compiling Markdown', () => {
     expect((await compileMarkdown('<Callout items={[{"t":1}]} />\n', 1)).segments).toContainEqual({ component: 'Callout', props: { items: [{ t: 1 }] }, children: [], line: 1 })
   })
 
+  it.each([
+    ['JSON three braces deep', '<Chart rows={[{"v":{"w":1}}]} />\n', { rows: [{ v: { w: 1 } }] }],
+    ['JSON strings holding braces and escaped quotes', '<Chart rows={[{"v":"a \\"}\\" {"}]} />\n', { rows: [{ v: 'a "}" {' }] }],
+    ['quoted text holding > and }', '<Chart title="a > b }" note=\'c > "d"\' />\n', { title: 'a > b }', note: 'c > "d"' }],
+    ['a tag inside a paragraph', 'See <Chart rows={[{"v":{"w":1}}]} /> here\n', { rows: [{ v: { w: 1 } }] }],
+  ])('reads a component tag of any depth: %s', async (_name, source, props) => {
+    const { segments } = await compileMarkdown(source, 1)
+
+    expect(segments).toContainEqual({ component: 'Chart', props, children: [], line: 1 })
+  })
+
+  it('reads a wrapping tag whose JSON is deep', async () => {
+    const { segments } = await compileMarkdown('<Chart rows={[{"v":{"w":{"x":"}"}}}]}>\n\nIn\n\n</Chart>\n', 1)
+
+    expect(segments[0]).toEqual({ component: 'Chart', props: { rows: [{ v: { w: { x: '}' } } }] }, children: ['\n<p>In</p>\n'], line: 1 })
+  })
+
+  it.each([
+    ['a stray brace after the prop', '<Chart rows={[1]}} />'],
+    ['text after the prop', '<Chart rows={[{"v":1}]},{"v":2}]} />'],
+    ['a brace never closed', '<Chart rows={[1] />'],
+    ['a quote never closed', '<Chart title="a />'],
+    ['a tag never ended', '<Chart rows={[1]}'],
+    ['a wrapping tag', '<Chart rows={[1]}}>\n\nIn\n\n</Chart>'],
+    ['a tag inside a paragraph', 'See <Chart rows={[1]}} /> here'],
+  ])('refuses a component tag kay cannot read at its line, rather than passing it through: %s', async (_name, tag) => {
+    await expect(compileMarkdown(`Intro\n\n${tag}\n`, 5)).rejects.toMatchObject({ code: 'markdown-invalid', line: 7 })
+    await expect(bodyHtml(`Intro\n\n${tag}\n`)).rejects.toMatchObject({ code: 'markdown-invalid', line: 3 })
+  })
+
+  it('leaves a tag kay cannot read alone in code', async () => {
+    const { segments } = await compileMarkdown('`<Chart rows={[1]}} />` in code\n\n```md\n<Chart rows={[1]}} />\n```\n', 1)
+
+    expect(segments).toEqual(['<p><code>&lt;Chart rows={[1]}} /&gt;</code> in code</p>\n<pre><code class="language-md">&lt;Chart rows={[1]}} /&gt;\n</code></pre>\n'])
+  })
+
   it('leaves a tag written in code alone, and refuses one never closed at its line', async () => {
     const { segments } = await compileMarkdown('`<Callout>` in code\n', 1)
 
@@ -400,7 +436,7 @@ describe('Markdown outside collections', () => {
 
   it('gives the HTML a body puts on the page outside its components, with their markup as kay takes it', async () => {
     expect(await bodyHtml('Hi <b>there</b>\n\n<Callout title="a}">In <i>it</i></Callout>\n\nBye')).toBe('<p>Hi <b>there</b></p>\n<p><kay-component n="0">In <i>it</i></kay-component></p>\n<p>Bye</p>\n')
-    expect(await bodyHtml('<Callout onclick=alert(1)//}>hi')).toBe('<p><Callout onclick=alert(1)//}>hi</p>\n')
+    await expect(bodyHtml('<Callout onclick=alert(1)//}>hi')).rejects.toBeInstanceOf(MarkdownError)
     await expect(bodyHtml('<Callout>open')).rejects.toBeInstanceOf(MarkdownError)
   })
 

@@ -46,7 +46,7 @@
 | `search-page-unreadable` | build | The search index could not read a prerendered page. | [Site search](sitemap-search-fonts.md#site-search) |
 | `config-default-export` | build | kay.config.ts that does not export its config by default. | [Project setup](project.md#project-setup) |
 | `content-invalid` | content | Entries of a collection that do not compile or match its schema, a slug two entries share, a component the collection does not name, or a feed entry with an invalid date. | [Collections](content.md#collections) |
-| `markdown-invalid` | content | Markdown or data an entry holds that kay cannot read: a component never closed, an attribute kay cannot read, JSON or YAML that does not parse. | [Components in Markdown](content.md#components-in-markdown) |
+| `markdown-invalid` | content | Markdown or data an entry holds that kay cannot read: a component never closed, a component tag or attribute kay cannot read, JSON or YAML that does not parse. | [Components in Markdown](content.md#components-in-markdown) |
 | `content-config-missing` | content | The content config the project names does not exist, or a collection is not exported from it. | [Collections](content.md#collections) |
 | `loader-result` | content | A collection's `load` that threw, did not give an array, or gave an entry with no slug. | [Loaded collections](content-cms.md#loaded-collections) |
 | `loader-method` | content | An entry saved or removed through a loader that declares no `save` or `remove`. | [Loaded collections](content-cms.md#loaded-collections) |

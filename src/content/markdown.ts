@@ -43,8 +43,10 @@ const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/
 const HEADING_OPEN = /<h([1-6]) id="([^"]*)"><a href="#[^"]*">/g
 const CODE_OPEN = /<pre><code(?: class="language-([^"]*)")?>/g
 const CODE_CLOSE = '</code></pre>'
-// A tag naming a component: capitalized, as kay components are; lowercase tags stay HTML.
-const COMPONENT_TAG = /<(\/?)([A-Z][\w.]*)((?:[\s/](?:[^>"'{}]|"[^"]*"|'[^']*'|\{(?:[^{}"]|"(?:[^"\\]|\\.)*"|\{(?:[^{}"]|"(?:[^"\\]|\\.)*")*\})*\})*)?)>/g
+// Where a tag naming a component opens: capitalized, as kay components are; lowercase tags stay HTML.
+const COMPONENT_TAG = /<(\/?)([A-Z][\w.]*)(?=[\s/>]|$)/g
+const ATTRIBUTE_AT = /[A-Z_][\w:-]*/iy
+const AFTER_VALUE = /[\s/>]/
 const SELF_CLOSING = /\/\s*$/
 const PLACEHOLDER = 'kay-component'
 const PLACEHOLDER_TAG = /<kay-component n="(\d+)" \/>|<kay-component n="(\d+)">|<\/kay-component>/g
@@ -268,29 +270,118 @@ function extractComponents(body: string, bodyLine: number): { text: string, comp
 
 // The block with its component tags, outside code spans, swapped for placeholders.
 function replaceTags(text: string, startLine: number, components: ExtractedComponent[], open: { name: string, line: number }[]): string {
-  return outsideCodeSpans(text, (part, offset) => part.replace(COMPONENT_TAG, (_tag: string, closing: string, name: string, inside: string, at: number) => {
-    const line = startLine + lineOf(text, offset + at) - 1
+  return outsideCodeSpans(text, (part, offset) => {
+    let result = ''
+    let copied = 0
 
-    if (closing !== '') {
-      const opened = open.pop()
+    COMPONENT_TAG.lastIndex = 0
 
-      if (opened?.name !== name)
-        throw new MarkdownError(`</${name}> closes ${opened === undefined ? 'no component' : `<${opened.name}>, opened on line ${opened.line}`}`, line)
+    for (let match = COMPONENT_TAG.exec(part); match; match = COMPONENT_TAG.exec(part)) {
+      const [start, closing, name] = match
+      const line = startLine + lineOf(text, offset + match.index) - 1
+      const from = match.index + start.length
+      const end = tagEnd(part, from, `${closing}${name}`, line)
 
-      return `</${PLACEHOLDER}>`
+      result += part.slice(copied, match.index) + placeholder(closing !== '', name!, part.slice(from, end - 1), line, components, open)
+      copied = end
+      COMPONENT_TAG.lastIndex = end
     }
 
-    const selfClosing = SELF_CLOSING.test(inside)
+    return result + part.slice(copied)
+  })
+}
 
-    components.push({ name, props: readAttributes(selfClosing ? inside.replace(SELF_CLOSING, '') : inside, name, line), line })
+// The placeholder standing for one component tag, its component recorded when it opens one.
+function placeholder(closing: boolean, name: string, inside: string, line: number, components: ExtractedComponent[], open: { name: string, line: number }[]): string {
+  if (closing) {
+    if (inside.trim() !== '')
+      throw new MarkdownError(`</${name}> takes no attributes`, line)
 
-    if (selfClosing)
-      return `<${PLACEHOLDER} n="${components.length - 1}" />`
+    const opened = open.pop()
 
-    open.push({ name, line })
+    if (opened?.name !== name)
+      throw new MarkdownError(`</${name}> closes ${opened === undefined ? 'no component' : `<${opened.name}>, opened on line ${opened.line}`}`, line)
 
-    return `<${PLACEHOLDER} n="${components.length - 1}">`
-  }))
+    return `</${PLACEHOLDER}>`
+  }
+
+  const selfClosing = SELF_CLOSING.test(inside)
+
+  components.push({ name, props: readAttributes(selfClosing ? inside.replace(SELF_CLOSING, '') : inside, name, line), line })
+
+  if (selfClosing)
+    return `<${PLACEHOLDER} n="${components.length - 1}" />`
+
+  open.push({ name, line })
+
+  return `<${PLACEHOLDER} n="${components.length - 1}">`
+}
+
+// Where the component tag whose name ends at `from` ends, past its `>`, quoted text and JSON of any depth read whole.
+// A tag kay cannot read throws rather than reach the page as text.
+function tagEnd(text: string, from: number, tag: string, line: number): number {
+  let at = from
+
+  for (;;) {
+    at = skip(text, WHITESPACE, at)
+
+    const char = text[at]
+
+    if (char === undefined)
+      throw new MarkdownError(`<${tag}> never ends: close it with > or />`, line)
+
+    if (char === '>')
+      return at + 1
+
+    if (char === '/') {
+      at = skip(text, WHITESPACE, at + 1)
+
+      if (text[at] === '>')
+        return at + 1
+
+      throw new MarkdownError(`<${tag}> has a / kay cannot read: only />, at its end, closes a tag`, line)
+    }
+
+    ATTRIBUTE_AT.lastIndex = at
+
+    const name = ATTRIBUTE_AT.exec(text)?.[0]
+
+    if (name === undefined)
+      throw new MarkdownError(`<${tag}> has an attribute kay cannot read at ${JSON.stringify(text.slice(at, at + 20))}`, line)
+
+    at = skip(text, WHITESPACE, at + name.length)
+
+    if (text[at] !== '=')
+      continue
+
+    at = skip(text, WHITESPACE, at + 1)
+
+    const quote = text[at]
+
+    if (quote === '"' || quote === '\'') {
+      const end = text.indexOf(quote, at + 1)
+
+      if (end === -1)
+        throw new MarkdownError(`<${tag}> never closes the quote of ${name}`, line)
+
+      at = end + 1
+
+      continue
+    }
+
+    if (quote !== '{')
+      throw new MarkdownError(`<${tag}> sets ${name} without quotes or braces: write ${name}="text" or ${name}={json}`, line)
+
+    const end = closingBrace(text, at)
+
+    if (end === -1)
+      throw new MarkdownError(`<${tag}> never closes the brace of ${name}`, line)
+
+    at = end + 1
+
+    if (at < text.length && !AFTER_VALUE.test(text[at]!))
+      throw new MarkdownError(`<${tag}> runs ${JSON.stringify(text.slice(at, at + 20))} into ${name}: a JSON value ends at its closing brace`, line)
+  }
 }
 
 // Applies `edit` to the parts of the text between its code spans, which stay as written, giving each part's offset.
@@ -530,7 +621,7 @@ function readAttributes(text: string, component: string, line: number): Record<s
     if (quote !== '{')
       throw new MarkdownError(`<${component}> sets ${name} without quotes or braces: write ${name}="text" or ${name}={json}`, line)
 
-    const end = closingBrace(rest) + 1
+    const end = closingBrace(rest, 0) + 1
 
     try {
       props[name] = JSON.parse(decode(rest.slice(1, end - 1)))
@@ -553,12 +644,12 @@ function readAttributes(text: string, component: string, line: number): Record<s
   return props
 }
 
-// Where the brace opening `text` closes, braces inside JSON strings left aside.
-function closingBrace(text: string): number {
+// Where the brace at `from` closes, braces inside JSON strings left aside, or -1 when it never does.
+function closingBrace(text: string, from: number): number {
   let depth = 0
   let inString = false
 
-  for (let index = 0; index < text.length; index++) {
+  for (let index = from; index < text.length; index++) {
     const char = text[index]
 
     if (inString) {
@@ -578,7 +669,7 @@ function closingBrace(text: string): number {
     }
   }
 
-  return text.length - 1
+  return -1
 }
 
 function decode(text: string): string {

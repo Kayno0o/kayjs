@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+import { bodyHtml, MarkdownError } from '../src/kay/content'
 import { scriptInBody } from '../src/unsafe'
 
 describe('scriptInBody', () => {
@@ -53,9 +54,12 @@ describe('scriptInBody', () => {
       expect(await scriptInBody(body), body).toBeUndefined()
   })
 
-  test('still finds script inside a component, or after a brace ending a component tag early', async () => {
-    expect(await scriptInBody('<Callout onclick=alert(1)//}>hi')).toBe('the attribute onclick')
-    expect(await scriptInBody('<Callout onmouseover=alert(1)//} />')).toBe('the attribute onmouseover')
+  test('still finds script inside a component, and leaves a component tag kay cannot read to kay, which refuses it', async () => {
+    for (const body of ['<Callout onclick=alert(1)//}>hi', '<Callout onmouseover=alert(1)//} />']) {
+      expect(await scriptInBody(body)).toBeUndefined()
+      await expect(bodyHtml(body)).rejects.toBeInstanceOf(MarkdownError)
+    }
+
     expect(await scriptInBody(`<div title='<Callout />' onclick=alert(1)>x</div>`)).toBe('the attribute onclick')
     expect(await scriptInBody(`<img src='x <Callout />' onerror=alert(1)>`)).toBe('the attribute onerror')
     expect(await scriptInBody('<Callout>\n\n<div title="</Callout>" onclick=alert(1)>x</div>')).toBe('the attribute onclick')

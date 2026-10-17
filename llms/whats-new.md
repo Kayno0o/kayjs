@@ -2,6 +2,10 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
+## Unreleased
+
+- A Markdown component tag kay cannot read, such as stray text after a JSON prop or a brace never closed, fails `kay check`, the build and `bodyHtml` with `markdown-invalid` at its line instead of reaching the page as text, and a JSON prop nests to any depth ([Content](content.md#components-in-markdown)).
+
 ## 1.51.0
 
 - `keslint --cache` lints every `.kay` file again after a kay upgrade, so findings a new kay adds show at once, and a lint message on a prop names it as the file writes it, not `__props.name` ([Checks](checks.md#linting)).
