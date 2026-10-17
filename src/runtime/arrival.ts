@@ -7,13 +7,13 @@ export function arrives(search: string): boolean {
   return search.includes(`${ARRIVAL_PARAM}=`)
 }
 
-// Marks the words a search hit's page was opened for, loading the code only for a page that asks, or one holding marks to clear; a failed load costs the marks alone.
-export async function arrive(search: string = location.search): Promise<void> {
+// Marks the words a search hit's page was opened for, loading the code only for a page that asks, or one holding marks to clear; `from` is where the window was scrolled to when the page showed, and a visitor who moved it since is left where they are. A failed load costs the marks alone.
+export async function arrive(search: string, from: number): Promise<void> {
   if (!arrives(search) && !CSS.highlights?.has(ARRIVAL_HIGHLIGHT))
     return
 
   try {
-    (await import('./search-arrival')).markArrival(search)
+    (await import('./search-arrival')).markArrival(search, location.hash, from)
   }
   catch {}
 }

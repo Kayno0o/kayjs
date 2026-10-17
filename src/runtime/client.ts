@@ -6,7 +6,6 @@ import { batch, flush, ownSignal, recordSignals, reportError, root, setErrorRepo
 import { freshPrefix, withIds } from './uid'
 import { decodeServerValue } from './wire'
 
-export { arrive } from './arrival'
 export { refreshForEdit } from './dev-refresh'
 export { startNavigation } from './navigate'
 

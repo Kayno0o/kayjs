@@ -7,6 +7,8 @@ let arrival: typeof import('../src/runtime/search-arrival')
 let launcher: typeof import('../src/runtime/arrival')
 let marked: Range[] = []
 let scrolled: Element[] = []
+// Where the first mark sits on screen, as the layout would say.
+let top = 100
 
 // The words painted, read back off the ranges the page highlighted.
 function painted(): string[] {
@@ -27,6 +29,7 @@ beforeAll(async () => {
   Element.prototype.scrollIntoView = function scrollIntoView(this: Element) {
     scrolled.push(this)
   }
+  Range.prototype.getBoundingClientRect = () => ({ top, bottom: top + 20 }) as DOMRect
   arrival = await import('../src/runtime/search-arrival')
   launcher = await import('../src/runtime/arrival')
 })
@@ -38,6 +41,7 @@ afterAll(async () => {
 beforeEach(() => {
   marked = []
   scrolled = []
+  top = 100
   class FakeHighlight extends Set<Range> {
     constructor(...ranges: Range[]) {
       super(ranges)
@@ -74,9 +78,7 @@ describe('marking a section on arrival', () => {
     expect(painted()).toEqual(['Deeper', 'deeper'])
   })
 
-  it('scrolls to the first mark, and marks nothing for an unknown anchor, a missing param or a decoded hash', () => {
-    arrival.markArrival('?kay_q=install', '#a')
-    expect(scrolled.map(element => element.tagName)).toEqual(['B'])
+  it('marks nothing for an unknown anchor, a missing param or a decoded hash that is none, and finds an encoded id', () => {
     arrival.markArrival('?kay_q=install', '#nope')
     expect(painted()).toEqual([])
     arrival.markArrival('', '#a')
@@ -84,6 +86,35 @@ describe('marking a section on arrival', () => {
     mount('<h2 id="a b">Spaced</h2><p>install here</p>')
     arrival.markArrival('?kay_q=install', '#a%20b')
     expect(painted()).toEqual(['install'])
+  })
+
+  it('scrolls to the first mark centred, only when it is out of view and the window has not moved since', () => {
+    arrival.markArrival('?kay_q=install', '#a')
+    expect(scrolled).toEqual([])
+    top = -50
+    arrival.markArrival('?kay_q=install', '#a')
+    expect(scrolled.map(element => element.tagName)).toEqual(['B'])
+    scrolled = []
+    arrival.markArrival('?kay_q=install', '#a', scrollY + 40)
+    expect(scrolled).toEqual([])
+    expect(painted().length).toBe(2)
+  })
+
+  it('finds the section of a layout that wraps the content, and of a heading wrapped itself', () => {
+    mount('<main id="content"><div class="page"><article><p>Intro install</p><div><h2 id="a">Setup</h2></div><section><p>install one</p></section><p>install two</p><div><h3 id="n">Next</h3><p>install out</p></div></article></div></main><p>install after</p>')
+    arrival.markArrival('?kay_q=install', '#a')
+    expect(painted()).toEqual(['install', 'install'])
+    arrival.markArrival('?kay_q=install', '')
+    expect(painted()).toEqual(['install'])
+    expect(marked[0]!.startContainer.textContent).toBe('Intro install')
+    arrival.markArrival('?kay_q=install', '#n')
+    expect(painted()).toEqual(['install', 'install'])
+  })
+
+  it('reads at most eight words of a link, each cut at 64 characters, and none of one letter', () => {
+    mount(`<h2 id="a">${'a'.repeat(70)} one two three four five six seven eight nine x</h2>`)
+    arrival.markArrival(`?kay_q=${'a'.repeat(70)}+x+one+two+three+four+five+six+seven+eight+nine`, '#a')
+    expect(painted()).toEqual(['a'.repeat(64), 'one', 'two', 'three', 'four', 'five', 'six', 'seven'])
   })
 
   it('treats hostile text as words to look for, never as markup', () => {
@@ -114,5 +145,18 @@ describe('what asks for the marking', () => {
     expect(launcher.ARRIVAL_PARAM).toBe('kay_q')
     expect(launcher.arrives('?a=1&kay_q=x')).toBe(true)
     expect(launcher.arrives('?a=1')).toBe(false)
+  })
+
+  it('loads the marking only for a query asking for it or marks to clear, and clears them otherwise', async () => {
+    mount()
+    await launcher.arrive('?a=1', 0)
+    expect(painted()).toEqual([])
+
+    location.hash = '#a'
+    await launcher.arrive('?kay_q=install', 0)
+    expect(painted()).toEqual(['install', 'install'])
+
+    await launcher.arrive('?a=1', 0)
+    expect(painted()).toEqual([])
   })
 })

@@ -20,7 +20,7 @@ const PRECACHED = /\.(?:js|css|woff2?|ttf)$/
 const SKIPPED = /\.(?:br|gz|map)$/
 const BACKSLASH = /\\/g
 // Bumped whenever the worker's own code changes, so every site installs it again.
-const WORKER_VERSION = 3
+const WORKER_VERSION = 4
 // Past this many pages kept by default, the boot says to list the ones worth it.
 const MANY_PAGES = 100
 
@@ -125,11 +125,12 @@ async function fromNetwork(request, key) {
   }
 }
 
+// A page opened from a search hit carries the words searched for, which change nothing it serves.
 async function page(request, url) {
   try {
     const kept = PAGES.get(bare(url.pathname))
 
-    return kept !== undefined && url.search === '' ? await fromNetwork(request, kept) : await fetch(request)
+    return kept !== undefined && [...url.searchParams.keys()].every(name => name === 'kay_q') ? await fromNetwork(request, kept) : await fetch(request)
   }
   catch (error) {
     const cache = await caches.open(KAY.cache)

@@ -98,6 +98,10 @@
       "types": "./types/runtime/dom.d.ts",
       "default": "./src/runtime/dom.ts"
     },
+    "./arrival": {
+      "types": "./types/runtime/arrival.d.ts",
+      "default": "./src/runtime/arrival.ts"
+    },
     "./client": {
       "types": "./types/runtime/client.d.ts",
       "default": "./src/runtime/client.ts"

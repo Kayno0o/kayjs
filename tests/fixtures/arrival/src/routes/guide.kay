@@ -1,6 +1,7 @@
 head
   title Guide
 h1 Guide
+a.toc(href="#third") To third
 p Needle above the headings
 h2#first First
 p needle in the first

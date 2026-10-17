@@ -18,9 +18,10 @@ const MARK = /\p{M}/gu
 // Characters of text kept on either side of the first word found.
 const SNIPPET_BEFORE = 50
 const SNIPPET_LENGTH = 160
+
 // The most words of a query, and the most characters of each, a hit's link carries for the page it opens to mark.
-const ARRIVAL_WORDS = 8
-const ARRIVAL_WORD_LENGTH = 64
+export const ARRIVAL_WORDS = 8
+export const ARRIVAL_WORD_LENGTH = 64
 // A word only starting with what was typed counts for less than the word itself, the more so the less of it was typed: `island` finds `Islands` nearly as well as `island`.
 const PREFIX_FACTOR = 0.7
 

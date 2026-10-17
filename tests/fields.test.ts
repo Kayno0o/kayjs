@@ -186,6 +186,13 @@ describe('readQuery', () => {
     expect(query('?since=2020-01-02', search)).toEqual({ exact: false, live: true, tags: ['all'], since: new Date('2020-01-02') })
   })
 
+  it('leaves out the words a search hit\'s link carries, so a strict schema does not refuse the page', () => {
+    const strict = t.Object({ n: t.Optional(t.Integer()) }, { additionalProperties: false })
+
+    expect(query('?kay_q=install+it&n=2', strict)).toEqual({ n: 2 })
+    expect(query('?kay_q=x')).toEqual({})
+  })
+
   it('denies a query its schema refuses with 400', () => {
     expect(() => query('?n=x', t.Object({ n: t.Integer() }))).toThrow(Denied)
   })

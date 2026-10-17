@@ -5,6 +5,7 @@ import { relative } from 'node:path'
 import process from 'node:process'
 import { mapValueError } from 'elysia'
 import { TypeCompiler } from 'elysia/type-system'
+import { ARRIVAL_PARAM } from '../runtime/arrival'
 import { formInput } from '../runtime/form'
 import { errorText } from './field-errors'
 import { pageSetting } from './page-settings'
@@ -238,6 +239,10 @@ function searchInput(url: URL): Record<string, string | string[]> {
   const input = new Map<string, string | string[]>()
 
   for (const [name, value] of url.searchParams) {
+    // The words a search hit's link carries for the page to mark are no param of the page's.
+    if (name === ARRIVAL_PARAM)
+      continue
+
     const seen = input.get(name)
 
     input.set(name, seen === undefined ? value : [...(Array.isArray(seen) ? seen : [seen]), value])

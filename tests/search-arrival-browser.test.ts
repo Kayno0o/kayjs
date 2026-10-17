@@ -95,6 +95,24 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a page open
     expect(await page.evaluate(() => location.hash)).toBe('#third')
   })
 
+  it('leaves a link to a heading of the same page, a table of contents entry, to the browser', async () => {
+    const fetched: string[] = []
+
+    // A visit differing by its hash alone would not load the page afresh.
+    await page.goto('about:blank')
+    await page.goto(`${origin}/guide?kay_q=needle#second`)
+    await page.waitForFunction(() => CSS.highlights.has('kay-search'))
+    page.on('request', (request) => {
+      if (request.isNavigationRequest() || request.headers()['x-kay-navigate'] !== undefined)
+        fetched.push(request.url())
+    })
+    await page.click('a.toc')
+    await page.waitForFunction(() => location.hash === '#third')
+
+    expect(fetched).toEqual([])
+    expect(await marks()).toEqual(['needle', 'NEEDLE'])
+  })
+
   it('marks the text above the first heading for a hit with no anchor', async () => {
     await page.goto(`${origin}/guide?kay_q=needle`)
     await page.waitForFunction(() => CSS.highlights.has('kay-search'))

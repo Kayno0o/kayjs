@@ -1,5 +1,4 @@
 import type { FetchedPage, HeadElement, Intent, Swap } from './navigation'
-import { arrive } from './arrival'
 import { focusInvalid } from './focus'
 import { ISLAND } from './markers'
 import { historyState, leave, leaving, navigation, pageKey, prefetched, restoreScroll, saveScroll, takeFormChecks } from './navigation'
@@ -303,7 +302,7 @@ export async function show(page: FetchedPage, hash: string, swap: Swap, isCurren
     void moveFocus(swap, policy)
     takeFormChecks(document)
     navigation.hooks!.hydrate(document.body)
-    void arrive(target.search)
+    void navigation.hooks!.arrive?.(target.search, scrollY)
   }
 
   if (policy.transition && viewTransitions())

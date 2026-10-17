@@ -206,6 +206,25 @@ describe('service worker', () => {
       }
     })
 
+    it('serves a kept page opened from a search hit, whose link carries the words searched for', async () => {
+      const dir = await mkdtemp(join(tmpdir(), 'kay-sw-'))
+
+      try {
+        const app = new Elysia()
+        const client = { dir, pages: new Map([['/about', { pattern: '/about', file: 'about.html', status: 200, headers: {}, etag: '"a"', renderedAt: 0 }]]) } as unknown as ClientBuild
+
+        await serveServiceWorker(app, new ServedPaths(), { client, offline: true, base: '', trailingSlash: 'never', publicPages: ['/about'] })
+
+        const { text } = await worker(app)
+        const online = new Map([['/about', new Response('about page')]])
+
+        expect(await visit(text, '/about?kay_q=about+page', online)).toEqual({ status: 200, body: 'about page' })
+      }
+      finally {
+        await rm(dir, { recursive: true, force: true })
+      }
+    })
+
     it('under a base', async () => {
       const app = await pages({ routes: ROUTES, prebuilt: false, site: 'https://x.example', base: '/repo', trailingSlash: 'always', offline: { pages: ['/', '/about'] } })
       const { settings } = await worker(app)

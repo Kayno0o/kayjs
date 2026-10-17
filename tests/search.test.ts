@@ -207,6 +207,56 @@ describe('search', () => {
     }
   }, 60_000)
 
+  it('ships nothing of the arrival to a site with search off, and a few bytes up front with it on', async () => {
+    const scripts = /<(?:script type="module" src|link rel="modulepreload" href)="([^"]+)"/g
+    const imports = /(?:from|import)\s*"([^"]+\.js)"/g
+    const built = async (config: string) => {
+      const site = await scratchDir('search-arrival-size-')
+
+      try {
+        await Promise.all([
+          Bun.write(join(site, 'kay.config.ts'), `export default { favicon: false, ${config} }\n`),
+          Bun.write(join(site, 'src/components/counter.kay'), '---\nimport { signal } from \'kay\'\n\nconst n = signal(0)\n---\nbutton(type="button" onClick={() => n.set(n() + 1)}) {n()}\n'),
+          Bun.write(join(site, 'src/routes/index.kay'), '---\nimport Counter from \'../components/counter.kay\'\n---\nh1 Home\nCounter\n'),
+        ])
+        await build(site, '--static', '--outdir', join(site, 'dist'))
+
+        const html = await Bun.file(join(site, 'dist/index.html')).text()
+        const files = await Array.fromAsync(new Bun.Glob('**/*.js').scan(join(site, 'dist')))
+        const texts = new Map<string, string>(await Promise.all(files.map(async file => [`/${file}`, await Bun.file(join(site, 'dist', file)).text()] as const)))
+        const pending = [...html.matchAll(scripts)].map(match => match[1]!)
+        const eager = new Set<string>()
+
+        for (let url = pending.pop(); url !== undefined; url = pending.pop()) {
+          if (eager.has(url))
+            continue
+
+          eager.add(url)
+          pending.push(...[...texts.get(url)?.matchAll(imports) ?? []].map(match => new URL(match[1]!, `http://x${url}`).pathname))
+        }
+
+        return {
+          holding: [...texts].filter(([, text]) => text.includes('kay_q')).map(([url]) => url),
+          eager: [...eager],
+          bytes: [...eager].reduce((sum, url) => sum + Bun.gzipSync(texts.get(url) ?? '').length, 0),
+          marking: [...texts].filter(([, text]) => text.includes('adoptedStyleSheets')).map(([url]) => eager.has(url)),
+        }
+      }
+      finally {
+        await rm(site, { recursive: true, force: true })
+      }
+    }
+    const off = await built('search: false')
+    const on = await built('search: true')
+
+    expect(off.holding).toEqual([])
+    expect(on.holding.length).toBeGreaterThan(0)
+    expect(off.marking).toEqual([])
+    // The code that paints is a chunk of its own, loaded for a page that asks.
+    expect(on.marking).toEqual([false])
+    expect(on.bytes - off.bytes).toBeLessThan(200)
+  }, 120_000)
+
   it('serves the manifest revalidated and the index for good', async () => {
     const { pages } = await import('../src/server')
     const cwd = process.cwd()

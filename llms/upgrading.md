@@ -4,6 +4,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ## 1.52.0
 
+### A search hit's `href` carries the words searched for
+
+- `hit.href` from `searchSite` and `searchResults` is now `/path?kay_q=words#anchor`, so a page opened from a hit marks them. An app comparing `hit.href` to a path, or splitting it at `#` only, reads the path from `new URL(hit.href, location.origin).pathname`. A page with a strict `query` schema is not affected, as `kay_q` is left out of `ctx.query`. No `deprecated` lint is possible, as no code `kay check` reads is wrong.
+
 ### `kay new --host` is `--forge`, and `kay/test`'s `mount` is `mountComponent`
 
 - `kay new --host forgejo|github` is now `--forge`, as `kay dev --host` is an address; `--host` still works for now and warns. A script calling `kay new` renames the flag. No `deprecated` lint is possible, as a command line is no code `kay check` reads.

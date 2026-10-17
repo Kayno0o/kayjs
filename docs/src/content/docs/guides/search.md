@@ -50,7 +50,11 @@ ul
 
 Each hit links a section of a page. A section is the text above its first `h2`, `h3` or `h4`, or a heading and the text under it. The link goes through the heading's `id`.
 
-A page opened from a hit marks those words in the section. It scrolls to the first one if it is out of view. You wire nothing: the hit's `href` carries the words, so it works with kay's palette and with your own links, and in a link you keep or share. The page needs kay's client, which any island brings. In a browser without the CSS Custom Highlight API, the page only scrolls to the heading. To change the look, style `::highlight(kay-search)`.
+A page opened from a hit marks those words in the section. It scrolls to the first one if it is out of view. You wire nothing: the hit's `href` carries the words, so it works with kay's palette and with your own links.
+
+The page needs kay's client, which any island brings. In a browser without the CSS Custom Highlight API, the page only scrolls to the heading. To change the look, style `::highlight(kay-search)`.
+
+The words stay in the URL, where analytics see them, and a refresh marks them again.
 
 `snippet` is a line of that text around the first word found. Its parts mark each word searched for.
 
