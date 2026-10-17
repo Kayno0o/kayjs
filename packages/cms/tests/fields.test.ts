@@ -81,6 +81,16 @@ describe('fieldsOf', () => {
     expect(size).toMatchObject({ kind: 'select', options: [{ value: '1', raw: 1 }, { value: '2', raw: 2 }] })
   })
 
+  it('labels a literal\'s option with its title, the value staying what is stored', () => {
+    const [status] = fieldsOf({
+      properties: {
+        status: { anyOf: [{ const: 'new', type: 'string', title: 'Nouveau' }, { const: 'sold', type: 'string' }] },
+      },
+    })
+
+    expect(status).toMatchObject({ kind: 'select', options: [{ value: 'new', label: 'Nouveau', raw: 'new' }, { value: 'sold', label: 'sold', raw: 'sold' }] })
+  })
+
   it('makes a nullable field optional and edits it as its inner type', () => {
     const [subtitle] = fieldsOf({
       required: ['subtitle'],

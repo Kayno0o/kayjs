@@ -114,11 +114,15 @@ function withoutNull(schema: JsonSchema): { schema: JsonSchema, nullable: boolea
   return { schema, nullable: Array.isArray(schema.type) && schema.type.includes('null') }
 }
 
-// A union of literals, or an enum, is picked from a list.
+// A union of literals, or an enum, is picked from a list; a literal's `title` labels its option, the value staying what is stored.
 function choicesOf(schema: JsonSchema): Choice[] | undefined {
-  const values = schema.enum ?? (schema.anyOf?.every(variant => 'const' in variant) === true ? schema.anyOf.map(variant => variant.const) : undefined)
+  if (schema.enum)
+    return schema.enum.map(raw => ({ value: String(raw), label: String(raw), raw }))
 
-  return values?.map(raw => ({ value: String(raw), label: String(raw), raw }))
+  if (schema.anyOf?.every(variant => 'const' in variant) !== true)
+    return undefined
+
+  return schema.anyOf.map(variant => ({ value: String(variant.const), label: variant.title ?? String(variant.const), raw: variant.const }))
 }
 
 // What a new list item starts as: blank text, an unset number, an empty group or list.
