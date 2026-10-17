@@ -17,6 +17,7 @@ test('takes the types an app lists, exact or by family', () => {
 
   expect(uploadRefusal(new File(['x'], 'drawing.svg'))).toBeUndefined()
   expect(uploadRefusal(new File(['x'], 'table.csv'))).toBeUndefined()
+  expect(uploadRefusal(new File(['x'], 'table.csv', { type: '' }))).toBeUndefined()
   expect(uploadRefusal(new File(['x'], 'brochure.pdf'))).toContain('which uploads here do not take: image/*, text/csv')
 })
 
