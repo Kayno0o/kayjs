@@ -212,7 +212,7 @@ catch
 - A throw renders `catch` in place of what was shown; without `catch` it is logged and the parts shown so far stay.
 - A `then` block that throws stops reading the iterable, reported, never showing `catch`.
 - An `await` inside `then` shows its pending block until the last part, whose blocks stream as any do.
-- An island in a part, or in the pending block, is cleaned up (its `onCleanup`s run) when the next part replaces it.
+- An island in a part, or in the pending block, is cleaned up (its `onCleanup`s run, with the island still in the page) when the next part replaces it.
 - A visitor leaving the page stops the iterable (`return()`), so a generator's `finally` runs and a request it made can be aborted.
 - In an island, the block renders again with each part, at most once a frame; a newer value given to the block, or the block going away, stops the older iterable.
 - `renderToString` and a server island render the last part.

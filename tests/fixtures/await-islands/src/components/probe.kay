@@ -1,12 +1,17 @@
 ---
 const { text } = props<{ text: string }>()
 
-// Counted on the body, which a test reads: how many probes mounted and how many were cleaned up.
-function count(name: 'mounted' | 'cleaned') {
+// Counted on the body, which a test reads: how many probes mounted, how many were cleaned up and how many of those still had their button in the document.
+function count(name: 'mounted' | 'cleaned' | 'attached') {
   document.body.dataset[name] = String(Number(document.body.dataset[name] ?? 0) + 1)
 }
 
 onMount(() => count('mounted'))
-onCleanup(() => count('cleaned'))
+onCleanup(() => {
+  count('cleaned')
+
+  if (document.querySelector(`button.probe[data-text="${text}"]`)?.isConnected)
+    count('attached')
+})
 ---
-button.probe {text}
+button.probe(data-text={text}) {text}

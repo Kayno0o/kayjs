@@ -24,4 +24,19 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the island
     expect(cleaned).toBe(mounted - 1)
     expect(page.errors).toEqual([])
   }, 30_000)
+
+  // A cleanup reading the page, an ancestor or the focus, sees the island where it stood.
+  for (const route of ['/', '/nested']) {
+    it(`dispose a replaced island while it is still in the document, at ${route}`, async () => {
+      const page = await site.open(route, { path })
+
+      await page.waitFor('button.probe', { text: 'three' })
+      await page.waitUntil(() => Number(document.body.dataset.cleaned ?? 0) > 1 && Number(document.body.dataset.mounted) === Number(document.body.dataset.cleaned ?? 0) + 1)
+
+      const { cleaned, attached } = await page.evaluate(() => ({ cleaned: Number(document.body.dataset.cleaned ?? 0), attached: Number(document.body.dataset.attached ?? 0) }))
+
+      expect(attached).toBe(cleaned)
+      expect(page.errors).toEqual([])
+    }, 30_000)
+  }
 })

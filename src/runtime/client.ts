@@ -380,9 +380,9 @@ function sameData(a: unknown, b: unknown): boolean {
   return left.length === right.length && left.every(([key, value], index) => sameData(key, right[index]![0]) && sameData(value, right[index]![1]))
 }
 
-// Ends every island under `root`, as a page swap takes them away.
+// Ends every island under `root`, `root` itself included, as a page swap takes them away.
 export function disposeIslands(root: ParentNode): void {
-  for (const element of root.querySelectorAll<HTMLElement>(ISLAND)) {
+  for (const element of [root, ...root.querySelectorAll<HTMLElement>(ISLAND)] as HTMLElement[]) {
     disposers.get(element)?.()
     disposers.delete(element)
   }

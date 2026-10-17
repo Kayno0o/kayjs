@@ -1,0 +1,7 @@
+---
+import Probe from './probe.kay'
+
+const { text } = props<{ text: string }>()
+---
+div.outer
+  Probe(text={text})

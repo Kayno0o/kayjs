@@ -153,7 +153,7 @@ catch
   p The reply was cut short
 ```
 
-The first part goes out at once. After that, kay sends at most one part every 50 ms, always the latest, and always the last one. In an island the block updates at most once a frame. An island inside a part is cleaned up when the next part replaces it.
+The first part goes out at once. After that, kay sends at most one part every 50 ms, always the latest, and always the last one. In an island the block updates at most once a frame. An island inside a part is cleaned up, while it is still in the page, when the next part replaces it.
 
 When the visitor leaves the page, kay stops the iterable, so a generator's `finally` runs.
 

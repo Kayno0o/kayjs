@@ -24,6 +24,9 @@ What each release of kay and its libraries adds, newest first, each feature with
 - An action's stream to an event handler closes with its island, a `persist` island's across pages ([actions from islands](api-from-islands.md)).
 - A stream an action answers with to an event handler (a leaving row's too) closes with its island, so a `persist` island's stays open across pages ([actions from islands](api-from-islands.md)).
 - A stream an action answers with to an event handler (a leaving row's too) or a `listen` callback closes with its island, so a `persist` island's stays open across pages ([actions from islands](api-from-islands.md)).
+- kayjs-ai `Chat`: a wide table scrolls, a 422-refused message returns to its field on retry, the history never opens on an assistant message, `action` takes `ctx.fail` ones ([kayjs-ai](../packages/ai/llms/chat.md)).
+- A stream an action answers with to a handler (leaving rows) or a `listen` callback closes with its island, a `persist` one's stays open across pages ([actions](api-from-islands.md)).
+- A streamed `await` part's island cleans up still in the page ([Streaming](rendering.md#streaming)).
 
 Releases before 1.53 are in [What's new, older releases](whats-new-archive.md).
 ## 1.52.0
