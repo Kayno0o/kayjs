@@ -24,8 +24,8 @@ import { routeSizes } from '../src/build/route-sizes'
 import { anchorModule, runtimeChunk } from '../src/build/runtime-chunk'
 import { runtimeConfig, withoutPlugins } from '../src/build/runtime-config'
 import { importedSignals, inSignalsScope } from '../src/build/signals'
-import { decodeBundleMappings, describeThrown, mapBundleToKay, mapStack } from '../src/build/sourcemap'
-import { analyzeKayCached, compilerModules, keepAnalyses, pruneCompileCache, transformKayCached } from '../src/build/transform'
+import { decodeBundleMappings, describeThrown, embeddedMap, mapBundleToKay, mapStack, registerEmbeddedMap } from '../src/build/sourcemap'
+import { analyzeKayCached, compilerModules, keepAnalyses, pruneCompileCache, transformKay, transformKayCached } from '../src/build/transform'
 import { loadConfig, withConfig } from '../src/config'
 import { devBuilder } from '../src/dev/builder'
 import { projectPaths } from '../src/project'
@@ -389,7 +389,7 @@ describe('kay build', () => {
     }
   })
 
-  it('keeps a production build\'s source maps out of the served directory, pointed at .kay lines, for the server to map island errors', async () => {
+  it('keeps a production build\'s source maps out of the served directory, compressed and pointed at .kay lines, for the server to map island errors', async () => {
     try {
       const client = await buildClient(root, { sourcemap: 'external', minify: true })
       const maps = join(outputDir(root), MAPS_DIR)
@@ -400,22 +400,22 @@ describe('kay build', () => {
       for (const chunk of served.filter(file => file.endsWith('.js')))
         expect(await Bun.file(join(client.dir, chunk)).text()).not.toContain('sourceMappingURL')
 
-      const kept = (await readdir(maps)).filter(file => file.endsWith('.js.map'))
-      const bundles = await Promise.all(kept.map(async file => ({ file, map: await Bun.file(join(maps, file)).json() as { sources: string[], mappings: string } })))
-      const { file, map } = bundles.find(({ map }) => map.sources.includes('counter.kay'))!
-      const index = map.sources.indexOf('counter.kay')
-      const lines = decodeBundleMappings(map.mappings)
-      const at = lines.findIndex(segments => segments.some(segment => segment[1] === index))
-      const segment = lines[at]!.find(found => found[1] === index)!
+      // No raw map is kept: an executable embeds the directory as it is.
+      expect((await readdir(maps)).filter(file => !file.endsWith('.js.map.zst'))).toEqual([])
+
+      const { chunk, frame, expected } = await counterFrame(maps)
       const mapper = browserStackMapper(maps)
-      const chunk = file.slice(0, -'.map'.length)
-      const frame = `    at count (https://shop.example/base/_kay/${chunk}:${at + 1}:${segment[0]! + 1})`
       const mapped = await mapper(`TypeError: x\n${frame}\n    at https://shop.example/_kay/gone.js:1:2\n    at ../x.js:1:1`)
 
-      expect(mapped).toContain(`    at count (counter.kay:${segment[2]! + 1}:${segment[3]! + 1})`)
+      expect(mapped).toContain(expected)
       // A chunk with no map, a name leaving the directory and a frame with no URL stay as they were.
       expect(mapped).toContain('    at https://shop.example/_kay/gone.js:1:2\n    at ../x.js:1:1')
       expect(await mapper(`E\n    at fn (https://h/_kay/..%2F${chunk}:1:1)`)).toContain('..%2F')
+
+      // A map that does not decompress, or holds no JSON, leaves the frames as they were rather than failing the report.
+      await Bun.write(join(maps, 'broken-aaaaaaaa.js.map.zst'), 'not zstd')
+      await Bun.write(join(maps, 'bare-bbbbbbbb.js.map.zst'), await Bun.zstdCompress('{'))
+      expect(await browserStackMapper(maps)('E\n    at f (https://h/_kay/broken-aaaaaaaa.js:1:1)\n    at g (https://h/_kay/bare-bbbbbbbb.js:1:1)')).toBe('E\n    at f (https://h/_kay/broken-aaaaaaaa.js:1:1)\n    at g (https://h/_kay/bare-bbbbbbbb.js:1:1)')
     }
     finally {
       await rm(join(root, '.kay'), { recursive: true, force: true })
@@ -1686,6 +1686,91 @@ async function printed(child: { stdout: ReadableStream<Uint8Array>, stderr: Read
 
   return [stdout + stderr, code]
 }
+
+// A frame of the chunk holding `counter.kay` as a browser would print it, and the line the maps in `maps` should give for it.
+async function counterFrame(maps: string): Promise<{ chunk: string, frame: string, expected: string }> {
+  const kept = (await readdir(maps)).filter(file => file.endsWith('.js.map.zst'))
+  const bundles = await Promise.all(kept.map(async file => ({ file, map: JSON.parse(new TextDecoder().decode(await Bun.zstdDecompress(await Bun.file(join(maps, file)).bytes()))) as { sources: string[], mappings: string } })))
+  const { file, map } = bundles.find(({ map }) => map.sources.includes('counter.kay') || map.sources.includes('src/counter.kay'))!
+  const source = map.sources.find(name => name.endsWith('counter.kay'))!
+  const index = map.sources.indexOf(source)
+  const lines = decodeBundleMappings(map.mappings)
+  const at = lines.findIndex(segments => segments.some(segment => segment[1] === index))
+  const segment = lines[at]!.find(found => found[1] === index)!
+  const chunk = file.slice(0, -'.map.zst'.length)
+
+  return { chunk, frame: `    at count (https://shop.example/base/_kay/${chunk}:${at + 1}:${segment[0]! + 1})`, expected: `    at count (${source}:${segment[2]! + 1}:${segment[3]! + 1})` }
+}
+
+describe('a compiled server\'s errors', () => {
+  it('maps the stacks of a server error and of an island\'s report to .kay lines with its sources gone, and leaves no map file beside it', async () => {
+    const root = await scratchProject({
+      'package.json': JSON.stringify({ name: 'exe-errors', private: true, dependencies: { elysia: '*' } }),
+      'tsconfig.json': tsconfig,
+      'kay.config.ts': 'export default { favicon: false }\n',
+      'src/counter.kay': '---\nimport { signal } from \'kay\'\n\nconst n = signal(0)\n---\nbutton(type="button" onClick={() => n.set(n() + 1)}) {n()}\n',
+      'src/routes/index.kay': '---\nimport Counter from \'../counter.kay\'\n---\nCounter\n',
+      'src/routes/boom.kay': '--- server\nfunction explode() {\n  throw new Error(\'server boom\')\n}\n\nif (ctx.request.headers.has(\'x-boom\'))\n  explode()\n---\np fine\n',
+      'src/server.ts': `import process from 'node:process'
+import { Elysia } from 'elysia'
+import { pages } from 'kay/server'
+
+const logged: string[] = []
+const reported: string[] = []
+const app = new Elysia().use(await pages({ security: false, log: entry => entry.type === 'message' && entry.error?.stack !== undefined && logged.push(entry.error.stack), onError: error => reported.push((error as Error).stack ?? '') }))
+const status = (await app.handle(new Request('http://localhost/boom', { headers: { 'x-boom': '1' } }))).status
+const island = await app.handle(new Request('http://localhost/_kay/error', { method: 'POST', headers: { 'content-type': 'application/json', 'origin': 'http://localhost' }, body: JSON.stringify({ name: 'TypeError', message: 'x', url: '/', stack: \`TypeError: x\\n\${process.env.FRAME}\\n    at https://h/_kay/gone.js:1:2\\n    at fn (https://h/_kay/..%2Fcounter.js:1:1)\` }) }))
+
+await Bun.sleep(20)
+console.log(JSON.stringify({ status, island: island.status, logged, reported }))
+process.exit(0)
+`,
+    })
+
+    const [report, code] = await printed(Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', root, '--no-check', '--compile', join(root, 'server')], { stdout: 'pipe', stderr: 'pipe' }))
+
+    expect(report).not.toContain('error')
+    expect(code).toBe(0)
+    // Bun writes a map beside the executable and its AVIF worker, which the executable embeds instead.
+    expect((await readdir(root)).filter(name => name.endsWith('.map'))).toEqual([])
+
+    const { frame, expected } = await counterFrame(join(outputDir(root), MAPS_DIR))
+
+    await rename(join(root, 'src'), join(root, 'moved'))
+    await rename(join(root, '.kay'), join(root, 'moved-kay'))
+
+    const child = Bun.spawn([join(root, 'server')], { cwd: root, env: { ...process.env, NODE_ENV: 'production', FRAME: frame.trimStart() }, stdout: 'pipe', stderr: 'pipe' })
+    const [output, errors, exited] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+
+    expect({ exited, errors }).toEqual({ exited: 0, errors: expect.any(String) })
+
+    const result = JSON.parse(output.trim().split('\n').at(-1)!) as { status: number, island: number, logged: string[], reported: string[] }
+
+    expect(result.status).toBe(500)
+    expect(result.island).toBe(204)
+    // The server error's log reads the line of the throw in the `.kay` file, not the generated code around it.
+    expect(result.logged.find(stack => stack.startsWith('Error: server boom'))).toMatch(/\n {4}at explode \(.*src\/routes\/boom\.kay:3:\d+\)/)
+    // The island's report is mapped before it reaches onError, a chunk with no map and a name leaving the directory as they were.
+    expect(result.reported.at(-1)).toBe(`TypeError: x\n${expected}\n    at https://h/_kay/gone.js:1:2\n    at fn (https://h/_kay/..%2Fcounter.js:1:1)`)
+  }, 60_000)
+
+  it('maps a frame an executable prints relative to where it was built, in either form, and leaves a map that cannot be read', async () => {
+    const file = join(await scratchDir('kay-frames-'), 'frames.kay')
+    const source = '--- server\nfunction explode() {\n  throw new Error(\'x\')\n}\n---\np\n'
+    const code = transformKay(source, file, { target: 'ssr' })
+    const line = code.split('\n').findIndex(text => text.includes('throw new Error')) + 1
+    const column = code.split('\n')[line - 1]!.indexOf('throw') + 1
+    const blob = (await embeddedMap(file))!
+
+    registerEmbeddedMap('app/frames.kay', blob)
+    registerEmbeddedMap('app/with space/frames.kay', blob)
+    registerEmbeddedMap('app/broken.kay', 'not base64 of zstd')
+
+    expect(mapStack(`    at explode (app/frames.kay:${line}:${column})\n    at app/frames.kay:${line}:${column}\n    at f (app/with space/frames.kay:${line}:${column})`)).toBe('    at explode (app/frames.kay:3:3)\n    at app/frames.kay:3:3\n    at f (app/with space/frames.kay:3:3)')
+    // A path nothing registered, a map that cannot be decoded and a frame with no column stay as they were.
+    expect(mapStack('    at a (app/other.kay:1:1)\n    at b (app/broken.kay:1:1)\n    at c (app/frames.kay:9)')).toBe('    at a (app/other.kay:1:1)\n    at b (app/broken.kay:1:1)\n    at c (app/frames.kay:9)')
+  })
+})
 
 describe('the size report', () => {
   it('weighs the entry and what each island loads beyond it, the heaviest first, and breaks them down by module', async () => {

@@ -9,7 +9,7 @@ import { Elysia } from 'elysia'
 import { openSqlite } from '../src/runtime/sqlite.server'
 import { background, memoryJobs, queue, schedule, shutdown, sqliteJobs } from '../src/server'
 import { drainQueues } from '../src/server/queue'
-import { useAppOnError } from '../src/server/report'
+import { reportBackgroundError, useAppOnError } from '../src/server/report'
 
 const dirs: string[] = []
 
@@ -547,6 +547,36 @@ describe('errors outside a request', () => {
       logged.mockRestore()
       cron.restore()
       process.exitCode = 0
+    }
+  })
+})
+
+describe('a slow onError', () => {
+  it('holds a background report for the timeout at most, logging it, and a fast or failing one returns at once', async () => {
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+
+    try {
+      useAppOnError(async () => new Promise<void>(() => undefined))
+
+      const started = Date.now()
+
+      await reportBackgroundError('a job failed', new Error('stuck'), 30)
+
+      expect(Date.now() - started).toBeLessThan(2000)
+      expect(logged.mock.calls.flat().join('\n')).toContain('onError did not finish in 30 ms')
+
+      logged.mockClear()
+      useAppOnError(async () => {
+        throw new Error('Tracker down')
+      })
+      await reportBackgroundError('a job failed', new Error('again'), 60_000)
+
+      expect(logged.mock.calls.flat().join('\n')).toContain('Tracker down')
+      expect(logged.mock.calls.flat().join('\n')).not.toContain('did not finish')
+    }
+    finally {
+      useAppOnError(undefined)
+      logged.mockRestore()
     }
   })
 })

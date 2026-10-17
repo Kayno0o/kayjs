@@ -2,6 +2,7 @@ import type { BunPlugin } from 'bun'
 import type { Project } from '../project'
 import type { Route, SpecialPages } from '../server/routes'
 import { existsSync } from 'node:fs'
+import { rm } from 'node:fs/promises'
 import { basename, dirname, join, resolve } from 'node:path'
 import { buildFailure, KayError, raisedMark } from '../compiler/errors'
 import { CONFIG_FILE, extensionServerModules } from '../config'
@@ -165,16 +166,21 @@ export async function compileServer(project: Project, options: CompileOptions): 
     target: 'bun',
     // Parsed at build time: the server starts in a third of the time, for a few more megabytes of executable.
     bytecode: true,
+    // Bun maps a frame to the file and line it came from, which for a `.kay` file is the code kay generated: each module carries what maps that to its `.kay` lines.
+    sourcemap: 'external',
     format: 'esm',
     compile: { outfile, assets: [clientBase, publicDir].filter(dir => existsSync(dir)) },
     // The production code of the app and its packages, as `NODE_ENV=production` gives a server started with Bun.
     define: { 'process.env.NODE_ENV': JSON.stringify('production') },
     // Stylesheets reach pages through the client build, already embedded.
-    plugins: [...configPlugins, withoutStyles(), withoutCompiler(), compressedWasm(), kay({ target: 'ssr', root, cacheDir: paths.cache, settings: config.settings }), ...config.plugins ?? []],
+    plugins: [...configPlugins, withoutStyles(), withoutCompiler(), compressedWasm(), kay({ target: 'ssr', root, cacheDir: paths.cache, settings: config.settings, embedMaps: true }), ...config.plugins ?? []],
   })
 
   if (!build.success)
     throw buildFailure(build.logs, 'kay: compiling the server failed', since)
+
+  // The executable embeds the maps; the files Bun also writes beside it would be dead weight.
+  await Promise.all(build.outputs.filter(output => output.kind === 'sourcemap').map(async output => rm(output.path, { force: true })))
 
   return outfile
 }

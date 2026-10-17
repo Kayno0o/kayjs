@@ -103,7 +103,7 @@ describe('page swap, on the server', () => {
 
     await mkdir(join(dir, 'maps'), { recursive: true })
     // One segment on line 3, column 3, naming source 0 at line 11, column 6 (0-based).
-    await Bun.write(join(dir, 'maps/chunk-abc.js.map'), JSON.stringify({ sources: ['src/routes/cart.kay'], mappings: ';;GAWM' }))
+    await Bun.write(join(dir, 'maps/chunk-abc.js.map.zst'), await Bun.zstdCompress(JSON.stringify({ sources: ['src/routes/cart.kay'], mappings: ';;GAWM' })))
 
     const mapped = await servePages(resolveProject(process.cwd(), { routes, security: false, onError: error => void caught.push(error) }), async () => ({ ...client, dir: join(dir, 'dist') }))
     const report = async (stack: string) => (await mapped.handle(new Request('http://localhost/_kay/error', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: 'Error', message: 'x', stack, url: 'http://localhost/' }) }))).status

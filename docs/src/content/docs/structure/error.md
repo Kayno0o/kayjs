@@ -21,4 +21,6 @@ Without an `_error.kay` the response is plain text, and development shows an err
 
 The nearest `_error.kay` wins, wrapped by the layouts of its own folder. Each error kay logs also goes to the `onError` option of [`kay.config.ts`](/structure/kay-config). Use it to send errors to an error tracker. It also gets an error a scheduled, background or queued job (once out of attempts) or an `onStop` hook throws, with no request, and an error an island meets in the browser, as a `BrowserError` whose stack points at your `.kay` files in production.
 
+kay waits 10 seconds at most for `onError` after a job or an `onStop` hook, so a tracker that hangs holds neither a queue worker nor a shutdown.
+
 <ReadMore href="/essentials/routing#not-found-and-errors">Not found and error pages in the routing guide.</ReadMore>

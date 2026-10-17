@@ -32,11 +32,30 @@ export function useAppOnError(onError: KayConfig['onError']): void {
   appOnError = onError
 }
 
+// How long a caller waits for the app's `onError` when it holds a queue worker or delays an exit: a tracker that hangs must not.
+export const ON_ERROR_TIMEOUT_MS = 10_000
+
 // Logs an error met outside any request, a scheduled, background or queued job or an `onStop` hook, and hands it to the app's `onError` with no request.
-// Resolves once `onError` returned and never rejects, for a caller about to exit to await.
-export async function reportBackgroundError(message: string, error: unknown): Promise<void> {
+// Resolves once `onError` returned, or after `timeout` ms with a log saying it did not, and never rejects, for a caller about to exit or to take its next job to await.
+export async function reportBackgroundError(message: string, error: unknown, timeout = ON_ERROR_TIMEOUT_MS): Promise<void> {
   kayLog('error', message, error)
 
-  if (appOnError)
-    await deliver(error, undefined, appOnError)
+  if (!appOnError)
+    return
+
+  let timer: ReturnType<typeof setTimeout> | undefined
+
+  const late = new Promise<void>((resolve) => {
+    timer = setTimeout(() => {
+      kayLog('error', `onError did not finish in ${timeout} ms, not waited for any longer`)
+      resolve()
+    }, timeout)
+  })
+
+  try {
+    await Promise.race([deliver(error, undefined, appOnError), late])
+  }
+  finally {
+    clearTimeout(timer)
+  }
 }

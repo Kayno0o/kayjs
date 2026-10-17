@@ -3,7 +3,7 @@ import type { RouteMount } from '../server/routes'
 import type { Target } from './transform'
 import type { WorkerBundle, WorkerResult } from './worker-bundle'
 import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs'
-import { basename, dirname, join, resolve, sep } from 'node:path'
+import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { ISLAND_TWIN, withoutTwin } from '../compiler'
 import { KayError } from '../compiler/errors'
@@ -16,6 +16,7 @@ import { expandGlobs } from './glob'
 import { iconModule, iconNames, installedIconSets } from './icons'
 import { settingsReplacements } from './libraries'
 import { liveIds } from './live-ids'
+import { embeddedMap } from './sourcemap'
 import { transformKayCached } from './transform'
 
 export interface KayPluginOptions {
@@ -40,6 +41,8 @@ export interface KayPluginOptions {
   external?: string[] | undefined
   // Points an import of names from `kay` at the runtime modules holding them: see direct-imports.ts.
   direct?: boolean | undefined
+  // An executable's modules carry their own source map, for it to map the stacks of the errors it meets to `.kay` lines with no compiler: they register it under the path Bun shows for the file, relative to the working directory.
+  embedMaps?: boolean | undefined
 }
 
 // A static component imports its `?island` twin, the build of it that renders inside islands, as a module of its own.
@@ -201,7 +204,10 @@ export function kayPlugin(options: KayPluginOptions, workers: string[]): BunPlug
 
         const contents = await pointed(await shippingFiles(expandGlobs(await transformKayCached(source, file, { target, hydratable: options.hydratable ?? true, root: options.root, cacheDir: options.cacheDir, inspect: options.inspect }), withoutTwin(file), root, 'ts'), withoutTwin(file), 'ts'))
 
-        return { contents: options.anchor !== undefined && options.anchor !== '' ? `${contents}\nimport ${JSON.stringify(options.anchor)}\n` : contents, loader: 'ts' as const }
+        const anchored = options.anchor !== undefined && options.anchor !== '' ? `${contents}\nimport ${JSON.stringify(options.anchor)}\n` : contents
+        const map = options.embedMaps === true ? await embeddedMap(file) : undefined
+
+        return { contents: map === undefined ? anchored : `${anchored}\nimport { registerEmbeddedMap } from 'kay/internal/server'\nregisterEmbeddedMap(${JSON.stringify(relative(process.cwd(), file))}, ${JSON.stringify(map)})\n`, loader: 'ts' as const }
       }
 
       build.onLoad({ filter: KAY_FILE }, async ({ path }) => load(path))

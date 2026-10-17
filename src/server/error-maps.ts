@@ -1,6 +1,6 @@
 import { readdir } from 'node:fs/promises'
 import { join } from 'node:path'
-import { decodeBundleMappings } from '../build/sourcemap'
+import { COMPRESSED_MAP, decodeBundleMappings } from '../build/sourcemap'
 
 interface LoadedMap {
   sources: string[]
@@ -24,7 +24,7 @@ export function browserStackMapper(dir: string): (stack: string) => Promise<stri
   async function load(name: string): Promise<LoadedMap | undefined> {
     names ??= listed(dir)
 
-    if (!CHUNK_NAME.test(name) || !(await names).has(`${name}.map`))
+    if (!CHUNK_NAME.test(name) || !(await names).has(`${name}.map${COMPRESSED_MAP}`))
       return undefined
 
     let map = loaded.get(name)
@@ -37,7 +37,7 @@ export function browserStackMapper(dir: string): (stack: string) => Promise<stri
       if (loaded.size >= MAX_LOADED)
         loaded.delete(loaded.keys().next().value!)
 
-      map = read(join(dir, `${name}.map`))
+      map = read(join(dir, `${name}.map${COMPRESSED_MAP}`))
     }
 
     loaded.set(name, map)
@@ -80,7 +80,7 @@ function chunkOf(url: string): string {
 
 async function read(file: string): Promise<LoadedMap | undefined> {
   try {
-    const { sources, mappings } = await Bun.file(file).json() as { sources: string[], mappings: string }
+    const { sources, mappings } = JSON.parse(new TextDecoder().decode(await Bun.zstdDecompress(await Bun.file(file).bytes()))) as { sources: string[], mappings: string }
 
     return { sources, lines: decodeBundleMappings(mappings) }
   }

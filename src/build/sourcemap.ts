@@ -3,7 +3,7 @@ import { mkdir, rm } from 'node:fs/promises'
 import { basename, dirname, join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { browserGlobalMissing } from '../compiler/globals'
-import { offsetAt, positionAt } from '../compiler/mapping'
+import { SourceMap as KayMap, offsetAt, positionAt } from '../compiler/mapping'
 import { withoutTwin } from '../compiler/twin'
 import { writeAtomically } from './files'
 
@@ -27,12 +27,17 @@ const BASE64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/
 const BASE64_DIGITS = new Map([...BASE64].map((char, index) => [char, index]))
 // A stack line is `at fn (path:line:column)` or `at path:line:column`, and the path may hold spaces and parentheses.
 const FRAME_START = /^\s*at\s+/
-const PATH_IN_PARENTHESES = /\s\((?=\/|[A-Z]:[\\/])/i
+// The path an executable's frames show is relative to where it was built, so it needs no root.
+const PATH_IN_PARENTHESES = /\s\((?=\/|[A-Z]:[\\/]|[^\s()][^()]*\.kay(?:\?island)?:\d)/i
 // A static component's `?island` twin is a module of its own, with its own map, shown as its `.kay` file.
 const FRAME_POSITION = /\.kay(?:\?island)?:(\d+):(\d+)/
 // Anything else mentioning a position, such as an error message.
 const KAY_POSITION = /([^\s()]+\.kay(?:\?island)?):(\d+):(\d+)/g
 const FIRST_KAY_POSITION = /([^\s()]+\.kay):(\d+):(\d+)/
+
+// What a kept map's name ends with, after the `.map` of the chunk's own.
+export const COMPRESSED_MAP = '.zst'
+const NOT_LINE_BREAK = /[^\r\n]/g
 const VLQ_CONTINUATION = 32
 const VLQ_VALUE = 31
 
@@ -47,11 +52,46 @@ export function registerSourceMap(file: string, entry: Compiled | (() => Compile
   (browser ? browserCompiled : compiled).set(file, entry)
 }
 
+// A file's compiled server map for an executable to carry, which has no compiler to make it: line structure only of the source and the generated code, which is all a position needs, so zstd-compressed it is a small string of base64.
+export async function embeddedMap(file: string): Promise<string | undefined> {
+  const entry = compiledFor(file)
+
+  if (!entry)
+    return undefined
+
+  const bytes = await Bun.zstdCompress(JSON.stringify({ source: lineShape(entry.source), tsx: lineShape(entry.tsx), map: entry.map.toJSON() }), { level: 10 })
+
+  return Buffer.from(bytes).toString('base64')
+}
+
+// Called by the modules of an executable, `name` being the path its stack frames show for the file; the map is read and decoded when a stack first needs it.
+export function registerEmbeddedMap(name: string, blob: string): void {
+  registerSourceMap(name, () => {
+    const { source, tsx, map } = JSON.parse(new TextDecoder().decode(Bun.zstdDecompressSync(Buffer.from(blob, 'base64')))) as { source: string, tsx: string, map: ReturnType<KayMap['toJSON']> }
+
+    return { source, tsx, map: KayMap.fromJSON(map) }
+  })
+}
+
+// The text with every character but its line breaks blanked: offsets, lines and columns stay the same.
+function lineShape(text: string): string {
+  return text.replace(NOT_LINE_BREAK, ' ')
+}
+
 function compiledFor(file: string, registry = compiled): Compiled | undefined {
   let entry = registry.get(file)
 
   if (typeof entry === 'function') {
-    entry = entry()
+    // A map that cannot be made leaves its frames as they are, rather than the log of the error that needed it failing.
+    try {
+      entry = entry()
+    }
+    catch {
+      registry.delete(file)
+
+      return undefined
+    }
+
     registry.set(file, entry)
   }
 
@@ -99,7 +139,7 @@ async function rewriteBundleMap(mapFile: string): Promise<void> {
   await writeAtomically(mapFile, JSON.stringify(bundle))
 }
 
-// A production map of the browser build, pointed at `.kay` lines and moved out of the served directory into `mapsDir`, its sources named from `root`.
+// A production map of the browser build, pointed at `.kay` lines and moved out of the served directory into `mapsDir`, its sources named from `root` and zstd-compressed, which is how an executable embeds it.
 export async function keepBundleMap(mapFile: string, root: string, mapsDir: string): Promise<void> {
   await mapBundleToKay(mapFile)
 
@@ -109,7 +149,7 @@ export async function keepBundleMap(mapFile: string, root: string, mapsDir: stri
   // The server maps positions only: the sources would double each map.
   delete bundle.sourcesContent
   await mkdir(mapsDir, { recursive: true })
-  await Bun.write(join(mapsDir, basename(mapFile)), JSON.stringify(bundle))
+  await Bun.write(join(mapsDir, `${basename(mapFile)}${COMPRESSED_MAP}`), await Bun.zstdCompress(JSON.stringify(bundle), { level: 10 }))
   await rm(mapFile, { force: true })
 }
 
