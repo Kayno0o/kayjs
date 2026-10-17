@@ -1,11 +1,15 @@
 --- <Value extends string, Held extends Value | null = Value>
 import type { JSX } from 'kay'
+import type { IconProps } from 'kay/icons'
+import type { IconSlot } from './defaults'
 import { effect, signal, uid, untrack } from 'kay'
 import { changeAccepted } from './change'
 import { onFormReset, resetWhenIdle, startRef } from './form-reset'
+import Icon from './icon.kay'
 
 const { options, value, label, name, onChange, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
-  options: readonly { value: Value, label: string }[]
+  // `icon` sits before the label; `disabled` keeps that option from being picked.
+  options: readonly { value: Value, label: string, icon?: IconSlot | IconProps | undefined, disabled?: boolean | undefined }[]
   // The option picked to start with, or `null` for none, such as while what shows matches no option; a group whose parent passes another follows it.
   value: Held
   // Names the group for screen readers.
@@ -98,5 +102,8 @@ onFormReset(() => root, resetting.reset)
 .kui-segmented({...rest} ref={ref} role="radiogroup" aria-label={label} aria-busy={busy() ? 'true' : undefined} class={className})
   for option of options key={option.value}
     label.kui-segmented-option
-      input.kui-segmented-input(ref={element => element.defaultChecked = untrack(() => option.value === value)} type="radio" name={group} value={option.value} checked={picked() === option.value} onChange={() => pick(option.value)})
-      span.kui-segmented-label {option.label}
+      input.kui-segmented-input(ref={element => element.defaultChecked = untrack(() => option.value === value)} type="radio" name={group} value={option.value} checked={picked() === option.value} disabled={option.disabled} onChange={() => pick(option.value)})
+      span.kui-segmented-label
+        if option.icon
+          Icon(icon={option.icon} class="kui-segmented-icon")
+        | {option.label}

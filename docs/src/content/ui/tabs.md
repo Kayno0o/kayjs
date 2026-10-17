@@ -4,7 +4,7 @@ description: Tabs that switch between panels on the same page, with keyboard nav
 
 <Demo name="tabs/basic" />
 
-`tabs` lists the `value` and `label` of each tab and `@panel(tab)` draws the panel for a value. The arrow keys, Home and End move between tabs. For tabs that are pages of their own, use [TabNav](/ui/tab-nav).
+`tabs` lists the `value` and `label` of each tab, and an `icon` drawn before it or `disabled` to keep it from being shown, the arrow keys going past it, and `@panel(tab)` draws the panel for a value. The arrow keys, Home and End move between tabs. For tabs that are pages of their own, use [TabNav](/ui/tab-nav).
 
 ## Panels keep their state
 

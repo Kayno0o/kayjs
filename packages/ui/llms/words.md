@@ -14,7 +14,7 @@ Every text kayjs-ui shows by default is looked up in the app's catalogs (`src/me
 
 ## The keys
 
-- `ui.barList.*`: `empty` (`No data yet.`)
+- `ui.barList.*`: `emptyLabel` (`No data yet.`), `empty` (the deprecated name of the same key, still read after `emptyLabel`)
 - `ui.carousel.*`: `dotLabel` (`Go to slide {n}`), `label` (`Carousel`), `nextLabel` (`Next slide`), `pauseLabel` (`Pause`), `playLabel` (`Play`), `previousLabel` (`Previous slide`), `slideLabel` (`Slide {n} of {count}`)
 - `ui.commandPalette.*`: `emptyLabel` (`No results`), `label` (`Search`), `placeholder` (`Search`), `recentLabel` (`Recent`), `resultsLabel` (`{count} results, `1 result` for one`), `siteSearchError` (`The pages could not be searched`), `siteSearchLabel` (`In the pages`)
 - `ui.confirmDelete.*`: `cancelLabel` (`Cancel`), `confirmLabel` (`Confirm`), `deleteLabel` (`Delete`), `pendingLabel` (`Deleting…`), `title` (`Confirm Deletion`)
@@ -26,13 +26,13 @@ Every text kayjs-ui shows by default is looked up in the app's catalogs (`src/me
 - `ui.lineChart.*`: `rangeHint` (`Shift with the arrow keys picks a span, Enter applies it, Escape drops it`)
 - `ui.loadMore.*`: `failureLabel` (`Could not load more.`), `loadingLabel` (`Loading more…`), `retryLabel` (`Try again`)
 - `ui.markdownEditor.*`: `keysHint` (`Tab indents a list item; Escape then Tab leaves the field.`), `placeholder` (`Write markdown…`), `uploadFailure` (`Could not upload the image`)
-- `ui.mediaGallery.*`: `closeLabel` (`Close`), `empty` (`No media.`), `itemLabel` (`Media {n}`), `nextLabel` (`Next`), `openLabel` (`Open full size`), `previousLabel` (`Previous`)
+- `ui.mediaGallery.*`: `closeLabel` (`Close`), `emptyLabel` (`No media.`), `empty` (the deprecated name of the same key, still read after `emptyLabel`), `itemLabel` (`Media {n}`), `nextLabel` (`Next`), `openLabel` (`Open full size`), `previousLabel` (`Previous`)
 - `ui.multiSelect.*`: `allLabel` (`All`), `emptyLabel` (`No match`), `noneLabel` (`None`), `placeholder` (`Any`), `searchLabel` (`Search`), `selectedLabel` (`{count} selected`)
 - `ui.pagination.*`: `label` (`Pagination`), `nextLabel` (`Next`), `previousLabel` (`Previous`)
 - `ui.rangeInput.*`: `fromLabel` (`{label} from`), `toLabel` (`{label} to`)
 - `ui.rating.*`: `label` (`{value} out of {max}`)
 - `ui.saveForm.*`: `cleanLabel` (`No unsaved change.`), `dirtyLabel` (`Unsaved changes.`), `discardLabel` (`Discard`), `saveLabel` (`Save`), `savingLabel` (`Saving…`)
-- `ui.scatterChart.*`: `empty` (`No data yet.`)
+- `ui.scatterChart.*`: `emptyLabel` (`No data yet.`), `empty` (the deprecated name of the same key, still read after `emptyLabel`)
 - `ui.select.*`: `loadingLabel` (`Loading…`)
 - `ui.sidePanel.*`: `closeLabel` (`Close`)
 - `ui.siteNav.*`: `menuLabel` (`Menu`)

@@ -4,6 +4,8 @@ description: A row of mutually exclusive options, drawn as radio buttons.
 
 <Demo name="segmented/basic" />
 
+An option is `{ value, label, icon?, disabled? }`, the shape of every group: `icon` draws before the label and a `disabled` option cannot be picked.
+
 ## None picked
 
 A `value` of `null` picks no option, for a moment when what shows matches none of them, such as a zoomed chart beside a period picker. Picking one, or the parent passing one, checks it again.

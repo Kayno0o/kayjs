@@ -4,6 +4,8 @@ description: A native select box for a list of options, with an optional empty c
 
 <Demo name="select/basic" />
 
+An option is `{ value, label, disabled? }`; a `disabled` one cannot be picked. A native option draws no icon, so unlike the other groups' options it has none.
+
 ## Typed values
 
 `value` and `onChange` take the type of the options' values. A union of strings stays that union, and a number option hands back a number. With `emptyOption`, they take the empty string too, so hold the value as `Kind | ''`.

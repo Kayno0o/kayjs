@@ -8,7 +8,8 @@ import { wording } from 'kay/words'
 const { value, options, onChange, submit = false, emptyOption, loading = false, loadingLabel = wording('ui.select.loadingLabel', 'Loading…'), class: className, ...rest } = props<Omit<JSX.IntrinsicElements['select'], 'value' | 'options' | 'class' | 'children' | 'onChange'> & {
   // One of the options' values, or the empty string once there is an `emptyOption`.
   value: Value | (Empty extends string | true ? '' : never)
-  options: readonly { value: Value, label: string }[]
+  // `disabled` keeps that option from being picked. A native option draws no icon, so it has none.
+  options: readonly { value: Value, label: string, disabled?: boolean | undefined }[]
   // Handed the option's own value, a number for a number option, or the empty string for the `emptyOption`.
   onChange?: ((value: Value | (Empty extends string | true ? '' : never)) => void) | undefined
   // Submits the form holding it once an option is picked, after `onChange`: a GET filter form then needs no ref to itself.
@@ -51,4 +52,4 @@ select.kui-field-input({...rest} ref={ref} class={className} onChange={event => 
   if loading
     option(value="" disabled) {loadingLabel}
   for choice of options key={choice.value}
-    option(ref={element => element.toggleAttribute('selected', untrack(() => String(choice.value) === String(value)))} value={choice.value} selected={String(choice.value) === String(value)}) {choice.label}
+    option(ref={element => element.toggleAttribute('selected', untrack(() => String(choice.value) === String(value)))} value={choice.value} disabled={choice.disabled} selected={String(choice.value) === String(value)}) {choice.label}

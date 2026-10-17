@@ -16,6 +16,6 @@ An item has a `key`, a `kind` of `image` or `video`, a `thumb` for the strip, a 
 
 ## Items and labels
 
-`items` is the required list, and `empty` is what the gallery reads with none, `No media.` by default.
+`items` is the required list, and `emptyLabel` is what the gallery reads with none, `No media.` by default. `empty` is its deprecated name.
 
 `previousLabel`, `nextLabel` and `closeLabel` name the lightbox buttons. `openLabel` names the button opening the lightbox, followed by the item's title when it has one, `Open full size` by default. `itemLabel` names an item with no title, `Media {n}`, `{n}` standing for its number.

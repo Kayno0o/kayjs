@@ -6,6 +6,9 @@ export default defineMessages({
   ...mail,
   ui: {
     pagination: { label: 'Pages', previousLabel: 'Précédent', nextLabel: 'Suivant' },
+    // The old key of BarList's `empty` is still read, as the new key of MediaGallery's `emptyLabel` is.
+    barList: { empty: 'Aucune donnée' },
+    mediaGallery: { emptyLabel: 'Aucun média' },
     table: { filterLabel: 'Filtrer', rowCount: { one: '{count} ligne', other: '{count} lignes' } },
   },
 })

@@ -14,6 +14,6 @@ With `onSelect`, every row becomes a button handing back the row it was pressed 
 
 ## Empty
 
-With no rows, the list reads `empty` instead.
+With no rows, the list reads `emptyLabel` instead. `empty` is its deprecated name.
 
 <Demo name="bar-list/empty" />

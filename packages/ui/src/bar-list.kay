@@ -4,14 +4,19 @@ import type { BarListRow } from './plot'
 import { memo } from 'kay'
 import { wording } from 'kay/words'
 
-const { rows, onSelect, empty = wording('ui.barList.empty', 'No data yet.'), class: className, ...rest } = props<Omit<JSX.IntrinsicElements['ul'], 'class' | 'children' | 'onSelect'> & {
+const { rows, onSelect, emptyLabel, empty, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['ul'], 'class' | 'children' | 'onSelect'> & {
   rows: Row[]
   // Makes every row a button handing back the row it was pressed on.
   onSelect?: ((row: Row) => void) | undefined
   // What the list reads with no rows.
+  emptyLabel?: string | undefined
+  // Deprecated: use `emptyLabel`, which wins when both are given.
   empty?: string | undefined
   class?: string | undefined
 }>()
+
+// The catalogs' `ui.barList.empty` key of the old prop is still read, after the new `ui.barList.emptyLabel`.
+const nothing = () => emptyLabel ?? empty ?? wording('ui.barList.emptyLabel', wording('ui.barList.empty', 'No data yet.'))
 
 const largest = memo(() => Math.max(0, ...rows.map(row => row.value)))
 
@@ -20,7 +25,7 @@ const percent = (row: Row) => largest() > 0 ? Math.max(0, row.value) / largest()
 ---
 if rows.length === 0
   // The app's id and class stay on whichever element shows.
-  p.kui-bar-list-empty(id={rest.id} class={className}) {empty}
+  p.kui-bar-list-empty(id={rest.id} class={className}) {nothing()}
 else
   ul.kui-bar-list({...rest} class={className})
     for row of rows key={row.key}

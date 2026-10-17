@@ -1,7 +1,10 @@
 --- <Value extends string>
 import type { JSX } from 'kay'
+import type { IconProps } from 'kay/icons'
+import type { IconSlot } from './defaults'
 import { effect, signal, uid, untrack } from 'kay'
 import { stepIndex } from './cycle'
+import Icon from './icon.kay'
 
 // The keys that move between tabs, as the tabs pattern has them: the arrows wrap, Home and End go to either end.
 const MOVES: Partial<Record<string, (index: number, count: number) => number>> = {
@@ -12,7 +15,8 @@ const MOVES: Partial<Record<string, (index: number, count: number) => number>> =
 }
 
 const { tabs, value, label, onChange, panel, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onChange'> & {
-  tabs: readonly { value: Value, label: string }[]
+  // `icon` sits before the label; `disabled` keeps that tab from being shown, and the arrow keys skip it.
+  tabs: readonly { value: Value, label: string, icon?: IconSlot | IconProps | undefined, disabled?: boolean | undefined }[]
   // The tab shown to start with; tabs whose parent passes another follow it.
   value: Value
   // Names the tab list for screen readers.
@@ -49,7 +53,16 @@ function keyDown(event: KeyboardEvent) {
 
   event.preventDefault()
 
-  const next = move(tabs.findIndex(tab => tab.value === shown()), tabs.length)
+  let next = move(tabs.findIndex(tab => tab.value === shown()), tabs.length)
+
+  // The arrows go on past a disabled tab, Home and End to the nearest one that is not, every tab being checked at most once.
+  const step = event.key === 'ArrowLeft' || event.key === 'End' ? -1 : 1
+
+  for (let tried = 0; tabs[next]?.disabled && tried < tabs.length; tried++)
+    next = stepIndex(next, step, tabs.length)
+
+  if (tabs[next]?.disabled)
+    return
 
   show(tabs[next]!.value)
   list?.querySelectorAll<HTMLElement>('[role="tab"]')[next]?.focus()
@@ -58,7 +71,10 @@ function keyDown(event: KeyboardEvent) {
 .kui-tabs({...rest} class={className})
   .kui-tabs-list(ref={element => list = element} role="tablist" aria-label={label} onKeyDown={keyDown})
     for tab, index of tabs key={tab.value}
-      button.kui-tabs-tab(type="button" role="tab" id={`${id}-tab-${index}`} aria-controls={`${id}-panel-${index}`} aria-selected={shown() === tab.value ? 'true' : 'false'} tabindex={shown() === tab.value ? 0 : -1} onClick={() => show(tab.value)}) {tab.label}
+      button.kui-tabs-tab(type="button" role="tab" id={`${id}-tab-${index}`} aria-controls={`${id}-panel-${index}`} aria-selected={shown() === tab.value ? 'true' : 'false'} tabindex={shown() === tab.value ? 0 : -1} disabled={tab.disabled} onClick={() => show(tab.value)})
+        if tab.icon
+          Icon(icon={tab.icon} class="kui-tabs-icon")
+        | {tab.label}
   for tab, index of tabs key={tab.value}
     .kui-tabs-panel(ref={element => element.addEventListener('beforematch', () => show(tab.value))} role="tabpanel" id={`${id}-panel-${index}`} aria-labelledby={`${id}-tab-${index}`} tabindex={shown() === tab.value ? 0 : undefined} hidden={shown() === tab.value ? undefined : 'until-found'})
       // Untracked, so a tab relabelled, such as with a count, keeps its panel and the focus inside it.

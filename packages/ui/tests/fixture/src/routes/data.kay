@@ -1,6 +1,7 @@
 ---
 import BarList from '@kaynooo/kayjs-ui/bar-list.kay'
 import CopyButton from '@kaynooo/kayjs-ui/copy-button.kay'
+import MediaGallery from '@kaynooo/kayjs-ui/media-gallery.kay'
 import Meter from '@kaynooo/kayjs-ui/meter.kay'
 import Rating from '@kaynooo/kayjs-ui/rating.kay'
 import SiteFavicon from '@kaynooo/kayjs-ui/site-favicon.kay'
@@ -15,6 +16,20 @@ main
     BarList(rows={[{ key: 'mars', label: 'Mars', value: 2 }, { key: 'earth', label: 'Earth', value: 1, display: 'one' }, { key: 'venus', label: 'Venus', value: 0 }]})
   article#no-bars
     BarList(rows={[]} empty="No planets")
+  article#no-bars-label
+    BarList(rows={[]} emptyLabel="No visits")
+  article#no-bars-both
+    BarList(rows={[]} emptyLabel="No visits" empty="No planets")
+  article#no-bars-default
+    BarList(rows={[]})
+  article#no-media
+    MediaGallery(items={[]} emptyLabel="No photos")
+  article#no-media-old
+    MediaGallery(items={[]} empty="No images")
+  article#no-media-both
+    MediaGallery(items={[]} emptyLabel="No photos" empty="No images")
+  article#no-media-default
+    MediaGallery(items={[]})
   article#favicon
     SiteFavicon(src="/favicon.png" name="kaynooo.fr")
   article#no-favicon

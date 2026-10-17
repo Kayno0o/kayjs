@@ -1414,14 +1414,23 @@
 
   .kui-segmented-option {
     @apply relative cursor-pointer;
+
+    &:where(:has(.kui-segmented-input:disabled)) {
+      @apply cursor-not-allowed opacity-50;
+    }
   }
 
   .kui-segmented-input {
     @apply absolute size-0 opacity-0;
   }
 
+  .kui-segmented-icon,
+  .kui-tabs-icon {
+    @apply size-3.5 shrink-0;
+  }
+
   .kui-segmented-label {
-    @apply block px-3 py-1.5 text-xs text-kui-subtext0 transition-colors hover:text-kui-text;
+    @apply flex items-center gap-1 px-3 py-1.5 text-xs text-kui-subtext0 transition-colors hover:text-kui-text;
   }
 
   :where(.kui-segmented-input:checked) + .kui-segmented-label {
@@ -1656,7 +1665,7 @@
   }
 
   .kui-tab-nav-link {
-    @apply -mb-px shrink-0 border-b-2 border-transparent px-4 py-2 text-sm text-kui-subtext0 transition-colors hover:text-kui-text;
+    @apply -mb-px inline-flex shrink-0 items-center gap-1 border-b-2 border-transparent px-4 py-2 text-sm text-kui-subtext0 transition-colors hover:text-kui-text disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:text-kui-subtext0;
 
     &:where([aria-current='page']) {
       @apply border-kui-accent text-kui-accent;

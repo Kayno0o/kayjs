@@ -11,7 +11,7 @@ import { wording } from 'kay/words'
 // How far a finger moves sideways before a swipe turns the gallery.
 const SWIPE_PX = 48
 
-const { items, index = 0, onIndexChange, ratio = '16 / 9', empty = wording('ui.mediaGallery.empty', 'No media.'), previousLabel = wording('ui.mediaGallery.previousLabel', 'Previous'), nextLabel = wording('ui.mediaGallery.nextLabel', 'Next'), closeLabel = wording('ui.mediaGallery.closeLabel', 'Close'), openLabel = wording('ui.mediaGallery.openLabel', 'Open full size'), itemLabel = wording('ui.mediaGallery.itemLabel', 'Media {n}'), class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
+const { items, index = 0, onIndexChange, ratio = '16 / 9', emptyLabel, empty, previousLabel = wording('ui.mediaGallery.previousLabel', 'Previous'), nextLabel = wording('ui.mediaGallery.nextLabel', 'Next'), closeLabel = wording('ui.mediaGallery.closeLabel', 'Close'), openLabel = wording('ui.mediaGallery.openLabel', 'Open full size'), itemLabel = wording('ui.mediaGallery.itemLabel', 'Media {n}'), class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
   items: MediaItem[]
   // The item on the stage to start with; a gallery whose parent passes another follows it, and `onIndexChange` reports each turn.
   index?: number | undefined
@@ -19,6 +19,8 @@ const { items, index = 0, onIndexChange, ratio = '16 / 9', empty = wording('ui.m
   // The stage's CSS `aspect-ratio`.
   ratio?: string | undefined
   // What the gallery reads with no items.
+  emptyLabel?: string | undefined
+  // Deprecated: use `emptyLabel`, which wins when both are given.
   empty?: string | undefined
   previousLabel?: string | undefined
   nextLabel?: string | undefined
@@ -30,6 +32,8 @@ const { items, index = 0, onIndexChange, ratio = '16 / 9', empty = wording('ui.m
   class?: string | undefined
 }>()
 
+// The catalogs' `ui.mediaGallery.empty` key of the old prop is still read, after the new `ui.mediaGallery.emptyLabel`.
+const nothing = () => emptyLabel ?? empty ?? wording('ui.mediaGallery.emptyLabel', wording('ui.mediaGallery.empty', 'No media.'))
 const shown = signal(index)
 const zoomed = signal(false)
 // Each video's player, stopped once its element leaves the page.
@@ -149,7 +153,7 @@ effect(() => {
 ---
 if !current()
   // The app's id and class stay on whichever element shows.
-  p.kui-media-gallery-empty(id={rest.id} class={className}) {empty}
+  p.kui-media-gallery-empty(id={rest.id} class={className}) {nothing()}
 else
   // Arrows turn the gallery while focus is anywhere inside it, which a keyboard user reaches through its buttons.
   .kui-media-gallery({...rest} class={className} onKeyDown={keyDown})
