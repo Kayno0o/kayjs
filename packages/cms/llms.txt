@@ -43,7 +43,7 @@ export default defineConfig({ extensions: [cms({ guard: { load: async () => (awa
 - `<prefix>/new/<collection>` (`?locale=`): a new entry, its slug typed, and in a localized collection its locale, one the site serves.
 - `<prefix>/uploads`: the unused uploads, each with its variants and a Delete that asks first; ticked rows are deleted together, the content read once for all.
 - `<prefix>/page?path=`: opens the page in edit mode.
-- A page of the app at a screen's path replaces it, and `<prefix>/_layout.kay` of the app wraps them all; the parts the screens are made of are exported: see [Arranging and replacing the screens](llms/screens.md).
+- A page of the app at a screen's path replaces it, and `<prefix>/_layout.kay` of the app replaces the cms's layout (Content link, `Toaster`, `TooltipHost`, `@kaynooo/kayjs-cms/admin.css`); the parts the screens are made of are exported: see [Arranging and replacing the screens](llms/screens.md).
 
 ## Field kinds of your own
 

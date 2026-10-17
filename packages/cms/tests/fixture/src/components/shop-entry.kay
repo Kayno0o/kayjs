@@ -19,6 +19,6 @@ form.shop-entry(novalidate onSubmit={event => { event.preventDefault(); void for
   EntryNotices(form={form})
   EntryField(form={form} name="photo")
   EntryField(form={form} name="name")
-  .shop-columns
+  .kcms-row
     EntryField(form={form} name="price")
     EntryField(form={form} name="stock")

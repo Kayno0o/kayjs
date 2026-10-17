@@ -22,6 +22,7 @@
       "default": "./src/index.ts"
     },
     "./add": "./src/add.ts",
+    "./admin.css": "./src/routes/admin.css",
     "./entry-actions.kay": "./src/components/entry-actions.kay",
     "./entry-body.kay": "./src/components/entry-body.kay",
     "./entry-editor.kay": "./src/components/entry-editor.kay",

@@ -22,14 +22,17 @@ cms({ collections: { shop: {
 
 ## Replace a screen
 
-A page of the app at a screen's path replaces it: `src/routes/admin/collections/shop/[...slug].kay` serves the shop's entries in place of `<prefix>/collections/[collection]/[...slug]`, and the other screens stay. A `src/routes/admin/_layout.kay` wraps every screen. The extension's guard still runs before a replacing page, as guards resolve per URL directory across both trees, unless the app has a `_guard.ts` of its own at that level.
+A page of the app at a screen's path replaces it: `src/routes/admin/collections/shop/[...slug].kay` serves the shop's entries in place of `<prefix>/collections/[collection]/[...slug]`, and the other screens stay. A `src/routes/admin/_layout.kay` replaces the cms's own layout for every screen. That one holds the Content link, kayjs-ui's `Toaster` and `TooltipHost` and the stylesheet `@kaynooo/kayjs-cms/admin.css`, so a layout of your own renders the first two and imports the last. The extension's guard still runs before a replacing page, as guards resolve per URL directory across both trees, unless the app has a `_guard.ts` of its own at that level.
 
-`entryScreen`, `listScreen` and `collectionScreen` from `@kaynooo/kayjs-cms` read what the screen reads, in a page's `--- server` fence, and return `undefined` for a collection the site lacks, with `collectionScreen`:
+`entryScreen`, `listScreen` and `collectionScreen` from `@kaynooo/kayjs-cms` read what the screen reads, in a page's `--- server` fence, and return `undefined` for a collection the site lacks:
 
 ```kay
 --- server
 import { entryScreen } from '@kaynooo/kayjs-cms'
+import { s } from 'kay'
 import ShopEntry from '../../../../components/shop-entry.kay'
+
+export const page = { query: s.Object({ locale: s.Optional(s.String()) }) }
 
 const screen = await entryScreen({ collection: 'shop', slug: ctx.params.slug, locale: ctx.query.locale }) ?? ctx.notFound()
 const entry = screen.entry ?? ctx.notFound()
@@ -67,7 +70,7 @@ form(novalidate onSubmit={event => { event.preventDefault(); void form.save() }}
   EntryNotices(form={form})
   EntryField(form={form} name="photo")
   EntryField(form={form} name="name")
-  .columns
+  .kcms-row
     EntryField(form={form} name="price")
     EntryField(form={form} name="stock")
 ```

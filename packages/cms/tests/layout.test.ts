@@ -114,6 +114,9 @@ describe('checkLayouts', () => {
     expect(refused({ a: { form: { hide: [''] } } })).toThrow('list of field names')
     expect(refused({ a: { list: { columns: ['a', 'a'] } } })).toThrow('twice')
     expect(refused({ a: { list: { actions: ['remove'] } } })).toThrow('the row actions are')
+    expect(refused({ a: { forms: {} } })).toThrow('has no option "forms"')
+    expect(refused({ a: { form: { hidden: ['x'] } } })).toThrow('it takes fields, hide')
+    expect(refused({ a: { list: { column: ['x'] } } })).toThrow('it takes columns, actions')
   })
 })
 

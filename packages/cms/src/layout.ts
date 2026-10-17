@@ -33,9 +33,14 @@ function distinct(where: string, names: string[]): void {
   }
 }
 
-function plain(where: string, value: unknown): Record<string, unknown> {
+function plain(where: string, value: unknown, allowed?: string[]): Record<string, unknown> {
   if (typeof value !== 'object' || value === null || Array.isArray(value))
     throw new Error(`kayjs-cms: \`${where}\` takes an object, got ${JSON.stringify(value)}`)
+
+  const unknown = allowed && Object.keys(value).find(key => !allowed.includes(key))
+
+  if (unknown !== undefined)
+    throw new Error(`kayjs-cms: \`${where}\` has no option ${JSON.stringify(unknown)}; it takes ${allowed!.join(', ')}`)
 
   return value as Record<string, unknown>
 }
@@ -45,7 +50,7 @@ function rowOf(where: string, row: unknown): string | string[] {
 }
 
 function checkForm(where: string, value: unknown): FormLayout {
-  const { fields, hide } = plain(where, value)
+  const { fields, hide } = plain(where, value, ['fields', 'hide'])
 
   if (fields !== undefined && !Array.isArray(fields))
     throw new Error(`kayjs-cms: \`${where}.fields\` takes a list of field names, or of lists of them for a row, got ${JSON.stringify(fields)}`)
@@ -66,7 +71,7 @@ function checkForm(where: string, value: unknown): FormLayout {
 }
 
 function checkList(where: string, value: unknown): ListLayout {
-  const { columns, actions } = plain(where, value)
+  const { columns, actions } = plain(where, value, ['columns', 'actions'])
   const named = columns === undefined ? undefined : strings(`${where}.columns`, columns)
   const kept = actions === undefined ? undefined : strings(`${where}.actions`, actions)
 
@@ -90,7 +95,7 @@ export function checkLayouts(collections: unknown): ReadonlyMap<string, Collecti
 
   for (const [name, value] of Object.entries(plain('cms({ collections })', collections))) {
     const where = `cms({ collections: { ${JSON.stringify(name)} } })`
-    const { form, list } = plain(where, value)
+    const { form, list } = plain(where, value, ['form', 'list'])
 
     layouts.set(name, { form: form === undefined ? undefined : checkForm(`${where}.form`, form), list: list === undefined ? undefined : checkList(`${where}.list`, list) })
   }

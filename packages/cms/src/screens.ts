@@ -20,7 +20,7 @@ export interface ListScreen {
   pages: number
 }
 
-// What an entry's screen reads, for an app's page at that screen's path: undefined for a collection the site lacks. Reads only; the guard is the app's.
+// What an entry's screen reads, for an app's page at that screen's path: undefined for a collection the site lacks. Reads only: the extension's guard covers a page at a screen's path, a page outside the prefix needs its own.
 export async function entryScreen(ref: EntryRef): Promise<EntryScreen | undefined> {
   const screen = await readEntry(ref)
 

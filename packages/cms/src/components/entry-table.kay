@@ -27,9 +27,12 @@ const actions = rowActions(collection.layout?.list)
 // A field's column is keyed apart from the built-in ones, so a field named `title` or `actions` clashes with none.
 const cellKey = (key: string | number) => `cell:${key}`
 
+// Numbers sort by value, not by their text.
+const sortKey = (kind: string, text = ''): string | number => kind === 'number' || kind === 'integer' ? Number(text) || 0 : text
+
 const columns: Column<EntryRow>[] = [
   { key: 'title', header: wording('cms.table.title', 'Title'), sortValue: true, defaultDirection: 'asc', cell: true },
-  ...shown.map(field => ({ key: cellKey(field.key), header: field.label, sortValue: (row: EntryRow) => row.cells?.[field.key] ?? '', cell: true }) satisfies Column<EntryRow>),
+  ...shown.map(field => ({ key: cellKey(field.key), header: field.label, sortValue: (row: EntryRow) => sortKey(field.kind, row.cells?.[field.key]), cell: true }) satisfies Column<EntryRow>),
   ...(collection.localized ? [{ key: 'locale', header: wording('cms.table.locale', 'Locale'), sortValue: true } satisfies Column<EntryRow>] : []),
   ...(collection.draftField === undefined ? [] : [{ key: 'draft', header: wording('cms.table.status', 'Status'), cell: true } satisfies Column<EntryRow>]),
   ...(actions.size === 0 ? [] : [{ key: 'actions', header: wording('cms.table.actions', 'Actions'), align: 'end', cell: true } satisfies Column<EntryRow>]),

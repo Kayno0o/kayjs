@@ -241,7 +241,7 @@ The editor on the page follows the form's layout too. A name twice, or an action
 
 ## Replacing a screen
 
-Write a page at the screen's path, such as `src/routes/admin/collections/shop/[...slug].kay`. It replaces that screen and leaves the others. A `src/routes/admin/_layout.kay` wraps all of them. The cms guard still runs before your page.
+Write a page at the screen's path, such as `src/routes/admin/collections/shop/[...slug].kay`. It replaces that screen and leaves the others. A `src/routes/admin/_layout.kay` replaces the cms's own layout for all of them, which holds the Content link, the toaster, the tooltip host and the stylesheet `@kaynooo/kayjs-cms/admin.css`. Render kayjs-ui's `Toaster` and `TooltipHost` and import that stylesheet to keep them. The cms guard still runs before your page.
 
 In the page, read what the screen reads with `entryScreen`, `listScreen` and `collectionScreen` from `@kaynooo/kayjs-cms`, then render a component of your own, or the screens' own `@kaynooo/kayjs-cms/entry-editor.kay` and `@kaynooo/kayjs-cms/entry-table.kay`.
 
