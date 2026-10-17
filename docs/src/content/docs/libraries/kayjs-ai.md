@@ -159,6 +159,27 @@ If the store fails or takes more than five seconds when the limit is read, the q
 
 <ReadMore href="/llms/kayjs-ai-limits">Every option, when tokens count, and what a failing store does.</ReadMore>
 
+## Translate what is missing
+
+`kay i18n translate fr` asks the model for every message and entry that French lacks, and saves the answers as drafts. It needs `ai()` in `extensions`, and a provider set up as for `ask`.
+
+```sh
+kay i18n translate fr --dry-run
+kay i18n translate fr
+```
+
+The dry run lists what would be translated and guesses the tokens it would cost. It sends nothing and writes nothing.
+
+A translation is kept only when it keeps what the original had. Every `{placeholder}` stays, with the same name. Plural forms stay, and so do tags such as `<b>`. A line break the original did not have is refused. A reply that does not pass is asked for once more, then dropped and reported. Nothing wrong is ever written.
+
+Messages are saved with a `// draft` comment, so `kay check` warns until you read them and run `kay i18n accept fr`. An entry of a localized collection is saved in the `fr` folder, and never over an entry that is already there.
+
+If the collection has `draft: 'field'`, that field is set to true, so the entry stays hidden in production until you publish it. Otherwise the entry starts with a `# draft` line in its header, which you delete once you have read it. Saving the entry from a CMS removes it too.
+
+A run that stops half way leaves whole files. Run it again to translate what is left.
+
+<ReadMore href="/llms/kayjs-ai-translating">The checks on a reply, which fields of an entry are translated, and how each kind of entry is marked.</ReadMore>
+
 ## Errors
 
 A failure throws an `AiError` with a `kind`: `auth`, `rate-limited`, `unavailable`, `invalid`, `network`, `cut`, `protocol` or `limited`. A rate limit has `retryAfter` in seconds. A reply cut halfway has `partial`, the text that came. Nothing is retried for you.

@@ -354,6 +354,8 @@ kay i18n accept fr
 
 A message whose line ends on `// draft` is a draft, written by a machine and waiting for a person. The comment goes on the message's own line: on a group's opening brace it marks nothing. `kay check` warns of each one. `kay i18n accept fr` deletes every draft comment in `src/messages/fr.ts` once you have checked them.
 
+`kay i18n translate fr` comes from the kayjs-ai library. It fills what `fr` lacks with a model and saves it as drafts. See [kayjs-ai](/libraries/kayjs-ai#translate-what-is-missing).
+
 A library can add commands of its own. `kay i18n` alone lists every `i18n` command, and `kay --help` lists each library's under its name.
 
 ## kay routes

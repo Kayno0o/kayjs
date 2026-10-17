@@ -198,6 +198,8 @@ On a site with `i18n`, `localized: true` keeps each entry in a folder named afte
 
 `all()` and `get()` read the request's locale and fall back to the default locale's entry. `entry.locale` says which one was read. The feed is served once per locale.
 
+`kay i18n translate fr` from the kayjs-ai library writes the entries `fr` lacks, as drafts (see [kayjs-ai](/libraries/kayjs-ai#translate-what-is-missing)).
+
 `entry.translations` lists the locales that have an entry with the slug. Use it for a language switcher that shows only the languages a post exists in.
 
 ```kay

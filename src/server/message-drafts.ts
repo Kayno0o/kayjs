@@ -3,6 +3,9 @@ import type * as t from '@babel/types'
 import type { KayConfig } from '../config'
 import type { Message } from '../runtime/i18n'
 import { existsSync } from 'node:fs'
+import { mkdir, rename } from 'node:fs/promises'
+import { dirname } from 'node:path'
+import process from 'node:process'
 import { parse } from '@babel/parser'
 import { KayError } from '../compiler/errors'
 import { messagesFile } from './i18n'
@@ -65,9 +68,18 @@ export async function writeDraftMessages(root: string, config: Pick<KayConfig, '
     source = next
   }
 
-  await Bun.write(file, source)
+  await writeWhole(file, source)
 
   return written
+}
+
+// Writes through a temporary file and a rename, so a run stopped in the middle leaves the file as it was or whole, never half written.
+export async function writeWhole(file: string, text: string): Promise<void> {
+  const temporary = `${file}.${process.pid}.tmp`
+
+  await mkdir(dirname(file), { recursive: true })
+  await Bun.write(temporary, text)
+  await rename(temporary, file)
 }
 
 // How the file breaks and indents its lines, which the lines written follow.

@@ -40,7 +40,7 @@ export async function projectCollections(root: string, config?: string): Promise
 }
 
 // The collections by the name the content config exports each under.
-async function namedCollections(root: string, config?: string): Promise<[string, Collection<unknown>][]> {
+export async function namedCollections(root: string, config?: string): Promise<[string, Collection<unknown>][]> {
   const file = projectPaths(root, { content: config }).content
 
   setContentPlace(root, dirname(file), file)

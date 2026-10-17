@@ -2,6 +2,7 @@
 
 export { underKayDev } from '../build/assets'
 export type { KayCommand, Parsed } from '../commands/command'
+export type { DataValue, JsonSchema } from '../content/edit'
 export type { ToolResult } from '../mcp/protocol'
 export { durationSeconds } from '../runtime/duration'
 export { isUrlAttribute, UNSAFE_ATTRIBUTE, UNSAFE_TAGS } from '../runtime/sanitize'
@@ -10,6 +11,7 @@ export { parseEvents } from '../runtime/sse'
 export { acceptedLocales, matchLocale, validLocale } from './accept-language'
 export { sourceHash } from './csp'
 export { RESTART_RELOAD } from './dev'
+export type { LocalizedEntry } from './entry-drafts'
 export { escapeHtml } from './escape-html'
 export { currentRequest } from './log'
 export { actionTool } from './mcp'
@@ -21,6 +23,7 @@ export type { MissingTranslations } from './translations'
 
 type Translations = typeof import('./translations')
 type Drafts = typeof import('./message-drafts')
+type Entries = typeof import('./entry-drafts')
 
 // Loaded on use: they pull Babel's parser and the content loader, which a library's server otherwise never needs.
 export async function missingTranslations(...args: Parameters<Translations['missingTranslations']>): ReturnType<Translations['missingTranslations']> {
@@ -29,4 +32,12 @@ export async function missingTranslations(...args: Parameters<Translations['miss
 
 export async function writeDraftMessages(...args: Parameters<Drafts['writeDraftMessages']>): ReturnType<Drafts['writeDraftMessages']> {
   return (await import('./message-drafts')).writeDraftMessages(...args)
+}
+
+export async function localizedEntry(...args: Parameters<Entries['localizedEntry']>): ReturnType<Entries['localizedEntry']> {
+  return (await import('./entry-drafts')).localizedEntry(...args)
+}
+
+export async function writeDraftEntry(...args: Parameters<Entries['writeDraftEntry']>): ReturnType<Entries['writeDraftEntry']> {
+  return (await import('./entry-drafts')).writeDraftEntry(...args)
 }

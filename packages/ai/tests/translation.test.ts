@@ -1,0 +1,46 @@
+import { existsSync } from 'node:fs'
+import { expect, it } from 'bun:test'
+import { ai } from '../src'
+import { estimateTokens, translateUnits, unitProblem } from '../src/translation'
+
+const message = (text: string) => ({ id: '1', text, kind: 'message' as const })
+
+it('is a kay command ai() adds as `kay i18n translate`', async () => {
+  const { 'i18n translate': module } = ai().commands!
+
+  expect(existsSync(module!)).toBe(true)
+  expect((await import(module!) as { default: { usage: string } }).default.usage).toBe('i18n translate <locale> [--dry-run]')
+})
+
+it('checks a text against its source', () => {
+  expect(unitProblem(message('Hello {name}'), 'Bonjour {name}')).toBeUndefined()
+  expect(unitProblem(message('Hello {name}'), 'Bonjour')).toBe('drops {name}')
+  expect(unitProblem(message('Hello'), 'Bonjour {who}')).toBe('invents {who}')
+  expect(unitProblem(message('<b>Hi</b>'), 'Salut')).toBe('changes the tags of the source')
+  expect(unitProblem(message('Hi'), 'Salut\nencore')).toBe('holds a line break the source has not')
+  expect(unitProblem(message('Hi'), 'Salut\u2028encore')).toBe('holds a line break the source has not')
+  expect(unitProblem(message('Hi\nthere'), 'Salut\nla')).toBeUndefined()
+  expect(unitProblem(message('Hi'), '  ')).toBe('is empty')
+  expect(unitProblem(message('Hi'), 3)).toBe('is not text')
+  expect(unitProblem({ id: '1', kind: 'markdown', text: '[a](/x)\n```\ncode\n```' }, '[b](/y)\n```\ncode\n```')).toBe('changes the link targets or code fences of the source')
+})
+
+it('estimates more tokens for more text', () => {
+  const small = estimateTokens([message('a')], 'en', 'fr')
+  const large = estimateTokens([message('a'.repeat(4000))], 'en', 'fr')
+
+  expect(large.input).toBeGreaterThan(small.input)
+  expect(large.output).toBeGreaterThan(1000)
+})
+
+it('fences around the JSON reply are tolerated, and the usage of both asks is summed', async () => {
+  const { fakeAi } = await import('../src')
+
+  fakeAi.reply(['```json', '{ "1": "Salut" }', '```'].join('\n'))
+
+  const result = await translateUnits([message('Hi')], { from: 'en', into: 'fr' })
+
+  expect([...result.done]).toEqual([['1', 'Salut']])
+  expect(result.inputTokens).toBeGreaterThan(0)
+  fakeAi.clear()
+})

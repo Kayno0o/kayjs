@@ -11,10 +11,9 @@
 - Under `bun test` `ask()` always answers from `fakeAi`, whatever keys the environment holds; in development it does until `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` or `AI_BASE_URL` is set. Production with none of them throws.
 - No model id is built in: set `AI_MODEL` (required in production) or pass `{ model }`.
 - A failure is an `AiError` with a `kind`; nothing retries by itself. A rate limit carries `retryAfter` in seconds. A reply cut by `maxTokens` still resolves as text: read `await reply.finish` (`length`) to tell.
-
 - A chat for a site is `Chat` from `@kaynooo/kayjs-ai/chat.kay`, rendered from a component of the app's own that imports the streaming action (a page with a server fence cannot pass it), styled by kayjs-ui's `theme.css`: see the chat topic.
-
 - A public chat sets `ai({ limit, budget })` in `kay.config.ts`: asks and tokens per visitor (the user `visitor` names, else the address) and in total, refused with a `limited` error, 429 and `Retry-After` in an action. Without it `ask` is unlimited.
+- `kay i18n translate <locale>` (added by `ai()`) writes a locale's missing messages and localized entries as drafts, a text kept only when it keeps every `{placeholder}`; `--dry-run` lists and estimates the tokens, [translating](llms/translating.md).
 
 ## Setup
 
@@ -48,4 +47,5 @@ The rest is split by topic, each file read whole with one command:
 - [Environment, ask() and its reply](llms/asking.md): the variables, picking a provider, `ask()`'s options, the reply, `await` blocks and streaming actions
 - [Chat island](llms/chat.md): `Chat(action={reply})`, its props, behaviour, markdown and the rules for passing it the action
 - [Limits and the token budget](llms/limits.md): `ai({ limit, budget, visitor })`, the stores, when tokens count, the `limited` error and a failing store
+- [`kay i18n translate`](llms/translating.md): filling a locale's missing messages and localized entries as drafts, the checks on the model's reply, how an entry is marked, a run stopped half way
 - [The fake, errors and providers](llms/testing-and-errors.md): scripting `fakeAi` in tests, `AiError` kinds, building a provider by hand
