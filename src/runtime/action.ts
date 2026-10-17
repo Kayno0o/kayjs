@@ -325,7 +325,7 @@ export function isFailure(value: unknown): value is Failure<unknown> {
 }
 
 export function actionUrl(moduleId: string, name: string): string {
-  return `/_kay/action/${moduleId.replace(UNSAFE_URL_CHARACTERS, '_').replace(PARENT_SEGMENT, '~')}/${name}`
+  return `${ACTION_PREFIX}${moduleId.replace(UNSAFE_URL_CHARACTERS, '_').replace(PARENT_SEGMENT, '~')}/${name}`
 }
 
 // What an action with no input takes: no fields, so `add()` calls it.

@@ -318,6 +318,14 @@ export const LINTS = {
     wrong: '---\nimport Profile from \'../components/profile.kay\'\n\nconst user = await db.users.find(1)\n---\nProfile(user={user})',
     right: '---\nimport Profile from \'../components/profile.kay\'\n\nconst user = await db.users.find(1)\n---\nProfile(user={{ id: user.id, name: user.name }})',
   },
+  'island-action': {
+    level: 'deny',
+    group: 'islands',
+    typed: true,
+    summary: 'A page or layout hands an island an action while the island\'s script never imports `Action`, `ServerAction` or `NoInputAction` from `kay` to type a prop with: the island\'s chunk then holds nothing to turn the action\'s URL back into a function, so it fails when it hydrates.',
+    wrong: '---\n// src/components/caller.kay\nconst { run } = props<{ run: (input: { name: string }) => Promise<string> }>()\n---\nbutton(onClick={() => run({ name: \'Ann\' })}) Run',
+    right: '---\n// src/components/caller.kay\nimport type { Action } from \'kay\'\n\nconst { run } = props<{ run: Action<{ name: string }, string> }>()\n---\nbutton(onClick={() => run({ name: \'Ann\' })}) Run',
+  },
   'deprecated-api-tool': {
     level: 'warn',
     group: 'deprecated',
@@ -732,6 +740,7 @@ const MISSING = /^Argument of type '(.+?)' is not assignable to parameter of typ
 const TRUNCATED = / \| \.\.\. (\d+) more \.\.\. \| /g
 const HANDED_SIGNAL = 'kayLint: "uncalled-signal"'
 const SECRET_PROP = 'kayLint: "secret-prop"'
+const ISLAND_ACTION = 'kayLint: "island-action"'
 const CUT_PATHS = /\.\.\. \d+ more/
 const SECRET_PATHS = /kayPath: ((?:"[^"]*"|\.\.\. \d+ more \.\.\.)(?: \| (?:"[^"]*"|\.\.\. \d+ more \.\.\.))*)/
 
@@ -752,6 +761,15 @@ export function typeLint(message: string, prop?: string): TypeLint | undefined {
       message: paths === undefined ? 'This value holds a field named like a secret, and an island\'s props are written into the page' : `${paths.map(path => `\`${path}\``).join(', ')}${cut ? ' and more' : ''} would be written into the page`,
       note: 'an island\'s props are in the page source, where anyone who views it reads them',
       help: 'hand the island only the fields it shows, `user={{ name: user.name }}`, or allow a public one with `// kay-allow secret-prop`',
+    }
+  }
+
+  if (message.includes(ISLAND_ACTION)) {
+    return {
+      code: 'island-action',
+      message: 'This island is handed an action but never types a prop as one',
+      note: 'the action goes to the browser as its URL, and only an island importing `Action` from `kay` carries the code that turns it back into a function',
+      help: 'import `Action` (or `ServerAction`, `NoInputAction`) from `kay` in the island\'s script and type the prop with it',
     }
   }
 

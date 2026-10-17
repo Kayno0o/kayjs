@@ -1,0 +1,10 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+export const rename = action(t.Object({ name: t.String({ minLength: 2, maxLength: 200, error: 'Two letters at least' }) }), async ({ name }) => name)
+--- script
+import RenameDialog from '../components/rename-dialog.kay'
+---
+main
+  RenameDialog(action={rename})

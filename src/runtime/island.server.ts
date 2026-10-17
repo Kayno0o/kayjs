@@ -13,7 +13,7 @@ import { renderOnServer, scope } from './reactive'
 import { SLOT_END, SLOT_START } from './static-slots'
 import { countIds } from './uid'
 import { islandPrefix, pageIds } from './uid.server'
-import { encodeValue, unsendable } from './wire'
+import { ACTION_PREFIX, encodeValue, unsendable } from './wire'
 
 // Island roots render synchronously, so a counter is enough to tell whether a component already sits inside one.
 let depth = 0
@@ -215,7 +215,7 @@ function refusedAction(value: unknown): string | undefined {
   if (formUrl !== undefined)
     return 'an action fixing fields with `with()`, which would lose them on the way: pass the plain action and the fields as its input'
 
-  return url.startsWith('/_kay/action/') ? undefined : 'an action no route module exports, which has no URL to reach the browser by'
+  return url.startsWith(ACTION_PREFIX) ? undefined : 'an action no route module exports, which has no URL to reach the browser by'
 }
 
 // `what` names the island and why it is one.

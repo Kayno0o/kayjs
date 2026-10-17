@@ -528,6 +528,17 @@ test('QrCode with inline draws the SVG in the page, so CSS colours resolve, and 
   expect(await element('/paging', 'qr-decor-inline')).not.toContain('role=')
 })
 
+describe('FormDialog', () => {
+  test('takes a page\'s action as a prop, which goes to the island as its URL', async () => {
+    const { rename } = await import('../src/routes/dialog-action.kay') as { rename: { url: string } }
+    const { html, status } = await site.visit('/dialog-action')
+
+    expect(status).toBe(200)
+    expect(html).toContain(`"${rename.url}"`)
+    expect(html).toContain('data-props=')
+  })
+})
+
 describe('ContactForm', () => {
   test('posts to the action with its fields, the honeypot and the extra field between the email and the message', async () => {
     const { html } = await site.visit('/contact')

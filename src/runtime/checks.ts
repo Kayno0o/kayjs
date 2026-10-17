@@ -225,8 +225,26 @@ type Joined<Prefix extends string, Key extends string> = Prefix extends '' ? Key
 
 type SecretProp<Value> = [SecretPaths<Value>] extends [never] ? unknown : { kayLint: 'secret-prop', kayPath: SecretPaths<Value> }
 
+// Whether a value is or holds an action, three levels deep; with `Open`, a type that says nothing (`any`, `unknown`) counts as holding one.
+type HoldsAction<T, Open extends boolean, Depth extends unknown[] = []> = 0 extends 1 & T
+  ? Open
+  : unknown extends T
+    ? Open
+    : T extends Action<never, unknown>
+      ? true
+      : Depth['length'] extends 3
+        ? false
+        : T extends readonly (infer Item)[]
+          ? HoldsAction<Item, Open, [...Depth, 0]>
+          : T extends object
+            ? true extends { [Key in keyof T]-?: HoldsAction<T[Key], Open, [...Depth, 0]> }[keyof T] ? true : false
+            : false
+
+// An island whose props name no action receives one as a bare function, which its chunk cannot revive: it needs `Action` imported from `kay` in its script, as the type of the prop. `kay check` reports it as the `island-action` lint.
+type ActionProp<Component, Value> = true extends HoldsAction<Value, false> ? Component extends (props: infer Props) => unknown ? true extends HoldsAction<Props, true> ? unknown : { kayLint: 'island-action' } : unknown : unknown
+
 // Props a static parent passes to an island are serialized for the browser, so they must survive it, and are public, so they should hold no secret-looking field. `kay check` reports the second as the `secret-prop` lint.
-export type IslandProp<Component, Value> = Component extends IslandBrand ? [IsSerializable<Value>] extends [true] ? SecretProp<Value> : { kayError: 'A layout, or a page with a server fence, sends an island its props serialized: plain objects, arrays, Dates, Maps, Sets, bigints, URLs and RegExps, but no functions, symbols or class instances; a component of its own passing one renders as an island in its place' } : unknown
+export type IslandProp<Component, Value> = Component extends IslandBrand ? [IsSerializable<Value>] extends [true] ? SecretProp<Value> & ActionProp<Component, Value> : { kayError: 'A layout, or a page with a server fence, sends an island its props serialized: plain objects, arrays, Dates, Maps, Sets, bigints, URLs and RegExps, but no functions, symbols or class instances; a component of its own passing one renders as an island in its place' } : unknown
 
 // A function written in the attribute is checked apart from its value, which a wrapping call would stop a generic component from typing: `0` stands for the attribute.
 export type FunctionProp<Component> = Component extends IslandBrand ? { kayError: 'A layout, or a page with a server fence, sends an island its props serialized: plain objects, arrays, Dates, Maps, Sets, bigints, URLs and RegExps, but no functions, symbols or class instances; a component of its own passing one renders as an island in its place' } : 0

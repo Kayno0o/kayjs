@@ -2228,6 +2228,32 @@ describe.concurrent('kay check, unused code', () => {
     })
   })
 
+  describe('island-action', () => {
+    const page = '--- server\nimport { t } from \'elysia\'\nimport { action } from \'kay\'\nimport Island from \'../components/island.kay\'\n\nexport const greet = action(t.Object({ name: t.String({ maxLength: 20 }) }), ({ name }) => name)\n---\nIsland(run={greet})\nIsland(run={{ greet }})\n'
+    const typed = '---\nimport type { Action } from \'kay\'\n\nconst { run } = props<{ run: Action<{ name: string }, string> }>()\n---\nbutton(onClick={() => run({ name: \'a\' })}) Run\n'
+    const bare = '---\nconst { run } = props<{ run: (input: { name: string }) => Promise<unknown> }>()\n---\nbutton(onClick={() => run({ name: \'a\' })}) Run\n'
+
+    async function found(island: string, routePage = page) {
+      const root = await scratchProject({ 'src/components/island.kay': island, 'src/routes/index.kay': routePage })
+
+      try {
+        return (await check(root)).filter(d => d.file.endsWith('index.kay') && d.code !== undefined).map(d => [d.line, d.code])
+      }
+      finally {
+        await rm(root, { recursive: true, force: true })
+      }
+    }
+
+    it('reports an action handed to an island that never types a prop as one, and stays silent when it does', async () => {
+      expect(await found(bare, page.replace('Island(run={{ greet }})\n', ''))).toEqual([[8, 'island-action']])
+      expect(await found(typed, page.replace('Island(run={{ greet }})\n', ''))).toEqual([])
+    })
+
+    it('reads an action held by an object prop', async () => {
+      expect(await found(bare.replace('run: (input: { name: string }) => Promise<unknown>', 'run: { greet: (input: { name: string }) => Promise<unknown> }'), page.replace('Island(run={greet})\n', '').replace('run={{ greet }}', 'run={{ greet }}'))).toEqual([[8, 'island-action']])
+    })
+  })
+
   it('reports a lint or a level the config names that kay does not have', async () => {
     const root = await scratchProject({ 'src/a.kay': 'p a\n' })
 
