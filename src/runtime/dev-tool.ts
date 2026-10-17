@@ -20,8 +20,10 @@ const FIRST_HEADERS = ['content-security-policy', 'content-security-policy-repor
 const PRERENDER = { 'page': 'prerendered by kay build', 'listed': 'prerendered by kay build for the paths its setting lists', 'server islands': 'prerendered by kay build, its server islands rendered on request' }
 // The most problem texts a tab remembers as dismissed.
 const MAX_DISMISSED = 200
-// How long an error page's copy button says it copied.
+// How long a copy button says it copied, or could not.
 const COPIED_MS = 1500
+// The pending reset of each button saying it copied.
+const copyResets = new WeakMap<HTMLButtonElement, ReturnType<typeof setTimeout>>()
 // The event the live reload script fires for each restart or stylesheet swap `kay dev` announces.
 const BUILT_EVENT = 'kay-dev-built'
 // A path segment, kay's `(group)`, `[param]`, `[[optional]]` and `[...rest]` names included.
@@ -30,6 +32,8 @@ const SEGMENT = String.raw`(?:\([\w@.+=-]+\)|\[{1,2}(?:\.{3})?[\w-]+\]{1,2}|[\w@
 // A `.kay` file a problem names, with its line and column when it gives them, not one inside a URL.
 const KAY_POSITION = new RegExp(String.raw`(?<![\w@.+=:/\\)\]-])(?:[A-Za-z]:)?[\\/]?(?:${SEGMENT}[\\/])*${SEGMENT}\.kay(?::\d+(?::\d+)?)?(?!\.?\w)`, 'g')
 const OPENED_POSITION = /^(.+\.\w+)(?::(\d+))?(?::(\d+))?$/
+// A value the Head tab gives a copy button, as a link.
+const WEB_URL = /^https?:\/\//i
 
 type ProblemKind = 'uncaught' | 'kay' | 'policy' | 'a11y' | 'check'
 
@@ -225,6 +229,10 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 .weight .rule { grid-column: 1 / -1; height: 1px; background: var(--line); }
 .build { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; padding: 8px 12px; border-radius: 9px; background: var(--accent-soft); font-size: 12.5px; }
 .build b { font: 600 12px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.copy { flex: none; display: inline-grid; place-items: center; width: 22px; height: 22px; margin: -2px 0; border-radius: 5px; color: var(--sub); vertical-align: middle; }
+.copy:hover { background: var(--mantle); color: var(--text); }
+.copy svg { width: 13px; height: 13px; }
+td .copy { margin-left: 4px; }
 .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .toolbar .search { flex: 1; min-width: min(12rem, 100%); }
 .tool[aria-pressed=true] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-hi); }
@@ -282,6 +290,8 @@ const ICONS = {
   'app-window': 'rect~x~2~y~4~width~20~height~16~rx~2|path~d~M10 4v4|path~d~M2 8h20|path~d~M6 4v4',
   'x': 'path~d~M18 6 6 18|path~d~m6 6 12 12',
   'copy': 'rect~width~14~height~14~x~8~y~8~rx~2~ry~2|path~d~M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2',
+  'check': 'path~d~M20 6 9 17l-5-5',
+  'clipboard-copy': 'rect~width~8~height~4~x~8~y~2~rx~1~ry~1|path~d~M8 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2|path~d~M16 4h2a2 2 0 0 1 2 2v4|path~d~M21 14H11|path~d~m15 10-4 4 4 4',
   'lock': 'rect~width~18~height~11~x~3~y~11~rx~2~ry~2|path~d~M7 11V7a5 5 0 0 1 10 0v4',
   'search': 'circle~cx~11~cy~11~r~8|path~d~m21 21-4.3-4.3',
   'user-round': 'circle~cx~12~cy~8~r~5|path~d~M20 21a8 8 0 0 0-16 0',
@@ -436,6 +446,34 @@ function plain<T extends HTMLElement>(element: T): T {
   return element
 }
 
+// An icon button copying `text`, saying for a moment whether it could.
+function copyButton(tool: DevTool, what: string, text: string): HTMLButtonElement {
+  const button = tool.make('button', 'copy')
+  const label = `Copy ${what}`
+
+  button.type = 'button'
+  setIcon(button, label, 'copy')
+  button.onclick = async () => copied(button, text, label, 'copy')
+
+  return button
+}
+
+// Copies `text` from an icon button, its icon and name saying for a moment whether it worked, without a dialog.
+async function copied(button: HTMLButtonElement, text: string, label: string, icon: DevIconName): Promise<void> {
+  let worked = true
+
+  try {
+    await button.ownerDocument.defaultView!.navigator.clipboard.writeText(text)
+  }
+  catch {
+    worked = false
+  }
+
+  setIcon(button, worked ? 'Copied' : 'Copy failed', worked ? 'check' : 'x')
+  clearTimeout(copyResets.get(button))
+  copyResets.set(button, setTimeout(setIcon, COPIED_MS, button, label, icon))
+}
+
 // A tab's filter box, and a "Problems only" toggle when `problems` is given, its help text naming what it matches; it applies to the rows marked by `filterable` under the element passed to `apply`, run again on each keystroke and press.
 function toolbar(tool: DevTool, help: string, rerun: () => void, problems = false): Toolbar {
   const element = tool.make('div', 'toolbar')
@@ -544,6 +582,7 @@ const DRAG_START = 5
 const KEY_STEP = 16
 // Below this window width the floating drawer spans it, wherever it was left.
 const NARROW = 480
+const COPY_TAB = 'Copy this tab as Markdown'
 
 export interface DevTabOptions {
   id: string
@@ -654,6 +693,7 @@ export function startDevTool(doc: Document = document): DevTool {
     return { value, button }
   })
   const size = make('button', 'icon size')
+  const copyTab = make('button', 'icon')
   const close = make('button', 'icon')
   const grips = GRIPS.map((edge) => {
     const grip = make('div', `grip ${edge}`)
@@ -691,7 +731,9 @@ export function startDevTool(doc: Document = document): DevTool {
   size.type = 'button'
   close.type = 'button'
   setIcon(close, 'Close', 'x')
-  head.append(title, where, dock, size, close)
+  setIcon(copyTab, COPY_TAB, 'clipboard-copy')
+  copyTab.type = 'button'
+  head.append(title, where, copyTab, dock, size, close)
   body.append(tabList, content)
   drawer.append(head, body, ...grips)
   bar.append(mark, status)
@@ -806,6 +848,13 @@ export function startDevTool(doc: Document = document): DevTool {
 
     if (focus)
       (tabs.find(tab => tab.options.id === state.tab) ?? tabs[0])?.button.focus()
+  }
+
+  copyTab.onclick = async () => {
+    const current = tabs.find(tab => tab.options.id === state.tab) ?? tabs[0]
+
+    if (current !== undefined)
+      await copied(copyTab, panelMarkdown(current.panel, `${current.options.label}, ${win.location.href}`), COPY_TAB, 'clipboard-copy')
   }
   const closeDrawer = (focus = false) => {
     state.open = false
@@ -1717,7 +1766,7 @@ function headTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
 
     fact('Title', ...title === '' ? [none()] : [title, meter(tool, title.length, TITLE_LENGTH)])
     fact('Description', ...description === undefined ? [none()] : [description, meter(tool, description.length, limit)])
-    fact('Canonical', canonical === undefined ? none() : tool.make('span', 'mono', canonical))
+    fact('Canonical', ...canonical === undefined ? [none()] : [tool.make('span', 'mono', canonical), copyButton(tool, 'the canonical URL', canonical)])
 
     const alternates = [...head.querySelectorAll('link[rel="alternate"][hreflang]')].map(link => `${link.getAttribute('hreflang')}: ${link.getAttribute('href')}`)
     const chips = tool.make('span', 'chips')
@@ -1755,7 +1804,12 @@ function headTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
       for (const [key, content] of found) {
         const row = tool.make('tr')
 
-        row.append(tool.make('td', '', key), tool.make('td', '', content))
+        const value = tool.make('td', '', content)
+
+        if (WEB_URL.test(content))
+          value.append(copyButton(tool, `the ${key} URL`, content))
+
+        row.append(tool.make('td', '', key), value)
         table.append(filterable(row, `${key} ${content}`))
       }
 
@@ -1939,16 +1993,17 @@ function envTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
     for (const [name, value] of entries) {
       const found = secretReason(name, value)
       const secret = found !== undefined && !found.maybe
+      const shown = typeof value === 'string' ? value : JSON.stringify(value)
 
       if (secret)
         flagged++
 
       list.append(filterable(entry(tool, 'env', {
         name,
-        after: [tool.make('span', 'val', typeof value === 'string' ? value : JSON.stringify(value))],
+        after: [tool.make('span', 'val', shown), copyButton(tool, `the value of ${name}`, shown)],
         issues: secret ? [{ text: `Every visitor reads this, and ${found.reason}. Keep a secret in defineEnv, read on the server alone.`, tone: 'error', icon: 'lock' }] : [],
         note: found?.maybe === true ? `Every visitor reads this: ${found.reason}.` : undefined,
-      }), `${name} ${typeof value === 'string' ? value : JSON.stringify(value)}`))
+      }), `${name} ${shown}`))
     }
 
     tab.count(flagged, flagged > 0 ? 'error' : undefined)
@@ -2276,7 +2331,7 @@ function imagesTab(doc: Document, tool: DevTool, vitals: Vitals, signal: AbortSi
       const row = entry(tool, 'image', {
         lead: thumb,
         name: info.url,
-        after: [...lcp ? [pill(tool, 'largest paint', 'accent')] : [], ...same.length > 1 ? [pill(tool, `${same.length} copies`)] : []],
+        after: [...lcp ? [pill(tool, 'largest paint', 'accent')] : [], ...same.length > 1 ? [pill(tool, `${same.length} copies`)] : [], copyButton(tool, 'the address', info.src)],
         chips: [info.variant, format, info.natural === 'not loaded' ? `not loaded, drawn ${info.drawn}` : `${info.natural} drawn ${info.drawn}`],
         issues: issues.map(text => ({ text, tone: 'warn' as const })),
       })
@@ -2719,7 +2774,7 @@ function routesTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
       const heading = tool.make('h3', 'heading', label)
       const list = tool.make('div')
 
-      list.append(...ofKind.map(route => routeRow(tool, route, win.location.pathname)))
+      list.append(...ofKind.map(route => routeRow(tool, route, win.location)))
       heading.append(pill(tool, String(ofKind.length)))
       section.append(heading, list)
 
@@ -2765,17 +2820,17 @@ function routesTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
   }, { signal })
 }
 
-function routeRow(tool: DevTool, route: DevRoute, current: string): HTMLElement {
+function routeRow(tool: DevTool, route: DevRoute, here: Location): HTMLElement {
   const name = route.href === undefined ? tool.make('span', 'name', route.path) : Object.assign(tool.make('a', 'name', route.path), { href: route.href })
   const row = entry(tool, 'route', {
     name,
-    after: route.locale === undefined ? [] : [tool.make('span', 'chip', route.locale)],
+    after: [...route.locale === undefined ? [] : [tool.make('span', 'chip', route.locale)], ...route.href === undefined ? [] : [copyButton(tool, 'the URL', new URL(route.href, here.href).href)]],
     chips: [route.owner === undefined ? positionButton(tool, route.file) : route.owner],
   })
 
   name.before(tool.make('span', 'method', route.method))
 
-  if (route.href === current)
+  if (route.href === here.pathname)
     row.setAttribute('aria-current', 'page')
 
   return row
@@ -2803,8 +2858,6 @@ function positionButton(tool: DevTool, source: string): HTMLButtonElement {
 
   return position
 }
-
-const copyResets = new WeakMap<HTMLButtonElement, ReturnType<typeof setTimeout>>()
 
 // Opens the position an error page's button names, saying why it could not, or copies the error, saying so a moment.
 async function answerErrorPage(tool: DevTool, target: HTMLButtonElement): Promise<void> {
@@ -2866,6 +2919,149 @@ function copiedProblems(url: string, listed: { problem: DevProblem & { text: str
   const blocks = listed.toSorted((a, b) => order.indexOf(a.kind) - order.indexOf(b.kind)).map(({ problem, kind, count }) => `[${KINDS[kind]}] ${problem.level}${count > 1 ? ` (${count} times)` : ''}\n${problem.text}`)
 
   return [`kay dev problems on ${url}`, ...blocks].join('\n\n')
+}
+
+// What the Markdown of a tab leaves out: its controls, drawings, the Head previews that repeat its tags, and what is hidden.
+const UNCOPIED = '.toolbar, .actions, .copy, .dismiss, .previews, .scalebox, img, svg, .rule, [hidden]'
+// Elements a line of text runs through, rather than blocks of their own.
+const INLINE = new Set(['a', 'b', 'button', 'code', 'i', 'small', 'span', 'strong'])
+const BULLET = /^ *- /
+const SPACES = /\s+/g
+
+// The text of an element, its parts spaced as they are drawn apart, and what the Markdown leaves out skipped.
+function spacedText(element: Element): string {
+  const parts: string[] = []
+  const walk = (node: Node) => {
+    if (node.nodeType === 3) {
+      parts.push(node.textContent ?? '')
+
+      return
+    }
+
+    if (node instanceof Element && node.matches(UNCOPIED))
+      return
+
+    // An element stands apart from the text around it, as a pill after a heading's words.
+    for (const child of node.childNodes) {
+      if (child instanceof Element)
+        parts.push(' ')
+
+      walk(child)
+
+      if (child instanceof Element)
+        parts.push(' ')
+    }
+  }
+
+  walk(element)
+
+  return parts.join('').replace(SPACES, ' ').trim()
+}
+
+function fenced(text: string): string {
+  const fence = text.includes('```') ? '````' : '```'
+
+  return `${fence}text\n${text}\n${fence}`
+}
+
+// What a tab shows, as Markdown to paste into an issue or an LLM: headings, facts and table rows as bullets, a row of a list with its chips, problems and note, problems and code as fenced blocks; the filter and buttons are left out, and so is what it hides.
+function panelMarkdown(panel: Element, title: string): string {
+  const lines: string[] = [`# ${title}`]
+  const block = (element: Element) => {
+    if (element.matches(UNCOPIED))
+      return
+
+    const tag = element.localName
+    const kind = element.classList
+
+    if (tag === 'h3') {
+      lines.push(`## ${spacedText(element)}`)
+    }
+    else if (tag === 'dl') {
+      for (const term of element.querySelectorAll(':scope > dt:not([hidden])'))
+        lines.push(`- ${spacedText(term)}: ${term.nextElementSibling === null ? '' : spacedText(term.nextElementSibling)}`)
+    }
+    else if (tag === 'table') {
+      for (const row of element.querySelectorAll('tr:not([hidden])'))
+        lines.push(`- ${[...row.children].map(cell => spacedText(cell)).filter(Boolean).join(': ')}`)
+    }
+    else if (tag === 'ul') {
+      for (const item of element.querySelectorAll(':scope > li:not([hidden])'))
+        lines.push(`- ${spacedText(item)}`)
+    }
+    else if (tag === 'pre') {
+      lines.push(fenced(element.textContent ?? ''))
+    }
+    else if (tag === 'details') {
+      lines.push(`**${spacedText(element.querySelector('summary') ?? element)}**`, fenced(element.querySelector('pre')?.textContent ?? ''))
+    }
+    else if (kind.contains('problem')) {
+      const level = kind.contains('error') ? 'Error' : 'Warning'
+      const told = [...element.querySelectorAll(':scope > .pill')].map(pill => spacedText(pill)).filter(Boolean)
+
+      lines.push(`**${level}**${told.length === 0 ? '' : `, ${told.join(', ')}`}`, fenced(element.querySelector('pre')?.textContent ?? ''))
+    }
+    else if (kind.contains('entry')) {
+      const chips = [...element.querySelectorAll('.chips > *')].map(chip => spacedText(chip)).filter(Boolean)
+
+      lines.push(`- ${spacedText(element.querySelector('.line')!)}`)
+
+      if (chips.length > 0)
+        lines.push(`  - ${chips.join(', ')}`)
+
+      for (const issue of element.querySelectorAll('.issue'))
+        lines.push(`  - ${issue.classList.contains('error') ? 'Error' : 'Warning'}: ${spacedText(issue)}`)
+
+      for (const note of element.querySelectorAll('.body > .note'))
+        lines.push(`  - ${spacedText(note)}`)
+    }
+    else if (kind.contains('vital')) {
+      const rating = element.querySelector('.top .pill')
+      const note = element.querySelector(':scope > .note')
+
+      lines.push(`- ${spacedText(element.querySelector('.name')!)}: ${spacedText(element.querySelector('.num')!)}${rating === null ? '' : `, ${spacedText(rating)}`}`)
+
+      if (note !== null)
+        lines.push(`  - ${spacedText(note)}`)
+    }
+    else if (kind.contains('timing') || kind.contains('weight')) {
+      // A grid of a name, a bar and a value per row, with a line of files under some.
+      let row: string[] = []
+
+      for (const cell of element.children) {
+        if (cell.matches(UNCOPIED) || cell.classList.contains('bars') || spacedText(cell) === '') {
+          continue
+        }
+        else if (cell.classList.contains('files')) {
+          lines.push(`  - ${spacedText(cell)}`)
+        }
+        else {
+          row.push(spacedText(cell))
+
+          if (row.length === 2) {
+            lines.push(`- ${row.join(': ')}`)
+            row = []
+          }
+        }
+      }
+    }
+    else if (element.children.length > 0 && ![...element.children].every(child => INLINE.has(child.localName))) {
+      for (const child of element.children)
+        block(child)
+    }
+    else {
+      const text = spacedText(element)
+
+      if (text !== '')
+        lines.push(text)
+    }
+  }
+
+  for (const child of panel.children)
+    block(child)
+
+  // Bullets run on, anything else stands apart.
+  return lines.reduce((text, line, index) => index === 0 ? line : `${text}${BULLET.test(line) && BULLET.test(lines[index - 1]!) ? '\n' : '\n\n'}${line}`, '')
 }
 
 // The text with each `.kay` file it names, with or without a position, as a button opening it once the inspector says how.
@@ -3071,6 +3267,7 @@ function headerRow(tool: DevTool, name: string, value: string): HTMLElement {
   else
     cell.append(...directives.map(directive => tool.make('span', 'directive', `${directive};`)))
 
+  cell.append(copyButton(tool, `the ${name} header`, value))
   row.append(tool.make('td', '', name), cell)
 
   return row

@@ -123,6 +123,12 @@ describe('the dev tool', () => {
     expect(copied).toEqual([`kay dev problems on ${location.href}\n\n[Recovered by kay] error (2 times)\nisland a.kay did not match its server markup\n\n[kay check] error\nerror[missing-alt]: An \`img\` needs \`alt\`\n --> src/routes/index.kay:3:5`])
     expect(copy().textContent).toBe('Copied')
 
+    // The tab as Markdown spaces a heading from its count and names no count a problem told once.
+    shadow().querySelector<HTMLButtonElement>('.head .icon[aria-label="Copy this tab as Markdown"]')!.click()
+    await Bun.sleep(0)
+
+    expect(copied[1]).toBe(`# Problems, ${location.href}\n\n## Recovered by kay 1\n\n**Error**, 2 times\n\n\`\`\`text\nisland a.kay did not match its server markup\n\`\`\`\n\n## kay check 1\n\n**Error**\n\n\`\`\`text\nerror[missing-alt]: An \`img\` needs \`alt\`\n --> src/routes/index.kay:3:5\n\`\`\``)
+
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async () => Promise.reject(new Error('denied')) } })
     copy().click()
     await Bun.sleep(0)
@@ -144,7 +150,7 @@ describe('the dev tool', () => {
 
     expect(rail.getAttribute('aria-orientation')).toBe('vertical')
     expect([...rail.querySelectorAll('[role=tab]')].map(tab => tab.id)).toEqual(['problems', 'request', 'head', 'env', 'images', 'performance', 'routes', 'other'].map(id => `kay-dev-tab-${id}`))
-    expect(icons()).toEqual([['Float', 'Float', ''], ['Dock to the bottom', 'Dock to the bottom', ''], ['Dock to the right', 'Dock to the right', ''], ['Fill the window', 'Fill the window', ''], ['Close', 'Close', '']])
+    expect(icons()).toEqual([['Copy this tab as Markdown', 'Copy this tab as Markdown', ''], ['Float', 'Float', ''], ['Dock to the bottom', 'Dock to the bottom', ''], ['Dock to the right', 'Dock to the right', ''], ['Fill the window', 'Fill the window', ''], ['Close', 'Close', '']])
 
     key({ key: 'K', code: 'KeyK', altKey: true, shiftKey: true })
     key({ key: 'ArrowDown' }, shadow().activeElement!)
@@ -157,7 +163,7 @@ describe('the dev tool', () => {
 
     shadow().querySelector<HTMLButtonElement>('.icon[aria-label="Fill the window"]')!.click()
     expect(shadow().querySelector('.ui.max')).not.toBeNull()
-    expect(icons()[3]).toEqual(['Restore the size', 'Restore the size', ''])
+    expect(icons()[4]).toEqual(['Restore the size', 'Restore the size', ''])
     tool.stop()
 
     tool = startDevTool()
@@ -549,6 +555,22 @@ describe('the dev tool', () => {
 
     // A policy reads a directive to a line.
     expect([...shadow().querySelectorAll('.headers .directive')].map(line => line.textContent)).toEqual(['default-src \'self\';', 'script-src \'self\' \'sha256-abc\';', 'img-src *;'])
+
+    // A header's button copies its value, the head's the tab as Markdown, and each says so a moment.
+    const copied: string[] = []
+
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async (text: string) => void copied.push(text) } })
+    shadow().querySelector<HTMLButtonElement>('#kay-dev-request .headers .copy[aria-label="Copy the cache-control header"]')!.click()
+    await Bun.sleep(0)
+
+    expect(copied).toEqual(['no-store'])
+    expect(shadow().querySelectorAll('#kay-dev-request .headers .copy[aria-label="Copied"]')).toHaveLength(1)
+
+    shadow().querySelector<HTMLButtonElement>('.head .icon[aria-label="Copy this tab as Markdown"]')!.click()
+    await Bun.sleep(0)
+
+    expect(copied[1]).toBe(`# Request, ${location.href}\n\nGET ${location.pathname}${location.search} 200 51 ms on the server\n\n## Matched\n\n- Route: /items/:id\n- Params: id = "7"\n- Locale: fr\n- Rendered: on request here, prerendered by kay build for the paths its setting lists\n- Redirected: /members (307, by the guard src/routes/members/_guard.ts)\n\n## Files, outermost first\n\n- Guard src/routes/_guard.ts passed\n- Guard src/routes/items/_guard.ts passed\n- Layout src/routes/_layout.kay\n- Page src/routes/items/[id].kay\n\n## Time on the server\n\n- src/routes/_layout.kay: 1.5 ms\n- src/routes/items/[id].kay: 42 ms\n- Whole request: 51 ms\n\n## Response headers\n\n- content-security-policy: default-src 'self'; script-src 'self' 'sha256-abc'; img-src *;\n- cache-control: no-store\n- x-request-id: abc\n- content-type: text/html`)
+    expect(shadow().querySelector('.head .icon[aria-label="Copied"]')).not.toBeNull()
 
     // The swap adds the next page's block, then drops this one's.
     recorded = undefined
