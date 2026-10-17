@@ -43,9 +43,9 @@ const KINDS: Record<ProblemKind, string> = {
 }
 
 const STYLE = `
-:host { all: initial; --canvas: #f8fafc; --mantle: #e8edf4; --surface: #fff; --line: #dde3ec; --sub: #566173; --text: #17202e; --accent: #1565a0; --accent-hi: #0f4c7a; --on-accent: #fff; --orange: #9c4a0a; --ok: #2f6b3a; --warn: #7a4f0f; --error: #a63227; --accent-soft: color-mix(in srgb, var(--accent) 11%, transparent); --ok-soft: color-mix(in srgb, var(--ok) 13%, transparent); --warn-soft: color-mix(in srgb, var(--warn) 14%, transparent); --error-soft: color-mix(in srgb, var(--error) 13%, transparent); --shadow: 0 10px 32px rgb(23 32 46 / 18%), 0 1px 3px rgb(23 32 46 / 10%); color-scheme: light; }
+:host { all: initial; --canvas: #f8fafc; --mantle: #e8edf4; --surface: #fff; --line: #e3e8ef; --sub: #566173; --text: #17202e; --accent: #1565a0; --accent-hi: #0f4c7a; --on-accent: #fff; --orange: #9c4a0a; --ok: #2f6b3a; --warn: #7a4f0f; --error: #a63227; --accent-soft: color-mix(in srgb, var(--accent) 11%, transparent); --ok-soft: color-mix(in srgb, var(--ok) 13%, transparent); --warn-soft: color-mix(in srgb, var(--warn) 14%, transparent); --error-soft: color-mix(in srgb, var(--error) 13%, transparent); --shadow: 0 10px 32px rgb(23 32 46 / 18%), 0 1px 3px rgb(23 32 46 / 10%); color-scheme: light; }
 @media (prefers-color-scheme: dark) {
-  :host { --canvas: #17202e; --mantle: #121a26; --surface: #1c2737; --line: #2a3a55; --sub: #9ba6b5; --text: #eef2f7; --accent: #4cb3ea; --accent-hi: #8fd0f5; --on-accent: #17202e; --orange: #f0954a; --ok: #8fd19e; --warn: #e8b46a; --error: #f2968c; --shadow: 0 10px 32px rgb(0 0 0 / 50%), 0 1px 3px rgb(0 0 0 / 40%); color-scheme: dark; }
+  :host { --canvas: #17202e; --mantle: #121a26; --surface: #1c2737; --line: #23314a; --sub: #9ba6b5; --text: #eef2f7; --accent: #4cb3ea; --accent-hi: #8fd0f5; --on-accent: #17202e; --orange: #f0954a; --ok: #8fd19e; --warn: #e8b46a; --error: #f2968c; --shadow: 0 10px 32px rgb(0 0 0 / 50%), 0 1px 3px rgb(0 0 0 / 40%); color-scheme: dark; }
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
@@ -68,6 +68,9 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 .pill.warn { background: var(--warn-soft); color: var(--warn); }
 .pill.ok { background: var(--ok-soft); color: var(--ok); }
 .pill.accent { background: var(--accent-soft); color: var(--accent-hi); }
+/* The rail is darker than the panels, so its tinted pills sit on the panel colour, which their text is measured on. */
+.tabs .pill.error { background: linear-gradient(var(--error-soft), var(--error-soft)), var(--surface); }
+.tabs .pill.warn { background: linear-gradient(var(--warn-soft), var(--warn-soft)), var(--surface); }
 .pill svg.i { width: 12px; height: 12px; }
 .bar .pill { font-size: 12px; }
 .error { color: var(--error); }

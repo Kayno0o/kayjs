@@ -559,10 +559,15 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay dev in
 
         host.shadowRoot!.querySelector('.ui')!.append(probe)
 
+        // A token name, or a colour of them as the stylesheet mixes one.
         const rgba = (name: string) => {
-          probe.style.color = `var(--${name})`
+          probe.style.color = name.includes('(') ? name : `var(--${name})`
 
-          return getComputedStyle(probe).color.match(/[0-9.]+/g)!.map(Number)
+          const colour = getComputedStyle(probe).color
+          const [r, g, b, a] = colour.match(/[0-9.]+/g)!.map(Number)
+
+          // A mixed colour computes as `color(srgb r g b / a)`, its channels from 0 to 1.
+          return colour.startsWith('color(') ? [r! * 255, g! * 255, b! * 255, a ?? 1] : [r!, g!, b!, a ?? 1]
         }
         const over = (top: number[], under: number[]) => [0, 1, 2].map(at => top[at]! * (top[3] ?? 1) + under[at]! * (1 - (top[3] ?? 1)))
         const luminance = (colour: number[]) => {
@@ -587,9 +592,12 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay dev in
           'icon': ['sub', 'mantle'],
           'icon:hover': ['text', 'surface'],
           'tab': ['sub', 'mantle'],
-          'tab:hover': ['text', 'mantle'],
+          'tab:hover': ['text', 'mantle', 'color-mix(in srgb, var(--surface) 60%, transparent)'],
           'tab selected': ['text', 'surface'],
           'tab count': ['sub', 'mantle'],
+          'tab count selected': ['sub', 'surface', 'mantle'],
+          'tab count error': ['error', 'mantle', 'surface', 'error-soft'],
+          'tab count warn': ['warn', 'mantle', 'surface', 'warn-soft'],
           'dock pressed': ['accent-hi', 'mantle', 'accent-soft'],
           'bar': ['text', 'surface'],
           'bar pressed': ['accent-hi', 'surface', 'accent-soft'],
@@ -1350,6 +1358,77 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
       await view.waitFor('h1', { text: 'Other' })
 
       expect(await view.evaluate(() => document.title)).toBe('Other | Site')
+    }
+    finally {
+      await dev.close()
+    }
+  }, 60_000)
+})
+
+describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the dev tool under a policy refusing inline styles', () => {
+  it('draws, moves and docks, styled through its adopted sheet and the CSSOM alone', async () => {
+    const dev = await testSite({ routes: 'tests/fixtures/title/src/routes', browser: { path }, dev: true, security: { csp: { 'style-src': ['\'self\''] } } })
+
+    try {
+      const view = await dev.open('/')
+
+      await view.waitUntil(() => document.querySelector('kay-dev')?.shadowRoot?.querySelector('.bar') !== null)
+
+      // The policy holds: a style attribute the page adds is refused.
+      const refused = await view.evaluate(async () => {
+        const blocked = new Promise<string>(resolve => document.addEventListener('securitypolicyviolation', event => resolve(event.violatedDirective), { once: true }))
+        const marked = document.createElement('div')
+
+        marked.setAttribute('style', 'color: red')
+        document.body.append(marked)
+
+        return blocked
+      })
+
+      expect(refused).toStartWith('style-src')
+
+      const drawn = await view.evaluate(async () => {
+        const violations: string[] = []
+
+        document.addEventListener('securitypolicyviolation', event => violations.push(`${event.violatedDirective} ${event.sourceFile}`))
+
+        const root = document.querySelector('kay-dev')!.shadowRoot!
+        const drawer = root.querySelector<HTMLElement>('.drawer')!
+
+        root.querySelector<HTMLButtonElement>('.bar > button')!.click()
+
+        const head = root.querySelector<HTMLElement>('.head')!
+        const from = head.getBoundingClientRect()
+        const start = drawer.getBoundingClientRect()
+        const at = { clientX: from.left + 40, clientY: from.top + 10, pointerId: 1, bubbles: true, composed: true }
+
+        head.dispatchEvent(new PointerEvent('pointerdown', { ...at, button: 0 }))
+        head.dispatchEvent(new PointerEvent('pointermove', { ...at, clientX: at.clientX + 60, clientY: at.clientY - 80 }))
+        head.dispatchEvent(new PointerEvent('pointerup', { ...at, clientX: at.clientX + 60, clientY: at.clientY - 80 }))
+
+        const moved = drawer.getBoundingClientRect()
+        const radius = getComputedStyle(drawer).borderTopLeftRadius
+
+        root.querySelector<HTMLButtonElement>('.dock button[aria-label="Dock to the bottom"]')!.click()
+        await new Promise(resolve => requestAnimationFrame(resolve))
+
+        return {
+          position: getComputedStyle(drawer).position,
+          radius,
+          moved: [Math.round(moved.left - start.left), Math.round(moved.top - start.top)],
+          padded: getComputedStyle(document.documentElement).paddingBottom,
+          problems: [...root.querySelectorAll('.problem pre')].map(pre => pre.textContent).filter(problem => !problem.startsWith('a11y ')),
+          violations,
+        }
+      })
+
+      expect(drawn.position).toBe('fixed')
+      expect(drawn.radius).toBe('12px')
+      expect(drawn.moved).toEqual([60, -80])
+      expect(drawn.padded).not.toBe('0px')
+      // The page's own refused attribute alone.
+      expect(drawn.problems).toEqual(['blocked inline by style-src-attr'])
+      expect(drawn.violations).toEqual([])
     }
     finally {
       await dev.close()

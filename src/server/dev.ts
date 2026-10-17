@@ -445,7 +445,7 @@ export function followBuilds(): void {
     if (typeof message !== 'object' || message === null || !('built' in message))
       return
 
-    lastBuilt = `event: built\ndata: ${JSON.stringify({ id: crypto.randomUUID(), at: Date.now(), ...message.built as object })}\n\n`
+    lastBuilt = `event: built\ndata: ${JSON.stringify(message.built)}\n\n`
     broadcast(lastBuilt)
   })
 }

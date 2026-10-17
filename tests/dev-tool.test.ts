@@ -422,7 +422,7 @@ describe('the dev tool', () => {
 
   it('says nothing on the bar of a rebuild, and keeps no state of one for the page', async () => {
     tool = startDevTool()
-    window.dispatchEvent(new CustomEvent('kay-dev-built', { detail: JSON.stringify({ id: 'a', at: Date.now(), changed: 'src/routes/index.kay', ms: 58 }) }))
+    window.dispatchEvent(new CustomEvent('kay-dev-built', { detail: JSON.stringify({ changed: 'src/routes/index.kay', ms: 58 }) }))
 
     expect(shadow().querySelector('.built')).toBeNull()
     expect(bar()).toEqual(['kay'])
@@ -646,7 +646,7 @@ describe('the dev tool', () => {
 
       // A restart may change the routes: the tab shown asks again.
       status = 500
-      window.dispatchEvent(new CustomEvent('kay-dev-built', { detail: JSON.stringify({ id: 'b', at: 0, changed: 'src/routes/x.kay', ms: 1 }) }))
+      window.dispatchEvent(new CustomEvent('kay-dev-built', { detail: JSON.stringify({ changed: 'src/routes/x.kay', ms: 1 }) }))
       await Bun.sleep(0)
 
       expect(fetched).toHaveLength(2)
@@ -825,7 +825,7 @@ describe('the dev tool', () => {
 
       // No `publicEnv`: nothing reaches the browser, and the tab says so after the restart.
       app = await pages({ routes, dev: true })
-      window.dispatchEvent(new CustomEvent('kay-dev-built', { detail: JSON.stringify({ id: 'b', at: 0, changed: 'kay.config.ts', ms: 1 }) }))
+      window.dispatchEvent(new CustomEvent('kay-dev-built', { detail: JSON.stringify({ changed: 'kay.config.ts', ms: 1 }) }))
       await Bun.sleep(20)
 
       expect(shadow().querySelector('#kay-dev-env .empty')?.textContent).toContain('sends no public env')
@@ -834,7 +834,7 @@ describe('the dev tool', () => {
       // Only a missing route means none: a failing server, or a page answering in its place, is told as a failure.
       for (const answer of [new Response(null, { status: 503 }), new Response('<p>Home</p>', { headers: { 'content-type': 'text/html' } })]) {
         fetching.mockImplementation((async () => answer.clone()) as unknown as typeof window.fetch)
-        window.dispatchEvent(new CustomEvent('kay-dev-built', { detail: JSON.stringify({ id: 'c', at: 0, changed: 'kay.config.ts', ms: 1 }) }))
+        window.dispatchEvent(new CustomEvent('kay-dev-built', { detail: JSON.stringify({ changed: 'kay.config.ts', ms: 1 }) }))
         await Bun.sleep(20)
 
         expect(shadow().querySelector('#kay-dev-env .empty')?.textContent).toContain('Could not read the public env')
@@ -941,7 +941,7 @@ describe('the dev tool', () => {
       expect(asked).toHaveLength(5)
       expect(rows().at(-5)).toContain('the server answered 404')
 
-      window.dispatchEvent(new CustomEvent('kay-dev-built', { detail: JSON.stringify({ id: 'b', at: 0, changed: 'src/routes/x.kay', ms: 1 }) }))
+      window.dispatchEvent(new CustomEvent('kay-dev-built', { detail: JSON.stringify({ changed: 'src/routes/x.kay', ms: 1 }) }))
       await Bun.sleep(20)
 
       expect(asked.filter(request => request.includes('gone'))).toHaveLength(2)

@@ -1824,7 +1824,7 @@ describe.concurrent('kay dev', () => {
       await until(() => lines.some(line => line.includes('src/app.css: stylesheets swapped in')), 10_000)
 
       // The dev tool says what was swapped in, and how long it took.
-      expect(await eventsUntil(events, 'built')).toMatch(/^event: styles\ndata: \d+\n\nevent: built\ndata: \{"id":"[\w-]+","at":\d+,"changed":"src\/app\.css","ms":\d+,"styles":true\}\n\n$/)
+      expect(await eventsUntil(events, 'built')).toMatch(/^event: styles\ndata: \d+\n\nevent: built\ndata: \{"changed":"src\/app\.css","ms":\d+,"styles":true\}\n\n$/)
       expect(await stylesheet()).toContain('#00f')
       expect(children).toHaveLength(1)
       await events.cancel()
@@ -1837,7 +1837,7 @@ describe.concurrent('kay dev', () => {
       expect(await (await fetch(url)).text()).toContain('Grace</h1>')
       expect(written()).toEqual(before)
       // As it does of a restart, to a page connecting after it.
-      expect(await eventsUntil((await fetch(`${url}/_kay/dev/events`)).body!.getReader(), 'built')).toMatch(/\nevent: built\ndata: \{"id":"[\w-]+","at":\d+,"changed":"src\/name\.ts","ms":\d+,"reloaded":true\}\n\n$/)
+      expect(await eventsUntil((await fetch(`${url}/_kay/dev/events`)).body!.getReader(), 'built')).toMatch(/\nevent: built\ndata: \{"changed":"src\/name\.ts","ms":\d+,"reloaded":true\}\n\n$/)
 
       await Bun.write(join(root, 'src/routes/index.kay'), `${page}else\n  p no\n`)
       await until(() => lines.length === 4, 10_000)
