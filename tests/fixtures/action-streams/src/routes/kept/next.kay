@@ -1,0 +1,5 @@
+---
+import Streamer from '../../components/streamer.kay'
+---
+h1 Kept next
+Streamer(persist mode="click")

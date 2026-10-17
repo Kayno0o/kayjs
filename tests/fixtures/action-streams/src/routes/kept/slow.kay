@@ -1,0 +1,7 @@
+--- server
+await Bun.sleep(400)
+--- script
+import Streamer from '../../components/streamer.kay'
+---
+h1 Kept slow
+Streamer(persist mode="click")

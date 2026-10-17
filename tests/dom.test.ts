@@ -368,6 +368,37 @@ describe('event handlers', () => {
   })
 })
 
+describe('what a handler registers', () => {
+  const marks = (name: string) => `onCleanup(() => { document.body.dataset.${name} = 'cleaned' })`
+  const mountOwned = site({
+    'main.kay': `---\nconst props = { onClick: () => ${marks('spread')} }\n---\nbutton.click(onClick={() => ${marks('click')}}) a\nbutton.focus(onFocus={() => ${marks('focus')}}) b\nform.submit(onSubmit={(event: Event) => { event.preventDefault(); ${marks('submit')} }}) c\nbutton.spread({...props}) d\n`,
+  })
+
+  it('belongs to the island through delegated, direct, held and spread listeners, so it runs once the island goes', async () => {
+    const { root, dispose } = await mountOwned()
+    const names = ['click', 'focus', 'submit', 'spread']
+
+    try {
+      root.querySelector<HTMLElement>('.click')!.click()
+      root.querySelector('.focus')!.dispatchEvent(new Event('focus'))
+      root.querySelector('.submit')!.dispatchEvent(new Event('submit', { cancelable: true }))
+      root.querySelector<HTMLElement>('.spread')!.click()
+      await settle()
+
+      for (const name of names)
+        expect(document.body.dataset[name], name).toBeUndefined()
+    }
+    finally {
+      await dispose()
+    }
+
+    for (const name of names) {
+      expect(document.body.dataset[name], name).toBe('cleaned')
+      delete document.body.dataset[name]
+    }
+  })
+})
+
 describe('kay without imports', () => {
   const mount10 = site({
     'main.kay': '---\nconst count = signal(1)\nconst double = memo(() => count() * 2)\nconst seen = signal(0)\nconst mounted = signal(false)\n\neffect(() => seen.set(count()))\nonMount(() => mounted.set(true))\nonCleanup(() => { document.body.dataset.cleaned = \'yes\' })\n---\nbutton(onClick={() => count.set(c => c + 1)}) {double()} {seen()} {mounted() ? \'mounted\' : \'not yet\'}\n',

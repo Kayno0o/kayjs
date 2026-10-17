@@ -1,10 +1,11 @@
 // What islands run on in the browser: DOM built from templates, kept in step with signals, and the server's markup claimed in place when an island hydrates.
 // A dynamic part sits between `<!--[-->` and `<!--]-->` comments unless it is the only content of its element; hydration walks the server's nodes in the order the generated code asks for them.
 
+import type { Owner } from './reactive'
 import { rebasedAttribute } from './base'
 import { imageSource } from './image'
 import { FAILED, ISLAND, PART_END, PART_START } from './markers'
-import { catchError, createSignal, getOwner, hydrationEnded, hydrationStarted, memo, onCleanup, renderEffect, reportError, root, runWithOwner, scope, unrecorded, untrack } from './reactive'
+import { activeOwner, catchError, createSignal, getOwner, hydrationEnded, hydrationStarted, memo, onCleanup, renderEffect, reportError, root, runWithOwner, scope, unrecorded, untrack } from './reactive'
 import { isSnapshots, readSnapshots } from './snapshots'
 import { freshPrefix, withIds } from './uid'
 import { safeUrl } from './url'
@@ -45,7 +46,7 @@ const SIZED_IMAGE = ['src', 'srcset', 'sizes', 'width', 'height']
 const VOID_PROPERTIES = new Set(['value', 'checked', 'selected', 'muted', 'indeterminate'])
 const CONTENT_PROPERTIES = new Set(['innerHTML', 'textContent', 'innerText'])
 // Events handled by one listener on the document, as most pages bind them on many elements at once.
-const DELEGATED = new Set(['beforeinput', 'click', 'dblclick', 'contextmenu', 'focusin', 'focusout', 'input', 'keydown', 'keyup', 'mousedown', 'mousemove', 'mouseout', 'mouseover', 'mouseup', 'pointerdown', 'pointermove', 'pointerout', 'pointerover', 'pointerup', 'touchend', 'touchmove', 'touchstart'])
+const DELEGATED = /^(?:beforeinput|click|dblclick|contextmenu|focus(?:in|out)|input|key(?:down|up)|mouse(?:down|move|out|over|up)|pointer(?:down|move|out|over|up)|touch(?:end|move|start))$/
 
 // The events the document already has a listener for, kept on the document so a second copy of this runtime on the page adds none of its own.
 interface DelegatingDocument extends Document {
@@ -1316,22 +1317,20 @@ export function setStyle(element: Element, value: unknown): void {
 }
 
 // Set by form-hold when an island loads it, so a `submit` handler given through a spread is held too.
-export const submits: { listen?: typeof listen, unlisten?: typeof unlisten } = {}
+export const submits: { listen?: typeof listen } = {}
 
-// `onClick` listens for `click`: through the document's one listener for the common events, on the element for the others.
-export function listen(element: Element, name: string, handler: (event: Event) => void, replaced?: (event: Event) => void): void {
+// `onClick` listens for `click`: through the document's one listener for the common events, on the element for the others. The handler is kept on the element with the owner it was bound in, so what it starts, such as a stream an action answers with, ends with that island.
+export function listen(element: Element, name: string, handler: (event: Event) => void): void {
   const type = name.slice(2).toLowerCase()
 
-  if (!DELEGATED.has(type)) {
-    if (replaced)
-      element.removeEventListener(type, replaced)
+  ;(element as ElementRecord)[`$$${type}`] = handler
+  ;(element as ElementRecord).$o = activeOwner
 
-    element.addEventListener(type, handler)
+  if (!DELEGATED.test(type)) {
+    element.addEventListener(type, fire)
 
     return
   }
-
-  ;(element as ElementRecord)[`$$${type}`] = handler
 
   const types = (document as DelegatingDocument)._$kt ??= new Set()
 
@@ -1341,13 +1340,15 @@ export function listen(element: Element, name: string, handler: (event: Event) =
   }
 }
 
-export function unlisten(element: Element, name: string, handler: (event: Event) => void): void {
+export function unlisten(element: Element, name: string): void {
   const type = name.slice(2).toLowerCase()
 
-  if (DELEGATED.has(type))
-    (element as ElementRecord)[`$$${type}`] = undefined
-  else
-    element.removeEventListener(type, handler)
+  ;(element as ElementRecord)[`$$${type}`] = undefined
+  element.removeEventListener(type, fire)
+}
+
+function fire(this: ElementRecord, event: Event): void {
+  runWithOwner(this.$o as Owner | undefined, () => (this[`$$${event.type}`] as (event: Event) => void)(event))
 }
 
 // Calls the handlers from the event's target up, each seeing its own element as `currentTarget`, until one stops propagation.
@@ -1361,7 +1362,7 @@ export function dispatch(event: Event): void {
     if (handler && !(node as unknown as { disabled?: boolean }).disabled) {
       // Defined only where a handler runs, as most events on a page reach none.
       Object.defineProperty(event, 'currentTarget', { configurable: true, get: () => node ?? document })
-      handler.call(node, event)
+      fire.call(node as unknown as ElementRecord, event)
 
       if (event.cancelBubble)
         return
@@ -1384,6 +1385,9 @@ export function spread(element: Element, sources: () => readonly object[], conte
   if (content)
     insert(element, null, null, () => merge(...sources()).children)
 
+  // The handlers belong to the component, not to the effect a prop change runs again.
+  const owner = getOwner()
+
   renderEffect(() => {
     const props = merge(...sources())
     const seen = new Set<string>()
@@ -1399,15 +1403,13 @@ export function spread(element: Element, sources: () => readonly object[], conte
       if (set.get(name) === value)
         continue
 
-      const previous = set.get(name)
-
       set.set(name, value)
 
       if (name === 'ref') {
         ref(element, value)
       }
       else if (handlerName(name) && typeof value === 'function') {
-        (submits.listen ?? listen)(element, name, value as (event: Event) => void, previous as ((event: Event) => void) | undefined)
+        runWithOwner(owner, () => (submits.listen ?? listen)(element, name, value as (event: Event) => void))
       }
       // A handler given as text runs as script, which the server never writes either.
       else if (handlerName(name)) {
@@ -1439,7 +1441,7 @@ export function spread(element: Element, sources: () => readonly object[], conte
       set.delete(name)
 
       if (handlerName(name) && typeof previous === 'function')
-        (submits.unlisten ?? unlisten)(element, name, previous as (event: Event) => void)
+        unlisten(element, name)
       else if (name !== 'ref' && !handlerName(name))
         property(element, name, undefined)
     }

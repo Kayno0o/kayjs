@@ -1,0 +1,25 @@
+---
+import type { ActionStream } from 'kay'
+import { listen, onMount, signal } from 'kay'
+import { quiet } from '../routes/index.kay'
+
+// Where the stream starts: from its setup (`setup`), a click on its button (`click`), or a listener on the window, which runs under no island (`window`).
+const { mode } = props<{ mode: 'setup' | 'click' | 'window' }>()
+const answer = signal<ActionStream<number> | undefined>(undefined)
+
+async function start() {
+  answer.set(await quiet())
+}
+
+onMount(() => {
+  if (mode === 'setup')
+    void start()
+})
+
+listen(window, 'keydown', () => {
+  if (mode === 'window')
+    void start()
+})
+---
+button.begin(type="button" onClick={() => mode === 'click' && start()}) Begin
+p.status {answer()?.status() ?? 'none'}

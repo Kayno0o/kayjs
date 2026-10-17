@@ -184,14 +184,8 @@ export async function go(url: URL, swap: Swap): Promise<void> {
   const token = ++navigation.current
 
   // Another page only: the same one with another query, or a form sending it back to itself, is not left.
-  if (url.pathname !== location.pathname) {
+  if (url.pathname !== location.pathname)
     navigation.visits = (navigation.visits ?? 0) + 1
-
-    for (const close of leaving)
-      close()
-
-    leaving.clear()
-  }
 
   const isCurrent = () => token === navigation.current
   const { history: change } = policyOf(swap)
@@ -274,6 +268,13 @@ export async function show(page: FetchedPage, hash: string, swap: Swap, isCurren
   const commit = () => {
     if (!isCurrent())
       return
+
+    if (navigation.shown === '' || new URL(navigation.shown).pathname !== target.pathname) {
+      navigation.arrivals = (navigation.arrivals ?? 0) + 1
+
+      for (const close of leaving)
+        close()
+    }
 
     document.title = next.title
     root()

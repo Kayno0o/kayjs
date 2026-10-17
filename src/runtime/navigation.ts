@@ -77,6 +77,8 @@ export const navigation: {
   page: number
   current: number
   visits?: number
+  // How many swaps to another path were shown, which a stream no island owns reads to tell whether the path it was started on is gone.
+  arrivals?: number
   released: boolean
   // Lands the query param writes held back to be spaced out, which run before the address is read to leave or change it.
   flush?: () => void
@@ -84,7 +86,7 @@ export const navigation: {
   typed?: boolean
 } = { shown: '', at: 0, page: 0, current: 0, released: false }
 
-// Run once as a swap to another path starts, as `visits` grows: what an action streams to a handler that started it closes there.
+// Run once a swap to another path is shown: what an action streams to a caller no island owns closes there.
 export const leaving = new Set<() => void>()
 
 // Pages fetched ahead of a click, by URL; an action may change what they show, so each post forgets them.

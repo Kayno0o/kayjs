@@ -220,7 +220,7 @@ button(onClick={() => messages.send({ text: text() })}) Send
 - Guards, the schema, `rateLimit`, the cross-site check and the bot protections run before the handler, and what the iterable throws before its first value, a `ctx.redirect`, a `ctx.deny` or an error, answers as the handler's would, the call throwing `ActionError` or redirecting; the cookies it set by then go out with the stream.
 - A throw past the first value is logged, `onError` included, and ends the stream `failed`.
 - `pending()` stays true until the stream ends; once it ran to its end the page refreshes, unless `refresh: false`, and `succeeded()` reads its last value.
-- `close()` stops the handler's iterable, its `finally` running, as does the visitor going away; a stream called from an island's setup or effect closes with it, and one called from an event handler once the visitor goes to another page.
+- `close()` stops the handler's iterable, its `finally` running, as does the visitor going away; a stream called from an island's setup or an event handler closes when the island does, so a `persist` island's stays open across pages, and an effect running again closes the one it called; a stream called outside any island closes once the visitor goes to another path.
 - `rateLimit` with `count: 'succeeded'` counts a stream once its first value is there, and a drained post once its iterable ended.
 - A `pretend` bot protection answering an island's `FormData` call resolves `undefined`, not an `ActionStream`, as the handler never ran.
 - `on()` added right after the call resolves gets every value, `last()` only the latest: a reply yields the text so far rather than the piece added, so `last()` is all an island reads.

@@ -412,4 +412,51 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
 
     expect(page.errors).toEqual([])
   })
+
+  // A `persist` island survives the swap, so a stream it started stays open with it and closes when a page without it takes its place.
+  for (const [mode, starts] of [['click', 'button.begin'], ['setup', undefined]] as const) {
+    it(`keeps a stream a persist island started from its ${mode === 'click' ? 'click handler' : 'setup'} open across a page swap, closing it once the island goes`, async () => {
+      const page = await site.open(`/kept/${mode}`, { path })
+      const before = seen.quietStopped
+
+      if (starts)
+        await page.click(starts)
+
+      await page.waitFor('p.status', { text: 'open' })
+      await page.click('a.next')
+      await page.waitFor('h1', { text: 'Kept next' })
+      await Bun.sleep(150)
+
+      expect(seen.quietStopped).toBe(before)
+      expect(await page.text('p.status')).toBe('open')
+
+      await page.click('a.bare')
+      await page.waitFor('h1', { text: 'Kept bare' })
+      await stoppedTimes(before + 1, 'quietStopped')
+
+      expect(page.errors).toEqual([])
+    })
+  }
+
+  it('keeps a stream no island owns open when the swap that began is superseded, closing it once a page is shown', async () => {
+    const page = await site.open('/kept/window', { path })
+    const before = seen.quietStopped
+
+    await page.press('a')
+    await page.waitFor('p.status', { text: 'open' })
+    // The slow page is still being fetched when the visitor asks for this one again.
+    await page.click('a.slow')
+    await page.click('a.self')
+    await Bun.sleep(600)
+
+    expect(await page.path()).toBe('/kept/window')
+    expect(seen.quietStopped).toBe(before)
+    expect(await page.text('p.status')).toBe('open')
+
+    await page.click('a.bare')
+    await page.waitFor('h1', { text: 'Kept bare' })
+    await stoppedTimes(before + 1, 'quietStopped')
+
+    expect(page.errors).toEqual([])
+  })
 })

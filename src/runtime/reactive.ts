@@ -85,6 +85,7 @@ interface Interceptor {
 // Defined by the browser build, which never renders on the server: tested where it is read, so the bundler drops the server's code.
 declare const KAY_BROWSER: true | undefined
 
+// eslint-disable-next-line import/no-mutable-exports -- exported as `activeOwner`, a live binding importers only read
 let owner: Owner | undefined
 let listener: Computation | undefined
 let renderQueue: Computation[] = []
@@ -241,6 +242,10 @@ export function readContext(key: symbol): { found: boolean, value?: unknown } {
 
   return { found: false }
 }
+
+// The owner now, read where a call is not worth a function in every page's entry: a listener binds the owner it was made under.
+
+export { owner as activeOwner }
 
 // The owner now, for a block rendered later to read what was provided where it was declared.
 export function getOwner(): Owner | undefined {

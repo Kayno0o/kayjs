@@ -20,6 +20,12 @@ const ACTION = Symbol.for('kay.action')
 const DAY = 86_400
 const FAILURE = Symbol.for('kay.failure')
 
+// Who made a call: the island whose setup or handler did, and how many paths were shown by then.
+export interface Caller {
+  owner: Owner | undefined
+  arrivals: number | undefined
+}
+
 // Type only: what the handler returns, failures included, so a page can type `ctx.failed(action)`.
 declare const RESULT: unique symbol
 // Type only: the honeypot field an action's forms render, which `kay check` then takes as one of their fields.
@@ -622,8 +628,8 @@ function callable(url: () => string): { call: (input: never, options?: CallOptio
     const page = navigation.page
     const visits = navigation.visits
     const left = () => navigation.visits !== visits
-    // The island calling from its setup or an effect, whose end ends a stream the call answers with.
-    const owner = getOwner()
+    // The island calling, from its setup or a handler, whose end ends a stream the call answers with; else the page, as long as no other path is shown.
+    const caller: Caller = { owner: getOwner(), arrivals: navigation.arrivals }
 
     shift(1)
     called(page, null)
@@ -644,7 +650,7 @@ function callable(url: () => string): { call: (input: never, options?: CallOptio
 
       const data = await post(url(), input, setProgress, options?.signal, () => {
         sent = true
-      }, left, owner)
+      }, left, caller)
 
       posted = true
 
@@ -705,15 +711,15 @@ function callable(url: () => string): { call: (input: never, options?: CallOptio
   }
 }
 
-// A stream ends with the island that started it; one started from an event handler, under no island, ends once the visitor goes to another page.
-function closeWithCaller(stream: ActionStream<unknown> & Settles, owner: Owner | undefined, left: (() => boolean) | undefined): void {
-  if (owner) {
-    onCleanupOf(owner, stream.close)
+// A stream ends with the island that started it, a `persist` island's living on across pages; one started under no island, from a listener on the window say, ends once a path other than the call's is shown, which a swap that fails or gives way to another does not do.
+function closeWithCaller(stream: ActionStream<unknown> & Settles, caller: Caller | undefined): void {
+  if (caller?.owner) {
+    onCleanupOf(caller.owner, stream.close)
   }
-  else if (left?.() === true) {
+  else if (caller && navigation.arrivals !== caller.arrivals) {
     stream.close()
   }
-  else if (left) {
+  else if (caller) {
     leaving.add(stream.close)
     stream[SETTLED](() => leaving.delete(stream.close))
   }
@@ -760,7 +766,7 @@ function tracked(call: (input: never, options?: CallOptions) => Promise<unknown>
   return Object.assign(run, { pending: () => inFlight() > 0 })
 }
 
-async function post<Output>(url: string, input: unknown, onProgress: (sent: number) => void, signal: AbortSignal | undefined, onSent: () => void, left: () => boolean, owner: Owner | undefined): Promise<Output> {
+async function post<Output>(url: string, input: unknown, onProgress: (sent: number) => void, signal: AbortSignal | undefined, onSent: () => void, left: () => boolean, caller: Caller): Promise<Output> {
   const { headers, body } = encodeCall(input)
   const sent: Record<string, string> = { ...headers }
 
@@ -793,7 +799,7 @@ async function post<Output>(url: string, input: unknown, onProgress: (sent: numb
 
   prefetched.clear()
 
-  return readActionResponse(response, url, left, owner)
+  return readActionResponse(response, url, left, caller)
 }
 
 // The encoding keeps numbers, booleans and Dates typed, which form fields would turn into strings; only a call carrying files needs multipart, whose boundary fetch writes.
@@ -839,8 +845,8 @@ export function decodeCall(body: unknown): unknown {
 }
 
 // What a call to `action` got back: the handler's result, or an `ActionError` with the refused fields and the failure data.
-// `left` tells whether the visitor went to another page since the call was made, which a redirect then no longer takes them from; a stream closes then, or with `owner`, the island that called.
-export async function readActionResponse<Output>(response: Response, action: string, left?: () => boolean, owner?: Owner): Promise<Output> {
+// `left` tells whether the visitor went to another page since the call was made, which a redirect then no longer takes them from; a stream closes with the island that called, else once another path is shown.
+export async function readActionResponse<Output>(response: Response, action: string, left?: () => boolean, caller?: Caller): Promise<Output> {
   const target = response.headers.get(REDIRECT_HEADER)
 
   if (target !== null) {
@@ -865,7 +871,7 @@ export async function readActionResponse<Output>(response: Response, action: str
   if (response.ok && response.headers.get('content-type')?.startsWith('text/event-stream') === true) {
     const stream = (await import('./action-stream')).actionStream(response, SETTLED)
 
-    closeWithCaller(stream, owner, left)
+    closeWithCaller(stream, caller)
 
     return stream as Output
   }

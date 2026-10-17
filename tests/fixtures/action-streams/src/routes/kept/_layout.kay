@@ -1,0 +1,6 @@
+nav
+  a.next(href="/kept/next") Next
+  a.bare(href="/kept/bare") Bare
+  a.slow(href="/kept/slow") Slow
+  a.self(href="/kept/window") Self
+slot
