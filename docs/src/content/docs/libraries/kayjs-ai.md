@@ -206,11 +206,17 @@ kay i18n translate fr --dry-run
 kay i18n translate fr
 ```
 
-The dry run lists what would be translated and guesses the tokens it would cost. It sends nothing and writes nothing.
+The dry run lists what would be translated, down to the fields of each entry, and guesses the tokens it would cost. It sends nothing and writes nothing.
 
 A translation is kept only when it keeps what the original had. Every `{placeholder}` stays, with the same name. Plural forms stay, and so do tags such as `<b>`. In a tag only the text of `title`, `alt`, `aria-label` and `placeholder` is translated, and `href`, `src` and every other attribute stay as they were. A line break the original did not have is refused. A reply that does not pass is asked for once more, then dropped and reported. Nothing wrong is ever written.
 
 Messages are saved with a `// draft` comment, so `kay check` warns until you read them and run `kay i18n accept fr`. An entry of a localized collection is saved in the `fr` folder, and never over an entry that is already there.
+
+Every plain text field of an entry is translated. Wrap one that holds a brand, a category or a code in `untranslated`, from `kay/content`, and it keeps the original's value:
+
+```ts
+brand: untranslated(t.String())
+```
 
 If the collection has `draft: 'field'`, that field is set to true, so the entry stays hidden in production until you publish it. Otherwise the entry starts with a `# draft` line in its header, which you delete once you have read it. Saving the entry from a CMS removes it too. Such an entry is shown at once, so read it before you deploy.
 

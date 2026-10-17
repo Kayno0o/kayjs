@@ -1,8 +1,8 @@
 import type { Asked } from '../packages/ai/src'
+import { afterAll, describe, expect, it } from 'bun:test'
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
-import { afterAll, describe, expect, it } from 'bun:test'
 import { flattenMessages } from '../src/runtime/i18n'
 import { draftMessages } from '../src/server/message-drafts'
 import { scratchDir } from './scratch'
@@ -194,6 +194,28 @@ describe('kay i18n translate: entries', () => {
     expect(asked[0]!.messages[0]!.content).not.toContain('#00ff00')
     expect(written).not.toContain('FR Boxed')
     expect(asked[0]!.messages[0]!.content).not.toContain('Boxed')
+  })
+
+  it('leaves a field the schema marks untranslated as it is, at any depth, and lists the paths it translates in a dry run', async () => {
+    const config = 'import { t } from \'elysia\'\nimport { collection, untranslated } from \'kay/content\'\n\nexport const shop = collection(\'content/shop\', { schema: t.Object({ title: t.String(), brand: untranslated(t.String()), maybe: t.Optional(untranslated(t.String())), meta: untranslated(t.Object({ label: t.String() })), rows: t.Array(t.Object({ name: t.String(), sku: untranslated(t.String()) })) }), localized: true })\n'
+    const files = { ...noMessages, 'src/content.config.ts': config, 'src/content/shop/en/mug.md': '---\ntitle: Mug\nbrand: Acme\nmaybe: Keep\nmeta:\n  label: Label\nrows:\n  - name: Red\n    sku: R-1\n---\nBody\n' }
+    const root = await project(files)
+    const dry = await run(root, ['fr'], [], { 'dry-run': true })
+
+    expect(dry.out).toContain('shop: mug (title, rows.0.name, body)')
+    expect(dry.out).not.toContain('brand')
+
+    const { asked } = await run(root, ['fr'], [{}])
+    const written = await read(root, 'src/content/shop/fr/mug.md')
+
+    expect(written).toContain('title: FR Mug')
+    expect(written).toContain('name: FR Red')
+    expect(written).toContain('brand: Acme')
+    expect(written).toContain('maybe: Keep')
+    expect(written).toContain('label: Label')
+    expect(written).toContain('sku: R-1')
+    for (const kept of ['Acme', 'Keep', 'Label', 'R-1'])
+      expect(asked[0]!.messages[0]!.content).not.toContain(kept)
   })
 
   it('writes an entry of a collection with a draft field with that field true, other fields kept', async () => {

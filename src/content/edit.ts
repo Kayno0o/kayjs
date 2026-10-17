@@ -200,6 +200,11 @@ export function customField<Schema extends TSchema>(kind: string, schema: Schema
   return { ...schema, 'x-kay': { kind } }
 }
 
+// A field of any schema that `kay i18n translate` leaves as it is, such as a category, a brand or a code: the translation keeps the default locale's value. Its kind and every other keyword are kept.
+export function untranslated<Schema extends TSchema>(schema: Schema): Schema {
+  return { ...schema, 'x-kay-translate': false }
+}
+
 // Every collection the content config exports, as a CMS edits it.
 // `counts: false` leaves out `body`, `count` and `problem`, so no loader runs and no folder is listed for a caller that needs the names, schemas and kinds alone.
 export async function collections({ counts = true }: { counts?: boolean | undefined } = {}): Promise<CollectionInfo[]> {

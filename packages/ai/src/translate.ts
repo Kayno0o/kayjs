@@ -180,12 +180,17 @@ function report(locale: string, from: string, keys: string[], plans: EntryPlan[]
   const byCollection = Map.groupBy(plans, plan => plan.collection)
 
   for (const [collection, planned] of byCollection)
-    console.log(`  ${collection}: ${planned.map(plan => plan.slug).join(', ')}`)
+    console.log(`  ${collection}: ${planned.map(plan => `${plan.slug} (${fieldNames(plan).join(', ')})`).join(', ')}`)
 
   for (const failure of failures)
     console.error(`kay i18n translate: ${failure}`)
 
   return failures.length === 0 ? 0 : 1
+}
+
+// The fields of an entry that would be translated, by path, `body` last.
+function fieldNames(plan: EntryPlan): string[] {
+  return [...plan.paths.map(path => path.join('.')), ...plan.units.some(unit => unit.id === 'body') ? ['body'] : []]
 }
 
 // The texts of the messages: a plural's forms are one text each, numbered so that no key is ever put in a prompt.
@@ -291,6 +296,9 @@ function collectPaths(schema: JsonSchema | undefined, data: unknown, path: Path,
     return
 
   // A field of a kind the app adds is data its component edits, whatever shape it wraps.
+  if (node['x-kay-translate'] === false)
+    return
+
   if (!TRANSLATED_KINDS.has(node['x-kay']?.kind ?? 'text'))
     return
 

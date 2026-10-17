@@ -79,7 +79,7 @@ Types include `BrowserError` and `CspViolation`, the browser errors and CSP viol
 
 | Entry | Exports |
 | --- | --- |
-| `kay/content` | `collection`, `paginate`, `renderMarkdown`, `highlightCode`; for a CMS, `bodyHtml`, `MarkdownError`, `collections`, `collectionInfo`, `entries`, `entrySource`, `entryFile`, `saveEntry`, `removeEntry`, `repositoryRoot`, `reference`, `imageField`, `fileField`, `markdownField`, `customField`. See [Content](/guides/content) |
+| `kay/content` | `collection`, `paginate`, `renderMarkdown`, `highlightCode`; for a CMS, `bodyHtml`, `MarkdownError`, `collections`, `collectionInfo`, `entries`, `entrySource`, `entryFile`, `saveEntry`, `removeEntry`, `repositoryRoot`, `reference`, `imageField`, `fileField`, `markdownField`, `customField`, `untranslated`. See [Content](/guides/content) |
 | `kay/edit` | `showDraft`, which shows the page with an editor's unsaved entries in edit mode, and the `EditorProps` an extension's `editor` is given. See [Content](/guides/content) |
 | `kay/dev-tool` | The `DevTool` type a library's `devTool` module is given, with `make`, `tab`, `button`, `outline`, `hideOutline` and `open`, and the `DevTab` and `DevTabOptions` of `tab`. See [A tab for a library](/llms/component-libraries#a-tab-for-a-library) |
 | `kay/compiler` | `compileKay`, which compiles one `.kay` source, `formatDiagnostic`, which prints a problem it found, and the `Diagnostic`, `CompileOptions` and `CompileResult` types. See [Compiling a component](/llms/check-and-tools#compile-a-component-from-a-tool) |

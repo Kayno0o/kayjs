@@ -73,6 +73,7 @@ export const CONTENT_EXPORTS: Record<string, 'free' | 'request' | 'folder'> = {
   fileField: 'free',
   markdownField: 'free',
   customField: 'free',
+  untranslated: 'free',
   renderMarkdown: 'free',
   bodyHtml: 'free',
   highlightCode: 'free',
