@@ -1315,6 +1315,7 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
     breached: breachedCheck(options.breachedPasswords),
     email: options.email && {
       ...options.email,
+      expires: tokenLifetimes(options.email.expires),
       links: emailLinks(options.email.links, paths?.links),
       requireVerified: options.email.requireVerified ?? true,
       locales,

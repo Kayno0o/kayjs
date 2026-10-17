@@ -45,6 +45,8 @@ export interface MailData {
   detail?: string | undefined
   // The language to write in, one of the `locales` option's.
   locale: string
+  // How many seconds the mail's link and its code work, for the ones it carries: `{ link: 86400, code: 600 }`. `lifetime(seconds, locale)` words them.
+  expires?: { link?: number, code?: number } | undefined
 }
 
 export type Templates = Record<MailKind, (data: MailData) => MailContent>
@@ -54,8 +56,8 @@ interface Wording {
   yourCode: string
   orTypeCode: string
   orPaste: string
-  linkWorks: (duration: string) => string
-  codeWorks: string
+  linkWorks: (duration: string, once: boolean) => string
+  codeWorks: (duration: string) => string
   review: string
   onSite: (subject: string, site: string) => string
   notYou: string
@@ -66,8 +68,8 @@ const ENGLISH: Wording = {
   yourCode: 'Your code:',
   orTypeCode: 'Or type this code where you asked for it:',
   orPaste: 'Or paste this into your browser:',
-  linkWorks: duration => `The link works for ${duration}.`,
-  codeWorks: 'The code works for 10 minutes, typed where you asked for it.',
+  linkWorks: (duration, once) => `The link works for ${duration}${once ? ', once' : ''}.`,
+  codeWorks: duration => `The code works for ${duration}, typed where you asked for it.`,
   review: 'See where your account is signed in, and end what you do not know:',
   onSite: (subject, site) => `${subject} on ${site}`,
   notYou: 'If this was not you, reset your password and check your account at once.',
@@ -78,8 +80,8 @@ const FRENCH: Wording = {
   yourCode: 'Votre code :',
   orTypeCode: 'Ou saisissez ce code là où vous l\'avez demandé :',
   orPaste: 'Ou collez ceci dans votre navigateur :',
-  linkWorks: duration => `Le lien est valable ${duration}.`,
-  codeWorks: 'Le code est valable 10 minutes, saisi là où vous l\'avez demandé.',
+  linkWorks: (duration, once) => `Le lien est valable ${duration}${once ? ', une seule fois' : ''}.`,
+  codeWorks: duration => `Le code est valable ${duration}, saisi là où vous l'avez demandé.`,
   review: 'Voyez où votre compte est connecté, et mettez fin à ce que vous ne reconnaissez pas :',
   onSite: (subject, site) => `${subject} sur ${site}`,
   notYou: 'Si ce n\'était pas vous, réinitialisez votre mot de passe et vérifiez votre compte sans attendre.',
@@ -111,9 +113,24 @@ function linkMail(words: Wording, data: MailData, subject: string, lead: string,
   }
 }
 
-// How long what the mail carries works.
-function lasting(words: Wording, data: MailData, link: string): string {
-  const parts = [data.url === undefined ? undefined : words.linkWorks(link), data.code === undefined ? undefined : words.codeWorks]
+const UNITS = [['day', 86_400], ['hour', 3600], ['minute', 60], ['second', 1]] as const
+
+// A lifetime in seconds as words in a language, in the largest unit it fills exactly: `24 hours`, `7 days`, `1 heure`. A bad `locale` falls back to English.
+export function lifetime(seconds: number, locale: string): string {
+  const [unit, size] = UNITS.find(([, size]) => seconds % size === 0) ?? UNITS[3]
+
+  try {
+    return new Intl.NumberFormat(locale, { style: 'unit', unit, unitDisplay: 'long' }).format(seconds / size)
+  }
+  catch {
+    return new Intl.NumberFormat('en', { style: 'unit', unit, unitDisplay: 'long' }).format(seconds / size)
+  }
+}
+
+// How long what the mail carries works, a magic link being usable once.
+function lasting(words: Wording, data: MailData, once = false): string {
+  const { link, code } = data.expires ?? {}
+  const parts = [data.url === undefined || link === undefined ? undefined : words.linkWorks(lifetime(link, data.locale), once), data.code === undefined || code === undefined ? undefined : words.codeWorks(lifetime(code, data.locale))]
 
   return parts.filter(part => part !== undefined).join(' ')
 }
@@ -136,10 +153,10 @@ function noticeMail(words: Wording, data: MailData, subject: string, lead: strin
 const en = ENGLISH
 
 export const defaultTemplates: Templates = {
-  'verify-email': data => linkMail(en, data, `Confirm your email for ${data.site}`, `Confirm ${data.email} as the address of your ${data.site} account.`, 'Confirm my email', `${lasting(en, data, '24 hours')} If you did not create an account, ignore this mail.`),
-  'reset-password': data => linkMail(en, data, `Reset your ${data.site} password`, `Someone asked to reset the password of the ${data.site} account for ${data.email}.`, 'Choose a new password', 'The link works for one hour. If you did not ask for it, ignore this mail: your password stays as it is.'),
-  'magic-link': data => linkMail(en, data, `Sign in to ${data.site}`, `Here is your ${data.url === undefined ? 'code' : 'link'} to sign in to ${data.site}.`, 'Sign in', `${lasting(en, data, '15 minutes, once')} If you did not ask for it, ignore this mail.`),
-  'change-email': data => linkMail(en, data, `Confirm your new email for ${data.site}`, `Confirm ${data.email} as the new address of your ${data.site} account.`, 'Confirm the change', 'The link works for one hour. If you did not ask for this change, ignore this mail.'),
+  'verify-email': data => linkMail(en, data, `Confirm your email for ${data.site}`, `Confirm ${data.email} as the address of your ${data.site} account.`, 'Confirm my email', `${lasting(en, data)} If you did not create an account, ignore this mail.`),
+  'reset-password': data => linkMail(en, data, `Reset your ${data.site} password`, `Someone asked to reset the password of the ${data.site} account for ${data.email}.`, 'Choose a new password', `${lasting(en, data)} If you did not ask for it, ignore this mail: your password stays as it is.`),
+  'magic-link': data => linkMail(en, data, `Sign in to ${data.site}`, `Here is your ${data.url === undefined ? 'code' : 'link'} to sign in to ${data.site}.`, 'Sign in', `${lasting(en, data, true)} If you did not ask for it, ignore this mail.`),
+  'change-email': data => linkMail(en, data, `Confirm your new email for ${data.site}`, `Confirm ${data.email} as the new address of your ${data.site} account.`, 'Confirm the change', `${lasting(en, data)} If you did not ask for this change, ignore this mail.`),
   'invitation': data => linkMail(en, data, `Join ${data.detail} on ${data.site}`, `You are invited to join ${data.detail} on ${data.site}, with an account at ${data.email}.`, 'See the invitation', 'If you did not expect it, ignore this mail.'),
   'account-exists': data => linkMail(en, data, `You already have a ${data.site} account`, `Someone tried to create a ${data.site} account for ${data.email}, which has one already. Sign in to it, or ask for a new password on the sign-in page if you forgot yours.`, 'Sign in', 'If this was not you, ignore this mail: nothing changed on your account.'),
   'new-sign-in': data => noticeMail(en, data, 'New sign-in', `Your ${data.site} account was just signed into from a device or network it had not used before.`),
@@ -161,10 +178,10 @@ export const defaultTemplates: Templates = {
 const fr = FRENCH
 
 export const frenchTemplates: Templates = {
-  'verify-email': data => linkMail(fr, data, `Confirmez votre adresse pour ${data.site}`, `Confirmez ${data.email} comme adresse de votre compte ${data.site}.`, 'Confirmer mon adresse', `${lasting(fr, data, '24 heures')} Si vous n'avez pas créé de compte, ignorez ce message.`),
-  'reset-password': data => linkMail(fr, data, `Réinitialisez votre mot de passe ${data.site}`, `Quelqu'un a demandé à réinitialiser le mot de passe du compte ${data.site} de ${data.email}.`, 'Choisir un nouveau mot de passe', 'Le lien est valable une heure. Si vous ne l\'avez pas demandé, ignorez ce message : votre mot de passe reste inchangé.'),
-  'magic-link': data => linkMail(fr, data, `Connexion à ${data.site}`, `Voici votre ${data.url === undefined ? 'code' : 'lien'} pour vous connecter à ${data.site}.`, 'Me connecter', `${lasting(fr, data, '15 minutes, une seule fois')} Si vous ne l'avez pas demandé, ignorez ce message.`),
-  'change-email': data => linkMail(fr, data, `Confirmez votre nouvelle adresse pour ${data.site}`, `Confirmez ${data.email} comme nouvelle adresse de votre compte ${data.site}.`, 'Confirmer le changement', 'Le lien est valable une heure. Si vous n\'avez pas demandé ce changement, ignorez ce message.'),
+  'verify-email': data => linkMail(fr, data, `Confirmez votre adresse pour ${data.site}`, `Confirmez ${data.email} comme adresse de votre compte ${data.site}.`, 'Confirmer mon adresse', `${lasting(fr, data)} Si vous n'avez pas créé de compte, ignorez ce message.`),
+  'reset-password': data => linkMail(fr, data, `Réinitialisez votre mot de passe ${data.site}`, `Quelqu'un a demandé à réinitialiser le mot de passe du compte ${data.site} de ${data.email}.`, 'Choisir un nouveau mot de passe', `${lasting(fr, data)} Si vous ne l'avez pas demandé, ignorez ce message : votre mot de passe reste inchangé.`),
+  'magic-link': data => linkMail(fr, data, `Connexion à ${data.site}`, `Voici votre ${data.url === undefined ? 'code' : 'lien'} pour vous connecter à ${data.site}.`, 'Me connecter', `${lasting(fr, data, true)} Si vous ne l'avez pas demandé, ignorez ce message.`),
+  'change-email': data => linkMail(fr, data, `Confirmez votre nouvelle adresse pour ${data.site}`, `Confirmez ${data.email} comme nouvelle adresse de votre compte ${data.site}.`, 'Confirmer le changement', `${lasting(fr, data)} Si vous n'avez pas demandé ce changement, ignorez ce message.`),
   'invitation': data => linkMail(fr, data, `Rejoignez ${data.detail} sur ${data.site}`, `Vous êtes invité à rejoindre ${data.detail} sur ${data.site}, avec un compte à l'adresse ${data.email}.`, 'Voir l\'invitation', 'Si vous ne l\'attendiez pas, ignorez ce message.'),
   'account-exists': data => linkMail(fr, data, `Vous avez déjà un compte ${data.site}`, `Quelqu'un a tenté de créer un compte ${data.site} pour ${data.email}, qui en a déjà un. Connectez-vous-y, ou demandez un nouveau mot de passe depuis la page de connexion si vous l'avez oublié.`, 'Me connecter', 'Si ce n\'était pas vous, ignorez ce message : rien n\'a changé sur votre compte.'),
   'new-sign-in': data => noticeMail(fr, data, 'Nouvelle connexion', `Votre compte ${data.site} vient d'être utilisé depuis un appareil ou un réseau qu'il n'avait jamais utilisé.`),

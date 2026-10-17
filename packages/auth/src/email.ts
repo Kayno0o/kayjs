@@ -1,11 +1,13 @@
+import type { Duration } from 'kay'
 import type { Core } from './core'
-import type { Mailer, Templates } from './mail'
+import type { MailData, Mailer, Templates } from './mail'
 import type { EmailProblem, PasswordProblem } from './rules'
 import type { RequestState } from './state'
 import type { CodeType, LinkType, TokenType, UserRecord } from './store'
 import type { Proof, ProofFailure } from './twoFactor'
 import { comparePasswords, hashPassword, nanoid } from '@kaynooo/utils'
 import { localPath } from 'kay'
+import { durationSeconds } from 'kay/library'
 import { newPasswordProblem } from './breached'
 import { admit } from './captcha'
 import { banned, homeOf } from './core'
@@ -18,17 +20,31 @@ import { emailProblem, normalizeEmail } from './rules'
 import { endOtherSessions, removeIdentities, revokeBearerTokens } from './sessions'
 import { reprove } from './twoFactor'
 
-const MINUTE_MS = 60 * 1000
-const HOUR_MS = 60 * MINUTE_MS
+const MINUTE = 60
+const HOUR = 60 * MINUTE
 
-// How long each link and code works.
-const TOKEN_LIFETIME_MS: Record<TokenType, number> = {
-  'verify-email': 24 * HOUR_MS,
-  'reset-password': HOUR_MS,
-  'magic-link': 15 * MINUTE_MS,
-  'change-email': HOUR_MS,
-  'sign-in-code': 10 * MINUTE_MS,
-  'verify-code': 10 * MINUTE_MS,
+// How long each link and code works, in seconds, unless the `email.expires` option says otherwise.
+const TOKEN_LIFETIMES: Record<TokenType, number> = {
+  'verify-email': 24 * HOUR,
+  'reset-password': HOUR,
+  'magic-link': 15 * MINUTE,
+  'change-email': HOUR,
+  'sign-in-code': 10 * MINUTE,
+  'verify-code': 10 * MINUTE,
+}
+
+// The lifetimes the `expires` option sets over the defaults, in seconds, a bad one failing at boot naming it.
+export function tokenLifetimes(expires: EmailOptions['expires']): Record<TokenType, number> {
+  const lifetimes = { ...TOKEN_LIFETIMES }
+
+  for (const type of Object.keys(lifetimes) as TokenType[]) {
+    const wanted = expires?.[type]
+
+    if (wanted !== undefined)
+      lifetimes[type] = durationSeconds(wanted, `email.expires.${type}`, 'kayjs-auth')
+  }
+
+  return lifetimes
 }
 
 const CODE_LENGTH = 6
@@ -57,11 +73,13 @@ export interface EmailOptions {
   translations?: Record<string, Partial<Templates>> | undefined
   // Refuses password sign-in until the address is verified, and signs no one in on registering, so registering answers alike whether or not the address is held. On by default; `false` signs in on registering and answers `'taken'` for a held address.
   requireVerified?: boolean | undefined
+  // How long each link and code works, over the defaults: `{ 'verify-email': '7d' }` for invited users. The keys are the four links, `verify-email`, `reset-password`, `magic-link` and `change-email`, and the two codes, `sign-in-code` and `verify-code`; the mails state what is set.
+  expires?: Partial<Record<TokenType, Duration>> | undefined
   // Whether magic links and verification mails carry a code, for both kinds at once or for each: `'both'`, `{ 'magic-link': 'code' }`. A link only by default.
   codes?: CodeMode | Partial<Record<CodedLink, CodeMode>> | undefined
 }
 
-export type EmailCore = Required<Omit<EmailOptions, 'links' | 'templates' | 'requireVerified' | 'codes' | 'locales' | 'translations'>> & { links: Record<LinkType, string>, requireVerified: boolean, locales: string[], templates: Record<string, Templates>, codes: Record<CodedLink, CodeMode> }
+export type EmailCore = Required<Omit<EmailOptions, 'links' | 'templates' | 'requireVerified' | 'codes' | 'locales' | 'translations' | 'expires'>> & { expires: Record<TokenType, number>, links: Record<LinkType, string>, requireVerified: boolean, locales: string[], templates: Record<string, Templates>, codes: Record<CodedLink, CodeMode> }
 
 // A code waiting in the session that asked for it, which alone can spend it.
 export interface PendingCode {
@@ -166,7 +184,7 @@ export async function resetPassword(state: RequestState, token: string, password
   const problem = await newPasswordProblem(state.core, password)
 
   // Checked before the token is spent, so a refused password leaves the link usable.
-  if (problem)
+  if (problem !== undefined)
     return { ok: false, errors: { password: problem } }
 
   const spent = await spendLink(state, token, 'reset-password')
@@ -333,7 +351,7 @@ async function bindCode(state: RequestState, type: LinkType, email: string): Pro
   const nonce = randomToken()
   const codeType = CODE_OF[type as CodedLink]
 
-  await state.session.set('authEmailCode', { type: codeType, email, nonce, expires: Date.now() + TOKEN_LIFETIME_MS[codeType] })
+  await state.session.set('authEmailCode', { type: codeType, email, nonce, expires: Date.now() + state.core.email!.expires[codeType] * 1000 })
 
   return nonce
 }
@@ -353,7 +371,7 @@ async function spendCode(state: RequestState, type: CodeType, code: string) {
   const record = spent && await core.store.users.get(spent.userId)
 
   if (!spent || !record || record.email !== spent.email) {
-    if (await core.store.attempts.hit(`email-code-miss:${pending.nonce}`, TOKEN_LIFETIME_MS[type] / 1000) < CODE_MISSES)
+    if (await core.store.attempts.hit(`email-code-miss:${pending.nonce}`, core.email!.expires[type]) < CODE_MISSES)
       return { ok: false, error: 'invalid' } as const
 
     await state.session.unset('authEmailCode')
@@ -441,6 +459,11 @@ async function spendResend(state: RequestState, id: string, limit: 'resend' | 'e
   return undefined
 }
 
+// The seconds the link and the code of a mail work, for the ones it carries.
+function lifetimesOf(mail: EmailCore, type: LinkType, content: { url?: string, code?: string }): MailData['expires'] {
+  return { ...content.url === undefined ? {} : { link: mail.expires[type] }, ...content.code === undefined ? {} : { code: mail.expires[CODE_OF[type as CodedLink]] } }
+}
+
 // One live link and code per kind and user: a new one replaces the last. A code goes only with the nonce of the session that asked for it.
 // Written in the user's language, else the browser's.
 async function issue(state: RequestState, record: UserRecord, type: LinkType, email: string, redirect: string | null, nonce: string | undefined): Promise<void> {
@@ -455,7 +478,7 @@ async function issue(state: RequestState, record: UserRecord, type: LinkType, em
     const token = randomToken() + await rememberMark(state, type)
 
     content.url = `${core.url}${mail.links[type]}?token=${token}`
-    await core.store.tokens.create({ digest: digest(type === 'magic-link' ? unmarked(token) : token), type, userId: record.id, email, redirect, expiresAt: new Date(Date.now() + TOKEN_LIFETIME_MS[type]) })
+    await core.store.tokens.create({ digest: digest(type === 'magic-link' ? unmarked(token) : token), type, userId: record.id, email, redirect, expiresAt: new Date(Date.now() + mail.expires[type] * 1000) })
   }
 
   if (mode !== 'link' && nonce !== undefined) {
@@ -464,12 +487,12 @@ async function issue(state: RequestState, record: UserRecord, type: LinkType, em
 
     content.code = code
     await core.store.tokens.deleteForUser(record.id, codeType)
-    await core.store.tokens.create({ digest: codeDigest(core, nonce, code), type: codeType, userId: record.id, email, redirect, expiresAt: new Date(Date.now() + TOKEN_LIFETIME_MS[codeType]) })
+    await core.store.tokens.create({ digest: codeDigest(core, nonce, code), type: codeType, userId: record.id, email, redirect, expiresAt: new Date(Date.now() + mail.expires[codeType] * 1000) })
   }
 
   const { locale, templates } = writing(mail, [record.locale, ...state.languages])
 
-  await mail.mailer.send({ to: email, kind: type, site: core.site, locale, ...content, ...templates[type]({ site: core.site, email, locale, ...content }) })
+  await mail.mailer.send({ to: email, kind: type, site: core.site, locale, ...content, ...templates[type]({ site: core.site, email, locale, ...content, expires: lifetimesOf(mail, type, content) }) })
 }
 
 // The token's user, once the token is spent; a link for an address the account no longer has is spent for nothing.
