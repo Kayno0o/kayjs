@@ -101,6 +101,27 @@ describe('direct imports of the runtime', () => {
     expect(await directImports(attributes)).toBe(attributes)
   })
 
+  it('leaves a file alone whose import text in a template literal or a comment hides behind a namespace, default or side-effect import of the barrel', async () => {
+    const namespace = 'import * as k from \'kay\'\nimport { signal } from \'kay\'\nconst sample = `\nimport { effect } from \'kay\'\n`\n'
+    const imported = 'import kay from \'kay\'\nconst sample = `\nimport { effect } from \'kay\'\n`\n'
+    const effectOnly = 'import \'kay\'\nconst sample = `\nimport { effect } from \'kay\'\n`\n'
+    const commented = 'import * as k from \'kay\'\n/*\nimport { effect } from \'kay\'\n*/\n'
+
+    const typed = 'import type { Signal } from \'kay\'\nimport type { Effect } from \'kay\'\nconst sample = `\nimport { effect } from \'kay\'\n`\n'
+
+    for (const source of [namespace, imported, effectOnly, commented, typed])
+      expect(await directImports(source)).toBe(source)
+  })
+
+  it('still rewrites a named import beside a namespace import of the barrel, keeping the line count', async () => {
+    const source = 'import * as k from \'kay\'\nimport {\n  signal,\n} from \'kay\'\nconst after = k\n'
+    const code = await directImports(source)
+
+    expect(code).toContain('/runtime/core.ts')
+    expect(code.split('\n').length).toBe(source.split('\n').length)
+    expect(code.split('\n')[4]).toBe('const after = k')
+  })
+
   it('leaves a name the barrel does not export in an import of the barrel', async () => {
     expect(await directImports('import { nothing } from \'kay\'')).toBe('import { nothing } from \'kay\';')
   })

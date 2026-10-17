@@ -66,7 +66,7 @@ async function sourcesOf(specifier: string): Promise<Map<string, Source>> {
 // Only `import { ... } from 'kay'` is rewritten: a module taking the barrel another way (a namespace, a default, `export ... from`, a dynamic import) makes its entry reach every module the barrel re-exports.
 // Rewrites each named import from `kay` and `kay/internal` into imports of the modules holding the names; a name that is not a value the barrel exports stays in an import of the barrel, and a statement of types alone goes.
 // Each statement keeps its lines, so the positions Bun reports in the code stay the module's own.
-// A file with more matches than the parser finds imports of `kay` has import text in a template literal: it is left to import the barrel.
+// A file where blanking the matches removes fewer imports of `kay` than it has matches has import text in a template literal or a comment: it is left to import the barrel.
 export async function directImports(code: string, loader: Bun.JavaScriptLoader = 'ts'): Promise<string> {
   if (!code.includes('kay'))
     return code
@@ -76,7 +76,12 @@ export async function directImports(code: string, loader: Bun.JavaScriptLoader =
   if (imports.length === 0)
     return code
 
-  if (transpilerFor(loader).scanImports(code).filter(entry => entry.kind === 'import-statement' && BARREL_SPECIFIER.test(entry.path)).length < imports.length)
+  // Blanking the matches takes away exactly the ones the parser sees as imports, whatever other imports of the barrel the file has.
+  const parser = transpilerFor(loader)
+  const barrelImports = (text: string) => parser.scanImports(text).filter(entry => entry.kind === 'import-statement' && BARREL_SPECIFIER.test(entry.path)).length
+  const blanked = imports.reduceRight((text, match) => text.slice(0, match.index) + '\n'.repeat(match[0].split('\n').length - 1) + text.slice(match.index + match[0].length), code)
+
+  if (barrelImports(code) - barrelImports(blanked) < imports.length)
     return code
 
   for (const specifier of BARRELS.keys()) {
