@@ -64,7 +64,7 @@ async function sourcesOf(specifier: string): Promise<Map<string, Source>> {
 }
 
 // Only `import { ... } from 'kay'` is rewritten: a module taking the barrel another way (a namespace, a default, `export ... from`, a dynamic import) makes its entry reach every module the barrel re-exports.
-// Rewrites each named import from `kay` and `kay/internal` into imports of the modules holding the names; a name that is not a value the barrel exports stays in an import of the barrel, and a statement of types alone goes.
+// Rewrites each named import from `kay` and `kay/internal` into imports of the modules holding the names; a name that is not a value the barrel exports stays in an import of the barrel, and the types of a statement with values go.
 // Each statement keeps its lines, so the positions Bun reports in the code stay the module's own.
 // A file where blanking the matches removes fewer imports of `kay` than it has matches has import text in a template literal or a comment: it is left to import the barrel.
 export async function directImports(code: string, loader: Bun.JavaScriptLoader = 'ts'): Promise<string> {
@@ -91,7 +91,13 @@ export async function directImports(code: string, loader: Bun.JavaScriptLoader =
 
   const known = new Map(await Promise.all([...sources].map(async ([specifier, found]) => [specifier, await found] as const)))
 
-  return code.replace(NAMED_IMPORT, (statement, clause: string, quote: string, specifier: string) => {
+  const counted = new Set(imports.map(match => match.index))
+
+  // A statement of types alone, or an empty one, is not counted above: it may be import text in a template literal, and Bun drops a real one.
+  return code.replace(NAMED_IMPORT, (statement, clause: string, quote: string, specifier: string, offset: number) => {
+    if (!counted.has(offset))
+      return statement
+
     const found = known.get(specifier)!
     const byFile = new Map<string, string[]>()
     const rest: string[] = []

@@ -106,6 +106,9 @@ describe('direct imports of the runtime', () => {
     const imported = 'import kay from \'kay\'\nconst sample = `\nimport { effect } from \'kay\'\n`\n'
     const effectOnly = 'import \'kay\'\nconst sample = `\nimport { effect } from \'kay\'\n`\n'
     const commented = 'import * as k from \'kay\'\n/*\nimport { effect } from \'kay\'\n*/\n'
+    const typedText = 'import { signal } from \'kay\'\nconst sample = `\nimport { type X } from \'kay\'\nimport {} from \'kay\'\n`\n'
+
+    expect(await directImports(typedText)).toContain('`\nimport { type X } from \'kay\'\nimport {} from \'kay\'\n`')
 
     const typed = 'import type { Signal } from \'kay\'\nimport type { Effect } from \'kay\'\nconst sample = `\nimport { effect } from \'kay\'\n`\n'
 
