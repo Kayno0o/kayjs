@@ -10,7 +10,7 @@ import { PUBLIC_ENV } from '../src/runtime/env'
 import { reportError } from '../src/runtime/reactive'
 import { ISLAND_PARAM } from '../src/runtime/server-islands'
 import { pages } from '../src/server'
-import { DEV_BOOT, problemsBlock } from '../src/server/dev'
+import { DEV_BOOT, liveReload, problemsBlock } from '../src/server/dev'
 import { scratchDir } from './scratch'
 
 // The fields of a request block the Request tab reads.
@@ -320,6 +320,53 @@ describe('the dev tool', () => {
     }
     finally {
       delete (window as { PerformanceObserver?: unknown }).PerformanceObserver
+    }
+  })
+
+  it('notes the live reload\'s fetches without the page\'s hash, and the last few only', async () => {
+    const happy = (window as unknown as { happyDOM: { setURL: (url: string) => void } }).happyDOM
+    const listeners = new Map<string, (event: { data: string }) => void>()
+    const realFetch = globalThis.fetch
+    const windowFetch = window.fetch.bind(window)
+    const hadSource = (window as { EventSource?: unknown }).EventSource
+
+    ;(window as unknown as { EventSource: unknown }).EventSource = class {
+      addEventListener(type: string, listener: (event: { data: string }) => void): void {
+        listeners.set(type, listener)
+      }
+    }
+    const answer = (async () => new Response('<html></html>', { headers: { 'content-type': 'text/html' } })) as typeof fetch
+
+    globalThis.fetch = answer
+    window.fetch = answer
+    happy.setURL('http://localhost/shop?page=2#reviews')
+    delete (window as { $kayReloads?: unknown }).$kayReloads
+
+    try {
+      // eslint-disable-next-line no-new-func -- runs the inline script a dev page carries
+      ;(new Function((/<script>([\s\S]*)<\/script>/).exec(liveReload())![1]!) as () => void)()
+
+      for (let reload = 0; reload < 30; reload++)
+        listeners.get('styles')!({ data: String(reload) })
+
+      await Bun.sleep(20)
+
+      const notes = (window as unknown as { $kayReloads: [string, number][] }).$kayReloads
+
+      expect(notes.length).toBeGreaterThan(0)
+      expect(notes.length).toBeLessThanOrEqual(20)
+      expect(new Set(notes.map(([href]) => href))).toEqual(new Set(['http://localhost/shop?page=2']))
+    }
+    finally {
+      globalThis.fetch = realFetch
+      window.fetch = windowFetch
+      happy.setURL('http://localhost/')
+      delete (window as { $kayReloads?: unknown }).$kayReloads
+
+      if (hadSource === undefined)
+        delete (window as { EventSource?: unknown }).EventSource
+      else
+        (window as unknown as { EventSource: unknown }).EventSource = hadSource
     }
   })
 
