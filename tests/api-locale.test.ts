@@ -1,4 +1,5 @@
 import { afterAll, describe, expect, it } from 'bun:test'
+import { inRequestLocale } from '../src/server/api'
 import { testSite } from '../src/test'
 
 const FIXTURE = 'tests/fixtures/api-locale'
@@ -96,5 +97,43 @@ describe('an API handler in the request\'s locale', () => {
 
     expect(await own(`${ORIGIN}/fr/x`)).toEqual({ own: 'Refusé' })
     expect(await own(`${ORIGIN}/`)).toEqual({ own: 'Refused' })
+  })
+
+  it('builds one locale state per request, whatever the handlers and hooks it runs', async () => {
+    const seen = globalThis as { apiLocaleStates?: unknown[] }
+
+    seen.apiLocaleStates = []
+    await sites.single.fetch('/api/words/states')
+    await sites.single.fetch('/api/words/states')
+
+    const [handler, hook, nextHandler, nextHook] = seen.apiLocaleStates
+
+    expect(handler).toBeDefined()
+    expect(hook).toBe(handler)
+    expect(nextHook).toBe(nextHandler)
+    expect(nextHandler).not.toBe(handler)
+  })
+
+  it('wraps a function as the function it wraps reads to Elysia', () => {
+    const options = { i18n: { settings: { locales: ['en'], defaultLocale: 'en' }, translations: new Map() } } as never
+    const plain = function named(_context: { request: Request }) {
+      return 1
+    }
+    const asynchronous = async function later(_context: { request: Request }) {
+      return 1
+    }
+    const generator = async function* each(_context: { request: Request }) {
+      yield 1
+    }
+
+    for (const fn of [plain, asynchronous, generator]) {
+      const wrapped = inRequestLocale(fn, options)
+
+      expect(wrapped.name).toBe(fn.name)
+      expect(wrapped.constructor).toBe(fn.constructor)
+      expect(wrapped.toString()).toBe(fn.toString())
+      // Wrapped again, as a module a second app mounts is, it still reads as the original.
+      expect(inRequestLocale(wrapped, options).constructor).toBe(fn.constructor)
+    }
   })
 })

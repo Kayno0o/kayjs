@@ -1,6 +1,7 @@
 import { t as message } from 'kay/i18n'
 import { api, eventStream } from 'kay/server'
 import { wording } from 'kay/words'
+import { localeState } from '../../../../../src/runtime/locale-state'
 
 const pause = async (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 const read = () => ({ word: wording('words.refused', 'Refused'), t: message('greeting') })
@@ -26,6 +27,23 @@ export default api()
   .get('/own-error', () => {
     throw new Error('own')
   }, { error: () => ({ own: wording('words.refused', 'Refused') }) } as never)
+  // The handler and the route's error hook both note the state they ran in, to show a request builds one.
+  .get('/states', () => {
+    states().push(localeState())
+
+    throw new Error('states')
+  }, { error: () => {
+    states().push(localeState())
+
+    return { states: states().length }
+  } } as never)
   .get('/boom', () => {
     throw new Error('boom')
   })
+
+// What the test reads back: the locale states the handler and error hook of one request ran in.
+function states(): unknown[] {
+  const store = globalThis as { apiLocaleStates?: unknown[] }
+
+  return store.apiLocaleStates ??= []
+}

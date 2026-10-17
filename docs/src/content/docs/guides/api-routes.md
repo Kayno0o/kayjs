@@ -24,7 +24,7 @@ export default api()
   )
 ```
 
-`api()` is an Elysia instance whose handlers read the app's `locals`, so `({ user })` is typed. A `_guard.ts` in `src/api/` protects its routes the way it protects pages. A handler runs in the locale of the page that called it, by its `Referer` or the browser's `Accept-Language`, so `t()` and `wording()` answer in it.
+`api()` is an Elysia instance whose handlers read the app's `locals`, so `({ user })` is typed. A `_guard.ts` in `src/api/` protects its routes the way it protects pages. A handler runs in the locale of the page that called it, by its `Referer` or the browser's `Accept-Language`, so `t()` and `wording()` answer in it. A websocket's `open` and `message` callbacks run outside it.
 
 A route at the path of a page, a public file, an endpoint or a redirect stops the server at boot. A single file a static export should write, such as `llms.txt`, is an [endpoint file](/essentials/routing#endpoint-files) in `src/routes/` instead.
 

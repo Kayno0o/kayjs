@@ -242,14 +242,15 @@ const WRAPPED = Symbol.for('kay.localized')
 
 // A handler or an error hook that runs in the request's locale, a generator it returns read there too.
 // It reads as the function it wraps, as Elysia infers from its source what the route needs of the context.
-function inRequestLocale(fn: Handler, options: ActionOptions): Handler {
+export function inRequestLocale(fn: Handler, options: ActionOptions): Handler {
   const original = (fn as { [WRAPPED]?: Handler })[WRAPPED] ?? fn
 
   const wrapped: Handler = function (this: unknown, context, ...rest) {
     return inApiLocale(context.request, options, () => inStream(original.call(this, context, ...rest), context.request, options))
   }
 
-  Object.defineProperties(wrapped, { toString: { value: () => original.toString() }, [WRAPPED]: { value: original } })
+  // Elysia tells a generator or an async handler by its `constructor`, and a handler's `name` shows in traces and errors.
+  Object.defineProperties(wrapped, { toString: { value: () => original.toString() }, constructor: { value: original.constructor }, name: { value: original.name }, [WRAPPED]: { value: original } })
 
   return wrapped
 }
