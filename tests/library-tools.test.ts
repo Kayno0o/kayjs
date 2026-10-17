@@ -45,8 +45,18 @@ describe('an action as a tool', () => {
     expect(await site.call(shape, { name: 'named' })).toMatchObject({ name: 'Say_Hello', description: 'Says hello' })
   })
 
-  it('is none for an action taking a file, which a model cannot send', async () => {
+  it('is none for an action taking a file, one of a page with params and one that set tool: false', async () => {
     expect(await site.call(shape, { name: 'upload' })).toBeUndefined()
+    expect(await site.call(shape, { name: 'rename' })).toBeUndefined()
+    expect(await site.call(shape, { name: 'vetoed' })).toBeUndefined()
+  })
+
+  it('refuses a call for a request a browser sent from another site, whatever its method', async () => {
+    const read = async (headers: Record<string, string>) => ((await (await site.fetch('/api/current/tool', { headers })).json()) as ToolResult)
+
+    expect((await read({ 'origin': 'https://evil.example', 'sec-fetch-site': 'cross-site' })).isError).toBe(true)
+    expect((await read({ 'sec-fetch-site': 'cross-site' })).isError).toBe(true)
+    expect((await read({ 'sec-fetch-site': 'same-origin' })).structuredContent).toMatchObject({ title: 'Milk' })
   })
 
   it('returns what the handler returned', async () => {

@@ -1,0 +1,6 @@
+--- server
+import { action, s } from 'kay'
+
+export const rename = action(s.Object({ title: s.String() }), ({ title }, ctx) => ({ id: ctx.params.id, title }))
+---
+h1 Item

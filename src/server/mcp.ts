@@ -12,7 +12,7 @@ import { joinBase } from '../runtime/base'
 import { configuredSite } from '../runtime/site'
 import { FAILURE_HEADER, REDIRECT_HEADER } from '../runtime/swap'
 import { decodeServerValue, encodeValue } from '../runtime/wire'
-import { isCrossSite } from './actions'
+import { boundToPage, isCrossSite, unadmittedCrossSite } from './actions'
 import { MCP_PATH, RESOURCE_METADATA } from './api-modules'
 import { currentRequest } from './log'
 import { actionOperation, guardRefusal, toolName } from './openapi'
@@ -325,13 +325,18 @@ export function receiveDispatched(app: Elysia): void {
   app.onRequest(({ request, server }) => {
     servers.set(request, { server, handle })
 
-    const marked = toolCall(request)
-    const address = request.headers.get(CLIENT)
-    const id = request.headers.get('x-request-id')
+    const { headers } = request
 
-    request.headers.delete(AGENT)
-    request.headers.delete(CLIENT)
-    request.headers.delete(TOOL)
+    if (!headers.has(AGENT) && !headers.has(CLIENT) && !headers.has(TOOL))
+      return
+
+    const marked = toolCall(request)
+    const address = headers.get(CLIENT)
+    const id = headers.get('x-request-id')
+
+    headers.delete(AGENT)
+    headers.delete(CLIENT)
+    headers.delete(TOOL)
 
     // A header an outside client sent is dropped with the rest, and counts for nothing.
     if (marked === undefined)
@@ -485,18 +490,35 @@ export interface LibraryTool {
   description: string
   inputSchema: object
   // Runs the action as the visitor `request` came from, the one being answered unless given, through the whole app: its guards, validation and rate limits apply as on a form post, while the honeypot, minimum time and proof of work, which only a person filling in a form passes, are skipped.
+  // A request a browser sent from another site is refused, as `/mcp` refuses it, since it carries the visitor's cookies whatever its method.
   // A call made once the answer is sent, from a reply streaming on, passes the request it captured while it was answered.
   call: (args: Record<string, unknown>, request?: Request) => Promise<ToolResult>
 }
 
 const WORD_START = /([a-z\d])([A-Z])/g
+const libraryTools = new WeakMap<object, LibraryTool | undefined>()
 
-// An action of a page module as a tool, whether or not it set `tool`, which still gives its name and description: passing it is the opt-in. None for one taking a file, which a model cannot send.
+// An action of a page module as a tool, whether or not it set `tool`, which still gives its name and description: passing it is the opt-in, and `tool: false` a veto.
+// None for one taking a file, which a model cannot send, or one of a page with params, which reads them from the page it is posted from.
 export function actionTool(action: ServerAction<TSchema, unknown, string>): LibraryTool | undefined {
+  if (libraryTools.has(action))
+    return libraryTools.get(action)
+
+  const tool = libraryTool(action)
+
+  libraryTools.set(action, tool)
+
+  return tool
+}
+
+function libraryTool(action: ServerAction<TSchema, unknown, string>): LibraryTool | undefined {
   const url = action.url as string | undefined
 
   if (url === undefined)
     throw new Error('kay: actionTool() takes an action a page module exports, which the server gives its URL as it loads')
+
+  if (action.protection?.tool === false || boundToPage(action))
+    return undefined
 
   const name = url.slice(url.lastIndexOf('/') + 1)
   const settings = toolSettings(action.protection?.tool) ?? {}
@@ -516,6 +538,9 @@ export function actionTool(action: ServerAction<TSchema, unknown, string>): Libr
 
       if (!request || !served)
         throw new Error(`kay: the ${tool.name} tool was called outside a request kay answers; pass the request it was asked for`)
+
+      if (unadmittedCrossSite(request))
+        return refusal('Cross-site request refused')
 
       return tool.call(args, { request, server: served.server, fallback: served.handle, challenged: false })
     },

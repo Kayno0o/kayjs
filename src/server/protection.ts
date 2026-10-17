@@ -91,7 +91,7 @@ function windowMs(rateLimit: { window: Duration }): number {
 }
 
 // Fixed windows per key in this process: enough to slow a script hammering a form, which is what a contact or login form needs.
-export function memoryRates(): { hit: (key: string, windowMs: number) => RateWindow, peek: (key: string) => RateWindow | undefined } {
+export function memoryRates(): { hit: (key: string, windowMs: number, weight?: number) => RateWindow, peek: (key: string) => RateWindow | undefined } {
   // Ordered by when each window opened, so the oldest come first.
   const windows = new Map<string, RateWindow>()
 
@@ -174,12 +174,12 @@ export function rateLimit(name: string, limit: RateLimit): RateLimiter {
 
   return {
     hit: async (from, server, weight = 1) => {
-      if (!Number.isInteger(weight) || weight < 1)
+      if (!Number.isSafeInteger(weight) || weight < 1)
         throw new KayError('config-invalid', `kay: rateLimit('${name}').hit()'s weight is ${weight}; it takes a whole number of at least 1`)
 
       const window = await (limit.store ?? memoryOf(name)).hit(typeof from === 'string' ? `${name}\nkey:${from}` : limitKey(name, clientAddress(from, server)), ms, weight)
 
-      // A count below the weight holds less than this hit alone: the store counted one.
+      // A count below the weight holds less than this hit alone: the store counted one, which shows on a window's first hit.
       if (window.count < weight)
         throw new KayError('config-invalid', `kay: rateLimit('${name}')'s store ignores the weight of a hit; its hit(key, windowMs, weight) adds weight to the count`)
 

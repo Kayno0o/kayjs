@@ -131,7 +131,7 @@ export default guard(async ({ request, headers, deny }) => {
 
 - A guard, an API route or a library limits attempts the same way with `rateLimit(name, { max, window, store })` from `kay/server`: `await limit.hit(request)` counts one from the request's client and gives the seconds to wait once over the limit, else `undefined`.
 - `await limit.hit(user.email)` counts under the app's own key instead, such as an account or a socket, whoever sends the request.
-- `await limit.hit(user.email, undefined, tokens)` counts `tokens` at once, a whole number from 1, so `max` caps tokens or bytes rather than attempts; a store of the app's own that ignores the weight throws on such a hit.
+- `await limit.hit(user.email, undefined, tokens)` counts `tokens` at once, a whole number from 1, so `max` caps tokens or bytes rather than attempts; a store of the app's own must add the weight, and one ignoring it throws when a window's first hit shows it.
 - Limits of one name count together; an action's counts under its URL.
 
 ```ts

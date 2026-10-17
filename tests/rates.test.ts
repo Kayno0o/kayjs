@@ -13,6 +13,14 @@ describe('a weighted hit', () => {
     }
   })
 
+  it('opens an expired window afresh with the weight, in SQLite as in memory', async () => {
+    for (const store of [memoryRates(), sqliteRates(join(await scratchDir('rates'), 'rates.sqlite'))]) {
+      await store.hit('key', 1, 5)
+      await Bun.sleep(5)
+      expect((await store.hit('key', 60_000, 3)).count).toBe(3)
+    }
+  })
+
   it('counts against a limit of tokens rather than attempts', async () => {
     const budget = rateLimit('tokens', { max: 10, window: '1m' })
 

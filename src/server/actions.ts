@@ -106,6 +106,9 @@ export interface RouteMatch {
 // Renders the page a refused plain form post came from, with how it failed, through the app the post reached.
 type Back = (request: Request, headers: Headers, flash: Flash, server: Server | null) => Promise<Response>
 
+// The actions of a page with params, which read them from the page they are posted from, so a call no page made cannot run them.
+const pageBound = new WeakSet<object>()
+
 // Registers every action the pages and layouts export as a POST route whose body Elysia validates against the action's schema, giving back the body limit of each by its path and the actions that opted in to being MCP tools.
 export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], match: RouteMatch, options: ActionOptions): Promise<{ limits: Map<string, BodyLimit>, tools: DocumentedAction[] }> {
   const back: Back = async (request, headers, flash, server) => renderBack(app, options.base ?? '', request, headers, flash, server)
@@ -132,6 +135,9 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], m
       served.set(value.url, { file, action: value })
 
       const tool = toolSettings(value.protection?.tool)
+
+      if (page.params.length > 0)
+        pageBound.add(value)
 
       if (tool && page.params.length === 0)
         tools.push({ name, url: value.url, schema: value.schema, tool, guards: guards.filter(guard => guard.check !== unguarded).map(guard => guard.file) })
@@ -460,6 +466,15 @@ const corsAdmitted = new WeakSet<Request>()
 
 export function admitCrossSite(request: Request): void {
   corsAdmitted.add(request)
+}
+
+// Whether a browser on another site sent `request`, which no `api({ cors })` module let in.
+export function unadmittedCrossSite(request: Request): boolean {
+  return isCrossSite(request) && !corsAdmitted.has(request)
+}
+
+export function boundToPage(action: object): boolean {
+  return pageBound.has(action)
 }
 
 // What `isCrossSite` answered for a request, as kayjs-auth asks again on every session read of one.
