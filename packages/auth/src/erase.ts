@@ -6,7 +6,9 @@ import { notify } from './notify'
 
 // Deletes the user with everything kayjs-auth keeps for them. The app's records go first, so an `onDelete` that throws leaves the account in place, to delete again. The audit log keeps what happened under a new random name, without the addresses, browsers and details that lead back to the user.
 // `leaving` for a user who goes, by their own hand or an admin's (`actor`): the invitations to their address go too, and the account-deleted notice is mailed. Without it, as for an unverified account a registration replaces, the address's invitations stay for whoever proves it.
-export async function erase(state: RequestState, record: UserRecord, leaving?: { actor?: UserRecord | undefined }): Promise<void> {
+export async function erase(state: Pick<RequestState, 'core'>, record: UserRecord): Promise<void>
+export async function erase(state: RequestState, record: UserRecord, leaving: { actor?: UserRecord | undefined }): Promise<void>
+export async function erase(state: Pick<RequestState, 'core'>, record: UserRecord, leaving?: { actor?: UserRecord | undefined }): Promise<void> {
   const { core } = state
   const { store } = core
 
@@ -19,7 +21,7 @@ export async function erase(state: RequestState, record: UserRecord, leaving?: {
         await store.invitations.delete(invitation.id)
     }
 
-    await notify(state, record, 'account-deleted', undefined, undefined, leaving.actor)
+    await notify(state as RequestState, record, 'account-deleted', undefined, undefined, leaving.actor)
   }
 
   if (!core.audit)

@@ -224,6 +224,8 @@ export interface AuthStore {
     update: (id: string, patch: Partial<Omit<UserRecord, 'id' | 'createdAt'>>) => MaybePromise<UserRecord | undefined>
     // Deletes the user with everything kayjs-auth keeps for them: identities, links, sessions, passkeys, bearer tokens, OAuth grants, codes and refresh tokens, recovery codes and memberships; invitations they sent lose their `invitedBy`.
     delete: (id: string) => MaybePromise<void>
+    // Up to `limit` guests created before `createdBefore` and holding no session, oldest first; without it guests are never pruned.
+    staleGuests?: (createdBefore: Date, limit: number) => MaybePromise<UserRecord[]>
     // Newest first; `search` matches part of the email or the username, whatever its case, or the whole id.
     // With `total: false` the caller does not read `total`, so a store may skip counting.
     list: (query: { search?: string, offset: number, limit: number, total?: boolean }) => MaybePromise<{ users: UserRecord[], total: number }>

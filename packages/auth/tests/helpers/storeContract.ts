@@ -430,6 +430,26 @@ export function storeContract(name: string, fresh: () => Promise<AuthStore>) {
       expect(await store.attempts.count('long')).toBe(1)
     })
 
+    test('staleGuests lists guests created before an instant that hold no session, oldest first, up to a limit', async () => {
+      const at = (minutes: number) => new Date(Date.UTC(2026, 5, 1, 0, minutes))
+      const session = (id: string, userId: string) => ({ id, userId, version: 0, userAgent: 'ua', ip: '127.0.0.1', createdAt: at(0), lastSeenAt: at(0), maxAge: null })
+
+      for (const [id, guest, createdAt] of [['g3', true, at(3)], ['g1', true, at(1)], ['exact', true, at(10)], ['live', true, at(5)], ['member', false, at(1)], ['g2', true, at(2)], ['late', true, at(11)]] as const)
+        await store.users.create(userRecord({ id, guest, createdAt }))
+
+      await store.sessions.create(session('s1', 'live'))
+
+      expect((await store.users.staleGuests!(at(10), 10)).map(user => user.id)).toEqual(['g1', 'g2', 'g3'])
+      expect((await store.users.staleGuests!(at(10), 2)).map(user => user.id)).toEqual(['g1', 'g2'])
+      expect((await store.users.staleGuests!(at(11), 10)).map(user => user.id)).toEqual(['g1', 'g2', 'g3', 'exact'])
+      expect(await store.users.staleGuests!(at(1), 10)).toEqual([])
+      expect((await store.users.staleGuests!(at(10), 1))[0]).toEqual(await store.users.get('g1'))
+
+      await store.sessions.delete('live', 's1')
+
+      expect((await store.users.staleGuests!(at(10), 10)).map(user => user.id)).toEqual(['g1', 'g2', 'g3', 'live'])
+    })
+
     describe('the OAuth server', () => {
       const bearer = (id: string, oauth?: { clientId: string, family: string }) => ({ id, userId: 'u1', label: id, digest: `d-${id}`, scopes: ['posts:read'], createdAt: new Date('2026-01-01T00:00:00Z'), lastUsedAt: null, expiresAt: null, ...oauth && { oauth } })
       const refresh = (digest: string, fields: Partial<OAuthRefreshRecord> = {}): OAuthRefreshRecord => ({ digest, userId: 'u1', clientId: 'c1', scopes: ['posts:read'], family: 'f1', createdAt: new Date('2026-01-01T00:00:00Z'), expiresAt: new Date('2030-01-01T00:00:00Z'), usedAt: null, ...fields })

@@ -217,6 +217,14 @@ export function pgStore(db: Database): AuthStore {
       async update(id, patch) {
         return toUser(await users.write.updateById(id, fromUser(patch)))
       },
+      async staleGuests(createdBefore, limit) {
+        const rows = await db.raw<{ id: string }>`
+          SELECT "id" FROM "auth_user"
+          WHERE "guest" = ${true} AND "created_at" < ${createdBefore} AND NOT EXISTS (SELECT 1 FROM "auth_session" WHERE "auth_session"."user_id" = "auth_user"."id")
+          ORDER BY "created_at" LIMIT ${limit}`
+
+        return rows.length === 0 ? [] : (await users.read.findMany(q => q.where({ id: { in: rows.map(row => row.id) } }).orderBy('created_at', 'asc'))).map(row => toUser(row)!)
+      },
       async delete(id) {
         await users.write.deleteById(id)
       },

@@ -185,7 +185,7 @@ form(action={start})
   button Continue as a guest
 ```
 
-When the guest registers, the account keeps their id, so the app's data stays theirs. `user.guest` is `true` until then. A guest whose session ends is left in the store, and `listUsers` shows them.
+When the guest registers, the account keeps their id, so the app's data stays theirs. `user.guest` is `true` until then. A guest whose session ends is left in the store, and `listUsers` shows them. `guests: { maxAge: '30d' }` in `createAuth` deletes a guest older than that who has no session left, calling `onDelete` as for any user. Without it guests are kept for good.
 
 `signUp: false` in `createAuth` closes self-service accounts. `register` and `signInAsGuest` answer `'closed'`. Make users yourself with `auth.createUser({ email, password, roles })`.
 

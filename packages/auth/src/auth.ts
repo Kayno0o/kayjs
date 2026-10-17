@@ -140,6 +140,8 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   onProviderProfile?: ((user: User, profile: Profile) => void | Promise<void>) | undefined
   // Called once a user is deleted, to delete the app's own records for them.
   onDelete?: ((user: User) => void | Promise<void>) | undefined
+  // Deletes a guest whose account is older than `maxAge` (seconds or a string such as '30d') and who has no session left, calling `onDelete` as for any user; guests are kept for good without it.
+  guests?: { maxAge: Duration } | undefined
   // What the app keeps about a user, added to their `exportData()` as `app`: their posts, their orders.
   onExport?: ((user: User) => unknown) | undefined
   // Called with every change to what protects an account, the ones mailed to the user, and with every sign-in, sign-out and failed sign-in of a known account, for an audit log of the app's own.
@@ -1332,6 +1334,7 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
     onSignUp: options.onSignUp,
     onProviderProfile: options.onProviderProfile,
     onDelete: options.onDelete,
+    guestMaxAge: options.guests === undefined ? undefined : durationSeconds(options.guests.maxAge, 'guests.maxAge', 'kayjs-auth'),
     onExport: options.onExport,
     onEvent: options.onEvent,
     organizations: options.organizations && organizationsCore(options.organizations),

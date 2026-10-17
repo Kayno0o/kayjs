@@ -118,6 +118,8 @@ export interface Core {
   onSignUp?: ((user: User, profile: Profile | undefined) => void | Promise<void>) | undefined
   onProviderProfile?: ((user: User, profile: Profile) => void | Promise<void>) | undefined
   onDelete?: ((user: User) => void | Promise<void>) | undefined
+  // Seconds a guest is kept once their sessions are gone; for good when undefined.
+  guestMaxAge?: number | undefined
   onExport?: ((user: User) => unknown) | undefined
   onEvent?: ((event: AuthEvent, user: User, detail: string | undefined, context: EventContext) => void | Promise<void>) | undefined
   organizations?: OrganizationsCore | undefined
