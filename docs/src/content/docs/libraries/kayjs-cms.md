@@ -59,6 +59,16 @@ export const produits = collection('src/content/produits', { schema, title: 'Pro
 
 The name keeps naming the collection's URL, its markers and its upload folder.
 
+## Ordering entries
+
+A collection listed in a hand-picked order names a number field with `order`:
+
+```ts
+export const produits = collection('src/content/produits', { schema: s.Object({ name: s.String(), position: s.Optional(s.Number()) }), order: 'position' })
+```
+
+`all()` then lists the entries by that field, those without a number last, and the entry list shows Up and Down on each entry. A move saves the field of the two entries that swap places, so the editor never types a number. If several entries hold the same number, or none, a move numbers the entries from 1. A search hides the buttons, as the rows no longer follow the order.
+
 ## Field kinds of your own
 
 A field the admin should edit another way, such as a colour or a rating, is declared in the schema with `customField(kind, schema)` from `kay/content`, and edited by `src/cms/fields/<kind>.kay`. There is nothing to register: the editor bundles every file in that folder.

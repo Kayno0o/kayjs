@@ -4,6 +4,7 @@ import { wording } from 'kay/words'
 import { fileVersion, ForgeError, SaveConflict } from './files'
 import { collectionInfo, entries, entryFile, entrySource, removeEntry, saveEntry as saveLoaded } from './kay/content'
 import { log } from './log'
+import { movable, moveChanges, orderValue, sortOrdered } from './order'
 import { settings } from './settings'
 import { scriptInBody } from './unsafe'
 
@@ -181,6 +182,35 @@ export async function publishEntry(ref: EntryRef, author?: Identity): Promise<Sa
     return refused(ref, wording('cms.store.parseFailure', '{slug}\'s file does not parse: {problem}', { slug: ref.slug, problem: existing.problem ?? '' }))
 
   return saveEntry({ ...ref, data: { ...existing.data, [collection.draftField]: false }, body: existing.body }, { version: existing.version, verb: 'publish', author, bodyKept: true })
+}
+
+// Moves an entry one place up or down in its collection's order, among the entries of its locale, by saving the `order` field of the one or the few entries that change; saving stops at the first that is refused.
+export async function moveEntry(ref: EntryRef, direction: 'up' | 'down', author?: Identity): Promise<SaveOutcome> {
+  const collection = await collectionNamed(ref.collection)
+  const field = collection.orderField
+
+  if (field === undefined)
+    return refused(ref, wording('cms.store.noOrderField', '{collection} names no order field to move entries by', { collection: collection.name }))
+
+  const group = sortOrdered(movable(await entries(collection.name, { locale: ref.locale }), ref.locale), field)
+  const changes = moveChanges(group.map(entry => ({ slug: entry.slug, value: orderValue(entry, field) })), ref.slug, direction)
+
+  if (changes === undefined)
+    return group.some(entry => entry.slug === ref.slug) ? { saved: true } : refused(ref, wording('cms.store.missing', '{slug} does not exist', { slug: ref.slug }), 'slug')
+
+  let outcome: SaveOutcome = { saved: true }
+
+  for (const change of changes) {
+    const entry = group.find(each => each.slug === change.slug)!
+    const target = { collection: collection.name, slug: entry.slug, locale: entry.locale }
+
+    outcome = await saveEntry({ ...target, data: { ...entry.data, [field]: change.value }, body: entry.body }, { version: await versionOf(target), verb: 'move', author, bodyKept: true })
+
+    if ('issues' in outcome)
+      return outcome
+  }
+
+  return outcome
 }
 
 // Hands a change to the configured saver, turning a conflict or a forge that failed into the issue the editor shows.

@@ -13,6 +13,10 @@ const posts: CollectionInfo = { name: 'posts', kind: 'folder', dir: 'content/pos
 const outside: CollectionInfo = { ...posts, name: 'outside', dir: undefined }
 const products: CollectionInfo = { name: 'products', kind: 'loaded', schema: { type: 'object', properties: { name: { type: 'string' } } }, components: [], localized: false }
 
+const shelf: CollectionInfo = { ...posts, name: 'shelf', dir: 'content/shelf', orderField: 'order' }
+const catalog: CollectionInfo = { ...products, name: 'catalog', orderField: 'order' }
+const collectionList = [posts, products, outside, shelf, catalog]
+
 const TAKEN = 'names an entry the collection already holds'
 const MISSING = 'names no entry of the collection'
 
@@ -24,7 +28,7 @@ function validSource(collection: string, slug: string, data: unknown, body: stri
 }
 
 let saved: FileChange[]
-let loaded: { slug: string, data: unknown }[]
+let loaded: { slug: string, locale?: string | undefined, data: unknown }[]
 let removed: string[]
 let stored: Record<string, SourceEntry[]>
 let infoCalls: unknown[]
@@ -34,11 +38,11 @@ let failing = false
 const content: typeof Content = {
   bodyHtml,
   MarkdownError,
-  collections: async () => [posts, products, outside],
+  collections: async () => collectionList,
   collectionInfo: async (name, options) => {
     infoCalls.push([name, options])
 
-    return [posts, products, outside].find(collection => collection.name === name)
+    return collectionList.find(collection => collection.name === name)
   },
   entries: async (collection, filter) => failing ? Promise.reject(new Error('kay: products\'s load threw: password for db.internal')) : (stored[collection] ?? []).filter(entry => (filter?.slug === undefined || entry.slug === filter.slug) && (filter?.locale === undefined || entry.locale === filter.locale)),
   entrySource: async (collection, slug, data, options) => options?.create && stored[collection]?.some(entry => entry.slug === slug)
@@ -70,7 +74,7 @@ const content: typeof Content = {
 void mock.module('../src/kay/content', () => content)
 
 // Imported once the mock is in place, so the store reads it.
-const { deleteEntry, entryOf, entryScreen, publishEntry, saveEntry, UnknownCollection } = await import('../src/store')
+const { deleteEntry, entryOf, entryScreen, moveEntry, publishEntry, saveEntry, UnknownCollection } = await import('../src/store')
 
 beforeEach(() => {
   saved = []
@@ -282,5 +286,54 @@ describe('publishEntry', () => {
 
   test('refuses a collection without a draft field', async () => {
     expect(await publishEntry({ collection: 'products', slug: 'mug' })).toHaveProperty('issues.0.message', 'products names no draft field to publish by')
+  })
+})
+
+describe('moveEntry', () => {
+  const place = (collection: string, slug: string, order: number | undefined, extra: Record<string, unknown> = {}): SourceEntry => ({ slug, path: collection === 'shelf' ? `content/shelf/${slug}.md` : undefined, data: order === undefined ? { title: slug, ...extra } : { title: slug, order, ...extra }, body: collection === 'shelf' ? `about ${slug}` : undefined, draft: false })
+
+  test('swaps the order values of two neighbours and commits both files, keeping their bodies', async () => {
+    stored.shelf = [place('shelf', 'a', 10), place('shelf', 'b', 20), place('shelf', 'c', 30)]
+
+    expect(await moveEntry({ collection: 'shelf', slug: 'c' }, 'up')).toHaveProperty('saved', true)
+    expect(saved.map(change => [change.repoPath, change.text, change.message])).toEqual([
+      ['content/shelf/c.md', '{"title":"c","order":20}\nabout c', 'content(shelf): move c'],
+      ['content/shelf/b.md', '{"title":"b","order":30}\nabout b', 'content(shelf): move b'],
+    ])
+  })
+
+  test('numbers the entries from 1 when the values repeat, sending a loaded collection through its loader', async () => {
+    stored.catalog = [place('catalog', 'a', 1), place('catalog', 'b', 1), place('catalog', 'c', undefined)]
+
+    expect(await moveEntry({ collection: 'catalog', slug: 'c' }, 'up')).toHaveProperty('saved', true)
+    expect(loaded.map(entry => [entry.slug, (entry.data as { order: number }).order])).toEqual([['c', 2], ['b', 3]])
+  })
+
+  test('writes nothing for an entry at the end it moves toward', async () => {
+    stored.shelf = [place('shelf', 'a', 1), place('shelf', 'b', 2)]
+
+    expect(await moveEntry({ collection: 'shelf', slug: 'a' }, 'up')).toHaveProperty('saved', true)
+    expect(saved).toEqual([])
+  })
+
+  test('moves among the entries of its own locale, passing over a broken file', async () => {
+    stored.catalog = [{ ...place('catalog', 'a', 1), locale: 'fr' }, { ...place('catalog', 'a', 1), locale: 'en' }, { slug: 'x', locale: 'fr', data: undefined, problem: 'bad', draft: false }, { ...place('catalog', 'b', 2), locale: 'fr' }]
+
+    expect(await moveEntry({ collection: 'catalog', slug: 'b', locale: 'fr' }, 'up')).toHaveProperty('saved', true)
+    expect(loaded.map(entry => [entry.slug, entry.locale])).toEqual([['b', 'fr'], ['a', 'fr']])
+  })
+
+  test('stops at the first save that is refused', async () => {
+    stored.shelf = [place('shelf', 'a', 1), place('shelf', 'b', 2)]
+    configure({ files: { save: async () => {
+      throw new SaveConflict('f00d')
+    } } })
+
+    expect(await moveEntry({ collection: 'shelf', slug: 'b' }, 'up')).toHaveProperty('issues.0.message')
+  })
+
+  test('refuses a collection with no order field, and an entry it does not hold', async () => {
+    expect(await moveEntry({ collection: 'posts', slug: 'hello' }, 'up')).toHaveProperty('issues.0.message', 'posts names no order field to move entries by')
+    expect(await moveEntry({ collection: 'shelf', slug: 'gone' }, 'up')).toHaveProperty('issues.0.message', 'gone does not exist')
   })
 })

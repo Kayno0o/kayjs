@@ -86,6 +86,9 @@ export interface ContentLoader {
   remove?: ((entry: { slug: string, locale?: string | undefined }) => void | Promise<void>) | undefined
 }
 
+// The fields of the data holding a number, which `order` may name.
+type NumberField<Data> = { [Name in keyof Data]-?: Data[Name] extends number | undefined ? Name : never }[keyof Data] & string
+
 // The fields of the data holding a boolean, which `draft` may name.
 type BooleanField<Data> = { [Name in keyof Data]-?: Data[Name] extends boolean | undefined ? Name : never }[keyof Data] & string
 
@@ -106,7 +109,9 @@ export interface CollectionOptions<Schema extends TSchema> {
   imageSizes?: string | undefined
   // Entries left out everywhere but `kay dev` and preview mode: from `all()`, `get()`, prerendering, the sitemap and the feed. A boolean field's name, `'draft'`, leaves out those where it is true, which a CMS then reads and writes.
   draft?: ((entry: Entry<Static<Schema>>) => boolean) | BooleanField<Static<Schema>> | undefined
-  // The order `all()` lists entries in; by slug otherwise.
+  // A number field the entries are ordered by, ascending, those without it last: `all()` lists them so unless `sort` says otherwise, and a CMS moves an entry up or down by writing it.
+  order?: NumberField<Static<Schema>> | undefined
+  // The order `all()` lists entries in; by `order`, else by slug.
   sort?: ((a: Entry<Static<Schema>>, b: Entry<Static<Schema>>) => number) | undefined
   // An RSS or Atom feed of the collection, served at its path.
   feed?: FeedOptions<Static<Schema>> | undefined
@@ -171,7 +176,7 @@ export function collection<Schema extends TSchema, Components extends Record<str
     const byLocale = new Map<string, Map<string, Entry<Data>>>()
     const paired = new Map<string, Map<string, Entry<Data>>>()
 
-    entries.sort(options.sort ?? bySlugThenLocale)
+    entries.sort(options.sort ?? (options.order === undefined ? bySlugThenLocale : byField(options.order)))
 
     for (const entry of entries) {
       if (entry.locale === undefined)
@@ -402,6 +407,23 @@ function bySlugThenLocale(a: { slug: string, locale?: string | undefined }, b: {
     return a.slug < b.slug ? -1 : 1
 
   return a.locale! < b.locale! ? -1 : 1
+}
+
+function byField(field: string): (a: Entry<unknown>, b: Entry<unknown>) => number {
+  const numberAt = (entry: Entry<unknown>) => {
+    const value = (entry.data as Record<string, unknown> | undefined)?.[field]
+
+    return typeof value === 'number' && !Number.isNaN(value) ? value : Infinity
+  }
+
+  return (a, b) => {
+    const [first, second] = [numberAt(a), numberAt(b)]
+
+    if (first === second)
+      return bySlugThenLocale(a, b)
+
+    return first < second ? -1 : 1
+  }
 }
 
 function toEntry<Data>(entry: RawEntry, data: Data, components: Record<string, Component<never>>, localized: boolean, readingSpeed: number, imageSizes: string | undefined): Entry<Data> {

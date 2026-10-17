@@ -207,7 +207,7 @@ article
 
 #### Reading entries
 
-- `all()` gives every entry in the collection's `sort` order, by slug without one; filter and sort it like any array.
+- `all()` gives every entry in the collection's `sort` order, by its `order` field without one, by slug without either; filter and sort it like any array.
 - `get(slug)` gives one entry or `undefined`.
 - An entry has `slug`, its path in the folder without the extension (`guides/intro`; an `index` file takes its folder's), `data`, `headings` (`{ depth, id, text }` in order, for a table of contents), `Content`, the component rendering its body, `words`, `readingTime` and `file`.
 - `words` counts the words of the rendered text, code blocks and Markdown inside a component's tags included, and a component's own output left out, since it only exists once a page renders; `readingTime` is the minutes at `markdown.readingSpeed` words a minute (230 by default), at least 1 for a body with words and 0 for an entry with none: `post.readingTime` gives `3`.
@@ -221,6 +221,7 @@ article
 - An entry `draft` returns true for shows in development (`kay dev`, or the server's `dev` option, which wins over `NODE_ENV`) and to a visitor in preview mode only.
 - Everywhere else a draft is left out of `all()`, `get()`, prerendering, the sitemap and the feed.
 - `draft: 'draft'`, a boolean field's name, holds back the entries where it is true, which a CMS then reads and publishes by writing false.
+- `order: 'position'`, a number field's name, orders the entries by it, ascending, those without a number last, unless `sort` says otherwise; kayjs-cms then lists them so and moves an entry up or down by writing the field, so the editor never types the numbers.
 - `title: 'Produits'` is what a CMS titles the collection with, instead of its export's name humanized (`produits` gives `Produits`, `blogPosts` gives `Blog posts`); the name still keeps the URLs, the markers and the upload folder.
 
 #### Markdown files

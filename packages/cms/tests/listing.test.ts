@@ -123,3 +123,29 @@ describe('paths', () => {
     expect(problemId('a-b', 'c')).not.toBe(problemId('a', 'b-c'))
   })
 })
+
+describe('pageRows of an ordered collection', () => {
+  const shelf: CollectionInfo = { ...posts, orderField: 'order' }
+  const entry = (slug: string, order: number | undefined, locale?: string): SourceEntry => ({ slug, locale, data: order === undefined ? { title: slug } : { title: slug, order }, draft: false })
+  const none = async () => undefined
+  const stock = [entry('c', 3), entry('a', 1), entry('b', 2), entry('z', undefined), { slug: 'bad', data: undefined, problem: 'bad', draft: false }]
+  const read = async () => stock
+
+  it('lists the entries by their order, each saying which way it can move, a broken one none', async () => {
+    const listed = await pageRows({ ...shelf, count: 5 }, '', 1, read, none)
+
+    expect(listed.rows.map(row => [row.slug, row.move])).toEqual([['a', { up: false, down: true }], ['b', { up: true, down: true }], ['c', { up: true, down: true }], ['z', { up: true, down: false }], ['bad', undefined]])
+  })
+
+  it('pages the ordered rows and offers no move while a search narrows them', async () => {
+    expect((await pageRows({ ...shelf, count: 5 }, '', 2, read, none, 2)).rows.map(row => row.slug)).toEqual(['c', 'z'])
+    expect((await pageRows({ ...shelf, count: 5 }, 'b', 1, read, none)).rows.map(row => [row.slug, row.move])).toEqual([['b', undefined], ['bad', undefined]])
+  })
+
+  it('orders each locale apart', async () => {
+    const localized = async () => [entry('a', 2, 'fr'), entry('a', 1, 'en'), entry('b', 1, 'fr')]
+    const listed = await pageRows({ ...shelf, localized: true, count: 3 }, '', 1, localized, none)
+
+    expect(listed.rows.map(row => [row.slug, row.locale, row.move?.up, row.move?.down])).toEqual([['a', 'en', false, false], ['b', 'fr', false, true], ['a', 'fr', true, false]])
+  })
+})

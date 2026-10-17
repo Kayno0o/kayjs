@@ -28,6 +28,7 @@ export const articles = collection('content/articles', {
 // One entry in each format a folder holds, which a CMS writes back as it read them.
 export const pages = collection('content/pages', {
   schema: t.Object({ title: t.String(), order: t.Number(), tags: t.Optional(t.Array(t.String())) }),
+  order: 'order',
 })
 
 // A localized loader declaring neither save nor remove.

@@ -207,6 +207,12 @@ describe('the collections a CMS edits', () => {
     expect(JSON.stringify(articles.schema)).not.toContain('"Date"')
   })
 
+  it('lists a collection by its order field, which a CMS reads as orderField', async () => {
+    expect((await pagesCollection.all()).map(page => page.slug)).toEqual(['home', 'about', 'contact'])
+    expect((await collections()).find(each => each.name === 'pages')).toMatchObject({ orderField: 'order' })
+    expect((await collections()).find(each => each.name === 'articles')).not.toHaveProperty('orderField')
+  })
+
   it('reports a custom field kind in the schema beside the schema it wraps, so saves validate by it alone', () => {
     const color = customField('color', t.String({ pattern: '^#[0-9a-f]{6}$' }))
 

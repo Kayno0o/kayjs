@@ -1,5 +1,6 @@
 import type { CollectionInfo, EntryFilter, EntryRef, SourceEntry } from './kay/contract'
 import { fieldsOf, humanize } from './fields'
+import { sortOrdered } from './order'
 
 const UNSAFE_ID = /[^a-z0-9]/giu
 
@@ -13,6 +14,8 @@ export interface EntryRow {
   problem?: string | undefined
   // The version of a folder entry's file as the list read it, which a delete from the list names, so it never removes a file saved since.
   version?: string | undefined
+  // In an ordered collection, whether the entry has one before or after it to swap places with, among the entries of its locale; absent while a search is on.
+  move?: { up: boolean, down: boolean } | undefined
 }
 
 // The page size when `cms({ pageSize })` says none.
@@ -81,6 +84,9 @@ export async function pageRows(collection: CollectionInfo, search: string, page:
     return { ...listed, rows }
   }
 
+  if (collection.orderField !== undefined)
+    return versioned(pageOf(orderedRows(collection, collection.orderField, await read({}), search), page, size))
+
   if (search.trim() !== '')
     return versioned(pageOf(searchRows(rowsOf(collection, await read({})), search), page, size))
 
@@ -90,6 +96,25 @@ export async function pageRows(collection: CollectionInfo, search: string, page:
 }
 
 // What the screens title a collection with: its `title`, else its name humanized.
+// The rows of an ordered collection in its order, every entry read so a page starts where the order says; each row that can move says which way, unless a search narrows the rows.
+function orderedRows(collection: CollectionInfo, field: string, found: SourceEntry[], search: string): EntryRow[] {
+  const sorted = sortOrdered(found, field)
+  const rows = rowsOf(collection, sorted)
+
+  if (search.trim() !== '')
+    return searchRows(rows, search)
+
+  const groups = Map.groupBy(sorted.filter(entry => entry.data !== undefined), entry => entry.locale)
+
+  return rows.map((row, i) => {
+    const entry = sorted[i]!
+    const group = groups.get(entry.locale) ?? []
+    const at = group.indexOf(entry)
+
+    return at < 0 ? row : { ...row, move: { up: at > 0, down: at < group.length - 1 } }
+  })
+}
+
 export function collectionTitle(collection: Pick<CollectionInfo, 'name' | 'title'>): string {
   return collection.title ?? humanize(collection.name)
 }

@@ -170,6 +170,17 @@ export async function publishSaved(ref: EntryRef): Promise<boolean> {
   return settled(outcome, wording('cms.save.published', 'Published'), wording('cms.save.notPublished', 'Not published'))
 }
 
+// Moves an entry one place up or down in its collection's order and says how it went; true once moved.
+export async function moveSaved(ref: EntryRef, direction: 'up' | 'down'): Promise<boolean> {
+  const outcome = await attempt(async () => call(entriesApi, '/:collection/:slug/move', {
+    method: 'post',
+    params: { collection: ref.collection, slug: ref.slug },
+    query: { ...localeOf(ref), direction },
+  }), wording('cms.save.moveFailure', 'Could not move'))
+
+  return settled(outcome, wording('cms.save.moved', 'Moved'), wording('cms.save.notMoved', 'Not moved'))
+}
+
 function localeOf({ locale }: EntryRef): { locale?: string } {
   return locale === undefined ? {} : { locale }
 }

@@ -9,7 +9,7 @@ import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
 import Table from '@kaynooo/kayjs-ui/table.kay'
 import { refresh } from 'kay'
 import { wording } from 'kay/words'
-import { deleteSaved, publishSaved } from '../editor/save'
+import { deleteSaved, moveSaved, publishSaved } from '../editor/save'
 import { shipWords } from '../editor/words'
 import { entryPath, onPagePath, problemId } from '../listing'
 
@@ -33,6 +33,11 @@ async function publish(row: EntryRow): Promise<void> {
     await refresh()
 }
 
+async function move(row: EntryRow, direction: 'up' | 'down'): Promise<void> {
+  if (await moveSaved(ref(row), direction))
+    await refresh()
+}
+
 async function remove(row: EntryRow): Promise<void> {
   if (await deleteSaved(ref(row), row.version))
     await refresh()
@@ -53,6 +58,9 @@ Table.kcms-entries(columns={columns} rows={rows} rowKey={keyOf})
         Badge(tone="success" label={wording('cms.table.published', 'Published')})
     else
       .kcms-row-actions
+        if row.move as place
+          Button(label={wording('cms.table.moveUp', 'Up')} aria-label={wording('cms.table.moveUpLabel', 'Move {title} up', { title: row.title })} disabled={!place.up} onClick={() => move(row, 'up')})
+          Button(label={wording('cms.table.moveDown', 'Down')} aria-label={wording('cms.table.moveDownLabel', 'Move {title} down', { title: row.title })} disabled={!place.down} onClick={() => move(row, 'down')})
         if row.draft && collection.draftField !== undefined
           Button(label={wording('cms.entry.publish', 'Publish')} aria-label={wording('cms.table.publishLabel', 'Publish {title}', { title: row.title })} onClick={() => publish(row)})
         if row.url as url
