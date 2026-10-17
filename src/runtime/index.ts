@@ -386,6 +386,8 @@ export interface PageSettings {
   query?: TSchema
   // The pages of the route the sitemap lists, as `prerender` takes them; `false` leaves it out.
   sitemap?: boolean | object
+  // When the page last changed, for the sitemap's `lastmod`: a `Date`, a date string such as '2026-05-06', or a function of the params of each URL the sitemap lists, returning one or nothing.
+  lastmod?: Lastmod | ((params: Record<string, string>) => Lastmod | undefined | Promise<Lastmod | undefined>)
   // Keeps the page out of search engines and the sitemap.
   noindex?: boolean
   // What the page's responses send over the site's security headers; a layout's applies to every page under it, the inner one merged over the outer.
@@ -395,6 +397,8 @@ export interface PageSettings {
   // With `search` on in kay.config.ts, `false` leaves the page out of the index, and `weight` multiplies what its words count, 1 by default.
   search?: false | { weight?: number }
 }
+
+export type Lastmod = Date | string | number
 
 export interface PageSecurity {
   // Sources added to the site's Content-Security-Policy directives, `{ 'script-src': ['https://cdn.example.com'] }`, a directive the policy lacks starting from the one it falls back to; `false` leaves a directive out.

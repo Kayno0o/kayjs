@@ -157,6 +157,21 @@ export const page = {
 ---
 ```
 
+`lastmod` tells crawlers when a URL last changed. It takes a date, a date string, or a function that gets the params of each URL:
+
+```kay
+--- server
+import { findPost, listPosts } from '../../data'
+
+export const page = {
+  sitemap: async () => (await listPosts()).map(post => ({ slug: post.slug })),
+  lastmod: async ({ slug }) => (await findPost(slug))?.updatedAt,
+}
+---
+```
+
+A URL the function returns nothing for is listed without one.
+
 `noindex: true` in a page's `page` object keeps a page out of search engines and the sitemap.
 
 Add rules to the robots file with `robots` in `kay.config.ts`:

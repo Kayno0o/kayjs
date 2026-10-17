@@ -96,6 +96,8 @@ const post = await findPost(ctx.params.slug) ?? ctx.notFound()
 h1 {post.title}
 ```
 
+`lastmod` in the same `page` adds a `<lastmod>` to each URL the page lists: a `Date` (written as ISO), a date string such as `'2026-05-06'` (written as it is), or a function of the params of the URL returning one or nothing, async too: `lastmod: async ({ slug }) => (await findPost(slug)).updatedAt`. Every locale's copy of a URL carries it; a value that is no date stops the sitemap with `page-settings-invalid`.
+
 In production the sitemap is built on the first request and kept for an hour; development builds it per request.
 
 `robots: { disallow: ['/admin'], allow: ['/admin/login'] }` in `kay.config.ts` adds `Disallow` and `Allow` lines below the default `Allow: /`, the `Sitemap:` line staying (each host's own with locales by domain); `robots: false` serves no `robots.txt`. A path starts with `/` and is written without the `base` and the locale, which kay adds: a site served by path lists `/admin` and `/en/admin`, a site by domain lists the asking host's. A pattern starting with `*`, such as `*.pdf$`, is written as it is.

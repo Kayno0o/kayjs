@@ -3,6 +3,7 @@ import type { KayConfig, RobotsConfig, TrailingSlash } from '../config'
 import type { LocaleSettings } from '../runtime/i18n'
 import type { ServedRoute } from './guards'
 import type { LocaleCopy } from './i18n'
+import type { ListedParams } from './prerendered'
 import type { ServedPaths } from './served-paths'
 import { relative } from 'node:path'
 import process from 'node:process'
@@ -18,6 +19,7 @@ import { slashedPath } from './routes'
 import { ROBOTS, SITEMAP } from './site-paths'
 
 // Long enough for crawlers, short enough that a new post shows up the same hour without a restart.
+const DATE_ONLY = /^\d{4}-\d\d-\d\d$/
 const ROBOTS_PATH = /^[/*][^\r\n]*$/
 const CACHE_MS = 60 * 60 * 1000
 
@@ -94,6 +96,21 @@ function robotsTxt(rules: Rules, origin: string, settings: LocaleSettings | unde
   return `User-agent: *\nAllow: /\n${[...lines('Allow', rules.allow), ...lines('Disallow', rules.disallow)].map(line => `${line}\n`).join('')}\nSitemap: ${origin}${SITEMAP}\n`
 }
 
+// A page's `lastmod` for one URL as the sitemap writes it, a W3C date, or nothing when the page has none for it.
+async function lastmodOf(setting: unknown, params: ListedParams, file: string): Promise<string> {
+  const value: unknown = typeof setting === 'function' ? await (setting as (params: Record<string, string>) => unknown)(Object.fromEntries(Object.entries(params))) : setting
+
+  if (value === undefined)
+    return ''
+
+  const date = new Date(value as Date | number | string)
+
+  if ((typeof value === 'object' && !(value instanceof Date)) || Number.isNaN(date.getTime()))
+    throw new KayError('page-settings-invalid', `kay: ${file}'s lastmod is ${JSON.stringify(value)}, which is no date: it takes a Date, a number of milliseconds or a string such as '2026-05-06'`)
+
+  return `<lastmod>${typeof value === 'string' && DATE_ONLY.test(value) ? value : date.toISOString()}</lastmod>`
+}
+
 // Every page a crawler can reach: a page without params unless it opts out, a page with params for the ones its `sitemap` or `prerender` export lists.
 // A page behind a guard is left out unless its `sitemap` export puts it in.
 // In a site of several locales, each copy of a page lists every other, `x-default` the default locale's; `only` keeps the copies of one locale, a domain's.
@@ -103,29 +120,30 @@ export async function sitemapXml(routes: ServedRoute[], origin: string, trailing
     const module = await importModule<object>(route.file)
     const sitemap = pageSetting(module, 'sitemap')
     const prerender = pageSetting(module, 'prerender')
+    const listed = async (params: ListedParams[]) => Promise.all(params.map(async value => ({ params: value, modified: await lastmodOf(pageSetting(module, 'lastmod'), value, file) })))
 
     if (pageSetting(module, 'noindex') === true)
       return []
 
     if (sitemap !== undefined)
-      return listedParams(route, file, 'sitemap', sitemap, settings)
+      return listed(await listedParams(route, file, 'sitemap', sitemap, settings))
 
     if (route.guards.length > 0)
       return []
 
     if (route.params.length === 0)
-      return [{}]
+      return listed([{}])
 
-    return prerender === undefined ? [] : listedParams(route, file, 'prerender', prerender, settings)
+    return prerender === undefined ? [] : listed(await listedParams(route, file, 'prerender', prerender, settings))
   }))
 
   const absolute = (copy: LocaleCopy) => escape(`${copy.host === undefined ? origin : `https://${copy.host}`}${slashedPath(copy.path, trailingSlash)}`)
-  const urls = routes.flatMap((route, index) => lists[index]!.flatMap((params) => {
+  const urls = routes.flatMap((route, index) => lists[index]!.flatMap(({ params, modified }) => {
     const copies = localeCopies(settings, pathOf(route, params)).filter(copy => listedIn(params, copy.locale, settings))
     const fallback = copies.find(copy => copy.locale === settings?.defaultLocale)
     const alternates = settings && fallback ? [...copies.map(copy => `<xhtml:link rel="alternate" hreflang="${copy.locale}" href="${absolute(copy)}"/>`), `<xhtml:link rel="alternate" hreflang="x-default" href="${absolute(fallback)}"/>`].join('') : ''
 
-    return copies.filter(copy => only === undefined || copy.locale === only).map(copy => `<url><loc>${absolute(copy)}</loc>${alternates}</url>`)
+    return copies.filter(copy => only === undefined || copy.locale === only).map(copy => `<url><loc>${absolute(copy)}</loc>${modified}${alternates}</url>`)
   }))
 
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"${settings ? ' xmlns:xhtml="http://www.w3.org/1999/xhtml"' : ''}>${urls.join('')}</urlset>\n`

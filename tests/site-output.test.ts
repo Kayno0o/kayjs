@@ -101,3 +101,31 @@ describe('robots', () => {
     expect(await text(app)).toBe('User-agent: *\nDisallow: /private\n')
   })
 })
+
+describe('sitemap lastmod', () => {
+  const site = 'https://x.example'
+  const sitemap = async (options: Parameters<typeof pages>[0] = {}, url = 'http://localhost/sitemap.xml') => (await (await appWith({ site, ...options })).handle(new Request(url))).text()
+
+  it('writes the lastmod a page gives each URL it lists, a Date as ISO and a date string as it is', async () => {
+    const xml = await sitemap()
+
+    expect(xml).toContain('<url><loc>https://x.example/posts/a</loc><lastmod>2026-03-04T10:00:00.000Z</lastmod></url>')
+    expect(xml).toContain('<url><loc>https://x.example/posts/b</loc><lastmod>2026-05-06</lastmod></url>')
+    expect(xml).toContain('<url><loc>https://x.example/posts/c</loc></url>')
+    expect(xml).toContain('<url><loc>https://x.example/about</loc></url>')
+  })
+
+  it('keeps it with the trailing slash, the base and every locale\'s copy', async () => {
+    const xml = await sitemap({ trailingSlash: 'always', base: '/docs', i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: `${ROOT}/src/messages` } })
+
+    expect(xml).toContain('<loc>https://x.example/docs/posts/a/</loc><lastmod>2026-03-04T10:00:00.000Z</lastmod><xhtml:link')
+    expect(xml).toContain('<loc>https://x.example/docs/en/posts/a/</loc><lastmod>2026-03-04T10:00:00.000Z</lastmod>')
+  })
+
+  it('gives each host of a site by domain its own pages with the lastmod', async () => {
+    const xml = await sitemap({ site: 'https://x.fr', i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', domains: { fr: 'x.fr', en: 'x.com' }, messages: `${ROOT}/src/messages` } }, 'http://x.com/sitemap.xml')
+
+    expect(xml).toContain('<loc>https://x.com/posts/b</loc><lastmod>2026-05-06</lastmod>')
+    expect(xml).not.toContain('<loc>https://x.fr')
+  })
+})

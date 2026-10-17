@@ -174,6 +174,7 @@ export default (value: string) =>
 | `layouts` | `false` only, to drop the layouts above | this section |
 | `query` | a schema `ctx.query` is read against | `ctx.query`, below |
 | `sitemap` | what `prerender` takes, or `false` | [Head and SEO](head.md) |
+| `lastmod` | a `Date`, a date string or a function of each listed URL's params returning one, for the sitemap's `<lastmod>` | [Sitemap](sitemap-search-fonts.md#sitemap-and-robotstxt) |
 | `noindex` | `true` to keep the page from search engines and the sitemap | [Head and SEO](head.md) |
 | `guards` | `false` only, to run none of the `_guard.ts` files above; on a layout, above its actions alone | [Server](server.md) |
 | `security` | `{ csp, headers }` added to the site's security headers for the page's responses | [Production](proxy-and-security.md#security-headers) |
