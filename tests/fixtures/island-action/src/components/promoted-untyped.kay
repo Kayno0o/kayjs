@@ -1,0 +1,6 @@
+---
+import Clicker from './clicker.kay'
+
+const { run } = props<{ run: unknown }>()
+---
+Clicker(choose={() => run})

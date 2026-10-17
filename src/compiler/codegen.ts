@@ -258,7 +258,7 @@ class ModuleShell {
       kayHelpers.push(fence ? 'registerActions' : 'actionStub')
 
     // An island typing a prop as an action may be passed one by a page, which arrives as its URL: the island's chunk is what brings the code building the stub, so an app without one ships none.
-    this.takesActions = this.kind === 'island' && typesAction(script)
+    this.takesActions = (this.kind === 'island' || this.kind === 'promotable' || this.kind === 'promotable twin') && typesAction(script)
 
     const takesActions = mode === 'dom' && this.takesActions
 
@@ -390,7 +390,7 @@ class ModuleShell {
     const { name } = this.options
 
     if (this.kind === 'promotable twin')
-      b.add(`\nexport default KayPromote(${JSON.stringify(this.options.promote)}, ${name} as never, KayHydrated as never${islandMessages(src)}) as typeof ${name}\n`)
+      b.add(`\nexport default KayPromote(${JSON.stringify(this.options.promote)}, ${name} as never, KayHydrated as never${this.takesActions ? `, ${JSON.stringify(messageKeys(src))}, true` : islandMessages(src)}) as typeof ${name}\n`)
     else if (this.kind === 'twin')
       b.add(`\nexport default ((props: never) => KayInsideIsland() ? KayHydrated(props) : ${name}(props)) as typeof ${name}\n`)
     else if (this.kind === 'island')
@@ -885,9 +885,13 @@ function typeParameterNames(parameters: string): string[] {
   return names
 }
 
+function messageKeys(source: string): string[] {
+  return [...new Set(Array.from(source.matchAll(MESSAGE_KEY), match => match[2]!))]
+}
+
 // The message keys an island's source names, as the third argument to `island()`, or nothing for an island naming none; the live values it imports go last.
 export function islandMessages(source: string, client = false, lives: string[] = [], takesActions = false): string {
-  const keys = [...new Set(Array.from(source.matchAll(MESSAGE_KEY), match => match[2]!))]
+  const keys = messageKeys(source)
 
   if (takesActions)
     return `, ${JSON.stringify(keys)}, ${client}, undefined, [${lives.join(', ')}], true`

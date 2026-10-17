@@ -1,0 +1,8 @@
+---
+import type { Action } from 'kay'
+import Clicker from './clicker.kay'
+
+const { run } = props<{ run: Action<{ name: string }, string> }>()
+---
+Clicker(choose={async () => { document.body.dataset.answer = await run({ name: 'Pat' }) }})
+p.url {run.url}

@@ -1,0 +1,4 @@
+---
+const { choose } = props<{ choose: () => void }>()
+---
+button.pick(type="button" onClick={choose}) Pick

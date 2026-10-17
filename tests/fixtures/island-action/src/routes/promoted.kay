@@ -1,0 +1,9 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+export const hello = action(t.Object({ name: t.String() }), ({ name }) => `Hi ${name}`)
+--- script
+import Promoted from '../components/promoted.kay'
+---
+Promoted(run={hello})

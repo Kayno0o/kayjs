@@ -158,6 +158,14 @@ describe('control flow', () => {
     expect(compileKay(typed.replace('---\nimport', '--- client\nimport'), 'src/caller.kay', { output: 'html' }).tsx).toContain('KayIsland("src/caller.kay", undefined, [], true, undefined, [], true)')
   })
 
+  it('has a promotable component typing a prop as an action revive the actions in its chunk and take them on the server', () => {
+    const source = (type: string) => `---\nimport type { Action } from 'kay'\nimport Pick from './pick.kay'\n\nconst { run } = props<{ run: ${type} }>()\n---\nPick(choose={() => run})`
+
+    expect(compileKay(source('Action<never, string>'), 'src/caller.kay', { output: 'dom' }).tsx).toContain('KayReviveActions()')
+    expect(compileKay(source('Action<never, string>'), 'src/caller.kay', { output: 'html', hydratable: true }).tsx).toContain('KayPromote("src/caller.kay", Caller as never, KayHydrated as never, [], true)')
+    expect(compileKay(source('() => void').replace('import type { Action } from \'kay\'\n', ''), 'src/caller.kay', { output: 'dom' }).tsx).not.toContain('KayReviveActions')
+  })
+
   it('reports a match with no when line in every output, which once crashed the html one', () => {
     for (const output of ['dom', 'html'] as const)
       expect(compileKay('match s\n', 'test.kay', { output }).diagnostics.map(d => d.message)).toEqual(['`match` has no `when` line'])

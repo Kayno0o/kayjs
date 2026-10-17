@@ -18,6 +18,7 @@ const developed = await testSite({ routes, islands: false, dev: true })
 const fixture = join(import.meta.dir, 'fixtures/island-action/src')
 const { greet } = await import(join(fixture, 'routes/index.kay')) as { greet: Action<{ name: string }, string> }
 const { shout } = await import(join(fixture, 'routes/other.kay')) as { shout: Action<{ name: string }, string> }
+const { hello } = await import(join(fixture, 'routes/promoted.kay')) as { hello: Action<{ name: string }, string> }
 const path = browserPath() ?? (existsSync(chromium.executablePath()) ? chromium.executablePath() : undefined)
 
 afterAll(async () => {
@@ -109,6 +110,18 @@ describe('the wire of an action', () => {
     expect(() => child(island('typed.kay', (_props: { run: unknown }) => null, [], false, undefined, [], true)({ run: greet }))).not.toThrow()
   })
 
+  it('has a promoted component typing a prop as an action take one, in production and in dev, and refuses one that does not naming the fix', async () => {
+    for (const rendered of [site, developed]) {
+      const html = await (await rendered.fetch('/promoted')).text()
+
+      expect(html).toContain(`"${hello.url}"`)
+      expect(html).toContain('<slot')
+      expect((await rendered.fetch('/promoted-untyped')).status).toBe(500)
+    }
+
+    expect(await (await developed.fetch('/promoted-untyped')).text()).toContain('import `Action` from')
+  })
+
   it('does not take any function for an action', () => {
     expect(() => encodeValue({ run: () => 1 }, true)).toThrow()
   })
@@ -138,6 +151,16 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
 
     await page.click('button.count')
     await page.waitFor('p.last', { text: '3' })
+    expect(page.errors).toEqual([])
+  })
+})
+
+describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a promoted component passed an action', () => {
+  it('calls it in the browser, its chunk installing the reviver', async () => {
+    const page = await site.open('/promoted', { path })
+
+    await page.click('button.pick')
+    await page.waitFor('body[data-answer="Hi Pat"]')
     expect(page.errors).toEqual([])
   })
 })

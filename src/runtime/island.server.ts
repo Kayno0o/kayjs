@@ -156,8 +156,8 @@ export function island<P extends object>(id: string, component: ((props: P) => J
 }
 
 // A static component that passes an island what only an island sends, a function, a block taking parameters or an instance of a class, renders as an island itself, sending its own props instead; one passing only data stays static.
-export function promote<P extends object>(id: string, render: (props: P) => JSX.Element, hydrated: (props: P) => JSX.Element, messages: readonly string[] = []): (props: P) => JSX.Element {
-  const asIsland = island(id, hydrated, messages, false, 'passes an island what only an island sends', [], true)
+export function promote<P extends object>(id: string, render: (props: P) => JSX.Element, hydrated: (props: P) => JSX.Element, messages: readonly string[] = [], takesActions = false): (props: P) => JSX.Element {
+  const asIsland = island(id, hydrated, messages, false, 'passes an island what only an island sends', [], takesActions)
 
   return (props) => {
     if (depth > 0)
