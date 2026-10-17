@@ -4,6 +4,7 @@ import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
 import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
 import Pagination from '@kaynooo/kayjs-ui/pagination.kay'
 import { s } from 'kay'
+import { wording } from 'kay/words'
 import EntryTable from '../../../components/entry-table.kay'
 import { humanize } from '../../../fields'
 import { entries } from '../../../kay/content'
@@ -24,11 +25,11 @@ head
 PageSection(title={humanize(collection.name)} level={1})
   @actions
     if collection.problem === undefined
-      Button(href={newEntryPath(prefix, collection.name)} label="New entry" icon="plus" variant="accent")
+      Button(href={newEntryPath(prefix, collection.name)} label={wording('cms.admin.newEntry', 'New entry')} icon="plus" variant="accent")
   if collection.problem as problem
-    EmptyState(title="This collection cannot be read" description={problem})
+    EmptyState(title={wording('cms.admin.collectionUnreadable', 'This collection cannot be read')} description={problem})
   else
     form.kcms-search(method="get" role="search")
-      input.kui-field-input(type="search" name="q" value={search} placeholder="Search" aria-label="Search entries")
+      input.kui-field-input(type="search" name="q" value={search} placeholder={wording('cms.admin.search', 'Search')} aria-label={wording('cms.admin.searchLabel', 'Search entries')})
     EntryTable(prefix={prefix} collection={collection} rows={listed.rows} searched={search !== ''})
     Pagination(page={listed.page} pages={listed.pages} url={url})

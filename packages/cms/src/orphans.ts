@@ -1,4 +1,5 @@
 import { files } from 'kay/server'
+import { wording } from 'kay/words'
 import { collections, entries } from './kay/content'
 import { log } from './log'
 import { uploadFolder } from './uploads'
@@ -42,7 +43,7 @@ export async function unusedUploads(): Promise<UploadScan> {
   catch (error) {
     log.error('listing the uploads failed', error)
 
-    return { blocked: [`The files cannot be listed: ${error instanceof Error ? error.message : String(error)}`] }
+    return { blocked: [wording('cms.uploads.listFailure', 'The files cannot be listed: {reason}', { reason: error instanceof Error ? error.message : String(error) })] }
   }
 
   const referenced = new Set<string>()
@@ -51,7 +52,7 @@ export async function unusedUploads(): Promise<UploadScan> {
     try {
       for (const entry of await entries(collection.name)) {
         if (entry.data === undefined) {
-          blocked.push(`${collection.name}/${entry.slug} does not parse`)
+          blocked.push(wording('cms.uploads.entryParse', '{entry} does not parse', { entry: `${collection.name}/${entry.slug}` }))
 
           continue
         }
@@ -64,7 +65,7 @@ export async function unusedUploads(): Promise<UploadScan> {
     }
     catch (error) {
       log.error(`reading ${collection.name} failed`, error)
-      blocked.push(`${collection.name} cannot be read`)
+      blocked.push(wording('cms.uploads.collectionRead', '{collection} cannot be read', { collection: collection.name }))
     }
   }
 

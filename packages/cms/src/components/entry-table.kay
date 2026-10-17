@@ -8,16 +8,21 @@ import ConfirmDelete from '@kaynooo/kayjs-ui/confirm-delete.kay'
 import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
 import Table from '@kaynooo/kayjs-ui/table.kay'
 import { refresh } from 'kay'
+import { wording } from 'kay/words'
 import { deleteSaved, publishSaved } from '../editor/save'
+import { shipWords } from '../editor/words'
 import { entryPath, onPagePath, problemId } from '../listing'
 
 const { prefix, collection, rows, searched } = props<{ prefix: string, collection: CollectionInfo, rows: EntryRow[], searched: boolean }>()
 
+// Looks up what a save says once the page has loaded, so the page sends it.
+shipWords()
+
 const columns: Column<EntryRow>[] = [
-  { key: 'title', header: 'Title', sortValue: true, defaultDirection: 'asc', cell: true },
-  ...(collection.localized ? [{ key: 'locale', header: 'Locale', sortValue: true } satisfies Column<EntryRow>] : []),
-  ...(collection.draftField === undefined ? [] : [{ key: 'draft', header: 'Status', cell: true } satisfies Column<EntryRow>]),
-  { key: 'actions', header: 'Actions', align: 'end', cell: true },
+  { key: 'title', header: wording('cms.table.title', 'Title'), sortValue: true, defaultDirection: 'asc', cell: true },
+  ...(collection.localized ? [{ key: 'locale', header: wording('cms.table.locale', 'Locale'), sortValue: true } satisfies Column<EntryRow>] : []),
+  ...(collection.draftField === undefined ? [] : [{ key: 'draft', header: wording('cms.table.status', 'Status'), cell: true } satisfies Column<EntryRow>]),
+  { key: 'actions', header: wording('cms.table.actions', 'Actions'), align: 'end', cell: true },
 ]
 
 const ref = (row: EntryRow) => ({ collection: collection.name, slug: row.slug, locale: row.locale })
@@ -39,22 +44,22 @@ Table.kcms-entries(columns={columns} rows={rows} rowKey={keyOf})
       // Why an entry is broken shows on the link too, so a keyboard reaches it and a screen reader reads it with the title.
       a(href={entryPath(prefix, ref(row))} data-tooltip={row.problem} aria-describedby={row.problem === undefined ? undefined : problemId(collection.name, keyOf(row))}) {row.title}
       if row.problem as problem
-        Badge(tone="danger" label="Broken")
+        Badge(tone="danger" label={wording('cms.table.broken', 'Broken')})
         span.kcms-sr-only(id={problemId(collection.name, keyOf(row))}) {problem}
     else if column.key === 'draft'
       if row.draft
-        Badge(tone="warning" label="Draft")
+        Badge(tone="warning" label={wording('cms.entry.draft', 'Draft')})
       else
-        Badge(tone="success" label="Published")
+        Badge(tone="success" label={wording('cms.table.published', 'Published')})
     else
       .kcms-row-actions
         if row.draft && collection.draftField !== undefined
-          Button(label="Publish" aria-label={`Publish ${row.title}`} onClick={() => publish(row)})
+          Button(label={wording('cms.entry.publish', 'Publish')} aria-label={wording('cms.table.publishLabel', 'Publish {title}', { title: row.title })} onClick={() => publish(row)})
         if row.url as url
-          Button(href={onPagePath(prefix, url)} label="Edit on page" aria-label={`Edit on page: ${row.title}`})
-        ConfirmDelete(message={`Delete ${row.title}? This cannot be undone.`} label={`Delete ${row.title}`} failure="Could not delete" size="sm" variant="ghost" onConfirm={() => remove(row)})
+          Button(href={onPagePath(prefix, url)} label={wording('cms.entry.editOnPage', 'Edit on page')} aria-label={wording('cms.table.editOnPageLabel', 'Edit on page: {title}', { title: row.title })})
+        ConfirmDelete(message={wording('cms.table.deleteMessage', 'Delete {title}? This cannot be undone.', { title: row.title })} label={wording('cms.table.deleteLabel', 'Delete {title}', { title: row.title })} failure={wording('cms.save.deleteFailure', 'Could not delete')} size="sm" variant="ghost" onConfirm={() => remove(row)})
   @empty
     if searched
-      EmptyState(title="No match" description="No entry's title or slug holds every word searched.")
+      EmptyState(title={wording('cms.table.noMatch', 'No match')} description={wording('cms.table.noMatchHint', 'No entry\'s title or slug holds every word searched.')})
     else
-      EmptyState(title="No entries yet")
+      EmptyState(title={wording('cms.table.empty', 'No entries yet')})

@@ -1,0 +1,64 @@
+import { wording } from 'kay/words'
+
+// The `cms.*` keys the editor reads only once the page has loaded: an entry's form is fetched by the browser, so the server never renders it, and an island's source names only the keys written in its own file.
+// `tests/words.test.ts` fails for a key the editor's files use that this list lacks.
+export const AFTER_LOAD: readonly string[] = [
+  'cms.entry.body',
+  'cms.entry.conflict',
+  'cms.entry.keepEdits',
+  'cms.entry.loadFailure',
+  'cms.entry.loading',
+  'cms.entry.problem',
+  'cms.entry.refusal',
+  'cms.entry.reset',
+  'cms.entry.save',
+  'cms.entry.saving',
+  'cms.field.add',
+  'cms.field.invalidJson',
+  'cms.field.item',
+  'cms.field.removeItem',
+  'cms.file.drop',
+  'cms.file.dropNow',
+  'cms.file.failure',
+  'cms.file.pathHint',
+  'cms.file.pathLabel',
+  'cms.file.rejected',
+  'cms.file.replace',
+  'cms.file.someType',
+  'cms.file.upload',
+  'cms.file.uploading',
+  'cms.save.deleteFailure',
+  'cms.save.deleted',
+  'cms.save.failure',
+  'cms.save.fields',
+  'cms.save.issues',
+  'cms.save.notDeleted',
+  'cms.save.notPublished',
+  'cms.save.notSaved',
+  'cms.save.publishFailure',
+  'cms.save.published',
+  'cms.save.rebuild',
+  'cms.save.refusal',
+  'cms.save.saved',
+  'cms.size.bytes',
+  'cms.size.kb',
+  'cms.size.mb',
+  'cms.upload.empty',
+  'cms.upload.theFile',
+  'cms.upload.tooLarge',
+  'cms.upload.tooLargeForServer',
+  'cms.uploads.deleted',
+  'cms.uploads.goneAll',
+  'cms.uploads.goneOne',
+  'cms.uploads.kept',
+]
+
+// Looked up while an island renders on the server, so the page sends the messages a catalog has for these keys; a key no catalog has sends nothing.
+export function shipWords(): void {
+  // The browser already has the page's messages.
+  if (typeof document !== 'undefined')
+    return
+
+  for (const key of AFTER_LOAD)
+    wording(key, '')
+}

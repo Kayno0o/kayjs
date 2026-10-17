@@ -8,5 +8,6 @@ import { recorder } from './src/saved'
 export default defineConfig({
   extensions: [cms({ uploads: { maxSize: '64kb' }, guard: guard(() => undefined), files: recorder, author: () => ({ name: 'Fixture editor', email: 'editor@example.com' }) })],
   plugins: [tailwind],
+  i18n: { locales: ['en', 'fr'], defaultLocale: 'en' },
   preview: { secret: 'a-preview-secret-long-enough-for-kay-0123456789' },
 })

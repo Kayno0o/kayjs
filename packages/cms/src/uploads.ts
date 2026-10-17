@@ -1,3 +1,4 @@
+import { wording } from 'kay/words'
 import { settings } from './settings'
 
 // What the multipart framing around the file adds to a request, so a file exactly at the limit is not refused for its envelope.
@@ -26,7 +27,7 @@ export function uploadRefusal(file: File): string | undefined {
   if (uploads.some(allowed => allowed === type || (allowed.endsWith('/*') && type.startsWith(allowed.slice(0, -1)))))
     return undefined
 
-  return `${file.name || 'The file'} is ${type}, which uploads here do not take: ${uploads.join(', ')}`
+  return wording('cms.upload.refused', '{name} is {type}, which uploads here do not take: {accepted}', { name: file.name || wording('cms.upload.theFile', 'The file'), type, accepted: uploads.join(', ') })
 }
 
 // What the pickers offer, as `accept` attributes: every type `uploads` takes, and for an image field the image ones, else all.

@@ -1,6 +1,7 @@
 import { guard } from 'kay'
 import { READ_METHODS } from 'kay/library'
 import { editRequested } from 'kay/server'
+import { wording } from 'kay/words'
 import { authors } from '../authors'
 import { settings } from '../settings'
 
@@ -15,7 +16,7 @@ export default guard(async (ctx) => {
     return
 
   if (!admits)
-    return ctx.deny(403, 'Not in edit mode')
+    return ctx.deny(403, wording('cms.guard.notEditing', 'Not in edit mode'))
 
   await admits(ctx)
 

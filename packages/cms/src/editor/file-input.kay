@@ -3,6 +3,7 @@ import Button from '@kaynooo/kayjs-ui/button.kay'
 import FileDrop from '@kaynooo/kayjs-ui/file-drop.kay'
 import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
 import { attempt, toast } from '@kaynooo/kayjs-ui'
+import { wording } from 'kay/words'
 import { uploadFile, uploadRules } from './upload'
 
 // An image or file field: the path of an upload dropped or picked, or one typed.
@@ -24,16 +25,16 @@ void offer()
 
 // A dropped file the picker's types miss, which FileDrop would otherwise ignore without a word.
 function reject([file]: File[]): void {
-  toast.error(`${file?.name || 'The file'} is ${file?.type || 'of a type'} that uploads here do not take: ${accept() ?? 'images'}`)
+  toast.error(wording('cms.file.rejected', '{name} is {type} that uploads here do not take: {accept}', { name: file?.name || wording('cms.upload.theFile', 'The file'), type: file?.type || wording('cms.file.someType', 'of a type'), accept: accept() ?? 'images' }))
 }
 
 function label(): string {
   const share = sent()
 
   if (share === undefined)
-    return value === '' ? 'Upload' : 'Replace'
+    return value === '' ? wording('cms.file.upload', 'Upload') : wording('cms.file.replace', 'Replace')
 
-  return `Uploading ${Math.round(share * 100)}%`
+  return wording('cms.file.uploading', 'Uploading {percent}%', { percent: Math.round(share * 100) })
 }
 
 async function upload([file]: File[]): Promise<void> {
@@ -43,7 +44,7 @@ async function upload([file]: File[]): Promise<void> {
   sent = 0
 
   try {
-    const path = await attempt(() => uploadFile(collection, file, share => sent = share), 'Could not upload')
+    const path = await attempt(() => uploadFile(collection, file, share => sent = share), wording('cms.file.failure', 'Could not upload'))
 
     if (path)
       onChange(path)
@@ -63,5 +64,5 @@ async function upload([file]: File[]): Promise<void> {
   FileDrop.kcms-file-drop(accept={accept() ?? (image ? 'image/*' : undefined)} disabled={sent() !== undefined} onFiles={upload} onReject={reject})
     @content(zone)
       Button(label={label()} busy={sent() !== undefined} onClick={zone.open})
-      span.kcms-file-hint {zone.dragging() ? 'Drop to upload' : 'or drop a file here'}
-  TextInput(value={value} placeholder="Or a path the site serves" aria-label="Path" onInput={onChange})
+      span.kcms-file-hint {zone.dragging() ? wording('cms.file.dropNow', 'Drop to upload') : wording('cms.file.drop', 'or drop a file here')}
+  TextInput(value={value} placeholder={wording('cms.file.pathHint', 'Or a path the site serves')} aria-label={wording('cms.file.pathLabel', 'Path')} onInput={onChange})

@@ -2,6 +2,7 @@
 import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
 import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
 import { s } from 'kay'
+import { wording } from 'kay/words'
 import EntryEditor from '../../../components/entry-editor.kay'
 import { humanize } from '../../../fields'
 import { collectionPath } from '../../../listing'
@@ -24,4 +25,4 @@ PageSection(title={name} level={1})
   if entry
     EntryEditor(prefix={prefix} collection={collection} entry={entry})
   else
-    EmptyState(title="This collection cannot be read" description={collection.problem})
+    EmptyState(title={wording('cms.admin.collectionUnreadable', 'This collection cannot be read')} description={collection.problem})

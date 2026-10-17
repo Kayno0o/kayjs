@@ -2,6 +2,7 @@ import type { Drafts } from '../drafts'
 import type { EntryRef, Issue } from '../kay/contract'
 import { attempt, toast } from '@kaynooo/kayjs-ui'
 import { call } from 'kay'
+import { wording } from 'kay/words'
 import entriesApi from '../api/entries'
 import filesApi from '../api/files'
 import { entryKey } from '../markers'
@@ -74,7 +75,7 @@ async function saveOnce(drafts: Drafts, ref: EntryRef, { slug = ref.slug, locale
     method: 'post',
     params: { collection: ref.collection, slug },
     body: { data: entry.data, create, ...localeOf({ ...ref, locale }), ...(entry.body === undefined ? {} : { body: entry.body }), ...versionOf(drafts.version(ref)) },
-  }), 'Could not save')
+  }), wording('cms.save.failure', 'Could not save'))
 
   if (outcome && 'issues' in outcome) {
     // A new entry's issues name the slug it was saved under, not the one its draft is kept by.
@@ -84,18 +85,18 @@ async function saveOnce(drafts: Drafts, ref: EntryRef, { slug = ref.slug, locale
     // A refusal of the entry as a whole, a conflict or a forge that failed, stays shown while the editor types, as no render clears it.
     if (whole) {
       drafts.refuse(ref, { message: whole.message, conflict: outcome.conflict })
-      tell(flight, told, `Not saved: ${whole.message}`)
+      tell(flight, told, wording('cms.save.refusal', 'Not saved: {message}', { message: whole.message }))
 
       return false
     }
 
     drafts.report(issues)
-    tell(flight, told, 'Not saved: some fields need fixing')
+    tell(flight, told, wording('cms.save.fields', 'Not saved: some fields need fixing'))
 
     return false
   }
 
-  if (!outcome || !settled(outcome, 'Saved', 'Not saved'))
+  if (!outcome || !settled(outcome, wording('cms.save.saved', 'Saved'), wording('cms.save.notSaved', 'Not saved')))
     return false
 
   drafts.markSaved(ref, entry, 'version' in outcome ? outcome.version : undefined)
@@ -119,9 +120,9 @@ export async function deleteSaved(ref: EntryRef, version?: string | undefined): 
     method: 'delete',
     params: { collection: ref.collection, slug: ref.slug },
     query: { ...localeOf(ref), ...versionOf(version) },
-  }), 'Could not delete')
+  }), wording('cms.save.deleteFailure', 'Could not delete'))
 
-  return settled(outcome, 'Deleted', 'Not deleted')
+  return settled(outcome, wording('cms.save.deleted', 'Deleted'), wording('cms.save.notDeleted', 'Not deleted'))
 }
 
 // The most keys one request deletes, which the API caps.
@@ -139,21 +140,21 @@ export async function deleteUnusedUploadsInChunks(keys: string[]): Promise<boole
 
 // Deletes unused uploads and their variants in one request, so the server reads the content once for all, and says how it went; true once the rows are stale, deleted or not.
 export async function deleteUnusedUploads(keys: string[]): Promise<boolean> {
-  const result = await attempt(async () => call(filesApi, '/unused/delete', { method: 'post', body: { keys } }), 'Could not delete')
+  const result = await attempt(async () => call(filesApi, '/unused/delete', { method: 'post', body: { keys } }), wording('cms.save.deleteFailure', 'Could not delete'))
 
   if (!result)
     return false
 
   if (result.deleted.length === 0) {
-    toast.info(keys.length === 1 ? 'No longer unused, or already deleted' : 'None are unused any longer, or all are already deleted')
+    toast.info(keys.length === 1 ? wording('cms.uploads.goneOne', 'No longer unused, or already deleted') : wording('cms.uploads.goneAll', 'None are unused any longer, or all are already deleted'))
 
     return true
   }
 
-  toast.success(result.deleted.length === 1 ? 'Deleted' : `Deleted ${result.deleted.length}`)
+  toast.success(wording('cms.uploads.deleted', result.deleted.length === 1 ? 'Deleted' : 'Deleted {count}', { count: result.deleted.length }))
 
   if (result.kept.length > 0)
-    toast.info(`${result.kept.length} no longer unused, or already deleted`)
+    toast.info(wording('cms.uploads.kept', '{count} no longer unused, or already deleted', { count: result.kept.length }))
 
   return true
 }
@@ -164,9 +165,9 @@ export async function publishSaved(ref: EntryRef): Promise<boolean> {
     method: 'post',
     params: { collection: ref.collection, slug: ref.slug },
     query: localeOf(ref),
-  }), 'Could not publish')
+  }), wording('cms.save.publishFailure', 'Could not publish'))
 
-  return settled(outcome, 'Published', 'Not published')
+  return settled(outcome, wording('cms.save.published', 'Published'), wording('cms.save.notPublished', 'Not published'))
 }
 
 function localeOf({ locale }: EntryRef): { locale?: string } {
@@ -183,13 +184,13 @@ function settled(outcome: Outcome | undefined, done: string, refused: string): b
     return false
 
   if ('issues' in outcome) {
-    toast.error(`${refused}: ${outcome.issues.map(issue => issue.message).join('; ')}`)
+    toast.error(wording('cms.save.issues', '{refused}: {issues}', { refused, issues: outcome.issues.map(issue => issue.message).join('; ') }))
 
     return false
   }
 
   // A commit shows on the site once it has rebuilt from it.
-  toast.success(outcome.commit === undefined ? done : `${done}. The site shows it once it has rebuilt.`)
+  toast.success(outcome.commit === undefined ? done : wording('cms.save.rebuild', '{done}. The site shows it once it has rebuilt.', { done }))
 
   return true
 }

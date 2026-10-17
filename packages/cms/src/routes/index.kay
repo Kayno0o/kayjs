@@ -4,6 +4,7 @@ import Button from '@kaynooo/kayjs-ui/button.kay'
 import CardRow from '@kaynooo/kayjs-ui/card-row.kay'
 import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
 import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
+import { wording } from 'kay/words'
 import { humanize } from '../fields'
 import { collections } from '../kay/content'
 import { collectionPath, problemId } from '../listing'
@@ -13,18 +14,18 @@ const { prefix } = settings()
 const listed = await collections()
 ---
 head
-  title Content
-PageSection(title="Content" level={1})
+  title {wording('cms.admin.content', 'Content')}
+PageSection(title={wording('cms.admin.content', 'Content')} level={1})
   @actions
-    Button(href={`${prefix}/uploads`} label="Unused uploads")
+    Button(href={`${prefix}/uploads`} label={wording('cms.admin.uploads', 'Unused uploads')})
   for collection of listed key={collection.name}
     CardRow
       @right
         if collection.problem as problem
-          Badge(tone="danger" label="Cannot be read")
+          Badge(tone="danger" label={wording('cms.admin.unreadable', 'Cannot be read')})
           span.kcms-sr-only(id={problemId(collection.name)}) {problem}
         else
-          span {collection.count === 1 ? '1 entry' : `${collection.count ?? 0} entries`}
+          span {wording('cms.admin.entryCount', collection.count === 1 ? '1 entry' : '{count} entries', { count: collection.count ?? 0 })}
       a(href={collectionPath(prefix, collection.name)} data-tooltip={collection.problem} aria-describedby={collection.problem === undefined ? undefined : problemId(collection.name)}) {humanize(collection.name)}
   else
-    EmptyState(title="No collections" description="This site declares no content collection in its content config.")
+    EmptyState(title={wording('cms.admin.noCollections', 'No collections')} description={wording('cms.admin.noCollectionsHint', 'This site declares no content collection in its content config.')})

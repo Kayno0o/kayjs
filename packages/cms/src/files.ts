@@ -1,5 +1,6 @@
 import { mkdir, rm } from 'node:fs/promises'
 import { dirname } from 'node:path'
+import { wording } from 'kay/words'
 import { log } from './log'
 
 export interface Identity {
@@ -34,7 +35,7 @@ export interface FileSaver {
 // `current` is the version the file is at, null once deleted, undefined when the saver could not tell.
 export class SaveConflict extends Error {
   constructor(readonly current?: string | null, readonly creating = false) {
-    super(creating ? 'An entry with this slug already exists: pick another slug' : 'This entry was saved since you opened it, by another save or by yours before the site rebuilt from it')
+    super(creating ? wording('cms.store.exists', 'An entry with this slug already exists: pick another slug') : wording('cms.store.conflict', 'This entry was saved since you opened it, by another save or by yours before the site rebuilt from it'))
   }
 }
 

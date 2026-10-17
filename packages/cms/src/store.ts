@@ -1,5 +1,6 @@
 import type { Commit, FileChange, Identity } from './files'
 import type { CollectionInfo, DraftEntry, EntryRef, Issue, StoredEntry } from './kay/contract'
+import { wording } from 'kay/words'
 import { fileVersion, ForgeError, SaveConflict } from './files'
 import { collectionInfo, entries, entryFile, entrySource, removeEntry, saveEntry as saveLoaded } from './kay/content'
 import { log } from './log'
@@ -30,7 +31,7 @@ export async function collectionNamed(name: string): Promise<CollectionInfo> {
   const found = await bareCollection(name)
 
   if (!found)
-    throw new UnknownCollection(`No collection ${name}`)
+    throw new UnknownCollection(wording('cms.store.noCollection', 'No collection {name}', { name }))
 
   return found
 }
@@ -54,7 +55,7 @@ export async function entryScreen(ref: EntryRef): Promise<{ collection: Collecti
     if (collection.value.kind === 'loaded') {
       log.error(`${collection.value.name}'s entry failed to read`, entry.reason)
 
-      return { collection: { ...collection.value, problem: `kay: ${collection.value.name}'s entries failed to read; the server's log says why` }, entry: undefined }
+      return { collection: { ...collection.value, problem: wording('cms.store.readFailure', 'kay: {collection}\'s entries failed to read; the server\'s log says why', { collection: collection.value.name }) }, entry: undefined }
     }
 
     if (collection.value.problem === undefined)
@@ -109,7 +110,7 @@ export async function saveEntry(entry: DraftEntry, { create = false, version, re
     const script = await scriptInBody(entry.body)
 
     if (script !== undefined)
-      return refused(entry, `The text holds ${script}, which would run as the site: write it as Markdown, or list ${collection.name} in cms({ rawHtml })`, 'body')
+      return refused(entry, wording('cms.store.script', 'The text holds {script}, which would run as the site: write it as Markdown, or list {collection} in cms({ rawHtml })', { script, collection: collection.name }), 'body')
   }
 
   if (collection.kind === 'loaded') {
@@ -148,7 +149,7 @@ export async function deleteEntry(ref: EntryRef, author?: Identity, { version, r
   }
 
   if (collection.dir === undefined)
-    return refused(ref, `${collection.name}'s folder lies outside the repository, so its files cannot be committed`)
+    return refused(ref, wording('cms.store.outside', '{collection}\'s folder lies outside the repository, so its files cannot be committed', { collection: collection.name }))
 
   // kay finds the file whether or not it still parses, so a broken one can be deleted too.
   const found = await entryFile(collection.name, ref.slug, { locale: ref.locale })
@@ -169,15 +170,15 @@ export async function publishEntry(ref: EntryRef, author?: Identity): Promise<Sa
   const collection = await collectionNamed(ref.collection)
 
   if (collection.draftField === undefined)
-    return refused(ref, `${collection.name} names no draft field to publish by`)
+    return refused(ref, wording('cms.store.noDraftField', '{collection} names no draft field to publish by', { collection: collection.name }))
 
   const existing = await entryOf(ref)
 
   if (!existing)
-    return refused(ref, `${ref.slug} does not exist`, 'slug')
+    return refused(ref, wording('cms.store.missing', '{slug} does not exist', { slug: ref.slug }), 'slug')
 
   if (!existing.data)
-    return refused(ref, `${ref.slug}'s file does not parse: ${existing.problem}`)
+    return refused(ref, wording('cms.store.parseFailure', '{slug}\'s file does not parse: {problem}', { slug: ref.slug, problem: existing.problem ?? '' }))
 
   return saveEntry({ ...ref, data: { ...existing.data, [collection.draftField]: false }, body: existing.body }, { version: existing.version, verb: 'publish', author, bodyKept: true })
 }
@@ -204,5 +205,5 @@ async function commitChange(ref: EntryRef, change: FileChange): Promise<{ commit
 function unversioned(ref: EntryRef, deleting = false): { issues: Issue[] } {
   log.warn(`refused a change to ${ref.collection}/${ref.slug} naming no version, from an editor older than the server`)
 
-  return refused(ref, deleting ? 'This editor has not shown the file as it is now, so it will not delete it: reload the page to see it, then delete again' : 'This editor is older than the server: copy your changes, reload the page, then make them again')
+  return refused(ref, deleting ? wording('cms.store.staleDelete', 'This editor has not shown the file as it is now, so it will not delete it: reload the page to see it, then delete again') : wording('cms.store.staleSave', 'This editor is older than the server: copy your changes, reload the page, then make them again'))
 }

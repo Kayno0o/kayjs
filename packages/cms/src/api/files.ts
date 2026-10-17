@@ -1,5 +1,6 @@
 import { s } from 'kay'
 import { api, files } from 'kay/server'
+import { wording } from 'kay/words'
 import { deleteUnusedUploads } from '../orphans'
 import { settings } from '../settings'
 import { collectionNamed, UnknownCollection } from '../store'
@@ -36,9 +37,9 @@ export default api({ bodyLimit: uploadBodyLimit })
   // Only whom the app's guard admits may delete, since an edit cookie is tied to no user; a file referenced since the screen was drawn is kept.
   .post('/unused/delete', async ({ body, status }) => {
     if (!settings().guard)
-      return status(403, 'Deleting uploads needs cms({ guard })')
+      return status(403, wording('cms.uploads.needsGuard', 'Deleting uploads needs cms({ guard })'))
 
     const result = await deleteUnusedUploads(body.keys)
 
-    return 'blocked' in result ? status(409, `Nothing was deleted: ${result.blocked.join('; ')}`) : result
+    return 'blocked' in result ? status(409, wording('cms.uploads.nothingDeleted', 'Nothing was deleted: {reasons}', { reasons: result.blocked.join('; ') })) : result
   }, { body: s.Object({ keys: s.Array(s.String({ maxLength: 300 }), { maxItems: 100 }) }) })

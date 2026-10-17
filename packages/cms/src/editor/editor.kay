@@ -8,14 +8,19 @@ import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
 import TooltipHost from '@kaynooo/kayjs-ui/tooltip-host.kay'
 import { attempt } from '@kaynooo/kayjs-ui'
 import { call, listen, refresh } from 'kay'
+import { wording } from 'kay/words'
 import previewApi from '../api/preview'
 import { entryKey, fieldsAt } from '../markers'
 import { drafts } from './drafts'
+import { shipWords } from './words'
 import EntryForm from './entry-form.kay'
 import './editor.css'
 
 // kay renders it at the end of the page in edit mode only, kept across page swaps, with the entries the page read.
 const { entries } = props<EditorProps>()
+
+// Looks up what the editor reads only once the page has loaded, so the page sends it.
+shipWords()
 
 const open = signal(true)
 const focused = signal<FieldMarker>()
@@ -54,7 +59,7 @@ listen(() => document, 'click', (event) => {
 async function stopEditing(): Promise<void> {
   leaving = true
 
-  if (!await attempt(() => call(previewApi, '/exit', { method: 'post' }), 'Could not leave edit mode')) {
+  if (!await attempt(() => call(previewApi, '/exit', { method: 'post' }), wording('cms.editor.leaveFailure', 'Could not leave edit mode'))) {
     leaving = false
 
     return
@@ -69,19 +74,19 @@ effect(() => {
   onCleanup(() => document.documentElement.classList.remove('kcms-editing'))
 })
 ---
-aside.kcms-editor(ref={element => panel = element} class={{ 'kcms-editor-open': open() }} aria-label="Content editor")
+aside.kcms-editor(ref={element => panel = element} class={{ 'kcms-editor-open': open() }} aria-label={wording('cms.editor.label', 'Content editor')})
   header.kcms-editor-head
     if open()
-      h2.kcms-editor-title Edit this page
-      Button(label={leaving() ? 'Leaving…' : 'Stop editing'} busy={leaving()} onClick={stopEditing})
-    IconButton(icon={open() ? 'close' : 'menu'} label={open() ? 'Hide the editor' : 'Edit this page'} variant="ghost" onClick={() => open = !open()})
+      h2.kcms-editor-title {wording('cms.editor.title', 'Edit this page')}
+      Button(label={leaving() ? wording('cms.editor.leaving', 'Leaving…') : wording('cms.editor.stop', 'Stop editing')} busy={leaving()} onClick={stopEditing})
+    IconButton(icon={open() ? 'close' : 'menu'} label={open() ? wording('cms.editor.hide', 'Hide the editor') : wording('cms.editor.open', 'Edit this page')} variant="ghost" onClick={() => open = !open()})
   if open()
     .kcms-editor-body
       if drafts.failure() as failure
-        p.kcms-editor-failure(role="alert") The page could not show your changes: {failure}
+        p.kcms-editor-failure(role="alert") {wording('cms.editor.draftFailure', 'The page could not show your changes: {failure}', { failure })}
       for entry of entries key={entryKey(entry)}
         EntryForm(entry={entry} focus={focusIn(entry)})
       else
-        p.kcms-editor-empty Nothing on this page comes from a collection.
+        p.kcms-editor-empty {wording('cms.editor.empty', 'Nothing on this page comes from a collection.')}
 Toaster
 TooltipHost

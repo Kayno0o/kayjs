@@ -67,6 +67,25 @@ Check each upload before you confirm. A URL written by hand in a page, or a file
 
 <ReadMore href="/llms/kayjs-cms">Which uploads the unused-uploads screen holds back, and when it lists nothing.</ReadMore>
 
+## Languages
+
+Every text the screens and the editor show, `Edit this page`, `Save`, `Not valid JSON`, is looked up in your messages before its English. Word them once in `src/messages/<locale>.ts` under `cms`, named for the area and the text, and the screens and the editor read them, the editor in the browser.
+
+```ts
+// src/messages/fr.ts
+export default defineMessages({
+  cms: {
+    editor: { title: 'Modifier cette page', stop: 'Arrêter de modifier' },
+    admin: { entryCount: { one: '{count} entrée', other: '{count} entrées' } },
+    size: { kb: '{size} Ko', mb: '{size} Mo' },
+  },
+})
+```
+
+A key a locale lacks reads the English, and `kay check` leaves the `cms` keys out of its comparison between locales. The API's own refusals stay English for now, as kay runs an API handler outside the request's locale.
+
+<ReadMore href="/llms/kayjs-cms">Every `cms.*` key and its English is in the full kayjs-cms reference.</ReadMore>
+
 ## Raw HTML in a body
 
 A Markdown body whose HTML would run as the site or cover it is refused on save. That is anything kay's sanitizer drops, such as a `<script>`, an `onclick`, a `style`, a `javascript:` link, or a tag left open for the page around it to close.

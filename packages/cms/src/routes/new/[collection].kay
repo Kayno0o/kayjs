@@ -2,6 +2,7 @@
 import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
 import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
 import { s } from 'kay'
+import { wording } from 'kay/words'
 import EntryEditor from '../../components/entry-editor.kay'
 import { humanize } from '../../fields'
 import { collectionPath } from '../../listing'
@@ -15,11 +16,11 @@ const collection = await findCollection(ctx.params.collection) ?? ctx.notFound()
 const locale = ctx.query.locale
 ---
 head
-  title New entry - {humanize(collection.name)}
-PageSection(title="New entry" level={1})
+  title {wording('cms.admin.newEntryTitle', 'New entry - {collection}', { collection: humanize(collection.name) })}
+PageSection(title={wording('cms.admin.newEntry', 'New entry')} level={1})
   @actions
     a(href={collectionPath(prefix, collection.name)}) {humanize(collection.name)}
   if collection.problem as problem
-    EmptyState(title="This collection cannot be read" description={problem})
+    EmptyState(title={wording('cms.admin.collectionUnreadable', 'This collection cannot be read')} description={problem})
   else
     EntryEditor(prefix={prefix} collection={collection} locale={locale})

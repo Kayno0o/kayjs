@@ -4,6 +4,7 @@ import type { CollectionInfo, EntryRef } from '../kay/contract'
 import Button from '@kaynooo/kayjs-ui/button.kay'
 import FormField from '@kaynooo/kayjs-ui/form-field.kay'
 import MarkdownEditor from '@kaynooo/kayjs-ui/markdown-editor.kay'
+import { wording } from 'kay/words'
 import { fieldsOf } from '../fields'
 import { BODY } from '../markers'
 import FieldInput from './field-input.kay'
@@ -16,15 +17,15 @@ const fields = memo(() => fieldsOf(collection.schema))
 ---
 if drafts.refusal(entry) as refusal
   .kcms-entry-failure.kcms-refusal(role="alert")
-    p Not saved: {refusal.message}.
+    p {wording('cms.entry.refusal', 'Not saved: {message}.', { message: refusal.message })}
     if refusal.conflict
-      p Keeping your edits makes the next save write them over that save.
-      Button(label="Keep my edits" onClick={() => drafts.keepEdits(entry)})
+      p {wording('cms.entry.conflict', 'Keeping your edits makes the next save write them over that save.')}
+      Button(label={wording('cms.entry.keepEdits', 'Keep my edits')} onClick={() => drafts.keepEdits(entry)})
 for issue of drafts.issues(entry, '') key={issue.message}
   p.kcms-entry-failure(role="alert") {issue.message}
 for field of fields() key={field.key}
   FieldInput(drafts={drafts} entry={entry} field={field} path={String(field.key)})
 if collection.body
   .kcms-field(data-kcms-body)
-    FormField(label="Body" issue={drafts.issues(entry, BODY)[0]?.message})
+    FormField(label={wording('cms.entry.body', 'Body')} issue={drafts.issues(entry, BODY)[0]?.message})
       MarkdownEditor(value={String(drafts.value(entry, BODY) ?? '')} onInput={text => drafts.set(entry, BODY, text)} onImage={file => uploadFile(entry.collection, file)})

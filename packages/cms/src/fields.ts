@@ -1,4 +1,5 @@
 import type { JsonSchema } from './kay/contract'
+import { wording } from 'kay/words'
 
 interface FieldBase {
   key: string | number
@@ -43,7 +44,7 @@ export function fieldOf(key: string | number, schema: JsonSchema, required: bool
   const { schema: inner, nullable } = withoutNull(schema)
   const base: FieldBase = {
     key,
-    label: inner.title ?? schema.title ?? (typeof key === 'number' ? `Item ${key + 1}` : humanize(key)),
+    label: inner.title ?? schema.title ?? (typeof key === 'number' ? wording('cms.field.item', 'Item {n}', { n: key + 1 }) : humanize(key)),
     // A field with a default is filled in when left out, so nothing has to be typed in it.
     required: required && !nullable && schema.default === undefined,
     hint: inner.description ?? schema.description,
@@ -91,7 +92,7 @@ export function fieldOf(key: string | number, schema: JsonSchema, required: bool
 
 // A list's field for its item at `index`, numbered by its place unless its schema titles it.
 export function itemAt(list: Field & { kind: 'list' }, index: number): Field {
-  return { ...list.item, key: index, ...list.numbered && { label: `Item ${index + 1}` } }
+  return { ...list.item, key: index, ...list.numbered && { label: wording('cms.field.item', 'Item {n}', { n: index + 1 }) } }
 }
 
 function typeOf(schema: JsonSchema): string | undefined {

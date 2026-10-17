@@ -51,8 +51,8 @@ export async function uploadFile(collection: string, file: File, progress?: (sha
     return answer.path
   }
   catch (error) {
-    // The route's own 413 says the limit; kay's body limit before it says only that the body is too large.
-    if (error instanceof ApiError && error.status === 413 && !error.message.includes('an upload may be'))
+    // Past the check above, the route's own 413 cannot happen, so one is kay's body limit, which says only that the body is too large; with no rules to check against the route's words are shown.
+    if (error instanceof ApiError && error.status === 413 && limits)
       throw refused(413, tooLargeForServer(file.name, file.size))
 
     if (error instanceof ApiError && (error.status === 413 || error.status === 415 || error.status === 400))

@@ -5,14 +5,19 @@ import ConfirmDelete from '@kaynooo/kayjs-ui/confirm-delete.kay'
 import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
 import Table from '@kaynooo/kayjs-ui/table.kay'
 import { refresh } from 'kay'
+import { wording } from 'kay/words'
 import { deleteUnusedUploadsInChunks } from '../editor/save'
+import { shipWords } from '../editor/words'
 
 const { uploads } = props<{ uploads: UnusedUpload[] }>()
 
+// Looks up what a deletion says once the page has loaded, so the page sends it.
+shipWords()
+
 const columns: Column<UnusedUpload>[] = [
-  { key: 'key', header: 'Upload', cell: true },
-  { key: 'variants', header: 'Variants', cell: true },
-  { key: 'actions', header: 'Actions', align: 'end', cell: true },
+  { key: 'key', header: wording('cms.uploads.upload', 'Upload'), cell: true },
+  { key: 'variants', header: wording('cms.uploads.variants', 'Variants'), cell: true },
+  { key: 'actions', header: wording('cms.table.actions', 'Actions'), align: 'end', cell: true },
 ]
 
 async function remove(keys: string[]): Promise<boolean> {
@@ -26,13 +31,13 @@ async function remove(keys: string[]): Promise<boolean> {
 ---
 Table.kcms-uploads(columns={columns} rows={uploads} rowKey={upload => upload.key} selectable)
   @bulk(keys, clear)
-    ConfirmDelete(message={`Delete ${keys.length} upload${keys.length === 1 ? '' : 's'} and their variants? Check that no page, unsaved form or older revision uses them: this cannot be undone.`} label={`Delete ${keys.length} selected`} failure="Could not delete" size="sm" variant="ghost" onConfirm={async () => { if (await remove(keys.map(String))) clear() }})
+    ConfirmDelete(message={wording('cms.uploads.deleteMany', keys.length === 1 ? 'Delete 1 upload and its variants? Check that no page, unsaved form or older revision uses it: this cannot be undone.' : 'Delete {count} uploads and their variants? Check that no page, unsaved form or older revision uses them: this cannot be undone.', { count: keys.length })} label={wording('cms.uploads.deleteSelected', 'Delete {count} selected', { count: keys.length })} failure={wording('cms.save.deleteFailure', 'Could not delete')} size="sm" variant="ghost" onConfirm={async () => { if (await remove(keys.map(String))) clear() }})
   @cell(row, column)
     if column.key === 'key'
       a(href={row.url} target="_blank" rel="noopener") {row.key}
     else if column.key === 'variants'
-      span(data-tooltip={row.variants.join(', ')} tabindex="0") {row.variants.length === 0 ? 'None' : `${row.variants.length} variant${row.variants.length === 1 ? '' : 's'}`}
+      span(data-tooltip={row.variants.join(', ')} tabindex="0") {row.variants.length === 0 ? wording('cms.uploads.noVariant', 'None') : wording('cms.uploads.variantCount', row.variants.length === 1 ? '1 variant' : '{count} variants', { count: row.variants.length })}
     else
-      ConfirmDelete(message={`Delete ${row.key}${row.variants.length === 0 ? '' : ` and its ${row.variants.length} variant${row.variants.length === 1 ? '' : 's'}`}? Check that no page, unsaved form or older revision uses it: this cannot be undone.`} label={`Delete ${row.key}`} failure="Could not delete" size="sm" variant="ghost" onConfirm={async () => { await remove([row.key]) }})
+      ConfirmDelete(message={row.variants.length === 0 ? wording('cms.uploads.deleteOne', 'Delete {key}? Check that no page, unsaved form or older revision uses it: this cannot be undone.', { key: row.key }) : wording('cms.uploads.deleteOneWithVariants', row.variants.length === 1 ? 'Delete {key} and its 1 variant? Check that no page, unsaved form or older revision uses it: this cannot be undone.' : 'Delete {key} and its {count} variants? Check that no page, unsaved form or older revision uses it: this cannot be undone.', { key: row.key, count: row.variants.length })} label={wording('cms.uploads.deleteLabel', 'Delete {key}', { key: row.key })} failure={wording('cms.save.deleteFailure', 'Could not delete')} size="sm" variant="ghost" onConfirm={async () => { await remove([row.key]) }})
   @empty
-    EmptyState(title="No unused uploads" description="Every upload is mentioned in an entry.")
+    EmptyState(title={wording('cms.uploads.empty', 'No unused uploads')} description={wording('cms.uploads.emptyHint', 'Every upload is mentioned in an entry.')})
