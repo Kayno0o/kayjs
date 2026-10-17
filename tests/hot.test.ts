@@ -358,7 +358,8 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('kay dev in 
 
   it('opens the line an element came from on Alt+click, and lists the islands with the values of their signals', async () => {
     await page.click('h1', { modifiers: ['Alt'] })
-    await until(() => existsSync(join(root, '.opened')))
+    // The editor stub creates the file before it writes it, so its existence alone does not mean it is complete.
+    await until(async () => existsSync(join(root, '.opened')) && await Bun.file(join(root, '.opened')).text() !== '')
     expect(JSON.parse(await Bun.file(join(root, '.opened')).text())).toEqual(['-g', `${join(root, 'src/routes/index.kay')}:8:1`])
 
     await page.locator('kay-dev .bar > button', { hasText: /islands?$/ }).click()
