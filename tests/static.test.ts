@@ -65,6 +65,8 @@ async function get(path: string): Promise<{ status: number, text: string }> {
 
 beforeAll(async () => {
   out = await mkdtemp(join(tmpdir(), 'kay-static-'))
+  // The chunks of the shared fixture's earlier builds, the one in place and those kept, would join the export as a deploy keeps them for open tabs: this one carries its own alone.
+  await Promise.all((await Array.fromAsync(new Bun.Glob('.kay/client*').scan({ cwd: FIXTURE, dot: true, onlyFiles: false }))).map(async dir => rm(join(FIXTURE, dir), { recursive: true, force: true })))
 
   const { code, errors } = await exportSite(out)
 
