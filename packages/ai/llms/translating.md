@@ -21,7 +21,7 @@ For each slug a localized collection has in the default locale and not in the lo
 A translated entry is marked a draft:
 
 - A collection with `draft: 'field'` gets that boolean field set to `true`: the entry is held back in production, the default locale's entry standing in, until a CMS or a person writes `false`.
-- Any other Markdown or YAML entry gets `# draft` as the first line of its YAML (inside the `---` of a Markdown entry). It is served as any entry, live at once (so is a collection whose `draft` is a function): read it before deploying. Saving it from a CMS rewrites the YAML and so accepts it, as does deleting the line. kay does not report it.
+- Any other Markdown or YAML entry gets `# draft` as the first line of its YAML (inside the `---` of a Markdown entry). It is served as any entry, live at once (so is a collection whose `draft` is a function): read it before deploying. Saving it from a CMS rewrites the YAML and so accepts it, as does deleting the line. `kay check` reports it as `draft-entry` (warn) until then.
 - A JSON entry in a collection without a draft field holds no comment, so it is reported (`data/item: holds JSON, which cannot be marked a draft`) and skipped: give the collection a `draft: 'field'`.
 
 ## A run stopped half way

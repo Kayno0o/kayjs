@@ -60,7 +60,7 @@ kay lint --cache
 - Only a schema written inside the `action(...)` call is read, not one held in a variable.
 - Every content collection entry against its schema and the components its collection names, and the props a Markdown entry gives each component against the props it takes, as a template's would be: one missing, misspelt or of another type, reported at the entry's line.
 - `kay check` reads the collections before it type-checks for this, and the editor reports them after a save.
-- With `i18n`, every `t()` key and its placeholders against the default locale's messages, and every other locale's messages against them: a key one lacks or has alone, a placeholder it drops or adds, plural forms where the default has text, and each message marked `// draft` (`draft-message`). Links may carry a locale's prefix.
+- With `i18n`, every `t()` key and its placeholders against the default locale's messages, and every other locale's messages against them: a key one lacks or has alone, a placeholder it drops or adds, plural forms where the default has text, each message marked `// draft` (`draft-message`) and each localized entry opening on a `# draft` line (`draft-entry`). Links may carry a locale's prefix.
 - What a page needs to be usable without seeing it:
   - An `img` has `alt` (`alt=""` for decoration) and so has an `input(type="image")` (`missing-alt`).
   - An `iframe` has a `title` (`missing-title`).

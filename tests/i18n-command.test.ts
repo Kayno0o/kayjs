@@ -1,9 +1,9 @@
 import { rm } from 'node:fs/promises'
-import { join } from 'node:path'
+import { join, relative } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { messageProblems } from '../src/check/messages'
-import { projectProblems } from '../src/check/project'
+import { contentChecks, projectProblems } from '../src/check/project'
 import { flattenMessages } from '../src/runtime/i18n'
 import { acceptDrafts, draftMessages, writeDraftMessages } from '../src/server/message-drafts'
 import { missingTranslations } from '../src/server/translations'
@@ -153,6 +153,47 @@ describe('draft messages', () => {
     ])
     expect((await reported({ 'draft-message': 'deny' })).map(({ severity }) => severity)).toEqual(['error', 'error'])
     expect(await reported({ i18n: 'allow' })).toEqual([])
+  })
+})
+
+describe('draft entries', () => {
+  const config = 'import { t } from \'elysia\'\nimport { collection } from \'kay/content\'\n\nconst schema = t.Object({ title: t.String() })\n\nexport const news = collection(\'content/news\', { schema, localized: true })\nexport const notes = collection(\'content/notes\', { schema })\nexport const held = collection(\'content/held\', { schema: t.Object({ title: t.String(), draft: t.Optional(t.Boolean()) }), localized: true, draft: \'draft\' })\n'
+  const entries = {
+    'kay.config.ts': `export default { favicon: false, i18n: ${JSON.stringify(i18n)} }\n`,
+    'src/messages/en.ts': messages('{}'),
+    'src/messages/fr.ts': messages('{}'),
+    'src/messages/de.ts': messages('{}'),
+    'src/content.config.ts': config,
+    'src/content/news/en/a.md': '---\ntitle: A\n---\n',
+    'src/content/news/fr/a.md': '---\n# draft\ntitle: A fr\n---\nBody\n',
+    'src/content/news/fr/crlf.md': '---\r\n# draft\r\ntitle: Crlf\r\n---\r\n',
+    'src/content/news/fr/b.yaml': '# draft\ntitle: B fr\n',
+    'src/content/news/de/b.yaml': 'title: "# draft"\n',
+    'src/content/news/de/c.md': '---\ntitle: C\n---\n# draft\n',
+    'src/content/news/de/d.yaml': '# drafted by Ann\ntitle: D\n',
+    'src/content/news/de/e.yaml': 'title: E\n# draft\n',
+    'src/content/notes/n.yaml': '# draft\ntitle: Not localized\n',
+    'src/content/held/fr/h.yaml': '# draft\ntitle: Held\ndraft: true\n',
+  }
+
+  it('are reported by kay check as draft-entry, at their line, only in a localized collection', async () => {
+    const root = await project(entries)
+    const reported = async (lints?: Record<string, 'allow' | 'warn' | 'deny'>) => (await contentChecks(root, { i18n, lints })).problems.filter(problem => problem.code === 'draft-entry')
+
+    expect((await reported()).map(({ file, line, severity }) => ({ file: relative(root, file), line, severity }))).toEqual([
+      { file: 'src/content/held/fr/h.yaml', line: 1, severity: 'warning' },
+      { file: 'src/content/news/fr/a.md', line: 2, severity: 'warning' },
+      { file: 'src/content/news/fr/b.yaml', line: 1, severity: 'warning' },
+      { file: 'src/content/news/fr/crlf.md', line: 2, severity: 'warning' },
+    ])
+    expect((await reported({ 'draft-entry': 'deny' })).map(({ severity }) => severity)).toEqual(['error', 'error', 'error', 'error'])
+    expect(await reported({ 'draft-entry': 'allow' })).toEqual([])
+  })
+
+  it('are not reported once accepted: the line deleted, or a draft kept by no comment', async () => {
+    const root = await project({ ...entries, 'src/content/news/fr/a.md': '---\ntitle: A fr\n---\n', 'src/content/news/fr/b.yaml': 'title: B fr\n', 'src/content/news/fr/crlf.md': '---\ntitle: Crlf\n---\n', 'src/content/held/fr/h.yaml': 'title: Held\n' })
+
+    expect((await contentChecks(root, { i18n })).problems.filter(problem => problem.code === 'draft-entry')).toEqual([])
   })
 })
 

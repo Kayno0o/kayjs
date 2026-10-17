@@ -4,6 +4,7 @@ import type { I18n } from '../server/i18n'
 import type { ServedPaths } from '../server/served-paths'
 import type { CollectionFeed } from './claims'
 import type { Collection } from './index'
+import type { RawEntry } from './load'
 import type { Segment } from './markdown'
 import type { ContentProblem } from './validate'
 import { dirname, relative, resolve } from 'node:path'
@@ -20,8 +21,11 @@ import { claimFeed } from './claims'
 import { entries, registerCollections } from './edit'
 import { feedXml } from './feed'
 import { isCollection } from './index'
-import { loadEntries, manifestFile, markdownOf, pruneContentCache, setContentPlace, translationKey } from './load'
+import { draftCommentLine, loadEntries, manifestFile, markdownOf, pruneContentCache, setContentPlace, translationKey } from './load'
 import { ContentError, decodeEntries } from './validate'
+
+// Enough of an entry's file to hold its first lines.
+const DRAFT_HEAD_BYTES = 64
 
 // A component a Markdown entry writes, with the props it gives, for `kay check` to type them.
 export interface ComponentUse {
@@ -119,6 +123,9 @@ export async function contentProblems(root: string, config?: string, site = true
         uses.push(...componentUses(name, collection.components, entry.file, entry.segments ?? []))
 
       decodeEntries(entries, collection.options.schema, collection.options.components ?? {}, collection.options.localized)
+
+      if (collection.options.localized === true)
+        problems.push(...await draftEntryProblems(root, entries))
     }
     catch (error) {
       if (!(error instanceof ContentError))
@@ -129,6 +136,23 @@ export async function contentProblems(root: string, config?: string, site = true
   }
 
   return { problems, uses, feeds, read }
+}
+
+// The entries of a localized collection marked with `# draft`, as `writeDraftEntry` marks a machine translation without a draft field.
+async function draftEntryProblems(root: string, entries: RawEntry[]): Promise<ContentProblem[]> {
+  const found: ContentProblem[] = []
+
+  for (const entry of entries) {
+    if (entry.file.endsWith('.json'))
+      continue
+
+    const line = draftCommentLine(entry.file, await Bun.file(resolve(root, entry.file)).slice(0, DRAFT_HEAD_BYTES).text())
+
+    if (line !== undefined)
+      found.push({ file: entry.file, line, message: 'is marked `# draft`, a machine translation no one has checked yet', code: 'draft-entry' })
+  }
+
+  return found
 }
 
 // A component the collection lacks is a content problem of its own, so only those it has are typed.

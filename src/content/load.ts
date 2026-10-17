@@ -312,6 +312,21 @@ export function parseEntry(name: string, source: string): { data: unknown, body?
   return { data: frontmatter === undefined ? {} : parseYaml(frontmatter, 2), body, bodyLine, ...frontmatter !== undefined && { frontmatter } }
 }
 
+const DRAFT_COMMENT_LINE = /^# draft[ \t]*\r?$/
+
+// The line of the `# draft` comment that marks a machine translation, the first of a YAML entry or of a Markdown entry's frontmatter; nothing for an entry without it. Reads the start of the entry, the head of its file, alone.
+export function draftCommentLine(name: string, head: string): number | undefined {
+  if (name.endsWith('.json'))
+    return undefined
+
+  const [first, second] = head.split('\n')
+
+  if (name.endsWith('.md'))
+    return first?.trimEnd() === '---' && DRAFT_COMMENT_LINE.test(second ?? '') ? 2 : undefined
+
+  return DRAFT_COMMENT_LINE.test(first ?? '') ? 1 : undefined
+}
+
 // A hash of the TypeScript and JavaScript modules of the project the content config imports, however deep, and the config itself: a highlighter imports what it draws on from them, and its own source shows none of it.
 async function importedSource(root: string, configs: (string | undefined)[]): Promise<string> {
   const project = root + sep

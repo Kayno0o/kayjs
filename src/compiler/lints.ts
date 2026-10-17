@@ -403,6 +403,14 @@ export const LINTS = {
     wrong: '// src/messages/fr.ts\nexport default defineMessages({\n  nav: { about: \'À propos\' }, // draft\n})',
     right: '// src/messages/fr.ts\nexport default defineMessages({\n  nav: { about: \'À propos\' },\n})',
   },
+  'draft-entry': {
+    level: 'warn',
+    group: 'i18n',
+    site: true,
+    summary: 'With `i18n`, an entry of a localized collection whose YAML (or Markdown frontmatter) opens on a `# draft` line, as `kay i18n translate` marks a machine translation in a collection with no `draft` field: it is served as any entry, and waits for a person to read it. Delete the line once checked, or save the entry from a CMS; `lints: { \'draft-entry\': \'deny\' }` holds a release until they are. A collection with `draft: \'field\'` holds its drafts back instead.',
+    wrong: '# src/content/news/fr/launch.yaml\n# draft\ntitle: Lancement',
+    right: '# src/content/news/fr/launch.yaml\ntitle: Lancement',
+  },
   'hidden-tool': {
     level: 'warn',
     group: 'code',

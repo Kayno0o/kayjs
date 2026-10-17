@@ -57,7 +57,15 @@ export async function contentChecks(root: string, options: CheckOptions, memory?
 
   await writeIfChanged(join(projectPaths(root).types, CONTENT_CHECK), props.code)
 
-  return { problems: content.problems, feeds: content.feeds, props: props.lines }
+  const drafts = lintLevel('draft-entry', options.lints)
+  const problems = content.problems.flatMap((problem) => {
+    if (problem.code !== 'draft-entry')
+      return [problem]
+
+    return drafts === 'allow' ? [] : [{ ...problem, severity: drafts === 'warn' ? 'warning' : 'error', help: 'read it, then delete its `# draft` line, or save the entry from a CMS' } satisfies CheckDiagnostic]
+  })
+
+  return { problems, feeds: content.feeds, props: props.lines }
 }
 
 // What the shadow tree's write and the config tell, reported ahead of the type errors.

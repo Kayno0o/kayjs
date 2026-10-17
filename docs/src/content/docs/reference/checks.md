@@ -91,6 +91,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `deprecated-test-mount` | warn | deprecated | `mount` imported, dynamically imported or re-exported from `kay/test`, now `mountComponent` |
 | `deprecated-ui-prop` | warn | deprecated | A kayjs-ui prop or value renamed in 1.52, such as `variant="danger"`, now `tone="danger"`, or a ConfirmDelete's, now `variant="solid"` |
 | `draft-message` | warn | i18n | A message marked `// draft`, which no one has checked yet |
+| `draft-entry` | warn | i18n | An entry marked `# draft`, which no one has checked yet |
 | `hidden-tool` | warn | code | With `mcp`, an API route that sets `hide` and `tool` |
 | `unsized-image` | warn | performance | An `img` with no `width` and `height` |
 | `missing-site` | warn | seo | `seo` with no `site`, on a static export |
