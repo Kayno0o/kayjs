@@ -5,7 +5,8 @@ import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { t } from 'elysia'
 import { chromium } from 'playwright-core'
-import { action, ActionRedirect, encodeCall } from '../src/runtime/action'
+import { action, ActionRedirect, encodeCall, SETTLED } from '../src/runtime/action'
+import { actionStream } from '../src/runtime/action-stream'
 import { browserPath, testSite } from '../src/test'
 
 const routes = 'tests/fixtures/action-streams/src/routes'
@@ -282,6 +283,40 @@ describe('an action returning an async iterable', () => {
     await Bun.sleep(30)
 
     expect(await response.text()).toContain('data: ["Home"]')
+  })
+})
+
+describe('the stream an island reads', () => {
+  // An answer whose body sends `text` and stays open, telling whether it was cancelled.
+  function answer(text: string): { response: Response, cancelled: () => boolean } {
+    let cancelled = false
+    const body = new ReadableStream<Uint8Array>({
+      start: controller => controller.enqueue(new TextEncoder().encode(text)),
+      cancel: () => {
+        cancelled = true
+      },
+    })
+
+    return { response: new Response(body), cancelled: () => cancelled }
+  }
+
+  it('fails and stops the answer when a value does not decode', async () => {
+    const { response, cancelled } = answer('data: [0]\n\ndata: {broken\n\n')
+    const stream = actionStream<number>(response, SETTLED)
+    const status = await new Promise(resolve => stream[SETTLED](resolve))
+
+    expect(status).toBe('failed')
+    expect(stream.last()).toBe(0)
+    expect(cancelled()).toBe(true)
+  })
+
+  it('reads an answer a proxy rewrote with CRLF line breaks', async () => {
+    const { response } = answer('data: [1]\r\n\r\nevent: end\r\ndata:\r\n\r\n')
+    const stream = actionStream<number>(response, SETTLED)
+    const status = await new Promise(resolve => stream[SETTLED](resolve))
+
+    expect(status).toBe('done')
+    expect(stream.last()).toBe(1)
   })
 })
 

@@ -6,6 +6,8 @@ import { decodeServerValue } from './wire'
 const DATA = 'data: '
 const END = 'event: end'
 const ERROR = 'event: error'
+// A proxy may rewrite the line breaks kay sends as \r\n.
+const LINE_BREAK = /\r?\n/
 
 // kay's own answer holds one line per value, so it is read here rather than by live.ts's reader: what this module imports of the runtime loads up front on every page, so it takes `settled` from its caller too.
 // Values arriving before the first `on()`, until the task the call resolved in ends, go to it when it comes.
@@ -79,7 +81,7 @@ export function actionStream<T>(response: Response, settled: typeof SETTLED): Ac
   }
 }
 
-// A body running out before its end event, or failing to read, ends the stream as failed; one already closed stays closed.
+// A body running out before its end event, failing to read or sending a value that does not decode ends the stream as failed and stops it on the server; one already closed stays closed.
 async function read<T>(reader: ReadableStreamDefaultReader<Uint8Array>, receive: (value: T) => void, end: (final: StreamStatus) => void): Promise<void> {
   const decoder = new TextDecoder()
   let buffer = ''
@@ -93,7 +95,7 @@ async function read<T>(reader: ReadableStreamDefaultReader<Uint8Array>, receive:
 
       buffer += decoder.decode(value, { stream: true })
 
-      const lines = buffer.split('\n')
+      const lines = buffer.split(LINE_BREAK)
 
       buffer = lines.pop() ?? ''
 
@@ -115,6 +117,7 @@ async function read<T>(reader: ReadableStreamDefaultReader<Uint8Array>, receive:
   }
 
   end('failed')
+  await cancel(reader)
 }
 
 async function cancel(reader: ReadableStreamDefaultReader<Uint8Array>): Promise<void> {
