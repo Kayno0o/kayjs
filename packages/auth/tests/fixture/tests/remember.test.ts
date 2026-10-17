@@ -1,6 +1,7 @@
 import { join } from 'node:path'
 import { afterEach, describe, expect, test } from 'bun:test'
 import { testSite } from 'kay/test'
+import { authenticator } from '../../helpers/authenticator'
 import { mails, store } from '../src/auth'
 
 // "Keep me signed in" on the prebuilt pages: one lifetime per choice, whichever way the visitor signs in.
@@ -16,6 +17,8 @@ await browser()
 const { magicLink, password } = await import(join(PAGES, 'sign-in.kay'))
 const { register } = await import(join(PAGES, 'register.kay'))
 const { spend } = await import('../src/routes/auth/magic-link.kay')
+const { passkey, passkeyOptions } = await import(join(PAGES, 'sign-in.kay'))
+const { addPasskey, passkeyOptions: registrationOptions } = await import(join(PAGES, 'account', 'security.kay'))
 
 // The lifetime of the newest session the address signed in with, in seconds unseen.
 async function lifetimeOf(email: string): Promise<number | null> {
@@ -101,6 +104,29 @@ describe('a provider sign-in', () => {
 
       await visitor.visit(`/auth/discord/callback?code=abc&state=${state}`)
       expect(await lifetimeOf(`discord${id}@example.com`)).toBe(expected)
+    }
+  })
+})
+
+describe('a passkey sign-in', () => {
+  test('lasts a day unchecked and rememberMaxAge checked, through the page\'s action', async () => {
+    const device = authenticator({ origin: 'http://localhost' })
+    const owner = await browser()
+
+    await owner.submit(register, { email: 'remember-key@example.com', password: PASSWORD }, { from: await owner.visit('/auth/register') })
+
+    const from = '/auth/account/security'
+    const options = await owner.call(registrationOptions, { password: PASSWORD }, { from })
+
+    await owner.call(addPasskey, { response: await device.create(options as never) }, { from })
+
+    for (const [remember, expected] of [[undefined, DAY], [true, REMEMBERED]] as const) {
+      const visitor = await browser()
+      const asked = await visitor.call(passkeyOptions, {}, { from: '/auth/sign-in' })
+
+      // The sign-in ends in a redirect, which a direct call throws.
+      await expect(visitor.call(passkey, { response: await device.get(asked as never), ...(remember && { remember }) }, { from: '/auth/sign-in' })).rejects.toMatchObject({ status: 303 })
+      expect(await lifetimeOf('remember-key@example.com')).toBe(expected)
     }
   })
 })

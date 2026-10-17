@@ -23,6 +23,9 @@ export const auth = createAuth({
   site: 'Fixture',
   scopes: ['notes:read'],
   pages: {
+    // A run of tests/variants.ts serves the fixture with another landing page and another remember setting, through the environment.
+    ...process.env.FIXTURE_HOME && { home: process.env.FIXTURE_HOME },
+    ...(process.env.FIXTURE_REMEMBER === 'always' || process.env.FIXTURE_REMEMBER === 'never') && { remember: process.env.FIXTURE_REMEMBER },
     profile: {
       fields: { displayName: { label: 'Display name', required: true, maxLength: 20 }, bio: { label: { en: 'Bio', fr: 'Biographie' }, type: 'textarea' }, constructor: { label: 'Constructor' } },
       load: user => profiles.get(user.id) ?? {},

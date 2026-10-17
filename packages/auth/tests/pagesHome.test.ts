@@ -1,7 +1,7 @@
 import type { RememberMode } from '../src/pages'
 import { afterEach, describe, expect, test } from 'bun:test'
 import { discordProvider } from '../src/oauth/providers'
-import { testApp } from './helpers/app'
+import { testApp, userRecord } from './helpers/app'
 import { authenticator } from './helpers/authenticator'
 import { mailbox } from './helpers/mail'
 
@@ -131,5 +131,30 @@ describe('what the pages make of the box', () => {
     expect([true, false, undefined].map(chosen => remembered(features('checkbox'), chosen))).toEqual([true, false, false])
     expect([true, false, undefined].map(chosen => remembered(features('always'), chosen))).toEqual([true, true, true])
     expect([true, false, undefined].map(chosen => remembered(features('never'), chosen))).toEqual([false, false, false])
+  })
+})
+
+describe('the lifetime of a sign-in by emailed code', () => {
+  test('lasts a day when remember is false, rememberMaxAge when true, and sessionMaxAge when the sign-in said nothing', async () => {
+    const { browser, take, store } = setup({ codes: 'code' })
+
+    const DAY = 24 * 60 * 60
+
+    for (const [index, [remember, expected]] of ([[false, DAY], [true, 90 * DAY], [undefined, 30 * DAY]] as const).entries()) {
+      const email = `ada${index}@example.com`
+      const visitor = browser()
+
+      await store.users.create(userRecord({ id: `u${index}`, email, emailVerifiedAt: new Date() }))
+
+      await visitor.call('requestMagicLink', email, undefined, remember === undefined ? {} : { remember })
+
+      const [mail] = await take({ kind: 'magic-link' })
+
+      expect(await visitor.call('signInWithEmailCode', mail!.code!)).toMatchObject({ ok: true })
+
+      const [session] = await store.sessions.listByUser(`u${index}`)
+
+      expect(session!.maxAge).toBe(expected === 30 * DAY ? null : expected)
+    }
   })
 })
