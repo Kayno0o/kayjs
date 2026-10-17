@@ -659,7 +659,7 @@ describe('server-only-import', () => {
 })
 
 describe('deprecated-ui-prop', () => {
-  const imports = 'import Button from \'@kaynooo/kayjs-ui/button.kay\'\nimport Notice from \'@kaynooo/kayjs-ui/notice.kay\'\nimport Popover from \'@kaynooo/kayjs-ui/popover.kay\'\nimport Dialog from \'@kaynooo/kayjs-ui/dialog.kay\'\nimport BarList from \'@kaynooo/kayjs-ui/bar-list.kay\'\nimport Menu from \'@kaynooo/kayjs-ui/menu.kay\'\nimport ConfirmDelete from \'@kaynooo/kayjs-ui/confirm-delete.kay\'\n'
+  const imports = 'import Button from \'@kaynooo/kayjs-ui/button.kay\'\nimport Notice from \'@kaynooo/kayjs-ui/notice.kay\'\nimport Popover from \'@kaynooo/kayjs-ui/popover.kay\'\nimport Dialog from \'@kaynooo/kayjs-ui/dialog.kay\'\nimport BarList from \'@kaynooo/kayjs-ui/bar-list.kay\'\nimport Menu from \'@kaynooo/kayjs-ui/menu.kay\'\nimport ConfirmDelete from \'@kaynooo/kayjs-ui/confirm-delete.kay\'\nimport Carousel from \'@kaynooo/kayjs-ui/carousel.kay\'\n'
   const page = (template: string) => `---\n${imports}---\n${template}\n`
   const found = (template: string) => {
     const source = page(template)
@@ -673,6 +673,17 @@ describe('deprecated-ui-prop', () => {
     expect(found('Button(variant="default") Ok')).toEqual([{ at: 'variant="default"', fix: ['variant="default"->variant="solid"'] }])
     expect(found('Notice(tone="error") Oops')).toEqual([{ at: 'tone="error"', fix: ['tone="error"->tone="danger"'] }])
     expect(found('Menu(variant="danger" label="x")')).toEqual([{ at: 'variant="danger"', fix: ['variant="danger"->variant="solid" tone="danger"'] }])
+  })
+
+  it('rewrites a Carousel autoplay in milliseconds to a duration string', () => {
+    expect(found('Carousel(slides={[]} autoplay={5000})')).toEqual([{ at: 'autoplay={5000}', fix: ['autoplay={5000}->autoplay="5s"'] }])
+    expect(found('Carousel(slides={[]} autoplay={ 800 })')).toEqual([{ at: 'autoplay={ 800 }', fix: ['autoplay={ 800 }->autoplay="800ms"'] }])
+    expect(found('Carousel(slides={[]} autoplay={1500})')).toEqual([{ at: 'autoplay={1500}', fix: ['autoplay={1500}->autoplay="1500ms"'] }])
+  })
+
+  it('leaves a Carousel autoplay that is a string, a variable, zero or spread alone', () => {
+    for (const autoplay of ['autoplay="5s"', 'autoplay={\'5s\'}', 'autoplay={delay}', 'autoplay={0}', 'autoplay={-5}', 'autoplay={5 * 1000}', 'autoplay'])
+      expect(found(`Carousel(slides={[]} ${autoplay})`)).toEqual([])
   })
 
   it('flags the danger variant of a ConfirmDelete without a fix, as it has no tone for the icon', () => {

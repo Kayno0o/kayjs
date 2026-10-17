@@ -2,10 +2,10 @@ import type * as t from '@babel/types'
 import type { CheckDiagnostic, CheckOptions } from '.'
 import { parse } from '@babel/parser'
 import { findProjectFiles } from '../build/files'
+import { millisecondsText } from '../compiler/duration-text'
 import { lintLevel } from '../compiler/lints'
 import { positionAt } from '../compiler/mapping'
 import { parseKay } from '../compiler/parser'
-import { DURATION_TEXT } from '../runtime/duration'
 
 const SOURCE_FILE = /(?:(?<!\.d)\.tsx?|\.kay)$/
 const CMS_PACKAGE = '@kaynooo/kayjs-cms'
@@ -25,7 +25,7 @@ const FUNCTIONS: Record<string, Record<string, Site>> = {
 const COALESCE: Site = { at: 1, key: 'wait' }
 
 // The bare milliseconds that `every`, `debounced`, `rooms.coalesce({ wait })`, `sqliteRooms({ poll })`, `forgejo({ timeout })` and `createDrafts({ delay })` took before 1.52 made them durations, as a number literal at the call is written.
-// The project's own TypeScript files and the script and server fences of its components are read, and only the calls of a name imported from the module that exports it, `coalesce` being any call on a file importing `rooms`; a number held in a variable or written in a template, such as a `Carousel`'s `autoplay`, is not read.
+// The project's own TypeScript files and the script and server fences of its components are read, and only the calls of a name imported from the module that exports it, `coalesce` being any call on a file importing `rooms`; a number held in a variable is not read, and a `Carousel`'s `autoplay` in a template is `deprecated-ui-prop`'s.
 export async function timeMilliseconds(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
   const level = lintLevel('deprecated-time-ms', options.lints)
 
@@ -110,14 +110,13 @@ export async function timeMilliseconds(root: string, options: CheckOptions): Pro
           ? argument
           : argument.properties.find((property): property is t.ObjectProperty => property.type === 'ObjectProperty' && !property.computed && !property.shorthand && (property.key.type === 'Identifier' ? property.key.name === site.key : property.key.type === 'StringLiteral' && property.key.value === site.key))?.value
 
-        // Zero or less is no duration a string could say, and a number held elsewhere is not read.
-        if (value?.type !== 'NumericLiteral' || !(value.value > 0))
+        // A number held elsewhere is not read, nor one no duration string could say.
+        if (value?.type !== 'NumericLiteral')
           return
 
-        const text = value.value % 1000 === 0 ? `${value.value / 1000}s` : `${value.value}ms`
+        const text = millisecondsText(value.value)
 
-        // An exponent or a tiny fraction is no duration a string could say.
-        if (!DURATION_TEXT.test(text))
+        if (text === undefined)
           return
 
         found.push({

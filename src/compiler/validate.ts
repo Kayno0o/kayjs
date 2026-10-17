@@ -7,6 +7,7 @@ import { RESIZABLE } from '../runtime/image'
 import { LOCALE_ATTRIBUTES } from '../runtime/root'
 import { WIDGET_ROLES } from './aria'
 import { childBlocks, FIELD_ATTRIBUTE, FIELD_ELEMENTS, isHead, isSlot, serverIslandOf, templateFacts } from './ast'
+import { millisecondsText } from './duration-text'
 
 type ValidateOptions = Pick<GenerateOptions, 'island' | 'insideIsland' | 'check' | 'special' | 'includeServer'>
 
@@ -18,6 +19,8 @@ interface UiRule {
   value?: string
   // The attribute, or for a value rule the whole attribute, that replaces it; left out when the change is not mechanical.
   to?: string
+  // Set when the old form is a number literal of milliseconds in `{}`, and the new one the duration string it stands for.
+  milliseconds?: true
   // Another attribute that makes the change unsafe to write for the app.
   blockedBy?: string[]
   note: string
@@ -48,6 +51,7 @@ const UI_RULES = new Map<string, UiRule[]>([
   ['bar-list', [EMPTY]],
   ['media-gallery', [EMPTY]],
   ['scatter-chart', [EMPTY]],
+  ['carousel', [{ prop: 'autoplay', milliseconds: true, note: 'a bare number is milliseconds for now, and `autoplay` takes a duration', help: 'Write the duration as a string' }]],
 ])
 
 const BINDABLE = new Set(['input', 'textarea', 'select'])
@@ -500,10 +504,19 @@ class Validator {
 
       const name = this.text(attribute.name)
       const whole = { start: attribute.name.start, end: this.attributeEnd(attribute) }
-      const rule = rules.find(candidate => candidate.prop === name && (candidate.value === undefined || (attribute.kind === 'static' && attribute.text === candidate.value)))
+      const milliseconds = attribute.kind === 'expression' ? millisecondsText(Number(this.text(attribute.expression))) : undefined
+      const rule = rules.find(candidate => candidate.prop === name && (candidate.milliseconds ? milliseconds !== undefined : candidate.value === undefined || (attribute.kind === 'static' && attribute.text === candidate.value)))
 
       if (!rule)
         continue
+
+      if (rule.milliseconds) {
+        const help = `Write ${name}="${milliseconds!}"`
+
+        this.lint(whole, 'deprecated-ui-prop', `\`${name}\` on \`${element.name}\` is the form kayjs-ui replaced in 1.52: ${rule.note}`, { help, fixes: [{ title: help, edits: [{ ...whole, text: `${name}="${milliseconds!}"` }], safe: true }] })
+
+        continue
+      }
 
       const blocked = rule.blockedBy?.some(other => written(other)) ?? false
       const edits = rule.to === undefined || blocked || (rule.value === undefined && written(rule.to)) ? undefined : [rule.value === undefined ? { ...attribute.name, text: rule.to } : { ...whole, text: rule.to }]
