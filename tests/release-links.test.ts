@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import { brokenLinks } from '../scripts/links'
-import { ARCHIVES, releasePages } from '../scripts/whats-new'
+import { ARCHIVES, releasePages, trimArchive } from '../scripts/whats-new'
 import { renderMarkdown } from '../src/content/markdown'
 
 const read = async (path: string) => Bun.file(path).text()
@@ -23,6 +23,16 @@ describe('the release\'s link check', () => {
 
     expect(broken).toHaveLength(1)
     expect(broken[0]).toStartWith(`llms/islands.md: upgrading-archive.md#${anchor}`)
+  })
+
+  it('names the anchor of a section a trim drops when another page links it', async () => {
+    const archive = '# Old\n\nWhat each release before 1.47 added.\n\n## 1.46.0\n\n### Kept\n\n- c\n\n## 1.45.0\n\n### Dropped\n\n- aaaaaaaaaaaaaaaaaaaaaaaaaaaa\n'
+    const trimmed = trimArchive(archive, 150)
+    const islands = (await read('llms/islands.md')).replace('# ', '[Old](upgrading-archive.md#dropped)\n\n# ')
+
+    expect(trimmed).not.toContain('Dropped')
+    expect(await brokenLinks(new Map([['llms/islands.md', islands], ['llms/upgrading-archive.md', trimmed]]))).toContain('llms/islands.md: /llms/upgrading-archive#dropped')
+    expect(await brokenLinks(new Map([['llms/islands.md', islands], ['llms/upgrading-archive.md', archive]]))).not.toContain('llms/islands.md: /llms/upgrading-archive#dropped')
   })
 
   it('finds no broken link in the pages the next release writes', async () => {

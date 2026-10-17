@@ -15,6 +15,7 @@ export const LINK = /\]\(((?:llms\/)?[\w-]+\.md)?(#[\w-]+)?\)/g
 const HOME_LINK = /href[=:] ?["'](\/[\w/-]*?)\/?(?:#([\w-]+))?["']/g
 const LLMS_PREFIX = /^llms\//
 const ARCHIVE_PAGE = /^llms\/[\w-]+-archive\.md$/
+const ARCHIVE_ADVICE = 'an archive loses its oldest sections at a release: link the page, or the current one'
 const ARCHIVE_ANCHOR = /-archive\.md#/
 
 // The links of llms.txt, llms/, the docs content, the library references and the home page that no page of the site answers, each as `file: /path#anchor`.
@@ -62,7 +63,7 @@ export async function brokenLinks(overrides: ReadonlyMap<string, string> = new M
 
       // An archive drops its oldest releases at a release, so a link into one by anchor goes stale.
       if (path !== undefined && anchor !== undefined && ARCHIVE_ANCHOR.test(`${path}${anchor}`) && !ARCHIVE_PAGE.test(file))
-        broken.push(`${file}: ${path}${anchor} (an archive loses its oldest sections at a release: link the page, or the current one)`)
+        broken.push(`${file}: ${path}${anchor} (${ARCHIVE_ADVICE})`)
     }
   }
 
@@ -72,14 +73,20 @@ export async function brokenLinks(overrides: ReadonlyMap<string, string> = new M
       resolve(file, path!, anchor?.slice(1))
 
       if (anchor !== undefined && path!.endsWith('-archive'))
-        broken.push(`${file}: ${path}${anchor} (an archive loses its oldest sections at a release: link the page, or the current one)`)
+        broken.push(`${file}: ${path}${anchor} (${ARCHIVE_ADVICE})`)
     }
   }
 
   // The libraries' llms.txt and topic files, whose links to kay's pages are made links to the site's.
   for (const library of libraries) {
-    for (const [, path, anchor] of library.body.replace(CODE, '').matchAll(SITE_LINK))
-      resolve(`packages/${library.data.library}/${library.data.source}`, path!, anchor?.slice(1))
+    for (const [, path, anchor] of library.body.replace(CODE, '').matchAll(SITE_LINK)) {
+      const from = `packages/${library.data.library}/${library.data.source}`
+
+      resolve(from, path!, anchor?.slice(1))
+
+      if (anchor !== undefined && path!.endsWith('-archive'))
+        broken.push(`${from}: ${path}${anchor} (${ARCHIVE_ADVICE})`)
+    }
   }
 
   // The home page: its cards, features and buttons.
