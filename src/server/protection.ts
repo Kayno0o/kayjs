@@ -12,6 +12,7 @@ import { openSqlite } from '../runtime/sqlite.server'
 import { NAVIGATE_HEADER, WORK_HEADER } from '../runtime/swap'
 import { appStore } from './app-store'
 import { nodeNet } from './builtins'
+import { checkRequestIdHeader } from './config-limits'
 import { onReload } from './reload'
 import { rewrittenAddress } from './rewrite'
 import { sharedKey, stampTime } from './stamp'
@@ -68,19 +69,10 @@ const requestIds = new WeakMap<Request, string>()
 // The header a request's id comes in from a trusted proxy and goes out on, every context holding it; `requestIdHeader` in kay.config.ts renames it.
 // It is one name per process, as the helpers that put it on a response see no app: an app that sets none leaves a name another one set, and two apps naming different ones is refused.
 const DEFAULT_ID_HEADER = 'x-request-id'
-const HEADER_NAME = /^[\w!#$%&'*+.^`|~-]+$/
-// Headers the id would overwrite or echo something else through.
-const RESERVED_HEADERS = new Set(['authorization', 'content-length', 'content-type', 'cookie', 'host', 'location', 'set-cookie'])
 let idHeader = DEFAULT_ID_HEADER
 
 export function requestIdHeader(): string {
   return idHeader
-}
-
-// Refuses a `requestIdHeader` that is no header's name.
-export function checkRequestIdHeader(name: string | undefined): void {
-  if (name !== undefined && (!HEADER_NAME.test(name) || RESERVED_HEADERS.has(name.toLowerCase())))
-    throw new KayError('config-invalid', `kay: requestIdHeader is ${JSON.stringify(name)}; it names a header of its own, such as x-correlation-id`)
 }
 
 export function setRequestIdHeader(name: string | undefined): void {

@@ -1,9 +1,8 @@
-import type { ImagesConfig } from '../config'
+import type { RemoteLimits } from './config-limits'
 import { mkdir, readdir, rm, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { JSON_FILE, writeAtomically } from '../build/files'
-import { byteSize } from '../runtime/byte-size'
-import { durationSeconds } from '../runtime/duration'
+import { FETCH_TIMEOUT_MS, MAX_REMOTE_BYTES } from './config-limits'
 import { overLimit } from './protection'
 
 // One entry of `images.remote`: the origin, a `*.` subdomain wildcard allowed, and the path every URL starts with.
@@ -31,9 +30,6 @@ const PATTERN = /^(https?:)\/\/(\*\.)?([^/*?#@]+)(\/[^*?#]*)?$/i
 const MAX_AGE = /(?:^|,)\s*max-age=(\d+)/i
 const NO_CACHE = /(?:^|,)\s*(?:no-cache|no-store)\b/i
 
-// Past this, a download is cut off unless `images.remoteMaxSize` says otherwise: an image worth resizing is a few megabytes.
-export const MAX_REMOTE_BYTES = 25 * 1024 * 1024
-const FETCH_TIMEOUT_MS = 10_000
 const MAX_REDIRECTS = 3
 // How long an original stays fresh when the host sends no `max-age`, and the bounds one it sends is held to.
 const DEFAULT_FRESH_MS = 60 * 60_000
@@ -46,19 +42,6 @@ const MAX_ORIGINALS = 500
 const DOWNLOADS_PER_MINUTE = 30
 const MINUTE_MS = 60_000
 const DOWNLOADS = 'kay:remote-images'
-
-export interface RemoteLimits {
-  bytes: number
-  timeoutMs: number
-}
-
-// `images.remoteMaxSize` and `images.remoteTimeout` with their defaults, each refused when it is no positive size or duration.
-export function remoteLimits(images: Pick<ImagesConfig, 'remoteMaxSize' | 'remoteTimeout'> | undefined): RemoteLimits {
-  return {
-    bytes: images?.remoteMaxSize === undefined ? MAX_REMOTE_BYTES : Math.floor(byteSize(images.remoteMaxSize, 'images.remoteMaxSize')),
-    timeoutMs: images?.remoteTimeout === undefined ? FETCH_TIMEOUT_MS : Math.round(durationSeconds(images.remoteTimeout, 'images.remoteTimeout') * 1000),
-  }
-}
 
 // `images.remote`, read once as the server boots, each entry refused with what is wrong with it.
 export function remotePatterns(entries: readonly string[] = []): RemotePattern[] {

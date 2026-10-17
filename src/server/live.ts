@@ -2,11 +2,11 @@ import type { Elysia } from 'elysia'
 import type { LiveConfig } from '../config'
 import type { LivePage, LiveRequest, LiveUpdate } from '../runtime/live-value'
 import type { ServerScope } from '../runtime/reactive'
-import { KayError } from '../compiler/errors'
 import { checkLiveWrites, LIVE_ROUTE, liveSlot, PROOF_LIFETIME_MS, slotValue, watchSlot } from '../runtime/live-value'
 import { currentServerScope } from '../runtime/reactive'
 import { encodeValue, unsendable } from '../runtime/wire'
 import { isCrossSite } from './actions'
+import { liveLimits } from './config-limits'
 import { readCapped } from './errors'
 import { eventStream, StreamRefused } from './event-stream'
 import { clientAddress, overLimit } from './protection'
@@ -21,28 +21,12 @@ const MAX_REQUEST_BYTES = 64 * 1024
 // The keys one connection watches, and the length of a key.
 const MAX_WATCHED = 500
 const MAX_KEY_LENGTH = 256
-const DEFAULT_PER_MINUTE = 120
 const MINUTE_MS = 60_000
 const LIMIT = 'kay:live'
 
-// How many connections one client holds at once unless `live.connections` says otherwise: a few tabs, not a flood.
-export const MAX_CONNECTIONS = 20
 // A clock a little ahead of the server's still dates a proof the server made.
 const SKEW_MS = 5000
 const open = new Map<string, number>()
-
-// `live` from kay.config.ts with its defaults, each limit a whole number from 1.
-export function liveLimits(config: LiveConfig | undefined): { connections: number, perMinute: number } {
-  const connections = config?.connections ?? MAX_CONNECTIONS
-  const perMinute = config?.perMinute ?? DEFAULT_PER_MINUTE
-
-  for (const [name, value] of [['connections', connections], ['perMinute', perMinute]] as const) {
-    if (!Number.isSafeInteger(value) || value < 1)
-      throw new KayError('config-invalid', `kay: live.${name} is ${String(value)}; it takes a whole number from 1`)
-  }
-
-  return { connections, perMinute }
-}
 
 // The proof that a page read these keys of these values: whoever holds it is let watch exactly them, as whoever rendered the page was.
 function proofText(keys: [string, string][], at: number): string {

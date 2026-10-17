@@ -2,18 +2,15 @@ import type { AnyElysia, Elysia } from 'elysia'
 import type { HealthConfig } from '../config'
 import type { Duration } from '../runtime/duration'
 import process from 'node:process'
-import { durationSeconds } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
 import { wholeResponse } from './compress'
+import { healthTimeoutMs, shutdownSeconds } from './config-limits'
 import { logMessage } from './log'
 import { START_COMMAND, START_PARENT } from './parent'
 import { requestUrl } from './request-url'
 
 export const HEALTH_PATH = '/_kay/health'
 const DEFAULT_SHUTDOWN_TIMEOUT = 10
-// A check slower than this fails unless `health.timeout` says otherwise, so a hung database never hangs the probe with it.
-const DEFAULT_CHECK_TIMEOUT = 5
-const MAX_TIMER_MS = 2 ** 31 - 1
 
 // Set on `globalThis` while a server watches its parent, so the watch `kay render` preloads, for a server nothing else stops, leaves it the stop.
 const PARENT_WATCHED = Symbol.for('kay.parentWatched')
@@ -59,21 +56,6 @@ export function serveHealth(app: Elysia, lifecycle: Lifecycle, holds: () => bool
 
     return wholeResponse('ok', { headers })
   })
-}
-
-// The milliseconds a health check may take, `health.timeout` read once per use: a value that is no positive duration throws naming the option.
-export function healthTimeoutMs(config: HealthConfig | undefined): number {
-  const ms = durationSeconds(config?.timeout ?? DEFAULT_CHECK_TIMEOUT, 'health.timeout') * 1000
-
-  // A timer past this fires at once.
-  if (ms > MAX_TIMER_MS)
-    throw new Error(`kay: health.timeout is ${String(config?.timeout)}; it takes at most 24 days`)
-
-  return ms
-}
-
-export function shutdownSeconds(timeout: Duration): number {
-  return durationSeconds(timeout, 'shutdownTimeout')
 }
 
 // On SIGTERM, SIGINT or SIGHUP, or once the `kay start` or `kay render` running it is gone, the server stops taking connections, lets the open requests and streams finish, runs the app's `onStop` hooks, then the process exits.
