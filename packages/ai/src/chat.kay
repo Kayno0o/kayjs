@@ -64,6 +64,8 @@ const partial = signal('')
 // The tool calls of the reply being written, as last seen.
 const calls = signal<ToolCall[]>([])
 const failure = signal<string | undefined>(undefined)
+// The last call was refused and its message taken back, so no message waits for an answer that Try again could ask for.
+const takenBack = signal(false)
 const busy = () => waiting() || streaming() !== undefined
 let run: AbortController | undefined
 let field: HTMLTextAreaElement | undefined
@@ -101,6 +103,7 @@ function takeBack() {
     return
 
   history.set(history().slice(0, -1))
+  takenBack.set(true)
   draft.set(draft() === '' ? last.content : `${last.content}\n${draft()}`)
 }
 
@@ -159,6 +162,7 @@ async function send(again = false) {
   run = mine
   pinned = true
   failure.set(undefined)
+  takenBack.set(false)
   partial.set('')
   calls.set([])
   waiting.set(true)
@@ -246,7 +250,7 @@ section.kai-chat(class={className} aria-label={label})
     .kui-notice(role="alert" data-tone="danger")
       | {failure()}
       |
-      if !busy() && history().at(-1)?.role === 'user'
+      if !busy() && !takenBack() && history().at(-1)?.role === 'user'
         button.kui-btn(type="button" onClick={() => void send(true)}) {retryLabel}
   form.kai-chat-form(onSubmit={event => { event.preventDefault(); void send() }})
     textarea.kui-field-input(ref={element => { field = element }} bind:value={draft} rows="1" aria-label={label} placeholder={placeholder} onKeyDown={keyDown})
