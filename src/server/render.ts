@@ -1,6 +1,6 @@
 import type { KayConfig } from '../config'
 import type { ErrorPageContext, FailureOf, Locals, PageContext, PageError, SuccessOf } from '../runtime'
-import type { Outcome } from '../runtime/action'
+import type { Action, Outcome } from '../runtime/action'
 import type { PendingBlock } from '../runtime/await.server'
 import type { EditorProps } from '../runtime/edit'
 import type { HeadOptions, RenderedHead } from '../runtime/head'
@@ -519,8 +519,17 @@ export async function renderServerIslands(route: ServedRoute, context: RequestCo
       // What a block inside an island renders is the island's own, every component of it included.
       const within = (view: () => unknown) => inScope(() => withServerIslands({ ...islands, inside: 1 }, () => renderBlock(view)))
       // The prerendered page holds the checks of the forms it rendered, not of those in a block that settles per request.
-      const checks = client.entry !== undefined && client.navigation === true ? (rendered: Rendered) => inScope(() => formChecks(rendered.forms, options.dev)) : () => ''
-      const settled = await Promise.all(islands.html.map(async html => settleBlocks(html, deferred, within, checks, report)))
+      const posts = client.entry !== undefined && client.navigation === true
+      const settled = await Promise.all(islands.html.map(async (html) => {
+        const forms = new Set<Action<never, unknown>>()
+        const markup = await settleBlocks(html, deferred, within, (rendered) => {
+          for (const form of rendered.forms ?? [])
+            forms.add(form)
+        }, report)
+
+        // After the island's own markup, so no sibling selector meets them.
+        return posts ? markup + inScope(() => formChecks(forms, options.dev, client.entry)) : markup
+      }))
       const base = options.base ?? ''
       const html = base === '' ? settled : await Promise.all(settled.map(async markup => rebaseHtml(new Response(markup, { headers: { 'content-type': 'text/html' } }), base).text()))
 
@@ -541,7 +550,7 @@ export async function renderServerIslands(route: ServedRoute, context: RequestCo
 }
 
 // Every `await` block in the markup swapped for what it settled into, as the island goes out whole.
-async function settleBlocks(html: string, deferred: PendingBlock[], render: (view: () => unknown) => Rendered, checks: (rendered: Rendered) => string, report: (error: unknown) => void): Promise<string> {
+async function settleBlocks(html: string, deferred: PendingBlock[], render: (view: () => unknown) => Rendered, collect: (rendered: Rendered) => void, report: (error: unknown) => void): Promise<string> {
   let markup = html
 
   for (const block of deferred) {
@@ -554,7 +563,9 @@ async function settleBlocks(html: string, deferred: PendingBlock[], render: (vie
 
     const rendered = await settle(block, () => false, report, render)
 
-    markup = markup.slice(0, at) + await settleBlocks(rendered.html, rendered.deferred, render, checks, report) + checks(rendered) + markup.slice(markup.indexOf(end, at) + end.length)
+    collect(rendered)
+
+    markup = markup.slice(0, at) + await settleBlocks(rendered.html, rendered.deferred, render, collect, report) + markup.slice(markup.indexOf(end, at) + end.length)
   }
 
   return markup

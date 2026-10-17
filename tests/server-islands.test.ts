@@ -201,6 +201,9 @@ describe('server islands', () => {
           expect(forms[0]![0]).toEndWith('/send')
           expect(works).toHaveLength(1)
           expect(works[0]![0]).toEndWith('/send')
+          // The entry comes with them, as the prerendered page may hold none, and after the island's own markup.
+          expect(html.match(/src="(?:\/blog)?\/_kay\/entry-[^"]+\.js"/g)).toHaveLength(1)
+          expect(html.indexOf('data-kay-forms')).toBeGreaterThan(html.indexOf('</form>'))
         }
       }
       finally {

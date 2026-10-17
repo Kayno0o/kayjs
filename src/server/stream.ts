@@ -57,13 +57,15 @@ export function renderBlock(view: () => unknown, salt?: string): Rendered {
 }
 
 // What a block settled inside a server island sends for its forms, as the shell of a page would: the schemas, the challenges and the words the browser's check uses; the browser merges every such script it finds.
-export function formChecks(forms: Set<Action<never, unknown>> | undefined, dev?: boolean): string {
-  if (!forms || forms.size === 0)
+export function formChecks(forms: Set<Action<never, unknown>>, dev: boolean | undefined, entry: string | undefined): string {
+  const checked = formsScript(forms, dev)
+  const worked = workScript(forms, false)
+
+  if (checked + worked === '')
     return ''
 
-  const checked = formsScript(forms, dev)
-
-  return checked + workScript(forms, false) + (checked === '' ? '' : messagesScript(new Set(invalidKeys()), true))
+  // The page may not load the entry otherwise: a module script runs once whatever the times it is written.
+  return checked + worked + (checked === '' ? '' : messagesScript(new Set(invalidKeys()), true)) + (entry === undefined ? '' : `<script type="module" async src="${entry}"></script>`)
 }
 
 // Bun closes a connection idle for 10 s by default, and proxies after a minute or so: an empty comment now and then keeps a page whose blocks are slow open.

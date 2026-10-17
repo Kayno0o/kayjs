@@ -182,7 +182,7 @@ catch
 - A block renders on its own, outside its layouts, and an `await` inside a pending block renders its own pending block only.
 - The response stays open until the last value settles, an empty comment going out every 5 seconds meanwhile, so neither Bun, which closes a connection idle for 10 seconds by default, nor a proxy in front closes it under a slow value.
 - In an island, the server sends the pending block and the browser renders the rest once the value settles.
-- A form inside a block is checked and sent by kay as one in the page is: the block brings its schema, its proof-of-work challenge (also inside a server island), the page's `kay.invalid.*` words and the entry when the page has none.
+- A form inside a block is checked and sent by kay as one in the page is: the block brings its schema, its proof-of-work challenge (also inside a server island, which brings the entry too), the page's `kay.invalid.*` words and the entry when the page has none.
 
 #### A value that arrives in parts
 
