@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 import process from 'node:process'
-import { fakeAi } from '@kaynooo/kayjs-ai'
+import { ai, fakeAi } from '@kaynooo/kayjs-ai'
 import { afterEach, expect, test } from 'bun:test'
 import { testSite } from 'kay/test'
 import { reply } from '../src/routes/chat.kay'
@@ -53,4 +53,23 @@ test('an action refuses a system message before anything is asked', async () => 
 
   expect(refused.status).toBeGreaterThanOrEqual(400)
   expect(fakeAi.asked).toEqual([])
+})
+
+test('a visitor over the limit gets 429 and words from the chat action, nothing asked of the model', async () => {
+  ai({ limit: { max: 1, window: '1m' } })
+
+  try {
+    const input = { messages: [{ role: 'user' as const, content: 'Hi' }] }
+
+    await site.call(reply, input)
+
+    const refusal = await site.refusal(reply, input)
+
+    expect(refusal.status).toBe(429)
+    expect(refusal.errors['']).toMatch(/^Too many questions; try again in \d+ s$/)
+    expect(fakeAi.asked).toHaveLength(1)
+  }
+  finally {
+    ai()
+  }
 })

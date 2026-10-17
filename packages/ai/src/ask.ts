@@ -33,7 +33,8 @@ export function ask(prompt: string | Message[], options: AskOptions = {}): Reply
     throw new Error('kayjs-ai: no model to ask; set AI_MODEL or pass { model }')
 
   const request = currentRequest()
-  const asker = { request, visitor: options.visitor, chars: messages.reduce((sum, message) => sum + message.content.length, options.system?.length ?? 0) }
+  const maxTokens = options.maxTokens ?? DEFAULT_MAX_TOKENS
+  const asker = { request, visitor: options.visitor, chars: messages.reduce((sum, message) => sum + message.content.length, options.system?.length ?? 0), maxTokens }
 
-  return createReply(signal => guarded(() => provider.stream({ messages, system: options.system, model, maxTokens: options.maxTokens ?? DEFAULT_MAX_TOKENS, temperature: options.temperature }, signal), asker), [request?.signal, options.signal])
+  return createReply(signal => guarded(() => provider.stream({ messages, system: options.system, model, maxTokens, temperature: options.temperature }, signal), asker, signal), [request?.signal, options.signal])
 }

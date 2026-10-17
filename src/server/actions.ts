@@ -72,14 +72,14 @@ function refusalOf(error: unknown): Refused | undefined {
   if (!Number.isInteger(status) || status! < 400 || status! > 599 || typeof message !== 'string')
     return undefined
 
-  return { status: status!, retryAfter: Number.isFinite(retryAfter) ? retryAfter : undefined, message }
+  return { status: status!, retryAfter: Number.isInteger(retryAfter) && retryAfter! >= 0 ? retryAfter : undefined, message }
 }
 
-// The action's own wording of a rate limit wins, given the seconds to wait.
-function refusalMessage(action: ServerAction<TSchema, unknown>, { retryAfter, message }: Refused): string {
+// The action's own wording of a rate limit wins for a 429, given the seconds to wait.
+function refusalMessage(action: ServerAction<TSchema, unknown>, { status, retryAfter, message }: Refused): string {
   const words = action.protection?.messages?.rateLimit
 
-  if (words === undefined || retryAfter === undefined)
+  if (status !== 429 || words === undefined || retryAfter === undefined)
     return message
 
   return typeof words === 'string' ? words : words(retryAfter)

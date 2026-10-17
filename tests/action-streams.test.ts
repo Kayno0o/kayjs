@@ -34,6 +34,8 @@ const actions = await import(join(fixture, 'routes/index.kay')) as {
   refuses: Action<{ full: boolean }, AsyncIterable<string>>
   libraryLimited: Action<Record<never, never>, AsyncIterable<string>>
   libraryWorded: Action<Record<never, never>, AsyncIterable<string>>
+  libraryBroken: Action<{ refusal: unknown }, AsyncIterable<string>>
+  libraryForbidden: Action<Record<never, never>, AsyncIterable<string>>
 }
 const { secret } = await import(join(fixture, 'routes/members/index.kay')) as { secret: Action<Record<never, never>, AsyncIterable<string>> }
 const { seen } = await import(join(fixture, 'seen.ts')) as { seen: { started: number, stopped: number, slowStopped: number, quietStopped: number } }
@@ -167,6 +169,26 @@ describe('an action returning an async iterable', () => {
     expect(worded.status).toBe(429)
     expect(worded.headers.get('retry-after')).toBe('42')
     expect(await worded.text()).toContain('Back in 42 s')
+  })
+
+  it('answers a malformed refusal as a server error, and keeps a bad Retry-After off the header', async () => {
+    for (const refusal of [{ status: 200, message: 'ok' }, { status: Number.NaN, message: 'x' }, { status: '429', message: 'x' }, { status: 429 }, { status: 429, message: 5 }, 'text', 7, null, []])
+      expect((await posted(actions.libraryBroken, { refusal })).status).toBe(500)
+
+    for (const retryAfter of [-3, 1.5, Number.NaN, '5', null]) {
+      const answered = await posted(actions.libraryBroken, { refusal: { status: 429, retryAfter, message: 'Wait' } })
+
+      expect(answered.status).toBe(429)
+      expect(answered.headers.get('retry-after')).toBeNull()
+    }
+  })
+
+  it('leaves the wording of a refusal that is no 429 to the library, its status and Retry-After kept', async () => {
+    const answered = await posted(actions.libraryForbidden)
+
+    expect(answered.status).toBe(403)
+    expect(answered.headers.get('retry-after')).toBe('7')
+    expect(await answered.text()).toContain('Not you')
   })
 
   it('counts its rate limit before the first value', async () => {

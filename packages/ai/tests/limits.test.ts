@@ -7,7 +7,7 @@ import { memoryRates, sqliteRates } from 'kay/server'
 import { answeringRequest } from '../../../src/server/log'
 import { sendFrom } from '../../../src/server/rewrite'
 import { ai, AiError, ask, fakeAi } from '../src'
-import { forgetCounts } from '../src/limits'
+import { forgetCounts, storeTimeout } from '../src/limits'
 
 const REFUSED = Symbol.for('kay.refused')
 
@@ -16,6 +16,7 @@ beforeEach(() => forgetCounts())
 afterEach(() => {
   ai()
   forgetCounts()
+  storeTimeout(5000)
   fakeAi.clear()
 })
 
@@ -214,7 +215,7 @@ describe('ai({ budget })', () => {
     await ask('b', { visitor: 'v' })
   })
 
-  it('counts every ask of those started together, so a race passes the budget by the replies in flight and loses none', async () => {
+  it('holds what a running reply may use, so asks started together are refused past the budget rather than all passing', async () => {
     const store = tracking()
     const count = 8
 
@@ -225,14 +226,47 @@ describe('ai({ budget })', () => {
 
     const results = await Promise.allSettled(Array.from({ length: count }, async (_, index) => ask(`q${index}`, { visitor: 'v' })))
 
-    // Each passed the check before any finished, and each was counted: 8 x (1 input + 10 output).
-    expect(results.every(result => result.status === 'fulfilled')).toBe(true)
-    expect(store.count()).toBe(count * 11)
-    expect((await failure(ask('late', { visitor: 'v' }))).limit).toBe('budget')
+    // The first holds its worst case (its input and maxTokens), so every other is refused while it runs.
+    expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(1)
+    expect(results.filter(result => result.status === 'rejected')).toHaveLength(count - 1)
+    expect(store.count()).toBe(11)
   })
 
-  it('bounds the overshoot of a race by the limit beside it', async () => {
-    ai({ limit: { max: 3, window: '1m' }, budget: { tokens: 20, window: '1m' } })
+  it('holds the worst case of a reply per visitor and in total, and lets it go when the reply ends, fails or is stopped', async () => {
+    ai({ budget: { tokens: 10_000, total: 10_000, window: '1m' } })
+
+    const open = { name: 's', model: 'm', async* stream(_: unknown, signal: AbortSignal) {
+      yield { text: 'a' }
+      await new Promise(resolve => signal.addEventListener('abort', resolve))
+    } }
+    // Each holds 4096 + 1 tokens of the 10,000: the third finds 8,194 held and passes, the fourth finds 12,291 and is refused.
+    const running = Array.from({ length: 3 }, () => ask('x', { visitor: 'v', provider: open }))
+    const readers = running.map(reply => reply[Symbol.asyncIterator]())
+
+    await Promise.all(readers.map(async reader => reader.next()))
+
+    const refused = await failure(ask('x', { visitor: 'v' }))
+
+    expect(refused.limit).toBe('budget')
+    // Another visitor holds nothing, and meets the total.
+    expect((await failure(ask('x', { visitor: 'w' }))).limit).toBe('total')
+
+    for (const reply of running)
+      reply.stop()
+
+    await Promise.all(running)
+    await ask('x', { visitor: 'v' })
+    await ask('x', { visitor: 'w' })
+  })
+
+  it('lets a failing reply release what it held', async () => {
+    ai({ budget: { tokens: 5000, window: '1m' } })
+    await failure(ask('x', { visitor: 'v', provider: saying([], new AiError('unavailable', 'down')) }))
+    await ask('x', { visitor: 'v' })
+  })
+
+  it('lets a burst through up to the limit when the budget has room for what they hold', async () => {
+    ai({ limit: { max: 3, window: '1m' }, budget: { tokens: 100_000, window: '1m' } })
 
     for (let index = 0; index < 10; index++)
       fakeAi.reply(usedBy(10))
@@ -283,7 +317,38 @@ describe('ai({ budget })', () => {
     reply.stop()
     await reply
     // The provider's input count was known, the output one not: the text received stands for it.
-    expect(store.count()).toBeGreaterThanOrEqual(3)
+    expect(store.count()).toBe(10)
+  })
+
+  it('counts the input of a reply stopped before the provider said anything, which it may already be reading', async () => {
+    const store = tracking()
+
+    ai({ budget: { tokens: 1000, window: '1m', store } })
+
+    const reply = ask('abcd'.repeat(25), { visitor: 'v', provider: { name: 's', model: 'm', async* stream(_, signal) {
+      await new Promise(resolve => signal.addEventListener('abort', resolve))
+      yield* []
+    } } })
+    const reading = reply[Symbol.asyncIterator]()
+    const first = reading.next()
+
+    await Bun.sleep(10)
+    reply.stop()
+    await first
+    expect(store.count()).toBe(25)
+  })
+
+  it('asks nothing and counts nothing for a reply stopped before it began', async () => {
+    const store = tracking()
+
+    ai({ budget: { tokens: 1000, window: '1m', store } })
+
+    const controller = new AbortController()
+
+    controller.abort()
+    await ask('a', { visitor: 'v', signal: controller.signal })
+    expect(store.keys.size).toBe(0)
+    expect(fakeAi.asked).toEqual([])
   })
 
   it('opens a fresh window once the last closed', async () => {
@@ -344,6 +409,47 @@ describe('when the store fails', () => {
     ai({ budget: { tokens: 5, window: '1m', store: broken } })
     expect((await failure(ask('a', { visitor: 'v' }))).kind).toBe('unavailable')
     expect(fakeAi.asked).toEqual([])
+  })
+
+  it('refuses the ask when the store hangs, rather than hang the chat', async () => {
+    const hanging = { hit: async () => new Promise<never>(() => undefined), peek: async () => new Promise<never>(() => undefined) }
+
+    storeTimeout(30)
+    ai({ limit: { max: 5, window: '1m', store: hanging } })
+
+    const refused = await failure(ask('a', { visitor: 'v' }))
+
+    expect(refused.kind).toBe('unavailable')
+    expect(refused.message).toContain('did not answer')
+
+    ai({ budget: { tokens: 5, window: '1m', store: hanging } })
+    expect((await failure(ask('a', { visitor: 'v' }))).kind).toBe('unavailable')
+  })
+
+  it('ends the reply when the store hangs as the tokens are counted', async () => {
+    const hanging = { hit: async () => new Promise<never>(() => undefined), peek: () => undefined }
+
+    storeTimeout(30)
+    ai({ budget: { tokens: 5000, window: '1m', store: hanging } })
+    fakeAi.reply('fine')
+    expect(await ask('a', { visitor: 'v' })).toBe('fine')
+  })
+
+  it('shares one store between the limit and the budget without mixing their counts', async () => {
+    const store = tracking()
+
+    ai({ limit: { max: 1, window: '1m', store }, budget: { tokens: 1000, window: '1m', store } })
+    await ask('a', { visitor: 'v' })
+    expect((await failure(ask('b', { visitor: 'v' }))).limit).toBe('asks')
+    expect(store.keys.size).toBe(2)
+  })
+
+  it('logs a store that adds one to the count whatever the weight, rather than fail the reply', async () => {
+    const ignoring = { hit: () => ({ count: 1, resetAt: Date.now() + 1000 }), peek: () => undefined }
+
+    ai({ budget: { tokens: 1000, window: '1m', store: ignoring } })
+    fakeAi.reply(usedBy(10))
+    expect(await ask('a', { visitor: 'v' })).toBe(usedBy(10))
   })
 
   it('keeps the reply when the store fails only as the tokens are counted', async () => {

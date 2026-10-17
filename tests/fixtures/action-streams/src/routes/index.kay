@@ -112,6 +112,15 @@ function libraryLimit() {
   return Object.assign(new Error('over the limit'), { [Symbol.for('kay.refused')]: { status: 429, retryAfter: 42, message: 'Slow down' } })
 }
 
+// An error whose refusal is malformed: a library's mistake or hostile data must not become a header or a success status.
+export const libraryBroken = action(t.Object({ refusal: t.Any() }), ({ refusal }) => (async function* () {
+  throw Object.assign(new Error('odd'), { [Symbol.for('kay.refused')]: refusal })
+})())
+
+export const libraryForbidden = action(() => (async function* () {
+  throw Object.assign(new Error('no'), { [Symbol.for('kay.refused')]: { status: 403, retryAfter: 7, message: 'Not you' } })
+})(), { messages: { rateLimit: 'Slow down' } })
+
 export const libraryLimited = action(() => (async function* () {
   throw libraryLimit()
 })())

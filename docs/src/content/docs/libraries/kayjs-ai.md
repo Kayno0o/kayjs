@@ -141,17 +141,21 @@ export default defineConfig({
 
 `limit` caps how many questions one visitor asks in a window. `budget.tokens` caps the tokens the answers to one visitor may use, and `budget.total` the tokens used for everyone. `ask` reads these on its own, so nothing changes where you call it.
 
-A visitor is counted by address. To count a signed-in user instead, pass `visitor`, a function from the request to the user's id. In a job with no request, name the visitor with `ask(prompt, { visitor })`, or leave it out: only `total` counts then.
+A visitor is counted by address. Behind a reverse proxy, set kay's `proxy` option, or every visitor shares the proxy's address and one quota.
+
+To count a signed-in user instead, pass `visitor`, a function from the request to the user's id, read from your session. Never take it from a header or cookie the visitor can set, or they get a fresh budget on every request. A free signup gives each account its own budget, which only `total` caps. In a job with no request, name the visitor with `ask(prompt, { visitor })`, or leave it out: only `total` counts then.
 
 The budget counts tokens, not money, because prices change too often to ship a table. Pick `tokens` from the price of your model.
 
 The count lives in memory and starts over with the server. Give `store` a `sqliteRates(path)` to keep it across restarts and share it between processes. A budget store must be able to `peek`, as both of kay's stores can.
 
-Tokens are added when a reply ends, with the count the provider reports. A reply that goes over the budget while it streams is let finish, and all of it counts. The next question is refused. Questions started at the same moment all pass the check before any of them ends, so set `limit` beside the budget to bound how many can start.
+Tokens are added when a reply ends, with the count the provider reports. A reply that goes over the budget while it streams is let finish, and all of it counts. The next question is refused.
 
-Over a limit, `ask` throws an `AiError` of kind `limited`. It has `retryAfter`, the seconds until the window closes, and `limit`, which says whether it was `asks`, `budget` or `total`. Nothing is sent to the provider. An action that lets it out answers 429 with a `Retry-After` header, as its own `rateLimit` would, and the chat shows `Too many questions; try again in 12 s`. Set `messages.rateLimit` on the action to word it yourself.
+While a reply runs, it holds its worst case against the budget: its input plus `maxTokens`. So questions started at the same moment cannot all slip through. A visitor close to the budget cannot start a second reply until the first ends. Other servers sharing a `store` do not see these holds.
 
-If the store fails when the limit is read, the question is refused with kind `unavailable`, so a broken store never leaves the chat unlimited. If it fails when the tokens are added, the answer still goes out and the failure is logged.
+Over a limit, the reply fails with an `AiError` of kind `limited`, when you `await` it or first read it. It has `retryAfter`, the seconds until the window closes, and `limit`, which says whether it was `asks`, `budget` or `total`. Nothing is sent to the provider. An action that lets it out answers 429 with a `Retry-After` header, as its own `rateLimit` would, and the chat shows `Too many questions; try again in 12 s`. Set `messages.rateLimit` on the action to word it yourself.
+
+If the store fails or takes more than five seconds when the limit is read, the question is refused with kind `unavailable`, so a broken store never leaves the chat unlimited. If it fails when the tokens are added, the answer still goes out and the failure is logged.
 
 <ReadMore href="/llms/kayjs-ai-limits">Every option, when tokens count, and what a failing store does.</ReadMore>
 
