@@ -53,7 +53,7 @@ export function followCaches(): void {
     meanwhile.clear()
   }
 
-  const keys = JSON.stringify([...next.keys()].toSorted())
+  const keys = JSON.stringify([...next.keys()].sort())
 
   if (connection?.keys === keys)
     return

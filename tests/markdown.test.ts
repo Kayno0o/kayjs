@@ -1,6 +1,6 @@
+import { describe, expect, it } from 'bun:test'
 import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { join } from 'node:path'
-import { describe, expect, it } from 'bun:test'
 import { buildClient } from '../src/build/client'
 import { renderMarkdown } from '../src/content'
 import { sanitizedMarkdown } from '../src/runtime/markdown'
@@ -175,8 +175,8 @@ describe('markdownHtml', () => {
       expect(marked(note!.modules)).toBe(true)
       expect(marked(counter!.modules)).toBe(false)
       expect(marked(report!.entry!.modules)).toBe(false)
-      // marked and the renderer matching Bun.markdown's HTML, minified and gzipped.
-      expect(note!.size.gzip - counter!.size.gzip).toBeLessThan(16_000)
+      // marked and the renderer matching Bun.markdown's HTML, minified and gzipped, plus the runtime modules only the note uses, which its own chunk carries.
+      expect(note!.size.gzip - counter!.size.gzip).toBeLessThan(17_000)
     }
     finally {
       await rm(root, { recursive: true, force: true })

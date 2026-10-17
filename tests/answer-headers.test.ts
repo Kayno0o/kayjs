@@ -1,7 +1,7 @@
 import type { ClientBuild } from '../src/server/client'
+import { beforeAll, describe, expect, it } from 'bun:test'
 import { rm } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
-import { beforeAll, describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
 import { files, memoryFiles, pages } from '../src/server'
 import { serveBuildFiles } from '../src/server/build-files'
@@ -19,6 +19,7 @@ const SECURITY = {
   'x-frame-options': 'SAMEORIGIN',
   'x-permitted-cross-domain-policies': 'none',
   'x-request-id': '<id>',
+  'x-kay-build': '<build>',
 }
 const IMMUTABLE = 'public, max-age=31536000, immutable'
 const JSON_TYPE = 'application/json;charset=utf-8'
@@ -33,6 +34,8 @@ function shape(response: Response): Record<string, string> {
 
     if (name === 'x-request-id')
       seen[name] = '<id>'
+    else if (name === 'x-kay-build')
+      seen[name] = '<build>'
     else
       seen[name] = name === 'set-cookie' ? value.replace(/=[^;]*/g, '=<value>') : value
   }

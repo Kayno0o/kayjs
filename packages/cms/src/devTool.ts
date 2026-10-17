@@ -1,5 +1,4 @@
 import type { DevTool } from 'kay/dev-tool'
-import { screenPath } from './paths'
 
 // The dev tool's CMS tab, a browser module kay loads on dev pages: whether this visitor is in edit mode, with a toggle for the page they are on.
 const STATE_URL = '/_kay/cms'
@@ -19,6 +18,11 @@ function sitePath(): string {
   const mount = base()
 
   return `${location.pathname.startsWith(mount) ? location.pathname.slice(mount.length) || '/' : location.pathname}${location.search}`
+}
+
+// `screenPath` of ./paths, copied: kay serves this module as one file, with no import of its own.
+function screenPath(prefix: string, path = ''): string {
+  return `${prefix === '/' ? '' : prefix}${path}` || '/'
 }
 
 export default function cmsDevTool(tool: DevTool): void {
