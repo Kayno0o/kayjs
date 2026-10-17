@@ -24,6 +24,11 @@ export const ERRORS = {
     summary: 'A command that could not run as asked: a path that does not exist or is no project, a flag it does not take, flags that do not go together.',
     fix: { file: 'llms/project.md', heading: 'Commands' },
   },
+  'extension-command': {
+    group: 'command',
+    summary: 'A command an extension adds to `kay` whose module does not load or does not export a `KayCommand` by default.',
+    fix: { file: 'llms/component-libraries.md', heading: 'Extensions' },
+  },
   'template-syntax': {
     group: 'compile',
     summary: 'A template line kay cannot read: indentation, an unclosed `(` or string, a malformed `for`, `const`, `await` or `match`, an attribute that is neither a quoted string nor a `{expression}`.',
@@ -131,7 +136,7 @@ export const ERRORS = {
   },
   'locales-invalid': {
     group: 'build',
-    summary: 'An `i18n` config that does not hold together: no locales, a tag that is none, a default outside the locales, domains and `prefixDefault` together, `paths` naming a page that does not exist, or a catalog that exports no messages.',
+    summary: 'An `i18n` config that does not hold together: no locales, a tag that is none, a default outside the locales, domains and `prefixDefault` together, `paths` naming a page that does not exist, a catalog that exports no messages or not as `defineMessages`, or `writeDraftMessages` given a locale the config does not translate.',
     fix: { file: 'llms/locales.md', heading: 'Configuring locales' },
   },
   'font-invalid': {

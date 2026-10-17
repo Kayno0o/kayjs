@@ -4,6 +4,7 @@ import type { KayConfig } from '../config'
 import type { Message } from '../runtime/i18n'
 import { existsSync } from 'node:fs'
 import { parse } from '@babel/parser'
+import { KayError } from '../compiler/errors'
 import { messagesFile } from './i18n'
 
 const COMMENTS = /\/\/[^\n]*|\/\*[\s\S]*?\*\//g
@@ -45,10 +46,10 @@ export async function writeDraftMessages(root: string, config: Pick<KayConfig, '
   const { i18n } = config
 
   if (!i18n)
-    throw new Error('kay: writeDraftMessages writes a locale\'s messages, and kay.config.ts sets no i18n')
+    throw new KayError('locales-invalid', 'kay: writeDraftMessages writes a locale\'s messages, and kay.config.ts sets no i18n')
 
   if (!i18n.locales.includes(locale) || locale === i18n.defaultLocale)
-    throw new Error(`kay: writeDraftMessages was given the locale ${JSON.stringify(locale)}, which is not one of those translated from ${i18n.defaultLocale}: ${i18n.locales.filter(code => code !== i18n.defaultLocale).join(', ')}`)
+    throw new KayError('locales-invalid', `kay: writeDraftMessages was given the locale ${JSON.stringify(locale)}, which is not one of those translated from ${i18n.defaultLocale}: ${i18n.locales.filter(code => code !== i18n.defaultLocale).join(', ')}`)
 
   const file = messagesFile(root, i18n, locale)
   let source = existsSync(file) ? await Bun.file(file).text() : 'import { defineMessages } from \'kay/i18n\'\n\nexport default defineMessages({})\n'
@@ -90,7 +91,7 @@ function withMessage(source: string, parts: string[], message: Message, style: S
   let object: t.ObjectExpression | undefined = messagesObject(source)
 
   if (!object)
-    throw new Error('kay: the messages file does not export its messages as `export default defineMessages({ ... })`')
+    throw new KayError('locales-invalid', 'kay: the messages file does not export its messages as `export default defineMessages({ ... })`')
 
   for (const [index, part] of parts.entries()) {
     const found: t.ObjectProperty | undefined = object.properties.find((property): property is t.ObjectProperty => property.type === 'ObjectProperty' && keyName(property) === part)

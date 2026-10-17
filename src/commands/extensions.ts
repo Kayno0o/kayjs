@@ -3,6 +3,7 @@ import type { KayConfig } from '../config'
 import type { KayCommand } from './command'
 import { existsSync } from 'node:fs'
 import { join, resolve } from 'node:path'
+import { KayError } from '../compiler/errors'
 import { CONFIG_FILE, loadConfig } from '../config'
 import { buildingWithoutEnv } from '../server/env-state'
 
@@ -72,11 +73,11 @@ export async function loadCommand(command: ExtensionCommand): Promise<KayCommand
     loaded = (await import(command.module) as { default?: KayCommand }).default
   }
   catch (error) {
-    throw new Error(`kay: ${command.module}, which the extension ${command.extension} gives as \`kay ${command.name}\`, does not load: ${error instanceof Error ? error.message : String(error)}`)
+    throw new KayError('extension-command', `kay: ${command.module}, which the extension ${command.extension} gives as \`kay ${command.name}\`, does not load: ${error instanceof Error ? error.message : String(error)}`)
   }
 
   if (typeof loaded?.run !== 'function' || typeof loaded.usage !== 'string')
-    throw new Error(`kay: ${command.module}, which the extension ${command.extension} gives as \`kay ${command.name}\`, does not export a command by default: export default { usage, options, positionals, run } satisfies KayCommand`)
+    throw new KayError('extension-command', `kay: ${command.module}, which the extension ${command.extension} gives as \`kay ${command.name}\`, does not export a command by default: export default { usage, options, positionals, run } satisfies KayCommand`)
 
   return loaded
 }

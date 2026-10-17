@@ -4,6 +4,7 @@ import type { Message, MessageTree } from '../runtime/i18n'
 import { existsSync } from 'node:fs'
 import { relative, resolve } from 'node:path'
 import process from 'node:process'
+import { KayError } from '../compiler/errors'
 import { PROBLEMS_MARKER } from '../content/claims'
 import { flattenMessages, isPlural, MESSAGE_TAG } from '../runtime/i18n'
 import { buildingWithoutEnv } from '../server/env-state'
@@ -117,7 +118,7 @@ export async function missingMessages(root: string, config: I18nConfig, extensio
   const missing = new Map<string, Map<string, Message>>()
 
   if ('problem' in reference)
-    throw new Error(`kay: ${reference.problem.file} ${reference.problem.message}`)
+    throw new KayError('locales-invalid', `kay: ${reference.problem.file} ${reference.problem.message}`)
 
   for (const locale of config.locales) {
     if (locale === config.defaultLocale)
