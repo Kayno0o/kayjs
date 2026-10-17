@@ -394,7 +394,16 @@ function tagEnd(text: string, from: number, tag: string, line: number, quoted: b
 
     const marked = lineStart + BLOCKQUOTE_MARKERS.exec(text)![0].length
 
-    return marked > end ? space(marked) : end
+    if (marked <= end)
+      return end
+
+    // A line of markers and nothing else, deeper than one `>`, ends with the tag's close.
+    const rest = text.indexOf('\n', marked)
+
+    if (BLANK.test(text.slice(marked, rest === -1 ? undefined : rest)) && text.indexOf('>', lineStart) < text.lastIndexOf('>', marked - 1))
+      return text.lastIndexOf('>', marked - 1)
+
+    return space(marked)
   }
 
   const refuse = (message: string) => {

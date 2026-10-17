@@ -421,6 +421,12 @@ describe('compiling Markdown', () => {
     expect((await compileMarkdown('> <Chart a="1">\n>\n> in\n>\n> </Chart>\n', 1)).segments).toContainEqual({ component: 'Chart', props: { a: '1' }, children: ['\n<p>in</p>\n'], line: 1 })
   })
 
+  it('reads a > alone after the markers of a later line as the close of a quoted tag, and a lone marker run as markers', async () => {
+    expect((await compileMarkdown('> <Chart a="1"\n> >\n> </Chart>\n', 1)).segments).toContainEqual(expect.objectContaining({ component: 'Chart', props: { a: '1' } }))
+    expect((await compileMarkdown('> > <Chart a="1"\n> > >\n> > </Chart>\n', 1)).segments).toContainEqual(expect.objectContaining({ component: 'Chart', props: { a: '1' } }))
+    expect((await compileMarkdown('> <Chart a="1"\n>\n> b="2" />\n', 1)).segments).toContainEqual({ component: 'Chart', props: { a: '1', b: '2' }, children: [], line: 1 })
+  })
+
   it('comes out escaped for a prose-fallback tag, with no live element', async () => {
     expect(await bodyHtml('<A/onfocus=alert(1)')).toBe('<p>&lt;A/onfocus=alert(1)</p>\n')
     expect(await bodyHtml('<A/onfocus=alert(1)\n\n>')).toBe('<p>&lt;A/onfocus=alert(1)</p>\n<blockquote>\n</blockquote>\n')
