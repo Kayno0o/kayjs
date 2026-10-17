@@ -281,10 +281,21 @@ function replaceTags(text: string, startLine: number, components: ExtractedCompo
     return current
   }
 
+  // The last `>` outside code spans, so a tag whose `>` sits past a code span is still told apart from prose.
+  let lastClose = -1
+
+  outsideCodeSpans(text, (part, offset) => {
+    const close = part.lastIndexOf('>')
+
+    if (close !== -1)
+      lastClose = offset + close
+
+    return part
+  })
+
   return outsideCodeSpans(text, (part, offset) => {
     let result = ''
     let copied = 0
-    const lastClose = part.lastIndexOf('>')
 
     COMPONENT_TAG.lastIndex = 0
 
@@ -292,7 +303,7 @@ function replaceTags(text: string, startLine: number, components: ExtractedCompo
       const [start, closing, name] = match
       const line = lineAt(offset + match.index)
       const from = match.index + start.length
-      const end = tagEnd(part, from, `${closing}${name}`, line, lastClose)
+      const end = tagEnd(part, from, `${closing}${name}`, line, lastClose - offset)
 
       // Prose such as `if 1<A then`, setting no attribute and with no `>` after it.
       if (end === -1)
@@ -334,7 +345,7 @@ function placeholder(closing: boolean, name: string, inside: string, line: numbe
 }
 
 // Where the component tag whose name ends at `from` ends, past its `>`, quoted text and JSON of any depth read whole.
-// A tag kay cannot read throws rather than reach the page as text, unless it sets no attribute and no `>` follows it, as prose such as `if 1<A then` reads: then -1.
+// A tag kay cannot read throws rather than reach the page as text, unless it sets no attribute value and no `>` follows it in its block outside code spans (`lastClose`, relative to the text), as prose such as `if 1<A then` reads: then -1.
 function tagEnd(text: string, from: number, tag: string, line: number, lastClose: number): number {
   let at = from
   let valued = false

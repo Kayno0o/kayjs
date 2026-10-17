@@ -351,6 +351,47 @@ describe('compiling Markdown', () => {
     expect(segments.every(segment => typeof segment === 'string')).toBe(true)
   })
 
+  it.each([
+    ['a code span, then the >', 'Intro\n\n<Chart foo `x` >\n'],
+    ['a code span in the tag, then a >', '<Chart foo `x` bar> text\n'],
+  ])('refuses a valueless tag whose > sits past a code span: %s', async (_name, source) => {
+    await expect(compileMarkdown(source, 1)).rejects.toMatchObject({ code: 'markdown-invalid' })
+  })
+
+  it.each([
+    ['a > only inside a code span', 'x <Foo `a > b`\n'],
+    ['a blank line before the >', '<Chart foo\n\nmore >\n'],
+    ['nothing after it', 'Intro\n\n<Chart stray'],
+  ])('leaves a valueless tag with no later > in its block as text: %s', async (_name, source) => {
+    const { segments } = await compileMarkdown(source, 1)
+
+    expect(segments.every(segment => typeof segment === 'string')).toBe(true)
+  })
+
+  it('comes out escaped for a prose-fallback tag, with no live element', async () => {
+    expect(await bodyHtml('<A/onfocus=alert(1)')).toBe('<p>&lt;A/onfocus=alert(1)</p>\n')
+  })
+
+  it('reads hostile valueless tags in linear time', async () => {
+    const units = ['<A `x` ', '<A <B ', '<A/', '<A `']
+    const times: number[] = []
+
+    for (const count of [200_000, 400_000]) {
+      const start = performance.now()
+
+      for (const unit of units) {
+        try {
+          await compileMarkdown(unit.repeat(count), 1)
+        }
+        catch {}
+      }
+
+      times.push(performance.now() - start)
+    }
+
+    expect(times[1]!).toBeLessThan(times[0]! * 4 + 500)
+  }, 60_000)
+
   it('leaves a tag kay cannot read alone in code', async () => {
     const { segments } = await compileMarkdown('`<Chart rows={[1]}} />` in code\n\n```md\n<Chart rows={[1]}} />\n```\n', 1)
 
