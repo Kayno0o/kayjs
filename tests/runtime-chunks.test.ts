@@ -1,9 +1,10 @@
+import { afterAll, describe, expect, it } from 'bun:test'
 import { rm } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
-import { afterAll, describe, expect, it } from 'bun:test'
 import { buildClient } from '../src/build/client'
 import { directImports } from '../src/build/direct-imports'
-import { fixtureCopy } from './scratch'
+import { kayPlugin } from '../src/build/plugin'
+import { fixtureCopy, scratchDir } from './scratch'
 
 const dirs: string[] = []
 
@@ -127,5 +128,27 @@ describe('direct imports of the runtime', () => {
 
   it('leaves a name the barrel does not export in an import of the barrel', async () => {
     expect(await directImports('import { nothing } from \'kay\'')).toBe('import { nothing } from \'kay\';')
+  })
+
+  it('rewrites a project module and leaves a module under node_modules importing the barrel', async () => {
+    const root = await scratchDir('direct-node-modules-')
+
+    dirs.push(root)
+    await Bun.write(join(root, 'src/own.ts'), 'import { signal } from \'kay\'\nexport const own = signal\n')
+    await Bun.write(join(root, 'src/both.ts'), 'import { own } from \'./own\'\nimport { vendored } from \'vendored\'\nexport { own, vendored }\n')
+    await Bun.write(join(root, 'node_modules/vendored/package.json'), '{"name":"vendored","main":"index.ts"}')
+    await Bun.write(join(root, 'node_modules/vendored/index.ts'), 'import { effect } from \'kay\'\nexport const vendored = effect\n')
+
+    const bundled = async (entry: string) => {
+      const build = await Bun.build({ entrypoints: [join(root, entry)], target: 'bun', plugins: [kayPlugin({ root, direct: true }, [])] })
+
+      expect(build.success).toBe(true)
+
+      return build.outputs[0]!.text()
+    }
+
+    // The runtime's own barrel is in a bundle only when some module imports it as it is.
+    expect(await bundled('src/own.ts')).not.toContain('src/runtime/index.ts')
+    expect(await bundled('src/both.ts')).toContain('src/runtime/index.ts')
   })
 })

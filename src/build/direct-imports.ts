@@ -79,7 +79,18 @@ export async function directImports(code: string, loader: Bun.JavaScriptLoader =
   // Blanking the matches takes away exactly the ones the parser sees as imports, whatever other imports of the barrel the file has.
   const parser = transpilerFor(loader)
   const barrelImports = (text: string) => parser.scanImports(text).filter(entry => entry.kind === 'import-statement' && BARREL_SPECIFIER.test(entry.path)).length
-  const blanked = imports.reduceRight((text, match) => text.slice(0, match.index) + '\n'.repeat(match[0].split('\n').length - 1) + text.slice(match.index + match[0].length), code)
+  // The code between the matches, so the blanked copy and the rewritten one are each one join.
+  const gaps: string[] = []
+  let end = 0
+
+  for (const match of imports) {
+    gaps.push(code.slice(end, match.index))
+    end = match.index + match[0].length
+  }
+
+  gaps.push(code.slice(end))
+
+  const blanked = gaps.map((gap, index) => index < imports.length ? gap + '\n'.repeat(imports[index]![0].split('\n').length - 1) : gap).join('')
 
   if (barrelImports(code) - barrelImports(blanked) < imports.length)
     return code
@@ -91,43 +102,38 @@ export async function directImports(code: string, loader: Bun.JavaScriptLoader =
 
   const known = new Map(await Promise.all([...sources].map(async ([specifier, found]) => [specifier, await found] as const)))
 
-  const counted = new Set(imports.map(match => match.index))
+  // A statement of types alone, or an empty one, is not among the imports: it may be import text in a template literal, and Bun drops a real one.
+  return gaps.map((gap, index) => index < imports.length ? gap + pointedStatement(imports[index]!, known) : gap).join('')
+}
 
-  // A statement of types alone, or an empty one, is not counted above: it may be import text in a template literal, and Bun drops a real one.
-  return code.replace(NAMED_IMPORT, (statement, clause: string, quote: string, specifier: string, offset: number) => {
-    if (!counted.has(offset))
-      return statement
+function pointedStatement([statement, clause, quote, specifier]: RegExpMatchArray, known: Map<string, Map<string, Source>>): string {
+  const found = known.get(specifier!)!
+  const byFile = new Map<string, string[]>()
+  const rest: string[] = []
 
-    const found = known.get(specifier)!
-    const byFile = new Map<string, string[]>()
-    const rest: string[] = []
+  for (const entry of clause!.split(',')) {
+    const name = entry.trim()
 
-    for (const entry of clause.split(',')) {
-      const name = entry.trim()
+    if (name === '' || TYPE_MODIFIER.test(name))
+      continue
 
-      if (name === '' || TYPE_MODIFIER.test(name))
-        continue
+    const [imported, alias = imported] = name.split(ALIAS)
+    const source = found.get(imported!)
 
-      const [imported, alias = imported] = name.split(ALIAS)
-      const source = found.get(imported!)
+    if (!source) {
+      rest.push(name)
 
-      if (!source) {
-        rest.push(name)
-
-        continue
-      }
-
-      const list = byFile.get(source.file) ?? []
-
-      list.push(source.local === alias ? alias : `${source.local} as ${alias}`)
-      byFile.set(source.file, list)
+      continue
     }
 
-    const lines = statement.split('\n').length - 1
+    const list = byFile.get(source.file) ?? []
 
-    return [
-      ...rest.length > 0 ? [`import { ${rest.join(', ')} } from ${quote}${specifier}${quote};`] : [],
-      ...[...byFile].map(([file, names]) => `import { ${names.join(', ')} } from ${JSON.stringify(file)};`),
-    ].join(' ') + '\n'.repeat(lines)
-  })
+    list.push(source.local === alias ? alias : `${source.local} as ${alias}`)
+    byFile.set(source.file, list)
+  }
+
+  return [
+    ...rest.length > 0 ? [`import { ${rest.join(', ')} } from ${quote}${specifier}${quote};`] : [],
+    ...[...byFile].map(([file, names]) => `import { ${names.join(', ')} } from ${JSON.stringify(file)};`),
+  ].join(' ') + '\n'.repeat(statement.split('\n').length - 1)
 }
