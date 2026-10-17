@@ -351,7 +351,6 @@ function count(problems: number, what: string): string {
   return problems === 1 ? `1 ${what}` : `${problems} ${what}s`
 }
 
-// A page's `revalidate` export in seconds, or undefined when it has none.
 // A page's `search` as the index takes it, `false` to leave the page out or the weight its words count.
 async function searchWeight(setting: unknown, params: ListedParams, file: string): Promise<number | false> {
   let value = setting
@@ -372,7 +371,7 @@ async function searchWeight(setting: unknown, params: ListedParams, file: string
   if (value === false)
     return false
 
-  const weight = typeof value === 'object' && value !== null ? (value as { weight?: unknown }).weight : null
+  const weight = typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as { weight?: unknown }).weight : null
 
   if (weight === undefined)
     return 1
@@ -383,6 +382,7 @@ async function searchWeight(setting: unknown, params: ListedParams, file: string
   return weight
 }
 
+// A page's `revalidate` export in seconds, or undefined when it has none.
 function revalidatePeriod(file: string, value: unknown): number | undefined {
   return value === undefined ? undefined : durationSeconds(value, `${file}'s revalidate`)
 }
