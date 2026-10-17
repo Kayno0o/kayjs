@@ -89,20 +89,4 @@ What each release of kay and its libraries adds, newest first, each feature with
 - A valueless Markdown component tag with no later `>` stays text inside a blockquote too, as outside one: the quote's `>` markers no longer count as its close ([Content](content.md#components-in-markdown)).
 - A component reading a slot anywhere but as a bare `{slot}`, in an attribute, a ternary, an `if` test or an `if ... as` alias, hydrates on the server's markup instead of logging `island ... did not match its server markup` and rendering again, as kayjs-ui's `Table` with an `@empty` slot and no rows did.
 
-## 1.51.1
-
-- A kayjs-ui `Table` stacked as cards on a phone breaks a long value with no space, such as a file path, inside its card instead of widening the page, and its sort buttons are at least 2rem tall to tap ([Table](../docs/src/content/docs/libraries/kayjs-ui.md)).
-- The dev tool's Problems tab has a Copy button that puts every listed problem on the clipboard as plain text, the page URL first, to paste into an LLM ([Dev server](dev-server.md)).
-- A Markdown component tag kay cannot read, such as stray text after a JSON prop or a brace never closed, fails `kay check`, the build and `bodyHtml` with `markdown-invalid` at its line instead of reaching the page as text, as it did already broken, and a JSON prop nests to any depth ([Content](content.md#components-in-markdown)).
-- The dev tool drawer keeps one height whatever its open tab, so switching tabs no longer moves its header and tab rail ([Dev server](dev-server.md)).
-- Linting a `.kay` file no longer reports `no-nested-ternary` on a single ternary that reads a prop with a default: kay's read of the default adds no ternary a lint rule can see ([Linting](checks.md#linting)).
-
-## 1.51.0
-
-- `keslint --cache` lints every `.kay` file again after a kay upgrade, so findings a new kay adds show at once, and a lint message on a prop names it as the file writes it, not `__props.name` ([Checks](checks.md#linting)).
-- With `mcp: true`, an API route is an MCP tool only when it opts in with `detail: { tool: true | 'description' | { name, description } }`, as an action does with `tool`: a route that does not stays in the OpenAPI document and an agent never finds it; `kay check` reports the routes relying on the old default (`deprecated-api-tool`) and a route setting both `hide` and `tool` (`hidden-tool`) ([API routes](api-routes.md#mcp), [upgrading](upgrading.md)).
-- `toolCall(request)` from `kay/server` tells a hook registered before `pages()`, a guard or a handler that a request is a tool call `/mcp` dispatched, and which tool: a front guard lets a bearer key reach `/mcp` and its tools alone, with no knowledge of kay's action URLs ([API routes](api-routes.md#mcp)).
-- kay type-checks with the stable TypeScript 7 compiler (`typescript` 7.0.x, installed under kay's own `typescript7` alias) instead of `@typescript/native-preview`, and its `tsgo` command stays: `kay` ships it, so a script running `tsgo` bare keeps working. An app declares nothing new: kay depends on `typescript` 6 itself, the package typescript-eslint reads, which `typescript` 7 no longer offers.
-- kayjs-auth's OAuth server ends a refresh token family 90 days after its first token whatever its rotations (a token unused for 30 days is still refused), shows an approved app's last use as its last API call, and asks the user again when an app starts declaring `scopes` after approving a client while it declared none ([kayjs-auth](../packages/auth/llms.txt)).
-
 Releases before 1.51 are in [What's new, older releases](whats-new-archive.md).
