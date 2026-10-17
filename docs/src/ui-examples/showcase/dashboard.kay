@@ -29,5 +29,5 @@ const replies = signal(true)
       Toggle(label="Email me on replies" checked={replies()} onChange={replies.set})
       Rating(value={4.6})
       .flex.flex-wrap.gap-2
-        Button(label="Save" variant="accent" icon="success")
-        Button(label="Delete" variant="danger" icon="delete")
+        Button(label="Save" tone="accent" icon="success")
+        Button(label="Delete" tone="danger" icon="delete")

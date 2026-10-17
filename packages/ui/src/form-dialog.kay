@@ -93,6 +93,6 @@ Dialog(open={open} title={title} dirty={action.pending()} class={className} onOp
       | {extra}
       .kui-form-dialog-actions
         Button(label={cancelLabel} disabled={action.pending()} onClick={close})
-        Button(label={action.pending() ? savingLabel : submitLabel} type="submit" form={formId} variant="accent" busy={action.pending()} disabled={action.pending()})
+        Button(label={action.pending() ? savingLabel : submitLabel} type="submit" form={formId} tone="accent" busy={action.pending()} disabled={action.pending()})
   form.kui-form-grid(id={formId} ref={element => form = element} onSubmit={submit} onKeyDown={submitOnCtrlEnter})
     slot

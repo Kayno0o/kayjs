@@ -4,12 +4,16 @@ import type { IconProps } from 'kay/icons'
 import type { IconSlot } from './defaults'
 import type { TagAttributes } from './button-props'
 import BusyButton from './internal/busy-button.kay'
-import { buttonOf, linkOf, lookOf } from './button-props'
+import { buttonOf, formOf, linkOf, lookOf } from './button-props'
 import Icon from './icon.kay'
 
 // The props the docs list, which button-props.ts repeats for BusyButton.
 interface Look {
-  variant?: 'default' | 'accent' | 'danger' | undefined
+  // The form: `solid` is the framed button, `ghost` has no frame until hovered and `inline` reads as a link. `default`, `accent` and `danger` are deprecated: use `tone` for the last two, and `solid` for the first.
+  variant?: 'solid' | 'ghost' | 'inline' | 'default' | 'accent' | 'danger' | undefined
+  // What the button means: `accent` for the main action, `danger` for a destructive one.
+  tone?: 'neutral' | 'accent' | 'danger' | undefined
+  size?: 'xs' | 'sm' | 'md' | 'lg' | undefined
   // Drawn before the label.
   icon?: IconSlot | IconProps | undefined
   // Spins in place of the icon while what the press started is under way.
@@ -32,17 +36,17 @@ type AsLink = Omit<JSX.IntrinsicElements['a'], 'class'> & Look & {
 }
 
 // A button with an `onClick` goes through BusyButton, which holds itself busy on the promise it returns: the others stay static markup on a page.
-const { variant = 'default', icon, busy, label, class: className, ...rest } = props<AsButton | AsLink>()
+const { variant = 'solid', tone, size = 'md', icon, busy, label, class: className, ...rest } = props<AsButton | AsLink>()
 
 const attributes = rest as TagAttributes
 // What the button was given besides its own props, handed on whole: an `onClick` named here would make this component an island itself.
 const handedOn = rest as Record<string, never>
-const look = () => lookOf(variant, className)
+const look = () => lookOf(variant, tone, className)
 ---
 if rest.onClick
-  BusyButton({...handedOn} variant={variant} icon={icon} busy={busy} label={label} class={className})
+  BusyButton({...handedOn} variant={variant} tone={tone} size={size} icon={icon} busy={busy} label={label} class={className})
 else if linkOf(attributes) as link
-  a.kui-btn({...link} class={look()} aria-busy={busy ? 'true' : undefined})
+  a.kui-btn({...link} class={look()} data-variant={formOf(variant)} data-size={size} aria-busy={busy ? 'true' : undefined})
     if busy
       Icon(icon="spinner" class="kui-spinner")
     else if icon
@@ -50,7 +54,7 @@ else if linkOf(attributes) as link
     | {label}
     slot
 else if buttonOf(attributes) as button
-  button.kui-btn({...button} class={look()} aria-busy={busy ? 'true' : undefined})
+  button.kui-btn({...button} class={look()} data-variant={formOf(variant)} data-size={size} aria-busy={busy ? 'true' : undefined})
     if busy
       Icon(icon="spinner" class="kui-spinner")
     else if icon

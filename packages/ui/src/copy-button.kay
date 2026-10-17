@@ -2,17 +2,21 @@
 import type { JSX } from 'kay'
 import { copy } from '@kaynooo/utils/browser/clipboard'
 import { signal } from 'kay'
+import { formOf, lookOf } from './button-props'
 import { attempt } from './toast'
 import { wording } from 'kay/words'
 
 const COPIED_MS = 2000
 
-const { text, label, html, variant = 'default', copiedLabel = wording('ui.copyButton.copiedLabel', 'Copied!'), failure = wording('ui.copyButton.failure', 'Could not copy to the clipboard'), class: className, ...rest } = props<Omit<JSX.IntrinsicElements['button'], 'class' | 'children' | 'onClick' | 'type'> & {
+const { text, label, html, variant = 'solid', tone, size = 'md', copiedLabel = wording('ui.copyButton.copiedLabel', 'Copied!'), failure = wording('ui.copyButton.failure', 'Could not copy to the clipboard'), class: className, ...rest } = props<Omit<JSX.IntrinsicElements['button'], 'class' | 'children' | 'onClick' | 'type'> & {
   text: string
   label: string
   // A rendered version copied alongside `text`, which rich editors paste instead.
   html?: string | undefined
-  variant?: 'default' | 'accent' | 'danger' | undefined
+  // As a Button's: `solid`, `ghost` or `inline`; `default`, `accent` and `danger` are deprecated, `tone` taking the last two.
+  variant?: 'solid' | 'ghost' | 'inline' | 'default' | 'accent' | 'danger' | undefined
+  tone?: 'neutral' | 'accent' | 'danger' | undefined
+  size?: 'xs' | 'sm' | 'md' | 'lg' | undefined
   // What the button says for two seconds once the copy went through.
   copiedLabel?: string | undefined
   // Toasted when the browser refuses the copy.
@@ -35,6 +39,6 @@ async function press() {
   setTimeout(() => copied.set(false), COPIED_MS)
 }
 ---
-button.kui-btn.kui-copy-btn({...rest} type="button" class={[{ 'kui-btn-accent': variant === 'accent', 'kui-btn-danger': variant === 'danger' }, className]} onClick={press}) {copied() ? copiedLabel : label}
+button.kui-btn.kui-copy-btn({...rest} type="button" class={lookOf(variant, tone, className)} data-variant={formOf(variant)} data-size={size} onClick={press}) {copied() ? copiedLabel : label}
 // A button's new text is not read out, so the copy is said here too.
 span.kui-copy-btn-live(role="status") {copied() ? copiedLabel : ''}

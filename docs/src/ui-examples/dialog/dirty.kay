@@ -22,5 +22,5 @@ Dialog(
 )
   @footer
     Button(label="Cancel" onClick={() => open.set(false)})
-    Button(label="Publish" variant="accent" busy={saving()} onClick={save})
+    Button(label="Publish" tone="accent" busy={saving()} onClick={save})
   p Publishing takes two seconds, and the dialog ignores Escape while it runs.

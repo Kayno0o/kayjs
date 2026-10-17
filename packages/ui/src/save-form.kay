@@ -163,4 +163,4 @@ form.kui-save-form(class={className} ref={element => form = element} onSubmit={s
     .kui-save-bar-actions
       // `aria-disabled` rather than `disabled`, so the button pressed keeps the focus as the form turns clean.
       Button(label={discardLabel} aria-disabled={!dirty() || action.pending() || undefined} onClick={discard})
-      Button(label={saveLabel} type="submit" variant="accent" busy={action.pending()} aria-disabled={!dirty() || action.pending() || undefined})
+      Button(label={saveLabel} type="submit" tone="accent" busy={action.pending()} aria-disabled={!dirty() || action.pending() || undefined})

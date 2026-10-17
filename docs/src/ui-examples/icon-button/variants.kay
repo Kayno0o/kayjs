@@ -5,4 +5,5 @@ import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
   IconButton(icon="plus" label="Add" variant="solid")
   IconButton(icon="plus" label="Add" variant="ghost")
   IconButton(icon="plus" label="Add" variant="inline")
-  IconButton(icon="delete" label="Delete" variant="danger")
+  IconButton(icon="delete" label="Delete" tone="danger")
+  IconButton(icon="delete" label="Delete" variant="ghost" tone="danger")

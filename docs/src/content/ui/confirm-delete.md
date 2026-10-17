@@ -38,4 +38,4 @@ A handler refusing with `ctx.fail(400, { error: 'Still in use' })` is a failure 
 
 ## Look and cancel label
 
-`size` is `xs`, `sm`, `md` or `lg` for the icon trigger, and sizes the cancel button too when asking inline. `variant` is `danger`, `inline`, `solid` or `ghost`. `cancelLabel` words the cancel button, `Cancel` by default.
+`size` is `xs`, `sm`, `md` or `lg` for the icon trigger, and sizes the cancel button too when asking inline. `variant` is `solid`, `ghost` or `inline`; `danger` is deprecated. `cancelLabel` words the cancel button, `Cancel` by default.

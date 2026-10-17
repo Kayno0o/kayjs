@@ -33,6 +33,7 @@ const { message, onConfirm, failure, success, refused, tone = 'danger', trigger 
   cancelLabel?: string | undefined
   // The icon trigger's size and look, `size` sizing the cancel button too when asking inline; the button trigger takes the tone's look.
   size?: 'xs' | 'sm' | 'md' | 'lg' | undefined
+  // The icon trigger's form, as an IconButton's; `danger` is deprecated.
   variant?: 'solid' | 'ghost' | 'inline' | 'danger' | undefined
   // Goes on the trigger.
   class?: string | undefined
@@ -84,7 +85,7 @@ function keyDown(event: KeyboardEvent) {
 }
 ---
 if trigger === 'button'
-  Button(label={triggerLabel()} variant={look()} hidden={ask === 'inline' && open()} class={className} onClick={start})
+  Button(label={triggerLabel()} tone={look()} hidden={ask === 'inline' && open()} class={className} onClick={start})
 else if trigger === 'link'
   button.kui-confirm-delete-link(type="button" hidden={ask === 'inline' && open()} class={className} onClick={start}) {triggerLabel()}
 else
@@ -93,11 +94,11 @@ if ask === 'inline'
   if open()
     // Armed by a click, so the focus moves onto the button that deletes.
     span.kui-confirm-delete-armed(ref={element => { armed = element; queueMicrotask(() => element.querySelector('button')?.focus()) }} role="group" aria-label={message} onKeyDown={keyDown})
-      Button(label={pending() ? pendingText() : confirmText()} variant={look()} busy={pending()} disabled={pending()} data-tooltip={message} onClick={confirm})
+      Button(label={pending() ? pendingText() : confirmText()} tone={look()} busy={pending()} disabled={pending()} data-tooltip={message} onClick={confirm})
       IconButton(icon="close" label={cancelLabel} size={size} variant="ghost" disabled={pending()} onClick={close})
 else
   Dialog(open={open()} title={dialogTitle()} dirty={pending()} onOpenChange={() => open.set(false)})
     @footer
       Button(label={cancelLabel} disabled={pending()} onClick={() => open.set(false)})
-      Button(label={pending() ? pendingText() : confirmText()} variant={look()} busy={pending()} disabled={pending()} onClick={confirm})
+      Button(label={pending() ? pendingText() : confirmText()} tone={look()} busy={pending()} disabled={pending()} onClick={confirm})
     p.kui-confirm-delete-message {message}

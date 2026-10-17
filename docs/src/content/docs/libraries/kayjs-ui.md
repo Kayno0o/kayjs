@@ -81,7 +81,7 @@ import Button from '@kaynooo/kayjs-ui/button.kay'
 
 const save = () => toast.success('Saved')
 ---
-Button(label="Save" variant="accent" onClick={save})
+Button(label="Save" tone="accent" onClick={save})
 ```
 
 <Callout type="warning">

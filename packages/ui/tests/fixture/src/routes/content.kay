@@ -26,7 +26,7 @@ main
   article#notice
     Notice(label="Saved")
   article#notice-error
-    Notice(tone="error" compact)
+    Notice(tone="danger" compact)
       | Could not save. #[a(href="/data") Retry]
   article#avatar
     Avatar(src="/ada.png" name="Ada" size="sm")

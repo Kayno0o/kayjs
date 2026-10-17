@@ -7,15 +7,15 @@ Each component spreads the other attributes it is given onto its root element, `
 ### Icon, Button, IconButton
 
 - `Icon(icon="close")`: an `svg.kui-icon`. It is decorative unless `label` names it for screen readers. `icon` is a slot or an imported `~icons` icon.
-- `Button(label="Save" variant="accent" icon="plus")`:
-  - `variant` is `default`, `accent` or `danger`.
+- `Button(label="Save" tone="accent" icon="plus")`:
+  - `variant` names the form: `solid` (the default, framed), `ghost` (no frame until hovered) or `inline` (reads as a link). `tone` names the meaning: `neutral` (the default), `accent` for the main action or `danger` for a destructive one. `size` is `xs`, `sm`, `md` or `lg`. The old `variant` values `default`, `accent` and `danger` still work, deprecated for `solid` and the two tones; `tone` wins over them.
   - Its label stays on one line; a row of buttons wraps whole buttons, as the dialog and panel footers do.
   - A promise returned by `onClick` holds that button alone busy (spinner in place of the icon, `aria-busy`) and disabled until it settles; a rejection is logged. A `type="submit"` button is busy (spinner, `aria-busy`, clicks ignored) the same way, but not disabled, while its `onClick` or its form's `onSubmit` returns a promise.
   - An explicit `busy` shows a spinner and sets `aria-busy` and has the last word; it does not disable the button.
   - `expanded` sets `aria-expanded`, for a button that opens a panel.
   - `type` defaults to `button`, so a button inside a form never submits it by accident: pass `type="submit"` to submit. Children render after `label`.
   - `href` makes it a link looking like a button, `a.kui-btn`, taking a link's attributes such as `target` in place of `type`, `expanded` and `disabled`. A site path in `href` is not checked against the pages the way a literal `a(href)` is.
-- `IconButton(icon="delete" label="Delete")`: an icon alone. `label` names it for screen readers and shows as its tooltip through TooltipHost. `size` is `xs`, `sm`, `md` or `lg`; `variant` is `solid`, `ghost`, `inline` or `danger`.
+- `IconButton(icon="delete" label="Delete")`: an icon alone. `label` names it for screen readers and shows as its tooltip through TooltipHost. `size` is `xs`, `sm`, `md` or `lg`; `variant` is `solid`, `ghost` or `inline` and `tone` `neutral`, `accent` or `danger` (the `danger` variant is deprecated for `tone="danger"`).
 
 ### toast and Toaster
 
@@ -47,7 +47,7 @@ A toast stays for six seconds, an error for ten, or until its close button is pr
 Dialog(open={editing()} title="Rename" onOpenChange={() => editing.set(false)})
   @footer
     Button(label="Cancel" onClick={() => editing.set(false)})
-    Button(label="Rename" variant="accent" onClick={rename})
+    Button(label="Rename" tone="accent" onClick={rename})
   input.kui-field-input(name="name")
 ```
 
@@ -68,7 +68,7 @@ Dialog(open={editing()} title="Rename" onOpenChange={() => editing.set(false)})
 - `Card(title="Traffic")`: a `section.kui-card` that frames its children in `.kui-card-body`. `head` sits at the far end of the title's line, for a count or a link. `bare` drops the body's inset, for content that runs to the edge, such as a table. The title is an `h3`, or the heading `level` given, from 2 to 6.
 - `Badge(label="Draft" tone="warning" icon="info")`: `tone` is `neutral`, `accent`, `success`, `warning`, `danger` or `info`. Children render after `label`. `stamp` draws it as a rubber stamp: a hairline in its ink, small spaced mono capitals, its ground turning `stamp-fill-hover` while a `.group` holding it, such as a card link, is hovered. A tone colours a stamp as it does a badge.
 - `EmptyState(title="No posts yet" description="Write the first one.")`: what a list shows when it holds nothing. `level` (1 to 6) makes the title a heading, `level={1}` for one standing for the whole page, such as a 404, which then needs no hidden `h1`; without it, the title is a paragraph. An `@actions` block sits below the description, for the button that adds the first item: `EmptyState(title="No posts yet")` then `@actions` holding `Button(href="/new" label="New post")`.
-- `Notice(tone="error" label={failure})`: a form's outcome or a refusal, in place. `tone` is `info`, `success`, `warning` or `error`; an error is `role="alert"`, read out at once, the others `role="status"`. Children render after `label`, for a link to follow up. It is a bordered box, for a page section; `compact` drops the box, for a line under a form.
+- `Notice(tone="danger" label={failure})`: a form's outcome or a refusal, in place. `tone` is `info`, `success`, `warning` or `danger` (`error`, deprecated, is read as `danger`); a danger is `role="alert"`, read out at once, the others `role="status"`. Children render after `label`, for a link to follow up. It is a bordered box, for a page section; `compact` drops the box, for a line under a form.
 - `Avatar(src={user.avatar} name={user.name} size="sm")`: the picture, or the name's first letter on a colour seeded by the name when `src` is empty or fails to load; a new `src` is tried again. `size` is `xs`, `sm`, `md` (the default) or `lg`. It is decorative, the name being written beside it, unless `label` names it for screen readers.
 
 ### Popover, TooltipHost
@@ -92,6 +92,6 @@ Popover(placement="bottom-end")
 - `Meter(value={usage} label="Disk" fillClass="bg-kui-warning")`: a `role="meter"` bar holding `value` between 0 and 100. `fillClass` styles the fill alone, such as a colour picked by threshold.
 - `BarList(rows={[{ key: 'fr', label: 'France', value: 120, display: '120 visits' }]})`: a bar per row, each measured against the largest value, reading `display` or else the value. `onSelect(row)` makes each row a button, from an island; `empty` is what it reads with no rows. Its rows are typed `BarListRow`, or any type extending it.
 - `SiteFavicon(src={site.favicon} name={site.name})`: a site's icon, or the `globe` slot in a colour drawn from `name` when `src` is missing or fails to load.
-- `CopyButton(text={url} label="Copy link")`: copies `text`, with `html` alongside for apps that paste rich text, and reads `copiedLabel` for two seconds. It takes Button's `variant`. A copy the browser refuses toasts `failure`.
+- `CopyButton(text={url} label="Copy link")`: copies `text`, with `html` alongside for apps that paste rich text, and reads `copiedLabel` for two seconds. It takes Button's `variant`, `tone` and `size`. A copy the browser refuses toasts `failure`.
 - `Rating(value={4.6} max={5} label="Rated 4.6 out of 5")`: stars filled to `value`'s share of `max`, part of a star included, kept between none and all. Screen readers read `label`, `4.6 out of 5` by default.
 - BarList, SiteFavicon and CopyButton are islands taking data alone, so a static page passes them their props as it would to any element.

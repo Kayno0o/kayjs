@@ -8,7 +8,7 @@ description: A button showing only an icon, named by a label that doubles as its
 
 ## Variants
 
-`variant` is `solid` (the default), `ghost`, `inline` or `danger`.
+`variant` is the form, `solid` (the default), `ghost` or `inline`, and `tone` the meaning, `neutral` (the default), `accent` or `danger`. The `danger` variant is deprecated: write `tone="danger"`.
 
 <Demo name="icon-button/variants" />
 

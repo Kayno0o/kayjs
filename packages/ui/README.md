@@ -58,7 +58,7 @@ A component with an `on*` handler is an island, so it runs in the browser, where
 import Button from '@kaynooo/kayjs-ui/button.kay'
 import { toast } from '@kaynooo/kayjs-ui'
 ---
-Button(label="Save" variant="accent" icon="plus" onClick={() => toast.success('Saved')})
+Button(label="Save" tone="accent" icon="plus" onClick={() => toast.success('Saved')})
 ```
 
 ## Reference

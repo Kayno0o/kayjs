@@ -41,8 +41,8 @@ form.kui-contact-form(action={action} novalidate class={className})
   slot
   FormField(label={messageLabel} required issue={action.error('message')})
     textarea(field="message" rows={rows})
-  Button(type="submit" variant="accent" label={submitLabel})
+  Button(type="submit" tone="accent" label={submitLabel})
   if action.succeeded()
     Notice(tone="success" compact) {sentLabel}
   else if action.error() as message
-    Notice(tone="error" compact) {message}
+    Notice(tone="danger" compact) {message}

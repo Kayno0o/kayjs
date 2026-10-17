@@ -4,5 +4,5 @@ import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
 ---
 PageSection(title="Moons")
   @actions
-    Button(label="New moon" icon="plus" variant="accent")
+    Button(label="New moon" icon="plus" tone="accent")
   p Jupiter has 95 known moons.

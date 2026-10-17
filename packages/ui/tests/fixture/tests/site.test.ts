@@ -184,10 +184,10 @@ describe('content', () => {
     expect((await one('/content', '#outlined .kui-card-title')).tag).toBe('h2')
   })
 
-  test('Notice is a status, or an alert for an error, drawn as a box or as a bare line', async () => {
+  test('Notice is a status, or an alert for a danger, drawn as a box or as a bare line', async () => {
     expect(await attributes('/content', '#notice [role], #notice-error [role]', ['role', 'data-tone', 'data-compact'])).toEqual([
       { 'role': 'status', 'data-tone': 'info', 'data-compact': null },
-      { 'role': 'alert', 'data-tone': 'error', 'data-compact': '' },
+      { 'role': 'alert', 'data-tone': 'danger', 'data-compact': '' },
     ])
     expect((await one('/content', '#notice-error a')).attributes.href).toBe('/data')
   })
@@ -655,5 +655,53 @@ describe('the texts a component shows by default, in the app\'s catalogs', () =>
     expect((await visit('/charts')).html).toMatch(/class="kui-contribution-month"[^>]*>Sep/)
     expect(filtered).toContain('Filtrer')
     expect(filtered).toMatch(/class="kui-table-count" role="status">\d+ lignes?</)
+  })
+})
+
+describe('variant names the form and tone the meaning', () => {
+  const shown = async (id: string) => {
+    const found = await one('/buttons', `#${id}`)
+
+    return [attr(found, 'class'), attr(found, 'data-variant'), attr(found, 'data-size'), attr(found, 'data-tone')]
+  }
+
+  test('Button draws a variant and a size, accent and danger being tones', async () => {
+    expect(await shown('tone-accent')).toEqual(['kui-btn kui-btn-accent', 'solid', 'lg', null])
+    expect(await shown('ghost-danger')).toEqual(['kui-btn kui-btn-danger', 'ghost', 'xs', null])
+    expect(await shown('inline-plain')).toEqual(['kui-btn', 'inline', 'md', null])
+    expect(await shown('plain')).toEqual(['kui-btn', 'solid', 'md', null])
+  })
+
+  test('Button still reads the variant values that became tones, a tone winning over them', async () => {
+    expect(await shown('old-default')).toEqual(['kui-btn', 'solid', 'md', null])
+    expect(await shown('old-accent')).toEqual(['kui-btn kui-btn-accent', 'solid', 'md', null])
+    expect(await shown('old-danger')).toEqual(['kui-btn kui-btn-danger', 'solid', 'md', null])
+    expect(await shown('new-wins')).toEqual(['kui-btn kui-btn-accent', 'solid', 'md', null])
+    expect(await shown('neutral-wins')).toEqual(['kui-btn', 'solid', 'md', null])
+  })
+
+  test('CopyButton takes the same variant, tone and size', async () => {
+    expect(await shown('copy-old')).toEqual([expect.stringContaining('kui-btn-accent'), 'solid', 'md', null])
+    expect(await shown('copy-new')).toEqual([expect.stringContaining('kui-btn-danger'), 'ghost', 'sm', null])
+  })
+
+  test('IconButton reads a tone, the danger variant being the danger tone and a tone winning over it', async () => {
+    expect(await shown('icon-tone')).toEqual([expect.not.stringContaining('kui-shell'), 'ghost', 'md', 'danger'])
+    expect(await shown('icon-accent')).toEqual([expect.stringContaining('kui-shell'), 'solid', 'md', 'accent'])
+    expect(await shown('icon-old-danger')).toEqual([expect.stringContaining('kui-shell-danger'), 'solid', 'md', 'danger'])
+    expect(await shown('icon-new-wins')).toEqual([expect.not.stringContaining('kui-shell-danger'), 'solid', 'md', 'neutral'])
+    expect(await shown('delete')).toEqual([expect.stringContaining('kui-shell-danger'), 'solid', 'sm', 'danger'])
+  })
+
+  test('Notice has a danger tone, an alert, and still reads the error tone as it', async () => {
+    const roles = async (id: string) => {
+      const found = await one('/buttons', `#${id}`)
+
+      return [attr(found, 'data-tone'), attr(found, 'role')]
+    }
+
+    expect(await roles('notice-danger')).toEqual(['danger', 'alert'])
+    expect(await roles('notice-error')).toEqual(['danger', 'alert'])
+    expect(await roles('notice-default')).toEqual(['info', 'status'])
   })
 })

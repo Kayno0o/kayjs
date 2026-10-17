@@ -8,6 +8,6 @@ Button(label="New note" onClick={() => open.set(true)})
 Dialog(open={open()} title="New note" onOpenChange={() => open.set(false)})
   @footer
     Button(label="Discard" onClick={() => open.set(false)})
-    Button(label="Save" variant="accent" onClick={() => open.set(false)})
+    Button(label="Save" tone="accent" onClick={() => open.set(false)})
   p.mb-2 Escape and a click outside close it, until you type something.
   textarea.kui-field-input(name="note" rows="3" aria-label="Note")

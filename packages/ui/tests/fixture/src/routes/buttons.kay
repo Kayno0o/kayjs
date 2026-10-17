@@ -1,7 +1,9 @@
 ---
 import Button from '@kaynooo/kayjs-ui/button.kay'
 import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
+import CopyButton from '@kaynooo/kayjs-ui/copy-button.kay'
 import Icon from '@kaynooo/kayjs-ui/icon.kay'
+import Notice from '@kaynooo/kayjs-ui/notice.kay'
 import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
 import home from '~icons/tabler/home'
 ---
@@ -9,10 +11,29 @@ main
   Icon#slot(icon="close")
   Icon#own(icon={home} label="Home")
   Button#plain(label="Save")
-  Button#accent(variant="accent" icon="plus" type="submit") Add
+  Button#accent(tone="accent" icon="plus" type="submit") Add
   Button#busy(busy label="Saving")
-  Button#link(href="/data" label="Data" variant="accent" icon="plus" target="_blank")
+  Button#link(href="/data" label="Data" tone="accent" icon="plus" target="_blank")
   Button#toggle(label="More" expanded={false} disabled)
-  IconButton#delete(icon="delete" label="Delete" variant="danger" size="sm")
+  IconButton#delete(icon="delete" label="Delete" tone="danger" size="sm")
+  #forms
+    Button#tone-accent(label="Accent" tone="accent" size="lg")
+    Button#ghost-danger(label="Ghost" variant="ghost" tone="danger" size="xs")
+    Button#inline-plain(label="Inline" variant="inline")
+    Button#old-default(label="Old default" variant="default")
+    Button#old-accent(label="Old accent" variant="accent")
+    Button#old-danger(label="Old danger" variant="danger")
+    Button#new-wins(label="Both" variant="danger" tone="accent")
+    Button#neutral-wins(label="Neutral" variant="accent" tone="neutral")
+    CopyButton#copy-old(text="x" label="Copy" variant="accent")
+    CopyButton#copy-new(text="x" label="Copy" variant="ghost" tone="danger" size="sm")
+    IconButton#icon-tone(icon="delete" label="Delete" variant="ghost" tone="danger")
+    IconButton#icon-accent(icon="plus" label="Add" tone="accent")
+    IconButton#icon-old-danger(icon="delete" label="Old" variant="danger")
+    IconButton#icon-new-wins(icon="delete" label="Wins" variant="danger" tone="neutral")
+  #notices
+    Notice#notice-danger(tone="danger" label="Refused")
+    Notice#notice-error(tone="error" label="Refused")
+    Notice#notice-default(label="Saved")
   #toasts
     Toaster

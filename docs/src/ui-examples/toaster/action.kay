@@ -17,4 +17,4 @@ async function save() {
     toast.success('Profile saved')
 }
 ---
-Button(label="Save profile" variant="accent" busy={saving()} onClick={save})
+Button(label="Save profile" tone="accent" busy={saving()} onClick={save})

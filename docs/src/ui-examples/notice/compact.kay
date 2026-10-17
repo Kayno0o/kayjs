@@ -2,4 +2,4 @@
 import Notice from '@kaynooo/kayjs-ui/notice.kay'
 ---
 .flex.max-w-md.flex-col.gap-2
-  Notice(tone="error" compact label="Enter the six-digit code from the email.")
+  Notice(tone="danger" compact label="Enter the six-digit code from the email.")

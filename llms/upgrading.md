@@ -15,6 +15,8 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 ### kayjs-ui names the same prop the same way
 
 - Every disclosure (`Dialog`, `SidePanel`, `FormDialog`, `CommandPalette`, `Popover`, `CollapsibleSection`) takes `open` and `onOpenChange(open)`. `onClose` on `Dialog`, `SidePanel` and `FormDialog` and `onToggle` on `Popover` still work for now, marked `@deprecated`, and `onOpenChange` wins when both are given. Rename the prop; a `Dialog` or `SidePanel` handler that read the close event now hears `false`.
+- `Button`, `IconButton`, `Menu` and `CopyButton`: `variant` names the form (`solid`, `ghost`, `inline`) and the new `tone` the meaning (`neutral`, `accent`, `danger`). `variant="default"` is `solid`, `variant="accent"` is `tone="accent"`, `variant="danger"` is `tone="danger"` (`IconButton`'s and `Menu`'s `danger` variant too), and a menu entry's `danger: true` is `tone: 'danger'`; the old values still work, deprecated, and a `tone` wins over them. `Notice`'s `tone="error"` is `tone="danger"` and is read as it.
+- `Button` and `CopyButton` take `size` (`xs`, `sm`, `md`, `lg`), as `IconButton` does.
 
 ### `kay dev` does not move a port it was asked for
 

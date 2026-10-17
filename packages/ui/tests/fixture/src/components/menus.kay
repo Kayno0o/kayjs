@@ -1,0 +1,15 @@
+---
+import type { MenuEntry } from '@kaynooo/kayjs-ui'
+import Menu from '@kaynooo/kayjs-ui/menu.kay'
+
+// Entries and triggers by the new `tone` and the deprecated names they replace, `danger` on an entry and the `danger` variant on a trigger.
+const items: MenuEntry[] = [
+  { label: 'Tone', tone: 'danger', onSelect: () => undefined },
+  { label: 'Old', danger: true, onSelect: () => undefined },
+  { label: 'Wins', tone: 'neutral', danger: true, onSelect: () => undefined },
+  { label: 'Plain', onSelect: () => undefined },
+]
+---
+Menu(id="by-tone" items={items} label="By tone" icon="plus" tone="danger")
+Menu(id="by-variant" items={items} label="By variant" icon="plus" variant="danger")
+Menu(id="plain" items={items} label="Plain" icon="plus")

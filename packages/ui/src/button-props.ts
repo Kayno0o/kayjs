@@ -4,7 +4,11 @@ import type { IconSlot } from './defaults'
 
 // Repeated in button.kay, which the docs read the props of: a prop is listed from the file declaring it.
 export interface Look {
-  variant?: 'default' | 'accent' | 'danger' | undefined
+  // The form: `solid` is the framed button, `ghost` has no frame until hovered and `inline` reads as a link. `default`, `accent` and `danger` are deprecated: use `tone` for the last two, and `solid` for the first.
+  variant?: 'solid' | 'ghost' | 'inline' | 'default' | 'accent' | 'danger' | undefined
+  // What the button means: `accent` for the main action, `danger` for a destructive one.
+  tone?: 'neutral' | 'accent' | 'danger' | undefined
+  size?: 'xs' | 'sm' | 'md' | 'lg' | undefined
   // Drawn before the label.
   icon?: IconSlot | IconProps | undefined
   // Spins in place of the icon while what the press started is under way.
@@ -44,6 +48,21 @@ export function buttonOf(attributes: TagAttributes) {
   return { ...others, 'type': type, 'aria-expanded': expanded === undefined ? undefined : String(expanded) }
 }
 
-export function lookOf(variant: Look['variant'], className: string | undefined) {
-  return [{ 'kui-btn-accent': variant === 'accent', 'kui-btn-danger': variant === 'danger' }, className]
+// The form a `variant` names: the three it used to hold for the meaning are the plain solid button.
+export function formOf(variant: Look['variant']): 'solid' | 'ghost' | 'inline' {
+  return variant === 'ghost' || variant === 'inline' ? variant : 'solid'
+}
+
+// The meaning: a `tone` has the last word over the `variant` that used to carry it.
+export function toneOf(variant: Look['variant'], tone: Look['tone']): 'neutral' | 'accent' | 'danger' {
+  if (tone !== undefined)
+    return tone
+
+  return variant === 'accent' || variant === 'danger' ? variant : 'neutral'
+}
+
+export function lookOf(variant: Look['variant'], tone: Look['tone'], className: string | undefined) {
+  const meant = toneOf(variant, tone)
+
+  return [{ 'kui-btn-accent': meant === 'accent', 'kui-btn-danger': meant === 'danger' }, className]
 }

@@ -222,6 +222,44 @@
     }
   }
 
+  /* The form of a button besides the framed one: no line or fill until hovered, `inline` also reading as a link. Declared after the tones, so a ghost accent is an accent text and no filled button. */
+  .kui-btn:where([data-variant='ghost'], [data-variant='inline']),
+  .kui-btn-accent:where([data-variant='ghost'], [data-variant='inline']) {
+    --kui-shell-line: transparent;
+    --kui-shell-fill: transparent;
+    box-shadow: none;
+
+    &:hover {
+      --kui-shell-line: transparent;
+      --kui-shell-fill: var(--color-kui-row-hover);
+    }
+  }
+
+  .kui-btn-accent:where([data-variant='ghost'], [data-variant='inline']) {
+    @apply text-kui-accent;
+
+    &:hover {
+      @apply text-kui-accent-hi;
+    }
+  }
+
+  .kui-btn:where([data-variant='inline']) {
+    @apply p-0 underline underline-offset-4;
+  }
+
+  /* Medium is the base; the others change the box and the type. An inline button keeps no padding at any size. */
+  .kui-btn:where([data-size='xs']:not([data-variant='inline'])) {
+    @apply px-2 py-0.5 text-kui-2xs;
+  }
+
+  .kui-btn:where([data-size='sm']:not([data-variant='inline'])) {
+    @apply px-2.5 py-0.5;
+  }
+
+  .kui-btn:where([data-size='lg']:not([data-variant='inline'])) {
+    @apply px-4 py-1.5 text-sm;
+  }
+
   /* A form field's own controls take this look with no class, all but the inputs a text box does not fit. */
   .kui-field-input,
   .kui-form-field
@@ -293,7 +331,11 @@
       @apply text-kui-subtext0;
     }
 
-    &:where([data-variant='danger']) {
+    &:where([data-tone='accent']) {
+      @apply text-kui-accent;
+    }
+
+    &:where([data-tone='danger']) {
       @apply text-kui-error;
     }
   }
@@ -2057,7 +2099,8 @@
       @apply border-kui-warning text-kui-warning;
     }
 
-    &:where([data-tone='error']) {
+    /* `error` is the old name of `danger`, still written by markup that sets `data-tone` on a `.kui-notice` itself. */
+    &:where([data-tone='danger'], [data-tone='error']) {
       @apply border-kui-error bg-kui-canvas text-kui-error;
     }
 

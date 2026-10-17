@@ -8,5 +8,5 @@ Button(label="Rename" onClick={() => editing.set(true)})
 Dialog(open={editing()} title="Rename" onOpenChange={() => editing.set(false)})
   @footer
     Button(label="Cancel" onClick={() => editing.set(false)})
-    Button(label="Rename" variant="accent" onClick={() => editing.set(false)})
+    Button(label="Rename" tone="accent" onClick={() => editing.set(false)})
   input.kui-field-input(name="name" aria-label="Name")

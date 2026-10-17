@@ -7,7 +7,7 @@ const open = signal(false)
 Button(label="Show details" onClick={() => open.set(true)})
 SidePanel(open={open()} title="Europa" onOpenChange={() => open.set(false)})
   @footer
-    Button(label="Done" variant="accent" onClick={() => open.set(false)})
+    Button(label="Done" tone="accent" onClick={() => open.set(false)})
   p
     | Jupiter's fourth largest moon, 1,561 km in radius,
     | with an ocean under its ice.

@@ -88,7 +88,7 @@ describe('the documentation site', () => {
     expect(components.filter(component => component.data.description === '').map(component => component.slug)).toEqual([])
     expect(components.filter(component => !component.body.includes('<Demo name=')).map(component => component.slug)).toEqual(['form-dialog'])
     expect(props.get('href')).toMatchObject({ type: 'string', optional: true })
-    expect(props.get('variant')).toMatchObject({ type: '"accent" | "danger" | "default"', default: '\'default\'' })
+    expect(props.get('variant')).toMatchObject({ type: '"accent" | "danger" | "solid" | "ghost" | "inline" | "default"', default: '\'solid\'' })
     expect(props.has('disabled')).toBe(false)
     expect(components.find(component => component.slug === 'table')!.data.props.find(prop => prop.name === 'onSort')!.type).toBe('(sort: SortState) => void')
   })

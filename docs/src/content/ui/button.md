@@ -6,7 +6,9 @@ description: A button or a link styled as one, with an optional icon and a busy 
 
 ## Variants
 
-`variant` is `default`, `accent` for the main action or `danger` for a destructive one.
+`variant` names the form: `solid` (the default), `ghost` or `inline`. `tone` names the meaning: `neutral` (the default), `accent` for the main action or `danger` for a destructive one. `size` goes from `xs` to `lg`, `md` by default.
+
+The old `variant` values `default`, `accent` and `danger` still work but are deprecated: `kay check` reports them as `deprecated-ui-prop` and `kay upgrade` rewrites them. A `tone` wins over them.
 
 <Demo name="button/variants" />
 

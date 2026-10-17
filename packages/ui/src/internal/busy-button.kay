@@ -1,17 +1,17 @@
 ---
 import type { ButtonProps, TagAttributes } from '../button-props'
 import { signal } from 'kay'
-import { buttonOf, linkOf, lookOf } from '../button-props'
+import { buttonOf, formOf, linkOf, lookOf } from '../button-props'
 import { isPromiseLike } from '../change'
 import Icon from '../icon.kay'
 
-const { variant = 'default', icon, busy, label, class: className, onClick, ...rest } = props<ButtonProps>()
+const { variant = 'solid', tone, size = 'md', icon, busy, label, class: className, onClick, ...rest } = props<ButtonProps>()
 
 const attributes = rest as TagAttributes
 
 const pending = signal(false)
 const spinning = () => busy ?? pending()
-const look = () => lookOf(variant, className)
+const look = () => lookOf(variant, tone, className)
 
 async function press(event: MouseEvent) {
   if (busy === undefined && pending()) {
@@ -40,7 +40,7 @@ async function press(event: MouseEvent) {
 }
 ---
 if linkOf(attributes) as link
-  a.kui-btn({...link} class={look()} aria-busy={spinning() ? 'true' : undefined} onClick={press})
+  a.kui-btn({...link} class={look()} data-variant={formOf(variant)} data-size={size} aria-busy={spinning() ? 'true' : undefined} onClick={press})
     if spinning()
       Icon(icon="spinner" class="kui-spinner")
     else if icon
@@ -48,7 +48,7 @@ if linkOf(attributes) as link
     | {label}
     slot
 else if buttonOf(attributes) as button
-  button.kui-btn({...button} class={look()} disabled={button.disabled || (busy === undefined && pending() && button.type !== 'submit' && button.type !== 'reset')} aria-busy={spinning() ? 'true' : undefined} onClick={press})
+  button.kui-btn({...button} class={look()} data-variant={formOf(variant)} data-size={size} disabled={button.disabled || (busy === undefined && pending() && button.type !== 'submit' && button.type !== 'reset')} aria-busy={spinning() ? 'true' : undefined} onClick={press})
     if spinning()
       Icon(icon="spinner" class="kui-spinner")
     else if icon

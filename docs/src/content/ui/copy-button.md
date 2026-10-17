@@ -14,4 +14,4 @@ description: A button that copies a text to the clipboard and confirms it.
 
 ## Variant
 
-`variant` is `default`, `accent` or `danger`, `default` by default.
+It takes a Button's `variant`, `tone` and `size`.
