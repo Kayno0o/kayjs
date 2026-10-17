@@ -134,6 +134,8 @@ export interface SeoConfig {
   twitter?: string | undefined
   // `og:locale`, such as `fr_FR`.
   locale?: Localized | undefined
+  // The colour browsers paint around the page, `#1e1e2e`, or a `{ light, dark }` pair for each colour scheme of the visitor; defaults to `manifest.themeColor`, which keeps its own value for the installed app.
+  themeColor?: string | { light: string, dark: string } | undefined
   // Structured data every page carries, such as the site's `WebSite` or `Organization`.
   jsonLd?: JsonLd[] | undefined
 }
@@ -218,7 +220,7 @@ export interface FaviconConfig {
 export interface ManifestConfig {
   // The name under the icon on a home screen; defaults to `seo.name`.
   shortName?: string | undefined
-  // Also every page's `theme-color`.
+  // Also every page's `theme-color`, unless `seo.themeColor` sets one.
   themeColor?: string | undefined
   backgroundColor?: string | undefined
   display?: 'fullscreen' | 'standalone' | 'minimal-ui' | 'browser' | undefined

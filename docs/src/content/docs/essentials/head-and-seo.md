@@ -77,6 +77,16 @@ export default defineConfig({
 })
 ```
 
+`seo.themeColor` colours the browser around every page. Give it a pair to follow the visitor's colour scheme:
+
+```ts
+export default {
+  seo: { themeColor: { light: '#ffffff', dark: '#111111' } },
+}
+```
+
+A single colour works too, and `manifest.themeColor` is the fallback. A page that writes its own `theme-color` meta replaces the site's one for the same `media`.
+
 With `site` set, every page gets a canonical link, `og:title`, `og:description`, `og:url` and `twitter:card`.
 
 A home page can put the name first with `title(raw) Example, the shop for kay`, which skips the template.

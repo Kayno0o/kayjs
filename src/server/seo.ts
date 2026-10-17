@@ -48,8 +48,7 @@ export async function configHead(root: string, config: KayConfig, clientDir: str
     extra.push(...faviconTags(config.favicon))
 
   // A site linking its own icons still colours the browser around its pages.
-  if (config.manifest?.themeColor !== undefined)
-    extra.push({ tag: 'meta', props: { name: 'theme-color', content: config.manifest.themeColor } })
+  extra.push(...themeColorTags(config.seo?.themeColor ?? config.manifest?.themeColor))
 
   for (const tag of config.head ?? []) {
     const inline = inlineText(tag)
@@ -64,6 +63,20 @@ export async function configHead(root: string, config: KayConfig, clientDir: str
   const sizeOf = social ? await cardImageSizes(projectPaths(root, config).public) : undefined
 
   return { head: seoHead(config.site, config.seo, extra, config.trailingSlash, basePath(config.base), sizeOf, appServesManifest), scripts, styles, fonts }
+}
+
+// One `theme-color` for every visitor, or one per colour scheme the browser reports.
+function themeColorTags(color: SeoConfig['themeColor']): HeadTag[] {
+  if (color === undefined)
+    return []
+
+  if (typeof color === 'string')
+    return [{ tag: 'meta', props: { name: 'theme-color', content: color } }]
+
+  return [
+    { tag: 'meta', props: { name: 'theme-color', content: color.light, media: '(prefers-color-scheme: light)' } },
+    { tag: 'meta', props: { name: 'theme-color', content: color.dark, media: '(prefers-color-scheme: dark)' } },
+  ]
 }
 
 // The pixel size of a card image named by its path: an imported image's, a public file's, read once here, and a share card's 1200x630.

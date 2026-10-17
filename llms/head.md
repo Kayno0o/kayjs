@@ -187,6 +187,7 @@ export default defineConfig({
 - `twitter:card` is `summary_large_image` once there is an `og:image`.
 - A canonical link or an `og:image` and `twitter:image` written as a path, `/og.png` or an imported asset's URL, is made absolute against `site`.
 - `og:type` is `website`.
+- `seo.themeColor` sets every page's `theme-color`: `'#1e1e2e'` for one, `{ light: '#ffffff', dark: '#111111' }` for one meta per colour scheme (`media="(prefers-color-scheme: light)"`, then dark). It defaults to `manifest.themeColor`, which the manifest keeps for the installed app; a page's own `theme-color` meta replaces the site's of the same `media`.
 - An `og:image` written as the path of a public file, an imported image or a `shareImage()` or `shareCard()` card gets `og:image:width` and `og:image:height`, read from the file, so a network draws the card without fetching the image first.
 - `imageAlt` gives `og:image:alt` beside `seo.image`, and `twitter:image:alt` repeats whatever `og:image:alt` is.
 - A page setting its own `og:image` keeps neither the size nor the alt text of the site's image: it sets `meta(property="og:image:alt" content="...")` beside it.

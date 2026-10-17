@@ -6,6 +6,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 - Site search ranks a word higher the more of its title or heading it makes up, leaves `button` labels out of the index but for a heading's own, and gives each hit `headingParts`, its heading with the words found marked ([Site search](sitemap-search-fonts.md#site-search)).
 - kayjs-ui: `CommandPalette` with `siteSearch` marks the words found in each section's heading as in its line of text, both in the accent colour ([kayjs-ui](../packages/ui/llms/tables-navigation-and-layout.md)).
+- `seo.themeColor` sets every page's `theme-color`, a colour or a `{ light, dark }` pair written as one meta per colour scheme, without a `manifest` ([Head](head.md#give-every-page-a-title-template-and-a-social-card)).
 - A page's `lastmod` setting, a `Date`, a date string or a function of each listed URL's params, adds `<lastmod>` to its entries in the sitemap ([Sitemap and robots.txt](sitemap-search-fonts.md#sitemap-and-robotstxt)).
 - `robots: { disallow: ['/admin'] }` in `kay.config.ts` adds rules to the generated `/robots.txt`, listed in every locale and under the `base` with the `Sitemap:` line kept, and `robots: false` serves none ([Sitemap and robots.txt](sitemap-search-fonts.md#sitemap-and-robotstxt)).
 - `publicCache: { '/fonts/**': '365d' }` in `kay.config.ts` has the browser keep the public files a glob names for that long instead of revalidating them on every visit ([Public files](styles-and-assets.md#public-files)).

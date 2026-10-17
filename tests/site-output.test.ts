@@ -129,3 +129,36 @@ describe('sitemap lastmod', () => {
     expect(xml).not.toContain('<loc>https://x.fr')
   })
 })
+
+describe('theme color', () => {
+  const THEME = /<meta name="theme-color"[^>]*>/g
+  const themes = async (options: Parameters<typeof pages>[0], path = '/about') => (await (await fetchFrom(await appWith({ site: 'https://x.example', ...options }), path)).text()).match(THEME) ?? []
+
+  it('writes one meta per colour scheme for a light and dark pair', async () => {
+    expect(await themes({ seo: { themeColor: { light: '#fff', dark: '#111' } } })).toEqual([
+      '<meta name="theme-color" content="#fff" media="(prefers-color-scheme: light)">',
+      '<meta name="theme-color" content="#111" media="(prefers-color-scheme: dark)">',
+    ])
+  })
+
+  it('takes one colour, and falls back to the manifest\'s', async () => {
+    expect(await themes({ seo: { themeColor: '#123456' } })).toEqual(['<meta name="theme-color" content="#123456">'])
+    expect(await themes({ manifest: { themeColor: '#654321' } })).toEqual(['<meta name="theme-color" content="#654321">'])
+    expect(await themes({ seo: { themeColor: '#123456' }, manifest: { themeColor: '#654321' } })).toEqual(['<meta name="theme-color" content="#123456">'])
+  })
+
+  it('writes none by default, and lets a page replace the one of its scheme', async () => {
+    expect(await themes({})).toEqual([])
+
+    expect(await themes({ seo: { themeColor: { light: '#fff', dark: '#111' } } }, '/themed')).toEqual([
+      '<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">',
+      '<meta name="theme-color" content="#111" media="(prefers-color-scheme: dark)">',
+    ])
+  })
+
+  it('is the same under every locale', async () => {
+    const i18n = { locales: ['fr', 'en'], defaultLocale: 'fr', messages: `${ROOT}/src/messages` }
+
+    expect(await themes({ i18n, seo: { themeColor: { light: '#fff', dark: '#111' } } }, '/en/about')).toHaveLength(2)
+  })
+})
