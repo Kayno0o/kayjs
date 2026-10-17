@@ -363,13 +363,10 @@ function schemaAt(schema: JsonSchema, path: Path): JsonSchema | undefined {
 function collectPaths(schema: JsonSchema | undefined, data: unknown, path: Path, found: Path[]): void {
   const node = narrowed(schema)
 
-  if (node === undefined)
+  if (node === undefined || schema?.['x-kay-translate'] === false || node['x-kay-translate'] === false)
     return
 
   // A field of a kind the app adds is data its component edits, whatever shape it wraps.
-  if (node['x-kay-translate'] === false)
-    return
-
   if (!TRANSLATED_KINDS.has(node['x-kay']?.kind ?? 'text'))
     return
 

@@ -232,8 +232,8 @@ describe('kay i18n translate: entries', () => {
   })
 
   it('leaves a field the schema marks untranslated as it is, at any depth, and lists the paths it translates in a dry run', async () => {
-    const config = 'import { t } from \'elysia\'\nimport { collection, untranslated } from \'kay/content\'\n\nexport const shop = collection(\'content/shop\', { schema: t.Object({ title: t.String(), brand: untranslated(t.String()), maybe: t.Optional(untranslated(t.String())), meta: untranslated(t.Object({ label: t.String() })), rows: t.Array(t.Object({ name: t.String(), sku: untranslated(t.String()) })) }), localized: true })\n'
-    const files = { ...noMessages, 'src/content.config.ts': config, 'src/content/shop/en/mug.md': '---\ntitle: Mug\nbrand: Acme\nmaybe: Keep\nmeta:\n  label: Label\nrows:\n  - name: Red\n    sku: R-1\n---\nBody\n' }
+    const config = 'import { t } from \'elysia\'\nimport { collection, untranslated } from \'kay/content\'\n\nexport const shop = collection(\'content/shop\', { schema: t.Object({ title: t.String(), brand: untranslated(t.String()), maybe: t.Optional(untranslated(t.String())), meta: untranslated(t.Object({ label: t.String() })), nothing: untranslated(t.Union([t.String(), t.Null()])), rows: t.Array(t.Object({ name: t.String(), sku: untranslated(t.String()) })) }), localized: true })\n'
+    const files = { ...noMessages, 'src/content.config.ts': config, 'src/content/shop/en/mug.md': '---\ntitle: Mug\nbrand: Acme\nmaybe: Keep\nnothing: Hidden\nmeta:\n  label: Label\nrows:\n  - name: Red\n    sku: R-1\n---\nBody\n' }
     const root = await project(files)
     const dry = await run(root, ['fr'], [], { 'dry-run': true })
 
@@ -249,7 +249,7 @@ describe('kay i18n translate: entries', () => {
     expect(written).toContain('maybe: Keep')
     expect(written).toContain('label: Label')
     expect(written).toContain('sku: R-1')
-    for (const kept of ['Acme', 'Keep', 'Label', 'R-1'])
+    for (const kept of ['Acme', 'Keep', 'Label', 'R-1', 'Hidden'])
       expect(asked[0]!.messages[0]!.content).not.toContain(kept)
   })
 

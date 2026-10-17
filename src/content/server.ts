@@ -140,19 +140,13 @@ export async function contentProblems(root: string, config?: string, site = true
 
 // The entries of a localized collection marked with `# draft`, as `writeDraftEntry` marks a machine translation without a draft field.
 async function draftEntryProblems(root: string, entries: RawEntry[]): Promise<ContentProblem[]> {
-  const found: ContentProblem[] = []
-
-  for (const entry of entries) {
-    if (entry.file.endsWith('.json'))
-      continue
-
+  const found = await Promise.all(entries.filter(entry => !entry.file.endsWith('.json')).map(async (entry): Promise<ContentProblem[]> => {
     const line = draftCommentLine(entry.file, await Bun.file(resolve(root, entry.file)).slice(0, DRAFT_HEAD_BYTES).text())
 
-    if (line !== undefined)
-      found.push({ file: entry.file, line, message: 'is marked `# draft`, a machine translation no one has checked yet', code: 'draft-entry' })
-  }
+    return line === undefined ? [] : [{ file: entry.file, line, message: 'is marked `# draft`, a machine translation no one has checked yet', code: 'draft-entry' }]
+  }))
 
-  return found
+  return found.flat()
 }
 
 // A component the collection lacks is a content problem of its own, so only those it has are typed.

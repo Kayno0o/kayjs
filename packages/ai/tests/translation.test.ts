@@ -65,6 +65,14 @@ it('lets the visible attributes of a tag be translated and holds every other one
   expect(unitProblem(html('<a title="Home">x</a>'), '<a title="Accueil"')).toBe('changes the tags of the source')
 })
 
+it('rejects a tag a browser reads that the check cannot count, an odd quote hiding it', () => {
+  expect(unitProblem(message('Hello <b>world</b>'), 'Bonjour <b>monde</b><svg onload=alert(1) a\'b>')).toBe('changes the tags of the source')
+  expect(unitProblem(message('Hello'), 'Bonjour <img src=x"onerror=alert(1)>')).toBe('changes the tags of the source')
+  expect(unitProblem(message('Hello'), 'Bonjour <a title="x">')).toBe('changes the tags of the source')
+  expect(unitProblem(message('a <b and c'), 'a <b et c')).toBeUndefined()
+  expect(unitProblem(message('<a title="a b">x</a>'), '<a title="a" b>x</a>')).toBe('changes the tags of the source')
+})
+
 it('asks for the visible attributes to be translated', () => {
   expect(systemPrompt('en', 'fr')).toContain('title, alt, aria-label')
 })
