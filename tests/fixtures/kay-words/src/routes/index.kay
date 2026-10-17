@@ -11,6 +11,13 @@ export const check = action(t.Object({
   req: t.String(),
 }), () => undefined)
 
+export const listed = action(t.Object({
+  mail: t.String({ format: 'email' }),
+  tags: t.Array(t.String(), { minItems: 2 }),
+  extra: t.Array(t.String(), { maxItems: 1 }),
+  slug: t.String({ pattern: '^x$', format: 'email' }),
+}), () => undefined)
+
 export const guarded = action(t.Object({ website: t.Optional(t.String()) }), () => undefined, { honeypot: 'website', rateLimit: { max: 1, window: '1m' }, bodyLimit: 200 })
 
 export const owned = action(t.Object({ website: t.Optional(t.String()) }), () => undefined, { honeypot: 'website', messages: { honeypot: 'Own words' } })
@@ -33,6 +40,16 @@ form(action={check})
   input(field="req")
   error req
   button Check
+form(action={listed})
+  input(field="mail")
+  error mail
+  input(field="tags")
+  error tags
+  input(field="extra")
+  error extra
+  input(field="slug")
+  error slug
+  button List
 form(action={guarded})
   if guarded.error('website') as message
     p.refused {message}

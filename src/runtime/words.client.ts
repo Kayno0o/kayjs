@@ -36,9 +36,16 @@ function load(): void {
   }
 }
 
-// The English as written, a number as `String` has it, so a site without the key reads what it always did.
+// The English as written, a number as `String` has it, so a site without the key reads what it always did; a date is written as the page's locale writes it.
 function plainEnglish(english: string, params: Record<string, MessageValue>): string {
-  return english.replace(PLACEHOLDER, (placeholder, name: string) => name in params ? String(params[name]) : placeholder)
+  return english.replace(PLACEHOLDER, (placeholder, name: string) => {
+    if (!(name in params))
+      return placeholder
+
+    const value = params[name]!
+
+    return value instanceof Date ? new Intl.DateTimeFormat(pageLocale(), { dateStyle: 'medium' }).format(value) : String(value)
+  })
 }
 
 // The page's locale, from the messages the server wrote or else its `lang`.
@@ -70,6 +77,9 @@ export function wording(key: string, english: string, params: Record<string, Mes
 
     if (value === undefined)
       return placeholder
+
+    if (value instanceof Date)
+      return new Intl.DateTimeFormat(here, { dateStyle: 'medium' }).format(value)
 
     return typeof value === 'number' ? new Intl.NumberFormat(here).format(value) : String(value)
   })

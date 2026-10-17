@@ -548,7 +548,9 @@ describe('ContactForm', () => {
 
     const french = (await site.visit('/fr/contact-words')).html
 
-    expect(french).toContain('Envoyer')
+    // `ui.contactForm.submitLabel` wins over kayjs-mail's `mail.contact.form.submit`, which still words the other labels.
+    expect(french).toContain('Expédier')
+    expect(french).not.toContain('Envoyer')
     expect(french).toContain('Nom')
     expect(french).not.toContain('>Send<')
 

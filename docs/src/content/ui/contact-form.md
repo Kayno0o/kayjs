@@ -20,7 +20,7 @@ ContactForm(action={contact})
 ```
 
 - Fields beyond the name, email and message go in as the children, between the email and the message, each in a [FormField](/ui/form-field) with `issue={contact.error('topic')}`. They are named with `name`, as `field` is only valid in the form itself.
-- `nameLabel`, `emailLabel`, `messageLabel`, `submitLabel` and `sentLabel` replace the texts, which read kayjs-mail's `mail.contact.form` messages in the page's language (English and French) and are English without them, and `rows` sets the message box's height.
+- `nameLabel`, `emailLabel`, `messageLabel`, `submitLabel` and `sentLabel` replace the texts, which read the `ui.contactForm.*` messages, then kayjs-mail's `mail.contact.form` ones in the page's language (English and French), and are English without them, and `rows` sets the message box's height.
 - The anti-spam fields the action asks for, the honeypot and the time stamp, are added by kay.
 
 <ReadMore href="/libraries/kayjs-mail">The action, its limits and its refusals are in kayjs-mail.</ReadMore>

@@ -1,16 +1,20 @@
 import type { Action } from '../src/runtime'
-import { join } from 'node:path'
+import { join, relative } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it, spyOn } from 'bun:test'
 import { messageProblems } from '../src/check/messages'
 import { wording } from '../src/runtime/words.server'
+import { pages } from '../src/server'
+import { sizeText } from '../src/server/body'
 import { testSite } from '../src/test'
+import { scratchDir } from './scratch'
 
 const FIXTURE = 'tests/fixtures/kay-words'
 const i18n = { locales: ['en', 'fr'], defaultLocale: 'en', messages: `${FIXTURE}/src/messages` }
 const site = await testSite({ routes: `${FIXTURE}/src/routes`, i18n, bodyLimit: 1024 * 1024 })
-const { check, guarded, owned, boom } = await import(join(import.meta.dir, 'fixtures/kay-words/src/routes/index.kay')) as {
+const { check, listed, guarded, owned, boom } = await import(join(import.meta.dir, 'fixtures/kay-words/src/routes/index.kay')) as {
   check: Action<Record<string, string>, unknown>
+  listed: Action<Record<string, string | string[]>, unknown>
   guarded: Action<Record<string, string>, unknown, 'website'>
   owned: Action<Record<string, string>, unknown, 'website'>
   boom: Action<Record<string, never>, unknown>
@@ -29,6 +33,20 @@ describe('kay\'s refusals in the app\'s catalogs', () => {
     expect(french.html).toContain('Champ requis')
     expect(french.html).toContain('Expected string to match')
     expect(french.html).toContain('Mine')
+  })
+
+  it('words a format, a pattern, too few and too many items each under its own key', async () => {
+    const refused = { mail: 'nope', tags: ['a'], extra: ['a', 'b'], slug: 'y' }
+    const french = await site.submit(listed, refused, { from: '/fr' })
+    const english = await site.submit(listed, refused, { from: '/' })
+
+    expect(french.html).toContain('Pas au format email')
+    expect(french.html).toContain('Au moins 2 choix')
+    expect(french.html).toContain('Au plus 1 choix')
+    // The pattern comes first for a field with both, and has no key here.
+    expect(french.html).toContain('Expected string to match')
+    expect(english.html).not.toContain('choix')
+    expect(english.html).toContain('Expected array length')
   })
 
   it('shows Elysia\'s wording on a site whose catalogs have no kay keys', async () => {
@@ -60,7 +78,7 @@ describe('kay\'s refusals in the app\'s catalogs', () => {
 
     expect(limited.status).toBe(429)
     expect(limited.html).toMatch(/Trop d(&#39;|&#x27;|')essais, réessayez dans \d+ s/)
-    expect(large.html).toContain('Trop volumineux, 200 bytes au plus')
+    expect(large.html).toMatch(/Trop volumineux, 200\s+octets au plus/)
   })
 
   it('words the server error when a handler throws', async () => {
@@ -79,13 +97,79 @@ describe('kay\'s refusals in the app\'s catalogs', () => {
   })
 })
 
+describe('sizeText', () => {
+  it('writes the units of the locale', () => {
+    expect(sizeText(200)).toBe('200 bytes')
+    expect(sizeText(512 * 1024)).toBe('512 KB')
+    expect(sizeText(1.5 * 1024 * 1024)).toBe('1.5 MB')
+    expect(sizeText(1.5 * 1024 * 1024, 'fr')).toMatch(/^1,5\sMo$/)
+    expect(sizeText(200, 'fr')).toMatch(/^200\soctets$/)
+  })
+})
+
+describe('the offline page', () => {
+  it('is worded in the default locale, in English without the keys', async () => {
+    const keys = { routes: `${FIXTURE}/src/routes`, prebuilt: false, offline: true as const }
+    const english = await offlinePage(await pages({ ...keys, i18n }))
+    const french = await offlinePage(await pages({ ...keys, i18n: { ...i18n, defaultLocale: 'fr' } }))
+
+    expect(english).toContain('<html lang="en"')
+    expect(english).toContain('<h1>Offline</h1><p>This page needs a connection, and none is open.</p>')
+    expect(french).toContain('<html lang="fr"')
+    expect(french).toContain('<h1>Hors ligne</h1>')
+    expect(french).toContain('aucune n\'est ouverte')
+  })
+})
+
 describe('kay check on the catalogs', () => {
+  it('compares the placeholders of a library message the default locale does not word with its English, and takes auth.* and mail.* keys alone', async () => {
+    const root = await scratchDir('kay-words-check-')
+    const messages = join(root, 'messages')
+    const write = async (locale: string, body: string) => Bun.write(join(messages, `${locale}.ts`), `import { defineMessages } from 'kay/i18n'\n\nexport default defineMessages(${body})\n`)
+
+    await write('en', '{ title: \'Words\' }')
+    await write('fr', `{
+  title: 'Mots',
+  kay: { action: { bodyLimit: 'Trop gros', serverError: 'Erreur {code}' }, invalid: { tooShort: 'Au moins {min}', tooLong: 'Au plus {min}' } },
+  ui: { table: { selectedLabel: { one: 'une', other: '{count} choisies' }, filterLabel: 'Filtre {x}', selectAllLabel: 'Tout' } },
+  cms: { table: { deleteMessage: 'Supprimer {title} ?' } },
+  auth: { scopes: { read: 'Lire' }, other: 'Autre' },
+  mail: { contact: { sent: 'Envoyé' } },
+}`)
+
+    const problems = (await messageProblems(process.cwd(), { locales: ['en', 'fr'], defaultLocale: 'en', messages: relative(process.cwd(), messages) })).map(problem => problem.message)
+
+    expect(problems.toSorted()).toEqual([
+      'gives kay.action.bodyLimit without {size}, which its English has',
+      'gives kay.action.serverError a {code}, which its English has not, so nothing fills it',
+      'gives kay.invalid.tooLong a {min}, which its English has not, so nothing fills it',
+      'gives kay.invalid.tooLong without {max}, which its English has',
+      'gives ui.table.filterLabel a {x}, which its English has not, so nothing fills it',
+    ].toSorted())
+  })
+
   it('lets a locale word the kay.* keys the default locale does not give', async () => {
     expect(await messageProblems(process.cwd(), { ...i18n, messages: `${FIXTURE}/src/messages` })).toEqual([])
   })
 })
 
+// The page the worker falls back to, from its settings.
+async function offlinePage(app: { handle: (request: Request) => Promise<Response> }): Promise<string> {
+  const script = await (await app.handle(new Request('http://localhost/sw.js'))).text()
+
+  return (JSON.parse((/^const KAY = (.+)$/m).exec(script)![1]!) as { offline: string }).offline
+}
+
 describe('wording', () => {
+  it('writes a date param the way the page\'s locale does, in the English too', async () => {
+    const day = new Date(Date.UTC(2026, 9, 4, 12))
+    const { runInLocale } = await import('../src/runtime/locale-state')
+
+    expect(wording('kay.none', 'Since {day}', { day })).toBe('Since Oct 4, 2026')
+    expect(runInLocale({ locale: 'fr', messages: new Map(), settings: { locales: ['fr'], defaultLocale: 'fr', prefixDefault: false }, path: '/' }, () => wording('kay.none', 'Since {day}', { day }))).toBe('Since 4 oct. 2026')
+    expect(runInLocale({ locale: 'fr', messages: new Map([['kay.since', 'Depuis le {day}']]), settings: { locales: ['fr'], defaultLocale: 'fr', prefixDefault: false }, path: '/' }, () => wording('kay.since', 'Since {day}', { day }))).toBe('Depuis le 4 oct. 2026')
+  })
+
   it('is the English with its placeholders filled outside a request', () => {
     expect(wording('kay.none', 'Up to {max} of {n}', { max: 5, n: 'a' })).toBe('Up to 5 of a')
     expect(wording('kay.none', 'Go to {n}')).toBe('Go to {n}')
@@ -102,7 +186,7 @@ describe('the kay.* keys in llms', () => {
 
     expect(keys.filter(key => !key.startsWith('invalid.') && !doc.includes(`\`${key}\``))).toEqual([])
 
-    for (const kind of ['required', 'tooShort', 'tooLong', 'pattern', 'tooSmall', 'tooBig', 'type'])
+    for (const kind of ['required', 'tooShort', 'tooLong', 'pattern', 'format', 'tooFewItems', 'tooManyItems', 'tooSmall', 'tooBig', 'type'])
       expect(doc).toContain(`\`${kind}\``)
   })
 })

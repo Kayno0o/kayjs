@@ -1,26 +1,14 @@
 ---
 import type { Action } from 'kay'
-import { t } from 'kay/i18n'
+import { wording } from 'kay/words'
 import Button from './button.kay'
 import FormField from './form-field.kay'
 import Notice from './notice.kay'
 
-// The `mail.contact.form` messages kayjs-mail brings in the page's language; a site without them reads English.
-function wording(key: string, english: string): string {
-  try {
-    const text = (t as (key: string) => string)(`mail.contact.form.${key}`)
-
-    return text.startsWith('mail.contact.form.') ? english : text
-  }
-  catch {
-    return english
-  }
-}
-
-const { action, nameLabel = wording('name', 'Name'), emailLabel = wording('email', 'Email'), messageLabel = wording('message', 'Message'), submitLabel = wording('submit', 'Send'), sentLabel = wording('sent', 'Thank you, your message has been sent.'), rows = 6, class: className } = props<{
+const { action, nameLabel = wording('ui.contactForm.nameLabel', wording('mail.contact.form.name', 'Name')), emailLabel = wording('ui.contactForm.emailLabel', wording('mail.contact.form.email', 'Email')), messageLabel = wording('ui.contactForm.messageLabel', wording('mail.contact.form.message', 'Message')), submitLabel = wording('ui.contactForm.submitLabel', wording('mail.contact.form.submit', 'Send')), sentLabel = wording('ui.contactForm.sentLabel', wording('mail.contact.form.sent', 'Thank you, your message has been sent.')), rows = 6, class: className } = props<{
   // The action `contactForm(mail)` from kayjs-mail gives, or any with a `name`, an `email` and a `message` field.
   action: Action<never, unknown>
-  // The labels read kayjs-mail's `mail.contact.form` messages in the page's language, English and French, which these replace.
+  // The labels read the `ui.contactForm.*` messages, then kayjs-mail's `mail.contact.form` ones in the page's language, English and French, which these replace.
   nameLabel?: string | undefined
   emailLabel?: string | undefined
   messageLabel?: string | undefined

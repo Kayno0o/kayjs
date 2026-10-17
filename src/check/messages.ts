@@ -2,7 +2,7 @@ import type { I18nConfig, KayExtension } from '../config'
 import type { ContentProblem } from '../content/validate'
 import type { Message, MessageTree } from '../runtime/i18n'
 import { existsSync } from 'node:fs'
-import { relative, resolve } from 'node:path'
+import { dirname, join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { KayError } from '../compiler/errors'
 import { PROBLEMS_MARKER } from '../content/claims'
@@ -10,11 +10,12 @@ import { flattenMessages, isPlural, MESSAGE_TAG } from '../runtime/i18n'
 import { buildingWithoutEnv } from '../server/env-state'
 import { extensionMessageFiles, messagesFile } from '../server/i18n'
 import { draftMessages } from '../server/message-drafts'
+import { INVALID_PARAMS, KAY_ENGLISH } from '../server/words'
 import { FILES_MARKER, loadedFiles } from './loaded'
 
 const PLACEHOLDER = /\{(\w+)\}/g
 // The keys kay and its libraries look their texts up under, which a locale may word alone: a site without them reads the English the code holds.
-const LIBRARY_KEY = /^(?:kay|ui|cms)\./
+const LIBRARY_KEY = /^(?:kay|ui|cms|auth|mail)\./
 const SPECIAL = /[.*+?^${}()|[\]\\]/g
 
 // A message as a locale reads it, with the catalog it comes from: the app's, or an extension's the app does not translate.
@@ -106,8 +107,33 @@ export async function messageProblems(root: string, config: I18nConfig, extensio
     }
 
     for (const [key, own] of entries) {
-      if (!reference.entries.has(key) && !LIBRARY_KEY.test(key))
+      if (reference.entries.has(key))
+        continue
+
+      if (!LIBRARY_KEY.test(key)) {
         problems.push({ file: own.file, line: lineOf(own.source, key), message: `has ${key}, which ${reference.file} lacks, so no \`t()\` can name it` })
+
+        continue
+      }
+
+      // A library's text the default locale does not word is compared with the English the library holds.
+      const expected = await libraryPlaceholders(root, key)
+
+      if (expected === undefined)
+        continue
+
+      const line = lineOf(own.source, key)
+      const found = placeholders(own.message)
+
+      for (const name of expected) {
+        if (!found.has(name) && !(name === 'count' && isPlural(own.message)))
+          problems.push({ file: own.file, line, message: `gives ${key} without {${name}}, which its English has` })
+      }
+
+      for (const name of found) {
+        if (!expected.has(name) && !(name === 'count' && isPlural(own.message)))
+          problems.push({ file: own.file, line, message: `gives ${key} a {${name}}, which its English has not, so nothing fills it` })
+      }
     }
   }
 
@@ -176,8 +202,58 @@ async function localeCatalog(root: string, config: I18nConfig, extensions: KayEx
   return { file, source, own: [...messages.keys()], entries }
 }
 
+const LIBRARIES = new Map([['ui', 'kayjs-ui'], ['cms', 'kayjs-cms'], ['auth', 'kayjs-auth']])
+// `wording('ui.table.filterLabel', 'Filter'` in a library's source, the key and the English it falls back to.
+const WORDING = /\bwording\(\s*(['"])([a-z]+\.[\w.]+)\1\s*,\s*(?:'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)")/g
+const sourcesRead = new Map<string, Promise<Map<string, string>>>()
+
+// The placeholders of the English a library words `key` with, from kay's own table or the library's installed sources; undefined when nothing says (a key built at run time, a library not installed).
+async function libraryPlaceholders(root: string, key: string): Promise<Set<string> | undefined> {
+  if (key in INVALID_PARAMS)
+    return new Set(INVALID_PARAMS[key])
+
+  const english = key in KAY_ENGLISH ? KAY_ENGLISH[key as keyof typeof KAY_ENGLISH] : await libraryEnglish(root, key)
+
+  return english === undefined ? undefined : placeholders(english)
+}
+
+async function libraryEnglish(root: string, key: string): Promise<string | undefined> {
+  const library = LIBRARIES.get(key.slice(0, key.indexOf('.')))
+
+  if (library === undefined)
+    return undefined
+
+  const cacheKey = `${root}\n${library}`
+
+  if (!sourcesRead.has(cacheKey))
+    sourcesRead.set(cacheKey, readEnglish(root, library))
+
+  return (await sourcesRead.get(cacheKey)!).get(key)
+}
+
+// Every text a library's installed sources word, by key; the first English a key is given wins.
+async function readEnglish(root: string, library: string): Promise<Map<string, string>> {
+  const english = new Map<string, string>()
+
+  try {
+    const folder = dirname(Bun.resolveSync(`@kaynooo/${library}`, root))
+
+    for (const path of await Array.fromAsync(new Bun.Glob('**/*.{kay,ts}').scan({ cwd: folder }))) {
+      for (const match of (await Bun.file(join(folder, path)).text()).matchAll(WORDING)) {
+        const text = match[3] ?? match[4]
+
+        if (text !== undefined && !english.has(match[2]!))
+          english.set(match[2]!, text)
+      }
+    }
+  }
+  catch {}
+
+  return english
+}
+
 // Every placeholder of a message, a plural's forms together, its `count` included.
-function placeholders(message: Message): Set<string> {
+function placeholders(message: Message | string): Set<string> {
   const texts = typeof message === 'string' ? [message] : Object.values(message)
   const names = new Set(texts.flatMap(text => Array.from(text.matchAll(PLACEHOLDER), match => match[1]!)))
 

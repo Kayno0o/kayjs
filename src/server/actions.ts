@@ -21,6 +21,7 @@ import { kayLog } from '../runtime/log'
 import { configuredSite } from '../runtime/site'
 import { FAILURE_HEADER, NAVIGATE_HEADER, PAGE_HEADER, REDIRECT_HEADER } from '../runtime/swap'
 import { encodeValue, unsendable } from '../runtime/wire'
+import { pageLocale } from '../runtime/words.server'
 import { actionClash } from './action-clash'
 import { routerPath } from './base'
 import { sizeText } from './body'
@@ -274,7 +275,7 @@ async function tooLarge(action: ServerAction<TSchema, unknown>, request: Request
   if (isCrossSite(request))
     return crossSiteRefusal(request)
 
-  const message = action.protection?.messages?.bodyLimit ?? (most => kayWord('kay.action.bodyLimit', { size: sizeText(most) }))
+  const message = action.protection?.messages?.bodyLimit ?? (most => kayWord('kay.action.bodyLimit', { size: sizeText(most, pageLocale()) }))
 
   return failed(request, new Headers(), cookieJar(request).cookies, { action: action.url, status: 413, values: {}, errors: { '': typeof message === 'string' ? message : message(bytes) } }, server, back)
 }
@@ -929,9 +930,12 @@ function encodeOrExplain(value: unknown, what: string): string {
   }
 }
 
-// The `kay.invalid.*` text for what an issue refused, Elysia's own summary when the site words none; the limit it names goes in as `{min}` or `{max}`.
+// The numeric text `s.Integer()` and `s.Numeric()` take, which a number refused for its type is not a format of.
+const NUMERIC_FORMATS = new Set(['integer', 'numeric'])
+
+// The `kay.invalid.*` text for what an issue refused, Elysia's own summary when the site words none; the limit it names goes in as `{min}` or `{max}`, a format as `{format}`.
 function refusalText(issue: { summary?: string | undefined, schema?: unknown, value?: unknown }): string {
-  const schema = (typeof issue.schema === 'object' && issue.schema !== null ? issue.schema : {}) as { minLength?: number, maxLength?: number, pattern?: string, minimum?: number, maximum?: number }
+  const schema = (typeof issue.schema === 'object' && issue.schema !== null ? issue.schema : {}) as { minLength?: number, maxLength?: number, pattern?: string, format?: string, minimum?: number, maximum?: number, minItems?: number, maxItems?: number }
   const { value } = issue
 
   if (value === undefined)
@@ -947,8 +951,19 @@ function refusalText(issue: { summary?: string | undefined, schema?: unknown, va
     if (schema.maxLength !== undefined && value.length > schema.maxLength)
       return invalidWord('kay.invalid.tooLong', issue.summary, { max: schema.maxLength })
 
-    if (schema.pattern !== undefined)
+    if (schema.pattern !== undefined && !new RegExp(schema.pattern).test(value))
       return invalidWord('kay.invalid.pattern', issue.summary)
+
+    if (schema.format !== undefined && !NUMERIC_FORMATS.has(schema.format))
+      return invalidWord('kay.invalid.format', issue.summary, { format: schema.format })
+  }
+
+  if (Array.isArray(value)) {
+    if (schema.minItems !== undefined && value.length < schema.minItems)
+      return invalidWord('kay.invalid.tooFewItems', issue.summary, { min: schema.minItems })
+
+    if (schema.maxItems !== undefined && value.length > schema.maxItems)
+      return invalidWord('kay.invalid.tooManyItems', issue.summary, { max: schema.maxItems })
   }
 
   if (typeof value === 'number') {

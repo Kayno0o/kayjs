@@ -122,7 +122,7 @@ FormField also works outside a dialog, in a plain form posting to an action:
 `ContactForm(action={contact})` is the form for the action `contactForm(mail, ...)` from kayjs-mail builds (any action with `name`, `email` and `message` fields works): a `form` posting without JavaScript, a FormField per field with the message the action refused it with, a submit button, and a `Notice` that the message went out (`sentLabel`) or why not (`contact.error()`). The labels read kayjs-mail's `mail.contact.form` messages in the page's language (English else), and the `*Label` props replace them.
 
 - Fields beyond the three go in as children, between the email and the message, in a `FormField` with `issue={contact.error('topic')}` and a control named with `name`, since `field` is only valid inside the form's own markup.
-- `nameLabel`, `emailLabel`, `messageLabel`, `submitLabel`, `sentLabel` replace the labels from the `mail.contact.form` messages, `rows` sets the message box, `class` goes on the form.
+- `nameLabel`, `emailLabel`, `messageLabel`, `submitLabel`, `sentLabel` replace the labels from the `ui.contactForm.*` messages, then kayjs-mail's `mail.contact.form` ones, `rows` sets the message box, `class` goes on the form.
 
 A GET filter form, whose every pick lands in the URL, submits as soon as a Select changes with `submit`, no ref to the form needed:
 

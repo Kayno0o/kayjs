@@ -166,7 +166,7 @@ export default defineConfig({
 - The build's other files, such as images, are kept as they are first loaded.
 - It answers the build's files from what it keeps, so islands hydrate offline.
 - A page is fetched from the network first, a kept page's copy refreshed each time, unless its response says `private` or `no-store`.
-- Offline, the kept copy answers, then the `fallback` page, then a plain page kay writes saying the page needs a connection, with status 503.
+- Offline, the kept copy answers, then the `fallback` page, then a plain page kay writes saying the page needs a connection, with status 503, worded in the default locale under `kay.offline.title` and `kay.offline.text`.
 - A page swap fetches through it too, so following a link between kept pages works offline.
 - Actions, API routes and every other path under `/_kay/` always go to the network, as does any request other than GET, to another site, or for a range, as a video or an audio file asks for.
 - Only a full 200 for the URL asked is kept, never one a redirect led to.

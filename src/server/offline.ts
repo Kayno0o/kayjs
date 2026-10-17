@@ -1,18 +1,21 @@
 import type { Elysia } from 'elysia'
 import type { OfflineConfig, TrailingSlash } from '../config'
 import type { ClientBuild } from './client'
+import type { I18n } from './i18n'
 import type { ServedPaths } from './served-paths'
 import { readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { ASSET_PREFIX } from '../build/assets'
 import { NOTICES_FILE } from '../build/licenses'
-import { escapeAttribute } from '../runtime/escape'
+import { escape, escapeAttribute } from '../runtime/escape'
 import { textDirection } from '../runtime/i18n'
+import { runInLocale } from '../runtime/locale-state'
 import { kayLog } from '../runtime/log'
 import { fixedReply } from './compress'
 import { PUBLIC_ENV_PATH } from './env-state'
-import { DEFAULT_LANG } from './i18n'
+import { DEFAULT_LANG, stateFor } from './i18n'
 import { slashedPath } from './routes'
+import { kayWord } from './words'
 
 export const SERVICE_WORKER = '/sw.js'
 // Fetched before the page needs them: what the first offline visit cannot do without.
@@ -169,6 +172,8 @@ export interface ServiceWorkerOptions {
   // How the site writes a page's path, which the pages are kept under.
   trailingSlash?: TrailingSlash | undefined
   lang?: string | undefined
+  // The site's locales, whose default one words the page a visitor offline gets in place of one that was not kept.
+  locales?: I18n | undefined
   // The prerendered pages of routes no guard covers, which every visitor gets alike, by path.
   publicPages: string[]
 }
@@ -220,8 +225,17 @@ async function workerScript(options: ServiceWorkerOptions, offline: true | Offli
     env: `${base}${PUBLIC_ENV_PATH}`,
     network: [`${base}${ASSET_PREFIX}`, `${base}/api/`],
     api: `${base}/api`,
-    offline: `<!doctype html><html lang="${escapeAttribute(options.lang ?? DEFAULT_LANG)}"${textDirection(options.lang ?? DEFAULT_LANG) === 'rtl' ? ' dir="rtl"' : ''}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Offline</title></head><body><h1>Offline</h1><p>This page needs a connection, and none is open.</p></body></html>`,
+    offline: offlinePage(options),
   }
 
   return `const KAY = ${JSON.stringify(settings)}\n${WORKER}`
+}
+
+// The page a visitor offline gets for one that was not kept, in the site's default locale: the worker is one script for every visitor, so it cannot follow theirs.
+function offlinePage(options: ServiceWorkerOptions): string {
+  const lang = options.locales?.settings.defaultLocale ?? options.lang ?? DEFAULT_LANG
+  const words = () => ({ title: escape(kayWord('kay.offline.title')), text: escape(kayWord('kay.offline.text')) })
+  const { title, text } = options.locales === undefined ? words() : runInLocale(stateFor(options.locales, lang, '/', new Request('http://localhost/')), words)
+
+  return `<!doctype html><html lang="${escapeAttribute(lang)}"${textDirection(lang) === 'rtl' ? ' dir="rtl"' : ''}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${title}</title></head><body><h1>${title}</h1><p>${text}</p></body></html>`
 }
