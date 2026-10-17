@@ -1,6 +1,6 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, describe, expect, test } from 'bun:test'
-import { mount, settle } from 'kay/test'
+import { mountComponent, settle } from 'kay/test'
 import { click } from './dom'
 
 let mounted: Mounted | undefined
@@ -12,7 +12,7 @@ afterEach(() => {
 })
 
 async function dialogs(onDelete: () => Promise<void> = async () => Promise.resolve(), dirty = false) {
-  mounted = await mount('src/components/dialogs.kay', { onClose: () => closes++, onDelete, dirty })
+  mounted = await mountComponent('src/components/dialogs.kay', { onClose: () => closes++, onDelete, dirty })
 
   return mounted.root
 }

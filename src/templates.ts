@@ -14,10 +14,15 @@ export interface ConfigSettings {
 // Where the project's repository is hosted, which decides the CI it is scaffolded with.
 export type Host = 'forgejo' | 'github'
 
+// The runner label each host's jobs run on unless `kay new --runner` names another.
+export const DEFAULT_RUNNERS: Record<Host, string> = { forgejo: 'debian', github: 'ubuntu-latest' }
+
 // The features a project is scaffolded with, as the files ask for them.
 interface Setup {
   has: (feature: Feature) => boolean
   host: Host
+  // The label of the runner the CI jobs run on: the host's own image unless `kay new --runner` names another.
+  runner: string
   // A Tailwind class list, left out of the markup of a project without Tailwind.
   tw: (classes: string) => string
   settings: ConfigSettings
@@ -305,7 +310,7 @@ function workflowSetup(host: Host): string {
 }
 
 // Every push is checked and tested before anything deploys it; the container build checks again, as `kay build` does. With `postgres`, the tests copy a database per test file on a Postgres service.
-function testWorkflow({ has, host }: Setup): string {
+function testWorkflow({ has, host, runner }: Setup): string {
   const database = has('postgres') && has('tests')
 
   return blocks(
@@ -317,7 +322,7 @@ on:
 
 jobs:
   test:
-    runs-on: ${host === 'forgejo' ? 'debian' : 'ubuntu-latest'}${database
+    runs-on: ${runner}${database
       ? `
     services:
       postgres:
@@ -349,7 +354,7 @@ ${workflowSetup(host)}`,
 }
 
 // A site with no server: `kay build --static` writes it to `dist`, which this workflow publishes to Forgejo Pages, or to GitHub Pages.
-function pagesWorkflow({ has, host }: Setup): string {
+function pagesWorkflow({ has, host, runner }: Setup): string {
   const github = host === 'github'
 
   return blocks(
@@ -372,7 +377,7 @@ concurrency:
 
 jobs:
   publish:
-    runs-on: ubuntu-latest
+    runs-on: ${runner}
     environment:
       name: github-pages
       url: \${{ steps.deployment.outputs.page_url }}`
@@ -381,7 +386,7 @@ jobs:
 
 jobs:
   publish:
-    runs-on: debian`}
+    runs-on: ${runner}`}
     steps:
 ${workflowSetup(host)}`,
     has('tests') && `      # A failing test publishes nothing; the build checks the project itself.
@@ -941,9 +946,9 @@ export function agentsFile(scripts: Record<string, string>): string {
 }
 
 // Every file but package.json, tsconfig.json and the agents' instructions, which `createProject` writes from the same features and scripts.
-export function templateFiles(features: ReadonlySet<Feature>, settings: ConfigSettings = {}, host: Host = 'forgejo'): Record<string, string> {
+export function templateFiles(features: ReadonlySet<Feature>, settings: ConfigSettings = {}, host: Host = 'forgejo', runner: string = DEFAULT_RUNNERS[host]): Record<string, string> {
   const has = (feature: Feature) => features.has(feature)
-  const setup: Setup = { has, host, tw: classes => has('tailwind') ? classes : '', settings }
+  const setup: Setup = { has, host, runner, tw: classes => has('tailwind') ? classes : '', settings }
   const server = has('server')
 
   return {

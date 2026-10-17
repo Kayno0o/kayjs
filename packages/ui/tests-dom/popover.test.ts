@@ -1,6 +1,6 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, describe, expect, test } from 'bun:test'
-import { mount } from 'kay/test'
+import { mountComponent } from 'kay/test'
 import { click, clock } from './dom'
 
 let mounted: Mounted | undefined
@@ -13,7 +13,7 @@ afterEach(() => {
 })
 
 async function popovers() {
-  mounted = await mount('src/components/popovers.kay', { onToggle: (open: boolean) => toggles.push(open) })
+  mounted = await mountComponent('src/components/popovers.kay', { onToggle: (open: boolean) => toggles.push(open) })
 
   clock.start()
 
@@ -111,7 +111,7 @@ test('keeps a tooltip while the pointer crosses onto it, and Escape closes it un
 })
 
 test('a second TooltipHost renders nothing while the first is mounted, and takes over once it unmounts', async () => {
-  mounted = await mount('src/components/hosts.kay')
+  mounted = await mountComponent('src/components/hosts.kay')
   clock.start()
   const { root } = mounted
   const tip = root.querySelector('#tip')!

@@ -1,6 +1,6 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, describe, expect, spyOn, test } from 'bun:test'
-import { mount, settle } from 'kay/test'
+import { mountComponent, settle } from 'kay/test'
 import { click } from './dom'
 
 let mounted: Mounted | undefined
@@ -87,7 +87,7 @@ type Report = [control: string, value: unknown]
 async function open(answer: (control: string, value: unknown) => unknown, mirror = false) {
   const calls: Report[] = []
 
-  mounted = await mount(FIXTURE, { mirror, onChange: (control: string, value: unknown) => {
+  mounted = await mountComponent(FIXTURE, { mirror, onChange: (control: string, value: unknown) => {
     calls.push([control, value])
 
     return answer(control, value)
@@ -210,7 +210,7 @@ test('a ChipGroup leaves its disabled chip alone', async () => {
 })
 
 test('a Checkbox is indeterminate while its parent says so, a click toggling it from checked', async () => {
-  mounted = await mount(FIXTURE, { onChange: () => undefined })
+  mounted = await mountComponent(FIXTURE, { onChange: () => undefined })
 
   expect([...mounted.root.querySelectorAll('.kui-checkbox')].map(box => box.textContent)).toEqual(['I agreev2', 'Select all', 'Some'])
 
@@ -235,7 +235,7 @@ test('a Checkbox is indeterminate while its parent says so, a click toggling it 
 })
 
 test('a Segmented group shows none picked while its parent passes null, and again once the parent goes back to it', async () => {
-  mounted = await mount(FIXTURE, { onChange: () => undefined })
+  mounted = await mountComponent(FIXTURE, { onChange: () => undefined })
 
   const radios = () => [...mounted!.root.querySelectorAll<HTMLInputElement>('#zoom input')].map(radio => radio.checked)
 

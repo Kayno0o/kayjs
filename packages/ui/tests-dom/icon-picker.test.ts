@@ -2,7 +2,7 @@ import type { Mounted } from 'kay/test'
 import type { IconChoice } from '../src/icon-picker'
 import { afterEach, expect, test } from 'bun:test'
 import { trustHtml } from 'kay'
-import { mount, settle } from 'kay/test'
+import { mountComponent, settle } from 'kay/test'
 import { click, clock } from './dom'
 
 // Fake time past the picker's debounce.
@@ -38,7 +38,7 @@ function found(query: string, limit: number, offset: number): IconChoice[] {
 }
 
 async function picker(options: { value?: string, hold?: (query: string) => boolean, ignoreOffset?: boolean } = {}) {
-  mounted = await mount('src/components/icon-picker.kay', {
+  mounted = await mountComponent('src/components/icon-picker.kay', {
     value: options.value,
     onChange: (name: string) => changes.push(name),
     search: async (query: string, limit: number, offset: number) => {

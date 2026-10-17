@@ -24,7 +24,7 @@ const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL
 const SCAFFOLD_MS = 120_000
 const ACCENT_TEST = `import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { expect, it } from 'bun:test'
-import { mount, settle, testSite } from 'kay/test'
+import { mountComponent, settle, testSite } from 'kay/test'
 import { encodeValue } from __WIRE__
 
 const site = await testSite()
@@ -40,7 +40,7 @@ it('changes the accent on a click', async () => {
   GlobalRegistrator.register({ url: 'http://localhost/' })
 
   try {
-    const { root, unmount } = await mount('src/components/accent-picker.kay')
+    const { root, unmount } = await mountComponent('src/components/accent-picker.kay')
 
     root.querySelector<HTMLButtonElement>('[aria-label="mauve"]')!.click()
     await settle()
@@ -319,6 +319,35 @@ describe('kay command line', () => {
     }
   })
 
+  it('runs the CI on the runner --runner names, the host\'s own image otherwise, and keeps --host working as --forge with a warning', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'kay-new-'))
+
+    try {
+      await createProject(join(root, 'forgejo'), { kay: '^1.0.0', features: PRESETS.server.features, runner: 'docker' })
+      await createProject(join(root, 'site'), { kay: '^1.0.0', features: PRESETS.site.features, runner: 'self-hosted:amd64' })
+      await createProject(join(root, 'github'), { kay: '^1.0.0', features: PRESETS.site.features, host: 'github', runner: 'big' })
+      await createProject(join(root, 'plain'), { kay: '^1.0.0', features: PRESETS.server.features })
+
+      expect(await Bun.file(join(root, 'forgejo/.forgejo/workflows/test.yml')).text()).toContain('runs-on: docker\n')
+      expect(await Bun.file(join(root, 'site/.forgejo/workflows/pages.yml')).text()).toContain('runs-on: self-hosted:amd64')
+      expect(await Bun.file(join(root, 'github/.github/workflows/pages.yml')).text()).toContain('runs-on: big')
+      expect(await Bun.file(join(root, 'plain/.forgejo/workflows/test.yml')).text()).toContain('runs-on: debian\n')
+      await expect(createProject(join(root, 'bad'), { kay: '^1.0.0', runner: 'a b\nc' })).rejects.toThrow('kay new: --runner is "a b\\nc"')
+
+      const old = await kay(['new', 'old', '--kay', '^1.0.0', '--template', 'server', '--host', 'github', '--runner', 'mine', '--quiet'], root)
+
+      expect(old).toMatchObject({ code: 0, stderr: expect.stringContaining('--host is now --forge') })
+      expect(await Bun.file(join(root, 'old/.github/workflows/test.yml')).text()).toContain('runs-on: mine')
+
+      const renamed = await kay(['new', 'renamed', '--kay', '^1.0.0', '--template', 'server', '--forge', 'github', '--quiet'], root)
+
+      expect(renamed.stderr).toBe('')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('takes the host from the origin remote of the target or the directory it lands in, GitHub only for github.com', async () => {
     const root = await mkdtemp(join(tmpdir(), 'kay-host-'))
     const remote = async (url: string, name: string) => {
@@ -336,7 +365,8 @@ describe('kay command line', () => {
       expect(await detectHost(await remote('https://github.com/me/site', 'https'))).toBe('github')
       expect(await detectHost(await remote('git@git.example.com:me/github.com.git', 'other'))).toBe('forgejo')
       expect(await detectHost(join(root, 'no-remote'))).toBe('forgejo')
-      expect(await kay(['new', 'app', '--host', 'gitlab'], root)).toEqual({ stdout: '', stderr: 'kay new: --host is gitlab, which is none of forgejo, github\n', code: 1 })
+      expect(await kay(['new', 'app', '--host', 'gitlab'], root)).toMatchObject({ stdout: '', stderr: expect.stringContaining('kay new: --host is gitlab, which is none of forgejo, github\n'), code: 1 })
+      expect(await kay(['new', 'app', '--forge', 'gitlab'], root)).toEqual({ stdout: '', stderr: 'kay new: --forge is gitlab, which is none of forgejo, github\n', code: 1 })
     }
     finally {
       await rm(root, { recursive: true, force: true })

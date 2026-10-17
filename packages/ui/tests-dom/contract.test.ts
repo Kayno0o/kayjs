@@ -1,7 +1,7 @@
 import { readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, describe, expect, test } from 'bun:test'
-import { mount } from 'kay/test'
+import { mountComponent } from 'kay/test'
 
 // What a component leaves to the browser to draw, which the server HTML cannot hold.
 const BROWSER_DRAWN: Record<string, string | undefined> = {
@@ -112,7 +112,7 @@ describe('component contract', () => {
     test(name, async () => {
       const { default: render } = await import(`${process.env.KAY_ROOT}/${wrapper}`) as { default: (props: { name: string }) => { t: string } }
       const server = render({ name }).t
-      const browser = await mount(wrapper, { name })
+      const browser = await mountComponent(wrapper, { name })
 
       mounted.push(browser)
 

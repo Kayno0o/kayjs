@@ -108,7 +108,7 @@ room.close()
 
 ### Test a component's handlers
 
-`mount(file, props)` renders one component built for the browser into `document`, and `settle()` lets effects land before the DOM is read. `kay/test/dom` registers happy-dom's DOM, `@happy-dom/global-registrator` installed as a dev dependency (20.14.6, or 21.0.3 and later):
+`mountComponent(file, props)` renders one component built for the browser into `document`, and `settle()` lets effects land before the DOM is read. `kay/test/dom` registers happy-dom's DOM, `@happy-dom/global-registrator` installed as a dev dependency (20.14.6, or 21.0.3 and later):
 
 ```toml
 [test]
@@ -117,10 +117,10 @@ preload = ["kay/test/preload", "kay/test/dom"]
 
 ```ts
 import { expect, it } from 'bun:test'
-import { mount, settle } from 'kay/test'
+import { mountComponent, settle } from 'kay/test'
 
 it('opens its panel on a click', async () => {
-  const { root, unmount } = await mount('src/components/toggle.kay', { label: 'Menu' })
+  const { root, unmount } = await mountComponent('src/components/toggle.kay', { label: 'Menu' })
 
   root.querySelector('button')!.click()
   await settle()
@@ -226,7 +226,7 @@ it('shows why a todo was refused', async () => {
 
 ### Mounting a component
 
-- `mount(file, props)` from `kay/test` renders one component built for the browser, as an island renders, into `document`, and resolves with `{ root, unmount }` once its effects ran: for what handlers and effects do, such as a dialog opening on a click.
+- `mountComponent(file, props)` from `kay/test` renders one component built for the browser, as an island renders, into `document`, and resolves with `{ root, unmount }` once its effects ran: for what handlers and effects do, such as a dialog opening on a click.
 - `file` is the `.kay` file relative to the project, since importing it through the preload gives its server build.
 - Props may be functions, and the component runs on a kay of its own, so a signal of the test reaches it through a callback rather than as a prop.
 - A library's settings apply as `kay.config.ts` sets them.

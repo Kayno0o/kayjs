@@ -1,6 +1,6 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, expect, spyOn, test } from 'bun:test'
-import { mount, settle } from 'kay/test'
+import { mountComponent, settle } from 'kay/test'
 import { click } from './dom'
 
 let mounted: Mounted | undefined
@@ -24,7 +24,7 @@ function state(root: Element, id: string) {
 test('a Button is busy and disabled alone until the promise its onClick returned settles', async () => {
   const save = later()
 
-  mounted = await mount('src/components/buttons.kay', { onSave: save.run, onSubmit: () => undefined })
+  mounted = await mountComponent('src/components/buttons.kay', { onSave: save.run, onSubmit: () => undefined })
 
   const root = mounted.root
 
@@ -45,7 +45,7 @@ test('a Button comes back from a promise that rejects, logging it', async () => 
   const logged = spyOn(console, 'error').mockImplementation(() => undefined)
 
   try {
-    mounted = await mount('src/components/buttons.kay', { onSave: async () => {
+    mounted = await mountComponent('src/components/buttons.kay', { onSave: async () => {
       throw new Error('refused')
     }, onSubmit: () => undefined })
     click(mounted.root.querySelector('#save'))
@@ -62,7 +62,7 @@ test('a Button comes back from a promise that rejects, logging it', async () => 
 test('a submit Button is busy while its form\'s async onSubmit runs, and a plain one is not', async () => {
   const submit = later()
 
-  mounted = await mount('src/components/buttons.kay', { onSave: () => undefined, onSubmit: submit.run })
+  mounted = await mountComponent('src/components/buttons.kay', { onSave: () => undefined, onSubmit: submit.run })
 
   const root = mounted.root
 
@@ -79,7 +79,7 @@ test('a submit Button is busy while its form\'s async onSubmit runs, and a plain
 })
 
 test('a submit Button whose onSubmit answers at once never shows busy', async () => {
-  mounted = await mount('src/components/buttons.kay', { onSave: () => undefined, onSubmit: () => undefined })
+  mounted = await mountComponent('src/components/buttons.kay', { onSave: () => undefined, onSubmit: () => undefined })
 
   click(mounted.root.querySelector('#send'))
   await settle()
@@ -90,7 +90,7 @@ test('a submit Button whose onSubmit answers at once never shows busy', async ()
 test('an explicit busy prop wins, whether it is false or true', async () => {
   const save = later()
 
-  mounted = await mount('src/components/buttons.kay', { onSave: save.run, onSubmit: () => undefined, busy: false })
+  mounted = await mountComponent('src/components/buttons.kay', { onSave: save.run, onSubmit: () => undefined, busy: false })
 
   const root = mounted.root
 
@@ -105,7 +105,7 @@ test('an explicit busy prop wins, whether it is false or true', async () => {
   expect(save.settles.length).toBe(2)
 
   mounted.unmount()
-  mounted = await mount('src/components/buttons.kay', { onSave: save.run, onSubmit: () => undefined, busy: true })
+  mounted = await mountComponent('src/components/buttons.kay', { onSave: save.run, onSubmit: () => undefined, busy: true })
 
   expect(state(mounted.root, 'forced')).toEqual(['true', false])
 })
@@ -114,7 +114,7 @@ test('a submit Button whose onClick answers a promise still submits its form, bu
   const save = later()
   const submits: number[] = []
 
-  mounted = await mount('src/components/buttons.kay', { onSave: save.run, onSubmit: () => submits.push(1) })
+  mounted = await mountComponent('src/components/buttons.kay', { onSave: save.run, onSubmit: () => submits.push(1) })
 
   const root = mounted.root
 

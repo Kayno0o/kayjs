@@ -1,6 +1,6 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, describe, expect, test } from 'bun:test'
-import { mount, settle } from 'kay/test'
+import { mountComponent, settle } from 'kay/test'
 import { click } from './dom'
 
 let mounted: Mounted | undefined
@@ -16,7 +16,7 @@ afterEach(() => {
 type Answer = string | { errors: Record<string, string> }
 
 async function saveForm(save: (input: { name: string }) => Promise<Answer>) {
-  mounted = await mount('src/components/save-form.kay', { save, onSaved: (name: string) => saved.push(name), onDiscard: () => discarded++ })
+  mounted = await mountComponent('src/components/save-form.kay', { save, onSaved: (name: string) => saved.push(name), onDiscard: () => discarded++ })
 
   return mounted.root
 }
@@ -308,7 +308,7 @@ describe('SaveForm', () => {
   })
 
   test('Discard puts the library\'s signal-driven controls back on the saved values, and the page signals with them', async () => {
-    mounted = await mount('src/components/save-form-controls.kay', { find: async () => [] })
+    mounted = await mountComponent('src/components/save-form-controls.kay', { find: async () => [] })
     await settle()
 
     const root = mounted.root
@@ -343,7 +343,7 @@ describe('SaveForm', () => {
   })
 
   test('Discard after a save empties the search boxes of an IconPicker and a MultiSelect, which are no saved values', async () => {
-    mounted = await mount('src/components/save-form-controls.kay', { find: async () => [] })
+    mounted = await mountComponent('src/components/save-form-controls.kay', { find: async () => [] })
     await settle()
 
     const root = mounted.root

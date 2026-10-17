@@ -1,6 +1,6 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
-import { mount, settle } from 'kay/test'
+import { mountComponent, settle } from 'kay/test'
 import { click } from './dom'
 
 // Stand-ins for the observers happy-dom lacks or never fires: each one made is kept, to be fired by hand.
@@ -41,7 +41,7 @@ afterEach(() => {
 })
 
 async function list(props: Record<string, unknown> = {}) {
-  mounted = await mount('src/components/infinite.kay', {
+  mounted = await mountComponent('src/components/infinite.kay', {
     size: 3,
     onLoad: async (offset: number) => {
       asked.push(offset)

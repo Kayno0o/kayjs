@@ -1,6 +1,6 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, expect, test } from 'bun:test'
-import { mount } from 'kay/test'
+import { mountComponent } from 'kay/test'
 import { click, clock } from './dom'
 
 // How often the carousel turns on its own in these tests, and the fake time covering two turns.
@@ -19,7 +19,7 @@ afterEach(() => {
 
 // Mounting waits on real timers, so a carousel is mounted before the clock is faked: its own interval would run in real time. A pointer resting on it then leaving makes it set the interval again, on the fake clock.
 async function carousel(autoplay?: number) {
-  mounted = await mount('src/components/carousel.kay', { autoplay, onIndexChange: (index: number) => turns.push(index) })
+  mounted = await mountComponent('src/components/carousel.kay', { autoplay, onIndexChange: (index: number) => turns.push(index) })
 
   const { root } = mounted
   const section = root.querySelector<HTMLElement>('.kui-carousel')!

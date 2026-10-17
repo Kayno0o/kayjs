@@ -8,7 +8,7 @@ import { USAGES } from './usages'
 
 export const scaffold: Command = {
   usage: USAGES.new,
-  options: { kay: { type: 'string' }, template: { type: 'string' }, with: { type: 'string' }, host: { type: 'string' }, without: { type: 'string' }, yes: { type: 'boolean', short: 'y' }, quiet: { type: 'boolean' } },
+  options: { kay: { type: 'string' }, template: { type: 'string' }, with: { type: 'string' }, forge: { type: 'string' }, host: { type: 'string' }, runner: { type: 'string' }, without: { type: 'string' }, yes: { type: 'boolean', short: 'y' }, quiet: { type: 'boolean' } },
   positionals: 1,
   run: async ({ values, positionals: [dir] }, refuse) => {
     if (dir === undefined || dir === '')
@@ -23,8 +23,14 @@ export const scaffold: Command = {
         return 1
       }
 
-      if (values.host !== undefined && !HOSTS.includes(values.host as Host)) {
-        console.error(`kay new: --host is ${String(values.host)}, which is none of ${HOSTS.join(', ')}`)
+      // `--host` named the forge before `kay dev --host` named an address: it still works, saying so.
+      if (values.host !== undefined && values.forge === undefined)
+        console.error('kay new: --host is now --forge (kay dev --host is an address); --host still works for now')
+
+      const forge = values.forge ?? values.host
+
+      if (forge !== undefined && !HOSTS.includes(forge as Host)) {
+        console.error(`kay new: --${values.forge === undefined ? 'host' : 'forge'} is ${String(forge)}, which is none of ${HOSTS.join(', ')}`)
 
         return 1
       }
@@ -66,7 +72,7 @@ export const scaffold: Command = {
         return 1
       }
 
-      const files = await createProject(dir, { kay: typeof values.kay === 'string' ? values.kay : undefined, features, host: values.host === undefined ? await detectHost(dir) : values.host as Host })
+      const files = await createProject(dir, { kay: typeof values.kay === 'string' ? values.kay : undefined, features, host: forge === undefined ? await detectHost(dir) : forge as Host, runner: typeof values.runner === 'string' ? values.runner : undefined })
 
       done('created', `${dir}, ${features.length > 0 ? features.join(', ') : 'blank'}, ${count(files.length, 'file')}`)
 

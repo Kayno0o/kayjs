@@ -1,6 +1,6 @@
 // Each command's line of the usage, apart from the commands so `kay <command>` loads only its own code and the usage still lists them all.
 export const USAGES = {
-  'new': 'new <dir> [--kay <dependency>] [--template blank|server|site|app] [--with <features>] [--without <features>] [--host forgejo|github] [-y] [--quiet]',
+  'new': 'new <dir> [--kay <dependency>] [--template blank|server|site|app] [--with <features>] [--without <features>] [--forge forgejo|github] [--runner <label>] [-y] [--quiet]',
   'add': 'add <features> [dir] [--no-install] [--quiet]',
   'dev': 'dev [dir] [--entry <file>] [--port <port>] [--host[=<address>]] [--inspect[=<address>]] [--open] [--format text|json] [--quiet]',
   'build': 'build [dir] [--compile <executable> [--verify]] [--entry <file>] [--static] [--outdir <dir>] [--no-check] [--analyze] [--deny-warnings] [-p tsconfig.json] [--format text|github|json] [--quiet]',

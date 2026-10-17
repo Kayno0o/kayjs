@@ -2379,6 +2379,30 @@ describe.concurrent('kay check, unused code', () => {
     }
   })
 
+  it('reports kay/test\'s mount as mountComponent, an import or a namespace member, and --fix renames it under the name the file uses', async () => {
+    const root = await scratchProject({
+      'src/a.test.ts': 'import { mount, settle } from \'kay/test\'\n\nawait mount(\'a.kay\')\nawait settle()\n',
+      'src/b.test.ts': 'import { mount as render } from \'kay/test\'\nimport { mount as other } from \'kay/mount\'\n\nawait render(\'a.kay\')\nvoid other\n',
+      'src/c.test.ts': 'import * as test from \'kay/test\'\n\nawait test.mount(\'a.kay\')\n',
+      'src/d.test.ts': 'import { mountComponent } from \'kay/test\'\nimport { mount } from \'kay/mount\'\n\nawait mountComponent(\'a.kay\')\nvoid mount\n',
+    })
+
+    try {
+      const { output } = await runCheck(root)
+
+      expect(output.match(/deprecated-test-mount/g)).toHaveLength(3)
+      expect(output).not.toContain('d.test.ts')
+      await runCheck(root, '--fix')
+      expect(await Bun.file(join(root, 'src/a.test.ts')).text()).toBe('import { mountComponent as mount, settle } from \'kay/test\'\n\nawait mount(\'a.kay\')\nawait settle()\n')
+      expect(await Bun.file(join(root, 'src/b.test.ts')).text()).toContain('import { mountComponent as render } from \'kay/test\'\nimport { mount as other } from \'kay/mount\'')
+      expect(await Bun.file(join(root, 'src/c.test.ts')).text()).toContain('test.mountComponent(')
+      expect((await runCheck(root)).output).not.toContain('deprecated-test-mount')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('applies the safe fixes in the paths named alone with --fix', async () => {
     const button = '---\nfunction go() {}\n---\nbutton(onclick={go}) x\n'
     const root = await scratchProject({ 'src/a.kay': button, 'src/b.kay': button })

@@ -1,6 +1,6 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, describe, expect, test } from 'bun:test'
-import { mount, settle } from 'kay/test'
+import { mountComponent, settle } from 'kay/test'
 import { click } from './dom'
 
 let mounted: Mounted | undefined
@@ -13,7 +13,7 @@ afterEach(() => {
 })
 
 async function panels(listWidthKey?: string) {
-  mounted = await mount('src/components/panels.kay', { onClose: () => closes++, listWidthKey })
+  mounted = await mountComponent('src/components/panels.kay', { onClose: () => closes++, listWidthKey })
 
   return mounted.root
 }

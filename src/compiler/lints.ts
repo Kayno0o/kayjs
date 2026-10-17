@@ -319,6 +319,15 @@ export const LINTS = {
     wrong: '// kay.config.ts sets mcp: true\nexport default api().get(\'/:id\', ({ params }) => find(params.id))',
     right: 'export default api().get(\'/:id\', ({ params }) => find(params.id), { detail: { tool: \'Read a note by its id\' } })',
   },
+  'deprecated-test-mount': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.52',
+    site: true,
+    summary: '`mount` imported from `kay/test`, which is `mountComponent` since 1.52, as `kay/mount` has a `mount` of its own that renders another thing: `mount` from `kay/test` still works for now. The fix imports `mountComponent` under the name the file already uses.',
+    wrong: 'import { mount, settle } from \'kay/test\'',
+    right: 'import { mountComponent, settle } from \'kay/test\'',
+  },
   'draft-message': {
     level: 'warn',
     group: 'i18n',

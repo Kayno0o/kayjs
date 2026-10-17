@@ -1,6 +1,6 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, describe, expect, spyOn, test } from 'bun:test'
-import { mount, settle } from 'kay/test'
+import { mountComponent, settle } from 'kay/test'
 import { Board } from '../src/dnd/board'
 import { DropTargets } from '../src/dnd/drop-targets'
 import { ACTIVATION_DELAY_MS } from '../src/dnd/pointer'
@@ -91,7 +91,7 @@ describe('Sortable, from the keyboard', () => {
   })
 
   test('starts each move from where the rows stand now, and keeps focus on the handle a keyed list moved', async () => {
-    mounted = await mount('src/components/sortable-list.kay')
+    mounted = await mountComponent('src/components/sortable-list.kay')
 
     const { root } = mounted
     const read = button(root, 'Read')
@@ -335,7 +335,7 @@ describe('Board, by pointer', () => {
 
 describe('Board, from the keyboard', () => {
   async function board() {
-    mounted = await mount('src/components/board-columns.kay')
+    mounted = await mountComponent('src/components/board-columns.kay')
 
     const { root } = mounted
     const titles = (column: string) => [...root.querySelector(`[aria-label="${column}"]`)!.querySelectorAll('button')].map(item => item.textContent?.trim())

@@ -78,4 +78,4 @@ export default settings
 
 ## Testing an app's use of it
 
-A page that uses the components renders them in `testSite()` like the app's own. To test what their handlers do, `mount(file, props)` from `kay/test` renders a component of the app into the DOM `kay/test/dom` registers, listed after `kay/test/preload` under `[test] preload` in bunfig.toml with `@happy-dom/global-registrator` installed; it shims the popover API happy-dom lacks, which Toaster and Popover use.
+A page that uses the components renders them in `testSite()` like the app's own. To test what their handlers do, `mountComponent(file, props)` from `kay/test` renders a component of the app into the DOM `kay/test/dom` registers, listed after `kay/test/preload` under `[test] preload` in bunfig.toml with `@happy-dom/global-registrator` installed; it shims the popover API happy-dom lacks, which Toaster and Popover use.

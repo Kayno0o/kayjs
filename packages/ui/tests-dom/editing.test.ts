@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from 'bun:test'
-import { mount, settle } from 'kay/test'
+import { mountComponent, settle } from 'kay/test'
 import { editing } from '../src/editing'
 import { click } from './dom'
 
@@ -10,7 +10,7 @@ afterEach(() => {
 })
 
 test('editing opens one dialog on a row or a draft, and forgets it once the dialog closes', async () => {
-  const mounted = await mount('src/components/editing.kay')
+  const mounted = await mountComponent('src/components/editing.kay')
   const dialog = mounted.root.querySelector<HTMLDialogElement>('#friend')!
   const state = () => [dialog.open, dialog.querySelector('.kui-dialog-title')?.textContent, dialog.querySelector('#name')?.textContent]
 

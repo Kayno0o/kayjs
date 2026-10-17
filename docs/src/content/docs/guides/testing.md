@@ -120,7 +120,7 @@ const admin = await testSite({
 
 ## One component
 
-`mount(file, props)` renders one component into `document`. Use it to test what its handlers and effects do.
+`mountComponent(file, props)` renders one component into `document`. Use it to test what its handlers and effects do.
 
 List `kay/test/dom` after the preload, with `@happy-dom/global-registrator` installed as a dev dependency. It registers happy-dom's DOM for every test file, and adds the popover API happy-dom lacks.
 
@@ -131,10 +131,10 @@ preload = ["kay/test/preload", "kay/test/dom"]
 
 ```ts
 import { expect, it } from 'bun:test'
-import { mount, settle } from 'kay/test'
+import { mountComponent, settle } from 'kay/test'
 
 it('opens its panel on a click', async () => {
-  const { root, unmount } = await mount('src/components/toggle.kay')
+  const { root, unmount } = await mountComponent('src/components/toggle.kay')
 
   root.querySelector('button')!.click()
   await settle()

@@ -43,9 +43,9 @@ export function readPersisted(key: string): unknown {
 
 // Renders a component compiled for the browser, as an island renders, into the document a DOM such as happy-dom's registered: for testing what its handlers and effects do.
 // `file` is the `.kay` file relative to the project, since importing it through the preload gives its server build.
-export async function mount(file: string, props: Record<string, unknown> = {}): Promise<Mounted> {
+export async function mountComponent(file: string, props: Record<string, unknown> = {}): Promise<Mounted> {
   if (typeof document === 'undefined')
-    throw new Error('kay: mount renders into `document`; register a DOM first, such as `kay/test/dom` preloaded after `kay/test/preload` in bunfig.toml')
+    throw new Error('kay: mountComponent renders into `document`; register a DOM first, such as `kay/test/dom` preloaded after `kay/test/preload` in bunfig.toml')
 
   const root = testRoot()
   const path = resolve(root, file)
@@ -86,6 +86,10 @@ export async function mount(file: string, props: Record<string, unknown> = {}): 
     element.remove()
   } }
 }
+
+// What `mountComponent` was called before 1.52: `kay/mount` has a `mount` of its own, which renders another thing. `kay check` reports it as `deprecated-test-mount`.
+/** @deprecated Renamed `mountComponent`. */
+export const mount = mountComponent
 
 // The bundle shares what the test process vouched for, such as an icon the test builds, as an island shares it with the page; its own copy would vouch for nothing.
 const sharedMarks: Bun.BunPlugin = {

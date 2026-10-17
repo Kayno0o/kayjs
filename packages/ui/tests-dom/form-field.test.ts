@@ -1,6 +1,6 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, expect, test } from 'bun:test'
-import { mount, settle } from 'kay/test'
+import { mountComponent, settle } from 'kay/test'
 import { click } from './dom'
 
 let mounted: Mounted | undefined
@@ -10,7 +10,7 @@ afterEach(() => {
 })
 
 async function group() {
-  mounted = await mount('src/components/marked-group.kay', {})
+  mounted = await mountComponent('src/components/marked-group.kay', {})
 
   const { root } = mounted
   const marks = (id: string) => {

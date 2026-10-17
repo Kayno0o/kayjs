@@ -2,7 +2,7 @@ import type { Mounted } from 'kay/test'
 import type { IconChoice } from '../src/icon-picker'
 import { afterEach, describe, expect, test } from 'bun:test'
 import { trustHtml } from 'kay'
-import { mount, settle } from 'kay/test'
+import { mountComponent, settle } from 'kay/test'
 import { startRef } from '../src/form-reset'
 import { click } from './dom'
 
@@ -19,7 +19,7 @@ function choice(name: string): IconChoice {
 const ICONS = ['star', 'moon'].map(choice)
 
 async function form() {
-  mounted = await mount('src/components/form-reset.kay', { search: async () => ICONS })
+  mounted = await mountComponent('src/components/form-reset.kay', { search: async () => ICONS })
   await settle()
 
   return mounted.root
@@ -146,7 +146,7 @@ describe('a form reset during a change under way', () => {
         const gate = Promise.withResolvers<boolean>()
         const told: string[] = []
 
-        mounted = await mount('src/components/form-reset-busy.kay', {
+        mounted = await mountComponent('src/components/form-reset-busy.kay', {
           answer: async (control: string, value: unknown) => {
             told.push(`${control}=${String(value)}`)
 
@@ -177,7 +177,7 @@ describe('a form reset during a change under way', () => {
     const gate = Promise.withResolvers<boolean>()
     const told: string[] = []
 
-    mounted = await mount('src/components/form-reset-busy.kay', {
+    mounted = await mountComponent('src/components/form-reset-busy.kay', {
       answer: async (control: string, value: unknown) => {
         told.push(`${control}=${String(value)}`)
 
@@ -257,7 +257,7 @@ describe('the app\'s ref on a control', () => {
   test('gets the element once, however often the control\'s attributes change', async () => {
     const got: string[] = []
 
-    mounted = await mount('src/components/form-reset-ref.kay', { got: (name: string, element: Element) => got.push(`${name}:${element.tagName}`) })
+    mounted = await mountComponent('src/components/form-reset-ref.kay', { got: (name: string, element: Element) => got.push(`${name}:${element.tagName}`) })
     await settle()
     click(mounted.root.querySelector('#change'))
     await settle()
@@ -268,7 +268,7 @@ describe('the app\'s ref on a control', () => {
   test('runs a ref swapped for another on the element again, and the old one no more', async () => {
     const got: string[] = []
 
-    mounted = await mount('src/components/form-reset-ref.kay', { got: (name: string) => got.push(name) })
+    mounted = await mountComponent('src/components/form-reset-ref.kay', { got: (name: string) => got.push(name) })
     await settle()
     click(mounted.root.querySelector('#swap'))
     await settle()

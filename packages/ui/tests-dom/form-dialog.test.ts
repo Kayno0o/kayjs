@@ -1,6 +1,6 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, describe, expect, test } from 'bun:test'
-import { mount, settle } from 'kay/test'
+import { mountComponent, settle } from 'kay/test'
 import { click } from './dom'
 
 let mounted: Mounted | undefined
@@ -14,7 +14,7 @@ afterEach(() => {
 type Answer = string | { errors: Record<string, string> } | { fail: { error: string, field?: string } }
 
 async function formDialog(save: (input: { name: string }) => Promise<Answer>, plain = false) {
-  mounted = await mount('src/components/form-dialog.kay', { save, plain, onSaved: (name: string) => saved.push(name) })
+  mounted = await mountComponent('src/components/form-dialog.kay', { save, plain, onSaved: (name: string) => saved.push(name) })
 
   return mounted.root
 }

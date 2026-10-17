@@ -16,6 +16,8 @@ const NAME_EDGES = /^[-._~]+|[-._~]+$/g
 
 export const GITHUB_REMOTE = /(?:@|\/\/)github\.com[:/]/
 
+const RUNNER_LABEL = /^[\w.:-]+$/
+
 export const HOSTS: readonly Host[] = ['forgejo', 'github']
 
 export type { Feature, Host }
@@ -57,6 +59,8 @@ export interface NewOptions {
   features?: readonly Feature[] | undefined
   // Where the repository lives, which decides the CI's format: Forgejo by default.
   host?: Host | undefined
+  // The label of the runner the CI jobs run on, the host's own image by default: `debian` on Forgejo, `ubuntu-latest` on GitHub.
+  runner?: string | undefined
 }
 
 // What checking or unchecking a feature leaves checked: checking takes what it needs along, unchecking drops what needs it.
@@ -146,9 +150,12 @@ export async function createProject(target: string, options: NewOptions = {}): P
       throw new Error(`kay: ${feature} needs ${missing.join(' and ')}: add --with ${missing.join(',')}, or drop it with --without ${feature}`)
   }
 
+  if (options.runner !== undefined && !RUNNER_LABEL.test(options.runner))
+    throw new Error(`kay new: --runner is ${JSON.stringify(options.runner)}, which is no runner label: it takes letters, digits and - _ . : only`)
+
   await refuseTarget(target)
 
-  const files = await projectFiles(dir, features, options.kay, {}, options.host)
+  const files = await projectFiles(dir, features, options.kay, {}, options.host, options.runner)
 
   // The session secret in .env is for its owner's eyes only from the moment it is written, which Bun.write cannot do as it ignores a mode.
   await mkdir(dir, { recursive: true })
@@ -158,7 +165,7 @@ export async function createProject(target: string, options: NewOptions = {}): P
 }
 
 // Every file of a project with these features in `dir`, named after it; run from a checkout of kay, packs it into `dir/vendor` for the project to depend on.
-export async function projectFiles(dir: string, features: ReadonlySet<Feature>, kayDependency?: string | undefined, settings: ConfigSettings = {}, host?: Host): Promise<Record<string, string>> {
+export async function projectFiles(dir: string, features: ReadonlySet<Feature>, kayDependency?: string | undefined, settings: ConfigSettings = {}, host?: Host, runner?: string): Promise<Record<string, string>> {
   const has = (feature: Feature) => features.has(feature)
   const name = packageName(basename(dir))
   const kay = await Bun.file(join(KAY_ROOT, 'package.json')).json() as { name: string, version: string, dependencies: Record<string, string>, devDependencies: Record<string, string> }
@@ -182,7 +189,7 @@ export async function projectFiles(dir: string, features: ReadonlySet<Feature>, 
     ...has('tailwind') ? ['bun-plugin-tailwind', 'tailwindcss'] : [],
   ].filter(entry => entry !== false)
   const files: Record<string, string> = {
-    ...templateFiles(features, settings, host),
+    ...templateFiles(features, settings, host, runner),
     'AGENTS.md': agentsFile(scripts),
     'package.json': `${JSON.stringify({
       name,
