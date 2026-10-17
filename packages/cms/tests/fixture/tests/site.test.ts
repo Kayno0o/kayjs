@@ -183,10 +183,14 @@ test('the missing-pages screen lists what visitors found nothing at, most visite
   for (const path of ['/Empty', '/Empty', '/never-was', '/%3Cscript%3Ealert(1)%3C/script%3E'])
     expect((await visit(path)).status).toBe(404)
 
-  // Counted once the response is sent.
-  await Bun.sleep(100)
+  // Counted once the response is sent: polls until every path and the target of /Empty show.
+  let page = await site.visit('/admin/not-found')
 
-  const page = await site.visit('/admin/not-found')
+  for (let waited = 0; waited < 3000 && !['/never-was', '%3Cscript%3E', '&#39;/Empty&#39;'].every(shown => page.html.includes(shown)); waited += 50) {
+    await Bun.sleep(50)
+    page = await site.visit('/admin/not-found')
+  }
+
   const rows = page.find('.kcms-missing tbody tr').map(row => row.text.replaceAll(/\s+/g, ' ').trim())
 
   expect(page.title()).toBe('Missing pages')

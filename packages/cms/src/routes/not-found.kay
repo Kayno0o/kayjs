@@ -12,7 +12,8 @@ import { settings } from '../settings'
 
 const { prefix } = settings()
 const screen = readMissing()
-const hint = underKayDev() ? wording('cms.missing.devHint', 'kay dev counts nothing: the production server records the pages visitors asked for and found nothing at.') : wording('cms.missing.emptyHint', 'The production server records the pages visitors asked for and found nothing at.')
+const records = 'production server records the pages visitors asked for and found nothing at.'
+const hint = underKayDev() ? wording('cms.missing.devHint', `kay dev counts nothing: the ${records}`) : wording('cms.missing.emptyHint', `The ${records}`)
 ---
 head
   title {wording('cms.missing.title', 'Missing pages')}
