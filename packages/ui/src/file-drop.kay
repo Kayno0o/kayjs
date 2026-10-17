@@ -3,7 +3,7 @@ import type { JSX } from 'kay'
 import { listen, signal } from 'kay'
 import { acceptsFile } from './accept'
 
-const { accept, multiple = false, paste = false, disabled = false, compact = false, onFiles, content, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role'> & {
+const { accept, multiple = false, paste = false, disabled = false, compact = false, onFiles, onReject, content, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role'> & {
   // The files the zone takes, as an `accept` attribute: the picker filters on it, and dropped or pasted files that miss it are ignored.
   accept?: string | undefined
   multiple?: boolean | undefined
@@ -14,6 +14,8 @@ const { accept, multiple = false, paste = false, disabled = false, compact = fal
   compact?: boolean | undefined
   // The files picked, dropped or pasted: one unless `multiple`, and never an empty list.
   onFiles: (files: File[]) => void
+  // The files dropped or picked that miss `accept`, so the page can say why they were left out; never called for pasted files, which may be anything on the clipboard.
+  onReject?: ((files: File[]) => void) | undefined
   // What the zone shows: `@content(zone)`, where `zone.open()` opens the picker and `zone.dragging()` reads whether files hover the zone.
   content: (zone: { open: () => void, dragging: () => boolean }) => JSX.Element
   class?: string | undefined
@@ -29,11 +31,18 @@ function open() {
 // Built in the script, where `dragging` is still the signal: the template would hand the slot its value.
 const zone = { open, dragging }
 
-function take(files: Iterable<File>): boolean {
-  const matching = [...files].filter(file => acceptsFile(accept, file))
+function take(files: Iterable<File>, reporting = true): boolean {
+  const all = [...files]
+  const matching = all.filter(file => acceptsFile(accept, file))
   const taken = multiple ? matching : matching.slice(0, 1)
 
-  if (disabled || taken.length === 0)
+  if (disabled)
+    return false
+
+  if (reporting && matching.length < all.length)
+    onReject?.(all.filter(file => !matching.includes(file)))
+
+  if (taken.length === 0)
     return false
 
   onFiles(taken)
@@ -85,7 +94,7 @@ function pasted(event: ClipboardEvent) {
   if (target?.closest('input, textarea, [contenteditable]'))
     return
 
-  if (take(event.clipboardData?.files ?? []))
+  if (take(event.clipboardData?.files ?? [], false))
     event.preventDefault()
 }
 

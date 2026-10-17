@@ -3,13 +3,30 @@ import Button from '@kaynooo/kayjs-ui/button.kay'
 import FileDrop from '@kaynooo/kayjs-ui/file-drop.kay'
 import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
 import { attempt } from '@kaynooo/kayjs-ui'
-import { uploadFile } from './upload'
+import { toast } from '@kaynooo/kayjs-ui'
+import { uploadFile, uploadRules } from './upload'
 
 // An image or file field: the path of an upload dropped or picked, or one typed.
 const { value, image, collection, onChange } = props<{ value: string, image: boolean, collection: string, onChange: (path: string) => void }>()
 
 // The share of the upload sent, from 0 to 1, while one is under way.
 const sent = signal<number>()
+
+// Until the server has said what it takes, an image field offers images and a file field anything.
+const accept = signal<string>()
+
+async function offer(): Promise<void> {
+  const rules = await uploadRules()
+
+  accept = rules === undefined ? undefined : image ? rules.images : rules.accept
+}
+
+void offer()
+
+// A dropped file the picker's types miss, which FileDrop would otherwise ignore without a word.
+function reject([file]: File[]): void {
+  toast.error(`${file?.name || 'The file'} is ${file?.type || 'of a type'} that uploads here do not take: ${accept() ?? 'images'}`)
+}
 
 function label(): string {
   const share = sent()
@@ -44,7 +61,7 @@ async function upload([file]: File[]): Promise<void> {
       img.kcms-file-preview(src={value} alt="")
     else
       a.kcms-file-link(href={value}) {value.split('/').at(-1)}
-  FileDrop.kcms-file-drop(accept={image ? 'image/*' : undefined} disabled={sent() !== undefined} onFiles={upload})
+  FileDrop.kcms-file-drop(accept={accept() ?? (image ? 'image/*' : undefined)} disabled={sent() !== undefined} onFiles={upload} onReject={reject})
     @content(zone)
       Button(label={label()} busy={sent() !== undefined} onClick={zone.open})
       span.kcms-file-hint {zone.dragging() ? 'Drop to upload' : 'or drop a file here'}

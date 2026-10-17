@@ -311,6 +311,15 @@ test('an upload is stored in its collection\'s folder, answered by the path that
   expect(await refusal.text()).toContain('which uploads here do not take')
 })
 
+test('the editor is told the types and the size an upload may have', async () => {
+  const rules = await (await site.fetch('/api/cms/files/rules')).json() as { accept: string, images: string, maxBytes: number }
+
+  expect(rules.accept.split(',')).toContain('application/pdf')
+  expect(rules.images.split(',')).not.toContain('application/pdf')
+  expect(rules.images).not.toContain('svg')
+  expect(rules.maxBytes).toBe(20 * 1024 * 1024)
+})
+
 test('the unused-uploads screen lists an upload no entry mentions, and deleting one removes it, a referenced one staying', async () => {
   const upload = async () => {
     const form = new FormData()
@@ -401,9 +410,41 @@ test('a refused upload toasts, and leaves the body as it was', async () => {
 
   await page.click(body)
   await paste(page, body, 'logo.svg', 'image/svg+xml', new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg"/>'))
-  await page.waitUntil(() => document.querySelector('.kui-toaster')?.textContent?.includes('Could not upload') === true)
+  await page.waitUntil(() => document.querySelector('.kui-toaster')?.textContent?.includes('which uploads here do not take') === true)
 
   expect(await page.value(body)).toBe(before)
+  expect(page.errors).toEqual([])
+}, 60_000)
+
+test('a file field offers only the types the server takes, and says why a dropped file is left out', async () => {
+  const built = await browser()
+  const page = await built.open('/admin/collections/products/mug')
+
+  await page.waitUntil(() => document.querySelector('.kcms-file input[type=file]')?.getAttribute('accept') === 'image/png,image/jpeg,image/webp,image/gif,image/avif')
+  await page.evaluate(() => {
+    const data = new DataTransfer()
+
+    data.items.add(new File(['<svg xmlns="http://www.w3.org/2000/svg"/>'], 'logo.svg', { type: 'image/svg+xml' }))
+    document.querySelector('.kcms-file-drop')!.dispatchEvent(new DragEvent('drop', { dataTransfer: data, bubbles: true, cancelable: true }))
+  })
+  await page.waitUntil(() => document.querySelector('.kui-toaster')?.textContent?.includes('logo.svg is image/svg+xml that uploads here do not take') === true)
+
+  expect(page.errors).toEqual([])
+}, 60_000)
+
+test('a file over the size limit is refused before it is sent, with its size in the toast', async () => {
+  const built = await browser()
+  const page = await built.open('/admin/collections/products/mug')
+
+  await page.waitUntil(() => document.querySelector('.kcms-file input[type=file]')?.getAttribute('accept') !== null)
+  await page.evaluate(() => {
+    const data = new DataTransfer()
+
+    data.items.add(new File([new Uint8Array(21 * 1024 * 1024)], 'huge.png', { type: 'image/png' }))
+    document.querySelector('.kcms-file-drop')!.dispatchEvent(new DragEvent('drop', { dataTransfer: data, bubbles: true, cancelable: true }))
+  })
+  await page.waitUntil(() => document.querySelector('.kui-toaster')?.textContent?.includes('huge.png is 21 MB, over the 20 MB an upload may be') === true)
+
   expect(page.errors).toEqual([])
 }, 60_000)
 

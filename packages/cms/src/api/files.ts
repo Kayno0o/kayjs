@@ -3,14 +3,13 @@ import { api, files } from 'kay/server'
 import { deleteUnusedUploads } from '../orphans'
 import { settings } from '../settings'
 import { collectionNamed, UnknownCollection } from '../store'
-import { uploadFolder, uploadRefusal } from '../uploads'
-
-// A photo straight off a phone fits; kay's own limit of 1 MB would not.
-const UPLOAD_LIMIT = 20 * 1024 * 1024
+import { UPLOAD_LIMIT, uploadFolder, uploadRefusal, uploadRules } from '../uploads'
 
 // Stores an upload public, in a folder named for its collection, and answers the path a page renders it from, which the field keeps.
 export default api({ bodyLimit: UPLOAD_LIMIT })
   .onError(({ error, status }) => error instanceof UnknownCollection ? status(404, error.message) : undefined)
+  // What the pickers offer and the size an upload may have, so a file the server would refuse is not offered.
+  .get('/rules', () => uploadRules())
   .post('/:collection', async ({ params, body, status }) => {
     const collection = await collectionNamed(params.collection)
     const refusal = uploadRefusal(body.file)
