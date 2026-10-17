@@ -61,3 +61,12 @@
 .kcms-refusal p {
   margin: 0;
 }
+
+.kcms-reorder {
+  display: flex;
+  flex-direction: column;
+}
+
+.kcms-move-up svg {
+  transform: rotate(180deg);
+}

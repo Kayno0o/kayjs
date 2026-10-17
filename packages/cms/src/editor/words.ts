@@ -28,6 +28,8 @@ export const AFTER_LOAD: readonly string[] = [
   'cms.file.someType',
   'cms.file.upload',
   'cms.file.uploading',
+  'cms.reorder.down',
+  'cms.reorder.up',
   'cms.save.deleteFailure',
   'cms.save.deleted',
   'cms.save.failure',

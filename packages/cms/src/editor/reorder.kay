@@ -1,0 +1,25 @@
+---
+import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
+import { wording } from 'kay/words'
+import { followFocus, targetOf } from './reorder'
+import type { Direction } from './reorder'
+import './fields.css'
+
+// Up and down buttons for one row of a list: rows are siblings carrying `data-kcms-row`, and `onMove` gets the row's new place.
+const { item, index, count, onMove } = props<{ item: string, index: number, count: number, onMove: (to: number) => void }>()
+
+function move(event: MouseEvent, direction: Direction) {
+  const to = targetOf(direction, index, count)
+
+  if (to === undefined)
+    return
+
+  const row = (event.currentTarget as HTMLElement).closest('[data-kcms-row]')
+
+  onMove(to)
+  followFocus(row, to, direction)
+}
+---
+.kcms-reorder
+  IconButton.kcms-move-up(icon="chevron" label={wording('cms.reorder.up', 'Move {item} up', { item })} variant="ghost" size="sm" disabled={index === 0} data-kcms-move="up" onClick={event => move(event, 'up')})
+  IconButton(icon="chevron" label={wording('cms.reorder.down', 'Move {item} down', { item })} variant="ghost" size="sm" disabled={index >= count - 1} data-kcms-move="down" onClick={event => move(event, 'down')})

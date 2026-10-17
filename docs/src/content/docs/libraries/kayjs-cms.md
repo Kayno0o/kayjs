@@ -83,6 +83,10 @@ status: s.Union([
 
 A literal with no `title` shows its value.
 
+## Lists
+
+An array field is a list of items, each with a button to remove it. Up and down buttons beside an item move it, and Alt with the up or down arrow does the same from inside its fields. The order saved is the order shown.
+
 ## Field kinds of your own
 
 A field the admin should edit another way, such as a colour or a rating, is declared in the schema with `customField(kind, schema)` from `kay/content`, and edited by `src/cms/fields/<kind>.kay`. There is nothing to register: the editor bundles every file in that folder.
