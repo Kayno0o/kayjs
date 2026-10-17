@@ -24,7 +24,7 @@ import { PUBLIC_ENV_PATH } from '../server/env-state'
 import { fontFallbacks, withFontFallbacks } from '../server/fonts'
 import { ASSET_PREFIX, clientDir, MAPS_DIR, outputDir } from './assets'
 import { pruneNodes } from './class-rules'
-import { CSS_FILE, findKayFiles, readSource, writeIfChanged } from './files'
+import { CSS_FILE, findKayFiles, findProjectFiles, readSource, writeIfChanged } from './files'
 import { fileWords } from './libraries'
 import { packagesOf } from './licenses'
 import { throughLinks } from './links'
@@ -119,6 +119,8 @@ export async function buildClient(root: string, options: ClientOptions = {}): Pr
   return inSignalsScope(async () => bundleClient(root, options))
 }
 
+// The files besides components that write markup a page shows: scripts such as a Markdown plugin, Markdown and data.
+const MARKUP_FILE = /\.(?:[cm]?[jt]sx?|html?|mdx?|json|ya?ml|txt)$/
 const ROOT_MARGIN = /^-?\d+(?:\.\d+)?(?:px|%)(?: -?\d+(?:\.\d+)?(?:px|%)){0,3}$/
 
 // A margin as an IntersectionObserver takes it; anything else makes the observer throw in the browser, where no island would then hydrate.
@@ -478,7 +480,8 @@ export async function bundleStyles(root: string, { pages, libraries, classes, sh
       styles[relative(root, file)] = assetUrl(meta.cssBundle!)
   }
 
-  const uses = options.hot === true ? undefined : styleUses(root, pages, await Promise.all(build.outputs.filter(output => CSS_FILE.test(output.path)).map(async output => Bun.file(output.path).text())), reached, shorthand)
+  const markup = options.hot !== true && reached.open.size > 0 ? await findProjectFiles(root, MARKUP_FILE, { project: true, ownKayOnly: true }) : []
+  const uses = options.hot === true ? undefined : styleUses(root, pages, await Promise.all(build.outputs.filter(output => CSS_FILE.test(output.path)).map(async output => Bun.file(output.path).text())), reached, shorthand, markup)
 
   // The code the entries shrank to is only a vehicle for their stylesheets.
   await Promise.all(build.outputs.filter(output => output.kind === 'entry-point' && JS_OUTPUT.test(output.path)).map(async output => rm(output.path)))

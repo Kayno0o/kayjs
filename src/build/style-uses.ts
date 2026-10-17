@@ -9,7 +9,7 @@ import { parse } from './supports'
 export interface StyleUses {
   // The classes some page or layout names, as the class attribute writes them: `md:flex`.
   classes: string[]
-  // By page or layout path relative to the root, the indexes into `classes` it names, or `true` when it may render markup naming others.
+  // By page or layout path relative to the root, the indexes into `classes` it names, or `true` for one the build gave no names (none do now, a manifest of an older build may).
   entries: Record<string, number[] | true>
 }
 
@@ -21,6 +21,13 @@ const HAS_LETTER = /[a-z]/i
 const PUNCTUATION_ONLY = /^[-_:]+$/
 const ENDS_OPEN = /[-_:]$/
 const STARTS_OPEN = /^[-_:]/
+const MARKDOWN_FILE = /\.mdx?$/
+// A closed fence and an inline span show their text as it is written, so a class named in them is no element.
+const FENCE_START = /^ {0,3}(`{3,}|~{3,})/
+const CODE_SPAN = /`[^`\n]*`/g
+const SCRIPT_OR_KAY = /\.(?:kay|[cm]?[jt]sx?)$/
+// What kay's Markdown renderer puts on a code block, `language-ts`.
+const RENDERED_FRAGMENT = 'language-'
 const CSS_IMPORT = /@import\s*(?:url\(\s*)?["']([^"']+)["']/g
 
 // The words of a source, and the fragments of names built at runtime among them: `btn-` from `btn-${kind}` or `:flex` from `${screen}:flex`.
@@ -42,6 +49,36 @@ function readWords(text: string, into: Set<string>, fragments: Set<string>): voi
         fragments.add(piece)
     }
   }
+}
+
+// A fence never closed keeps its lines, as the renderer's reading of it is not kay's to guess.
+function withoutCode(markdown: string): string {
+  const kept: string[] = []
+  let fence = ''
+  let pending: string[] = []
+
+  for (const line of markdown.split('\n')) {
+    if (fence === '') {
+      fence = FENCE_START.exec(line)?.[1] ?? ''
+
+      if (fence === '')
+        kept.push(line)
+      else
+        pending = [line]
+    }
+    else {
+      pending.push(line)
+
+      const trimmed = line.trim()
+
+      if (trimmed.length >= fence.length && trimmed.startsWith(fence) && [...trimmed].every(char => char === fence[0])) {
+        fence = ''
+        pending = []
+      }
+    }
+  }
+
+  return kept.concat(pending).join('\n').replace(CODE_SPAN, '')
 }
 
 function stylesheetClasses(file: string, seen = new Set<string>()): Set<string> {
@@ -70,7 +107,8 @@ function stylesheetClasses(file: string, seen = new Set<string>()): Set<string> 
 }
 
 // `sheets` is the text of every stylesheet the build wrote, `shorthand` the classes each component writes as `div.flex.w-1/2`, which the words of its source cannot tell from a name with a dot.
-export function styleUses(root: string, entries: Iterable<string>, sheets: Iterable<string>, reached: Reached, shorthand: ReadonlyMap<string, Iterable<string>>): StyleUses {
+// `markup` lists the files that can write markup into a page without being a component it imports: scripts such as a Markdown plugin, Markdown and data files. A page rendering a collection's Markdown may show the classes of any of them, so it names theirs besides its components'.
+export function styleUses(root: string, entries: Iterable<string>, sheets: Iterable<string>, reached: Reached, shorthand: ReadonlyMap<string, Iterable<string>>, markup: readonly string[] = []): StyleUses {
   const styled = new Set<string>()
 
   // Identical texts, as the stylesheets of two entries often are, are read once.
@@ -115,7 +153,7 @@ export function styleUses(root: string, entries: Iterable<string>, sheets: Itera
 
     const words = new Set<string>(shorthand.get(file) ?? [])
     const fragments = new Set<string>()
-    const text = readSource(file).text
+    const text = MARKDOWN_FILE.test(file) ? withoutCode(readSource(file).text) : readSource(file).text
 
     readWords(text, words, fragments)
 
@@ -129,15 +167,32 @@ export function styleUses(root: string, entries: Iterable<string>, sheets: Itera
         found.add(word)
     }
 
-    for (const fragment of fragments) {
-      for (const name of completing(fragment))
-        found.add(name)
+    // Markdown and data hold prose, where `btn-` is a word, not the start of a name built at runtime.
+    if (SCRIPT_OR_KAY.test(file)) {
+      for (const fragment of fragments) {
+        for (const name of completing(fragment))
+          found.add(name)
+      }
     }
 
     return found
   }
+  let written: Set<string> | undefined
+  // The classes Markdown renders and the files that write markup name, which only a page rendering a collection's Markdown can show.
+  const markupNames = (): Set<string> => {
+    if (written === undefined) {
+      written = new Set(completing(RENDERED_FRAGMENT))
 
-  const used = new Map<string, Set<string> | true>()
+      for (const file of markup) {
+        for (const name of named(file))
+          written.add(name)
+      }
+    }
+
+    return written
+  }
+
+  const used = new Map<string, Set<string>>()
 
   for (const entry of entries) {
     const seen = new Set<string>()
@@ -158,15 +213,20 @@ export function styleUses(root: string, entries: Iterable<string>, sheets: Itera
       pending.push(...reached.edges.get(file) ?? [])
     }
 
-    used.set(entry, open ? true : names)
+    if (open) {
+      for (const name of markupNames())
+        names.add(name)
+    }
+
+    used.set(entry, names)
   }
 
-  const classes = [...new Set([...used.values()].flatMap(names => names === true ? [] : [...names]))].sort()
+  const classes = [...new Set([...used.values()].flatMap(names => [...names]))].sort()
   const index = new Map(classes.map((name, at) => [name, at]))
   const result: StyleUses['entries'] = {}
 
   for (const [entry, names] of used)
-    result[relative(root, entry)] = names === true ? true : [...names].map(name => index.get(name)!).sort((a, b) => a - b)
+    result[relative(root, entry)] = [...names].map(name => index.get(name)!).sort((a, b) => a - b)
 
   return { classes, entries: result }
 }

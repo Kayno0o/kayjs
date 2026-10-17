@@ -20,9 +20,13 @@ import { prerenderPages } from '../src/server/prerender'
 import { fixtureCopy } from './scratch'
 
 // Many arbitrary values, each its own rule, so the app's one stylesheet passes what a head may inline.
-const BULK = Array.from({ length: 1800 }, (_, index) => `bg-[#${((index * 2654435761) >>> 8).toString(16).padStart(6, '0').slice(0, 6)}] p-[${index + 3}px]`).join(' ')
+const bulk = (seed: number) => Array.from({ length: 1800 }, (_, index) => `bg-[#${(((index + seed) * 2654435761) >>> 8).toString(16).padStart(6, '0').slice(0, 6)}] p-[${index + 3 + seed}px]`).join(' ')
+const BULK = bulk(0)
+// A second page with as many rules of its own, so each of the two leaves out the other's.
+const OTHER_BULK = bulk(5000)
 const LISTENING = /port (\d+)/
 const STYLE = /<style>([\s\S]*?)<\/style>/g
+const ROUTE_COPY = /\/_kay\/[^/]+\.r-[a-z0-9]+\.css$/
 const REST_SCRIPT = 'for(const l of document.querySelectorAll("link[data-kay-rest]"))l.media="all"'
 const executablePath = process.env.BUN_CHROME_PATH !== undefined && process.env.BUN_CHROME_PATH !== '' ? process.env.BUN_CHROME_PATH : chromium.executablePath()
 const browserInstalled = existsSync(executablePath)
@@ -36,13 +40,17 @@ type App = Awaited<ReturnType<typeof servePages>>
 async function copyOfFixture(): Promise<string> {
   const dir = resolve(await fixtureCopy('page-styles'))
 
-  await Bun.write(join(dir, 'src/routes/bulk.kay'), `h1 Bulk\np(class="${BULK}") bulk\n`)
+  await Bun.write(join(dir, 'src/routes/bulk.kay'), `h1 Bulk\na.to-other(href="/other-bulk") other\np(class="${BULK}") bulk\n`)
+  await Bun.write(join(dir, 'src/routes/other-bulk.kay'), `h1 Other\np(class="${OTHER_BULK}") other\n`)
   // A failure and a missing page have chains of their own, and a page rendering a collection's Markdown may name any class.
   await Bun.write(join(dir, 'src/routes/_404.kay'), 'h1 Gone\np.italic nothing here\n')
   await Bun.write(join(dir, 'src/routes/_error.kay'), 'h1 Broken\np.tracking-wide went wrong\n')
   await Bun.write(join(dir, 'src/routes/boom.kay'), '--- server\nthrow new Error(\'boom\')\n---\nh1 Boom\n')
   await Bun.write(join(dir, 'src/content.config.ts'), 'import { s } from \'kay\'\nimport { collection } from \'kay/content\'\n\nexport const notes = collection(\'content/notes\', { schema: s.Object({ title: s.String() }) })\n')
-  await Bun.write(join(dir, 'src/content/notes/first.md'), '---\ntitle: First\n---\n\nHello\n')
+  // Raw HTML names a class; a fenced block and a code span only show one as text.
+  await Bun.write(join(dir, 'src/content/notes/first.md'), '---\ntitle: First\n---\n\nHello <span class="ring-4">there</span> `text-red-500`\n\n```html\n<i class="md:flex"></i>\n```\n')
+  // A script that is no component writes markup into the Markdown, as a highlighter plugin does.
+  await Bun.write(join(dir, 'src/markup.ts'), 'export const wrapper = \'<div class="border-red-500"></div>\'\n')
   await Bun.write(join(dir, 'src/routes/notes.kay'), '--- server\nimport { notes } from \'../content.config\'\n\nconst { Content } = (await notes.get(\'first\'))!\n---\nh1 Notes\nContent\n')
 
   return dir
@@ -85,6 +93,15 @@ function styles(css: string, name: string): boolean {
 // Whether the rules written inline hold one for the class.
 function hasRule(styles: string, name: string): boolean {
   return styles.includes(`.${name.replaceAll(':', '\\:').replaceAll('/', '\\/')}`)
+}
+
+function firstOf(classes: string): string {
+  return classes.slice(0, classes.indexOf(' '))
+}
+
+// A class as a selector writes it.
+function escaped(name: string): string {
+  return `.${name.replaceAll(/[^\w-]/g, '\\$&')}`
 }
 
 async function sharedText(built: ClientBuild, url: string): Promise<string> {
@@ -182,12 +199,18 @@ describe('a page\'s head', () => {
     expect(await sharedText(client, data.rest[0]!)).toContain('.ring-4')
   })
 
-  it('links the stylesheets whole for a page rendering a collection\'s Markdown, which may name any class', async () => {
+  it('carries the rules of the classes a page rendering a collection\'s Markdown may show, and leaves out the rest', async () => {
     const notes = await head(await serve(), '/notes')
 
-    expect(notes.blocking).toHaveLength(1)
-    expect(notes.rest).toEqual([])
-    expect(notes.html).not.toContain('data-kay-rest')
+    // Raw HTML in the entry, and a script writing markup into it.
+    for (const name of ['ring-4', 'border-red-500'])
+      expect(hasRule(notes.styles, name), name).toBe(true)
+
+    // Text in a fenced block or a code span is no element, and the components of other pages are not its own.
+    for (const name of ['text-red-500', 'md:flex', 'bg-lime-300', 'underline'])
+      expect(hasRule(notes.styles, name), name).toBe(false)
+
+    expect(notes.rest).toHaveLength(1)
   })
 
   it('writes the head of the missing page and of the error page as any page\'s', async () => {
@@ -209,13 +232,57 @@ describe('a page\'s head', () => {
     }
   })
 
-  it('links the stylesheets whole when its own rules pass the limit too', async () => {
-    const bulk = await head(await serve(), '/bulk')
+  it('links a copy of the stylesheet without the rules a route never renders, when its own rules pass the limit', async () => {
+    const app = await serve()
+    const bulk = await head(app, '/other-bulk')
+    const other = await head(app, '/bulk')
+    const whole = (await head(app, '/tie')).rest[0]!
 
-    expect(bulk.styles).toBe('')
-    expect(bulk.blocking).toHaveLength(1)
-    expect(bulk.rest).toEqual([])
-    expect(bulk.html).not.toContain('data-kay-rest')
+    for (const page of [bulk, other]) {
+      expect(page.styles).toBe('')
+      expect(page.blocking).toHaveLength(1)
+      expect(page.blocking[0]).toMatch(ROUTE_COPY)
+      expect(page.rest).toEqual([])
+      expect(page.html).not.toContain('data-kay-rest')
+    }
+
+    expect(bulk.blocking[0]).not.toBe(other.blocking[0])
+
+    const wholeText = await sharedText(client, whole)
+    const copy = await sharedText(client, bulk.blocking[0]!)
+    const own = escaped(firstOf(OTHER_BULK))
+    const foreign = escaped(firstOf(BULK))
+
+    expect(copy.length).toBeLessThan(wholeText.length * 0.75)
+    expect(wholeText).toContain(foreign)
+    expect(copy).toContain(own)
+    expect(copy).not.toContain(foreign)
+    // Rules nothing names stay, and the rules of the other route's components go.
+    for (const name of ['underline', 'bg-lime-300', 'text-red-500'])
+      expect(hasRule(copy, name), name).toBe(false)
+
+    expect(copy).toContain('@layer theme')
+    expect(copy).toContain('@property')
+  })
+
+  it('keeps the rules of a route copy in the order of the shared stylesheet', async () => {
+    const copy = await sharedText(client, (await head(await serve(), '/bulk')).blocking[0]!)
+    const wholeText = await sharedText(client, (await head(await serve(), '/tie')).rest[0]!)
+    const order = (css: string) => [...css.matchAll(/\.([\w\\[\]#:/.-]+)\{/g)].map(match => match[1]!)
+    const whole = order(wholeText)
+    let at = 0
+
+    for (const name of order(copy)) {
+      at = whole.indexOf(name, at)
+      expect(at, name).not.toBe(-1)
+    }
+  })
+
+  it('writes the copy once, named by its text, and finds it again when the server restarts', async () => {
+    const before = await Bun.file(join(client.dir, ...(await head(await serve(), '/bulk')).blocking[0]!.slice('/_kay/'.length).split('/'))).stat()
+    const again = await head(await serve(), '/bulk')
+
+    expect((await Bun.file(join(client.dir, ...again.blocking[0]!.slice('/_kay/'.length).split('/'))).stat()).mtimeMs).toBe(before.mtimeMs)
   })
 
   it.each([undefined, '/docs'])('goes out under the mount point %s, each rule let through a strict style-src by its hash and compressed whole', async (base) => {
@@ -246,6 +313,15 @@ describe('a page\'s head', () => {
     expect(new TextDecoder().decode(Bun.gunzipSync(new Uint8Array(await compressed.arrayBuffer())))).toBe(html)
   })
 
+  it('puts the mount point on the href of a route copy, which is cut from the stylesheet as the build wrote it', async () => {
+    const built = await buildClient(root, { plugins: [tailwind], base: '/docs' })
+    const bulk = await head(await serve({ base: '/docs' }, built), '/bulk')
+
+    expect(bulk.blocking).toHaveLength(1)
+    expect(bulk.blocking[0]).toMatch(/^\/docs\/_kay\/[^/]+\.r-[a-z0-9]+\.css$/)
+    expect(await Bun.file(join(built.dir, bulk.blocking[0]!.slice('/docs/_kay/'.length))).text()).toContain(escaped(firstOf(BULK)))
+  })
+
   it('stays as it was for inlineStyles true and false, and in development', async () => {
     const forced = await head(await serve({ inlineStyles: true }), '/about')
     const linked = await head(await serve({ inlineStyles: false }), '/about')
@@ -258,6 +334,9 @@ describe('a page\'s head', () => {
     expect(linked.blocking).toHaveLength(1)
     expect(dev.html).not.toContain('data-kay-rest')
     expect(dev.html).not.toContain('<style>')
+
+    for (const mode of [{ inlineStyles: true }, { inlineStyles: false }, { dev: true }])
+      expect((await head(await serve(mode), '/bulk')).blocking[0] ?? '', JSON.stringify(mode)).not.toMatch(ROUTE_COPY)
   })
 
   it('is written into a page kept at build time, its hash known to the server that serves it', async () => {
@@ -424,6 +503,36 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('the page sw
       return children.slice(first).some(element => element.tagName === 'STYLE')
     })).toBe(false)
     await direct.close()
+    await page.close()
+  })
+
+  it('swaps the copy of the route it leaves for the one of the route it reaches before it paints, and the rules apply', async () => {
+    const page = await browser.newPage()
+
+    await page.goto(`${origin}/bulk`)
+
+    const links = async () => page.evaluate(() => [...document.head.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]:not([data-kay-rest])')].map(link => link.getAttribute('href')))
+    const first = await links()
+
+    expect(first).toHaveLength(1)
+    expect(first[0]).toMatch(ROUTE_COPY)
+    await page.evaluate(() => {
+      (window as { kayAlive?: boolean }).kayAlive = true
+    })
+    await page.click('a.to-other')
+    await page.locator('h1', { hasText: 'Other' }).waitFor()
+
+    const second = await links()
+
+    expect(second).toHaveLength(1)
+    expect(second[0]).toMatch(ROUTE_COPY)
+    expect(second[0]).not.toBe(first[0])
+    expect(await page.evaluate(() => (window as { kayAlive?: boolean }).kayAlive)).toBe(true)
+    expect(await page.evaluate(() => getComputedStyle(document.querySelector('p')!).paddingTop)).toBe('6802px')
+    await page.goBack()
+    await page.locator('h1', { hasText: 'Bulk' }).waitFor()
+    expect(await links()).toEqual(first)
+    expect(await page.evaluate(() => getComputedStyle(document.querySelector('p')!).paddingTop)).toBe('1802px')
     await page.close()
   })
 

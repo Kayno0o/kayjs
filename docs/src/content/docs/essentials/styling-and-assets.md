@@ -36,9 +36,11 @@ When a page's styles are over that size, kay still tries to inline what the page
 
 kay links the full stylesheet for the rest. The browser fetches it without holding the first paint back. Once it arrives, every rule is there, so a class built at runtime or coming from your data still gets its style. You need no safelist and no setting.
 
-Until that stylesheet arrives, such a class shows unstyled. A class no page names, from Markdown for instance, stays inline on every page. A page whose own rules are still over the size links its stylesheets as before.
+Until that stylesheet arrives, such a class shows unstyled. A class no page names, from Markdown for instance, stays inline on every page. A page whose own rules are still over the size, or take up more than half of it, links a copy of the stylesheet instead. The copy has the same rules in the same order, without the rules of components the page never renders. A page links it only when it is a quarter lighter or more, so a site with similar pages keeps one cached file.
 
-When you move to another page without a reload, the next page's rules come with it.
+A page that shows Markdown counts the classes the Markdown, the scripts that write markup into it and its components name. Text in a code block does not count.
+
+When you move to another page without a reload, the next page's rules come with it. A route with a copy of its own loads it before the page paints.
 
 Set `inlineStyles` in `kay.config.ts` to force one way.
 

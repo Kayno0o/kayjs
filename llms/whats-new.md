@@ -10,6 +10,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 - `onError` gets the errors of `schedule`, `background` and queue jobs and `onStop` hooks, with no request, and an island's stack is mapped to `.kay` lines in production ([Error reporting](routing.md#error-reporting), [Error fallbacks](islands.md#error-fallbacks)).
 - kayjs-cms: `cms({ collections })` arranges a form (field order, rows of columns, hidden fields) and a list (columns, row actions), and the screens' parts, `createEntryForm`, `entryScreen` and `listScreen` are exported to build an entry screen of your own ([screens](../packages/cms/llms/screens.md)).
+- A page of many rules, Markdown pages included, links a copy of the stylesheet cut to the classes it names instead of every component's rules, loaded before a page swap paints ([styles](styles-and-assets.md#link-or-inline-the-stylesheets)).
 - A page with a `--- server` fence passes an island an action, `Chat(action={reply})` with no wrapper ([actions](actions.md#pass-an-action-to-an-island)).
 - `island-action` reports an action handed to an island that never types a prop as one ([actions](actions.md#pass-an-action-to-an-island)).
 - `secret-prop` warns of a secret-looking field, as `user.passwordHash`, handed to an island ([islands](islands.md#props-to-an-island)).

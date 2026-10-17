@@ -42,6 +42,8 @@ export interface ClientManifest {
 export interface PageStyles {
   html: string
   inline: string[]
+  // The stylesheets it links.
+  links: string[]
 }
 
 export interface PrerenderedPage {
@@ -148,7 +150,7 @@ export async function readInlineStyles(client: ClientBuild, base: string): Promi
 
   return new Map(await Promise.all(urls.map(async (url): Promise<[string, string]> => {
     // The browser hashes the text with its line breaks read as `\n`.
-    const css = (await Bun.file(join(client.dir, ...url.slice(ASSET_PREFIX.length).split('/').map(decodeURIComponent))).text()).replaceAll('\r\n', '\n')
+    const css = (await Bun.file(styleFile(client, url)).text()).replaceAll('\r\n', '\n')
     const absolute = (base === '' ? css : unrebaseCss(css, base)).replace(CSS_URL, (match, double: string | undefined, single: string | undefined, bare: string | undefined) => {
       const path = double ?? single ?? bare!
 
@@ -202,25 +204,113 @@ export async function chooseInlineStyles(client: ClientBuild, base: string, sett
   }
 
   if (client.styleUses !== undefined)
-    client.pageStyles = pageStyles(client, base, texts, chains)
+    client.pageStyles = await pageStyles(client, base, texts, chains)
 }
 
 // Run while the head is parsed, which puts the shared stylesheets on the page the moment they load rather than after it is printed.
 export const restScript = '<script data-kay-rest>for(const l of document.querySelectorAll("link[data-kay-rest]"))l.media="all"</script>'
 
-// The head of each chain whose full stylesheets are too heavy to inline but whose own rules fit: the rules for the classes its components name, written inline, then the full stylesheets linked without holding the first paint back.
+interface StyleGroup {
+  urls: string[]
+  unused: Set<string>
+  // The rules of the classes its components name, for the head to write when they fit.
+  inline: string[]
+  // The stylesheets some other rule of is left, which the head links.
+  rest: string[]
+  size: number
+  chains: number
+  // Each stylesheet's lighter copy for this group, by URL.
+  routes: Map<string, string>
+}
+
+// A route links a stylesheet of its own only when it weighs this much of the shared one or less: the shared one stays cached across routes, so a few bytes saved are not worth losing that.
+const ROUTE_SAVING = 0.75
+// The most such copies a build writes, the ones saving the most first.
+const ROUTE_FILES = 32
+const CSS_EXTENSION = /\.css$/
+
+// Where the build wrote the stylesheet at `url`.
+function styleFile(client: ClientBuild, url: string): string {
+  return join(client.dir, ...url.slice(ASSET_PREFIX.length).split('/').map(decodeURIComponent))
+}
+
+// Writes the stylesheets some groups of chains link in a lighter form, the shared one pruned of the classes none of their files name: the same rules in the same order, so the cascade is the shared stylesheet's.
+// Each is named by its text, so a cache never holds an old one under a new name, and written beside the shared one, where a build puts it in the export and the executable and a server finds it again.
+async function writeRouteStyles(client: ClientBuild, groups: StyleGroup[], parsed: Map<string, Node[]>): Promise<void> {
+  const whole = new Map<string, { text: string, size: number }>()
+  const found: { group: StyleGroup, url: string, text: string, saved: number }[] = []
+
+  for (const group of groups) {
+    // A head inlines little at no cost to the page, but more than this on every view weighs more than a copy a cache keeps.
+    if (group.size <= INLINE_LIMIT / 2)
+      continue
+
+    for (const url of group.size > INLINE_LIMIT ? group.urls : group.rest) {
+      let own = whole.get(url)
+
+      if (own === undefined) {
+        const text = await Bun.file(styleFile(client, url)).text()
+
+        whole.set(url, own = { text, size: Bun.gzipSync(text).length })
+      }
+
+      let nodes = parsed.get(url)
+
+      if (nodes === undefined)
+        parsed.set(url, nodes = parse(own.text))
+
+      const text = print(pruneUnescaped(nodes, group.unused))
+      const size = Bun.gzipSync(text).length
+
+      if (size <= own.size * ROUTE_SAVING)
+        found.push({ group, url, text, saved: (own.size - size) * group.chains })
+    }
+  }
+
+  const written = new Map<string, string>()
+
+  for (const { group, url, text } of found.sort((a, b) => b.saved - a.saved)) {
+    let linked = written.get(text)
+
+    if (linked === undefined) {
+      if (written.size >= ROUTE_FILES)
+        continue
+
+      const name = `${url.slice(url.lastIndexOf('/') + 1).replace(CSS_EXTENSION, '')}.r-${Bun.hash(text).toString(36).slice(0, 8)}.css`
+      const file = join(client.dir, name)
+
+      try {
+        if (!await Bun.file(file).exists())
+          await Bun.write(file, text)
+      }
+      catch {
+        continue
+      }
+
+      written.set(text, linked = `${url.slice(0, url.lastIndexOf('/') + 1)}${name}`)
+    }
+
+    group.routes.set(url, linked)
+  }
+}
+
+// The head of each chain whose full stylesheets are too heavy to inline.
+// When its own rules fit: the rules for the classes its components name, written inline, then the stylesheets linked without holding the first paint back.
 // A class no component names, or one built at runtime, has its rule in the linked stylesheet, which applies when it arrives, and at once without scripts. It follows the inline rules so it keeps the place it has in the whole stylesheet.
-function pageStyles(client: ClientBuild, base: string, texts: Map<string, string>, chains: string[][]): Map<string, PageStyles> {
+// When they do not, or whatever is linked: a route whose files leave out enough of a stylesheet links a copy without those rules, written beside it.
+async function pageStyles(client: ClientBuild, base: string, texts: Map<string, string>, chains: string[][]): Promise<Map<string, PageStyles>> {
   const { classes, entries } = client.styleUses!
   const found = new Map<string, PageStyles>()
   const parsed = new Map<string, Node[]>()
-  const made = new Map<string, { inline: string[], rest: string[], size: number }>()
+  const groups = new Map<string, StyleGroup>()
+  const planned: { key: string, group: StyleGroup }[] = []
+  const seen = new Set<string>()
 
   for (const files of chains) {
     const key = files.join('\n')
     const urls = [...new Set(files.map(file => client.styles.get(file)))].filter(url => url !== undefined)
 
-    if (found.has(key) || urls.length === 0 || urls.reduce((sum, url) => sum + (client.inlineSizes?.get(url) ?? Infinity), 0) <= INLINE_LIMIT)
+    if (seen.has(key) || urls.length === 0 || urls.reduce((sum, url) => sum + (client.inlineSizes?.get(url) ?? Infinity), 0) <= INLINE_LIMIT)
       continue
 
     const used = new Set<number>()
@@ -236,9 +326,9 @@ function pageStyles(client: ClientBuild, base: string, texts: Map<string, string
 
     // Chains naming the same classes of the same stylesheets get the same rules, pruned, printed and gzipped once.
     const shared = `${urls.join('\n')}\n${[...used].sort((a, b) => a - b).join(',')}`
-    let written = made.get(shared)
+    let group = groups.get(shared)
 
-    if (written === undefined) {
+    if (group === undefined) {
       const unused = new Set(classes.filter((_name, index) => !used.has(index)))
       const own: string[] = []
       const left: string[] = []
@@ -263,20 +353,37 @@ function pageStyles(client: ClientBuild, base: string, texts: Map<string, string
         weight += Bun.gzipSync(pruned).length
       }
 
-      written = { inline: own, rest: left, size: weight }
-      made.set(shared, written)
+      group = { urls, unused, inline: own, rest: left, size: weight, chains: 0, routes: new Map() }
+      groups.set(shared, group)
     }
 
-    const { inline, rest, size } = written
+    seen.add(key)
+    group.chains++
+    planned.push({ key, group })
+  }
+
+  // What the build wrote is what the copies are cut from, not the inline texts, which have their mount point and relative paths taken out.
+  parsed.clear()
+  await writeRouteStyles(client, [...groups.values()], parsed)
+
+  for (const { key, group } of planned) {
+    const { inline, rest, size, urls, routes } = group
+    const linked = (url: string) => routes.get(url) ?? url
+
+    if (routes.size > 0) {
+      found.set(key, { html: urls.map(url => `<link rel="stylesheet" href="${linked(url)}">`).join(''), inline: [], links: urls.map(linked) })
+
+      continue
+    }
 
     if (size > INLINE_LIMIT)
       continue
 
-    const links = rest.map(url => `<link rel="stylesheet" href="${url}" media="print" data-kay-rest>`).join('')
+    const links = rest.map(url => `<link rel="stylesheet" href="${linked(url)}" media="print" data-kay-rest>`).join('')
     // A noscript holds text for the rewriter that puts the mount point on links, so its hrefs carry it already.
-    const plain = rest.map(url => `<link rel="stylesheet" href="${joinBase(base, url)}">`).join('')
+    const plain = rest.map(url => `<link rel="stylesheet" href="${joinBase(base, linked(url))}">`).join('')
 
-    found.set(key, { html: `${inline.map(css => `<style>${css}</style>`).join('')}${links}${rest.length === 0 ? '' : `${restScript}<noscript>${plain}</noscript>`}`, inline })
+    found.set(key, { html: `${inline.map(css => `<style>${css}</style>`).join('')}${links}${rest.length === 0 ? '' : `${restScript}<noscript>${plain}</noscript>`}`, inline, links: rest.map(linked) })
   }
 
   return found
