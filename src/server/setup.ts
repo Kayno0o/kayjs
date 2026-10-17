@@ -14,6 +14,7 @@ import { setContentMode, setMarkdownDefaults } from '../content/load'
 import { projectCollections } from '../content/server'
 import { renderOptionsOf } from '../project'
 import { setSite } from '../runtime/site'
+import { setupStore } from './app-store'
 import { basePath } from './base'
 import { setupCards } from './card'
 import { chooseInlineStyles } from './client'
@@ -91,6 +92,7 @@ export async function setupPages(project: Project, loadClient: () => ClientBuild
     setupPreview(config.preview, base)
     setTracer(config.tracer)
     setupStorage(config.storage, join(imageCache, 'stored'), imageCache)
+    setupStore(config.store)
     // A test's server restarts with its process and has no replica, so a key of the process is right there.
     warnOnStampKey(!mode.dev && process.env.NODE_ENV !== 'test')
   }

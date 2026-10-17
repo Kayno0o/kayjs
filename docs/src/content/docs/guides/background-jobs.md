@@ -97,6 +97,8 @@ Set `idlePoll: '1s'` to look every second, or `'30s'` to ask the database less o
 
 `sqliteJobs` is the default store. To keep jobs in Redis or Postgres, pass `store` an object of `JobStore`, from `kay/server`. Every process of the app opens it, so it must hand each job to one process only.
 
+To put the jobs, the schedule locks and the rate limit counts of the whole app in one place, set `store` in `kay.config.ts`: `store: sqliteData('data/app.sqlite')`, or `{ jobs, rates }` with a `JobStore` and a `RateStore` of your own. A queue, a schedule or a limit naming its own `store` keeps it.
+
 | Method | Does |
 | --- | --- |
 | `add(job)` | Keeps a new job |

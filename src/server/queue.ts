@@ -8,6 +8,7 @@ import { KayError } from '../compiler/errors'
 import { durationSeconds } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
 import { openSqlite } from '../runtime/sqlite.server'
+import { appStore } from './app-store'
 import { onReload } from './reload'
 
 // A job as a store keeps it, its payload as devalue text.
@@ -262,7 +263,7 @@ export function memoryJobs(): JobStore {
 
 // What a queue or a locked schedule names no store of its own uses, opened on first use.
 export function defaultJobStore(): JobStore {
-  return defaultStore ??= process.env.NODE_ENV === 'test' ? memoryJobs() : sqliteJobs(DEFAULT_PATH)
+  return appStore()?.jobs ?? (defaultStore ??= process.env.NODE_ENV === 'test' ? memoryJobs() : sqliteJobs(DEFAULT_PATH))
 }
 
 // A queue of jobs the server runs in the background, each surviving a restart: `enqueue` from an action, `app.use(queue)` in the server to run them.

@@ -10,6 +10,7 @@ import { durationSeconds } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
 import { openSqlite } from '../runtime/sqlite.server'
 import { NAVIGATE_HEADER, WORK_HEADER } from '../runtime/swap'
+import { appStore } from './app-store'
 import { nodeNet } from './builtins'
 import { onReload } from './reload'
 import { rewrittenAddress } from './rewrite'
@@ -178,7 +179,7 @@ export function rateLimit(name: string, limit: RateLimit): RateLimiter {
       if (!Number.isSafeInteger(weight) || weight < 1)
         throw new KayError('config-invalid', `kay: rateLimit('${name}').hit()'s weight is ${weight}; it takes a whole number of at least 1`)
 
-      const window = await (limit.store ?? memoryOf(name)).hit(typeof from === 'string' ? `${name}\nkey:${from}` : limitKey(name, clientAddress(from, server)), ms, weight)
+      const window = await (limit.store ?? sharedRates(name)).hit(typeof from === 'string' ? `${name}\nkey:${from}` : limitKey(name, clientAddress(from, server)), ms, weight)
 
       // A count below the weight holds less than this hit alone: the store counted one, which shows on a window's first hit.
       if (window.count < weight)
@@ -217,7 +218,7 @@ export async function apiLimitWait(limits: { name: string, limit: ApiRateLimit }
   let wait: number | undefined
 
   for (const { name, limit } of limits) {
-    const own = waitFor(await (limit.store ?? memoryOf(name)).hit(await actionKey(name, limit, request, client, context), windowMs(limit)), limit.max)
+    const own = waitFor(await (limit.store ?? sharedRates(name)).hit(await actionKey(name, limit, request, client, context), windowMs(limit)), limit.max)
 
     if (own !== undefined && (wait === undefined || own > wait))
       wait = own
@@ -301,7 +302,7 @@ export async function protectionRefusal(action: ServerAction<TSchema, unknown>, 
 
   // A form posted without kay's script sends no solution, refused unless `minTime` let it through above, which then checks it alone; an agent's call has no script to solve one.
   if (work && !agentCalls.has(request) && !(plain && minTime && (request.headers.get(WORK_HEADER) ?? '') === '')) {
-    const reason = await workRefusal(action.url, request.headers.get(WORK_HEADER), work.store ?? memoryOf(`${action.url}#work`))
+    const reason = await workRefusal(action.url, request.headers.get(WORK_HEADER), work.store ?? sharedRates(`${action.url}#work`))
 
     if (reason === 'wrong' && work.pretend)
       return PRETEND
@@ -325,7 +326,7 @@ export async function protectionRefusal(action: ServerAction<TSchema, unknown>, 
 
   // Every limit counts the attempt, whichever refuses it, and the longest wait is the one to tell.
   for (const { name, limit } of limits) {
-    const store = limit.store ?? memoryOf(name)
+    const store = limit.store ?? sharedRates(name)
     const key = await actionKey(name, limit, request, client, keyContext)
     // A limit on the posts that went through only reads its count here; the handler's success adds to it.
     const own = limit.count === 'succeeded' ? reached(await store.peek!(key), limit.max) : waitFor(await store.hit(key, windowMs(limit)), limit.max)
@@ -352,7 +353,7 @@ export async function countSucceeded(action: ServerAction<TSchema, unknown>, req
   const client = clientAddress(request, server)
 
   for (const { name, limit } of limits)
-    await (limit.store ?? memoryOf(name)).hit(await actionKey(name, limit, request, client, undefined), windowMs(limit))
+    await (limit.store ?? sharedRates(name)).hit(await actionKey(name, limit, request, client, undefined), windowMs(limit))
 }
 
 // The most characters of a custom key kept as it is, a longer one is hashed: a store keeps a key whole.
@@ -420,6 +421,11 @@ function filledIn(value: unknown): boolean {
 // Seconds until the client may try again under `name`, in this process's memory, or undefined while it is under the limit: for kay's own routes.
 export function overLimit(name: string, client: string, max: number, windowMs: number): number | undefined {
   return waitFor(memoryOf(name).hit(limitKey(name, client), windowMs), max)
+}
+
+// The store a limit counts in when it names none: the app's `store.rates`, else this process's memory.
+function sharedRates(name: string): RateStore {
+  return appStore()?.rates ?? memoryOf(name)
 }
 
 function memoryOf(name: string): ReturnType<typeof memoryRates> {
