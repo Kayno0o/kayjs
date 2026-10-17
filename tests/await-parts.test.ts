@@ -111,6 +111,17 @@ describe('an await block given an async iterable', () => {
     expect([...before.reported, ...after.reported]).toEqual([])
   })
 
+  it('renders the catch block of an iterable failing to give its iterator, and still ends the page', async () => {
+    const refusing = { [Symbol.asyncIterator]: () => {
+      throw new Error('No iterator')
+    } } as AsyncIterable<unknown>
+    const { page, reported } = await streamed([block(refusing, { failed: true })])
+
+    expect(templatesOf(page, 'b')).toEqual(['<p class="failed">No iterator</p>'])
+    expect(page).toEndWith('</body></html>')
+    expect(reported).toEqual([])
+  })
+
   it('without a catch block, reports the failure, removing the pending block or leaving the parts sent so far', async () => {
     const before = await streamed([block(parts([], 0, new Error('Down')))])
     const after = await streamed([block(parts(['a'], 0, new Error('Cut')))])

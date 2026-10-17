@@ -11,7 +11,7 @@ export interface SnapshotReader {
 
 // Reads an iterable to its end, showing its first value at once and then at most one every `everyMs`, the latest of those that came meanwhile; the last is left to `done`.
 export function readSnapshots(source: AsyncIterable<unknown>, everyMs: number, show: (value: unknown) => void): SnapshotReader {
-  const iterator = source[Symbol.asyncIterator]()
+  let iterator: AsyncIterator<unknown> | undefined
   let stopped = false
   let latest: { value: unknown } | undefined
   let unshown = false
@@ -29,8 +29,11 @@ export function readSnapshots(source: AsyncIterable<unknown>, everyMs: number, s
     show(latest!.value)
   }
 
+  // Taken here, so an iterable failing to give its iterator fails as one throwing does.
   const read = async (): Promise<{ value: unknown } | undefined> => {
     try {
+      iterator = source[Symbol.asyncIterator]()
+
       for (;;) {
         const step = await iterator.next()
 
@@ -67,7 +70,7 @@ export function readSnapshots(source: AsyncIterable<unknown>, everyMs: number, s
 
       // Not awaited: an async generator waiting on its next value only returns once it has one.
       try {
-        const returned = iterator.return?.()
+        const returned = iterator?.return?.()
 
         if (returned)
           void Promise.allSettled([returned])
