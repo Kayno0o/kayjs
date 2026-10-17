@@ -1,0 +1,5 @@
+---
+import Alpha from '../components/alpha.kay'
+---
+h1 Home
+Alpha

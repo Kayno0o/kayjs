@@ -149,7 +149,7 @@ export interface RuntimeSearchCache {
 
 // Bundles `entry` with kay's runtime left out, then each lazy runtime module with its siblings left out, to learn what of the runtime the client build uses where.
 // Undefined when the build fails, which the real one then reports.
-export async function runtimeChunk(entry: string, options: { plugins: BunPlugin[], define: Record<string, string>, external: string[], cache?: RuntimeSearchCache | undefined }): Promise<RuntimeChunk | undefined> {
+export async function runtimeChunk(entry: string, options: { plugins: BunPlugin[], define: Record<string, string>, external: string[], islands?: string[] | undefined, cache?: RuntimeSearchCache | undefined }): Promise<RuntimeChunk | undefined> {
   const slot = options.cache && { file: options.cache.file, key: Bun.hash([compilerFingerprint(), JSON.stringify(options.define), options.external.join(), options.plugins.map(plugin => plugin.name).join(), RUNTIME_DIR, options.cache.key].join('\0')).toString(36) }
   const known = slot && await readCacheEntry<Remembered>(slot)
   const fresh = known !== undefined && Object.entries(known.inputs).every(([file, stamp]) => fileStamp(file) === stamp)
@@ -191,9 +191,9 @@ async function remember(slot: CacheSlot, found: { chunk: RuntimeChunk, inputs: s
   catch {}
 }
 
-async function searchRuntime(entry: string, options: { plugins: BunPlugin[], define: Record<string, string>, external: string[] }): Promise<{ chunk: RuntimeChunk, inputs: string[] } | undefined> {
+async function searchRuntime(entry: string, options: { plugins: BunPlugin[], define: Record<string, string>, external: string[], islands?: string[] | undefined }): Promise<{ chunk: RuntimeChunk, inputs: string[] } | undefined> {
   const used = new Map<string, Set<string>>()
-  const outer = await Bun.build({ entrypoints: [entry], target: 'browser', splitting: true, define: options.define, external: ['kay', 'kay/*', ...options.external], plugins: options.plugins, metafile: true, throw: false })
+  const outer = await Bun.build({ entrypoints: [entry, ...options.islands ?? []], target: 'browser', splitting: true, define: options.define, external: ['kay', 'kay/*', ...options.external], plugins: options.plugins, metafile: true, throw: false })
 
   if (!outer.success)
     return undefined

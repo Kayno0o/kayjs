@@ -168,6 +168,18 @@ describe('kay build --static', () => {
     expect(code.filter(text => text.includes('/_kay/error'))).toEqual([])
   })
 
+  it('names each island\'s chunk by its file in the markup, under the mount point, and keeps every island\'s loader out of the entry', async () => {
+    const home = (await get('/')).text
+    const file = (/<slot data-component="src\/components\/counter\.kay"[^>]* data-chunk="([^"/]+\.js)"/).exec(home)![1]!
+    const chunks = await Array.fromAsync(new Bun.Glob('_kay/*.js').scan(out))
+    const others = await Promise.all(chunks.filter(chunk => chunk !== `_kay/${file}`).map(async chunk => Bun.file(join(out, chunk)).text()))
+
+    expect((await get(`/_kay/${file}`)).status).toBe(200)
+    expect(others.some(text => text.includes('counter'))).toBe(false)
+    expect(others.some(text => text.includes(file))).toBe(false)
+    expect(home).toContain(`<link rel="modulepreload" href="/repo/_kay/${file}">`)
+  })
+
   it('keeps the JS a page loads up front within its budget', async () => {
     await expectEagerJsWithin(EAGER_JS_BUDGET, (await get('/')).text, async url => Bun.file(join(out, url.slice(BASE.length))).text())
   })

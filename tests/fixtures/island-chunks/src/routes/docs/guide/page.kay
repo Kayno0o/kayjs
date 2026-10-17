@@ -1,0 +1,5 @@
+---
+import Beta from '../../../components/beta.kay'
+---
+h1 Deep
+Beta

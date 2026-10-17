@@ -106,6 +106,21 @@ const CSS_URL = /url\(\s*(?:"([^"]*)"|'([^']*)'|([^"')\s]+))\s*\)/gi
 const NOT_RELATIVE = /^(?:[a-z][\w+.-]*:|\/|#)/i
 const STYLE_END = /<\/style/gi
 
+const chunkFiles = new WeakMap<ClientBuild['islands'], Record<string, string>>()
+
+// The file name of each island's own chunk, which an island's markup carries so the browser imports it from beside the runtime, whatever the page's URL or the site's base.
+// A development build, the only one listing the sources of its chunks, has the registry of its boot instead.
+export function islandChunks(client: Pick<ClientBuild, 'islands' | 'chunkInputs'>): Record<string, string> {
+  let files = chunkFiles.get(client.islands)
+
+  if (!files) {
+    files = client.chunkInputs !== undefined ? {} : Object.fromEntries(Object.entries(client.islands).flatMap(([id, chunks]) => chunks[0] === undefined ? [] : [[id, chunks[0].slice(ASSET_PREFIX.length)]]))
+    chunkFiles.set(client.islands, files)
+  }
+
+  return files
+}
+
 export const MANIFEST = 'manifest.json'
 // Left beside the manifest when the build `kay dev` keeps failed; a server reads it first.
 export const BUILD_FAILURE = 'failure.json'

@@ -160,9 +160,14 @@ async function fetchServerIsland(registry: IslandRegistry, element: HTMLElement)
   await hydrateIslands(registry, element)
 }
 
+// The chunk file the server named in an island's markup sits beside this runtime, so the page's URL and the site's base do not matter.
+// Only a bare file name is imported: an island's markup may come from content, and no other URL may be reached through it.
+const CHUNK_FILE = /^[^/\\:?#%]+\.js$/
+
 async function hydrateIsland(registry: IslandRegistry, element: HTMLElement): Promise<void> {
   const id = element.dataset.component ?? ''
-  const load = registry[id]
+  const file = element.dataset.chunk ?? ''
+  const load = registry[id] ?? (CHUNK_FILE.test(file) ? async () => import(new URL(file, import.meta.url).href) as ReturnType<IslandRegistry[string]> : undefined)
 
   // What was clicked on it is dropped, as it never hydrates.
   if (!load) {

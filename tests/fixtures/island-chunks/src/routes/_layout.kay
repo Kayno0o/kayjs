@@ -1,0 +1,8 @@
+---
+import Kept from '../components/kept.kay'
+---
+nav
+  a.home(href="/") Home
+  a.deep(href="/docs/guide/page") Deep
+Kept(persist)
+slot

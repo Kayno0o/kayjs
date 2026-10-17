@@ -110,7 +110,7 @@ describe('pages', () => {
 
     expect(home.html).toContain('<slot data-component="tests/fixtures/site/src/components/counter.kay"')
     expect(home.html).toContain('window._$K')
-    expect(home.html).toContain(`<slot data-component="tests/fixtures/site/src/components/counter.kay" data-props='[{"start":1},1]'><button class="counter">Clicked <!--[-->1<!--]--></button></slot>`)
+    expect(home.html).toContain(`<slot data-component="tests/fixtures/site/src/components/counter.kay" data-props='[{"start":1},1]' data-chunk="${(/data-chunk="(counter-\w+\.js)"/).exec(home.html)![1]}"><button class="counter">Clicked <!--[-->1<!--]--></button></slot>`)
     expect(home.html.replace(/<slot[\s\S]*<\/slot>/, '')).not.toContain('<!--[-->')
     const entry = (/<script type="module" src="(\/_kay\/[^"]+)"><\/script>/).exec(home.html)?.[1]
 
@@ -118,7 +118,9 @@ describe('pages', () => {
     const bundle = await app.handle(new Request(`http://localhost${entry}`))
 
     expect(bundle.status).toBe(200)
-    expect(await bundle.text()).toContain('counter.kay')
+    // The page names the island's chunk, so the entry holds no loader of it.
+    expect(await bundle.text()).not.toContain('counter.kay')
+    expect((await app.handle(new Request(`http://localhost/_kay/${(/data-chunk="([^"]+)"/).exec(home.html)![1]}`))).status).toBe(200)
 
     const about = await get('/about')
 

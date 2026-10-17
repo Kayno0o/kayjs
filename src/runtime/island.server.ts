@@ -23,6 +23,8 @@ let rendered: RenderedIslands | undefined
 export interface RenderedIslands {
   eager: Set<string>
   count: number
+  // The file name of each island's chunk, which its markup names for the browser to import; none while the browser has its islands from the page's own registry.
+  chunks?: Record<string, string> | undefined
   // The message keys the islands use, which go to the browser with them.
   messages: Set<string>
 }
@@ -55,8 +57,8 @@ function trim(set: Set<string>, size: number): void {
 }
 
 // Runs a synchronous page render and lists the islands it rendered.
-export function collectIslands<T>(render: () => T, salt?: string): { result: T, islands: RenderedIslands } {
-  const islands: RenderedIslands = { eager: new Set(), count: 0, messages: new Set() }
+export function collectIslands<T>(render: () => T, salt?: string, chunks?: Record<string, string>): { result: T, islands: RenderedIslands } {
+  const islands: RenderedIslands = { eager: new Set(), count: 0, messages: new Set(), chunks }
 
   rendered = islands
 
@@ -132,7 +134,8 @@ export function island<P extends object>(id: string, component: ((props: P) => J
       // Marks an island whose title the page shows, so the browser leaves it alone while a later one has not hydrated.
       const titled = setsIslandTitle(mark) ? ` ${TITLED_ATTRIBUTE}` : ''
       const lazy = when === 'idle' || when === 'visible' ? ` data-hydrate="${when}"` : ''
-      const markup: Html = { t: `<slot data-component="${escapeAttribute(id)}" data-props=${quotedAttribute(serialized)}${lazy}${titled}${shipped}${browserOnly ? ' data-client' : ''}${count === 0 ? '' : ` data-uid="${escapeAttribute(ids)}"`}${persist === undefined ? '' : ` data-persist="${escapeAttribute(persist)}"`}>${html}</slot>` }
+      const chunk = rendered?.chunks?.[id]
+      const markup: Html = { t: `<slot data-component="${escapeAttribute(id)}" data-props=${quotedAttribute(serialized)}${lazy}${titled}${shipped}${browserOnly ? ' data-client' : ''}${count === 0 ? '' : ` data-uid="${escapeAttribute(ids)}"`}${persist === undefined ? '' : ` data-persist="${escapeAttribute(persist)}"`}${chunk === undefined ? '' : ` data-chunk="${escapeAttribute(chunk)}"`}>${html}</slot>` }
 
       return markup as unknown as JSX.Element
     }

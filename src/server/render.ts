@@ -35,7 +35,7 @@ import { editing } from '../runtime/preview'
 import { encodeValue, unsendable } from '../runtime/wire'
 import { rebaseHtml } from './base'
 import { importModule, onForgetModules } from './bundle'
-import { INLINE_LIMIT } from './client'
+import { INLINE_LIMIT, islandChunks } from './client'
 import { preferredEncoding, wholeResponse } from './compress'
 import { cookieJar, requestCookies } from './cookies'
 import { A11Y_SCRIPT, DEV_BOOT, devToolScripts, errorPageScripts, liveReload, problemsBlock } from './dev'
@@ -515,9 +515,10 @@ export async function renderServerIslands(route: ServedRoute, context: RequestCo
       const islands = newServerIslands(path === undefined, path, skip)
       const rules = queryRules(chainQuery(page.files, page.modules))
       const inScope = <T>(run: () => T) => inServerScope(request, report, run, () => rendering.headers.append('vary', 'cookie'), rules)
-      const { deferred } = inScope(() => withServerIslands(islands, () => renderStatic(viewOf(page.modules, page.data))))
+      const chunks = islandChunks(client)
+      const { deferred } = inScope(() => withServerIslands(islands, () => renderStatic(viewOf(page.modules, page.data), undefined, chunks)))
       // What a block inside an island renders is the island's own, every component of it included.
-      const within = (view: () => unknown) => inScope(() => withServerIslands({ ...islands, inside: 1 }, () => renderBlock(view)))
+      const within = (view: () => unknown) => inScope(() => withServerIslands({ ...islands, inside: 1 }, () => renderBlock(view, undefined, chunks)))
       // The prerendered page holds the checks of the forms it rendered, not of those in a block that settles per request.
       const posts = client.entry !== undefined && client.navigation === true
       const settled = await Promise.all(islands.html.map(async (html) => {
@@ -818,6 +819,7 @@ function viewOf(modules: PageModule[], data: Record<string, unknown>[]): () => u
 
 function documentOf(files: string[], modules: PageModule[], data: Record<string, unknown>[], client: ClientBuild, rendering: Rendering, options: RenderOptions, rules: QueryRules | undefined): string | ReadableStream<Uint8Array> {
   const view = viewOf(modules, data)
+  const chunks = islandChunks(client)
   // A prerendered page holds each server island between marks the server splits it at.
   const scan = options.prerendering ? newServerIslands(true) : undefined
   // In edit mode the page's markup is marked with the fields of the entries it renders, once whole.
@@ -828,7 +830,7 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
   const shown = marks === undefined || editor === undefined ? view : () => ({ t: child(view()) + child(editor.default({ entries: [...marks.entries.values()], persist: true })) })
   // Its stylesheet comes last, after the page's.
   const styled = file === undefined || editor === undefined ? files : [...files, file]
-  const { result: { result: { html: body, islands, deferred }, head }, forms } = withFieldMarks(marks, () => collectForms(() => collectHead(() => scan ? withServerIslands(scan, () => renderStatic(shown)) : renderStatic(shown), pageHead(modules, options.head?.(rendering.ctx.url, rendering.status)))))
+  const { result: { result: { html: body, islands, deferred }, head }, forms } = withFieldMarks(marks, () => collectForms(() => collectHead(() => scan ? withServerIslands(scan, () => renderStatic(shown, undefined, chunks)) : renderStatic(shown, undefined, chunks), pageHead(modules, options.head?.(rendering.ctx.url, rendering.status)))))
   const streamed = deferred.length > 0
   const hasIslands = client.entry !== undefined && islands.count > 0
   // A page posting forms to actions loads the entry too, which sends them without a reload; a page with neither ships only `historyScript`, and links from it load pages, losing no state.

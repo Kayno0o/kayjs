@@ -1,0 +1,6 @@
+---
+import { signal } from 'kay'
+
+const count = signal(0)
+---
+button.kept(onClick={() => count.set(value => value + 1)}) Kept {count()}

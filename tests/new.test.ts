@@ -975,7 +975,7 @@ describe('kay build --compile', () => {
       expect(about.headers.get('etag')).toEndWith('-br"')
       expect(await about.text()).toContain('<p>About</p>')
       expect(badges.text).toContain('<ul class="badges"><li><i class="dot"></i>OUT</li></ul>')
-      expect(badges.text).toContain('<slot data-component="src/components/tally.kay" data-props="[{}]"><!--[--><ul class="badges"><li><!--[--><i class="dot"></i><!--]--><!--[-->IN<!--]--></li></ul><!--]--><button>0</button></slot>')
+      expect(badges.text).toMatch(/<slot data-component="src\/components\/tally\.kay" data-props="\[\{\}\]" data-chunk="tally-\w+\.js"><!--\[--><ul class="badges"><li><!--\[--><i class="dot"><\/i><!--\]--><!--\[-->IN<!--\]--><\/li><\/ul><!--\]--><button>0<\/button><\/slot>/)
       expect(parse(await call.text())).toBe('HI')
       expect(await get('/admin')).toEqual({ status: 403, text: 'Admins only' })
       expect(await get('/api/ping')).toEqual({ status: 200, text: 'pong' })
@@ -1013,7 +1013,7 @@ describe('kay build --compile', () => {
       // Content entries come from what the build compiled, with nothing of src/content beside the executable.
       expect((await get('/notes/first')).text).toContain('<h1>First note</h1><h2 id="read-me"><a href="#read-me">Read me</a></h2>')
       expect((await get('/notes.xml')).text).toContain('<link>https://example.com/notes/first</link>')
-      expect((await get('/tags')).text).toContain(`<slot data-component="node_modules/kay-lib/src/tag.kay" data-props='[{"label":1},"kept"]'><button class="tag">app:kept</button></slot>`)
+      expect((await get('/tags')).text).toMatch(/<slot data-component="node_modules\/kay-lib\/src\/tag\.kay" data-props='\[\{"label":1\},"kept"\]' data-chunk="tag-\w+\.js"><button class="tag">app:kept<\/button><\/slot>/)
       expect((await get('/live-tags')).text).toContain('<button class="tag">app:live</button>')
 
       // A container's health check runs the executable again, asking the server beside it.

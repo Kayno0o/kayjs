@@ -920,6 +920,38 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a docs-lik
   }, 60_000)
 })
 
+describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('islands imported from the chunk their markup names', () => {
+  it('hydrates the islands of a page loaded at a nested URL with a trailing slash or swapped to, the persisted one imported once', async () => {
+    const site = await testSite({ routes: 'tests/fixtures/island-chunks/src/routes', trailingSlash: 'always', browser: { path } })
+
+    try {
+      const page = await site.open('/')
+
+      await page.click('button.alpha')
+      await page.click('button.kept')
+      await page.click('a.deep')
+      await page.waitFor('h1', { text: 'Deep' })
+      await page.click('button.beta')
+
+      expect(await page.path()).toBe('/docs/guide/page/')
+      expect([await page.text('button.alpha'), await page.text('button.beta'), await page.text('button.kept')]).toEqual([null, 'Beta 1', 'Kept 1'])
+
+      expect(await page.evaluate(() => performance.getEntriesByType('resource').filter(entry => (/kept-\w+\.js/).test(entry.name)).length)).toBe(1)
+
+      // Opened afresh at the nested URL, where a chunk resolved from the page's URL would be looked for under it.
+      await page.goto('/docs/guide/page/')
+      await page.click('button.beta')
+      await page.click('button.kept')
+
+      expect([await page.text('button.beta'), await page.text('button.kept')]).toEqual(['Beta 1', 'Kept 1'])
+      expect(page.errors).toEqual([])
+    }
+    finally {
+      await site.close()
+    }
+  }, 60_000)
+})
+
 describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the browser\'s profile', () => {
   const LOCKED = 'kay-chrome-999999998-locked'
   const kindOf = (name: string) => {

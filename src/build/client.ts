@@ -308,7 +308,8 @@ export async function bundleIslands(root: string, islands: Map<string, string>, 
   const runtimeFile = join(base, 'runtime.ts')
   const trees = apiTrees(root, options)
   const api = apiStubs(trees)
-  const registry = [...islands].map(([id, file]) => `  ${JSON.stringify(id)}: () => import(${JSON.stringify(file)}),`).join('\n')
+  // A page names its islands' chunks in their markup, so a production boot holds no loader of its own; development swaps islands in through the registry.
+  const registry = options.hot ? [...islands].map(([id, file]) => `  ${JSON.stringify(id)}: () => import(${JSON.stringify(file)}),`).join('\n') : ''
 
   // `hydrate` re-runs over a root whose markup was swapped in after load; a block a streamed page sends later calls it as `$kayHydrate`, after `$kayHydrate.dispose` took the islands it replaces.
   const publicEnv = options.publicEnv ? `${options.base ?? ''}${PUBLIC_ENV_PATH}` : undefined
@@ -320,7 +321,7 @@ export async function bundleIslands(root: string, islands: Map<string, string>, 
     ...options.search ? ['import { arrive } from \'kay/arrival\''] : [],
     '',
     ...publicEnv !== undefined ? [`;(globalThis as Record<symbol, unknown>)[Symbol.for('kay.publicEnv')] = kayPublicEnv`, ''] : [],
-    `const islands = {\n${registry}\n}`,
+    `const islands = {${registry === '' ? '' : `\n${registry}\n`}}`,
     'const hydrate = (root?: ParentNode) => hydrateIslands(islands, root)',
     '',
     // A lazy module of the runtime the page also loads up front, as `navigate`, imports the module importing this one, a cycle in which this one may run before a module it calls: what it starts waits until all of them have run.
@@ -347,7 +348,9 @@ export async function bundleIslands(root: string, islands: Map<string, string>, 
 
   await Bun.write(entryFile, `import ${JSON.stringify(bootFile)}\n`)
 
-  const chunk = await runtimeChunk(entryFile, { plugins: plugins(), define, external, cache: { file: join(projectPaths(root).cache, `runtime-search-${options.hot ? 'dev' : 'build'}.json`), key: `${JSON.stringify([options.settings, options.inspect, options.navigation, trees])}\0${await Bun.file(bootFile).text()}` } })
+  // Without the registry in the boot, each island is an entry point of its own.
+  const islandFiles = options.hot ? [] : [...islands.values()]
+  const chunk = await runtimeChunk(entryFile, { plugins: plugins(), define, external, islands: islandFiles, cache: { file: join(projectPaths(root).cache, `runtime-search-${options.hot ? 'dev' : 'build'}.json`), key: `${JSON.stringify([options.settings, options.inspect, options.navigation, trees, islandFiles])}\0${await Bun.file(bootFile).text()}` } })
 
   // In development the entry keeps its own code, the islands it imports by their hashed names included: the runtime's chunk then stays as it was through an edit of an island, which swaps in alone.
   // A second entry point importing the runtime alone has Bun give it that chunk of its own, which it would otherwise merge into the entry's.
@@ -359,7 +362,7 @@ export async function bundleIslands(root: string, islands: Map<string, string>, 
   }
 
   const config = {
-    entrypoints: [entryFile, ...chunk && options.hot ? [runtimeFile] : []],
+    entrypoints: [entryFile, ...chunk && options.hot ? [runtimeFile] : [], ...islandFiles],
     target: 'browser',
     splitting: true,
     // The pages preload the chunks of their islands themselves, and every island shares the one the page loads first, so Bun's own preloading would only weigh on it.

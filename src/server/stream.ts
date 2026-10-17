@@ -8,6 +8,7 @@ import { collectDeferred } from '../runtime/await.server'
 import { child } from '../runtime/html'
 import { collectIslands } from '../runtime/island.server'
 import { isSnapshots, lastSnapshot, readSnapshots } from '../runtime/snapshots'
+import { islandChunks } from './client'
 import { formsScript } from './forms'
 import { hydrationScript } from './hydration'
 import { invalidKeys, messagesScript } from './i18n'
@@ -43,15 +44,15 @@ export interface Shipped {
 }
 
 // A static render, as pages and layouts are: only islands carry the markers hydration claims.
-export function renderStatic(view: () => unknown, salt?: string): Rendered {
-  const { result: { result: html, islands }, deferred } = collectDeferred(() => collectIslands(() => child(view()), salt))
+export function renderStatic(view: () => unknown, salt?: string, chunks?: Record<string, string>): Rendered {
+  const { result: { result: html, islands }, deferred } = collectDeferred(() => collectIslands(() => child(view()), salt, chunks))
 
   return { html, islands, deferred }
 }
 
 // A streamed block, whose forms are collected for the stream to send their schemas along as the shell would have.
-export function renderBlock(view: () => unknown, salt?: string): Rendered {
-  const { result, forms } = collectForms(() => renderStatic(view, salt))
+export function renderBlock(view: () => unknown, salt?: string, chunks?: Record<string, string>): Rendered {
+  const { result, forms } = collectForms(() => renderStatic(view, salt, chunks))
 
   return { ...result, forms }
 }
@@ -85,6 +86,8 @@ export function streamDocument(shell: string, deferred: PendingBlock[], client: 
   // A page without navigation has no entry to send a form with.
   const posts = client.entry !== undefined && client.navigation === true
   let swapShipped = false
+  const chunks = islandChunks(client)
+  const render = (view: () => unknown, salt?: string) => renderBlock(view, salt, chunks)
   // Once the browser goes away, blocks still settling render nothing.
   let cancelled = false
   let keepAlive: ReturnType<typeof setInterval> | undefined
@@ -147,7 +150,7 @@ export function streamDocument(shell: string, deferred: PendingBlock[], client: 
         if (isSnapshots(block.value))
           return sendParts(block, block.value)
 
-        const rendered = await settle(block, () => cancelled, report)
+        const rendered = await settle(block, () => cancelled, report, render)
 
         if (cancelled)
           return
@@ -164,7 +167,7 @@ export function streamDocument(shell: string, deferred: PendingBlock[], client: 
           if (cancelled || broken)
             return
 
-          const rendered = renderOrReport(() => block.ready(value as never), report, renderBlock, block.id)
+          const rendered = renderOrReport(() => block.ready(value as never), report, render, block.id)
 
           // A `then` block that throws is a bug in the page: the iterable is not read further.
           if (rendered === EMPTY) {
@@ -198,7 +201,7 @@ export function streamDocument(shell: string, deferred: PendingBlock[], client: 
           }
 
           const failed = block.failed
-          const rendered = renderOrReport(() => failed(error), report, renderBlock, block.id)
+          const rendered = renderOrReport(() => failed(error), report, render, block.id)
 
           write(block.id, rendered, false)
           await Promise.all(rendered.deferred.map(send))
@@ -213,7 +216,7 @@ export function streamDocument(shell: string, deferred: PendingBlock[], client: 
           return
 
         // An iterable ending with no value leaves nothing in place of its pending block.
-        const rendered = last ? renderOrReport(() => block.ready(last.value as never), report, renderBlock, block.id) : EMPTY
+        const rendered = last ? renderOrReport(() => block.ready(last.value as never), report, render, block.id) : EMPTY
 
         write(block.id, rendered, false)
         await Promise.all(rendered.deferred.map(send))

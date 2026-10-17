@@ -36,6 +36,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## 1.52.1
 
+- An island's markup names its chunk (`data-chunk`), so a page no longer loads a loader for every island of the app: the docs' 128 islands weigh 2 KB gzip less on every page ([Build and start](build-and-start.md)).
 - `collection(..., { order: 'position' })` orders a collection by a number field, and kayjs-cms moves its entries up or down by writing it ([Content](content.md)).
 - `collection(..., { title })` names a collection on the kayjs-cms screens ([Content](content.md)).
 - kayjs-cms: every image preview has the same square box, and a list item carries no required asterisk. kayjs-ui: a grouped `FormField`'s legend keeps its layout under an app's own `legend` styles ([kayjs-cms](../packages/cms/llms.txt)).
