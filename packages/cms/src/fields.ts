@@ -104,14 +104,36 @@ function typeOf(schema: JsonSchema): string | undefined {
   return Array.isArray(schema.type) ? schema.type.find(type => type !== 'null') : schema.type
 }
 
+// kay's `s.Integer()`, `s.Numeric()`, `s.BooleanString()` and `s.Date()` accept a string or a value the schema names, so they come as a union of both: the field edits the value alone, the outer keywords (`title`, `description`, `default`) kept.
+const COERCED: Record<string, string> = { integer: 'integer', numeric: 'number', boolean: 'boolean' }
+
+function withoutCoercion(schema: JsonSchema): JsonSchema {
+  const { anyOf, ...outer } = schema
+
+  if (anyOf === undefined)
+    return schema
+
+  if (anyOf.some(variant => variant.type === 'Date'))
+    return { ...outer, type: 'Date' }
+
+  const [first, second] = anyOf
+  const text = [first, second].find(variant => variant?.type === 'string' && variant.format !== undefined && Object.hasOwn(COERCED, variant.format))
+  const value = [first, second].find(variant => variant !== text)
+
+  if (anyOf.length !== 2 || text?.format === undefined || value?.type !== COERCED[text.format])
+    return schema
+
+  return { ...value, ...outer }
+}
+
 // `s.Nullable(x)` and `s.Optional(s.Union([x, s.Null()]))` both come as an anyOf holding a null.
 function withoutNull(schema: JsonSchema): { schema: JsonSchema, nullable: boolean } {
   const variants = schema.anyOf?.filter(variant => variant.type !== 'null')
 
   if (variants?.length === 1 && variants[0] !== undefined && variants.length < (schema.anyOf?.length ?? 0))
-    return { schema: { ...variants[0], title: schema.title ?? variants[0].title, description: schema.description ?? variants[0].description }, nullable: true }
+    return { schema: withoutCoercion({ ...variants[0], title: schema.title ?? variants[0].title, description: schema.description ?? variants[0].description }), nullable: true }
 
-  return { schema, nullable: Array.isArray(schema.type) && schema.type.includes('null') }
+  return { schema: withoutCoercion(schema), nullable: Array.isArray(schema.type) && schema.type.includes('null') }
 }
 
 // A union of literals, or an enum, is picked from a list; a literal's `title` labels its option, the value staying what is stored.

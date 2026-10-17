@@ -1,5 +1,6 @@
 import type { Field } from '../src/fields'
 import { describe, expect, it } from 'bun:test'
+import { s } from 'kay'
 import { emptyValue, fieldsOf, humanize, itemAt } from '../src/fields'
 
 describe('fieldsOf', () => {
@@ -89,6 +90,37 @@ describe('fieldsOf', () => {
     })
 
     expect(status).toMatchObject({ kind: 'select', options: [{ value: 'new', label: 'Nouveau', raw: 'new' }, { value: 'sold', label: 'sold', raw: 'sold' }] })
+  })
+
+  it('edits the coercing numbers, booleans and dates of kay\'s own `s` as their plain kind', () => {
+    const schema = JSON.parse(JSON.stringify(s.Object({
+      price: s.Integer(),
+      titled: s.Integer({ title: 'Price', description: 'In cents', minimum: 1, default: 100 }),
+      optional: s.Optional(s.Integer()),
+      nullable: s.Nullable(s.Integer()),
+      ratio: s.Numeric(),
+      flag: s.BooleanString(),
+      day: s.Date(),
+      optionalDay: s.Optional(s.Date()),
+      nullableDay: s.Nullable(s.Date()),
+      prices: s.Array(s.Integer()),
+    })))
+    const [price, titled, optional, nullable, ratio, flag, day, optionalDay, nullableDay, prices] = fieldsOf(schema)
+
+    expect(price).toMatchObject({ kind: 'integer', required: true })
+    expect(titled).toMatchObject({ kind: 'integer', label: 'Price', hint: 'In cents', required: false })
+    expect(optional).toMatchObject({ kind: 'integer', required: false })
+    expect(nullable).toMatchObject({ kind: 'integer', required: false })
+    expect(ratio?.kind).toBe('number')
+    expect(flag?.kind).toBe('boolean')
+    expect(day?.kind).toBe('date')
+    expect(optionalDay?.kind).toBe('date')
+    expect(nullableDay).toMatchObject({ kind: 'date', required: false })
+    expect(prices).toMatchObject({ kind: 'list', item: { kind: 'integer' } })
+  })
+
+  it('keeps a union of other shapes as JSON', () => {
+    expect(fieldsOf({ properties: { mixed: { anyOf: [{ type: 'string', format: 'integer' }, { type: 'string' }] } } })[0]?.kind).toBe('json')
   })
 
   it('makes a nullable field optional and edits it as its inner type', () => {
