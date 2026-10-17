@@ -51,8 +51,8 @@ describe('authMailer', () => {
     const set = await authMailer(mail.render).send({ ...link, expires: { link: 7 * 86_400, code: 20 * 60 } })
     const magic = await authMailer(mail.render).send({ ...link, kind: 'magic-link', locale: 'en', expires: { link: 7200, code: 300 } })
 
-    expect(set.html.replace(SPACES, ' ')).toContain('Le lien est valable 7 jours. Le code est valable 20 minutes, saisi là où vous l\'avez demandé.')
-    expect(magic.html.replace(SPACES, ' ')).toContain('The link works for 2 hours, once. The code works for 5 minutes, typed where you asked for it.')
+    expect(set.html?.replace(SPACES, ' ')).toContain('Le lien est valable 7 jours. Le code est valable 20 minutes, saisi là où vous l\'avez demandé.')
+    expect(magic.html?.replace(SPACES, ' ')).toContain('The link works for 2 hours, once. The code works for 5 minutes, typed where you asked for it.')
   })
 
   it('writes the detail a mail is about, and only the code when there is no link', async () => {
