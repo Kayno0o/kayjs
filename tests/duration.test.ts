@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { durationMs, durationSeconds, optionMs } from '../src/runtime/duration'
+import { durationMs, durationSeconds, optionMs, wholeSeconds } from '../src/runtime/duration'
 import { durationWords } from '../src/runtime/duration-words'
 
 describe('durations', () => {
@@ -26,6 +26,11 @@ describe('durations', () => {
   it('keeps the seconds of a fractional minute, hour or day exact, as headers carry them', () => {
     expect(['8.7m', '17.1m', '2.3h', '34.3m'].map(value => durationSeconds(value, 'ttl'))).toEqual([522, 1026, 8280, 2058])
     expect(['1001ms', '1.1s', '8.7m'].map(value => optionMs(value, 'wait'))).toEqual([1001, 1100, 522_000])
+  })
+
+  it('rounds up to whole seconds for a header or a cookie, so a sub-second duration is never 0 nor fractional', () => {
+    expect(['250ms', '1.5s', '0.4s', '1ms', '999ms', '1000ms', '1001ms', '2s', 0.2, 1.2, 90].map(value => wholeSeconds(value, 'maxAge'))).toEqual([1, 2, 1, 1, 1, 1, 2, 2, 1, 2, 90])
+    expect(() => wholeSeconds('0ms', 'maxAge')).toThrow(/^kay: maxAge is '0ms'/)
   })
 
   it('refuses what is no positive duration, naming the option', () => {

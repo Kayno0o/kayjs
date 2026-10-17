@@ -21,6 +21,11 @@ export function durationSeconds(value: unknown, what: string, owner = 'kay'): nu
   return seconds
 }
 
+// The same rounded up to whole seconds, for a header or a cookie that takes an integer: `'250ms'` is 1, never `0.25` nor 0.
+export function wholeSeconds(value: unknown, what: string, owner = 'kay'): number {
+  return Math.ceil(durationSeconds(value, what, owner))
+}
+
 // The milliseconds an option that took them before 1.52 stands for: a bare number is still milliseconds there, for three minors, and a string is a duration.
 // No check on the value, as a timer takes whatever it gets; it only reads the text.
 export function durationMs(value: number | string): number {

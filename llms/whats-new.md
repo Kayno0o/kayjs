@@ -6,6 +6,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 - kayjs-cms: `uploads.maxSize` over 128 MB less 64 KB stops `kay.config.ts` from loading, as Bun refuses a larger request body before the upload route sees it ([kayjs-cms](../packages/cms/llms.txt)).
 - `sizeText(bytes, locale?)` from `kay/words` writes a size in the page's locale (`1.5 MB`, `1,5 Mo`); kayjs-cms's upload refusals use it, so its `cms.size.*` messages are gone and a size follows the locale on its own ([Locales](locales.md)).
+- A duration written into a header or a cookie, `publicCache`, `cors` `maxAge`, the session and preview `maxAge`, is rounded up to whole seconds, so `'250ms'` writes `max-age=1` and not the `0.25` browsers ignore ([Public files](styles-and-assets.md#public-files)).
 - `kay add` keeps the runner label a project was scaffolded with when it rewrites the CI workflow, and `deprecated-test-mount` also finds `await import('kay/test')` and `export { mount } from 'kay/test'` ([Project](project.md)).
 - Under a `base`, an action's redirect goes under it for a call from an island and a form the page swap posts as it does for a plain form, so the browser lands on `/app/dashboard` and not `/dashboard`; the app declares nothing ([Actions](actions.md#calling-from-an-island)).
 - kayjs-ui: `MultiSelect` options take `icon` and `disabled` like ChipGroup's and Segmented's, a disabled option staying as it is under All and None ([kayjs-ui](../packages/ui/llms/forms.md)).

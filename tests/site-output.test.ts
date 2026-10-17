@@ -4,6 +4,7 @@ import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { pages } from '../src/server'
 import { readManifest } from '../src/server/client'
+import { publicCacheRules } from '../src/server/public'
 
 import { scratchBuild } from './prerendered'
 import { fixtureCopy } from './scratch'
@@ -19,6 +20,12 @@ async function fetchFrom(app: Awaited<ReturnType<typeof pages>>, path: string, h
 }
 
 describe('publicCache', () => {
+  it('writes whole seconds, rounded up, for a sub-second or fractional duration', () => {
+    const rules = publicCacheRules({ '/a/*': '250ms', '/b/*': '1.5s', '/c/*': '0.4s', '/d/*': '2m' })
+
+    expect(['/a/x', '/b/x', '/c/x', '/d/x'].map(rules)).toEqual(['public, max-age=1', 'public, max-age=2', 'public, max-age=1', 'public, max-age=120'])
+  })
+
   const publicCache: KayConfig['publicCache'] = { '/fonts/**': '365d', '**/*.png': '1d', '/img/*': '1h' }
 
   it('gives a public file the cache of the first pattern its path matches, and keeps revalidating the others', async () => {

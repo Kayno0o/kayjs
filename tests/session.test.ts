@@ -124,6 +124,11 @@ describe('sessions', () => {
     expect(warnings).toEqual([expect.stringContaining('a sign-in regenerated a session kept in its session cookie alone, with no store')])
   })
 
+  it('writes a whole Max-Age for a sub-second or fractional maxAge', async () => {
+    for (const [maxAge, seconds] of [['250ms', 1], ['1.5s', 2], ['0.4s', 1]] as const)
+      expect((await browser(counter({ maxAge }))('/count')).set).toMatch(new RegExp(`; Max-Age=${seconds};`, 'i'))
+  })
+
   for (const [name, store] of [['in the cookie', undefined], ['in memory', memoryStore()], ['in sqlite', sqliteStore(':memory:')]] as const) {
     it(`keeps data across requests ${name}, writing the cookie only when it changed`, async () => {
       const visit = browser(counter({ store }))

@@ -1,6 +1,6 @@
 import type { Duration } from '../runtime/duration'
 import { KayError } from '../compiler/errors'
-import { durationSeconds } from '../runtime/duration'
+import { wholeSeconds } from '../runtime/duration'
 
 interface CorsCommon {
   // Response headers a page may read beyond the ones browsers always show it, such as `x-total-count`.
@@ -49,7 +49,7 @@ export function corsRule(options: CorsOptions): CorsRule {
       exact.add(concrete)
   }
 
-  return { any: options.origins === '*', exact, subdomains, credentials: options.credentials === true, expose: options.expose ?? [], headers: options.headers, maxAge: durationSeconds(options.maxAge ?? '1h', 'cors maxAge') }
+  return { any: options.origins === '*', exact, subdomains, credentials: options.credentials === true, expose: options.expose ?? [], headers: options.headers, maxAge: wholeSeconds(options.maxAge ?? '1h', 'cors maxAge') }
 }
 
 // A scheme and a host, with a port if any: `https://app.example.com`, or `capacitor://localhost` for an app's web view.

@@ -5,7 +5,7 @@ import process from 'node:process'
 import { parse, stringify } from 'devalue'
 import { Elysia } from 'elysia'
 import { KayError } from '../compiler/errors'
-import { durationSeconds } from '../runtime/duration'
+import { wholeSeconds } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
 import { openSqlite } from '../runtime/sqlite.server'
 import { overHttps } from './actions'
@@ -128,7 +128,7 @@ export function session<Data extends object = SessionData>(options: SessionOptio
   if (options.sameSite !== undefined && !SAME_SITE.has(options.sameSite))
     throw new KayError('config-invalid', `kay: the session sameSite is ${JSON.stringify(options.sameSite)}, which is none of 'lax', 'strict' and 'none'`)
 
-  const config = { name: options.cookie ?? 'session', sameSite: options.sameSite ?? 'lax', maxAge: options.maxAge === undefined ? DEFAULT_MAX_AGE : durationSeconds(options.maxAge, 'the session maxAge'), absoluteMaxAge: options.absoluteMaxAge === undefined ? DEFAULT_ABSOLUTE_MAX_AGE : durationSeconds(options.absoluteMaxAge, 'the session absoluteMaxAge'), browserMaxAge: options.browserMaxAge === undefined ? DEFAULT_BROWSER_MAX_AGE : durationSeconds(options.browserMaxAge, 'the session browserMaxAge'), domain, store: options.store, keys }
+  const config = { name: options.cookie ?? 'session', sameSite: options.sameSite ?? 'lax', maxAge: options.maxAge === undefined ? DEFAULT_MAX_AGE : wholeSeconds(options.maxAge, 'the session maxAge'), absoluteMaxAge: options.absoluteMaxAge === undefined ? DEFAULT_ABSOLUTE_MAX_AGE : wholeSeconds(options.absoluteMaxAge, 'the session absoluteMaxAge'), browserMaxAge: options.browserMaxAge === undefined ? DEFAULT_BROWSER_MAX_AGE : wholeSeconds(options.browserMaxAge, 'the session browserMaxAge'), domain, store: options.store, keys }
 
   return new Elysia({ name: 'kay/session', seed: config.name })
     .derive({ as: 'scoped' }, ({ request }) => ({ session: new RequestSession<Data>(request, config) }))
@@ -235,7 +235,7 @@ class RequestSession<Data extends object> implements Session<Data> {
 
   async lifetime(maxAge: Duration | 'browser'): Promise<void> {
     await this.load()
-    this.own = maxAge === 'browser' ? { maxAge: this.config.browserMaxAge, browser: true } : { maxAge: durationSeconds(maxAge, 'a session lifetime') }
+    this.own = maxAge === 'browser' ? { maxAge: this.config.browserMaxAge, browser: true } : { maxAge: wholeSeconds(maxAge, 'a session lifetime') }
     this.changed = true
   }
 

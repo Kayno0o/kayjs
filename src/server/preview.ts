@@ -9,7 +9,7 @@ import type { BodyLimit } from './body'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { KayError } from '../compiler/errors'
 import { entryIssues } from '../content/edit'
-import { durationSeconds } from '../runtime/duration'
+import { wholeSeconds } from '../runtime/duration'
 import { exportNameOf } from '../runtime/fields'
 import { setPreviewScope } from '../runtime/preview'
 import { DRAFT_ROUTE } from '../runtime/swap'
@@ -61,7 +61,7 @@ export function setupPreview(config: PreviewConfig | undefined, base: string): v
     throw new KayError('config-invalid', `kay: preview.secret in kay.config.ts is ${typeof config.secret === 'string' ? `${config.secret.length} characters long` : 'missing'}: it signs preview links and cookies, so it is at least ${MIN_SECRET_LENGTH} random characters, read from the environment`)
 
   useStampSecret(config.secret, 'preview')
-  settings = { secret: config.secret, maxAge: durationSeconds(config.maxAge ?? DEFAULT_MAX_AGE, 'preview.maxAge'), base }
+  settings = { secret: config.secret, maxAge: wholeSeconds(config.maxAge ?? DEFAULT_MAX_AGE, 'preview.maxAge'), base }
 }
 
 // Renders for a visitor in preview mode, in edit mode too when `edit` is set, with the entries `drafts` holds standing in for theirs.
@@ -192,7 +192,7 @@ export function previewUrl(path: string, options: { ttl?: Duration, edit?: boole
   if (!SITE_PATH.test(path))
     throw new KayError('config-invalid', `kay: previewUrl() was given ${path}, which is no path of the site such as /blog/draft`)
 
-  const until = Math.floor(Date.now() / 1000) + durationSeconds(options.ttl ?? DEFAULT_LINK_TTL, 'previewUrl()\'s ttl')
+  const until = Math.floor(Date.now() / 1000) + wholeSeconds(options.ttl ?? DEFAULT_LINK_TTL, 'previewUrl()\'s ttl')
 
   const edit = options.edit === true
 

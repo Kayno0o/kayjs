@@ -5,7 +5,7 @@ import { existsSync } from 'node:fs'
 import { readdir, stat } from 'node:fs/promises'
 import { join, relative, sep } from 'node:path'
 import process from 'node:process'
-import { durationSeconds } from '../runtime/duration'
+import { wholeSeconds } from '../runtime/duration'
 
 // For a file served under a name that stays when its content changes.
 export const REVALIDATE = 'public, max-age=0, must-revalidate'
@@ -130,7 +130,7 @@ export function revalidated(request: Request, etag: string, body: () => BodyInit
 
 // The `cache-control` of each public file the `publicCache` setting names, the first pattern a path matches deciding; a file it leaves out keeps revalidating.
 export function publicCacheRules(setting: Record<string, Duration> | undefined): ((url: string) => string) {
-  const rules = Object.entries(setting ?? {}).map(([pattern, value]) => ({ glob: new Bun.Glob(pattern.replace(LEADING_SLASH, '')), control: `public, max-age=${durationSeconds(value, `publicCache['${pattern}']`)}` }))
+  const rules = Object.entries(setting ?? {}).map(([pattern, value]) => ({ glob: new Bun.Glob(pattern.replace(LEADING_SLASH, '')), control: `public, max-age=${wholeSeconds(value, `publicCache['${pattern}']`)}` }))
 
   return url => rules.find(rule => rule.glob.match(url.replace(LEADING_SLASH, '')))?.control ?? REVALIDATE
 }

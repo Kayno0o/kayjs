@@ -118,7 +118,7 @@ export default defineConfig({ plugins: [tailwind] })
 - As a static host's `try_files $uri $uri.html $uri/index.html` does, an HTML file is also served without its `.html`, and an `index.html` at its directory: `public/shelf/books.html` at `/shelf/books`, `public/shelf/index.html` at `/shelf`, so a site exported into `public/` keeps its links.
 - `x.html` wins over `x/index.html`, and anything else served at that path, a file, a page or a redirect, over both.
 - `kay check` accepts links to these paths.
-- A public file is served `max-age=0, must-revalidate` with an ETag; `publicCache: { '/fonts/**': '365d', '**/*.png': '30d' }` in `kay.config.ts` keeps the files a glob names for that long (`public, max-age=N`), the first matching glob deciding, still with their ETag once it runs out. Globs read the served path, `*` stays inside a folder, `kay dev` ignores it, and `kay build --static` writes the files as they are, their headers being the host's to set.
+- A public file is served `max-age=0, must-revalidate` with an ETag; `publicCache: { '/fonts/**': '365d', '**/*.png': '30d' }` in `kay.config.ts` keeps the files a glob names for that long (`public, max-age=N`, whole seconds rounded up, so `'250ms'` is 1), the first matching glob deciding, still with their ETag once it runs out. Globs read the served path, `*` stays inside a folder, `kay dev` ignores it, and `kay build --static` writes the files as they are, their headers being the host's to set.
 
 ### Imported files
 

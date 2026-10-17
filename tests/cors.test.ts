@@ -5,7 +5,7 @@ import { afterAll, describe, expect, it, spyOn } from 'bun:test'
 import { check } from '../src/check'
 import { configuredSite, setSite } from '../src/runtime/site'
 import { admitCrossSite, crossSiteRefused, crossSiteResponse } from '../src/server/actions'
-import { corsRule } from '../src/server/cors'
+import { corsRule, preflight } from '../src/server/cors'
 import { testSite } from '../src/test'
 import { scratchDir } from './scratch'
 
@@ -27,6 +27,14 @@ async function asked(path: string, origin: string, method: string, headers: Reco
 async function posted(path: string, headers: Record<string, string>, body: unknown = { name: 'pen' }): Promise<Response> {
   return site.fetch(path, { method: 'POST', headers: { 'content-type': 'application/json', 'sec-fetch-site': 'cross-site', ...headers }, body: JSON.stringify(body) })
 }
+
+describe('a preflight cached for a sub-second duration', () => {
+  it('writes whole seconds in access-control-max-age', () => {
+    const request = new Request('http://localhost/x', { method: 'OPTIONS', headers: { 'origin': APP, 'access-control-request-method': 'GET' } })
+
+    expect((['250ms', '1.5s', '0.4s', '90s'] as const).map(maxAge => preflight(corsRule({ origins: [APP], maxAge }), ['GET'], request).headers.get('access-control-max-age'))).toEqual(['1', '2', '1', '90'])
+  })
+})
 
 describe('an API module opening its routes to other sites', () => {
   it('answers a preflight from an origin it lists with its methods, the headers asked, and how long to keep the answer', async () => {
