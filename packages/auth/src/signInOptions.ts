@@ -10,6 +10,17 @@ export interface SignInOptions {
   captcha?: string | undefined
 }
 
+// Each message once per process, so an app still on an old form does not log a line per sign-in.
+const warned = new Set<string>()
+
+function warnOnce(message: string) {
+  if (warned.has(message))
+    return
+
+  warned.add(message)
+  log.warn(message)
+}
+
 const KEYS = ['redirect', 'remember', 'captcha'] as const
 
 // The options of a call, `options` winning key by key over the same keys of the `input` they used to sit in, which still work for now and log a warning.
@@ -17,7 +28,7 @@ export function mergeInput<Input extends SignInOptions>(method: string, input: I
   const old = KEYS.filter(key => input[key] !== undefined)
 
   if (old.length > 0)
-    log.warn(`${method}({ ${old.join(', ')} }) is renamed ${method}(input, { ${old.join(', ')} }): the options come as the second argument`)
+    warnOnce(`${method}({ ${old.join(', ')} }) is renamed ${method}(input, { ${old.join(', ')} }): the options come as the second argument`)
 
   const merged: Input = { ...input }
 
@@ -34,7 +45,7 @@ export function mergePositional(method: string, second: string | SignInOptions |
   if (typeof second !== 'string')
     return second ?? third ?? {}
 
-  log.warn(`${method}(..., redirect, options) is renamed ${method}(..., { redirect, ...options }): the redirect goes in the options`)
+  warnOnce(`${method}(..., redirect, options) is renamed ${method}(..., { redirect, ...options }): the redirect goes in the options`)
 
   return { redirect: second, ...Object.fromEntries(Object.entries(third ?? {}).filter(([, value]) => value !== undefined)) }
 }

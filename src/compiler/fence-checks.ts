@@ -286,7 +286,7 @@ function propertyKey(property: t.ObjectProperty | t.ObjectMethod): string | unde
   return property.key.type === 'StringLiteral' ? property.key.value : undefined
 }
 
-const SIGN_IN_CALL = /\b(?:signInWithPassword|requestMagicLink|signInWithPasskey|register|createAuth)\b/
+const SIGN_IN_CALL = /\b(?:signInWithPassword|requestMagicLink|signInWithPasskey|createAuth)\b|\bauth\.register\b/
 // What a way of signing in of kayjs-auth took in its input before 1.52, which is its trailing options object now.
 const INPUT_OPTIONS: Record<string, string[]> = { signInWithPassword: ['redirect', 'remember', 'captcha'], register: ['remember', 'captcha'] }
 // The ones whose redirect was a positional argument after the first.
@@ -411,6 +411,12 @@ function positionalRedirectEdit(code: string, name: string, args: t.CallExpressi
   const [first, redirect, options] = args
 
   if (!POSITIONAL_REDIRECT.has(name) || !first || !redirect || args.length > 3 || redirect.type === 'ObjectExpression')
+    return undefined
+
+  // A second argument that is a variable or a call may already be the options object, so only a string, a template or `undefined` is read as the old redirect.
+  const literal = redirect.type === 'StringLiteral' || redirect.type === 'TemplateLiteral' || (redirect.type === 'Identifier' && redirect.name === 'undefined')
+
+  if (args.length === 2 && !literal)
     return undefined
 
   const parts: string[] = []

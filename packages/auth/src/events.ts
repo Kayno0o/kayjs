@@ -20,7 +20,7 @@ export type AuthEvent = SecurityEvent | ActivityEvent
 
 // What each event says besides who it happened to and where from, as `onAuthEvent` hears it.
 export interface EventFields {
-  // `method` is how: `password`, `register`, `reset-password`, `magic-link`, `email-code`, `passkey`, `guest` or `oauth`, with the `provider` for the last.
+  // `method` is how: `password`, `register`, `reset-password`, `magic-link`, `email-code`, `passkey`, `guest`, `app` (the app called `auth.signIn`), `oauth` with the `provider`, or `unknown`.
   'signed-in': { method: string, provider?: string }
   'signed-out': Record<never, never>
   // `method` is the attempt that failed: `password`, `passkey` or `two-factor`.

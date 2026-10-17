@@ -6,7 +6,7 @@ import { session } from 'kay/server'
 import { createAuth } from '../src/auth'
 import { memoryStore } from '../src/memoryStore'
 import { discordProvider, githubProvider } from '../src/oauth/providers'
-import { authPages } from '../src/pages'
+import { authExtension, authPages } from '../src/pages'
 import { scopeLabel } from '../src/pages/forms'
 import { totpCode, totpStep } from '../src/totp'
 import { testApp, userRecord } from './helpers/app'
@@ -78,6 +78,12 @@ describe('authPages and createAuth share the prefix and home', () => {
     await expect((authPages({ prefix: '/account', auth: async () => ({ auth: defaults }) }).server as () => Promise<AnyElysia>)()).resolves.toBeDefined()
     await expect((authPages({ prefix: '/account', auth: async () => ({ auth: plain }) }).server as () => Promise<AnyElysia>)()).resolves.toBeDefined()
     await expect((authPages({ auth: async () => ({ auth: defaults }) }).server as () => Promise<AnyElysia>)()).resolves.toBeDefined()
+  })
+
+  test('authExtension, which serves no pages, leaves a prefix of createAuth alone', async () => {
+    const plugin = await (authExtension(async () => ({ auth: make({ prefix: '/profile' }) })).server as () => Promise<AnyElysia>)()
+
+    expect(plugin).toBeDefined()
   })
 
   test('createAuth outside authPages takes the prefix it is given, and nothing leaks from a load that failed', async () => {

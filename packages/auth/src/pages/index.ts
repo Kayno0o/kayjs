@@ -157,7 +157,8 @@ async function pluginIn<Module extends AuthModule>(load: () => Promise<Module>, 
   if (!auth)
     throw new Error('kayjs-auth: the module `authPages` or `authExtension` loads exports no `auth`, nor a default `createAuth` result')
 
-  auth[PAGES_OF]?.adopt(given ?? {})
+  if (given)
+    auth[PAGES_OF]?.adopt(given)
 
   return auth.plugin as PluginOf<Module>
 }

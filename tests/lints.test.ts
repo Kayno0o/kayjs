@@ -152,16 +152,17 @@ describe('deprecated-sign-in-options', () => {
 
   it('moves the positional redirect of requestMagicLink and signInWithPasskey into the options', () => {
     expect(fixes(page('auth.requestMagicLink(email, input.redirect, { captcha, remember })'))).toEqual([{ safe: true, text: page('auth.requestMagicLink(email, { redirect: input.redirect, captcha, remember })') }])
-    expect(fixes(page('auth.requestMagicLink(email, redirect)'))).toEqual([{ safe: true, text: page('auth.requestMagicLink(email, { redirect })') }])
+    expect(fixes(page('auth.requestMagicLink(email, \'/x\')'))).toEqual([{ safe: true, text: page('auth.requestMagicLink(email, { redirect: \'/x\' })') }])
+    expect(fixes(page('auth.requestMagicLink(email, options)'))).toEqual([])
     expect(fixes(page('auth.requestMagicLink(email, undefined, { captcha })'))).toEqual([{ safe: true, text: page('auth.requestMagicLink(email, { captcha })') }])
     expect(fixes(page('auth.requestMagicLink(email, undefined)'))).toEqual([{ safe: true, text: page('auth.requestMagicLink(email)') }])
     expect(fixes(page('auth.signInWithPasskey(response, \'/account\', { remember })'))).toEqual([{ safe: true, text: page('auth.signInWithPasskey(response, { redirect: \'/account\', remember })') }])
   })
 
   it('reads a module, the `.ts` files of an app, and is allowed by a comment', () => {
-    expect(moduleChecks('export const a = (auth: Auth) => auth.requestMagicLink(email, redirect)\n').map(d => d.code)).toEqual(['deprecated-sign-in-options'])
+    expect(moduleChecks('export const a = (auth: Auth) => auth.requestMagicLink(email, \'/x\')\n').map(d => d.code)).toEqual(['deprecated-sign-in-options'])
     expect(moduleChecks('export const a = 1\n')).toEqual([])
-    expect(codes(page('auth.signInWithPasskey(response, redirect)').replace('export', '// kay-allow deprecated-sign-in-options\nexport'))).toEqual([])
+    expect(codes(page('auth.signInWithPasskey(response, \'/x\')').replace('export', '// kay-allow deprecated-sign-in-options\nexport'))).toEqual([])
   })
 })
 

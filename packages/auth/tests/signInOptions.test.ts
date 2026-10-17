@@ -1,6 +1,7 @@
 import type { CaptchaOptions } from '../src/captcha'
 import type { Mail } from '../src/mail'
 import { afterEach, describe, expect, test } from 'bun:test'
+import { mergeInput, mergePositional } from '../src/signInOptions'
 import { testApp, userRecord } from './helpers/app'
 import { authenticator } from './helpers/authenticator'
 import { mailbox } from './helpers/mail'
@@ -192,5 +193,28 @@ describe('signInWithPasskey', () => {
     expect((await signIn({ redirect: hostile })).result).toEqual({ ok: true, redirect: '/' })
     expect((await signIn(hostile)).result).toEqual({ ok: true, redirect: '/' })
     expect((await signIn('/old', { redirect: hostile })).result).toEqual({ ok: true, redirect: '/' })
+  })
+})
+
+describe('the deprecation warning', () => {
+  test('is logged once per process for each old form, not once per call', () => {
+    const lines: string[] = []
+    const original = console.warn
+
+    console.warn = (...args: unknown[]) => {
+      lines.push(args.join(' '))
+    }
+
+    try {
+      for (let call = 0; call < 3; call++) {
+        mergeInput('onceTest', { remember: true }, undefined)
+        mergePositional('onceTest', '/old', undefined)
+      }
+    }
+    finally {
+      console.warn = original
+    }
+
+    expect(lines.filter(line => line.includes('onceTest'))).toHaveLength(2)
   })
 })
