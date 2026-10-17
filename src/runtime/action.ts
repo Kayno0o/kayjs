@@ -6,6 +6,7 @@ import type { RequestContext } from './index'
 import type { EventReader, StreamStatus } from './live'
 import type { Owner } from './reactive'
 import { withBase } from './base'
+import { skew } from './build'
 import { durationSeconds } from './duration'
 import { escapeAttribute } from './escape'
 import { holdInvalid } from './invalid'
@@ -813,6 +814,8 @@ async function post<Output>(url: string, input: unknown, onProgress: (sent: numb
     response = await send(await (await import('./work.client')).spendWork(url, challenge))
 
   prefetched.clear()
+
+  void skew(response)
 
   return readActionResponse(response, url, left, caller)
 }

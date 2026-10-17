@@ -1,0 +1,9 @@
+---
+import Counter from '../components/counter.kay'
+---
+h1 Home
+form
+  input(name="note")
+a.other(href="/other") Other
+div(style="height: 3000px")
+Counter(hydrate="visible")

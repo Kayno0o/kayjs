@@ -80,6 +80,8 @@ export const navigation: {
   // How many swaps to another path were shown, which a stream no island owns reads to tell whether the path it was started on is gone.
   arrivals?: number
   released: boolean
+  // A response showed the server runs another build than this page's: the next link loads in full, as the new build's pages are not this page's to swap in.
+  stale?: boolean
   // Lands the query param writes held back to be spaced out, which run before the address is read to leave or change it.
   flush?: () => void
   // Development: set while `kay dev` refreshes the page for an edit, where a field the edit leaves as it was keeps what was typed into it.

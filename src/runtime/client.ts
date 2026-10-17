@@ -1,5 +1,6 @@
 import type { DevProblems } from './dev-boot'
 import { withBase } from './base'
+import { skew, warm } from './build'
 import { dispatch, hydrate, render } from './dom'
 import { ISLAND } from './markers'
 import { batch, flush, ownSignal, recordSignals, reportError, root, setErrorReporter } from './reactive'
@@ -96,6 +97,8 @@ async function post(body: string): Promise<void> {
 export async function hydrateIslands(registry: IslandRegistry, root: ParentNode = document): Promise<void> {
   const eager: Promise<void>[] = []
 
+  whenIdle(warm)
+
   for (const element of root.querySelectorAll<HTMLElement>(SERVER_ISLAND)) {
     if (started.has(element))
       continue
@@ -155,6 +158,9 @@ async function hydrateIsland(registry: IslandRegistry, element: HTMLElement): Pr
   catch (error) {
     // A chunk that failed to load is dropped like a missing one.
     takeEvents(element)
+
+    if (await skew())
+      return
 
     throw error
   }

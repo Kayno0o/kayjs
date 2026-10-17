@@ -156,6 +156,12 @@ async function preloadSwap(): Promise<void> {
 
 // Swaps the page in, or loads it fully when the swap cannot load: the browser keeps a module that failed as failed, so retrying is no use.
 async function follow(url: URL, swap: Swap): Promise<void> {
+  if (navigation.stale) {
+    leave(url, swap.intent === 'traverse')
+
+    return
+  }
+
   let swapper: typeof import('./page-swap')
 
   try {

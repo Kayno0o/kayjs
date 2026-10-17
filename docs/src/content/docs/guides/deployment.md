@@ -112,6 +112,16 @@ A provider key such as kayjs-ai's `ANTHROPIC_API_KEY`, or kayjs-mail's `SMTP_PAS
 
 `kay env` lists the variables each library reads, and which of them production requires. Compare its output with your compose file before you deploy.
 
+## Tabs open during a deploy
+
+A deploy replaces the JavaScript files of the site. A tab opened before it still runs the old ones, and the old files are gone: the next island it loads is a 404.
+
+Kay handles this without setup. Every answer of a production server names its build in an `x-kay-build` header. When a tab fails to load a file, it asks the server which build it runs now. If that is another one, the tab reloads the current page, and the browser keeps the scroll position.
+
+A tab with something typed in it is not reloaded under the visitor. The next link they follow loads the new page in full instead of swapping it in. The same goes for a tab whose action call or server island was answered by the new build. An action the new build dropped reloads the tab at once.
+
+A tab reloads for one build once a minute at most, so a cache that keeps serving the old page cannot loop it. Static exports work the same way, with the tab reading the build off the host's page. Kay does not keep the old build's files. Keep your HTML pages revalidating in any cache in front of the server, as kay's own pages do.
+
 ## Health check and shutdown
 
 `/_kay/health` answers `200 ok` while the server takes requests. Move it, or add a check, in `kay.config.ts`.
