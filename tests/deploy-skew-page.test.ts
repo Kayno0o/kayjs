@@ -66,7 +66,7 @@ describe('a page noticing a deploy', () => {
     expect(await skew(answer('bbb', 404))).toBe(true)
     expect(reload).toHaveBeenCalledTimes(1)
     expect(navigation.stale).toBe(true)
-    expect(JSON.parse(sessionStorage.getItem('kay-reloaded')!)).toMatchObject({ build: 'bbb' })
+    expect(Number(sessionStorage.getItem('kay-reloaded'))).toBeGreaterThan(0)
 
     // The page the reload loaded still says it is the old one, as a cache in front of the server may keep it: no second reload.
     expect(noticed(answer('bbb', 404))).toBe(false)
@@ -197,15 +197,36 @@ describe('a page noticing a deploy', () => {
     }
   })
 
-  it('reloads again for a build after that, and again for the same one a minute later', async () => {
+  it('reloads again a minute later, and not for another build within it, as replicas on two builds may alternate', async () => {
     fetched.mockResolvedValue(answer('bbb'))
     expect(await reloadIfStale()).toBe(true)
 
     fetched.mockResolvedValue(answer('ccc'))
+    expect(await reloadIfStale()).toBe(false)
+
+    sessionStorage.setItem('kay-reloaded', String(Date.now() - 61_000))
+    expect(await reloadIfStale()).toBe(true)
+    expect(reload).toHaveBeenCalledTimes(2)
+  })
+
+  it('keeps a field the visitor changed outside any form, and a select left on its first option does not count', async () => {
+    document.body.innerHTML = '<select name="kind"><option>a</option><option>b</option></select><select name="chosen"><option>a</option><option selected>b</option></select>'
+    fetched.mockResolvedValue(answer('bbb'))
+
     expect(await reloadIfStale()).toBe(true)
 
-    sessionStorage.setItem('kay-reloaded', JSON.stringify({ build: 'ccc', at: Date.now() - 61_000 }))
-    expect(await reloadIfStale()).toBe(true)
-    expect(reload).toHaveBeenCalledTimes(3)
+    reload.mockClear()
+    sessionStorage.clear()
+    document.body.innerHTML = '<input name="search" value="">'
+    document.querySelector('input')!.value = 'typed'
+
+    expect(await reloadIfStale()).toBe(false)
+    expect(reload).not.toHaveBeenCalled()
+
+    sessionStorage.clear()
+    document.body.innerHTML = '<select name="kind"><option>a</option><option>b</option></select>'
+    document.querySelector('select')!.selectedIndex = 1
+
+    expect(await reloadIfStale()).toBe(false)
   })
 })

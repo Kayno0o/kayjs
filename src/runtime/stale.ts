@@ -6,9 +6,9 @@ function onPage(build: string): boolean {
   return [...document.scripts].some(script => script.src.includes(`-${build}.`))
 }
 
-const ENTRY_SCRIPT = 'script[type="module"][src]'
+const ENTRY_SCRIPT = 'script[type="module"][src*="/_kay/"]:not([src*="/_kay/dev/"])'
 const STORAGE_KEY = 'kay-reloaded'
-// A page loaded for a build is not reloaded for it again within this time, whatever it still says: a cache in front of the server may keep serving the old page.
+// A page is not reloaded again within this time, whatever it still says: a cache in front of the server may keep serving the old page, and replicas on two builds may alternate.
 const REPEAT_MS = 60_000
 
 let probing: Promise<boolean> | undefined
@@ -31,8 +31,15 @@ async function served(): Promise<string | undefined> {
 
 // Whether a field holds something other than the page rendered it with.
 function changed(field: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement): boolean {
-  if (field instanceof HTMLSelectElement)
-    return [...field.options].some(option => option.selected !== option.defaultSelected)
+  if (field instanceof HTMLSelectElement) {
+    if (field.multiple)
+      return [...field.options].some(option => option.selected !== option.hasAttribute('selected'))
+
+    // A single select shows its first option when none says `selected`.
+    const initial = [...field.options].findIndex(option => option.hasAttribute('selected'))
+
+    return field.selectedIndex !== Math.max(initial, 0)
+  }
 
   if (field instanceof HTMLInputElement) {
     if (field.type === 'checkbox' || field.type === 'radio')
@@ -47,23 +54,23 @@ function changed(field: HTMLInputElement | HTMLSelectElement | HTMLTextAreaEleme
 
 // Whether the visitor typed something a reload would lose.
 function unsaved(): boolean {
-  return dirtyGuard() !== undefined || [...document.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>('form input, form textarea, form select')].some(changed)
+  return dirtyGuard() !== undefined || [...document.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>('input, textarea, select')].some(changed)
 }
 
-// Reloads the current URL, the browser putting the scroll position back, unless it would lose what was typed or has reloaded for this build already; then the next link followed loads in full instead.
-function reload(build: string): boolean {
+// Reloads the current URL, the browser putting the scroll position back, unless it would lose what was typed or has reloaded a minute ago; then the next link followed loads in full instead.
+function reload(): boolean {
   navigation.stale = true
 
   if (unsaved())
     return false
 
   try {
-    const last = JSON.parse(sessionStorage.getItem(STORAGE_KEY) ?? 'null') as { build: string, at: number } | null
+    const last = Number(sessionStorage.getItem(STORAGE_KEY))
 
-    if (last?.build === build && Date.now() - last.at < REPEAT_MS)
+    if (Date.now() - last < REPEAT_MS)
       return false
 
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ build, at: Date.now() }))
+    sessionStorage.setItem(STORAGE_KEY, String(Date.now()))
   }
   catch {
     // Without storage nothing would stop a loop.
@@ -85,14 +92,14 @@ export function noticed(response: Response): boolean {
 
   navigation.stale = true
 
-  return response.status === 404 && reload(seen)
+  return response.status === 404 && reload()
 }
 
 async function probe(): Promise<boolean> {
   try {
     const build = await served()
 
-    return build !== undefined && !onPage(build) && reload(build)
+    return build !== undefined && !onPage(build) && reload()
   }
   catch {
     return false

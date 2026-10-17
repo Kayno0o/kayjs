@@ -5,6 +5,8 @@ import process from 'node:process'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test'
 import { chromium } from 'playwright-core'
 import { BUILD_HEADER, buildOf } from '../src/runtime/swap'
+import { requestIdHeader } from '../src/server/protection'
+import { headerCopies, ownHeaders } from '../src/server/security'
 import { browse, browserPath, testSite } from '../src/test'
 import { fixtureCopy } from './scratch'
 
@@ -66,6 +68,21 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a page of 
       await site.close()
     }
   }, 60_000)
+})
+
+describe('a file route under the build header', () => {
+  it('sends the request id and the build on the response itself, leaving the context empty for Elysia to copy nothing', () => {
+    const copies = headerCopies({ 'cache-control': 'immutable' }, { 'x-frame-options': 'DENY' })
+    const set = { headers: { [requestIdHeader()]: 'r1', [BUILD_HEADER]: 'bbb' } } as unknown as Parameters<typeof ownHeaders>[0]
+
+    expect(ownHeaders(set, copies)).toEqual({ 'cache-control': 'immutable', 'x-frame-options': 'DENY', [requestIdHeader()]: 'r1', [BUILD_HEADER]: 'bbb' })
+    expect(Object.keys(set.headers)).toEqual([])
+
+    const app = { headers: { [requestIdHeader()]: 'r2', [BUILD_HEADER]: 'bbb', 'x-app': '1' } } as unknown as Parameters<typeof ownHeaders>[0]
+
+    expect(ownHeaders(app, copies)).toEqual({ 'cache-control': 'immutable' })
+    expect(app.headers['x-frame-options']).toBe('DENY')
+  })
 })
 
 describe('kay dev', () => {

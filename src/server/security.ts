@@ -3,6 +3,7 @@ import type { KayConfig, SecurityConfig } from '../config'
 import type { PageSecurity } from '../runtime'
 import type { Prefetch } from './speculation'
 import { offlineOf } from '../project'
+import { BUILD_HEADER } from '../runtime/swap'
 import { basePath } from './base'
 import { inlineScriptHashes, sourceHash } from './csp'
 import { requestIdHeader } from './protection'
@@ -138,12 +139,12 @@ export function setSecurityHeaders(set: Context['set'], security: [name: string,
 }
 
 // The copy a file route answers with: the secured one when the context holds no header, since the response's own would win over the app's; else the plain one, the security headers going on the context as on every other route.
-// The request id every context holds goes on the response itself when it is alone there, so Elysia has no header to copy the response for.
+// The request id and build every context holds go on the response itself when it is alone there, so Elysia has no header to copy the response for.
 export function ownHeaders(set: Context['set'], copies: HeaderCopies): Record<string, string> {
-  const id = takeAloneRequestId(set)
+  const own = takeOwnHeaders(set)
 
-  if (id !== undefined)
-    return { ...copies.secured, [requestIdHeader()]: id }
+  if (own !== undefined)
+    return { ...copies.secured, ...own }
 
   if (Object.keys(set.headers).length === 0)
     return copies.secured
@@ -201,16 +202,15 @@ export function carryContext<T extends Response>(set: Context['set'], response: 
 
 // The same for headers built per request: the security headers go under what the response sets, and the request id on the response when it is alone on the context.
 export function ownedHeaders(set: Context['set'], headers: Record<string, string>, security: [name: string, value: string][]): Record<string, string> {
-  const id = takeAloneRequestId(set)
+  const own = takeOwnHeaders(set)
 
-  if (id === undefined && Object.keys(set.headers).length > 0) {
+  if (own === undefined && Object.keys(set.headers).length > 0) {
     setSecurityHeaders(set, security)
 
     return headers
   }
 
-  if (id !== undefined)
-    headers[requestIdHeader()] = id
+  Object.assign(headers, own)
 
   for (const [name, value] of security)
     headers[name] ??= value
@@ -218,21 +218,24 @@ export function ownedHeaders(set: Context['set'], headers: Record<string, string
   return headers
 }
 
-// The request id when it is the only header on the context, taken off it for the response to carry.
-function takeAloneRequestId(set: Context['set']): string | undefined {
-  let id: string | undefined
+// The request id and the build every context holds, when they are all that is there, taken off it for the response to carry.
+function takeOwnHeaders(set: Context['set']): Record<string, string> | undefined {
+  const own: Record<string, string> = {}
 
   for (const name in set.headers) {
-    if (name !== requestIdHeader())
+    if (name !== requestIdHeader() && name !== BUILD_HEADER)
       return undefined
 
-    id = String(set.headers[name])
+    own[name] = String(set.headers[name])
   }
 
-  if (id !== undefined)
-    delete set.headers[requestIdHeader()]
+  if (Object.keys(own).length === 0)
+    return undefined
 
-  return id
+  for (const name in own)
+    delete set.headers[name]
+
+  return own
 }
 
 // kay's directives, plus the sources its islands need, with each layer of the app's merged over them in turn, a directive given `false` left out; `script-src` and `script-src-elem` always keep the hashes of kay's inline scripts, and `style-src` and `style-src-elem` those of its inline styles.

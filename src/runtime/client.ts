@@ -92,12 +92,18 @@ async function post(body: string): Promise<void> {
   catch {}
 }
 
+// Whether the tab already queued what it does about a deploy.
+let warming = false
+
 // Hydrates every island the server rendered, loading each component's chunk on demand; resolves once the eager ones are done.
 // Running it again over the same root leaves the islands it already took alone.
 export async function hydrateIslands(registry: IslandRegistry, root: ParentNode = document): Promise<void> {
   const eager: Promise<void>[] = []
 
-  whenIdle(warm)
+  if (!warming) {
+    warming = true
+    whenIdle(warm)
+  }
 
   for (const element of root.querySelectorAll<HTMLElement>(SERVER_ISLAND)) {
     if (started.has(element))

@@ -16,7 +16,7 @@ export async function warm(): Promise<void> {
 
 // What a page of a build the server replaced does about it, in a chunk of its own: given the response that showed it, whether the page is reloading; given none, whether a chunk it failed to load was dropped by a deploy, which reloads it.
 export async function skew(response?: Response): Promise<boolean> {
-  if (process.env.NODE_ENV !== 'production')
+  if (process.env.NODE_ENV !== 'production' || typeof document === 'undefined')
     return false
 
   try {

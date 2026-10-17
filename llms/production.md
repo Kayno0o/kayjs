@@ -173,7 +173,7 @@ Then `await welcomeMails.enqueue({ to: email })` in an action, or `enqueue(paylo
 - A chunk the new build dropped is a 404, so a tab opened before the deploy meets it on the next island it hydrates (`hydrate="visible"`, `"idle"`, a server island) or the next lazy chunk. A tab that failed to load a chunk asks the server for its page once, and when that names another build, reloads the current URL, the browser putting the scroll back. No config.
 - An action call or server island answered by another build marks the tab: its next link, form post or back/forward loads in full instead of swapping pages in. A 404 from another build, as for an action the new build no longer has, reloads at once.
 - A tab with something typed (a changed field, a file chosen, a `guardLeave` guard holding unsaved changes) is never reloaded under the visitor: it waits for the next navigation, which loads in full.
-- A tab reloads for one build once a minute at most, and not at all without `sessionStorage`, so a cache in front of the server keeping an old page cannot loop it.
+- A tab reloads once a minute at most, and not at all without `sessionStorage`, so a cache in front of the server keeping an old page cannot loop it.
 - A static export has no header: the tab reads the entry script of its own page from the host instead. The tab loads the code doing all this ahead, when idle, as a deploy drops it with the other chunks.
 - kay keeps no old build's chunks: an image or a fresh `.kay` holds only its own. The reload is what the old tab does instead.
 - A cache or CDN serving the old HTML after a deploy is the one case kay cannot see past: keep HTML pages revalidating, as kay's own pages do.
