@@ -100,6 +100,7 @@ const SETTING_NAMES = new Set<string>([PAGE, ...PAGE_SETTINGS])
 const MODULE_EXPORT = new RegExp(`^export (?!(?:type|interface) )(?!(?:async )?(?:const|let|var|function) (?:${[...SETTING_NAMES].join('|')})\\b)`, 'm')
 
 const WHITESPACE = /\s+/g
+const NOT_LINE_BREAK = /[^\n]/g
 const SPACE = /\s/
 const CTX = /\bctx\b/g
 const CTX_PATHNAME = /\s*\??\.\s*url\s*\??\.\s*pathname(?![\w$])(?![ \t]*(?:\+\+|--))(?!\s*(?:=(?!=)|[-+*/%&|^]=|<<=|>>>?=|\*\*=|&&=|\|\|=|\?\?=))/y
@@ -561,8 +562,18 @@ export async function keptScan(route: { layouts: string[], file: string }, scans
   return { pathname }
 }
 
+// The source with the value of the page's `lastmod` blanked, line breaks kept: the sitemap reads it, never a render, so a clock in it makes no page depend on one.
+function withoutLastmod(file: string, source: string): string {
+  if (!file.endsWith('.kay') || !source.includes('lastmod'))
+    return source
+
+  const value = analyzeServer(source, parseKay(source).server)?.page?.settings.get('lastmod')?.value
+
+  return value === undefined ? source : source.slice(0, value.start) + source.slice(value.start, value.end).replace(NOT_LINE_BREAK, ' ') + source.slice(value.end)
+}
+
 async function scanned(file: string): Promise<Scan> {
-  const source = await Bun.file(file).text()
+  const source = withoutLastmod(file, await Bun.file(file).text())
   const code: string[] = []
 
   const reads = READS_REQUEST.exec(source)

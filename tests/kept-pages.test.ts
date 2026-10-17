@@ -426,6 +426,19 @@ describe('a kept page and the state a script declares', () => {
     expect(await readsNothing(route(root, 'src/routes/class.kay'))).toBe(false)
   })
 
+  it('keeps a page whose lastmod reads the clock, as the sitemap reads it and no render does', async () => {
+    const root = await scratch({
+      'src/routes/dated.kay': '--- server\nexport const page = { sitemap: true, lastmod: new Date(\'2026-03-04T10:00:00Z\') }\n---\nh1 Dated\n',
+      'src/routes/computed.kay': '--- server\nexport const page = {\n  lastmod: () => new Date(Date.now() - 1000),\n}\n---\nh1 Computed\n',
+      'src/routes/reading.kay': '--- server\nexport const page = { lastmod: new Date(\'2026-03-04\') }\nconst now = new Date()\n---\nh1 {now.getFullYear()}\n',
+    })
+
+    expect(await readsNothing(route(root, 'src/routes/dated.kay'))).toBe(true)
+    expect(await readsNothing(route(root, 'src/routes/computed.kay'))).toBe(true)
+    // What the page reads outside `lastmod` still counts.
+    expect(await readsNothing(route(root, 'src/routes/reading.kay'))).toBe(false)
+  })
+
   it('keeps a layout whose script declares a let per render', async () => {
     const root = await scratch({
       'src/routes/_layout.kay': '---\nlet label = \'Site\'\n---\np {label}\nslot\n',
