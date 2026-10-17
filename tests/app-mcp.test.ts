@@ -854,6 +854,23 @@ describe('kay check on routes that opt in', () => {
     expect(found.sort()).toEqual([['deprecated-api-tool', 'GET /named'], ['deprecated-api-tool', 'POST /bare'], ['deprecated-api-tool', 'PUT /summary']])
   })
 
+  it('reads api() under an aliased import, a namespace import, a reassigned let and a helper of the file, and not an api of another module', async () => {
+    const dir = await fixtureCopy('mcp')
+    const only = async (name: string, lines: string[]) => {
+      await Bun.write(join(dir, 'src/api/more.ts'), `${lines.join('\n')}\n`)
+
+      return (await codes(dir)).filter(([, route]) => !route!.endsWith('/internal') && !route!.endsWith('/both')).map(([, route]) => `${name} ${route}`)
+    }
+
+    expect(await only('alias', ['import { api as server } from \'kay/server\'', 'export default server().get(\'/a\', () => 1)'])).toEqual(['alias GET /a'])
+    expect(await only('aliased-const', ['import { api as server } from \'kay/server\'', 'const app = server()', 'export default app.get(\'/a\', () => 1)'])).toEqual(['aliased-const GET /a'])
+    expect(await only('namespace', ['import * as kay from \'kay/server\'', 'export default kay.api().get(\'/a\', () => 1)'])).toEqual(['namespace GET /a'])
+    expect(await only('let', ['import { api } from \'kay/server\'', 'let app', 'app = api()', 'export default app.get(\'/a\', () => 1)'])).toEqual(['let GET /a'])
+    expect((await only('helper', ['import { api } from \'kay/server\'', 'function base() { return api().get(\'/b\', () => 1) }', 'const arrow = () => api()', 'const one = base()', 'export default one.get(\'/a\', () => 1)', 'arrow().post(\'/c\', () => 1)'])).sort()).toEqual(['helper GET /a', 'helper GET /b', 'helper POST /c'])
+    expect(await only('other', ['import { api } from \'./my-api\'', 'export default api().get(\'/a\', () => 1)'])).toEqual([])
+    expect(await only('none', ['const api = () => ({ get: (path: string, run: () => number) => run() })', 'export default api().get(\'/a\', () => 1)'])).toEqual([])
+  })
+
   it('says nothing without mcp, or when the lints are allowed', async () => {
     const dir = await fixtureCopy('mcp')
 
