@@ -5,6 +5,7 @@ import type { Address, Field } from './types'
 import { s } from 'kay'
 import { t } from 'kay/i18n'
 import { siteOrigin } from 'kay/seo'
+import { wording } from 'kay/words'
 import { log } from './log'
 import { MailNotConfigured, wasLogged } from './mailer'
 
@@ -25,17 +26,11 @@ const WORDS = /[-_]+/g
 const RESERVED = ['name', 'email', 'message', 'website']
 const DEFAULT_ERRORS = { name: 'Please write your name, on one line.', email: 'Please write a valid email address.', message: 'Please write your message.' }
 
-// The message in the page's language, or the English text when kayjs-mail's messages are not brought in (`mailExtension`) or the language has none.
-function wording(key: string, english: string): string {
-  try {
-    // eslint-disable-next-line ts/no-unnecessary-type-assertion -- t takes any key until an app registers its messages
-    const text = (t as (key: string) => string)(key)
-
-    return text === key ? english : text
-  }
-  catch {
-    return english
-  }
+// The refusal of each field in the page's language, or the English text when kayjs-mail's messages are not brought in (`mailExtension`) or the language has none.
+const ERROR_WORDS = {
+  name: () => wording('mail.contact.errors.name', DEFAULT_ERRORS.name),
+  email: () => wording('mail.contact.errors.email', DEFAULT_ERRORS.email),
+  message: () => wording('mail.contact.errors.message', DEFAULT_ERRORS.message),
 }
 
 export interface ContactOptions<Extra extends Record<string, TSchema> = Record<never, TSchema>> {
@@ -73,7 +68,7 @@ export function contactForm<const Extra extends Record<string, TSchema> = Record
   protection: ActionProtection<'website'>,
 ] {
   const { fields = {} as Extra, labels = {}, reach, maxLinks = 3, maxLength = 5000 } = options
-  const refusal = (key: keyof typeof DEFAULT_ERRORS) => ({ error: options.errors?.[key] ?? (() => wording(`mail.contact.errors.${key}`, DEFAULT_ERRORS[key])) })
+  const refusal = (key: keyof typeof DEFAULT_ERRORS) => ({ error: options.errors?.[key] ?? ERROR_WORDS[key] })
   const reserved = RESERVED.filter(key => key in fields)
 
   if (reserved.length > 0)

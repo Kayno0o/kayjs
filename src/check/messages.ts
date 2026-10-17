@@ -1,6 +1,7 @@
 import type { I18nConfig, KayExtension } from '../config'
 import type { ContentProblem } from '../content/validate'
 import type { Message, MessageTree } from '../runtime/i18n'
+import type { InvalidWord } from '../server/words'
 import { existsSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import process from 'node:process'
@@ -202,15 +203,15 @@ async function localeCatalog(root: string, config: I18nConfig, extensions: KayEx
   return { file, source, own: [...messages.keys()], entries }
 }
 
-const LIBRARIES = new Map([['ui', 'kayjs-ui'], ['cms', 'kayjs-cms'], ['auth', 'kayjs-auth']])
-// `wording('ui.table.filterLabel', 'Filter'` in a library's source, the key and the English it falls back to.
+const LIBRARIES = new Map([['ui', 'kayjs-ui'], ['cms', 'kayjs-cms'], ['auth', 'kayjs-auth'], ['mail', 'kayjs-mail']])
+// `wording('ui.table.filterLabel', 'Filter'` in a library's source, the key and the English it falls back to; a key written at run time, or an English put together from parts, is not compared.
 const WORDING = /\bwording\(\s*(['"])([a-z]+\.[\w.]+)\1\s*,\s*(?:'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)")/g
 const sourcesRead = new Map<string, Promise<Map<string, string>>>()
 
 // The placeholders of the English a library words `key` with, from kay's own table or the library's installed sources; undefined when nothing says (a key built at run time, a library not installed).
 async function libraryPlaceholders(root: string, key: string): Promise<Set<string> | undefined> {
   if (key in INVALID_PARAMS)
-    return new Set(INVALID_PARAMS[key])
+    return new Set(INVALID_PARAMS[key as InvalidWord])
 
   const english = key in KAY_ENGLISH ? KAY_ENGLISH[key as keyof typeof KAY_ENGLISH] : await libraryEnglish(root, key)
 

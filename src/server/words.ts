@@ -32,7 +32,7 @@ export function invalidWord(kind: InvalidWord, summary: string | undefined, para
 }
 
 // The placeholders each `kay.invalid.*` message may hold; their English is the schema's own summary, which has none to check against.
-export const INVALID_PARAMS: Readonly<Record<string, readonly string[]>> = {
+export const INVALID_PARAMS: Readonly<Record<InvalidWord, readonly string[]>> = {
   'kay.invalid.required': [],
   'kay.invalid.tooShort': ['min'],
   'kay.invalid.tooLong': ['max'],

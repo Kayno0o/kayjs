@@ -22,8 +22,9 @@ const BOOLEAN_TEXT = new Map([['true', true], ['on', true], ['false', false]])
 const DECIMAL = /^\s*[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?\s*$/i
 // What a form posts for a line break, a lone carriage return included.
 const CRLF = /\r\n?/g
+
 // The string formats Elysia gives the numeric text `s.Integer()` and `s.Numeric()` also take.
-const NUMERIC_FORMATS = new Set<unknown>(['integer', 'numeric'])
+export const NUMERIC_FORMATS = new Set<unknown>(['integer', 'numeric'])
 // A field name holding one of these anywhere is a secret: `newPassword`, `accessToken`.
 const SECRET_PART = /password|passwd|passphrase|passcode|secret|token|apikey|cvc|cvv|pass(?![a-z])/i
 // These only as a whole word of the name, so `passenger` and `shipping` are echoed: `pin`, `card_number`, `apiKey`.

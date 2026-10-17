@@ -15,7 +15,7 @@ import type { I18n } from './i18n'
 import type { DocumentedAction } from './openapi'
 import { decodeCall, failure, FORM_CALL, isAction, isFailure, PAYLOAD_PARAM } from '../runtime/action'
 import { escapeAttribute } from '../runtime/escape'
-import { formInput } from '../runtime/form'
+import { formInput, NUMERIC_FORMATS } from '../runtime/form'
 import { localeState, runInLocale } from '../runtime/locale-state'
 import { kayLog } from '../runtime/log'
 import { configuredSite } from '../runtime/site'
@@ -930,8 +930,18 @@ function encodeOrExplain(value: unknown, what: string): string {
   }
 }
 
-// The numeric text `s.Integer()` and `s.Numeric()` take, which a number refused for its type is not a format of.
-const NUMERIC_FORMATS = new Set(['integer', 'numeric'])
+// The formats Elysia gives its own string types, which a visitor does not name: a number, a boolean, an object or array in text, a file.
+const INTERNAL_FORMATS = new Set(['boolean', 'ObjectString', 'ArrayString', 'binary'])
+
+// Whether the pattern holds for the text; one a plain RegExp cannot compile is taken as failed, as the schema refused it.
+function matches(pattern: string, text: string): boolean {
+  try {
+    return new RegExp(pattern).test(text)
+  }
+  catch {
+    return false
+  }
+}
 
 // The `kay.invalid.*` text for what an issue refused, Elysia's own summary when the site words none; the limit it names goes in as `{min}` or `{max}`, a format as `{format}`.
 function refusalText(issue: { summary?: string | undefined, schema?: unknown, value?: unknown }): string {
@@ -951,10 +961,10 @@ function refusalText(issue: { summary?: string | undefined, schema?: unknown, va
     if (schema.maxLength !== undefined && value.length > schema.maxLength)
       return invalidWord('kay.invalid.tooLong', issue.summary, { max: schema.maxLength })
 
-    if (schema.pattern !== undefined && !new RegExp(schema.pattern).test(value))
+    if (schema.pattern !== undefined && !matches(schema.pattern, value))
       return invalidWord('kay.invalid.pattern', issue.summary)
 
-    if (schema.format !== undefined && !NUMERIC_FORMATS.has(schema.format))
+    if (schema.format !== undefined && !NUMERIC_FORMATS.has(schema.format) && !INTERNAL_FORMATS.has(schema.format))
       return invalidWord('kay.invalid.format', issue.summary, { format: schema.format })
   }
 

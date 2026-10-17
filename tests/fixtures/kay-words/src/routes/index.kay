@@ -16,6 +16,8 @@ export const listed = action(t.Object({
   tags: t.Array(t.String(), { minItems: 2 }),
   extra: t.Array(t.String(), { maxItems: 1 }),
   slug: t.String({ pattern: '^x$', format: 'email' }),
+  flag: t.BooleanString(),
+  after: t.String({ pattern: '^[a-z]+$', format: 'email' }),
 }), () => undefined)
 
 export const guarded = action(t.Object({ website: t.Optional(t.String()) }), () => undefined, { honeypot: 'website', rateLimit: { max: 1, window: '1m' }, bodyLimit: 200 })
@@ -49,6 +51,10 @@ form(action={listed})
   error extra
   input(field="slug")
   error slug
+  input(field="flag")
+  error flag
+  input(field="after")
+  error after
   button List
 form(action={guarded})
   if guarded.error('website') as message

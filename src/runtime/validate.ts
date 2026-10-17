@@ -1,5 +1,5 @@
 import type { TSchema } from 'elysia'
-import { formInput } from './form'
+import { formInput, NUMERIC_FORMATS } from './form'
 
 // What the server sends of an action's schema, for the forms of a page to be checked before they post: the top-level fields, the keywords the browser checks, and their `error` messages.
 export interface FieldRules {
@@ -32,8 +32,6 @@ const FORMATS: Record<string, RegExp> = {
   email: /^[\w!#$%&'*+/=?^`{|}~-]+(?:\.[\w!#$%&'*+/=?^`{|}~-]+)*@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/i,
   uuid: /^(?:urn:uuid:)?[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i,
 }
-// The numeric text `s.Integer()` and `s.Numeric()` take, already read as a number.
-const NUMERIC_TEXT = new Set(['integer', 'numeric'])
 
 // Checks a form against the schema of the action it posts to, as the server would, reporting each refused field with the message the server would give; true when it may post.
 export function checkForm(form: HTMLFormElement, action: string): boolean {
@@ -115,7 +113,7 @@ function refusal(name: string, field: FieldRules, value: unknown): string | unde
       if (typeof value !== 'string')
         return 'Expected string'
 
-      if (field.format !== undefined && NUMERIC_TEXT.has(field.format))
+      if (field.format !== undefined && NUMERIC_FORMATS.has(field.format))
         return 'Expected string'
 
       if (field.minLength !== undefined && value.length < field.minLength)

@@ -36,7 +36,7 @@ describe('kay\'s refusals in the app\'s catalogs', () => {
   })
 
   it('words a format, a pattern, too few and too many items each under its own key', async () => {
-    const refused = { mail: 'nope', tags: ['a'], extra: ['a', 'b'], slug: 'y' }
+    const refused = { mail: 'nope', tags: ['a'], extra: ['a', 'b'], slug: 'y', flag: 'maybe', after: 'abc' }
     const french = await site.submit(listed, refused, { from: '/fr' })
     const english = await site.submit(listed, refused, { from: '/' })
 
@@ -45,6 +45,9 @@ describe('kay\'s refusals in the app\'s catalogs', () => {
     expect(french.html).toContain('Au plus 1 choix')
     // The pattern comes first for a field with both, and has no key here.
     expect(french.html).toContain('Expected string to match')
+    // A pattern the value passes leaves the format to speak, and Elysia's own BooleanString format is not named.
+    expect(french.html.match(/Pas au format/g)).toHaveLength(2)
+    expect(french.html).not.toContain('format boolean')
     expect(english.html).not.toContain('choix')
     expect(english.html).toContain('Expected array length')
   })
