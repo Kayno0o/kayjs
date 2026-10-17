@@ -9,7 +9,7 @@ import type { Color } from './raster'
 import type { RemoteImages } from './remote'
 import { existsSync, linkSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { readdir, rm, stat } from 'node:fs/promises'
-import { join, normalize, resolve, sep } from 'node:path'
+import { join } from 'node:path'
 import { ASSET_PREFIX } from '../build/assets'
 import { countCache } from '../build/cache'
 import { SVG_FILE, writeAtomically } from '../build/files'
@@ -21,9 +21,10 @@ import { nodeCrypto } from './builtins'
 import { drawCard, LOGO_SIZE } from './card-draw'
 import { coverImage } from './crop'
 import { readFace } from './face'
-import { DEFAULT_QUALITY, drawing, findSource, MAX_UPLOAD_PIXELS, VARIANTS_DIR } from './image'
+import { builtAsset, DEFAULT_QUALITY, drawing, findSource, MAX_UPLOAD_PIXELS, VARIANTS_DIR } from './image'
 import { revalidated } from './public'
 import { requestUrl } from './request-url'
+import { decodePath } from './routes'
 import { sameText } from './seal'
 
 export interface CardSetup {
@@ -161,19 +162,7 @@ function cardFont(clientDir: string, faces: FontAssets['faces'], wanted: CardCon
 
 // The imported SVG a card is drawn on, never a file outside the built assets.
 function svgFile(cards: Cards, image: string): string | undefined {
-  let name: string
-
-  try {
-    name = decodeURIComponent(image.slice(IMPORTED.length).replace(QUERY, ''))
-  }
-  catch {
-    return undefined
-  }
-
-  const dir = join(cards.clientDir, 'assets')
-  const path = normalize(resolve(dir, name))
-
-  return !name.includes('\0') && path.startsWith(dir + sep) ? path : undefined
+  return builtAsset(cards.clientDir, decodePath(image.slice(IMPORTED.length).replace(QUERY, '')))
 }
 
 function svgDrawingName(image: string): string {
@@ -211,12 +200,19 @@ async function cardSvg(cards: Cards, image: string): Promise<Uint8Array> {
 
   if (!drawing) {
     drawing = (async () => {
-      const { svgCover } = await import('./svg-icon')
-      const raster = await svgCover(file, 'shareCard() image', CARD.width, CARD.height)
+      try {
+        const { svgCover } = await import('./svg-icon')
+        const raster = await svgCover(file, 'shareCard() image', CARD.width, CARD.height)
 
-      await writeAtomically(built, raster)
+        await writeAtomically(built, raster)
 
-      return raster
+        return raster
+      }
+      catch (error) {
+        svgDrawings.delete(built)
+
+        throw error
+      }
     })()
     svgDrawings.set(built, drawing)
   }

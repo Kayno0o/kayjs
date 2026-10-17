@@ -4,7 +4,7 @@ import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { inflateSync } from 'node:zlib'
 import { Resvg } from '@resvg/resvg-js'
-import { afterAll, describe, expect, it } from 'bun:test'
+import { afterAll, beforeEach, describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
 import { clientDir, writeAsset } from '../src/build/assets'
 import { bootProblems } from '../src/check/boot'
@@ -17,7 +17,7 @@ import { decodePng } from '../src/server/crop'
 import { readFace } from '../src/server/face'
 import { prepareFonts } from '../src/server/fonts'
 import { fillOutline } from '../src/server/raster'
-import { svgCover } from '../src/server/svg-icon'
+import { svgCover, svgIcon } from '../src/server/svg-icon'
 
 const FIXTURE = resolve('tests/fixtures/cards')
 const FONTS = join(FIXTURE, 'src/fonts')
@@ -536,14 +536,36 @@ describe('share cards on an imported SVG', () => {
   const banner = join(FIXTURE, 'src/banner.svg')
   const asset = '/_kay/assets/card-test-banner'
 
+  // The cards the client build held before a test, which it leaves alone.
+  let cardsBefore = new Set<string>()
+
+  async function cardFiles(client: string): Promise<string[]> {
+    try {
+      return (await readdir(join(client, 'images'))).filter(name => name.startsWith('card-'))
+    }
+    catch {
+      return []
+    }
+  }
+
+  // The cards a test wrote, not those of another file's run in the same client build.
+  async function written(client: string): Promise<string[]> {
+    return (await cardFiles(client)).filter(name => !cardsBefore.has(name))
+  }
+
+  beforeEach(async () => {
+    cardsBefore = new Set(await cardFiles(clientDir(process.cwd())))
+  })
+
   // The files these tests added to the client build, which the font the cards are drawn in shares.
   async function clean(dir: string, client: string): Promise<void> {
     await rm(dir, { recursive: true, force: true })
 
-    for (const sub of ['assets', 'images']) {
-      for (const file of (await readdir(join(client, sub))).filter(name => name.startsWith('card-test-') || (sub === 'images' && name.startsWith('card-'))))
-        await rm(join(client, sub, file), { force: true })
-    }
+    for (const file of (await readdir(join(client, 'assets'))).filter(name => name.startsWith('card-test-')))
+      await rm(join(client, 'assets', file), { force: true })
+
+    for (const file of await written(client))
+      await rm(join(client, 'images', file), { force: true })
   }
 
   // The card of `image` written at build time, as a JPEG; `image` has to be a file of the client build.
@@ -567,7 +589,7 @@ describe('share cards on an imported SVG', () => {
       await Bun.write(join(client, 'assets', 'card-test-banner.png'), new Resvg(await Bun.file(banner).text(), { fitTo: { mode: 'width', value: 1200 } }).render().asPng())
 
       const [svg, png] = await built(dir, client, cache, [`${asset}.svg`, `${asset}.png`])
-      const files = (await readdir(join(client, 'images'))).filter(file => file.startsWith('card-'))
+      const files = await written(client)
 
       expect(svg).not.toBe(png)
       expect(files).toHaveLength(2)
@@ -625,7 +647,7 @@ describe('share cards on an imported SVG', () => {
 
       // The executable holds the drawing, not the SVG, and the card is not among the ones built.
       await rm(join(client, 'assets', 'card-test-banner.svg'))
-      for (const file of (await readdir(join(client, 'images'))).filter(name => name.startsWith('card-')))
+      for (const file of await written(client))
         await rm(join(client, 'images', file), { force: true })
 
       const cards = await setupCards({ dir, clientDir: client, fonts: await prepareFonts(process.cwd(), config.fonts, dir), name: 'Cards', bundled: true })
@@ -661,7 +683,26 @@ describe('share cards on an imported SVG', () => {
       const urls = await built(dir, client, cache, [...files.values()])
 
       expect(new Set(urls).size).toBe(2)
-      expect((await readdir(join(client, 'images'))).filter(file => file.startsWith('card-'))).toHaveLength(2)
+      expect(await written(client)).toHaveLength(2)
+    }
+    finally {
+      await clean(dir, client)
+    }
+  })
+
+  it('draws a build\'s SVG again after a failed drawing, rather than keeping the rejection', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kay-card-svg-'))
+    const client = clientDir(process.cwd())
+    const cache = join(dir, 'cache')
+
+    try {
+      await Bun.write(join(client, 'assets', 'card-test-banner.svg'), 'not an svg')
+      await setupCards({ dir, clientDir: client, fonts: await prepareFonts(process.cwd(), config.fonts, cache), name: 'Cards', collect: true })
+      shareCard({ title: 'On a banner', image: `${asset}.svg` })
+      await expect(writeCards(client, cache)).rejects.toThrow('is not an SVG kay can draw')
+
+      await Bun.write(join(client, 'assets', 'card-test-banner.svg'), Bun.file(banner))
+      expect(await writeCards(client, cache)).toBe(1)
     }
     finally {
       await clean(dir, client)
@@ -699,6 +740,12 @@ describe('share cards on an imported SVG', () => {
 
       await svgCover(await svg('text.svg', `<svg ${xmlns} viewBox="0 0 8 8"><text x="1" y="6">K</text></svg>`), 'shareCard() image', 1200, 630, message => warnings.push(message))
       expect(warnings).toEqual([`the shareCard() image ${join(dir, 'text.svg')} has text, which kay draws without fonts, so as nothing; turn the text into paths`])
+
+      // A logo that is not square is refused before its text is warned of.
+      const squareWarnings: string[] = []
+
+      await expect(svgIcon(await svg('wide.svg', `<svg ${xmlns} viewBox="0 0 20 10"><text x="1" y="6">K</text></svg>`), 'favicon', message => squareWarnings.push(message))).rejects.toThrow('has to be square')
+      expect(squareWarnings).toEqual([])
 
       await expect(svgCover(await svg('sizeless.svg', `<svg ${xmlns}/>`), 'shareCard() image', 1200, 630)).rejects.toThrow('has no viewBox, nor a width and height')
       await expect(svgCover(await svg('tall.svg', `<svg ${xmlns} viewBox="0 0 10 1000"/>`), 'shareCard() image', 1200, 630)).rejects.toThrow('to cover 1200x630')

@@ -497,6 +497,17 @@ export async function findSource(src: string, options: ImageRouteOptions, client
   return 'path' in original ? { path: original.path, immutable: false, prefix: remoteVariants(original.key) } : original
 }
 
+// The file a built asset's name stands for, never one outside the built assets.
+export function builtAsset(clientDir: string, name: string | undefined): string | undefined {
+  if (name === undefined || name.includes('\0'))
+    return undefined
+
+  const dir = join(clientDir, 'assets')
+  const path = normalize(resolve(dir, name))
+
+  return path.startsWith(dir + sep) ? path : undefined
+}
+
 // The file a `src` names, never one outside the built assets or the directories of runtime images.
 export function sourceFile(src: string, options: ImageRouteOptions): { path: string, immutable: boolean } | undefined {
   const decoded = decodePath(src)
@@ -505,10 +516,9 @@ export function sourceFile(src: string, options: ImageRouteOptions): { path: str
     return undefined
 
   if (src.startsWith(ASSETS_PATH)) {
-    const dir = join(options.clientDir, 'assets')
-    const path = normalize(resolve(dir, decodePath(src.slice(ASSETS_PATH.length)) ?? ''))
+    const path = builtAsset(options.clientDir, decodePath(src.slice(ASSETS_PATH.length)))
 
-    return path.startsWith(dir + sep) ? { path, immutable: true } : undefined
+    return path === undefined ? undefined : { path, immutable: true }
   }
 
   for (const [prefix, dir] of Object.entries(options.dirs ?? {})) {
