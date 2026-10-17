@@ -1657,7 +1657,7 @@ function pageImages(doc: Document, lcp: Element | undefined): ImageInfo[] {
       src,
       variant: imageVariant(src, win.location.origin),
       natural: image.naturalWidth > 0 ? `${image.naturalWidth}x${image.naturalHeight}` : 'not loaded',
-      drawn: `${Math.round(box.width)}x${Math.round(box.height)}${density === 1 ? '' : ` at ${density}x`}`,
+      drawn: `${Math.round(box.width)}x${Math.round(box.height)}${density === 1 ? '' : ` at ${Number(density.toFixed(2))}x`}`,
       flags,
       lcp: image === lcp,
     }]
@@ -1823,7 +1823,19 @@ function imagesTab(doc: Document, tool: DevTool, vitals: Vitals, signal: AbortSi
       return
     }
 
+    // Copies of one image drawn alike share a row, as the logo of a header and a footer would.
+    const copies = new Map<string, ImageInfo[]>()
+
     for (const info of images) {
+      const key = JSON.stringify([info.src, info.variant, info.drawn, info.flags, info.lcp])
+
+      copies.set(key, [...copies.get(key) ?? [], info])
+    }
+
+    const rows = [...copies.values()]
+
+    for (const same of rows) {
+      const info = same[0]!
       const row = tool.make('div', 'image')
       const thumb = tool.make('img', 'thumb')
       const src = tool.make('div', 'src', info.url)
@@ -1841,6 +1853,9 @@ function imagesTab(doc: Document, tool: DevTool, vitals: Vitals, signal: AbortSi
       if (info.lcp)
         src.append(pill(tool, 'largest paint', 'accent'))
 
+      if (same.length > 1)
+        src.append(pill(tool, `${same.length} copies`))
+
       facts.append(tool.make('span', 'chip', info.variant), format, tool.make('span', 'chip', info.natural === 'not loaded' ? `not loaded, drawn ${info.drawn}` : `${info.natural} drawn ${info.drawn}`))
 
       for (const flag of info.flags) {
@@ -1852,17 +1867,18 @@ function imagesTab(doc: Document, tool: DevTool, vitals: Vitals, signal: AbortSi
 
       row.tabIndex = 0
       row.setAttribute('role', 'group')
-      row.setAttribute('aria-label', info.url)
+      row.setAttribute('aria-label', same.length > 1 ? `${info.url}, ${same.length} copies` : info.url)
       row.append(thumb, src, facts, flags)
-      row.onpointerenter = row.onfocus = () => tool.outline([info.image], label)
+      row.onpointerenter = row.onfocus = () => tool.outline(same.map(copy => copy.image), label)
       row.onpointerleave = row.onblur = () => tool.hideOutline()
       body.append(row)
     }
 
-    tab.panel.replaceChildren(tool.make('div', 'note', `${images.length} image${images.length === 1 ? '' : 's'}, ${flagged} to look at`), body, tool.make('div', 'note', 'Formats are those the server picks for a browser accepting AVIF and WebP.'))
+    tab.panel.replaceChildren(tool.make('div', 'note', `${images.length} image${images.length === 1 ? '' : 's'}, ${flagged} to look at`), body, tool.make('div', 'note', 'Formats are those the server picks for a browser accepting AVIF and WebP. Those of images kay does not serve are not looked up, as asking could run the app\'s own handler.'))
 
     // An image the server is not asked about answers at once; the others go a few at a time, so a page of many images does not ask the server for all of them at once, and one that hangs holds back one slot only.
-    await Promise.all(images.map(async (info, index) => {
+    await Promise.all(rows.map(async (same, index) => {
+      const info = same[0]!
       let text = unaskedFormat(win, info.image, info.src)
 
       if (text === undefined) {
@@ -1928,7 +1944,7 @@ function unaskedFormat(win: Window & typeof globalThis, image: HTMLImageElement,
     return 'on another host'
 
   if (url.pathname !== IMAGE_ROUTE && !url.pathname.startsWith(IMAGE_FILES))
-    return `format not looked up, as kay does not serve it${transferred(win, url.href)}`
+    return `format not looked up${transferred(win, url.href)}`
 
   return !image.complete || image.naturalWidth === 0 ? 'not loaded' : undefined
 }

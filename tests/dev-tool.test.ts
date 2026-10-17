@@ -866,7 +866,7 @@ describe('the dev tool', () => {
       expect(signals.every(signal => signal instanceof AbortSignal)).toBe(true)
       expect(rows()).toEqual([
         '/_kay/image?src=%2F_kay%2Fassets%2Fhero.jpg&w=1280 (largest paint) | 1280w, resized on request - avif, 43.9 KB - 1280x1280 drawn 640x360 at 2x',
-        '/photo.jpg | not resized by kay - format not looked up, as kay does not serve it - 4000x4000 drawn 300x225 at 2x | served 59 times the pixels it is drawn with, give it a smaller width or `sizes`',
+        '/photo.jpg | not resized by kay - format not looked up - 4000x4000 drawn 300x225 at 2x | served 59 times the pixels it is drawn with, give it a smaller width or `sizes`',
         '/_kay/images/logo-320-1x1.webp | 320w, cut 1x1, written by kay build - webp, 43.9 KB - 160x160 drawn 80x80 at 2x | no width and height, so the page shifts as it loads | lazy-loaded but in view, which delays it',
         'https://cdn.example/a.png | not resized by kay - on another host - 10x10 drawn 10x10 at 2x',
         '/_kay/images/100%.webp | not resized by kay - avif, 43.9 KB - 10x10 drawn 10x10 at 2x',
@@ -957,6 +957,54 @@ describe('the dev tool', () => {
     }
     finally {
       fetching.mockRestore()
+      document.body.innerHTML = ''
+      happyDOM.setURL(href)
+    }
+  })
+
+  it('gives copies of one image drawn alike one row, outlining each, and rounds the density', async () => {
+    const { happyDOM } = window as unknown as { happyDOM: { setURL: (url: string) => void } }
+    const { href } = location
+    const { devicePixelRatio } = window
+
+    happyDOM.setURL('http://localhost/')
+    document.body.innerHTML = [
+      '<img src="/logo.svg" width="16" height="16" alt="">',
+      '<img src="/logo.svg" width="16" height="16" alt="">',
+      '<img src="/logo.svg" width="16" height="16" alt="">',
+      '<img id="big" src="/logo.svg" width="32" height="32" alt="">',
+    ].join('')
+
+    for (const image of document.querySelectorAll('img')) {
+      const side = image.id === 'big' ? 32 : 16
+
+      Object.defineProperty(image, 'naturalWidth', { value: 150 })
+      Object.defineProperty(image, 'naturalHeight', { value: 150 })
+      Object.defineProperty(image, 'complete', { value: true })
+      image.getBoundingClientRect = () => ({ width: side, height: side, top: 5000, bottom: 5000 + side, left: 0, right: side, x: 0, y: 0, toJSON: () => ({}) })
+    }
+
+    // Chromium's density at a 120% zoom.
+    Object.defineProperty(window, 'devicePixelRatio', { value: 1.2000000476837158, configurable: true })
+    const rows = () => [...shadow().querySelectorAll('#kay-dev-images .image')].map(row => `${row.querySelector('.src')!.textContent} | ${[...row.querySelectorAll('.chip')].map(chip => chip.textContent).join(' - ')}`)
+    const visible = () => [...shadow().querySelectorAll<HTMLElement>('.outline')].filter(outline => outline.hidden === false).length
+
+    try {
+      tool = startDevTool()
+      shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-images')!.click()
+      await Bun.sleep(20)
+
+      expect(rows()).toEqual([
+        '/logo.svg3 copies | not resized by kay - format not looked up - 150x150 drawn 16x16 at 1.2x',
+        '/logo.svg | not resized by kay - format not looked up - 150x150 drawn 32x32 at 1.2x',
+      ])
+      expect(shadow().querySelector('#kay-dev-images .image')!.getAttribute('aria-label')).toBe('/logo.svg, 3 copies')
+
+      shadow().querySelector('#kay-dev-images .image')!.dispatchEvent(new PointerEvent('pointerenter'))
+      expect(visible()).toBe(3)
+    }
+    finally {
+      Object.defineProperty(window, 'devicePixelRatio', { value: devicePixelRatio, configurable: true })
       document.body.innerHTML = ''
       happyDOM.setURL(href)
     }
