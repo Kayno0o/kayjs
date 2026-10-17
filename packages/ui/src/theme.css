@@ -1678,6 +1678,16 @@
     @apply sticky left-0 flex flex-wrap items-center gap-3 border-b border-kui-surface2 px-3 py-2 text-sm;
   }
 
+  /* The box is 1rem, so its label grows to the 1.5rem a finger needs. */
+  .kui-table-selection .kui-checkbox,
+  .kui-table-select-cell .kui-checkbox {
+    @apply min-h-6 min-w-6;
+  }
+
+  .kui-table-select-cell .kui-checkbox {
+    @apply justify-center;
+  }
+
   .kui-table-bulk {
     @apply flex flex-wrap items-center gap-2;
   }

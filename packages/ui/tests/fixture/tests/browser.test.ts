@@ -44,6 +44,21 @@ inBrowser('in the browser', () => {
     expect(wide!.end).toBe(wide!.cellEnd)
     expect(page.errors).toEqual([])
   }, 120_000)
+
+  test('Table keeps a long unbroken value inside its stacked card, and its sort button 2rem tall', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/stacked')
+    const measured = await page.evaluate(() => {
+      const card = document.querySelector('#long .kui-table-row')!.getBoundingClientRect()
+      const value = document.querySelector('#long .kui-table-cell-body')!.getBoundingClientRect()
+
+      return { cardEnd: card.right, valueEnd: value.right, sortHeight: document.querySelector('#long .kui-table-sort-btn')!.getBoundingClientRect().height, rem: Number.parseFloat(getComputedStyle(document.documentElement).fontSize) }
+    })
+
+    expect(measured.valueEnd).toBeLessThanOrEqual(measured.cardEnd)
+    expect(measured.sortHeight).toBeGreaterThanOrEqual(2 * measured.rem)
+  }, 120_000)
 })
 
 inBrowser('FormField in an island', () => {

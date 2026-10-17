@@ -425,6 +425,10 @@ async function phoneProblems(path: string): Promise<string[]> {
       const found: string[] = []
       const width = document.documentElement.clientWidth
 
+      // The stacked cards need the viewport to be the phone's.
+      if (innerWidth !== 375)
+        found.push(`the viewport is ${innerWidth} px wide, not 375`)
+
       if (document.documentElement.scrollWidth > width)
         found.push(`page scrolls sideways: ${document.documentElement.scrollWidth} > ${width}`)
 
@@ -439,8 +443,11 @@ async function phoneProblems(path: string): Promise<string[]> {
         const scroller = control.closest('.kui-table-wrap')
         const limit = scroller === null ? width : scroller.getBoundingClientRect().right
 
-        if (control.matches('button, input:not([type="checkbox"]), select, textarea, a.kui-btn') && box.height < tap)
-          found.push(`${name} is ${Math.round(box.height)} px tall`)
+        // A checkbox is tapped through its label.
+        const target = control.matches('input[type="checkbox"]') ? control.closest('label')?.getBoundingClientRect() ?? box : box
+
+        if (control.matches('button, input, select, textarea, a.kui-btn') && (target.height < tap || target.width < tap))
+          found.push(`${name} is ${Math.round(target.width)}x${Math.round(target.height)} px`)
 
         if (box.left < -1 || box.right > limit + 1)
           found.push(`${name} spans ${Math.round(box.left)}-${Math.round(box.right)} of ${Math.round(limit)}`)

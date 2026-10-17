@@ -3,6 +3,8 @@ import Table from '@kaynooo/kayjs-ui/table.kay'
 import '../app.css'
 
 const planets = [{ id: 1, name: 'Mars', moons: 2 }, { id: 2, name: 'Earth', moons: 1 }]
+const files = [{ id: 1, name: 'uploads/products/b99ee817fb95d11e5e91-with-a-very-long-name-and-no-space.1x1.png', moons: 1 }]
+const sortable = [{ key: 'name', header: 'Name', sortValue: true as const }, { key: 'moons', header: 'Moons', align: 'end' as const }]
 const columns = [{ key: 'name', header: 'Name' }, { key: 'moons', header: 'Moons', align: 'end' as const }]
 ---
 main
@@ -10,3 +12,5 @@ main
     Table(columns={columns} rows={planets} rowKey="id")
   .w-240#wide
     Table(columns={columns} rows={planets} rowKey="id")
+  .w-96#long
+    Table(columns={sortable} rows={files} rowKey="id")
