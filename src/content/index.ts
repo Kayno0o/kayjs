@@ -8,7 +8,7 @@ import type { RawEntry } from './load'
 import type { Heading, Highlighter, Segment } from './markdown'
 import type { ContentProblem } from './validate'
 import { KayError } from '../compiler/errors'
-import { cached, invalidate, noteRead, onKeysInvalidated } from '../runtime/cache'
+import { cached, invalidate, noteLive, noteRead, onKeysInvalidated } from '../runtime/cache'
 import { durationSeconds } from '../runtime/duration'
 import { editableEntries } from '../runtime/fields'
 import { child, localLinks } from '../runtime/html'
@@ -119,6 +119,8 @@ export interface CollectionOptions<Schema extends TSchema> {
   localized?: boolean | undefined
   // The path of the page showing an entry, under the base, which a CMS opens it on; by default the page whose `prerender` lists the collection.
   url?: ((entry: { slug: string, locale?: string | undefined, data: Static<Schema> }) => string) | undefined
+  // Every open page that read the collection follows it: once `invalidate()` drops its entries, a CMS saving or removing one included, the page shows what `all()` and `get()` give now. Needs the read in a page's server fence or a layout's; a static export of such a page fails.
+  live?: boolean | undefined
 }
 
 export interface Collection<Data, Components extends Record<string, Component<never>> = Record<string, Component<never>>, FeedPath extends string = string> {
@@ -300,6 +302,9 @@ export function collection<Schema extends TSchema, Components extends Record<str
   // A page reading the entries is refreshed when `invalidate()` drops them.
   const loaded = async () => {
     noteRead(key)
+
+    if (options.live)
+      noteLive(key)
 
     return withDrafts(await (loader ? fromLoader : fromFolder)())
   }

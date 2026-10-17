@@ -222,6 +222,7 @@ article
 - Everywhere else a draft is left out of `all()`, `get()`, prerendering, the sitemap and the feed.
 - `draft: 'draft'`, a boolean field's name, holds back the entries where it is true, which a CMS then reads and publishes by writing false.
 - `order: 'position'`, a number field's name, orders the entries by it, ascending, those without a number last, unless `sort` says otherwise; kayjs-cms then lists them so and moves an entry up or down by writing the field, so the editor never types the numbers.
+- `live: true` has every open page that read the collection (`all()`, `get()`, `translation()`) in its server fence or a layout's show it afresh in each tab once `posts.invalidate()` drops it, so a kayjs-cms save or removal shows in the other open tabs; it is the collection's side of `cached(..., { live: true })` ([Following cached values](api-from-islands.md#following-cached-values)), with the same cost: a page reading it is rendered per request and a static export of it fails with `export-server-render`.
 - `title: 'Produits'` is what a CMS titles the collection with, instead of its export's name humanized (`produits` gives `Produits`, `blogPosts` gives `Blog posts`); the name still keeps the URLs, the markers and the upload folder.
 
 #### Markdown files

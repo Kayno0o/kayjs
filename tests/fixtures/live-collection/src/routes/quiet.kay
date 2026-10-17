@@ -1,0 +1,9 @@
+--- server
+import { quiet } from '../content.config'
+
+const list = await quiet.all()
+---
+h1 Quiet
+ul.quiet
+  for entry of list key={entry.slug}
+    li {entry.data.title}

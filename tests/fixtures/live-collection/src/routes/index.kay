@@ -1,0 +1,9 @@
+--- server
+import { posts } from '../content.config'
+
+const list = await posts.all()
+---
+h1 Posts
+ul.posts
+  for entry of list key={entry.slug}
+    li {entry.data.title}

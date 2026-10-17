@@ -1,0 +1,9 @@
+--- server
+import { posts, tales } from '../content.config'
+
+const list = [...await tales.all(), ...await tales.all(), ...await posts.all()]
+---
+h1 Both
+ul.both
+  for entry of list key={entry.slug + entry.data.title}
+    li {entry.data.title}

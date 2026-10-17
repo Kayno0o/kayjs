@@ -54,6 +54,16 @@ A data file has neither.
 
 <ReadMore href="/llms/content#reading-entries">What the word count includes and leaves out, and the `file` of an entry, are in the full content reference.</ReadMore>
 
+### Showing edits in open tabs
+
+Add `live: true` to a collection and every open page that read it shows an `invalidate()` right away, in every tab. A save or a removal from the CMS drops the entries, so the other tabs show it too.
+
+```ts
+export const news = collection('content/news', { schema, live: true })
+```
+
+The page is rendered for each request then, so `kay build` cannot keep it as a file. See [Data from the cache](/guides/live-and-realtime#data-from-the-cache).
+
 ## A page per entry
 
 A page named after the slug reads one entry and prerenders a page for each of them.

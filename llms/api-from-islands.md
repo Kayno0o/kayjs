@@ -245,7 +245,8 @@ button(onClick={() => messages.send({ text: text() })}) Send
 - Several processes sharing a `sqliteCache` follow each other's `invalidate` (heard within about half a second); with no shared store a process hears its own only. A key expiring by `ttl` refreshes in the background without telling tabs: only `invalidate` pushes.
 - The connection is the one route live values use but a reader of its own, so a page with both holds two connections of the client's cap. A key is at most 256 characters and a page follows at most 100 keys (a `RangeError` where `cached` is called). A page reading such a key is rendered per request, like one reading a live value: `kay build` keeps no file of it and a static export fails with `export-server-render`.
 - A `resource(module, path)` follows the same keys with nothing written: a GET route whose handler reads a `cached(..., { live: true })` key answers with the header `x-kay-live`, the signed proof of the keys it read, and the `resource()` asks the route again after an `invalidate` of one, keeping `value()` and without turning `status()` to `loading`. A route that read no such key sends no header and its resource opens nothing. Only the answer of a handler that returned (not a thrown error, a `status()` refusal or a guard's) carries a proof, so a visitor gets the keys their own request read; a route follows at most 100 keys and 2,000 characters of them (a `RangeError` where `cached` is called). `call()`, `stream()` and the function form of `resource()` do not follow.
-- Presence (who else views a page) and a collection read without `cached` do not follow yet.
+- A collection with `live: true` ([content](content.md)) is followed the same way by a page that reads it directly, with no `cached` around it: its key is `kay:content:<name>`, which `posts.invalidate()` and a CMS save drop.
+- Presence (who else views a page) does not follow yet.
 
 ### Rooms
 

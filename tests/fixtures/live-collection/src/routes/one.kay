@@ -1,0 +1,7 @@
+--- server
+import { tales } from '../content.config'
+
+const first = await tales.get('first')
+---
+h1 One
+p.one {first?.data.title}

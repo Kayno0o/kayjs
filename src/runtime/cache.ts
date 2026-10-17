@@ -71,7 +71,7 @@ export async function cached<T, const Ttl extends Duration = Duration>(key: stri
   noteRead(key)
 
   if (options.live)
-    liveListener?.(key)
+    noteLive(key)
 
   // A visitor in preview mode sees what the load gives now, which no other visitor gets.
   if (previewing())
@@ -129,6 +129,11 @@ async function waited<T>(key: string, entry: Entry): Promise<T> {
 // Tells the server a render read `key`, a cached value or a collection's entries, so the page it renders is refreshed when `invalidate` drops it.
 export function noteRead(key: string): void {
   readListener?.(key)
+}
+
+// Tells the server a render read `key` and its page follows it: every open tab shows the page afresh once `invalidate` drops the key.
+export function noteLive(key: string): void {
+  liveListener?.(key)
 }
 
 // The server hears each key a render reads; one listener at a time, which a second import replaces.
