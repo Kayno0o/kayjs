@@ -147,7 +147,7 @@ describe('sitemap lastmod', () => {
     expect(await xml('() => null')).toContain('<url><loc>https://x.example/posts/a</loc></url>')
     expect(await xml('\'2026-05-06T10:00:00+02:00\'')).toContain('<lastmod>2026-05-06T08:00:00.000Z</lastmod>')
 
-    for (const hostile of ['\'2026-02-31\'', '\'2026-5-6\'', '\'2026-05-06T10:00:00\'', 'true', '\'soon\'', '{}', 'Number.NaN'])
+    for (const hostile of ['\'2026-02-31\'', '\'2026-13-01\'', '\'2026-00-10\'', '\'2026-5-6\'', '\'2026-05-06T10:00:00\'', 'true', '\'soon\'', '{}', 'Number.NaN'])
       expect(await xml(hostile)).toBe('Internal Server Error')
   })
 

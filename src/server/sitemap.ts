@@ -128,7 +128,9 @@ async function lastmodOf(setting: unknown, params: ListedParams, file: string): 
 
   if (typeof value === 'string' && DATE_ONLY.test(value)) {
     // A day that does not exist, such as February 31st, rolls over to another when read.
-    if (!new Date(value).toISOString().startsWith(value))
+    const day = new Date(value)
+
+    if (Number.isNaN(day.getTime()) || !day.toISOString().startsWith(value))
       throw invalid()
 
     return `<lastmod>${value}</lastmod>`
