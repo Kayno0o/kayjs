@@ -270,7 +270,8 @@ async function planCore(dir: string, core: readonly Feature[]): Promise<Plan> {
   // The project may have been renamed since `kay new` named its package after the directory, so the templates take its own name.
   const named = join(dirname(dir), manifest.name ?? basename(dir))
   const host = await hostOf(dir)
-  const [old, next] = await Promise.all([projectFiles(named, current, kay, {}, host), projectFiles(named, wanted, kay, {}, host)])
+  const runner = await runnerOf(dir, host)
+  const [old, next] = await Promise.all([projectFiles(named, current, kay, {}, host, runner), projectFiles(named, wanted, kay, {}, host, runner)])
 
   for (const [path, content] of Object.entries(next)) {
     const disk = await read(join(dir, path))
@@ -324,6 +325,21 @@ async function hostOf(dir: string): Promise<'github' | 'forgejo'> {
     return remote
 
   return existsSync(join(dir, '.github/workflows')) && !existsSync(join(dir, '.forgejo/workflows')) ? 'github' : 'forgejo'
+}
+
+const RUNS_ON = /^\s+runs-on:\s*(\S+)\s*$/m
+
+// The runner label the project's workflows run on, which `kay new --runner` may have set: the first `runs-on` of its test or pages workflow, else the host's own.
+async function runnerOf(dir: string, host: 'github' | 'forgejo'): Promise<string | undefined> {
+  for (const name of ['test', 'pages']) {
+    const workflow = await read(join(dir, `.${host}/workflows/${name}.yml`))
+    const label = workflow?.match(RUNS_ON)?.[1]
+
+    if (label !== undefined)
+      return label
+  }
+
+  return undefined
 }
 
 const LOCK_FILES = ['bun.lock', 'bun.lockb']

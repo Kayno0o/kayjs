@@ -498,6 +498,32 @@ it('writes the workflow of the host the project remote or folder names, not the 
   }
 })
 
+it('rewrites the CI workflow on the runner the project was scaffolded with', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'kay-add-'))
+
+  try {
+    const dir = join(root, 'app')
+    const features: Feature[] = [...PRESETS.server.features, 'auth']
+
+    await createProject(dir, { kay: '^1.0.0', features, runner: 'docker' })
+    // Its sqlite URL would stop the switch to Postgres, which this test is not about.
+    await rm(join(dir, '.env'))
+
+    const { written } = await addFeatures(dir, ['postgres'], { install: false })
+
+    expect(written).toContain('.forgejo/workflows/test.yml')
+
+    const workflow = await Bun.file(join(dir, '.forgejo/workflows/test.yml')).text()
+
+    expect(workflow).toContain('runs-on: docker\n')
+    expect(workflow).not.toContain('runs-on: debian')
+    expect(workflow).toContain('postgres')
+  }
+  finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
 it('names a file the author deleted rather than skipping it silently', async () => {
   const root = await mkdtemp(join(tmpdir(), 'kay-add-'))
 

@@ -349,7 +349,7 @@ export const LINTS = {
     group: 'deprecated',
     since: '1.52',
     site: true,
-    summary: '`mount` imported from `kay/test`, which is `mountComponent` since 1.52, as `kay/mount` has a `mount` of its own that renders another thing: `mount` from `kay/test` still works for now. The fix imports `mountComponent` under the name the file already uses.',
+    summary: '`mount` imported from `kay/test` (statically, through `await import(\'kay/test\')` or re-exported), which is `mountComponent` since 1.52, as `kay/mount` has a `mount` of its own that renders another thing: `mount` from `kay/test` still works for now. The fix imports `mountComponent` under the name the file already uses.',
     wrong: 'import { mount, settle } from \'kay/test\'',
     right: 'import { mountComponent, settle } from \'kay/test\'',
   },

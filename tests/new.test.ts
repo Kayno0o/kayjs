@@ -334,9 +334,13 @@ describe('kay command line', () => {
       expect(await Bun.file(join(root, 'plain/.forgejo/workflows/test.yml')).text()).toContain('runs-on: debian\n')
       await expect(createProject(join(root, 'bad'), { kay: '^1.0.0', runner: 'a b\nc' })).rejects.toThrow('kay new: --runner is "a b\\nc"')
 
-      const old = await kay(['new', 'old', '--kay', '^1.0.0', '--template', 'server', '--host', 'github', '--runner', 'mine', '--quiet'], root)
+      const old = await kay(['new', 'old', '--kay', '^1.0.0', '--template', 'server', '--host', 'github', '--runner', 'mine'], root)
 
       expect(old).toMatchObject({ code: 0, stderr: expect.stringContaining('--host is now --forge') })
+
+      const quiet = await kay(['new', 'quiet', '--kay', '^1.0.0', '--template', 'server', '--host', 'github', '--quiet'], root)
+
+      expect(quiet).toMatchObject({ code: 0, stderr: '' })
       expect(await Bun.file(join(root, 'old/.github/workflows/test.yml')).text()).toContain('runs-on: mine')
 
       const renamed = await kay(['new', 'renamed', '--kay', '^1.0.0', '--template', 'server', '--forge', 'github', '--quiet'], root)

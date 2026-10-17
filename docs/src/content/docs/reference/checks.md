@@ -84,7 +84,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `deprecated-provider-url` | warn | deprecated | `discordProvider({ apiBase })` of kayjs-auth, now `discordProvider({ url })` |
 | `deprecated-sign-in-options` | warn | deprecated | `redirect`, `remember` or `captcha` in the input of kayjs-auth's `signInWithPassword` or `register`, or a positional `redirect` of `requestMagicLink` or `signInWithPasskey`: now one trailing options object |
 | `deprecated-auth-event` | warn | deprecated | `createAuth({ onEvent })` of kayjs-auth, now `onAuthEvent`, which gets one object instead of four arguments |
-| `deprecated-test-mount` | warn | deprecated | `mount` imported from `kay/test`, now `mountComponent` |
+| `deprecated-test-mount` | warn | deprecated | `mount` imported, dynamically imported or re-exported from `kay/test`, now `mountComponent` |
 | `deprecated-ui-prop` | warn | deprecated | A kayjs-ui prop or value renamed in 1.52, such as `variant="danger"`, now `tone="danger"` |
 | `draft-message` | warn | i18n | A message marked `// draft`, which no one has checked yet |
 | `hidden-tool` | warn | code | With `mcp`, an API route that sets `hide` and `tool` |

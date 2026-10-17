@@ -24,7 +24,7 @@ export const scaffold: Command = {
       }
 
       // `--host` named the forge before `kay dev --host` named an address: it still works, saying so.
-      if (values.host !== undefined && values.forge === undefined)
+      if (values.host !== undefined && values.forge === undefined && values.quiet !== true)
         console.error('kay new: --host is now --forge (kay dev --host is an address); --host still works for now')
 
       const forge = values.forge ?? values.host
