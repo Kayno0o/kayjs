@@ -240,7 +240,8 @@ article
 - A page rendering an entry's `Content` links the stylesheets those components import, for every collection its `--- server` fence imports.
 - A tag in a code span, a fenced code block or an indented one stays text.
 - Attributes take JSON of any depth; quoted text may hold `>` or `}`.
-- A component the collection does not name, a tag left open, or a capitalized tag kay cannot read (stray text after a JSON value, a quote or brace never closed) fails `kay check`, the build and `bodyHtml` at its line (`markdown-invalid`), rather than reaching the page as text.
+- A component the collection does not name, a tag left open, or a capitalized tag kay cannot read (stray text after a JSON value, a quote or brace never closed) fails `kay check`, the build and `bodyHtml` at its line (`markdown-invalid`), rather than reaching the page as text; so does a closing tag holding more than its name.
+- In prose, `<` before a capital reads as a tag once it sets an attribute or a `>` follows it in the paragraph: write `&lt;` for a literal one. Attribute text holds no backtick, which opens code.
 
 #### Pages from a collection
 

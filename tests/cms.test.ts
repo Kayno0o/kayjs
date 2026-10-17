@@ -504,6 +504,12 @@ describe('the collections a CMS edits', () => {
     expect(await rejection(entrySource('news', 'launch', {}))).toMatchObject({ message: expect.stringContaining('saveEntry()') })
   })
 
+  // kayjs-cms's script check leaves a body bodyHtml cannot read to this refusal.
+  it.each(['<Callout onclick=alert(1)//}>hi', '<Callout onmouseover=alert(1)//} />'])('refuses a body holding a component tag kay cannot read: %s', async (body) => {
+    expect(await entrySource('articles', 'hostile', { title: 'X' }, { locale: 'en', body })).toEqual({ issues: expect.arrayContaining([expect.objectContaining({ collection: 'articles', slug: 'hostile', body: true })]) })
+    expect(await saveEntry('news', { slug: 'hostile', data: { title: 'X', published: '2026-01-01T00:00:00.000Z', tags: [] }, body })).toEqual({ issues: expect.arrayContaining([expect.objectContaining({ collection: 'news', slug: 'hostile', body: true })]) })
+  })
+
   // An entry's data is an object of fields, as `entries()` reads it back.
   it.each([
     ['a list', 'entrySource', 'pages', 'listed', [1]],

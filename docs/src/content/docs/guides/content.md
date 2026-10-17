@@ -131,7 +131,7 @@ An interactive component renders as an island. A page rendering an entry's `Cont
 
 A component the collection does not name fails `kay check` and the build. So does an attribute that would put its text on the page as markup, such as `innerHTML`.
 
-A capitalized tag kay cannot read fails too, at its line, rather than showing on the page as text. That is a quote or a brace never closed, or text after a JSON value, as in `rows={[1]}}`. JSON values may nest to any depth.
+A capitalized tag kay cannot read fails too, at its line, rather than showing on the page as text. That is a quote or a brace never closed, or text after a JSON value, as in `rows={[1]}}`. JSON values may nest to any depth. In prose, a `<` before a capital letter reads as a tag once a `>` follows it in the paragraph, so write `&lt;` for a literal one.
 
 ## Feeds
 

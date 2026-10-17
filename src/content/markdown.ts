@@ -270,17 +270,33 @@ function extractComponents(body: string, bodyLine: number): { text: string, comp
 
 // The block with its component tags, outside code spans, swapped for placeholders.
 function replaceTags(text: string, startLine: number, components: ExtractedComponent[], open: { name: string, line: number }[]): string {
+  let current = startLine
+  let next = text.indexOf('\n')
+
+  // Tags come in order, so the line is counted on from the last one rather than from the block's start.
+  const lineAt = (offset: number) => {
+    for (; next !== -1 && next < offset; next = text.indexOf('\n', next + 1))
+      current++
+
+    return current
+  }
+
   return outsideCodeSpans(text, (part, offset) => {
     let result = ''
     let copied = 0
+    const lastClose = part.lastIndexOf('>')
 
     COMPONENT_TAG.lastIndex = 0
 
     for (let match = COMPONENT_TAG.exec(part); match; match = COMPONENT_TAG.exec(part)) {
       const [start, closing, name] = match
-      const line = startLine + lineOf(text, offset + match.index) - 1
+      const line = lineAt(offset + match.index)
       const from = match.index + start.length
-      const end = tagEnd(part, from, `${closing}${name}`, line)
+      const end = tagEnd(part, from, `${closing}${name}`, line, lastClose)
+
+      // Prose such as `if 1<A then`, setting no attribute and with no `>` after it.
+      if (end === -1)
+        continue
 
       result += part.slice(copied, match.index) + placeholder(closing !== '', name!, part.slice(from, end - 1), line, components, open)
       copied = end
@@ -295,7 +311,7 @@ function replaceTags(text: string, startLine: number, components: ExtractedCompo
 function placeholder(closing: boolean, name: string, inside: string, line: number, components: ExtractedComponent[], open: { name: string, line: number }[]): string {
   if (closing) {
     if (inside.trim() !== '')
-      throw new MarkdownError(`</${name}> takes no attributes`, line)
+      throw new MarkdownError(`</${name}> holds ${JSON.stringify(inside.trim())}: a closing tag is its name alone`, line)
 
     const opened = open.pop()
 
@@ -318,9 +334,17 @@ function placeholder(closing: boolean, name: string, inside: string, line: numbe
 }
 
 // Where the component tag whose name ends at `from` ends, past its `>`, quoted text and JSON of any depth read whole.
-// A tag kay cannot read throws rather than reach the page as text.
-function tagEnd(text: string, from: number, tag: string, line: number): number {
+// A tag kay cannot read throws rather than reach the page as text, unless it sets no attribute and no `>` follows it, as prose such as `if 1<A then` reads: then -1.
+function tagEnd(text: string, from: number, tag: string, line: number, lastClose: number): number {
   let at = from
+  let valued = false
+
+  const refuse = (message: string) => {
+    if (!valued && lastClose < from)
+      return -1
+
+    throw new MarkdownError(`<${tag}> ${message}`, line)
+  }
 
   for (;;) {
     at = skip(text, WHITESPACE, at)
@@ -328,7 +352,7 @@ function tagEnd(text: string, from: number, tag: string, line: number): number {
     const char = text[at]
 
     if (char === undefined)
-      throw new MarkdownError(`<${tag}> never ends: close it with > or />`, line)
+      return refuse('never ends: close it with > or />')
 
     if (char === '>')
       return at + 1
@@ -336,10 +360,7 @@ function tagEnd(text: string, from: number, tag: string, line: number): number {
     if (char === '/') {
       at = skip(text, WHITESPACE, at + 1)
 
-      if (text[at] === '>')
-        return at + 1
-
-      throw new MarkdownError(`<${tag}> has a / kay cannot read: only />, at its end, closes a tag`, line)
+      return text[at] === '>' ? at + 1 : refuse('has a / kay cannot read: only />, at its end, closes a tag')
     }
 
     ATTRIBUTE_AT.lastIndex = at
@@ -347,13 +368,14 @@ function tagEnd(text: string, from: number, tag: string, line: number): number {
     const name = ATTRIBUTE_AT.exec(text)?.[0]
 
     if (name === undefined)
-      throw new MarkdownError(`<${tag}> has an attribute kay cannot read at ${JSON.stringify(text.slice(at, at + 20))}`, line)
+      return refuse(`has an attribute kay cannot read at ${JSON.stringify(text.slice(at, at + 20))}`)
 
     at = skip(text, WHITESPACE, at + name.length)
 
     if (text[at] !== '=')
       continue
 
+    valued = true
     at = skip(text, WHITESPACE, at + 1)
 
     const quote = text[at]
@@ -361,8 +383,9 @@ function tagEnd(text: string, from: number, tag: string, line: number): number {
     if (quote === '"' || quote === '\'') {
       const end = text.indexOf(quote, at + 1)
 
+      // A backtick opens a code span, which ends the text the tag is read in.
       if (end === -1)
-        throw new MarkdownError(`<${tag}> never closes the quote of ${name}`, line)
+        throw new MarkdownError(`<${tag}> never closes the quote of ${name}: close it, and keep backticks out of it`, line)
 
       at = end + 1
 

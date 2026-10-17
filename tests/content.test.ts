@@ -332,6 +332,25 @@ describe('compiling Markdown', () => {
     await expect(bodyHtml(`Intro\n\n${tag}\n`)).rejects.toMatchObject({ code: 'markdown-invalid', line: 3 })
   })
 
+  it.each([
+    ['a tag spread over lines', 'Intro\n\n<Chart\n  title="a"\n  rows={[1]}} />\n', 3],
+    ['a tag after another in its paragraph', '<Badge />\ntext\n<Chart rows={[1]}} />\n', 3],
+    ['a closing tag holding text', '<Chart>\n\nIn\n\n</Chart x>\n', 5],
+    ['a closing tag holding a /', '<Chart>\n\nIn\n\n</Chart/>\n', 5],
+  ])('names the line of the tag it cannot read: %s', async (_name, source, line) => {
+    await expect(compileMarkdown(source, 1)).rejects.toMatchObject({ code: 'markdown-invalid', line })
+  })
+
+  it.each([
+    ['a capital after <', 'if 1<A then\n'],
+    ['a capital after < and a comma', 'a<B, then x = 1\n'],
+    ['a capital after < ending at code', 'x <Foo`bar`\n'],
+  ])('leaves prose setting no attribute and with no > after it as text: %s', async (_name, source) => {
+    const { segments } = await compileMarkdown(source, 1)
+
+    expect(segments.every(segment => typeof segment === 'string')).toBe(true)
+  })
+
   it('leaves a tag kay cannot read alone in code', async () => {
     const { segments } = await compileMarkdown('`<Chart rows={[1]}} />` in code\n\n```md\n<Chart rows={[1]}} />\n```\n', 1)
 

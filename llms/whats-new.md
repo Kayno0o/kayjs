@@ -4,7 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
-- A Markdown component tag kay cannot read, such as stray text after a JSON prop or a brace never closed, fails `kay check`, the build and `bodyHtml` with `markdown-invalid` at its line instead of reaching the page as text, and a JSON prop nests to any depth ([Content](content.md#components-in-markdown)).
+- A Markdown component tag kay cannot read, such as stray text after a JSON prop or a brace never closed, fails `kay check`, the build and `bodyHtml` with `markdown-invalid` at its line instead of reaching the page as text, as it did already broken, and a JSON prop nests to any depth ([Content](content.md#components-in-markdown)).
 
 ## 1.51.0
 
