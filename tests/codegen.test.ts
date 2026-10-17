@@ -155,7 +155,7 @@ describe('control flow', () => {
     expect(compileKay(typed, 'src/caller.kay', { output: 'html' }).tsx).toContain('KayIsland("src/caller.kay", Caller, [], false, undefined, [], true)')
     expect(compileKay(untyped, 'src/caller.kay', { output: 'html' }).tsx).toContain('KayIsland("src/caller.kay", Caller)')
     expect(compileKay(typed, 'src/caller.kay', { output: 'dom' }).tsx).not.toContain('undefined, [], true)')
-    expect(compileKay(typed.replace('---\nimport', '--- client\nimport'), 'src/caller.kay', { output: 'html', client: true }).tsx).toContain('KayIsland("src/caller.kay", undefined, [], true, undefined, [], true)')
+    expect(compileKay(typed.replace('---\nimport', '--- client\nimport'), 'src/caller.kay', { output: 'html' }).tsx).toContain('KayIsland("src/caller.kay", undefined, [], true, undefined, [], true)')
   })
 
   it('reports a match with no when line in every output, which once crashed the html one', () => {
