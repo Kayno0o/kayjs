@@ -8,14 +8,17 @@ import { loadConfig } from '../config'
 import { buildingWithoutEnv } from '../server/env-state'
 import { missingStore, NOT_FOUND_FILE } from '../server/not-found'
 import { readRedirects } from '../server/redirects'
-import { formatOption, printDocument, printFailure, projectRoot, withStdoutOnStderr } from './command'
+import { formatOption, printDocument, printFailure, projectRoot, shellQuote, withStdoutOnStderr } from './command'
 import { USAGES } from './usages'
 
-const REDIRECTS = /\bredirects\s*:\s*\{/
-const REDIRECTS_KEY = /\bredirects\b/
 const CONFIG_OBJECT = /(?:defineConfig\(|export default )\{/
 const TARGET = /^(?:\/|https?:\/\/)/
 const EMPTY_OBJECT = /^\s*\}/
+const IDENTIFIER_START = /[\w$]/
+const CONTROL = /\p{Cc}/u
+const COLON_BRACE = /^\s*:\s*\{/
+const PARAM_SEGMENT = /:[A-Z_$][\w$]*/gi
+const REGEX_SPECIALS = /[.+?^${}()|[\]\\]/g
 const REFERRER_LIMIT = 3
 
 // The paths visitors asked for and found nothing at, most hit first, read from the file the production server keeps.
@@ -47,11 +50,13 @@ export const notFound: Command = {
 
     try {
       const config = await withStdoutOnStderr(async () => loadConfig(root))
-      const redirected = new Set(Object.keys(config.redirects ?? {}))
+      const redirects = Object.keys(config.redirects ?? {})
+      const redirected = new Set(redirects)
       const store = existsSync(file) ? missingStore(file) : undefined
 
       try {
-        const missing = (store?.list() ?? []).filter(row => !redirected.has(row.path))
+        const all = store?.list() ?? []
+        const missing = all.filter(row => !answered(row.path, redirects))
 
         if (redirect !== undefined) {
           const found = missing.find(row => row.path === redirect)
@@ -63,6 +68,9 @@ export const notFound: Command = {
           if (redirected.has(redirect))
             throw new Error(`${redirect} is a redirect already`)
 
+          if (CONTROL.test(redirect) || CONTROL.test(target))
+            throw new Error('a path and a target hold no control character')
+
           if (!TARGET.test(target))
             throw new Error(`${target} is no target: it starts with / or is another site's URL`)
 
@@ -71,7 +79,7 @@ export const notFound: Command = {
           const written = await addRedirect(join(root, 'kay.config.ts'), redirect, target)
 
           if (written === 'by hand') {
-            console.log(`kay.config.ts has no object literal to add the redirect to: add it to \`redirects\` by hand\n  ${redirectEntry(redirect, target)}`)
+            printFailure('not-found', `kay.config.ts has no \`redirects\` object literal to add the redirect to: add it by hand\n  ${redirectEntry(redirect, target)}`, format)
 
             return 1
           }
@@ -92,7 +100,7 @@ export const notFound: Command = {
           return 0
         }
 
-        console.log(formatListing(missing))
+        console.log(formatListing(missing, all.length > 0))
 
         return 0
       }
@@ -108,7 +116,10 @@ export const notFound: Command = {
   },
 }
 
-function formatListing(missing: MissingPath[]): string {
+function formatListing(missing: MissingPath[], redirected: boolean): string {
+  if (missing.length === 0 && redirected)
+    return 'Every recorded path has a redirect.'
+
   if (missing.length === 0)
     return 'No missing path recorded: the production server records the pages visitors asked for and found nothing at in data/not-found.sqlite.'
 
@@ -117,7 +128,7 @@ function formatListing(missing: MissingPath[]): string {
     const lines = [`${String(hits).padStart(6)}  ${path}${from === '' ? '' : `  (from ${from}${referrers.length > REFERRER_LIMIT ? ', ...' : ''})`}`]
 
     if (target !== undefined)
-      lines.push(`        -> ${target}  (${reason}) kay not-found --redirect ${path}`)
+      lines.push(`        -> ${target}  (${reason}) kay not-found --redirect ${shellQuote(path)}`)
 
     return lines.join('\n')
   }).join('\n')
@@ -131,27 +142,92 @@ function quoted(text: string): string {
   return `'${text.replaceAll('\\', '\\\\').replaceAll('\'', '\\\'')}'`
 }
 
-// `config` with the redirect added to its `redirects` object, or to a new one in the config object; the text unchanged and undefined when there is no literal object to add to.
-export function withRedirect(config: string, from: string, to: string): string | undefined {
-  const entry = redirectEntry(from, to)
-  const redirects = REDIRECTS.exec(config)
+// Whether a redirect of the config takes the path: `:name` stands for a segment, a final `*` for the rest.
+function answered(path: string, redirects: string[]): boolean {
+  return redirects.some((from) => {
+    const star = from.endsWith('/*')
+    const body = (star ? from.slice(0, -2) : from).replace(REGEX_SPECIALS, '\\$&').replace(PARAM_SEGMENT, '[^/]+')
 
-  if (redirects !== null) {
-    const at = redirects.index + redirects[0].length
-    const empty = EMPTY_OBJECT.test(config.slice(at))
+    return new RegExp(`^${body}${star ? '(?:/.*)?' : ''}$`).test(path)
+  })
+}
 
-    return `${config.slice(0, at)}\n    ${entry}${empty ? '\n  ' : ''}${config.slice(at)}`
+// Where the config object's own `redirects` key stands: the offset after its `{`, `'other'` for a value that is no literal, undefined when the key is absent.
+// Strings and comments are skipped, and only the object's top level is read.
+function redirectsOf(config: string, from: number): number | 'other' | undefined {
+  let depth = 0
+
+  for (let at = from; at < config.length; at++) {
+    const char = config[at]!
+
+    if (char === '/' && config[at + 1] === '/') {
+      at = config.indexOf('\n', at)
+
+      if (at === -1)
+        break
+    }
+    else if (char === '/' && config[at + 1] === '*') {
+      at = config.indexOf('*/', at + 2) + 1
+
+      if (at === 0)
+        break
+    }
+    else if (char === '\'' || char === '"' || char === '`') {
+      const start = at
+
+      for (at++; at < config.length && config[at] !== char; at++) {
+        if (config[at] === '\\')
+          at++
+      }
+
+      if (depth === 1 && config.slice(start + 1, at) === 'redirects')
+        return after(config, at + 1)
+    }
+    else if (char === '{' || char === '[' || char === '(') {
+      depth++
+    }
+    else if (char === '}' || char === ']' || char === ')') {
+      if (--depth === 0)
+        return undefined
+    }
+    else if (depth === 1 && IDENTIFIER_START.test(char) && !IDENTIFIER_START.test(config[at - 1] ?? ' ') && config.startsWith('redirects', at) && !IDENTIFIER_START.test(config[at + 9] ?? ' ')) {
+      return after(config, at + 9)
+    }
   }
 
+  return undefined
+}
+
+function after(config: string, at: number): number | 'other' {
+  const rest = config.slice(at)
+  const colon = (/^\s*:\s*\{/).exec(rest)
+
+  return colon === null ? 'other' : at + colon[0].length
+}
+
+// `config` with the redirect added to its `redirects` object, or to a new one in the config object; undefined when there is no literal object to add to.
+export function withRedirect(config: string, from: string, to: string): string | undefined {
+  const entry = redirectEntry(from, to)
   const object = CONFIG_OBJECT.exec(config)
 
-  if (object === null || REDIRECTS_KEY.test(config))
+  if (object === null)
     return undefined
 
-  const at = object.index + object[0].length
-  const rest = config.slice(at)
+  const start = object.index + object[0].length
+  const redirects = redirectsOf(config, start - 1)
 
-  return `${config.slice(0, at)}\n  redirects: {\n    ${entry}\n  },${rest.startsWith('\n') ? rest : `\n${rest.trimStart()}`}`
+  if (redirects === 'other')
+    return undefined
+
+  if (redirects !== undefined) {
+    const empty = EMPTY_OBJECT.test(config.slice(redirects))
+
+    return `${config.slice(0, redirects)}\n    ${entry}${empty ? '\n  ' : ''}${config.slice(redirects)}`
+  }
+
+  const rest = config.slice(start)
+
+  return `${config.slice(0, start)}\n  redirects: {\n    ${entry}\n  },${rest.startsWith('\n') ? rest : `\n${rest.trimStart()}`}`
 }
 
 async function addRedirect(path: string, from: string, to: string): Promise<'written' | 'by hand'> {

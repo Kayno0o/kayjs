@@ -1,11 +1,13 @@
 import type { Database } from 'bun:sqlite'
 import type { Elysia } from 'elysia'
+import type { TrailingSlash } from '../config'
 import type { LocaleSettings } from '../runtime/i18n'
 import { localePath, splitLocale } from '../runtime/i18n'
+import { kayLog } from '../runtime/log'
 import { openSqlite } from '../runtime/sqlite.server'
 import { pathOf } from './log'
 import { onReload } from './reload'
-import { withoutSlash } from './routes'
+import { slashedPath, withoutSlash } from './routes'
 
 // Where the production server keeps the paths visitors asked for and found nothing at, next to the job store.
 export const NOT_FOUND_FILE = 'data/not-found.sqlite'
@@ -25,7 +27,9 @@ const HTML_SUFFIX = /(?:\/index)?\.html?$/
 const TRAILING_SLASHES = /\/+$/
 // What scanners ask every site for, not a page anyone linked to: scripts and configuration of other stacks, dotfiles, the files a careless deploy leaves behind.
 const SCANNED_FILE = /\.(?:php\d?|phtml|aspx?|jsp|cgi|env|sql|bak|ini|htaccess|htpasswd|git|svn|ds_store)(?:\/|$)/
-const SCANNED_SEGMENT = /^(?:wp-[\w-]+|xmlrpc|phpmyadmin|pma|cgi-bin|vendor|boaform|actuator)$/
+const SCANNED_SEGMENT = /^(?:wp-[\w-]+|xmlrpc|phpmyadmin|pma|cgi-bin|boaform|actuator)$/
+// What browsers and crawlers ask every site for, which a site without them is not missing a page for.
+const DEFAULT_FILE = /^\/(?:favicon\.ico|robots\.txt|apple-touch-icon[\w-]*\.png)$/
 
 export interface MissingPath {
   path: string
@@ -67,7 +71,7 @@ export function countedPath(pathname: string): string | undefined {
     return undefined
   }
 
-  if (CONTROL_CHARACTERS.test(decoded) || scanned(decoded.toLowerCase()))
+  if (CONTROL_CHARACTERS.test(decoded) || DEFAULT_FILE.test(decoded.toLowerCase()) || scanned(decoded.toLowerCase()))
     return undefined
 
   const path = withoutSlash(pathname.replace(TRAILING_SLASHES, '')) || '/'
@@ -257,8 +261,7 @@ export function missingStore(path: string): MissingStore {
   const bump = db.query<{ hits: number, target: string | null }, [string, number]>('INSERT INTO kay_missing (path, hits, first_at, last_at) VALUES (?1, 1, ?2, ?2) ON CONFLICT (path) DO UPDATE SET hits = hits + 1, last_at = ?2 RETURNING hits, target')
   const count = db.query<{ total: number }, []>('SELECT COUNT(*) AS total FROM kay_missing')
   const known = db.query<{ hits: number }, [string]>('SELECT hits FROM kay_missing WHERE path = ?')
-  const evict = db.query('DELETE FROM kay_missing WHERE path = (SELECT path FROM kay_missing ORDER BY hits, last_at LIMIT 1) RETURNING path')
-  const orphans = db.query('DELETE FROM kay_missing_referrers WHERE path NOT IN (SELECT path FROM kay_missing)')
+  const evict = db.query<{ path: string }, []>('DELETE FROM kay_missing WHERE path = (SELECT path FROM kay_missing ORDER BY hits, last_at LIMIT 1) RETURNING path')
   const referrers = db.query<{ total: number }, [string]>('SELECT COUNT(*) AS total FROM kay_missing_referrers WHERE path = ?')
   const hasReferrer = db.query<{ hits: number }, [string, string]>('SELECT hits FROM kay_missing_referrers WHERE path = ? AND host = ?')
   const addReferrer = db.query('INSERT INTO kay_missing_referrers (path, host, hits) VALUES (?1, ?2, 1) ON CONFLICT (path, host) DO UPDATE SET hits = hits + 1')
@@ -274,8 +277,10 @@ export function missingStore(path: string): MissingStore {
   return {
     hit(path, referrer, suggest) {
       if (!known.get(path) && count.get()!.total >= MAX_PATHS) {
-        evict.run()
-        orphans.run()
+        const evicted = evict.get()
+
+        if (evicted)
+          removedHosts.run(evicted.path)
       }
 
       const { hits, target } = bump.get(path, Date.now())!
@@ -308,6 +313,12 @@ export function missingStore(path: string): MissingStore {
 }
 
 let current: MissingStore | undefined
+// The requests a page route took, which are the only routes of the app whose 404 means a page is missing.
+const pageRequests = new WeakSet<Request>()
+
+export function pageRequested(request: Request): void {
+  pageRequests.add(request)
+}
 
 // The paths counted so far by this process's server, for the tests of the server.
 export function missingPaths(): MissingPath[] {
@@ -316,15 +327,17 @@ export function missingPaths(): MissingPath[] {
 
 // Counts the pages a visitor asked for with a GET that answered 404, in production: the path without its query, the host of the referrer, never an address or a header.
 // The file is opened by the first one, so a site nobody mistypes a URL of writes nothing.
-export function countMissing<App extends Elysia>(app: App, options: { known: () => Iterable<string>, settings?: LocaleSettings | undefined, file?: string | undefined }): App {
+export function countMissing<App extends Elysia>(app: App, options: { known: () => Iterable<string>, settings?: LocaleSettings | undefined, trailingSlash?: TrailingSlash | undefined, file?: string | undefined }): App {
   let suggest: ReturnType<typeof suggester> | undefined
+  let told = false
   const file = options.file ?? (process.env.NODE_ENV === 'test' ? ':memory:' : NOT_FOUND_FILE)
 
-  app.onAfterResponse({ as: 'global' }, ({ request, set, responseValue }) => {
-    const status = responseValue instanceof Response ? responseValue.status : set.status
-    const answered = responseValue instanceof Response ? responseValue.headers.get('content-type') : null
+  // Global, as a plugin's hook reaches the routes the app adds after it too: only what no route took, or a page route, is counted.
+  app.onAfterResponse({ as: 'global' }, ({ request, set, responseValue, route }) => {
+    const answered = responseValue instanceof Response ? responseValue : undefined
+    const status = answered ? answered.status : set.status
 
-    if (status !== 404 || request.method !== 'GET' || answered?.includes('json') === true)
+    if (status !== 404 || request.method !== 'GET' || (route && !pageRequests.has(request)) || answered?.headers.get('content-type')?.includes('json') === true)
       return
 
     const path = countedPath(pathOf(request.url))
@@ -337,12 +350,26 @@ export function countMissing<App extends Elysia>(app: App, options: { known: () 
       current.hit(path, referrerHost(request.headers.get('referer')), (missing) => {
         suggest ??= suggester(options.known(), options.settings)
 
-        return suggest(missing)
+        const found = suggest(missing)
+
+        return found && { ...found, target: slashedPath(found.target, options.trailingSlash) }
       })
     }
-    catch {
-      // Counting never costs a visitor their answer; a store that failed is opened again by the next one.
+    catch (error) {
+      // Counting never costs a visitor their answer; a store that failed is opened again by the next one, and the first failure is told.
+      try {
+        current?.close()
+      }
+      catch {
+        // Closed already.
+      }
+
       current = undefined
+
+      if (!told) {
+        told = true
+        kayLog('warn', `the paths visitors found nothing at cannot be recorded in ${file}: ${error instanceof Error ? error.message : String(error)}`)
+      }
     }
   })
 

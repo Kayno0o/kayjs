@@ -22,6 +22,7 @@ import { handedOverFlash } from './flash'
 import { cookieLocale, hostLocale, localeCookie, preferredLocale, prerenderKey, stateFor } from './i18n'
 import { stillKept } from './kept-pages'
 import { answeringPage } from './log'
+import { pageRequested } from './not-found'
 import { hookedResponse } from './page-hook'
 import { matchedParams, positionalParams, slashSpelling } from './params'
 import { inPreview, previewRequested, requestDrafts } from './preview'
@@ -258,7 +259,11 @@ export function servePageRoutes(app: Elysia, { table, served: claims, matchers, 
     }
 
     // The context is spread rather than handed over whole, which would make Elysia parse cookies and query for every request.
-    app.get(path, async given => carryContext(given.set, await handle(sharedContext(given.request, () => ({ ...given })))))
+    app.get(path, async (given) => {
+      pageRequested(given.request)
+
+      return carryContext(given.set, await handle(sharedContext(given.request, () => ({ ...given }))))
+    })
   }
 
   // Every route above wins over this one, so it only answers what no page serves.
@@ -282,5 +287,9 @@ export function servePageRoutes(app: Elysia, { table, served: claims, matchers, 
     return response
   }
 
-  app.get('/*', async given => carryContext(given.set, await unmatched(sharedContext(given.request, () => ({ ...given })))))
+  app.get('/*', async (given) => {
+    pageRequested(given.request)
+
+    return carryContext(given.set, await unmatched(sharedContext(given.request, () => ({ ...given }))))
+  })
 }

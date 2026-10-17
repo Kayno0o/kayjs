@@ -4,7 +4,7 @@ import { describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
 import { withRedirect } from '../src/commands/not-found'
 import { pages } from '../src/server'
-import { countedPath, countMissing, missingPaths, missingStore, referrerHost, suggester } from '../src/server/not-found'
+import { countedPath, countMissing, missingPaths, missingStore, pageRequested, referrerHost, suggester } from '../src/server/not-found'
 import { scratchDir } from './scratch'
 
 const known = ['/', '/about', '/blog/hello-world', '/blog/second-post', '/news/launch', '/fr/a-propos', '/fr/blog/hello-world']
@@ -25,6 +25,9 @@ describe('countedPath', () => {
     expect(countedPath('/.well-known/security.txt')).toBe('/.well-known/security.txt')
     expect(countedPath('/envelope')).toBe('/envelope')
     expect(countedPath('/phpfan')).toBe('/phpfan')
+    expect(countedPath('/vendor/acme')).toBe('/vendor/acme')
+    expect(countedPath('/favicon.ico')).toBeUndefined()
+    expect(countedPath('/robots.txt')).toBeUndefined()
   })
 
   it('ignores hostile input rather than storing it', () => {
@@ -184,7 +187,11 @@ describe('missingStore', () => {
 
 describe('countMissing', () => {
   const served = countMissing(new Elysia(), { known: () => ['/fine', '/news/gone2'] })
-    .get('/gone', () => new Response('Not Found', { status: 404, headers: { 'content-type': 'text/html' } }))
+    .get('/gone', ({ request }) => {
+      pageRequested(request)
+
+      return new Response('Not Found', { status: 404, headers: { 'content-type': 'text/html' } })
+    })
     .get('/api/user', () => Response.json({ error: 'none' }, { status: 404 }))
     .get('/fine', () => 'ok')
     .post('/gone', () => new Response('Not Found', { status: 404 }))
@@ -304,6 +311,25 @@ describe('kay not-found', () => {
     expect((await run(['not-found', '--format', 'json'], root)).stdout).not.toContain('"/old"')
   })
 
+  it('quotes a hostile path in the hint it prints, and leaves out what a pattern redirect answers', async () => {
+    const root = await scratchDir('not-found-cli-')
+    const store = missingStore(join(root, 'data/not-found.sqlite'))
+    const hostile = '/x;$(id)|y&z\'q'
+
+    for (const path of [hostile, hostile, '/old/thing', '/legacy/a/b', '/other'])
+      store.hit(path, undefined, () => ({ target: '/blog', reason: 'slug' }))
+
+    store.close()
+    await Bun.write(join(root, 'kay.config.ts'), 'export default { favicon: false, redirects: { \'/old/:id\': \'/new/:id\', \'/legacy/*\': \'/x/*\' } }\n')
+
+    const { stdout } = await run(['not-found'], root)
+
+    expect(stdout).toContain('--redirect \'/x;$(id)|y&z\'\\\'\'q\'')
+    expect(stdout).not.toContain('/old/thing')
+    expect(stdout).not.toContain('/legacy/a/b')
+    expect(stdout).toContain('/other')
+  })
+
   it('needs a target when none is suggested, and refuses a bad one or a redirect that exists', async () => {
     const root = await project()
 
@@ -320,5 +346,58 @@ describe('kay not-found', () => {
     await Bun.write(join(root, 'kay.config.ts'), 'export default { favicon: false }\n')
     expect((await run(['not-found', '--redirect', '/legacy/x', '--to', '/blog/x'], root)).code).toBe(0)
     expect(await Bun.file(join(root, 'kay.config.ts')).text()).toContain('\'/legacy/x\': \'/blog/x\'')
+  })
+})
+
+describe('routes the counter must not reach', () => {
+  it('leaves the 404s of routes registered after the pages alone, whatever they answer with', async () => {
+    const app = new Elysia().use(await pages({ routes: 'tests/fixtures/routing/src/routes', prebuilt: false, security: false })).get('/api/users/42', ({ status }) => status(404, { error: 'none' })).get('/api/set/9', ({ set }) => {
+      set.status = 404
+
+      return { error: 'none' }
+    }).get('/api/text/7', () => new Response('none', { status: 404, headers: { 'content-type': 'text/plain' } }))
+
+    for (const path of ['/api/users/42', '/api/set/9', '/api/text/7', '/page-nobody-has-x'])
+      await app.handle(new Request(`http://localhost${path}`))
+
+    await Bun.sleep(50)
+
+    const paths = missingPaths().map(({ path }) => path)
+
+    expect(paths).toContain('/page-nobody-has-x')
+    expect(paths.filter(path => path.startsWith('/api/'))).toEqual([])
+  })
+})
+
+describe('withRedirect in a config that tempts it', () => {
+  it('skips comments, strings and nested keys, and gives up on a redirects that is no literal', () => {
+    const commented = 'export default defineConfig({\n  // redirects: { }\n  i18n: { redirects: {} },\n  note: \'redirects: {\',\n})\n'
+    const added = withRedirect(commented, '/o', '/n')!
+
+    expect(added).toContain('\n  redirects: {\n    \'/o\': \'/n\',\n  },\n  // redirects: { }')
+    expect(added.indexOf('\'/o\'')).toBeLessThan(added.indexOf('i18n'))
+    expect(withRedirect('export default defineConfig({\n  redirects,\n})\n', '/o', '/n')).toBeUndefined()
+    expect(withRedirect('export default defineConfig({\n  redirects: shared,\n})\n', '/o', '/n')).toBeUndefined()
+    expect(withRedirect('export default defineConfig({\n  \'redirects\': {\n    \'/a\': \'/b\',\n  },\n})\n', '/o', '/n')).toContain('\'redirects\': {\n    \'/o\': \'/n\',')
+  })
+})
+
+describe('suggestions under trailingSlash always', () => {
+  it('keep the slash the site spells its paths with', async () => {
+    const app = countMissing(new Elysia(), { known: () => ['/about/'], trailingSlash: 'always' })
+      .get('/*', ({ request }) => {
+        pageRequested(request)
+
+        return new Response('Not Found', { status: 404, headers: { 'content-type': 'text/html' } })
+      })
+
+    for (let index = 0; index < 2; index++)
+      await app.handle(new Request('http://localhost/About-Us-x/'))
+
+    for (let index = 0; index < 2; index++)
+      await app.handle(new Request('http://localhost/ABOUT/'))
+
+    await Bun.sleep(50)
+    expect(missingPaths().find(({ path }) => path === '/ABOUT')?.target).toBe('/about/')
   })
 })

@@ -410,7 +410,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
 
   // Before the page routes, which a hook registered after them does not reach.
   if (!mode.dev && !exported)
-    countMissing(app, { known: () => [...client.pages.keys(), ...[...table.paths.keys()].filter(path => !DYNAMIC_PATH.test(path))], settings: i18n?.settings })
+    countMissing(app, { known: () => [...client.pages.keys(), ...[...table.paths.keys()].filter(path => !DYNAMIC_PATH.test(path))], settings: i18n?.settings, trailingSlash: options.trailingSlash })
 
   const respond = withPageHeaders(pageResponder({ client, renderOptions, prerendered, writes: countWrites(app), settings: i18n?.settings, transforms: pageHooks(options.extensions), pageFile: assetFiles({ clientDir: client.dir, publicDir: paths.public, base, aspects: options.images?.aspects }) }), securityOptions, security)
 
