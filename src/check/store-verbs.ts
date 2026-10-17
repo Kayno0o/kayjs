@@ -95,7 +95,7 @@ const STORE_SIBLINGS: Record<string, string[]> = {
   grants: ['clients', 'codes', 'refresh'],
 }
 
-// `members` or `grants` when the node is that part of a kayjs-auth store: a property of a literal given as a `store` or held in a variable of that name, beside the store's other parts, or a variable typed `AuthStore['members']`. An object named the same elsewhere is left alone.
+// `members` or `grants` when the node is that part of a kayjs-auth store: a property of the literal given as a `store` or held in a variable of that name (or, for `grants`, of its `oauth`), beside the store's other parts, or a variable typed `AuthStore['members']`. An object named the same elsewhere is left alone.
 function labelOf(node: t.Node, ancestors: t.Node[], source: string): string | undefined {
   if (node.type === 'VariableDeclarator') {
     const annotation = node.id.type === 'Identifier' && node.id.typeAnnotation ? source.slice(node.id.typeAnnotation.start!, node.id.typeAnnotation.end!) : ''
@@ -112,10 +112,36 @@ function labelOf(node: t.Node, ancestors: t.Node[], source: string): string | un
   if (name === undefined || !(name in STORE_SIBLINGS) || parent?.type !== 'ObjectExpression')
     return undefined
 
-  const insideStore = ancestors.some(ancestor => (ancestor.type === 'ObjectProperty' && !ancestor.computed && keyName(ancestor.key) === 'store') || (ancestor.type === 'VariableDeclarator' && ancestor.id.type === 'Identifier' && ancestor.id.name === 'store'))
+  const insideStore = isStoreLiteral(ancestors, ancestors.length - 1) || (name === 'grants' && ownerKey(ancestors, ancestors.length - 1) === 'oauth' && isStoreLiteral(ancestors, ownerIndex(ancestors, ancestors.length - 1) - 1))
   const beside = parent.properties.some(property => (property.type === 'ObjectProperty' || property.type === 'ObjectMethod') && !property.computed && STORE_SIBLINGS[name]!.includes(keyName(property.key) ?? ''))
 
   return insideStore || beside ? name : undefined
+}
+
+const WRAPPERS = new Set(['TSAsExpression', 'TSSatisfiesExpression', 'TSNonNullExpression', 'ParenthesizedExpression', 'TSTypeAssertion'])
+
+// The index of the property or variable that holds the object literal at `ancestors[index]`, past the `as` and `satisfies` around it.
+function ownerIndex(ancestors: t.Node[], index: number): number {
+  let at = index - 1
+
+  while (at >= 0 && WRAPPERS.has(ancestors[at]!.type))
+    at--
+
+  return at
+}
+
+function ownerKey(ancestors: t.Node[], index: number): string | undefined {
+  const owner = ancestors[ownerIndex(ancestors, index)]
+
+  if (owner?.type === 'ObjectProperty' && !owner.computed)
+    return keyName(owner.key)
+
+  return owner?.type === 'VariableDeclarator' && owner.id.type === 'Identifier' ? owner.id.name : undefined
+}
+
+// Whether the object literal at `ancestors[index]` is the value of a `store` property or variable.
+function isStoreLiteral(ancestors: t.Node[], index: number): boolean {
+  return index >= 0 && ancestors[index]?.type === 'ObjectExpression' && ownerKey(ancestors, index) === 'store'
 }
 
 function walk(node: t.Node, ancestors: t.Node[], visit: (node: t.Node, ancestors: t.Node[]) => void): void {

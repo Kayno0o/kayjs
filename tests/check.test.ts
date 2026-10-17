@@ -2424,13 +2424,15 @@ describe.concurrent('kay check, unused code', () => {
       'src/store.ts': 'import { memoryStore } from \'@kaynooo/kayjs-auth\'\n\nconst base = memoryStore()\n\nexport const store = { ...base, members: { ...base.members, remove: (a: string, b: string) => base.members!.delete(a, b) }, oauth: { ...base.oauth!, grants: { ...base.oauth!.grants, \'put\'(grant: never) { return base.oauth!.grants.upsert(grant) } } } }\n',
       'src/other.ts': 'import { memoryStore } from \'@kaynooo/kayjs-auth\'\n\nconst remove = () => true\nconst put = () => undefined\n\nexport const a = { users: {}, members: { remove }, oauth: { codes: {}, grants: { put, upsert: put } } }\nexport const b = { store: { members: { remove: remove, delete: remove } }, other: memoryStore }\nexport const team = { members: { remove: (id: string) => id }, grants: { put: 1 } }\nexport const typed: AuthStore[\'members\'] = { ...memoryStore().members!, remove }\n',
       'src/unrelated.ts': 'export const c = { store: {}, members: { remove: () => true }, grants: { put: () => undefined } }\n',
+      'src/nested.ts': 'import { memoryStore } from \'@kaynooo/kayjs-auth\'\n\nconst store = { team: { members: { remove: 1 }, deep: { grants: { put: 1 } } }, list: [{ members: { remove: 1 } }] }\nexport const config = { store: { cache: { members: { remove: 1 } } }, other: memoryStore }\nexport const real = { store: { members: { remove: 1 }, oauth: { grants: { put: 1 } } } }\nexport const wrapped = { store: { members: { remove: 1 } } as const }\n',
     })
 
     try {
       const { output } = await runCheck(root)
 
-      expect(output.match(/deprecated-store-verb/g)).toHaveLength(6)
+      expect(output.match(/deprecated-store-verb/g)).toHaveLength(9)
       expect(output).not.toContain('src/unrelated.ts')
+      expect(output.match(/nested\.ts:\d+/g)).toEqual(['nested.ts:5', 'nested.ts:5', 'nested.ts:6'])
       await runCheck(root, '--fix')
 
       const store = await Bun.file(join(root, 'src/store.ts')).text()
@@ -2439,6 +2441,7 @@ describe.concurrent('kay check, unused code', () => {
       expect(store).toContain('upsert(grant: never)')
       expect(await Bun.file(join(root, 'src/other.ts')).text()).toContain('members: { remove }, oauth: { codes: {}, grants: { put, upsert: put } }')
       expect((await runCheck(root)).output.match(/deprecated-store-verb/g)).toHaveLength(4)
+      expect(await Bun.file(join(root, 'src/nested.ts')).text()).toContain('team: { members: { remove: 1 }, deep: { grants: { put: 1 } } }')
       expect(await Bun.file(join(root, 'src/other.ts')).text()).toContain('team = { members: { remove: (id: string) => id }, grants: { put: 1 } }')
     }
     finally {
