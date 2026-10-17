@@ -125,6 +125,20 @@ Requests with no `Origin` (scripts, webhooks), safe methods and `Authorization: 
 
 ## Signing in with a password
 
+Passwords are 10 to 128 characters and usernames 2 to 32. The `rules` option changes them, and adds a check of your own for the password:
+
+```ts
+createAuth({
+  // ...
+  rules: {
+    password: { min: 12, check: password => /\d/.test(password) ? undefined : 'Add a digit.' },
+    username: { min: 3, max: 16 },
+  },
+})
+```
+
+`check` returns a problem code or a message, and the prebuilt pages show it as it is. Registering, resetting, changing a password and `createUser` all follow the rules, and so do the pages' hints. An island checks before posting with the same values: `passwordProblem(value, auth.features().rules)` from `@kaynooo/kayjs-auth/rules`, with `features().rules` passed down as a prop. A password longer than a ceiling you lowered later can still sign in.
+
 Methods that can fail answer `{ ok: true, ... }` or `{ ok: false, error }`, with codes such as `'invalid'` or `'limited'`. Your page words them.
 
 ```kay

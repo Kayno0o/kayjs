@@ -28,6 +28,16 @@ async function lifetimeOf(email: string): Promise<number | null> {
 
 const linkOf = (kind: string) => new URL(mails.findLast(mail => mail.kind === kind)!.url!)
 
+if (process.env.FIXTURE_RULES) {
+  // The register page hints, constrains and words a refusal by the app's rules, not the defaults.
+  const page = await site.visit('/auth/register')
+  const refused = await site.submit(register, { email: 'rules@example.com', password: 'twelve chars!' }, { from: page })
+  const short = await site.submit(register, { email: 'rules@example.com', password: 'only11chars' }, { from: await site.visit('/auth/register') })
+
+  console.log(JSON.stringify({ hint: page.find('.kui-form-field-hint').map(hint => hint.text), minlength: page.find('input[name="password"]')[0]?.attributes.minlength, check: refused.find('.kui-form-field-issue').map(issue => issue.text), short: short.find('.kui-form-field-issue').map(issue => issue.text) }))
+  process.exit(0)
+}
+
 const out: Record<string, unknown> = { signIn: await shown('/auth/sign-in'), register: await shown('/auth/register') }
 
 // A newcomer lands where the page sends them, and a sign-in with the box left alone lasts what the setting says.

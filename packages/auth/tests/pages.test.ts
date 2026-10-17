@@ -55,6 +55,7 @@ describe('features', () => {
       oauthServer: false,
       signInPage: '/',
       pages: null,
+      rules: { password: { min: 10, max: 128 }, username: { min: 2, max: 32 } },
     })
   })
 

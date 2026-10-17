@@ -1,7 +1,6 @@
 --- server
 import { localPath } from 'kay'
 import { localize, t } from 'kay/i18n'
-import { PASSWORD_MIN_LENGTH } from '../../rules'
 import Captcha from '../components/captcha.kay'
 import Message from '../components/message.kay'
 import Panel from '../components/panel.kay'
@@ -60,8 +59,8 @@ Panel(title={t('auth.register.title')})
       input(type="hidden" name="redirect" value={redirect})
       FormField(label={t('auth.email')} issue={fields.email && issue('email', fields.email)} required)
         input(name="email" type="email" autocomplete="email" required)
-      FormField(label={t('auth.password')} hint={t('auth.passwordHint', { min: PASSWORD_MIN_LENGTH })} issue={fields.password && issue('password', fields.password)} required)
-        input(name="password" type="password" autocomplete="new-password" minlength={PASSWORD_MIN_LENGTH} required)
+      FormField(label={t('auth.password')} hint={t('auth.passwordHint', { min: features.rules.password.min })} issue={fields.password && issue('password', fields.password, features.rules)} required)
+        input(name="password" type="password" autocomplete="new-password" minlength={features.rules.password.min} required)
       if askRemember
         label.flex.items-center.gap-2
           input(name="remember" type="checkbox")

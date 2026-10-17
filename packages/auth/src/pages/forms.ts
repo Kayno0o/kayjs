@@ -7,7 +7,7 @@ import type en from './messages/en'
 import { t } from 'elysia'
 import { t as message } from 'kay/i18n'
 import { passkeyAssertion, passkeyAttestation } from '../payloads'
-import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH, PROFILE_MAX_LENGTH, USERNAME_MAX_LENGTH, USERNAME_MIN_LENGTH } from '../rules'
+import { PROFILE_MAX_LENGTH } from '../rules'
 
 // The codes the pages word, as the English catalog, which every other language mirrors, holds them: a code a flow answers with no message is a type error here.
 type Catalog = typeof en['auth']
@@ -18,6 +18,7 @@ type Problem<Field extends keyof Fields> = keyof Fields[Field]
 
 // Stands for a `minTime` refusal's reason, which kay words before the request's locale is known: `refusal` puts it in the page's language.
 const MIN_TIME = 'kayjs-auth-min-time:'
+const PASSWORD_PROBLEMS: ReadonlySet<string> = new Set<Problem<'password'>>(['too-short', 'too-long', 'breached'])
 const OAUTH_FAILURES: ReadonlySet<string> = new Set<OAuthFailureCode>(['oauth', 'cancelled', 'refused', 'taken', 'unavailable', 'signed-out', 'banned'])
 
 // What the prebuilt pages' actions take. A field longer than kayjs-auth would ever accept is refused here rather than read.
@@ -147,12 +148,12 @@ export function refusal(failed: { errors: Partial<Record<string, string>>, data?
   return error === 'captcha' || error === 'captchaScript' ? failure(captchaFailure(captcha, error)) : failure(error)
 }
 
-// What a page shows under a field refused for `problem`, with the limits the rule holds it to.
-export function issue(...[field, problem]: [field: 'email', problem: Problem<'email'>] | [field: 'password', problem: Problem<'password'>] | [field: 'username', problem: Problem<'username'>]): string {
+// What a page shows under a field refused for `problem`, with the limits the app's rules hold it to. A password problem the app's own `check` returned that has no message of the page's shows as it is.
+export function issue(...[field, problem, rules]: [field: 'email', problem: Problem<'email'>, rules?: undefined] | [field: 'password', problem: Problem<'password'> | (string & {}), rules: AuthFeatures['rules']] | [field: 'username', problem: Problem<'username'>, rules: AuthFeatures['rules']]): string {
   switch (field) {
     case 'email': return message(`auth.fields.email.${problem}`)
-    case 'password': return message(`auth.fields.password.${problem}`, { min: PASSWORD_MIN_LENGTH, max: PASSWORD_MAX_LENGTH })
-    case 'username': return message(`auth.fields.username.${problem}`, { min: USERNAME_MIN_LENGTH, max: USERNAME_MAX_LENGTH })
+    case 'password': return PASSWORD_PROBLEMS.has(problem) ? message(`auth.fields.password.${problem as Problem<'password'>}`, { min: rules.password.min, max: rules.password.max }) : problem
+    case 'username': return message(`auth.fields.username.${problem}`, { min: rules.username.min, max: rules.username.max })
   }
 }
 

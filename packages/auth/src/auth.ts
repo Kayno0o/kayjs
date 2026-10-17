@@ -20,7 +20,7 @@ import type { AuthFeatures, AuthPagesConfig, ProfileFieldView, ProfileProblem } 
 import type { Passkey, PasskeyOptionsResult, PasskeySignInResult, RegisterPasskeyResult } from './passkeys'
 import type { CreateUserInput, CreateUserResult, PasswordSignInInput, PasswordSignInResult, RegisterInput, RegisterResult } from './password'
 import type { RoleHierarchy } from './roles'
-import type { PasswordProblem } from './rules'
+import type { CredentialRules, PasswordProblem } from './rules'
 import type { UserSession } from './sessions'
 import type { RequestState } from './state'
 import type { AuthStore, LinkType, SessionRecord, UserRecord } from './store'
@@ -40,7 +40,7 @@ import { bearerRequest, bearerUser, createToken, issueToken, listTokens, revokeT
 import { pwnedPassword } from './breached'
 import { admit, captchaChallenge, captchaRequired, proofOfWork } from './captcha'
 import { banned, homeOf, newUserRecord, publicUser } from './core'
-import { changeEmail, confirmEmailChange, pendingCode, requestMagicLink, requestPasswordReset, resetPassword, sendVerification, signInWithEmailCode, signInWithMagicLink, verifyEmail, verifyEmailCode } from './email'
+import { changeEmail, confirmEmailChange, pendingCode, requestMagicLink, requestPasswordReset, resetPassword, sendVerification, signInWithEmailCode, signInWithMagicLink, tokenLifetimes, verifyEmail, verifyEmailCode } from './email'
 import { auditEntries, report } from './events'
 import { exportData } from './export'
 import { createGate, scopeAllows } from './gate'
@@ -61,7 +61,7 @@ import { createUser, register, signInWithPassword } from './password'
 import { pruneWhenDue } from './prune'
 import { meetsRequirement } from './requirement'
 import { createRoleHierarchy } from './roles'
-import { PROFILE_MAX_LENGTH } from './rules'
+import { PROFILE_MAX_LENGTH, resolveRules } from './rules'
 import { applyLifetime, chooseRemember, listSessions, liveSession, openSession, revokeBearerTokens } from './sessions'
 import { challenged, completeSignIn, disableTwoFactor, enableTwoFactor, provedLately, regenerateRecoveryCodes, reprove, setUpTwoFactor, verifyTwoFactor } from './twoFactor'
 
@@ -158,6 +158,8 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   defaultRoles?: NoInfer<Role>[] | undefined
   // How long a session lives unseen when its sign-in asked to be remembered, `remember: true`: seconds or a string such as '90d', 90 days by default. The other lifetimes are the session plugin's own: its `maxAge` without a choice, its `browserMaxAge` for `remember: false`, and its `absoluteMaxAge` from the sign-in however much it is used, "remember me" included.
   rememberMaxAge?: Duration | undefined
+  // The password and username rules, over the defaults of 10 to 128 characters and 2 to 32: `{ password: { min: 12, check: p => /\\d/.test(p) ? undefined : 'Add a digit.' }, username: { min: 3, max: 16 } }`. The server, the prebuilt pages and `features().rules` all follow them, and an island passes the same object, or `features().rules`, to `passwordProblem` and `usernameProblem` from `@kaynooo/kayjs-auth/rules`.
+  rules?: CredentialRules | undefined
   // The app's page listing where the user is signed in, linked from new sign-in mails: `/account/sessions`.
   sessionsPage?: string | undefined
   // Where an address is, shown beside each session, from a geolocation database of the app's: `ip => cityOf(ip)`.
@@ -1302,6 +1304,7 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
     site: options.site ?? (url === undefined ? 'kayjs-auth' : new URL(url).host),
     limits: resolveLimits(options.limits),
     rememberMaxAge: options.rememberMaxAge === undefined ? DEFAULT_REMEMBER_MAX_AGE : durationSeconds(options.rememberMaxAge, 'rememberMaxAge', 'kayjs-auth'),
+    rules: resolveRules(options.rules),
     sessionsPage: options.sessionsPage ?? paths?.sessions,
     locate: options.locate,
     scopes: new Set(options.scopes),

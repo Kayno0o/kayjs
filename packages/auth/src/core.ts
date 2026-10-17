@@ -11,6 +11,7 @@ import type { OAuthProvider, OAuthUser } from './oauth/types'
 import type { OrganizationsCore } from './organizations'
 import type { ProfileOptions, RememberMode } from './pages'
 import type { PasskeyChallenge, Relying } from './passkeys'
+import type { ResolvedRules } from './rules'
 import type { AuthStore, IdentityRecord, UserRecord } from './store'
 import type { Challenge } from './twoFactor'
 
@@ -88,6 +89,8 @@ export interface Core {
   limits: Limits
   // Seconds a session signed in with `remember: true` lives unseen.
   rememberMaxAge: number
+  // The password and username rules, the defaults over the app's `rules`.
+  rules: ResolvedRules
   // The app's page listing the user's sessions, linked from new sign-in mails.
   sessionsPage?: string | undefined
   // Where an address is, such as a city, shown beside each session.

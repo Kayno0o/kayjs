@@ -1,6 +1,5 @@
 --- server
 import { formatDate, t } from 'kay/i18n'
-import { PASSWORD_MIN_LENGTH } from '../../../rules'
 import Message from '../../components/message.kay'
 import PasskeyAdd from '../../components/passkey-add.kay'
 import Proof from '../../components/proof.kay'
@@ -90,8 +89,8 @@ PageSection(title={t('auth.account.password.title')})
     if !user.hasPassword
       p {t('auth.account.password.none')}
     Proof(user={user})
-    FormField(label={t('auth.newPassword')} hint={t('auth.passwordHint', { min: PASSWORD_MIN_LENGTH })} issue={passwordRefused && 'password' in passwordRefused ? issue('password', passwordRefused.password) : undefined} required)
-      input(name="newPassword" type="password" autocomplete="new-password" minlength={PASSWORD_MIN_LENGTH} required)
+    FormField(label={t('auth.newPassword')} hint={t('auth.passwordHint', { min: features.rules.password.min })} issue={passwordRefused && 'password' in passwordRefused ? issue('password', passwordRefused.password, features.rules) : undefined} required)
+      input(name="newPassword" type="password" autocomplete="new-password" minlength={features.rules.password.min} required)
     if passwordSaved
       Message(tone="success" text={t('auth.account.password.changed')})
     if passwordRefused && 'error' in passwordRefused

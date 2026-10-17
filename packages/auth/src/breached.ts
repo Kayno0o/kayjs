@@ -31,9 +31,9 @@ export async function pwnedPassword(password: string): Promise<boolean> {
 
 // The rules' problem with a new password, or `breached` when the app checks for those and the check finds it. A check that fails lets the password through, logged, so an outage never stops anyone registering.
 export async function newPasswordProblem(core: Core, password: string): Promise<PasswordProblem | 'breached' | undefined> {
-  const problem = passwordProblem(password)
+  const problem = passwordProblem(password, core.rules)
 
-  if (problem || !core.breached)
+  if (problem !== undefined || !core.breached)
     return problem
 
   try {

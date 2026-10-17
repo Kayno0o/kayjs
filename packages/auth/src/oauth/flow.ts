@@ -267,7 +267,7 @@ async function signUp(core: Core, profile: Profile, locale: string | null, guest
   const name = normalizeUsername(profile.username)
   const freeEmail = email !== undefined && !(await core.store.users.findByEmail(email)) ? email : null
   // A name these rules refuse is left out too: the user picks one later.
-  const freeName = !usernameProblem(name) && !(await core.store.users.findByUsername(name)) ? name : null
+  const freeName = !usernameProblem(name, core.rules) && !(await core.store.users.findByUsername(name)) ? name : null
 
   if (guest) {
     const patch = { email: freeEmail, emailVerifiedAt: freeEmail === null ? null : new Date(), username: guest.username ?? freeName, guest: false }

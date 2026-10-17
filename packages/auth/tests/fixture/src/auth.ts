@@ -5,6 +5,7 @@ import { createAuth } from '../../../src/auth'
 import { memoryStore } from '../../../src/memoryStore'
 import { discordProvider } from '../../../src/oauth/providers'
 
+const DIGIT = /\d/
 const SECRET = 'a-fixture-secret-that-is-long-enough-for-kay'
 
 // Every mail the site sends, read by the test.
@@ -22,6 +23,8 @@ export const auth = createAuth({
   url: 'http://localhost',
   site: 'Fixture',
   scopes: ['notes:read'],
+  // A run of tests/variants.ts serves the fixture with the app's own credential rules.
+  ...process.env.FIXTURE_RULES && { rules: { password: { min: 12, check: (value: string) => DIGIT.test(value) ? undefined : 'Add a digit.' }, username: { min: 3, max: 16 } } },
   pages: {
     // A run of tests/variants.ts serves the fixture with another landing page and another remember setting, through the environment.
     ...process.env.FIXTURE_HOME && { home: process.env.FIXTURE_HOME },

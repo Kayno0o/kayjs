@@ -47,3 +47,12 @@ test('with pages.remember never under a base, the pages show no box, the provide
     'reset-en': '/app/dashboard',
   })
 }, 60_000)
+
+test('with the app\'s credential rules, the register page hints, constrains and words a refusal by them', async () => {
+  expect(await variant({ FIXTURE_RULES: '1' })).toEqual({
+    hint: ['At least 12 characters'],
+    minlength: '12',
+    check: ['Add a digit.'],
+    short: ['Use at least 12 characters.'],
+  })
+}, 60_000)

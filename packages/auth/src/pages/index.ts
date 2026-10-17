@@ -87,6 +87,8 @@ export interface AuthFeatures {
   signInPage: string
   // The prebuilt pages' prefix and home; null without them.
   pages: { prefix: string, home: string, remember: RememberMode } | null
+  // The password and username limits, for a page or an island to show and check with: `passwordProblem(value, features.rules)`. The password rule's `check` stays on the server and in the app's own `rules`.
+  rules: { password: { min: number, max: number }, username: { min: number, max: number } }
 }
 
 const DEFAULT_PREFIX = '/auth'
@@ -114,6 +116,7 @@ export function featuresOf(core: Core): AuthFeatures {
     prefix: core.prefix,
     oauthServer: core.oauthServer !== undefined,
     signInPage: core.signInPage,
+    rules: { password: { min: core.rules.password.min, max: core.rules.password.max }, username: { ...core.rules.username } },
     pages: core.pages ? { prefix: core.pages.prefix, home: core.pages.home, remember: core.pages.remember } : null,
   }
 }

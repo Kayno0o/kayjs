@@ -75,7 +75,7 @@ PageSection(title={t('auth.account.profile.title')})
           Message(text={failure(resendError)})
         Button(type="submit" label={t('auth.account.profile.resend')})
     form.flex.flex-col.gap-3(action={changeUsername})
-      FormField(label={t('auth.account.profile.username')} issue={usernameRefused && 'username' in usernameRefused ? issue('username', usernameRefused.username) : undefined})
+      FormField(label={t('auth.account.profile.username')} issue={usernameRefused && 'username' in usernameRefused ? issue('username', usernameRefused.username, features.rules) : undefined})
         input(name="username" value={user.username ?? ''} autocomplete="username" required)
       if usernameSaved
         Message(tone="success" text={t('auth.account.profile.usernameSaved')})

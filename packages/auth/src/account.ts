@@ -17,7 +17,7 @@ import { reprove } from './twoFactor'
 export async function changePassword(state: RequestState, proof: Proof, password: string): Promise<{ ok: true } | { ok: false, error: ProofFailure } | { ok: false, errors: { password: PasswordProblem | 'breached' } }> {
   const problem = await newPasswordProblem(state.core, password)
 
-  if (problem)
+  if (problem !== undefined)
     return { ok: false, errors: { password: problem } }
 
   const proved = await reprove(state, proof)
@@ -46,7 +46,7 @@ export async function changeUsername(state: RequestState, username: string): Pro
     return { ok: false, error: 'signed-out' }
 
   const name = normalizeUsername(username)
-  const problem = usernameProblem(name)
+  const problem = usernameProblem(name, state.core.rules)
 
   if (problem)
     return { ok: false, errors: { username: problem } }

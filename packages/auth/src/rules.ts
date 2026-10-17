@@ -16,7 +16,8 @@ const WHITESPACE = /\s+/g
 const CONFUSABLE_SCRIPTS = [/\p{Script=Latin}/u, /\p{Script=Cyrillic}/u, /\p{Script=Greek}/u]
 
 export type EmailProblem = 'invalid'
-export type PasswordProblem = 'too-short' | 'too-long'
+// `too-short`, `too-long`, or the code or message an app's `check` returned.
+export type PasswordProblem = 'too-short' | 'too-long' | (string & {})
 export type UsernameProblem = 'length' | 'characters' | 'mixed-scripts'
 
 // The form an email is stored, compared and looked up in.
@@ -40,17 +41,76 @@ export function emailProblem(email: string): EmailProblem | undefined {
   return EMAIL.test(normalized) && normalized.length <= EMAIL_MAX_LENGTH && !mixesConfusableScripts(normalized.slice(0, normalized.lastIndexOf('@'))) ? undefined : 'invalid'
 }
 
-export function passwordProblem(password: string): PasswordProblem | undefined {
-  if (password.length < PASSWORD_MIN_LENGTH)
-    return 'too-short'
-
-  return password.length > PASSWORD_MAX_LENGTH ? 'too-long' : undefined
+// What an app sets over the defaults, in the `rules` option of `createAuth`, and the same object an island passes to `passwordProblem` and `usernameProblem`.
+export interface CredentialRules {
+  password?: {
+    // 10 by default.
+    min?: number | undefined
+    // 128 by default: Argon2id has no ceiling of its own.
+    max?: number | undefined
+    // An extra rule on top of the length ones, returning a problem code or a message for what it refuses, such as `p => /\d/.test(p) ? undefined : 'Add a digit.'`. A message is shown as it is by the prebuilt pages unless the code has an `auth.fields.password.<code>` message.
+    check?: ((password: string) => string | undefined) | undefined
+  } | undefined
+  username?: {
+    // 2 by default.
+    min?: number | undefined
+    // 32 by default.
+    max?: number | undefined
+  } | undefined
 }
 
-export function usernameProblem(username: string): UsernameProblem | undefined {
-  const name = normalizeUsername(username)
+// The rules with every limit set, as `features().rules` hands them to a page or an island.
+export interface ResolvedRules {
+  password: { min: number, max: number, check?: ((password: string) => string | undefined) | undefined }
+  username: { min: number, max: number }
+}
 
-  if (name.length < USERNAME_MIN_LENGTH || name.length > USERNAME_MAX_LENGTH)
+export const DEFAULT_RULES: ResolvedRules = { password: { min: PASSWORD_MIN_LENGTH, max: PASSWORD_MAX_LENGTH }, username: { min: USERNAME_MIN_LENGTH, max: USERNAME_MAX_LENGTH } }
+
+function limit(value: number | undefined, fallback: number, name: string): number {
+  if (value === undefined)
+    return fallback
+
+  if (!Number.isInteger(value) || value < 1)
+    throw new Error(`kayjs-auth: rules.${name} is ${value}, a whole number of at least 1`)
+
+  return value
+}
+
+// The rules with the defaults filled in, refusing a range that no value fits.
+export function resolveRules(rules: CredentialRules = {}): ResolvedRules {
+  const password = { min: limit(rules.password?.min, PASSWORD_MIN_LENGTH, 'password.min'), max: limit(rules.password?.max, PASSWORD_MAX_LENGTH, 'password.max'), check: rules.password?.check }
+  const username = { min: limit(rules.username?.min, USERNAME_MIN_LENGTH, 'username.min'), max: limit(rules.username?.max, USERNAME_MAX_LENGTH, 'username.max') }
+
+  if (password.min > password.max)
+    throw new Error(`kayjs-auth: rules.password.min is ${password.min}, over rules.password.max ${password.max}`)
+
+  if (username.min > username.max)
+    throw new Error(`kayjs-auth: rules.username.min is ${username.min}, over rules.username.max ${username.max}`)
+
+  return { password, username }
+}
+
+// The rules an app set, over the defaults when none are given: an island passes `features().rules` it was handed, or the object the app gave `createAuth`.
+export function passwordProblem(password: string, rules: CredentialRules = DEFAULT_RULES): PasswordProblem | undefined {
+  const { min, max, check } = resolveRules(rules).password
+
+  if (password.length < min)
+    return 'too-short'
+
+  if (password.length > max)
+    return 'too-long'
+
+  const problem = check?.(password)
+
+  return problem === '' ? undefined : problem
+}
+
+export function usernameProblem(username: string, rules: CredentialRules = DEFAULT_RULES): UsernameProblem | undefined {
+  const name = normalizeUsername(username)
+  const { min, max } = resolveRules(rules).username
+
+  if (name.length < min || name.length > max)
     return 'length'
 
   if (!USERNAME.test(name))
