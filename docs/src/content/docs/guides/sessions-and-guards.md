@@ -126,6 +126,12 @@ The cookie is `HttpOnly` and `SameSite=Lax`. Over https it is `Secure` and named
 
 `cookie` changes the name from `session`.
 
+`sameSite` changes what the browser does with it on a request another site starts. `'lax'`, the default, sends it on a link followed from elsewhere and not on a post.
+
+`'strict'` sends it on neither, so a visitor arriving from another site is signed out until they navigate within yours, and a provider redirecting back to a sign-in fails.
+
+`'none'` sends it everywhere, for a site embedded in another's page. It is always `Secure`, as browsers drop it otherwise, so over plain http only `localhost` keeps it. Any other value throws. The cross-site check on actions refuses a post from another site whatever the cookie.
+
 To share the session between subdomains, such as `app.example.com` and `auth.example.com`, set `domain` to the visited host or a parent of it. The cookie then loses the `__Host-` prefix, since that prefix forbids a domain.
 
 ```ts

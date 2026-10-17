@@ -292,6 +292,24 @@ describe('sessions', () => {
     expect((await counter({ domain: 'example.com' }).handle(new Request('http://localhost/count', { headers: https }))).headers.getSetCookie()[0]).toMatch(/^session=.*; Domain=example\.com; .*Secure/i)
   })
 
+  it('sends the cookie SameSite=Lax unless told another, Strict or None', async () => {
+    const https = { 'x-forwarded-proto': 'https' }
+    const cookie = async (options: Partial<Parameters<typeof session>[0]>, headers: Record<string, string> = {}) => (await counter(options).handle(new Request('http://localhost/count', { headers }))).headers.getSetCookie()[0]!
+
+    expect(await cookie({})).toMatch(/; SameSite=Lax$/i)
+    expect(await cookie({ sameSite: 'strict' })).toMatch(/; HttpOnly; SameSite=Strict$/i)
+    expect(await cookie({ sameSite: 'strict' }, https)).toMatch(/^__Host-session=.*; Secure; HttpOnly; SameSite=Strict$/i)
+    expect(await cookie({ sameSite: 'none' }, https)).toMatch(/^__Host-session=.*; Secure; HttpOnly; SameSite=None$/i)
+    // Browsers drop a SameSite=None cookie that is not Secure, so it never goes out without it, over plain http included.
+    expect(await cookie({ sameSite: 'none' })).toMatch(/^session=.*; Secure; HttpOnly; SameSite=None$/i)
+    expect(await cookie({ sameSite: 'none', domain: 'example.com' })).toMatch(/Domain=example\.com; .*Secure.*SameSite=None$/i)
+  })
+
+  it('refuses a sameSite that is none of lax, strict and none', () => {
+    for (const sameSite of ['Lax', 'NONE', '', 'relaxed', true, 1, null])
+      expect(() => session({ secret: SECRET, sameSite: sameSite as never })).toThrow('sameSite')
+  })
+
   it('in production with an https site, takes a request without X-Forwarded-Proto as https, one with it as it says', async () => {
     const env = process.env.NODE_ENV ?? 'test'
     const before = configuredSite()

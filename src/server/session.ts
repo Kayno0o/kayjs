@@ -28,6 +28,10 @@ export interface SessionStore {
   deleteWhere?: ((match: (data: SessionData) => boolean) => number | Promise<number>) | undefined
 }
 
+export type SameSite = 'lax' | 'strict' | 'none'
+
+const SAME_SITE = new Set<unknown>(['lax', 'strict', 'none'])
+
 export interface SessionOptions {
   // At least 32 characters, from the environment. A list rotates them: the first seals new cookies, every one opens old ones.
   secret: string | string[]
@@ -41,6 +45,8 @@ export interface SessionOptions {
   browserMaxAge?: Duration | undefined
   // The parent domain sibling hosts share the session under, `example.com` for `app.example.com` and `auth.example.com`, the visited host or a parent of it; the cookie is the visited host's only without it.
   domain?: string | undefined
+  // Whether the browser sends the cookie along a request another site starts, a link followed or a form posted from there: `'lax'` by default sends it on a link's navigation and not on a post; `'strict'` on neither, so a visitor following a link from elsewhere arrives signed out; `'none'` on all, for a site embedded in another's page, and always `Secure`, which browsers ask of it.
+  sameSite?: SameSite | undefined
   // Keeps the data server-side, the cookie carrying only an id; without one the data travels sealed in the cookie, about 3.5 KB at most.
   store?: SessionStore | undefined
 }
@@ -101,7 +107,7 @@ type SqliteSessionStore = SessionStore & { deleteWhere: NonNullable<SessionStore
 const sqliteStores = new Map<string, { store: SqliteSessionStore, reopen: () => void }>()
 
 // Sessions for kay pages and plain Elysia routes alike, as `session` in the context: `ctx.locals.session` in a page, an action or a guard.
-// The cookie is read on first use and written only when the session changed or is due an extension; it is HttpOnly, SameSite=Lax, and over https Secure and named `__Host-` unless shared under a domain.
+// The cookie is read on first use and written only when the session changed or is due an extension; it is HttpOnly, SameSite=Lax unless `sameSite` says another, and over https Secure and named `__Host-` unless shared under a domain.
 export function session<Data extends object = SessionData>(options: SessionOptions) {
   const secrets = [options.secret].flat()
 
@@ -119,7 +125,10 @@ export function session<Data extends object = SessionData>(options: SessionOptio
   if (domain !== undefined && !COOKIE_DOMAIN.test(domain))
     throw new KayError('config-invalid', `kay: the session domain is ${JSON.stringify(options.domain)}, which is no host name such as example.com`)
 
-  const config = { name: options.cookie ?? 'session', maxAge: options.maxAge === undefined ? DEFAULT_MAX_AGE : durationSeconds(options.maxAge, 'the session maxAge'), absoluteMaxAge: options.absoluteMaxAge === undefined ? DEFAULT_ABSOLUTE_MAX_AGE : durationSeconds(options.absoluteMaxAge, 'the session absoluteMaxAge'), browserMaxAge: options.browserMaxAge === undefined ? DEFAULT_BROWSER_MAX_AGE : durationSeconds(options.browserMaxAge, 'the session browserMaxAge'), domain, store: options.store, keys }
+  if (options.sameSite !== undefined && !SAME_SITE.has(options.sameSite))
+    throw new KayError('config-invalid', `kay: the session sameSite is ${JSON.stringify(options.sameSite)}, which is none of 'lax', 'strict' and 'none'`)
+
+  const config = { name: options.cookie ?? 'session', sameSite: options.sameSite ?? 'lax', maxAge: options.maxAge === undefined ? DEFAULT_MAX_AGE : durationSeconds(options.maxAge, 'the session maxAge'), absoluteMaxAge: options.absoluteMaxAge === undefined ? DEFAULT_ABSOLUTE_MAX_AGE : durationSeconds(options.absoluteMaxAge, 'the session absoluteMaxAge'), browserMaxAge: options.browserMaxAge === undefined ? DEFAULT_BROWSER_MAX_AGE : durationSeconds(options.browserMaxAge, 'the session browserMaxAge'), domain, store: options.store, keys }
 
   return new Elysia({ name: 'kay/session', seed: config.name })
     .derive({ as: 'scoped' }, ({ request }) => ({ session: new RequestSession<Data>(request, config) }))
@@ -146,6 +155,7 @@ export function session<Data extends object = SessionData>(options: SessionOptio
 
 interface SessionConfig {
   name: string
+  sameSite: SameSite
   maxAge: number
   absoluteMaxAge: number
   browserMaxAge: number
@@ -316,7 +326,7 @@ class RequestSession<Data extends object> implements Session<Data> {
 
   // Without `maxAge`, a cookie the browser drops on closing.
   private cookie(value: string, maxAge: number | undefined): string {
-    return new Bun.Cookie(this.name, value, { path: '/', ...this.config.domain === undefined ? {} : { domain: this.config.domain }, httpOnly: true, sameSite: 'lax', secure: this.secure, ...maxAge === undefined ? {} : { maxAge } }).serialize()
+    return new Bun.Cookie(this.name, value, { path: '/', ...this.config.domain === undefined ? {} : { domain: this.config.domain }, httpOnly: true, sameSite: this.config.sameSite, secure: this.secure || this.config.sameSite === 'none', ...maxAge === undefined ? {} : { maxAge } }).serialize()
   }
 }
 
