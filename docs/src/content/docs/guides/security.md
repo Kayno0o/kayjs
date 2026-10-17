@@ -163,7 +163,37 @@ export default guard(async ({ request, headers, deny }) => {
 
 Pass your own key to count something other than the client, such as `visits.hit(user.email)`.
 
-Honeypots, a minimum time and proof of work protect a form from bots too. They are in [Forms and actions](/essentials/forms-and-actions#rate-limit-honeypot-minimum-time-and-proof-of-work).
+Honeypots, a minimum time and proof of work protect a form from bots too. `minTime` also takes `plain: true` for plain forms only. They are in [Forms and actions](/essentials/forms-and-actions#rate-limit-honeypot-minimum-time-and-proof-of-work).
+
+## Proof of work checked in your own code
+
+`proofOfWork: true` on an action checks the work for you. For a form your code checks itself, such as a sign-up handled in an API route, `workChallenge` and `verifyWork` from `kay/server` do the same, bound to a name you pick.
+
+```kay
+---
+import { workChallenge } from 'kay/server'
+---
+form(method="post" action="/api/contact")
+  input(type="hidden" name="proof" data-kay-work={workChallenge('contact')})
+  button Send
+```
+
+kay's script solves the challenge once the form takes focus, and posts the solution as the field's value. The handler checks it.
+
+```ts
+import { verifyWork } from 'kay/server'
+
+const refusal = await verifyWork(input.proof, 'contact')
+
+if (refusal !== undefined)
+  deny(422, 'Please try again')
+```
+
+`verifyWork` answers `undefined` once for each solution. Otherwise it says `missing`, `expired` or `wrong`. A solution can pass only once, so replaying one fails.
+
+Both take a `difficulty`, 100,000 by default, and `workChallenge` takes a `maxAge`, a day by default. Pass `store` to `verifyWork`, such as `sqliteRates(path)`, to share the used solutions between processes.
+
+<ReadMore href="/llms/action-protection#proof-of-work-checked-in-code">The refusal values and what a prerendered page does.</ReadMore>
 
 ## The request body limit
 

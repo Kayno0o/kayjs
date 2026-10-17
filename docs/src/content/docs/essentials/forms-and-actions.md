@@ -92,6 +92,35 @@ While the post is refused, `error title` renders `p.error` with the message. The
 
 Anywhere else, `add.error('title')` reads the message.
 
+### A component that holds the field
+
+A form field component writes the control its parent hands it as a slot. It cannot give that control an `id`, so it ties the control to its hint with `describeField` from `kay`. Call it in the component's script with the ids to add.
+
+```kay
+---
+import { describeField, uid } from 'kay'
+
+const { hint } = props<{ hint: string }>()
+const hintId = uid()
+
+describeField(hintId)
+---
+slot
+small(id={hintId}) {hint}
+```
+
+The first `input`, `select` or `textarea` the component renders gets `hintId` in its `aria-describedby`, after the ids kay adds for a refused field.
+
+A component that checks the field its own way marks it with `markInvalid(element, by, invalid)` from `kay`. `by` is any value naming the check, such as the component. The field stays `aria-invalid` while any source holds it, so the schema refusing it and your check do not undo each other.
+
+```ts
+import { markInvalid } from 'kay'
+
+markInvalid(input, 'length', input.value.length < 8)
+```
+
+<ReadMore href="/llms/navigation#forms-posting-in-place">What `describeField` skips, and `focusInvalid` after your own writes.</ReadMore>
+
 ## Failing on purpose
 
 A handler refuses a post with `ctx.fail(status, data)`. The page reads `data` with `add.failed()?.data`.
@@ -186,6 +215,36 @@ While an island's `onSubmit` returns a promise, the form and its submit buttons 
 
 Once a call goes through, the page's loads run again, so its list is up to date. `add({ title }, { refresh: false })` leaves the page as it is.
 
+### Showing a change before the server answers
+
+`optimistic` writes your signals at once. If the call fails, they go back to what they held.
+
+```kay
+---
+import { move } from '../routes/board.kay'
+
+const { id } = props<{ id: number }>()
+const column = signal('todo')
+---
+button(onClick={() => move({ id, to: 'done' }, { optimistic: () => column.set('done') })}) Done
+p {column()}
+```
+
+The call still throws when it fails. While it runs, `pending()` follows its own request. Let one call finish before the next on the same signal, as `move.pending()` tells, or a failure may leave the earlier value.
+
+### Aborting a call
+
+Pass an `AbortSignal` as `signal`. The call rejects with the signal's reason, what `optimistic` showed goes back, and the action records no outcome.
+
+```ts
+const controller = new AbortController()
+
+search({ query }, { signal: controller.signal })
+controller.abort()
+```
+
+The server may still have run a call that was already sent, so the page refreshes as after any other, unless `refresh: false`.
+
 ## Fixed fields
 
 A button that always posts the same values, such as a row's move-up arrow, needs no hidden inputs. `with` gives the action with its fields fixed. The form carries them without JavaScript too.
@@ -234,9 +293,19 @@ Any answer other than success gives `{ ok: false, status, errors, data }`. `erro
 
 A success gives `{ ok: true, data }`. A failure with no answer from the server, such as a lost connection, still throws.
 
+In a server fence, `ctx.failed(add)` and `ctx.succeeded(add)` read the same outcome as `add.failed()` and `add.succeeded()` in a template. Each gives `undefined` when there is none.
+
 ## File uploads
 
 Use `s.File()` in the schema and `input(type="file" name="avatar")` in the form. The handler receives a `File`, which `files.put` stores.
+
+`s.Files()` takes several files from one field.
+
+A form that posts to an action is sent as `multipart/form-data` unless it sets its own `enctype`. An empty file input counts as no file, so `s.Optional(s.File())` works.
+
+An island passes a `File` or `Blob` anywhere in its input: `await upload({ avatar: input.files[0] })`.
+
+`s.File({ type: 'image/png' })` checks the file's bytes, not its name or the type the browser declared. That holds for a top-level field only. A nested file is checked against the type it declares.
 
 A post carries 1 MB at most. Raise `bodyLimit` in the third argument of `action`. See [File storage](/guides/file-storage).
 
@@ -262,6 +331,8 @@ The third argument of `action` protects it from scripts.
 
 `rateLimit` answers 429 past `max` posts per `window`. `honeypot` names a hidden field that kay renders for you and bots fill in. `minTime` refuses a form posted sooner than that after its page rendered.
 
+`minTime` checks a form posted without JavaScript, and an island's call carries no stamp. Write `minTime: { after: '3s', plain: true }` to check only the plain post. The page swap and an island's call then go through, which suits a form whose script already proves something, such as a proof of work.
+
 For spam that still gets through, `proofOfWork: true` makes each post cost the sender CPU, with no third-party script. It needs JavaScript in the browser.
 
 ```kay
@@ -282,4 +353,4 @@ export const contact = action(schema, send, {
 
 Without one, a production server signs with a key of its own process. A restart changes that key and other replicas do not share it, and the server says so once in its log.
 
-<ReadMore href="/llms/actions">Optimistic calls, aborting a call, custom browser validation, `minTime` for plain forms only, your own proof of work check, shared rate limit stores, messages and body limits.</ReadMore>
+<ReadMore href="/llms/action-protection">Your own proof of work check, shared rate limit stores, refusal messages and body limits.</ReadMore>
