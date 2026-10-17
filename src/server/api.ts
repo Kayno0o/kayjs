@@ -93,8 +93,8 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
       const method = route.method.toUpperCase()
       const path = withoutSlash(apiRoutePath(module.mount, route.path))
 
-      if (detail?.bodyLimit !== undefined)
-        routeLimits.push({ method, path, limit: { bytes: detail.bodyLimit, refuse } })
+      // Every route is listed, so a static sibling of a route with a limit of its own is not taken for it.
+      routeLimits.push({ method, path, limit: detail?.bodyLimit === undefined ? undefined : { bytes: detail.bodyLimit, refuse } })
 
       if (detail?.rateLimit !== undefined)
         routeRates.set(`${method} ${path}`, rateLimitsOf(detail.rateLimit, `${method} ${path}`))

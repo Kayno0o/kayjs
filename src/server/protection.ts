@@ -327,6 +327,10 @@ export async function protectionRefusal(action: ServerAction<TSchema, unknown>, 
   // Every limit counts the attempt, whichever refuses it, and the longest wait is the one to tell.
   for (const { name, limit } of limits) {
     const store = limit.store ?? sharedRates(name)
+
+    if (limit.count === 'succeeded' && !store.peek)
+      throw new KayError('config-invalid', `kay: ${name} counts only the posts that went through, so its store needs a peek(key) method; the app's \`store.rates\` has none`)
+
     const key = await actionKey(name, limit, request, client, keyContext)
     // A limit on the posts that went through only reads its count here; the handler's success adds to it.
     const own = limit.count === 'succeeded' ? reached(await store.peek!(key), limit.max) : waitFor(await store.hit(key, windowMs(limit)), limit.max)

@@ -19,7 +19,8 @@ export interface BodyLimit {
 export interface RouteBodyLimit {
   method: string
   path: string
-  limit: BodyLimit
+  // Undefined for a route setting none, which keeps its module's.
+  limit: BodyLimit | undefined
 }
 
 const SPECIAL = /[.*+?^${}()|[\]\\]/g
@@ -51,7 +52,7 @@ export function limitBodies(app: Elysia, bytes: number, actions: Map<string, Bod
   const matchers = routes.map(route => ({ ...route, matcher: routeMatcher(route.path) })).sort((a, b) => specificity(a.path) - specificity(b.path))
 
   for (const { path, method, limit } of routes) {
-    if (limit.bytes !== undefined)
+    if (limit?.bytes !== undefined)
       checkLimit(limit.bytes, `the bodyLimit of ${method} ${path}`)
   }
 

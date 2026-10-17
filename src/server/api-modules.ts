@@ -50,11 +50,11 @@ export function mcpPath(value: boolean | McpConfig | undefined): string | undefi
 }
 
 // The paths the OpenAPI document and its reference page are served at.
-export function openApiPaths(config: { path?: string | undefined, referencePath?: string | undefined } | undefined): { document: string, reference: string } {
+export function openApiPaths(config: { path?: string | undefined, referencePath?: string | undefined, reference?: boolean | undefined } | undefined): { document: string, reference: string } {
   const document = config?.path === undefined ? OPENAPI_PATH : servedPath(config.path, 'openapi.path')
   const reference = config?.referencePath === undefined ? REFERENCE_PATH : servedPath(config.referencePath, 'openapi.referencePath')
 
-  if (document === reference)
+  if (config?.reference === true && document === reference)
     throw new KayError('config-invalid', `kay: openapi.path and openapi.referencePath are both ${document}; give the reference page a path of its own`)
 
   return { document, reference }

@@ -73,6 +73,10 @@ describe('a path that cannot be served', () => {
     await expect(boot(extra)).rejects.toThrow(message)
   })
 
+  it('lets the document sit at the reference page\'s default path while the page is off', async () => {
+    await expect(boot({ openapi: { path: '/api/reference' } })).resolves.toBeDefined()
+  })
+
   it('refuses a path under /_kay', async () => {
     await expect(boot({ mcp: { path: '/_kay/mcp' } })).rejects.toThrow('/_kay')
     await expect(boot({ openapi: { path: '/_kay' } })).rejects.toThrow('/_kay')

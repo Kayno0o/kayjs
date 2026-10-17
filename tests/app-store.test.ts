@@ -91,3 +91,14 @@ describe('the app store of a test site', () => {
     }
   })
 })
+
+describe('an app store without peek', () => {
+  it('refuses a limit counting the posts that went through', async () => {
+    const { protectionRefusal } = await import('../src/server/protection')
+    const rates = { hit: memoryRates().hit }
+    const action = { url: '/_kay/a', protection: { rateLimit: { max: 1, window: '1m', count: 'succeeded' } } }
+
+    setupStore({ rates })
+    await expect(protectionRefusal(action as never, new Request('http://localhost/_kay/a', { method: 'POST' }), {}, false, null)).rejects.toThrow('peek')
+  })
+})

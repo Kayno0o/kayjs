@@ -93,6 +93,15 @@ describe('a rate limit on an API module', () => {
   })
 })
 
+describe('a body limit on one API route', () => {
+  it('leaves a static sibling of a parameter route with a limit to its module\'s', async () => {
+    const big = { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pad: 'x'.repeat(100) }) }
+
+    expect((await bare.fetch('/api/routes/items/4', big)).status).toBe(413)
+    expect((await bare.fetch('/api/routes/items/plain', big)).status).toBe(200)
+  })
+})
+
 describe('a rate limit on one API route', () => {
   for (const [name, site] of Object.entries(sites)) {
     it(`counts the route alone, whatever its params (${name})`, async () => {
