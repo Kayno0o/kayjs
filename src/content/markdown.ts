@@ -281,17 +281,7 @@ function replaceTags(text: string, startLine: number, components: ExtractedCompo
     return current
   }
 
-  // The last `>` outside code spans, so a tag whose `>` sits past a code span is still told apart from prose.
-  let lastClose = -1
-
-  outsideCodeSpans(text, (part, offset) => {
-    const close = part.lastIndexOf('>')
-
-    if (close !== -1)
-      lastClose = offset + close
-
-    return part
-  })
+  let lastClose: number | undefined
 
   return outsideCodeSpans(text, (part, offset) => {
     let result = ''
@@ -303,7 +293,7 @@ function replaceTags(text: string, startLine: number, components: ExtractedCompo
       const [start, closing, name] = match
       const line = lineAt(offset + match.index)
       const from = match.index + start.length
-      const end = tagEnd(part, from, `${closing}${name}`, line, lastClose - offset)
+      const end = tagEnd(part, from, `${closing}${name}`, line, () => (lastClose ??= lastCloseOutsideCodeSpans(text)) - offset)
 
       // Prose such as `if 1<A then`, setting no attribute and with no `>` after it.
       if (end === -1)
@@ -346,12 +336,12 @@ function placeholder(closing: boolean, name: string, inside: string, line: numbe
 
 // Where the component tag whose name ends at `from` ends, past its `>`, quoted text and JSON of any depth read whole.
 // A tag kay cannot read throws rather than reach the page as text, unless it sets no attribute value and no `>` follows it in its block outside code spans (`lastClose`, relative to the text), as prose such as `if 1<A then` reads: then -1.
-function tagEnd(text: string, from: number, tag: string, line: number, lastClose: number): number {
+function tagEnd(text: string, from: number, tag: string, line: number, lastClose: () => number): number {
   let at = from
   let valued = false
 
   const refuse = (message: string) => {
-    if (!valued && lastClose < from)
+    if (!valued && lastClose() < from)
       return -1
 
     throw new MarkdownError(`<${tag}> ${message}`, line)
@@ -416,6 +406,22 @@ function tagEnd(text: string, from: number, tag: string, line: number, lastClose
     if (at < text.length && !AFTER_VALUE.test(text[at]!))
       throw new MarkdownError(`<${tag}> runs ${JSON.stringify(text.slice(at, at + 20))} into ${name}: a JSON value ends at its closing brace`, line)
   }
+}
+
+// The offset of the last `>` outside code spans, -1 when there is none.
+function lastCloseOutsideCodeSpans(text: string): number {
+  let last = -1
+
+  outsideCodeSpans(text, (part, offset) => {
+    const close = part.lastIndexOf('>')
+
+    if (close !== -1)
+      last = offset + close
+
+    return part
+  })
+
+  return last
 }
 
 // Applies `edit` to the parts of the text between its code spans, which stay as written, giving each part's offset.

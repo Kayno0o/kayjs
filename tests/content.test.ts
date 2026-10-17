@@ -370,6 +370,7 @@ describe('compiling Markdown', () => {
 
   it('comes out escaped for a prose-fallback tag, with no live element', async () => {
     expect(await bodyHtml('<A/onfocus=alert(1)')).toBe('<p>&lt;A/onfocus=alert(1)</p>\n')
+    expect(await bodyHtml('<A/onfocus=alert(1)\n\n>')).toBe('<p>&lt;A/onfocus=alert(1)</p>\n<blockquote>\n</blockquote>\n')
   })
 
   it('reads hostile valueless tags in linear time', async () => {
