@@ -7,16 +7,16 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `shareCard({ title, image })` takes an imported `.svg` as `image`, drawn to cover the card before the title, with its cards written by `kay build` and kept for an executable like `images.card.logo` ([Images](images.md#draw-a-share-card-for-a-page)).
 - The dev tool's Images tab no longer flags an SVG as served more pixels than it is drawn with, as Chromium gives one without a size 150x150 and the same bytes draw at any size; an image whose address ends in `.svg` is exempt, a raster still is flagged ([Dev server](dev-server.md)).
 - `kay check` and the editor warn of an `img` or `input(type="image")` with no `width` and `height`, which shifts the page as it loads (`unsized-image`, in the new `performance` group; [What `kay check` verifies](checks.md#what-kay-check-verifies), [Lints](lints.md)).
+- A valueless Markdown component tag with no later `>` stays text inside a blockquote too, as outside one: the quote's `>` markers no longer count as its close ([Content](content.md#components-in-markdown)).
+- A component reading a slot anywhere but as a bare `{slot}`, in an attribute, a ternary, an `if` test or an `if ... as` alias, hydrates on the server's markup instead of logging `island ... did not match its server markup` and rendering again, as kayjs-ui's `Table` with an `@empty` slot and no rows did.
 
 ## 1.51.1
 
-- A valueless Markdown component tag with no later `>` stays text inside a blockquote too, as outside one: the quote's `>` markers no longer count as its close ([Content](content.md#components-in-markdown)).
 - A kayjs-ui `Table` stacked as cards on a phone breaks a long value with no space, such as a file path, inside its card instead of widening the page, and its sort buttons are at least 2rem tall to tap ([Table](../docs/src/content/docs/libraries/kayjs-ui.md)).
 - The dev tool's Problems tab has a Copy button that puts every listed problem on the clipboard as plain text, the page URL first, to paste into an LLM ([Dev server](dev-server.md)).
 - A Markdown component tag kay cannot read, such as stray text after a JSON prop or a brace never closed, fails `kay check`, the build and `bodyHtml` with `markdown-invalid` at its line instead of reaching the page as text, as it did already broken, and a JSON prop nests to any depth ([Content](content.md#components-in-markdown)).
 - The dev tool drawer keeps one height whatever its open tab, so switching tabs no longer moves its header and tab rail ([Dev server](dev-server.md)).
 - Linting a `.kay` file no longer reports `no-nested-ternary` on a single ternary that reads a prop with a default: kay's read of the default adds no ternary a lint rule can see ([Linting](checks.md#linting)).
-- A component reading a slot anywhere but as a bare `{slot}`, in an attribute, a ternary, an `if` test or an `if ... as` alias, hydrates on the server's markup instead of logging `island ... did not match its server markup` and rendering again, as kayjs-ui's `Table` with an `@empty` slot and no rows did.
 
 ## 1.51.0
 
