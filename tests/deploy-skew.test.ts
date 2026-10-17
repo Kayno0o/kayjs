@@ -1,8 +1,9 @@
 import type { TestPage } from '../src/test'
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test'
 import { existsSync } from 'node:fs'
+import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test'
 import { chromium } from 'playwright-core'
 import { BUILD_HEADER } from '../src/runtime/swap'
 import { requestIdHeader } from '../src/server/protection'
@@ -132,6 +133,9 @@ async function staticHost(): Promise<Deploy> {
     }),
     async build(name) {
       const out = join(root, `out-${name}`)
+
+      // A deploy from a fresh checkout: a `.kay` that survived would keep the last build's chunks, which the tab then still finds.
+      await rm(join(root, '.kay'), { recursive: true, force: true })
       const child = Bun.spawn([process.execPath, CLI, 'build', root, '--no-check', '--static', '--outdir', out], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, NODE_ENV: 'development' } })
       const [errors, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
 
