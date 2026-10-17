@@ -199,10 +199,8 @@ function followable(link: HTMLAnchorElement): URL | undefined {
   if (!swappable(url))
     return undefined
 
-  // A jump within the page is the browser's own, but for a link from a search hit, which marks the section it opens.
-  const same = url.hash !== '' && url.pathname === location.pathname && url.search === location.search
-
-  return same && (link.getAttribute('href')!.startsWith('#') || !navigation.hooks?.arrives?.(url.search)) ? undefined : url
+  // A jump within the page is the browser's own.
+  return url.hash !== '' && url.pathname === location.pathname && url.search === location.search ? undefined : url
 }
 
 function onClick(event: MouseEvent): void {

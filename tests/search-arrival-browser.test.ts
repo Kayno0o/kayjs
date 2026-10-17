@@ -76,7 +76,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a page open
     await page.waitForFunction(() => !CSS.highlights.has('kay-search'))
   })
 
-  it('marks the section of a link to the same page and query, which the swap follows rather than jumping', async () => {
+  it('marks the section of a link to the same page and query, which the browser jumps to', async () => {
     await page.goto(`${origin}/guide?kay_q=needle#second`)
     await page.waitForFunction(() => CSS.highlights.has('kay-search'))
     await page.evaluate(() => {
@@ -95,7 +95,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a page open
     expect(await page.evaluate(() => location.hash)).toBe('#third')
   })
 
-  it('leaves a link to a heading of the same page, a table of contents entry, to the browser', async () => {
+  it('leaves a link to a heading of the same page, a table of contents entry, to the browser, marking the words in the section it jumps to', async () => {
     const fetched: string[] = []
 
     // A visit differing by its hash alone would not load the page afresh.
@@ -109,8 +109,9 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a page open
     await page.click('a.toc')
     await page.waitForFunction(() => location.hash === '#third')
 
+    await page.waitForFunction(() => [...CSS.highlights.get('kay-search') ?? []].map(range => (range as unknown as Range).toString()).join() === 'needle')
+
     expect(fetched).toEqual([])
-    expect(await marks()).toEqual(['needle', 'NEEDLE'])
   })
 
   it('marks the text above the first heading for a hit with no anchor', async () => {

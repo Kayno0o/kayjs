@@ -7,9 +7,8 @@ export interface NavigationHooks {
   hydrate: (root: ParentNode) => unknown
   // Ends the islands under a root.
   dispose: (root: ParentNode) => void
-  // With `search` on: marks the words a search hit's page was opened for, and says whether a URL's query asks for it.
+  // With `search` on: marks the words a search hit's page was opened for.
   arrive?: (search: string, from: number) => unknown
-  arrives?: (search: string) => boolean
 }
 
 export interface FetchedPage {

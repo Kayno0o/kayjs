@@ -119,7 +119,7 @@ describe('search', () => {
   })
 
   it('lets a dynamic route weigh each of its pages, or leave one out, through a function of the params', async () => {
-    expect((await search(client, 'quokka')).hits.map(hit => hit.href)).toEqual(['/notes/loud', '/notes/quiet'])
+    expect((await search(client, 'quokka')).hits.map(hit => bare(hit.href))).toEqual(['/notes/loud', '/notes/quiet'])
   })
 
   it('refuses a weight that is no number of 0 or more, naming the route file', async () => {
@@ -430,7 +430,7 @@ describe('the search index', () => {
       html: '<main><h1>Short</h1><p>One tool here.</p></main>',
     }])
 
-    expect((await search(dir, 'tool')).hits.map(hit => hit.href)).toEqual(['/named#t', '/tools', '/tools#a', '/tools#b', '/other', '/short'])
+    expect((await search(dir, 'tool')).hits.map(hit => bare(hit.href))).toEqual(['/named#t', '/tools', '/tools#a', '/tools#b', '/other', '/short'])
   })
 
   it('finds a word by most of it nearly as well as by the word itself, a page titled with its plural before a heading naming it', async () => {
@@ -442,7 +442,7 @@ describe('the search index', () => {
       html: '<main><h1>Islands</h1><p>Hydrated parts.</p></main>',
     }])
 
-    expect((await search(dir, 'island')).hits.map(hit => hit.href)).toEqual(['/islands', '/guide#props'])
+    expect((await search(dir, 'island')).hits.map(hit => bare(hit.href))).toEqual(['/islands', '/guide#props'])
   })
 
   it('counts the words searched for past the snippet', async () => {
