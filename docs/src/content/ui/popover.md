@@ -10,7 +10,7 @@ The `@trigger(attributes)` block renders the button, which spreads the `attribut
 
 ## Controlled
 
-`open` shows or hides the panel from the page, and `onToggle(open)` runs however it changed. A page driving `open` sets its own value back there.
+`open` shows or hides the panel from the page, and `onOpenChange(open)` runs however it changed. A page driving `open` sets its own value back there.
 
 <Demo name="popover/controlled" />
 

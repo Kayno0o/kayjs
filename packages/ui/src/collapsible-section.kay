@@ -2,19 +2,34 @@
 import type { JSX } from 'kay'
 import Icon from './icon.kay'
 
-const { title, open = true, boxed = false, meta, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['details'], 'class' | 'title' | 'open' | 'children'> & {
+const { title, open = true, boxed = false, meta, onOpenChange, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['details'], 'class' | 'title' | 'open' | 'children'> & {
   title: string
-  // Whether it starts unfolded; the reader folds and unfolds it from then on.
+  // Whether it is unfolded; the reader folds and unfolds it too, and a parent setting it again unfolds or folds it.
   open?: boolean | undefined
+  // Called with the new state when the reader folds or unfolds it, or the parent does.
+  onOpenChange?: ((open: boolean) => void) | undefined
   // Draws the section as a card: the title becomes a band over a padded body, so a stack of them reads as separate blocks.
   boxed?: boolean | undefined
   // Sits in the band before the chevron, for a count or a state the folded section would otherwise hide.
   meta?: JSX.Element
   class?: string | undefined
 }>()
+
+// The toggle event also fires when the `open` attribute is first parsed, so only a change from the last known state is reported.
+let known = open
+
+function toggled(event: Event) {
+  const now = (event.currentTarget as HTMLDetailsElement).open
+
+  if (now === known)
+    return
+
+  known = now
+  onOpenChange?.(now)
+}
 ---
 // A native disclosure, so it folds without script and a static page can hold it.
-details.kui-collapsible-section({...rest} open={open} data-boxed={boxed || undefined} class={className})
+details.kui-collapsible-section({...rest} open={open} data-boxed={boxed || undefined} class={className} onToggle={toggled})
   summary.kui-collapsible-section-summary
     span.kui-heading-section.kui-collapsible-section-title {title}
     if meta

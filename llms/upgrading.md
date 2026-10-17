@@ -12,6 +12,9 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 ### kayjs-auth: `discordProvider({ apiBase })` is `url`
 
 - `discordProvider({ apiBase })` is now `discordProvider({ url })`, as `gitlabProvider` and `githubProvider` take; `apiBase` still works for now and logs a warning, and production refuses an `http://` one as it does for `url`. `kay check` reports it as `deprecated-provider-url`, and `kay check --fix` (or `kay upgrade`) renames the key.
+### kayjs-ui names the same prop the same way
+
+- Every disclosure (`Dialog`, `SidePanel`, `FormDialog`, `CommandPalette`, `Popover`, `CollapsibleSection`) takes `open` and `onOpenChange(open)`. `onClose` on `Dialog`, `SidePanel` and `FormDialog` and `onToggle` on `Popover` still work for now, marked `@deprecated`, and `onOpenChange` wins when both are given. Rename the prop; a `Dialog` or `SidePanel` handler that read the close event now hears `false`.
 
 ### `kay dev` does not move a port it was asked for
 

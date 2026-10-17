@@ -131,7 +131,7 @@ function focusLeft(event: FocusEvent) {
 }
 ---
 .kui-multi-select({...rest} ref={ref} class={className})
-  Popover(id={id} placement={placement} class="kui-multi-select-panel" role="group" aria-label={label} onToggle={toggled} onKeyDown={keyDown} onFocusOut={focusLeft})
+  Popover(id={id} placement={placement} class="kui-multi-select-panel" role="group" aria-label={label} onOpenChange={toggled} onKeyDown={keyDown} onFocusOut={focusLeft})
     @trigger(attributes)
       // Named by its label and what is picked, which a name of the label alone would hide; a count is described by the labels it stands for.
       button.kui-field-input.kui-multi-select-trigger({...attributes} type="button" aria-label={`${label}: ${summary()}`} aria-description={picked().length > 1 ? pickedLabels(options, picked()).join(', ') : undefined} disabled={disabled} data-empty={picked().length === 0 || undefined})

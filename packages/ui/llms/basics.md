@@ -44,14 +44,14 @@ A toast stays for six seconds, an error for ten, or until its close button is pr
 ### Dialog, ConfirmDelete
 
 ```kay
-Dialog(open={editing()} title="Rename" onClose={() => editing.set(false)})
+Dialog(open={editing()} title="Rename" onOpenChange={() => editing.set(false)})
   @footer
     Button(label="Cancel" onClick={() => editing.set(false)})
     Button(label="Rename" variant="accent" onClick={rename})
   input.kui-field-input(name="name")
 ```
 
-- Dialog is a modal `dialog`. It closes when its parent sets `open` to false, on Escape, or on a click outside. `onClose(event)` runs however it closed. Closed by Escape or a click outside, its content is still there to read; closed by the parent, it is already gone. Its title names it for screen readers, an `h2` unless `level` says otherwise.
+- Dialog is a modal `dialog`. It closes when its parent sets `open` to false, on Escape, or on a click outside. `onOpenChange(false)` runs however it closed (`onClose(event)` is the deprecated name). Closed by Escape or a click outside, its content is still there to read; closed by the parent, it is already gone. Its title names it for screen readers, an `h2` unless `level` says otherwise.
 - Once something has been typed inside, or while `dirty` is set (for example while a request is in flight), Escape and a click outside leave it open: only its own buttons close it.
 - `ConfirmDelete(message="Delete this post?" failure="Could not delete" onConfirm={remove})` renders a trigger that opens a dialog asking before deleting:
   - While the promise `onConfirm` returns is pending, the dialog's buttons are disabled.
@@ -83,7 +83,7 @@ Popover(placement="bottom-end")
 - Popover is the browser's popover, which needs Chrome and Edge 114, Firefox 125 or Safari 17, and it sits beside its trigger through CSS anchor positioning, Chrome and Edge 129, Firefox 147 or Safari 26, so an older browser opens it away from the trigger. A click on the trigger toggles it, and a click outside or Escape closes it. The panel draws an id unique on the page, pairing it with its trigger; an `id` given instead must be unique too, and made of letters, digits, `-` and `_`, since it also names the CSS anchor.
 - `@trigger(attributes)` renders the trigger, which spreads `attributes`: `popovertarget`, `aria-expanded` and its anchor.
 - `placement` is `bottom-start`, `bottom-end`, `top-start` or `top-end`, and the browser flips it when there is no room.
-- `open` opens or closes it from the page, and `onToggle(open)` runs however it changed: a page driving `open` sets its own value back there, or it could not open the panel again after a click outside closed it.
+- `open` opens or closes it from the page, and `onOpenChange(open)` runs however it changed (`onToggle`, the deprecated name): a page driving `open` sets its own value back there, or it could not open the panel again after a click outside closed it.
 - TooltipHost shows the `data-tooltip` of whichever element the pointer or a tab lands on. `data-tooltip-placement`, a CSS `position-area`, says where it sits, `top` by default: `button(data-tooltip="Copy link" data-tooltip-placement="bottom")`. IconButton sets `data-tooltip` to its label. The pointer can cross onto the tooltip without it closing, and Escape closes it until the pointer or the focus moves to another element.
 
 ### Stat, Meter, BarList, SiteFavicon, CopyButton, Rating

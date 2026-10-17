@@ -15,7 +15,7 @@ async function archive() {
 }
 ---
 button#open(onClick={() => open.set(true)}) Open
-Dialog#dialog(open={open()} title="Rename" dirty={dirty} onClose={() => { open.set(false); onClose() }})
+Dialog#dialog(open={open()} title="Rename" dirty={dirty} onOpenChange={() => { open.set(false); onClose() }})
   @footer
     button#cancel.kui-btn(onClick={() => open.set(false)}) Cancel
   input#name(name="name")

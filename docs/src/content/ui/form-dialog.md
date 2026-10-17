@@ -46,7 +46,7 @@ FormDialog(
   submitLabel="Rename"
   failure="Could not rename"
   onSaved={saved => title.set(saved.title)}
-  onClose={() => editing.set(false)}
+  onOpenChange={() => editing.set(false)}
 )
   input(type="hidden" name="id" value={post.id})
   FormField(label="Title" name="title" required)
@@ -67,7 +67,7 @@ FormDialog(
   submitLabel="Rename"
   failure="Could not rename"
   refused={data => ({ slug: data.error })}
-  onClose={() => editing.set(false)}
+  onOpenChange={() => editing.set(false)}
 )
 ```
 
@@ -100,7 +100,7 @@ FormDialog(
   action={save}
   submitLabel="Save"
   failure="Could not save"
-  onClose={friend.close}
+  onOpenChange={friend.close}
 )
   input(type="hidden" name="id" value={friend.row()?.id ?? ''})
   FormField(label="Name" name="name" required)

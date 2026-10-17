@@ -6,7 +6,7 @@ description: A modal panel along the edge of the screen, with a head, a body and
 
 ## Controlled
 
-`open` shows the panel and `onClose` is called however it closes: its close button, a click outside or Escape. Set `open` back to `false` there.
+`open` shows the panel and `onOpenChange(false)` is called however it closes: its close button, a click outside or Escape. Set `open` back to `false` there.
 
 ## Head actions
 

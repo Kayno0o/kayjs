@@ -67,7 +67,7 @@ function select(action: MenuAction) {
   action.onSelect()
 }
 ---
-Popover(id={menuId} placement={placement} class="kui-menu" onToggle={open => open && entries()[0]?.focus()})
+Popover(id={menuId} placement={placement} class="kui-menu" onOpenChange={open => open && entries()[0]?.focus()})
   @trigger(attributes)
     IconButton({...attributes} icon={icon} label={label} size={size} variant={variant} aria-haspopup="menu" class={className})
   .kui-menu-list(ref={element => list = element} role="menu" aria-label={label} tabindex="-1" onKeyDown={keyDown})

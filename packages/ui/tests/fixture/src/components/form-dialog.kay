@@ -41,7 +41,7 @@ function said(refusal: Refusal) {
 ---
 button#open(onClick={() => open.set(true)}) Open
 button#hide(onClick={() => open.set(false)}) Hide
-FormDialog(open={open()} title="Rename" action={rename} submitLabel="Rename" failure="Could not rename" refused={plain ? undefined : said} onSaved={onSaved} onClose={() => open.set(false)})
+FormDialog(open={open()} title="Rename" action={rename} submitLabel="Rename" failure="Could not rename" refused={plain ? undefined : said} onSaved={onSaved} onOpenChange={() => open.set(false)})
   FormField(label="Name" name="name" hint="As the profile shows it")
     input#name(name="name" value="Ada" aria-describedby="name-note")
   p#name-note Public

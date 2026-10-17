@@ -18,7 +18,7 @@ Dialog(
   open={open()}
   title="Publish the post"
   dirty={saving()}
-  onClose={() => open.set(false)}
+  onOpenChange={() => open.set(false)}
 )
   @footer
     Button(label="Cancel" onClick={() => open.set(false)})

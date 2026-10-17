@@ -11,7 +11,7 @@ const sidebarOpen = signal(true)
 ---
 button#open(onClick={() => open.set(true)}) Open
 button#shut(onClick={() => open.set(false)}) Shut
-SidePanel#panel(open={open()} title="Mars" onClose={() => { open.set(false); onClose() }})
+SidePanel#panel(open={open()} title="Mars" onOpenChange={() => { open.set(false); onClose() }})
   @actions
     button#next Next
   @footer

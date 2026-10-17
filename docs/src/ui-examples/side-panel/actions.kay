@@ -6,7 +6,7 @@ import SidePanel from '@kaynooo/kayjs-ui/side-panel.kay'
 const open = signal(false)
 ---
 Button(label="Open panel" onClick={() => open.set(true)})
-SidePanel(open={open()} title="Moons" onClose={() => open.set(false)})
+SidePanel(open={open()} title="Moons" onOpenChange={() => open.set(false)})
   @actions
     IconButton(icon="back" label="Previous" variant="ghost")
   p Io, Europa, Ganymede and Callisto.

@@ -96,7 +96,7 @@ if ask === 'inline'
       Button(label={pending() ? pendingText() : confirmText()} variant={look()} busy={pending()} disabled={pending()} data-tooltip={message} onClick={confirm})
       IconButton(icon="close" label={cancelLabel} size={size} variant="ghost" disabled={pending()} onClick={close})
 else
-  Dialog(open={open()} title={dialogTitle()} dirty={pending()} onClose={() => open.set(false)})
+  Dialog(open={open()} title={dialogTitle()} dirty={pending()} onOpenChange={() => open.set(false)})
     @footer
       Button(label={cancelLabel} disabled={pending()} onClick={() => open.set(false)})
       Button(label={pending() ? pendingText() : confirmText()} variant={look()} busy={pending()} disabled={pending()} onClick={confirm})

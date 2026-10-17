@@ -5,7 +5,7 @@ import SidePanel from '@kaynooo/kayjs-ui/side-panel.kay'
 const open = signal(false)
 ---
 Button(label="Show details" onClick={() => open.set(true)})
-SidePanel(open={open()} title="Europa" onClose={() => open.set(false)})
+SidePanel(open={open()} title="Europa" onOpenChange={() => open.set(false)})
   @footer
     Button(label="Done" variant="accent" onClick={() => open.set(false)})
   p

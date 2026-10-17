@@ -1,0 +1,48 @@
+---
+import { signal } from 'kay'
+import CollapsibleSection from '@kaynooo/kayjs-ui/collapsible-section.kay'
+import Dialog from '@kaynooo/kayjs-ui/dialog.kay'
+import Popover from '@kaynooo/kayjs-ui/popover.kay'
+import SidePanel from '@kaynooo/kayjs-ui/side-panel.kay'
+
+// Each disclosure is given its handler by the new name (`new`), the old one (`old`), or both (`both`, where the new one has to win), and writes what it heard to `calls`.
+const { mode, calls } = props<{ mode: 'new' | 'old' | 'both', calls: string[] }>()
+
+const dialog = signal(true)
+const panel = signal(true)
+const popover = signal(false)
+const section = signal(true)
+---
+button#shut-dialog(onClick={() => dialog.set(false)}) Shut dialog
+button#shut-panel(onClick={() => panel.set(false)}) Shut panel
+button#show-popover(onClick={() => popover.set(true)}) Show popover
+button#hide-popover(onClick={() => popover.set(false)}) Hide popover
+if mode === 'new'
+  Dialog#dialog(open={dialog()} title="Dialog" onOpenChange={shown => { calls.push(`dialog onOpenChange ${shown}`); dialog.set(shown) }})
+    p Dialog body
+  SidePanel#panel(open={panel()} title="Panel" onOpenChange={shown => { calls.push(`panel onOpenChange ${shown}`); panel.set(shown) }})
+    p Panel body
+  Popover(id="popover" open={popover()} onOpenChange={shown => { calls.push(`popover onOpenChange ${shown}`); popover.set(shown) }})
+    @trigger(attributes)
+      button#popover-trigger({...attributes}) Trigger
+    p Popover body
+else if mode === 'old'
+  Dialog#dialog(open={dialog()} title="Dialog" onClose={event => { calls.push(`dialog onClose ${event.type}`); dialog.set(false) }})
+    p Dialog body
+  SidePanel#panel(open={panel()} title="Panel" onClose={event => { calls.push(`panel onClose ${event.type}`); panel.set(false) }})
+    p Panel body
+  Popover(id="popover" open={popover()} onToggle={shown => { calls.push(`popover onToggle ${shown}`); popover.set(shown) }})
+    @trigger(attributes)
+      button#popover-trigger({...attributes}) Trigger
+    p Popover body
+else
+  Dialog#dialog(open={dialog()} title="Dialog" onOpenChange={shown => { calls.push(`dialog onOpenChange ${shown}`); dialog.set(shown) }} onClose={() => calls.push('dialog onClose')})
+    p Dialog body
+  SidePanel#panel(open={panel()} title="Panel" onOpenChange={shown => { calls.push(`panel onOpenChange ${shown}`); panel.set(shown) }} onClose={() => calls.push('panel onClose')})
+    p Panel body
+  Popover(id="popover" open={popover()} onOpenChange={shown => { calls.push(`popover onOpenChange ${shown}`); popover.set(shown) }} onToggle={() => calls.push('popover onToggle')})
+    @trigger(attributes)
+      button#popover-trigger({...attributes}) Trigger
+    p Popover body
+CollapsibleSection#section(title="Section" open={section()} onOpenChange={shown => { calls.push(`section onOpenChange ${shown}`); section.set(shown) }})
+  p Section body

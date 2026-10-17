@@ -5,7 +5,7 @@ import Dialog from '@kaynooo/kayjs-ui/dialog.kay'
 const editing = signal(false)
 ---
 Button(label="Rename" onClick={() => editing.set(true)})
-Dialog(open={editing()} title="Rename" onClose={() => editing.set(false)})
+Dialog(open={editing()} title="Rename" onOpenChange={() => editing.set(false)})
   @footer
     Button(label="Cancel" onClick={() => editing.set(false)})
     Button(label="Rename" variant="accent" onClick={() => editing.set(false)})

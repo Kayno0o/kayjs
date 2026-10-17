@@ -4,18 +4,35 @@ import { effect } from 'kay'
 import IconButton from './icon-button.kay'
 import { wording } from 'kay/words'
 
-const { open, title, actions, footer, onClose, closeLabel = wording('ui.sidePanel.closeLabel', 'Close'), class: className, ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'title' | 'onClose' | 'closedby' | 'closedBy'> & {
-  // Shows the panel as a modal along the edge; the parent sets it back to false in `onClose`.
+const { open, title, actions, footer, onOpenChange, onClose, closeLabel = wording('ui.sidePanel.closeLabel', 'Close'), class: className, ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'title' | 'onClose' | 'closedby' | 'closedBy'> & {
+  // Shows the panel as a modal along the edge; the parent sets it back to false in `onOpenChange`.
   open: boolean
   title: string
   // Controls in the head line, before its close button, such as previous and next.
   actions?: JSX.Element
   footer?: JSX.Element
-  // Called however the panel closes, a click outside and Escape included. Closed by either of those or its close button, its content is still there to read; closed by the parent, it is already gone.
-  onClose: (event: Event) => void
   closeLabel?: string | undefined
   class?: string | undefined
-}>()
+} & (
+  | {
+    // Called with `false` however the panel closes, a click outside and Escape included. Closed by either of those or its close button, its content is still there to read; closed by the parent, it is already gone.
+    onOpenChange: (open: boolean) => void
+    // Deprecated: use `onOpenChange`, which wins when both are given.
+    onClose?: ((event: Event) => void) | undefined
+  }
+  | {
+    onOpenChange?: ((open: boolean) => void) | undefined
+    // Deprecated: use `onOpenChange`, which hears `false` where this heard the close event.
+    onClose: (event: Event) => void
+  }
+)>()
+
+function closed(event: Event) {
+  if (onOpenChange)
+    onOpenChange(false)
+  else
+    onClose?.(event)
+}
 
 let panel: HTMLDialogElement | undefined
 
@@ -31,8 +48,8 @@ effect(() => {
     panel.close()
 })
 ---
-// Named by its title for screen readers. Every way of closing it ends in the dialog's `close` event, the close button included, so `onClose` is the one place the parent learns of it.
-dialog.kui-side-panel(aria-label={title} {...rest} ref={element => panel = element} closedby="any" onClose={onClose} class={className})
+// Named by its title for screen readers. Every way of closing it ends in the dialog's `close` event, the close button included, so `onOpenChange` is the one place the parent learns of it.
+dialog.kui-side-panel(aria-label={title} {...rest} ref={element => panel = element} closedby="any" onClose={closed} class={className})
   if open
     header.kui-side-panel-head
       h2.kui-side-panel-title {title}

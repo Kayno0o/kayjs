@@ -1,0 +1,18 @@
+---
+import type { Action } from 'kay'
+import { signal } from 'kay'
+import FormDialog from '@kaynooo/kayjs-ui/form-dialog.kay'
+
+// The deprecated `onClose`, as a FormDialog was closed before `onOpenChange`; `closes` counts how often it was called and `both` gives `onOpenChange` too, which has to win.
+const { closes, both = false } = props<{ closes: string[], both?: boolean }>()
+
+const open = signal(true)
+const save = Object.assign(async () => 'saved', { pending: signal(false), url: '/_kay/action/form/save' }) as unknown as Action<never, string>
+---
+button#open(onClick={() => open.set(true)}) Open
+if both
+  FormDialog(open={open()} title="Save" action={save} submitLabel="Save" failure="Could not save" onOpenChange={shown => { closes.push(`onOpenChange ${shown}`); open.set(shown) }} onClose={() => closes.push('onClose')})
+    input#name(name="name" value="Ada")
+else
+  FormDialog(open={open()} title="Save" action={save} submitLabel="Save" failure="Could not save" onClose={() => { closes.push('onClose'); open.set(false) }})
+    input#name(name="name" value="Ada")

@@ -84,7 +84,7 @@ const editing = signal(false)
 const title = signal(post.title)
 ---
 Button(label="Rename" onClick={() => editing.set(true)})
-FormDialog(open={editing()} title="Rename" action={rename} submitLabel="Rename" failure="Could not rename" onSaved={saved => title.set(saved.title)} onClose={() => editing.set(false)})
+FormDialog(open={editing()} title="Rename" action={rename} submitLabel="Rename" failure="Could not rename" onSaved={saved => title.set(saved.title)} onOpenChange={() => editing.set(false)})
   input(type="hidden" name="id" value={post.id})
   FormField(label="Title" name="title" required)
     input.kui-field-input(name="title" value={title()})
@@ -95,7 +95,7 @@ FormDialog(open={editing()} title="Rename" action={rename} submitLabel="Rename" 
 - A refused message no FormField shows is toasted instead, a refusal of the whole form under the empty name included. A failure carrying no message toasts `failure`.
 - A refusal of the handler, `ctx.fail(400, { error: 'Slug taken' })`, reaches the dialog through `refused`, which reads that data and answers a message per field (`{ slug: data.error }`), shown on the FormFields, or one message (`data.error`), toasted. Without `refused`, or when it answers undefined, `failure` is toasted: `FormDialog(... failure="Could not save" refused={data => data.error})`.
 - A save hands what the action returned to `onSaved`, then closes the dialog.
-- `editing<Row, Draft>()`, from the package, keeps which row one dialog adds or edits for a list: `edit(row)` opens it on a row, `create(draft)` on what a new row starts from, `close` shuts it, forgetting both, and `open()`, `row()` and `draft()` read it: `FormDialog(open={friend.open()} title={friend.row() ? 'Edit friend' : 'Add friend'} ... onClose={friend.close})`. Without `Draft`, `create()` takes nothing.
+- `editing<Row, Draft>()`, from the package, keeps which row one dialog adds or edits for a list: `edit(row)` opens it on a row, `create(draft)` on what a new row starts from, `close` shuts it, forgetting both, and `open()`, `row()` and `draft()` read it: `FormDialog(open={friend.open()} title={friend.row() ? 'Edit friend' : 'Add friend'} ... onOpenChange={friend.close})`. Without `Draft`, `create()` takes nothing.
 - The submit button sits in the footer, paired with the form by `id`. Without an `id`, it draws one unique on the page.
 - Enter submits from a single-line field, and Ctrl+Enter from a textarea. While the call is under way, the buttons are disabled, and Escape or a click outside leaves the dialog open.
 - `extra` fills the left end of the footer, for a ConfirmDelete with `trigger="button"`.
