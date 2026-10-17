@@ -291,6 +291,19 @@ describe('the browser\'s form check in the page\'s locale', () => {
     expect(document.querySelector('input')!.validationMessage).toBe('Au moins 4 caractères')
   })
 
+  it('skips a forms script still streaming', () => {
+    bring(FRENCH)
+
+    const second = action(t.Object({ title: t.String({ minLength: 4 }) }), () => undefined)
+
+    ;(second as { url: string }).url = '/second'
+    document.body.insertAdjacentHTML('beforeend', '<script type="application/json" data-kay-forms>{"/third":{"prop')
+    document.body.insertAdjacentHTML('beforeend', formsScript(new Set([second])))
+    document.body.insertAdjacentHTML('afterbegin', '<form><input name="title" value="ab"></form>')
+    expect(checkForm(document.querySelector('form')!, '/second')).toBe(false)
+    expect(checkForm(document.querySelector('form')!, '/third')).toBe(true)
+  })
+
   it('checks a form an island rendered after the page loaded as one the page held', () => {
     bring(FRENCH)
 

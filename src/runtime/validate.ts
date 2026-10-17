@@ -80,10 +80,15 @@ export function checkForm(form: HTMLFormElement, action: string): boolean {
 
 function formRules(action: string): FormRules | undefined {
   for (const script of document.querySelectorAll(FORMS_SCRIPT)) {
-    const rules = (JSON.parse(script.textContent ?? '{}') as Record<string, FormRules>)[action]
+    try {
+      const rules = (JSON.parse(script.textContent ?? '{}') as Record<string, FormRules>)[action]
 
-    if (rules)
-      return rules
+      if (rules)
+        return rules
+    }
+    catch {
+      // A script still streaming does not parse yet: the next check reads it whole.
+    }
   }
 
   return undefined
