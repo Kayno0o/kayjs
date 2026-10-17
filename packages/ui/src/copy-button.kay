@@ -1,5 +1,5 @@
 ---
-import type { Duration, JSX } from 'kay'
+import type { DurationText, JSX } from 'kay'
 import { copy } from '@kaynooo/utils/browser/clipboard'
 import { durationMs, signal } from 'kay'
 import { formOf, lookOf } from './button-props'
@@ -16,7 +16,7 @@ const { text, label, html, variant = 'solid', tone, size = 'md', copiedFor = '2s
   tone?: 'neutral' | 'accent' | 'danger' | undefined
   size?: 'xs' | 'sm' | 'md' | 'lg' | undefined
   // How long the button says `copiedLabel` once the copy went through.
-  copiedFor?: Duration | undefined
+  copiedFor?: DurationText | undefined
   // What the button says once the copy went through.
   copiedLabel?: string | undefined
   // Toasted when the browser refuses the copy.

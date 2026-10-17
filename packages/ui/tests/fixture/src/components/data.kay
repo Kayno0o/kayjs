@@ -1,5 +1,5 @@
 ---
-import type { Duration } from 'kay'
+import type { DurationText } from 'kay'
 import { signal } from 'kay'
 import Avatar from '@kaynooo/kayjs-ui/avatar.kay'
 import BarList from '@kaynooo/kayjs-ui/bar-list.kay'
@@ -7,7 +7,7 @@ import CopyButton from '@kaynooo/kayjs-ui/copy-button.kay'
 import SiteFavicon from '@kaynooo/kayjs-ui/site-favicon.kay'
 import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
 
-const { onSelect, src, copiedFor } = props<{ onSelect: (key: string) => void, src: string, copiedFor?: Duration | undefined }>()
+const { onSelect, src, copiedFor } = props<{ onSelect: (key: string) => void, src: string, copiedFor?: DurationText | undefined }>()
 
 const picture = signal('/ada.png')
 ---

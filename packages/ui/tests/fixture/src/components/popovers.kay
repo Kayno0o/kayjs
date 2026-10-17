@@ -1,11 +1,11 @@
 ---
-import type { Duration } from 'kay'
+import type { DurationText } from 'kay'
 import { signal } from 'kay'
 import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
 import Popover from '@kaynooo/kayjs-ui/popover.kay'
 import TooltipHost from '@kaynooo/kayjs-ui/tooltip-host.kay'
 
-const { onToggle, showDelay, hideDelay } = props<{ onToggle: (open: boolean) => void, showDelay?: Duration | undefined, hideDelay?: Duration | undefined }>()
+const { onToggle, showDelay, hideDelay } = props<{ onToggle: (open: boolean) => void, showDelay?: DurationText | undefined, hideDelay?: DurationText | undefined }>()
 
 const open = signal(false)
 ---

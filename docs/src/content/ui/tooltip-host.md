@@ -8,7 +8,7 @@ Render one `TooltipHost` in the root layout, then add `data-tooltip` to any elem
 
 <Callout type="note">
 
-`showDelay` and `hideDelay` set how long a tooltip waits before it shows and before it hides, `80ms` and `150ms` by default, as any kay duration: `TooltipHost(showDelay="300ms")`.
+`showDelay` and `hideDelay` set how long a tooltip waits before it shows and before it hides, `80ms` and `150ms` by default, as a duration with its unit, never a bare number: `TooltipHost(showDelay="300ms")`.
 
 This page already renders the `TooltipHost`.
 

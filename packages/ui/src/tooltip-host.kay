@@ -1,5 +1,5 @@
 ---
-import type { Duration } from 'kay'
+import type { DurationText } from 'kay'
 import { durationMs, effect, onCleanup, signal } from 'kay'
 import { claim } from './claim'
 
@@ -10,9 +10,9 @@ const ANCHOR = '--kui-tooltip-anchor'
 
 const { showDelay = '80ms', hideDelay = '150ms' } = props<{
   // How long the pointer or focus rests on an element before its tooltip shows.
-  showDelay?: Duration | undefined
+  showDelay?: DurationText | undefined
   // How long a tooltip lingers once the pointer leaves, long enough by default for it to cross the gap onto the tooltip, which stays while hovered.
-  hideDelay?: Duration | undefined
+  hideDelay?: DurationText | undefined
 }>()
 
 const aimed = signal<{ element: HTMLElement, text: string } | null>(null)

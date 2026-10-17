@@ -1,5 +1,8 @@
 // A length of time: seconds as a number, or a number with its unit, `'250ms'`, `'30s'`, `'5m'`, `'12h'`, `'30d'` or `'2w'`.
-export type Duration = number | `${number}${'ms' | keyof typeof UNIT_SECONDS}`
+export type Duration = number | DurationText
+
+// A duration written with its unit, never a bare number: for an option with no number to stay compatible with.
+export type DurationText = `${number}${'ms' | keyof typeof UNIT_SECONDS}`
 
 const UNIT_SECONDS = { s: 1, m: 60, h: 3600, d: 86_400, w: 604_800 }
 
