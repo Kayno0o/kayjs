@@ -111,9 +111,10 @@ export function parseWidths(widths: unknown): number[] {
   return [...new Set(widths as number[])].sort((a, b) => a - b)
 }
 
-// `images.widths` on the server, the default ladder when none is given.
+// `images.widths` on the server, the default ladder when none is given, which also has the browser read the page's again.
 export function setImageWidths(widths: readonly number[] | undefined): void {
   ladder = widths === undefined ? undefined : parseWidths(widths)
+  widthsRead = false
 }
 
 // The widths the route makes, ascending: `images.widths`, which the browser reads off the page.

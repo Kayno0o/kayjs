@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { kay } from '../src/build/plugin'
 import { compileKay } from '../src/compiler'
 import { patch } from '../src/runtime/dev-patch'
-import { cappedSizes } from '../src/runtime/image'
+import { cappedSizes, setImageWidths } from '../src/runtime/image'
 import { shortcut } from '../src/runtime/shortcut'
 import { liveReload } from '../src/server/dev'
 import { settle } from '../src/test'
@@ -287,6 +287,24 @@ describe('imported images', () => {
     }
     finally {
       meta.remove()
+      await dispose()
+    }
+  })
+
+  it('take their widths from images.widths, which the server wrote on the page', async () => {
+    const meta = Object.assign(document.createElement('meta'), { name: 'kay-image-widths', content: '480,960' })
+
+    document.head.append(meta)
+    setImageWidths(undefined)
+
+    const { root, dispose } = await mount6()
+
+    try {
+      expect(root.querySelector('img')!.getAttribute('srcset')!.split(', ').map(entry => entry.split(' ').at(-1))).toEqual(['480w', '960w', '1000w'])
+    }
+    finally {
+      meta.remove()
+      setImageWidths(undefined)
       await dispose()
     }
   })
