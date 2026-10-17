@@ -52,7 +52,8 @@ function itemKey(event: KeyboardEvent, from: number): void {
   const direction = keyDirection(event)
   const to = direction === undefined ? undefined : targetOf(direction, from, items().length)
 
-  if (direction === undefined || to === undefined)
+  // A list inside an item sees the key first: the item holding that list is not moved too.
+  if (event.defaultPrevented || direction === undefined || to === undefined)
     return
 
   event.preventDefault()
