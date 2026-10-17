@@ -15,6 +15,8 @@ const TRANSITION_PART = 'transition:'
 const TRANSITION_PARTS = new Set(['enter', 'enter-from', 'enter-to', 'leave', 'leave-from', 'leave-to'])
 const LOWERCASE_EVENT = /^on:?([a-z]+)$/
 const WHITESPACE = /\s+/
+// `files.url(key)`: a stored file's URL holds its size, which kay writes on the `img` showing it.
+const STORED_URL = /^[\w.]+\.url\(/
 const COMPOUND_EVENT = /^(dbl|key|mouse|pointer|touch|drag|focus|context|before|after)(click|down|up|press|move|enter|leave|over|out|start|end|cancel|in|menu|input)$/
 const HEAD_TAGS = new Set(['title', 'meta', 'link', 'style', 'script', 'base', 'html'])
 const HEAD_CONTENT = 'A `head` block holds `title`, `meta`, `link`, `style`, `script`, `base` and `html` elements only'
@@ -456,15 +458,29 @@ class Validator {
     if (names.has('width') && names.has('height'))
       return false
 
+    // Writing either drops the size kay would have written.
+    if (names.has('width') || names.has('height'))
+      return element.name === 'img' || this.isImageInput(element)
+
     if (element.name === 'input')
-      return element.attributes.some(attribute => attribute.kind === 'static' && this.text(attribute.name) === 'type' && attribute.text === 'image')
+      return this.isImageInput(element)
 
     if (element.name !== 'img')
       return false
 
     const src = element.attributes.find(attribute => attribute.kind === 'expression' && this.text(attribute.name) === 'src')
 
-    return src?.kind !== 'expression' || !this.sizedImports.has(this.text(src.expression).trim())
+    // An own `srcset` keeps kay from sizing the image.
+    if (src?.kind !== 'expression' || names.has('srcset'))
+      return true
+
+    const expression = this.text(src.expression).trim()
+
+    return !this.sizedImports.has(expression) && !STORED_URL.test(expression)
+  }
+
+  private isImageInput(element: ElementNode): boolean {
+    return element.name === 'input' && element.attributes.some(attribute => attribute.kind === 'static' && this.text(attribute.name) === 'type' && attribute.text === 'image')
   }
 
   private text(span: Span): string {

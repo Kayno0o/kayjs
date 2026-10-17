@@ -28,7 +28,7 @@ The editor shows each problem of an open file with the same message, note and he
 - With `i18n`, every `t()` key and placeholder in every locale.
 - Island props can be serialized, and no component reads a browser global while it renders.
 - Accessibility basics: `alt`, labels, headings, keyboard access.
-- An `img` with no `width` and `height`, which shifts the page as it loads. An imported PNG, JPEG, WebP, GIF or AVIF gets its size from kay, and so does an image drawn with `image()`. An SVG or a path needs both written, and only their ratio matters.
+- An `img` with no `width` and `height`, which shifts the page as it loads. An imported PNG, JPEG, WebP, GIF or AVIF written as `src={name}` gets its size from kay, and so does a stored file's `files.url(key)` and an image drawn with `image()`. An SVG, a path or a value from data needs both written, and only their ratio matters.
 - Config the server would refuse at boot, such as two pages serving one path.
 - On a public site, what search engines and social networks read: a `site`, a description, a share image, a favicon.
 

@@ -329,7 +329,7 @@ export const LINTS = {
   'unsized-image': {
     level: 'warn',
     group: 'performance',
-    summary: 'An `img`, or an `input(type="image")`, given neither `width` and `height` nor a spread that may carry them: the page keeps no room for it, so everything below shifts when it loads. An image imported from a PNG, JPEG, WebP, GIF or AVIF file is sized by kay, and `image()` gives its size too; an SVG or a path has to be given one. The ratio is what counts, CSS sets the size it is drawn at.',
+    summary: 'An `img`, or an `input(type="image")`, given neither `width` and `height` nor a spread that may carry them: the page keeps no room for it, so everything below shifts when it loads. An image imported from a PNG, JPEG, WebP, GIF or AVIF file and given as `src={name}` is sized by kay, so is a stored file\'s `files.url(key)`, and `image()` gives its size too; an SVG, a path, a value from data, an image with its own `srcset` or with only one of the two has to be given one. The ratio is what counts, CSS sets the size it is drawn at.',
     wrong: 'img(src="/team.png" alt="The team")',
     right: 'img(src="/team.png" width="1200" height="800" alt="The team")',
   },

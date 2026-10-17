@@ -6,7 +6,9 @@ img({...image(hero, { sizes: '100vw' })} alt="Hero")
 img({...image('/uploads/photo.png', { width: 700, height: 420 })} alt="Upload")
 img({...image('/logo.svg')} alt="Logo")
 img.plain(src={hero} sizes="50vw" alt="Plain")
+// kay-allow unsized-image
 img.sized(src={hero} width="500" alt="Sized")
+// kay-allow unsized-image
 img.own(src={hero} srcset="/a.png 1x" alt="Own")
 // kay-allow unsized-image
 img.other(src={'/logo.svg'} alt="Other")

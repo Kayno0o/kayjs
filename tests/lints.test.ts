@@ -460,7 +460,7 @@ describe('a11y lints', () => {
 
 describe('unsized-image', () => {
   const only = (source: string, options: CompileOptions = {}) => lints(source, options).filter(d => d.code === 'unsized-image').map(d => `${d.severity} ${d.at}`)
-  const imports = '---\nimport hero from \'./hero.png\'\nimport logo from \'./logo.svg?x\'\nimport photo from \'./photo.JPG?v=2\'\nimport { image } from \'kay/image\'\nconst { url, w, h } = props<{ url: string, w: number, h: number }>()\n---\n'
+  const imports = '---\nimport hero from \'./hero.png\'\nimport logo from \'./logo.svg\'\nimport photo from \'./photo.JPG\'\nimport { image } from \'kay/image\'\nconst { url, w, h } = props<{ url: string, w: number, h: number }>()\n---\n'
 
   it('warns of an img with no width and height, one written as a path or a value from data', () => {
     expect(only(`${imports}img(src="/public.png" alt="A")\nimg(src={url} alt="B")\n`)).toEqual(['warning img', 'warning img'])
@@ -469,6 +469,14 @@ describe('unsized-image', () => {
   it('leaves an imported raster image alone, as kay writes its size, and warns of any other import such as an SVG', () => {
     expect(only(`${imports}img(src={hero} alt="A")\nimg(src={photo} alt="B")\n`)).toEqual([])
     expect(only(`${imports}img(src={logo} alt="A")\n`)).toEqual(['warning img'])
+  })
+
+  it('warns of an imported image given its own srcset or only one of the two sizes, which keep kay from writing its size', () => {
+    expect(only(`${imports}img(src={hero} srcset="/a.png 1x" alt="A")\nimg(src={hero} width="500" alt="B")\nimg(src={hero} height="500" alt="C")\n`)).toEqual(['warning img', 'warning img', 'warning img'])
+  })
+
+  it('leaves a stored file, as its key holds the size', () => {
+    expect(only(`${imports}img(src={files.url(key)} alt="A")\nimg(src={\`\${base}/a.png\`} alt="B")\n`)).toEqual(['warning img'])
   })
 
   it('leaves an img with a spread, as image() gives width and height', () => {
