@@ -23,7 +23,7 @@ const ENDS_OPEN = /[-_:]$/
 const STARTS_OPEN = /^[-_:]/
 const MARKDOWN_FILE = /\.mdx?$/
 // A closed fence and an inline span show their text as it is written, so a class named in them is no element.
-const FENCE_START = /^ {0,3}(`{3,}|~{3,})/
+const FENCE_START = /^ {0,3}(`{3,}(?=[^`]*$)|~{3,})/
 const CODE_SPAN = /`[^`\n]*`/g
 const SCRIPT_OR_KAY = /\.(?:kay|[cm]?[jt]sx?)$/
 // What kay's Markdown renderer puts on a code block, `language-ts`.

@@ -51,3 +51,23 @@ describe('which classes a page rendering Markdown names', () => {
     expect(named(true)).toEqual(['btn-primary', 'mt-1', 'p-1'])
   })
 })
+
+describe('which Markdown counts as code', () => {
+  it.each([
+    ['a tilde fence', '~~~\n<i class="p-1"></i>\n~~~\n', []],
+    ['a fence closed by a longer one', '```\n<i class="p-1"></i>\n`````\n', []],
+    ['a fence never closed', '```\n<i class="p-1"></i>\n', ['p-1']],
+    ['a line of inline code that opens like a fence', '```x``` <i class="p-1"></i>\n', ['p-1']],
+  ])('reads %s', async (_name, markdown, expected) => {
+    const root = await scratchDir('style-uses-md-')
+    const page = join(root, 'page.kay')
+    const notes = join(root, 'notes.md')
+
+    await Bun.write(page, 'p hello\n')
+    await Bun.write(notes, markdown)
+
+    const { classes, entries } = styleUses(root, [page], [CSS], { edges: new Map(), open: new Set([page]) }, new Map(), [notes])
+
+    expect((entries['page.kay'] as number[]).map(index => classes[index]!)).toEqual(expected)
+  })
+})

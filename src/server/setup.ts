@@ -98,7 +98,7 @@ export async function setupPages(project: Project, loadClient: () => ClientBuild
   }
 
   if (!mode.dev)
-    await chooseInlineStyles(client, base, config.inlineStyles, styleChains(routes))
+    await chooseInlineStyles(client, base, config.inlineStyles, styleChains(routes), config.offline === undefined || config.offline === false)
 
   const [files, endpoints] = await Promise.all([publicFiles(paths.public), source.endpoints(paths.routes, mounts)])
   const ownManifest = appServesManifest(files, endpoints, routes)

@@ -2,7 +2,7 @@ import type { Browser, Page } from 'playwright-core'
 import type { PagesOptions } from '../src/server/app'
 import type { ClientBuild } from '../src/server/client'
 import { existsSync } from 'node:fs'
-import { rm } from 'node:fs/promises'
+import { mkdir, rm } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
 import tailwind from 'bun-plugin-tailwind'
@@ -311,6 +311,34 @@ describe('a page\'s head', () => {
 
     expect(compressed.headers.get('content-encoding')).toBe('gzip')
     expect(new TextDecoder().decode(Bun.gunzipSync(new Uint8Array(await compressed.arrayBuffer())))).toBe(html)
+  })
+
+  it('links the shared stylesheet when the copy cannot be written, and with offline on', async () => {
+    const copy = (await head(await serve(), '/bulk')).blocking[0]!
+    const file = join(client.dir, copy.slice('/_kay/'.length))
+
+    await rm(file)
+    await mkdir(file)
+
+    const blocked = await head(await serve(), '/bulk')
+
+    expect(blocked.blocking[0]).not.toMatch(ROUTE_COPY)
+    await rm(file, { recursive: true })
+
+    const offline = await head(await serve({ offline: true }), '/bulk')
+
+    expect(offline.blocking[0]).not.toMatch(ROUTE_COPY)
+    expect((await head(await serve(), '/bulk')).blocking[0]).toBe(copy)
+  })
+
+  it('replaces a copy cut short under its name', async () => {
+    const copy = (await head(await serve(), '/bulk')).blocking[0]!
+    const file = join(client.dir, copy.slice('/_kay/'.length))
+    const text = await Bun.file(file).text()
+
+    await Bun.write(file, text.slice(0, 100))
+    await head(await serve(), '/bulk')
+    expect(await Bun.file(file).text()).toBe(text)
   })
 
   it('puts the mount point on the href of a route copy, which is cut from the stylesheet as the build wrote it', async () => {

@@ -38,7 +38,7 @@ kay links the full stylesheet for the rest. The browser fetches it without holdi
 
 Until that stylesheet arrives, such a class shows unstyled. A class no page names, from Markdown for instance, stays inline on every page. A page whose own rules are still over the size, or take up more than half of it, links a copy of the stylesheet instead. The copy has the same rules in the same order, without the rules of components the page never renders. A page links it only when it is a quarter lighter or more, so a site with similar pages keeps one cached file.
 
-A page that shows Markdown counts the classes the Markdown, the scripts that write markup into it and its components name. Text in a code block does not count.
+A page that shows Markdown counts the classes the Markdown, the scripts that write markup into it and its components name. Text in a code block does not count. A class that Markdown gets at run time, through the CMS or from a plugin in a package, is named by none of those, so write it in a file of your project too. With `offline` on, pages link the shared stylesheet, which the worker keeps.
 
 When you move to another page without a reload, the next page's rules come with it. A route with a copy of its own loads it before the page paints.
 

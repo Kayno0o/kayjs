@@ -6,8 +6,10 @@ import type { ServerIslandMode } from '../runtime/html'
 import { join, resolve } from 'node:path'
 import { ASSET_PREFIX, clientDir, outputDir } from '../build/assets'
 import { pruneUnescaped } from '../build/class-rules'
+import { writeIfChanged } from '../build/files'
 import { parse, print } from '../build/supports'
 import { joinBase, NOWHERE } from '../runtime/base'
+import { kayLog } from '../runtime/log'
 import { unrebaseCss } from './base'
 
 // Written beside the bundle as `manifest.json`, so a production server reads it instead of bundling at boot.
@@ -178,7 +180,7 @@ export const INLINE_LIMIT = 14_000
 
 // `inlineStyles: true` makes every stylesheet inlinable, `false` none, and unset the ones that compress under `INLINE_LIMIT`, the page deciding by the sum of its own.
 // `chains` lists the layouts and page each route renders: unset, a page whose stylesheets together pass the limit still inlines the rules its own components use, when those fit, and links the stylesheets whole for the rest.
-export async function chooseInlineStyles(client: ClientBuild, base: string, setting: boolean | undefined, chains: string[][] = []): Promise<void> {
+export async function chooseInlineStyles(client: ClientBuild, base: string, setting: boolean | undefined, chains: string[][] = [], copies = true): Promise<void> {
   if (setting === false)
     return
 
@@ -204,7 +206,7 @@ export async function chooseInlineStyles(client: ClientBuild, base: string, sett
   }
 
   if (client.styleUses !== undefined)
-    client.pageStyles = await pageStyles(client, base, texts, chains)
+    client.pageStyles = await pageStyles(client, base, texts, chains, copies)
 }
 
 // Run while the head is parsed, which puts the shared stylesheets on the page the moment they load rather than after it is printed.
@@ -215,7 +217,7 @@ interface StyleGroup {
   unused: Set<string>
   // The rules of the classes its components name, for the head to write when they fit.
   inline: string[]
-  // The stylesheets some other rule of is left, which the head links.
+  // The stylesheets with a rule left out of the inline ones, which the head links.
   rest: string[]
   size: number
   chains: number
@@ -236,7 +238,9 @@ function styleFile(client: ClientBuild, url: string): string {
 
 // Writes the stylesheets some groups of chains link in a lighter form, the shared one pruned of the classes none of their files name: the same rules in the same order, so the cascade is the shared stylesheet's.
 // Each is named by its text, so a cache never holds an old one under a new name, and written beside the shared one, where a build puts it in the export and the executable and a server finds it again.
-async function writeRouteStyles(client: ClientBuild, groups: StyleGroup[], parsed: Map<string, Node[]>): Promise<void> {
+async function writeRouteStyles(client: ClientBuild, groups: StyleGroup[]): Promise<void> {
+  // The build's own text is what a copy is cut from, not the inline one, which has its mount point and relative paths taken out.
+  const parsed = new Map<string, Node[]>()
   const whole = new Map<string, { text: string, size: number }>()
   const found: { group: StyleGroup, url: string, text: string, saved: number }[] = []
 
@@ -280,10 +284,11 @@ async function writeRouteStyles(client: ClientBuild, groups: StyleGroup[], parse
       const file = join(client.dir, name)
 
       try {
-        if (!await Bun.file(file).exists())
-          await Bun.write(file, text)
+        await writeIfChanged(file, text)
       }
-      catch {
+      catch (error) {
+        kayLog('warn', `a page's stylesheet copy could not be written, so its pages link the shared stylesheet: ${error instanceof Error ? error.message : String(error)}`)
+
         continue
       }
 
@@ -294,11 +299,10 @@ async function writeRouteStyles(client: ClientBuild, groups: StyleGroup[], parse
   }
 }
 
-// The head of each chain whose full stylesheets are too heavy to inline.
-// When its own rules fit: the rules for the classes its components name, written inline, then the stylesheets linked without holding the first paint back.
+// The head of each chain whose full stylesheets are too heavy to inline: the rules for the classes its components name, written inline when they fit, then the full stylesheets linked without holding the first paint back.
 // A class no component names, or one built at runtime, has its rule in the linked stylesheet, which applies when it arrives, and at once without scripts. It follows the inline rules so it keeps the place it has in the whole stylesheet.
-// When they do not, or whatever is linked: a route whose files leave out enough of a stylesheet links a copy without those rules, written beside it.
-async function pageStyles(client: ClientBuild, base: string, texts: Map<string, string>, chains: string[][]): Promise<Map<string, PageStyles>> {
+// A route whose own rules weigh more than half the limit links a copy of each stylesheet without the rules of the classes its files leave out instead, when that saves enough.
+async function pageStyles(client: ClientBuild, base: string, texts: Map<string, string>, chains: string[][], copies: boolean): Promise<Map<string, PageStyles>> {
   const { classes, entries } = client.styleUses!
   const found = new Map<string, PageStyles>()
   const parsed = new Map<string, Node[]>()
@@ -362,9 +366,9 @@ async function pageStyles(client: ClientBuild, base: string, texts: Map<string, 
     planned.push({ key, group })
   }
 
-  // What the build wrote is what the copies are cut from, not the inline texts, which have their mount point and relative paths taken out.
-  parsed.clear()
-  await writeRouteStyles(client, [...groups.values()], parsed)
+  // A service worker keeps the shared stylesheet for every visitor, so copies would only add files to download.
+  if (copies)
+    await writeRouteStyles(client, [...groups.values()])
 
   for (const { key, group } of planned) {
     const { inline, rest, size, urls, routes } = group
@@ -383,7 +387,7 @@ async function pageStyles(client: ClientBuild, base: string, texts: Map<string, 
     // A noscript holds text for the rewriter that puts the mount point on links, so its hrefs carry it already.
     const plain = rest.map(url => `<link rel="stylesheet" href="${joinBase(base, linked(url))}">`).join('')
 
-    found.set(key, { html: `${inline.map(css => `<style>${css}</style>`).join('')}${links}${rest.length === 0 ? '' : `${restScript}<noscript>${plain}</noscript>`}`, inline, links: rest.map(linked) })
+    found.set(key, { html: `${inline.map(css => `<style>${css}</style>`).join('')}${links}${rest.length === 0 ? '' : `${restScript}<noscript>${plain}</noscript>`}`, inline, links: urls.map(linked) })
   }
 
   return found
