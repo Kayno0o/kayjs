@@ -1,0 +1,16 @@
+---
+import type { EntryForm } from '../form'
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import Select from '@kaynooo/kayjs-ui/select.kay'
+import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
+import { wording } from 'kay/words'
+
+// A new entry's slug and, in a localized collection, its locale. Renders nothing for a saved entry.
+const { form } = props<{ form: EntryForm }>()
+---
+if !form.stored
+  FormField(label={wording('cms.entry.slug', 'Slug')} hint={form.collection.kind === 'folder' ? wording('cms.entry.slugHint', 'The file\'s path in the collection\'s folder, with / between folders') : undefined} required)
+    TextInput(value={form.slug()} onInput={text => form.slug.set(text)} required)
+  if form.collection.localized
+    FormField(label={wording('cms.entry.locale', 'Locale')} required)
+      Select(value={form.newLocale()} options={(form.collection.locales ?? []).map(code => ({ value: code, label: code }))} onChange={code => form.newLocale.set(code)})

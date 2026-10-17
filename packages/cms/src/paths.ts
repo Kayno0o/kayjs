@@ -50,3 +50,10 @@ function setIn(container: unknown, segments: string[], value: unknown): unknown 
 
   return { ...container, [segment]: setIn((container as Record<string, unknown>)[segment], rest, value) }
 }
+
+// The first key of a dotted path: the field of the entry's data it lies in.
+export function topKey(path: string): string {
+  const dot = path.indexOf('.')
+
+  return dot < 0 ? path : path.slice(0, dot)
+}

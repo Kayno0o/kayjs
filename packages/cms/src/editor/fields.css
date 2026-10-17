@@ -83,3 +83,15 @@
 .kcms-move-up svg {
   transform: rotate(180deg);
 }
+
+/* A row of the layout: its fields side by side, stacking where there is no room, so a single field fills the row. */
+.kcms-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  gap: 0.75rem;
+  align-items: start;
+}
+
+.kcms-row > * {
+  min-width: 0;
+}

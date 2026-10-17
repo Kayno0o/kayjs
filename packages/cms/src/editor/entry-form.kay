@@ -9,6 +9,7 @@ import { collectionTitle } from '../listing'
 import { BODY } from '../markers'
 import { drafts } from './drafts'
 import EntryFields from './entry-fields.kay'
+import { formScope } from '../form'
 import { saveDraft } from './save'
 
 const { entry, focus } = props<{ entry: EntryRef, focus?: FieldPath | undefined }>()
@@ -67,6 +68,6 @@ section.kcms-entry(ref={element => box = element})
   else if source.value() as answer
     if answer.entry.problem as problem
       p.kcms-entry-failure(role="alert") {wording('cms.entry.problem', 'This entry\'s file does not parse: {problem}. Saving writes the form over it.', { problem })}
-    EntryFields(drafts={drafts} entry={entry} collection={answer.collection})
+    EntryFields(form={formScope(drafts, entry, answer.collection)})
   else
     p.kcms-entry-loading {wording('cms.entry.loading', 'Loading…')}

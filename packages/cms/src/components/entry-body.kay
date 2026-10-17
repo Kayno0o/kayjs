@@ -1,0 +1,19 @@
+---
+import type { FormScope } from '../form'
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import MarkdownEditor from '@kaynooo/kayjs-ui/markdown-editor.kay'
+import { wording } from 'kay/words'
+import { uploadFile } from '../editor/upload'
+import { BODY } from '../markers'
+
+// The Markdown body of an entry whose collection has one.
+const { form } = props<{ form: FormScope }>()
+
+effect(() => {
+  onCleanup(form.shown.add('#body'))
+})
+---
+if form.collection.body
+  .kcms-field(data-kcms-body)
+    FormField(label={wording('cms.entry.body', 'Body')} issue={form.drafts.issues(form.entry, BODY)[0]?.message})
+      MarkdownEditor(value={String(form.drafts.value(form.entry, BODY) ?? '')} onInput={text => form.drafts.set(form.entry, BODY, text)} onImage={file => uploadFile(form.entry.collection, file)})

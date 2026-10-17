@@ -5,14 +5,12 @@ import { wording } from 'kay/words'
 import EntryEditor from '../../../components/entry-editor.kay'
 import EntryHeader from '../../../components/entry-header.kay'
 import { collectionTitle, entryTitle } from '../../../listing'
-import { settings } from '../../../settings'
-import { entryScreen } from '../../../store'
+import { entryScreen } from '../../../screens'
 
 export const page = { query: s.Object({ locale: s.Optional(s.String()) }) }
 
-const { prefix } = settings()
 const screen = await entryScreen({ collection: ctx.params.collection, slug: ctx.params.slug, locale: ctx.query.locale }) ?? ctx.notFound()
-const { collection } = screen
+const { prefix, collection } = screen
 const entry = collection.problem === undefined ? screen.entry ?? ctx.notFound() : undefined
 const title = collectionTitle(collection)
 const name = ctx.query.locale === undefined ? ctx.params.slug : `${ctx.params.slug} (${ctx.query.locale})`

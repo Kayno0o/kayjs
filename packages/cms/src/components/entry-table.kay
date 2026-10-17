@@ -1,6 +1,6 @@
 ---
 import type { Column } from '@kaynooo/kayjs-ui'
-import type { CollectionInfo } from '../kay/contract'
+import type { ScreenCollection } from '../kay/contract'
 import type { EntryRow } from '../listing'
 import Badge from '@kaynooo/kayjs-ui/badge.kay'
 import Button from '@kaynooo/kayjs-ui/button.kay'
@@ -11,18 +11,28 @@ import { refresh } from 'kay'
 import { wording } from 'kay/words'
 import { deleteSaved, moveSaved, publishSaved } from '../editor/save'
 import { shipWords } from '../editor/words'
+import { fieldsOf } from '../fields'
+import { listColumns, rowActions } from '../layout'
 import { entryPath, onPagePath, problemId } from '../listing'
 
-const { prefix, collection, rows, searched } = props<{ prefix: string, collection: CollectionInfo, rows: EntryRow[], searched: boolean }>()
+const { prefix, collection, rows, searched } = props<{ prefix: string, collection: ScreenCollection, rows: EntryRow[], searched: boolean }>()
 
 // Looks up what a save says once the page has loaded, so the page sends it.
 shipWords()
 
+// The columns and row actions the collection's layout names, all actions by default.
+const shown = listColumns(fieldsOf(collection.schema), collection.layout?.list)
+const actions = rowActions(collection.layout?.list)
+
+// A field's column is keyed apart from the built-in ones, so a field named `title` or `actions` clashes with none.
+const cellKey = (key: string | number) => `cell:${key}`
+
 const columns: Column<EntryRow>[] = [
   { key: 'title', header: wording('cms.table.title', 'Title'), sortValue: true, defaultDirection: 'asc', cell: true },
+  ...shown.map(field => ({ key: cellKey(field.key), header: field.label, sortValue: (row: EntryRow) => row.cells?.[field.key] ?? '', cell: true }) satisfies Column<EntryRow>),
   ...(collection.localized ? [{ key: 'locale', header: wording('cms.table.locale', 'Locale'), sortValue: true } satisfies Column<EntryRow>] : []),
   ...(collection.draftField === undefined ? [] : [{ key: 'draft', header: wording('cms.table.status', 'Status'), cell: true } satisfies Column<EntryRow>]),
-  { key: 'actions', header: wording('cms.table.actions', 'Actions'), align: 'end', cell: true },
+  ...(actions.size === 0 ? [] : [{ key: 'actions', header: wording('cms.table.actions', 'Actions'), align: 'end', cell: true } satisfies Column<EntryRow>]),
 ]
 
 const ref = (row: EntryRow) => ({ collection: collection.name, slug: row.slug, locale: row.locale })
@@ -51,6 +61,8 @@ Table.kcms-entries(columns={columns} rows={rows} rowKey={keyOf})
       if row.problem as problem
         Badge(tone="danger" label={wording('cms.table.broken', 'Broken')})
         span.kcms-sr-only(id={problemId(collection.name, keyOf(row))}) {problem}
+    else if column.key.startsWith('cell:')
+      span {row.cells?.[column.key.slice(5)] ?? ''}
     else if column.key === 'draft'
       if row.draft
         Badge(tone="warning" label={wording('cms.entry.draft', 'Draft')})
@@ -58,14 +70,17 @@ Table.kcms-entries(columns={columns} rows={rows} rowKey={keyOf})
         Badge(tone="success" label={wording('cms.table.published', 'Published')})
     else
       .kcms-row-actions
-        if row.move as place
-          Button(label={wording('cms.table.moveUp', 'Up')} aria-label={wording('cms.table.moveUpLabel', 'Move {title} up', { title: row.title })} disabled={!place.up} onClick={() => move(row, 'up')})
-          Button(label={wording('cms.table.moveDown', 'Down')} aria-label={wording('cms.table.moveDownLabel', 'Move {title} down', { title: row.title })} disabled={!place.down} onClick={() => move(row, 'down')})
-        if row.draft && collection.draftField !== undefined
+        if actions.has('move')
+          if row.move as place
+            Button(label={wording('cms.table.moveUp', 'Up')} aria-label={wording('cms.table.moveUpLabel', 'Move {title} up', { title: row.title })} disabled={!place.up} onClick={() => move(row, 'up')})
+            Button(label={wording('cms.table.moveDown', 'Down')} aria-label={wording('cms.table.moveDownLabel', 'Move {title} down', { title: row.title })} disabled={!place.down} onClick={() => move(row, 'down')})
+        if actions.has('publish') && row.draft && collection.draftField !== undefined
           Button(label={wording('cms.entry.publish', 'Publish')} aria-label={wording('cms.table.publishLabel', 'Publish {title}', { title: row.title })} onClick={() => publish(row)})
-        if row.url as url
-          Button(href={onPagePath(prefix, url)} label={wording('cms.entry.editOnPage', 'Edit on page')} aria-label={wording('cms.table.editOnPageLabel', 'Edit on page: {title}', { title: row.title })})
-        ConfirmDelete(message={wording('cms.table.deleteMessage', 'Delete {title}? This cannot be undone.', { title: row.title })} label={wording('cms.table.deleteLabel', 'Delete {title}', { title: row.title })} failure={wording('cms.save.deleteFailure', 'Could not delete')} size="sm" variant="ghost" onConfirm={() => remove(row)})
+        if actions.has('editOnPage')
+          if row.url as url
+            Button(href={onPagePath(prefix, url)} label={wording('cms.entry.editOnPage', 'Edit on page')} aria-label={wording('cms.table.editOnPageLabel', 'Edit on page: {title}', { title: row.title })})
+        if actions.has('delete')
+          ConfirmDelete(message={wording('cms.table.deleteMessage', 'Delete {title}? This cannot be undone.', { title: row.title })} label={wording('cms.table.deleteLabel', 'Delete {title}', { title: row.title })} failure={wording('cms.save.deleteFailure', 'Could not delete')} size="sm" variant="ghost" onConfirm={() => remove(row)})
   @empty
     if searched
       EmptyState(title={wording('cms.table.noMatch', 'No match')} description={wording('cms.table.noMatchHint', 'No entry\'s title or slug holds every word searched.')})

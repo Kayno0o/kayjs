@@ -1,0 +1,24 @@
+---
+import type { ScreenCollection, StoredEntry } from '@kaynooo/kayjs-cms'
+import EntryActions from '@kaynooo/kayjs-cms/entry-actions.kay'
+import EntryField from '@kaynooo/kayjs-cms/entry-field.kay'
+import EntryHeader from '@kaynooo/kayjs-cms/entry-header.kay'
+import EntryIdentity from '@kaynooo/kayjs-cms/entry-identity.kay'
+import EntryNotices from '@kaynooo/kayjs-cms/entry-notices.kay'
+import { createEntryForm } from '@kaynooo/kayjs-cms/form'
+
+// The app's own entry screen for the shop: the photo above the name, the price and the stock side by side, no sku.
+const { prefix, collection, entry } = props<{ prefix: string, collection: ScreenCollection, entry?: StoredEntry | undefined }>()
+
+const form = createEntryForm({ prefix, collection, entry })
+---
+form.shop-entry(novalidate onSubmit={event => { event.preventDefault(); void form.save() }})
+  EntryHeader(prefix={prefix} collection={collection} title={form.name} subtitle={form.subtitle})
+    EntryActions(form={form})
+  EntryIdentity(form={form})
+  EntryNotices(form={form})
+  EntryField(form={form} name="photo")
+  EntryField(form={form} name="name")
+  .shop-columns
+    EntryField(form={form} name="price")
+    EntryField(form={form} name="stock")

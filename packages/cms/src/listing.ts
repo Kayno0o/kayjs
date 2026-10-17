@@ -1,5 +1,6 @@
-import type { CollectionInfo, EntryFilter, EntryRef, SourceEntry } from './kay/contract'
+import type { EntryFilter, EntryRef, ScreenCollection, SourceEntry } from './kay/contract'
 import { fieldsOf, humanize } from './fields'
+import { cellText, listColumns } from './layout'
 import { sortOrdered } from './order'
 
 const UNSAFE_ID = /[^a-z0-9]/giu
@@ -12,6 +13,8 @@ export interface EntryRow {
   url?: string | undefined
   // Why the entry's file does not parse, when it does not.
   problem?: string | undefined
+  // The text of each column the collection's list names, by field key.
+  cells?: Record<string, string> | undefined
   // The version of a folder entry's file as the list read it, which a delete from the list names, so it never removes a file saved since.
   version?: string | undefined
   // In an ordered collection, whether the entry has one before or after it to swap places with, among the entries of its locale; absent while a search is on.
@@ -22,18 +25,21 @@ export interface EntryRow {
 export const PAGE_SIZE = 50
 
 // A row per entry, titled by the entry's first one-line text field, else its slug.
-export function rowsOf(collection: CollectionInfo, entries: SourceEntry[]): EntryRow[] {
-  const titleKey = fieldsOf(collection.schema).find(field => field.kind === 'text')?.key
+export function rowsOf(collection: ScreenCollection, entries: SourceEntry[]): EntryRow[] {
+  const fields = fieldsOf(collection.schema)
+  const titleKey = fields.find(field => field.kind === 'text')?.key
+  const columns = listColumns(fields, collection.layout?.list)
 
   return entries.map(({ slug, locale, url, data, draft, problem }) => {
     const title = titleKey === undefined ? undefined : data?.[titleKey]
+    const cells = columns.length === 0 ? undefined : Object.fromEntries(columns.map(field => [field.key, cellText(field, data?.[field.key])]))
 
-    return { slug, locale, url, draft, problem, title: typeof title === 'string' && title.trim() !== '' ? title : slug }
+    return { slug, locale, url, draft, problem, cells, title: typeof title === 'string' && title.trim() !== '' ? title : slug }
   })
 }
 
 // An entry's title as the list shows it.
-export function entryTitle(collection: CollectionInfo, entry: SourceEntry): string {
+export function entryTitle(collection: ScreenCollection, entry: SourceEntry): string {
   return rowsOf(collection, [entry])[0]!.title
 }
 
@@ -71,7 +77,7 @@ function pageAt(total: number, page: number, size: number): { page: number, page
 
 // A page of the collection's rows: a search reads every entry to match their titles, a plain page its own entries alone.
 // `versionOf` reads the version of a folder entry's file, for the rows of the page shown alone.
-export async function pageRows(collection: CollectionInfo, search: string, page: number, read: (filter: EntryFilter) => Promise<SourceEntry[]>, versionOf: (ref: EntryRef) => Promise<string | undefined>, size = PAGE_SIZE): Promise<{ rows: EntryRow[], page: number, pages: number }> {
+export async function pageRows(collection: ScreenCollection, search: string, page: number, read: (filter: EntryFilter) => Promise<SourceEntry[]>, versionOf: (ref: EntryRef) => Promise<string | undefined>, size = PAGE_SIZE): Promise<{ rows: EntryRow[], page: number, pages: number }> {
   if (collection.problem !== undefined)
     return pageOf([], 1, size)
 
@@ -96,7 +102,7 @@ export async function pageRows(collection: CollectionInfo, search: string, page:
 }
 
 // The rows of an ordered collection in its order, every entry read so a page starts where the order says; each row that can move says which way, unless a search narrows the rows.
-function orderedRows(collection: CollectionInfo, field: string, found: SourceEntry[], search: string): EntryRow[] {
+function orderedRows(collection: ScreenCollection, field: string, found: SourceEntry[], search: string): EntryRow[] {
   const sorted = sortOrdered(found, field)
   const rows = rowsOf(collection, sorted)
 
@@ -115,7 +121,7 @@ function orderedRows(collection: CollectionInfo, field: string, found: SourceEnt
 }
 
 // What the screens title a collection with: its `title`, else its name humanized.
-export function collectionTitle(collection: Pick<CollectionInfo, 'name' | 'title'>): string {
+export function collectionTitle(collection: Pick<ScreenCollection, 'name' | 'title'>): string {
   return collection.title ?? humanize(collection.name)
 }
 

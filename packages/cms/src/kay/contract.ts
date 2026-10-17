@@ -1,7 +1,30 @@
 // The shapes kayjs-cms passes around: kay's own from kay/content, and the entry references and issues its forms and API share.
-import type { SourceEntry } from 'kay/content'
+import type { CollectionInfo, SourceEntry } from 'kay/content'
 
 export type { CollectionInfo, DataValue, EntryFile, EntryFilter, JsonSchema, SourceEntry } from 'kay/content'
+
+// How a collection's form is arranged: `fields` first, in that order, an inner array being one row of columns, then the others in the schema's order unless hidden; the Markdown body is `body`, or `#body` when a data field has that name.
+export interface FormLayout {
+  fields?: (string | string[])[] | undefined
+  hide?: string[] | undefined
+}
+
+// What a row of a collection's list can offer beside its title.
+export type RowAction = 'move' | 'publish' | 'editOnPage' | 'delete'
+
+// The columns of a collection's list, field keys shown after the title, and the row actions kept, all by default.
+export interface ListLayout {
+  columns?: string[] | undefined
+  actions?: RowAction[] | undefined
+}
+
+export interface CollectionLayout {
+  form?: FormLayout | undefined
+  list?: ListLayout | undefined
+}
+
+// A collection as the screens read it: kay's, with the layout `cms({ collections })` gave it.
+export type ScreenCollection = CollectionInfo & { layout?: CollectionLayout | undefined }
 
 export interface EntryRef {
   collection: string

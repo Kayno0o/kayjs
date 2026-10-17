@@ -5,13 +5,11 @@ import { wording } from 'kay/words'
 import EntryEditor from '../../components/entry-editor.kay'
 import EntryHeader from '../../components/entry-header.kay'
 import { collectionTitle } from '../../listing'
-import { settings } from '../../settings'
-import { findCollection } from '../../store'
+import { collectionScreen } from '../../screens'
 
 export const page = { query: s.Object({ locale: s.Optional(s.String()) }) }
 
-const { prefix } = settings()
-const collection = await findCollection(ctx.params.collection) ?? ctx.notFound()
+const { prefix, collection } = await collectionScreen(ctx.params.collection) ?? ctx.notFound()
 const locale = ctx.query.locale
 ---
 head

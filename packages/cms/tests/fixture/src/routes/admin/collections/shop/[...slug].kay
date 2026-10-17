@@ -1,0 +1,11 @@
+--- server
+import { entryScreen } from '@kaynooo/kayjs-cms'
+import ShopEntry from '../../../../components/shop-entry.kay'
+
+// The shop's entry screen is the app's own, built from the cms's parts.
+const screen = await entryScreen({ collection: 'shop', slug: ctx.params.slug, locale: undefined }) ?? ctx.notFound()
+const entry = screen.entry ?? ctx.notFound()
+---
+head
+  title {entry.slug} - Shop
+ShopEntry(prefix={screen.prefix} collection={screen.collection} entry={entry})

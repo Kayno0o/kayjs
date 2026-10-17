@@ -1,8 +1,10 @@
 import type { Guard, GuardContext } from 'kay'
 import type { ByteSize } from 'kay/library'
 import type { FileSaver, Identity } from './files'
+import type { CollectionLayout } from './kay/contract'
 import { byteSize } from 'kay/library'
 import { workingTree } from './files'
+import { checkLayouts } from './layout'
 import { PAGE_SIZE } from './listing'
 
 // A guard built when the first request reaches it, so kay.config.ts imports nothing of the app's auth or database: `{ load: async () => (await import('./src/auth')).auth.guard({ require: 'editor' }) }`.
@@ -28,6 +30,8 @@ export interface CmsOptions {
   pageSize?: number | undefined
   // Collections whose bodies may hold HTML that runs as the site, such as a `<script>` or an `onclick`, which a save is otherwise refused for.
   rawHtml?: string[] | undefined
+  // How the screens arrange a collection, by its name: `form` its entry form (`fields` shown first, a nested list being a row of columns, `hide` left out) and `list` its list (`columns` of field keys after the title, `actions` kept among 'move', 'publish', 'editOnPage' and 'delete').
+  collections?: Record<string, CollectionLayout> | undefined
   // Who a save the guard let through is committed as, from the guard's context: `async ({ locals }) => ...` reading the signed-in user.
   author?: ((ctx: GuardContext) => Identity | undefined | Promise<Identity | undefined>) | undefined
 }
@@ -42,6 +46,7 @@ export interface CmsSettings {
   pageSize: number
   rawHtml: ReadonlySet<string>
   author: CmsOptions['author']
+  layouts: ReadonlyMap<string, CollectionLayout>
 }
 
 const DEFAULT_UPLOADS = ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/avif', 'application/pdf']
@@ -60,13 +65,13 @@ const TRAILING_SLASHES = /\/+$/
 
 let current: CmsSettings | undefined
 
-export function configure({ prefix = '/admin', guard, files = workingTree(), uploads, pageSize = PAGE_SIZE, rawHtml = [], author }: CmsOptions): CmsSettings {
+export function configure({ prefix = '/admin', guard, files = workingTree(), uploads, pageSize = PAGE_SIZE, rawHtml = [], author, collections }: CmsOptions): CmsSettings {
   if (!Number.isInteger(pageSize) || pageSize < 1)
     throw new Error(`kayjs-cms: \`cms({ pageSize })\` is ${JSON.stringify(pageSize)}; it takes a positive whole number of entries`)
 
   const { types = DEFAULT_UPLOADS, maxSize } = Array.isArray(uploads) ? { types: uploads, maxSize: undefined } : uploads ?? {}
 
-  current = { prefix: prefix.replace(TRAILING_SLASHES, '') || '/', guard: guard === undefined ? undefined : lazily(guard), files, uploads: types, maxSize: uploadSize(maxSize), pageSize, rawHtml: new Set(rawHtml), author }
+  current = { prefix: prefix.replace(TRAILING_SLASHES, '') || '/', guard: guard === undefined ? undefined : lazily(guard), files, uploads: types, maxSize: uploadSize(maxSize), pageSize, rawHtml: new Set(rawHtml), author, layouts: checkLayouts(collections) }
 
   return current
 }

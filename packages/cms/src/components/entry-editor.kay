@@ -1,97 +1,19 @@
 ---
-import type { CollectionInfo, EntryRef, StoredEntry } from '../kay/contract'
-import Badge from '@kaynooo/kayjs-ui/badge.kay'
-import Button from '@kaynooo/kayjs-ui/button.kay'
-import ConfirmDelete from '@kaynooo/kayjs-ui/confirm-delete.kay'
-import FormField from '@kaynooo/kayjs-ui/form-field.kay'
-import Select from '@kaynooo/kayjs-ui/select.kay'
-import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
-import { guardLeave, navigate } from 'kay'
-import { wording } from 'kay/words'
-import { createDrafts } from '../drafts'
+import type { ScreenCollection, StoredEntry } from '../kay/contract'
 import EntryFields from '../editor/entry-fields.kay'
-import { deleteSaved, saveDraft } from '../editor/save'
-import { shipWords } from '../editor/words'
-import { collectionPath, entryPath, entryTitle, onPagePath } from '../listing'
+import { createEntryForm } from '../form'
+import EntryActions from './entry-actions.kay'
 import EntryHeader from './entry-header.kay'
+import EntryIdentity from './entry-identity.kay'
 
 // An entry's form on its own screen, or a new entry's when `entry` is left out.
-const { prefix, collection, entry, locale } = props<{ prefix: string, collection: CollectionInfo, entry?: StoredEntry | undefined, locale?: string | undefined }>()
+// An app's own screen builds the same from `createEntryForm` and the parts this one is made of.
+const { prefix, collection, entry, locale } = props<{ prefix: string, collection: ScreenCollection, entry?: StoredEntry | undefined, locale?: string | undefined }>()
 
-// Looks up what the form reads only once the page has loaded, so the page sends it.
-shipWords()
-
-// Nothing on this screen shows the entry rendered, so a change waits for no draft render.
-const drafts = createDrafts({ show: async () => ({}) })
-// A new entry's draft is kept under no slug until it is saved under the one typed.
-const ref: EntryRef = { collection: collection.name, slug: entry?.slug ?? '', locale: entry?.locale ?? locale }
-const slug = signal(entry?.slug ?? '')
-// kay files each entry of a localized collection under one of the site's locales.
-const newLocale = signal(locale ?? collection.locales?.[0] ?? '')
-const saving = signal(false)
-
-drafts.open({ ...ref, data: entry?.data ?? {}, body: entry?.body }, entry?.version)
-guardLeave(() => !saving() && drafts.changed(ref))
-
-// The entry's own title, its slug beneath when that is not the title; a new entry has neither.
-const name = entry ? entryTitle(collection, entry) : wording('cms.admin.newEntry', 'New entry')
-const slugLine = entry && name !== entry.slug ? (entry.locale === undefined ? entry.slug : `${entry.slug} (${entry.locale})`) : entry?.locale
-
-const draft = () => collection.draftField !== undefined && drafts.value(ref, collection.draftField) === true
-
-async function save(): Promise<void> {
-  saving = true
-
-  try {
-    if (entry) {
-      await saveDraft(drafts, ref)
-
-      return
-    }
-
-    const created = { collection: collection.name, slug: slug().trim(), locale: collection.localized ? newLocale() : undefined }
-
-    if (await saveDraft(drafts, ref, { slug: created.slug, locale: created.locale, create: true }))
-      await navigate(entryPath(prefix, created), { replace: true })
-  }
-  finally {
-    saving = false
-  }
-}
-
-async function publish(): Promise<void> {
-  if (collection.draftField === undefined)
-    return
-
-  drafts.set(ref, collection.draftField, false)
-  await save()
-}
-
-async function remove(): Promise<void> {
-  if (await deleteSaved(ref, drafts.version(ref)))
-    await navigate(collectionPath(prefix, collection.name), { replace: true })
-}
+const form = createEntryForm({ prefix, collection, entry, locale })
 ---
-form.kcms-entry-editor(novalidate onSubmit={event => { event.preventDefault(); void save() }})
-  EntryHeader(prefix={prefix} collection={collection} title={name} subtitle={slugLine})
-    if draft()
-      Badge(tone="warning" label={wording('cms.entry.draft', 'Draft')})
-    .kcms-entry-actions
-      if entry
-        if entry.url as url
-          Button(href={onPagePath(prefix, url)} label={wording('cms.entry.editOnPage', 'Edit on page')})
-        if draft()
-          Button(label={wording('cms.entry.publish', 'Publish')} disabled={saving()} onClick={publish})
-        ConfirmDelete(message={wording('cms.entry.deleteMessage', 'Delete this entry? This cannot be undone.')} failure={wording('cms.save.deleteFailure', 'Could not delete')} trigger="button" onConfirm={remove})
-      if drafts.changed(ref)
-        Button(label={wording('cms.entry.reset', 'Reset')} disabled={saving()} onClick={() => drafts.reset(ref)})
-      Button(type="submit" label={saving() ? wording('cms.entry.saving', 'Saving…') : entry ? wording('cms.entry.save', 'Save') : wording('cms.entry.create', 'Create')} tone="accent" busy={saving()})
-  if entry?.problem as problem
-    p.kcms-failure(role="alert") {wording('cms.entry.problem', 'This entry\'s file does not parse: {problem}. Saving writes the form over it.', { problem })}
-  if !entry
-    FormField(label={wording('cms.entry.slug', 'Slug')} hint={collection.kind === 'folder' ? wording('cms.entry.slugHint', 'The file\'s path in the collection\'s folder, with / between folders') : undefined} required)
-      TextInput(value={slug()} onInput={text => slug = text} required)
-    if collection.localized
-      FormField(label={wording('cms.entry.locale', 'Locale')} required)
-        Select(value={newLocale()} options={(collection.locales ?? []).map(code => ({ value: code, label: code }))} onChange={code => newLocale = code})
-  EntryFields(drafts={drafts} entry={ref} collection={collection})
+form.kcms-entry-editor(novalidate onSubmit={event => { event.preventDefault(); void form.save() }})
+  EntryHeader(prefix={prefix} collection={collection} title={form.name} subtitle={form.subtitle})
+    EntryActions(form={form})
+  EntryIdentity(form={form})
+  EntryFields(form={form})

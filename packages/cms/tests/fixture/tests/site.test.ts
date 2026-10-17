@@ -5,7 +5,7 @@ import { beforeAll, expect, setSystemTime, test } from 'bun:test'
 import { testSite } from 'kay/test'
 import { fileVersion } from '../../../src/files'
 import { BODY, parseMarker } from '../../../src/markers'
-import { outage, products } from '../src/products'
+import { outage, products, shop } from '../src/products'
 import { saved } from '../src/saved'
 
 const ROOT = join(import.meta.dir, '..')
@@ -58,7 +58,7 @@ test('the editor says when nothing on the page comes from a collection', async (
 test('the screens list each collection with its entry count', async () => {
   const page = await site.visit('/admin')
 
-  expect(page.find('.kui-card-row a').map(link => [link.text, link.attributes.href])).toEqual([['Posts', '/admin/collections/posts'], ['Our products', '/admin/collections/products']])
+  expect(page.find('.kui-card-row a').map(link => [link.text, link.attributes.href])).toEqual([['Posts', '/admin/collections/posts'], ['Our products', '/admin/collections/products'], ['Shop', '/admin/collections/shop']])
   expect(page.text('main')).toContain('2 entries')
 })
 
@@ -119,6 +119,52 @@ test('an entry opens in a form of its collection\'s fields, nested slugs include
 test('a new entry asks for its slug, and no locale in a plain collection', async () => {
   expect((await site.visit('/admin/new/posts')).find('.kui-label-text').map(label => label.text)).toEqual(['Slug*', 'Title*', 'Tags', 'Body'])
 })
+
+test('a collection\'s list shows the columns and the row actions its layout names', async () => {
+  const page = await site.visit('/admin/collections/shop')
+
+  expect(page.find('.kcms-entries th').map(head => head.text.trim())).toEqual(['Title', 'Price', 'Live', 'Actions'])
+  expect(page.find('.kcms-entries td').map(cell => cell.text.trim())).toEqual(['TitleLamp', 'Price30', 'Live✓', 'Actions', 'TitleVase', 'Price12.5', 'Live', 'Actions'])
+  expect(page.find('.kcms-entries a').map(link => link.text)).toEqual(['Lamp', 'Vase'])
+  expect(page.find('.kcms-row-actions button').map(button => button.attributes['aria-label'] ?? button.text)).toEqual(['Delete Lamp', 'Delete Vase'])
+  expect((await site.visit('/admin/collections/shop?q=vase')).find('.kcms-entries a').map(link => link.text)).toEqual(['Vase'])
+})
+
+test('a form is arranged by its layout: the named fields first, a row side by side, a hidden one left out', async () => {
+  const page = await site.visit('/admin/new/shop')
+
+  expect(page.find('.kcms-field[data-kcms-path]').map(field => field.attributes['data-kcms-path'])).toEqual(['price', 'stock', 'live', 'photo', 'name'])
+  expect(page.find('.kcms-row').map(row => Array.from(row.html.matchAll(/data-kcms-path="(\w+)"/g), match => match[1]))).toEqual([['price'], ['stock', 'live'], ['photo'], ['name']])
+  expect(page.find('.kui-label-text').map(label => label.text)[0]).toBe('Slug*')
+  expect((await site.visit('/admin/collections/shop/lamp')).find('[data-kcms-path]')).not.toHaveLength(0)
+})
+
+test('an app\'s own screen built from the parts keeps the title, the actions, the fields it names and the notices', async () => {
+  const page = await site.visit('/admin/collections/shop/lamp')
+
+  expect(page.find('form.shop-entry')).toHaveLength(1)
+  expect(page.find('h1.kcms-entry-name').map(heading => heading.text)).toEqual(['Lamp'])
+  expect(page.find('[data-kcms-path]').map(field => field.attributes['data-kcms-path'])).toEqual(['photo', 'name', 'price', 'stock'])
+  expect(page.find('.kcms-entry-actions button').map(button => button.text)).toContain('Save')
+  expect((await site.fetch('/admin/collections/shop/nope')).status).toBe(404)
+})
+
+test('a field the layout hides still says why a save was refused', async () => {
+  const built = await browser()
+  const page = await built.open('/admin/new/shop')
+
+  await page.waitUntil(() => document.querySelector('form.kcms-entry-editor input') !== null)
+  await page.click('form.kcms-entry-editor input')
+  await page.type('cup')
+  await page.click('[data-kcms-path="name"] input')
+  await page.type('Cup')
+  await page.click('form.kcms-entry-editor button[type=submit]')
+  await page.waitUntil(() => document.querySelector('.kcms-entry-failure[role=alert]') !== null)
+
+  expect(shop.map(item => item.slug)).toEqual(['lamp', 'vase'])
+  expect(await page.evaluate(() => [...document.querySelectorAll('.kcms-entry-failure[role=alert], p.kcms-entry-failure')].map(node => node.textContent))).toContain('Property \'sku\' is missing')
+  expect(page.errors).toEqual([])
+}, 60_000)
 
 test('an unknown collection or entry is a 404', async () => {
   expect((await site.fetch('/admin/collections/nope')).status).toBe(404)
@@ -606,7 +652,7 @@ test('a file over the size limit is refused before it is sent, with its size in 
 const PHONE = { width: 375, height: 700 }
 // WCAG 2.5.8's minimum target size.
 const TAP = 24
-const SCREENS = ['/admin', '/admin/collections/posts', '/admin/collections/posts?q=garden', '/admin/collections/posts?q=zzz', '/admin/collections/posts/hello', '/admin/collections/posts/notes/garden', '/admin/new/posts', '/admin/collections/products/mug', '/admin/uploads']
+const SCREENS = ['/admin', '/admin/collections/posts', '/admin/collections/posts?q=garden', '/admin/collections/posts?q=zzz', '/admin/collections/posts/hello', '/admin/collections/posts/notes/garden', '/admin/new/posts', '/admin/collections/products/mug', '/admin/collections/shop', '/admin/new/shop', '/admin/collections/shop/lamp', '/admin/uploads']
 
 // What a 375 px screen gets wrong: it scrolls sideways, a control spills past the screen or its own scrolling table, or one is too short to tap.
 async function phoneProblems(path: string): Promise<string[]> {

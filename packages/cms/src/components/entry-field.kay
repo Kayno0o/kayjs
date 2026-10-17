@@ -1,0 +1,24 @@
+---
+import type { FormScope } from '../form'
+import FieldInput from '../editor/field-input.kay'
+import { fieldsOf } from '../fields'
+
+// One field of an entry's form by its key in the schema, a group or a list with the fields inside it. Unknown names throw, naming the schema's.
+const { form, name } = props<{ form: FormScope, name: string }>()
+
+const field = memo(() => {
+  const fields = fieldsOf(form.collection.schema)
+  const found = fields.find(candidate => String(candidate.key) === name)
+
+  if (!found)
+    throw new Error(`kayjs-cms: ${form.collection.name} has no field ${JSON.stringify(name)} to render; its fields are ${fields.map(candidate => candidate.key).join(', ')}`)
+
+  return found
+})
+
+// An issue on a field nothing renders is shown with the entry's own.
+effect(() => {
+  onCleanup(form.shown.add(name))
+})
+---
+FieldInput(drafts={form.drafts} entry={form.entry} field={field()} path={name})

@@ -1,0 +1,21 @@
+---
+import type { FormScope } from '../form'
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import { wording } from 'kay/words'
+import { topKey } from '../paths'
+
+// What went wrong with the entry as a whole: its file not parsing, a save refused (with Keep my edits after a conflict), issues on the entry, and issues on a field or the body that nothing renders.
+const { form } = props<{ form: FormScope }>()
+
+const unseen = () => form.drafts.issues(form.entry).filter(issue => issue.body === true ? !form.shown.has('#body') : issue.path === '' || !form.shown.has(topKey(issue.path)))
+---
+if form.problem as problem
+  p.kcms-failure(role="alert") {wording('cms.entry.problem', 'This entry\'s file does not parse: {problem}. Saving writes the form over it.', { problem })}
+if form.drafts.refusal(form.entry) as refusal
+  .kcms-entry-failure.kcms-refusal(role="alert")
+    p {wording('cms.entry.refusal', 'Not saved: {message}.', { message: refusal.message })}
+    if refusal.conflict
+      p {wording('cms.entry.conflict', 'Keeping your edits makes the next save write them over that save.')}
+      Button(label={wording('cms.entry.keepEdits', 'Keep my edits')} onClick={() => form.drafts.keepEdits(form.entry)})
+for issue of unseen() key={`${issue.path}:${issue.message}`}
+  p.kcms-entry-failure(role="alert") {issue.message}

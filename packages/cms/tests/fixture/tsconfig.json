@@ -11,6 +11,7 @@
     "allowImportingTsExtensions": true,
     "strict": true,
     "noEmit": true,
+    "preserveSymlinks": true,
     "skipLibCheck": true
   },
   "include": ["src", "tests", ".kay/types"]

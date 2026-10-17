@@ -1,31 +1,21 @@
 ---
-import type { Drafts } from '../drafts'
-import type { CollectionInfo, EntryRef } from '../kay/contract'
-import Button from '@kaynooo/kayjs-ui/button.kay'
-import FormField from '@kaynooo/kayjs-ui/form-field.kay'
-import MarkdownEditor from '@kaynooo/kayjs-ui/markdown-editor.kay'
-import { wording } from 'kay/words'
+import type { FormScope } from '../form'
+import EntryBody from '../components/entry-body.kay'
+import EntryField from '../components/entry-field.kay'
+import EntryNotices from '../components/entry-notices.kay'
 import { fieldsOf } from '../fields'
-import { BODY } from '../markers'
-import FieldInput from './field-input.kay'
-import { uploadFile } from './upload'
+import { formRows } from '../layout'
 
-// An entry's form: a control per field of its collection's schema, then its Markdown body.
-const { drafts, entry, collection } = props<{ drafts: Drafts, entry: EntryRef, collection: CollectionInfo }>()
+// An entry's form: a control per field of its collection's schema, then its Markdown body, arranged as the collection's layout says (`cms({ collections })`), and what went wrong above.
+const { form } = props<{ form: FormScope }>()
 
-const fields = memo(() => fieldsOf(collection.schema))
+const rows = memo(() => formRows(fieldsOf(form.collection.schema), form.collection.body !== undefined, form.collection.layout?.form))
 ---
-if drafts.refusal(entry) as refusal
-  .kcms-entry-failure.kcms-refusal(role="alert")
-    p {wording('cms.entry.refusal', 'Not saved: {message}.', { message: refusal.message })}
-    if refusal.conflict
-      p {wording('cms.entry.conflict', 'Keeping your edits makes the next save write them over that save.')}
-      Button(label={wording('cms.entry.keepEdits', 'Keep my edits')} onClick={() => drafts.keepEdits(entry)})
-for issue of drafts.issues(entry, '') key={issue.message}
-  p.kcms-entry-failure(role="alert") {issue.message}
-for field of fields() key={field.key}
-  FieldInput(drafts={drafts} entry={entry} field={field} path={String(field.key)})
-if collection.body
-  .kcms-field(data-kcms-body)
-    FormField(label={wording('cms.entry.body', 'Body')} issue={drafts.issues(entry, BODY)[0]?.message})
-      MarkdownEditor(value={String(drafts.value(entry, BODY) ?? '')} onInput={text => drafts.set(entry, BODY, text)} onImage={file => uploadFile(entry.collection, file)})
+EntryNotices(form={form})
+for row, i of rows() key={i}
+  .kcms-row
+    for item of row key={item === 'body' ? '#body' : item.key}
+      if item === 'body'
+        EntryBody(form={form})
+      else
+        EntryField(form={form} name={String(item.key)})

@@ -6,7 +6,7 @@ import { emptyFile, tooLarge, tooLargeForServer } from '../src/upload-text'
 const SRC = join(import.meta.dir, '../src')
 const KEY = /wording\(\s*'(cms\.[A-Za-z.]+)'/g
 // The files the editor runs in once the page has loaded, whose keys no island's own source names.
-const AFTER_LOAD_FILES = ['editor/entry-fields.kay', 'editor/entry-form.kay', 'editor/field-input.kay', 'editor/file-input.kay', 'editor/reorder.kay', 'editor/save.ts', 'editor/upload.ts', 'upload-text.ts', 'fields.ts']
+const AFTER_LOAD_FILES = ['components/entry-body.kay', 'components/entry-notices.kay', 'editor/entry-fields.kay', 'editor/entry-form.kay', 'editor/field-input.kay', 'editor/file-input.kay', 'editor/reorder.kay', 'editor/save.ts', 'editor/upload.ts', 'upload-text.ts', 'fields.ts']
 
 async function keysOf(file: string): Promise<string[]> {
   return Array.from((await Bun.file(join(SRC, file)).text()).matchAll(KEY), match => match[1]!)

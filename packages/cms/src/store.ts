@@ -1,5 +1,5 @@
 import type { Commit, FileChange, Identity } from './files'
-import type { CollectionInfo, DraftEntry, EntryRef, Issue, StoredEntry } from './kay/contract'
+import type { CollectionInfo, DraftEntry, EntryRef, Issue, ScreenCollection, StoredEntry } from './kay/contract'
 import { wording } from 'kay/words'
 import { fileVersion, ForgeError, SaveConflict } from './files'
 import { collectionInfo, entries, entryFile, entrySource, removeEntry, saveEntry as saveLoaded } from './kay/content'
@@ -19,8 +19,12 @@ export interface VersionRule {
 
 export class UnknownCollection extends Error {}
 
-export async function findCollection(name: string): Promise<CollectionInfo | undefined> {
-  return collectionInfo(name)
+// The collection as the screens read it, with the layout `cms({ collections })` gave it.
+export async function findCollection(name: string): Promise<ScreenCollection | undefined> {
+  const found = await collectionInfo(name)
+  const layout = settings().layouts.get(name)
+
+  return found && layout ? { ...found, layout } : found
 }
 
 // The collection with no `body`, `count` or `problem`, which a loaded one's loader is run to tell: for a save, a delete or an upload, which need its kind and its folder alone.
@@ -39,7 +43,7 @@ export async function collectionNamed(name: string): Promise<CollectionInfo> {
 
 // What an entry's screen shows: the collection as findCollection gives it and the entry, read together so a loader that cannot count or give one entry runs once for both.
 // Undefined for an unknown collection; `entry` is undefined when the collection fails to read, `problem` then saying why, or when it holds no such entry.
-export async function entryScreen(ref: EntryRef): Promise<{ collection: CollectionInfo, entry: StoredEntry | undefined } | undefined> {
+export async function entryScreen(ref: EntryRef): Promise<{ collection: ScreenCollection, entry: StoredEntry | undefined } | undefined> {
   if (!await bareCollection(ref.collection))
     return undefined
 

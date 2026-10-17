@@ -4,8 +4,9 @@ import { serverRoot, underKayDev } from 'kay/library'
 import { api, editRequested } from 'kay/server'
 import { collections } from './kay/content'
 import { missingKindLines } from './kinds'
+import { layoutProblems } from './layout'
 import { log } from './log'
-import { configure } from './settings'
+import { configure, settings } from './settings'
 
 // The API path the editor and the screens call, under `/api`.
 export const API_PREFIX = 'cms'
@@ -33,11 +34,13 @@ export function cms(options: CmsOptions = {}): KayExtension {
       // Once the server listens, the content config is registered.
       plugin.onStart(async () => {
         try {
-          for (const line of missingKindLines(await serverRoot(), await collections({ counts: false })))
+          const listed = await collections({ counts: false })
+
+          for (const line of [...missingKindLines(await serverRoot(), listed), ...layoutProblems(listed, settings().layouts)])
             log.warn(line)
         }
         catch (error) {
-          log.warn('the collections could not be checked for field kinds with no component', error)
+          log.warn('the collections could not be checked for field kinds with no component or a layout naming a field they lack', error)
         }
       })
 

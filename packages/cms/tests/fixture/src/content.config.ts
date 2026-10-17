@@ -1,6 +1,6 @@
 import { s } from 'kay'
 import { collection, customField, imageField } from 'kay/content'
-import { outage, products as stock } from './products'
+import { outage, shop as shelf, products as stock } from './products'
 
 export const posts = collection('content/posts', {
   schema: s.Object({ title: s.String(), draft: s.Optional(s.Boolean()), tags: s.Array(s.String(), { default: [] }) }),
@@ -25,4 +25,18 @@ export const products = collection({
 }, {
   schema: s.Object({ name: s.String({ minLength: 1 }), photo: s.Optional(imageField()), color: s.Optional(customField('color', s.String({ pattern: '^#[0-9a-f]{6}$' }))), mood: s.Optional(customField('mood', s.String())) }),
   title: 'Our products',
+})
+
+// A loaded collection the config arranges: `sku` is required and hidden from its form.
+export const shop = collection({
+  name: 'shop',
+  load: () => shelf.map(({ slug, data }) => ({ slug, data })),
+  save: (entry) => {
+    shelf.splice(0, shelf.length, ...shelf.filter(item => item.slug !== entry.slug), { slug: entry.slug, data: entry.data as { name: string, sku: string } })
+  },
+  remove: (entry) => {
+    shelf.splice(0, shelf.length, ...shelf.filter(item => item.slug !== entry.slug))
+  },
+}, {
+  schema: s.Object({ name: s.String({ minLength: 1 }), price: s.Optional(s.Number()), stock: s.Optional(s.Integer()), live: s.Optional(s.Boolean()), photo: s.Optional(imageField()), sku: s.String({ minLength: 1 }) }),
 })

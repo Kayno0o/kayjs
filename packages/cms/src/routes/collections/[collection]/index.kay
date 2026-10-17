@@ -6,17 +6,13 @@ import Pagination from '@kaynooo/kayjs-ui/pagination.kay'
 import { s } from 'kay'
 import { wording } from 'kay/words'
 import EntryTable from '../../../components/entry-table.kay'
-import { entries } from '../../../kay/content'
-import { collectionTitle, newEntryPath, pageRows } from '../../../listing'
-import { settings } from '../../../settings'
-import { findCollection, versionOf } from '../../../store'
+import { collectionTitle, newEntryPath } from '../../../listing'
+import { listScreen } from '../../../screens'
 
 export const page = { query: s.Object({ q: s.Optional(s.String()), page: s.Optional(s.Integer()) }) }
 
-const { prefix, pageSize } = settings()
-const collection = await findCollection(ctx.params.collection) ?? ctx.notFound()
 const search = ctx.query.q ?? ''
-const listed = await pageRows(collection, search, ctx.query.page ?? 1, async filter => entries(collection.name, filter), versionOf, pageSize)
+const { prefix, collection, ...listed } = await listScreen({ collection: ctx.params.collection, q: search, page: ctx.query.page }) ?? ctx.notFound()
 const url = ctx.url
 const title = collectionTitle(collection)
 ---

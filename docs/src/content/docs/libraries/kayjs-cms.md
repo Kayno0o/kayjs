@@ -222,9 +222,57 @@ A save that takes over 15 seconds (`timeout`), or a forge out of reach, fails wi
 
 A repository checked out with CRLF line endings, or using SHA-256 object names, gives files another version than the editor computes, so every save conflicts.
 
+## Arranging a collection
+
+The screens read each collection's schema. To change how one looks, name it in `cms({ collections })`:
+
+```ts
+cms({ collections: { shop: {
+  form: { fields: ['price', ['stock', 'live'], 'photo'], hide: ['sku'] },
+  list: { columns: ['price', 'live'], actions: ['delete'] },
+} } })
+```
+
+In the form, `fields` come first, in that order. A list inside it is a row of columns, which stack where there is no room. The other fields follow in the schema's order, then the Markdown body, which you name `body`. `hide` leaves a field out. A hidden field that a save refuses still shows its message above the form.
+
+In the list, `columns` are field keys shown after the title, and `actions` keeps some of a row's `move`, `publish`, `editOnPage` and `delete`. A list, group, JSON or custom field cannot be a column.
+
+The editor on the page follows the form's layout too. A name twice, or an action that does not exist, throws when `kay.config.ts` loads. A field the schema lacks logs a warning at boot.
+
 ## Replacing a screen
 
-Write a page at the screen's path, such as `src/routes/admin/new/[collection].kay`. It can render the screens' own `@kaynooo/kayjs-cms/entry-editor.kay` and `@kaynooo/kayjs-cms/entry-table.kay`.
+Write a page at the screen's path, such as `src/routes/admin/collections/shop/[...slug].kay`. It replaces that screen and leaves the others. A `src/routes/admin/_layout.kay` wraps all of them. The cms guard still runs before your page.
+
+In the page, read what the screen reads with `entryScreen`, `listScreen` and `collectionScreen` from `@kaynooo/kayjs-cms`, then render a component of your own, or the screens' own `@kaynooo/kayjs-cms/entry-editor.kay` and `@kaynooo/kayjs-cms/entry-table.kay`.
+
+## Building an entry screen
+
+To arrange an entry screen in a way the layout cannot, build it from the parts the default one is made of. `createEntryForm` from `@kaynooo/kayjs-cms/form` keeps the state: drafts, save, publish, delete, reset and the warning when you leave with edits. Each part takes that `form`.
+
+```kay
+---
+import type { ScreenCollection, StoredEntry } from '@kaynooo/kayjs-cms'
+import EntryActions from '@kaynooo/kayjs-cms/entry-actions.kay'
+import EntryField from '@kaynooo/kayjs-cms/entry-field.kay'
+import EntryHeader from '@kaynooo/kayjs-cms/entry-header.kay'
+import EntryIdentity from '@kaynooo/kayjs-cms/entry-identity.kay'
+import EntryNotices from '@kaynooo/kayjs-cms/entry-notices.kay'
+import { createEntryForm } from '@kaynooo/kayjs-cms/form'
+
+const { prefix, collection, entry } = props<{ prefix: string, collection: ScreenCollection, entry?: StoredEntry | undefined }>()
+
+const form = createEntryForm({ prefix, collection, entry })
+---
+form(novalidate onSubmit={event => { event.preventDefault(); void form.save() }})
+  EntryHeader(prefix={prefix} collection={collection} title={form.name} subtitle={form.subtitle})
+    EntryActions(form={form})
+  EntryIdentity(form={form})
+  EntryNotices(form={form})
+  EntryField(form={form} name="photo")
+  EntryField(form={form} name="name")
+```
+
+`EntryField` renders one field by its key in the schema, and throws for a key the schema lacks. `EntryBody` renders the Markdown body and `EntryFields` renders everything as the layout arranges it. `EntryNotices` shows a file that does not parse, a refused save with its Keep my edits button, and the messages of any field the screen does not render. Saves, conflicts, uploads and messages work as on the default screen, and the words come from the same `cms.*` keys.
 
 ## In the dev tool
 
