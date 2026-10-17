@@ -12,6 +12,7 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 ### `kay dev` does not move a port it was asked for
 
 - A busy port given with `--port`, or by `PORT` in the environment or `.env`, used to move the server to the next free one; the server now fails to start naming the port. Free it, or drop the `PORT` to get the old behaviour. A port the entry names in code still moves. No deprecated lint is possible, as the port is an environment value.
+
 ### A `slug` field in an entry is the entry's slug
 
 - A Markdown or data entry whose frontmatter or content has a `slug` is now served under that slug instead of its path's, and a `slug` that is empty or holds a `..` part, a backslash, `?` or `#` fails the collection. An app that kept a `slug` field for another purpose renames the field.
