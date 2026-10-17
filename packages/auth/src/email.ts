@@ -209,6 +209,10 @@ export async function signInWithMagicLink(state: RequestState, token: string): P
     ? await state.core.store.users.update(spent.record.id, { ...await claim(state.core, spent.record), emailVerifiedAt: new Date() }) ?? spent.record
     : spent.record
 
+  // The browser opening the link signs in as the one that asked for it chose, which a link opened elsewhere would otherwise lose.
+  if (spent.remember !== undefined)
+    await state.session.set('authRemember', spent.remember)
+
   return state.complete(record, spent.token.redirect ?? homeOf(state.core), 'magic-link')
 }
 
@@ -448,10 +452,10 @@ async function issue(state: RequestState, record: UserRecord, type: LinkType, em
   await core.store.tokens.deleteForUser(record.id, type)
 
   if (mode !== 'code') {
-    const token = randomToken()
+    const token = randomToken() + await rememberMark(state, type)
 
     content.url = `${core.url}${mail.links[type]}?token=${token}`
-    await core.store.tokens.create({ digest: digest(token), type, userId: record.id, email, redirect, expiresAt: new Date(Date.now() + TOKEN_LIFETIME_MS[type]) })
+    await core.store.tokens.create({ digest: digest(unmarked(token)), type, userId: record.id, email, redirect, expiresAt: new Date(Date.now() + TOKEN_LIFETIME_MS[type]) })
   }
 
   if (mode !== 'link' && nonce !== undefined) {
@@ -475,7 +479,7 @@ async function spendLink(state: RequestState, token: string, type: LinkType) {
   if (await spend(store, `link:${state.client}`, limits.link))
     return { ok: false, error: 'limited' } as const
 
-  const spent = await store.tokens.consume(digest(token), type)
+  const spent = await store.tokens.consume(digest(type === 'magic-link' ? unmarked(token) : token), type)
   const record = spent && await store.users.get(spent.userId)
 
   if (!spent || !record || (type !== 'change-email' && record.email !== spent.email))
@@ -485,7 +489,37 @@ async function spendLink(state: RequestState, token: string, type: LinkType) {
   if (type in CODE_OF)
     await store.tokens.deleteForUser(record.id, CODE_OF[type as CodedLink])
 
-  return { ok: true, token: spent, record } as const
+  return { ok: true, token: spent, record, remember: type === 'magic-link' ? rememberOf(token) : undefined } as const
+}
+
+// A magic link carries the remember choice of the browser that asked for it as a suffix of its token, so the browser opening it, perhaps another, signs in as chosen. The store keeps the digest of the token without it; stripping or adding one changes only the link holder's own session.
+const REMEMBER_MARK = '.r'
+const FORGET_MARK = '.b'
+
+async function rememberMark(state: RequestState, type: LinkType): Promise<string> {
+  if (type !== 'magic-link')
+    return ''
+
+  const remember = await state.session.get('authRemember')
+
+  if (remember === undefined)
+    return ''
+
+  return remember ? REMEMBER_MARK : FORGET_MARK
+}
+
+function unmarked(token: string): string {
+  return token.endsWith(REMEMBER_MARK) || token.endsWith(FORGET_MARK) ? token.slice(0, -2) : token
+}
+
+function rememberOf(token: string): boolean | undefined {
+  if (token.endsWith(REMEMBER_MARK))
+    return true
+
+  if (token.endsWith(FORGET_MARK))
+    return false
+
+  return undefined
 }
 
 // An address proved for the first time by a link its owner asked for: whatever was set on the account before, perhaps by a stranger who registered the address first, is dropped, so the owner gets the account clean.

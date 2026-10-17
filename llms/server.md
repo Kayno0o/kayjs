@@ -219,6 +219,7 @@ export default defineConfig({ requireGuards: true })
 - It takes seconds or a string such as `'90d'`, or `'browser'` for a cookie without `Max-Age`, which the browser drops on closing, lasting `browserMaxAge` unused on the server, `'1d'` by default.
 - The session keeps it through its extensions and `regenerate()`, a store getting it as `set`'s `maxAge`, until `destroy()`, never past `absoluteMaxAge`.
 - A lifetime that is no positive duration throws.
+- `settings` is `{ maxAge, absoluteMaxAge, browserMaxAge }` as the plugin resolved them, in seconds and defaults included, for a library that follows the app's session instead of asking for the lifetimes again.
 - `secret` is at least 32 characters, read from the environment; the placeholder an older `kay new` wrote to `.env.example` is refused.
 - A list rotates secrets: the first seals new cookies, every one opens old ones, and a cookie an older one sealed goes out sealed with the first on its next use. A key derived from the first also signs form stamps, links to private files and the flash cookie, so a rotation refuses those already out, as a restart does without any secret.
 - Without a `store`, the data travels in the cookie, sealed with AES-GCM so it can be neither read nor altered, about 3.5 KB at most: past that the response fails with an error saying so.

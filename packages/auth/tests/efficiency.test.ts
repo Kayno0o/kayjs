@@ -1,8 +1,9 @@
 import type { AuthStore } from '../src/store'
 import { afterEach, describe, expect, setSystemTime, test } from 'bun:test'
+import { session as sessionPlugin } from 'kay/server'
 import { memoryStore } from '../src/memoryStore'
 import { totpCode, totpStep, verifyTotp } from '../src/totp'
-import { testApp, userRecord } from './helpers/app'
+import { SECRET, testApp, userRecord } from './helpers/app'
 import { mailbox } from './helpers/mail'
 
 const PASSWORD = 'correct horse battery'
@@ -101,7 +102,7 @@ describe('pruning what expired', () => {
     await store.sessions.create(session('fresh', now - HOUR_MS))
     await store.attempts.hit('closed', 1)
 
-    const { browser } = testApp({ store, sessionMaxAge: 30 * 24 * 3600, rememberMaxAge: 30 * 24 * 3600, sessionAbsoluteMaxAge: 365 * 24 * 3600 })
+    const { browser } = testApp({ store, sessions: sessionPlugin({ secret: SECRET, absoluteMaxAge: '365d' }), rememberMaxAge: 30 * 24 * 3600 })
 
     setSystemTime(now + 5000)
     await browser().json('/me')

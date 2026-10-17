@@ -4,6 +4,11 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ## 1.52.0
 
+### kayjs-auth follows the `session()` plugin's lifetimes
+
+- `sessionMaxAge`, `sessionAbsoluteMaxAge` and `browserSessionMaxAge` are removed from `createAuth`: a sign-in used to override the app's `session({ maxAge })` with auth's own 30 days, and the list of sessions used auth's 90-day absolute lifetime while the cookie used kay's. Both now use the `session()` plugin's `maxAge`, `absoluteMaxAge` and `browserMaxAge`, so delete the three options and set the lifetime on `session()`. `rememberMaxAge` stays.
+- `kay check` reports a leftover option as a type error (an unknown property of `createAuth`'s options), and no `deprecated` lint is added: the options live in the app's TypeScript call, which no template lint reads.
+
 ### Unchecked "keep me signed in" is a browser session on every way of signing in
 
 - On the prebuilt pages, a magic link, a passkey or a provider sign-in with the box unchecked gave a 30-day session; it now gives the one-day browser session a password does. An app wanting the long session on all of them sets `pages: { remember: 'always' }`, and one wanting the box gone `'always'` or `'never'`. No deprecated lint covers it, as nothing in the app's code is the old form: it is a default.

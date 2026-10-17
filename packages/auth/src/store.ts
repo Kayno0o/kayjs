@@ -371,7 +371,7 @@ export interface AuthStore {
     hit: (key: string, window: number) => MaybePromise<number>
     reset: (key: string) => MaybePromise<void>
   }
-  // Deletes what outlived its use: expired links and codes and invitations, bearer tokens expired long ago, sessions past `sessionMaxAge` unseen or `sessionAbsoluteMaxAge` old, and attempt windows that ended. kayjs-auth calls it at most once an hour; a store without it keeps those rows until the app deletes them.
+  // Deletes what outlived its use: expired links and codes and invitations, bearer tokens expired long ago, sessions past their lifetime unseen or the session plugin's `absoluteMaxAge` old, and attempt windows that ended. kayjs-auth calls it at most once an hour; a store without it keeps those rows until the app deletes them.
   prune?: (limits: PruneLimits) => MaybePromise<void>
 }
 

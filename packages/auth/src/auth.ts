@@ -71,13 +71,7 @@ const STATE = Symbol('kayjs-auth.state')
 // How long a user read stays good. A request is over long before; a websocket, which keeps its `Auth` for its life, reads its user again past it, so a sign-out, a revoked token or a ban reaches it.
 const USER_FRESH_MS = 30 * 1000
 const TRAILING_SLASH = /\/$/
-// kay's own session lifetime, 30 days.
-const DEFAULT_SESSION_MAX_AGE = 30 * 24 * 60 * 60
 const DEFAULT_REMEMBER_MAX_AGE = 90 * 24 * 60 * 60
-// kay's own lifetime of a session whose cookie dies with the browser, a day.
-const DEFAULT_BROWSER_SESSION_MAX_AGE = 24 * 60 * 60
-// kay's own absolute session lifetime, 90 days.
-const DEFAULT_SESSION_ABSOLUTE_MAX_AGE = 90 * 24 * 60 * 60
 const DEFAULT_AUDIT_MAX_AGE = 365 * 24 * 60 * 60
 const LINK_TYPES: LinkType[] = ['verify-email', 'reset-password', 'magic-link', 'change-email']
 // The close code of a socket whose user is gone: a policy violation.
@@ -104,6 +98,7 @@ function guardSession(session: Session<AuthSessionData>, refuse: () => boolean, 
     set: write(async (key, value) => session.set(key, value)),
     unset: write(async key => session.unset(key)),
     destroy: write(async () => session.destroy()),
+    settings: session.settings,
     regenerate: write(async () => session.regenerate()),
     lifetime: write(async maxAge => session.lifetime(maxAge)),
   }
@@ -161,14 +156,8 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   admin?: AuthRequirement<NoInfer<Role>> | undefined
   // The roles every new user starts with, by password or by provider, such as a site's `user`. An unverified account holding only these counts as given none: see `requireVerified`.
   defaultRoles?: NoInfer<Role>[] | undefined
-  // Seconds a session lives unseen: kay's session `maxAge`, 30 days by default as kay's is. A session past it leaves the list of where the user is signed in.
-  sessionMaxAge?: number | undefined
-  // Seconds a session lives unseen when its sign-in asked to be remembered, `remember: true`: 90 days by default.
+  // Seconds a session lives unseen when its sign-in asked to be remembered, `remember: true`: 90 days by default. The other lifetimes are the session plugin's own: its `maxAge` without a choice, its `browserMaxAge` for `remember: false`, and its `absoluteMaxAge` from the sign-in however much it is used, "remember me" included.
   rememberMaxAge?: number | undefined
-  // Seconds a session lives unseen when its sign-in asked not to be, `remember: false`, its cookie dying with the browser: kay's session `browserMaxAge`, a day by default as kay's is.
-  browserSessionMaxAge?: number | undefined
-  // Seconds a session lives from its sign-in, however much it is used: kay's session `absoluteMaxAge`, 90 days by default as kay's is. Past it the user signs in again, "remember me" included.
-  sessionAbsoluteMaxAge?: number | undefined
   // The app's page listing where the user is signed in, linked from new sign-in mails: `/account/sessions`.
   sessionsPage?: string | undefined
   // Where an address is, shown beside each session, from a geolocation database of the app's: `ip => cityOf(ip)`.
@@ -987,7 +976,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   // Whether the sign-in's session is still on the user's list; one from before kayjs-auth kept them is put on it.
   private async live(signedIn: SignedIn, record: UserRecord, stored: SessionRecord | undefined): Promise<boolean> {
     if (signedIn.session !== undefined)
-      return liveSession(this.core, stored, record, this[STATE].address)
+      return liveSession(this[STATE], stored, record, this[STATE].address)
 
     const session = await openSession(this.core, record, this[STATE].address, this[STATE].userAgent)
 
@@ -1063,7 +1052,7 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
 
       const address = clientAddress(ctx.request, ctx.server, options.proxy)
 
-      pruneWhenDue(core)
+      pruneWhenDue(core, session.settings)
 
       return { auth: new Auth<Scope, Role, OrgRole>(session, core, ctx.request, rateKey(address), address) }
     })
@@ -1308,10 +1297,7 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
     pages,
     site: options.site ?? (url === undefined ? 'kayjs-auth' : new URL(url).host),
     limits: { ...DEFAULT_LIMITS, ...options.limits },
-    sessionMaxAge: options.sessionMaxAge ?? DEFAULT_SESSION_MAX_AGE,
     rememberMaxAge: options.rememberMaxAge ?? DEFAULT_REMEMBER_MAX_AGE,
-    browserSessionMaxAge: options.browserSessionMaxAge ?? DEFAULT_BROWSER_SESSION_MAX_AGE,
-    sessionAbsoluteMaxAge: options.sessionAbsoluteMaxAge ?? DEFAULT_SESSION_ABSOLUTE_MAX_AGE,
     sessionsPage: options.sessionsPage ?? paths?.sessions,
     locate: options.locate,
     scopes: new Set(options.scopes),

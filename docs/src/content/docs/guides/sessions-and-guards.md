@@ -106,6 +106,8 @@ await ctx.locals.session.lifetime(input.remember ? '90d' : 'browser')
 
 `'browser'` sends a cookie the browser drops when it closes. The server keeps that session for `browserMaxAge` without use, one day by default.
 
+A library that must follow the app's session reads `ctx.locals.session.settings`: the `maxAge`, `absoluteMaxAge` and `browserMaxAge` the plugin resolved, in seconds.
+
 ### Changing the secret
 
 Give `secret` a list to rotate it. The first secret seals new cookies, and every one in the list opens old cookies.

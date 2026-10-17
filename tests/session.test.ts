@@ -361,6 +361,19 @@ describe('sessions', () => {
     expect(await peek(legacy(now - 60))).toBe('none')
   })
 
+  it('hands a library the lifetimes it resolved, defaults included', async () => {
+    const read = async (options: Partial<Parameters<typeof session>[0]>) => {
+      const app = new Elysia().use(session({ secret: SECRET, ...options })).get('/settings', ({ session }) => session.settings)
+
+      return await (await app.handle(new Request('http://localhost/settings'))).json() as unknown
+    }
+
+    const DAY = 24 * 60 * 60
+
+    expect(await read({})).toEqual({ maxAge: 30 * DAY, absoluteMaxAge: 90 * DAY, browserMaxAge: DAY })
+    expect(await read({ maxAge: '7d', absoluteMaxAge: 3600, browserMaxAge: '2h' })).toEqual({ maxAge: 7 * DAY, absoluteMaxAge: 3600, browserMaxAge: 7200 })
+  })
+
   it('caps a browser session\'s lifetime in the store too', async () => {
     const lifetimes: number[] = []
     const memory = memoryStore()

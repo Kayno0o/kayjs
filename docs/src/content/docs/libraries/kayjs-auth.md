@@ -55,9 +55,11 @@ A file of yours at the same path, such as `src/routes/auth/sign-in.kay`, replace
 
 `pages.home` is where a visitor lands when nothing asked for another page, `/` by default: after a password reset, a verified address, a changed one, a magic link, a code, registering, a passkey or a provider. On a site with locales it is read as written for the default locale, and the pages put it in the visitor's language.
 
+How long a session lasts is the `session()` plugin's: its `maxAge` unseen, its `absoluteMaxAge` from the sign-in, and its `browserMaxAge` for a visitor who did not ask to be remembered. kayjs-auth repeats none of it, so the cookie and the list of sessions agree. Only the longer session of "keep me signed in" is its own, `rememberMaxAge`.
+
 The sign-in and register pages show a "Keep me signed in" box. Unchecked, every way of signing in gives the same short session, a browser-session cookie lasting a day unseen; checked, every way gives `rememberMaxAge`, the provider buttons and the passkey button included. `pages.remember` changes that: `'always'` hides the box and remembers every sign-in, `'never'` hides it and never does, and `'checkbox'` is the default.
 
-A magic link opened in another browser than the one that asked for it gives the ordinary session length, `sessionMaxAge`, and the sign-out route and a provider link with no `redirect` go to `home` as written, not in the visitor's language.
+A magic link carries the choice of the browser that asked for it, so opened in another browser it signs in as chosen. The sign-out route and a provider link with no `redirect` go to `home` as written, not in the visitor's language.
 
 ```ts
 createAuth({ /* ... */ pages: { home: '/dashboard', remember: 'always' } })

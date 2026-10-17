@@ -1,8 +1,9 @@
 import type { Mail } from '../src/mail'
 import { describe, expect, setSystemTime, test } from 'bun:test'
 import { Elysia } from 'elysia'
+import { session } from 'kay/server'
 import { totpCode, totpStep } from '../src/totp'
-import { browser, testApp, userRecord } from './helpers/app'
+import { browser, SECRET, testApp, userRecord } from './helpers/app'
 import { authenticator } from './helpers/authenticator'
 import { mailbox } from './helpers/mail'
 
@@ -98,7 +99,7 @@ describe('sessions', () => {
   })
 
   test('a session unseen for longer than its lifetime is over, and dropped from the list', async () => {
-    const { signedIn, store } = await setup({ sessionMaxAge: 3600 })
+    const { signedIn, store } = await setup({ sessions: session({ secret: SECRET, maxAge: 3600 }) })
     const laptop = await signedIn()
     const phone = await signedIn('10.0.0.2', IPHONE)
 
@@ -117,8 +118,8 @@ describe('sessions', () => {
     }
   })
 
-  test('a session signed in longer than sessionAbsoluteMaxAge ago is over, however often it was seen', async () => {
-    const { signedIn, store } = await setup({ sessionMaxAge: 3600, sessionAbsoluteMaxAge: 7200 })
+  test('a session signed in longer than the session plugin\'s absoluteMaxAge ago is over, however often it was seen', async () => {
+    const { signedIn, store } = await setup({ sessions: session({ secret: SECRET, maxAge: 3600, absoluteMaxAge: 7200 }) })
     const laptop = await signedIn()
 
     try {
