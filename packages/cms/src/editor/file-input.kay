@@ -7,7 +7,8 @@ import { wording } from 'kay/words'
 import { uploadFile, uploadRules } from './upload'
 
 // An image or file field: the path of an upload dropped or picked, or one typed.
-const { value, image, collection, onChange } = props<{ value: string, image: boolean, collection: string, onChange: (path: string) => void }>()
+// With `many`, the zone of a list of them: it takes several files, calls `onChange` with the path of each in order as it lands, and shows no path of its own.
+const { value, image, collection, many = false, onChange } = props<{ value: string, image: boolean, collection: string, many?: boolean, onChange: (path: string) => void }>()
 
 // The share of the upload sent, from 0 to 1, while one is under way.
 const sent = signal<number>()
@@ -24,30 +25,31 @@ async function offer(): Promise<void> {
 void offer()
 
 // A dropped file the picker's types miss, which FileDrop would otherwise ignore without a word.
-function reject([file]: File[]): void {
-  toast.error(wording('cms.file.rejected', '{name} is {type} that uploads here do not take: {accept}', { name: file?.name || wording('cms.upload.theFile', 'The file'), type: file?.type || wording('cms.file.someType', 'of a type'), accept: accept() ?? 'images' }))
+function reject(files: File[]): void {
+  for (const file of many ? files : files.slice(0, 1))
+    toast.error(wording('cms.file.rejected', '{name} is {type} that uploads here do not take: {accept}', { name: file.name || wording('cms.upload.theFile', 'The file'), type: file.type || wording('cms.file.someType', 'of a type'), accept: accept() ?? 'images' }))
 }
 
 function label(): string {
   const share = sent()
 
   if (share === undefined)
-    return value === '' ? wording('cms.file.upload', 'Upload') : wording('cms.file.replace', 'Replace')
+    return many ? wording('cms.file.uploadMany', 'Upload files') : value === '' ? wording('cms.file.upload', 'Upload') : wording('cms.file.replace', 'Replace')
 
   return wording('cms.file.uploading', 'Uploading {percent}%', { percent: Math.round(share * 100) })
 }
 
-async function upload([file]: File[]): Promise<void> {
-  if (!file)
-    return
-
-  sent = 0
-
+// One after the other, so the items land in the order the files were given, and a refused file is toasted while the others still land.
+async function upload(files: File[]): Promise<void> {
   try {
-    const path = await attempt(() => uploadFile(collection, file, share => sent = share), wording('cms.file.failure', 'Could not upload'))
+    for (const file of many ? files : files.slice(0, 1)) {
+      sent = 0
 
-    if (path)
-      onChange(path)
+      const path = await attempt(() => uploadFile(collection, file, share => sent = share), wording('cms.file.failure', 'Could not upload'))
+
+      if (path)
+        onChange(path)
+    }
   }
   finally {
     sent = undefined
@@ -55,17 +57,18 @@ async function upload([file]: File[]): Promise<void> {
 }
 ---
 .kcms-file
-  if value !== ''
+  if value !== '' && !many
     if image
       // kay-allow unsized-image
       img.kcms-file-preview(src={value} alt="")
     else
       a.kcms-file-link(href={value}) {value.split('/').at(-1)}
-  FileDrop.kcms-file-drop(accept={accept() ?? (image ? 'image/*' : undefined)} disabled={sent() !== undefined} onFiles={upload} onReject={reject})
+  FileDrop.kcms-file-drop(accept={accept() ?? (image ? 'image/*' : undefined)} multiple={many} disabled={sent() !== undefined} onFiles={upload} onReject={reject})
     @content(zone)
       Button(label={label()} busy={sent() !== undefined} onClick={zone.open})
-      span.kcms-file-hint {zone.dragging() ? wording('cms.file.dropNow', 'Drop to upload') : wording('cms.file.drop', 'or drop a file here')}
+      span.kcms-file-hint {zone.dragging() ? wording('cms.file.dropNow', 'Drop to upload') : many ? wording('cms.file.dropMany', 'or drop files here') : wording('cms.file.drop', 'or drop a file here')}
   // Uploading is how a path is usually set, so typing one waits behind a disclosure.
-  details.kcms-file-path
-    summary {wording('cms.file.pathLabel', 'Path')}
-    TextInput(value={value} placeholder={wording('cms.file.pathHint', 'Or a path the site serves')} aria-label={wording('cms.file.pathLabel', 'Path')} onInput={onChange})
+  if !many
+    details.kcms-file-path
+      summary {wording('cms.file.pathLabel', 'Path')}
+      TextInput(value={value} placeholder={wording('cms.file.pathHint', 'Or a path the site serves')} aria-label={wording('cms.file.pathLabel', 'Path')} onInput={onChange})

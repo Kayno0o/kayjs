@@ -473,7 +473,7 @@ test('the unused-uploads screen lists an upload no entry mentions, and deleting 
 test('an image field previews what it holds, takes a drop or a pick, and still a typed path', async () => {
   const page = await site.visit('/admin/collections/products/mug')
 
-  expect(page.find('[data-kcms-path]').map(field => field.attributes['data-kcms-path'])).toEqual(['name', 'photo', 'color', 'mood'])
+  expect(page.find('[data-kcms-path]').map(field => field.attributes['data-kcms-path'])).toEqual(['name', 'photo', 'color', 'mood', 'gallery'])
   expect(page.find('[data-kcms-path="photo"] .kcms-file-drop')).toHaveLength(1)
   expect(page.find('[data-kcms-path="photo"] input[aria-label="Path"]')).toHaveLength(1)
 })
@@ -630,6 +630,31 @@ test('a file field offers only the types the server takes, and says why a droppe
   })
   await page.waitUntil(() => document.querySelector('.kui-toaster')?.textContent?.includes('logo.svg is image/svg+xml that uploads here do not take') === true)
 
+  expect(page.errors).toEqual([])
+}, 60_000)
+
+test('a list of images takes several files at once, one item per file in order, a refused one toasted while the others land', async () => {
+  const built = await browser()
+  const page = await built.open('/admin/collections/products/mug')
+
+  await page.waitUntil(() => document.querySelector('[data-kcms-path="gallery"] input[type=file]')?.getAttribute('accept') === 'image/png,image/jpeg,image/webp,image/gif,image/avif')
+  expect(await page.evaluate(() => document.querySelector('[data-kcms-path="gallery"] input[type=file]')?.hasAttribute('multiple'))).toBe(true)
+  await page.evaluate(async () => {
+    const bytes = (base64: string) => Uint8Array.from(atob(base64), char => char.charCodeAt(0))
+    const data = new DataTransfer()
+
+    data.items.add(new File([bytes('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAwS2OUAAAAABJRU5ErkJggg==')], 'a.png', { type: 'image/png' }))
+    data.items.add(new File(['<svg xmlns="http://www.w3.org/2000/svg"/>'], 'logo.svg', { type: 'image/svg+xml' }))
+    data.items.add(new File([bytes('R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==')], 'b.gif', { type: 'image/gif' }))
+    data.items.add(new File([bytes('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAwS2OUAAAAABJRU5ErkJggg==')], 'c.png', { type: 'image/png' }))
+    document.querySelector('[data-kcms-path="gallery"] .kcms-file-drop')!.dispatchEvent(new DragEvent('drop', { dataTransfer: data, bubbles: true, cancelable: true }))
+  })
+  await page.waitUntil(() => document.querySelectorAll('[data-kcms-path="gallery"] .kcms-list-item').length === 3)
+
+  const paths = await page.evaluate(() => [...document.querySelectorAll('[data-kcms-path="gallery"] .kcms-file-preview')].map(image => image.getAttribute('src')))
+
+  expect(paths.map(path => (/\.1x1\.(png|gif)&/).exec(path ?? '')?.[1])).toEqual(['png', 'gif', 'png'])
+  expect(await page.evaluate(() => document.querySelector('.kui-toaster')?.textContent?.includes('logo.svg is image/svg+xml that uploads here do not take'))).toBe(true)
   expect(page.errors).toEqual([])
 }, 60_000)
 

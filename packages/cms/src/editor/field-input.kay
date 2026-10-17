@@ -81,6 +81,8 @@ function setJson(next: string): void {
             Reorder(item={itemAt(current, i).label} index={i} count={items().length} onMove={to => moveItem(i, to)})
             FieldInput(drafts={drafts} entry={entry} field={itemAt(current, i)} path={joinPath(path, i)})
             IconButton(icon="delete" label={wording('cms.field.removeItem', 'Remove item {n}', { n: i + 1 })} variant="ghost" size="sm" onClick={() => set(items().filter((_, at) => at !== i))})
+        if current.item.kind === 'image' || current.item.kind === 'file'
+          FileInput(value="" image={current.item.kind === 'image'} collection={entry.collection} many onChange={path => set([...items(), path])})
         Button(label={wording('cms.field.add', 'Add')} icon="plus" onClick={() => set([...items(), emptyValue(current.item)])})
     when 'group'
       FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()} group)

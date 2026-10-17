@@ -23,7 +23,7 @@ export const products = collection({
     stock.splice(0, stock.length, ...stock.filter(product => product.slug !== entry.slug))
   },
 }, {
-  schema: s.Object({ name: s.String({ minLength: 1 }), photo: s.Optional(imageField()), color: s.Optional(customField('color', s.String({ pattern: '^#[0-9a-f]{6}$' }))), mood: s.Optional(customField('mood', s.String())) }),
+  schema: s.Object({ name: s.String({ minLength: 1 }), photo: s.Optional(imageField()), color: s.Optional(customField('color', s.String({ pattern: '^#[0-9a-f]{6}$' }))), mood: s.Optional(customField('mood', s.String())), gallery: s.Optional(s.Array(imageField())) }),
   title: 'Our products',
 })
 

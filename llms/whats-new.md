@@ -14,6 +14,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - kayjs-ai's `Chat` announces each tool call's start and end to screen readers through its polite status line, and a Stop before the first word returns the message to the field ([Chat island](../packages/ai/llms/chat.md)).
 - kayjs-ai's `Chat` names each table of a reply as a `group`, numbered when a reply has several, and escapes `tableLabel` ([Chat island](../packages/ai/llms/chat.md)).
 - A tab opened before a deploy reloads itself, the scroll kept and what was typed left alone, on the next island it fails to load; production answers carry `x-kay-build` ([a deploy under open tabs](production.md#a-deploy-under-open-tabs)).
+- kayjs-cms: a list of `imageField()` or `fileField()` takes several files dropped or picked at once, one item per file ([kayjs-cms](../packages/cms/llms.txt)).
 - `unreachable-tooltip` no longer takes an `aria-label` on a role-less `span` or `div` as a fix, and leaves an expression `tabindex` or an element whose only text is its tooltip alone ([checks](checks.md)); kayjs-ui's TooltipHost describes the element it shows for with `aria-describedby`.
 - A page with a `--- server` fence passes an island an action, `Chat(action={reply})` with no wrapper ([actions](actions.md#pass-an-action-to-an-island)).
 - `island-action` reports an action handed to an island that never types a prop as one ([actions](actions.md#pass-an-action-to-an-island)).

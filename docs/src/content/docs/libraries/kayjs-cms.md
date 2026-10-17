@@ -116,6 +116,8 @@ A file added while `kay dev` runs is picked up on the next reload. `customField`
 
 An image or file field (`imageField()`, `fileField()` from `kay/content`) takes a file dropped or picked. It is stored through kay's [file storage](/guides/file-storage), and the field keeps the path that serves it. The path stays behind a collapsed Path control under the preview, for an editor who would rather type one.
 
+A list of them, such as `s.Array(imageField())`, has a zone of its own that takes several files at once: each is uploaded in turn and added as a new item, in the order given, and a file the server refuses is reported while the others still land.
+
 An image pasted or dropped into a Markdown body is uploaded the same way and embedded where the cursor is. A refused upload shows a message and leaves the text as it was.
 
 A file field takes PNG, JPEG, WebP, GIF, AVIF and PDF files. Set `uploads` to list others, such as `['image/*', 'application/pdf']`. The file picker offers only those types, and a file over the size limit or of another type is refused with its type or size in the message, an empty one too.
