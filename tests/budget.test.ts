@@ -2,7 +2,8 @@ import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
-import { budgetLints, byteSize } from '../src/build/budget'
+import { budgetLints } from '../src/build/budget'
+import { byteSize } from '../src/runtime/byte-size'
 import { scratchDir } from './scratch'
 
 const CLI = join(import.meta.dir, '../src/cli.ts')

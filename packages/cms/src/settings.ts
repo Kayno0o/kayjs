@@ -43,7 +43,7 @@ export interface CmsSettings {
 const DEFAULT_UPLOADS = ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/avif', 'application/pdf']
 
 // A photo straight off a phone fits; kay's own limit of 1 MB would not.
-export const DEFAULT_MAX_SIZE = 20 * 1024 * 1024
+const DEFAULT_MAX_SIZE = 20 * 1024 * 1024
 
 const TRAILING_SLASHES = /\/+$/
 

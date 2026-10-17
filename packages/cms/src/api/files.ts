@@ -18,8 +18,10 @@ export default api({ bodyLimit: uploadBodyLimit() })
       return status(400, emptyFile(body.file.name))
 
     // Authoritative: the editor checks the size too, but a client that skips it reaches here.
-    if (body.file.size > settings().maxSize)
-      return status(413, tooLarge(body.file.name, body.file.size, settings().maxSize))
+    const { maxSize } = settings()
+
+    if (body.file.size > maxSize)
+      return status(413, tooLarge(body.file.name, body.file.size, maxSize))
 
     const refusal = uploadRefusal(body.file)
 

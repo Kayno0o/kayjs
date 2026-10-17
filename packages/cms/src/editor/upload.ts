@@ -1,6 +1,6 @@
 import { ActionError, ApiError, call } from 'kay'
 import filesApi from '../api/files'
-import { emptyFile, tooLarge } from '../upload-text'
+import { emptyFile, tooLarge, tooLargeForServer } from '../upload-text'
 
 export interface UploadRules {
   accept: string
@@ -33,10 +33,10 @@ function refused(status: number, reason: string): ActionError {
 
 // Uploads a file where a file field's upload goes for `collection`, and answers the path the site serves it at; throws when the upload fails, saying why when the type or the size is refused.
 export async function uploadFile(collection: string, file: File, progress?: (share: number) => void): Promise<string> {
-  const limits = await uploadRules()
-
   if (file.size === 0)
     throw refused(400, emptyFile(file.name))
+
+  const limits = await uploadRules()
 
   if (limits && file.size > limits.maxBytes)
     throw refused(413, tooLarge(file.name, file.size, limits.maxBytes))
@@ -51,6 +51,10 @@ export async function uploadFile(collection: string, file: File, progress?: (sha
     return answer.path
   }
   catch (error) {
+    // The route's own 413 says the limit; kay's body limit before it says only that the body is too large.
+    if (error instanceof ApiError && error.status === 413 && !error.message.includes('an upload may be'))
+      throw refused(413, tooLargeForServer(file.name, file.size))
+
     if (error instanceof ApiError && (error.status === 413 || error.status === 415 || error.status === 400))
       throw refused(error.status, error.message)
 

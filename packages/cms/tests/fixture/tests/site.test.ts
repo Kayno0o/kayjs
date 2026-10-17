@@ -464,10 +464,10 @@ test('a file over the size limit is refused before it is sent, with its size in 
   await page.evaluate(() => {
     const data = new DataTransfer()
 
-    data.items.add(new File([new Uint8Array(21 * 1024 * 1024)], 'huge.png', { type: 'image/png' }))
+    data.items.add(new File([new Uint8Array(100 * 1024)], 'huge.png', { type: 'image/png' }))
     document.querySelector('.kcms-file-drop')!.dispatchEvent(new DragEvent('drop', { dataTransfer: data, bubbles: true, cancelable: true }))
   })
-  await page.waitUntil(() => document.querySelector('.kui-toaster')?.textContent?.includes('huge.png is 21 MB, over the 20 MB an upload may be') === true)
+  await page.waitUntil(() => document.querySelector('.kui-toaster')?.textContent?.includes('huge.png is 100 KB, over the 64 KB an upload may be') === true)
 
   expect(page.errors).toEqual([])
 }, 60_000)

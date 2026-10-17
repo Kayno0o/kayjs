@@ -17,3 +17,8 @@ export function tooLarge(name: string, bytes: number, limit: number): string {
 export function emptyFile(name: string): string {
   return `${name || 'The file'} is empty`
 }
+
+// What a 413 from kay's body limit says, which only the editor can word with the file it sent.
+export function tooLargeForServer(name: string, bytes: number): string {
+  return `${name || 'The file'} is ${sizeText(bytes)}, over what an upload may be`
+}

@@ -1,11 +1,11 @@
 // What kay's own libraries share with kay, for their server code, not API: free to change with any minor, as every library peers on kay's exact minor.
 
 export { underKayDev } from '../build/assets'
-export { byteSize } from '../build/budget'
-export type { ByteSize } from '../build/budget'
 export type { KayCommand, Parsed } from '../commands/command'
 export type { DataValue, JsonSchema } from '../content/edit'
 export type { ToolResult } from '../mcp/protocol'
+export { byteSize } from '../runtime/byte-size'
+export type { ByteSize } from '../runtime/byte-size'
 export { durationSeconds } from '../runtime/duration'
 export { isUrlAttribute, UNSAFE_ATTRIBUTE, UNSAFE_TAGS } from '../runtime/sanitize'
 export { configuredSite } from '../runtime/site'
