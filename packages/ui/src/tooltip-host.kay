@@ -7,6 +7,8 @@ import { claim } from './claim'
 const CARRIER = '[data-tooltip]'
 // The anchor name theme.css's `.kui-tooltip` positions against.
 const ANCHOR = '--kui-tooltip-anchor'
+// The id of the tooltip panel, which the element it shows for points at with `aria-describedby`.
+const PANEL_ID = 'kui-tooltip'
 
 const { showDelay = '80ms', hideDelay = '150ms' } = props<{
   // How long the pointer or focus rests on an element before its tooltip shows.
@@ -130,6 +132,14 @@ effect(() => {
   const own = target.element.style.getPropertyValue('anchor-name')
 
   target.element.style.setProperty('anchor-name', own ? `${own}, ${ANCHOR}` : ANCHOR)
+  // The element may describe itself already, so the tooltip adds its id to that list too, and takes only its own back out.
+  const described = target.element.getAttribute('aria-describedby')
+
+  const added = !described?.split(/\s+/).includes(PANEL_ID)
+
+  if (added)
+    target.element.setAttribute('aria-describedby', described ? `${described} ${PANEL_ID}` : PANEL_ID)
+
   element.style.setProperty('position-area', target.element.dataset.tooltipPlacement ?? 'top')
 
   if (!element.matches(':popover-open'))
@@ -140,9 +150,17 @@ effect(() => {
       target.element.style.setProperty('anchor-name', own)
     else
       target.element.style.removeProperty('anchor-name')
+
+    if (!added)
+      return
+
+    if (described)
+      target.element.setAttribute('aria-describedby', described)
+    else
+      target.element.removeAttribute('aria-describedby')
   })
 })
 ---
 // Rendered in the root layout, it shows the tooltip of whichever element the pointer or a tab lands on. A second one, such as an extension's, renders nothing while the first is mounted.
 if owns()
-  .kui-tooltip(ref={element => panel.set(element)} popover="manual" role="tooltip") {aimed()?.text}
+  .kui-tooltip(id="kui-tooltip" ref={element => panel.set(element)} popover="manual" role="tooltip") {aimed()?.text}

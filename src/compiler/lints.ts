@@ -183,7 +183,7 @@ export const LINTS = {
   'unreachable-tooltip': {
     level: 'warn',
     group: 'a11y',
-    summary: 'A `data-tooltip` on an element the keyboard never reaches, so its text shows only under the pointer. One whose `aria-label`, `aria-labelledby` or `aria-describedby` gives a screen reader the same is left alone.',
+    summary: 'A `data-tooltip` on an element the keyboard never reaches, so its text shows only under the pointer. One whose `aria-label` (on an element with a role that takes a name, not a bare `span` or `div`), `aria-labelledby` or `aria-describedby` gives a screen reader the same is left alone, as is one with an expression `tabindex` or whose only content is the same text as the tooltip.',
     wrong: 'span(data-tooltip="Published on Monday") Published',
     right: 'span(tabindex="0" data-tooltip="Published on Monday") Published',
   },

@@ -70,12 +70,32 @@ describe('TooltipHost', () => {
     expect(tooltip.matches(':popover-open')).toBe(true)
     expect(tooltip.style.getPropertyValue('position-area')).toBe('bottom')
     expect(button.style.getPropertyValue('anchor-name')).toBe('--kui-tooltip-anchor')
+    expect(tooltip.id).toBe('kui-tooltip')
+    expect(button.getAttribute('aria-describedby')).toBe('kui-tooltip')
 
     document.dispatchEvent(new Event('pointerdown'))
     await clock.settle()
 
     expect(tooltip.matches(':popover-open')).toBe(false)
     expect(button.style.getPropertyValue('anchor-name')).toBe('')
+    expect(button.hasAttribute('aria-describedby')).toBe(false)
+  })
+
+  test('adds its id to an element\'s own aria-describedby while it shows, and leaves the rest as it was', async () => {
+    const root = await popovers()
+    const button = root.querySelector<HTMLElement>('#delete')!
+
+    button.setAttribute('aria-describedby', 'hint')
+    button.dispatchEvent(new Event('pointerover', { bubbles: true }))
+    await clock.elapse(100)
+    await clock.settle()
+
+    expect(button.getAttribute('aria-describedby')).toBe('hint kui-tooltip')
+
+    document.dispatchEvent(new Event('pointerdown'))
+    await clock.settle()
+
+    expect(button.getAttribute('aria-describedby')).toBe('hint')
   })
 })
 

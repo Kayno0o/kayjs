@@ -108,7 +108,7 @@ kay check --only seo
 | `missing-captions` | warn | a11y | A `video` that is not `muted` with no captions `track`. |
 | `unannounced-click` | warn | a11y | An `onClick` on an element whose `role` names no widget, such as `presentation` or `region`. |
 | `dangling-aria` | warn | a11y | An `aria-labelledby` or `aria-describedby` listing an id nothing in the template has. |
-| `unreachable-tooltip` | warn | a11y | A `data-tooltip` on an element the keyboard never reaches and no `aria-label`, `aria-labelledby` or `aria-describedby` speaks for. |
+| `unreachable-tooltip` | warn | a11y | A `data-tooltip` on an element the keyboard never reaches and no `aria-label` (ignored on a role-less `span` or `div`), `aria-labelledby` or `aria-describedby` speaks for, and whose content is not just the tooltip's own text. |
 | `uncontrolled-autoplay` | warn | a11y | A `video` or `audio` with `autoplay` and no `controls`. |
 | `meta-refresh` | warn | a11y | A `meta(http-equiv="refresh")` reloading or leaving the page after a delay. |
 | `ungrouped-radios` | warn | a11y | Radios sharing a `name` outside a `fieldset` or a `role="radiogroup"`. |

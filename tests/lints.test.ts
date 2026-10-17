@@ -542,6 +542,12 @@ describe('a11y lints', () => {
     expect(a11y('span(data-tooltip="Tip") a\nbutton(data-tooltip="Tip") b\nspan(tabindex="0" data-tooltip="Tip") c\nspan(role="img" aria-label="3 commits" data-tooltip="3 commits") d\na(href="/x" data-tooltip="Tip") e\n')).toEqual(['unreachable-tooltip data-tooltip'])
   })
 
+  it('does not take an aria-label on a role-less element as a way to reach a tooltip, nor reports an expression tabindex or the element\'s own text', () => {
+    expect(a11y('span(aria-label="x" data-tooltip="y") a\nbutton(aria-label="x" data-tooltip="y") b\nspan(role="img" aria-label="x" data-tooltip="y") c\nspan(aria-describedby={d} data-tooltip="y") d\n')).toEqual(['unreachable-tooltip data-tooltip'])
+    expect(a11y('span(data-tooltip={a} tabindex={a ? \'0\' : undefined}) a\nspan(data-tooltip={a} tabindex="-1") b\n')).toEqual(['unreachable-tooltip data-tooltip'])
+    expect(a11y('span(data-tooltip={v}) {v}\nspan(data-tooltip={v}) {w}\nspan(data-tooltip="Same") Same\nspan(data-tooltip={v}) Is {v}\n')).toEqual(['unreachable-tooltip data-tooltip', 'unreachable-tooltip data-tooltip'])
+  })
+
   it('reports media playing by itself with no controls, and a meta refresh with a delay', () => {
     expect(only('uncontrolled-autoplay', 'video(src="/a.mp4" autoplay muted)\nvideo(src="/b.mp4" autoplay muted controls)\naudio(src="/c.mp3" autoplay)\n')).toEqual(['uncontrolled-autoplay autoplay', 'uncontrolled-autoplay autoplay'])
     expect(a11y('head\n  meta(http-equiv="refresh" content="5; url=/next")\n  meta(http-equiv="Refresh" content="0; url=/next")\n')).toEqual(['meta-refresh meta'])

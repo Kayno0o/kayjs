@@ -21,6 +21,10 @@ const FILENAME_ALT = /^[\w-]+\.(?:png|jpe?g|gif|webp|avif|svg)$/i
 const WHITESPACE = /\s+/
 // What a screen reader reads a tooltip's text from on an element the keyboard never reaches.
 const DESCRIBING = ['aria-label', 'aria-labelledby', 'aria-describedby']
+// Elements with no role of their own, which ARIA 1.2 forbids naming: a screen reader ignores an `aria-label` on one.
+// The roles that leave an element as bare as having none.
+const ROLELESS = /^\s*(?:none|presentation|generic)\s*$/i
+const UNNAMEABLE = new Set(['span', 'div', 'p', 'b', 'i', 'u', 's', 'em', 'strong', 'small', 'mark', 'code', 'sub', 'sup', 'del', 'ins', 'abbr'])
 // Attributes pointing at other elements by their ids.
 const REFERENCES = ['aria-labelledby', 'aria-describedby']
 // Roles named by a label, as a field is, besides the native fields.
@@ -112,6 +116,38 @@ export function accessibilityLints(file: KayFile): Diagnostic[] {
       return staticValue(element, 'type')?.toLowerCase() !== 'hidden'
 
     return FOCUSABLE.has(element.name)
+  }
+  // Whether an `aria-label` is ignored on an element: it has no role, or a role that takes no name.
+  const isUnnameable = (element: ElementNode) => {
+    if (!UNNAMEABLE.has(element.name))
+      return false
+
+    const role = attribute(element, 'role')
+
+    return role === undefined || (role.kind === 'static' && ROLELESS.test(role.text))
+  }
+  // Whether an element's markup gives a screen reader the tooltip's text without the keyboard: a name or a description, or the text itself as its only child.
+  const speaksForTooltip = (element: ElementNode) => {
+    if (DESCRIBING.some(name => has(element, name) && !(name === 'aria-label' && isUnnameable(element))))
+      return true
+
+    const tooltip = attribute(element, 'data-tooltip')
+    const [only, ...rest] = element.children
+
+    if (!tooltip || tooltip.kind === 'boolean' || only?.kind !== 'text' || rest.length > 0)
+      return false
+
+    const parts = only.parts.filter(part => part.kind !== 'chunk' || part.text.trim() !== '')
+
+    if (parts.length !== 1)
+      return false
+
+    const [part] = parts
+
+    if (tooltip.kind === 'expression')
+      return part!.kind === 'expression' && text(part!.expression).trim() === text(tooltip.expression).trim()
+
+    return tooltip.kind === 'static' && part!.kind === 'chunk' && part!.text.trim() === tooltip.text.trim()
   }
   const interactive = (element: ElementNode) => (element.name === 'a' && has(element, 'href'))
     || (element.name === 'input' && staticValue(element, 'type')?.toLowerCase() !== 'hidden')
@@ -268,8 +304,11 @@ export function accessibilityLints(file: KayFile): Diagnostic[] {
       }
     }
 
-    if (has(element, 'data-tooltip') && !focusable(element) && !DESCRIBING.some(name => has(element, name)))
-      lint(attribute(element, 'data-tooltip')!.name, 'unreachable-tooltip', `This \`${element.name}\`'s tooltip shows only under the pointer`, { note: 'a tooltip shows as the pointer or the focus lands on its element, and the keyboard never lands on this one', help: 'put it on a `button` or a link, give the element `tabindex="0"`, or say the same in `aria-label` or visible text' })
+    if (has(element, 'data-tooltip') && !focusable(element) && attribute(element, 'tabindex')?.kind !== 'expression' && !speaksForTooltip(element)) {
+      const generic = isUnnameable(element)
+
+      lint(attribute(element, 'data-tooltip')!.name, 'unreachable-tooltip', `This \`${element.name}\`'s tooltip shows only under the pointer`, { note: generic && has(element, 'aria-label') ? 'a tooltip shows as the pointer or the focus lands on its element, the keyboard never lands on this one, and a screen reader ignores an `aria-label` on a role-less element' : 'a tooltip shows as the pointer or the focus lands on its element, and the keyboard never lands on this one', help: generic ? 'put it on a `button` or a link, give the element `tabindex="0"`, or say the same in visible text' : 'put it on a `button` or a link, give the element `tabindex="0"`, or say the same in `aria-label` or visible text' })
+    }
 
     if ((element.name === 'video' || element.name === 'audio') && has(element, 'autoplay') && !has(element, 'controls'))
       lint(attribute(element, 'autoplay')!.name, 'uncontrolled-autoplay', `This \`${element.name}\` plays by itself with no controls`, { note: 'a visitor who did not start it has no way to pause or stop it', help: 'add `controls`, or a pause button of its own beside it' })
