@@ -594,6 +594,7 @@ function problemsTab(doc: Document, tool: DevTool, state: DevState, save: () => 
   const tab = tool.tab({ id: 'problems', label: 'Problems', summary: count => `${count} problem${count === 1 ? '' : 's'}`, announce: true })
   const actions = tool.make('div', 'actions')
   const clear = tool.make('button', 'tool', 'Dismiss all')
+  const copy = tool.make('button', 'tool', 'Copy')
   const empty = tool.make('div', 'empty', 'No problems on this page.')
   const groups = new Map(Object.entries(KINDS).map(([kind, label]) => {
     const section = tool.make('section', 'group')
@@ -609,7 +610,9 @@ function problemsTab(doc: Document, tool: DevTool, state: DevState, save: () => 
   const dismissed = new Set(state.dismissed)
 
   clear.type = 'button'
-  actions.append(clear)
+  copy.type = 'button'
+  copy.title = 'Copy every problem as plain text, to paste into an LLM'
+  actions.append(clear, copy)
   tab.panel.append(actions, empty, ...[...groups.values()].map(group => group.section))
 
   const update = () => {
@@ -700,6 +703,7 @@ function problemsTab(doc: Document, tool: DevTool, state: DevState, save: () => 
   }
 
   clear.onclick = () => dismiss([...shown.keys()])
+  copy.onclick = async () => copyText(copy, copiedProblems(win.location.href, [...shown.values()]), 'Copy')
 
   // What `kay check` finds now, as the page carries it: a swap brings the block of the code the server runs.
   const readChecks = () => {
@@ -2015,17 +2019,22 @@ async function answerErrorPage(tool: DevTool, target: HTMLButtonElement): Promis
     return
   }
 
+  await copyText(target, target.ownerDocument.getElementById(copied!)?.textContent ?? '', 'Copy')
+}
+
+// Writes the text to the clipboard and says so on the button for a moment, or that it failed, without a dialog.
+async function copyText(button: HTMLButtonElement, text: string, label: string): Promise<void> {
   try {
-    await target.ownerDocument.defaultView!.navigator.clipboard.writeText(target.ownerDocument.getElementById(copied!)?.textContent ?? '')
-    target.textContent = 'Copied'
+    await button.ownerDocument.defaultView!.navigator.clipboard.writeText(text)
+    button.textContent = 'Copied'
   }
   catch {
-    target.textContent = 'Copy failed'
+    button.textContent = 'Copy failed'
   }
 
-  clearTimeout(copyResets.get(target))
-  copyResets.set(target, setTimeout(() => {
-    target.textContent = 'Copy'
+  clearTimeout(copyResets.get(button))
+  copyResets.set(button, setTimeout(() => {
+    button.textContent = label
   }, COPIED_MS))
 }
 
@@ -2048,6 +2057,14 @@ function problemText({ text, error, island }: DevProblem): string {
   const where = island === undefined ? '' : `in island ${island}: `
 
   return `${where}${text.startsWith('Uncaught (in promise) ') && shown !== text ? `Uncaught (in promise) ${shown}` : shown}`
+}
+
+// Every listed problem as plain text for a reader without the page, such as an LLM: the page, then a block per problem in the tab's order, with its kind, level and how often it came, and the message as listed, which names its file and line where it knows them.
+function copiedProblems(url: string, listed: { problem: DevProblem & { text: string }, kind: ProblemKind, count: number }[]): string {
+  const order = Object.keys(KINDS)
+  const blocks = listed.toSorted((a, b) => order.indexOf(a.kind) - order.indexOf(b.kind)).map(({ problem, kind, count }) => `[${KINDS[kind]}] ${problem.level}${count > 1 ? ` (${count} times)` : ''}\n${problem.text}`)
+
+  return [`kay dev problems on ${url}`, ...blocks].join('\n\n')
 }
 
 // The text with each `.kay` file it names, with or without a position, as a button opening it once the inspector says how.

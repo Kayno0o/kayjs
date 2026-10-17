@@ -94,6 +94,36 @@ describe('the dev tool', () => {
     expect(shadow().querySelector('[role=status]')?.textContent).toBe('3 problems')
   })
 
+  it('copies every listed problem as plain text with the page URL, dismissed ones left out, and says whether it worked', async () => {
+    const copied: string[] = []
+    const copy = () => shadow().querySelector<HTMLButtonElement>('.actions button[title^="Copy"]')!
+
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async (text: string) => void copied.push(text) } })
+    document.head.innerHTML = problemsBlock(['error[missing-alt]: An `img` needs `alt`\n --> src/routes/index.kay:3:5'])
+    console.error('[kay] island a.kay did not match its server markup')
+    console.warn('[kay] a note to dismiss')
+    tool = startDevTool()
+    console.error('[kay] island a.kay did not match its server markup')
+    await Bun.sleep(0)
+    ;[...shadow().querySelectorAll<HTMLElement>('.problem')].find(problem => problem.textContent?.includes('a note to dismiss'))!.querySelector<HTMLButtonElement>('button')!.click()
+
+    copy().click()
+    await Bun.sleep(0)
+
+    expect(copied).toEqual([`kay dev problems on ${location.href}\n\n[Recovered by kay] error (2 times)\nisland a.kay did not match its server markup\n\n[kay check] error\nerror[missing-alt]: An \`img\` needs \`alt\`\n --> src/routes/index.kay:3:5`])
+    expect(copy().textContent).toBe('Copied')
+
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async () => Promise.reject(new Error('denied')) } })
+    copy().click()
+    await Bun.sleep(0)
+    expect(copy().textContent).toBe('Copy failed')
+
+    for (const button of shadow().querySelectorAll<HTMLButtonElement>('.problem button'))
+      button.click()
+
+    expect(shadow().querySelector<HTMLElement>('.actions')!.hidden).toBe(true)
+  })
+
   it('lists its tabs in a vertical rail that moves by Up and Down, and keeps the size and side it was given for the browser tab', async () => {
     tool = startDevTool()
     tool.tab({ id: 'other', label: 'Other' })

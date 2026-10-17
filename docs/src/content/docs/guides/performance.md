@@ -12,6 +12,8 @@ kay dev --open
 
 The bar turns red when a problem is an error. Production pages never carry the dev tool.
 
+The Problems tab has a Copy button. It puts every listed problem on the clipboard as plain text, starting with the page URL, so you can paste them into an LLM. Problems you dismissed are left out.
+
 ## The tabs
 
 Each tab answers one question about the page in view. A tab with a count in the bar needs your attention.
