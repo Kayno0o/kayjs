@@ -52,10 +52,10 @@ import { withPageHeaders } from './page-headers'
 import { assetFiles } from './page-hook'
 import { loadPrerendered, pageResponder, servePageRoutes } from './page-routes'
 import { DRAFT_BODY_LIMIT, serveDrafts, servePreview } from './preview'
-import { REQUEST_ID_HEADER, requestId, trustProxy } from './protection'
+import { requestId, requestIdHeader, setRequestIdHeader, trustProxy } from './protection'
 import { claimPublic, publicCacheRules, servePublic } from './public'
 import { claimRedirects, readRedirects, serveRedirects } from './redirects'
-import { remoteImages, remotePatterns } from './remote'
+import { remoteImages, remoteLimits, remotePatterns } from './remote'
 import { reportServerError } from './report'
 import { rewriteRequests } from './rewrite'
 import { routeMatch, routeTable } from './route-table'
@@ -163,7 +163,7 @@ function imageRouteOf({ root, config: options, mode }: Project<PagesOptions>, { 
     quality: options.images?.quality,
     avif: mode.dev ? undefined : avifQuality(options.images),
     aspects: options.images?.aspects,
-    remote: remoteImages(join(imageCache, 'remote'), remotePatterns(options.images?.remote), imageCache),
+    remote: remoteImages(join(imageCache, 'remote'), remotePatterns(options.images?.remote), imageCache, undefined, remoteLimits(options.images)),
     security,
     resolve: lookup && { find: async (src: string, ctx: GuardContext) => {
       const path = await lookup(src, ctx)
@@ -218,6 +218,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   const log = options.log ?? process.env.NODE_ENV === 'production'
   const lifecycle = { draining: false }
 
+  setRequestIdHeader(options.requestIdHeader)
   trustProxy(app, options.proxy)
   refuseForeignHosts(app, site)
 
@@ -239,7 +240,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   // After the rewrite, which hands the request served in its place the id it had, as a tool call dispatched through the app does.
   app.onRequest(({ request, set }) => {
     receiveDispatched(request)
-    set.headers[REQUEST_ID_HEADER] = requestId(request)
+    set.headers[requestIdHeader()] = requestId(request)
   })
   serveToolCallsThrough(app)
 
@@ -342,7 +343,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
     serveMcp(app, document, { title: (document.info as { title: string }).title, version: (document.info as { version: string }).version, base, guards: await covering(true), actions: actionOptions, metadataPaths, path: mcpAt })
 
   serveErrorReports(app, options.onError)
-  serveLive(app)
+  serveLive(app, options.live)
 
   if (options.security !== undefined && options.security !== false && options.security.reports === true)
     serveViolationReports(app, options.onError)

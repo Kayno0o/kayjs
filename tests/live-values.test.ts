@@ -256,8 +256,8 @@ describe('live values on the server', () => {
 })
 
 describe('the connections of one client', () => {
-  async function withSite(run: (connect: (proofs?: LiveRequest['proofs']) => Promise<Response>, proofs: LiveRequest['proofs']) => Promise<void>): Promise<void> {
-    const site = await testSite({ root: ROOT })
+  async function withSite(run: (connect: (proofs?: LiveRequest['proofs']) => Promise<Response>, proofs: LiveRequest['proofs']) => Promise<void>, live?: { connections?: number, perMinute?: number }): Promise<void> {
+    const site = await testSite({ root: ROOT, live })
 
     try {
       const proofs = proofsOf(pagesOf((await site.visit('/other')).html))
@@ -268,6 +268,27 @@ describe('the connections of one client', () => {
       await site.close()
     }
   }
+
+  it('are capped by live.connections, and its openings a minute by live.perMinute', async () => {
+    await withSite(async (connect) => {
+      const first = new Feed(await connect())
+      const second = new Feed(await connect())
+
+      await first.next()
+      await second.next()
+      expect((await connect()).status).toBe(429)
+      await first.close()
+      await second.close()
+    }, { connections: 2 })
+
+    await withSite(async (connect) => {
+      const first = await connect()
+
+      expect(first.status).toBe(200)
+      await first.body!.cancel()
+      expect((await connect()).status).toBe(429)
+    }, { perMinute: 1 })
+  })
 
   it('are capped, a slot freeing as one closes', async () => {
     await withSite(async (connect) => {

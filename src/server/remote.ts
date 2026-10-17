@@ -1,6 +1,9 @@
+import type { ImagesConfig } from '../config'
 import { mkdir, readdir, rm, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { JSON_FILE, writeAtomically } from '../build/files'
+import { byteSize } from '../runtime/byte-size'
+import { durationSeconds } from '../runtime/duration'
 import { overLimit } from './protection'
 
 // One entry of `images.remote`: the origin, a `*.` subdomain wildcard allowed, and the path every URL starts with.
@@ -28,7 +31,7 @@ const PATTERN = /^(https?:)\/\/(\*\.)?([^/*?#@]+)(\/[^*?#]*)?$/i
 const MAX_AGE = /(?:^|,)\s*max-age=(\d+)/i
 const NO_CACHE = /(?:^|,)\s*(?:no-cache|no-store)\b/i
 
-// Past this, a download is cut off: an image worth resizing is a few megabytes.
+// Past this, a download is cut off unless `images.remoteMaxSize` says otherwise: an image worth resizing is a few megabytes.
 export const MAX_REMOTE_BYTES = 25 * 1024 * 1024
 const FETCH_TIMEOUT_MS = 10_000
 const MAX_REDIRECTS = 3
@@ -43,6 +46,19 @@ const MAX_ORIGINALS = 500
 const DOWNLOADS_PER_MINUTE = 30
 const MINUTE_MS = 60_000
 const DOWNLOADS = 'kay:remote-images'
+
+export interface RemoteLimits {
+  bytes: number
+  timeoutMs: number
+}
+
+// `images.remoteMaxSize` and `images.remoteTimeout` with their defaults, each refused when it is no positive size or duration.
+export function remoteLimits(images: Pick<ImagesConfig, 'remoteMaxSize' | 'remoteTimeout'> | undefined): RemoteLimits {
+  return {
+    bytes: images?.remoteMaxSize === undefined ? MAX_REMOTE_BYTES : Math.floor(byteSize(images.remoteMaxSize, 'images.remoteMaxSize')),
+    timeoutMs: images?.remoteTimeout === undefined ? FETCH_TIMEOUT_MS : Math.round(durationSeconds(images.remoteTimeout, 'images.remoteTimeout') * 1000),
+  }
+}
 
 // `images.remote`, read once as the server boots, each entry refused with what is wrong with it.
 export function remotePatterns(entries: readonly string[] = []): RemotePattern[] {
@@ -87,7 +103,7 @@ export function remoteVariants(key: string): string {
 
 // Downloads an image another host serves, or keeps the copy `dir` holds while it is fresh, asking the host whether it changed once it is not. A host that fails leaves the last copy served, and is asked again a minute later.
 // `variantsDir` holds what the image route made of the originals, named after `remoteVariants`, removed with the original they came from.
-export function remoteImages(dir: string, patterns: readonly RemotePattern[], variantsDir?: string, maxOriginals = MAX_ORIGINALS): RemoteImages {
+export function remoteImages(dir: string, patterns: readonly RemotePattern[], variantsDir?: string, maxOriginals = MAX_ORIGINALS, limits: RemoteLimits = { bytes: MAX_REMOTE_BYTES, timeoutMs: FETCH_TIMEOUT_MS }): RemoteImages {
   const stored = new Map<string, Stored>()
   const failedUntil = new Map<string, number>()
   const pending = new Map<string, Promise<RemoteOriginal>>()
@@ -203,7 +219,7 @@ export function remoteImages(dir: string, patterns: readonly RemotePattern[], va
     let url = src
 
     try {
-      const signal = AbortSignal.timeout(FETCH_TIMEOUT_MS)
+      const signal = AbortSignal.timeout(limits.timeoutMs)
 
       // Each hop is checked against the list, so a listed host cannot send the server to another.
       for (let hops = 0; ; hops++) {
@@ -233,16 +249,16 @@ export function remoteImages(dir: string, patterns: readonly RemotePattern[], va
         return { status: 502, message: `The host answered ${response.status}` }
       }
 
-      if (Number(response.headers.get('content-length') ?? 0) > MAX_REMOTE_BYTES) {
+      if (Number(response.headers.get('content-length') ?? 0) > limits.bytes) {
         await response.body?.cancel()
 
-        return { status: 413, message: `The image is over ${MAX_REMOTE_BYTES} bytes` }
+        return { status: 413, message: `The image is over ${limits.bytes} bytes` }
       }
 
       await mkdir(dir, { recursive: true })
 
-      if (!await saveCapped(response, path))
-        return { status: 413, message: `The image is over ${MAX_REMOTE_BYTES} bytes` }
+      if (!await saveCapped(response, path, limits.bytes))
+        return { status: 413, message: `The image is over ${limits.bytes} bytes` }
     }
     catch {
       return { status: 502, message: 'The host did not give the image' }
@@ -253,7 +269,7 @@ export function remoteImages(dir: string, patterns: readonly RemotePattern[], va
 }
 
 // False once the body passed the cap, leaving no file behind.
-async function saveCapped(response: Response, path: string): Promise<boolean> {
+async function saveCapped(response: Response, path: string, cap: number): Promise<boolean> {
   return writeAtomically(path, async (partial) => {
     const writer = Bun.file(partial).writer()
     let size = 0
@@ -263,7 +279,7 @@ async function saveCapped(response: Response, path: string): Promise<boolean> {
       for await (const chunk of response.body ?? []) {
         size += chunk.byteLength
 
-        if (size > MAX_REMOTE_BYTES)
+        if (size > cap)
           return false
 
         void writer.write(chunk)

@@ -132,7 +132,7 @@ With `NODE_ENV=production`, the server's first line says where it listens, the k
 GET /blog/hello 200 12ms AZnLe0vUe9qD0uXq9vLwZw
 ```
 
-An error logged while answering the request starts with the same id. `requestId(request)` from `kay/server` gives it to `onError`. Behind a proxy set in `proxy`, an `X-Request-Id` the proxy passed on is kept.
+An error logged while answering the request starts with the same id. `requestId(request)` from `kay/server` gives it to `onError`. Behind a proxy set in `proxy`, an `X-Request-Id` the proxy passed on is kept, and `requestIdHeader: 'x-correlation-id'` in kay.config.ts names another header for both.
 
 Set `log: 'json'` to write these lines, and kay's own errors and warnings, as one JSON object each. Use it for a log collector.
 

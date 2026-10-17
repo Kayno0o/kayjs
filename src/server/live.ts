@@ -1,6 +1,8 @@
 import type { Elysia } from 'elysia'
+import type { LiveConfig } from '../config'
 import type { LivePage, LiveRequest, LiveUpdate } from '../runtime/live-value'
 import type { ServerScope } from '../runtime/reactive'
+import { KayError } from '../compiler/errors'
 import { checkLiveWrites, LIVE_ROUTE, liveSlot, PROOF_LIFETIME_MS, slotValue, watchSlot } from '../runtime/live-value'
 import { currentServerScope } from '../runtime/reactive'
 import { encodeValue, unsendable } from '../runtime/wire'
@@ -19,15 +21,28 @@ const MAX_REQUEST_BYTES = 64 * 1024
 // The keys one connection watches, and the length of a key.
 const MAX_WATCHED = 500
 const MAX_KEY_LENGTH = 256
-const CONNECTIONS_PER_MINUTE = 120
+const DEFAULT_PER_MINUTE = 120
 const MINUTE_MS = 60_000
 const LIMIT = 'kay:live'
 
-// How many connections one client holds at once: a few tabs, not a flood.
+// How many connections one client holds at once unless `live.connections` says otherwise: a few tabs, not a flood.
 export const MAX_CONNECTIONS = 20
 // A clock a little ahead of the server's still dates a proof the server made.
 const SKEW_MS = 5000
 const open = new Map<string, number>()
+
+// `live` from kay.config.ts with its defaults, each limit a whole number from 1.
+export function liveLimits(config: LiveConfig | undefined): { connections: number, perMinute: number } {
+  const connections = config?.connections ?? MAX_CONNECTIONS
+  const perMinute = config?.perMinute ?? DEFAULT_PER_MINUTE
+
+  for (const [name, value] of [['connections', connections], ['perMinute', perMinute]] as const) {
+    if (!Number.isSafeInteger(value) || value < 1)
+      throw new KayError('config-invalid', `kay: live.${name} is ${String(value)}; it takes a whole number from 1`)
+  }
+
+  return { connections, perMinute }
+}
 
 // The proof that a page read these keys of these values: whoever holds it is let watch exactly them, as whoever rendered the page was.
 function proofText(keys: [string, string][], at: number): string {
@@ -86,10 +101,10 @@ interface Watched {
 // The updates a connection sends: every watched value as it is now, then the ones that changed, as often as they do.
 // It ends when the proofs it was let in on expire, `lifetime` from now.
 // It holds a connection slot of the client from the moment it is read until it ends, and is refused when the client has none by then, which a browser retries after its backoff: a response nobody reads holds nothing.
-function updates(watched: Watched[], lifetime: number, client: string): AsyncIterable<LiveUpdate[]> {
+function updates(watched: Watched[], lifetime: number, client: string, most: number): AsyncIterable<LiveUpdate[]> {
   return {
     [Symbol.asyncIterator]() {
-      if ((open.get(client) ?? 0) >= MAX_CONNECTIONS)
+      if ((open.get(client) ?? 0) >= most)
         return { next: async () => Promise.reject(new StreamRefused('kay: the client holds too many live connections')) }
 
       open.set(client, (open.get(client) ?? 0) + 1)
@@ -186,7 +201,9 @@ function readRequest(text: string): LiveRequest | undefined {
 }
 
 // `POST /_kay/live`: one event stream per page carrying the live values its islands read. A value is sent only to a request holding the proof a page that read it carried, so a guard on the page covers it.
-export function serveLive(app: Elysia): void {
+export function serveLive(app: Elysia, config?: LiveConfig): void {
+  const { connections, perMinute } = liveLimits(config)
+
   checkLiveWrites(checkSendable)
   app.post(LIVE_ROUTE, async ({ request, server }) => {
     if (isCrossSite(request))
@@ -195,7 +212,7 @@ export function serveLive(app: Elysia): void {
     if (Number(request.headers.get('content-length') ?? 0) > MAX_REQUEST_BYTES)
       return new Response(null, { status: 413 })
 
-    if (overLimit(LIMIT, clientAddress(request, server), CONNECTIONS_PER_MINUTE, MINUTE_MS) !== undefined)
+    if (overLimit(LIMIT, clientAddress(request, server), perMinute, MINUTE_MS) !== undefined)
       return new Response(null, { status: 429 })
 
     const text = await readCapped(request, MAX_REQUEST_BYTES)
@@ -240,9 +257,9 @@ export function serveLive(app: Elysia): void {
 
     const client = clientAddress(request, server)
 
-    if ((open.get(client) ?? 0) >= MAX_CONNECTIONS)
+    if ((open.get(client) ?? 0) >= connections)
       return new Response(null, { status: 429 })
 
-    return eventStream(updates(watched, PROOF_LIFETIME_MS - (now - oldest), client))
+    return eventStream(updates(watched, PROOF_LIFETIME_MS - (now - oldest), client, connections))
   }, { parse: 'none' })
 }

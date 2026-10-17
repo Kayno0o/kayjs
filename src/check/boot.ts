@@ -15,9 +15,12 @@ import { claimEndpoints } from '../server/endpoint-claims'
 import { PUBLIC_ENV_PATH } from '../server/env-state'
 import { faviconSource, svgFaviconProblems } from '../server/favicon'
 import { localeSettings, refuseLocaleClashes } from '../server/i18n'
-import { shutdownSeconds } from '../server/lifecycle'
+import { healthTimeoutMs, shutdownSeconds } from '../server/lifecycle'
+import { liveLimits } from '../server/live'
+import { checkRequestIdHeader } from '../server/protection'
 import { claimPublic, publicFiles } from '../server/public'
 import { claimRedirects, readRedirects } from '../server/redirects'
+import { remoteLimits } from '../server/remote'
 import { refuseClashes } from '../server/route-table'
 import { routeMounts, scanEndpoints, scanRoutes } from '../server/routes'
 import { siteOrigin } from '../server/seo'
@@ -52,6 +55,15 @@ export async function bootProblems(root: string, options: CheckOptions, feeds: C
 
   if (shutdownTimeout !== undefined)
     refused(config, () => shutdownSeconds(shutdownTimeout))
+
+  const { health } = options
+
+  if (health !== undefined && health !== false)
+    refused(config, () => healthTimeoutMs(health))
+
+  refused(config, () => liveLimits(options.live))
+  refused(config, () => remoteLimits(options.images))
+  refused(config, () => checkRequestIdHeader(options.requestIdHeader))
 
   refused(config, () => checkBudget(budget))
 

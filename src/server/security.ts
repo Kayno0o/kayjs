@@ -5,7 +5,7 @@ import type { Prefetch } from './speculation'
 import { offlineOf } from '../project'
 import { basePath } from './base'
 import { inlineScriptHashes, sourceHash } from './csp'
-import { REQUEST_ID_HEADER } from './protection'
+import { requestIdHeader } from './protection'
 import { CSP_ENDPOINT, CSP_REPORTS } from './violations'
 
 export interface SecurityOptions {
@@ -142,7 +142,7 @@ export function ownHeaders(set: Context['set'], copies: HeaderCopies): Record<st
   const id = takeAloneRequestId(set)
 
   if (id !== undefined)
-    return { ...copies.secured, [REQUEST_ID_HEADER]: id }
+    return { ...copies.secured, [requestIdHeader()]: id }
 
   if (Object.keys(set.headers).length === 0)
     return copies.secured
@@ -209,7 +209,7 @@ export function ownedHeaders(set: Context['set'], headers: Record<string, string
   }
 
   if (id !== undefined)
-    headers[REQUEST_ID_HEADER] = id
+    headers[requestIdHeader()] = id
 
   for (const [name, value] of security)
     headers[name] ??= value
@@ -222,14 +222,14 @@ function takeAloneRequestId(set: Context['set']): string | undefined {
   let id: string | undefined
 
   for (const name in set.headers) {
-    if (name !== REQUEST_ID_HEADER)
+    if (name !== requestIdHeader())
       return undefined
 
-    id = set.headers[name]
+    id = String(set.headers[name])
   }
 
   if (id !== undefined)
-    delete set.headers[REQUEST_ID_HEADER]
+    delete set.headers[requestIdHeader()]
 
   return id
 }

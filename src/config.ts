@@ -87,8 +87,12 @@ export interface KayConfig {
   tracer?: Tracer | undefined
   // Serves a request from another path, query included, such as a host's pages from a section: `url => url.hostname === 'blog.example.com' ? `/blog${url.pathname}` : undefined`. The browser keeps its URL.
   rewrite?: Rewrite | undefined
-  // Old paths sent elsewhere with a 308, or a 307 with `permanent: false`: `{ '/blog/:slug': '/posts/:slug', '/docs/*': '/guide/*' }`. `kay check` reports a target no page serves.
+  // Old paths sent elsewhere with a 308, or a 307 with `permanent: false`, or the 301 or 302 older clients and some crawlers expect with `status`: `{ '/blog/:slug': '/posts/:slug', '/docs/*': '/guide/*', '/old': { to: '/new', status: 301 } }`. `kay check` reports a target no page serves.
   redirects?: Redirects | undefined
+  // What the live values' connections may cost one client address: how many at once and how many opened a minute.
+  live?: LiveConfig | undefined
+  // The header a request's id comes in on from a trusted proxy and goes out on, `x-request-id` by default: `'x-correlation-id'`.
+  requestIdHeader?: string | undefined
   // The locales pages are served in, each under its prefix or on its own domain, with messages in `src/messages/<locale>.ts`.
   i18n?: I18nConfig | undefined
   // Where the site is mounted when not at its host's root, `/docs`: the links, assets, forms and redirects pages render, the sitemap and the feeds carry it, links stay written without it, and a proxy in front of the server takes it off requests.
@@ -166,8 +170,17 @@ export interface PreviewConfig {
   maxAge?: Duration | undefined
 }
 
+export interface LiveConfig {
+  // How many live connections one client address holds at once, 20 by default: a few tabs, not a flood. One more answers 429.
+  connections?: number | undefined
+  // How many it may open in a minute, 120 by default.
+  perMinute?: number | undefined
+}
+
 export interface HealthConfig {
   path?: string | undefined
+  // How long `check` may take before the route fails with 503, and how long `--health` waits for the route: seconds or a string such as `'250ms'` or `'10s'`; 5 seconds by default.
+  timeout?: Duration | undefined
   // Fails the route with 503 when it returns false or throws, such as a database that does not answer.
   check?: (() => unknown) | undefined
 }
@@ -277,6 +290,10 @@ export interface ImagesConfig {
   dirs?: Record<string, string> | undefined
   // Hosts whose images are resized too, each an origin and maybe a path, its host maybe starting with `*.` for any subdomain: `['https://cms.example.com/uploads/', 'https://*.cdn.example.com']`. The image route downloads them, keeping a copy it revalidates; a host not listed is refused, so the route is no open proxy.
   remote?: string[] | undefined
+  // The most a remote original may weigh, bytes or a size such as `'10mb'`: a bigger one answers 413 and is not kept. 25 MB by default.
+  remoteMaxSize?: ByteSize | undefined
+  // How long the image route waits for a remote host, redirects included, seconds or a string such as `'30s'`; 10 seconds by default. A slower host answers 502.
+  remoteTimeout?: Duration | undefined
   // WebP quality, 1 to 100. Defaults to 80. It also sets the quality of the share cards' JPEG; `image(src, { quality })` sets one image's variants.
   quality?: number | undefined
   // The widths in pixels `image()` resizes to and the route makes, whole numbers from 1 to 16384, at most 16, in any order: `[480, 960, 1440, 1920]`. Defaults to `[320, 640, 960, 1280, 1920, 2560, 3840]`. Each width is a file per image, so a short ladder builds fewer.

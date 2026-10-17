@@ -65,8 +65,26 @@ const trustedRanges = new Map<string, BlockList>()
 const RANGE = /^([^/]+)\/(\d{1,3})$/
 const requestIds = new WeakMap<Request, string>()
 
-// The header a request's id comes in from a trusted proxy and goes out on, every context holding it.
-export const REQUEST_ID_HEADER = 'x-request-id'
+// The header a request's id comes in from a trusted proxy and goes out on, every context holding it; `requestIdHeader` in kay.config.ts renames it, set as the server boots.
+const DEFAULT_ID_HEADER = 'x-request-id'
+const HEADER_NAME = /^[\w!#$%&'*+.^`|~-]+$/
+let idHeader = DEFAULT_ID_HEADER
+
+export function requestIdHeader(): string {
+  return idHeader
+}
+
+// Refuses a `requestIdHeader` that is no header's name.
+export function checkRequestIdHeader(name: string | undefined): void {
+  if (name !== undefined && !HEADER_NAME.test(name))
+    throw new KayError('config-invalid', `kay: requestIdHeader is ${JSON.stringify(name)}; it names a header, such as x-correlation-id`)
+}
+
+export function setRequestIdHeader(name: string | undefined): void {
+  checkRequestIdHeader(name)
+  idHeader = name?.toLowerCase() ?? DEFAULT_ID_HEADER
+}
+
 // What an id a proxy passed on may hold, so it can neither forge a log line nor swell one.
 const PASSED_ID = /^[\w.:+/=@-]{1,128}$/
 
@@ -575,7 +593,7 @@ export function keepRequestId(request: Request, id: string): void {
 }
 
 function passedId(request: Request): string | undefined {
-  const id = request.headers.get(REQUEST_ID_HEADER)
+  const id = request.headers.get(idHeader)
 
   if (id === null || !proxies.get(request) || !PASSED_ID.test(id))
     return undefined

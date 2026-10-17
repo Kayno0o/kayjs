@@ -11,8 +11,8 @@ import { requestUrl } from './request-url'
 
 export const HEALTH_PATH = '/_kay/health'
 const DEFAULT_SHUTDOWN_TIMEOUT = 10
-// A check slower than this fails, so a hung database never hangs the probe with it.
-const CHECK_TIMEOUT_MS = 5000
+// A check slower than this fails unless `health.timeout` says otherwise, so a hung database never hangs the probe with it.
+const DEFAULT_CHECK_TIMEOUT = 5
 
 // Set on `globalThis` while a server watches its parent, so the watch `kay render` preloads, for a server nothing else stops, leaves it the stop.
 const PARENT_WATCHED = Symbol.for('kay.parentWatched')
@@ -31,6 +31,7 @@ let signalsTaken = false
 export function serveHealth(app: Elysia, lifecycle: Lifecycle, holds: () => boolean, config: HealthConfig = {}): void {
   const headers = { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' }
   const path = config.path ?? HEALTH_PATH
+  const timeoutMs = healthTimeoutMs(config)
 
   app.onRequest(async ({ request }) => {
     if (request.method !== 'GET' && request.method !== 'HEAD')
@@ -46,7 +47,7 @@ export function serveHealth(app: Elysia, lifecycle: Lifecycle, holds: () => bool
       return wholeResponse('stopping', { status: 503, headers })
 
     try {
-      if (config.check && await withTimeout(config.check()) === false)
+      if (config.check && await withTimeout(config.check(), timeoutMs) === false)
         return wholeResponse('unhealthy', { status: 503, headers })
     }
     catch (error) {
@@ -57,6 +58,11 @@ export function serveHealth(app: Elysia, lifecycle: Lifecycle, holds: () => bool
 
     return wholeResponse('ok', { headers })
   })
+}
+
+// The milliseconds a health check may take, `health.timeout` read once per use: a value that is no positive duration throws naming the option.
+export function healthTimeoutMs(config: HealthConfig | undefined): number {
+  return durationSeconds(config?.timeout ?? DEFAULT_CHECK_TIMEOUT, 'health.timeout') * 1000
 }
 
 export function shutdownSeconds(timeout: Duration): number {
@@ -143,10 +149,10 @@ export function alive(pid: number): boolean {
   }
 }
 
-async function withTimeout(check: unknown): Promise<unknown> {
+async function withTimeout(check: unknown, ms: number): Promise<unknown> {
   let timer: Timer | undefined
   const timedOut = new Promise((_, reject) => {
-    timer = setTimeout(() => reject(new Error(`kay: the health check took longer than ${CHECK_TIMEOUT_MS / 1000} s`)), CHECK_TIMEOUT_MS)
+    timer = setTimeout(() => reject(new Error(`kay: the health check took longer than ${ms / 1000} s`)), ms)
   })
 
   try {
@@ -197,7 +203,7 @@ export async function probeHealth(config: HealthConfig | false | undefined, port
   }
 
   try {
-    const response = await fetch(`http://${probeHost(host)}:${port}${config?.path ?? HEALTH_PATH}`, { signal: AbortSignal.timeout(CHECK_TIMEOUT_MS) })
+    const response = await fetch(`http://${probeHost(host)}:${port}${config?.path ?? HEALTH_PATH}`, { signal: AbortSignal.timeout(healthTimeoutMs(config)) })
 
     return response.ok ? 0 : 1
   }

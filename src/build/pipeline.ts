@@ -29,7 +29,7 @@ import { fontFiles } from '../server/fonts'
 import { avifQuality, writeImageVariants, writeRemoteVariants } from '../server/image'
 import { hookPrerendered } from '../server/page-hook'
 import { prerenderPages } from '../server/prerender'
-import { remoteImages, remotePatterns } from '../server/remote'
+import { remoteImages, remoteLimits, remotePatterns } from '../server/remote'
 import { slashedPath } from '../server/routes'
 import { linkStoredFiles } from '../server/storage'
 import { budgetLints, checkBudget } from './budget'
@@ -398,7 +398,7 @@ async function outputStage(project: Project, exported: boolean, client: ClientBu
   const linted = [...checking ? [...pageSeoLints(config, rendered, exported), ...unkeptPageLints(config, [...stops.values()])] : [], ...budgetLints(config.budget, config.lints, sizes, routes, client.report)]
 
   // Remote originals are kept between builds, revalidated as the image route does.
-  const remote = remoteImages(cacheDir(root, 'remote'), remotePatterns(config.images?.remote))
+  const remote = remoteImages(cacheDir(root, 'remote'), remotePatterns(config.images?.remote), undefined, undefined, remoteLimits(config.images))
 
   await writeImageVariants(client.dir, config.images?.quality, cacheDir(root, 'variants'), { avif: exported ? undefined : avifQuality(config.images), onImage: imageProgress(report) })
   report({ step: 'writing images, cards and favicons' })

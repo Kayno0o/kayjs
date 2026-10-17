@@ -2,7 +2,7 @@ import type { BudgetConfig } from '../build/budget'
 import type { Diagnostic } from '../compiler/ast'
 import type { Paint } from '../compiler/frame'
 import type { LintLevels } from '../compiler/lints'
-import type { FaviconConfig, I18nConfig, ImagesConfig, KayConfig, KayExtension, ManifestConfig, SeoConfig } from '../config'
+import type { FaviconConfig, HealthConfig, I18nConfig, ImagesConfig, KayConfig, KayExtension, LiveConfig, ManifestConfig, SeoConfig } from '../config'
 import type { Duration } from '../runtime/duration'
 import type { McpConfig } from '../server/api-modules'
 import type { EnvSchema } from '../server/env'
@@ -53,6 +53,10 @@ export interface CheckOptions {
   base?: string | undefined
   site?: string | undefined
   shutdownTimeout?: Duration | undefined
+  // The settings with a value the server refuses at boot when it cannot read it.
+  health?: HealthConfig | false | undefined
+  live?: LiveConfig | undefined
+  requestIdHeader?: string | undefined
   budget?: BudgetConfig | undefined
   // The config's locales: links may carry their prefixes, `t()` reads the default locale's messages, and every other locale's must match them.
   i18n?: I18nConfig | undefined
@@ -93,9 +97,9 @@ export interface CheckDiagnostic extends Pick<Diagnostic, 'label' | 'related' | 
 }
 
 export function configCheckOptions(config: KayConfig): CheckOptions {
-  const { entry, routes, publicDir, api, content, redirects, i18n, lang, settings, base, site, shutdownTimeout, budget, lints, extensions, seo, favicon, manifest, images, publicEnv, requireGuards, mcp, openapi } = config
+  const { entry, routes, publicDir, api, content, redirects, i18n, lang, settings, base, site, shutdownTimeout, health, live, requestIdHeader, budget, lints, extensions, seo, favicon, manifest, images, publicEnv, requireGuards, mcp, openapi } = config
 
-  return { entry, routes, publicDir, api, content, redirects, i18n, lang, settings, base, site, shutdownTimeout, budget, lints, extensions, seo, favicon, manifest, images, publicEnv, requireGuards, mcp, openapi }
+  return { entry, routes, publicDir, api, content, redirects, i18n, lang, settings, base, site, shutdownTimeout, health, live, requestIdHeader, budget, lints, extensions, seo, favicon, manifest, images, publicEnv, requireGuards, mcp, openapi }
 }
 
 // Type-checks a project, .kay components included, and reports every error at the line and column the user wrote.

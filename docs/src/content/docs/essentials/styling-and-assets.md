@@ -193,7 +193,7 @@ Without the size the image keeps its `src` alone.
 
 ### Images from another host
 
-An image on a CMS or a CDN is resized too, once its host is in `images.remote`. Each entry is an origin, and its host can start with `*.` for any subdomain.
+An image on a CMS or a CDN is resized too, once its host is in `images.remote`. Each entry is an origin, and its host can start with `*.` for any subdomain. A download is cut off past 25 MB and given up on after 10 s; `remoteMaxSize` and `remoteTimeout` change them.
 
 ```ts
 export default defineConfig({

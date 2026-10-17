@@ -43,7 +43,7 @@ export default defineConfig({
 
 ### Check the database in the health route
 
-`health` moves the route and adds a check, which answers 503 when it returns `false`, throws or takes over 5 s:
+`health` moves the route and adds a check, which answers 503 when it returns `false`, throws or takes over 5 s, which `timeout` changes (`health: { timeout: '10s' }`, seconds or a duration such as `'250ms'`, which `./server --health` waits for too):
 
 ```ts
 import { defineConfig } from 'kay/server'
@@ -138,7 +138,7 @@ Then `await welcomeMails.enqueue({ to: email })` in an action, or `enqueue(paylo
 - A library logs through the same setting with `logFrom` from `kay`: `const log = logFrom('kayjs-mail')`, then `log.info(message)`, `log.warn(message)` or `log.error(message, error)`.
 - Its lines read `kayjs-mail: ` and the message, headed by the request being answered as kay's are, in a page, an action, an endpoint or a guard, though not in an API module's handler or a socket, which Elysia runs outside any call kay makes, and carry `from: 'kayjs-mail'` as JSON or in the entry a log function receives.
 - Outside a server, in the browser or a script, they go to the console as `[kayjs-mail] message`.
-- Every response carries its request's id as `X-Request-Id`, time-ordered, made by kay unless `proxy` is set and the proxy passed one on in that header.
+- Every response carries its request's id as `X-Request-Id`, time-ordered, made by kay unless `proxy` is set and the proxy passed one on in that header; `requestIdHeader: 'x-correlation-id'` in kay.config.ts names another header for both.
 - An error logged while answering a request is headed by the request, `kay: GET /blog/hello, request AZnLe0vUe9qD0uXq9vLwZw`, then its stack, so a line from a user or a log search finds both.
 - `requestId(request)` from `kay/server` gives it, in `onError` or a route, and a server span carries it as `kay.request.id`.
 
