@@ -33,6 +33,8 @@ const LIMIT = 'kay:live'
 const MAX_CACHE_KEYS = 100
 // How many keys read with `live: true` are remembered for their last invalidation.
 const MAX_STAMPED = 10_000
+// How many watched keys the eviction passes over before it gives up for now, so a set of watched keys does not make each read scan it whole.
+const MAX_SKIPS = 32
 
 interface CacheReads {
   // The time the render read each key it follows.
@@ -71,13 +73,20 @@ function remember(key: string): void {
   stamped.add(key)
 
   const slot = liveSlot(CACHE_LIVE_ID)
+  let skips = 0
 
   for (const old of stamped) {
-    if (stamped.size <= MAX_STAMPED)
+    if (stamped.size <= MAX_STAMPED || skips >= MAX_SKIPS)
       break
 
-    if ((slot?.listeners.get(old)?.size ?? 0) > 0)
+    // Watched, so as good as read now: moved behind the rest, where the next passes meet the keys nobody watches first.
+    if ((slot?.listeners.get(old)?.size ?? 0) > 0) {
+      skips++
+      stamped.delete(old)
+      stamped.add(old)
+
       continue
+    }
 
     stamped.delete(old)
     stamps.delete(old)

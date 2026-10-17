@@ -28,6 +28,8 @@ let timer: ReturnType<typeof setTimeout> | undefined
 let running = false
 // What was invalidated while the page loaded, by key, to be held against the page that arrives.
 const meanwhile = new Map<string, number>()
+// What was invalidated since the page was last loaded, by key, which a refresh held back by a swap in progress checks against the page then shown.
+const due = new Map<string, number>()
 let waiting = false
 
 function pagesOf(): LivePage[] {
@@ -51,6 +53,7 @@ export function followCaches(): void {
     clearTimeout(timer)
     timer = undefined
     meanwhile.clear()
+    due.clear()
   }
 
   const keys = JSON.stringify([...next.keys()].sort())
@@ -125,6 +128,7 @@ async function read(body: ReadableStream<Uint8Array>, controller: AbortControlle
 
       if (data !== '') {
         attempt = 0
+        refused = 0
 
         for (const [id, key, at] of decodeServerValue(data) as LiveUpdate[]) {
           if (id === CACHE_LIVE_ID)
@@ -175,6 +179,7 @@ function changed(key: string, at: number): void {
     return
   }
 
+  due.set(key, at)
   schedule()
 }
 
@@ -210,6 +215,19 @@ async function load(): Promise<void> {
   running = true
 
   try {
+    // A swap in progress is the visitor's click: refreshing now would supersede it, and the page it arrives on is as recent as that fetch.
+    if (document.documentElement.hasAttribute('aria-busy')) {
+      await idle()
+
+      if (![...due].some(([key, at]) => at >= (rendered.get(key) ?? Infinity))) {
+        due.clear()
+
+        return
+      }
+    }
+
+    due.clear()
+
     if (navigation.refresh)
       await navigation.refresh()
     else if (!dirtyGuard())
@@ -226,4 +244,20 @@ async function load(): Promise<void> {
 
   for (const [key, at] of late)
     changed(key, at)
+}
+
+// Resolves once no page swap is in progress.
+async function idle(): Promise<void> {
+  const root = document.documentElement
+
+  await new Promise<void>((resolve) => {
+    const observer = new MutationObserver(() => {
+      if (!root.hasAttribute('aria-busy')) {
+        observer.disconnect()
+        resolve()
+      }
+    })
+
+    observer.observe(root, { attributes: true, attributeFilter: ['aria-busy'] })
+  })
 }

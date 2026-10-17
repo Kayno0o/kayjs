@@ -7,9 +7,10 @@ import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
 import { chromium } from 'playwright-core'
-import { invalidate, trackStore, untrackStore } from '../src/runtime/cache'
+import { cached, invalidate, trackStore, untrackStore } from '../src/runtime/cache'
 import { CACHE_LIVE_ID } from '../src/runtime/cache-live-id'
 import { liveSlot } from '../src/runtime/live-value'
+import { inLiveReads } from '../src/server/live'
 import { signText } from '../src/server/stamp'
 import { browserPath, testSite } from '../src/test'
 import { db } from './fixtures/live-cache/src/data'
@@ -175,6 +176,35 @@ describe('a cached value a page follows', () => {
     await feed.close()
   })
 
+  it('remembers the invalidation time of the latest keys read only, keeping those a connection watches however old', async () => {
+    const read = async (keys: string[]) => inLiveReads(async () => {
+      for (const key of keys)
+        await cached(key, '1m', () => 1, { live: true })
+    })
+    // More watched keys than the eviction passes over in one read.
+    const watched = Array.from({ length: 40 }, (_, index) => `evict-watched-${index}`)
+    const keys: [string, string][] = watched.map(key => [CACHE_LIVE_ID, key])
+    const at = Date.now()
+    const sig = signText('live', `${at}\n${keys.map(key => JSON.stringify(key)).toSorted().join('\n')}`)
+
+    await read(watched)
+    await read(['evict-old'])
+    invalidate(key => key === 'evict-old' || key.startsWith('evict-watched-'))
+
+    const feed = new Feed(await site.fetch('/_kay/live', { ...JSON_POST, body: JSON.stringify({ proofs: [{ keys, at, sig }], watch: keys } satisfies LiveRequest) }))
+    const slot = liveSlot(CACHE_LIVE_ID)!
+
+    expect(await feed.next()).toHaveLength(40)
+    expect(slot.values.has('evict-old')).toBe(true)
+
+    for (let batch = 0; batch < 101; batch++)
+      await read(Array.from({ length: 100 }, (_, index) => `evict-flood-${batch}-${index}`))
+
+    expect(slot.values.has('evict-old')).toBe(false)
+    expect(watched.filter(key => !slot.values.has(key))).toEqual([])
+    await feed.close()
+  }, 60_000)
+
   it('sends nothing for a key the proof does not cover, and refuses a forged one', async () => {
     const { html } = await site.visit('/')
     const proofs = proofsOf(pagesOf(html))
@@ -252,6 +282,10 @@ const chrome = browserPath() ?? (existsSync(chromium.executablePath()) ? chromiu
 describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a cached value a page follows, in a browser', () => {
   let site: TestSite
   const connections: string[] = []
+  // The pages of `/` asked for, a refusal the connection meets while `refuse` holds, and a response of `/plain` held back until `gate` resolves.
+  const loads: string[] = []
+  let refuse = false
+  let gate: Promise<void> | undefined
 
   const shows = (count: number) => [(expected: number) => document.querySelector('p.orders')?.textContent === `${expected} orders`, { timeout: 5000 }, count] as const
   const change = (orders: number) => {
@@ -260,9 +294,23 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a cached
   }
 
   beforeAll(async () => {
-    const count = new Elysia().onRequest(({ request }) => {
-      if (request.method === 'POST' && new URL(request.url).pathname === '/_kay/live')
+    const count = new Elysia().onRequest(async ({ request }) => {
+      const { pathname } = new URL(request.url)
+
+      if (request.method === 'POST' && pathname === '/_kay/live') {
         connections.push(request.url)
+
+        if (refuse)
+          return new Response(null, { status: 403 })
+      }
+
+      if (request.method === 'GET' && pathname === '/')
+        loads.push(request.url)
+
+      if (pathname === '/plain')
+        await gate
+
+      return undefined
     })
 
     site = await testSite({ root: ROOT, use: [count], browser: { path: chrome } })
@@ -336,6 +384,52 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a cached
     await page.waitUntil(() => location.pathname === '/')
     change(7)
     await page.waitUntil(...shows(7))
+    expect(page.errors).toEqual([])
+  })
+
+  it('loads the page again once on a refused connection, then backs off and follows again when the server accepts', async () => {
+    change(8)
+    refuse = true
+    connections.length = 0
+    loads.length = 0
+
+    await using page = await site.open('/')
+
+    // The page loaded, the connection refused, the page loaded again for a new proof, the connection refused again, then retried after a delay.
+    for (let waited = 0; connections.length < 3 && waited < 15_000; waited += 25)
+      await Bun.sleep(25)
+
+    expect(connections.length).toBeGreaterThanOrEqual(3)
+    expect(loads).toHaveLength(2)
+    refuse = false
+    change(9)
+    await page.waitUntil(...shows(9))
+    expect(page.errors).toEqual([])
+  }, 30_000)
+
+  it('leaves a link being followed to arrive, as a refresh would supersede it', async () => {
+    change(10)
+
+    await using page = await site.open('/')
+    await using other = await site.open('/')
+
+    await page.waitUntil(...shows(10))
+    await page.evaluate(() => {
+      Math.random = () => 0
+    })
+
+    const { promise, resolve } = Promise.withResolvers<void>()
+
+    gate = promise
+    await page.click('a.plain')
+    await page.waitUntil(() => document.documentElement.hasAttribute('aria-busy'))
+    change(11)
+    await other.waitUntil(...shows(11))
+    gate = undefined
+    resolve()
+    await page.waitUntil(() => location.pathname === '/plain')
+    // The page asked for the home page once, when it opened.
+    expect(await page.evaluate(() => performance.getEntriesByType('resource').filter(entry => entry.name === `${location.origin}/` && (entry as PerformanceResourceTiming).initiatorType === 'fetch').length)).toBe(0)
     expect(page.errors).toEqual([])
   })
 })
