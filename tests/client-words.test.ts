@@ -1,12 +1,13 @@
 import type { ClientBuild } from '../src/server/client'
 import process from 'node:process'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'bun:test'
 import { t } from 'elysia'
 import { clientDir } from '../src/build/assets'
 import { resolveProject } from '../src/project'
 import { action } from '../src/runtime/action'
 import { checkForm } from '../src/runtime/validate'
+import { resetWords } from '../src/runtime/words.client'
 import { servePages } from '../src/server/app'
 import { formsScript } from '../src/server/forms'
 import { INVALID_PARAMS } from '../src/server/words'
@@ -54,6 +55,20 @@ describe('the messages a page sends for the browser\'s form check', () => {
     })
   }
 
+  it('brings them on a page whose form is in an island', async () => {
+    const html = await page('/fr/island')
+
+    expect(payload(html)?.messages).toEqual(FRENCH)
+    expect(payload(html)?.locale).toBe('fr')
+  })
+
+  // A form in a streamed block ships no entry, rules or messages, so the browser's own check runs: kaynooo/kayjs#960.
+  it.todo('brings them on a page whose form is in a streamed block')
+
+  it('sends nothing on a page without a form', async () => {
+    expect(payload(await page('/fr/plain'))).toBeUndefined()
+  })
+
   it('sends nothing on a site without i18n', async () => {
     expect(payload(await page('/', { i18n: false }))).toBeUndefined()
   })
@@ -62,6 +77,12 @@ describe('the messages a page sends for the browser\'s form check', () => {
 describe('the browser\'s form check in the page\'s locale', () => {
   beforeAll(() => GlobalRegistrator.register())
   afterAll(async () => GlobalRegistrator.unregister())
+  // Each test is a fresh page load: the words a page brought stay in the module otherwise.
+  beforeEach(() => {
+    resetWords()
+    document.head.innerHTML = ''
+    document.body.innerHTML = ''
+  })
 
   function check(fields: [string, string][], schema: ReturnType<typeof t.Object>): Record<string, string> {
     const submitted = action(schema, () => undefined)
@@ -69,7 +90,8 @@ describe('the browser\'s form check in the page\'s locale', () => {
     ;(submitted as { url: string }).url = '/act'
     document.head.querySelector('script[data-kay-forms]')?.remove()
     document.head.insertAdjacentHTML('beforeend', formsScript(new Set([submitted])))
-    document.body.innerHTML = `<form>${fields.map(([name, value]) => `<input name="${name}" value="${value}">`).join('')}</form>`
+    document.querySelector('form')?.remove()
+    document.body.insertAdjacentHTML('afterbegin', `<form>${fields.map(([name, value]) => `<input name="${name}" value="${value}">`).join('')}</form>`)
     checkForm(document.querySelector('form')!, '/act')
 
     // The first control of a name carries its message, so it is read last.
@@ -81,6 +103,11 @@ describe('the browser\'s form check in the page\'s locale', () => {
   function bring(messages: Record<string, string>, locale = 'fr'): void {
     document.head.querySelector('script[data-kay-i18n]')?.remove()
     document.head.insertAdjacentHTML('beforeend', `<script type="application/json" data-kay-i18n>${JSON.stringify({ locale, messages })}</script>`)
+  }
+
+  // A streamed block or a swapped page brings its own script, which the check reads the next time it needs a word.
+  function append(parent: Element, text: string): void {
+    parent.insertAdjacentHTML('beforeend', `<script type="application/json" data-kay-i18n>${text}</script>`)
   }
 
   const schema = t.Object({
@@ -140,15 +167,57 @@ describe('the browser\'s form check in the page\'s locale', () => {
   })
 
   it('words a bound before the type of a number, and an exclusive bound as a type refusal, as the server does', () => {
+    bring(FRENCH)
     const numbers = t.Object({ whole: t.Integer({ minimum: 1 }), below: t.Number({ exclusiveMaximum: 10 }), plain: t.Integer() })
 
     expect(check([['whole', '0.5'], ['below', '10'], ['plain', '1.5']], numbers)).toEqual({ whole: '1 ou plus', below: 'Valeur invalide', plain: 'Valeur invalide' })
   })
 
   it('words an empty field its schema asks one character of as required, as the server does, and keeps a schema\'s own error', () => {
+    bring(FRENCH)
     const own = t.Object({ name: t.String({ minLength: 1 }), nick: t.String({ minLength: 5, error: 'Five at least' }) })
 
     expect(check([['name', ''], ['nick', 'abc']], own)).toEqual({ name: 'Champ requis', nick: 'Five at least' })
     expect(check([['name', 'x'], ['nick', 'abcdef']], t.Object({ name: t.String({ minLength: 2 }), nick: t.String() }))).toEqual({ name: 'Au moins 2 caractères', nick: '' })
+  })
+
+  it('reads the script a swapped page brings in the head, beside the words of the page it left', async () => {
+    bring({ 'kay.invalid.tooShort': 'Au moins {min} caractères' })
+    expect(check(fields, schema).long).toBe('Expected string length less or equal to 2')
+
+    await Promise.resolve()
+    append(document.head, JSON.stringify({ messages: { 'kay.invalid.tooLong': 'Au plus {max} caractères' } }))
+
+    const messages = check(fields, schema)
+
+    expect(messages.short).toBe('Au moins 3 caractères')
+    expect(messages.long).toBe('Au plus 2 caractères')
+  })
+
+  it('reads a script a streamed block appends to the body once it is whole, and skips it while it streams', async () => {
+    bring({ 'kay.invalid.tooShort': 'Au moins {min} caractères' })
+    append(document.body, '{"messages":{"kay.invalid.tooLo')
+    expect(check(fields, schema).long).toBe('Expected string length less or equal to 2')
+
+    document.body.querySelector('script[data-kay-i18n]')?.remove()
+    await Promise.resolve()
+    append(document.body, JSON.stringify({ messages: { 'kay.invalid.tooLong': 'Au plus {max} caractères' } }))
+    expect(check(fields, schema).long).toBe('Au plus 2 caractères')
+  })
+
+  it('checks a form an island rendered after the page loaded as one the page held', () => {
+    bring(FRENCH)
+
+    const submitted = action(t.Object({ name: t.String({ minLength: 3 }) }), () => undefined)
+
+    ;(submitted as { url: string }).url = '/act'
+    document.head.insertAdjacentHTML('beforeend', formsScript(new Set([submitted])))
+
+    const island = document.createElement('div')
+
+    island.innerHTML = '<form><input name="name" value="ab"></form>'
+    document.body.append(island)
+    checkForm(island.querySelector('form')!, '/act')
+    expect(island.querySelector('input')!.validationMessage).toBe('Au moins 3 caractères')
   })
 })

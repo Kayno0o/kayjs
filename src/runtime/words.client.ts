@@ -9,11 +9,19 @@ interface Payload {
 
 const PAYLOAD = 'script[data-kay-i18n]'
 const PLACEHOLDER = /\{(\w+)\}/g
-const read = new WeakSet<Element>()
+let read = new WeakSet<Element>()
 const messages = new Map<string, string | Plural>()
 let locale = ''
 // Whether the page was searched for scripts since the last microtask: a render looks up many texts, and one search serves them all.
 let searched = false
+
+// Forgets every payload read, for a test that stands for a fresh page load.
+export function resetWords(): void {
+  read = new WeakSet()
+  messages.clear()
+  locale = ''
+  searched = false
+}
 
 function parse(text: string): Payload | undefined {
   try {
