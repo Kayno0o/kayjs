@@ -21,7 +21,7 @@ function shown(address: Address): string {
 }
 
 export default function mailDevTool(tool: DevTool): void {
-  const tab = tool.tab({ id: 'mail', label: 'Mail', summary: count => `${count} mail${count === 1 ? '' : 's'}`, shown: show, hidden: hide })
+  const tab = tool.tab({ id: 'mail', label: 'Mail', icon: 'mail', summary: count => `${count} mail${count === 1 ? '' : 's'}`, shown: show, hidden: hide })
   let asked = 0
   let live: EventSource | undefined
   const previewed = new Set<string>()
@@ -60,7 +60,7 @@ export default function mailDevTool(tool: DevTool): void {
       frame.setAttribute('sandbox', '')
       frame.srcdoc = mail.html
       frame.title = mail.subject
-      frame.style.cssText = 'width: 100%; height: 22rem; margin-top: 6px; border: 1px solid var(--border); border-radius: 6px; background: #fff'
+      frame.style.cssText = 'width: 100%; height: 22rem; margin-top: 6px; border: 1px solid var(--line); border-radius: 6px; background: #fff'
       preview.append(frame)
     }
 

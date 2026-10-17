@@ -22,7 +22,7 @@ function sitePath(): string {
 
 export default function cmsDevTool(tool: DevTool): void {
   let asked = 0
-  const tab = tool.tab({ id: 'cms', label: 'CMS', shown: () => void show() })
+  const tab = tool.tab({ id: 'cms', label: 'CMS', icon: 'pencil', shown: () => void show() })
   const empty = (text: string) => {
     tab.count(0)
     tab.panel.replaceChildren(tool.make('div', 'empty', text))

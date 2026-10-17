@@ -15,7 +15,7 @@ function base(): string {
 
 export default function authDevTool(tool: DevTool): void {
   let asked = 0
-  const tab = tool.tab({ id: 'auth', label: 'Auth', shown: () => void show() })
+  const tab = tool.tab({ id: 'auth', label: 'Auth', icon: 'user-round', shown: () => void show() })
   const empty = (text: string) => {
     tab.count(0)
     tab.panel.replaceChildren(tool.make('div', 'empty', text))
