@@ -52,6 +52,16 @@ export function remembered(features: Pick<AuthFeatures, 'pages'>, chosen: boolea
   return mode === 'always' || (mode === 'checkbox' && chosen === true)
 }
 
+// What the sign-in and register pages share about the box: whether to show it, and the provider links carrying the choice a click without script leaves.
+export function rememberOf(features: Pick<AuthFeatures, 'pages' | 'prefix'>, redirect: string, label: (provider: string) => string, providers: AuthFeatures['providers']) {
+  const mode = features.pages?.remember ?? 'checkbox'
+
+  return {
+    askRemember: mode === 'checkbox',
+    providerLinks: providers.map(provider => ({ name: provider.name, label: label(provider.label), href: `${features.prefix}/${provider.name}?redirect=${encodeURIComponent(redirect)}&remember=${mode === 'always' ? 1 : 0}` })),
+  }
+}
+
 export const schemas = {
   signIn: t.Object({ identifier: email, password, remember, redirect, ...captcha }),
   magicLink: t.Object({ email, remember, redirect, ...captcha }),

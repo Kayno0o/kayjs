@@ -1,7 +1,7 @@
 ---
 import { onMount, signal } from 'kay'
 import Button from '@kaynooo/kayjs-ui/button.kay'
-import { askPasskey, canAskPasskey, passkeyFailure, rememberChecked } from '../../browser'
+import { askPasskey, canAskPasskey, passkeyFailure, rememberChoice } from '../../browser'
 import { passkey, passkeyOptions } from '../routes/sign-in.kay'
 
 const { redirect, label, failed } = props<{ redirect: string, label: string, failed: string }>()
@@ -18,9 +18,10 @@ async function signIn() {
   try {
     const options = await passkeyOptions({}, { refresh: false })
     const response = await askPasskey(options)
+    const remember = rememberChoice()
 
     if (response)
-      await passkey({ response, redirect, remember: rememberChecked() })
+      await passkey({ response, redirect, ...(remember === undefined ? {} : { remember }) })
   }
   catch (caught) {
     error.set(passkeyFailure(caught, {}, failed))

@@ -57,6 +57,8 @@ A file of yours at the same path, such as `src/routes/auth/sign-in.kay`, replace
 
 The sign-in and register pages show a "Keep me signed in" box. Unchecked, every way of signing in gives the same short session, a browser-session cookie lasting a day unseen; checked, every way gives `rememberMaxAge`, the provider buttons and the passkey button included. `pages.remember` changes that: `'always'` hides the box and remembers every sign-in, `'never'` hides it and never does, and `'checkbox'` is the default.
 
+A magic link opened in another browser than the one that asked for it gives the ordinary session length, `sessionMaxAge`, and the sign-out route and a provider link with no `redirect` go to `home` as written, not in the visitor's language.
+
 ```ts
 createAuth({ /* ... */ pages: { home: '/dashboard', remember: 'always' } })
 ```

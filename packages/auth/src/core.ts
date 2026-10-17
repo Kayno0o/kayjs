@@ -173,12 +173,12 @@ export function newUserRecord(fields: Partial<UserRecord>): UserRecord {
   }
 }
 
-// Whether an admin bars `record` from signing in at this moment.
 // Where a flow lands when nothing asked for another page: the prebuilt pages' `home`, else `/`.
 export function homeOf(core: Pick<Core, 'pages'>): string {
   return core.pages?.home ?? '/'
 }
 
+// Whether an admin bars `record` from signing in at this moment.
 export function banned(record: UserRecord, now = Date.now()): boolean {
   return record.bannedAt !== null && (record.bannedUntil === null || record.bannedUntil.getTime() > now)
 }

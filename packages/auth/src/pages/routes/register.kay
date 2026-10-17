@@ -7,7 +7,7 @@ import Message from '../components/message.kay'
 import Panel from '../components/panel.kay'
 import ProviderButtons from '../components/provider-buttons.kay'
 import Separator from '../components/separator.kay'
-import { captchaFor, captchaOf, guarded, issue, refusal, refusedFor, remembered, schemas } from '../forms'
+import { captchaFor, captchaOf, guarded, issue, refusal, refusedFor, remembered, rememberOf, schemas } from '../forms'
 import Button from '@kaynooo/kayjs-ui/button.kay'
 import FormField from '@kaynooo/kayjs-ui/form-field.kay'
 
@@ -39,8 +39,7 @@ const user = await auth.user()
 if (user && !user.guest)
   ctx.redirect(redirect)
 
-const askRemember = features.pages?.remember !== 'always' && features.pages?.remember !== 'never'
-const providerLinks = features.providers.map(provider => ({ name: provider.name, label: t('auth.signIn.provider', { provider: provider.label }), href: `${features.prefix}/${provider.name}?redirect=${encodeURIComponent(redirect)}&remember=${features.pages?.remember === 'always' ? 1 : 0}` }))
+const { askRemember, providerLinks } = rememberOf(features, redirect, provider => t('auth.signIn.provider', { provider }), features.providers)
 const captcha = await captchaFor(auth, features.captcha, 'register')
 const refused = ctx.failed(register)?.data
 const fields = refused && 'fields' in refused ? refused.fields : {}

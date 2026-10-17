@@ -1,18 +1,25 @@
 ---
 import Button from '@kaynooo/kayjs-ui/button.kay'
-import { rememberChecked } from '../../browser'
+import { rememberChoice } from '../../browser'
 
 const { providers } = props<{ providers: { name: string, label: string, href: string }[] }>()
 
-// The links carry `remember` as the page's setting leaves it; a click with the box checked takes the link with it on, which needs script, as a box beside a link needs.
-function carryRemember(event: MouseEvent) {
+// The links carry `remember` as the page's setting leaves it; a press sets it from the box first, which needs script, as a box beside a link does.
+function carryRemember(event: Event) {
   const link = (event.target as Element).closest<HTMLAnchorElement>('a[data-provider]')
 
-  if (link && rememberChecked())
-    link.href = link.href.replace(/remember=0$/, 'remember=1')
+  const chosen = rememberChoice()
+
+  if (!link || chosen === undefined)
+    return
+
+  const url = new URL(link.href)
+
+  url.searchParams.set('remember', chosen ? '1' : '0')
+  link.href = url.pathname + url.search
 }
 ---
 // kay-allow unreachable-click
-.flex.flex-col.gap-2(onClick={carryRemember})
+.flex.flex-col.gap-2(onClick={carryRemember} onAuxClick={carryRemember})
   for provider of providers key={provider.name}
     Button(href={provider.href} label={provider.label} data-provider={provider.name} data-no-prefetch)

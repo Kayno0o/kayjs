@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import { describe, expect, test } from 'bun:test'
+import { afterEach, describe, expect, test } from 'bun:test'
 import { testSite } from 'kay/test'
 import { mails, store } from '../src/auth'
 
@@ -45,39 +45,62 @@ describe('the lifetime of a sign-in', () => {
   test('registering and signing in by password last a day unchecked and rememberMaxAge checked', async () => {
     const signUp = await browser()
 
-    await signUp.submit(register, { email: 'ada@example.com', password: PASSWORD }, { from: await signUp.visit('/auth/register') })
-    expect(await lifetimeOf('ada@example.com')).toBe(DAY)
+    await signUp.submit(register, { email: 'remember-ada@example.com', password: PASSWORD }, { from: await signUp.visit('/auth/register') })
+    expect(await lifetimeOf('remember-ada@example.com')).toBe(DAY)
 
     const checked = await browser()
 
-    await checked.submit(register, { email: 'grace@example.com', password: PASSWORD, remember: 'on' }, { from: await checked.visit('/auth/register') })
-    expect(await lifetimeOf('grace@example.com')).toBe(REMEMBERED)
+    await checked.submit(register, { email: 'remember-grace@example.com', password: PASSWORD, remember: 'on' }, { from: await checked.visit('/auth/register') })
+    expect(await lifetimeOf('remember-grace@example.com')).toBe(REMEMBERED)
 
     const unchecked = await browser()
 
-    await unchecked.submit(password, { identifier: 'grace@example.com', password: PASSWORD }, { from: await unchecked.visit('/auth/sign-in') })
-    expect(await lifetimeOf('grace@example.com')).toBe(DAY)
+    await unchecked.submit(password, { identifier: 'remember-grace@example.com', password: PASSWORD }, { from: await unchecked.visit('/auth/sign-in') })
+    expect(await lifetimeOf('remember-grace@example.com')).toBe(DAY)
 
     const again = await browser()
 
-    await again.submit(password, { identifier: 'grace@example.com', password: PASSWORD, remember: 'on' }, { from: await again.visit('/auth/sign-in') })
-    expect(await lifetimeOf('grace@example.com')).toBe(REMEMBERED)
+    await again.submit(password, { identifier: 'remember-grace@example.com', password: PASSWORD, remember: 'on' }, { from: await again.visit('/auth/sign-in') })
+    expect(await lifetimeOf('remember-grace@example.com')).toBe(REMEMBERED)
   })
 
   test('a magic link lasts a day unchecked, as a password does, and rememberMaxAge checked', async () => {
     const signUp = await browser()
 
-    await signUp.submit(register, { email: 'magic@example.com', password: PASSWORD }, { from: await signUp.visit('/auth/register') })
+    await signUp.submit(register, { email: 'remember-magic@example.com', password: PASSWORD }, { from: await signUp.visit('/auth/register') })
 
     for (const [remember, expected] of [[undefined, DAY], ['on', REMEMBERED]] as const) {
       const visitor = await browser()
 
-      await visitor.submit(magicLink, { email: 'magic@example.com', ...(remember && { remember }) }, { from: await visitor.visit('/auth/sign-in') })
+      await visitor.submit(magicLink, { email: 'remember-magic@example.com', ...(remember && { remember }) }, { from: await visitor.visit('/auth/sign-in') })
 
       const link = new URL(mails.findLast(mail => mail.kind === 'magic-link')!.url!)
 
       await visitor.submit(spend, { token: link.searchParams.get('token')! }, { from: link.pathname + link.search })
-      expect(await lifetimeOf('magic@example.com')).toBe(expected)
+      expect(await lifetimeOf('remember-magic@example.com')).toBe(expected)
+    }
+  })
+})
+
+describe('a provider sign-in', () => {
+  const realFetch = globalThis.fetch
+
+  afterEach(() => {
+    globalThis.fetch = realFetch
+  })
+
+  test('lasts a day on the page\'s default link and rememberMaxAge on the link a checked box leads to', async () => {
+    for (const [remember, expected, id] of [[0, DAY, '71'], [1, REMEMBERED, '72']] as const) {
+      globalThis.fetch = (async (input: string | URL | Request) => String(input).endsWith('/oauth2/token')
+        ? Response.json({ access_token: 'token', expires_in: 3600 })
+        : Response.json({ id, username: `discord${id}`, email: `discord${id}@example.com`, verified: true })) as typeof fetch
+
+      const visitor = await browser()
+      const leaving = await visitor.fetch(`/auth/discord?redirect=/auth/account&remember=${remember}`)
+      const state = new URL(leaving.headers.get('location')!).searchParams.get('state')
+
+      await visitor.visit(`/auth/discord/callback?code=abc&state=${state}`)
+      expect(await lifetimeOf(`discord${id}@example.com`)).toBe(expected)
     }
   })
 })
