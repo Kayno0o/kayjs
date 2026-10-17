@@ -580,7 +580,7 @@ function warnUnknownScheme(request: Request): void {
 }
 
 export function inLocale<T>(request: Request, options: ActionOptions, run: () => T): T {
-  const locale = requestLocale(options.i18n.settings, request, postedFrom(request) ?? null)
+  const locale = requestLocale(options.i18n.settings, request, postedFrom(request) ?? null, options.base)
 
   return runInLocale(stateFor(options.i18n, locale, requestUrl(request).pathname, request), run)
 }

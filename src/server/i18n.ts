@@ -9,6 +9,7 @@ import { KayError } from '../compiler/errors'
 import { flattenMessages, localePath, pathSegment, splitLocale, translatedPath } from '../runtime/i18n'
 import { localeState } from '../runtime/locale-state'
 import { acceptedLocales, LOCALE_TAG, matchLocale } from './accept-language'
+import { routerPath } from './base'
 import { importModule } from './bundle'
 import { requestCookies } from './cookies'
 import { requestUrl } from './request-url'
@@ -300,12 +301,16 @@ export function cookieLocale(request: Request): string | undefined {
 }
 
 // The locale an action runs in: its host's, its page's, as the `Referer` or the form names it, or the visitor's preferred one.
-export function requestLocale(settings: LocaleSettings, request: Request, referer = request.headers.get('referer')): string {
+// The page's path is under the site's `base` in the browser, which the locale prefix follows.
+export function requestLocale(settings: LocaleSettings, request: Request, referer = request.headers.get('referer'), base = ''): string {
   if (settings.hosts)
     return hostLocale(settings, request)
 
   if (referer !== null && URL.canParse(referer) && new URL(referer).host === requestUrl(request).host) {
-    const { locale } = splitLocale(settings, new URL(referer).pathname)
+    const { pathname } = new URL(referer)
+    const path = routerPath(pathname, base)
+    // A page outside the base is none of this site's.
+    const { locale } = path === pathname && base !== '' ? { locale: undefined } : splitLocale(settings, path)
 
     if (locale !== undefined)
       return locale

@@ -1,0 +1,10 @@
+--- server
+import { s } from 'kay'
+import { localize } from 'kay/i18n'
+
+export const go = action(s.Object({}), (_input, ctx) => {
+  ctx.redirect(localize('/dashboard'))
+})
+---
+form(action={go})
+  button Go
