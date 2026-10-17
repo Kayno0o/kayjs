@@ -1,6 +1,6 @@
 import type { AnyElysia } from 'elysia'
 import type { ClientOptions } from '../build/client'
-import type { Action, ActionError, ActionProtection, FailureData, ResultOf, Success } from '../runtime/action'
+import type { Action, ActionError, ActionProtection, FailureData, ResultOf, Settles, Success } from '../runtime/action'
 import type { Duration } from '../runtime/duration'
 import type { EventReader, NodeAt, Optional, SocketOf, SocketOptions, SocketPath, StreamMethod, StreamOf, StreamOptions, StreamPath, StreamStatus } from '../runtime/live'
 import type { PagesOptions } from '../server/app'
@@ -510,16 +510,16 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
   }
 }
 
-function isStream(value: unknown): value is EventReader<unknown> & { [SETTLED]: Promise<StreamStatus> } {
-  return typeof value === 'object' && value !== null && SETTLED in value
+function isStream(value: unknown): value is EventReader<unknown> & Settles {
+  return (value as Partial<Settles> | null | undefined)?.[SETTLED] !== undefined
 }
 
-async function streamedValues(stream: EventReader<unknown> & { [SETTLED]: Promise<StreamStatus> }, url: string): Promise<unknown[]> {
+async function streamedValues(stream: EventReader<unknown> & Settles, url: string): Promise<unknown[]> {
   const values: unknown[] = []
 
   stream.on(value => void values.push(value))
 
-  const status = await stream[SETTLED]
+  const status = await new Promise<StreamStatus>(resolve => stream[SETTLED](resolve))
 
   if (status !== 'done')
     throw new Error(`kay: the stream ${url} answered ${status} after ${values.length} values`)

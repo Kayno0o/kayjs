@@ -10,7 +10,7 @@ import { escapeAttribute } from './escape'
 import { holdInvalid } from './invalid'
 import { leave, leaving, mayLeave, navigation, prefetched } from './navigation'
 import { pageData } from './page-data'
-import { getOwner, isDisposed, onCleanup, ownSignal, runWithOwner, undoable, untrack } from './reactive'
+import { getOwner, onCleanupOf, ownSignal, undoable, untrack } from './reactive'
 import { sendValue } from './send'
 import { FAILURE_HEADER, PAGE_HEADER, REDIRECT_HEADER, WORK_HEADER, WORK_SCRIPT } from './swap'
 import { decodeServerValue, decodeValue, unflattenValue } from './wire'
@@ -36,10 +36,13 @@ export const FILE_MARK = '$kayFile'
 const FILE_TYPE = 'KayFile'
 const SPACES = /\s+/
 const HTTP_PROTOCOLS = new Set(['http:', 'https:'])
-const EVENT_STREAM = /^text\/event-stream\b/i
 
-// Where the stream a streaming action answered a call with says how it ended, once it did.
-export const SETTLED = Symbol.for('kay.streamSettled')
+// Where the stream a streaming action answered a call with takes a callback, handed how it ended once it did.
+export const SETTLED = Symbol.for('kay.settled')
+
+export interface Settles {
+  [SETTLED]: (then: (status: StreamStatus) => void) => void
+}
 
 // The `x-kay-action` of a call whose input is a form's fields rather than encoded.
 export const FORM_CALL = 'form'
@@ -627,27 +630,23 @@ function callable(url: () => string): { call: (input: never, options?: CallOptio
 
       const data = await post(url(), input, setProgress, options?.signal, () => {
         sent = true
-      }, left)
+      }, left, owner)
 
       posted = true
 
-      if (isActionStream(data)) {
-        streaming = true
-        closeWithCaller(data, owner, left)
-        void streamEnded(data, (done) => {
-          if (done) {
-            called(page, { action: url(), succeeded: true, data: untrack(data.last) })
-            refreshPage()
-          }
+      streaming = onStreamEnd(data, (status) => {
+        if (status === 'done') {
+          called(page, { action: url(), succeeded: true, data: untrack((data as ActionStream<unknown>).last) })
+          refreshPage()
+        }
 
-          shift(-1)
-        })
+        shift(-1)
+      })
 
-        return data
+      if (!streaming) {
+        called(page, { action: url(), succeeded: true, data })
+        refreshPage()
       }
-
-      called(page, { action: url(), succeeded: true, data })
-      refreshPage()
 
       return data
     }
@@ -692,31 +691,27 @@ function callable(url: () => string): { call: (input: never, options?: CallOptio
   }
 }
 
-// A stream ends with the island that started it; one started from an event handler, which runs under no island, ends once the visitor goes to another page.
-function closeWithCaller(stream: ActionStream<unknown> & { [SETTLED]: Promise<StreamStatus> }, owner: Owner | undefined, left: () => boolean): void {
-  if (owner ? isDisposed(owner) : left()) {
-    stream.close()
-
-    return
-  }
-
+// A stream ends with the island that started it; one started from an event handler, under no island, ends once the visitor goes to another page.
+function closeWithCaller(stream: ActionStream<unknown> & Settles, owner: Owner | undefined, left: (() => boolean) | undefined): void {
   if (owner) {
-    runWithOwner(owner, () => onCleanup(stream.close))
-
-    return
+    onCleanupOf(owner, stream.close)
   }
-
-  leaving.add(stream.close)
-  void streamEnded(stream, () => leaving.delete(stream.close))
+  else if (left?.() === true) {
+    stream.close()
+  }
+  else if (left) {
+    leaving.add(stream.close)
+    stream[SETTLED](() => leaving.delete(stream.close))
+  }
 }
 
-function isActionStream(value: unknown): value is ActionStream<unknown> & { [SETTLED]: Promise<StreamStatus> } {
-  return typeof value === 'object' && value !== null && SETTLED in value
-}
+// Hands `then` how a stream ended, once it ended, failed or was closed; false when `data` is no stream.
+function onStreamEnd(data: unknown, then: (status: StreamStatus) => void): boolean {
+  const settles = (data as Partial<Settles> | null | undefined)?.[SETTLED]
 
-// Hands `then` whether the stream ran to its end, once it ended, failed or was closed.
-async function streamEnded(stream: { [SETTLED]: Promise<StreamStatus> }, then: (done: boolean) => void): Promise<void> {
-  then(await stream[SETTLED] === 'done')
+  settles?.(then)
+
+  return settles !== undefined
 }
 
 // A handle with a pending count of its own over `call`, whose refusals of this action it answers as results.
@@ -732,10 +727,7 @@ function tracked(call: (input: never, options?: CallOptions) => Promise<unknown>
     try {
       const data = await call(input as never, options)
 
-      if (isActionStream(data)) {
-        streaming = true
-        void streamEnded(data, () => shift(-1))
-      }
+      streaming = onStreamEnd(data, () => shift(-1))
 
       return { ok: true, data }
     }
@@ -754,7 +746,7 @@ function tracked(call: (input: never, options?: CallOptions) => Promise<unknown>
   return Object.assign(run, { pending: () => inFlight() > 0 })
 }
 
-async function post<Output>(url: string, input: unknown, onProgress: (sent: number) => void, signal: AbortSignal | undefined, onSent: () => void, left: () => boolean): Promise<Output> {
+async function post<Output>(url: string, input: unknown, onProgress: (sent: number) => void, signal: AbortSignal | undefined, onSent: () => void, left: () => boolean, owner: Owner | undefined): Promise<Output> {
   const { headers, body } = encodeCall(input)
   const sent: Record<string, string> = { ...headers }
 
@@ -787,7 +779,7 @@ async function post<Output>(url: string, input: unknown, onProgress: (sent: numb
 
   prefetched.clear()
 
-  return readActionResponse(response, url, left)
+  return readActionResponse(response, url, left, owner)
 }
 
 // The encoding keeps numbers, booleans and Dates typed, which form fields would turn into strings; only a call carrying files needs multipart, whose boundary fetch writes.
@@ -833,8 +825,8 @@ export function decodeCall(body: unknown): unknown {
 }
 
 // What a call to `action` got back: the handler's result, or an `ActionError` with the refused fields and the failure data.
-// `left` tells whether the visitor went to another page since the call was made, which a redirect then no longer takes them from.
-export async function readActionResponse<Output>(response: Response, action: string, left?: () => boolean): Promise<Output> {
+// `left` tells whether the visitor went to another page since the call was made, which a redirect then no longer takes them from; a stream closes then, or with `owner`, the island that called.
+export async function readActionResponse<Output>(response: Response, action: string, left?: () => boolean, owner?: Owner): Promise<Output> {
   const target = response.headers.get(REDIRECT_HEADER)
 
   if (target !== null) {
@@ -856,8 +848,13 @@ export async function readActionResponse<Output>(response: Response, action: str
   }
 
   // Loaded only once an action streams, so a page calling none does not carry it.
-  if (response.ok && EVENT_STREAM.test(response.headers.get('content-type') ?? ''))
-    return (await import('./action-stream')).actionStream(response) as Output
+  if (response.ok && response.headers.get('content-type')?.startsWith('text/event-stream') === true) {
+    const stream = (await import('./action-stream')).actionStream(response, SETTLED)
+
+    closeWithCaller(stream, owner, left)
+
+    return stream as Output
+  }
 
   const body = await response.text()
 

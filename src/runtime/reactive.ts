@@ -247,8 +247,12 @@ export function getOwner(): Owner | undefined {
   return owner
 }
 
-export function isDisposed(node: Owner): boolean {
-  return node.state === DISPOSED
+// Runs `fn` as `node` is cleaned up, or at once when it was disposed already.
+export function onCleanupOf(node: Owner, fn: () => void): void {
+  if (node.state === DISPOSED)
+    fn()
+  else
+    (node.cleanups ??= []).push(fn)
 }
 
 export function runWithOwner<T>(parent: Owner | undefined, fn: () => T): T {
