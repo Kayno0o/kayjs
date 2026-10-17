@@ -27,31 +27,47 @@ export function buildCommands(variant: Variant): string[][] {
   return variant.kind === 'astro' ? [[...BUNX, 'astro', 'build']] : [[...BUNX, 'kay', 'build'], [...BUNX, 'kay', 'build', '--no-check']]
 }
 
-// Clean builds, medians of `BUILDS`: wall seconds, CPU seconds of every process, peak memory of the largest.
-export async function timeBuild(variant: Variant, command: string[]): Promise<BuildTime> {
+export interface CleanBuild {
+  command: string[]
+  cwd: string
+  env?: Record<string, string>
+  // Removed, relative to `cwd`, before each build, so every one is clean.
+  outputs: string[]
+  // The runs timed, `BUILDS` unless set.
+  builds?: number
+}
+
+// Clean builds, the median of `builds`: wall seconds, CPU seconds of every process, peak memory of the largest.
+export async function timeClean({ command, cwd, env = {}, outputs, builds = BUILDS }: CleanBuild): Promise<BuildTime> {
   const runs: BuildTime[] = []
 
-  for (let build = 0; build < BUILDS; build++) {
-    for (const output of OUTPUTS)
-      rmSync(join(variant.dir, output), { recursive: true, force: true })
+  for (let build = 0; build < builds; build++) {
+    for (const output of outputs)
+      rmSync(join(cwd, output), { recursive: true, force: true })
 
     const started = performance.now()
-    const proc = tracked(Bun.spawn(command, { cwd: variant.dir, env: { ...process.env, ...envOf(variant) }, stdout: 'ignore', stderr: 'pipe' }))
+    const proc = tracked(Bun.spawn(command, { cwd, env: { ...process.env, ...env }, stdout: 'ignore', stderr: 'pipe' }))
     const errors = await new Response(proc.stderr).text()
 
     if (await proc.exited !== 0)
-      throw new Error(`${command.join(' ')} failed in ${variant.dir}:\n${errors}`)
+      throw new Error(`${command.join(' ')} failed in ${cwd}:\n${errors}`)
 
     const usage = proc.resourceUsage()!
 
     runs.push({ command: command.slice(BUNX.length).join(' '), wall: (performance.now() - started) / 1000, cpu: Number(usage.cpuTime.total) / 1e6, rss: usage.maxRSS })
   }
 
+  return { command: runs[0]!.command, wall: median(runs.map(r => r.wall)), cpu: median(runs.map(r => r.cpu)), rss: median(runs.map(r => r.rss)) }
+}
+
+export async function timeBuild(variant: Variant, command: string[]): Promise<BuildTime> {
+  const time = await timeClean({ command, cwd: variant.dir, env: envOf(variant), outputs: OUTPUTS })
+
   // The servers run what the last build left, the executable included.
   if (variant.kind === 'kay')
     run([...BUNX, 'kay', 'build', '--compile', 'server'], variant.dir, envOf(variant))
 
-  return { command: runs[0]!.command, wall: median(runs.map(r => r.wall)), cpu: median(runs.map(r => r.cpu)), rss: median(runs.map(r => r.rss)) }
+  return time
 }
 
 // Lines of code by cloc when it is installed, `.kay` and `.astro` read as Vue's single-file components.

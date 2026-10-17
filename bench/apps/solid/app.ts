@@ -2,9 +2,8 @@ import type { PageProps } from './src/app'
 import { join } from 'node:path'
 import { plugin } from 'bun'
 import { Elysia } from 'elysia'
+import { buildClient, DIST } from './build'
 import { solidPlugin } from './src/compile'
-
-const DIST = join(import.meta.dir, 'dist')
 
 // The same page shell as kay's: hydration script and module entry in the head, the app straight in the body.
 export async function createApp() {
@@ -14,7 +13,7 @@ export async function createApp() {
     import('./src/app'),
     import('solid-js/web'),
     import('../../shared/data'),
-    Bun.build({ entrypoints: [join(import.meta.dir, 'src', 'client.tsx')], outdir: DIST, target: 'browser', splitting: true, minify: true, define: { 'process.env.NODE_ENV': '"production"' }, naming: '[name]-[hash].[ext]', plugins: [solidPlugin('dom')] }),
+    buildClient(),
   ])
   const entry = build.outputs.find(output => output.kind === 'entry-point')!.path.slice(DIST.length + 1)
   const page = (props: PageProps) => {

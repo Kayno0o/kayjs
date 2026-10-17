@@ -1,13 +1,15 @@
 // kay against Solid, Svelte, Astro, Next.js and Nuxt, `bun run bench`, written to bench/results.md: it drives Chromium, the one BUN_CHROME_PATH names or the one `bunx playwright-core install chromium` downloads.
 import type { Browser } from 'playwright-core'
 import type { LoadResult, OperationResult } from './browser'
+import type { BuildResult } from './build'
 import { existsSync } from 'node:fs'
 import { cpus } from 'node:os'
 import { join } from 'node:path'
 import { parseArgs } from 'node:util'
 import { APPS, IN_PROCESS_APPS } from './apps'
 import { assertHydrated, launch, measureLoad, measureOperations, serve } from './browser'
-import { kilobytes, medianOf, milliseconds, table } from './format'
+import { buildAll, BUILDS } from './build'
+import { kilobytes, medianOf, milliseconds, seconds, table } from './format'
 import { clientRows, PATHS, serverMarkup } from './markup'
 
 interface SsrResult {
@@ -96,7 +98,7 @@ function loadRows(apps: AppResult[], page: 'products' | 'table'): string[][] {
   ]
 }
 
-function report(apps: AppResult[], environment: string[]): string {
+function report(apps: AppResult[], builds: BuildResult[], environment: string[]): string {
   const renders = apps.flatMap(app => app.ssr ? [app.ssr] : [])
 
   return [
@@ -111,6 +113,23 @@ function report(apps: AppResult[], environment: string[]): string {
     '- Solid and Svelte hydrate the whole page, so their HTML carries the page data as JSON and their one bundle holds both pages\' components. kay hydrates its islands only and ships one chunk per island, fetched after its entry and shared chunk.',
     '- Nuxt hydrates the whole page too, the products coming from an API route into its payload. Astro hydrates its counter and table as SolidJS islands. Next renders server components and hydrates its client ones, the counter and table, streaming the component payload with the page.',
     '- Each table is written the way its framework\'s js-framework-benchmark entry is: Solid keeps a signal per label and selects rows with `createSelector`, Svelte keeps a `$state` label per row, kay replaces rows immutably under a keyed `for` and selects rows with `selection`. Astro\'s island is the Solid table, Next keeps rows and selection in one reducer with memoised rows, Nuxt keeps a shallow ref of plain rows memoised with `v-memo`.',
+    '',
+    '## Build',
+    '',
+    `A clean production build of each app, run ${RUNS} ${RUNS === 1 ? 'time' : 'times'} before anything else is timed, the wall time the median. kay is built as \`kay build\` runs it, \`kay check\` included, and with \`--no-check\`, as \`astro build\` and the rest check nothing (Next's build type-checks the app as it goes). Size is what the build deploys, server and client output, without the dependencies it runs on, source maps and the precompressed copies kay writes beside its files; gzip is each file compressed alone.`,
+    '',
+    table(['', ...BUILDS.map(build => build.name)], [
+      ['build time', ...relative(builds.map(build => build.wall), seconds)],
+      ['output (gzip)', ...relative(builds.map(build => build.gzip), kilobytes)],
+      ['output (raw)', ...relative(builds.map(build => build.raw), kilobytes)],
+      ['output files', ...builds.map(build => String(build.files))],
+    ]),
+    '',
+    'What is counted:',
+    '',
+    '- kay: `.kay/client/dist` (the browser bundle, a chunk per island) and `.kay/client/pages` (the prerendered pages). Its server is not bundled: Bun runs the app\'s sources, so it adds nothing here.',
+    '- Solid and Svelte: `dist`, the browser bundle `Bun.build` writes. Their server code is compiled in memory as the server starts, so it adds nothing here.',
+    '- Astro: `dist`, its server entry and its client assets. Next: `.next` without `cache`, `diagnostics`, `types` and the build traces; its server needs `next` from `node_modules` to run. Nuxt: `.output`, the Nitro server with the dependencies it traced, and `public`.',
     '',
     '## Server rendering',
     '',
@@ -182,6 +201,9 @@ async function measure(browser: Browser, run: number): Promise<AppResult[]> {
 
 await installApps()
 
+// Before anything is timed, and apart from it: a build uses every core.
+const builds = await buildAll(RUNS, name => console.error(`building: ${name}`))
+
 const browser = await launch()
 
 try {
@@ -201,7 +223,7 @@ try {
     `${await version('kay', 'kay')}, ${await version('solid', 'solid-js')}, ${await version('svelte', 'svelte')}, ${await version('astro', 'astro')}, ${await version('next', 'next')}, ${await version('nuxt', 'nuxt')}`,
     `run on ${new Date().toISOString().slice(0, 10)}${RUNS > 1 ? `, each value the median of ${RUNS} runs` : ''}`,
   ]
-  const markdown = report(results, environment)
+  const markdown = report(results, builds, environment)
 
   await Bun.write(join(import.meta.dir, 'results.md'), markdown)
   console.log(markdown)

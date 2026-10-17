@@ -6,6 +6,10 @@ export function milliseconds(value: number): string {
   return value >= 100 ? value.toFixed(0) : value.toFixed(1)
 }
 
+export function seconds(value: number): string {
+  return `${value.toFixed(value < 10 ? 2 : 1)} s`
+}
+
 export function median(values: number[]): number {
   const sorted = values.toSorted((a, b) => a - b)
   const middle = sorted.length >> 1
