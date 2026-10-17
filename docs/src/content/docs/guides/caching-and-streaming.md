@@ -40,6 +40,8 @@ invalidate('posts')
 invalidate(key => key.startsWith('post:'))
 ```
 
+To have the pages that show a value change in every open tab when you drop it, add `live: true` to the `cached` call. See [Data from the cache](/guides/live-and-realtime#data-from-the-cache).
+
 To keep a value across restarts, name a store.
 
 ```ts

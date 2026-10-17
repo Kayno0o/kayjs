@@ -46,7 +46,7 @@ import { runGuards } from './guards'
 import { historyScript } from './history'
 import { hydrationScript } from './hydration'
 import { DEFAULT_LANG, invalidKeys, messagesScript } from './i18n'
-import { liveScript } from './live'
+import { CACHE_MARK, inLiveReads, liveScript } from './live'
 import { registerScript } from './offline'
 import { errorPage } from './overlay'
 import { chainSetting, pageSetting } from './page-settings'
@@ -198,7 +198,7 @@ const VARY_COOKIE = /(?:^|,)\s*cookie\s*(?:,|$)/i
 export async function renderPage(route: ServedRoute, context: RequestContext, params: Record<string, unknown>, client: ClientBuild, options: RenderOptions = {}): Promise<Response> {
   const rendering = createRendering(context, params, options)
 
-  return withOutcome(rendering.outcome, async () => renderRoute(route, rendering, client, withEditor(route, options)))
+  return inLiveReads(async () => withOutcome(rendering.outcome, async () => renderRoute(route, rendering, client, withEditor(route, options))))
 }
 
 async function renderRoute(route: ServedRoute, rendering: Rendering, client: ClientBuild, options: RenderOptions): Promise<Response> {
@@ -834,13 +834,16 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
   // A page posting forms to actions loads the entry too, which sends them without a reload; a page with neither ships only `historyScript`, and links from it load pages, losing no state.
   const posts = client.entry !== undefined && client.navigation === true && forms.size > 0
   // The entry fetches a deferred server island as it nears the viewport.
-  const shipsEntry = hasIslands || posts || (client.entry !== undefined && scan?.modes.includes('defer') === true)
+  const liveText = liveScript()
+  // A page following cached values loads the entry too, which opens the connection telling it they changed.
+  const follows = client.entry !== undefined && liveText.includes(CACHE_MARK)
+  const shipsEntry = hasIslands || posts || follows || (client.entry !== undefined && scan?.modes.includes('defer') === true)
   const checked = posts ? formsScript(forms, options.dev) : ''
   const scripts = shipsEntry ? islandScripts(client, islands.eager, streamed, hasIslands) + checked + workScript(forms, options.prerendering === true) : ''
   const lang = localeState()?.locale ?? options.lang ?? DEFAULT_LANG
   // The browser's form check words a refusal as the server does, so a page with a checked form sends the `kay.invalid.*` messages too.
   const words = checked === '' ? islands.messages : new Set([...islands.messages, ...invalidKeys()])
-  const islandData = (hasIslands || (checked !== '' && words.size > 0) ? messagesScript(words, true) : '') + (hasIslands ? outcomeScript(rendering.carried()) + queryScript(rules) : '') + liveScript()
+  const islandData = (hasIslands || (checked !== '' && words.size > 0) ? messagesScript(words, true) : '') + (hasIslands ? outcomeScript(rendering.carried()) + queryScript(rules) : '') + liveText
   const written = `${htmlOpen(lang, head.root)}<head>${headStart(head)}${stylesheets(client, styled)}${head.html}${scripts}${islandData}${kayMetas(options, hasIslands)}${speculationRules(options.prefetch, options.base)}${client.navigation === true && !shipsEntry ? historyScript : ''}${options.offline ? registerScript(options.base ?? '') : ''}${options.dev ? devScripts(client) + (options.prerendering ? '' : requestBlock(files, rendering, options.base ?? '')) : ''}</head><body>${body}`
   const start = marks === undefined ? written : placeFieldMarks(written, marks)
 

@@ -25,6 +25,8 @@ export type Invalidation = { keys: string[] } | { pages: string[] }
 export interface CacheOptions {
   // Keeps the value across restarts, and for every process sharing the store; the value must survive devalue, as session data does.
   store?: CacheStore | undefined
+  // Every open page that read the value follows it: once an `invalidate` drops the key, or a key it was built from, the page shows what the loads give now. Needs the key read while a page renders, in its server fence or a layout's; a static export of such a page fails.
+  live?: boolean | undefined
 }
 
 interface Entry {
@@ -49,6 +51,7 @@ const pageListeners = new Set<(paths: string[]) => void>()
 // What learns of the keys a page render reads, and of the keys an invalidation drops: the server, to refresh the prerendered pages built from them.
 let tracker: Tracker | undefined
 let readListener: ((key: string) => void) | undefined
+let liveListener: ((key: string) => void) | undefined
 const keyListeners = new Set<(matches: (key: string) => boolean) => string[]>()
 
 // Stands for every key, in the reads of a render or a load that read more than the server tracks: any invalidation reaches it.
@@ -66,6 +69,9 @@ export async function cached<T, const Ttl extends Duration = Duration>(key: stri
   const seconds = durationSeconds(ttl, `cached('${key}')'s ttl`)
 
   noteRead(key)
+
+  if (options.live)
+    liveListener?.(key)
 
   // A visitor in preview mode sees what the load gives now, which no other visitor gets.
   if (previewing())
@@ -138,6 +144,11 @@ async function trackedLoad<T>(load: () => T | Promise<T>): Promise<{ result: T, 
 
 export function onRead(listener: (key: string) => void): void {
   readListener = listener
+}
+
+// The server hears each key read with `live: true`, to make the page that read it follow the key.
+export function onLiveRead(listener: (key: string) => void): void {
+  liveListener = listener
 }
 
 // Hears each invalidation by what it matches, and gives back the keys it refreshed pages for, which go to the other processes too.

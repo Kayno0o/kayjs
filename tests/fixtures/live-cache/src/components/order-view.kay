@@ -1,0 +1,8 @@
+---
+import { signal } from 'kay'
+
+const { count } = props<{ count: number }>()
+const note = signal('')
+---
+p.orders {count} orders
+input.note(bind:value={note})

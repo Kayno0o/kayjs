@@ -1,0 +1,8 @@
+--- server
+import { cached } from 'kay/cache'
+import { db } from '../../data'
+
+const orders = await cached('orders', '1m', () => db.orders, { live: true })
+---
+p.shell {orders} in the layout
+slot

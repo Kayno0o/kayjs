@@ -1,0 +1,11 @@
+--- server
+import { cached } from 'kay/cache'
+import { db } from '../data'
+import Nav from '../components/nav.kay'
+import OrderView from '../components/order-view.kay'
+
+const orders = await cached('orders', '1m', () => db.orders)
+---
+Nav
+h1 Plain
+OrderView(count={orders})

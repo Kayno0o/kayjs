@@ -71,6 +71,34 @@ A client holds at most 20 live connections, a few tabs, and opens at most 120 a 
 
 <ReadMore href="/llms/api-from-islands#live-values">Proof lifetimes and renewal, reconnect delays, how an island's imports are followed and the exact limits are in the full API routes reference.</ReadMore>
 
+### Data from the cache
+
+Data you load with `cached` can follow too. Add `live: true`, and every open page that read it shows it again after an `invalidate`.
+
+```kay
+--- server
+import { cached } from 'kay/cache'
+import { listOrders } from '../data'
+
+const orders = await cached('orders', '1m', listOrders, { live: true })
+---
+OrderList(orders={orders})
+```
+
+```ts
+import { invalidate } from 'kay/cache'
+
+invalidate('orders')
+```
+
+You write no route, socket or island code. The server only tells each tab that `orders` changed. The tab then loads the page again, as `refresh()` does, so each visitor gets what they may see, and the page keeps its scroll, its focus and every island whose props did not change. Give an island `persist` to keep its state while its props change.
+
+A tab you cannot see waits and loads the page when you come back. An `invalidate` made while the connection was down is not lost: the tab catches up when it reconnects. Processes sharing a `sqliteCache` follow each other's `invalidate`.
+
+Read the value in the page's server fence or a layout's. A page that follows a value is rendered for each request, so a static export of it fails. A value that only expires by its `ttl` is not pushed: call `invalidate` when it changes.
+
+<ReadMore href="/llms/api-from-islands#following-cached-values">The proof, the first event after a reconnect, refresh timing and the limits are in the full API routes reference.</ReadMore>
+
 ## Reading a route in an island
 
 An island imports an API module and reads its GET routes with `resource`. The route's types carry over, and only the mount reaches the browser, never the module's code.

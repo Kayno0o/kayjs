@@ -24,6 +24,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - The dev tool's filters update a group's count, Head's hreflang alternates have a copy button, and a copy's outcome is announced to a screen reader ([dev server](dev-server.md)).
 - A stream an action answers with to a leaving row's handler or a `listen` callback closes with its island too ([actions from islands](api-from-islands.md)).
 - A streamed `await` part's island cleans up still in the page ([Streaming](rendering.md#streaming)).
+- `cached(key, ttl, load, { live: true })` has every open page that read the key show it afresh when `invalidate` drops it, with no socket or polling ([live data](api-from-islands.md#following-cached-values)).
 
 ## 1.52.1
 

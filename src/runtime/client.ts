@@ -32,6 +32,9 @@ const started = new WeakSet<HTMLElement>()
 const disposers = new WeakMap<Node, () => void>()
 // Where the browser sends the errors it meets, for the server's `onError`.
 const ERROR_URL = '/_kay/error'
+const CACHE_SCRIPT = 'script[data-kay-cache]'
+// Whether a page carried cached values to follow, so the page swapped in after it lets go of them.
+let following = false
 
 // Defined by `kay build --static`, whose host has no server to take the reports. Tested where it is read, not through a constant, so the bundler drops the code sending them.
 declare const KAY_STATIC_EXPORT: true | undefined
@@ -95,6 +98,12 @@ async function post(body: string): Promise<void> {
 // Whether the tab already queued what it does about a deploy.
 let warming = false
 
+// Loads the code that keeps the cached values the page read with `live: true` up to date, only for a page that carries some.
+async function followCaches(): Promise<void> {
+  following = true
+  ;(await import('./live-cache')).followCaches()
+}
+
 // Hydrates every island the server rendered, loading each component's chunk on demand; resolves once the eager ones are done.
 // Running it again over the same root leaves the islands it already took alone.
 export async function hydrateIslands(registry: IslandRegistry, root: ParentNode = document): Promise<void> {
@@ -104,6 +113,9 @@ export async function hydrateIslands(registry: IslandRegistry, root: ParentNode 
     warming = true
     whenIdle(warm)
   }
+
+  if (following || document.querySelector(CACHE_SCRIPT))
+    void followCaches()
 
   for (const element of root.querySelectorAll<HTMLElement>(SERVER_ISLAND)) {
     if (started.has(element))

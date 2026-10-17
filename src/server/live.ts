@@ -2,7 +2,10 @@ import type { Elysia } from 'elysia'
 import type { LiveConfig } from '../config'
 import type { LivePage, LiveRequest, LiveUpdate } from '../runtime/live-value'
 import type { ServerScope } from '../runtime/reactive'
-import { checkLiveWrites, LIVE_ROUTE, liveSlot, PROOF_LIFETIME_MS, slotValue, watchSlot } from '../runtime/live-value'
+import { AsyncLocalStorage } from 'node:async_hooks'
+import { onKeysInvalidated, onLiveRead } from '../runtime/cache'
+import { CACHE_LIVE_ID } from '../runtime/cache-live-id'
+import { checkLiveWrites, live, LIVE_ROUTE, liveSlot, PROOF_LIFETIME_MS, slotValue, watchSlot } from '../runtime/live-value'
 import { currentServerScope } from '../runtime/reactive'
 import { encodeValue, unsendable } from '../runtime/wire'
 import { isCrossSite } from './actions'
@@ -16,13 +19,73 @@ import { signedText, signText } from './stamp'
 const PROOF = 'live'
 
 // What a page carrying live values holds, which a prerendered file cannot: the values and their proof are per request.
-export const LIVE_MARK = '<script type="application/json" data-kay-live>'
+export const LIVE_MARK = '<script type="application/json" data-kay-live'
+// Added to the script of a page that follows cached values, which the entry script looks for.
+export const CACHE_MARK = ' data-kay-cache'
 const MAX_REQUEST_BYTES = 64 * 1024
 // The keys one connection watches, and the length of a key.
 const MAX_WATCHED = 500
 const MAX_KEY_LENGTH = 256
 const MINUTE_MS = 60_000
 const LIMIT = 'kay:live'
+
+const MAX_CACHE_KEYS = 200
+// How many keys read with `live: true` are remembered for their last invalidation.
+const MAX_STAMPED = 10_000
+
+interface CacheReads {
+  // The time the render read each key it follows.
+  at: Map<string, number>
+  sent: Set<string>
+}
+
+const cacheReads = new AsyncLocalStorage<CacheReads>()
+const stamped = new Set<string>()
+// The last invalidation time of each key a page followed, which a connection sends first: the declaration gives 0 to a key never invalidated.
+const stamps = (live as (initial: (key: string) => number, id: string, name: string) => { set: (key: string, value: number) => void })((): number => 0, CACHE_LIVE_ID, 'cache')
+
+// Runs the render of a request, loads included, so the cached values it reads with `live: true` are the page's to follow.
+export function inLiveReads<T>(run: () => T): T {
+  return cacheReads.run({ at: new Map(), sent: new Set() }, run)
+}
+
+onLiveRead((key) => {
+  const reads = cacheReads.getStore()
+
+  if (reads === undefined || reads.at.has(key))
+    return
+
+  if (key.length > MAX_KEY_LENGTH || reads.at.size >= MAX_CACHE_KEYS)
+    throw new RangeError(`kay: cached('${key.slice(0, 40)}...') with live: true: a key is at most ${MAX_KEY_LENGTH} characters and a page follows at most ${MAX_CACHE_KEYS} keys`)
+
+  reads.at.set(key, Date.now())
+
+  if (!stamped.has(key)) {
+    stamped.add(key)
+
+    for (const old of stamped) {
+      if (stamped.size <= MAX_STAMPED)
+        break
+
+      stamped.delete(old)
+    }
+  }
+})
+
+// An invalidation, this process's or another's, tells the pages following what it dropped: each key gets the time, which only grows.
+onKeysInvalidated((matches) => {
+  const slot = liveSlot(CACHE_LIVE_ID)
+
+  if (slot === undefined)
+    return []
+
+  for (const key of stamped) {
+    if (matches(key))
+      stamps.set(key, Math.max(Date.now(), (slotValue(slot, key) as number) + 1))
+  }
+
+  return []
+})
 
 // A clock a little ahead of the server's still dates a proof the server made.
 const SKEW_MS = 5000
@@ -54,25 +117,26 @@ function checkSendable(label: string, value: unknown): void {
   }
 }
 
-// The script a page carries for the live values its render read since the last one: their ids with the proof of them, and each value as it rendered, for the islands to hydrate with.
+// The script a page carries for the live values its render read since the last one, and the cached values it follows: their ids with the proof of them, and each value as it rendered, for the islands to hydrate with.
 export function liveScript(scope: ServerScope | undefined = currentServerScope()): string {
-  const reads = scope?.live
+  const fresh = [...scope?.live?.values() ?? []].filter(read => !read.sent)
+  const cache = cacheReads.getStore()
+  const following = cache === undefined ? [] : [...cache.at].filter(([key]) => !cache.sent.has(key))
 
-  if (reads === undefined)
-    return ''
-
-  const fresh = [...reads.values()].filter(read => !read.sent)
-
-  if (fresh.length === 0)
+  if (fresh.length === 0 && following.length === 0)
     return ''
 
   for (const read of fresh)
     read.sent = true
 
-  const at = Date.now()
-  const page: LivePage = { at, sig: proofOf(fresh.map(read => [read.id, read.key]), at), values: fresh.map(read => [read.id, read.key, read.value]) }
+  for (const [key] of following)
+    cache!.sent.add(key)
 
-  return `${LIVE_MARK}${encodeValue(page).replaceAll('<', '\\u003c')}</script>`
+  const at = Date.now()
+  const values: LivePage['values'] = [...fresh.map(read => [read.id, read.key, read.value] as LivePage['values'][number]), ...following.map(([key, read]) => [CACHE_LIVE_ID, key, read] as LivePage['values'][number])]
+  const page: LivePage = { at, sig: proofOf(values.map(([id, key]) => [id, key]), at), values }
+
+  return `${LIVE_MARK}${following.length > 0 ? CACHE_MARK : ''}>${encodeValue(page).replaceAll('<', '\\u003c')}</script>`
 }
 
 interface Watched {

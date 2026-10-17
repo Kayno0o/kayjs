@@ -1,7 +1,7 @@
 import type { LivePage, LiveRequest, LiveUpdate } from '../src/runtime/live-value'
 import { decodeServerValue } from '../src/runtime/wire'
 
-const SCRIPT = /<script type="application\/json" data-kay-live>([^<]*)<\/script>/g
+const SCRIPT = /<script type="application\/json" data-kay-live[^>]*>([^<]*)<\/script>/g
 
 export const JSON_POST = { method: 'POST', headers: { 'content-type': 'application/json' } }
 

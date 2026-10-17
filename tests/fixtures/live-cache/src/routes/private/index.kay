@@ -1,0 +1,8 @@
+--- server
+import { cached } from 'kay/cache'
+import { db } from '../../data'
+
+const secret = await cached('secret', '1m', () => db.secret, { live: true })
+---
+h1 Private
+p.secret {secret}

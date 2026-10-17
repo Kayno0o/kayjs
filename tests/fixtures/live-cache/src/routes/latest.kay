@@ -1,0 +1,11 @@
+--- server
+import { cached } from 'kay/cache'
+import { db } from '../data'
+import Nav from '../components/nav.kay'
+
+const news = () => cached('news', '1m', () => [...db.news])
+const latest = await cached('latest', '1m', async () => (await news()).at(-1), { live: true })
+---
+Nav
+h1 Latest
+p.latest {latest}
