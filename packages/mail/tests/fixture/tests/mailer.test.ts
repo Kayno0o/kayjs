@@ -82,6 +82,16 @@ describe('rendering', () => {
     await expect(mail.render({ to: 'ada@example.com', subject: 'Hallo', view: Hello, lang: 'de' })).rejects.toThrow('none of the site\'s locales')
   })
 
+  it('renders in the mailer\'s lang when the message names none, the html lang being the locale rendered', async () => {
+    const inherited = await mail.render({ to: 'ada@example.com', subject: 'Salut', view: Hello })
+    const overridden = await mail.render({ to: 'ada@example.com', subject: 'Hi', view: Hello, lang: 'en' })
+
+    expect(inherited.text).toBe('Bonjour')
+    expect(inherited.html).toContain('<html lang="fr"')
+    expect(overridden.text).toBe('Hello')
+    expect(overridden.html).toContain('<html lang="en"')
+  })
+
   it('offers one-click unsubscribe through the headers RFC 8058 names, refusing a URL that is not https', async () => {
     const single = await mail.render({ to: 'ada@example.com', subject: 'News', text: 'Hi', unsubscribe: 'https://fixture.test/unsubscribe?u=1&t=<x>' })
     const both = await mail.render({ to: 'ada@example.com', subject: 'News', text: 'Hi', unsubscribe: { url: 'https://fixture.test/u', address: 'unsubscribe@fixture.test' } })

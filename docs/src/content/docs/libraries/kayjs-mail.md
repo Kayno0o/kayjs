@@ -174,13 +174,13 @@ await mail.enqueue({
 
 ### The recipient's language
 
-A message's `lang` is the `<html lang>` of the mail and the locale its component renders in. `t()` and the formatters from `kay/i18n` then read the recipient's language, not the site's.
+A message's `lang`, else the mailer's, is the `<html lang>` of the mail and the locale its component renders in. `t()` and the formatters from `kay/i18n` then read the recipient's language, not the site's.
 
 ```ts
 await mail.enqueue({ to: user.email, subject: 'Bienvenue', view: Welcome, props: { name }, lang: user.locale })
 ```
 
-`lang` must be one of the site's locales. Without it, the component renders in the site's default locale, or the request's.
+`lang` must be one of the site's locales. Without one on the message or the mailer, the component renders in the site's default locale, or the request's, and the `<html lang>` says that locale.
 
 ### Plain text
 

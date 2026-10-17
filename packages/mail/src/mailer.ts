@@ -4,6 +4,7 @@ import type { Address, Delivery, Envelope, Mail, Message, Transport } from './ty
 import process from 'node:process'
 import { Elysia } from 'elysia'
 import { s } from 'kay'
+import { locale } from 'kay/i18n'
 import { escapeHtml as escape, underKayDev } from 'kay/library'
 import { defineEnv, queue, renderToString } from 'kay/server'
 import parseAddresses from 'nodemailer/lib/addressparser'
@@ -51,7 +52,7 @@ export interface MailerOptions {
   to?: Address | Address[] | undefined
   // Where mails go: the outbox in development and under `bun test`, else SMTP configured from the environment.
   transport?: Transport | undefined
-  // The `lang` of the html document a mail's markup is wrapped in. `en` by default.
+  // The language mails are written in unless one names its own: the locale their component renders `t()` in, and the `<html lang>` of the document. The site's default locale (the request's, while one runs) when left out.
   lang?: string | undefined
   // The queue `enqueue` hands mails to, `mail` unless named, retried as kay's queues are.
   queue?: QueueOptions<Mail> & { name?: string | undefined } | undefined
@@ -282,7 +283,6 @@ export function mailExtension(from: string | (() => Promise<Mailer>)): KayExtens
 
 // Sends mails written as `.kay` components, html or text: over SMTP in production, to the outbox in development and tests. Using it in the server runs the queue `enqueue` fills, and under `kay dev` lists the outbox at `/_kay/mail`.
 export function mailer(options: MailerOptions = {}): Mailer {
-  const lang = options.lang ?? 'en'
   const whom = (addresses: string[]): string => options.logRecipients ? addresses.join(', ') : counted(addresses)
   const configured = options.transport === undefined && delivering() === 'smtp' ? fromEnvironment(options.from, options.fromName, options.optional === true) : undefined
   const transport = options.transport ?? configured?.transport ?? outbox
@@ -330,8 +330,11 @@ export function mailer(options: MailerOptions = {}): Mailer {
     }
 
     const unsubscribe = message.unsubscribe === undefined ? {} : unsubscribeHeaders(message.unsubscribe, message.subject)
-    const markup = message.view ? await renderToString(message.view, ...[message.props, message.lang === undefined ? undefined : { locale: message.lang }] as never) : message.html
-    const html = markup === undefined ? undefined : asDocument(markup, message.subject, message.lang ?? lang)
+    const chosen = message.lang ?? options.lang
+    const markup = message.view ? await renderToString(message.view, ...[message.props, chosen === undefined ? undefined : { locale: chosen }] as never) : message.html
+    // With no language chosen the component renders in the site's default locale, or the request's, which the html's `lang` reads from a probe rendered the same way.
+    const rendered = chosen ?? (message.view && markup !== undefined ? await renderToString(() => locale() as never) : 'en')
+    const html = markup === undefined ? undefined : asDocument(markup, message.subject, rendered)
 
     return {
       from: from ?? sender(),
