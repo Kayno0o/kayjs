@@ -3,25 +3,28 @@ import type { Locals } from '../runtime'
 import type { ActionTool } from '../runtime/action'
 import type { ActionOptions } from './actions'
 import type { ApiModule } from './api-modules'
-import type { BodyLimit } from './body'
+import type { BodyLimit, RouteBodyLimit } from './body'
 import type { CorsOptions, CorsRule } from './cors'
 import type { LoadedGuard } from './guards'
 import type { MountedApi } from './openapi'
+import type { ApiRateLimit } from './protection'
 import type { Span } from './trace'
 import { Cookie, Elysia, ElysiaCustomStatusResponse, ElysiaFile } from 'elysia'
 import { KayError } from '../compiler/errors'
 import { TRAILING_SLASH } from '../runtime/base'
 import { API_MOUNT } from '../runtime/live'
-import { admitCrossSite, crossSiteRefused, crossSiteResponse, guardsFirst, inLocale, passGuards } from './actions'
+import { admitCrossSite, contextLocale, crossSiteRefused, crossSiteResponse, guardsFirst, inLocale, passGuards } from './actions'
 import { importModule } from './bundle'
+import { cookieJar } from './cookies'
 import { corsAdmits, corsResponse, corsRule, dropOwnGrant, grantedByKay, preflight, varyByOrigin, withCors, withoutOwnGrant } from './cors'
 import { streamReporters } from './event-stream'
 import { loadGuard, requiredGuards } from './guards'
 import { answeringRequest, statusOf } from './log'
-import { requestId } from './protection'
+import { apiLimitWait, checkApiLimit, requestId } from './protection'
 import { sharedContext } from './render'
 import { reportServerError } from './report'
 import { requestUrl } from './request-url'
+import { apiRoutePath, withoutSlash } from './routes'
 import { carriedNames, carryContext } from './security'
 import { answered, failed, SERVER_SPAN, startSpan } from './trace'
 
@@ -30,8 +33,10 @@ const STREAMED = ['next', 'then', 'toResponse']
 const TEXT = { 'content-type': 'text/plain; charset=utf-8' }
 // Where `api({ bodyLimit })` keeps its limit on the instance it makes.
 const BODY_LIMIT = Symbol.for('kay.bodyLimit')
-// Where `api({ cors })` keeps the origins it lets in.
+// Where `api({ cors })` keeps the origins it lets in, or `false` for a module that lets none in.
 const CORS = Symbol.for('kay.cors')
+// Where `api({ rateLimit })` keeps the limits of the module.
+const RATE_LIMIT = Symbol.for('kay.rateLimit')
 
 // The requests the guards of their module let through, whose later errors are no refused input.
 const admitted = new WeakSet<Request>()
@@ -44,9 +49,12 @@ const owners = new WeakMap<Request, object>()
 
 // Mounts each module's default export, an Elysia instance, under its path: its guards run first, then a websocket upgrade or an unsafe request from another site is refused, unless the module's `cors` lets that site in.
 // Gives back the body limit of each module by the path it is mounted at, and the modules as mounted.
-export async function serveApi(app: Elysia, modules: ApiModule[], options: ActionOptions): Promise<{ limits: Map<string, BodyLimit>, mounted: MountedApi[] }> {
+export async function serveApi(app: Elysia, modules: ApiModule[], options: ActionOptions): Promise<{ limits: Map<string, BodyLimit>, routeLimits: RouteBodyLimit[], mounted: MountedApi[] }> {
   const limits = new Map<string, BodyLimit>()
+  const routeLimits: RouteBodyLimit[] = []
   const mounted: MountedApi[] = []
+  // The app's `cors`, the rule of every module that sets none.
+  const appCors = options.cors === undefined ? undefined : corsRule(options.cors)
 
   // Global: a group's own afterResponse hook never runs once the app holds a global one, as the request log does.
   app.onAfterResponse({ as: 'global' }, ({ request, set, responseValue }) => {
@@ -68,11 +76,29 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
 
     Object.defineProperty(instance, API_MOUNT, { value: module.mount, configurable: true })
     mounted.push({ ...module, instance })
-    const cors = (instance as { [CORS]?: CorsRule })[CORS]
+    const own = (instance as { [CORS]?: CorsRule | false })[CORS]
+    const cors = own === false ? undefined : own ?? appCors
 
     const bytes = (instance as { [BODY_LIMIT]?: number | (() => number) })[BODY_LIMIT]
+    const refuse: BodyLimit['refuse'] = cors ? request => corsResponse(cors, request, tooLarge()) : tooLarge
 
-    limits.set(module.mount, { bytes: typeof bytes === 'function' ? bytes() : bytes, refuse: cors ? request => corsResponse(cors, request, tooLarge()) : tooLarge })
+    limits.set(module.mount, { bytes: typeof bytes === 'function' ? bytes() : bytes, refuse })
+
+    const moduleLimits = rateLimitsOf((instance as { [RATE_LIMIT]?: ApiRateLimit | ApiRateLimit[] })[RATE_LIMIT], module.mount)
+    const routeRates = new Map<string, { name: string, limit: ApiRateLimit }[]>()
+
+    // What a route sets for itself in its `detail`, by the method and path it answers.
+    for (const route of instance.routes) {
+      const detail = (route.hooks as { detail?: { bodyLimit?: number, rateLimit?: ApiRateLimit | ApiRateLimit[] } } | undefined)?.detail
+      const method = route.method.toUpperCase()
+      const path = withoutSlash(apiRoutePath(module.mount, route.path))
+
+      if (detail?.bodyLimit !== undefined)
+        routeLimits.push({ method, path, limit: { bytes: detail.bodyLimit, refuse } })
+
+      if (detail?.rateLimit !== undefined)
+        routeRates.set(`${method} ${path}`, rateLimitsOf(detail.rateLimit, `${method} ${path}`))
+    }
 
     const guards = requiredGuards(await Promise.all(module.guards.map(async ({ file }) => loadGuard({ file, special: {} }))), module, {}, options.requireGuards)
     const methods = [...new Set(instance.routes.map(route => route.method.toUpperCase()).filter(method => method !== 'OPTIONS' && method !== 'WS'))]
@@ -102,6 +128,26 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
             return crossSiteRefused(context.request) ? crossSiteResponse(context.request, 'request') : undefined
 
           return answeringRequest(context.request, async () => inLocale(context.request, options, async () => admit(guards, sharedContext(context.request, () => ({ ...context })), options, cors)))
+        })
+        // After the guards, so a caller they refuse costs no allowance and a `key` reads what they set up.
+        .onBeforeHandle(async (context) => {
+          const route = withoutSlash(context.route)
+          const limits = [...moduleLimits, ...routeRates.get(`${context.request.method} ${route}`) ?? routeRates.get(`${context.request.method === 'HEAD' ? 'GET' : 'ALL'} ${route}`) ?? routeRates.get(`ALL ${route}`) ?? []]
+
+          if (limits.length === 0)
+            return undefined
+
+          const request = context.request
+          const wait = await answeringRequest(request, async () => inLocale(request, options, async () => apiLimitWait(limits, request, context.server, () => ({
+            request,
+            locale: contextLocale(options),
+            get cookies() {
+              return cookieJar(request).cookies
+            },
+            locals: { ...context } as unknown as Locals,
+          }))))
+
+          return wait === undefined ? undefined : tooManyRequests(wait)
         })
         // Elysia runs the `mapResponse` of every module registered before the one matched, so only the matched module's, which knows its cors rule, acts.
         .mapResponse(({ request, responseValue, set }) => {
@@ -160,7 +206,7 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
     })
   }
 
-  return { limits, mounted }
+  return { limits, routeLimits, mounted }
 }
 
 const answeredBefore = new WeakSet<Response>()
@@ -308,6 +354,21 @@ function holdsBigint(value: unknown, seen = new WeakSet<object>()): boolean {
   return Object.values(value).some(item => holdsBigint(item, seen))
 }
 
+// The limits of a module or a route, each counted under its own name: the first under the place's, the others under their place in the list.
+function rateLimitsOf(given: ApiRateLimit | ApiRateLimit[] | undefined, place: string): { name: string, limit: ApiRateLimit }[] {
+  return [given ?? []].flat().map((limit, index) => {
+    const name = index === 0 ? place : `${place}#${index}`
+
+    checkApiLimit(place, limit)
+
+    return { name, limit }
+  })
+}
+
+function tooManyRequests(wait: number): Response {
+  return new Response(`Too many requests; try again in ${wait} s`, { status: 429, headers: { ...TEXT, 'retry-after': String(wait) } })
+}
+
 function tooLarge(): Response {
   return new Response('Request body too large', { status: 413, headers: TEXT })
 }
@@ -358,6 +419,10 @@ async function admit(guards: LoadedGuard[], context: { request: Request, params?
 
 declare module 'elysia' {
   interface DocumentDecoration {
+    // The most bytes a request to this route may send, in place of the module's and the app's `bodyLimit`; a bigger one answers 413 before it is read.
+    bodyLimit?: number | undefined
+    // At most `max` requests to this route from one client, or from whatever `key` names, every `window`; past that it answers 429 with `Retry-After`. Counted after the module's guards, beside the module's own `rateLimit`.
+    rateLimit?: ApiRateLimit | ApiRateLimit[] | undefined
     // Offers the route to agents as an MCP tool when `mcp` is set in kay.config.ts: `true`, its description, or `{ name, description }`, as an action's `tool` is. A route without it is in the OpenAPI document and never offered.
     tool?: boolean | string | ActionTool | undefined
   }
@@ -370,8 +435,10 @@ type Empty = Record<never, never>
 export interface ApiOptions {
   // The most bytes a request to the module's routes may send, in place of the app's `bodyLimit`; a function is read once the server mounts the module, after the config's extensions ran.
   bodyLimit?: number | (() => number) | undefined
-  // Lets other sites' pages call the module's routes from the browser: `cors: { origins: ['https://app.example.com'], credentials: true }`.
-  cors?: CorsOptions | undefined
+  // Lets other sites' pages call the module's routes from the browser: `cors: { origins: ['https://app.example.com'], credentials: true }`. `false` keeps the module to its own site where the app's `cors` in kay.config.ts opens the others.
+  cors?: CorsOptions | false | undefined
+  // At most `max` requests to any route of the module from one client, or from whatever `key` names, every `window`; past that they answer 429 with `Retry-After`. Counted after the module's guards.
+  rateLimit?: ApiRateLimit | ApiRateLimit[] | undefined
   // Runs none of the guards above the module, as a page's `guards: false` does; read from the `api({ guards: false })` call as written.
   guards?: false | undefined
 }
@@ -384,7 +451,10 @@ export function api(options: ApiOptions = {}): Elysia<'', { decorator: Empty, st
     Object.defineProperty(instance, BODY_LIMIT, { value: options.bodyLimit })
 
   if (options.cors !== undefined)
-    Object.defineProperty(instance, CORS, { value: corsRule(options.cors) })
+    Object.defineProperty(instance, CORS, { value: options.cors === false ? false : corsRule(options.cors) })
+
+  if (options.rateLimit !== undefined)
+    Object.defineProperty(instance, RATE_LIMIT, { value: options.rateLimit })
 
   return instance as unknown as Elysia<'', { decorator: Empty, store: Empty, derive: Empty, resolve: ApiLocals }>
 }

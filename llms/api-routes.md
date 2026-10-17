@@ -163,6 +163,17 @@ export default api()
 - An origin is a scheme and a host, a port if any, `capacitor://localhost` for an app's web view included.
 - The module's rule alone grants: `Access-Control-Allow-Origin`, `-Allow-Credentials` and `-Expose-Headers` a route sets itself, on `set.headers` or on a `Response` it returns, a `fetch()` result passed on included, are replaced by the rule's, or dropped for an origin it does not list. A route needing another rule goes in a module of its own.
 - A module without `cors` answers no preflight and keeps refusing.
+- `cors` in kay.config.ts takes the same options and is the rule of every module that sets none; a module setting its own keeps it, and `api({ cors: false })` keeps a module to its own site.
+
+### Limits
+
+- `api({ rateLimit: { max: 60, window: '1m' } })` lets one client send `max` requests to the module's routes every `window`, then answers 429 with `Retry-After` and `Too many requests; try again in N s`.
+- A route sets its own in its `detail`, `.post('/send', send, { detail: { rateLimit: { max: 5, window: '1m' }, bodyLimit: 4096 } })`: counted apart from the module's, which also applies, one limit for every value of a param, a wildcard and an optional segment, and for a route answering every method, `all`, whichever one.
+- `rateLimit` takes a list, `key`, `store` and `window` as an action's does (see [Action protection](action-protection.md#rate-limits)).
+- It counts after the module's guards, so a caller they refuse costs no allowance and `key: ctx => ctx.locals.user?.id` reads what they and `derive` set; `ctx` also holds `request`, `locale`, `cookies` and `client`.
+- A refusal carries the module's `cors` grant, so the calling page reads it.
+- `bodyLimit` in a route's `detail` is the most bytes it may be sent, in place of the module's and the app's; a bigger request answers 413 before it is read.
+- A body limit that is no whole number of bytes from 1, or a `max` that is no whole number from 1, stops the server.
 
 ### OpenAPI
 

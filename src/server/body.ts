@@ -15,9 +15,45 @@ export interface BodyLimit {
   refuse: (request: Request, bytes: number, server: Server | null) => Response | Promise<Response>
 }
 
-// Refuses a request to an action or an API route sending more than its limit, before Elysia reads the body: actions by their path, API modules by the path they are mounted at.
-export function limitBodies(app: Elysia, bytes: number, actions: Map<string, BodyLimit>, mounts: Map<string, BodyLimit>): void {
+// The limit of one API route, by the method and path pattern it answers: `ALL` for a route answering every method.
+export interface RouteBodyLimit {
+  method: string
+  path: string
+  limit: BodyLimit
+}
+
+const SPECIAL = /[.*+?^${}()|[\]\\]/g
+
+// A route path as the router reads it: `:id` is any one segment, `:id?` an optional one and `*` the rest.
+function routeMatcher(path: string): RegExp {
+  const segments = path.split('/').filter(segment => segment !== '').map((segment) => {
+    if (segment === '*')
+      return '(?:/.*)?'
+
+    if (segment.startsWith(':'))
+      return segment.endsWith('?') ? '(?:/[^/]+)?' : '/[^/]+'
+
+    return `/${segment.replace(SPECIAL, '\\$&')}`
+  })
+
+  return new RegExp(`^${segments.join('')}/?$`)
+}
+
+// Fewer params and wildcards first, so `/items/new` wins over `/items/:id`.
+function specificity(path: string): number {
+  return path.split('/').filter(segment => segment.startsWith(':') || segment === '*').length
+}
+
+// Refuses a request to an action or an API route sending more than its limit, before Elysia reads the body: actions by their path, API modules by the path they are mounted at, and the routes of a module that set their own by their pattern.
+export function limitBodies(app: Elysia, bytes: number, actions: Map<string, BodyLimit>, mounts: Map<string, BodyLimit>, routes: RouteBodyLimit[] = []): void {
   checkLimit(bytes, 'bodyLimit')
+
+  const matchers = routes.map(route => ({ ...route, matcher: routeMatcher(route.path) })).sort((a, b) => specificity(a.path) - specificity(b.path))
+
+  for (const { path, method, limit } of routes) {
+    if (limit.bytes !== undefined)
+      checkLimit(limit.bytes, `the bodyLimit of ${method} ${path}`)
+  }
 
   for (const [path, limit] of [...actions, ...mounts]) {
     if (limit.bytes !== undefined)
@@ -33,7 +69,8 @@ export function limitBodies(app: Elysia, bytes: number, actions: Map<string, Bod
 
     // Elysia serves `/path/` as `/path`, so a trailing slash reaches the same route.
     const path = withoutSlash(requestUrl(request).pathname)
-    const limit = actions.get(path) ?? prefixes.find(([mount]) => path === mount || path.startsWith(`${mount}/`))?.[1]
+    const own = matchers.find(route => (route.method === request.method || route.method === 'ALL') && route.matcher.test(path))
+    const limit = own?.limit ?? actions.get(path) ?? prefixes.find(([mount]) => path === mount || path.startsWith(`${mount}/`))?.[1]
     const allowed = limit?.bytes ?? bytes
 
     return limit && await exceeds(request, allowed) ? limit.refuse(request, allowed, server) : undefined

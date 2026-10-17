@@ -2,7 +2,7 @@ import type { Server } from 'bun'
 import type { Elysia, TSchema } from 'elysia'
 import type { BlockList } from 'node:net'
 import type { ProxyConfig } from '../config'
-import type { ActionRateLimit, RateKeyContext, RateLimit, RateStore, RateWindow, ServerAction } from '../runtime/action'
+import type { ActionRateLimit, RateKey, RateKeyContext, RateLimit, RateStore, RateWindow, ServerAction } from '../runtime/action'
 import type { Duration } from '../runtime/duration'
 import { KayError } from '../compiler/errors'
 import { honeypotField, minTimeOf, STAMP_FIELD } from '../runtime/action'
@@ -203,6 +203,37 @@ function actionLimits(action: ServerAction<TSchema, unknown>): ActionLimit[] {
   return limits
 }
 
+// What an API module or route limits its requests by: `max` every `window` from one client, or from whatever `key` names.
+export interface ApiRateLimit extends RateLimit {
+  key?: RateKey | undefined
+}
+
+// The longest wait among the limits a request to an API route is over, counting it against each, or undefined while it is under all; under the key each gives, the client's address else.
+export async function apiLimitWait(limits: { name: string, limit: ApiRateLimit }[], request: Request, server: Server<unknown> | null | undefined, context: () => Omit<RateKeyContext, 'client'>): Promise<number | undefined> {
+  if (limits.length === 0)
+    return undefined
+
+  const client = clientAddress(request, server)
+  let wait: number | undefined
+
+  for (const { name, limit } of limits) {
+    const own = waitFor(await (limit.store ?? memoryOf(name)).hit(await actionKey(name, limit, request, client, context), windowMs(limit)), limit.max)
+
+    if (own !== undefined && (wait === undefined || own > wait))
+      wait = own
+  }
+
+  return wait
+}
+
+// Checks a limit declared on an API module or route, as `rateLimit()` checks its own.
+export function checkApiLimit(name: string, limit: ApiRateLimit): void {
+  if (!Number.isInteger(limit.max) || limit.max < 1)
+    throw new KayError('config-invalid', `kay: the rateLimit of ${name} has a max of ${limit.max}; it takes a whole number of at least 1`)
+
+  durationSeconds(limit.window, `the rateLimit window of ${name}`)
+}
+
 // Seconds until the next attempt may go through, or undefined while under the limit.
 function waitFor(window: { count: number, resetAt: number }, max: number): number | undefined {
   return window.count > max ? Math.ceil((window.resetAt - Date.now()) / 1000) : undefined
@@ -327,11 +358,11 @@ export async function countSucceeded(action: ServerAction<TSchema, unknown>, req
 // The most characters of a custom key kept as it is, a longer one is hashed: a store keeps a key whole.
 const MAX_KEY_LENGTH = 256
 // The key each limit counted a request under, so the count after the handler follows the one before it, whatever the handler changed.
-const countedKeys = new WeakMap<Request, Map<ActionRateLimit, string>>()
-const warnedKeys = new WeakSet<ActionRateLimit>()
+const countedKeys = new WeakMap<Request, Map<object, string>>()
+const warnedKeys = new WeakSet<object>()
 
 // What the limit counts the request under: its `key`'s text, else the client's address; an empty text, one that is not a text or a key that throws counts the address, so the limit stays.
-async function actionKey(name: string, limit: ActionRateLimit, request: Request, client: string, context: (() => Omit<RateKeyContext, 'client'>) | undefined): Promise<string> {
+async function actionKey(name: string, limit: { key?: RateKey | undefined }, request: Request, client: string, context: (() => Omit<RateKeyContext, 'client'>) | undefined): Promise<string> {
   let kept = countedKeys.get(request)
   const known = kept?.get(limit)
 
@@ -363,7 +394,7 @@ async function actionKey(name: string, limit: ActionRateLimit, request: Request,
   const counted = identity === undefined ? limitKey(name, client) : `${name}\nkey:${identity.length > MAX_KEY_LENGTH ? new Bun.CryptoHasher('sha256').update(identity).digest('base64url') : identity}`
 
   if (!kept)
-    countedKeys.set(request, kept = new Map<ActionRateLimit, string>())
+    countedKeys.set(request, kept = new Map<object, string>())
 
   kept.set(limit, counted)
 

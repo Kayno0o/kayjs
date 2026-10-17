@@ -238,7 +238,7 @@ export default defineConfig({
 })
 ```
 
-Raise it for one action in its third argument, `{ bodyLimit: 20 * 1024 * 1024 }`, or for an API module with `api({ bodyLimit })`. A form that takes files usually needs this.
+Raise it for one action in its third argument, `{ bodyLimit: 20 * 1024 * 1024 }`, for an API module with `api({ bodyLimit })`, or for one route with `detail: { bodyLimit }`. A form that takes files usually needs this.
 
 A form post goes back to its page with a message, an island's call throws an `ActionError` with status 413, and an API route answers 413. Bun's own cap of 128 MB still holds over any `bodyLimit`.
 
@@ -283,6 +283,8 @@ export default api({
 ```
 
 A module without `cors` refuses every other origin. The module's rule is the only place that grants access.
+
+`cors` in kay.config.ts is the default of every module that sets none, and `api({ cors: false })` opts a module out.
 
 <ReadMore href="/llms/api-routes#cors">Credentials, preflight answers, exposed headers and the wildcard origin.</ReadMore>
 

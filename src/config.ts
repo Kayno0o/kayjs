@@ -8,6 +8,7 @@ import type { HeadTag } from './runtime/head'
 import type { Guard, GuardContext } from './runtime/index'
 import type { Localized } from './runtime/localized'
 import type { JsonLd } from './runtime/seo'
+import type { CorsOptions } from './server/cors'
 import type { EnvSchema } from './server/env'
 import type { Logger } from './server/log'
 import type { OpenApiConfig } from './server/openapi'
@@ -65,6 +66,8 @@ export interface KayConfig {
   bodyLimit?: number | undefined
   // Every page, action, endpoint and API module of the app answers 403 unless a `_guard.ts` covers it or it sets `guards: false`, in its `page` or its `api()` options; `kay check` reports each such route. A library's routes keep the guards it gives them.
   requireGuards?: boolean | undefined
+  // Lets other sites' pages call every API module's routes from the browser, as `api({ cors })` does for one: `cors: { origins: ['https://app.example.com'], credentials: true }`. A module setting its own `cors` keeps it, and `api({ cors: false })` keeps a module to its own site.
+  cors?: CorsOptions | undefined
   // Serves an OpenAPI 3.1 document of the API modules' routes at `/api/openapi.json`, read from their schemas, behind the API directory's own `_guard.ts`; `{ reference: true }` adds a page listing them at `/api/reference`, `{ dev: true }` keeps both to `kay dev`.
   openapi?: boolean | OpenApiConfig | undefined
   // Serves an MCP endpoint at `/mcp` over Streamable HTTP, for an agent to call the app: a tool per API route that sets `tool` in its `detail`, and per action that sets `tool` on its protection. A call runs through the same guards, rate limits and `ctx.locals` as a fetch would.

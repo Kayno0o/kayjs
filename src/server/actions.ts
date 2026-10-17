@@ -7,6 +7,7 @@ import type { ActionContext, RateKeyContext, ServerAction } from '../runtime/act
 import type { Locale } from '../runtime/i18n'
 import type { BodyLimit } from './body'
 import type { CookieJar } from './cookies'
+import type { CorsOptions } from './cors'
 import type { Flash } from './flash'
 import type { LoadedGuard, ServedRoute } from './guards'
 import type { I18n } from './i18n'
@@ -126,6 +127,8 @@ export interface ActionOptions {
   // Where the site is mounted, which the page a refused form post came from is served under.
   base?: string | undefined
   requireGuards?: boolean | undefined
+  // The app's `cors`, the rule of every API module that sets none.
+  cors?: CorsOptions | undefined
 }
 
 export interface RouteMatch {

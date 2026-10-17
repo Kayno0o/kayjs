@@ -82,7 +82,31 @@ Three more keys tune it. `headers` limits the request headers allowed. `expose` 
 
 The module's `cors` is the only place that grants. If a route sets `Access-Control-Allow-Origin`, `Access-Control-Allow-Credentials` or `Access-Control-Expose-Headers` itself, kay replaces them with the module's. It drops them for an origin the module does not list. A route that needs another rule goes in a module of its own.
 
+`cors` in kay.config.ts is the default of every module that sets none, so an app opening its whole API says it once. A module with its own `cors` keeps it, and `api({ cors: false })` keeps a module to its own site.
+
+```ts
+// kay.config.ts
+export default defineConfig({
+  cors: { origins: ['https://shop.example.com'] },
+})
+```
+
 <ReadMore href="/llms/api-routes#cors">The exact rules for origins, preflight answers and a `Response` that carries its own headers are in the full API routes reference.</ReadMore>
+
+## Limits
+
+A module limits how often one client calls it. Past the limit a request answers 429 with `Retry-After`.
+
+```ts
+export default api({ rateLimit: { max: 60, window: '1m' } })
+  .post('/send', send, { detail: { rateLimit: { max: 5, window: '1m' }, bodyLimit: 4096 } })
+```
+
+A route sets its own limit and its own `bodyLimit` in its `detail`. The module's limit applies to it as well.
+
+`key` counts a person instead of an address, as it does for an action. The limit counts after the guards, so a caller they refuse costs no allowance.
+
+<ReadMore href="/llms/api-routes#limits">Lists of limits, shared stores, params and the order they count in.</ReadMore>
 
 ## OpenAPI
 

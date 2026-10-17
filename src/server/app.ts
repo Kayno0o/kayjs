@@ -283,7 +283,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   for (const path of await serveBuildFiles(app, client, { dev: mode.dev, security }))
     filePaths.add(path)
 
-  const actionOptions = { dev: mode.dev, onError: options.onError, i18n: locales, base, requireGuards: options.requireGuards }
+  const actionOptions = { dev: mode.dev, onError: options.onError, i18n: locales, base, requireGuards: options.requireGuards, cors: options.cors }
   const [{ limits: actionLimits, tools: toolActions }, apiModules] = await Promise.all([registerActionRoutes(app, routes, routeMatch(table, matchers, options.trailingSlash), actionOptions), source.api(root, options)])
   const publicServed = claimPublic(served, files)
   const api = await serveApi(app, apiModules, actionOptions)
@@ -323,7 +323,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
     }
   }
 
-  limitBodies(app, options.bodyLimit ?? DEFAULT_BODY_LIMIT, new Map([...actionLimits, ...options.preview ? [[DRAFT_ROUTE, DRAFT_BODY_LIMIT] as const] : [], ...options.mcp === true ? [[MCP_PATH, mcpBodyLimit] as const] : []]), api.limits)
+  limitBodies(app, options.bodyLimit ?? DEFAULT_BODY_LIMIT, new Map([...actionLimits, ...options.preview ? [[DRAFT_ROUTE, DRAFT_BODY_LIMIT] as const] : [], ...options.mcp === true ? [[MCP_PATH, mcpBodyLimit] as const] : []]), api.limits, api.routeLimits)
 
   // The actions that opted in to being tools are in the document beside the routes, and the MCP endpoint reads its tools from it.
   const document = servesOpenApi || options.mcp === true

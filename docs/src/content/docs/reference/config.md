@@ -96,6 +96,7 @@ Every option is optional. The tables give each option's default. The full refere
 | `log` | One line per request, and kay's own messages. On in production as text; `'json'` writes one JSON object each, a function receives each `LogEntry`, and `false` turns the request lines off |
 | `bodyLimit` | The most bytes an action or API request may send, 1 MB by default. A bigger one answers 413. See [The request body limit](/guides/security#the-request-body-limit) |
 | `requireGuards` | `true` makes every page, action, endpoint and API module answer 403 unless a guard covers it or it sets `guards: false`. `kay build --static` refuses to export such a page. A library's routes are left open. See [Sessions and guards](/guides/sessions-and-guards) |
+| `cors` | The origins every API module accepts that sets no `cors` of its own, as `api({ cors })` takes them. `api({ cors: false })` opts a module out. See [Calls from other sites](/guides/api-routes#calls-from-other-sites) |
 | `mcp` | `true` serves an MCP endpoint at `/mcp` for AI agents, with a tool per API route or action that sets `tool`. Off by default. See [API routes](/guides/api-routes#letting-an-agent-call-the-app-over-mcp) |
 | `openapi` | `true` serves an OpenAPI document of the API modules at `/api/openapi.json`. `{ reference: true }` adds a page at `/api/reference`. See [API routes](/guides/api-routes#openapi) |
 | `shutdownTimeout` | How long a stopping server lets open requests finish, as seconds or `'30s'`. 10 seconds by default |
