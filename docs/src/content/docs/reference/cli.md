@@ -24,7 +24,7 @@ This needs Bun to know the registry first, see [Installation](/getting-started/i
 | `kay start [dir]` | Serve the last build as production does |
 | `kay render <url> [dir]` | Print what the server answers for one URL, without starting it on a port |
 | `kay check [dir]` | Type-check the project, `.kay` files included |
-| `kay upgrade [dir]` | Move kay and its libraries to the latest version and rewrite the old forms |
+| `kay upgrade [dir] [--dry-run]` | Move kay and its libraries to the latest version and rewrite the old forms |
 | `kay routes [dir]` | List every route the project serves, and the file serving it |
 | `kay env [dir]` | List the environment variables the project, its libraries and kay declare |
 | `kay i18n missing [locale] [dir]` | List what each locale lacks against the default one |
@@ -322,6 +322,7 @@ The first path is the project when it is a directory holding a `kay.config.ts`, 
 ```sh
 kay upgrade
 kay upgrade ../my-site
+kay upgrade --dry-run
 ```
 
 `kay upgrade` moves `kay` and every `@kaynooo/kayjs-*` library in `package.json` to the latest version, then installs. A range pointing at a path, a workspace or a git source is left as it is.
@@ -329,6 +330,8 @@ kay upgrade ../my-site
 It then runs the kay it installed. Each minor you skipped may have replaced a form with a new one, and each is a lint in the `deprecated` group with a fix. The oldest minor's fixes run first.
 
 A last `kay check --fix` applies any other quick fix and prints what is left for you to change by hand. An app already on the latest version is left alone. If the install fails, `package.json` goes back as it was.
+
+`--dry-run` lists the packages it would move and changes nothing: no write, no install, no rewrite.
 
 What a minor breaks that `kay check` cannot see is in [Upgrading](/guides/upgrading).
 

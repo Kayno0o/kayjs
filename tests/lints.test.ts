@@ -47,6 +47,28 @@ describe('lint levels', () => {
     ])
   })
 
+  it('allows a lint everywhere in the file after a `// kay-allow-file` comment, leaving the other lints and other files alone', () => {
+    const source = '---\nimport { signal } from \'kay\'\n\n// kay-allow-file constant-signal, missing-alt\nconst a = signal(1)\nconst c = signal(3)\n---\nimg(src="/a.png" width="1" height="1")\nimg(src="/b.png" width="1" height="1")\np {a()} {c()}\n'
+
+    expect(lints(source)).toEqual([])
+    expect(lints(source.replace('// kay-allow-file constant-signal, missing-alt', '// kay-allow-file constant-signal'))).toEqual([
+      { code: 'missing-alt', severity: 'error', at: 'img' },
+      { code: 'missing-alt', severity: 'error', at: 'img' },
+    ])
+    expect(lints(source.replace('// kay-allow-file constant-signal, missing-alt', '// kay-allow-file'))).toEqual([
+      { code: 'constant-signal', severity: 'warning', at: 'a' },
+      { code: 'constant-signal', severity: 'warning', at: 'c' },
+      { code: 'missing-alt', severity: 'error', at: 'img' },
+      { code: 'missing-alt', severity: 'error', at: 'img' },
+    ])
+  })
+
+  it('reports a `// kay-allow-file` naming no lint', () => {
+    const diagnostics = compileKay('// kay-allow-file missing-alt, missing-alts\nimg(src="/a.png" width="1" height="1")\n', 'list.kay', { check: true }).diagnostics
+
+    expect(diagnostics.map(d => [d.message, d.code])).toEqual([['Unknown lint `missing-alts`', 'unknown-lint']])
+  })
+
   it('reports a `// kay-allow` naming no lint, listing the ones there are', () => {
     const diagnostics = compileKay('// kay-allow missing-alt, missing-alts\nimg(src="/a.png" width="1" height="1")\n', 'list.kay', { check: true }).diagnostics
 

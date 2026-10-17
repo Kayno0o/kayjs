@@ -62,7 +62,7 @@ kay lint --cache
 - What a page needs to be usable without seeing it:
   - An `img` has `alt` (`alt=""` for decoration) and so has an `input(type="image")` (`missing-alt`).
   - An `iframe` has a `title` (`missing-title`).
-  - An element with `onClick` is one a keyboard reaches, such as a `button` or an `a`, or has a `role` (`unreachable-click`); `// kay-allow unreachable-click` keeps a click the keyboard has another way to, such as a backdrop Escape also closes.
+  - An element with `onClick` is one a keyboard reaches, such as a `button` or an `a`, or has a `role` (`unreachable-click`); `// kay-allow unreachable-click` keeps a click the keyboard has another way to, such as a backdrop Escape also closes, and `// kay-allow-file unreachable-click` does for the whole file.
   - A `button` or a link has text, a value or an `aria-label` to announce, an icon alone not counting (`empty-control`).
   - An `input`, `select`, `textarea`, `meter`, `role="slider"` or `role="meter"` has a `label` around it or pointing at its id, or an `aria-label`, `aria-labelledby` or `title`, a `placeholder` being no label (`missing-label`).
   - A heading follows the one before it by at most a level, each branch of an `if` following the heading before the block (`skipped-heading`).

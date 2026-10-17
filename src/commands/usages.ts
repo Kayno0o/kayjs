@@ -7,7 +7,7 @@ export const USAGES = {
   'start': 'start [dir] [--entry <file>] [--port <port>]',
   'render': 'render <url> [dir] [--entry <file>] [--method <method>] [--body <text>] [--header <name: value>]... [--cookie <name=value>]... [-i|--include]',
   'check': 'check [dir] [paths...] [-p tsconfig.json] [--entry <file>] [--deny-warnings] [--fix] [--only <group>] [--since <minor>] [--format text|github|json] [--watch] [--quiet]',
-  'upgrade': 'upgrade [dir]',
+  'upgrade': 'upgrade [dir] [--dry-run]',
   'routes': 'routes [dir] [--format text|json]',
   'env': 'env [dir] [--format text|json]',
   'explain': 'explain [lint|error|group] [--format text|json]',

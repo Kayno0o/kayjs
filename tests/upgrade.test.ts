@@ -90,6 +90,41 @@ describe('kay upgrade', () => {
     }
   })
 
+  it('lists what it would move on --dry-run, writing, installing and rewriting nothing', async () => {
+    const root = await project()
+    const { deps, calls } = fakes({ '@kaynooo/kayjs': '1.46.0', '@kaynooo/kayjs-ui': '1.46.0' }, ['1.44'])
+    const log = spyOn(console, 'log').mockImplementation(() => undefined)
+
+    try {
+      expect(await upgradeProject(root, deps, { dryRun: true })).toBe(0)
+
+      const printed = log.mock.calls.map(call => String(call[0])).join('\n')
+
+      expect(printed).toContain('@kaynooo/kayjs-ui')
+      expect(printed).toContain('~1.46.0')
+      expect(printed).toContain('kay')
+      expect(await Bun.file(join(root, 'package.json')).text()).toBe(MANIFEST)
+      expect(calls).toEqual({ installs: [], kay: [] })
+    }
+    finally {
+      log.mockRestore()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('says --dry-run has nothing to move for an app on the latest', async () => {
+    const root = await project()
+    const { deps, calls } = fakes({ '@kaynooo/kayjs': '1.40.1', '@kaynooo/kayjs-ui': '1.39.0' })
+
+    try {
+      expect(await quietly(async () => upgradeProject(root, deps, { dryRun: true }))).toBe(0)
+      expect(calls).toEqual({ installs: [], kay: [] })
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('applies the fixes of each minor it crosses in order, then fixes and reports the rest', async () => {
     const root = await project()
     // 1.38 is behind the app, 1.48 ahead of the version it moves to.

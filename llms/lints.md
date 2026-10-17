@@ -78,6 +78,7 @@ kay check --only seo
 - The `deprecated` group holds the old forms a minor replaced, each with a safe fix and the minor it came in (`since`, in `kay explain --format json`): `kay upgrade` moves an app to the latest kay and applies them (see [Commands](check-and-tools.md#check-and-inspect-commands)), and `kay check --fix` any time; `kay check --fix --since 1.46` fixes and reports the ones of that minor alone. A deprecation stays reported for three minors, then goes with its old form.
 - `kay check --only seo` prints one group's lints alone, leaving out the other lints and every problem that is no lint, type errors included: an audit, not a check.
 - `// kay-allow constant-signal` allows a lint on the line it ends, or, alone on its line, on the line after it, in a fence or in the template; it takes several names separated by commas, and one that is no lint is reported.
+- `// kay-allow-file constant-signal, missing-alt` anywhere in a file allows those lints in the whole file; it needs at least one name, and one that is no lint is reported.
 - `kay explain` lists the lints with their group; `kay explain seo` lists a group's; `kay explain positional-key` prints one with an example it reports and the same written right.
 
 | Lint | Default | Group | Reports |

@@ -70,16 +70,17 @@ const registryDeps = registryDepsFor(process.execPath)
 // Moves kay and the kay libraries an app lists to their latest version, installs, then has that kay rewrite the old forms the minors crossed deprecated, one minor at a time, and report what is left to do by hand.
 export const upgrade: Command = {
   usage: USAGES.upgrade,
-  options: {},
+  options: { 'dry-run': { type: 'boolean' } },
   positionals: 1,
-  run: async ({ positionals: [dir] }) => {
+  run: async ({ values, positionals: [dir] }) => {
     const root = projectRoot('upgrade', dir)
 
-    return root === undefined ? 1 : upgradeProject(root, registryDeps)
+    return root === undefined ? 1 : upgradeProject(root, registryDeps, { dryRun: values['dry-run'] === true })
   },
 }
 
-export async function upgradeProject(root: string, deps: UpgradeDeps): Promise<number> {
+// With `dryRun`, lists the packages that would move and touches nothing: no write, no install, no rewrite.
+export async function upgradeProject(root: string, deps: UpgradeDeps, { dryRun = false }: { dryRun?: boolean } = {}): Promise<number> {
   const manifest = join(root, 'package.json')
 
   if (!existsSync(manifest)) {
@@ -150,6 +151,15 @@ export async function upgradeProject(root: string, deps: UpgradeDeps): Promise<n
 
   if (changes.length === 0) {
     done('upgraded', `nothing: kay ${from} is the latest, run \`kay check --fix\` for the rest`)
+
+    return 0
+  }
+
+  if (dryRun) {
+    for (const { name, spec } of changes)
+      done('would move', `${name} to ${spec.slice(spec.lastIndexOf('~'))}`)
+
+    done('dry run', 'nothing written; run `kay upgrade` to install them and rewrite the old forms')
 
     return 0
   }

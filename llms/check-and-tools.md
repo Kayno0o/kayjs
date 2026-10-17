@@ -92,8 +92,9 @@ kay fmt --check
 - `kay i18n missing [locale] [dir] [--format text|json]` and `kay i18n accept <locale> [dir]`:
   - List what each locale lacks against the default one, messages and localized entries; accept a locale's draft messages, deleting their `// draft` comments (see [Locales](locales.md#messages)).
   - `kay i18n` alone lists every `i18n` command, those a library adds included, such as `kay i18n translate <locale> [--dry-run]` of `@kaynooo/kayjs-ai`, which fills the missing messages and entries as drafts.
-- `kay upgrade [dir]`:
+- `kay upgrade [dir] [--dry-run]`:
   - Move the `kay` and `@kaynooo/kayjs-*` ranges of `package.json` that are version ranges of the registry, `npm:@kaynooo/kayjs@~1.45.0` or `~1.45.0` (a path, workspace or git source is left), to `~<latest>` with the registry's answer, install, then run the installed kay's `kay check --fix --since <minor>` once per minor between the version the app was on and the one it moves to, oldest first, listing them from the installed kay's `kay explain deprecated --format json`, then `kay check --fix`, which prints what is left to do by hand and sets the exit code.
+  - `--dry-run` lists the packages it would move and writes, installs and rewrites nothing.
   - An app already on the latest is left as it is, a registry older than the app's range never moves it back, and a failed install puts `package.json` back as it was. A deprecated form is one `deprecated` lint with its `since` minor and a safe fix; a minor's breaking changes carry one when `kay check` can see the old form, see [Checks](checks.md).
 - `kay explain [lint|error|group] [--format text|json]`:
   - List the lints with their groups and default levels and the errors with theirs, or a group's, or print one: a lint with an example it reports and the same written right, an error with where its fix is written.

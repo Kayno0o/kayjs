@@ -500,6 +500,8 @@ export type LintLevels = Partial<Record<LintName | LintGroup, LintLevel>>
 export const LEVELS: ReadonlySet<string> = new Set<LintLevel>(['allow', 'warn', 'deny'])
 
 const ALLOW_COMMENT = /\/\/[ \t]*kay-allow[ \t]+([\w-]+(?:[ \t]*,[ \t]*[\w-]+)*)/g
+// The file-wide form, which allows the lints it names wherever they are reported in the file.
+const ALLOW_FILE_COMMENT = /\/\/[ \t]*kay-allow-file[ \t]+([\w-]+(?:[ \t]*,[ \t]*[\w-]+)*)/g
 const LINT_NAME = /[\w-]+/g
 const MINOR = /^(\d+)\.(\d+)(?:\.\d+)?$/
 const IDENTIFIER = /^[a-z_$][\w$]*$/i
@@ -545,6 +547,12 @@ export function lintLevel(name: LintName, levels: LintLevels = {}, fallback: Lin
 // The level each lint has at an offset of `source`: none where a `// kay-allow` comment allows it, else the config's, else its default.
 export function lintLevels(source: string, levels: LintLevels = {}): (name: LintName, offset: number) => LintLevel {
   const allowed = new Map<number, Set<string>>()
+  const everywhere = new Set<string>()
+
+  for (const comment of source.matchAll(ALLOW_FILE_COMMENT)) {
+    for (const name of comment[1]!.matchAll(LINT_NAME))
+      everywhere.add(name[0])
+  }
 
   for (const comment of source.matchAll(ALLOW_COMMENT)) {
     const { line, column } = positionAt(source, comment.index)
@@ -558,7 +566,7 @@ export function lintLevels(source: string, levels: LintLevels = {}): (name: Lint
     allowed.set(target, names)
   }
 
-  return (name, offset) => allowed.get(positionAt(source, offset).line)?.has(name) ? 'allow' : lintLevel(name, levels)
+  return (name, offset) => everywhere.has(name) || allowed.get(positionAt(source, offset).line)?.has(name) ? 'allow' : lintLevel(name, levels)
 }
 
 // Sets each lint's severity from its level and drops the ones allowed; a `// kay-allow` naming no lint is reported.
@@ -579,7 +587,7 @@ export function applyLints(diagnostics: Diagnostic[], source: string, levels: Li
 function unknownLints(source: string): Diagnostic[] {
   const unknown: Diagnostic[] = []
 
-  for (const comment of source.matchAll(ALLOW_COMMENT)) {
+  for (const comment of [...source.matchAll(ALLOW_COMMENT), ...source.matchAll(ALLOW_FILE_COMMENT)]) {
     const listStart = comment.index + comment[0].length - comment[1]!.length
 
     for (const name of comment[1]!.matchAll(LINT_NAME)) {
