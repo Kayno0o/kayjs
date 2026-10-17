@@ -6,7 +6,7 @@ import { describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
 import { pages } from '../src/server'
 import { devNotFound, devRedirect } from '../src/server/dev-not-found'
-import { countedPath, countMissing, missingPaths, missingStore, pageRequested, referrerHost, suggester } from '../src/server/not-found'
+import { answeredBy, countedPath, countMissing, knowRedirects, missingPaths, missingStore, pageRequested, referrerHost, suggester, unansweredPaths } from '../src/server/not-found'
 import { answered, withRedirect } from '../src/server/not-found-config'
 import { scratchDir } from './scratch'
 
@@ -200,6 +200,43 @@ describe('missingStore', () => {
     store.forget('/a')
     expect(store.list()).toEqual([])
     store.close()
+  })
+})
+
+describe('answeredBy', () => {
+  it('reads a :param as a segment and a final * as the rest, an exact path as itself alone', () => {
+    const answered = answeredBy(['/old', '/blog/:slug', '/docs/*', '/a.b'])
+
+    expect(['/old', '/blog/x', '/docs', '/docs/a/b', '/a.b'].map(answered)).toEqual([true, true, true, true, true])
+    expect(['/old/x', '/blog', '/blog/x/y', '/docsx', '/axb', '/'].map(answered)).toEqual([false, false, false, false, false, false])
+    expect(answeredBy([])('/old')).toBe(false)
+  })
+})
+
+describe('unansweredPaths', () => {
+  it('lists a file\'s paths most hit first, those a redirect answers left out, and creates no file', async () => {
+    const dir = await scratchDir('not-found-')
+    const file = join(dir, 'missing.sqlite')
+
+    expect(unansweredPaths(file)).toEqual([])
+    expect(await Bun.file(file).exists()).toBe(false)
+
+    const store = missingStore(file)
+
+    for (const path of ['/gone', '/gone', '/moved/x', '/blog/old', '/blog/old', '/blog/old'])
+      store.hit(path, 'search.example', () => undefined)
+
+    store.close()
+    knowRedirects(['/moved/*'])
+
+    try {
+      expect(unansweredPaths(file).map(({ path, hits }) => [path, hits])).toEqual([['/blog/old', 3], ['/gone', 2]])
+      knowRedirects(['/blog/:slug', '/gone'])
+      expect(unansweredPaths(file).map(({ path }) => path)).toEqual(['/moved/x'])
+    }
+    finally {
+      knowRedirects([])
+    }
   })
 })
 

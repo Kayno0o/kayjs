@@ -17,6 +17,7 @@ head
   title {wording('cms.admin.content', 'Content')}
 PageSection(title={wording('cms.admin.content', 'Content')} level={1})
   @actions
+    Button(href={screenPath(prefix, '/not-found')} label={wording('cms.missing.title', 'Missing pages')})
     Button(href={screenPath(prefix, '/uploads')} label={wording('cms.admin.uploads', 'Unused uploads')})
   for collection of listed key={collection.name}
     CardRow

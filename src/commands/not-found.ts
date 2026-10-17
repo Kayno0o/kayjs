@@ -5,7 +5,7 @@ import { join, relative } from 'node:path'
 import process from 'node:process'
 import { loadConfig } from '../config'
 import { buildingWithoutEnv } from '../server/env-state'
-import { missingStore, NOT_FOUND_FILE } from '../server/not-found'
+import { answeredBy, missingStore, NOT_FOUND_FILE } from '../server/not-found'
 import { addRedirect, answered, checkRedirect, redirectEntry } from '../server/not-found-config'
 import { formatOption, printDocument, printFailure, projectRoot, shellQuote, withStdoutOnStderr } from './command'
 import { USAGES } from './usages'
@@ -47,7 +47,8 @@ export const notFound: Command = {
 
       try {
         const all = store?.list() ?? []
-        const missing = all.filter(row => !answered(row.path, redirects))
+        const answered = answeredBy(redirects)
+        const missing = all.filter(row => !answered(row.path))
 
         if (redirect !== undefined) {
           const found = missing.find(row => row.path === redirect)

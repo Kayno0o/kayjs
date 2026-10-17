@@ -1,0 +1,30 @@
+---
+import type { Column } from '@kaynooo/kayjs-ui'
+import type { MissingRow } from '../missing'
+import CopyButton from '@kaynooo/kayjs-ui/copy-button.kay'
+import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
+import Table from '@kaynooo/kayjs-ui/table.kay'
+import { wording } from 'kay/words'
+
+const { rows } = props<{ rows: MissingRow[] }>()
+
+const columns: Column<MissingRow>[] = [
+  { key: 'path', header: wording('cms.missing.path', 'Path'), sortValue: true, cell: true },
+  { key: 'hits', header: wording('cms.missing.hits', 'Visits'), sortValue: true, defaultDirection: 'desc', align: 'end' },
+  { key: 'lastSeen', header: wording('cms.missing.lastSeen', 'Last visit'), sortValue: true },
+  { key: 'from', header: wording('cms.missing.from', 'From') },
+  { key: 'target', header: wording('cms.missing.suggestion', 'Suggested target'), cell: true },
+]
+---
+Table.kcms-missing(columns={columns} rows={rows} rowKey={row => row.path} sort={{ key: 'hits', direction: 'desc' }})
+  @cell(row, column)
+    if column.key === 'path'
+      code.kcms-missing-path {row.path}
+    else if row.target as target
+      .kcms-missing-target
+        code.kcms-missing-path {target}
+        small {row.reason}
+        if row.line as line
+          CopyButton(text={line} label={wording('cms.missing.copy', 'Copy redirect')} aria-label={wording('cms.missing.copyLabel', 'Copy the redirect from {path}', { path: row.path })} size="sm" variant="ghost")
+  @empty
+    EmptyState(title={wording('cms.missing.empty', 'No missing page recorded')} description={wording('cms.missing.emptyHint', 'The production server records the pages visitors asked for and found nothing at.')})

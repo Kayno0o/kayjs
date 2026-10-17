@@ -134,6 +134,12 @@ Check each upload before you confirm. A URL written by hand in a page, or a file
 
 <ReadMore href="/llms/kayjs-cms">Which uploads the unused-uploads screen holds back, and when it lists nothing.</ReadMore>
 
+## Pages visitors cannot find
+
+When a visitor asks a production server for a page it does not have, kay counts the path. The screen at `<prefix>/not-found` lists those paths, the most visited first, with the sites visitors came from and, where kay can tell, the page they most likely meant. Paths that a redirect already answers are left out.
+
+The screen only reads. A redirect is part of `kay.config.ts`, which a running server cannot change, so each suggestion has a Copy redirect button that copies the line to paste into `redirects`. You can also run `kay not-found --redirect <path>` in the project, which writes it for you.
+
 ## Languages
 
 Every text the screens and the editor show, `Edit this page`, `Save`, `Not valid JSON`, is looked up in your messages before its English. Word them once in `src/messages/<locale>.ts` under `cms`, named for the area and the text, and the screens and the editor read them, the editor in the browser.

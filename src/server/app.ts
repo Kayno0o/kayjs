@@ -48,7 +48,7 @@ import { HEALTH_PATH, serveHealth, stopOnSignal } from './lifecycle'
 import { serveLive } from './live'
 import { announceStart, logRequests, pathOf, useLogger } from './log'
 import { mcpBodyLimit, receiveDispatched, serveMcp, serveToolCallsThrough } from './mcp'
-import { countMissing } from './not-found'
+import { countMissing, knowRedirects } from './not-found'
 import { serveServiceWorker } from './offline'
 import { claimApi, openApiDocument, openApiSettings, serveOpenApi } from './openapi'
 import { withPageHeaders } from './page-headers'
@@ -327,6 +327,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   const openapi = openApiSettings(options.openapi)
   const servesOpenApi = openapi !== undefined && (openapi.dev !== true || mode.dev)
 
+  knowRedirects(Object.keys(options.redirects ?? {}))
   claimRedirects(served, redirects)
   claimApi(served, api.mounted, servesOpenApi ? openapi : undefined)
 

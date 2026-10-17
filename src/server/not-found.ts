@@ -2,6 +2,7 @@ import type { Database } from 'bun:sqlite'
 import type { Elysia } from 'elysia'
 import type { TrailingSlash } from '../config'
 import type { LocaleSettings } from '../runtime/i18n'
+import { existsSync } from 'node:fs'
 import { localePath, splitLocale } from '../runtime/i18n'
 import { kayLog } from '../runtime/log'
 import { openSqlite } from '../runtime/sqlite.server'
@@ -30,6 +31,8 @@ const SCANNED_FILE = /\.(?:php\d?|phtml|aspx?|jsp|cgi|env|sql|bak|ini|htaccess|h
 const SCANNED_SEGMENT = /^(?:wp-[\w-]+|xmlrpc|phpmyadmin|pma|cgi-bin|boaform|actuator)$/
 // What browsers and crawlers ask every site for, which a site without them is not missing a page for.
 const DEFAULT_FILE = /^\/(?:favicon\.ico|robots\.txt|apple-touch-icon[\w-]*\.png)$/
+const PARAM_SEGMENT = /:[A-Z_$][\w$]*/gi
+const REGEX_SPECIALS = /[.+?^${}()|[\]\\]/g
 
 export interface MissingPath {
   path: string
@@ -375,4 +378,45 @@ export function countMissing<App extends Elysia>(app: App, options: { known: () 
   })
 
   return app
+}
+
+// Whether a redirect of the config takes a path: `:name` stands for a segment, a final `*` for the rest.
+export function answeredBy(redirects: string[]): (path: string) => boolean {
+  const patterns = redirects.map((from) => {
+    const star = from.endsWith('/*')
+    const body = (star ? from.slice(0, -2) : from).replace(REGEX_SPECIALS, '\\$&').replace(PARAM_SEGMENT, '[^/]+')
+
+    return new RegExp(`^${body}${star ? '(?:/.*)?' : ''}$`)
+  })
+
+  return path => patterns.some(pattern => pattern.test(path))
+}
+
+// The old paths of the `redirects` the running app serves, which the paths it lists leave out.
+let redirected: string[] = []
+
+export function knowRedirects(redirects: string[]): void {
+  redirected = redirects
+}
+
+// The paths visitors found nothing at that no `redirects` entry answers, most hit first, for a library's screen: this process's store while it has one open, else the file the production server keeps (or `file`), which asking never creates.
+export function unansweredPaths(file?: string): MissingPath[] {
+  const answered = answeredBy(redirected)
+
+  if (file === undefined && current)
+    return current.list().filter(row => !answered(row.path))
+
+  file ??= NOT_FOUND_FILE
+
+  if (!existsSync(file))
+    return []
+
+  const store = missingStore(file)
+
+  try {
+    return store.list().filter(row => !answered(row.path))
+  }
+  finally {
+    store.close()
+  }
 }

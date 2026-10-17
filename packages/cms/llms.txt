@@ -42,6 +42,7 @@ export default defineConfig({ extensions: [cms({ guard: { load: async () => (awa
 - `<prefix>/collections/<collection>/<slug>` (`?locale=`): the entry's form, headed by its title with the way back to its collection, its slug beneath, and Save, Reset, Publish, Delete and Edit on page beside it.
 - `<prefix>/new/<collection>` (`?locale=`): a new entry, its slug typed, and in a localized collection its locale, one the site serves.
 - `<prefix>/uploads`: the unused uploads, each with its variants and a Delete that asks first; ticked rows are deleted together, the content read once for all.
+- `<prefix>/not-found`: the pages visitors asked for and found nothing at, most visited first, as the production server counted them (kay's `data/not-found.sqlite`), with the hosts they came from, a suggested target and a button copying its `redirects` line for kay.config.ts; paths a redirect answers are left out. It writes nothing: a redirect is source, so add it to kay.config.ts or with `kay not-found --redirect <path>`.
 - `<prefix>/page?path=`: opens the page in edit mode.
 - A page of the app at a screen's path replaces it, and `<prefix>/_layout.kay` of the app replaces the cms's layout (Content link, `Toaster`, `TooltipHost`, `@kaynooo/kayjs-cms/admin.css`); the parts the screens are made of are exported: see [Arranging and replacing the screens](llms/screens.md).
 

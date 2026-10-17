@@ -170,11 +170,39 @@ test('a part asked for a field the schema lacks throws, naming the schema\'s fie
 test('the extension\'s guard covers an app page standing in for a screen, and the screens themselves', async () => {
   const denied = { headers: { 'x-deny': '1' } }
 
-  for (const path of ['/admin', '/admin/collections/shop', '/admin/collections/shop/lamp', '/admin/new/shop', '/admin/uploads', '/admin/page?path=/blog/hello'])
+  for (const path of ['/admin', '/admin/collections/shop', '/admin/collections/shop/lamp', '/admin/new/shop', '/admin/uploads', '/admin/not-found', '/admin/page?path=/blog/hello'])
     expect((await site.fetch(path, denied)).status).toBe(403)
 
   expect((await site.fetch('/admin/collections/shop/lamp')).status).toBe(200)
   expect((await site.fetch('/api/cms/entries/shop/lamp', denied)).status).toBe(403)
+})
+
+test('the missing-pages screen lists what visitors found nothing at, most visited first, with where they came from and a redirect to copy', async () => {
+  const visit = async (path: string) => site.fetch(path, { headers: { referer: 'https://search.example/results?q=private-query' } })
+
+  for (const path of ['/Empty', '/Empty', '/never-was', '/%3Cscript%3Ealert(1)%3C/script%3E'])
+    expect((await visit(path)).status).toBe(404)
+
+  // Counted once the response is sent.
+  await Bun.sleep(100)
+
+  const page = await site.visit('/admin/not-found')
+  const rows = page.find('.kcms-missing tbody tr').map(row => row.text.replaceAll(/\s+/g, ' ').trim())
+
+  expect(page.title()).toBe('Missing pages')
+  expect(page.find('.kcms-missing-path').map(path => path.text)).toEqual(expect.arrayContaining(['/Empty', '/empty', '/never-was', '/%3Cscript%3Ealert(1)%3C/script%3E']))
+  expect(rows.find(row => row.includes('/Empty'))).toContain('search.example')
+  expect(rows.find(row => row.includes('/Empty'))).toContain('Spelled differently')
+  expect(rows.findIndex(row => row.includes('/Empty'))).toBeLessThan(rows.findIndex(row => row.includes('/never-was')))
+  expect(page.html).not.toContain('private-query')
+  expect(page.html).not.toContain('<script>alert(1)</script>')
+  expect(page.find('.kcms-missing a').filter(link => link.attributes.href?.includes('Empty'))).toEqual([])
+  expect(page.html).toContain('&#39;/Empty&#39;: &#39;/empty&#39;,')
+})
+
+test('the content index links to the missing-pages screen under the prefix', async () => {
+  expect((await site.visit('/admin')).find('a').filter(link => link.text === 'Missing pages').map(link => link.attributes.href)).toEqual(['/admin/not-found'])
+  expect((await site.fetch('/fr/admin/not-found')).status).toBe(200)
 })
 
 test('an entry\'s Edit on page link goes through the screens, a nested slug escaped once', async () => {

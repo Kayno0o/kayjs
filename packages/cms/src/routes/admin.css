@@ -94,3 +94,14 @@
   gap: 0.5rem;
   margin-left: auto;
 }
+
+.kcms-missing-path {
+  overflow-wrap: anywhere;
+}
+
+.kcms-missing-target {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.5rem;
+}
