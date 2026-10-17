@@ -9,6 +9,7 @@ import { Elysia } from 'elysia'
 import { openSqlite } from '../src/runtime/sqlite.server'
 import { background, memoryJobs, queue, schedule, shutdown, sqliteJobs } from '../src/server'
 import { drainQueues } from '../src/server/queue'
+import { useAppOnError } from '../src/server/report'
 
 const dirs: string[] = []
 
@@ -511,6 +512,42 @@ describe('background', () => {
     expect(steps).toEqual(['started'])
     await shutdown(app)
     expect(steps).toEqual(['started', 'cleaned up'])
+  })
+})
+
+describe('errors outside a request', () => {
+  it('hands a failed schedule, background job and onStop hook to onError with no request, and logs a reporter that throws', async () => {
+    const cron = fakeCron()
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+    const caught: [string, unknown][] = []
+
+    useAppOnError((error, request) => {
+      caught.push([(error as Error).message, request])
+
+      if ((error as Error).message === 'stop failed')
+        throw new Error('Tracker down')
+    })
+
+    try {
+      const app = new Elysia()
+        .use(schedule('@hourly', () => { throw new Error('nightly failed') }))
+        .use(background(() => { throw new Error('consumer failed') }))
+        .onStop(() => { throw new Error('stop failed') })
+
+      app.listen(0)
+      await cron.fired[0]!.handler()
+      await shutdown(app)
+      await Bun.sleep(5)
+
+      expect(caught.toSorted()).toEqual([['consumer failed', undefined], ['nightly failed', undefined], ['stop failed', undefined]])
+      expect(logged.mock.calls.flat().join('\n')).toContain('Tracker down')
+    }
+    finally {
+      useAppOnError(undefined)
+      logged.mockRestore()
+      cron.restore()
+      process.exitCode = 0
+    }
   })
 })
 

@@ -13,6 +13,7 @@ import type { PageSetup } from './setup'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { Elysia } from 'elysia'
+import { MAPS_DIR } from '../build/assets'
 import { extensionServers, pageHooks } from '../config'
 import { clearEditSite, registerEditSite } from '../content/edit'
 import { clearContentMode } from '../content/load'
@@ -58,7 +59,7 @@ import { requestId, requestIdHeader, setRequestIdHeader, trustProxy } from './pr
 import { claimPublic, publicCacheRules, servePublic } from './public'
 import { claimRedirects, readRedirects, serveRedirects } from './redirects'
 import { remoteImages, remotePatterns } from './remote'
-import { reportServerError } from './report'
+import { reportServerError, useAppOnError } from './report'
 import { rewriteRequests } from './rewrite'
 import { routeMatch, routeTable } from './route-table'
 import { READ_METHODS } from './routes'
@@ -348,7 +349,8 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   if (mcpAt !== undefined && document)
     serveMcp(app, document, { title: (document.info as { title: string }).title, version: (document.info as { version: string }).version, base, guards: await covering(true), actions: actionOptions, metadataPaths, path: mcpAt })
 
-  serveErrorReports(app, options.onError)
+  useAppOnError(options.onError)
+  serveErrorReports(app, options.onError, mode.dev ? undefined : join(client.dir, '..', MAPS_DIR))
   serveLive(app, options.live)
 
   if (options.security !== undefined && options.security !== false && options.security.reports === true)

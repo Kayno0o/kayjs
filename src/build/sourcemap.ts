@@ -1,5 +1,6 @@
 import type { SourceMap } from '../compiler'
-import { dirname, relative, resolve } from 'node:path'
+import { mkdir, rm } from 'node:fs/promises'
+import { basename, dirname, join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { browserGlobalMissing } from '../compiler/globals'
 import { offsetAt, positionAt } from '../compiler/mapping'
@@ -96,6 +97,18 @@ async function rewriteBundleMap(mapFile: string): Promise<void> {
   bundle.mappings = encodeBundleMappings(lines)
   // `kay dev` points the maps at their `.kay` sources while its server may be sending them.
   await writeAtomically(mapFile, JSON.stringify(bundle))
+}
+
+// A production map of the browser build, pointed at `.kay` lines and moved out of the served directory into `mapsDir`, its sources named from `root`.
+export async function keepBundleMap(mapFile: string, root: string, mapsDir: string): Promise<void> {
+  await mapBundleToKay(mapFile)
+
+  const bundle = await Bun.file(mapFile).json() as BundleMap
+
+  bundle.sources = bundle.sources.map(source => relative(root, resolve(dirname(mapFile), source)))
+  await mkdir(mapsDir, { recursive: true })
+  await Bun.write(join(mapsDir, basename(mapFile)), JSON.stringify(bundle))
+  await rm(mapFile, { force: true })
 }
 
 export function decodeBundleMappings(mappings: string): BundleSegment[][] {

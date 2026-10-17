@@ -102,7 +102,7 @@ export async function archive(scan: File) {
 ### What the server keeps
 
 - Request logs carry the method, the path without its query string, the status, the duration and the request id: no address, no user agent, no cookie.
-- `onError` gets the request whole; an error tracker is sent its path and id, not `request.url`, whose query may hold an address or a token.
+- `onError` gets the request whole, or `undefined` for an error met outside one; an error tracker is sent its path and id, not `request.url`, whose query may hold an address or a token.
 - Sessions with a store live in it until they expire or `destroy()`; `sqliteStore` drops expired ones every hour and every 1000 writes, `memoryStore` every 1000 writes.
 - `deleteWhere(match)` on `memoryStore()` and `sqliteStore(path)` deletes every session whose data `match` returns true for, resolving with how many went; an app's own store may offer it too, and sessions kept in the cookie alone cannot be listed, only waited out or ended for everyone by replacing the secret.
 - Rate limits count by address in memory, or in `sqliteRates(path)`, which stores each key pseudonymised: hashed with a salt the file keeps, as an HMAC keyed by the session's, the app's (`secret`, `KAY_SECRET`) or the preview's secret once one is set, so the file alone cannot be checked against a guessed address; a window is dropped once it closed.

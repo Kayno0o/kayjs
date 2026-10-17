@@ -7,6 +7,7 @@ import { wholeResponse } from './compress'
 import { healthTimeoutMs, shutdownSeconds } from './config-limits'
 import { logMessage } from './log'
 import { START_COMMAND, START_PARENT } from './parent'
+import { reportBackgroundError } from './report'
 import { requestUrl } from './request-url'
 
 export const HEALTH_PATH = '/_kay/health'
@@ -167,7 +168,7 @@ export async function shutdown(app: AnyElysia, force = false): Promise<void> {
       await hook.fn(app)
     }
     catch (error) {
-      kayLog('error', 'an onStop hook failed', error)
+      reportBackgroundError('an onStop hook failed', error)
       process.exitCode = 1
     }
   }

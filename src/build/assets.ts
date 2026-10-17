@@ -9,6 +9,9 @@ export const ASSET_FILE = new RegExp(`\\.(?:${ASSET_EXTENSIONS.join('|')})$`, 'i
 export const ASSET_PREFIX = '/_kay/'
 const ASSETS_DIR = 'assets'
 
+// Beside `clientDir`, never served: the browser build's source maps, pointed at `.kay` lines, for the server to map the stacks islands report.
+export const MAPS_DIR = 'maps'
+
 // A server `kay dev` started, which it tells how many changes came before it.
 export function underKayDev(): boolean {
   return process.env.KAY_DEV_CODE !== undefined

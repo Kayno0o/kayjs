@@ -1,4 +1,5 @@
 import type { KayConfig } from '../config'
+import { kayLog } from '../runtime/log'
 import { recordRequestError } from './dev-errors'
 import { logMessage } from './log'
 
@@ -11,7 +12,7 @@ export function reportServerError(error: unknown, request: Request, onError: Kay
     void deliver(error, request, onError)
 }
 
-async function deliver(error: unknown, request: Request, onError: NonNullable<KayConfig['onError']>): Promise<void> {
+async function deliver(error: unknown, request: Request | undefined, onError: NonNullable<KayConfig['onError']>): Promise<void> {
   try {
     await onError(error, request)
   }
@@ -19,4 +20,19 @@ async function deliver(error: unknown, request: Request, onError: NonNullable<Ka
   catch (failure) {
     logMessage('error', 'onError failed', failure, request)
   }
+}
+
+// What `onError` of the app being served is, for the errors met outside any request, where no config is at hand.
+let appOnError: KayConfig['onError']
+
+export function useAppOnError(onError: KayConfig['onError']): void {
+  appOnError = onError
+}
+
+// Logs an error met outside any request, a scheduled or background job or an `onStop` hook, and hands it to the app's `onError` with no request.
+export function reportBackgroundError(message: string, error: unknown): void {
+  kayLog('error', message, error)
+
+  if (appOnError)
+    void deliver(error, undefined, appOnError)
 }

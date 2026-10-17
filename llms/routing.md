@@ -248,13 +248,15 @@ p.status {todo.done ? 'Done' : 'Open'}
 
 - Each error kay logs while answering a request, from a load, a render, a guard, an action, an API route, a streamed block without `catch` or a `try` block's, also goes to the `onError` option of `kay.config.ts` or `pages()`, the place to send it to an error tracker.
 - The response does not wait for a promise it returns, and an error it throws is logged.
+- An error met outside any request, in a `schedule` or `background` job or an `onStop` hook, goes to `onError` too, with `undefined` for the request.
+- An island's error reaches it as a `BrowserError` (see [Error fallbacks](islands.md#error-fallbacks)).
 - `request.url` keeps its query, which may hold an address or a token, so a tracker is sent its path:
 
 ```ts
 import { defineConfig, requestId } from 'kay/server'
 
 export default defineConfig({
-  onError: (error, request) => tracker.capture(error, { path: new URL(request.url).pathname, id: requestId(request) }),
+  onError: (error, request) => tracker.capture(error, request && { path: new URL(request.url).pathname, id: requestId(request) }),
 })
 ```
 

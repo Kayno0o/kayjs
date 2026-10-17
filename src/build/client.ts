@@ -21,7 +21,7 @@ import { rebaseCss } from '../server/base'
 import { fromManifest, MANIFEST, PRERENDERED_DIR, writeManifest } from '../server/client'
 import { PUBLIC_ENV_PATH } from '../server/env-state'
 import { fontFallbacks, withFontFallbacks } from '../server/fonts'
-import { ASSET_PREFIX, clientDir, outputDir } from './assets'
+import { ASSET_PREFIX, clientDir, MAPS_DIR, outputDir } from './assets'
 import { pruneNodes } from './class-rules'
 import { CSS_FILE, findKayFiles, readSource, writeIfChanged } from './files'
 import { fileWords } from './libraries'
@@ -34,7 +34,7 @@ import { sizeReport } from './report'
 import { ANCHOR, runtimeAnchor, runtimeChunk } from './runtime-chunk'
 import { builtinChains, refusedBuiltins, refuseServerOnlyReads } from './server-only'
 import { inSignalsScope } from './signals'
-import { forgetBundleMaps } from './sourcemap'
+import { forgetBundleMaps, keepBundleMap } from './sourcemap'
 import { styleUses } from './style-uses'
 import { styleImports, withoutStyles } from './styles'
 import { mergingSupports } from './supports'
@@ -50,7 +50,8 @@ export interface ClientOptions {
   // API directory relative to the root: an island importing a module there, or under an extension's, gets where its routes are served, not its code.
   api?: string | undefined
   // Links each island chunk to a map of its `.kay` sources, for the browser's devtools; the server points a map at them as it first serves it.
-  sourcemap?: boolean | undefined
+  // `true` links maps for development's devtools, `'external'` keeps them for the server to map the stacks islands report.
+  sourcemap?: boolean | 'external' | undefined
   // The site's mount point, which the stylesheets' own paths go under, `url(/bg.png)` included.
   base?: string | undefined
   // The app's own modules for its libraries' settings, as `kay.config.ts` gives them.
@@ -139,6 +140,9 @@ async function bundleClient(root: string, options: ClientOptions): Promise<Clien
   const [scripts, styles] = await bothBundles(bundleIslands(root, sources.islands, options), bundleStyles(root, sources, options))
   const manifest: ClientManifest = { ...scripts.manifest, styles: styles.styles, ...styles.uses && { styleUses: styles.uses }, ...options.hot && { problems: sources.problems } }
 
+  if (options.sourcemap === 'external')
+    await keepMaps(root, scripts.maps)
+
   await writeManifest(root, manifest)
 
   const built = fromManifest(root, manifest)
@@ -150,6 +154,27 @@ async function bundleClient(root: string, options: ClientOptions): Promise<Clien
     built.report = await sizeReport(root, clientDir(root), scripts.manifest, sources.islands, sources.why, options.report === 'modules' ? scripts.inputs : undefined)
 
   return built
+}
+
+function sourcemapOf(option: ClientOptions['sourcemap']): 'linked' | 'external' | 'none' {
+  if (option === 'external')
+    return option
+
+  return option === true ? 'linked' : 'none'
+}
+
+// A map that cannot be pointed at `.kay` lines is left out: the report then keeps its minified frames.
+async function keepMaps(root: string, maps: string[]): Promise<void> {
+  const dir = join(outputDir(root), MAPS_DIR)
+
+  await rm(dir, { recursive: true, force: true })
+
+  for (const map of maps) {
+    try {
+      await keepBundleMap(map, root, dir)
+    }
+    catch {}
+  }
 }
 
 // Fails on either only once both stopped, so neither goes on writing into the output of the build after; failing both, it reports what each logged.
@@ -253,7 +278,7 @@ export async function clearClientOutput(root: string): Promise<void> {
   const base = outputDir(root)
   const dir = clientDir(root)
 
-  await Promise.all([rm(dir, { recursive: true, force: true }), rm(join(base, PRERENDERED_DIR), { recursive: true, force: true }), rm(join(base, MANIFEST), { force: true })])
+  await Promise.all([rm(dir, { recursive: true, force: true }), rm(join(base, PRERENDERED_DIR), { recursive: true, force: true }), rm(join(base, MANIFEST), { force: true }), rm(join(base, MAPS_DIR), { recursive: true, force: true })])
   await mkdir(dir, { recursive: true })
 }
 
@@ -335,7 +360,7 @@ export async function bundleIslands(root: string, islands: Map<string, string>, 
     // The pages preload the chunks of their islands themselves, and every island shares the one the page loads first, so Bun's own preloading would only weigh on it.
     modulePreload: false,
     minify: options.minify ?? false,
-    sourcemap: options.sourcemap ? 'linked' : 'none',
+    sourcemap: sourcemapOf(options.sourcemap),
     metafile: true,
     define,
     naming: { entry: '[name]-[hash].[ext]', chunk: '[name]-[hash].[ext]' },

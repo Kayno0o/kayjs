@@ -1,4 +1,6 @@
 import type { ClientBuild } from '../src/server/client'
+import { mkdir, rm } from 'node:fs/promises'
+import { join } from 'node:path'
 import process from 'node:process'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
@@ -21,6 +23,7 @@ import { servePages } from '../src/server/app'
 import { BrowserError } from '../src/server/errors'
 import { formsScript } from '../src/server/forms'
 import { inServerScope } from '../src/server/scope'
+import { scratchDir } from './scratch'
 
 const routes = 'tests/fixtures/navigation/src/routes'
 // The field an issue of the server's validation is about, as it reads it.
@@ -91,6 +94,28 @@ describe('page swap, on the server', () => {
     expect(page).toContain('<!--kay-failed--><p class="unavailable">Unavailable</p>')
     expect(page).toContain('<p class="fragile">Fine</p>')
     expect(caught.map(error => (error as Error).message)).toEqual(['Broken on the server'])
+  })
+
+  it('maps the stack a browser reports in production with the build\'s kept source maps, leaving a chunk without one alone', async () => {
+    const dir = await scratchDir('error-maps-')
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+    const caught: unknown[] = []
+
+    await mkdir(join(dir, 'maps'), { recursive: true })
+    // One segment on line 3, column 3, naming source 0 at line 11, column 6 (0-based).
+    await Bun.write(join(dir, 'maps/chunk-abc.js.map'), JSON.stringify({ sources: ['src/routes/cart.kay'], mappings: ';;GAWM' }))
+
+    const mapped = await servePages(resolveProject(process.cwd(), { routes, security: false, onError: error => void caught.push(error) }), async () => ({ ...client, dir: join(dir, 'dist') }))
+    const report = async (stack: string) => (await mapped.handle(new Request('http://localhost/_kay/error', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: 'Error', message: 'x', stack, url: 'http://localhost/' }) }))).status
+
+    try {
+      expect(await report('Error: x\n    at add (http://localhost/_kay/chunk-abc.js:3:5)\n    at http://localhost/_kay/other.js:1:1')).toBe(204)
+      expect((caught[0] as Error).stack).toBe('Error: x\n    at add (src/routes/cart.kay:12:7)\n    at http://localhost/_kay/other.js:1:1')
+    }
+    finally {
+      logged.mockRestore()
+      await rm(dir, { recursive: true, force: true })
+    }
   })
 
   it('hands what a browser reports to onError, refusing another site\'s, a malformed one and a flood, and dropping control characters', async () => {

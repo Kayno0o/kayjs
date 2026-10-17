@@ -4,8 +4,8 @@ import type { JobStore } from './queue'
 import { Elysia } from 'elysia'
 import { KayError } from '../compiler/errors'
 import { DURATION_TEXT, durationSeconds } from '../runtime/duration'
-import { kayLog } from '../runtime/log'
 import { defaultJobStore } from './queue'
+import { reportBackgroundError } from './report'
 
 export interface ScheduleOptions {
   // IANA time zone the schedule reads in, such as `Europe/Paris`; the system's by default.
@@ -146,7 +146,7 @@ function scheduledRun(label: string, slotMs: number, job: () => unknown, options
       await job()
     }
     catch (error) {
-      kayLog('error', `the job scheduled ${label} failed`, error)
+      reportBackgroundError(`the job scheduled ${label} failed`, error)
     }
   }
 }
@@ -171,7 +171,7 @@ export function background(work: (signal: AbortSignal) => unknown) {
         }
         catch (error) {
           if (!started.signal.aborted) {
-            kayLog('error', 'a background job failed', error)
+            reportBackgroundError('a background job failed', error)
           }
         }
       })()

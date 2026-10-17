@@ -161,7 +161,7 @@ export function clientOptionsOf(config: ClientConfig, mode: Pick<Mode, 'dev' | '
     publicEnv: config.publicEnv !== undefined,
     lints: config.lints,
     fonts: config.fonts,
-    sourcemap: mode.dev,
+    sourcemap: mode.dev || (build !== undefined && build.exported !== true ? 'external' : false),
     hot: mode.dev,
     inspect: mode.underKayDev,
     ...build,

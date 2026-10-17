@@ -13,7 +13,7 @@ import process from 'node:process'
 import tailwind from 'bun-plugin-tailwind'
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { Elysia } from 'elysia'
-import { ASSET_FILE, clientDir, outputDir, writeAsset } from '../src/build/assets'
+import { ASSET_FILE, clientDir, MAPS_DIR, outputDir, writeAsset } from '../src/build/assets'
 import { writeCacheEntry } from '../src/build/cache'
 import { buildClient, readClientSources } from '../src/build/client'
 import { forgetSources, keepSources, readSource, realPath, writeAtomically, writeIfChanged } from '../src/build/files'
@@ -24,12 +24,13 @@ import { routeSizes } from '../src/build/route-sizes'
 import { anchorModule, runtimeChunk } from '../src/build/runtime-chunk'
 import { runtimeConfig, withoutPlugins } from '../src/build/runtime-config'
 import { importedSignals, inSignalsScope } from '../src/build/signals'
-import { describeThrown, mapBundleToKay, mapStack } from '../src/build/sourcemap'
+import { decodeBundleMappings, describeThrown, mapBundleToKay, mapStack } from '../src/build/sourcemap'
 import { analyzeKayCached, compilerModules, keepAnalyses, pruneCompileCache, transformKayCached } from '../src/build/transform'
 import { loadConfig, withConfig } from '../src/config'
 import { devBuilder } from '../src/dev/builder'
 import { projectPaths } from '../src/project'
 import { serveBuildFiles } from '../src/server/build-files'
+import { browserStackMapper } from '../src/server/error-maps'
 import { compileErrorPage } from '../src/server/overlay'
 import { encodePng } from '../src/server/png'
 import { fixtureCopy, scratchDir } from './scratch'
@@ -382,6 +383,39 @@ describe('kay build', () => {
       // `button(onClick={() => count.set(count() + 1)}) Count {count()}` is the template's one line.
       expect(lines).toContain(source.split('\n').findIndex(line => line.startsWith('button(')))
       expect(Math.max(...lines)).toBeLessThan(source.split('\n').length)
+    }
+    finally {
+      await rm(join(root, '.kay'), { recursive: true, force: true })
+    }
+  })
+
+  it('keeps a production build\'s source maps out of the served directory, pointed at .kay lines, for the server to map island errors', async () => {
+    try {
+      const client = await buildClient(root, { sourcemap: 'external', minify: true })
+      const maps = join(outputDir(root), MAPS_DIR)
+      const served = await readdir(client.dir)
+
+      expect(served.filter(file => file.endsWith('.map'))).toEqual([])
+
+      for (const chunk of served.filter(file => file.endsWith('.js')))
+        expect(await Bun.file(join(client.dir, chunk)).text()).not.toContain('sourceMappingURL')
+
+      const kept = (await readdir(maps)).filter(file => file.endsWith('.js.map'))
+      const bundles = await Promise.all(kept.map(async file => ({ file, map: await Bun.file(join(maps, file)).json() as { sources: string[], mappings: string } })))
+      const { file, map } = bundles.find(({ map }) => map.sources.includes('counter.kay'))!
+      const index = map.sources.indexOf('counter.kay')
+      const lines = decodeBundleMappings(map.mappings)
+      const at = lines.findIndex(segments => segments.some(segment => segment[1] === index))
+      const segment = lines[at]!.find(found => found[1] === index)!
+      const mapper = browserStackMapper(maps)
+      const chunk = file.slice(0, -'.map'.length)
+      const frame = `    at count (https://shop.example/base/_kay/${chunk}:${at + 1}:${segment[0]! + 1})`
+      const mapped = await mapper(`TypeError: x\n${frame}\n    at https://shop.example/_kay/gone.js:1:2\n    at ../x.js:1:1`)
+
+      expect(mapped).toContain(`    at count (counter.kay:${segment[2]! + 1}:${segment[3]! + 1})`)
+      // A chunk with no map, a name leaving the directory and a frame with no URL stay as they were.
+      expect(mapped).toContain('    at https://shop.example/_kay/gone.js:1:2\n    at ../x.js:1:1')
+      expect(await mapper(`E\n    at fn (https://h/_kay/..%2F${chunk}:1:1)`)).toContain('..%2F')
     }
     finally {
       await rm(join(root, '.kay'), { recursive: true, force: true })

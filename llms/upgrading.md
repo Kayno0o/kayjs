@@ -2,6 +2,12 @@
 
 What each minor release breaks, and what an app changes to move to it. kay and its libraries share one version, so one section covers them all; a patch breaks nothing, and a minor missing here broke nothing.
 
+## 1.53.0
+
+### `onError` may get no request
+
+- `onError(error, request)` is now typed `request: Request | undefined`, as it also receives the errors of scheduled and background jobs and `onStop` hooks. An `onError` reading `request.url` or `requestId(request)` checks for it first: `request && { path: new URL(request.url).pathname }`. `kay check` cannot recognise the old form, so there is no lint.
+
 ## 1.52.0
 
 ### 404 bodies read `Not Found`
