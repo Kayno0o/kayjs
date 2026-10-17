@@ -87,9 +87,10 @@ describe('an API handler in the request\'s locale', () => {
     expect(await failed('/api/words/boom', `${ORIGIN}/`)).toEqual({ custom: 'Refused' })
   })
 
-  it('leaves the handler to the context it asked for', async () => {
-    const response = await sites.plain.fetch('/api/words/late?ms=1', { headers: { referer: `${ORIGIN}/fr/x` } })
+  it('reads the locale in a route\'s own error hook', async () => {
+    const own = async (referer: string) => (await sites.plain.fetch('/api/words/own-error', { headers: { referer } })).json() as Promise<unknown>
 
-    expect(response.status).toBe(200)
+    expect(await own(`${ORIGIN}/fr/x`)).toEqual({ own: 'Refusé' })
+    expect(await own(`${ORIGIN}/`)).toEqual({ own: 'Refused' })
   })
 })

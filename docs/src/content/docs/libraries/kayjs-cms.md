@@ -82,7 +82,7 @@ export default defineMessages({
 })
 ```
 
-A key a locale lacks reads the English, and `kay check` leaves the `cms` keys out of its comparison between locales. The API's own refusals stay English for now, as kay runs an API handler outside the request's locale.
+A key a locale lacks reads the English, and `kay check` leaves the `cms` keys out of its comparison between locales. The API's refusals are worded in the locale of the page that called.
 
 <ReadMore href="/llms/kayjs-cms">Every `cms.*` key and its English is in the full kayjs-cms reference.</ReadMore>
 

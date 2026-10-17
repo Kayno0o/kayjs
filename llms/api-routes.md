@@ -137,7 +137,7 @@ export default api()
 - A class instance without its own `toString`, or a `Map`, passed to `status()` answers 500 the same way.
 - `api()` is a `new Elysia()` whose handlers read the app's locals, typed as `ctx.locals` is (see [Locals](server.md#locals)): `({ user })`, `ws.data.user`.
 - A plain `new Elysia()` is mounted the same way.
-- A handler, and the `onError` of its module or route, runs in the request's locale as the guards do, so `t()`, `wording()` and `locale()` read it: the locale of the page the call came from by its `Referer`, else the browser's `Accept-Language`, the site's one language without `i18n`. An `eventStream` source is read in it too; a stream of your own `Response` is not.
+- A handler, and the `onError` of its module or route, runs in the request's locale as the guards do, so `t()`, `wording()` and `locale()` read it: the locale of the page the call came from by its `Referer`, else the browser's `Accept-Language`, the site's one language without `i18n`. An `eventStream` source is read in it too; a stream of your own `Response` and a websocket's `open` and `message` are not.
 - A `_guard.ts` in `src/api/` or below runs before every route of the modules in its directory and below, outermost first, a websocket upgrade included, as it does for pages and actions.
 - A body, query or params the route's schema refuses, or a file of the wrong type, meets the guards first, as an action's input does (see [Guards](server.md#guards)): a caller they refuse gets their answer, never the validation error.
 - A redirect or a denial from a guard answers the request, and the cookies and headers it sets go out with the route's response.

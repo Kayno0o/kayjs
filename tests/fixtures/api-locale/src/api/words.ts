@@ -6,7 +6,7 @@ const pause = async (ms: number) => new Promise(resolve => setTimeout(resolve, m
 const read = () => ({ word: wording('words.refused', 'Refused'), t: message('greeting') })
 
 export default api()
-  .onError(({ code }) => code === 'UNKNOWN' ? { custom: wording('words.refused', 'Refused') } : undefined)
+  .onError(({ code, error }) => code === 'UNKNOWN' && error.message === 'boom' ? { custom: wording('words.refused', 'Refused') } : undefined)
   .get('/', () => read())
   .get('/plain', () => ({ word: wording('words.refused', 'Refused') }))
   // The locale survives an await, and two requests overlapping in time each keep their own.
@@ -23,6 +23,9 @@ export default api()
     await pause(1)
     yield read()
   })
+  .get('/own-error', () => {
+    throw new Error('own')
+  }, { error: () => ({ own: wording('words.refused', 'Refused') }) } as never)
   .get('/boom', () => {
     throw new Error('boom')
   })

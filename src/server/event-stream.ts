@@ -20,7 +20,7 @@ export class StreamRefused extends Error {
 // The source is read one value per value the browser takes, and stopped when it goes away; a source that throws ends the stream as failed, the error logged.
 export function eventStream<T>(source: AsyncIterable<T> | Iterable<T>): EventStream<T> {
   const reporter = { report: (error: unknown) => kayLog('error', 'an event stream failed', error) }
-  const response = new Response(eventBody(inRequestLocale(source), error => reporter.report(error)), { headers: { 'content-type': 'text/event-stream; charset=utf-8', 'cache-control': 'no-cache' } })
+  const response = new Response(eventBody(localizedSource(source), error => reporter.report(error)), { headers: { 'content-type': 'text/event-stream; charset=utf-8', 'cache-control': 'no-cache' } })
 
   streamReporters.set(response, reporter)
 
@@ -28,7 +28,7 @@ export function eventStream<T>(source: AsyncIterable<T> | Iterable<T>): EventStr
 }
 
 // The source read in the locale the route answered in, which the body is read outside of.
-function inRequestLocale<T>(source: AsyncIterable<T> | Iterable<T>): AsyncIterable<T> | Iterable<T> {
+function localizedSource<T>(source: AsyncIterable<T> | Iterable<T>): AsyncIterable<T> | Iterable<T> {
   const state = localeState()
 
   if (!state)
