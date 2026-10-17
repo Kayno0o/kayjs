@@ -11,7 +11,7 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ### kayjs-auth: `discordProvider({ apiBase })` is `url`
 
-- `discordProvider({ apiBase })` is now `discordProvider({ url })`, as `gitlabProvider` and `githubProvider` take; `apiBase` still works for now and logs a warning. No `deprecated` lint is possible, as `kay check` reads no `kay.config.ts` option of a library.
+- `discordProvider({ apiBase })` is now `discordProvider({ url })`, as `gitlabProvider` and `githubProvider` take; `apiBase` still works for now and logs a warning, and production refuses an `http://` one as it does for `url`. `kay check` reports it as `deprecated-provider-url`, and `kay check --fix` (or `kay upgrade`) renames the key.
 
 ### `kay dev` does not move a port it was asked for
 

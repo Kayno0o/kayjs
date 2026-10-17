@@ -33,15 +33,12 @@ function discordImage(kind: 'avatars' | 'banners', userId: string, hash: string 
   return hash == null || hash === '' ? null : `https://cdn.discordapp.com/${kind}/${userId}/${hash}.${hash.startsWith('a_') ? 'gif' : 'png'}`
 }
 
-let warnedApiBase = false
-
 /** Discord OAuth2 provider preset, its avatar and banner as CDN URLs. `url` is the API's base, `https://discord.com/api/v10` by default, and `params` extra authorize URL parameters. */
 export function discordProvider(opts: ProviderOptions & {
   /** @deprecated Renamed `url`, as on every provider. */
   apiBase?: string
 } = {}): OAuthProvider<DiscordRawUser> {
-  if (opts.apiBase !== undefined && opts.url === undefined && !warnedApiBase) {
-    warnedApiBase = true
+  if (opts.apiBase !== undefined && opts.url === undefined) {
     log.warn('discordProvider({ apiBase }) is renamed discordProvider({ url })')
   }
 
@@ -168,6 +165,9 @@ function requireHttps(url: string, what: string): void {
 // A provider's base URL without its trailing slashes, `fallback` when the app gave none.
 function providerUrl(url: string | undefined, fallback: string, what: string): string {
   const base = (url ?? fallback).replace(TRAILING_SLASHES, '')
+
+  if (base === '' && url !== undefined)
+    throw new Error(`${what} is empty`)
 
   if (base !== '')
     requireHttps(base, what)

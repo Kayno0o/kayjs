@@ -6,8 +6,9 @@ import { log } from './log'
 // What expired is deleted at most this often.
 export const PRUNE_EVERY_MS = 60 * 60 * 1000
 const BEARER_EXPIRED_KEPT_MS = 30 * 24 * 60 * 60 * 1000
-// Guests deleted by one run; a larger backlog goes on with the next.
-const GUESTS_PER_RUN = 500
+// Guests listed at once, and the most batches one run goes through; a larger backlog goes on with the next run.
+const GUESTS_PER_BATCH = 500
+const GUEST_BATCHES_PER_RUN = 20
 
 // Starts the store's pruning when it is due, without making the request wait for it; `core.pruned.running` is the run while it lasts. A failure is logged, and the next try is an hour away.
 export function pruneWhenDue(core: Core, settings: SessionSettings): void {
@@ -41,15 +42,26 @@ async function pruneGuests(core: Core, now: number): Promise<void> {
     return
 
   try {
-    for (const guest of await core.store.users.staleGuests(new Date(now - core.guestMaxAge * 1000), GUESTS_PER_RUN)) {
-      try {
-        // A guest registered since the list was read is a real account.
-        if ((await core.store.users.get(guest.id))?.guest === true)
-          await erase({ core }, guest)
+    for (let batch = 0; batch < GUEST_BATCHES_PER_RUN; batch++) {
+      const guests = await core.store.users.staleGuests(new Date(now - core.guestMaxAge * 1000), GUESTS_PER_BATCH)
+      let deleted = 0
+
+      for (const guest of guests) {
+        try {
+          // A guest registered since the list was read is a real account.
+          if ((await core.store.users.get(guest.id))?.guest === true) {
+            await erase({ core }, guest)
+            deleted++
+          }
+        }
+        catch (error) {
+          log.error('deleting a stale guest failed', error)
+        }
       }
-      catch (error) {
-        log.error('deleting a stale guest failed', error)
-      }
+
+      // A short list is the end of them, and a batch deleting none would only come back as it was.
+      if (guests.length < GUESTS_PER_BATCH || deleted === 0)
+        return
     }
   }
   catch (error) {

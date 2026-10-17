@@ -319,6 +319,15 @@ export const LINTS = {
     wrong: '// kay.config.ts sets mcp: true\nexport default api().get(\'/:id\', ({ params }) => find(params.id))',
     right: 'export default api().get(\'/:id\', ({ params }) => find(params.id), { detail: { tool: \'Read a note by its id\' } })',
   },
+  'deprecated-provider-url': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.52',
+    site: true,
+    summary: '`discordProvider({ apiBase })` of kayjs-auth, which is `discordProvider({ url })` since 1.52, as every provider that a server can host names its base URL: `apiBase` still works for now and logs a warning. The fix renames the key, and is not offered for a shorthand `{ apiBase }` or a call that gives `url` too.',
+    wrong: 'discordProvider({ apiBase: \'https://proxy.example.com/discord\' })',
+    right: 'discordProvider({ url: \'https://proxy.example.com/discord\' })',
+  },
   'deprecated-test-mount': {
     level: 'warn',
     group: 'deprecated',

@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, test } from 'bun:test'
+import { afterEach, describe, expect, spyOn, test } from 'bun:test'
+import { log } from '../src/log'
 import { createOAuthClient, OAuthExchangeError } from '../src/oauth/client'
 import { appleProvider, discordProvider, githubProvider, gitlabProvider, oidcProvider } from '../src/oauth/providers'
 
@@ -309,6 +310,23 @@ describe('provider options', () => {
     expect(discordProvider({ url: 'https://new.test', apiBase: 'https://old.test' }).tokenUrl).toBe('https://new.test/oauth2/token')
     expect(discordProvider().tokenUrl).toBe('https://discord.com/api/v10/oauth2/token')
     expect(gitlabProvider({ url: 'https://lab.test/gitlab/' })).toMatchObject({ authorizeUrl: 'https://lab.test/gitlab/oauth/authorize', userUrl: 'https://lab.test/gitlab/oauth/userinfo' })
+  })
+
+  test('apiBase warns that it is url, and an empty url is refused', () => {
+    const warn = spyOn(log, 'warn').mockImplementation(() => undefined)
+
+    try {
+      discordProvider({ apiBase: 'https://old.test' })
+      discordProvider({ url: 'https://new.test' })
+      expect(warn).toHaveBeenCalledTimes(1)
+      expect(String(warn.mock.calls[0]![0])).toContain('apiBase')
+    }
+    finally {
+      warn.mockRestore()
+    }
+
+    expect(() => githubProvider({ url: '/' })).toThrow('empty')
+    expect(() => discordProvider({ url: '' })).toThrow('empty')
   })
 
   test('production refuses a plain-http url', () => {

@@ -2379,6 +2379,31 @@ describe.concurrent('kay check, unused code', () => {
     }
   })
 
+  it('reports discordProvider\'s apiBase as url, and --fix renames the key unless it is a shorthand or url is given too', async () => {
+    const root = await scratchProject({
+      'src/a.ts': 'import { discordProvider } from \'@kaynooo/kayjs-auth\'\n\nexport const a = discordProvider({ apiBase: \'https://proxy.test\' })\n',
+      'src/b.ts': 'import * as auth from \'@kaynooo/kayjs-auth\'\n\nexport const b = auth.discordProvider({ \'apiBase\': \'https://proxy.test\', scopes: [] })\n',
+      'src/c.ts': 'import { discordProvider } from \'@kaynooo/kayjs-auth\'\n\nconst apiBase = \'https://proxy.test\'\n\nexport const c = discordProvider({ apiBase })\nexport const d = discordProvider({ apiBase: \'a\', url: \'b\' })\n',
+      'src/mine.ts': 'export function discordProvider(options: { apiBase: string }): string {\n  return options.apiBase\n}\n',
+      'src/d.ts': 'import { discordProvider } from \'./mine\'\n\nexport const e = discordProvider({ apiBase: \'https://proxy.test\' })\n',
+    })
+
+    try {
+      const { output } = await runCheck(root)
+
+      expect(output.match(/deprecated-provider-url/g)).toHaveLength(4)
+      expect(output).not.toContain('src/d.ts')
+      await runCheck(root, '--fix')
+      expect(await Bun.file(join(root, 'src/a.ts')).text()).toContain('discordProvider({ url: \'https://proxy.test\' })')
+      expect(await Bun.file(join(root, 'src/b.ts')).text()).toContain('{ url: \'https://proxy.test\', scopes: [] }')
+      expect(await Bun.file(join(root, 'src/c.ts')).text()).toContain('discordProvider({ apiBase })')
+      expect((await runCheck(root)).output.match(/deprecated-provider-url/g)).toHaveLength(2)
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('reports kay/test\'s mount as mountComponent, an import or a namespace member, and --fix renames it under the name the file uses', async () => {
     const root = await scratchProject({
       'src/a.test.ts': 'import { mount, settle } from \'kay/test\'\n\nawait mount(\'a.kay\')\nawait settle()\n',
