@@ -1140,6 +1140,12 @@ describe.skipIf(!existsSync('/proc'))('a killed Chrome\'s leftovers', () => {
     const chrome = fake('chromium')
     const crashHandler = fake('chrome_crashpad_handler')
 
+    // A process just spawned may not have run its command yet, its /proc entry still naming Bun, which would tell no Chrome runs.
+    const started = (pid: number, name: string) => readFileSync(`/proc/${pid}/cmdline`, 'utf8').startsWith(`${join(bin, name)}\0`)
+
+    while (!started(chrome.pid, 'chromium') || !started(crashHandler.pid, 'chrome_crashpad_handler'))
+      await Bun.sleep(5)
+
     process.env.TMPDIR = temp
 
     try {
