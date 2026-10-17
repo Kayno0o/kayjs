@@ -117,6 +117,19 @@ export async function buildClient(root: string, options: ClientOptions = {}): Pr
   return inSignalsScope(async () => bundleClient(root, options))
 }
 
+const ROOT_MARGIN = /^-?\d+(?:\.\d+)?(?:px|%)(?: -?\d+(?:\.\d+)?(?:px|%)){0,3}$/
+
+// A margin as an IntersectionObserver takes it; anything else makes the observer throw in the browser, where no island would then hydrate.
+function rootMargin(value: string | undefined, fallback: string, what: string): string {
+  if (value === undefined)
+    return fallback
+
+  if (!ROOT_MARGIN.test(value))
+    throw new Error(`kay: \`hydration.${what}\` is ${JSON.stringify(value)}; it takes one to four lengths in px or %, such as '200px' or '100% 0px'`)
+
+  return value
+}
+
 async function bundleClient(root: string, options: ClientOptions): Promise<ClientBuild> {
   const sources = await readClientSources(root, options)
 
@@ -298,7 +311,7 @@ export async function bundleIslands(root: string, islands: Map<string, string>, 
   ].join('\n'))
 
   // Bun resolves packages' `development` export condition unless NODE_ENV is defined as production, which would ship a package's dev build; a build for development, not NODE_ENV, asks for theirs.
-  const define: Record<string, string> = { 'KAY_BROWSER': 'true', 'process.env.NODE_ENV': JSON.stringify(options.hot === true ? 'development' : 'production'), ...options.exported === true && { KAY_STATIC_EXPORT: 'true' }, 'KAY_VISIBLE_MARGIN': JSON.stringify(options.hydration?.visible ?? '200px'), 'KAY_NEAR_MARGIN': JSON.stringify(options.hydration?.serverIslands ?? '100% 0px') }
+  const define: Record<string, string> = { 'KAY_BROWSER': 'true', 'process.env.NODE_ENV': JSON.stringify(options.hot === true ? 'development' : 'production'), ...options.exported === true && { KAY_STATIC_EXPORT: 'true' }, 'KAY_VISIBLE_MARGIN': JSON.stringify(rootMargin(options.hydration?.visible, '200px', 'visible')), 'KAY_NEAR_MARGIN': JSON.stringify(rootMargin(options.hydration?.serverIslands, '100% 0px', 'serverIslands')) }
   const external = publicEnv !== undefined ? [publicEnv] : []
   const plugins = (anchor?: string, anchored?: ReadonlySet<string>) => [withoutStyles(), api, kay({ target: 'dom', root, cacheDir: projectPaths(root).cache, settings: options.settings, anchor, anchored, inspect: options.inspect, api: trees, external }), ...options.plugins ?? []]
 

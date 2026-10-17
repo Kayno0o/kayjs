@@ -777,6 +777,6 @@ export function explainLint(name: LintName): string {
     ...lint.launch === true ? ['Reported by `kay build` and `kay check --only seo`, never a plain `kay check`: a site lacks it until it goes public, a fresh project included.'] : [],
     `Reported:\n\n${indent(lint.wrong)}`,
     `Written right:\n\n${indent(lint.right)}`,
-    `Its level is set in kay.config.ts, as \`lints: { '${name}': '${lint.level === 'deny' ? 'warn' : 'deny'}' }\`, to \`allow\`, \`warn\` or \`deny\`, or with its group's, \`lints: { ${lint.group}: '${lint.level === 'deny' ? 'warn' : 'deny'}' }\`${lint.site === true ? '.' : `; a \`// kay-allow ${name}\` comment allows it on the line it ends, or alone on its line, on the line after it.`}`,
+    `Its level is set in kay.config.ts, as \`lints: { '${name}': '${lint.level === 'deny' ? 'warn' : 'deny'}' }\`, to \`allow\`, \`warn\` or \`deny\`, or with its group's, \`lints: { ${lint.group}: '${lint.level === 'deny' ? 'warn' : 'deny'}' }\`${lint.site === true ? '.' : `; a \`// kay-allow ${name}\` comment allows it on the line it ends, or alone on its line, on the line after it, and \`// kay-allow-file ${name}\` in the whole file.`}`,
   ].join('\n\n')
 }

@@ -12,6 +12,20 @@ async function scripts(dir: string): Promise<string> {
 }
 
 describe('hydration margins', () => {
+  it('refuses a margin an IntersectionObserver would throw on, as the build starts', async () => {
+    const dir = resolve(await fixtureCopy('navigation'))
+
+    try {
+      for (const visible of ['10rem', '200', '5vh', '1px 2px 3px 4px 5px', ''])
+        await expect(buildClient(dir, { hydration: { visible } })).rejects.toThrow(/hydration\.visible/)
+
+      await expect(buildClient(dir, { hydration: { serverIslands: 'a screen' } })).rejects.toThrow(/hydration\.serverIslands/)
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  }, 60_000)
+
   it('hands the config\'s margins to the browser build', () => {
     expect(clientOptionsOf({ hydration: { visible: '50px' } }, { dev: false, underKayDev: false }).hydration).toEqual({ visible: '50px' })
     expect(clientOptionsOf({}, { dev: false, underKayDev: false }).hydration).toBeUndefined()

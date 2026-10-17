@@ -331,7 +331,7 @@ It then runs the kay it installed. Each minor you skipped may have replaced a fo
 
 A last `kay check --fix` applies any other quick fix and prints what is left for you to change by hand. An app already on the latest version is left alone. If the install fails, `package.json` goes back as it was.
 
-`--dry-run` lists the packages it would move and changes nothing: no write, no install, no rewrite.
+`--dry-run` lists the packages it would move and changes nothing: no write, no install, no rewrite. The old forms it would then fix are known only to the new version, so they are not listed.
 
 What a minor breaks that `kay check` cannot see is in [Upgrading](/guides/upgrading).
 

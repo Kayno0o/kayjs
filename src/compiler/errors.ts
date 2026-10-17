@@ -71,7 +71,7 @@ export const ERRORS = {
   },
   'unknown-lint': {
     group: 'compile',
-    summary: 'A `// kay-allow` comment naming something that is no lint.',
+    summary: 'A `// kay-allow` or `// kay-allow-file` comment naming something that is no lint.',
     fix: { file: 'llms/lints.md', heading: 'Allow a lint on one line' },
   },
   'browser-builtin-import': {

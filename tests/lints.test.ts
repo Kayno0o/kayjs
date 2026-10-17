@@ -118,7 +118,7 @@ describe('kay explain', () => {
       LINTS['constant-signal'].summary,
       'Reported:\n\n    ---\n    import { signal } from \'kay\'\n\n    const title = signal(\'Todos\')\n    ---\n    h1 {title()}',
       'Written right:\n\n    ---\n    const title = \'Todos\'\n    ---\n    h1 {title}',
-      'Its level is set in kay.config.ts, as `lints: { \'constant-signal\': \'deny\' }`, to `allow`, `warn` or `deny`, or with its group\'s, `lints: { islands: \'deny\' }`; a `// kay-allow constant-signal` comment allows it on the line it ends, or alone on its line, on the line after it.',
+      'Its level is set in kay.config.ts, as `lints: { \'constant-signal\': \'deny\' }`, to `allow`, `warn` or `deny`, or with its group\'s, `lints: { islands: \'deny\' }`; a `// kay-allow constant-signal` comment allows it on the line it ends, or alone on its line, on the line after it, and `// kay-allow-file constant-signal` in the whole file.',
     ].join('\n\n'))
   })
 
