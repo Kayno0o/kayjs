@@ -500,6 +500,37 @@ describe('the modules a change leaves stale', () => {
     }
   })
 
+  it('evicts a library component holding a glob of the app\'s files for a file added to it, one in node_modules or outside the project', async () => {
+    const dir = await scratchDir('reload-plan-')
+    const library = await scratchDir('reload-plan-library-')
+
+    await Bun.write(join(dir, 'src/routes/index.kay'), 'p home\n')
+    await Bun.write(join(dir, 'node_modules/kayjs-lib/field.kay'), '---\nconst kinds = import.meta.glob(\'/src/cms/fields/*.kay\')\n---\np field\n')
+    await Bun.write(join(library, 'editor.kay'), '---\nimport Field from \'./field.kay\'\n---\nField\n')
+    await Bun.write(join(library, 'field.kay'), '---\nconst kinds = import.meta.glob(\'/src/cms/fields/*.kay\')\n---\np field\n')
+
+    try {
+      const real = realpathSync(dir)
+      const at = (file: string) => join(real, file)
+      const inModules = at('node_modules/kayjs-lib/field.kay')
+      const outside = [join(realpathSync(library), 'editor.kay'), join(realpathSync(library), 'field.kay')]
+      const input = { root: dir, owned: [at('src/routes')], config: at('kay.config.ts'), entry: at('src/server.ts') }
+      const evicted = (loaded: string[]) => {
+        const plan = planReload({ ...input, loaded, changed: ['src/cms/fields/color.kay'] })
+
+        return 'evict' in plan ? plan.evict.sort() : plan
+      }
+
+      expect(evicted([at('src/routes/index.kay'), inModules])).toEqual([inModules, at('src/server.ts')].sort())
+      // The component importing the holder follows it.
+      expect(evicted([at('src/routes/index.kay'), ...outside])).toEqual([...outside, at('src/server.ts')].sort())
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+      await rm(library, { recursive: true, force: true })
+    }
+  })
+
   it('leaves out of a glob what the loader does, and follows a glob held by a TypeScript module, an exclusion and a file added later', async () => {
     const dir = await scratchDir('reload-plan-')
 

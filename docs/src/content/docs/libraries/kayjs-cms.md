@@ -70,7 +70,9 @@ label {label}
   input(type="color" value={typeof value === 'string' ? value : '#000000'} onInput={event => onChange(event.currentTarget.value)})
 ```
 
-The component gets `value`, `onChange`, `label`, `hint`, `issue` (why the last save refused the field) and `required`. A save checks the value against the schema alone, so a `pattern` or a union refuses a bad one. A kind with no file is edited as JSON, with a hint naming the file to add.
+The component gets `value`, `onChange`, `label`, `hint`, `issue` (why the last save refused the field) and `required`. A save checks the value against the schema alone, so a `pattern` or a union refuses a bad one. A kind with no file is edited as JSON, with a hint naming the file to add in development only, and the server logs a warning at boot for it.
+
+A file added while `kay dev` runs is picked up on the next reload. `customField` refuses the name of a kind the editor has built in, such as `text`, `image` or `reference`.
 
 ## Files and images
 

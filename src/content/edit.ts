@@ -116,6 +116,8 @@ export interface EditSite {
 
 const MARKDOWN = /\.md$/
 const KIND_NAME = /^[\w-]+$/
+// The kinds an editor has a control for, which `customField` cannot name: the built-in control would win over the app's component.
+const BUILT_IN_KINDS = ['text', 'textarea', 'markdown', 'number', 'integer', 'boolean', 'date', 'datetime', 'image', 'file', 'json', 'reference']
 const YAML_FILE = /\.ya?ml$/
 const SLASHES = /[\\/]/
 const CRLF = /\r\n/g
@@ -187,6 +189,9 @@ export function markdownField(options?: StringOptions): ReturnType<typeof t.Stri
 export function customField<Schema extends TSchema>(kind: string, schema: Schema): Schema {
   if (!KIND_NAME.test(kind))
     throw new KayError('content-api-misuse', `kay: customField(${JSON.stringify(kind)}) names a kind outside letters, digits, - and _, which no src/cms/fields/<kind>.kay file can have`)
+
+  if (BUILT_IN_KINDS.includes(kind))
+    throw new KayError('content-api-misuse', `kay: customField(${JSON.stringify(kind)}) names a kind the editor has built in (${BUILT_IN_KINDS.join(', ')}), which would win over src/cms/fields/${kind}.kay: pick another name`)
 
   return { ...schema, 'x-kay': { kind } }
 }

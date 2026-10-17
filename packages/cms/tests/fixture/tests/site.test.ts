@@ -435,6 +435,25 @@ test('a kind with no component falls back to JSON and names the file to add', as
   expect(page.find('[data-kcms-path="mood"]')[0]?.text).toContain('No editor for the mood kind: add src/cms/fields/mood.kay')
 })
 
+test('the hint to add a component shows in development and test, not in production', async () => {
+  const before = process.env.NODE_ENV
+
+  process.env.NODE_ENV = 'production'
+
+  try {
+    const page = await site.visit('/admin/collections/products/mug')
+
+    expect(page.find('[data-kcms-path="mood"] textarea')).toHaveLength(1)
+    expect(page.find('[data-kcms-path="mood"]')[0]?.text).not.toContain('No editor for the mood kind')
+  }
+  finally {
+    if (before === undefined)
+      delete process.env.NODE_ENV
+    else
+      process.env.NODE_ENV = before
+  }
+})
+
 test('a custom kind\'s value is validated by its schema alone on save', async () => {
   const refused = await send('POST', 'products/mug', { data: { name: 'Mug', color: 'red' } })
 

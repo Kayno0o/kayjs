@@ -61,7 +61,8 @@ const imports = new Map<string, Imports>()
 // The files of the routes and API directories and `.kay` files are kay's to import again. Any other changed module is too when only such files import it, as a helper of the pages is; one the entry or other code imports may hold what a reload cannot let go of, a connection, a timer, a cache an earlier module filled, so it needs a new process.
 export function planReload({ root, changed, loaded, owned, content, config, entry }: ReloadInput): ReloadPlan {
   const real = realpathOf(root)
-  const modules = new Set(loaded.filter(file => file.startsWith(real + sep) && !NOT_PROJECT.test(file.slice(real.length))))
+  // The components a library ships are modules too: one holding a glob of the app's files, `/src/cms/fields/*.kay` in kayjs-cms, follows a file added to it.
+  const modules = new Set(loaded.filter(file => file.endsWith('.kay') ? !file.startsWith(join(real, '.kay') + sep) : file.startsWith(real + sep) && !NOT_PROJECT.test(file.slice(real.length))))
   const contentConfig = content === undefined ? undefined : realpathOf(content.file)
   const folders = (content?.folders ?? []).map(realpathOf)
   const kays = (file: string) => file.endsWith('.kay') || file === contentConfig || owned.some(dir => file.startsWith(dir + sep))

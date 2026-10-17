@@ -65,10 +65,10 @@ label {label}
   input(type="color" value={typeof value === 'string' ? value : '#000000'} onInput={event => onChange(event.currentTarget.value)})
 ```
 
-- The kind's name is the file's name in `src/cms/fields/`: the editor bundles every file there, so adding one needs no config. A new file is picked up when the dev server restarts.
+- The kind's name is the file's name in `src/cms/fields/`: the editor bundles every file there, so adding one needs no config. A file added or removed while `kay dev` runs is picked up on the next reload. A kind named like a built-in one (`text`, `textarea`, `markdown`, `number`, `integer`, `boolean`, `date`, `datetime`, `image`, `file`, `json`, `reference`) is refused by `customField`, as the built-in editor would win.
 - The component gets `CustomFieldProps`: `value` (`undefined` while unset), `onChange(next)`, `label`, `hint`, `issue` (why the last save refused it) and `required`. It renders in the admin form and in the editor on the page, in a list or a group too.
 - A save validates the value by the schema given to `customField` alone, so a `pattern`, a range or a union refuses a bad value as for any field; `customField` keeps the schema's own type.
-- A kind with no file there is edited as JSON, with a hint naming the file to add.
+- A kind with no file there is edited as JSON, with a hint naming the file to add that shows in development and test only. The server logs a warning at boot for each such kind, naming the collections that use it, when the project has a `src` folder.
 - The list of entries shows a title, never a field, and the value on the page is read by the page as for any field.
 
 ## API
