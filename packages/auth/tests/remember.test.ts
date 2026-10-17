@@ -24,7 +24,7 @@ function later(seconds: number) {
 }
 
 describe('remember me', () => {
-  test('a remembered sign-in outlives sessionMaxAge, up to rememberMaxAge unseen', async () => {
+  test('a remembered sign-in outlives the session plugin\'s maxAge, up to rememberMaxAge unseen', async () => {
     const { browser, store } = await setup()
     const ada = browser()
 

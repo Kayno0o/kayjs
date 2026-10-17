@@ -455,7 +455,7 @@ async function issue(state: RequestState, record: UserRecord, type: LinkType, em
     const token = randomToken() + await rememberMark(state, type)
 
     content.url = `${core.url}${mail.links[type]}?token=${token}`
-    await core.store.tokens.create({ digest: digest(unmarked(token)), type, userId: record.id, email, redirect, expiresAt: new Date(Date.now() + TOKEN_LIFETIME_MS[type]) })
+    await core.store.tokens.create({ digest: digest(type === 'magic-link' ? unmarked(token) : token), type, userId: record.id, email, redirect, expiresAt: new Date(Date.now() + TOKEN_LIFETIME_MS[type]) })
   }
 
   if (mode !== 'link' && nonce !== undefined) {

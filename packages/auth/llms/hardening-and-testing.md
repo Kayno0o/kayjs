@@ -24,7 +24,7 @@ createAuth({
 
 ## Limits
 
-Attempts are counted in the store, so every process shares them, per client address (read as kay's `rateLimit` reads it, through `proxy` in kay.config.ts) and per account. A plain Elysia app that kay's `pages()` does not serve passes the same setting to `createAuth` as `proxy`, `{ hops: 1 }` behind nginx, or every client counts as the proxy. `limits` overrides any of `DEFAULT_LIMITS`, each `{ max, window }` with `window` in seconds:
+Attempts are counted in the store, so every process shares them, per client address (read as kay's `rateLimit` reads it, through `proxy` in kay.config.ts) and per account. A plain Elysia app that kay's `pages()` does not serve passes the same setting to `createAuth` as `proxy`, `{ hops: 1 }` behind nginx, or every client counts as the proxy. `limits` overrides any of `DEFAULT_LIMITS`, each `{ max, window }` with `window` seconds or a string such as `'1h'`:
 
 - `signIn` 40 and `signInAccount` 6 per 15 minutes; the account counts failures only, and a success clears it.
 - `register` 6 per hour.

@@ -135,7 +135,7 @@ describe('what the pages make of the box', () => {
 })
 
 describe('the lifetime of a sign-in by emailed code', () => {
-  test('lasts a day when remember is false, rememberMaxAge when true, and sessionMaxAge when the sign-in said nothing', async () => {
+  test('lasts a day when remember is false, rememberMaxAge when true, and the session plugin\'s maxAge when the sign-in said nothing', async () => {
     const { browser, take, store } = setup({ codes: 'code' })
 
     const DAY = 24 * 60 * 60
