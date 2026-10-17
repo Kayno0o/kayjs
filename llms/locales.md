@@ -232,7 +232,7 @@ export default defineMessages({
 - In an island, give `formatRelativeTime` the moment it is relative to, `{ now }`, from the server, so the browser renders what the server did, or use `relativeTime`.
 - `locales()` is the configured locales in `i18n`'s order, only the page's own without `i18n`; `localeName('fr')` is `Français`, `localeName('pt-BR')` is `Português (Brasil)`, each in its own language through `Intl.DisplayNames`, first letter capitalized, a code `Intl` cannot read as written.
 - `direction()` is `rtl` or `ltr`, for the request's locale or the one given.
-- `locale()` names it, as do `ctx.locale` in pages, guards, endpoints and actions, the site's `lang` (English by default) without `i18n`.
+- `locale()` names it, as do `ctx.locale` in pages, guards, endpoints and actions, and `t()`, `wording()` and `locale()` in API handlers and their `onError`, the locale of the page the call came from, the site's `lang` (English by default) without `i18n`.
 - A link written as the default locale names a page, `a(href="/about")`, goes to the page's locale's copy as it renders: `/en/about` on an English page, translated by `paths`, on the locale's host with `domains`.
 - So do links to a localized collection's feed, the links of Markdown entries, and those an island renders in the browser, so converting a site needs no change to its links.
 - A link carrying `hreflang` stays as written, as a language switcher's must: `a(href={alternate('fr')} hreflang="fr")`.

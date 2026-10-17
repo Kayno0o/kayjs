@@ -1,5 +1,6 @@
 import type { EventStream } from '../runtime/live'
 import { END_EVENT, ERROR_EVENT } from '../runtime/live'
+import { localeState, runInLocale } from '../runtime/locale-state'
 import { kayLog } from '../runtime/log'
 import { encodeValue, unsendable } from '../runtime/wire'
 
@@ -19,11 +20,32 @@ export class StreamRefused extends Error {
 // The source is read one value per value the browser takes, and stopped when it goes away; a source that throws ends the stream as failed, the error logged.
 export function eventStream<T>(source: AsyncIterable<T> | Iterable<T>): EventStream<T> {
   const reporter = { report: (error: unknown) => kayLog('error', 'an event stream failed', error) }
-  const response = new Response(eventBody(source, error => reporter.report(error)), { headers: { 'content-type': 'text/event-stream; charset=utf-8', 'cache-control': 'no-cache' } })
+  const response = new Response(eventBody(inRequestLocale(source), error => reporter.report(error)), { headers: { 'content-type': 'text/event-stream; charset=utf-8', 'cache-control': 'no-cache' } })
 
   streamReporters.set(response, reporter)
 
   return response as EventStream<T>
+}
+
+// The source read in the locale the route answered in, which the body is read outside of.
+function inRequestLocale<T>(source: AsyncIterable<T> | Iterable<T>): AsyncIterable<T> | Iterable<T> {
+  const state = localeState()
+
+  if (!state)
+    return source
+
+  const iterator = () => Symbol.asyncIterator in source ? source[Symbol.asyncIterator]() : source[Symbol.iterator]()
+
+  return {
+    [Symbol.asyncIterator]() {
+      const read = iterator()
+
+      return {
+        next: async () => runInLocale(state, async () => read.next()),
+        return: async () => runInLocale(state, async () => read.return?.() ?? { done: true, value: undefined }),
+      }
+    },
+  }
 }
 
 // The body of an event stream, a source's failure handed to `report`.

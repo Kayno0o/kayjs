@@ -5,6 +5,7 @@ import type { KayConfig } from '../config'
 import type { GuardContext, Locals, RouteParams } from '../runtime'
 import type { ActionContext, RateKeyContext, ServerAction } from '../runtime/action'
 import type { Locale } from '../runtime/i18n'
+import type { LocaleState } from '../runtime/locale-state'
 import type { BodyLimit } from './body'
 import type { CookieJar } from './cookies'
 import type { CorsOptions } from './cors'
@@ -580,9 +581,15 @@ function warnUnknownScheme(request: Request): void {
 }
 
 export function inLocale<T>(request: Request, options: ActionOptions, run: () => T): T {
-  const locale = requestLocale(options.i18n.settings, request, postedFrom(request) ?? null, options.base)
+  return runInLocale(requestState(request, options), run)
+}
 
-  return runInLocale(stateFor(options.i18n, locale, requestUrl(request).pathname, request), run)
+// The locale state of a request: its locale as the host, the page it came from or the visitor's preference say, a site's single language without a lookup.
+export function requestState(request: Request, options: ActionOptions): LocaleState {
+  const { i18n } = options
+  const locale = i18n.settings.locales.length === 1 ? i18n.settings.defaultLocale : requestLocale(i18n.settings, request, postedFrom(request) ?? null, options.base)
+
+  return stateFor(i18n, locale, requestUrl(request).pathname, request)
 }
 
 // What `ctx.locale` reads: the request's locale, or the site's single language.

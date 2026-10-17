@@ -344,6 +344,37 @@ test('an upload exactly at uploads.maxSize is stored, one byte over refused by t
   expect(await empty.text()).toBe('big.pdf is empty')
 })
 
+test('the API refusals come back in the locale of the page that called, English from any other', async () => {
+  const french = { referer: 'http://localhost/fr/products' }
+  const english = { referer: 'http://localhost/products' }
+  const refused = () => {
+    const form = new FormData()
+
+    form.append('file', new File(['alert(1)'], 'app.js', { type: 'image/png' }))
+
+    return form
+  }
+  const upload = async (headers: Record<string, string>) => (await site.fetch('/api/cms/files/products', { method: 'POST', body: refused(), headers })).text()
+
+  expect(await upload(french)).toContain('que les envois ici n\'acceptent pas')
+  expect(await upload(english)).toContain('which uploads here do not take')
+  expect(await (await site.fetch('/api/cms/entries/products/nope', { headers: french })).text()).toBe('Aucune entrée nope dans products')
+  expect(await (await site.fetch('/api/cms/entries/products/nope', { headers: english })).text()).toBe('No entry nope in products')
+  expect(await (await site.fetch('/api/cms/entries/nope/x', { headers: { 'accept-language': 'fr' } })).text()).toBe('Aucune collection nope')
+
+  outage.message = 'down'
+
+  try {
+    const remove = async (headers: Record<string, string>) => (await site.fetch('/api/cms/files/unused/delete', { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify({ keys: ['products/x.png'] }) })).text()
+
+    expect(await remove(french)).toContain('Rien n\'a été supprimé')
+    expect(await remove(english)).toContain('Nothing was deleted')
+  }
+  finally {
+    outage.message = undefined
+  }
+})
+
 test('the unused-uploads screen lists an upload no entry mentions, and deleting one removes it, a referenced one staying', async () => {
   const upload = async () => {
     const form = new FormData()

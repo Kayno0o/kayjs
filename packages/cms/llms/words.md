@@ -7,7 +7,6 @@ Every text kayjs-cms shows is looked up in the app's catalogs (`src/messages/<lo
 - A value is text: the catalog's HTML is escaped, never rendered.
 - `kay check` leaves `cms.*` keys out of its comparison between locales, so a French block needs no English twin; a key a locale lacks reads the English.
 - A name a collection or its schema gives, a field's label, a collection's name or a title, is the app's data and stays as written.
-- A refusal the API sends, `/api/cms/*`, is English for now: kay runs a guard in the request's locale but not an API handler, so `cms.store.*`, `cms.upload.refused`, `cms.uploads.needsGuard` and `cms.uploads.nothingDeleted` read the catalog only where the page that loads them runs in the locale, and the editor shows the others as the server sent them. What the editor checks before sending, an empty file or one over the size, `cms.upload.tooLarge`, `empty` and `tooLargeForServer`, and the guard's `cms.guard.notEditing`, are worded.
 
 ## The keys
 

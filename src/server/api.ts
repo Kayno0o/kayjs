@@ -1,6 +1,7 @@
 import type { Context } from 'elysia'
 import type { Locals } from '../runtime'
 import type { ActionTool } from '../runtime/action'
+import type { LocaleState } from '../runtime/locale-state'
 import type { ActionOptions } from './actions'
 import type { ApiModule } from './api-modules'
 import type { BodyLimit, RouteBodyLimit } from './body'
@@ -13,7 +14,8 @@ import { Cookie, Elysia, ElysiaCustomStatusResponse, ElysiaFile } from 'elysia'
 import { KayError } from '../compiler/errors'
 import { TRAILING_SLASH } from '../runtime/base'
 import { API_MOUNT } from '../runtime/live'
-import { admitCrossSite, contextLocale, crossSiteRefused, crossSiteResponse, guardsFirst, inLocale, passGuards } from './actions'
+import { runInLocale } from '../runtime/locale-state'
+import { admitCrossSite, contextLocale, crossSiteRefused, crossSiteResponse, guardsFirst, passGuards, requestState } from './actions'
 import { importModule } from './bundle'
 import { cookieJar } from './cookies'
 import { corsAdmits, corsResponse, corsRule, dropOwnGrant, grantedByKay, preflight, varyByOrigin, withCors, withoutOwnGrant } from './cors'
@@ -100,6 +102,17 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
         routeRates.set(`${method} ${path}`, rateLimitsOf(detail.rateLimit, `${method} ${path}`))
     }
 
+    // The handlers and error hooks run in Elysia's call, so each is wrapped to run in the request's locale, as the guards do.
+    for (const route of instance.routes) {
+      if (typeof route.handler === 'function')
+        route.handler = inRequestLocale(route.handler as Handler, options)
+
+      const hooks = route.hooks as { error?: unknown } | undefined
+
+      if (hooks?.error !== undefined)
+        hooks.error = [hooks.error].flat().map(hook => localizedHook(hook, options))
+    }
+
     const guards = requiredGuards(await Promise.all(module.guards.map(async ({ file }) => loadGuard({ file, special: {} }))), module, {}, options.requireGuards)
     const methods = [...new Set(instance.routes.map(route => route.method.toUpperCase()).filter(method => method !== 'OPTIONS' && method !== 'WS'))]
 
@@ -127,7 +140,7 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
           if (guards.length === 0 && !cors)
             return crossSiteRefused(context.request) ? crossSiteResponse(context.request, 'request') : undefined
 
-          return answeringRequest(context.request, async () => inLocale(context.request, options, async () => admit(guards, sharedContext(context.request, () => ({ ...context })), options, cors)))
+          return answeringRequest(context.request, async () => inApiLocale(context.request, options, async () => admit(guards, sharedContext(context.request, () => ({ ...context })), options, cors)))
         })
         // After the guards, so a caller they refuse costs no allowance and a `key` reads what they set up.
         .onBeforeHandle(async (context) => {
@@ -138,7 +151,7 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
             return undefined
 
           const request = context.request
-          const wait = await answeringRequest(request, async () => inLocale(request, options, async () => apiLimitWait(limits, request, context.server, () => ({
+          const wait = await answeringRequest(request, async () => inApiLocale(request, options, async () => apiLimitWait(limits, request, context.server, () => ({
             request,
             locale: contextLocale(options),
             get cookies() {
@@ -176,7 +189,7 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
           if ((context.code !== 'VALIDATION' && context.code !== 'INVALID_FILE_TYPE') || guards.length === 0 || admitted.has(context.request))
             return undefined
 
-          const refusal = await answeringRequest(context.request, async () => inLocale(context.request, options, async () => guardsFirst(guards, sharedContext(context.request, () => ({ ...context })), (context as { params?: Record<string, unknown> }).params ?? {}, undefined, options)))
+          const refusal = await answeringRequest(context.request, async () => inApiLocale(context.request, options, async () => guardsFirst(guards, sharedContext(context.request, () => ({ ...context })), (context as { params?: Record<string, unknown> }).params ?? {}, undefined, options)))
 
           if (refusal && cors) {
             withCors(cors, context.request, refusal.headers)
@@ -207,6 +220,75 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
   }
 
   return { limits, routeLimits, mounted }
+}
+
+// The locale state of each API request, resolved once for its guards, rate limits, handler and error hooks.
+const states = new WeakMap<Request, LocaleState>()
+
+function inApiLocale<T>(request: Request, options: ActionOptions, run: () => T): T {
+  let state = states.get(request)
+
+  if (state === undefined)
+    states.set(request, state = requestState(request, options))
+
+  return runInLocale(state, run)
+}
+
+type Handler = (context: { request: Request }, ...rest: unknown[]) => unknown
+
+// Where a wrapped function keeps the one it wraps, so a module mounted by a second app is wrapped again from the original.
+const WRAPPED = Symbol.for('kay.localized')
+
+// A handler or an error hook that runs in the request's locale, a generator it returns read there too.
+// It reads as the function it wraps, as Elysia infers from its source what the route needs of the context.
+function inRequestLocale(fn: Handler, options: ActionOptions): Handler {
+  const original = (fn as { [WRAPPED]?: Handler })[WRAPPED] ?? fn
+
+  const wrapped: Handler = function (this: unknown, context, ...rest) {
+    return inApiLocale(context.request, options, () => inStream(original.call(this, context, ...rest), context.request, options))
+  }
+
+  Object.defineProperties(wrapped, { toString: { value: () => original.toString() }, [WRAPPED]: { value: original } })
+
+  return wrapped
+}
+
+function localizedHook(hook: unknown, options: ActionOptions): unknown {
+  if (typeof hook === 'function')
+    return inRequestLocale(hook as Handler, options)
+
+  const container = hook as { fn?: unknown }
+
+  if (typeof container?.fn === 'function')
+    container.fn = inRequestLocale(container.fn as Handler, options)
+
+  return hook
+}
+
+// A generator a handler answers is read by Elysia after the handler returned, so each step runs in the locale again.
+function inStream(value: unknown, request: Request, options: ActionOptions): unknown {
+  const stream = value as Partial<AsyncGenerator> | null
+
+  if (typeof stream !== 'object' || stream === null || typeof stream.next !== 'function' || (!(Symbol.asyncIterator in stream) && !(Symbol.iterator in stream)))
+    return value
+
+  const step = (name: 'next' | 'return' | 'throw') => (argument?: never) => inApiLocale(request, options, () => (stream[name] as ((argument?: never) => unknown) | undefined)?.call(stream, argument))
+
+  // Not a plain object, which a JSON answer would take it for.
+  return new LocalizedStream({ next: step('next'), return: step('return'), throw: step('throw') }, Symbol.asyncIterator in stream)
+}
+
+class LocalizedStream {
+  next: () => unknown
+  return: () => unknown
+  throw: () => unknown
+
+  constructor(read: Record<'next' | 'return' | 'throw', () => unknown>, asynchronous: boolean) {
+    this.next = read.next
+    this.return = read.return
+    this.throw = read.throw
+    Object.defineProperty(this, asynchronous ? Symbol.asyncIterator : Symbol.iterator, { value: () => this })
+  }
 }
 
 const answeredBefore = new WeakSet<Response>()

@@ -27,7 +27,9 @@ export default defineMessages({
       empty: '{name} est vide',
       refused: '{name} est {type}, que les envois ici n\'acceptent pas : {accepted}',
     },
+    store: { noCollection: 'Aucune collection {name}', noEntry: 'Aucune entrée {slug} dans {collection}' },
     uploads: {
+      nothingDeleted: 'Rien n\'a été supprimé : {reasons}',
       deleteMany: { one: 'Supprimer 1 fichier et ses variantes ?', other: 'Supprimer {count} fichiers et leurs variantes ?' },
       empty: 'Aucun fichier inutilisé',
     },
