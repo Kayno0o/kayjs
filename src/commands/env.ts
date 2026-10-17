@@ -13,7 +13,7 @@ import { importApi } from './import-module'
 import { USAGES } from './usages'
 
 // A variable with the place that declares it.
-interface Listed extends EnvVariable {
+export interface Listed extends EnvVariable {
   source: string
 }
 
@@ -68,7 +68,7 @@ export const env: Command = {
   },
 }
 
-async function listEnv(root: string): Promise<{ variables: Listed[], unread: { file: string, error: string }[] }> {
+export async function listEnv(root: string): Promise<{ variables: Listed[], unread: { file: string, error: string }[] }> {
   const config = await loadConfig(root)
   const declared = listingEnv()
   const shown = (file: string) => relative(root, file)

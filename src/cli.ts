@@ -20,6 +20,7 @@ const COMMANDS: Record<keyof typeof USAGES, () => Promise<Command>> = {
   'routes': async () => (await import('./commands/routes')).routes,
   'not-found': async () => (await import('./commands/not-found')).notFound,
   'env': async () => (await import('./commands/env')).env,
+  'doctor': async () => (await import('./commands/doctor')).doctor,
   'explain': async () => (await import('./commands/explain')).explain,
   'types': async () => (await import('./commands/types')).types,
   'fmt': async () => (await import('./commands/fmt')).fmt,

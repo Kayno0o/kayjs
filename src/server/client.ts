@@ -4,6 +4,7 @@ import type { StyleUses } from '../build/style-uses'
 import type { Node } from '../build/supports'
 import type { ServerIslandMode } from '../runtime/html'
 import { join, resolve } from 'node:path'
+import { version } from '../../package.json'
 import { ASSET_PREFIX, clientDir, outputDir } from '../build/assets'
 import { pruneUnescaped } from '../build/class-rules'
 import { writeIfChanged } from '../build/files'
@@ -38,6 +39,8 @@ export interface ClientManifest {
   problems?: string[]
   // The build `kay dev` keeps: the options it was made with, as `clientOptionsKey` writes them, so a server given others builds its own.
   options?: string
+  // The version of the kay that wrote the build, which `kay doctor` compares with the one installed.
+  kay?: string
 }
 
 // What a head carries for one chain of layouts and page: the markup, and the inline texts in it.
@@ -129,7 +132,7 @@ function isPlugin(value: unknown): value is { name: string } {
 
 // `base` is where the build is written, `.kay/client` unless a project's `paths.output` names another.
 export async function writeManifest(root: string, manifest: ClientManifest, base = outputDir(root)): Promise<void> {
-  await Bun.write(join(base, MANIFEST), JSON.stringify(manifest))
+  await Bun.write(join(base, MANIFEST), JSON.stringify({ ...manifest, kay: version }))
 }
 
 // `base` is where `kay build` wrote the client build, `.kay/client` unless an executable embeds it elsewhere.

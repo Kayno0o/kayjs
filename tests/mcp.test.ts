@@ -350,8 +350,16 @@ describe.concurrent('kay mcp', () => {
     const { result } = await agent.request('tools/list')
     const tools = result?.tools as { name: string, inputSchema: { type: string }, annotations: object }[]
 
-    expect(tools.map(tool => tool.name)).toEqual(['check', 'routes', 'explain', 'render', 'screenshot', 'dev_errors'])
+    expect(tools.map(tool => tool.name)).toEqual(['check', 'routes', 'explain', 'render', 'screenshot', 'doctor', 'dev_errors'])
     expect(tools.every(tool => tool.inputSchema.type === 'object' && 'readOnlyHint' in tool.annotations)).toBe(true)
+  })
+
+  it('answers the doctor\'s checks, a failing one being a result', async () => {
+    const { result } = await agent.request('tools/call', { name: 'doctor', arguments: { port: 65_000 } })
+    const checks = (result?.structuredContent as { checks: { name: string }[] }).checks
+
+    expect(checks.map(check => check.name)).toEqual(['bun', 'versions', 'config', 'env', 'port', 'build'])
+    expect(result?.isError).toBeUndefined()
   })
 
   it('checks the project, or only the files given, a lint being a result and not a failure', async () => {

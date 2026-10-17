@@ -186,6 +186,28 @@ function tools(root: string): Tool[] {
       },
     },
     {
+      name: 'doctor',
+      title: 'Diagnose the setup',
+      description: 'Checks what can keep the project from running, without starting it: the Bun version, kay and its libraries on one minor, the config loading, the declared environment variables being set, the port being free and `.kay` being built by this kay. Answers `{ checks }`, each with its name, whether it is ok, a message and, on a failure, the `fix`. A failing check is a result, not a failure of the tool.',
+      inputSchema: { type: 'object', properties: { port: { type: 'integer', minimum: 1, maximum: 65_535, description: 'The port to check is free; PORT, else 3000, by default.' } }, additionalProperties: false },
+      annotations: READ_ONLY,
+      run: async (args) => {
+        const port = args.port === undefined ? undefined : Number(args.port)
+
+        if (port !== undefined && !Number.isInteger(port))
+          throw new Error('port takes a port number')
+
+        const result = await kay(['doctor', '--format', 'json', ...port === undefined ? [] : [`--port=${port}`]])
+
+        try {
+          return jsonText(JSON.parse(result.stdout) as object)
+        }
+        catch {
+          return { content: [{ type: 'text', text: result.stderr.trim() || result.stdout.trim() || 'The command printed nothing.' }], isError: true }
+        }
+      },
+    },
+    {
       name: 'dev_errors',
       title: 'Read the dev server\'s errors',
       description: 'Reads the errors a running `kay dev` met, from `.kay/dev/errors.json`: why the server failed to boot, requests that threw and errors islands met in the browser, each with its message, report and where the project\'s own code threw. An error leaves the list once the file compiles or the request answers again. Answers an empty list when `kay dev` has met none or has not run.',

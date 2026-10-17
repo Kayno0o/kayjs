@@ -28,6 +28,7 @@ This needs Bun to know the registry first, see [Installation](/getting-started/i
 | `kay upgrade [dir] [--dry-run]` | Move kay and its libraries to the latest version and rewrite the old forms |
 | `kay routes [dir]` | List every route the project serves, and the file serving it |
 | `kay not-found [dir]` | List the old URLs visitors hit and found nothing at, and turn one into a redirect |
+| `kay doctor [dir]` | Check Bun, versions, config, environment, port and build, and say how to fix each failure |
 | `kay env [dir]` | List the environment variables the project, its libraries and kay declare |
 | `kay i18n missing [locale] [dir]` | List what each locale lacks against the default one |
 | `kay i18n accept <locale> [dir]` | Accept a locale's draft messages |
@@ -365,6 +366,26 @@ A last `kay check --fix` applies any other quick fix and prints what is left for
 
 What a minor breaks that `kay check` cannot see is in [Upgrading](/guides/upgrading).
 
+## kay doctor
+
+```sh
+kay doctor
+kay doctor --port 4000
+```
+
+`kay doctor` checks what keeps a project from running and prints one line per check, with the fix under each that fails. It exits 1 when any fails, and runs every check either way.
+
+| Check | Fails when |
+| --- | --- |
+| `bun` | Bun is older than kay needs |
+| `versions` | `@kaynooo/kayjs` or a `@kaynooo/kayjs-*` library listed in `package.json` is not installed, or a library is not on kay's minor |
+| `config` | `kay.config.ts` does not load |
+| `env` | A variable the project declares as required is set neither in the shell nor in the project's `.env` files. `kay env` lists them |
+| `port` | The port is in use. It is `--port`, else `PORT`, else 3000. The port of this project's own `kay dev` passes |
+| `build` | `.kay/client` or `.kay/dev` was built by another kay, which `kay build` or a restart of `kay dev` fixes |
+
+`--format json` prints `{ checks }`, each with its `name`, `ok`, `message` and, on a failure, its `fix`.
+
 ## kay env
 
 ```sh
@@ -476,6 +497,7 @@ Another client takes the same command in its MCP config, such as `.mcp.json` at 
 | `explain` | The lints and error codes, or with `name` one lint, error code or group |
 | `render` | `kay render` on `url`, with `method`, `body`, `headers` and `cookies` |
 | `screenshot` | `kay screenshot` on `path`, with `width`, `height`, `scheme`, `fullPage` and `cookies` (as `name=value`). Answers the document, then an image per shot; `diff: true` adds the diff image against the shot before |
+| `doctor` | `kay doctor --format json`. `port` is the port to check |
 | `dev_errors` | The errors a running `kay dev` met, from [`.kay/dev/errors.json`](#errors-without-a-browser) |
 
 The resources are `kay://llms.txt`, the index to start from, and one `kay://llms/<file>.md` for each guide of kay's `llms/`.
@@ -494,7 +516,7 @@ Colour only goes to a terminal, and not under `NO_COLOR` or `TERM=dumb`. `FORCE_
 
 ## Output for tools
 
-`kay build`, `kay routes`, `kay env`, `kay i18n missing`, `kay explain`, `kay fmt` and `kay migrate` take `--format json`, as `kay check` does. Stdout then holds one JSON document on one line, and what the app's own code prints goes to stderr. The exit code is the one the text output gives.
+`kay build`, `kay routes`, `kay env`, `kay doctor`, `kay i18n missing`, `kay explain`, `kay fmt` and `kay migrate` take `--format json`, as `kay check` does. Stdout then holds one JSON document on one line, and what the app's own code prints goes to stderr. The exit code is the one the text output gives.
 
 | Command | Document |
 | --- | --- |
@@ -502,6 +524,7 @@ Colour only goes to a terminal, and not under `NO_COLOR` or `TERM=dumb`. `FORCE_
 | `kay not-found` | `{ missing }`, each with its `path`, `hits`, `referrers`, `target` and `reason` |
 | `kay routes` | `{ routes, unlisted }`, each route with its `methods`, `path`, `kind` and `file` |
 | `kay i18n missing` | `{ locales }`, each locale with its missing `messages` keys and its missing `entries` by collection |
+| `kay doctor` | `{ checks }`, each with its `name`, `ok`, `message` and `fix` |
 | `kay env` | `{ variables, unread }`, each variable with its `name`, `source`, `type`, `required` and `default` |
 | `kay explain` | `{ groups, lints, errorGroups, errors }`, or for one lint its `summary` and its `wrong` and `right` examples |
 | `kay fmt` | `{ errors, warnings, problems, written, changed }` |

@@ -12,6 +12,7 @@ export const USAGES = {
   'routes': 'routes [dir] [--format text|json]',
   'not-found': 'not-found [dir] [--redirect <path> [--to <target>]] [--file <database>] [--format text|json]',
   'env': 'env [dir] [--format text|json]',
+  'doctor': 'doctor [dir] [--port <port>] [--format text|json]',
   'explain': 'explain [lint|error|group] [--format text|json]',
   'types': 'types [dir] [--quiet]',
   'fmt': 'fmt [paths...] [--check] [--format text|json] [--quiet]',
