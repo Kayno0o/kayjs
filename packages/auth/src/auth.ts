@@ -1295,8 +1295,13 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
   }
 }
 
+// The seconds of a lifetime option, rounded up to whole ones as a cookie's Max-Age and the stored lifetimes take them.
+function wholeSeconds(value: Duration, what: string): number {
+  return Math.ceil(durationSeconds(value, what, 'kayjs-auth'))
+}
+
 function auditMaxAge(audit: true | { maxAge?: Duration }): number {
-  return audit === true || audit.maxAge === undefined ? DEFAULT_AUDIT_MAX_AGE : durationSeconds(audit.maxAge, 'audit.maxAge', 'kayjs-auth')
+  return audit === true || audit.maxAge === undefined ? DEFAULT_AUDIT_MAX_AGE : wholeSeconds(audit.maxAge, 'audit.maxAge')
 }
 
 // Lets `authPages` hand a `createAuth({ pages: true })` its prefix and home, the paths derived from the prefix following, whichever of the two ran first.
@@ -1363,7 +1368,7 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
     pages,
     site: options.site ?? (url === undefined ? 'kayjs-auth' : new URL(url).host),
     limits: resolveLimits(options.limits),
-    rememberMaxAge: options.rememberMaxAge === undefined ? DEFAULT_REMEMBER_MAX_AGE : durationSeconds(options.rememberMaxAge, 'rememberMaxAge', 'kayjs-auth'),
+    rememberMaxAge: options.rememberMaxAge === undefined ? DEFAULT_REMEMBER_MAX_AGE : wholeSeconds(options.rememberMaxAge, 'rememberMaxAge'),
     rules: resolveRules(options.rules),
     sessionsPage: options.sessionsPage ?? paths?.sessions,
     locate: options.locate,
@@ -1392,7 +1397,7 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
     onSignUp: options.onSignUp,
     onProviderProfile: options.onProviderProfile,
     onDelete: options.onDelete,
-    guestMaxAge: options.guests === undefined ? undefined : durationSeconds(options.guests.maxAge, 'guests.maxAge', 'kayjs-auth'),
+    guestMaxAge: options.guests === undefined ? undefined : wholeSeconds(options.guests.maxAge, 'guests.maxAge'),
     onExport: options.onExport,
     onAuthEvent: options.onAuthEvent,
     onEvent: options.onEvent,

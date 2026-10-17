@@ -24,6 +24,14 @@ describe('time options take a Duration', () => {
     expect(() => testApp({ rememberMaxAge: 0 })).toThrow('kayjs-auth: rememberMaxAge is 0')
   })
 
+  test('a sub-second rememberMaxAge is stored as whole seconds, rounded up', async () => {
+    const { browser, store } = testApp({ rememberMaxAge: 0.4 })
+    const ada = browser()
+
+    await ada.call('register', { email: 'ada@example.com', password: PASSWORD }, { remember: true })
+    expect((await store.sessions.listByUser((await store.users.findByEmail('ada@example.com'))!.id))[0]!.maxAge).toBe(1)
+  })
+
   test('audit.maxAge takes a string, and a bad one fails at boot naming it', async () => {
     const { browser, store } = testApp({ audit: { maxAge: '1m' } })
     const ada = browser()
