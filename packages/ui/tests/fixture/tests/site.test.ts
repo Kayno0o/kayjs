@@ -595,6 +595,7 @@ const SCRIPT_PATH = /src="(\/[^"]+\.js)"/g
 const STATIC_IMPORT = /(?:from|import)\s*["'](\.\/[^"']+\.js)["']/g
 const DYNAMIC_IMPORT = /import\(\s*["'](\.\/[^"']+\.js)["']/g
 const TURNDOWN = /turndown/i
+const CHUNK_NAME = /data-chunk="([^"/]+\.js)"/g
 
 test('a CopyButton island ships no HTML to Markdown converter, and MarkdownEditor loads it only on demand', async () => {
   // Built for the browser, never opened in one.
@@ -620,12 +621,34 @@ test('a CopyButton island ships no HTML to Markdown converter, and MarkdownEdito
   const converting = async (paths: Set<string>) => (await Promise.all([...paths].map(async path => TURNDOWN.test(await script(path)) ? [path] : []))).flat()
 
   try {
-    const entry = [...(await built.visit('/data')).html.matchAll(SCRIPT_PATH)].map(([, path = '']) => path).find(path => path.includes('/entry-'))!
-    const island = (name: string) => imports(scripts.get(entry)!, DYNAMIC_IMPORT).find(path => path.startsWith(`/_kay/${name}-`))!
+    // Each island's markup names its chunk, and every chunk a page can load is reached from those and the entry.
+    const reached = new Set<string>()
+    const reach = async (path: string) => {
+      if (reached.has(path))
+        return
 
-    await script(entry)
+      reached.add(path)
+      const code = await script(path)
+
+      for (const next of [...imports(code, STATIC_IMPORT), ...imports(code, DYNAMIC_IMPORT)])
+        await reach(next)
+    }
+
+    for (const page of ['/data', '/form-reset']) {
+      const { html } = await built.visit(page)
+      const paths = [...[...html.matchAll(SCRIPT_PATH)].map(([, path = '']) => path), ...[...html.matchAll(CHUNK_NAME)].map(([, file = '']) => `/_kay/${file}`)]
+
+      for (const path of paths)
+        await reach(path)
+    }
+
+    const island = (name: string) => [...reached].find(path => path.startsWith(`/_kay/${name}-`))!
+
+    expect(island('copy-button')).toBeDefined()
+    // The form-reset island renders a MarkdownEditor, which its chunk carries.
+    expect(island('form-reset')).toBeDefined()
     const copyButton = await loadedWith(island('copy-button'))
-    const editor = await loadedWith(island('markdown-editor'))
+    const editor = await loadedWith(island('form-reset'))
     const onPaste = new Set<string>()
 
     for (const path of editor) {
