@@ -6,7 +6,7 @@ import { comparePasswords, hashPassword, passwordNeedsRehash } from '@kaynooo/ut
 import { localPath } from 'kay'
 import { newPasswordProblem } from './breached'
 import { admit } from './captcha'
-import { newUserRecord, publicUser } from './core'
+import { homeOf, newUserRecord, publicUser } from './core'
 import { warnHolder, welcome } from './email'
 import { erase } from './erase'
 import { report } from './events'
@@ -156,7 +156,7 @@ export async function register(state: RequestState, input: RegisterInput): Promi
   if (requireVerified && !guest)
     return { ok: true, signedIn: false }
 
-  await state.complete(record, '/', 'register')
+  await state.complete(record, homeOf(state.core), 'register')
 
   return { ok: true, user, signedIn: true }
 }
@@ -270,7 +270,7 @@ export async function signInWithPassword(state: RequestState, input: PasswordSig
   if (passwordNeedsRehash(record!.passwordHash!))
     await store.users.update(record!.id, { passwordHash: await hashPassword(input.password) })
 
-  return state.complete(record!, localPath(input.redirect, '/'), 'password')
+  return state.complete(record!, localPath(input.redirect, homeOf(state.core)), 'password')
 }
 
 // Spends as long on an account without a password as on a wrong one, so the time taken tells nothing either.

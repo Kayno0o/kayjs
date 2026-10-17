@@ -39,7 +39,7 @@ import { serveOAuthServer } from './authorize/routes'
 import { bearerRequest, bearerUser, createToken, issueToken, listTokens, revokeToken, tokenUser } from './bearer'
 import { pwnedPassword } from './breached'
 import { admit, captchaChallenge, captchaRequired, proofOfWork } from './captcha'
-import { banned, newUserRecord, publicUser } from './core'
+import { banned, homeOf, newUserRecord, publicUser } from './core'
 import { changeEmail, confirmEmailChange, pendingCode, requestMagicLink, requestPasswordReset, resetPassword, sendVerification, signInWithEmailCode, signInWithMagicLink, verifyEmail, verifyEmailCode } from './email'
 import { auditEntries, report } from './events'
 import { exportData } from './export'
@@ -1092,7 +1092,7 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
     .post(`${core.prefix}/sign-out` as `${Prefix}/sign-out`, async ({ auth, body, redirect }) => {
       await auth.signOut()
 
-      return redirect(safeRedirect(text((body as Record<string, unknown> | undefined)?.redirect), core.pages?.home ?? '/'), 303)
+      return redirect(safeRedirect(text((body as Record<string, unknown> | undefined)?.redirect), homeOf(core)), 303)
     })
     // A GET, so a sign-in link works without JavaScript: give it `data-no-prefetch` so a hover starts nothing.
     // Typed as their literal paths, so `kay check` checks links to them once the app registers its Elysia app.

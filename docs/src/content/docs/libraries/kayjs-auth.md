@@ -53,6 +53,14 @@ Every page, action and guard can now read `ctx.locals.auth`, typed. `pages: true
 
 A file of yours at the same path, such as `src/routes/auth/sign-in.kay`, replaces that page.
 
+`pages.home` is where a visitor lands when nothing asked for another page, `/` by default: after a password reset, a verified address, a changed one, a magic link, a code, registering, a passkey or a provider. On a site with locales it is read as written for the default locale, and the pages put it in the visitor's language.
+
+The sign-in and register pages show a "Keep me signed in" box. Unchecked, every way of signing in gives the same short session, a browser-session cookie lasting a day unseen; checked, every way gives `rememberMaxAge`, the provider buttons and the passkey button included. `pages.remember` changes that: `'always'` hides the box and remembers every sign-in, `'never'` hides it and never does, and `'checkbox'` is the default.
+
+```ts
+createAuth({ /* ... */ pages: { home: '/dashboard', remember: 'always' } })
+```
+
 To write every page yourself, leave out `pages` and set `signInPage` to your sign-in page. List `authExtension(() => import('./src/auth'))` instead of `authPages`.
 
 ### Postgres

@@ -8,7 +8,7 @@ import { comparePasswords, hashPassword, nanoid } from '@kaynooo/utils'
 import { localPath } from 'kay'
 import { newPasswordProblem } from './breached'
 import { admit } from './captcha'
-import { banned } from './core'
+import { banned, homeOf } from './core'
 import { digest, randomToken } from './keys'
 import { spend, typedKey } from './limits'
 import { log } from './log'
@@ -143,7 +143,7 @@ export async function verifyEmail(state: RequestState, token: string, password?:
 
   await state.core.store.users.update(record.id, { emailVerifiedAt: new Date() })
 
-  return { ok: true, redirect: current?.id === record.id ? '/' : state.core.signInPage }
+  return { ok: true, redirect: current?.id === record.id ? homeOf(state.core) : state.core.signInPage }
 }
 
 // Counted as a sign-in attempt on the account, since it is one.
@@ -192,11 +192,11 @@ export async function resetPassword(state: RequestState, token: string, password
   await revokeBearerTokens(state.core, record.id)
   await notify(state, record, 'password-changed')
 
-  return state.complete(record, '/', 'reset-password')
+  return state.complete(record, homeOf(state.core), 'reset-password')
 }
 
 export async function requestMagicLink(state: RequestState, email: string, redirect?: string, captcha?: string): Promise<MailRequestResult> {
-  return mailByAddress(state, email, 'magic-link', localPath(redirect, '/'), captcha)
+  return mailByAddress(state, email, 'magic-link', localPath(redirect, homeOf(state.core)), captcha)
 }
 
 export async function signInWithMagicLink(state: RequestState, token: string): Promise<LinkResult> {
@@ -209,7 +209,7 @@ export async function signInWithMagicLink(state: RequestState, token: string): P
     ? await state.core.store.users.update(spent.record.id, { ...await claim(state.core, spent.record), emailVerifiedAt: new Date() }) ?? spent.record
     : spent.record
 
-  return state.complete(record, spent.token.redirect ?? '/', 'magic-link')
+  return state.complete(record, spent.token.redirect ?? homeOf(state.core), 'magic-link')
 }
 
 // Mails the new address a link confirming it; the account keeps the old one until then.
@@ -256,7 +256,7 @@ export async function confirmEmailChange(state: RequestState, token: string): Pr
   // To the address the account left, which is the one a thief would want silent.
   await notify(state, record, 'email-changed', record.email!, spent.record.emailVerifiedAt === null ? null : spent.record.email)
 
-  return { ok: true, redirect: '/' }
+  return { ok: true, redirect: homeOf(state.core) }
 }
 
 // On registering: the verification mail, when the app sends mail.
@@ -296,7 +296,7 @@ export async function signInWithEmailCode(state: RequestState, code: string): Pr
     ? await state.core.store.users.update(spent.record.id, { ...await claim(state.core, spent.record), emailVerifiedAt: new Date() }) ?? spent.record
     : spent.record
 
-  return state.complete(record, spent.token.redirect ?? '/', 'email-code')
+  return state.complete(record, spent.token.redirect ?? homeOf(state.core), 'email-code')
 }
 
 // Verifies the address with the code its verification mail carried, in the session that asked for it, which registered the account or is signed in as it.
@@ -308,7 +308,7 @@ export async function verifyEmailCode(state: RequestState, code: string): Promis
 
   await state.core.store.users.update(spent.record.id, { emailVerifiedAt: new Date() })
 
-  return { ok: true, redirect: (await state.current())?.id === spent.record.id ? '/' : state.core.signInPage }
+  return { ok: true, redirect: (await state.current())?.id === spent.record.id ? homeOf(state.core) : state.core.signInPage }
 }
 
 // The code this session waits for, for the page that asks for it.

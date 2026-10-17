@@ -16,6 +16,11 @@ function isAttestation(answer: unknown): answer is RegistrationResponseJSON {
 }
 
 // Whether this browser can answer a passkey request.
+// Whether the page's "keep me signed in" box is checked, false when it shows none: read by the sign-in ways that are no form of its own, the passkey and the provider buttons.
+export function rememberChecked(): boolean {
+  return document.querySelector<HTMLInputElement>('input[name="remember"]')?.checked === true
+}
+
 export function canAskPasskey(): boolean {
   return typeof PublicKeyCredential !== 'undefined' && 'parseRequestOptionsFromJSON' in PublicKeyCredential
 }

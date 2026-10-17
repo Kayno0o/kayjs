@@ -455,7 +455,7 @@ describe('the prebuilt pages', () => {
   test('the sign-in page shows what the config enables, and why a provider sign-in failed', async () => {
     const page = await (await browser()).visit('/auth/sign-in?error=cancelled')
 
-    expect(page.find('a.kui-btn').map(link => link.attributes.href)).toEqual(['/auth/discord?redirect=%2F'])
+    expect(page.find('a.kui-btn').map(link => link.attributes.href)).toEqual(['/auth/discord?redirect=%2F&remember=0'])
     expect(page.find('input[name="email"]')).toHaveLength(1)
     expect(text(page, '[role="alert"]')).toBe('The sign-in was cancelled.')
   })

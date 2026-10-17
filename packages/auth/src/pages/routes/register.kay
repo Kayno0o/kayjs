@@ -5,8 +5,9 @@ import { PASSWORD_MIN_LENGTH } from '../../rules'
 import Captcha from '../components/captcha.kay'
 import Message from '../components/message.kay'
 import Panel from '../components/panel.kay'
+import ProviderButtons from '../components/provider-buttons.kay'
 import Separator from '../components/separator.kay'
-import { captchaFor, captchaOf, guarded, issue, refusal, refusedFor, schemas } from '../forms'
+import { captchaFor, captchaOf, guarded, issue, refusal, refusedFor, remembered, schemas } from '../forms'
 import Button from '@kaynooo/kayjs-ui/button.kay'
 import FormField from '@kaynooo/kayjs-ui/form-field.kay'
 
@@ -14,7 +15,7 @@ import FormField from '@kaynooo/kayjs-ui/form-field.kay'
 export const page = { guards: false }
 
 export const register = action(schemas.register, async (input, ctx) => {
-  const result = await ctx.locals.auth.register({ email: input.email, password: input.password, ...(input.username === undefined ? {} : { username: input.username }), remember: input.remember === true, captcha: captchaOf(input), locale: ctx.locale })
+  const result = await ctx.locals.auth.register({ email: input.email, password: input.password, ...(input.username === undefined ? {} : { username: input.username }), remember: remembered(ctx.locals.auth.features(), input.remember), captcha: captchaOf(input), locale: ctx.locale })
 
   if (!result.ok)
     return ctx.fail(400, 'errors' in result ? { fields: result.errors } : { error: refusedFor(result.error, input) })
@@ -38,6 +39,8 @@ const user = await auth.user()
 if (user && !user.guest)
   ctx.redirect(redirect)
 
+const askRemember = features.pages?.remember !== 'always' && features.pages?.remember !== 'never'
+const providerLinks = features.providers.map(provider => ({ name: provider.name, label: t('auth.signIn.provider', { provider: provider.label }), href: `${features.prefix}/${provider.name}?redirect=${encodeURIComponent(redirect)}&remember=${features.pages?.remember === 'always' ? 1 : 0}` }))
 const captcha = await captchaFor(auth, features.captcha, 'register')
 const refused = ctx.failed(register)?.data
 const fields = refused && 'fields' in refused ? refused.fields : {}
@@ -52,8 +55,7 @@ Panel(title={t('auth.register.title')})
   else
     if features.providers.length > 0
       .flex.flex-col.gap-2
-        for provider of features.providers key={provider.name}
-          Button(href={`${features.prefix}/${provider.name}?redirect=${encodeURIComponent(redirect)}`} label={t('auth.signIn.provider', { provider: provider.label })} data-no-prefetch)
+        ProviderButtons(providers={providerLinks})
       Separator
     form.flex.flex-col.gap-3(action={register})
       input(type="hidden" name="redirect" value={redirect})
@@ -61,9 +63,10 @@ Panel(title={t('auth.register.title')})
         input(name="email" type="email" autocomplete="email" required)
       FormField(label={t('auth.password')} hint={t('auth.passwordHint', { min: PASSWORD_MIN_LENGTH })} issue={fields.password && issue('password', fields.password)} required)
         input(name="password" type="password" autocomplete="new-password" minlength={PASSWORD_MIN_LENGTH} required)
-      label.flex.items-center.gap-2
-        input(name="remember" type="checkbox")
-        span {t('auth.remember')}
+      if askRemember
+        label.flex.items-center.gap-2
+          input(name="remember" type="checkbox")
+          span {t('auth.remember')}
       if features.captcha && captcha.shown
         Captcha(widget={features.captcha} challenge={captcha.challenge})
       if error

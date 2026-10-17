@@ -4,7 +4,7 @@ import type { IdentityRecord, UserRecord } from '../store'
 import type { Proof, ProofFailure } from '../twoFactor'
 import type { OAuthTokens } from './types'
 import { localPath } from 'kay'
-import { newUserRecord, publicUser, sameText } from '../core'
+import { homeOf, newUserRecord, publicUser, sameText } from '../core'
 import { randomToken } from '../keys'
 import { log } from '../log'
 import { notify } from '../notify'
@@ -85,7 +85,7 @@ async function leave(state: RequestState, provider: string, redirect: string | u
     throw error
   }
 
-  await state.session.set('authOAuth', { provider, state: flowState, verifier: pkce.verifier, nonce, redirect: localPath(redirect, '/'), link, expires: Date.now() + FLOW_MAX_AGE_MS })
+  await state.session.set('authOAuth', { provider, state: flowState, verifier: pkce.verifier, nonce, redirect: localPath(redirect, homeOf(state.core)), link, expires: Date.now() + FLOW_MAX_AGE_MS })
 
   return url
 }

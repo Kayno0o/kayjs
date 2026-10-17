@@ -11,7 +11,11 @@ export interface AuthPagesOptions {
   prefix?: string | undefined
   // Where a sign-in goes when nothing asked for another page, and a sign-out always: `/` by default.
   home?: string | undefined
+  // The "keep me signed in" choice of the sign-in and register pages: `'checkbox'` shows a box that decides (unchecked is the same short session by every way of signing in, OAuth and passkeys included), `'always'` hides it and keeps every sign-in `rememberMaxAge`, `'never'` hides it and ends every session with the browser. `'checkbox'` by default.
+  remember?: RememberMode | undefined
 }
+
+export type RememberMode = 'checkbox' | 'always' | 'never'
 
 // One input of the profile form the account page shows beside the username.
 export interface ProfileField {
@@ -82,7 +86,7 @@ export interface AuthFeatures {
   // Where a sign-in that failed goes, and where a guard sends an anonymous visitor once the prebuilt pages are on.
   signInPage: string
   // The prebuilt pages' prefix and home; null without them.
-  pages: { prefix: string, home: string } | null
+  pages: { prefix: string, home: string, remember: RememberMode } | null
 }
 
 const DEFAULT_PREFIX = '/auth'
@@ -110,7 +114,7 @@ export function featuresOf(core: Core): AuthFeatures {
     prefix: core.prefix,
     oauthServer: core.oauthServer !== undefined,
     signInPage: core.signInPage,
-    pages: core.pages ? { prefix: core.pages.prefix, home: core.pages.home } : null,
+    pages: core.pages ? { prefix: core.pages.prefix, home: core.pages.home, remember: core.pages.remember } : null,
   }
 }
 
@@ -167,13 +171,13 @@ export function authPages(options: AuthPagesOptions & { auth?: (() => Promise<Au
 }
 
 // The prefix and home `createAuth` reads off its `pages` option.
-export function pagesOf(pages: boolean | AuthPagesConfig | undefined): { prefix: string, home: string, profile?: ProfileOptions } | undefined {
+export function pagesOf(pages: boolean | AuthPagesConfig | undefined): { prefix: string, home: string, remember: RememberMode, profile?: ProfileOptions } | undefined {
   if (pages == null || pages === false)
     return undefined
 
   const options = pages === true ? {} : pages
 
-  return { prefix: options.prefix ?? DEFAULT_PREFIX, home: options.home ?? '/', ...options.profile && { profile: options.profile } }
+  return { prefix: options.prefix ?? DEFAULT_PREFIX, home: options.home ?? '/', remember: options.remember ?? 'checkbox', ...options.profile && { profile: options.profile } }
 }
 
 // The label of a profile field in `locale`: a plain string as it is, a map by locale tag the entry matching `locale` exactly or by language, else the first.

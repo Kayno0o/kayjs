@@ -5,8 +5,9 @@ import Captcha from '../components/captcha.kay'
 import Message from '../components/message.kay'
 import Panel from '../components/panel.kay'
 import PasskeySignIn from '../components/passkey-sign-in.kay'
+import ProviderButtons from '../components/provider-buttons.kay'
 import Separator from '../components/separator.kay'
-import { captchaFor, captchaOf, failure, guarded, oauthFailure, refusal, refusedFor, schemas } from '../forms'
+import { captchaFor, captchaOf, failure, guarded, oauthFailure, refusal, refusedFor, remembered, schemas } from '../forms'
 import Button from '@kaynooo/kayjs-ui/button.kay'
 import FormField from '@kaynooo/kayjs-ui/form-field.kay'
 
@@ -14,16 +15,16 @@ import FormField from '@kaynooo/kayjs-ui/form-field.kay'
 export const page = { guards: false }
 
 export const password = action(schemas.signIn, async (input, ctx) => {
-  const result = await ctx.locals.auth.signInWithPassword({ identifier: input.identifier, password: input.password, remember: input.remember === true, ...(input.redirect === undefined ? {} : { redirect: input.redirect }), captcha: captchaOf(input) })
+  const result = await ctx.locals.auth.signInWithPassword({ identifier: input.identifier, password: input.password, remember: remembered(ctx.locals.auth.features(), input.remember), ...(input.redirect === undefined ? {} : { redirect: input.redirect }), captcha: captchaOf(input) })
 
   if (!result.ok)
     return ctx.fail(400, { error: result.error === 'invalid' ? 'credentials' : refusedFor(result.error, input) })
 
-  return ctx.redirect(result.redirect)
+  return ctx.redirect(localize(result.redirect))
 }, guarded)
 
 export const magicLink = action(schemas.magicLink, async (input, ctx) => {
-  const result = await ctx.locals.auth.requestMagicLink(input.email, input.redirect, { captcha: captchaOf(input), remember: input.remember })
+  const result = await ctx.locals.auth.requestMagicLink(input.email, input.redirect, { captcha: captchaOf(input), remember: remembered(ctx.locals.auth.features(), input.remember) })
 
   return result.ok ? input.email : ctx.fail(400, { error: refusedFor(result.error, input) })
 }, guarded)
@@ -34,15 +35,15 @@ export const emailCode = action(schemas.emailCode, async ({ code }, ctx) => {
   if (!result.ok)
     return ctx.fail(400, { error: result.error === 'invalid' ? 'code' : result.error })
 
-  return ctx.redirect(result.redirect)
+  return ctx.redirect(localize(result.redirect))
 })
 
 export const passkeyOptions = action(async (ctx) => ctx.locals.auth.passkeySignInOptions())
 
 export const passkey = action(schemas.passkey, async (input, ctx) => {
-  const result = await ctx.locals.auth.signInWithPasskey(input.response, input.redirect, { remember: input.remember === true })
+  const result = await ctx.locals.auth.signInWithPasskey(input.response, input.redirect, { remember: remembered(ctx.locals.auth.features(), input.remember) })
 
-  return !result.ok ? ctx.fail(400, { error: result.error }) : ctx.redirect(result.redirect)
+  return !result.ok ? ctx.fail(400, { error: result.error }) : ctx.redirect(localize(result.redirect))
 })
 
 const auth = ctx.locals.auth
@@ -62,6 +63,8 @@ const signInError = refusal(ctx.failed(password), features.captcha)
 const mailError = refusal(ctx.failed(magicLink), features.captcha)
 const codeError = ctx.failed(emailCode)?.data?.error
 const mailedTo = ctx.succeeded(magicLink)?.data
+const askRemember = features.pages?.remember !== 'always' && features.pages?.remember !== 'never'
+const providerLinks = features.providers.map(provider => ({ name: provider.name, label: t('auth.signIn.provider', { provider: provider.label }), href: `${features.prefix}/${provider.name}?redirect=${encodeURIComponent(redirect)}&remember=${features.pages?.remember === 'always' ? 1 : 0}` }))
 const codes = features.codes?.['magic-link'] ?? 'link'
 ---
 head
@@ -71,8 +74,7 @@ Panel(title={t('auth.signIn.title')})
     Message(text={oauthError})
   if features.providers.length > 0
     .flex.flex-col.gap-2
-      for provider of features.providers key={provider.name}
-        Button(href={`${features.prefix}/${provider.name}?redirect=${encodeURIComponent(redirect)}`} label={t('auth.signIn.provider', { provider: provider.label })} data-no-prefetch)
+      ProviderButtons(providers={providerLinks})
     Separator
   if pending?.type === 'sign-in'
     form.flex.flex-col.gap-3(action={emailCode})
@@ -88,9 +90,10 @@ Panel(title={t('auth.signIn.title')})
       input(name="identifier" autocomplete="username webauthn" required)
     FormField(label={t('auth.password')} required)
       input(name="password" type="password" autocomplete="current-password" required)
-    label.flex.items-center.gap-2
-      input(name="remember" type="checkbox")
-      span {t('auth.remember')}
+    if askRemember
+      label.flex.items-center.gap-2
+        input(name="remember" type="checkbox")
+        span {t('auth.remember')}
     if features.captcha && captchaSignIn.shown
       Captcha(widget={features.captcha} challenge={captchaSignIn.challenge})
     if signInError
@@ -108,6 +111,10 @@ Panel(title={t('auth.signIn.title')})
       input(type="hidden" name="redirect" value={redirect})
       FormField(label={t('auth.email')} required)
         input(name="email" type="email" autocomplete="email" required)
+      if askRemember
+        label.flex.items-center.gap-2
+          input(name="remember" type="checkbox")
+          span {t('auth.remember')}
       if features.captcha && captchaMagic.shown
         Captcha(widget={features.captcha} challenge={captchaMagic.challenge})
       if mailError

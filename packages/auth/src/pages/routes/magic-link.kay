@@ -1,5 +1,5 @@
 --- server
-import { t } from 'kay/i18n'
+import { localize, t } from 'kay/i18n'
 import Message from '../components/message.kay'
 import Panel from '../components/panel.kay'
 import { failure, schemas } from '../forms'
@@ -15,7 +15,7 @@ export const spend = action(schemas.token, async ({ token }, ctx) => {
   if (!result.ok)
     return ctx.fail(400, { error: result.error === 'invalid' ? 'link' : result.error })
 
-  return ctx.redirect(result.redirect)
+  return ctx.redirect(localize(result.redirect))
 })
 
 const token = ctx.url.searchParams.get('token') ?? ctx.failed(spend)?.values.token
