@@ -48,6 +48,22 @@ test('with pages.remember never under a base, the pages show no box, the provide
   })
 }, 60_000)
 
+test('with a prefix given to authPages alone, under a base, the pages are served there and every flow lands on home, createAuth taking the prefix from authPages', async () => {
+  const seen = await variant({ FIXTURE_PREFIX: '/members', FIXTURE_BASE: '/app', FIXTURE_HOME: '/dashboard' })
+
+  delete seen['reset-fr']
+
+  expect(seen).toEqual({
+    'signIn': { boxes: 2, links: ['/app/auth/discord?redirect=%2Fdashboard&remember=0'] },
+    'register': { boxes: 1, links: ['/app/auth/discord?redirect=%2Fdashboard&remember=0'] },
+    'registered': '/app/dashboard',
+    'registeredLifetime': 24 * 60 * 60,
+    'signedIn': '/app/dashboard',
+    'checkedLifetime': 90 * 24 * 60 * 60,
+    'reset-en': '/app/dashboard',
+  })
+}, 60_000)
+
 test('with the app\'s credential rules, the register page hints, constrains and words a refusal by them', async () => {
   expect(await variant({ FIXTURE_RULES: '1' })).toEqual({
     hint: ['At least 12 characters'],

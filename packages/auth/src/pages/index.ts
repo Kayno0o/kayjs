@@ -7,7 +7,7 @@ import type { LinkType } from '../store'
 import { pickLocale } from '../locale'
 
 export interface AuthPagesOptions {
-  // Where the pages are served, `/auth` by default, beside kayjs-auth's own routes: `/auth/sign-in`.
+  // Where the pages are served, `/auth` by default, beside kayjs-auth's own routes: `/auth/sign-in`. `createAuth` reads it when `authPages` loads it with `auth`.
   prefix?: string | undefined
   // Where a sign-in goes when nothing asked for another page, and a sign-out always: `/` by default.
   home?: string | undefined
@@ -91,7 +91,7 @@ export interface AuthFeatures {
   rules: { password: { min: number, max: number }, username: { min: number, max: number } }
 }
 
-const DEFAULT_PREFIX = '/auth'
+export const DEFAULT_PREFIX = '/auth'
 
 // The dev tool's Auth tab, which kay loads on dev pages.
 const DEV_TOOL = { module: `${import.meta.dir}/../devTool.ts` }
@@ -142,12 +142,22 @@ export type AuthModule = { auth: { plugin: AnyElysia } } | { default: { plugin: 
 // The plugin of an `AuthModule`, for `kay check` to type `ctx.locals.auth` off.
 export type PluginOf<Module> = Module extends { auth: { plugin: infer Plugin extends AnyElysia } } ? Plugin : Module extends { default: { plugin: infer Plugin extends AnyElysia } } ? Plugin : never
 
-async function pluginIn<Module extends AuthModule>(load: () => Promise<Module>): Promise<PluginOf<Module>> {
-  const module: Partial<Record<'auth' | 'default', { plugin: AnyElysia }>> = await load()
+// What `createAuth` hands `authPages` to settle the prefix and home between them, whichever of the two was made first.
+export const PAGES_OF = Symbol('kayjs-auth.pages')
+
+export interface PagesHandle {
+  // Takes the prefix and home `authPages` was given where `createAuth({ pages })` set none of its own, and throws when both name another prefix.
+  adopt: (given: { prefix?: string | undefined, home?: string | undefined }) => void
+}
+
+async function pluginIn<Module extends AuthModule>(load: () => Promise<Module>, given?: { prefix?: string | undefined, home?: string | undefined }): Promise<PluginOf<Module>> {
+  const module: Partial<Record<'auth' | 'default', { plugin: AnyElysia, [PAGES_OF]?: PagesHandle | undefined }>> = await load()
   const auth = module.auth ?? module.default
 
   if (!auth)
     throw new Error('kayjs-auth: the module `authPages` or `authExtension` loads exports no `auth`, nor a default `createAuth` result')
+
+  auth[PAGES_OF]?.adopt(given ?? {})
 
   return auth.plugin as PluginOf<Module>
 }
@@ -157,14 +167,14 @@ export function authExtension<Module extends AuthModule>(load: () => Promise<Mod
   return { name: 'auth', server: async () => pluginIn(load), devTool: DEV_TOOL }
 }
 
-// The sign-in, register, mailed-link and account pages, for `extensions` in kay.config.ts. Give `createAuth` the same `prefix` and `home` as `pages`, or `pages: true` for the defaults.
+// The sign-in, register, mailed-link and account pages, for `extensions` in kay.config.ts. With `auth`, `createAuth({ pages: true })` takes this `prefix` and `home`; one given in both places must match for the prefix.
 // `auth` loads the app's `auth` as `authExtension` does, so the app mounts nothing else and `kay check` types `ctx.locals.auth` and links to kayjs-auth's routes; `server` hands `pages()` any other plugin carrying it.
 export function authPages<Module extends AuthModule>(options: AuthPagesOptions & { auth: () => Promise<Module> }): AuthPages<PluginOf<Module>>
 export function authPages<Server extends AnyElysia = AnyElysia>(options?: AuthPagesOptions & { server?: (() => Server | Promise<Server>) | undefined }): AuthPages<Server>
 export function authPages(options: AuthPagesOptions & { auth?: (() => Promise<AuthModule>) | undefined, server?: (() => AnyElysia | Promise<AnyElysia>) | undefined } = {}): AuthPages {
   return {
     name: '@kaynooo/kayjs-auth',
-    server: options.auth ? async () => pluginIn(options.auth!) : options.server,
+    server: options.auth ? async () => pluginIn(options.auth!, { prefix: options.prefix, home: options.home }) : options.server,
     routes: { dir: `${import.meta.dir}/routes`, prefix: options.prefix ?? DEFAULT_PREFIX },
     devTool: DEV_TOOL,
     messages: `${import.meta.dir}/messages`,

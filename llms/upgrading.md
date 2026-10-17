@@ -29,6 +29,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 - `createAuth({ onEvent: (event, user, detail, context) => ... })` is now `onAuthEvent: ({ event, user, context, ...fields }) => ...`: the `detail` string is gone for fields typed per event (`method` and `provider` of a `signed-in`, `role`, `reason`, `organizationId` and `roles`, `client`, `provider`, `name`, `email`, `keptThisOne`). `onEvent` still works for now and logs a warning, and when both are given each hears every event. `kay check` reports it as `deprecated-auth-event`; no fix is offered, as the handler's parameters change with the name, so rewrite it by hand. The audit log is unchanged, its entries keep their `detail`.
 
+### kayjs-auth: `authPages` reads `prefix` and `home` from `createAuth`
+
+- `authPages({ auth, prefix, home })` now hands its `prefix` and `home` to `createAuth({ pages: true })`, so they are given once; a `createAuth({ pages: { prefix } })` naming another prefix than `authPages` stops the server at start instead of redirecting to pages that are not there. Nothing to change for an app giving both the same. No `deprecated` lint is possible: both are plain config values `kay check` does not read.
+
 ### `kay dev` does not move a port it was asked for
 
 - A busy port given with `--port`, or by `PORT` in the environment or `.env`, used to move the server to the next free one; the server now fails to start naming the port. Free it, or drop the `PORT` to get the old behaviour. A port the entry names in code still moves. No deprecated lint is possible, as the port is an environment value.

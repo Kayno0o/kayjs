@@ -1,13 +1,16 @@
 import { join } from 'node:path'
 import { testSite } from 'kay/test'
-import { mails, store } from '../src/auth'
 
 // Run in a process of its own, as the environment sets the pages' `home` and `remember` before the fixture's auth loads: prints what the pages show and where each flow lands.
 const ROOT = join(import.meta.dir, '..')
 const PAGES = join(ROOT, '..', '..', 'src', 'pages', 'routes')
 const PASSWORD = 'correct horse battery'
+// Where the pages are served: the fixture's kay.config.ts gives `authPages` a prefix through the environment, and its `createAuth` none.
+const PAGES_AT = process.env.FIXTURE_PREFIX ?? '/auth'
 
 const site = await testSite({ root: ROOT, ...process.env.FIXTURE_BASE && { base: process.env.FIXTURE_BASE } })
+// After the site loads, so `authPages` hands the fixture's `createAuth` its prefix.
+const { mails, store } = await import('../src/auth')
 
 const { password } = await import(join(PAGES, 'sign-in.kay'))
 const { register } = await import(join(PAGES, 'register.kay'))
@@ -30,23 +33,23 @@ const linkOf = (kind: string) => new URL(mails.findLast(mail => mail.kind === ki
 
 if (process.env.FIXTURE_RULES) {
   // The register page hints, constrains and words a refusal by the app's rules, not the defaults.
-  const page = await site.visit('/auth/register')
+  const page = await site.visit(`${PAGES_AT}/register`)
   const refused = await site.submit(register, { email: 'rules@example.com', password: 'twelve chars!' }, { from: page })
-  const short = await site.submit(register, { email: 'rules@example.com', password: 'only11chars' }, { from: await site.visit('/auth/register') })
+  const short = await site.submit(register, { email: 'rules@example.com', password: 'only11chars' }, { from: await site.visit(`${PAGES_AT}/register`) })
 
   console.log(JSON.stringify({ hint: page.find('.kui-form-field-hint').map(hint => hint.text), minlength: page.find('input[name="password"]')[0]?.attributes.minlength, check: refused.find('.kui-form-field-issue').map(issue => issue.text), short: short.find('.kui-form-field-issue').map(issue => issue.text) }))
   process.exit(0)
 }
 
-const out: Record<string, unknown> = { signIn: await shown('/auth/sign-in'), register: await shown('/auth/register') }
+const out: Record<string, unknown> = { signIn: await shown(`${PAGES_AT}/sign-in`), register: await shown(`${PAGES_AT}/register`) }
 
 // A newcomer lands where the page sends them, and a sign-in with the box left alone lasts what the setting says.
-const newcomer = await site.visit('/auth/register')
+const newcomer = await site.visit(`${PAGES_AT}/register`)
 
 out.registered = (await site.submit(register, { email: 'variant@example.com', password: PASSWORD }, { from: newcomer })).url
 out.registeredLifetime = await lifetimeOf('variant@example.com')
 
-const returning = await site.submit(password, { identifier: 'variant@example.com', password: PASSWORD, remember: 'on' }, { from: await site.visit('/auth/sign-in') })
+const returning = await site.submit(password, { identifier: 'variant@example.com', password: PASSWORD, remember: 'on' }, { from: await site.visit(`${PAGES_AT}/sign-in`) })
 
 out.signedIn = returning.url
 out.checkedLifetime = await lifetimeOf('variant@example.com')
@@ -54,10 +57,10 @@ out.checkedLifetime = await lifetimeOf('variant@example.com')
 for (const [name, prefix] of [['en', ''], ['fr', '/fr']] as const) {
   const forgetful = await testSite({ root: ROOT, ...process.env.FIXTURE_BASE && { base: process.env.FIXTURE_BASE } })
 
-  await forgetful.submit(request, { email: 'variant@example.com' }, { from: await forgetful.visit(`${prefix}/auth/reset-password`) })
+  await forgetful.submit(request, { email: 'variant@example.com' }, { from: await forgetful.visit(`${prefix}${PAGES_AT}/reset-password`) })
 
   const link = linkOf('reset-password')
-  const done = await forgetful.submit(reset, { token: link.searchParams.get('token')!, password: PASSWORD }, { from: await forgetful.visit(`${prefix}/auth/reset-password?token=${link.searchParams.get('token')}`) })
+  const done = await forgetful.submit(reset, { token: link.searchParams.get('token')!, password: PASSWORD }, { from: await forgetful.visit(`${prefix}${PAGES_AT}/reset-password?token=${link.searchParams.get('token')}`) })
 
   out[`reset-${name}`] = done.url
 }

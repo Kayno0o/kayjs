@@ -16,7 +16,7 @@ import type { ScopeRequirement } from './gate'
 import type { LimitsOption } from './limits'
 import type { LinkProviderResult, OAuthFailure } from './oauth/flow'
 import type { AcceptResult, CreateOrganizationResult, Invitation, InviteResult, Member, MemberResult, Membership, OrganizationFailure, OrganizationsOptions, UpdateOrganizationResult } from './organizations'
-import type { AuthFeatures, AuthPagesConfig, ProfileFieldView, ProfileProblem } from './pages'
+import type { AuthFeatures, AuthPagesConfig, PagesHandle, ProfileFieldView, ProfileProblem } from './pages'
 import type { Passkey, PasskeyOptionsResult, PasskeySignInResult, RegisterPasskeyResult } from './passkeys'
 import type { CreateUserInput, CreateUserResult, PasswordSignInInput, PasswordSignInResult, RegisterInput, RegisterResult } from './password'
 import type { RoleHierarchy } from './roles'
@@ -56,7 +56,7 @@ import { finishOAuth, providerToken, sealTokens, startLink, startOAuth } from '.
 import { safeRedirect } from './oauth/redirect'
 import { createOAuthTokenRefresher } from './oauth/refresher'
 import { acceptInvitation, createOrganization, declineInvitation, deleteOrganization, getInvitation, getMembership, holdsInOrganization, invite, listInvitations, listMembers, listMemberships, myInvitations, organizationsCore, removeMember, revokeInvitation, setMemberRoles, updateOrganization } from './organizations'
-import { featuresOf, pagePaths, pagesOf, profileLabel, profileValue } from './pages'
+import { DEFAULT_PREFIX as DEFAULT_PAGES_PREFIX, featuresOf, pagePaths, PAGES_OF, pagesOf, profileLabel, profileValue } from './pages'
 import { listPasskeys, passkeyProofOptions, passkeyRegistrationOptions, passkeySignInOptions, registerPasskey, removePasskey, renamePasskey, signInWithPasskey, twoFactorPasskeyOptions, verifyTwoFactorPasskey } from './passkeys'
 import { createUser, register, signInWithPassword } from './password'
 import { pruneWhenDue } from './prune'
@@ -1175,6 +1175,7 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
     core.organizations.create = async user => authorize(user, create, 'write', {})
 
   return {
+    [PAGES_OF]: core.pages && pagesHandle(core, options),
     // `.use(auth.plugin)` before kay's pages: it adds `auth` to the context and kayjs-auth's routes, and uses the session plugin itself.
     plugin,
     hasRole,
@@ -1296,6 +1297,39 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
 
 function auditMaxAge(audit: true | { maxAge?: Duration }): number {
   return audit === true || audit.maxAge === undefined ? DEFAULT_AUDIT_MAX_AGE : durationSeconds(audit.maxAge, 'audit.maxAge', 'kayjs-auth')
+}
+
+// Lets `authPages` hand a `createAuth({ pages: true })` its prefix and home, the paths derived from the prefix following, whichever of the two ran first.
+function pagesHandle(core: Core, options: { pages?: boolean | AuthPagesConfig | undefined, signInPage?: string | undefined, twoFactorPage?: string | undefined, sessionsPage?: string | undefined, email?: { links?: Partial<Record<LinkType, string>> | undefined } | undefined }): PagesHandle {
+  const own = typeof options.pages === 'object' ? options.pages : {}
+
+  return {
+    adopt(given) {
+      const pages = core.pages
+
+      if (!pages)
+        return
+
+      if (own.prefix !== undefined && own.prefix !== (given.prefix ?? DEFAULT_PAGES_PREFIX))
+        throw new Error(`kayjs-auth: authPages serves the pages under '${given.prefix ?? DEFAULT_PAGES_PREFIX}' and createAuth({ pages: { prefix: '${own.prefix}' } }) sends users to '${own.prefix}'. Give authPages({ prefix: '${own.prefix}' }), or drop the prefix of one of them`)
+
+      if (own.home === undefined && given.home !== undefined)
+        pages.home = given.home
+
+      if (own.prefix !== undefined || given.prefix === undefined || given.prefix === pages.prefix)
+        return
+
+      const paths = pagePaths(given.prefix)
+
+      pages.prefix = given.prefix
+      core.signInPage = options.signInPage ?? paths.signIn
+      core.twoFactorPage = options.twoFactorPage ?? paths.twoFactor
+      core.sessionsPage = options.sessionsPage ?? paths.sessions
+
+      if (core.email)
+        core.email.links = emailLinks(options.email?.links, paths.links)
+    },
+  }
 }
 
 function createCore<Data extends AuthSessionData, Role extends string, Prefix extends string, Scope extends string, OrgRole extends string>(options: AuthOptions<Data, Role, Prefix, Scope, OrgRole>): Core {
