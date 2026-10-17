@@ -1,7 +1,7 @@
 import type { FetchedPage, HeadElement, Intent, Swap } from './navigation'
 import { focusInvalid } from './focus'
 import { ISLAND } from './markers'
-import { historyState, leave, navigation, pageKey, prefetched, restoreScroll, saveScroll, takeFormChecks } from './navigation'
+import { historyState, leave, leaving, navigation, pageKey, prefetched, restoreScroll, saveScroll, takeFormChecks } from './navigation'
 import { forgetPageData } from './page-data'
 import { ROOT_ATTRIBUTES } from './root'
 import { NAVIGATE_HEADER, RELOAD_HEADER } from './swap'
@@ -174,8 +174,14 @@ export async function go(url: URL, swap: Swap): Promise<void> {
   const token = ++navigation.current
 
   // Another page only: the same one with another query, or a form sending it back to itself, is not left.
-  if (url.pathname !== location.pathname)
+  if (url.pathname !== location.pathname) {
     navigation.visits = (navigation.visits ?? 0) + 1
+
+    for (const close of leaving)
+      close()
+
+    leaving.clear()
+  }
 
   const isCurrent = () => token === navigation.current
   const { history: change } = policyOf(swap)

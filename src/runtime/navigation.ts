@@ -76,6 +76,9 @@ export const navigation: {
   typed?: boolean
 } = { shown: '', at: 0, page: 0, current: 0, released: false }
 
+// Run once as a swap to another path starts, as `visits` grows: what an action streams to a handler that started it closes there.
+export const leaving = new Set<() => void>()
+
 // Pages fetched ahead of a click, by URL; an action may change what they show, so each post forgets them.
 export const prefetched = new Map<string, { at: number, page: Promise<FetchedPage> }>()
 export const leaveGuards = new Set<LeaveGuard>()

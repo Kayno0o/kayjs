@@ -23,11 +23,16 @@ const actions = await import(join(fixture, 'routes/index.kay')) as {
   limited: Action<Record<never, never>, AsyncIterable<string>>
   baked: Action<Record<never, never>, AsyncIterable<string>>
   language: Action<Record<never, never>, AsyncIterable<string>>
+  greets: Action<Record<never, never>, AsyncIterable<string>>
+  slow: Action<Record<never, never>, AsyncIterable<string>>
+  counted: Action<{ fail: boolean }, AsyncIterable<string>>
+  trapped: Action<{ name: string }, AsyncIterable<string>>
+  pretending: Action<{ name: string }, AsyncIterable<string>>
   sendsAway: Action<Record<never, never>, AsyncIterable<string>>
   refuses: Action<{ full: boolean }, AsyncIterable<string>>
 }
 const { secret } = await import(join(fixture, 'routes/members/index.kay')) as { secret: Action<Record<never, never>, AsyncIterable<string>> }
-const { seen } = await import(join(fixture, 'seen.ts')) as { seen: { started: number, stopped: number } }
+const { seen } = await import(join(fixture, 'seen.ts')) as { seen: { started: number, stopped: number, slowStopped: number, quietStopped: number } }
 const path = browserPath() ?? (existsSync(chromium.executablePath()) ? chromium.executablePath() : undefined)
 
 afterAll(async () => {
@@ -41,14 +46,23 @@ async function posted(action: Action<never, unknown>, input?: unknown): Promise<
   return site.fetch(action.url, { method: 'POST', headers: { ...headers, origin: 'http://localhost' }, body })
 }
 
-// Waits for the endless stream's source to have been stopped `times` times in all.
-async function stoppedTimes(times: number): Promise<void> {
-  for (let tries = 0; seen.stopped < times; tries++) {
+// Waits for the endless stream's source, or another `seen` counts, to have been stopped `times` times in all.
+async function stoppedTimes(times: number, counter: keyof typeof seen = 'stopped'): Promise<void> {
+  for (let tries = 0; seen[counter] < times; tries++) {
     if (tries === 200)
-      throw new Error(`the endless stream stopped ${seen.stopped} times, not ${times}`)
+      throw new Error(`the stream stopped ${seen[counter]} times, not ${times}`)
 
     await Bun.sleep(10)
   }
+}
+
+function form(fields: Record<string, string>): FormData {
+  const data = new FormData()
+
+  for (const [name, value] of Object.entries(fields))
+    data.append(name, value)
+
+  return data
 }
 
 describe('an action returning an async iterable', () => {
@@ -167,6 +181,75 @@ describe('an action returning an async iterable', () => {
     await stoppedTimes(before + 1)
   })
 
+  it('stops the iterable when the client goes away before its first value', async () => {
+    const before = seen.slowStopped
+    const leaving = new AbortController()
+    const { headers, body } = encodeCall(undefined)
+    const response = site.fetch(actions.slow.url, { method: 'POST', headers: { ...headers, origin: 'http://localhost' }, body, signal: leaving.signal })
+
+    await Bun.sleep(10)
+    leaving.abort()
+
+    try {
+      await response
+    }
+    catch {}
+
+    await stoppedTimes(before + 1, 'slowStopped')
+  })
+
+  it('stops the iterable a plain form post drains once the browser goes away', async () => {
+    const before = seen.stopped
+    const leaving = new AbortController()
+    const response = site.fetch(actions.endless.url, { method: 'POST', headers: { origin: 'http://localhost' }, body: new FormData(), signal: leaving.signal })
+
+    await Bun.sleep(30)
+    leaving.abort()
+
+    try {
+      await response
+    }
+    catch {}
+
+    await stoppedTimes(before + 1)
+  })
+
+  it('sends each value as it comes when compressed, and stops once the client goes away', async () => {
+    const compressed = await testSite({ routes, islands: false, compress: true })
+    const before = seen.stopped
+    const { headers, body } = encodeCall(undefined)
+    const response = await compressed.fetch(actions.endless.url, { method: 'POST', headers: { ...headers, 'origin': 'http://localhost', 'accept-encoding': 'gzip' }, body })
+
+    expect(response.headers.get('content-encoding')).toBe('gzip')
+
+    const reader = response.body!.pipeThrough(new DecompressionStream('gzip')).getReader()
+    const decoder = new TextDecoder()
+    let received = ''
+
+    while (!received.includes('data: [2]'))
+      received += decoder.decode((await reader.read()).value, { stream: true })
+
+    await reader.cancel()
+    await stoppedTimes(before + 1)
+    await compressed.close()
+  })
+
+  it('counts a succeeded-only rate limit once the first value is there', async () => {
+    const limited = await testSite({ routes, islands: false })
+
+    expect((await limited.refusal(actions.counted, { fail: true })).status).toBe(500)
+    expect((await limited.refusal(actions.counted, { fail: true })).status).toBe(500)
+    expect(await limited.call(actions.counted, { fail: false })).toEqual(['ok'])
+    expect((await limited.refusal(actions.counted, { fail: false })).status).toBe(429)
+    await limited.close()
+  })
+
+  it('refuses a bot the honeypot caught before the first value, or answers it with nothing when pretending', async () => {
+    await expect(site.call(actions.trapped, form({ name: 'a', website: 'spam' }) as never)).rejects.toMatchObject({ status: 422, errors: { website: 'Leave this field empty' } })
+    expect(await site.call(actions.trapped, form({ name: 'a' }) as never)).toEqual(['a'])
+    expect(await site.call(actions.pretending, form({ name: 'a', website: 'spam' }) as never)).toBeUndefined()
+  })
+
   it('gives a plain form post the last value', async () => {
     const { status, html } = await site.submit(actions.count, { to: '2' }, { from: '/' })
 
@@ -187,6 +270,18 @@ describe('an action returning an async iterable', () => {
   it('runs in the locale of the page it was called from', async () => {
     expect(await localized.call(actions.language, {}, { from: '/en/' })).toEqual(['en'])
     expect(await localized.call(actions.language, {}, { from: '/' })).toEqual(['fr'])
+  })
+
+  it('keeps the locale for the values read after the answer went out', async () => {
+    const { headers, body } = encodeCall(undefined)
+
+    using server = Bun.serve({ port: 0, fetch: async request => localized.handle(request) })
+    const response = await fetch(new URL(actions.greets.url, server.url), { method: 'POST', headers: { ...headers, origin: server.url.origin, referer: new URL('/en/', server.url).href }, body })
+
+    // Over a server and read late, so the values after the first are pulled by its reads rather than where the answer was made.
+    await Bun.sleep(30)
+
+    expect(await response.text()).toContain('data: ["Home"]')
   })
 })
 
@@ -213,5 +308,18 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
     await stoppedTimes(before + 1)
 
     expect(await page.text('p.pending')).toBe('false')
+  })
+
+  it('closes a quiet stream a handler started once the visitor goes to another page', async () => {
+    const page = await site.open('/', { path })
+    const before = seen.quietStopped
+
+    await page.click('button.quiet')
+    await page.waitFor('p.status', { text: 'open' })
+    await page.click('a.away')
+    await page.waitFor('h1', { text: 'Elsewhere' })
+    await stoppedTimes(before + 1, 'quietStopped')
+
+    expect(page.errors).toEqual([])
   })
 })

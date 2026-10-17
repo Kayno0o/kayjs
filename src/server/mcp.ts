@@ -193,7 +193,8 @@ async function dispatch(context: CallContext, url: string, init: RequestInit, ac
   headers.set(TOOL, tool)
   headers.set('x-request-id', requestId(request))
 
-  const visit = new Request(new URL(url, request.url), { ...init, headers, redirect: 'manual' })
+  // The agent going away stops the call, as a browser leaving stops a post.
+  const visit = new Request(new URL(url, request.url), { ...init, headers, redirect: 'manual', signal: request.signal })
   const response = await visitAs(request, visit, server, fallback)
 
   return result(context, visit, response, action)

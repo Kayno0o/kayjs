@@ -280,7 +280,9 @@ Yield the whole text so far, not just the new piece. Then `last()` is all the is
 
 Guards, the schema and rate limits run before the first value, as for any call. A refusal throws an `ActionError`. `reply.pending()` stays true until the stream ends.
 
-`close()` stops the handler's loop on the server. So does the visitor leaving. A stream outlives the island that started it, so an island that goes away first calls `close()` in `onCleanup`.
+`close()` stops the handler's loop on the server. So does the visitor leaving. A stream started while the island sets up closes when the island goes away. One started from a button closes when the visitor goes to another page.
+
+A bot caught by a `pretend` protection gets `undefined` back, not a stream, since the handler never ran.
 
 A form posted without JavaScript waits for the end and gets the last value, through `ctx.succeeded(reply)`. In a test, `site.call(reply, input)` gives every value.
 

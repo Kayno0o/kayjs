@@ -3,13 +3,14 @@ import type { ErrorStatus, RouteParams } from './checks'
 import type { Duration } from './duration'
 import type { RequestContext } from './index'
 import type { EventReader, StreamStatus } from './live'
+import type { Owner } from './reactive'
 import { withBase } from './base'
 import { durationSeconds } from './duration'
 import { escapeAttribute } from './escape'
 import { holdInvalid } from './invalid'
-import { leave, mayLeave, navigation, prefetched } from './navigation'
+import { leave, leaving, mayLeave, navigation, prefetched } from './navigation'
 import { pageData } from './page-data'
-import { ownSignal, undoable, untrack } from './reactive'
+import { getOwner, isDisposed, onCleanup, ownSignal, runWithOwner, undoable, untrack } from './reactive'
 import { sendValue } from './send'
 import { FAILURE_HEADER, PAGE_HEADER, REDIRECT_HEADER, WORK_HEADER, WORK_SCRIPT } from './swap'
 import { decodeServerValue, decodeValue, unflattenValue } from './wire'
@@ -604,6 +605,8 @@ function callable(url: () => string): { call: (input: never, options?: CallOptio
     const page = navigation.page
     const visits = navigation.visits
     const left = () => navigation.visits !== visits
+    // The island calling from its setup or an effect, whose end ends a stream the call answers with.
+    const owner = getOwner()
 
     shift(1)
     called(page, null)
@@ -630,6 +633,7 @@ function callable(url: () => string): { call: (input: never, options?: CallOptio
 
       if (isActionStream(data)) {
         streaming = true
+        closeWithCaller(data, owner, left)
         void streamEnded(data, (done) => {
           if (done) {
             called(page, { action: url(), succeeded: true, data: untrack(data.last) })
@@ -686,6 +690,24 @@ function callable(url: () => string): { call: (input: never, options?: CallOptio
       with: read((fields: Record<string, unknown>) => withFields(call, fields)),
     },
   }
+}
+
+// A stream ends with the island that started it; one started from an event handler, which runs under no island, ends once the visitor goes to another page.
+function closeWithCaller(stream: ActionStream<unknown> & { [SETTLED]: Promise<StreamStatus> }, owner: Owner | undefined, left: () => boolean): void {
+  if (owner ? isDisposed(owner) : left()) {
+    stream.close()
+
+    return
+  }
+
+  if (owner) {
+    runWithOwner(owner, () => onCleanup(stream.close))
+
+    return
+  }
+
+  leaving.add(stream.close)
+  void streamEnded(stream, () => leaving.delete(stream.close))
 }
 
 function isActionStream(value: unknown): value is ActionStream<unknown> & { [SETTLED]: Promise<StreamStatus> } {
@@ -835,7 +857,7 @@ export async function readActionResponse<Output>(response: Response, action: str
 
   // Loaded only once an action streams, so a page calling none does not carry it.
   if (response.ok && EVENT_STREAM.test(response.headers.get('content-type') ?? ''))
-    return (await import('./action-stream')).actionStream(response, left) as Output
+    return (await import('./action-stream')).actionStream(response) as Output
 
   const body = await response.text()
 

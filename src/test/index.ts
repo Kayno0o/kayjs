@@ -510,7 +510,6 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
   }
 }
 
-// Keeps every message a client receives, for a test to read in order.
 function isStream(value: unknown): value is EventReader<unknown> & { [SETTLED]: Promise<StreamStatus> } {
   return typeof value === 'object' && value !== null && SETTLED in value
 }
@@ -528,6 +527,7 @@ async function streamedValues(stream: EventReader<unknown> & { [SETTLED]: Promis
   return values
 }
 
+// Keeps every message a client receives, for a test to read in order.
 function inbox<T>(client: Pick<EventReader<T>, 'on'>): { received: T[], next: () => Promise<T> } {
   const received: T[] = []
   const waiting: ((value: T) => void)[] = []

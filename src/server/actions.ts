@@ -680,7 +680,7 @@ async function runAction(action: ServerAction<TSchema, unknown>, context: { body
 
     // A call reads a stream as it comes; a plain form post or an agent gets its last value, as a handler returning it would.
     const streams = isAsyncIterable(result) && isCall(request) && !isAgentCall(request)
-    const answer = isAsyncIterable(result) ? await (streams ? started(result, request.signal) : lastOf(result)) : result
+    const answer = isAsyncIterable(result) ? await (streams ? started(result, request.signal) : lastOf(result, request.signal)) : result
 
     await countGoneThrough(action, request, context.server, options)
 
@@ -738,11 +738,21 @@ function isAsyncIterable(value: unknown): value is AsyncIterable<unknown> {
   return typeof value === 'object' && value !== null && Symbol.asyncIterator in value
 }
 
-async function lastOf(source: AsyncIterable<unknown>): Promise<unknown> {
+// The client going away stops the iterable, an endless one included, as it stops a stream.
+async function lastOf(source: AsyncIterable<unknown>, signal: AbortSignal): Promise<unknown> {
+  const iterator = source[Symbol.asyncIterator]()
+  const stop = () => void iterator.return?.()
   let last: unknown
 
-  for await (const value of source)
-    last = value
+  signal.addEventListener('abort', stop, { once: true })
+
+  try {
+    for (let next = await iterator.next(); next.done !== true; next = await iterator.next())
+      last = next.value
+  }
+  finally {
+    signal.removeEventListener('abort', stop)
+  }
 
   return last
 }

@@ -1,6 +1,7 @@
 --- server
 import { t } from 'elysia'
 import { action } from 'kay'
+import { t as translate } from 'kay/i18n'
 import { seen } from '../seen'
 
 export const count = action(t.Object({ to: t.Number({ minimum: 0, maximum: 5, error: 'Too many' }) }), async function* ({ to }) {
@@ -50,6 +51,48 @@ export const language = action(async function* (ctx) {
   yield ctx.locale
 })
 
+export const greets = action(async function* (ctx) {
+  yield ctx.locale
+  await Bun.sleep(5)
+  yield translate('nav.home')
+})
+
+// Says nothing after its first value until the client goes away.
+export const quiet = action(async function* (ctx) {
+  try {
+    yield 0
+    await new Promise(resolve => ctx.request.signal.addEventListener('abort', resolve))
+  }
+  finally {
+    seen.quietStopped++
+  }
+})
+
+export const slow = action(async function* () {
+  try {
+    await Bun.sleep(50)
+    yield 'late'
+  }
+  finally {
+    seen.slowStopped++
+  }
+})
+
+export const counted = action(t.Object({ fail: t.Boolean() }), async function* ({ fail }) {
+  if (fail)
+    throw new Error('before the first value')
+
+  yield 'ok'
+}, { rateLimit: { max: 1, window: '1m', count: 'succeeded' } })
+
+export const trapped = action(t.Object({ name: t.String() }), async function* ({ name }) {
+  yield name
+}, { honeypot: 'website' })
+
+export const pretending = action(t.Object({ name: t.String() }), async function* ({ name }) {
+  yield name
+}, { honeypot: { field: 'website', pretend: true } })
+
 export const sendsAway = action(async function* (ctx) {
   ctx.redirect('/done')
   yield 'never'
@@ -75,3 +118,4 @@ form(action={count})
   input(field="to")
   button Count
 Counter
+a.away(href="/other") Away

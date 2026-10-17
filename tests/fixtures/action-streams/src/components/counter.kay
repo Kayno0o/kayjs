@@ -1,7 +1,7 @@
 ---
 import type { ActionStream } from 'kay'
 import { signal } from 'kay'
-import { count, endless } from '../routes/index.kay'
+import { count, endless, quiet } from '../routes/index.kay'
 
 const answer = signal<ActionStream<number> | undefined>(undefined)
 
@@ -12,9 +12,14 @@ async function start() {
 async function forever() {
   answer.set(await endless())
 }
+
+async function hush() {
+  answer.set(await quiet())
+}
 ---
 button.start(type="button" onClick={start}) Start
 button.forever(type="button" onClick={forever}) Forever
+button.quiet(type="button" onClick={hush}) Quiet
 button.stop(type="button" onClick={() => answer()?.close()}) Stop
 p.last {String(answer()?.last() ?? '')}
 p.status {answer()?.status() ?? 'none'}

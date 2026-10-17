@@ -247,6 +247,10 @@ export function getOwner(): Owner | undefined {
   return owner
 }
 
+export function isDisposed(node: Owner): boolean {
+  return node.state === DISPOSED
+}
+
 export function runWithOwner<T>(parent: Owner | undefined, fn: () => T): T {
   const previous = owner
 
