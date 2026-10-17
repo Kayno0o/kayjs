@@ -61,6 +61,8 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a page of 
       await page.fill('input[name="title"]', 'abcd')
       await page.click('form button')
       await page.waitFor('p.done', { text: 'Added abcd' })
+      // The meta naming the page's build stays through the swaps, as a page without the entry would otherwise drop it.
+      expect(await page.count('meta[name="kay-build"]')).toBe(1)
       await page.back()
 
       expect(await page.text('h1')).toBe('Home')

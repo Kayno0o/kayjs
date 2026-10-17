@@ -56,7 +56,9 @@ const HISTORY = 'script[data-kay-history]'
 const ENTRY_SCRIPT = 'script[type="module"][src]:not([src*="/_kay/dev/"])'
 const REST_LINK = 'link[data-kay-rest]'
 // The head elements a swap leaves to itself rather than merging.
-const UNMERGED = `title,${SPECULATION},${HISTORY}`
+// The meta naming the build the page's code belongs to stays through every swap, as that code does.
+const BUILD_TAG = 'meta[name="kay-build"]'
+const UNMERGED = `title,${SPECULATION},${HISTORY},${BUILD_TAG}`
 // The attributes naming a meta, a head holding one per name and media.
 const META_NAMES = ['name', 'property', 'http-equiv']
 const SWAP_PATTERN = /\$kayAwait/
@@ -465,6 +467,9 @@ function mergeHead(next: Document): { loaded: Promise<unknown>, commit: () => vo
   const named: Element[] = []
 
   for (const element of document.head.children as HTMLCollectionOf<HeadElement>) {
+    if (element.matches(BUILD_TAG))
+      continue
+
     // A stylesheet `kay dev` swapped in for an edited one, and what the page's own scripts only touch the markup of, are the server's as they stand.
     if (element.matches(`[data-kay-dev],${REST_LINK},noscript`))
       element._$s = html(element)
