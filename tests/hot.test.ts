@@ -35,6 +35,13 @@ async function until(condition: () => boolean | Promise<boolean>, timeout = 30_0
   }
 }
 
+// A file the dev server or the editor stub writes, once it holds something: Bun.write creates it before it writes it, so its existence alone does not mean it is complete.
+async function written(path: string): Promise<string> {
+  await until(async () => existsSync(path) && await Bun.file(path).text() !== '')
+
+  return Bun.file(path).text()
+}
+
 // Set on the window: still there after an edit means the page was not reloaded.
 async function sameDocument(): Promise<boolean> {
   return page.evaluate(() => (window as { kayAlive?: boolean }).kayAlive === true)
@@ -98,9 +105,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('kay dev in 
   })
 
   async function origin(): Promise<string> {
-    await until(() => existsSync(join(root, '.port')))
-
-    return `http://localhost:${await Bun.file(join(root, '.port')).text()}`
+    return `http://localhost:${await written(join(root, '.port'))}`
   }
 
   it('swaps an edited island into the open page, and the islands embedding it, their signals keeping their values', async () => {
@@ -358,9 +363,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('kay dev in 
 
   it('opens the line an element came from on Alt+click, and lists the islands with the values of their signals', async () => {
     await page.click('h1', { modifiers: ['Alt'] })
-    // The editor stub creates the file before it writes it, so its existence alone does not mean it is complete.
-    await until(async () => existsSync(join(root, '.opened')) && await Bun.file(join(root, '.opened')).text() !== '')
-    expect(JSON.parse(await Bun.file(join(root, '.opened')).text())).toEqual(['-g', `${join(root, 'src/routes/index.kay')}:8:1`])
+    expect(JSON.parse(await written(join(root, '.opened')))).toEqual(['-g', `${join(root, 'src/routes/index.kay')}:8:1`])
 
     await page.locator('kay-dev .bar > button', { hasText: /islands?$/ }).click()
     await page.locator('#kay-dev-islands', { hasText: /extra\.kay.*#1true/ }).waitFor()
