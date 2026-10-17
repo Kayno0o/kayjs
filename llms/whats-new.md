@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- kayjs-auth: `githubProvider({ scopes: ['read:user', 'user:email'] })` reads the primary verified address off `/user/emails`, so a user hiding their email signs up with it; every provider preset takes `{ scopes, params }` and the self-hostable ones a base `url`, GitHub Enterprise's included, Discord's `apiBase` being `url` ([kayjs-auth](../packages/auth/llms/oauth-passkeys-two-factor.md)).
 - Site search ranks a word higher the more of its title or heading it makes up, leaves `button` labels out of the index but for a heading's own, and gives each hit `headingParts`, its heading with the words found marked ([Site search](sitemap-search-fonts.md#site-search)).
 - kayjs-ui: `CommandPalette` with `siteSearch` marks the words found in each section's heading as in its line of text, both in the accent colour ([kayjs-ui](../packages/ui/llms/tables-navigation-and-layout.md)).
 - A layout's `page` takes `noindex`, `revalidate` and `search` for every page under it, as it takes `security`, the innermost setting winning ([Page settings](routing.md#page-settings)).

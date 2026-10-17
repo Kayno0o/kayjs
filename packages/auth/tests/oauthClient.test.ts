@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from 'bun:test'
 import { createOAuthClient, OAuthExchangeError } from '../src/oauth/client'
-import { discordProvider, githubProvider, oidcProvider } from '../src/oauth/providers'
+import { appleProvider, discordProvider, githubProvider, gitlabProvider, oidcProvider } from '../src/oauth/providers'
 
 const CONFIG = { clientId: 'cid', clientSecret: 'sec', redirectUri: 'https://app.test/cb' }
 
@@ -234,5 +234,108 @@ describe('a provider out of reach or answering nonsense', () => {
 
     mockFetch(() => new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } }))
     expect((await failure(async () => client.exchangeCode('c'))).status).toBe(502)
+  })
+})
+
+describe('githubProvider email', () => {
+  const profile = { id: 7, login: 'oz', name: 'Oz', avatar_url: 'u', email: null }
+  const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })
+  const signIn = async (emails: Response | (() => Response), scope: string | undefined, raw: Record<string, unknown> = profile) => {
+    const answer = () => typeof emails === 'function' ? emails() : emails
+    const calls = mockFetch(({ url }) => url.endsWith('/user/emails') ? answer() : json(raw))
+    const user = await createOAuthClient(githubProvider({ scopes: ['read:user', 'user:email'] }), CONFIG).readUser({ accessToken: 'at', scope })
+
+    return { user, calls }
+  }
+
+  test('a user hiding their email signs in with the primary verified address', async () => {
+    const { user, calls } = await signIn(json([{ email: 'old@t.co', primary: false, verified: true }, { email: 'main@t.co', primary: true, verified: true }]), 'read:user,user:email')
+
+    expect(user.email).toBe('main@t.co')
+    expect(calls.map(call => call.url)).toEqual(['https://api.github.com/user', 'https://api.github.com/user/emails'])
+    expect(new Headers(calls[1]!.init?.headers).get('authorization')).toBe('Bearer at')
+  })
+
+  test('an unverified primary and a verified address that is not the primary give none', async () => {
+    expect((await signIn(json([{ email: 'main@t.co', primary: true, verified: false }]), 'user:email')).user.email).toBeNull()
+    expect((await signIn(json([{ email: 'main@t.co', primary: true, verified: false }, { email: 'other@t.co', primary: false, verified: true }]), 'user:email')).user.email).toBeNull()
+  })
+
+  test('the profile\'s public email is kept when the list holds no primary verified one', async () => {
+    expect((await signIn(json([]), 'user:email', { ...profile, email: 'public@t.co' })).user.email).toBe('public@t.co')
+  })
+
+  test('without the user:email scope /user/emails is not asked', async () => {
+    const { user, calls } = await signIn(json([{ email: 'main@t.co', primary: true, verified: true }]), 'read:user')
+
+    expect(user.email).toBeNull()
+    expect(calls).toHaveLength(1)
+  })
+
+  test('the scope asked for counts when GitHub names none, and the broader user scope counts', async () => {
+    expect((await signIn(json([{ email: 'main@t.co', primary: true, verified: true }]), undefined)).user.email).toBe('main@t.co')
+    expect((await signIn(json([{ email: 'main@t.co', primary: true, verified: true }]), 'user')).user.email).toBe('main@t.co')
+  })
+
+  test('a failing /user/emails, an HTML answer or a malformed list leaves the sign-in going with the profile\'s email', async () => {
+    expect((await signIn(json({ message: 'nope' }, 403), 'user:email', { ...profile, email: 'public@t.co' })).user.email).toBe('public@t.co')
+    expect((await signIn(() => {
+      throw new Error('connection reset')
+    }, 'user:email')).user.email).toBeNull()
+    expect((await signIn(new Response('<html>', { status: 200 }), 'user:email')).user.email).toBeNull()
+    expect((await signIn(json({ not: 'a list' }), 'user:email')).user.email).toBeNull()
+    expect((await signIn(json([null, 'x', { email: 7, primary: true, verified: true }]), 'user:email')).user.email).toBeNull()
+  })
+
+  test('fetchUser reads the emails by the scopes asked for', async () => {
+    mockFetch(({ url }) => url.endsWith('/user/emails') ? json([{ email: 'main@t.co', primary: true, verified: true }]) : json(profile))
+
+    expect((await createOAuthClient(githubProvider({ scopes: ['user:email'] }), CONFIG).fetchUser('at')).email).toBe('main@t.co')
+  })
+})
+
+describe('provider options', () => {
+  test('GitHub Enterprise takes a base url, with a trailing slash or a path', () => {
+    for (const url of ['https://git.example.com/', 'https://git.example.com///']) {
+      expect(githubProvider({ url })).toMatchObject({ authorizeUrl: 'https://git.example.com/login/oauth/authorize', tokenUrl: 'https://git.example.com/login/oauth/access_token', userUrl: 'https://git.example.com/api/v3/user' })
+    }
+
+    expect(githubProvider({ url: 'https://example.com/github/' })).toMatchObject({ authorizeUrl: 'https://example.com/github/login/oauth/authorize', userUrl: 'https://example.com/github/api/v3/user' })
+  })
+
+  test('the Discord and GitLab urls drop trailing slashes and keep paths; apiBase still works', () => {
+    expect(discordProvider({ url: 'https://proxy.test/discord/api/' })).toMatchObject({ tokenUrl: 'https://proxy.test/discord/api/oauth2/token', userUrl: 'https://proxy.test/discord/api/users/@me' })
+    expect(discordProvider({ apiBase: 'https://old.test/api/' })).toMatchObject({ tokenUrl: 'https://old.test/api/oauth2/token' })
+    expect(discordProvider({ url: 'https://new.test', apiBase: 'https://old.test' }).tokenUrl).toBe('https://new.test/oauth2/token')
+    expect(discordProvider().tokenUrl).toBe('https://discord.com/api/v10/oauth2/token')
+    expect(gitlabProvider({ url: 'https://lab.test/gitlab/' })).toMatchObject({ authorizeUrl: 'https://lab.test/gitlab/oauth/authorize', userUrl: 'https://lab.test/gitlab/oauth/userinfo' })
+  })
+
+  test('production refuses a plain-http url', () => {
+    const before = process.env.NODE_ENV ?? 'test'
+
+    process.env.NODE_ENV = 'production'
+
+    try {
+      expect(() => githubProvider({ url: 'http://git.example.com' })).toThrow('not https')
+      expect(() => discordProvider({ url: 'http://proxy.test' })).toThrow('not https')
+      expect(() => discordProvider({ apiBase: 'http://proxy.test' })).toThrow('not https')
+    }
+    finally {
+      process.env.NODE_ENV = before
+    }
+  })
+
+  test('every preset takes scopes and params into the authorize URL', async () => {
+    const apple = appleProvider({ teamId: 't', keyId: 'k', privateKey: 'p', scopes: ['email'], params: { prompt: 'login' } })
+
+    expect(apple.authorizeParams).toEqual({ prompt: 'login', response_mode: 'form_post' })
+    expect(appleProvider({ teamId: 't', keyId: 'k', privateKey: 'p', params: { response_mode: 'query' } }).authorizeParams).toEqual({ response_mode: 'form_post' })
+
+    const github = new URL(await createOAuthClient(githubProvider({ scopes: ['repo'], params: { allow_signup: 'false' } }), CONFIG).authorizeUrl({ state: 's' }))
+    const discord = new URL(await createOAuthClient(discordProvider({ scopes: ['identify'], params: { prompt: 'none' } }), CONFIG).authorizeUrl({ state: 's' }))
+
+    expect([github.searchParams.get('scope'), github.searchParams.get('allow_signup')]).toEqual(['repo', 'false'])
+    expect([discord.searchParams.get('scope'), discord.searchParams.get('prompt')]).toEqual(['identify', 'none'])
   })
 })

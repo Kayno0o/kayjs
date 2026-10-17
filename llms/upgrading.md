@@ -9,6 +9,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 - `kay new --host forgejo|github` is now `--forge`, as `kay dev --host` is an address; `--host` still works for now and warns. A script calling `kay new` renames the flag. No `deprecated` lint is possible, as a command line is no code `kay check` reads.
 - `mount(file, props)` from `kay/test` is now `mountComponent`, so it no longer shares its name with `kay/mount`'s `mount`; the old name still works for now. `kay check` reports it as `deprecated-test-mount`, and `kay check --fix` (or `kay upgrade`) renames the import.
 
+### kayjs-auth: `discordProvider({ apiBase })` is `url`
+
+- `discordProvider({ apiBase })` is now `discordProvider({ url })`, as `gitlabProvider` and `githubProvider` take; `apiBase` still works for now and logs a warning. No `deprecated` lint is possible, as `kay check` reads no `kay.config.ts` option of a library.
+
 ### `kay dev` does not move a port it was asked for
 
 - A busy port given with `--port`, or by `PORT` in the environment or `.env`, used to move the server to the next free one; the server now fails to start naming the port. Free it, or drop the `PORT` to get the old behaviour. A port the entry names in code still moves. No deprecated lint is possible, as the port is an environment value.

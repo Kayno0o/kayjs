@@ -56,6 +56,8 @@ export interface OAuthProvider<Raw = any, User = OAuthUser> extends OAuthEndpoin
   tokenAccept?: 'json' | 'form'
   /** Extra headers for the user-info request (e.g. GitHub's `User-Agent`/`Accept`). */
   authHeaders?: (accessToken: string) => Record<string, string>
+  /** Completes the user endpoint's answer with what another request holds, such as GitHub's `/user/emails`; `scope` is what the token was granted when the provider said. A failure there is the provider's to absorb: the sign-in goes on with the answer as it is. */
+  completeUser?: (raw: Raw, token: { accessToken: string, scope: string | undefined }) => Promise<Raw>
   // eslint-disable-next-line ts/no-explicit-any -- an app's own provider reads the token answer untyped
   parseTokens: (raw: any) => OAuthTokens
   /** `raw` is the user endpoint's answer or, for OpenID Connect, the ID token's claims with the user endpoint's over them; `callback` the parameters the provider came back with. */

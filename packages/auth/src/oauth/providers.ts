@@ -1,7 +1,16 @@
 import type { OAuthProvider, OAuthTokens, OAuthUser } from './types'
+import { log } from '../log'
 import { PROVIDER_TIMEOUT_MS } from './timeout'
 
 const TRAILING_SLASHES = /\/+$/
+const SCOPE_SEPARATORS = /[\s,]+/
+
+/** What every provider preset takes: other `scopes` than its own, extra authorize URL `params` such as `{ prompt: 'consent' }`, and for one a server can host (GitHub Enterprise, GitLab, Discord's API), its base `url`, any trailing slash dropped and any path kept. */
+export interface ProviderOptions {
+  scopes?: string[]
+  params?: Record<string, string>
+  url?: string
+}
 // The tenant Microsoft signs personal accounts in under, whatever the app's.
 const MICROSOFT_PERSONAL_TENANT = '9188040d-6c67-4c5b-b112-36a304b66dad'
 const APPLE_SECRET_LIFETIME_S = 24 * 60 * 60
@@ -24,9 +33,19 @@ function discordImage(kind: 'avatars' | 'banners', userId: string, hash: string 
   return hash == null || hash === '' ? null : `https://cdn.discordapp.com/${kind}/${userId}/${hash}.${hash.startsWith('a_') ? 'gif' : 'png'}`
 }
 
-/** Discord OAuth2 provider preset, its avatar and banner as CDN URLs. */
-export function discordProvider(opts: { scopes?: string[], apiBase?: string } = {}): OAuthProvider<DiscordRawUser> {
-  const apiBase = opts.apiBase ?? 'https://discord.com/api/v10'
+let warnedApiBase = false
+
+/** Discord OAuth2 provider preset, its avatar and banner as CDN URLs. `url` is the API's base, `https://discord.com/api/v10` by default, and `params` extra authorize URL parameters. */
+export function discordProvider(opts: ProviderOptions & {
+  /** @deprecated Renamed `url`, as on every provider. */
+  apiBase?: string
+} = {}): OAuthProvider<DiscordRawUser> {
+  if (opts.apiBase !== undefined && opts.url === undefined && !warnedApiBase) {
+    warnedApiBase = true
+    log.warn('discordProvider({ apiBase }) is renamed discordProvider({ url })')
+  }
+
+  const apiBase = providerUrl(opts.url ?? opts.apiBase, 'https://discord.com/api/v10', 'the Discord url')
 
   return {
     name: 'discord',
@@ -35,6 +54,7 @@ export function discordProvider(opts: { scopes?: string[], apiBase?: string } = 
     tokenUrl: `${apiBase}/oauth2/token`,
     userUrl: `${apiBase}/users/@me`,
     scopes: opts.scopes ?? ['identify', 'email'],
+    ...opts.params === undefined ? {} : { authorizeParams: opts.params },
     parseTokens: parseStandardTokens,
     normalizeUser: raw => ({
       providerId: raw.id,
@@ -55,19 +75,56 @@ interface GithubRawUser {
   email?: string | null
 }
 
-/** GitHub OAuth provider preset. Classic OAuth-App tokens do not expire, so `expiresAt` stays undefined. */
-export function githubProvider(opts: { scopes?: string[] } = {}): OAuthProvider<GithubRawUser> {
+// GitHub's `/user/emails` list: the primary address is the one the account is known by.
+interface GithubEmail {
+  email?: unknown
+  primary?: unknown
+  verified?: unknown
+}
+
+/** GitHub OAuth provider preset. Classic OAuth-App tokens do not expire, so `expiresAt` stays undefined. With the `user:email` scope the email is the account's primary verified address read off `/user/emails`, so a user hiding their email on their profile signs in with it all the same; without it, the public one. `url` is a GitHub Enterprise Server's base, as `https://git.example.com`. */
+export function githubProvider(opts: ProviderOptions = {}): OAuthProvider<GithubRawUser> {
+  const base = opts.url === undefined ? undefined : providerUrl(opts.url, '', 'the GitHub url')
+  const api = base === undefined ? 'https://api.github.com' : `${base}/api/v3`
+  const scopes = opts.scopes ?? ['read:user']
+  const headers = {
+    'User-Agent': '@kaynooo/kayjs-auth',
+    'Accept': 'application/vnd.github+json',
+  }
+
   return {
     name: 'github',
     label: 'GitHub',
-    authorizeUrl: 'https://github.com/login/oauth/authorize',
-    tokenUrl: 'https://github.com/login/oauth/access_token',
-    userUrl: 'https://api.github.com/user',
-    scopes: opts.scopes ?? ['read:user'],
-    authHeaders: () => ({
-      'User-Agent': '@kaynooo/kayjs-auth',
-      'Accept': 'application/vnd.github+json',
-    }),
+    authorizeUrl: `${base ?? 'https://github.com'}/login/oauth/authorize`,
+    tokenUrl: `${base ?? 'https://github.com'}/login/oauth/access_token`,
+    userUrl: `${api}/user`,
+    scopes,
+    ...opts.params === undefined ? {} : { authorizeParams: opts.params },
+    authHeaders: () => headers,
+    async completeUser(raw, { accessToken, scope }) {
+      // What the token was granted when GitHub said, else what was asked for.
+      const granted = new Set((scope ?? scopes.join(' ')).split(SCOPE_SEPARATORS))
+
+      if (!granted.has('user:email') && !granted.has('user'))
+        return raw
+
+      try {
+        const res = await fetch(`${api}/user/emails`, { headers: { ...headers, Authorization: `Bearer ${accessToken}` }, redirect: 'error', signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS) })
+
+        if (!res.ok)
+          throw new Error(`answered ${res.status}`)
+
+        const list = await res.json() as unknown
+        const primary = Array.isArray(list) ? (list as GithubEmail[]).find(entry => entry?.primary === true && entry.verified === true && typeof entry.email === 'string' && entry.email !== '') : undefined
+
+        return { ...raw, email: primary === undefined ? raw.email ?? null : primary.email as string }
+      }
+      catch (error) {
+        log.warn(`GitHub's /user/emails could not be read, the sign-in goes on with the profile's email: ${error instanceof Error ? error.message : String(error)}`)
+
+        return raw
+      }
+    },
     parseTokens: parseStandardTokens,
     normalizeUser: raw => ({
       // Not `String(raw.id)`, which makes a missing id the string "undefined".
@@ -106,6 +163,16 @@ const OPENID_SCOPES = ['openid', 'email', 'profile']
 function requireHttps(url: string, what: string): void {
   if (process.env.NODE_ENV === 'production' && new URL(url).protocol !== 'https:')
     throw new Error(`${what} ${url} is not https, which production refuses`)
+}
+
+// A provider's base URL without its trailing slashes, `fallback` when the app gave none.
+function providerUrl(url: string | undefined, fallback: string, what: string): string {
+  const base = (url ?? fallback).replace(TRAILING_SLASHES, '')
+
+  if (base !== '')
+    requireHttps(base, what)
+
+  return base
 }
 
 /** Any OpenID Connect provider by its issuer URL, its endpoints read off its discovery document on first use: Keycloak, Authentik, Auth0, Okta, Zitadel... */
@@ -210,9 +277,7 @@ function microsoftIssued(tenant: string, claims: Record<string, unknown>): boole
 
 /** GitLab sign-in, on gitlab.com or a self-hosted instance at `url`. */
 export function gitlabProvider(opts: OpenIdOptions & { url?: string } = {}): OAuthProvider<OpenIdClaims> {
-  const base = (opts.url ?? 'https://gitlab.com').replace(TRAILING_SLASHES, '')
-
-  requireHttps(base, 'the GitLab url')
+  const base = providerUrl(opts.url, 'https://gitlab.com', 'the GitLab url')
 
   return {
     name: 'gitlab',
@@ -229,7 +294,7 @@ export function gitlabProvider(opts: OpenIdOptions & { url?: string } = {}): OAu
 }
 
 /** Sign in with Apple. Its client secret is a JWT signed with the app's key from the Apple developer account: `teamId`, the key's `keyId`, and `privateKey`, the `.p8` file's PEM text. The app's `clientId` is its Services ID, and it needs no `clientSecret`. */
-export function appleProvider(opts: { teamId: string, keyId: string, privateKey: string, scopes?: string[] }): OAuthProvider<OpenIdClaims> {
+export function appleProvider(opts: Pick<ProviderOptions, 'scopes' | 'params'> & { teamId: string, keyId: string, privateKey: string }): OAuthProvider<OpenIdClaims> {
   let key: Promise<CryptoKey> | undefined
   let signed: { clientId: string, value: string, expires: number } | undefined
 
@@ -241,7 +306,7 @@ export function appleProvider(opts: { teamId: string, keyId: string, privateKey:
     openId: { issuer: 'https://appleid.apple.com', jwksUrl: 'https://appleid.apple.com/auth/keys' },
     scopes: opts.scopes ?? ['name', 'email'],
     // Apple answers a request for the name or the email only through a POST back to the callback.
-    authorizeParams: { response_mode: 'form_post' },
+    authorizeParams: { ...opts.params, response_mode: 'form_post' },
     async clientSecret(clientId) {
       if (signed?.clientId === clientId && signed.expires - Date.now() > APPLE_SECRET_MARGIN_MS)
         return signed.value

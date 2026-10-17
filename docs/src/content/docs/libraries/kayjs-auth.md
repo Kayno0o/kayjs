@@ -445,6 +445,10 @@ createAuth({
 a(href="/auth/discord?redirect=/account" data-no-prefetch) Sign in with Discord
 ```
 
+Every preset takes `scopes` and `params`, extra parameters for the authorize URL. A provider a server can host takes its base `url`: `githubProvider({ url: 'https://git.example.com' })` for GitHub Enterprise Server, `gitlabProvider({ url })`, `discordProvider({ url })`. A trailing slash is dropped and a path kept, and production refuses an `http://` one. Discord's earlier `apiBase` works as `url` and logs a warning.
+
+GitHub hides the email of a user who keeps it private. With `githubProvider({ scopes: ['read:user', 'user:email'] })` the primary verified address is read off `/user/emails`, so that user signs up with an email all the same. An unverified or non-primary address is never taken, and when GitHub fails to answer the profile's public email is used.
+
 An OpenID Connect provider (`oidcProvider({ issuer })`, `googleProvider()`, `microsoftProvider()`...) has its ID token checked before anything is read off it. Only an asymmetric signature passes (`RS*`, `PS*`, `ES*`, `EdDSA`). `none` and the shared-secret `HS*` algorithms never do.
 
 Set `algorithms: ['RS256']` to narrow the list to the one the provider signs with. In production an `http://` issuer or discovered endpoint is refused.

@@ -89,6 +89,8 @@ export function createOAuthClient<Raw = unknown, User = unknown>(provider: OAuth
     return parseJson(provider.name, 'user fetch', text) as Record<string, unknown>
   }
 
+  const completed = async (raw: Raw, accessToken: string, scope: string | undefined): Promise<Raw> => provider.completeUser ? provider.completeUser(raw, { accessToken, scope }) : raw
+
   const checkIdToken = async (idToken: string | undefined, check: OpenIdCheck, nonce: string | undefined): Promise<Record<string, unknown>> => {
     if (idToken === undefined)
       throw new OAuthExchangeError(400, `OAuth token response missing id_token (${provider.name})`)
@@ -180,7 +182,7 @@ export function createOAuthClient<Raw = unknown, User = unknown>(provider: OAuth
 
     /** Fetches and normalizes the provider user. */
     async fetchUser(accessToken: string): Promise<User> {
-      return provider.normalizeUser(await userInfo(accessToken, (await endpoints()).userUrl) as Raw, {})
+      return provider.normalizeUser(await completed(await userInfo(accessToken, (await endpoints()).userUrl) as Raw, accessToken, undefined), {})
     },
 
     /** The user a sign-in came back with: for OpenID Connect, off the ID token once checked, the user endpoint's answer over it when there is one; `callback` holds the parameters the provider came back with. */
@@ -189,7 +191,7 @@ export function createOAuthClient<Raw = unknown, User = unknown>(provider: OAuth
       const callback = opts.callback ?? {}
 
       if (!openId)
-        return provider.normalizeUser(await userInfo(tokens.accessToken, userUrl) as Raw, callback)
+        return provider.normalizeUser(await completed(await userInfo(tokens.accessToken, userUrl) as Raw, tokens.accessToken, tokens.scope), callback)
 
       const claims = await checkIdToken(tokens.idToken, openId, opts.nonce)
 
