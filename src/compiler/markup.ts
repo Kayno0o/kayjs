@@ -109,7 +109,7 @@ export abstract class TemplateWriter {
   constructor(protected readonly b: CodeBuilder, protected readonly src: string, protected readonly facts: TemplateFacts) {}
 
   // Whether a component's slots and children are handed over as a function building them: in the browser, so a slot read in an attribute, a test or a ternary builds nothing and claims no server markup while an island hydrates.
-  // The server hands over the markup itself, which an island reads its static slots off.
+  // The server hands over the markup itself, which an island reads its static slots off, and so draws a slot's ids once per read where the browser draws them once per insert; the browser sets the ids it binds, so they agree.
   protected readonly lazySlots: boolean = false
 
   // Children rendered as the template renders them: markup on the server, a block in the browser.

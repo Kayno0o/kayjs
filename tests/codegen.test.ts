@@ -1015,3 +1015,16 @@ describe('module signals', () => {
     expect(moduleSignals('export const a = signal(1)\n')).toEqual({})
   })
 })
+
+describe('a component\'s slots', () => {
+  const source = 'import Card from \'./card.kay\'\n---\nCard\n  @side\n    p Side\n  em Body\n'
+
+  it('are functions building them in the browser, so a read that is no insert claims nothing, and markup on the server', () => {
+    const dom = compileKay(source, 'page.kay', { output: 'dom' }).tsx
+    const html = compileKay(source, 'page.kay', { output: 'html' }).tsx
+
+    expect(dom).toContain('get "side"() { return () => (')
+    expect(dom).toContain('get children() { return () => (')
+    expect(html).not.toContain('return () => (')
+  })
+})
