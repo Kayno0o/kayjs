@@ -5,13 +5,13 @@ import type { RenderedPage } from '../src/check/seo'
 import type { KayConfig } from '../src/config'
 import type { ClientBuild } from '../src/server/client'
 import type { Route } from '../src/server/routes'
+import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { existsSync, utimesSync } from 'node:fs'
 import { mkdir, mkdtemp, readdir, realpath, rename, rm, stat, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import tailwind from 'bun-plugin-tailwind'
-import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { Elysia } from 'elysia'
 import { ASSET_FILE, clientDir, MAPS_DIR, outputDir, writeAsset } from '../src/build/assets'
 import { writeCacheEntry } from '../src/build/cache'
@@ -24,8 +24,8 @@ import { routeSizes } from '../src/build/route-sizes'
 import { anchorModule, runtimeChunk } from '../src/build/runtime-chunk'
 import { runtimeConfig, withoutPlugins } from '../src/build/runtime-config'
 import { importedSignals, inSignalsScope } from '../src/build/signals'
-import { decodeBundleMappings, describeThrown, embeddedMap, mapBundleToKay, mapStack, registerEmbeddedMap } from '../src/build/sourcemap'
-import { analyzeKayCached, compilerModules, keepAnalyses, pruneCompileCache, transformKay, transformKayCached } from '../src/build/transform'
+import { decodeBundleMappings, describeThrown, embeddedMap, mapBundleToKay, mapStack, registerEmbeddedMap, registerSourceMap } from '../src/build/sourcemap'
+import { analyzeKayCached, compilerModules, embeddedMapCached, keepAnalyses, pruneCompileCache, transformKay, transformKayCached } from '../src/build/transform'
 import { loadConfig, withConfig } from '../src/config'
 import { devBuilder } from '../src/dev/builder'
 import { projectPaths } from '../src/project'
@@ -1753,6 +1753,74 @@ process.exit(0)
     // The island's report is mapped before it reaches onError, a chunk with no map and a name leaving the directory as they were.
     expect(result.reported.at(-1)).toBe(`TypeError: x\n${expected}\n    at https://h/_kay/gone.js:1:2\n    at fn (https://h/_kay/..%2Fcounter.js:1:1)`)
   }, 60_000)
+
+  it('keeps the map an executable carries beside the cached code, so a warm cache compiles nothing for it', async () => {
+    const dir = await scratchDir('kay-embedded-')
+    const file = join(dir, 'warm.kay')
+    const source = '--- server\nfunction explode() {\n  throw new Error(\'x\')\n}\n---\np\n'
+    const code = await transformKayCached(source, file, { target: 'ssr', root: dir, cacheDir: dir })
+    const blob = await embeddedMapCached(source, file, code, dir)
+
+    expect(blob).toBe(await embeddedMap(file))
+
+    // A warm run registers a map that compiles on demand; the stored blob answers without asking it.
+    registerSourceMap(file, () => {
+      throw new Error('compiled again')
+    })
+
+    expect(await embeddedMapCached(source, file, code, dir)).toBe(blob)
+    // The source or the code changing is a new key.
+    await expect(embeddedMapCached(`${source}\n`, file, code, dir)).rejects.toThrow('compiled again')
+  })
+
+  it('maps the frame of a server error to the column of its .kay file for a library, a static component in an island, and a build run from another folder', async () => {
+    const throwing = (name: string) => `---\nconst here = 1\n\nif (here === 1)\n  throw new Error('${name} boom')\n---\np ${name}\n`
+    const root = await scratchProject({
+      'package.json': JSON.stringify({ name: 'exe-frames', private: true, dependencies: { elysia: '*' } }),
+      'tsconfig.json': tsconfig,
+      'kay.config.ts': 'export default { favicon: false }\n',
+      'node_modules/kaylib/package.json': JSON.stringify({ name: 'kaylib', version: '1.0.0', exports: { './*': './*' } }),
+      'node_modules/kaylib/lib-box.kay': throwing('library'),
+      'src/plain.kay': throwing('plain'),
+      'src/counter.kay': '---\nimport { signal } from \'kay\'\nimport Plain from \'./twin.kay\'\n\nconst n = signal(0)\n---\nbutton(type="button" onClick={() => n.set(n() + 1)}) {n()}\nPlain\n',
+      'src/twin.kay': throwing('twin'),
+      'src/routes/library.kay': '---\nimport Box from \'kaylib/lib-box.kay\'\n---\nBox\n',
+      'src/routes/plain.kay': '---\nimport Plain from \'../plain.kay\'\n---\nPlain\n',
+      'src/routes/twin.kay': '---\nimport Counter from \'../counter.kay\'\n---\nCounter\n',
+      'src/server.ts': `import process from 'node:process'
+import { Elysia } from 'elysia'
+import { pages } from 'kay/server'
+
+const logged: string[] = []
+const app = new Elysia().use(await pages({ security: false, log: entry => entry.type === 'message' && entry.error?.stack !== undefined && logged.push(entry.error.stack) }))
+
+for (const path of ['library', 'plain', 'twin'])
+  await app.handle(new Request(\`http://localhost/\${path}\`))
+
+console.log(JSON.stringify({ logged }))
+process.exit(0)
+`,
+    })
+
+    const elsewhere = await scratchDir('kay-elsewhere-')
+    const [report, code] = await printed(Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', root, '--no-check', '--compile', join(root, 'server')], { cwd: elsewhere, stdout: 'pipe', stderr: 'pipe' }))
+
+    expect(report).not.toContain('error')
+    expect(code).toBe(0)
+
+    const child = Bun.spawn([join(root, 'server')], { cwd: root, env: { ...process.env, NODE_ENV: 'production' }, stdout: 'pipe', stderr: 'pipe' })
+    const [output, , exited] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+
+    expect(exited).toBe(0)
+
+    const { logged } = JSON.parse(output.trim().split('\n').at(-1)!) as { logged: string[] }
+    const frame = (name: string) => logged.find(stack => stack.startsWith(`Error: ${name} boom`))?.split('\n').at(1)
+
+    // The throw is on line 5 of each file, its `new Error` at column 13.
+    expect(frame('library')).toMatch(/lib-box\.kay:5:13\)?$/)
+    expect(frame('plain')).toMatch(/plain\.kay:5:13\)?$/)
+    expect(frame('twin')).toMatch(/twin\.kay:5:13\)?$/)
+  }, 90_000)
 
   it('maps a frame an executable prints relative to where it was built, in either form, and leaves a map that cannot be read', async () => {
     const file = join(await scratchDir('kay-frames-'), 'frames.kay')

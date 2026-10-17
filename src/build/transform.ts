@@ -16,7 +16,7 @@ import { countCache, pruneCache, readCacheEntry, writeCacheEntry } from './cache
 import { throughLinks } from './links'
 import { anyBrowserOnly, mayImportPackage, packagesToProbe } from './probe'
 import { importedSignals, keepImportedSignals } from './signals'
-import { registerSourceMap } from './sourcemap'
+import { embeddedMap, registerSourceMap } from './sourcemap'
 
 export type Target = 'dom' | 'ssr'
 
@@ -113,6 +113,22 @@ export async function transformKayCached(source: string, filename: string, given
   return code
 }
 
+// The map an executable carries for a compiled file, kept beside its code so a warm cache does not compile the file again for it; keyed by the source and the code, which fix the map.
+export async function embeddedMapCached(source: string, filename: string, code: string, cacheDir: string | undefined): Promise<string | undefined> {
+  const slot = cacheDir === undefined ? undefined : cacheEntry(cacheDir, filename, 'embedded-map', `${source}\0${code}`)
+  const cached = slot && await readCacheEntry<string>(slot)
+
+  if (cached !== undefined)
+    return cached
+
+  const map = await embeddedMap(filename)
+
+  if (slot && map !== undefined)
+    await writeCacheEntry(slot, map)
+
+  return map
+}
+
 // The island, class names and diagnostics of a component, through the same cache; only a file without errors is kept. `check` adds the problems only `kay check` reports otherwise, flagged `checkOnly`.
 export async function analyzeKayCached(source: string, filename: string, root: string, cacheDir: string, check = false, lints?: LintLevels): Promise<Analysis> {
   // The id the file goes by is part of what it compiles to, and a link may change it.
@@ -158,7 +174,7 @@ export function keepAnalyses(files: ReadonlySet<string>): void {
 }
 
 // What a build keeps in `.kay/cache`: a file's compiled output, analysis and probed packages, and a package's answer, not what `kay check` keeps there.
-const BUILD_ENTRY = /^[\da-z]+-(?:(?:ssr|dom)(?:-hydratable)?(?:-inspect)?|analysis|probed|browser-only)\.json$/
+const BUILD_ENTRY = /^[\da-z]+-(?:(?:ssr|dom)(?:-hydratable)?(?:-inspect)?|analysis|probed|browser-only|embedded-map)\.json$/
 
 // What `kay check` keeps there, each a file's own entry.
 const CHECK_ENTRY = /^[\da-z]+-(?:shadow|renders-island|analysis-check)\.json$/

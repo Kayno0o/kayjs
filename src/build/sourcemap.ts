@@ -35,6 +35,9 @@ const FRAME_POSITION = /\.kay(?:\?island)?:(\d+):(\d+)/
 const KAY_POSITION = /([^\s()]+\.kay(?:\?island)?):(\d+):(\d+)/g
 const FIRST_KAY_POSITION = /([^\s()]+\.kay):(\d+):(\d+)/
 
+// What a plugin's namespace puts before the path of a static component's `?island` twin in a frame.
+const TWIN_NAMESPACE_PREFIX = /^kay-island:/
+
 // What a kept map's name ends with, after the `.map` of the chunk's own.
 export const COMPRESSED_MAP = '.zst'
 const NOT_LINE_BREAK = /[^\r\n]/g
@@ -222,7 +225,7 @@ function mapPosition(file: string, line: string, column: string): string | undef
 
   const position = module && toKay(module, Number(line), Number(column))
 
-  return position ? `${withoutTwin(file)}:${position.line}:${position.column}` : undefined
+  return position ? `${withoutTwin(file.replace(TWIN_NAMESPACE_PREFIX, ''))}:${position.line}:${position.column}` : undefined
 }
 
 // An error's stack mapped to `.kay` lines, starting with its message; undefined when it has none.

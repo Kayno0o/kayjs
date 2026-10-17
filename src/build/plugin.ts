@@ -16,8 +16,7 @@ import { expandGlobs } from './glob'
 import { iconModule, iconNames, installedIconSets } from './icons'
 import { settingsReplacements } from './libraries'
 import { liveIds } from './live-ids'
-import { embeddedMap } from './sourcemap'
-import { transformKayCached } from './transform'
+import { embeddedMapCached, transformKayCached } from './transform'
 
 export interface KayPluginOptions {
   // Defaults to `dom` when bundling for the browser and `ssr` everywhere else, the Bun runtime included.
@@ -199,15 +198,17 @@ export function kayPlugin(options: KayPluginOptions, workers: string[]): BunPlug
 
       const pointed = async (contents: string, loader: Bun.JavaScriptLoader = 'ts') => options.direct === true ? directImports(contents, loader) : contents
 
-      const load = async (file: string) => {
+      // A twin's frames show its namespace and the whole path, where a file's show its path from where the build ran.
+      const load = async (file: string, twin = false) => {
         const source = await Bun.file(withoutTwin(file)).text()
 
-        const contents = await pointed(await shippingFiles(expandGlobs(await transformKayCached(source, file, { target, hydratable: options.hydratable ?? true, root: options.root, cacheDir: options.cacheDir, inspect: options.inspect }), withoutTwin(file), root, 'ts'), withoutTwin(file), 'ts'))
+        const code = await transformKayCached(source, file, { target, hydratable: options.hydratable ?? true, root: options.root, cacheDir: options.cacheDir, inspect: options.inspect })
+        const contents = await pointed(await shippingFiles(expandGlobs(code, withoutTwin(file), root, 'ts'), withoutTwin(file), 'ts'))
 
         const anchored = options.anchor !== undefined && options.anchor !== '' ? `${contents}\nimport ${JSON.stringify(options.anchor)}\n` : contents
-        const map = options.embedMaps === true ? await embeddedMap(file) : undefined
+        const map = options.embedMaps === true ? await embeddedMapCached(source, file, code, options.cacheDir) : undefined
 
-        return { contents: map === undefined ? anchored : `${anchored}\nimport { registerEmbeddedMap } from 'kay/internal/server'\nregisterEmbeddedMap(${JSON.stringify(relative(process.cwd(), file))}, ${JSON.stringify(map)})\n`, loader: 'ts' as const }
+        return { contents: map === undefined ? anchored : `${anchored}\nimport { registerEmbeddedMap } from 'kay/internal/server'\nregisterEmbeddedMap(${JSON.stringify(twin ? `${TWIN_NAMESPACE}:${file}` : relative(process.cwd(), file))}, ${JSON.stringify(map)})\n`, loader: 'ts' as const }
       }
 
       build.onLoad({ filter: KAY_FILE }, async ({ path }) => load(path))
@@ -217,7 +218,7 @@ export function kayPlugin(options: KayPluginOptions, workers: string[]): BunPlug
       // Only a bundle has a config; the runtime loader takes the specifier as it is.
       if (build.config !== undefined) {
         build.onResolve({ filter: TWIN_IMPORT }, ({ path, importer }) => ({ path: `${resolve(dirname(importer), withoutTwin(path))}${ISLAND_TWIN}`, namespace: TWIN_NAMESPACE }))
-        build.onLoad({ filter: KAY_FILE, namespace: TWIN_NAMESPACE }, async ({ path }) => load(path))
+        build.onLoad({ filter: KAY_FILE, namespace: TWIN_NAMESPACE }, async ({ path }) => load(path, true))
         build.onResolve({ filter: ICON_SPECIFIER }, ({ path }) => ({ path, namespace: ICON_NAMESPACE }))
         build.onLoad({ filter: ANY, namespace: ICON_NAMESPACE }, ({ path }) => ({ contents: iconModule(iconSets, path), loader: 'js' }))
       }
