@@ -1393,7 +1393,7 @@ describe.concurrent('kay dev', () => {
             answers.set(++id, resolve)
             socket.send(JSON.stringify({ id, method: 'Runtime.evaluate', params: { expression: 'process.pid' } }))
           }),
-          new Promise((_, reject) => socket.addEventListener('close', () => reject(new Error('the debugger connection closed before the server answered')))),
+          new Promise((_, reject) => socket.readyState === WebSocket.CLOSED ? reject(new Error('the debugger connection is closed')) : socket.addEventListener('close', () => reject(new Error('the debugger connection closed before the server answered')))),
         ]),
         closed,
       }

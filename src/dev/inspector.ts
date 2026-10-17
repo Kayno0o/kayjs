@@ -9,6 +9,8 @@ import { isLoopback, loopbackTaken } from './loopback'
 
 // A connection the server never opens is given up on past this, its client closed.
 const CONNECT_MS = 10_000
+// How long a server is given to answer before its connection closes anyway, well past what a loaded host takes.
+const RELEASE_MS = 10_000
 const RETRY_MS = 50
 // No client asks with an id this high, and none is connected by the time the answer comes.
 const RELEASE_ID = 2 ** 31 - 1
@@ -182,14 +184,27 @@ function retry(client: ServerWebSocket<Link>, current: () => string | undefined,
     setTimeout(() => !client.data.closed && connect(client, current, started), RETRY_MS)
 }
 
-// Closed once the server answered, however long that takes: closing a connection its inspector is still setting up lets go of the hold a listening server has on its process under Bun 1.4.4, which then exits with code 0 (#285), and a loaded host or a server still starting answered after a second.
-// One paused on a breakpoint keeps its connection until it runs on or ends.
+// Closed once the server answered: closing a connection its inspector is still setting up lets go of the hold a listening server has on its process under Bun 1.4.4, which then exits with code 0 (#285), and a loaded host or a server still starting answers after a second.
+// One paused on a breakpoint does not answer, and is let go of by closing the connection, so it is given up on past RELEASE_MS.
 function release(upstream: WebSocket) {
+  const timer = setTimeout(() => upstream.close(), RELEASE_MS)
+
   upstream.addEventListener('message', (event) => {
-    if ((JSON.parse(String(event.data)) as { id?: unknown }).id === RELEASE_ID)
+    if (answered(event.data)) {
+      clearTimeout(timer)
       upstream.close()
+    }
   })
   upstream.send(RELEASE)
+}
+
+function answered(data: unknown): boolean {
+  try {
+    return (JSON.parse(String(data)) as { id?: unknown }).id === RELEASE_ID
+  }
+  catch {
+    return false
+  }
 }
 
 // As Bun's inspector checks them: a page on another site must not reach the debugger through a name that points to this machine.
