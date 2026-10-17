@@ -24,6 +24,14 @@ describe('toast', () => {
     expect(shown()).toEqual([{ message: 'Saved', type: 'success' }, { message: 'Refused', type: 'error' }])
   })
 
+  test('carries the tone of its type, a failed call being a danger, and the deprecated type beside it', () => {
+    toast.error('Refused')
+    toast.success('Saved')
+    toast.info('Copied')
+
+    expect(toasts().map(({ tone, type }) => [tone, type])).toEqual([['danger', 'error'], ['success', 'success'], ['info', 'info']])
+  })
+
   test('dismisses one toast by its id', () => {
     toast.info('first')
     toast.info('second')
@@ -54,6 +62,54 @@ describe('a toast\'s time', () => {
     expect(shown().map(item => item.message)).toEqual(['Refused'])
 
     jest.advanceTimersByTime(4000)
+
+    expect(shown()).toEqual([])
+  })
+
+  test('runs for the duration it is given, whatever its tone', () => {
+    toast.info('Short', { duration: 1000 })
+    toast.error('Long', { duration: 20_000 })
+    jest.advanceTimersByTime(999)
+
+    expect(shown().map(item => item.message)).toEqual(['Short', 'Long'])
+
+    jest.advanceTimersByTime(1)
+
+    expect(shown().map(item => item.message)).toEqual(['Long'])
+
+    jest.advanceTimersByTime(18_999)
+
+    expect(shown().map(item => item.message)).toEqual(['Long'])
+
+    jest.advanceTimersByTime(1)
+
+    expect(shown()).toEqual([])
+  })
+
+  test('falls back to the default time for a duration that is not a time', () => {
+    toast.info('NaN', { duration: Number.NaN })
+    toast.info('Negative', { duration: -5 })
+    toast.info('Unset', { duration: undefined })
+    jest.advanceTimersByTime(6000)
+
+    expect(shown()).toEqual([])
+  })
+
+  test('stays until dismissed with an infinite duration, holds and releases included, and answers its id', () => {
+    const sticky = toast.error('Stuck', { duration: Infinity })
+
+    toast.info('Gone')
+    jest.advanceTimersByTime(60_000)
+
+    expect(shown().map(item => item.message)).toEqual(['Stuck'])
+
+    holdToasts('pointer', true)
+    holdToasts('pointer', false)
+    jest.advanceTimersByTime(60_000)
+
+    expect(shown().map(item => item.message)).toEqual(['Stuck'])
+
+    dismissToast(sticky)
 
     expect(shown()).toEqual([])
   })

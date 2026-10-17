@@ -136,7 +136,13 @@
     position: absolute;
     inset: 0;
     border: var(--kui-border-card) solid var(--kui-shell-line);
+    border-radius: inherit;
     pointer-events: none;
+  }
+
+  /* One radius, --radius-kui-card, for the boxes the library frames: buttons, cards, notices and the overlays over the page. Square by default; a docked side panel stays square. */
+  :is(.kui-shell, .kui-btn, .kui-stat-badge, .kui-card, .kui-card-row, .kui-widget, .kui-notice, .kui-toast, .kui-dialog, .kui-command-palette, .kui-popover) {
+    @apply rounded-kui-card;
   }
 
   /* :where() keeps these at one class, so the variants below still win. */
@@ -1889,17 +1895,21 @@
     @apply pointer-events-none fixed inset-auto right-4 bottom-4 z-100 m-0 flex w-[calc(100%-2rem)] max-w-sm flex-col gap-2 overflow-visible border-0 bg-transparent p-0;
   }
 
-  /* --kui-toast-tone is the colour of the toast's type, which its icon takes. */
+  /* --kui-toast-tone is the colour of the toast's tone, which its icon takes. */
   .kui-toast {
     --kui-toast-tone: var(--color-kui-accent);
     @apply pointer-events-auto flex items-start gap-2 border border-kui-overlay0 bg-kui-surface0 px-3 py-2;
 
-    &:where([data-type='error']) {
+    &:where([data-tone='danger']) {
       --kui-toast-tone: var(--color-kui-error);
     }
 
-    &:where([data-type='success']) {
+    &:where([data-tone='success']) {
       --kui-toast-tone: var(--color-kui-success);
+    }
+
+    &:where([data-tone='info']) {
+      --kui-toast-tone: var(--color-kui-info);
     }
   }
 

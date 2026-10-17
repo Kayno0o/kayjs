@@ -26,6 +26,9 @@ toast.success('Saved')
 toast.error('Could not save')
 toast.info('Copied')
 
+// `duration` is in milliseconds (6000, an error 10000 by default); `Infinity` keeps the toast until the reader dismisses it, or `dismissToast(id)` does, each call answering its id. Its `tone` is `danger`, `success` or `info`; `type`, `error` for `danger`, is its deprecated name.
+const sticky = toast.error('Offline', { duration: Infinity })
+
 // Resolves to what the call returned (`true` for a call returning nothing), or to undefined once it threw and `failure` was toasted, or a refusal of the whole call such as a limit.
 const post = await attempt(() => publish({ id }), 'Could not publish')
 

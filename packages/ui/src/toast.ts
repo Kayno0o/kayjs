@@ -1,11 +1,22 @@
 import { ActionError, signal, untrack } from 'kay'
 
+// What a toast means, in the vocabulary of every tone: a failed call is a `danger`.
+export type ToastTone = 'danger' | 'success' | 'info'
+
+// Deprecated: the old name of a toast's tone, `error` for `danger`.
 export type ToastType = 'error' | 'success' | 'info'
 
 export interface Toast {
   id: number
   message: string
+  tone: ToastTone
+  // Deprecated: use `tone`.
   type: ToastType
+}
+
+export interface ToastOptions {
+  // How long it stays, in milliseconds: 6000 by default, 10000 for an error. `Infinity` keeps it until the reader dismisses it, or `dismissToast(id)` does.
+  duration?: number | undefined
 }
 
 // Long enough to read a sentence, an error longer as the reader has something to do about it.
@@ -28,7 +39,11 @@ const holds = new Set<ToastHold>()
 // The toasts `Toaster` shows. Only ever added to in the browser: the server's copy of this module is shared by every request, so it stays empty.
 export const toasts = signal<Toast[]>([])
 
+// A sticky toast, with an infinite time left, sets no clock: the reader or `dismissToast(id)` ends it.
 function run(id: number, timer: Timer): void {
+  if (!Number.isFinite(timer.remaining))
+    return
+
   timer.started = Date.now()
   timer.handle = setTimeout(dismissToast, timer.remaining, id)
 }
@@ -67,21 +82,25 @@ export function holdToasts(hold: ToastHold, on: boolean): void {
 }
 
 // Untracked: an effect toasting a settled task would otherwise read the list, and toast again on every toast it adds.
-function push(message: string, type: ToastType): void {
+function push(message: string, type: ToastType, duration: number | undefined): number {
   const id = nextId++
-  const timer: Timer = { remaining: type === 'error' ? ERROR_DURATION_MS : DURATION_MS, started: Date.now() }
+  const wanted = duration === undefined || Number.isNaN(duration) || duration < 0 ? undefined : duration
+  const timer: Timer = { remaining: wanted ?? (type === 'error' ? ERROR_DURATION_MS : DURATION_MS), started: Date.now() }
 
-  untrack(() => toasts.set(list => [...list, { id, message, type }]))
+  untrack(() => toasts.set(list => [...list, { id, message, tone: type === 'error' ? 'danger' : type, type }]))
   timers.set(id, timer)
 
   if (holds.size === 0)
     run(id, timer)
+
+  return id
 }
 
+// Each shows a message and answers its id, for `dismissToast` to close a sticky one.
 export const toast = {
-  error: (message: string) => push(message, 'error'),
-  success: (message: string) => push(message, 'success'),
-  info: (message: string) => push(message, 'info'),
+  error: (message: string, options: ToastOptions = {}) => push(message, 'error', options.duration),
+  success: (message: string, options: ToastOptions = {}) => push(message, 'success', options.duration),
+  info: (message: string, options: ToastOptions = {}) => push(message, 'info', options.duration),
 }
 
 export interface AttemptOptions<Data = unknown> {

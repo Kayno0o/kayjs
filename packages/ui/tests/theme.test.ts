@@ -248,4 +248,25 @@ describe('theme.css', () => {
     expect(press).toContain('box-shadow: var(--kui-shadow-press);')
     expect(blockOf(press ?? '', '&:active')).toContain('translate: 0 var(--kui-press-travel);')
   })
+
+  test('rounds cards, buttons and overlays by --radius-kui-card, square unless a skin sets it', async () => {
+    const css = await built('@theme { --radius-kui-card: 0.5rem; }')
+    const rounded = [...css.matchAll(/([^{}]+)\{[^{}]*border-radius: var\(--radius-kui-card\)[^{}]*\}/g)].map(([, selectors]) => selectors).join(',')
+
+    for (const name of ['kui-btn', 'kui-shell', 'kui-stat-badge', 'kui-card', 'kui-card-row', 'kui-widget', 'kui-notice', 'kui-toast', 'kui-dialog', 'kui-command-palette', 'kui-popover'])
+      expect(rounded, name).toContain(`.${name}`)
+
+    expect(css).toContain('--radius-kui-card: 0.5rem')
+    expect(theme).toContain('--radius-kui-card: 0px;')
+    // The hairline drawn over a shell follows its corners.
+    expect(blockOf(theme, ':is(.kui-shell, .kui-btn, .kui-stat-badge)::before')).toContain('border-radius: inherit;')
+  })
+
+  test('draws the info toast in the info colour, the danger and success toasts in theirs', () => {
+    const toast = blockOf(theme, '.kui-toast') ?? ''
+
+    expect(blockOf(toast, '&:where([data-tone=\'info\'])')).toContain('--kui-toast-tone: var(--color-kui-info);')
+    expect(blockOf(toast, '&:where([data-tone=\'danger\'])')).toContain('--kui-toast-tone: var(--color-kui-error);')
+    expect(blockOf(toast, '&:where([data-tone=\'success\'])')).toContain('--kui-toast-tone: var(--color-kui-success);')
+  })
 })

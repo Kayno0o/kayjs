@@ -17,7 +17,7 @@ test('a toast shows in the toaster and is read from a region kept in the page, a
 
   const toasts = [...mounted.root.querySelectorAll('.kui-toast')]
 
-  expect(toasts.map(item => [item.getAttribute('data-type'), item.querySelector('.kui-toast-message')?.textContent])).toEqual([['success', 'Saved'], ['error', 'Refused']])
+  expect(toasts.map(item => [item.getAttribute('data-tone'), item.getAttribute('data-type'), item.querySelector('.kui-toast-message')?.textContent])).toEqual([['success', 'success', 'Saved'], ['danger', 'error', 'Refused']])
   expect([...mounted.root.querySelectorAll('.kui-toaster-live')].map(region => [region.getAttribute('role'), region.textContent])).toEqual([['status', 'Saved'], ['alert', 'Refused']])
   expect(mounted.root.querySelector('.kui-toaster')?.matches(':popover-open')).toBe(true)
 
@@ -57,6 +57,37 @@ test('the toasts hold while the pointer rests on them, and run out once it leave
 
     toaster.dispatchEvent(new PointerEvent('pointerleave'))
     await elapse(6000)
+
+    expect(messages()).toEqual([])
+  }
+  finally {
+    jest.useRealTimers()
+  }
+})
+
+test('an info toast is drawn in the info tone, and a sticky one stays until it is dismissed', async () => {
+  mounted = await mountComponent('src/components/toasts.kay')
+  const { root } = mounted
+  const messages = () => [...root.querySelectorAll('.kui-toast-message')].map(item => item.textContent)
+
+  for (const dismiss of root.querySelectorAll('.kui-toast-dismiss'))
+    click(dismiss)
+
+  jest.useFakeTimers()
+
+  try {
+    click(root.querySelector('#copied'))
+    click(root.querySelector('#sticky'))
+    await elapse(0)
+
+    expect([...root.querySelectorAll('.kui-toast')].map(item => item.getAttribute('data-tone'))).toEqual(['info', 'info'])
+
+    await elapse(60_000)
+
+    expect(messages()).toEqual(['Stuck'])
+
+    click(root.querySelector('.kui-toast-dismiss'))
+    await elapse(0)
 
     expect(messages()).toEqual([])
   }

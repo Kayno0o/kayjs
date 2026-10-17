@@ -12,6 +12,10 @@ This page already renders the `Toaster`. `toast` only shows in the browser: the 
 
 </Callout>
 
+## How long it stays
+
+`toast.info('Copied', { duration: 3000 })` sets how long a toast stays, in milliseconds. `Infinity` keeps it until the reader dismisses it, and each call answers the toast's id, for `dismissToast(id)` to close a sticky one from code. A toast carries a `tone`, `danger`, `success` or `info`; the info toast takes `--color-kui-info`. `type` is the deprecated name of the tone, with `error` for `danger`.
+
 ## After an action
 
 Call `toast` once what the user started has finished, with the outcome as its type. Here the button fails every other time.
