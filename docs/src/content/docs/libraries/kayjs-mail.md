@@ -83,7 +83,21 @@ Layout(preheader="Your account is ready")
 
 It also ships `Code`, `Divider`, `Image`, `Link`, and `Row` with `Column` for columns that stack on a phone. They hold in Outlook for Windows.
 
-In a client's dark mode they switch to dark colours, derived from the light ones unless `settings.dark` gives them.
+### Dark mode
+
+In a client's dark mode, such as Apple Mail's or Outlook.com's, the components switch to dark colours. Each is derived from its light colour, with the lightness turned over and the accent lightened until it reads on the card.
+
+Set `dark` in the settings to choose any of them. A colour you leave out is still derived.
+
+```ts
+// src/mail-settings.ts
+import type { Settings } from '@kaynooo/kayjs-mail'
+import { defaults } from '@kaynooo/kayjs-mail'
+
+export default { ...defaults, accent: '#0047ff', dark: { background: '#101014', accent: '#7aa2ff' } } satisfies Settings
+```
+
+`dark` takes `text`, `muted`, `background`, `surface`, `border`, `accent` and `onAccent`. Only hex colours are derived. `darkPalette(settings)` gives the colours a mail would switch to. The Gmail apps apply their own dark mode whatever the mail says.
 
 <Callout type="note">
 
@@ -124,6 +138,85 @@ A message also takes `cc`, `bcc`, `replyTo`, `attachments`, `lang` and `unsubscr
 Each address holds one mailbox. A visitor's `a@x.com,b@y.com` is refused, and several recipients go as a list. An empty `cc`, `bcc`, `replyTo` or `from`, as a form's blank field gives, is left out. An empty `to` is refused.
 
 To list the queued mails given up on, call `mail.failed()`. To erase a person, call `mail.remove({ recipient: 'ada@example.com' })`, which deletes every queued or failed mail to that address.
+
+### Unsubscribe links
+
+Gmail and Yahoo require one-click unsubscribe from bulk senders. `unsubscribe` takes an https URL that unsubscribes the recipient when it gets a POST.
+
+```ts
+await mail.enqueue({
+  to: email,
+  subject: 'This week',
+  view: Digest,
+  unsubscribe: 'https://example.com/unsubscribe?u=abc',
+})
+```
+
+It is written as the `List-Unsubscribe` and `List-Unsubscribe-Post` headers. Pass `{ url, address }` to offer an address to write to as well. A URL that is not https is refused.
+
+### Attachments
+
+An attachment is `{ filename, content }`, with `content` a string or bytes. Set `contentType` when the file name does not say it.
+
+A `cid` lets the mail's html show the file inline.
+
+```ts
+await mail.enqueue({
+  to: email,
+  subject: 'Your invoice',
+  html: '<p>Attached.</p><img src="cid:logo" alt="Logo">',
+  attachments: [
+    { filename: 'invoice.pdf', content: await Bun.file('invoice.pdf').bytes() },
+    { filename: 'logo.png', content: await Bun.file('logo.png').bytes(), cid: 'logo' },
+  ],
+})
+```
+
+### The recipient's language
+
+A message's `lang` is the `<html lang>` of the mail and the locale its component renders in. `t()` and the formatters from `kay/i18n` then read the recipient's language, not the site's.
+
+```ts
+await mail.enqueue({ to: user.email, subject: 'Bienvenue', view: Welcome, props: { name }, lang: user.locale })
+```
+
+`lang` must be one of the site's locales. Without it, the component renders in the site's default locale, or the request's.
+
+### Plain text
+
+Every mail with html also goes out with a text part. Give `text` to write it yourself. Otherwise it is made from the html, with links followed by their address.
+
+`htmlToText(html)` does the same conversion on its own.
+
+### Mails given up
+
+A failed send is retried, 5 times by default, each wait twice the last. A mail given up after its last attempt is logged. `queue.onFailed` is called with it as well, to alert someone.
+
+```ts
+export const mail = mailer({
+  from: 'Site <contact@example.com>',
+  queue: { onFailed: async (mail, error) => reportError(error) },
+})
+```
+
+### Other transports
+
+By default mails go over SMTP, or to the outbox in development. `transport` takes any `{ send(mail) }` that resolves with a delivery, such as a provider's HTTP API.
+
+```ts
+export const mail = mailer({
+  from: 'Site <contact@example.com>',
+  transport: {
+    async send(mail) {
+      const response = await fetch('https://api.example.com/send', { method: 'POST', body: JSON.stringify(mail) })
+
+      return { messageId: await response.text(), accepted: [], rejected: [] }
+    },
+  },
+})
+```
+
+`smtp({ host, port, user, pass })` is the SMTP transport, for settings read some other way. `outbox` is a transport too, for a staging server that must never send.
 
 ## A contact form
 
@@ -220,4 +313,4 @@ export const auth = createAuth({
 
 Under `kay dev`, the dev tool has a Mail tab with nothing to set up. It lists the mails sent to the outbox, newest first. A click on one previews it in place, and Open shows its page.
 
-<ReadMore href="/llms/kayjs-mail-writing-and-sending">Optional mail setup, other transports, attachments, the queue's retry options and the settings are in the full kayjs-mail reference.</ReadMore>
+<ReadMore href="/llms/kayjs-mail-writing-and-sending">Every message field, the queue's retry options, the settings and the full contact form are in the kayjs-mail reference.</ReadMore>

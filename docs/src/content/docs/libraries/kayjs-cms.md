@@ -69,6 +69,62 @@ A Markdown body whose HTML would run as the site or cover it is refused on save.
 
 List the collection in `rawHtml` to allow it. The collection's own components and HTML shown in a code block are always fine.
 
+## Collections from a loader
+
+A collection whose entries come from a loader has no files to commit. Give it `save` and `remove` beside `load`, and the screens and edit mode write through them.
+
+```ts
+export const news = collection({
+  name: 'news',
+  load: async () => (await listPosts()).map(post => ({ slug: post.slug, data: { title: post.title }, html: post.content })),
+  save: async ({ slug, data, create }) => {
+    if (create)
+      await createPost(slug, data)
+    else
+      await updatePost(slug, data)
+  },
+  remove: async ({ slug }) => deletePost(slug),
+}, {
+  schema: s.Object({ title: s.String() }),
+})
+```
+
+`create` is `true` for a new entry. Throw then if the entry exists, so another editor's new entry is not overwritten.
+
+kayjs-cms calls them through `saveEntry` and `removeEntry` from `kay/content`, after checking the entry against the schema. Never call those two from inside `save` or `remove` of the same collection, as they wait for each other.
+
+## Where files are saved
+
+A folder entry is a file, and `files` says where it goes. `forgejo()` commits it. `workingTree()` writes it in place, which is the default under `kay dev`.
+
+A production server refuses to boot on the working tree, as the next deploy would drop its saves. Name `workingTree()` yourself where the files outlive a deploy.
+
+Any `{ save(change) }` is a saver. `change` has the file's `repoPath`, its new `text` (`undefined` to delete it), a commit `message` and the `base` version it was edited from.
+
+```ts
+import type { FileSaver } from '@kaynooo/kayjs-cms'
+import { fileVersion, SaveConflict } from '@kaynooo/kayjs-cms'
+
+const saver: FileSaver = {
+  async save({ absolute, text, base }) {
+    const file = Bun.file(absolute)
+    const current = await file.exists() ? fileVersion(await file.bytes()) : null
+
+    if (base !== undefined && base !== current)
+      throw new SaveConflict(current)
+
+    if (text === undefined)
+      await file.delete()
+    else
+      await Bun.write(absolute, text)
+
+    return undefined
+  },
+}
+```
+
+`base` is `null` for a new file and `undefined` to write whatever is there. A saver that finds another version throws `SaveConflict`, which the editor shows with its Keep my edits button.
+
 ## Saves and conflicts
 
 A commit shows on the site once it has rebuilt from it. The Forgejo token needs write access to the repository's contents, and the commit is the token's user's.
