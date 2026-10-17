@@ -177,9 +177,9 @@ export default defineConfig({
 
 `limit` caps how many questions one visitor asks in a window. `budget.tokens` caps the tokens the answers to one visitor may use, and `budget.total` the tokens used for everyone. `ask` reads these on its own, so nothing changes where you call it.
 
-A visitor is counted by address. Behind a reverse proxy, set kay's `proxy` option, or every visitor shares the proxy's address and one quota.
+A visitor is counted by address, or by user when kayjs-auth is in `extensions`: a signed-in user has their own quota wherever they connect from, with nothing to add. Behind a reverse proxy, set kay's `proxy` option, or every visitor shares the proxy's address and one quota.
 
-To count a signed-in user instead, pass `visitor`, a function from the request to the user's id, read from your session. Never take it from a header or cookie the visitor can set, or they get a fresh budget on every request. A free signup gives each account its own budget, which only `total` caps. In a job with no request, name the visitor with `ask(prompt, { visitor })`, or leave it out: only `total` counts then.
+To count users from a session of your own instead, pass `visitor`, a function from the request to the user's id; it wins over kayjs-auth. Never take it from a header or cookie the visitor can set, or they get a fresh budget on every request. A free signup gives each account its own budget, which only `total` caps. In a job with no request, name the visitor with `ask(prompt, { visitor })`, or leave it out: only `total` counts then.
 
 The budget counts tokens, not money, because prices change too often to ship a table. Pick `tokens` from the price of your model.
 

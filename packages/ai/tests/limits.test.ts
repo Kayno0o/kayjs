@@ -3,6 +3,7 @@ import { rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
+import { nameUser } from 'kay/library'
 import { memoryRates, sqliteRates } from 'kay/server'
 import { answeringRequest } from '../../../src/server/log'
 import { sendFrom } from '../../../src/server/rewrite'
@@ -122,6 +123,29 @@ describe('ai({ limit })', () => {
     // A user called like an address does not take that address's window.
     await inside(asUser('203.0.113.9', '203.0.113.1'), () => ask('a'))
     await inside(rewrittenRequest('203.0.113.9'), () => ask('a'))
+  })
+
+  it('counts the user a library names to kay with no visitor option, and lets the visitor option override it', async () => {
+    ai({ limit: { max: 1, window: '1m' } })
+
+    const named = (user: string | undefined, address: string) => {
+      const request = rewrittenRequest(address)
+
+      nameUser(request, () => user)
+
+      return request
+    }
+
+    await inside(named('ann', '203.0.113.1'), () => ask('a'))
+    expect((await failure(inside(named('ann', '203.0.113.2'), () => ask('b')))).limit).toBe('asks')
+    await inside(named('bob', '203.0.113.1'), () => ask('a'))
+    // Nobody signed in: the address counts.
+    await inside(named(undefined, '203.0.113.5'), () => ask('a'))
+    expect((await failure(inside(named(undefined, '203.0.113.5'), () => ask('b')))).limit).toBe('asks')
+
+    ai({ limit: { max: 1, window: '1m' }, visitor: () => 'mine' })
+    await inside(named('cat', '203.0.113.7'), () => ask('a'))
+    expect((await failure(inside(named('dan', '203.0.113.8'), () => ask('b')))).limit).toBe('asks')
   })
 
   it('lets a visitor hook answer later, and a call name the visitor over it', async () => {

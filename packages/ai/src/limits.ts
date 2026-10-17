@@ -2,7 +2,7 @@ import type { Duration, RateStore } from 'kay'
 import type { AiLimit } from './errors'
 import type { Piece, Usage } from './types'
 import { logFrom } from 'kay'
-import { durationSeconds } from 'kay/library'
+import { durationSeconds, userOf } from 'kay/library'
 import { clientAddress, memoryRates, rateKey } from 'kay/server'
 import { AiError } from './errors'
 
@@ -33,7 +33,7 @@ export interface BudgetOptions {
 export interface AiOptions {
   limit?: LimitOptions | undefined
   budget?: BudgetOptions | undefined
-  // Who a signed-in visitor is, such as their id: counted in place of their address. Left out, the address counts.
+  // Who a signed-in visitor is, such as their id: counted in place of their address, and in place of the user a library such as kayjs-auth names. Left out, that user counts, else the address.
   visitor?: ((request: Request) => string | undefined | Promise<string | undefined>) | undefined
 }
 
@@ -145,7 +145,8 @@ async function bounded<T>(read: () => T | Promise<T>): Promise<T> {
 }
 
 async function visitorKey(visitor: Settings['visitor'], { request, visitor: named }: Asker): Promise<string | undefined> {
-  const user = named ?? (request && await visitor?.(request))
+  const hooked = request && await visitor?.(request)
+  const user = named ?? (hooked !== undefined && hooked !== '' ? hooked : request && await userOf(request))
 
   if (typeof user === 'string' && user !== '')
     return `user:${user}`

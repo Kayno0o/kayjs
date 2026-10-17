@@ -28,7 +28,7 @@ import type { AuthStore, LinkType, SessionRecord, UserRecord } from './store'
 import type { Proof, ProofFailure, TwoFactorResult, TwoFactorSetup } from './twoFactor'
 import type { Level, PolicyContext, Predicate, Requirement } from './types'
 import { Elysia } from 'elysia'
-import { durationSeconds, READ_METHODS, stoppers, underKayDev } from 'kay/library'
+import { durationSeconds, nameUser, READ_METHODS, stoppers, underKayDev } from 'kay/library'
 import { clientAddress, crossSiteRefused, crossSiteResponse, rateKey } from 'kay/server'
 import { changePassword, changeUsername, deleteAccount, unlink } from './account'
 import { actingAdmin, adminAuditLog, banUser, changeRole, deleteUser, getUser, isAdmin, listUsers, unbanUser } from './admin'
@@ -1076,7 +1076,12 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
 
       pruneWhenDue(core, session.settings)
 
-      return { auth: new Auth<Scope, Role, OrgRole>(session, core, ctx.request, rateKey(address), address) }
+      const auth = new Auth<Scope, Role, OrgRole>(session, core, ctx.request, rateKey(address), address)
+
+      // Lets other libraries, such as kayjs-ai counting a visitor, know the signed-in user without importing kayjs-auth.
+      nameUser(ctx.request, async () => (await auth.user())?.id)
+
+      return { auth }
     })
     // The session's derive reaches this instance only; lifting both globally lets them reach every route the app declares after it, however deep the plugin is used.
     .as('global')

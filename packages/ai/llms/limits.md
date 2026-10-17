@@ -11,7 +11,6 @@ export default defineConfig({
   extensions: [ai({
     limit: { max: 10, window: '1m' },
     budget: { tokens: 50_000, total: 2_000_000, window: '1d', store: sqliteRates('data/ai.sqlite') },
-    visitor: async request => (await currentUser(request))?.id,
   })],
 })
 ```
@@ -20,7 +19,7 @@ export default defineConfig({
 
 - `limit: { max, window, store? }`: at most `max` asks per visitor every `window`. Counted when the reply is first read, so a reply never read counts nothing.
 - `budget: { tokens, total?, window, store? }`: the tokens (input plus output) the replies to one visitor may use every `window`, and across all visitors with `total`. `tokens` and `total` are whole numbers of at least 1.
-- `visitor: (request) => string | undefined`: who a signed-in visitor is, such as their user id from your own session lookup; sync or async. It must return something the client cannot choose: a header or cookie the visitor sets gives them a fresh budget per request, or a victim's. kay's core has no notion of a user and its own rate limits count the address, so this is the one hook; without it, or when it returns nothing, the address counts, one key per IPv6 /64 as `rateLimit` does. Behind a reverse proxy without kay's `proxy` setting every visitor shares the proxy's address, hence one quota. A user and an address never share a key. A free signup mints a budget per account, which only `total` caps.
+- `visitor: (request) => string | undefined`: overrides who a signed-in visitor is, such as a user id from your own session lookup; sync or async. With kayjs-auth in `extensions` you leave it out: the signed-in user it names to kay is counted. It must return something the client cannot choose: a header or cookie the visitor sets gives them a fresh budget per request, or a victim's. Without a user, from `visitor` or a library, the address counts, one key per IPv6 /64 as `rateLimit` does. Behind a reverse proxy without kay's `proxy` setting every visitor shares the proxy's address, hence one quota. A user and an address never share a key. A free signup mints a budget per account, which only `total` caps.
 - `store`: a `RateStore`, in this process's memory unless given. `sqliteRates(path)` or an app's own store keeps the count over a restart and shares it between processes. The budget's store must have `peek(key)` (`memoryRates` and `sqliteRates` do), else `ai()` throws.
 - `ask(..., { visitor: 'id' })` names the visitor for one ask, in place of the hook: a job, a test.
 - With no request being answered and no `visitor`, the per-visitor `limit` and `budget` are skipped and `total` still counts, so a background job spends the shared budget but is never one visitor's.

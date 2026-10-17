@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- kayjs-ai counts a signed-in kayjs-auth user, not their address, with no `visitor` option; `visitor` stays as an override ([kayjs-ai](../packages/ai/llms/limits.md)).
 - kayjs-cms: `uploads.maxSize` over 128 MB less 64 KB stops `kay.config.ts` from loading, as Bun refuses a larger request body before the upload route sees it ([kayjs-cms](../packages/cms/llms.txt)).
 - `sizeText(bytes, locale?)` from `kay/words` writes a size in the page's locale (`1.5 MB`, `1,5 Mo`); kayjs-cms's upload refusals use it, so its `cms.size.*` messages are gone and a size follows the locale on its own ([Locales](locales.md)).
 - `deprecated-ui-prop` also reports a `Carousel`'s `autoplay={5000}` in a template, and `kay check --fix` writes `autoplay="5s"` ([kayjs-ui](../packages/ui/llms/charts-drag-and-media.md)).

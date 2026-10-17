@@ -1,6 +1,7 @@
 import type { Auth, AuthOptions, AuthSessionData } from '../../src/auth'
 import type { AuthStore, UserRecord } from '../../src/store'
 import { Elysia } from 'elysia'
+import { userOf } from 'kay/library'
 import { session } from 'kay/server'
 import { cookieJar } from 'kay/test'
 import { createAuth } from '../../src/auth'
@@ -59,6 +60,7 @@ export function testApp<const Scope extends string = never, OrgRole extends stri
   const app = new Elysia()
     .use(auth.plugin)
     .get('/me', async ({ auth }) => (await auth.user()) ?? 'anonymous')
+    .get('/named', async ({ request }) => (await userOf(request)) ?? 'anonymous')
     .post('/sign-in/:id', async ({ auth, params }) => {
       await auth.signIn({ id: params.id })
 
