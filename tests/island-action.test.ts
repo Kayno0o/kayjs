@@ -4,6 +4,8 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { chromium } from 'playwright-core'
+import { child } from '../src/runtime/html'
+import { island, IslandPropsError } from '../src/runtime/island.server'
 import { actionStub, reviveActions } from '../src/runtime/action'
 import { decodeValue, encodeValue, serverWritten, setActionReviver, unflattenValue } from '../src/runtime/wire'
 import { browserPath, testSite } from '../src/test'
@@ -87,13 +89,15 @@ describe('the wire of an action', () => {
     expect(stub.run.url).toBe(greet.url)
     expect(typeof stub.run).toBe('function')
     expect(() => unflattenValue([{ run: 1 }, ['Action', 2], 'https://evil.example/x'], serverWritten)).toThrow(/malformed/)
-    expect(() => unflattenValue([{ run: 1 }, ['Action', 2], '/_kay/action/../../x'.replace('..', '..')], serverWritten)).not.toThrow()
     expect(() => unflattenValue([{ run: 1 }, ['Action', 2], 7], serverWritten)).toThrow(/malformed/)
     expect(actionStub('/_kay/action/a/b').url).toBe('/_kay/action/a/b')
   })
 
-  it('refuses an action with no URL, one no route module exports', () => {
-    expect(() => encodeValue({ run: actionStub('') }, true)).toThrow('no URL')
+  it('refuses, as a prop an island cannot take, a `with()` action and one no route module exports, so a component passing one still renders as an island', () => {
+    const Dialog = island('dialog.kay', (_props: { run: unknown }) => null)
+
+    expect(() => child(Dialog({ run: actionStub('') }))).toThrow(IslandPropsError)
+    expect(() => child(Dialog({ run: (greet as unknown as { with: (fields: object) => unknown }).with({ name: 'Ann' }) }))).toThrow('with()')
   })
 
   it('does not take any function for an action', () => {

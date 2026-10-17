@@ -79,6 +79,9 @@ const PRERENDER: PageSettingName = 'prerender'
 const QUERY: PageSettingName = 'query'
 // `t('nav.home')`, `wording('ui.close', 'Close')` or `T(key="intro")`: a message key an island's source names as it is written.
 const MESSAGE_KEY = /(?:\b(?:t|wording)\(\s*|\bT\([^)]*?\bkey=)(['"`])([\w.-]+)\1/g
+// The types of `kay` an island types a prop with when a page may pass it an action.
+const ACTION_TYPES = new Set(['Action', 'ServerAction', 'NoInputAction'])
+
 // The server exports that are no actions: the page's settings, and each under its own name as they were exported before.
 const NOT_ACTIONS = new Set<string>([PAGE, ...PAGE_SETTINGS])
 // A type parameter's name, past the `const`, `in` and `out` modifiers it may carry.
@@ -837,9 +840,6 @@ function lineOf(source: string, offset: number): number {
 
   return line
 }
-
-// The types of `kay` an island types a prop with when a page may pass it an action.
-const ACTION_TYPES = new Set(['Action', 'ServerAction', 'NoInputAction'])
 
 type KayHelper = 'formAction' | 'formValue' | 'formChecked' | 'formDescribed' | 'formInvalid' | 'formMarked' | 'formError' | 'formProtection' | 'registerActions' | 'actionStub' | 'reviveActions' | 'autoDefer'
 

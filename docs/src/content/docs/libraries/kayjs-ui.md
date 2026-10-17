@@ -86,7 +86,7 @@ Button(label="Save" tone="accent" onClick={save})
 
 <Callout type="warning">
 
-A page can pass a Dialog or a Popover its content. A layout, or a page with a `--- server` fence, cannot pass a function or a block with parameters, such as a Table's `@cell`. Put those in a component of yours, which then renders as an island.
+A page can pass a Dialog or a Popover its content. A layout, or a page with a `--- server` fence, cannot pass a function or a block with parameters, such as a Table's `@cell`, but can pass an action. Put those in a component of yours, which then renders as an island.
 
 </Callout>
 

@@ -205,6 +205,19 @@ function slotsValue(slots: [string, string][], html: string): string {
   return JSON.stringify(Object.fromEntries(slots.map(([key, markup], index) => [key, html.includes(`<!--${SLOT_START}${index}-->`) ? index : markup])))
 }
 
+// Why an action cannot cross as its URL, undefined for one that can and for anything that is no action.
+function refusedAction(value: unknown): string | undefined {
+  if (!isAction(value))
+    return undefined
+
+  const { url, formUrl } = value as { url: string, formUrl?: string }
+
+  if (formUrl !== undefined)
+    return 'an action fixing fields with `with()`, which would lose them on the way: pass the plain action and the fields as its input'
+
+  return url.startsWith('/_kay/action/') ? undefined : 'an action no route module exports, which has no URL to reach the browser by'
+}
+
 // `what` names the island and why it is one.
 function serializeProps(what: string, props: object, slots: [string, string][]): string {
   const plain: Record<string, unknown> = {}
@@ -215,8 +228,12 @@ function serializeProps(what: string, props: object, slots: [string, string][]):
 
     const value = (props as Record<string, unknown>)[key]
 
-    if ((typeof value === 'function' && !isAction(value)) || typeof value === 'symbol')
-      throw new IslandPropsError(`${what}, so it renders as an island: its \`${key}\` prop is a ${typeof value} and cannot reach the browser; pass it from a component of its own, which then renders as an island in its place`)
+    if (typeof value === 'function' || typeof value === 'symbol') {
+      const reason = refusedAction(value)
+
+      if (reason !== undefined || !isAction(value))
+        throw new IslandPropsError(`${what}, so it renders as an island: its \`${key}\` prop is ${reason ?? `a ${typeof value}`} and cannot reach the browser; pass it from a component of its own, which then renders as an island in its place`)
+    }
 
     plain[key] = value
   }

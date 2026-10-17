@@ -20,18 +20,7 @@ export function encodeValue(value: unknown, actions = false): string {
 }
 
 function sendableAction(value: unknown): string | false {
-  if (typeof value !== 'function' || !(ACTION_MARK in value))
-    return false
-
-  const { url, formUrl } = value as { url?: unknown, formUrl?: unknown }
-
-  if (formUrl !== undefined)
-    throw new TypeError('an action fixing fields with `with()` cannot reach an island: pass the island the plain action and the fields as its input')
-
-  if (typeof url !== 'string' || !url.startsWith(ACTION_PREFIX))
-    throw new TypeError('an action no route module exports has no URL to reach an island by: export it from a page or an endpoint')
-
-  return url
+  return typeof value === 'function' && ACTION_MARK in value ? (value as unknown as { url: string }).url : false
 }
 
 let reviveAction: ((url: string) => unknown) | undefined

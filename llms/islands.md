@@ -180,7 +180,7 @@ ul(id={id} hidden={!open()})
 - A block the island did not show on the server, or a client-only island's, travels in its props as markup and is built once shown.
 - Text alone, as in `Label Save`, is a string prop like any other.
 - The island cannot change what a block renders: one it calls with values takes parameters.
-- A function, a block with parameters, a class instance or a symbol cannot be serialized.
+- A function, a block with parameters, a class instance or a symbol cannot be serialized; an action is the exception, going as its URL ([actions](actions.md#pass-an-action-to-an-island)).
 - Props are written into the page source, so a field named like a secret (`passwordHash`, `token`, `apiKey`, `email`) is reported as `secret-prop`: pick the fields the island shows, or `// kay-allow secret-prop` for a public one.
 - A static component passing one to an island renders as an island itself, decided as it renders, its own props serialized instead: a component rendering `Picker(format={shout})` hydrates whole, while one passing only data stays static and ships nothing.
 - Its own props must then be serializable, else the component rendering it renders as an island in turn.
