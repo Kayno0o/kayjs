@@ -11,7 +11,7 @@ import { resolveFrom, scriptLoader, transpilerFor, writeAtomically } from '../bu
 import { KayError } from '../compiler/errors'
 import { modeOf, cacheDir as projectCache } from '../project'
 import { projectSource } from '../server/source'
-import { linkImages } from './images'
+import { linkImages, statOf } from './images'
 import { compileMarkdown, MarkdownError, splitFrontmatter } from './markdown'
 import { ContentError } from './validate'
 
@@ -380,7 +380,7 @@ async function imagesCurrent(entry: RawEntry, root: string): Promise<RawEntry | 
   }
 
   for (const { file, stamp } of entry.unreadableImages ?? []) {
-    const found = await stat(join(root, file)).catch(() => undefined)
+    const found = await statOf(join(root, file))
 
     if (found === undefined || stamp !== `${found.mtimeMs}:${found.size}`)
       return undefined

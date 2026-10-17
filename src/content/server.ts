@@ -223,7 +223,7 @@ export async function localizedSlugs(root: string, config?: string): Promise<Map
 
     for (const entry of await entries(name)) {
       if (entry.locale !== undefined)
-        byLocale.set(entry.locale, (byLocale.get(entry.locale) ?? new Map()).set(translationKey(entry), entry.slug))
+        byLocale.set(entry.locale, (byLocale.get(entry.locale) ?? new Map<string, string>()).set(translationKey(entry), entry.slug))
     }
 
     found.set(name, byLocale)

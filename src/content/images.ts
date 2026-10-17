@@ -1,3 +1,4 @@
+import type { Stats } from 'node:fs'
 // Relative images in a Markdown body: linked to the built assets when the entry compiles, and given their srcset and sizes when it renders, as `image()` gives an imported one.
 import type { Segment } from './markdown'
 import { realpathSync } from 'node:fs'
@@ -35,6 +36,16 @@ const SCHEME = /^(?:[a-z][a-z\d+.-]*:|\/|#)/i
 const QUERY_OR_HASH = /[?#].*$/
 const ENTITIES: Record<string, string> = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': '\'', '&#x27;': '\'' }
 const ENTITY = /&(?:amp|lt|gt|quot|#39|#x27);/g
+
+// The file's stat, or undefined when it is not there.
+export async function statOf(file: string): Promise<Stats | undefined> {
+  try {
+    return await stat(file)
+  }
+  catch {
+    return undefined
+  }
+}
 
 function insideOf(dir: string, path: string): boolean {
   return path.startsWith(dir + sep)
@@ -77,7 +88,7 @@ async function linkedImage(src: string, entryDir: string, folder: string, root: 
   catch {
     // A file not there yet, or half copied, is linked once it is, which the entry's cache looks for.
     if (!file.includes('\0')) {
-      const found = await stat(file).catch(() => undefined)
+      const found = await statOf(file)
 
       if (found === undefined)
         unlinked.missing.add(file)

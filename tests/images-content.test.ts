@@ -266,7 +266,7 @@ describe('Markdown images', () => {
   })
 
   it('link an image that was half copied once it is whole, with the Markdown unchanged', async () => {
-    const { root, restore } = await project({ 'posts/a.md': '---\ntitle: A\n---\n\n![a](./cat.png)\n', 'posts/cat.png': (await Bun.file(HERO).bytes()).slice(0, 12) })
+    const { root, restore } = await project({ 'posts/a.md': '---\ntitle: A\n---\n\n![a](./cat.png)\n', 'posts/cat.png': new Blob([(await Bun.file(HERO).bytes()).slice(0, 12)]) })
 
     try {
       expect((await loadEntries('posts', { live: true }))[0]!.images).toBeUndefined()
@@ -389,7 +389,7 @@ describe('entry slugs', () => {
         'fr/same': ['en', 'fr'],
       })
 
-      const [hello] = await posts.all('en').then(all => all.filter(found => found.slug === 'hello-world'))
+      const hello = (await posts.all('en')).find(found => found.slug === 'hello-world')
 
       expect((await posts.translation(hello!, 'fr'))?.slug).toBe('bonjour-le-monde')
       expect((await posts.translation(hello!, 'en'))?.slug).toBe('hello-world')
