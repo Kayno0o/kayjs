@@ -14,7 +14,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the island
     const page = await site.open('/', { path })
 
     await page.waitFor('button.probe', { text: 'three' })
-    await page.waitUntil(() => document.body.dataset.cleaned !== undefined)
+    await page.waitUntil(() => Number(document.body.dataset.mounted ?? 0) > 1 && Number(document.body.dataset.mounted) === Number(document.body.dataset.cleaned ?? 0) + 1)
 
     const { mounted, cleaned } = await page.evaluate(() => ({ mounted: Number(document.body.dataset.mounted ?? 0), cleaned: Number(document.body.dataset.cleaned ?? 0) }))
 
