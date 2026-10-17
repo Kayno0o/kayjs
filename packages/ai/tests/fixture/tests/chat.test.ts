@@ -326,7 +326,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
     expect(await page.evaluate(() => document.activeElement?.tagName)).toBe('TEXTAREA')
   })
 
-  test('Stop before the first word ends the wait without an error, a turn or a retry', async () => {
+  test('Stop before the first word ends the wait without an error or a retry, and the message returns to the field', async () => {
     const page = await site.open('/held')
 
     await page.fill('textarea', 'Go')
@@ -336,10 +336,18 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
     await page.waitFor('[data-pending]', { gone: true })
 
     expect(await page.count('[role="alert"]')).toBe(0)
-    expect(await page.count('.kai-chat-turn[data-role="assistant"]')).toBe(0)
-    expect(await page.count('.kai-chat-turn[data-role="user"]')).toBe(1)
+    expect(await page.count('.kai-chat-turn')).toBe(0)
+    expect(await page.value('textarea')).toBe('Go')
     expect(await page.text('.kai-chat-form button')).toBe('Send')
     expect(await page.evaluate(() => document.activeElement?.tagName)).toBe('TEXTAREA')
+
+    // Sent again, it is the one user turn there is, not a second beside the stopped one.
+    await page.fill('textarea', 'Go on')
+    await page.press('Enter')
+    await page.waitFor('[data-pending] .kai-chat-thinking')
+
+    expect(await page.count('.kai-chat-turn[data-role="user"]')).toBe(1)
+    expect(await page.text('.kai-chat-turn[data-role="user"]')).toBe('Go on')
   })
 
   test('the chat has no accessibility violation, its log and field named', async () => {
@@ -347,5 +355,6 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
 
     expect(await page.a11y('.kai-chat')).toEqual([])
     expect(await page.evaluate(() => document.querySelector('[role="log"]')?.getAttribute('aria-label'))).toBe('Assistant')
+    expect(await page.evaluate(() => document.querySelector('.kai-chat')?.hasAttribute('aria-label'))).toBe(false)
   })
 })

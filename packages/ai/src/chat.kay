@@ -30,7 +30,7 @@ const { action, initial = [], label = 'Chat', placeholder = 'Write a message…'
   action: Action<{ messages: Message[] }, AsyncIterable<string | Progress> | Failure<unknown>>
   // The messages shown to start with.
   initial?: Message[] | undefined
-  // Names the chat and its message list for screen readers.
+  // Names the message list and the field for screen readers.
   label?: string | undefined
   placeholder?: string | undefined
   sendLabel?: string | undefined
@@ -104,7 +104,7 @@ function markdown(text: string, scrollable = true) {
   }).replaceAll('</table>', '</table></div>'))
 }
 
-// A message the schema refuses would fail every later send, so it leaves the history and goes back to the field, ahead of what the visitor typed since.
+// A message the schema refuses would fail every later send, and one stopped before any word came has no answer, so a next send would post two user turns: it leaves the history and goes back to the field, ahead of what the visitor typed since.
 function takeBack() {
   const last = history().at(-1)
 
@@ -130,6 +130,8 @@ function finish(state: string) {
 
   if (state === 'failed')
     failure.set(errorMessage)
+  else if (state === 'closed' && text === '' && made.length === 0)
+    takeBack()
 }
 
 effect(() => {
@@ -182,6 +184,7 @@ async function send(again = false) {
 
     if (mine.signal.aborted) {
       stream.close()
+      takeBack()
 
       return
     }
@@ -190,8 +193,11 @@ async function send(again = false) {
     streaming.set(stream)
   }
   catch (error) {
-    // A call stopped before its first word is not a failure.
-    if (!mine.signal.aborted) {
+    // A call stopped before its first word is not a failure, and its message returns to the field.
+    if (mine.signal.aborted) {
+      takeBack()
+    }
+    else {
       console.error(error)
 
       if (error instanceof ActionError && error.status === 422)
@@ -232,7 +238,7 @@ function scrolled() {
   pinned = log !== undefined && log.scrollHeight - log.scrollTop - log.clientHeight < PINNED_PX
 }
 ---
-section.kai-chat(class={className} aria-label={label})
+section.kai-chat(class={className})
   // The log is the turns so far; the reply streaming in is hidden from screen readers until it is whole, so the finished turn is announced once, not word by word.
   .kai-chat-log(role="log" aria-label={label} tabindex="0" ref={element => { log = element }} onScroll={scrolled})
     for turn of history() key={turn.id}

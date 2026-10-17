@@ -95,7 +95,7 @@ Chat(action={reply} label="Assistant")
 A page, with or without a `server` fence, hands the action straight to `Chat`. The action has to be exported by a page or endpoint.
 
 - Enter sends and Shift+Enter starts a new line.
-- Stop, or Escape in the field, ends the reply. The words that came stay, marked as stopped.
+- Stop, or Escape in the field, ends the reply. The words that came stay, marked as stopped. Stopped before the first word, the message goes back to the field.
 - If the call fails, the chat shows an alert and a button to ask again. The message is not sent twice.
 - A screen reader hears each finished turn once, not word by word.
 - A table wider than its bubble scrolls sideways inside it, and the keyboard can scroll it.
