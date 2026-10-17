@@ -57,6 +57,9 @@ const content: typeof Content = {
     return {}
   },
   entryFile: async (collection, slug) => {
+    if (collectionList.find(each => each.name === collection)?.kind === 'loaded')
+      throw new Error(`kay: entryFile() gives a folder collection's files, and ${collection} is loaded`)
+
     const path = stored[collection]?.find(entry => entry.slug === slug)?.path
 
     return path === undefined ? { issues: [{ collection, slug, path: '', key: 'slug', message: MISSING }] } : { file: { path, absolute: path.startsWith('/') ? path : `/site/${path}`, repoPath: path } }

@@ -203,8 +203,9 @@ export async function moveEntry(ref: EntryRef, direction: 'up' | 'down', author?
   for (const change of changes) {
     const entry = group.find(each => each.slug === change.slug)!
     const target = { collection: collection.name, slug: entry.slug, locale: entry.locale }
+    const version = collection.kind === 'loaded' ? undefined : await versionOf(target)
 
-    outcome = await saveEntry({ ...target, data: { ...entry.data, [field]: change.value }, body: entry.body }, { version: await versionOf(target), verb: 'move', author, bodyKept: true })
+    outcome = await saveEntry({ ...target, data: { ...entry.data, [field]: change.value }, body: entry.body }, { version, verb: 'move', author, bodyKept: true })
 
     if ('issues' in outcome)
       return outcome
