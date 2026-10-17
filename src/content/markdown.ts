@@ -40,7 +40,7 @@ export type Highlighter = (code: string, language: string | undefined) => string
 
 const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/
 // Where a heading and a code block open, each closed by the first `</a></hN>` or `</code></pre>` after it.
-const HEADING_OPEN = /<h([1-6]) id="([^"]*)"><a href="#[^"]*">/g
+const HEADING_OPEN = /<h([1-6]) id="([^"]*)"><a href="#\2">/g
 const CODE_OPEN = /<pre><code(?: class="language-([^"]*)")?>/g
 const CODE_CLOSE = '</code></pre>'
 // Where a tag naming a component opens: capitalized, as kay components are; lowercase tags stay HTML.

@@ -548,6 +548,17 @@ describe('Markdown settings', () => {
       expect(segments[0]).toContain(links ? '<h3 id="sub"><a href="#sub">Sub</a></h3>' : '<h3 id="sub">Sub</h3>')
     }
   })
+
+  it('leave a raw heading whose anchor points elsewhere as written, not counted and not stripped', async () => {
+    const body = '## Part\n\n<h2 id="x"><a href="#y">Raw</a></h2>\n'
+
+    for (const links of [true, false]) {
+      const { segments, headings } = await compileMarkdown(body, 1, undefined, links)
+
+      expect(headings).toEqual([{ depth: 2, id: 'part', text: 'Part' }])
+      expect(segments[0]).toContain('<h2 id="x"><a href="#y">Raw</a></h2>')
+    }
+  })
 })
 
 describe('Markdown images in a static export', () => {
