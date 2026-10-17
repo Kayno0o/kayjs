@@ -133,6 +133,9 @@ describe('the dev tool', () => {
 
     expect(copied).toEqual([`kay dev problems on ${location.href}\n\n[Recovered by kay] error (2 times)\nisland a.kay did not match its server markup\n\n[kay check] error\nerror[missing-alt]: An \`img\` needs \`alt\`\n --> src/routes/index.kay:3:5`])
     expect(copy().textContent).toBe('Copied')
+    await Bun.sleep(1)
+
+    expect(shadow().querySelector('.copies')?.textContent).toBe('Copied')
 
     // The tab as Markdown spaces a heading from its count and names no count a problem told once.
     shadow().querySelector<HTMLButtonElement>('.head .icon[aria-label="Copy this tab as Markdown"]')!.click()
@@ -226,7 +229,7 @@ describe('the dev tool', () => {
       typeFilter('#kay-dev-network', 'font')
 
       expect(names()).toEqual(['/fonts/inter.woff2'])
-      expect(groups()).toEqual([`Before, /shop4`])
+      expect(groups()).toEqual([`Before, /shop1`])
 
       // The last 5 navigations are kept.
       typeFilter('#kay-dev-network', '')
@@ -861,9 +864,9 @@ describe('the dev tool', () => {
       ] }), { status })
     }) as unknown as typeof window.fetch)
 
-    const rows = () => [...shadow().querySelectorAll('#kay-dev-routes .route')].map(row => [row.querySelector('.method')!.textContent, row.querySelector('.name')!.textContent, row.querySelector('.line .chip')?.textContent ?? '', row.querySelector('.chips')!.textContent].join(' | '))
+    const rows = () => [...shadow().querySelectorAll('#kay-dev-routes .route')].filter(row => row.closest('[hidden]') === null).map(row => [row.querySelector('.method')!.textContent, row.querySelector('.name')!.textContent, row.querySelector('.line .chip')?.textContent ?? '', row.querySelector('.chips')!.textContent].join(' | '))
     const filter = () => shadow().querySelector<HTMLInputElement>('#kay-dev-routes input')!
-    const sections = () => [...shadow().querySelectorAll('#kay-dev-routes .group')].map(group => `${group.querySelector('h3')!.firstChild!.textContent} (${group.querySelector('h3 .pill')!.textContent})`)
+    const sections = () => [...shadow().querySelectorAll('#kay-dev-routes .group')].filter(group => (group as HTMLElement).hidden === false).map(group => `${group.querySelector('h3')!.firstChild!.textContent} (${group.querySelector('h3 .pill')!.textContent})`)
 
     try {
       tool = startDevTool()
@@ -880,11 +883,11 @@ describe('the dev tool', () => {
       filter().value = 'ABOUT'
       filter().dispatchEvent(new Event('input'))
       expect(rows()).toEqual(['GET | /fr/a-propos | fr | src/routes/about.kay'])
-      expect(await copiedBy(shadow().querySelector<HTMLButtonElement>('#kay-dev-routes .route .copy')!)).toBe(new URL('/fr/a-propos', location.href).href)
+      expect(await copiedBy(shadow().querySelector<HTMLButtonElement>('#kay-dev-routes .route:not([hidden]) .copy')!)).toBe(new URL('/fr/a-propos', location.href).href)
       expect(await copiedBy()).toContain('\n- GET /fr/a-propos')
       filter().value = 'nothing'
       filter().dispatchEvent(new Event('input'))
-      expect(shadow().querySelector('#kay-dev-routes .empty')?.textContent).toBe('No route matches the filter.')
+      expect(shadow().querySelector<HTMLElement>('#kay-dev-routes .empty:not([hidden])')?.textContent).toBe('Nothing matches the filter.')
 
       // A restart may change the routes: the tab shown asks again.
       status = 500
@@ -992,6 +995,7 @@ describe('the dev tool', () => {
       expect(text('.meter.over')).toEqual([])
       expect(await copiedBy(panel().querySelector<HTMLButtonElement>('.facts .copy')!)).toBe('https://shop.example/')
       expect(await copiedBy(panel().querySelector<HTMLButtonElement>('.kv .copy')!)).toBe('https://shop.example/_kay/card?title=Home')
+      expect(await copiedBy(panel().querySelector<HTMLButtonElement>('.facts .chip .copy')!)).toBe('https://shop.example/fr')
       expect(await copiedBy()).toContain('\n- Canonical: https://shop.example/\n')
       expect(text('h3')).toEqual(['Tags', 'Open Graph2', 'Twitter1', 'JSON-LD2'])
       expect(panel().querySelector<HTMLImageElement>('.preview img.card')!.src).toBe('http://localhost:3000/_kay/card?title=Home')
@@ -1004,7 +1008,7 @@ describe('the dev tool', () => {
       typeFilter('#kay-dev-head', 'og:image')
 
       expect(visible('#kay-dev-head', '.kv tr')).toEqual(['og:imagehttps://shop.example/_kay/card?title=Home'])
-      expect(visible('#kay-dev-head', 'h3')).toEqual(['Open Graph2'])
+      expect(visible('#kay-dev-head', 'h3')).toEqual(['Open Graph1'])
       expect(visible('#kay-dev-head', '.problem')).toEqual([])
       expect(visible('#kay-dev-head', '.previews')).toHaveLength(1)
 
@@ -1017,7 +1021,7 @@ describe('the dev tool', () => {
 
       expect(shadow().querySelector('#kay-dev-head .toolbar button')!.getAttribute('aria-pressed')).toBe('true')
       expect(visible('#kay-dev-head', '.problem pre')).toEqual(['The description of `/` runs 200 characters\nhelp: shorten it'])
-      expect(visible('#kay-dev-head', 'h3')).toEqual(['JSON-LD2'])
+      expect(visible('#kay-dev-head', 'h3')).toEqual(['JSON-LD1'])
       expect(visible('#kay-dev-head', '.previews')).toEqual([])
 
       shadow().querySelector<HTMLButtonElement>('#kay-dev-head .toolbar button')!.click()

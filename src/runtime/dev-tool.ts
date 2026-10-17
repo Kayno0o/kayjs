@@ -486,8 +486,22 @@ async function copied(button: HTMLButtonElement, text: string, label: string, ic
   const worked = await toClipboard(button, text)
 
   setIcon(button, worked ? 'Copied' : 'Copy failed', worked ? 'check' : 'x')
+  announce(button, worked ? 'Copied' : 'Copy failed')
   clearTimeout(copyResets.get(button))
   copyResets.set(button, setTimeout(setIcon, COPIED_MS, button, label, icon))
+}
+
+// Says a copy's outcome to a screen reader, which a button's changed name alone does not: the drawer's live region takes it, and empties again for the next copy to be heard.
+function announce(button: HTMLElement, text: string): void {
+  const region = (button.getRootNode() as ParentNode).querySelector('.copies')
+
+  if (region === null)
+    return
+
+  region.textContent = ''
+  setTimeout(() => {
+    region.textContent = text
+  }, 0)
 }
 
 // A tab's filter box, and a "Problems only" toggle when `problems` is given, its help text naming what it matches; it applies to the rows marked by `filterable` under the element passed to `apply`, run again on each keystroke and press.
@@ -536,10 +550,18 @@ function toolbar(tool: DevTool, help: string, rerun: () => void, problems = fals
       for (const group of within.querySelectorAll<HTMLElement>('.group')) {
         const own = [...group.querySelectorAll<HTMLElement>('[data-filter]')]
 
-        if (own.length > 0)
+        if (own.length > 0) {
           group.hidden = own.every(row => row.hidden === true)
-        else
+
+          // The heading's count follows the rows shown, and goes back to the whole when nothing filters.
+          for (const count of group.querySelectorAll<HTMLElement>(':scope > .heading > .pill')) {
+            count.dataset.total ??= count.textContent
+            count.textContent = typed === '' && !only ? count.dataset.total : String(own.filter(row => row.hidden === false).length)
+          }
+        }
+        else {
           group.toggleAttribute('data-filtered', typed !== '' || only)
+        }
       }
 
       empty.textContent = only && typed === '' ? 'No problems.' : 'Nothing matches the filter.'
@@ -723,6 +745,7 @@ export function startDevTool(doc: Document = document): DevTool {
     return grip
   })
   const status = make('span', 'sr')
+  const copies = make('div', 'sr copies')
   const tabs: { options: DevTabOptions, button: HTMLButtonElement, panel: HTMLElement, badge: HTMLButtonElement }[] = []
   // A docked drawer pads the page by its size, so none of the page hides under it.
   const pageSheet = new CSSStyleSheet()
@@ -748,6 +771,7 @@ export function startDevTool(doc: Document = document): DevTool {
   mark.append(drawing(doc, MARK, '4 5 54 52', ''), 'kay')
   title.append(drawing(doc, MARK, '4 5 54 52', ''), make('span', 'words', 'kay dev tools'))
   status.setAttribute('role', 'status')
+  copies.setAttribute('role', 'status')
   size.type = 'button'
   close.type = 'button'
   setIcon(close, 'Close', 'x')
@@ -757,7 +781,7 @@ export function startDevTool(doc: Document = document): DevTool {
   body.append(tabList, content)
   drawer.append(head, body, ...grips)
   bar.append(mark, status)
-  ui.append(drawer, bar)
+  ui.append(drawer, bar, copies)
   root.append(ui)
   host.setAttribute('data-kay-dev', '')
   doc.documentElement.append(host)
@@ -2041,10 +2065,18 @@ function headTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
     fact('Description', ...description === undefined ? [none()] : [description, meter(tool, description.length, limit)])
     fact('Canonical', ...canonical === undefined ? [none()] : [tool.make('span', 'mono', canonical), copyButton(tool, 'the canonical URL', canonical)])
 
-    const alternates = [...head.querySelectorAll('link[rel="alternate"][hreflang]')].map(link => `${link.getAttribute('hreflang')}: ${link.getAttribute('href')}`)
+    const alternates = [...head.querySelectorAll('link[rel="alternate"][hreflang]')].map(link => [`${link.getAttribute('hreflang')}: ${link.getAttribute('href')}`, link.getAttribute('href') ?? ''] as const)
     const chips = tool.make('span', 'chips')
 
-    chips.append(...alternates.map(line => tool.make('span', 'chip', line)))
+    for (const [line, alternate] of alternates) {
+      const chip = tool.make('span', 'chip', line)
+
+      if (alternate !== '')
+        chip.append(copyButton(tool, `the ${line.slice(0, line.indexOf(':'))} alternate URL`, new URL(alternate, href).href))
+
+      chips.append(chip)
+    }
+
     fact('Alternates', alternates.length === 0 ? none() : chips)
     fact('Robots', metaContent(head, 'robots') ?? tool.make('span', 'note', 'no tag, indexable'))
 
@@ -3035,10 +3067,8 @@ function routesTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
   const bar = toolbar(tool, 'Filter by path or file', () => render())
 
   render = () => {
-    const typed = bar.input.value.trim().toLowerCase()
-    const shown = routes.filter(route => typed === '' || route.path.toLowerCase().includes(typed) || route.file.toLowerCase().includes(typed) || (route.owner ?? '').toLowerCase().includes(typed))
     const sections = Object.entries(ROUTE_KINDS).flatMap(([kind, label]) => {
-      const ofKind = shown.filter(route => route.kind === kind)
+      const ofKind = routes.filter(route => route.kind === kind)
 
       if (ofKind.length === 0)
         return []
@@ -3047,14 +3077,15 @@ function routesTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
       const heading = tool.make('h3', 'heading', label)
       const list = tool.make('div')
 
-      list.append(...ofKind.map(route => routeRow(tool, route, win.location)))
+      list.append(...ofKind.map(route => filterable(routeRow(tool, route, win.location), `${route.path} ${route.file} ${route.owner ?? ''}`)))
       heading.append(pill(tool, String(ofKind.length)))
       section.append(heading, list)
 
       return [section]
     })
 
-    body.replaceChildren(...sections.length > 0 ? sections : [tool.make('div', 'empty', routes.length === 0 ? 'No routes.' : 'No route matches the filter.')], ...notes.map(note => tool.make('div', 'note', note)))
+    body.replaceChildren(...sections.length > 0 ? sections : [tool.make('div', 'empty', 'No routes.')], bar.empty, ...notes.map(note => tool.make('div', 'note', note)))
+    bar.apply(body)
   }
   const list = async () => {
     const ask = ++asked
@@ -3264,7 +3295,10 @@ async function answerErrorPage(tool: DevTool, target: HTMLButtonElement): Promis
 async function copyText(button: HTMLButtonElement, text: string): Promise<void> {
   const label = button.querySelector('span') ?? button
 
-  label.textContent = await toClipboard(button, text) ? 'Copied' : 'Copy failed'
+  const worked = await toClipboard(button, text)
+
+  label.textContent = worked ? 'Copied' : 'Copy failed'
+  announce(button, label.textContent)
 
   clearTimeout(copyResets.get(button))
   copyResets.set(button, setTimeout(() => {

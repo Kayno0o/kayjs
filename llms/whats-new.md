@@ -21,6 +21,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `kay not-found` lists the paths production found nothing at, with a target, and writes the redirect ([Redirects](routing.md#redirects)).
 - The dev tool's Not found tab lists the paths production found nothing at, and turns one into a redirect with a click ([dev server](dev-server.md)).
 - `deprecated-api-tool` is reported by `kay upgrade` of an app from before 1.51 alone: an app turning `mcp` on since gets no warning for routes that do not opt in ([Checks](checks.md)).
+- The dev tool's filters update a group's count, Head's hreflang alternates have a copy button, and a copy's outcome is announced to a screen reader ([dev server](dev-server.md)).
 - A stream an action answers with to a leaving row's handler or a `listen` callback closes with its island too ([actions from islands](api-from-islands.md)).
 - A streamed `await` part's island cleans up still in the page ([Streaming](rendering.md#streaming)).
 
