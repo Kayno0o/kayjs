@@ -1,8 +1,10 @@
 import { join, relative } from 'node:path'
-import { afterAll, describe, expect, it } from 'bun:test'
+import process from 'node:process'
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
 import { writeShadowTypes } from '../src/check'
 import { bootProblems } from '../src/check/boot'
+import { UPGRADE_FROM } from '../src/compiler/lints'
 import { configuredSite, setSite } from '../src/runtime/site'
 import { encodeValue } from '../src/runtime/wire'
 import { toolCall } from '../src/server'
@@ -46,6 +48,14 @@ async function rpc(target: typeof site, method: string, params: object = {}, hea
 
   return { response, body: await response.json() as { result?: Record<string, unknown> & { capabilities?: Record<string, unknown> }, error?: { code: number, message: string } } }
 }
+
+// `kay upgrade` sets the version the app came from, which the lint about the old default needs.
+beforeAll(() => {
+  process.env[UPGRADE_FROM] = '1.50.0'
+})
+afterAll(() => {
+  delete process.env[UPGRADE_FROM]
+})
 
 describe('the endpoint', () => {
   it('is not served without mcp', async () => {
@@ -876,5 +886,22 @@ describe('kay check on routes that opt in', () => {
 
     expect(await codes(dir, false)).toEqual([])
     expect(await codes(dir, true, { 'deprecated-api-tool': 'allow', 'hidden-tool': 'allow' })).toEqual([])
+  })
+
+  it('speaks to an app upgrading from before 1.51 alone, not to one turning mcp on since', async () => {
+    const dir = await fixtureCopy('mcp')
+    const before = process.env[UPGRADE_FROM]
+
+    try {
+      delete process.env[UPGRADE_FROM]
+      expect(await codes(dir)).toEqual([['hidden-tool', 'GET /both']])
+      process.env[UPGRADE_FROM] = '1.51.2'
+      expect(await codes(dir)).toEqual([['hidden-tool', 'GET /both']])
+      process.env[UPGRADE_FROM] = '1.50.4'
+      expect((await codes(dir)).map(([code]) => code).sort()).toEqual(['deprecated-api-tool', 'hidden-tool'])
+    }
+    finally {
+      process.env[UPGRADE_FROM] = before
+    }
   })
 })

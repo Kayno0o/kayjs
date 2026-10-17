@@ -81,7 +81,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `unguarded-route` | deny | security | With `requireGuards`, a route no guard covers that does not set `guards: false` |
 | `unguarded-tool` | warn | security | With `mcp`, a tool action with bot protection that no guard covers |
 | `secret-prop` | warn | security | A value handed to an island with a field named like a secret, such as `passwordHash` or `token`, which lands in the page source |
-| `deprecated-api-tool` | warn | deprecated | With `mcp`, an API route that sets neither `detail.tool` nor `hide`: it was a tool before 1.51 and is none now |
+| `deprecated-api-tool` | warn | deprecated | With `mcp`, an API route that sets neither `detail.tool` nor `hide`, reported while `kay upgrade` moves an app from before 1.51, not by `kay check` of an app turning `mcp` on since: it was a tool before 1.51 and is none now |
 | `deprecated-provider-url` | warn | deprecated | `discordProvider({ apiBase })` of kayjs-auth, now `discordProvider({ url })` |
 | `deprecated-store-verb` | warn | deprecated | A kayjs-auth store's `members.remove` or `oauth.grants.put`, now `delete` and `upsert` |
 | `deprecated-sign-in-options` | warn | deprecated | `redirect`, `remember` or `captcha` in the input of kayjs-auth's `signInWithPassword` or `register`, or a positional `redirect` of `requestMagicLink` or `signInWithPasskey`: now one trailing options object |

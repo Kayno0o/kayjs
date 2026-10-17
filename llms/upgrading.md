@@ -89,7 +89,7 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 ### An API route is an MCP tool only when it sets `detail.tool`
 
 - With `mcp: true`, every API route not hidden was a tool; it is now one only when its `detail` says `tool: true`, a description, or `{ name, description }`, as an action's `tool` does. A route that does not opt in stays in the OpenAPI document and is absent from `tools/list`; a call naming it is refused as an unknown tool.
-- `kay check` reports a route still relying on the old default with `deprecated-api-tool`, and `kay upgrade` lists them; `tool: false` silences it for a route no agent should call; its fix adds `detail: { tool: true }` and is not applied by `--fix`, since it would offer every route, the ones an agent should not call included. It reads routes written with an inline handler and an object literal of options.
+- `kay upgrade` of an app from before 1.51 lists the routes still relying on the old default with `deprecated-api-tool` (a plain `kay check`, or an app turning `mcp` on after 1.51, reports none, as those routes were never tools); `tool: false` silences it for a route no agent should call; its fix adds `detail: { tool: true }` and is not applied by `--fix`, since it would offer every route, the ones an agent should not call included. It reads routes written with an inline handler and an object literal of options.
 
 ## 1.50.0
 

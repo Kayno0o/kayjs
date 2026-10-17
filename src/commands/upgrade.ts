@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
-import { minorAfter, minorOf } from '../compiler/lints'
+import { minorAfter, minorOf, UPGRADE_FROM } from '../compiler/lints'
 import { done, printFailure, projectRoot } from './command'
 import { USAGES } from './usages'
 
@@ -14,7 +14,7 @@ export interface UpgradeDeps {
   // Installs what `package.json` now asks for, `changes` being the packages that moved.
   install: (root: string, changes: DependencyChange[]) => Promise<boolean>
   // Runs the project's own kay, the one just installed, so the fixes of the minor moved to are the ones applied; answers its exit code and, when `capture`, its stdout.
-  kay: (root: string, args: string[], capture: boolean) => Promise<{ code: number, stdout: string }>
+  kay: (root: string, args: string[], capture: boolean, env?: Record<string, string>) => Promise<{ code: number, stdout: string }>
 }
 
 export interface DependencyChange {
@@ -61,7 +61,7 @@ export function registryDepsFor(bun: string): UpgradeDeps {
 
       return true
     },
-    kay: async (root, args, capture) => run([bun, join(root, 'node_modules/kay/src/cli.ts'), ...args], root, capture),
+    kay: async (root, args, capture, env) => run([bun, join(root, 'node_modules/kay/src/cli.ts'), ...args], root, capture, env),
   }
 }
 
@@ -184,12 +184,12 @@ export async function upgradeProject(root: string, deps: UpgradeDeps, { dryRun =
 
   for (const since of await crossed(root, from, latestKay, deps)) {
     done('rewriting', `what ${since} deprecated`)
-    await deps.kay(root, ['check', '--fix', '--since', since], false)
+    await deps.kay(root, ['check', '--fix', '--since', since], false, { [UPGRADE_FROM]: from })
   }
 
   done('checking', 'what is left')
 
-  const left = await deps.kay(root, ['check', '--fix'], false)
+  const left = await deps.kay(root, ['check', '--fix'], false, { [UPGRADE_FROM]: from })
 
   if (left.code === 0)
     done('upgraded', `to kay ${latestKay}, nothing left to do by hand`)
@@ -319,8 +319,8 @@ function replaceSpec(source: string, dependency: KayDependency, spec: string): s
   return entry.test(inside) ? source.slice(0, span.start) + inside.replace(entry, (_whole, key: string) => `${key}${JSON.stringify(spec)}`) + source.slice(span.end) : undefined
 }
 
-async function run(args: string[], root: string, capture: boolean): Promise<{ code: number, stdout: string }> {
-  const child = Bun.spawn(args, { cwd: root, stdin: 'ignore', stdout: capture ? 'pipe' : 'inherit', stderr: 'inherit' })
+async function run(args: string[], root: string, capture: boolean, env: Record<string, string> = {}): Promise<{ code: number, stdout: string }> {
+  const child = Bun.spawn(args, { cwd: root, env: { ...process.env, ...env }, stdin: 'ignore', stdout: capture ? 'pipe' : 'inherit', stderr: 'inherit' })
   const [stdout, code] = await Promise.all([capture ? new Response(child.stdout).text() : '', child.exited])
 
   return { code, stdout }

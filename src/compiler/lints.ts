@@ -323,7 +323,7 @@ export const LINTS = {
     group: 'deprecated',
     since: '1.51',
     site: true,
-    summary: 'With `mcp`, an API route with an inline handler whose `detail` sets neither `tool` nor `hide`. Before 1.51 every API route was an MCP tool unless hidden, and an API route is one only when it sets `detail: { tool: true }` now, as an action sets `tool`: the route stays in the OpenAPI document and an agent no longer finds it. Add `tool` to the routes an agent should call, and `tool: false` to the others to silence this. No fix is safe, as adding it to every route offers the ones the app never meant to.',
+    summary: 'With `mcp`, an API route with an inline handler whose `detail` sets neither `tool` nor `hide`, reported while `kay upgrade` moves an app from before 1.51 and not by a plain `kay check`, as an app turning `mcp` on since never had those routes as tools. Before 1.51 every API route was an MCP tool unless hidden, and an API route is one only when it sets `detail: { tool: true }` now, as an action sets `tool`: the route stays in the OpenAPI document and an agent no longer finds it. Add `tool` to the routes an agent should call, and `tool: false` to the others to silence this. No fix is safe, as adding it to every route offers the ones the app never meant to.',
     wrong: '// kay.config.ts sets mcp: true\nexport default api().get(\'/:id\', ({ params }) => find(params.id))',
     right: 'export default api().get(\'/:id\', ({ params }) => find(params.id), { detail: { tool: \'Read a note by its id\' } })',
   },
@@ -536,6 +536,9 @@ export function isLint(code: string | undefined): code is LintName {
 }
 
 // The minor, as `[major, minor]`, a version or a `1.46` names, or undefined for what is neither.
+// Set by `kay upgrade` for the checks it runs, to the version the app came from: a lint about a change of default speaks to an app crossing it, and only then.
+export const UPGRADE_FROM = 'KAY_UPGRADE_FROM'
+
 export function minorOf(version: string): [number, number] | undefined {
   const found = MINOR.exec(version)
 

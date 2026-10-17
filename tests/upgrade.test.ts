@@ -73,6 +73,28 @@ async function quietly<T>(run: () => Promise<T>): Promise<T> {
 }
 
 describe('kay upgrade', () => {
+  it('runs each check knowing the version the app came from', async () => {
+    const root = await project()
+    const { deps } = fakes({ '@kaynooo/kayjs': '1.46.0', '@kaynooo/kayjs-ui': '1.46.0' }, ['1.45'])
+    const envs: (Record<string, string> | undefined)[] = []
+    const kay = deps.kay
+
+    deps.kay = async (dir, args, capture, env) => {
+      if (args[0] === 'check')
+        envs.push(env)
+
+      return kay(dir, args, capture, env)
+    }
+
+    try {
+      await quietly(async () => upgradeProject(root, deps))
+      expect(envs).toEqual([{ KAY_UPGRADE_FROM: '1.40.1' }, { KAY_UPGRADE_FROM: '1.40.1' }])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('moves the ranges of kay and its libraries, each in its own section and form, and leaves the rest as it was', async () => {
     const root = await project()
     const { deps, calls } = fakes({ '@kaynooo/kayjs': '1.46.0', '@kaynooo/kayjs-ui': '1.46.0' })

@@ -1,17 +1,20 @@
 import type * as t from '@babel/types'
 import type { CheckDiagnostic, CheckOptions } from '.'
 import type { ServedProject } from './shadow-types'
+import process from 'node:process'
 import { parse } from '@babel/parser'
-import { lintLevel } from '../compiler/lints'
+import { lintLevel, minorAfter, minorOf, UPGRADE_FROM } from '../compiler/lints'
 import { positionAt } from '../compiler/mapping'
 
 const ROUTE_METHODS = new Set(['get', 'post', 'put', 'patch', 'delete', 'all'])
+// 1.51 is the minor whose routes stopped being tools.
+const TOOL_MINOR: [number, number] = [1, 51]
 const NODE_MODULES = /[\\/]node_modules[\\/]/
 
 // With `mcp`, the routes of the API modules whose `detail` says nothing of `tool` or `hide`, which were tools before 1.51 and are none now, and those that set both.
 // Only a route written with an inline handler and an object literal of options is read: `app.get('/x', () => ..., { detail: ... })`; a handler or options held in a variable are left out.
 export async function mcpRoutes(options: CheckOptions, { apiModules }: ServedProject): Promise<CheckDiagnostic[]> {
-  const stale = lintLevel('deprecated-api-tool', options.lints)
+  const stale = upgradingAcross() ? lintLevel('deprecated-api-tool', options.lints) : 'allow'
   const contradicted = lintLevel('hidden-tool', options.lints)
 
   if (options.mcp === undefined || options.mcp === false || (stale === 'allow' && contradicted === 'allow'))
@@ -46,6 +49,13 @@ export async function mcpRoutes(options: CheckOptions, { apiModules }: ServedPro
   }
 
   return found
+}
+
+// Only an app `kay upgrade` moves from before 1.51 had routes that were tools: one turning `mcp` on since never did.
+function upgradingAcross(): boolean {
+  const from = minorOf(process.env[UPGRADE_FROM] ?? '')
+
+  return from !== undefined && minorAfter(TOOL_MINOR, from)
 }
 
 interface ReadRoute {
