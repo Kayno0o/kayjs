@@ -182,7 +182,7 @@ export const page = {
 
 A URL the function returns nothing for is listed without one.
 
-`noindex: true` in a page's `page` object keeps a page out of search engines and the sitemap.
+`noindex: true` in a page's `page` object keeps a page out of search engines and the sitemap. In a layout it does the same for every page under it, and a page's own `noindex: false` takes it back. A layout takes `search` and `revalidate` the same way.
 
 Add rules to the robots file with `robots` in `kay.config.ts`:
 

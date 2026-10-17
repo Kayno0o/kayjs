@@ -100,6 +100,8 @@ export const page = { noindex: true }
 h1 Legal notice
 ```
 
+In a layout's `page` it covers every page under it, the sitemap and the search index too; a page's own `noindex: false` takes it back.
+
 ## Reference
 
 ### Head

@@ -24,7 +24,7 @@ import { exportedEndpoints } from './endpoints'
 import { localeCopies, stateFor } from './i18n'
 import { LIVE_MARK } from './live'
 import { readsOf } from './page-reads'
-import { pageSetting } from './page-settings'
+import { chainSetting, pageSetting } from './page-settings'
 import { matchedParams } from './params'
 import { listedIn, listedParams, pageEtag, pageToken, pathOf, storedHeaders } from './prerendered'
 import { keptScan } from './pure-page'
@@ -114,7 +114,9 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
     const reserved = new Map<string, string>()
 
     const module = await import(route.file) as Record<string, unknown>
-    const revalidate = revalidatePeriod(file, pageSetting(module, 'revalidate'))
+    // A layout's `revalidate`, `noindex` and `search` apply to every page under it, the innermost setting winning.
+    const chain = [...await Promise.all(route.layouts.map(async layout => import(layout) as Promise<object>)), module]
+    const revalidate = revalidatePeriod(file, chainSetting(chain, 'revalidate'))
 
     // A copy that goes stale is rendered again for every visitor with the request a page reads, which an unmarked page was never asked to.
     if (auto && revalidate !== undefined)
@@ -227,8 +229,8 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
         })
 
         if (response.status === 200 && !auto) {
-          const noindex = pageSetting(module, 'noindex') === true
-          const search = pageSetting(module, 'search') as PageSettings['search']
+          const noindex = chainSetting(chain, 'noindex') === true
+          const search = chainSetting(chain, 'search') as PageSettings['search']
 
           options.rendered?.push({ path: copy.path, file: route.file, locale: copy.locale, html, noindex, sitemap: pageSetting(module, 'sitemap') !== undefined, search: noindex || search === false || guardedPage(route, config.requireGuards) ? false : search?.weight ?? 1 })
         }

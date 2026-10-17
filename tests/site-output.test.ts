@@ -1,6 +1,12 @@
+import type { RenderedPage } from '../src/check/seo'
 import type { KayConfig } from '../src/config'
+import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { pages } from '../src/server'
+import { readManifest } from '../src/server/client'
+
+import { scratchBuild } from './prerendered'
+import { fixtureCopy } from './scratch'
 
 const ROOT = 'tests/fixtures/site-output'
 
@@ -160,5 +166,45 @@ describe('theme color', () => {
     const i18n = { locales: ['fr', 'en'], defaultLocale: 'fr', messages: `${ROOT}/src/messages` }
 
     expect(await themes({ i18n, seo: { themeColor: { light: '#fff', dark: '#111' } } }, '/en/about')).toHaveLength(2)
+  })
+})
+
+describe('layout settings', () => {
+  it('has a layout\'s noindex ask search engines to leave out every page under it, and the sitemap', async () => {
+    const app = await appWith({ site: 'https://x.example' })
+
+    expect(await (await fetchFrom(app, '/private')).text()).toContain('<meta name="robots" content="noindex">')
+    expect(await (await fetchFrom(app, '/about')).text()).not.toContain('noindex')
+    expect(await (await fetchFrom(app, '/sitemap.xml')).text()).not.toContain('/private')
+  })
+
+  it('has the page undo what its layout says', async () => {
+    const root = await fixtureCopy('site-output')
+
+    await Bun.write(`${root}/src/routes/private/open.kay`, '--- server\nexport const page = { noindex: false }\n---\nh1 Open\n')
+
+    const app = await appWith({ routes: `${root}/src/routes`, site: 'https://x.example' })
+
+    expect(await (await fetchFrom(app, '/private/open')).text()).not.toContain('noindex')
+    expect(await (await fetchFrom(app, '/sitemap.xml')).text()).toContain('<loc>https://x.example/private/open</loc>')
+    expect(await (await fetchFrom(app, '/sitemap.xml')).text()).not.toContain('<loc>https://x.example/private</loc>')
+  })
+
+  it('has a layout\'s noindex and search: false keep the pages under it out of the search index, and its revalidate set their period', async () => {
+    const build = await scratchBuild()
+    const rendered: RenderedPage[] = []
+
+    try {
+      await build.prerender({ routes: `${ROOT}/src/routes`, search: true, publicDir: `${ROOT}/public` }, { rendered })
+
+      const byPath = new Map(rendered.map(page => [page.path, page]))
+
+      expect(byPath.get('/private')).toMatchObject({ noindex: true, search: false })
+      expect(byPath.get('/stale')).toMatchObject({ noindex: false, search: 1 })
+      expect((await readManifest(process.cwd(), build.dir))!.pages!['/stale']!.revalidate).toBe(60)
+    }
+    finally {
+      await build.remove()
+    }
   })
 })

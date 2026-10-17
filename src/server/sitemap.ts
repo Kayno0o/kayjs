@@ -12,10 +12,10 @@ import { escape } from '../runtime/escape'
 import { importModule } from './bundle'
 import { fixedReply } from './compress'
 import { hostLocale, localeCopies } from './i18n'
-import { pageSetting } from './page-settings'
+import { chainSetting, pageSetting } from './page-settings'
 import { listedIn, listedParams, pathOf } from './prerendered'
 import { reportServerError } from './report'
-import { slashedPath } from './routes'
+import { routeChain, slashedPath } from './routes'
 import { ROBOTS, SITEMAP } from './site-paths'
 
 // Long enough for crawlers, short enough that a new post shows up the same hour without a restart.
@@ -117,12 +117,13 @@ async function lastmodOf(setting: unknown, params: ListedParams, file: string): 
 export async function sitemapXml(routes: ServedRoute[], origin: string, trailingSlash?: TrailingSlash, settings?: LocaleSettings, only?: string): Promise<string> {
   const lists = await Promise.all(routes.map(async (route) => {
     const file = relative(process.cwd(), route.file)
-    const module = await importModule<object>(route.file)
+    const modules = await Promise.all(routeChain(route).files.map(async each => importModule<object>(each)))
+    const module = modules.at(-1)!
     const sitemap = pageSetting(module, 'sitemap')
     const prerender = pageSetting(module, 'prerender')
     const listed = async (params: ListedParams[]) => Promise.all(params.map(async value => ({ params: value, modified: await lastmodOf(pageSetting(module, 'lastmod'), value, file) })))
 
-    if (pageSetting(module, 'noindex') === true)
+    if (chainSetting(modules, 'noindex') === true)
       return []
 
     if (sitemap !== undefined)

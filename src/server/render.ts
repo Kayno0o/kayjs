@@ -49,7 +49,7 @@ import { DEFAULT_LANG, messagesScript } from './i18n'
 import { liveScript } from './live'
 import { registerScript } from './offline'
 import { errorPage } from './overlay'
-import { pageSetting } from './page-settings'
+import { chainSetting, pageSetting } from './page-settings'
 import { requestId } from './protection'
 import { matchesEtag } from './public'
 import { chainQuery, queryRules, queryScript, readQuery, readQueryLeniently } from './query'
@@ -749,9 +749,9 @@ async function renderSpecialPage(page: SpecialPage, rendering: Rendering, loaded
   return undefined
 }
 
-// The head a page starts from, a page saying `noindex` asking search engines to leave it out; a layout or the page may still set its own `robots`.
-function pageHead(page: PageModule, head: HeadOptions | undefined): HeadOptions | undefined {
-  if (pageSetting(page, 'noindex') !== true)
+// The head a page starts from, a page or a layout above it saying `noindex` asking search engines to leave it out; a layout or the page may still set its own `robots`.
+function pageHead(modules: PageModule[], head: HeadOptions | undefined): HeadOptions | undefined {
+  if (chainSetting(modules, 'noindex') !== true)
     return head
 
   return { ...head, defaults: [...head?.defaults ?? [], { tag: 'meta', props: { name: 'robots', content: 'noindex' } }] }
@@ -802,7 +802,6 @@ function viewOf(modules: PageModule[], data: Record<string, unknown>[]): () => u
 }
 
 function documentOf(files: string[], modules: PageModule[], data: Record<string, unknown>[], client: ClientBuild, rendering: Rendering, options: RenderOptions, rules: QueryRules | undefined): string | ReadableStream<Uint8Array> {
-  const page = modules.length - 1
   const view = viewOf(modules, data)
   // A prerendered page holds each server island between marks the server splits it at.
   const scan = options.prerendering ? newServerIslands(true) : undefined
@@ -814,7 +813,7 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
   const shown = marks === undefined || editor === undefined ? view : () => ({ t: child(view()) + child(editor.default({ entries: [...marks.entries.values()], persist: true })) })
   // Its stylesheet comes last, after the page's.
   const styled = file === undefined || editor === undefined ? files : [...files, file]
-  const { result: { result: { html: body, islands, deferred }, head }, forms } = withFieldMarks(marks, () => collectForms(() => collectHead(() => scan ? withServerIslands(scan, () => renderStatic(shown)) : renderStatic(shown), pageHead(modules[page]!, options.head?.(rendering.ctx.url, rendering.status)))))
+  const { result: { result: { html: body, islands, deferred }, head }, forms } = withFieldMarks(marks, () => collectForms(() => collectHead(() => scan ? withServerIslands(scan, () => renderStatic(shown)) : renderStatic(shown), pageHead(modules, options.head?.(rendering.ctx.url, rendering.status)))))
   const streamed = deferred.length > 0
   const hasIslands = client.entry !== undefined && islands.count > 0
   // A page posting forms to actions loads the entry too, which sends them without a reload; a page with neither ships only `historyScript`, and links from it load pages, losing no state.

@@ -2073,6 +2073,23 @@ describe.concurrent('kay check, unused code', () => {
     }
   })
 
+  it('does not tell a page under a layout saying noindex that the sitemap lists it', async () => {
+    const root = await scratchProject({
+      'src/routes/hidden/_layout.kay': '--- server\nexport const page = { noindex: true }\n---\nslot\n',
+      'src/routes/hidden/index.kay': '--- server\nexport const page = { prerender: true }\n---\nhead\n  title Hidden\n  meta(name="description" content="Fine")\n  meta(name="robots" content="noindex")\nh1 Hi\n',
+      'src/routes/shown.kay': '--- server\nexport const page = { prerender: true }\n---\nhead\n  title Shown\n  meta(name="description" content="Fine")\n  meta(name="robots" content="noindex")\nh1 Hi\n',
+    })
+
+    try {
+      const found = await check(root, { site: 'https://example.com', favicon: false })
+
+      expect(found.filter(d => d.code === 'noindex-in-sitemap').map(d => basename(d.file))).toEqual(['shown.kay'])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('reads a seo default of an empty per-locale record as none, and a per-locale name as the title of every untitled page', async () => {
     const head = (lines: string[]) => `--- server\nexport const page = { prerender: true }\n---\nhead\n${lines.map(line => `  ${line}`).join('\n')}\nh1 Hi\n`
     const root = await scratchProject({

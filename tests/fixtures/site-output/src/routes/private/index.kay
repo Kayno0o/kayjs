@@ -1,1 +1,4 @@
+--- server
+export const page = { prerender: true }
+---
 h1 Private

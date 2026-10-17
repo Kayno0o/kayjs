@@ -46,7 +46,7 @@ export async function pageHeadLints(options: CheckOptions, routes: Route[], rout
   const siteName = localizedText(options.seo?.name, undefined, defaultLocale)
   const siteImage = localizedText(options.seo?.image, undefined, defaultLocale)
   const siteDescriptions = localizedTexts(options.seo?.description)
-  const sources = new Map<string, { file: KayFile, prerender: string | undefined, noindex: boolean, sitemap: boolean }>()
+  const sources = new Map<string, { file: KayFile, prerender: string | undefined, noindex: string | undefined, sitemap: boolean }>()
   const read = async (path: string) => {
     let known = sources.get(path)
 
@@ -60,7 +60,7 @@ export async function pageHeadLints(options: CheckOptions, routes: Route[], rout
         return value === undefined ? undefined : source.slice(value.start, value.end).trim()
       }
 
-      known = { file, prerender: text('prerender'), noindex: text('noindex') === 'true', sitemap: settings?.has('sitemap') === true }
+      known = { file, prerender: text('prerender'), noindex: text('noindex'), sitemap: settings?.has('sitemap') === true }
       sources.set(path, known)
     }
 
@@ -78,9 +78,15 @@ export async function pageHeadLints(options: CheckOptions, routes: Route[], rout
       continue
 
     const chain: Chain[] = []
+    // The innermost `noindex` of the page and its layouts, as the server reads it.
+    let noindex: string | undefined
 
-    for (const file of [route.file, ...[...route.layouts].reverse()])
-      chain.push({ file, facts: headFacts((await read(file)).file) })
+    for (const file of [route.file, ...[...route.layouts].reverse()]) {
+      const source = await read(file)
+
+      noindex ??= source.noindex
+      chain.push({ file, facts: headFacts(source.file) })
+    }
 
     const facts = merge(chain.map(entry => entry.facts))
     const at = { file: route.file, line: 1, column: 1 }
@@ -110,7 +116,7 @@ export async function pageHeadLints(options: CheckOptions, routes: Route[], rout
     if (image !== undefined && !facts.imageWidth && sizeOf(image) === undefined)
       report('unsized-share-image', { ...at, message: `The share image of \`${route.pattern}\` has no size`, note: `kay reads no size off ${image}, so a network fetches it before laying the card out`, help: 'link a public file, an imported image, `shareImage()` or `shareCard()`, or set `og:image:width` and `og:image:height`' })
 
-    if (facts.robots?.text !== undefined && NOINDEX.test(facts.robots.text) && !page.noindex && !page.sitemap && options.site !== undefined)
+    if (facts.robots?.text !== undefined && NOINDEX.test(facts.robots.text) && noindex !== 'true' && !page.sitemap && options.site !== undefined)
       report('noindex-in-sitemap', { ...at, message: `\`${route.pattern}\` is in the sitemap, though its head says \`noindex\``, help: '`export const page = { noindex: true }` in its server fence sets the tag and leaves it out of the sitemap' })
   }
 

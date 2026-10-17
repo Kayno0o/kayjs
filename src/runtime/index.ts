@@ -370,7 +370,7 @@ export function defer<T>(value: T | PromiseLike<T>): Deferred<T> {
   return promise
 }
 
-// `export const page = { ... }` in a page's server fence; a layout takes `query` as well as `layouts`, `security` and `reload`, which apply to the pages under it, and `guards`, which opens its own actions.
+// `export const page = { ... }` in a page's server fence; a layout takes `query` as well as `layouts`, `security`, `reload`, `noindex`, `revalidate` and `search`, which apply to the pages under it, and `guards`, which opens its own actions.
 export interface PageSettings {
   // `kay build` renders the page once: `true` for a route without params, else the params of each page to render, as a list, a function returning one, a content collection or a `paginate()` list.
   prerender?: boolean | object
