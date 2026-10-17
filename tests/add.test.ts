@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
 import { expect, it } from 'bun:test'
-import { addExtension, addFeatures, detectFeatures, handEdit, restore, snapshot as snapshotManifest } from '../src/add'
+import { addExtension, addFeatures, detectFeatures, handEdit, restore, runnerOf, snapshot as snapshotManifest } from '../src/add'
 import { createProject, PRESETS } from '../src/new'
 
 const repo = join(import.meta.dir, '..')
@@ -495,6 +495,29 @@ it('writes the workflow of the host the project remote or folder names, not the 
     finally {
       await rm(root, { recursive: true, force: true })
     }
+  }
+})
+
+it.each([
+  ['runs-on: docker', 'docker'],
+  ['runs-on: "docker"', 'docker'],
+  ['runs-on: \'docker\'', 'docker'],
+  ['runs-on: docker # self-hosted', 'docker'],
+  ['runs-on: "docker" # self-hosted', 'docker'],
+  ['runs-on: [docker]', 'docker'],
+  ['runs-on: [self-hosted, docker]', undefined],
+  ['runs-on: ${{ matrix.os }}', undefined],
+])('reads the runner of a workflow written as %s', async (line, label) => {
+  const root = await mkdtemp(join(tmpdir(), 'kay-add-'))
+
+  try {
+    await mkdir(join(root, '.forgejo/workflows'), { recursive: true })
+    await Bun.write(join(root, '.forgejo/workflows/test.yml'), `jobs:\n  test:\n    ${line}\n    steps: []\n`)
+
+    expect(await runnerOf(root, 'forgejo')).toBe(label)
+  }
+  finally {
+    await rm(root, { recursive: true, force: true })
   }
 })
 

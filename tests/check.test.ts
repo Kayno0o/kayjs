@@ -2447,6 +2447,31 @@ describe.concurrent('kay check, unused code', () => {
     }
   })
 
+  it('leaves a same-named variable that is not the kay/test import alone', async () => {
+    const root = await scratchProject({
+      'src/a.test.ts': 'export {}\nconst test = await import(\'kay/test\')\n\nfunction other(test: { mount: () => void }) {\n  test.mount()\n}\n\nawait test.mount(\'a.kay\')\nvoid other\n',
+      'src/b.test.ts': 'import * as test from \'kay/test\'\n\nfunction other() {\n  const test = { mount() {} }\n\n  test.mount()\n}\n\nawait test.mount(\'a.kay\')\nvoid other\n',
+      'src/c.test.ts': 'export {}\n\nasync function a() {\n  const test = await import(\'kay/test\')\n\n  await test.mount(\'a.kay\')\n}\n\nconst test = { mount() {} }\n\ntest.mount()\nvoid a\n',
+      'src/d.test.ts': 'import * as test from \'kay/test\'\n\nfor (const test of [{ mount() {} }]) test.mount()\n\ntry {\n  await test.mount(\'a.kay\')\n}\ncatch (test) {\n  void (test as { mount: unknown }).mount\n}\n',
+    })
+
+    try {
+      const { output } = await runCheck(root)
+
+      expect(output.match(/deprecated-test-mount/g)).toHaveLength(4)
+      await runCheck(root, '--fix')
+      expect(await Bun.file(join(root, 'src/a.test.ts')).text()).toBe('export {}\nconst test = await import(\'kay/test\')\n\nfunction other(test: { mount: () => void }) {\n  test.mount()\n}\n\nawait test.mountComponent(\'a.kay\')\nvoid other\n')
+      expect(await Bun.file(join(root, 'src/b.test.ts')).text()).toContain('  test.mount()\n}\n\nawait test.mountComponent(')
+      expect(await Bun.file(join(root, 'src/c.test.ts')).text()).toContain('await test.mountComponent(\'a.kay\')\n}\n\nconst test = { mount() {} }\n\ntest.mount()')
+      expect(await Bun.file(join(root, 'src/d.test.ts')).text()).toContain('for (const test of [{ mount() {} }]) test.mount()')
+      expect(await Bun.file(join(root, 'src/d.test.ts')).text()).toContain('await test.mountComponent(')
+      expect(await Bun.file(join(root, 'src/d.test.ts')).text()).toContain('(test as { mount: unknown }).mount\n')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('reports kay/test\'s mount as mountComponent, an import or a namespace member, and --fix renames it under the name the file uses', async () => {
     const root = await scratchProject({
       'src/a.test.ts': 'import { mount, settle } from \'kay/test\'\n\nawait mount(\'a.kay\')\nawait settle()\n',

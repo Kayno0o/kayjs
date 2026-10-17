@@ -327,13 +327,15 @@ async function hostOf(dir: string): Promise<'github' | 'forgejo'> {
   return existsSync(join(dir, '.github/workflows')) && !existsSync(join(dir, '.forgejo/workflows')) ? 'github' : 'forgejo'
 }
 
-const RUNS_ON = /^\s+runs-on:\s*(\S+)\s*$/m
+// A bare, quoted or single-item flow sequence label, then an optional comment: `docker`, `"docker"`, `[docker]`, `docker # self-hosted`.
+const RUNS_ON = /^\s+runs-on:[ \t]*(?:\[[ \t]*)?(?:"([\w.:-]+)"|'([\w.:-]+)'|([\w.:-]+))(?:[ \t]*\])?[ \t]*(?:#.*)?$/m
 
 // The runner label the project's workflows run on, which `kay new --runner` may have set: the first `runs-on` of its test or pages workflow, else the host's own.
-async function runnerOf(dir: string, host: 'github' | 'forgejo'): Promise<string | undefined> {
+export async function runnerOf(dir: string, host: 'github' | 'forgejo'): Promise<string | undefined> {
   for (const name of ['test', 'pages']) {
     const workflow = await read(join(dir, `.${host}/workflows/${name}.yml`))
-    const label = workflow?.match(RUNS_ON)?.[1]
+    const found = workflow?.match(RUNS_ON)
+    const label = found?.[1] ?? found?.[2] ?? found?.[3]
 
     if (label !== undefined)
       return label
