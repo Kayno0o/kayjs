@@ -8,7 +8,6 @@ export const CURRENT = 'KayCurrent'
 export const VALUES = '__values'
 // What type checking wraps a name kay sees no signal made in, assigned, so the type checker asserts it holds one: `KayWritable(theme).set('dark')`.
 export const WRITABLE = 'KayWritable('
-
 // What type checking reads a defaulted prop through, `KayDefault(__props.size, __default_0)`: the same value as the `!== undefined` ternary the output modes write, without a ternary for a lint rule to judge in the shadow.
 export const DEFAULTED = 'KayDefault('
 // What type checking wraps a signal the template hands on whole, a function's argument or a component's prop, so the types report one handed to a parameter that takes anything: `describe(KayHanded(count))`.

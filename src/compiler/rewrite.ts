@@ -825,7 +825,6 @@ function patternIdentifier(pattern: t.Node | null | undefined, name: string): t.
 // A default applies when the prop is `undefined` and runs only then, like a destructuring default.
 function propRead(binding: PropsBinding, index: number, local: string, check: boolean): Rewrite {
   const quoted = !IDENTIFIER.test(binding.key)
-  const text = quoted ? `${PROPS}[${JSON.stringify(binding.key)}]` : `${PROPS}.${binding.key}`
   const access: Rewrite = quoted
     ? { before: `${PROPS}[`, replace: JSON.stringify(binding.key), after: ']' }
     : { before: `${PROPS}.`, replace: binding.key === local ? undefined : binding.key }
@@ -836,6 +835,8 @@ function propRead(binding: PropsBinding, index: number, local: string, check: bo
   // Type checking reads it through a call, so the shadow the linter reads holds no ternary of the author's to nest in theirs.
   if (check)
     return { before: `${DEFAULTED}${access.before}`, replace: access.replace, after: `${access.after ?? ''}, ${defaultName(index)})` }
+
+  const text = quoted ? `${PROPS}[${JSON.stringify(binding.key)}]` : `${PROPS}.${binding.key}`
 
   return { before: `(${access.before}`, replace: access.replace, after: `${access.after ?? ''} !== undefined ? ${text} : ${defaultName(index)}())` }
 }
