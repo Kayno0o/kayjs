@@ -126,7 +126,8 @@ function thrown(error: unknown): NonNullable<MessageEntry['error']> {
   return { name: error.name, message: error.message, ...error.stack !== undefined && error.stack !== '' && { stack: describeThrown(error) } }
 }
 
-function currentRequest(): Request | undefined {
+// The request kay is answering in this async context, a page or an action, until its answer is made; an API route's handler runs in Elysia's call, outside it.
+export function currentRequest(): Request | undefined {
   const request = answering.getStore()
 
   return request && inFlight.has(request) ? request : undefined

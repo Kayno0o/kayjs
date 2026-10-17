@@ -68,7 +68,7 @@ export default guard(async ({ request, headers, deny }) => {
 - An IPv6 client counts as its /64 block, which one host or home network holds.
 - Counts live in the process unless `store` names a shared one, for at most 100,000 windows in all, the oldest dropped past that.
 - `rateLimit: { max: 5, window: '1m', store: sqliteRates('data/rates.sqlite') }`, `sqliteRates` from `kay/server`, counts every process of the machine opening that file together, which stores each key pseudonymised, hashed with a salt it keeps and keyed by the session's, the app's (`secret`, `KAY_SECRET`) or the preview's secret once one is set.
-- `RateStore`, a `hit(key, windowMs)` method giving `{ count, resetAt }` and, for a limit counting what went through, a `peek(key)` giving the open window without counting or `undefined`, is the shape of an app's own.
+- `RateStore`, a `hit(key, windowMs, weight)` method adding `weight` (one unless given) to the count and giving `{ count, resetAt }` and, for a limit counting what went through, a `peek(key)` giving the open window without counting or `undefined`, is the shape of an app's own.
 
 #### Honeypot
 
@@ -131,6 +131,7 @@ export default guard(async ({ request, headers, deny }) => {
 
 - A guard, an API route or a library limits attempts the same way with `rateLimit(name, { max, window, store })` from `kay/server`: `await limit.hit(request)` counts one from the request's client and gives the seconds to wait once over the limit, else `undefined`.
 - `await limit.hit(user.email)` counts under the app's own key instead, such as an account or a socket, whoever sends the request.
+- `await limit.hit(user.email, undefined, tokens)` counts `tokens` at once, a whole number from 1, so `max` caps tokens or bytes rather than attempts; a store of the app's own that ignores the weight throws on such a hit.
 - Limits of one name count together; an action's counts under its URL.
 
 ```ts

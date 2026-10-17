@@ -45,7 +45,7 @@ import { countWrites } from './kept-pages'
 import { HEALTH_PATH, serveHealth, stopOnSignal } from './lifecycle'
 import { serveLive } from './live'
 import { announceStart, logRequests, pathOf, useLogger } from './log'
-import { mcpBodyLimit, serveMcp } from './mcp'
+import { mcpBodyLimit, receiveDispatched, serveMcp } from './mcp'
 import { serveServiceWorker } from './offline'
 import { claimApi, openApiDocument, openApiSettings, serveOpenApi } from './openapi'
 import { withPageHeaders } from './page-headers'
@@ -332,6 +332,8 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
 
   if (servesOpenApi && document && openapi !== undefined)
     serveOpenApi(app, document, openapi, await covering(false), actionOptions)
+
+  receiveDispatched(app)
 
   if (options.mcp === true && document)
     serveMcp(app, document, { title: (document.info as { title: string }).title, version: (document.info as { version: string }).version, base, guards: await covering(true), actions: actionOptions, metadataPaths })

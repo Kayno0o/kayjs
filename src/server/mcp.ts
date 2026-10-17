@@ -1,6 +1,7 @@
-import type { Elysia } from 'elysia'
+import type { Elysia, TSchema } from 'elysia'
 import type { Server } from 'elysia/universal'
 import type { Tool, ToolResult } from '../mcp/protocol'
+import type { ServerAction } from '../runtime/action'
 import type { ActionOptions } from './actions'
 import type { BodyLimit } from './body'
 import type { LoadedGuard } from './guards'
@@ -13,10 +14,12 @@ import { FAILURE_HEADER, REDIRECT_HEADER } from '../runtime/swap'
 import { decodeServerValue, encodeValue } from '../runtime/wire'
 import { isCrossSite } from './actions'
 import { MCP_PATH, RESOURCE_METADATA } from './api-modules'
-import { guardRefusal, toolName } from './openapi'
+import { currentRequest } from './log'
+import { actionOperation, guardRefusal, toolName } from './openapi'
 import { clientAddress, keepRequestId, markAgentCall, requestId, wasChallenged } from './protection'
 import { requestUrl } from './request-url'
 import { sendFrom } from './rewrite'
+import { toolSettings } from './tool-settings'
 import { visitAs } from './visit'
 
 type Schema = Record<string, unknown>
@@ -26,6 +29,8 @@ type Handle = (request: Request) => Promise<Response>
 interface CallContext {
   request: Request
   server: Server | null
+  // What serves the call when no server does, as under `kay/test`.
+  fallback: Handle
   // Set when a guard refused the call for want of a sign-in, which the endpoint answers 401.
   challenged: boolean
 }
@@ -54,7 +59,7 @@ const NO_BODY = new Set(['get', 'delete'])
 const ANSWER = { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }
 
 // A tool per operation of the document that opted in and that a JSON call can make: an action that set `tool`, or an API route that did and whose body, if any, is a JSON object.
-export function documentedTools(document: Schema, fallback: Handle): AppTool[] {
+export function documentedTools(document: Schema): AppTool[] {
   const tools: AppTool[] = []
 
   // Made safe as names and told apart here, as a route's own `operationId` is kept as written in the document.
@@ -62,7 +67,7 @@ export function documentedTools(document: Schema, fallback: Handle): AppTool[] {
 
   for (const [path, methods] of Object.entries(document.paths as Record<string, Record<string, Operation>>)) {
     for (const [method, operation] of Object.entries(methods)) {
-      const tool = HTTP_METHODS.has(method) && operation.operationId !== undefined && isTool(operation) ? toolOf(path, method, operation, operation.operationId, fallback, taken) : undefined
+      const tool = HTTP_METHODS.has(method) && operation.operationId !== undefined && isTool(operation) ? toolOf(path, method, operation, operation.operationId, taken) : undefined
 
       if (tool)
         tools.push(tool)
@@ -77,7 +82,7 @@ function isTool(operation: Operation): boolean {
   return operation['x-kay-action'] === true || operation['x-kay-tool'] !== undefined
 }
 
-function toolOf(path: string, method: string, operation: Operation, id: string, fallback: Handle, taken: Set<string>): AppTool | undefined {
+function toolOf(path: string, method: string, operation: Operation, id: string, taken: Set<string>): AppTool | undefined {
   const tool = operation['x-kay-tool']
   const description = tool?.description ?? ([operation.summary, operation.description].filter(text => text !== undefined).join('\n\n') || `${method.toUpperCase()} ${path}`)
   const body = operation.requestBody?.content['application/json']?.schema as Schema | undefined
@@ -135,7 +140,7 @@ function toolOf(path: string, method: string, operation: Operation, id: string, 
         init.body = JSON.stringify(Object.fromEntries(Object.entries(args).filter(([name]) => places.get(name)?.has('body'))))
       }
 
-      return dispatch(context, url, init, action, fallback, name)
+      return dispatch(context, url, init, action, name)
     },
   }
 }
@@ -177,8 +182,8 @@ function refusal(text: string): ToolResult {
 }
 
 // Sends the call through the whole app as a fetch would, so its guards, rate limits and `ctx.locals` are the web path's, and words what came back for the agent.
-async function dispatch(context: CallContext, url: string, init: RequestInit, action: boolean, fallback: Handle, tool: string): Promise<ToolResult> {
-  const { request, server } = context
+async function dispatch(context: CallContext, url: string, init: RequestInit, action: boolean, tool: string): Promise<ToolResult> {
+  const { request, server, fallback } = context
   const headers = new Headers(init.headers)
 
   for (const name of FORWARDED) {
@@ -309,9 +314,17 @@ export function toolCall(request: Request): ToolCall | undefined {
   return request.headers.get(AGENT) === TOKEN && tool !== null ? { tool, client: request.headers.get(CLIENT) ?? '' } : undefined
 }
 
-// Counts a request the endpoint dispatched as the client it came from and drops the marker, so the app never reads it.
-function receiveDispatched(app: Elysia): void {
-  app.onRequest(({ request }) => {
+// What serves each request the app answers, for an action a library calls as a tool to go through the same app.
+const servers = new WeakMap<Request, { server: Server | null, handle: Handle }>()
+
+// Counts a request the endpoint or a library dispatched as the client it came from and drops the marker, so the app never reads it.
+// Installed whether or not the app serves `mcp`, as a library calls actions as tools in-process all the same.
+export function receiveDispatched(app: Elysia): void {
+  const handle: Handle = async request => app.handle(request)
+
+  app.onRequest(({ request, server }) => {
+    servers.set(request, { server, handle })
+
     const marked = toolCall(request)
     const address = request.headers.get(CLIENT)
     const id = request.headers.get('x-request-id')
@@ -415,12 +428,10 @@ function serveResourceMetadata(app: Elysia, name: string, paths: string[]): void
 // Serves the tools of `document` at `/mcp` over Streamable HTTP: one JSON-RPC message per POST, answered with JSON.
 export function serveMcp(app: Elysia, document: Schema, options: McpOptions): void {
   const calls = new AsyncLocalStorage<CallContext>()
-  const tools = documentedTools(document, async request => app.handle(request)).map(({ call, ...tool }): Tool => ({ ...tool, run: async args => call(args, calls.getStore()!) }))
+  const tools = documentedTools(document).map(({ call, ...tool }): Tool => ({ ...tool, run: async args => call(args, calls.getStore()!) }))
   const known = new Set(tools.map(tool => tool.name))
   const mcp = new McpServer(tools, [], undefined, { serverInfo: { name: options.title, title: options.title, version: options.version } })
   const notAllowed = () => new Response(null, { status: 405, headers: { allow: 'POST' } })
-
-  receiveDispatched(app)
 
   app.post(MCP_PATH, async (served) => {
     const { request, server } = served
@@ -441,7 +452,7 @@ export function serveMcp(app: Elysia, document: Schema, options: McpOptions): vo
         return declined(refusal, guarded.id, request, options.base, guarded.call, originOf(served))
     }
 
-    const context: CallContext = { request, server, challenged: false }
+    const context: CallContext = { request, server, fallback: async visit => app.handle(visit), challenged: false }
     // A text that is no JSON goes to the server as it is, which words the parse error.
     const reply = await calls.run(context, async () => message === undefined ? mcp.answer(text) : mcp.answerMessage(message))
 
@@ -466,4 +477,47 @@ export function serveMcp(app: Elysia, document: Schema, options: McpOptions): vo
   app.get(MCP_PATH, notAllowed)
   app.delete(MCP_PATH, notAllowed)
   serveResourceMetadata(app, options.title, options.metadataPaths)
+}
+
+// An action a library offers a model: what the model reads of it, and the call it makes.
+export interface LibraryTool {
+  name: string
+  description: string
+  inputSchema: object
+  // Runs the action as the visitor `request` came from, the one being answered unless given, through the whole app: its guards, validation and rate limits apply as on a form post, while the honeypot, minimum time and proof of work, which only a person filling in a form passes, are skipped.
+  // A call made once the answer is sent, from a reply streaming on, passes the request it captured while it was answered.
+  call: (args: Record<string, unknown>, request?: Request) => Promise<ToolResult>
+}
+
+const WORD_START = /([a-z\d])([A-Z])/g
+
+// An action of a page module as a tool, whether or not it set `tool`, which still gives its name and description: passing it is the opt-in. None for one taking a file, which a model cannot send.
+export function actionTool(action: ServerAction<TSchema, unknown, string>): LibraryTool | undefined {
+  const url = action.url as string | undefined
+
+  if (url === undefined)
+    throw new Error('kay: actionTool() takes an action a page module exports, which the server gives its URL as it loads')
+
+  const name = url.slice(url.lastIndexOf('/') + 1)
+  const settings = toolSettings(action.protection?.tool) ?? {}
+  const sentence = name.replace(WORD_START, '$1 $2').toLowerCase()
+  const operation = actionOperation({ name, url, schema: action.schema, tool: { name: settings.name, description: settings.description ?? `${sentence.charAt(0).toUpperCase()}${sentence.slice(1)}` }, guards: [] }, new Set())
+  const tool = operation && toolOf(url, 'post', operation, operation.operationId!, new Set())
+
+  if (!tool)
+    return undefined
+
+  return {
+    name: tool.name,
+    description: tool.description,
+    inputSchema: tool.inputSchema,
+    call: async (args, request = currentRequest()) => {
+      const served = request && servers.get(request)
+
+      if (!request || !served)
+        throw new Error(`kay: the ${tool.name} tool was called outside a request kay answers; pass the request it was asked for`)
+
+      return tool.call(args, { request, server: served.server, fallback: served.handle, challenged: false })
+    },
+  }
 }

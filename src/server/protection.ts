@@ -26,7 +26,8 @@ export interface ProtectionRefusal {
 
 export interface RateLimiter {
   // Counts an attempt from the request's client, or under the app's own key such as an account id: the seconds it must wait before the next one once over the limit, else undefined. `server` is the one serving the request, read from `pages()`'s app when left out.
-  hit: (from: Request | string, server?: Server<unknown> | null) => Promise<number | undefined>
+  // `weight` counts that many at once, the tokens a reply used say, against a `max` of tokens.
+  hit: (from: Request | string, server?: Server<unknown> | null, weight?: number) => Promise<number | undefined>
 }
 
 // A post a honeypot caught, answered as if it went through.
@@ -100,7 +101,7 @@ export function memoryRates(): { hit: (key: string, windowMs: number) => RateWin
 
       return window && window.resetAt > Date.now() ? { ...window } : undefined
     },
-    hit(key, windowMs) {
+    hit(key, windowMs, weight = 1) {
       const now = Date.now()
       let window = windows.get(key)
 
@@ -113,7 +114,7 @@ export function memoryRates(): { hit: (key: string, windowMs: number) => RateWin
         windows.set(key, window = { count: 0, resetAt: now + windowMs })
       }
 
-      window.count++
+      window.count += weight
 
       return { count: window.count, resetAt: window.resetAt }
     },
@@ -134,8 +135,8 @@ export function sqliteRates(path: string): RateStore {
   const salt = db.query<{ salt: string }, []>('SELECT salt FROM kay_rates_salt').get()!.salt
   const hashed = (key: string) => new Bun.CryptoHasher('sha256', sharedKey('rates')).update(salt).update(key).digest('base64url')
 
-  // The row's old values are what both cases read: a closed window opens afresh, an open one counts one more.
-  const hit = db.query<{ count: number, reset_at: number }, [string, number, number]>('INSERT INTO kay_rates (key, count, reset_at) VALUES (?1, 1, ?2 + ?3) ON CONFLICT (key) DO UPDATE SET count = CASE WHEN reset_at <= ?2 THEN 1 ELSE count + 1 END, reset_at = CASE WHEN reset_at <= ?2 THEN ?2 + ?3 ELSE reset_at END RETURNING count, reset_at')
+  // The row's old values are what both cases read: a closed window opens afresh, an open one counts the weight more.
+  const hit = db.query<{ count: number, reset_at: number }, [string, number, number, number]>('INSERT INTO kay_rates (key, count, reset_at) VALUES (?1, ?4, ?2 + ?3) ON CONFLICT (key) DO UPDATE SET count = CASE WHEN reset_at <= ?2 THEN ?4 ELSE count + ?4 END, reset_at = CASE WHEN reset_at <= ?2 THEN ?2 + ?3 ELSE reset_at END RETURNING count, reset_at')
   const peek = db.query<{ count: number, reset_at: number }, [string, number]>('SELECT count, reset_at FROM kay_rates WHERE key = ? AND reset_at > ?')
   const sweep = db.query('DELETE FROM kay_rates WHERE reset_at <= ?')
   let swept = 0
@@ -144,7 +145,7 @@ export function sqliteRates(path: string): RateStore {
   onReload(() => db.close())
 
   return {
-    hit(key, windowMs) {
+    hit(key, windowMs, weight = 1) {
       const now = Date.now()
 
       if (now - swept > SWEEP_MS) {
@@ -152,7 +153,7 @@ export function sqliteRates(path: string): RateStore {
         sweep.run(now)
       }
 
-      const row = hit.get(hashed(key), now, windowMs)!
+      const row = hit.get(hashed(key), now, windowMs, weight)!
 
       return { count: row.count, resetAt: row.reset_at }
     },
@@ -172,7 +173,18 @@ export function rateLimit(name: string, limit: RateLimit): RateLimiter {
   const ms = durationSeconds(limit.window, `rateLimit('${name}')'s window`) * 1000
 
   return {
-    hit: async (from, server) => waitFor(await (limit.store ?? memoryOf(name)).hit(typeof from === 'string' ? `${name}\nkey:${from}` : limitKey(name, clientAddress(from, server)), ms), limit.max),
+    hit: async (from, server, weight = 1) => {
+      if (!Number.isInteger(weight) || weight < 1)
+        throw new KayError('config-invalid', `kay: rateLimit('${name}').hit()'s weight is ${weight}; it takes a whole number of at least 1`)
+
+      const window = await (limit.store ?? memoryOf(name)).hit(typeof from === 'string' ? `${name}\nkey:${from}` : limitKey(name, clientAddress(from, server)), ms, weight)
+
+      // A count below the weight holds less than this hit alone: the store counted one.
+      if (window.count < weight)
+        throw new KayError('config-invalid', `kay: rateLimit('${name}')'s store ignores the weight of a hit; its hit(key, windowMs, weight) adds weight to the count`)
+
+      return waitFor(window, limit.max)
+    },
   }
 }
 

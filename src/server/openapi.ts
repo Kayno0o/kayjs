@@ -262,26 +262,31 @@ export function openApiDocument(modules: MountedApi[], options: { title: string,
   }
 
   for (const action of actions) {
-    // Files do not go as arguments.
-    if (holdsFile(action.schema))
-      continue
+    const post = actionOperation(action, tools, options.root)
 
-    const guards = action.guards.map(file => options.root === undefined ? basename(file) : relative(options.root, file))
-
-    paths[action.url] = {
-      post: {
-        'operationId': toolName(action.tool.name ?? snakeCase(action.name), tools),
-        'tags': ['actions'],
-        ...action.tool.description !== undefined && { summary: action.tool.description },
-        'requestBody': { required: true, content: content(action.schema, 'application/json') },
-        'responses': { 200: { description: 'OK' } },
-        ...guards.length > 0 && { 'x-kay-guards': guards },
-        'x-kay-action': true,
-      },
-    }
+    if (post)
+      paths[action.url] = { post }
   }
 
   return { openapi: '3.1.0', info: { title: options.title, version: options.version }, servers: [{ url: options.base || '/' }], paths }
+}
+
+// The operation an action is as a tool, named free of `taken`; none for one taking a file, which does not go as an argument.
+export function actionOperation(action: DocumentedAction, taken: Set<string>, root?: string): Operation | undefined {
+  if (holdsFile(action.schema))
+    return undefined
+
+  const guards = action.guards.map(file => root === undefined ? basename(file) : relative(root, file))
+
+  return {
+    'operationId': toolName(action.tool.name ?? snakeCase(action.name), taken),
+    'tags': ['actions'],
+    ...action.tool.description !== undefined && { summary: action.tool.description },
+    'requestBody': { required: true, content: content(action.schema, 'application/json') },
+    'responses': { 200: { description: 'OK' } },
+    ...guards.length > 0 && { 'x-kay-guards': guards },
+    'x-kay-action': true,
+  }
 }
 
 function parameters(path: string, hooks: Record<string, unknown>): { parameters?: Parameter[] } {

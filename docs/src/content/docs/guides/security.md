@@ -141,16 +141,16 @@ rateLimit: { max: 5, window: '1m', store: sqliteRates('data/rates.sqlite') }
 
 ### Your own store
 
-`store` takes a `RateStore`, from `kay`, to count in Redis or a database. `hit` counts one attempt under a key and opens a window when none is open. It answers with the attempts so far, this one included, and when the window closes.
+`store` takes a `RateStore`, from `kay`, to count in Redis or a database. `hit` adds a weight under a key, one attempt unless given, and opens a window when none is open. It answers with the count so far, this hit included, and when the window closes.
 
 ```ts
 import type { RateStore } from 'kay'
 
 const store: RateStore = {
-  hit: async (key, windowMs) => {
-    const count = await redis.incr(key)
+  hit: async (key, windowMs, weight = 1) => {
+    const count = await redis.incrby(key, weight)
 
-    if (count === 1)
+    if (count === weight)
       await redis.pexpire(key, windowMs)
 
     return { count, resetAt: Date.now() + await redis.pttl(key) }
@@ -183,6 +183,8 @@ export default guard(async ({ request, headers, deny }) => {
 ```
 
 Pass your own key to count something other than the client, such as `visits.hit(user.email)`.
+
+A third argument counts several at once. With `max` set to tokens, `budget.hit(user.email, undefined, usage.tokens)` caps the tokens a visitor spends, not their requests.
 
 Honeypots, a minimum time and proof of work protect a form from bots too. `minTime` also takes `plain: true` for plain forms only. They are in [Forms and actions](/essentials/forms-and-actions#rate-limit-honeypot-minimum-time-and-proof-of-work).
 

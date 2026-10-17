@@ -9,6 +9,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - The dev tool's Images tab gives copies of one image drawn alike one row with their count, outlining each on hover, rounds the density to two decimals, and its panels wrap long values instead of scrolling sideways ([Dev server](dev-server.md)).
 - `kay i18n missing` lists what each locale lacks, messages and localized entries; a message marked `// draft` is reported by `kay check` (`draft-message`, in the new `i18n` group) until `kay i18n accept <locale>` or a person deletes the comment; an extension adds commands to `kay` with `commands` ([Locales](locales.md#messages), [Extensions](component-libraries.md#extensions), [Commands](check-and-tools.md)).
 - An action whose handler is an `async function*`, or returns any async iterable, streams each value to the island calling it: the call resolves with a typed `ActionStream` (`last()`, `status()`, `on()`, `close()`), the action's guards, schema, rate limits and cross-site check running first, while a plain form post and an MCP tool call get the last value and `site.call` every value ([Streaming actions](api-from-islands.md#streaming-actions)).
+- A rate limit counts a weight: `limit.hit(key, undefined, tokens)` and a `RateStore`'s `hit(key, windowMs, weight)` add several at once, so `max` caps tokens or bytes rather than attempts ([Action protection](action-protection.md#limits-outside-an-action)).
 
 ## 1.51.2
 

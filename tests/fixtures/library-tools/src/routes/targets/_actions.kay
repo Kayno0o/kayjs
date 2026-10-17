@@ -1,0 +1,32 @@
+--- server
+import { action, s } from 'kay'
+
+export const addNote = action(s.Object({
+  title: s.String({ minLength: 3, error: 'Too short' }),
+  pinned: s.Optional(s.Boolean()),
+}), ({ title }) => ({ id: 1, title, at: new Date(0) }))
+
+export const described = action(s.Object({}), () => 'described', { tool: 'Says it was described' })
+
+export const named = action(() => 'named', { tool: { name: 'Say-Hello', description: 'Says hello' } })
+
+export const refuses = action(s.Object({}), (_input, ctx) => ctx.fail(409, { reason: 'full' }))
+
+export const sendsAway = action(s.Object({}), (_input, ctx) => ctx.redirect('/done'))
+
+export const breaks = action(s.Object({}), () => {
+  throw new Error('boom')
+})
+
+export const language = action(s.Object({}), (_input, ctx) => ({ locale: ctx.locale }))
+
+export const upload = action(s.Object({ photo: s.File() }), () => 'stored')
+
+export const signup = action(s.Object({ email: s.String(), website: s.Optional(s.String()) }), ({ email }) => ({ email }), {
+  honeypot: 'website',
+  minTime: '1h',
+  rateLimit: { max: 2, window: '1m' },
+})
+
+export const solve = action(s.Object({}), () => 'solved', { proofOfWork: true })
+---

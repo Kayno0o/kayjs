@@ -1,0 +1,23 @@
+--- server
+import type { ToolResult } from 'kay/library'
+import { action, s } from 'kay'
+import { actionTool, currentRequest } from 'kay/library'
+import { wipe } from './admin/_actions.kay'
+import { addNote, breaks, described, language, named, refuses, sendsAway, signup, solve, upload } from './targets/_actions.kay'
+
+const offered = { addNote, breaks, described, language, named, refuses, sendsAway, signup, solve, upload, wipe }
+
+type Offered = keyof typeof offered
+
+// What a library would call: the action offered to a model, run as the visitor.
+export const run = action(s.Object({ name: s.String(), args: s.Record(s.String(), s.Unknown()) }), async ({ name, args }): Promise<ToolResult> => actionTool(offered[name as Offered])!.call(args))
+
+export const shape = action(s.Object({ name: s.String() }), ({ name }) => {
+  const tool = actionTool(offered[name as Offered])
+
+  return tool && { name: tool.name, description: tool.description, inputSchema: tool.inputSchema }
+})
+
+export const current = action(() => currentRequest()?.url ?? null)
+---
+p#current {currentRequest()?.url}

@@ -54,8 +54,9 @@ export interface EncodedCall {
 
 // Where rate limits count, shared by every process opening it: `sqliteRates` from `kay/server`, or one of an app's own.
 export interface RateStore {
-  // Counts one more attempt under `key`, opening a window of `windowMs` when none is open: the attempts in it so far, this one included, and when it closes, in ms since the epoch.
-  hit: (key: string, windowMs: number) => RateWindow | Promise<RateWindow>
+  // Counts `weight` more under `key`, one attempt unless given, opening a window of `windowMs` when none is open: the count in it so far, this hit included, and when it closes, in ms since the epoch.
+  // A store of its own adds `weight` to the count, or a weighted limit, tokens say, refuses it.
+  hit: (key: string, windowMs: number, weight?: number) => RateWindow | Promise<RateWindow>
   // The window open under `key` without counting an attempt, undefined when none is: what a limit counting only the posts that went through reads before the handler runs.
   peek?: (key: string) => RateWindow | undefined | Promise<RateWindow | undefined>
 }

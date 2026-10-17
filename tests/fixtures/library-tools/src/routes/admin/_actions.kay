@@ -1,0 +1,5 @@
+--- server
+import { action, s } from 'kay'
+
+export const wipe = action(s.Object({ confirm: s.Boolean() }), (_input, ctx) => ({ by: (ctx.locals as { key?: string }).key ?? 'nobody' }))
+---
