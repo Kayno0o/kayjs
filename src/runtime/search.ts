@@ -1,3 +1,4 @@
+import { ARRIVAL_PARAM } from './arrival'
 import { withBase } from './base'
 
 // What `kay build` writes with `search` on: the manifest naming the index of the build and each language's, served revalidated, and the index under a directory named by its hash, served for good.
@@ -17,6 +18,9 @@ const MARK = /\p{M}/gu
 // Characters of text kept on either side of the first word found.
 const SNIPPET_BEFORE = 50
 const SNIPPET_LENGTH = 160
+// The most words of a query, and the most characters of each, a hit's link carries for the page it opens to mark.
+const ARRIVAL_WORDS = 8
+const ARRIVAL_WORD_LENGTH = 64
 // A word only starting with what was typed counts for less than the word itself, the more so the less of it was typed: `island` finds `Islands` nearly as well as `island`.
 const PREFIX_FACTOR = 0.7
 
@@ -45,7 +49,7 @@ export interface SearchHit {
   heading?: string | undefined
   // The heading split into parts as `snippet` is, each word searched for marked, so a hit found by its heading shows why.
   headingParts?: SearchPart[] | undefined
-  // The page's path, with the heading's anchor: a link rendering it puts it under the site's base.
+  // The page's path, with the words searched for for the page to mark and the heading's anchor: a link rendering it puts it under the site's base.
   href: string
   // About a line of the text around the first word found, each part saying whether it is one searched for.
   snippet: SearchPart[]
@@ -134,8 +138,17 @@ export async function searchSite(query: string, options: SearchOptions = {}): Pr
   return best.map(([section, score]) => {
     const { page, heading, href, text } = chunks.get(Math.floor(section / SEARCH_CHUNK))![section % SEARCH_CHUNK]!
 
-    return { page, ...heading !== undefined && { heading, headingParts: marked(heading, wordHits(heading, terms), 0, heading.length) }, href, ...snippet(text, terms), score }
+    return { page, ...heading !== undefined && { heading, headingParts: marked(heading, wordHits(heading, terms), 0, heading.length) }, href: arrivalHref(href, terms), ...snippet(text, terms), score }
   })
+}
+
+// The hit's link with the words searched for, before its anchor.
+function arrivalHref(href: string, terms: string[]): string {
+  const at = href.indexOf('#')
+  const path = at === -1 ? href : href.slice(0, at)
+  const words = terms.slice(0, ARRIVAL_WORDS).map(term => term.slice(0, ARRIVAL_WORD_LENGTH)).join(' ')
+
+  return `${path}?${ARRIVAL_PARAM}=${encodeURIComponent(words).replaceAll('%20', '+')}${at === -1 ? '' : href.slice(at)}`
 }
 
 // Each section holding a word the term starts, scored by the best such word.
@@ -218,7 +231,7 @@ function snippet(text: string, terms: string[]): { snippet: SearchPart[], more: 
 }
 
 // Where each word starting as a term does sits in the text, by the term's length.
-function wordHits(text: string, terms: string[]): [number, number][] {
+export function wordHits(text: string, terms: string[]): [number, number][] {
   // Folding can change a character's length, so each folded character keeps the index of the one it came from.
   let folded = ''
   const from: number[] = []

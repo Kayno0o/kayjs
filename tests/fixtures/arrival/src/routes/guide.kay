@@ -1,0 +1,12 @@
+head
+  title Guide
+h1 Guide
+p Needle above the headings
+h2#first First
+p needle in the first
+div(style="height: 2500px")
+h2#second Second
+p Before, then a needle and a NEEDLES word, <img src=x onerror="window.pwned = 1">.
+div(style="height: 2500px")
+h2#third Third
+p Third needle

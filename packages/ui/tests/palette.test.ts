@@ -54,18 +54,18 @@ describe('paletteSections', () => {
 })
 
 describe('paletteHits', () => {
-  test('turns each hit into a link, a heading under its page with its words found, and drops one an entry already leads to, with or without a trailing slash', () => {
+  test('turns each hit into a link, a heading under its page with its words found, and drops one an entry already leads to, with or without a trailing slash or the words searched for in its link', () => {
     const snippet = [{ text: 'a ', hit: false }, { text: 'signal', hit: true }]
     const headingParts = [{ text: 'Signal', hit: true }, { text: 's', hit: false }]
     const hits = [
-      { page: 'Islands', heading: 'Signals', headingParts, href: '/islands/#signals', snippet, more: 2, score: 3 },
-      { page: 'Islands', href: '/islands/', snippet, more: 0, score: 2 },
-      { page: 'Forms', href: '/forms', snippet, more: 0, score: 1 },
+      { page: 'Islands', heading: 'Signals', headingParts, href: '/islands/?kay_q=signal#signals', snippet, more: 2, score: 3 },
+      { page: 'Islands', href: '/islands/?kay_q=signal', snippet, more: 0, score: 2 },
+      { page: 'Forms', href: '/forms?kay_q=signal', snippet, more: 0, score: 1 },
     ]
 
     expect(paletteHits(hits, [{ label: 'Islands', group: 'Guides', href: '/islands' }])).toEqual([
-      { link: { label: 'Signals', group: 'Islands', href: '/islands/#signals' }, snippet, more: 2, labelParts: headingParts },
-      { link: { label: 'Forms', group: '', href: '/forms' }, snippet, more: 0 },
+      { link: { label: 'Signals', group: 'Islands', href: '/islands/?kay_q=signal#signals' }, snippet, more: 2, labelParts: headingParts },
+      { link: { label: 'Forms', group: '', href: '/forms?kay_q=signal' }, snippet, more: 0 },
     ])
   })
 })

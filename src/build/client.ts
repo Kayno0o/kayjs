@@ -57,6 +57,8 @@ export interface ClientOptions {
   settings?: Record<string, string> | undefined
   // Swaps pages in place: the entry is built whether or not any component is interactive, for the pages posting forms to actions.
   navigation?: boolean | undefined
+  // `search` is on: a page opened from a search hit marks the words searched for.
+  search?: boolean | undefined
   // The app has locales: the links its islands write go to the page's locale's copy, as the server writes them.
   i18n?: boolean | undefined
   // Development: an edited island swaps into the open pages rather than reloading them.
@@ -268,7 +270,7 @@ export async function bundleIslands(root: string, islands: Map<string, string>, 
 
   await Bun.write(bootFile, [
     ...publicEnv !== undefined ? [`import kayPublicEnv from ${JSON.stringify(publicEnv)}`] : [],
-    `import { ${[...navigation ? ['disposeIslands'] : [], ...options.hot ? ['enableHotSwap'] : [], 'hydrateIslands', ...options.hot && navigation ? ['refreshForEdit'] : [], ...navigation ? ['startNavigation'] : []].join(', ')} } from 'kay/client'`,
+    `import { ${[...navigation ? ['disposeIslands'] : [], ...options.hot ? ['enableHotSwap'] : [], 'hydrateIslands', ...options.search ? ['arrive'] : [], ...options.hot && navigation ? ['refreshForEdit'] : [], ...navigation ? ['startNavigation'] : []].join(', ')} } from 'kay/client'`,
     ...options.i18n ? ['import \'kay/i18n\''] : [],
     '',
     ...publicEnv !== undefined ? [`;(globalThis as Record<symbol, unknown>)[Symbol.for('kay.publicEnv')] = kayPublicEnv`, ''] : [],
@@ -283,7 +285,7 @@ export async function bundleIslands(root: string, islands: Map<string, string>, 
     '  const hydrated = hydrate()',
     '',
     ...navigation ? ['  startNavigation({ hydrate, dispose: disposeIslands })', ''] : [],
-    '  return hydrated',
+    ...options.search ? ['  await hydrated', '  void arrive()'] : ['  return hydrated'],
     '})',
     '',
     ';(globalThis as { $kayHydrate?: unknown }).$kayHydrate = Object.assign(hydrate, { ready })',

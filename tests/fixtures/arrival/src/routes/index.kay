@@ -1,0 +1,6 @@
+head
+  title Home
+h1 Home
+a.hit(href="/guide?kay_q=needle#second") Second
+a.same(href="/guide?kay_q=needle#third") Third
+a.plain(href="/guide") Plain

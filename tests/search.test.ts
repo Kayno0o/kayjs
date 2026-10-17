@@ -44,6 +44,11 @@ async function inBrowser<T>(dir: string, lang: string, test: () => Promise<T>, d
   }
 }
 
+// A hit's link without the words it carries for the page to mark, which the tests of the arrival read whole.
+function bare(href: string): string {
+  return href.replace(/\?kay_q=[^#]*/, '')
+}
+
 async function search(dir: string, query: string, lang = 'en', options: { limit?: number } = {}) {
   const { result, loaded } = await inBrowser(dir, lang, async () => searchSite(query, options))
 
@@ -83,7 +88,7 @@ describe('search', () => {
   it('finds a section by the words of its heading, its text and its page, the heading first, with the anchor it sits under', async () => {
     const { hits } = await search(client, 'install')
 
-    expect(hits.map(hit => [hit.page, hit.heading, hit.href])).toEqual([
+    expect(hits.map(hit => [hit.page, hit.heading, bare(hit.href)])).toEqual([
       ['Welcome home', 'Installing the package', '/#install'],
       ['Guide', undefined, '/guide'],
     ])
@@ -99,7 +104,7 @@ describe('search', () => {
   })
 
   it('needs every word, as a word or the start of one, and folds a query as it folds the text', async () => {
-    expect((await search(client, 'welcome dependances')).hits.map(hit => hit.href)).toEqual(['/#deps'])
+    expect((await search(client, 'welcome dependances')).hits.map(hit => bare(hit.href))).toEqual(['/#deps'])
     const [accented] = (await search(client, 'DÉPEND')).hits
 
     expect(accented!.heading).toBe('Dépendances')
@@ -138,9 +143,9 @@ describe('search', () => {
   })
 
   it('keeps an index per language, searched by the page\'s lang', async () => {
-    expect((await search(client, 'bonjour', 'fr')).hits.map(hit => hit.href)).toEqual(['/fr'])
+    expect((await search(client, 'bonjour', 'fr')).hits.map(hit => bare(hit.href))).toEqual(['/fr'])
     expect((await search(client, 'bonjour', 'en')).hits).toEqual([])
-    expect((await search(client, 'hello', 'en-GB')).hits.map(hit => hit.href)).toEqual(['/'])
+    expect((await search(client, 'hello', 'en-GB')).hits.map(hit => bare(hit.href))).toEqual(['/'])
   })
 
   it('loads the manifest, the language\'s list, the files of the words searched and the texts of its hits alone', async () => {
@@ -174,11 +179,33 @@ describe('search', () => {
       await Bun.sleep(60)
       dispose()
 
-      return results!.hits().map(hit => hit.href)
+      return results!.hits().map(hit => bare(hit.href))
     }, url => url.includes(`w-${searchShard('welcome')}`) ? 40 : 0)
 
     expect(result).toEqual(['/#install', '/guide'])
   })
+
+  it('puts the words searched for in each hit\'s link, before its anchor, under trailingSlash and a locale too', async () => {
+    const { hits } = await search(client, 'INSTALL')
+
+    expect(hits.map(hit => hit.href)).toEqual(['/?kay_q=install#install', '/guide?kay_q=install'])
+    expect((await search(client, 'dépendances welcome')).hits.map(hit => hit.href)).toEqual(['/?kay_q=dependances+welcome#deps'])
+    expect((await search(client, 'bonjour', 'fr')).hits.map(hit => hit.href)).toEqual(['/fr?kay_q=bonjour'])
+
+    const site = await scratchDir('search-arrival-')
+
+    try {
+      await Promise.all([
+        Bun.write(join(site, 'kay.config.ts'), 'export default { favicon: false, search: true, trailingSlash: \'always\', base: \'/docs\' }\n'),
+        Bun.write(join(site, 'src/routes/about.kay'), `--- server\n${PRERENDER}\n---\nh1 About\nh2#team The team\np Teamword\n`),
+      ])
+      await build(site)
+      expect((await search(clientDir(site), 'teamword')).hits.map(hit => hit.href)).toEqual(['/about/?kay_q=teamword#team'])
+    }
+    finally {
+      await rm(site, { recursive: true, force: true })
+    }
+  }, 60_000)
 
   it('serves the manifest revalidated and the index for good', async () => {
     const { pages } = await import('../src/server')
@@ -213,7 +240,7 @@ describe('search', () => {
       const dir = clientDir(site)
 
       expect((await search(dir, 'pricingword')).hits).toEqual([])
-      expect((await search(dir, 'aboutword')).hits.map(hit => hit.href)).toEqual(['/about/'])
+      expect((await search(dir, 'aboutword')).hits.map(hit => bare(hit.href))).toEqual(['/about/'])
     }
     finally {
       await rm(site, { recursive: true, force: true })
@@ -226,12 +253,12 @@ describe('search', () => {
     try {
       await Promise.all([
         Bun.write(join(site, 'kay.config.ts'), 'export default { favicon: false, search: true }\n'),
-        Bun.write(join(site, 'src/components/finder.kay'), '---\nimport { searchResults, signal } from \'kay\'\n\nconst query = signal(\'\')\nconst { hits } = searchResults(query)\n---\ninput(aria-label="Search" bind:value={query})\nfor hit of hits() key={hit.href}\n  a(href={hit.href}) {hit.page}\n'),
+        Bun.write(join(site, 'src/components/finder.kay'), '---\nimport { searchResults, signal } from \'kay\'\n\nconst query = signal(\'\')\nconst { hits } = searchResults(query)\n---\ninput(aria-label="Search" bind:value={query})\nfor hit of hits() key={bare(hit.href)}\n  a(href={bare(hit.href)}) {hit.page}\n'),
         Bun.write(join(site, 'src/routes/index.kay'), '---\nimport Finder from \'../components/finder.kay\'\n---\nh1 Home\np Staticword\nFinder\n'),
       ])
       await build(site, '--static', '--outdir', join(site, 'dist'))
 
-      expect((await search(join(site, 'dist/_kay'), 'staticword')).hits.map(hit => hit.href)).toEqual(['/'])
+      expect((await search(join(site, 'dist/_kay'), 'staticword')).hits.map(hit => bare(hit.href))).toEqual(['/'])
 
       const html = await Bun.file(join(site, 'dist/index.html')).text()
       const loaded = [...html.matchAll(/(?:src|href)="(\/_kay\/[^"]+\.js)"/g)].map(match => match[1]!)
@@ -257,6 +284,20 @@ describe('the search index', () => {
     return dir
   }
 
+  it('encodes a hostile query in the link, and carries at most eight words of it, each cut short', async () => {
+    const long = 'a'.repeat(100)
+    const words = Array.from({ length: 12 }, (_, index) => `word${index}`)
+    const dir = await index([{ path: '/x', html: `<main><h1>X</h1><h2 id="s">S</h2><p>img src onerror alert quote hash kay ${words.join(' ')} ${long}</p></main>` }])
+    const hostile = (await search(dir, '<img src=x onerror=alert(1)> "quote" #hash & ?kay_q=')).hits[0]!.href
+    const many = (await search(dir, `${words.join(' ')} ${long}`)).hits[0]!.href
+
+    expect(hostile).toMatch(/^\/x\?kay_q=[\w+%]+#s$/)
+    expect(hostile).not.toMatch(/[<>"&]/)
+    expect(new URL(hostile, 'http://x').searchParams.get('kay_q')).toBe('img src onerror alert quote hash kay')
+    expect(new URL(many, 'http://x').searchParams.get('kay_q')).toBe(words.slice(0, 8).join(' '))
+    expect(new URL((await search(dir, long)).hits[0]!.href, 'http://x').searchParams.get('kay_q')).toBe('a'.repeat(64))
+  })
+
   it('splits a large file of two letters by three, and keeps one of three letters whole however large', async () => {
     const words = 'product project process program provide professional property protect'
     const huge = 'pr'.padEnd(40_000, 'x')
@@ -266,7 +307,7 @@ describe('the search index', () => {
 
     expect(shards).toContain(`w-${searchShard('pro', 3)}.json`)
     expect((await search(dir, 'protect')).hits).toHaveLength(20)
-    expect((await search(dir, huge)).hits.map(hit => hit.href)).toEqual(['/blob'])
+    expect((await search(dir, huge)).hits.map(hit => bare(hit.href))).toEqual(['/blob'])
   }, 60_000)
 
   it('reads a page with no main, void and self-closing elements kept out, entities decoded, headings and their anchors as they read', async () => {
@@ -276,12 +317,12 @@ describe('the search index', () => {
     }])
     const [cafe] = (await search(dir, 'cafe creme')).hits
 
-    expect(cafe).toMatchObject({ page: 'First Second', href: '/plain' })
+    expect(cafe).toMatchObject({ page: 'First Second', href: '/plain?kay_q=cafe+creme' })
     expect(cafe!.snippet.map(part => part.text).join('')).toContain('Café & crème, &#99999999; \u2014 done')
     expect((await search(dir, 'afterword')).hits).toHaveLength(1)
     expect((await search(dir, 'navword')).hits).toEqual([])
-    expect((await search(dir, 'usageword')).hits.map(hit => [hit.heading, hit.href])).toEqual([['Usage', '/plain#a%20b']])
-    expect((await search(dir, 'againword')).hits.map(hit => hit.href)).toEqual(['/plain#a%20b'])
+    expect((await search(dir, 'usageword')).hits.map(hit => [hit.heading, bare(hit.href)])).toEqual([['Usage', '/plain#a%20b']])
+    expect((await search(dir, 'againword')).hits.map(hit => bare(hit.href))).toEqual(['/plain#a%20b'])
   })
 
   it('keeps a heading\'s own marks and the text of a link wrapping it, leaves out a mark linking to it, and joins a word split by a soft hyphen or a zero-width joiner, in the text and the query, where a zero-width space parts two', async () => {
@@ -321,7 +362,7 @@ describe('the search index', () => {
       html: '<main><h1>The MCP endpoint and every tool an agent may call</h1><p>Agents.</p></main>',
     }])
 
-    expect((await search(dir, 'mcp')).hits.map(hit => hit.href)).toEqual(['/guide', '/cli#one', '/cli#mcp', '/upgrading#long'])
+    expect((await search(dir, 'mcp')).hits.map(hit => bare(hit.href))).toEqual(['/guide', '/cli#one', '/cli#mcp', '/upgrading#long'])
   })
 
   it('ranks the sections of the page about a word before one naming it once, below a heading naming it', async () => {
@@ -370,6 +411,6 @@ describe('the search index', () => {
     expect((await search(dir, 'copyword')).hits).toEqual([])
     expect((await search(dir, 'clickword')).hits).toEqual([])
     expect((await search(dir, 'after')).hits[0]!.snippet.map(part => part.text).join('')).toBe('sh bunx kay Before after')
-    expect((await search(dir, 'answerword')).hits.map(hit => [hit.heading, hit.href])).toEqual([['Accordion question', '/code#faq']])
+    expect((await search(dir, 'answerword')).hits.map(hit => [hit.heading, bare(hit.href)])).toEqual([['Accordion question', '/code#faq']])
   })
 })

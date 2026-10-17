@@ -1,0 +1,6 @@
+---
+import { signal } from 'kay'
+
+const clicks = signal(0)
+---
+button.clicker(onClick={() => clicks.set(n => n + 1)}) Clicked {clicks()}

@@ -35,6 +35,8 @@ export const RECENT_GROUP = 'Recent'
 
 const COLLATOR = new Intl.Collator()
 const TRAILING_SLASH = /\/(?=[?#]|$)/
+// The words kay's search puts in a hit's link for the page it opens to mark.
+const SEARCHED_FOR = /[?&]kay_q=[^&#]*/
 
 export function isPaletteLink(entry: PaletteEntry): entry is PaletteLink {
   return 'href' in entry
@@ -119,7 +121,7 @@ export interface PaletteHit {
   more: number
 }
 
-// The site search's hits as links, but for those leading where one of `matches` already does, with or without a trailing slash; a section under a heading is listed under its page.
+// The site search's hits as links, but for those leading where one of `matches` already does, with or without a trailing slash, the words searched for in a hit's link left out; a section under a heading is listed under its page.
 export function paletteHits(hits: SearchHit[], matches: PaletteEntry[]): PaletteHit[] {
   const linked = new Set(matches.filter(isPaletteLink).map(link => withoutSlash(link.href)))
 
@@ -132,7 +134,7 @@ export function withRecent(recent: string[], href: string, limit = 8): string[] 
 }
 
 function withoutSlash(href: string): string {
-  return href.replace(TRAILING_SLASH, '')
+  return href.replace(SEARCHED_FOR, '').replace(TRAILING_SLASH, '')
 }
 
 function groupRank(groups: string[]): (group: string) => number {

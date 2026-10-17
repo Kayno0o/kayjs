@@ -50,11 +50,13 @@ ul
 
 Each hit links a section of a page. A section is the text above its first `h2`, `h3` or `h4`, or a heading and the text under it. The link goes through the heading's `id`.
 
+A page opened from a hit marks those words in the section. It scrolls to the first one if it is out of view. You wire nothing: the hit's `href` carries the words, so it works with kay's palette and with your own links, and in a link you keep or share. The page needs kay's client, which any island brings. In a browser without the CSS Custom Highlight API, the page only scrolls to the heading. To change the look, style `::highlight(kay-search)`.
+
 `snippet` is a line of that text around the first word found. Its parts mark each word searched for.
 
 A query needs all its words. Each is found as a word or the start of one, with case and accents ignored.
 
-Each hit has `page`, `heading`, `headingParts`, `href`, `snippet`, `more` and a `score`. `heading` is `undefined` for the text above the first heading. `headingParts` is the heading in parts, as `snippet` is, so you can mark the words found in it too. `more` counts the words found in the text past the snippet.
+Each hit has `page`, `heading`, `headingParts`, `href`, `snippet`, `more` and a `score`. `heading` is `undefined` for the text above the first heading. `href` is the page's path, then `?kay_q=` with the words searched for, then the heading's anchor. `headingParts` is the heading in parts, as `snippet` is, so you can mark the words found in it too. `more` counts the words found in the text past the snippet.
 
 `searchResults(query, { limit })` returns at most `limit` hits, 20 by default. `searchSite(query, options)` from `kay` is the same search as a promise, for a script. Both return no hits on the server.
 

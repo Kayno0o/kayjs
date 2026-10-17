@@ -1,5 +1,6 @@
 import type { CheckedHref } from './checks'
 import type { HeadElement, HistoryState, NavigationHooks, Swap } from './navigation'
+import { arrives } from './arrival'
 import { withBase, withoutBase } from './base'
 import { busyForms, dirtyGuard, dropScrollSave, historyState, leave, mayLeave, nativeSubmits, navigation, onScroll, pageKey, prefetched, restoreScroll, saveScroll, submitNatively, swappable, swappedActionUrl, takeFormCheck, takeFormChecks } from './navigation'
 
@@ -199,8 +200,8 @@ function followable(link: HTMLAnchorElement): URL | undefined {
   if (!swappable(url))
     return undefined
 
-  // A jump within the page is the browser's own.
-  return url.hash !== '' && url.pathname === location.pathname && url.search === location.search ? undefined : url
+  // A jump within the page is the browser's own, but one from a search hit, which marks the section it opens.
+  return url.hash !== '' && url.pathname === location.pathname && url.search === location.search && !arrives(url.search) ? undefined : url
 }
 
 function onClick(event: MouseEvent): void {

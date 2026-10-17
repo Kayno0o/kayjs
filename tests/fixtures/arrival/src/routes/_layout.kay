@@ -1,0 +1,5 @@
+---
+import Clicker from '../components/clicker.kay'
+---
+Clicker
+slot
