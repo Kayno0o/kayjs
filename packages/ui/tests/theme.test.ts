@@ -236,6 +236,10 @@ describe('theme.css', () => {
     expect(css.slice(compact)).toMatch(/^[^}]*width: auto;/)
   })
 
+  test('zeroes the padding of a grouped field\'s legend, which an app\'s own `legend` styles would indent', () => {
+    expect(blockOf(theme, '.kui-form-field-head')).toMatch(/@apply [^;]*\bp-0\b/)
+  })
+
   test('draws no offset shadow nor press-down unless a skin sets their tokens alone', async () => {
     const build = async (skin: string) => [...(await built(skin)).matchAll(PRESS_TOKEN)].map(([, token, value]) => `${token} ${value}`)
 

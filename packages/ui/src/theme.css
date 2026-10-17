@@ -733,9 +733,9 @@
     @apply m-0 min-w-0 border-0 p-0;
   }
 
-  /* A floated legend is no longer the fieldset's rendered legend, so it sits in the row like the label's head; the float itself does nothing in a flex row. */
+  /* A floated legend is no longer the fieldset's rendered legend, so it sits in the row like the label's head; the float itself does nothing in a flex row. Its padding is zeroed so an app's own `legend` styles do not indent it. */
   .kui-form-field-head {
-    @apply float-left order-first flex flex-1 basis-auto flex-wrap items-center gap-2;
+    @apply float-left order-first p-0 flex flex-1 basis-auto flex-wrap items-center gap-2;
   }
 
   /* Held on the label's line, outside the label, and moved under it when the line is too short for both. */

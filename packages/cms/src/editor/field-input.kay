@@ -35,6 +35,8 @@ const value = () => drafts.value(entry, path)
 const text = () => value() === undefined || value() === null ? '' : String(value())
 const items = () => Array.isArray(value()) ? value() as unknown[] : []
 const kindOf = (name: string) => Object.hasOwn(kinds, `/src/cms/fields/${name}.kay`) ? kinds[`/src/cms/fields/${name}.kay`] : undefined
+// A list item is never marked required: a list holds as many items as it has, none of them optional or mandatory on its own.
+const starred = () => field.required && typeof field.key === 'string'
 const issue = () => jsonIssue() ?? drafts.issues(entry, path)[0]?.message
 
 function set(next: unknown): void {
@@ -74,7 +76,7 @@ function setJson(next: string): void {
     when 'boolean'
       Toggle(label={current.label} checked={value() === true} onChange={set})
     when 'list'
-      FormField(label={current.label} hint={current.hint} issue={issue()} required={current.required} group)
+      FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()} group)
         for item, i of items() key={i}
           .kcms-list-item(data-kcms-row onKeyDown={event => itemKey(event, i)})
             Reorder(item={itemAt(current, i).label} index={i} count={items().length} onMove={to => moveItem(i, to)})
@@ -82,40 +84,40 @@ function setJson(next: string): void {
             IconButton(icon="delete" label={wording('cms.field.removeItem', 'Remove item {n}', { n: i + 1 })} variant="ghost" size="sm" onClick={() => set(items().filter((_, at) => at !== i))})
         Button(label={wording('cms.field.add', 'Add')} icon="plus" onClick={() => set([...items(), emptyValue(current.item)])})
     when 'group'
-      FormField(label={current.label} hint={current.hint} issue={issue()} required={current.required} group)
+      FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()} group)
         for child of current.fields key={child.key}
           FieldInput(drafts={drafts} entry={entry} field={child} path={joinPath(path, child.key)})
     when 'textarea'
-      FormField(label={current.label} hint={current.hint} issue={issue()} required={current.required})
+      FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()})
         Textarea(rows="4" value={text()} onInput={set})
     when 'markdown'
-      FormField(label={current.label} hint={current.hint} issue={issue()} required={current.required})
+      FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()})
         MarkdownEditor(value={text()} onInput={set} onImage={file => uploadFile(entry.collection, file)})
     when 'number', 'integer'
-      FormField(label={current.label} hint={current.hint} issue={issue()} required={current.required})
+      FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()})
         TextInput(type="number" step={current.kind === 'integer' ? '1' : 'any'} value={text()} onInput={next => set(next ?? undefined)})
     when 'date'
-      FormField(label={current.label} hint={current.hint} issue={issue()} required={current.required})
+      FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()})
         TextInput(type="date" value={text().slice(0, 10)} onInput={set})
     when 'datetime'
-      FormField(label={current.label} hint={current.hint} issue={issue()} required={current.required})
+      FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()})
         TextInput(type="datetime-local" value={text().slice(0, 16)} onInput={set})
     when 'select'
-      FormField(label={current.label} hint={current.hint} issue={issue()} required={current.required})
+      FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()})
         Select(value={text()} options={current.options} emptyOption={!current.required} onChange={next => set(current.options.find(option => option.value === next)?.raw)})
     when 'image', 'file'
-      FormField(label={current.label} hint={current.hint} issue={issue()} required={current.required} group)
+      FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()} group)
         FileInput(value={text()} image={current.kind === 'image'} collection={entry.collection} onChange={set})
     when 'custom'
       const Kind = kindOf(current.name)
       if Kind
-        Kind(value={value()} onChange={set} label={current.label} hint={current.hint} issue={issue()} required={current.required})
+        Kind(value={value()} onChange={set} label={current.label} hint={current.hint} issue={issue()} required={starred()})
       else
-        FormField(label={current.label} hint={[current.hint, development ? wording('cms.field.noKind', 'No editor for the {kind} kind: add src/cms/fields/{kind}.kay. Edited as JSON until then.', { kind: current.name }) : undefined].filter(Boolean).join(' ')} issue={issue()} required={current.required})
+        FormField(label={current.label} hint={[current.hint, development ? wording('cms.field.noKind', 'No editor for the {kind} kind: add src/cms/fields/{kind}.kay. Edited as JSON until then.', { kind: current.name }) : undefined].filter(Boolean).join(' ')} issue={issue()} required={starred()})
           Textarea.kcms-json(rows="4" value={value() === undefined ? '' : JSON.stringify(value(), null, 2)} onChange={setJson})
     when 'json'
-      FormField(label={current.label} hint={current.hint ?? 'JSON'} issue={issue()} required={current.required})
+      FormField(label={current.label} hint={current.hint ?? 'JSON'} issue={issue()} required={starred()})
         Textarea.kcms-json(rows="4" value={value() === undefined ? '' : JSON.stringify(value(), null, 2)} onChange={setJson})
     else
-      FormField(label={current.label} hint={current.hint} issue={issue()} required={current.required})
+      FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()})
         TextInput(value={text()} onInput={set})

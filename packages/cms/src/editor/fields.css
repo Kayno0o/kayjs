@@ -21,11 +21,13 @@
 }
 
 .kcms-file-preview {
+  width: 12rem;
   max-width: 100%;
-  max-height: 12rem;
+  aspect-ratio: 1;
   object-fit: contain;
   align-self: start;
   border-radius: 0.5rem;
+  background: var(--color-kui-surface0);
 }
 
 .kcms-file-link {

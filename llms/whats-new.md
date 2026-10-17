@@ -6,6 +6,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 - `collection(..., { order: 'position' })` orders a collection by a number field, and kayjs-cms moves its entries up or down by writing it ([Content](content.md)).
 - `collection(..., { title })` names a collection on the kayjs-cms screens ([Content](content.md)).
+- kayjs-cms: every image preview has the same square box, and a list item carries no required asterisk. kayjs-ui: a grouped `FormField`'s legend keeps its layout under an app's own `legend` styles ([kayjs-cms](../packages/cms/llms.txt)).
 - kayjs-cms: an image or file field keeps its path behind a collapsed Path control, the preview and the upload button alone showing ([kayjs-cms](../packages/cms/llms.txt)).
 - kayjs-cms: the items of a list field move up and down, with buttons or Alt and an arrow key ([kayjs-cms](../packages/cms/llms.txt)).
 - kayjs-cms: `s.Integer()`, `s.Numeric()`, `s.BooleanString()` and `s.Date()` fields get a number, toggle or date input, not a JSON box ([kayjs-cms](../packages/cms/llms.txt)).
