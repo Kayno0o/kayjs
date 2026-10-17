@@ -1,5 +1,6 @@
 import type { AuthMail } from './auth'
 import { t } from 'kay/i18n'
+import { durationWords } from 'kay/library'
 import { isLinkKind, isNoticeKind } from './auth'
 
 export interface AuthWords {
@@ -17,21 +18,6 @@ export interface AuthWords {
   ending: string
 }
 
-const DAY = 86_400
-const UNITS = [['hour', 3600], ['minute', 60], ['second', 1]] as const
-
-// A lifetime in seconds in a language, in the largest unit it fills exactly, days from two on: `24 hours`, `7 jours`.
-function spoken(seconds: number, locale: string): string {
-  const [unit, size] = seconds >= 2 * DAY && seconds % DAY === 0 ? ['day', DAY] as const : UNITS.find(([, size]) => seconds % size === 0) ?? UNITS[2]
-
-  try {
-    return new Intl.NumberFormat(locale, { style: 'unit', unit, unitDisplay: 'long' }).format(seconds / size)
-  }
-  catch {
-    return new Intl.NumberFormat('en', { style: 'unit', unit, unitDisplay: 'long' }).format(seconds / size)
-  }
-}
-
 // The default wording of a kayjs-auth mail in the language it renders in, from the `mail.auth` messages an app overrides key by key; for a view of the app's own keeping some of it.
 export function authWords(mail: AuthMail): AuthWords {
   const { kind } = mail
@@ -41,9 +27,9 @@ export function authWords(mail: AuthMail): AuthWords {
 
   const of = (line: 'subject' | 'lead' | 'ending'): string => t(`mail.auth.${kind}.${line}`, { site: mail.site, email: mail.to, detail: mail.detail ?? '', what: t(mail.url === undefined ? 'mail.auth.code' : 'mail.auth.link') })
   // How long a link works, left unsaid when its `lasts` is empty; the figure kayjs-auth was set to when it sends one, the default wording otherwise.
-  const link = mail.expires?.link === undefined ? undefined : spoken(mail.expires.link, mail.locale) + (kind === 'magic-link' ? t('mail.auth.once') : '')
+  const link = mail.expires?.link === undefined ? undefined : durationWords(mail.expires.link, mail.locale) + (kind === 'magic-link' ? t('mail.auth.once') : '')
   const lasts = isLinkKind(kind) && mail.url !== undefined ? link ?? t(`mail.auth.${kind}.lasts`) : ''
-  const code = mail.expires?.code === undefined ? t('mail.auth.codeWorks', { duration: t('mail.auth.codeLasts') }) : t('mail.auth.codeWorks', { duration: spoken(mail.expires.code, mail.locale) })
+  const code = mail.expires?.code === undefined ? t('mail.auth.codeWorks', { duration: t('mail.auth.codeLasts') }) : t('mail.auth.codeWorks', { duration: durationWords(mail.expires.code, mail.locale) })
   const ending = [lasts === '' ? undefined : t('mail.auth.linkWorks', { duration: lasts }), mail.code === undefined ? undefined : code, of('ending')]
 
   return {

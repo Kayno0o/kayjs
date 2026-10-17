@@ -1,6 +1,6 @@
 import type { EmailCore } from './email'
 import type { LinkType } from './store'
-import { escapeHtml as escape } from 'kay/library'
+import { durationWords, escapeHtml as escape } from 'kay/library'
 import { language, pickLocale } from './locale'
 import { log } from './log'
 
@@ -115,20 +115,8 @@ function linkMail(words: Wording, data: MailData, subject: string, lead: string,
   }
 }
 
-const DAY = 86_400
-const UNITS = [['hour', 3600], ['minute', 60], ['second', 1]] as const
-
-// A lifetime in seconds as words in a language, in the largest unit it fills exactly, days from two on: `24 hours`, `7 days`, `1 heure`. A bad `locale` falls back to English.
-export function lifetime(seconds: number, locale: string): string {
-  const [unit, size] = seconds >= 2 * DAY && seconds % DAY === 0 ? ['day', DAY] as const : UNITS.find(([, size]) => seconds % size === 0) ?? UNITS[2]
-
-  try {
-    return new Intl.NumberFormat(locale, { style: 'unit', unit, unitDisplay: 'long' }).format(seconds / size)
-  }
-  catch {
-    return new Intl.NumberFormat('en', { style: 'unit', unit, unitDisplay: 'long' }).format(seconds / size)
-  }
-}
+// A lifetime in seconds as words in a language: `24 hours`, `7 days`, `1 heure`, from kay's `durationWords`.
+export const lifetime = durationWords
 
 // How long what the mail carries works, a magic link being usable once.
 function lasting(words: Wording, data: MailData, once = false): string {

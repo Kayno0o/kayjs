@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import { durationMs, durationSeconds, optionMs } from '../src/runtime/duration'
+import { durationWords } from '../src/runtime/duration-words'
 
 describe('durations', () => {
   it('reads seconds, or a number with its unit', () => {
@@ -30,5 +31,19 @@ describe('durations', () => {
   it('refuses what is no positive duration, naming the option', () => {
     for (const value of [0, -5, Number.NaN, Number.POSITIVE_INFINITY, '0m', '-5m', '5', '5 m', '5min', '5M', 'm', '', null, undefined])
       expect(() => durationSeconds(value, 'ttl')).toThrow(/^kay: ttl is .+; it takes a positive duration, seconds or a string such as '5m', '12h' or '30d'$/)
+  })
+})
+
+describe('duration words', () => {
+  it('words a lifetime in the largest unit it fills exactly, days from two on', () => {
+    expect([86_400, 7 * 86_400, 3600, 90 * 60, 900, 45, 2 * 86_400 + 1].map(seconds => durationWords(seconds, 'en'))).toEqual(['24 hours', '7 days', '1 hour', '90 minutes', '15 minutes', '45 seconds', '172,801 seconds'])
+  })
+
+  it('words it in French, with its plurals', () => {
+    expect([86_400, 7 * 86_400, 3600, 7200, 600, 1].map(seconds => durationWords(seconds, 'fr').replace(/\s/g, ' '))).toEqual(['24 heures', '7 jours', '1 heure', '2 heures', '10 minutes', '1 seconde'])
+  })
+
+  it('falls back to English for a bad locale', () => {
+    expect(durationWords(600, 'not a locale')).toBe('10 minutes')
   })
 })
