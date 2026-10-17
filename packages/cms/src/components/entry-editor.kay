@@ -12,7 +12,8 @@ import { createDrafts } from '../drafts'
 import EntryFields from '../editor/entry-fields.kay'
 import { deleteSaved, saveDraft } from '../editor/save'
 import { shipWords } from '../editor/words'
-import { collectionPath, entryPath, onPagePath } from '../listing'
+import { collectionPath, entryPath, entryTitle, onPagePath } from '../listing'
+import EntryHeader from './entry-header.kay'
 
 // An entry's form on its own screen, or a new entry's when `entry` is left out.
 const { prefix, collection, entry, locale } = props<{ prefix: string, collection: CollectionInfo, entry?: StoredEntry | undefined, locale?: string | undefined }>()
@@ -31,6 +32,10 @@ const saving = signal(false)
 
 drafts.open({ ...ref, data: entry?.data ?? {}, body: entry?.body }, entry?.version)
 guardLeave(() => !saving() && drafts.changed(ref))
+
+// The entry's own title, its slug beneath when that is not the title; a new entry has neither.
+const name = entry ? entryTitle(collection, entry) : wording('cms.admin.newEntry', 'New entry')
+const slugLine = entry && name !== entry.slug ? (entry.locale === undefined ? entry.slug : `${entry.slug} (${entry.locale})`) : entry?.locale
 
 const draft = () => collection.draftField !== undefined && drafts.value(ref, collection.draftField) === true
 
@@ -68,9 +73,7 @@ async function remove(): Promise<void> {
 }
 ---
 form.kcms-entry-editor(novalidate onSubmit={event => { event.preventDefault(); void save() }})
-  if entry?.problem as problem
-    p.kcms-failure(role="alert") {wording('cms.entry.problem', 'This entry\'s file does not parse: {problem}. Saving writes the form over it.', { problem })}
-  .kcms-entry-editor-bar
+  EntryHeader(prefix={prefix} collection={collection} title={name} subtitle={slugLine})
     if draft()
       Badge(tone="warning" label={wording('cms.entry.draft', 'Draft')})
     .kcms-entry-actions
@@ -83,6 +86,8 @@ form.kcms-entry-editor(novalidate onSubmit={event => { event.preventDefault(); v
       if drafts.changed(ref)
         Button(label={wording('cms.entry.reset', 'Reset')} disabled={saving()} onClick={() => drafts.reset(ref)})
       Button(type="submit" label={saving() ? wording('cms.entry.saving', 'Saving…') : entry ? wording('cms.entry.save', 'Save') : wording('cms.entry.create', 'Create')} tone="accent" busy={saving()})
+  if entry?.problem as problem
+    p.kcms-failure(role="alert") {wording('cms.entry.problem', 'This entry\'s file does not parse: {problem}. Saving writes the form over it.', { problem })}
   if !entry
     FormField(label={wording('cms.entry.slug', 'Slug')} hint={collection.kind === 'folder' ? wording('cms.entry.slugHint', 'The file\'s path in the collection\'s folder, with / between folders') : undefined} required)
       TextInput(value={slug()} onInput={text => slug = text} required)

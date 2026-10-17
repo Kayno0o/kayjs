@@ -29,6 +29,11 @@ export function rowsOf(collection: CollectionInfo, entries: SourceEntry[]): Entr
   })
 }
 
+// An entry's title as the list shows it.
+export function entryTitle(collection: CollectionInfo, entry: SourceEntry): string {
+  return rowsOf(collection, [entry])[0]!.title
+}
+
 const WHITESPACE = /\s+/
 
 // The rows whose title or slug holds every word of the search, whatever their case.

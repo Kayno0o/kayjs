@@ -1,10 +1,10 @@
 --- server
 import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
-import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
 import { s } from 'kay'
 import { wording } from 'kay/words'
 import EntryEditor from '../../../components/entry-editor.kay'
-import { collectionPath, collectionTitle } from '../../../listing'
+import EntryHeader from '../../../components/entry-header.kay'
+import { collectionTitle, entryTitle } from '../../../listing'
 import { settings } from '../../../settings'
 import { entryScreen } from '../../../store'
 
@@ -18,11 +18,9 @@ const title = collectionTitle(collection)
 const name = ctx.query.locale === undefined ? ctx.params.slug : `${ctx.params.slug} (${ctx.query.locale})`
 ---
 head
-  title {name} - {title}
-PageSection(title={name} level={1})
-  @actions
-    a(href={collectionPath(prefix, collection.name)}) {title}
-  if entry
-    EntryEditor(prefix={prefix} collection={collection} entry={entry})
-  else
-    EmptyState(title={wording('cms.admin.collectionUnreadable', 'This collection cannot be read')} description={collection.problem})
+  title {entry ? entryTitle(collection, entry) : name} - {title}
+if entry
+  EntryEditor(prefix={prefix} collection={collection} entry={entry})
+else
+  EntryHeader(prefix={prefix} collection={collection} title={name})
+  EmptyState(title={wording('cms.admin.collectionUnreadable', 'This collection cannot be read')} description={collection.problem})

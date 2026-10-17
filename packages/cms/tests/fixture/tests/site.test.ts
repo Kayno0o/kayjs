@@ -58,7 +58,7 @@ test('the editor says when nothing on the page comes from a collection', async (
 test('the screens list each collection with its entry count', async () => {
   const page = await site.visit('/admin')
 
-  expect(page.find('.kui-card-row a').map(link => [link.text, link.attributes.href])).toEqual([['Posts', '/admin/collections/posts'], ['Products', '/admin/collections/products']])
+  expect(page.find('.kui-card-row a').map(link => [link.text, link.attributes.href])).toEqual([['Posts', '/admin/collections/posts'], ['Our products', '/admin/collections/products']])
   expect(page.text('main')).toContain('2 entries')
 })
 
@@ -111,7 +111,7 @@ test('a collection lists its entries, with a draft to publish, and searches them
 test('an entry opens in a form of its collection\'s fields, nested slugs included', async () => {
   const page = await site.visit('/admin/collections/posts/notes/garden')
 
-  expect(page.title()).toBe('notes/garden - Posts')
+  expect(page.title()).toBe('Spring garden - Posts')
   expect(page.find('[data-kcms-path]').map(field => field.attributes['data-kcms-path'])).toEqual(['title', 'draft', 'tags'])
   expect(page.find('[data-kcms-body]')).toHaveLength(1)
 })
@@ -210,11 +210,22 @@ test('a loaded entry is created and removed through its loader, a slug starting 
 
   try {
     expect((await site.visit('/admin/collections/products')).find('.kcms-entries a').map(link => link.attributes.href)).toContain('/admin/collections/products/%2Fabout')
-    expect((await site.visit('/admin/collections/products/%2Fabout')).title()).toBe('/about - Products')
+    expect((await site.visit('/admin/collections/products/%2Fabout')).title()).toBe('About - Our products')
   }
   finally {
     await send('DELETE', 'products/%2Fabout')
   }
+})
+
+test('an entry\'s screen is headed by its title as the page\'s title, its slug beneath and the way back to its collection', async () => {
+  const page = await site.visit('/admin/collections/posts/hello')
+
+  expect(page.find('h1.kcms-entry-name').map(heading => heading.text)).toEqual(['Hello world'])
+  expect(page.find('.kcms-entry-subtitle').map(line => line.text)).toEqual(['hello'])
+  expect(page.find('.kcms-entry-crumb').map(link => [link.text, link.attributes.href])).toEqual([['Posts', '/admin/collections/posts']])
+  expect(page.find('.kcms-entry-header button[type=submit]')).toHaveLength(1)
+  expect((await site.visit('/admin/new/products')).find('h1.kcms-entry-name').map(heading => heading.text)).toEqual(['New entry'])
+  expect((await site.visit('/admin/collections/products')).find('h1').map(heading => heading.text)).toEqual(['Our products'])
 })
 
 test('a file that does not parse lists as broken, why said on its link too, and is written over or deleted', async () => {

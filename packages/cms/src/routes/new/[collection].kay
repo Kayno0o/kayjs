@@ -1,11 +1,10 @@
 --- server
 import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
-import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
 import { s } from 'kay'
 import { wording } from 'kay/words'
 import EntryEditor from '../../components/entry-editor.kay'
-import { humanize } from '../../fields'
-import { collectionPath } from '../../listing'
+import EntryHeader from '../../components/entry-header.kay'
+import { collectionTitle } from '../../listing'
 import { settings } from '../../settings'
 import { findCollection } from '../../store'
 
@@ -16,11 +15,9 @@ const collection = await findCollection(ctx.params.collection) ?? ctx.notFound()
 const locale = ctx.query.locale
 ---
 head
-  title {wording('cms.admin.newEntryTitle', 'New entry - {collection}', { collection: humanize(collection.name) })}
-PageSection(title={wording('cms.admin.newEntry', 'New entry')} level={1})
-  @actions
-    a(href={collectionPath(prefix, collection.name)}) {humanize(collection.name)}
-  if collection.problem as problem
-    EmptyState(title={wording('cms.admin.collectionUnreadable', 'This collection cannot be read')} description={problem})
-  else
-    EntryEditor(prefix={prefix} collection={collection} locale={locale})
+  title {wording('cms.admin.newEntryTitle', 'New entry - {collection}', { collection: collectionTitle(collection) })}
+if collection.problem as problem
+  EntryHeader(prefix={prefix} collection={collection} title={wording('cms.admin.newEntry', 'New entry')})
+  EmptyState(title={wording('cms.admin.collectionUnreadable', 'This collection cannot be read')} description={problem})
+else
+  EntryEditor(prefix={prefix} collection={collection} locale={locale})

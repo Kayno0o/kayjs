@@ -24,4 +24,5 @@ export const products = collection({
   },
 }, {
   schema: s.Object({ name: s.String({ minLength: 1 }), photo: s.Optional(imageField()), color: s.Optional(customField('color', s.String({ pattern: '^#[0-9a-f]{6}$' }))), mood: s.Optional(customField('mood', s.String())) }),
+  title: 'Our products',
 })
