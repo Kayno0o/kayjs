@@ -9,21 +9,32 @@ const solutions = new Map<string, Promise<string | undefined>>()
 // The challenges a post went with: a solution goes through once, so the next post waits for a fresh one.
 const spent = new Set<string>()
 
-// The challenge the page holds for the action at `url`, unless a post spent it: in the script of its head, or one a streamed block brought.
+// The challenge the page holds for the action at `url`, unless a post spent it: the one that expires last among those in the script of its head and those a streamed block or a server island brought, so an expired one of the prerendered page loses to a fresh one.
 function challengeOf(url: string): string | undefined {
+  let freshest: string | undefined
+  let latest = Number.NEGATIVE_INFINITY
+
   for (const script of document.querySelectorAll(`script[${WORK_SCRIPT}]`)) {
     try {
-      const challenge = (JSON.parse(script.textContent ?? '') as Record<string, string | undefined>)[url]
+      const challenge = (JSON.parse(script.textContent ?? '') as Record<string, unknown>)[url]
 
-      if (challenge !== undefined && !spent.has(challenge))
-        return challenge
+      if (typeof challenge !== 'string' || spent.has(challenge))
+        continue
+
+      // The first part of a challenge is when it expires, in base 36.
+      const expires = Number.parseInt(challenge, 36)
+
+      if (freshest === undefined || expires > latest) {
+        freshest = challenge
+        latest = Number.isNaN(expires) ? Number.NEGATIVE_INFINITY : expires
+      }
     }
     catch {
       // A script still streaming does not parse yet: the next post reads it whole.
     }
   }
 
-  return undefined
+  return freshest
 }
 
 async function solving(challenge: string): Promise<string | undefined> {
