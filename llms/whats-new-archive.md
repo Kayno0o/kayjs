@@ -33,4 +33,4 @@ What each release before 1.47 added, newest first, each feature with where it is
 - A `transformPage` hook gets the page's `locale` beside its `path` ([Routing](prerendering.md#page-hooks)).
 - `page.find()` in `kay/test` gives each element's `html`, the markup inside it, beside its `tag`, `attributes` and `text` ([Testing](testing.md#reading-a-page)).
 
-Releases before 1.46 are in the notes of their releases, at https://git.kevyn.fr/kaynooo/kayjs/releases.
+Releases before 1.46 are in the notes of their releases, at https://git.kaynooo.fr/kaynooo/kayjs/releases.

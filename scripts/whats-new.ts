@@ -14,7 +14,7 @@ const VERSION_HEADING = /^## (\d+\.\d+)/
 
 const UNRELEASED = /^## Unreleased$/m
 // The last line of an archive whose oldest releases were dropped.
-const RELEASES_NOTE = 'Releases before 0.0 are in the notes of their releases, at https://git.kevyn.fr/kaynooo/kayjs/releases.'
+const RELEASES_NOTE = 'Releases before 0.0 are in the notes of their releases, at https://git.kaynooo.fr/kaynooo/kayjs/releases.'
 
 // Names the `## Unreleased` section after the version being released; a page without one is left as it is.
 export function stampUnreleased(text: string, version: string): string {

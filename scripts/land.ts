@@ -25,6 +25,8 @@ const READERS: [RegExp, string[]][] = [
   [/^examples\//, ['tests/examples.test.ts', 'tests/new.test.ts', 'tests/docs.test.ts']],
   [/^packages\//, ['tests/llms.test.ts', 'tests/packages.test.ts', 'tests/docs.test.ts', 'tests/examples.test.ts', 'tests/library.test.ts', 'tests/new.test.ts']],
   [/^tests\/fixtures\//, ['tests/format.test.ts']],
+  // Greps every tracked file for the private forge domain.
+  [/^/, ['tests/public-repo.test.ts']],
 ]
 // Half the host's cores, as CI runs them, so a landing leaves the machine to the rest.
 const WORKERS = '--parallel=6'
