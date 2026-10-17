@@ -1823,6 +1823,7 @@ function envTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
 // An image served more than this many times the pixels it is drawn with is flagged: the ladder's widths are at most 2 apart, so a variant picked for the size drawn is under 2 times as wide, 4 times the pixels, even at its worst.
 const OVERSIZED = 4
 const IMAGE_ROUTE = '/_kay/image'
+const SVG_TYPE = /^image\/svg\+xml\s*(?:;|$)/i
 // The files `kay build` wrote for the variants.
 const IMAGE_FILES = '/_kay/images/'
 // How many formats are asked of the server at once, and how long one gets.
@@ -1900,7 +1901,7 @@ function isVector(src: string, win: Window & typeof globalThis): boolean {
 
   url.hash = ''
 
-  return win.performance.getEntriesByName(url.href, 'resource').some(entry => 'contentType' in entry && typeof entry.contentType === 'string' && entry.contentType.split(';')[0]!.trim().toLowerCase() === 'image/svg+xml')
+  return win.performance.getEntriesByName(url.href, 'resource').some(entry => 'contentType' in entry && typeof entry.contentType === 'string' && SVG_TYPE.test(entry.contentType))
 }
 
 // Every image of the page with what it is, what it is drawn at and what is wrong with it; `lcp` is the element the browser reported as the largest paint.
