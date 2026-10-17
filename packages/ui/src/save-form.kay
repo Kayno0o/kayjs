@@ -1,5 +1,5 @@
 --- <Output>
-import type { Action, Failure, FailureData } from 'kay'
+import type { Action, Answer, FailureData, Success } from 'kay'
 import { guardLeave, onCleanup, onMount, shortcut, signal } from 'kay'
 import Button from './button.kay'
 import { callAction, formIssues } from './forms'
@@ -16,7 +16,7 @@ const { action, failure, refused, saved, onSaved, onDiscard, dirtyLabel = 'Unsav
   // Toasted as a success once the action has run.
   saved?: string | undefined
   // What the action returned, for the page to patch into what it shows. The form is clean again once it has run.
-  onSaved?: ((result: Exclude<Output, Failure<unknown>>) => void) | undefined
+  onSaved?: ((result: Answer<Success<Output>>) => void) | undefined
   // Called after Discard has put the controls back to their initial values, for state the page keeps beyond them: the library's controls and their `onChange` need nothing from it.
   onDiscard?: (() => void) | undefined
   // The bar's texts: unsaved changes, nothing to save, the save under way, and the two buttons.

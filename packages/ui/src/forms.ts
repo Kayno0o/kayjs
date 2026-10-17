@@ -1,4 +1,4 @@
-import type { Action, Failure, FailureData, Signal } from 'kay'
+import type { Action, Answer, FailureData, Signal, Success } from 'kay'
 import { ActionError, context, describeField, effect, focusInvalid, markInvalid, uid } from 'kay'
 import { toast } from './toast'
 
@@ -98,7 +98,7 @@ function messagesOf(said: Record<string, string> | string | undefined): Record<s
 
 // Calls the action with the form's fields. A refusal sets the messages for each FormField, toasts the ones no field shows (or `failure` when it carries none) and focuses the first invalid field, answering undefined; what the action returned is answered inside an object, so a result of undefined is told apart.
 // The schema refuses fields; the handler refuses with data of its own, which `refused` reads, a single message going under the empty name as the whole form's.
-export async function callAction<Output>(form: HTMLFormElement, action: Action<never, Output>, issues: Signal<Record<string, string>>, failure: string, refused?: ((data: FailureData<Output>) => Record<string, string> | string | undefined) | undefined): Promise<{ result: Exclude<Output, Failure<unknown>> } | undefined> {
+export async function callAction<Output>(form: HTMLFormElement, action: Action<never, Output>, issues: Signal<Record<string, string>>, failure: string, refused?: ((data: FailureData<Output>) => Record<string, string> | string | undefined) | undefined): Promise<{ result: Answer<Success<Output>> } | undefined> {
   try {
     return { result: await action(new FormData(form)) }
   }

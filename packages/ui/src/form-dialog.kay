@@ -1,5 +1,5 @@
 --- <Output>
-import type { Action, Failure, FailureData, JSX } from 'kay'
+import type { Action, Answer, FailureData, JSX, Success } from 'kay'
 import { effect, signal, uid } from 'kay'
 import Button from './button.kay'
 import Dialog from './dialog.kay'
@@ -21,7 +21,7 @@ const { open, title, action, submitLabel, savingLabel = 'Saving…', cancelLabel
   // What a refusal of the action's handler says, from the data it passed to `ctx.fail`: a message per field, each shown on its FormField, or one message, toasted. Without it, or when it answers undefined or an empty message, `failure` is toasted.
   refused?: ((data: FailureData<Output>) => Record<string, string> | string | undefined) | undefined
   // What the action returned, for the page to patch into what it shows. The dialog closes once it has run.
-  onSaved?: ((result: Exclude<Output, Failure<unknown>>) => void) | undefined
+  onSaved?: ((result: Answer<Success<Output>>) => void) | undefined
   // Called however the dialog closes, saved or not.
   onClose: () => void
   // The left end of the footer, for a delete button.
