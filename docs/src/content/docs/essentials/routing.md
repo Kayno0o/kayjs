@@ -224,6 +224,8 @@ kay not-found
 
 The list starts with the most hit. A path asked for twice also gets a suggestion: the same page in another case or locale, a page with the same slug elsewhere, or a near typo. To turn one into a redirect, run `kay not-found --redirect /old`, or add `--to /new` when there is no suggestion. kay adds the line to `redirects` in `kay.config.ts`.
 
+In `kay dev`, the dev tool's Not found tab shows the same list from the file a production run left, with a field for the target and an Add redirect button on each path. It writes the same line to `kay.config.ts`. `kay dev` counts nothing itself, so the tab is empty until that file exists.
+
 Requests for `.php`, `.env` and similar files are ignored, as bots send them to every site. The list holds 1,000 paths; the least hit give way to new ones.
 
 ### Rewrite a request to another path

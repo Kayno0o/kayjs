@@ -16,6 +16,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `secret-prop` warns of a secret-looking field, as `user.passwordHash`, handed to an island ([islands](islands.md#props-to-an-island)).
 - `kay screenshot` and an MCP `screenshot` tool shoot a page of `kay dev`, with a diff, and `--cookie` shoots one behind a session ([tools](check-and-tools.md#screenshot-a-page)).
 - `kay not-found` lists the paths production found nothing at, with a target, and writes the redirect ([Redirects](routing.md#redirects)).
+- The dev tool's Not found tab lists the paths production found nothing at, and turns one into a redirect with a click ([dev server](dev-server.md)).
 - `deprecated-api-tool` is reported by `kay upgrade` of an app from before 1.51 alone: an app turning `mcp` on since gets no warning for routes that do not opt in ([Checks](checks.md)).
 - A stream an action answers with to a leaving row's handler or a `listen` callback closes with its island too ([actions from islands](api-from-islands.md)).
 - A streamed `await` part's island cleans up still in the page ([Streaming](rendering.md#streaming)).

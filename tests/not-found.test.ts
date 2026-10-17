@@ -4,9 +4,10 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
-import { answered, withRedirect } from '../src/commands/not-found'
 import { pages } from '../src/server'
+import { devNotFound, devRedirect } from '../src/server/dev-not-found'
 import { countedPath, countMissing, missingPaths, missingStore, pageRequested, referrerHost, suggester } from '../src/server/not-found'
+import { answered, withRedirect } from '../src/server/not-found-config'
 import { scratchDir } from './scratch'
 
 const known = ['/', '/about', '/blog/hello-world', '/blog/second-post', '/news/launch', '/fr/a-propos', '/fr/blog/hello-world']
@@ -457,5 +458,99 @@ describe('suggestions under trailingSlash always', () => {
       await app.handle(new Request('http://localhost/ABOUT/'))
 
     expect((await counted('/ABOUT')).target).toBe('/about/')
+  })
+})
+
+describe('the dev tool tab', () => {
+  async function recorded(redirects = 'redirects: { \'/done\': \'/about\' },\n  '): Promise<string> {
+    const root = await scratchDir('not-found-dev-')
+    const store = missingStore(join(root, 'data/not-found.sqlite'), false)
+
+    await Bun.write(join(root, 'kay.config.ts'), `export default {\n  ${redirects}favicon: false,\n}\n`)
+
+    for (const [path, hits, host] of [['/old', 3, 'a.example'], ['/other', 1, undefined], ['/done', 9, undefined]] as const) {
+      for (let index = 0; index < hits; index++)
+        store.hit(path, host, () => path === '/old' ? { target: '/new', reason: 'slug' } : undefined)
+    }
+
+    store.close()
+
+    return root
+  }
+
+  const post = (body: unknown, headers: Record<string, string> = { 'x-kay-dev': '1' }) => new Request('http://localhost/_kay/dev/not-found', { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body) })
+
+  it('lists the recorded paths most hit first, without those a redirect answers', async () => {
+    const listed = devNotFound(await recorded(), ['/done'])
+
+    expect(listed.recorded).toBe(true)
+    expect(listed.missing.map(row => [row.path, row.hits, row.target, row.referrers])).toEqual([['/old', 3, '/new', [{ host: 'a.example', hits: 3 }]], ['/other', 1, undefined, []]])
+  })
+
+  it('says there is no file when production left none', async () => {
+    expect(devNotFound(await scratchDir('not-found-dev-'), [])).toEqual({ file: 'data/not-found.sqlite', recorded: false, missing: [] })
+  })
+
+  it('writes the suggested redirect, or the one named, and forgets the path', async () => {
+    const root = await recorded()
+    const suggested = await devRedirect(root, post({ path: '/old' }), ['/done'])
+
+    expect(await suggested.json()).toEqual({ redirect: { from: '/old', to: '/new' } })
+    expect(await Bun.file(join(root, 'kay.config.ts')).text()).toContain('redirects: {\n    \'/old\': \'/new\',')
+    expect(devNotFound(root, ['/done']).missing.map(row => row.path)).toEqual(['/other'])
+
+    const named = await devRedirect(root, post({ path: '/other', to: 'https://example.com/x' }), ['/done', '/old'])
+
+    expect(await named.json()).toEqual({ redirect: { from: '/other', to: 'https://example.com/x' } })
+    expect(devNotFound(root, []).missing.map(row => row.path)).toEqual(['/done'])
+  })
+
+  it('refuses a request without the dev header, a cross-site one, a missing target, a bad target and a redirect that exists', async () => {
+    const root = await recorded()
+    const config = await Bun.file(join(root, 'kay.config.ts')).text()
+
+    expect((await devRedirect(root, post({ path: '/old' }, {}), [])).status).toBe(403)
+    expect((await devRedirect(root, post({ path: '/old' }, { 'x-kay-dev': '1', 'sec-fetch-site': 'cross-site' }), [])).status).toBe(403)
+
+    for (const [body, redirects, message] of [
+      [{ path: '/other' }, [], 'no suggested target'],
+      [{ path: '/other', to: 'javascript:alert(1)' }, [], 'is no target'],
+      [{ path: '/other', to: '/x\n' }, [], 'control character'],
+      [{ path: '/old' }, ['/old'], 'is a redirect already'],
+      [{ path: 3 }, [], 'texts'],
+    ] as const) {
+      const response = await devRedirect(root, post(body), [...redirects])
+
+      expect(response.status).toBe(400)
+      expect(((await response.json()) as { error: string }).error).toContain(message)
+    }
+
+    expect(await Bun.file(join(root, 'kay.config.ts')).text()).toBe(config)
+  })
+
+  it('tells when the config has no redirects object to write into', async () => {
+    const root = await recorded()
+
+    await Bun.write(join(root, 'kay.config.ts'), 'export default makeConfig()\n')
+    expect(((await (await devRedirect(root, post({ path: '/old' }), [])).json()) as { error: string }).error).toContain('add it by hand')
+  })
+
+  it('is served by a dev server alone', async () => {
+    const root = await recorded()
+    const script = join(root, 'serve.ts')
+
+    await Promise.all([
+      Bun.write(join(root, 'src/routes/index.kay'), 'h1 Home\n'),
+      Bun.write(script, `import { pages } from ${JSON.stringify(join(import.meta.dir, '../src/server'))}\n\nconst ask = async (app: { handle: (request: Request) => Promise<Response> }, method: string) => {\n  const response = await app.handle(new Request('http://localhost/_kay/dev/not-found', { method, headers: { 'x-kay-dev': '1', 'content-type': 'application/json' }, body: method === 'POST' ? JSON.stringify({ path: '/old' }) : undefined }))\n\n  return { status: response.status, body: response.headers.get('content-type')?.includes('json') ? await response.json() : undefined }\n}\nconst dev = await pages({ root: process.cwd(), prebuilt: false, security: false, dev: true, redirects: { '/done': '/about' } })\nconst listed = await ask(dev, 'GET')\nconst added = await ask(dev, 'POST')\nconst served = await pages({ root: process.cwd(), prebuilt: false, security: false })\n\nconsole.log(JSON.stringify({ listed, added, served: (await ask(served, 'GET')).status }))\nprocess.exit(0)\n`),
+    ])
+
+    const child = Bun.spawn([process.execPath, script], { cwd: root, env: { PATH: process.env.PATH! }, stdout: 'pipe', stderr: 'pipe' })
+    const [stdout, stderr] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+    const result = JSON.parse(stdout.trim().split('\n').at(-1)!) as { listed: { body: { missing: { path: string }[] } }, added: { status: number }, served: number }
+
+    expect(stderr).not.toContain('error')
+    expect(result.listed.body.missing.map(row => row.path)).toEqual(['/old', '/other'])
+    expect(result.added.status).toBe(200)
+    expect(result.served).toBe(404)
   })
 })

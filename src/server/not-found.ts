@@ -252,7 +252,7 @@ function firstSegment(path: string): string {
 }
 
 // The store in a SQLite file, so a restart or a deploy keeps the counts and the command reading them needs no server.
-export function missingStore(path: string): MissingStore {
+export function missingStore(path: string, closedByReload = true): MissingStore {
   const db: Database = openSqlite(path)
 
   db.run('CREATE TABLE IF NOT EXISTS kay_missing (path TEXT PRIMARY KEY, hits INTEGER NOT NULL, first_at INTEGER NOT NULL, last_at INTEGER NOT NULL, target TEXT, reason TEXT)')
@@ -272,7 +272,8 @@ export function missingStore(path: string): MissingStore {
   const removedHosts = db.query('DELETE FROM kay_missing_referrers WHERE path = ?')
 
   // A reload runs the module that opened the store again, which opens its own.
-  onReload(() => db.close())
+  if (closedByReload)
+    onReload(() => db.close())
 
   return {
     hit(path, referrer, suggest) {

@@ -32,7 +32,7 @@ import { serveBuildFiles } from './build-files'
 import { serveCards } from './card'
 import { compressResponse, fixedTexts } from './compress'
 import { remoteLimits } from './config-limits'
-import { DEV_A11Y, DEV_AXE, DEV_EVENTS, DEV_HEAD, DEV_INSPECTOR, DEV_OPEN, DEV_PATCH, DEV_ROUTES, DEV_SIZES, DEV_TOOL, devA11y, devAxe, devEvents, devInspector, devPatch, devRoutes, devTool, devToolFile, devToolFiles, followBuilds, hotSwap, openInEditor, recordResponses, refuseForeignHosts, rememberBoot, trackRunning } from './dev'
+import { DEV_A11Y, DEV_AXE, DEV_EVENTS, DEV_HEAD, DEV_INSPECTOR, DEV_NOT_FOUND, DEV_OPEN, DEV_PATCH, DEV_ROUTES, DEV_SIZES, DEV_TOOL, devA11y, devAxe, devEvents, devInspector, devPatch, devRoutes, devTool, devToolFile, devToolFiles, followBuilds, hotSwap, openInEditor, recordResponses, refuseForeignHosts, rememberBoot, trackRunning } from './dev'
 import { clearDevErrorsOnAnswer } from './dev-errors'
 import { claimEndpoints } from './endpoint-claims'
 import { serveEndpoints } from './endpoints'
@@ -308,6 +308,11 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
     const { devSizes } = await import('./dev-sizes')
 
     app.get(DEV_SIZES, async ({ request }) => devSizes(request, { table, match: routeMatch(table, matchers, options.trailingSlash), base, reports: [paths.report, paths.report.replace(JSON_EXTENSION, '-static.json')] }))
+    const { devNotFound, devRedirect } = await import('./dev-not-found')
+    const redirected = Object.keys(options.redirects ?? {})
+
+    app.get(DEV_NOT_FOUND, () => Response.json(devNotFound(root, redirected)))
+    app.post(DEV_NOT_FOUND, async ({ request }) => devRedirect(root, request, redirected))
     app.get(DEV_ROUTES, () => Response.json(devRoutes(root, routes, endpoints, api.mounted, i18n?.settings, base, { claims: served.kay(), extensions: mountedByExtensions, notes: options.seo !== undefined && site === undefined ? [NO_ORIGIN_NOTE] : [] })))
   }
 

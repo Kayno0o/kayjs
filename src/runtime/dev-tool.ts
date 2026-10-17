@@ -1,6 +1,7 @@
+import type { DevHead, DevRequest, DevResponse, DevRoute, DevRoutes } from '../server/dev'
 // Loaded by every page a dev server serves: a bar in a corner of the page opens a drawer whose tabs show what kay knows of the page, its problems first; under `kay dev` the inspector adds its own tab and buttons.
 // It runs in the browser from its own route, so it imports types only; its elements live in a shadow root on the root element, which a page swap keeps, styled by an adopted stylesheet, which a policy without inline styles allows.
-import type { DevHead, DevRequest, DevResponse, DevRoute, DevRoutes } from '../server/dev'
+import type { DevNotFound } from '../server/dev-not-found'
 import type { DevProblem, DevProblems } from './dev-boot'
 
 const HOST = 'kay-dev'
@@ -15,6 +16,7 @@ const MODULE_START = 'export default '
 const HEAD_HEADER = 'x-kay-dev'
 const REQUEST_URL = '/_kay/dev/request'
 const SIZES_URL = '/_kay/dev/sizes'
+const NOT_FOUND_URL = '/_kay/dev/not-found'
 // The navigations the Network tab keeps: the page's load, then each swap.
 const MAX_NAVIGATIONS = 5
 // The most requests one navigation lists, the rest counted.
@@ -379,7 +381,7 @@ function worstTone(bad: string[]): 'error' | 'warn' | undefined {
 }
 
 // The tabs kay makes itself; those a library adds sit under a line.
-const CORE_TABS = new Set(['problems', 'request', 'network', 'head', 'env', 'images', 'performance', 'routes', 'i18n', 'islands'])
+const CORE_TABS = new Set(['problems', 'request', 'network', 'head', 'env', 'images', 'performance', 'routes', 'i18n', 'islands', 'not-found'])
 
 // A small rounded label, tinted by what it counts or says, with an icon before it when given.
 function pill(tool: Pick<DevTool, 'make' | 'icon'>, text: string, tone?: 'error' | 'warn' | 'ok' | 'accent', icon?: DevIconName): HTMLElement {
@@ -1201,6 +1203,7 @@ export function startDevTool(doc: Document = document): DevTool {
   performanceTab(doc, tool, vitals, listening.signal)
   routesTab(doc, tool, listening.signal)
   i18nTab(doc, tool, missing, listening.signal)
+  notFoundTab(doc, tool, listening.signal)
   doc.addEventListener('click', (event) => {
     const target = event.target instanceof Element ? event.target.closest<HTMLButtonElement>('button[data-kay-open],button[data-kay-copy]') : null
 
@@ -3081,6 +3084,98 @@ function routesTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
   const tab = tool.tab({ id: 'routes', label: 'Routes', icon: 'route', shown: () => void list() })
 
   tab.panel.append(bar.element, body)
+  win.addEventListener(BUILT_EVENT, () => {
+    if (tab.panel.hidden === false)
+      void list()
+  }, { signal })
+}
+
+const REFERRER_LIMIT = 3
+
+// The paths a production run recorded visitors found nothing at, most hit first, each with the hosts they came from and the target kay suggests; a click writes the redirect into kay.config.ts, as `kay not-found --redirect` does. Fetched as the tab shows and again after each restart.
+function notFoundTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
+  const win = doc.defaultView!
+  const body = tool.make('div', 'list')
+  const status = tool.make('div', 'note')
+  let asked = 0
+  let reread: () => void = () => undefined
+  const tab = tool.tab({ id: 'not-found', label: 'Not found', icon: 'circle-x', shown: () => reread() })
+  const redirect = async (path: string, to: string, row: HTMLElement) => {
+    try {
+      const response = await ownFetch(win, NOT_FOUND_URL, { method: 'POST', headers: { 'content-type': 'application/json', [HEAD_HEADER]: '1' }, body: JSON.stringify({ path, ...to === '' ? {} : { to } }), cache: 'no-store' })
+      const answer = await response.json() as { error?: string, redirect?: { from: string, to: string } }
+
+      if (!response.ok || answer.redirect === undefined)
+        throw new Error(answer.error ?? `the server answered ${response.status}`)
+
+      status.textContent = `Added to kay.config.ts: ${answer.redirect.from} to ${answer.redirect.to}. kay dev restarts to serve it.`
+      row.remove()
+    }
+    catch (error) {
+      status.textContent = `Could not add the redirect: ${error instanceof Error ? error.message : String(error)}`
+    }
+  }
+  const missingRow = (missing: DevNotFound['missing'][number]) => {
+    const input = tool.make('input', 'filter')
+    const add = tool.make('button', 'tool', 'Add redirect')
+    const actions = tool.make('div', 'actions')
+    const row = entry(tool, 'missing', {
+      name: missing.path,
+      after: [pill(tool, `${missing.hits} hit${missing.hits === 1 ? '' : 's'}`, 'accent')],
+      chips: missing.referrers.slice(0, REFERRER_LIMIT).map(({ host }) => `from ${host}`).concat(missing.referrers.length > REFERRER_LIMIT ? ['...'] : []),
+      note: missing.target === undefined ? 'No target suggested: name one to redirect.' : `Suggested target (${missing.reason}): ${missing.target}`,
+    })
+
+    input.type = 'text'
+    input.value = missing.target ?? ''
+    input.placeholder = '/new-path'
+    input.setAttribute('aria-label', `Redirect target of ${missing.path}`)
+    add.type = 'button'
+    add.onclick = async () => {
+      add.disabled = true
+      await redirect(missing.path, input.value.trim(), row)
+      add.disabled = false
+    }
+    actions.append(input, add)
+    row.querySelector('.body')!.append(actions)
+
+    return filterable(row, missing.path)
+  }
+  const bar = toolbar(tool, 'Filter by path', () => bar.apply(body))
+  const list = async () => {
+    const ask = ++asked
+
+    try {
+      const response = await ownFetch(win, NOT_FOUND_URL, { cache: 'no-store' })
+
+      if (!response.ok)
+        throw new Error(`the server answered ${response.status}`)
+
+      const listed = await response.json() as DevNotFound
+
+      if (ask !== asked)
+        return
+
+      tab.count(listed.missing.length)
+      bar.element.hidden = listed.missing.length === 0
+
+      if (!listed.recorded)
+        body.replaceChildren(tool.make('div', 'empty', `No ${listed.file} here: the production server records the pages visitors asked for and found nothing at, and kay dev records none.`))
+      else if (listed.missing.length === 0)
+        body.replaceChildren(tool.make('div', 'empty', 'Every recorded path has a redirect.'))
+      else
+        body.replaceChildren(...listed.missing.map(missingRow), bar.empty)
+
+      bar.apply(body)
+    }
+    catch (error) {
+      if (ask === asked)
+        body.replaceChildren(tool.make('div', 'empty', `Could not list the missing paths: ${error instanceof Error ? error.message : String(error)}`))
+    }
+  }
+
+  reread = () => void list()
+  tab.panel.append(bar.element, status, body)
   win.addEventListener(BUILT_EVENT, () => {
     if (tab.panel.hidden === false)
       void list()

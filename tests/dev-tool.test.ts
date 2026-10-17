@@ -320,7 +320,7 @@ describe('the dev tool', () => {
     const icons = () => [...shadow().querySelectorAll<HTMLButtonElement>('.head .icon')].map(button => [button.getAttribute('aria-label'), button.title, button.textContent])
 
     expect(rail.getAttribute('aria-orientation')).toBe('vertical')
-    expect([...rail.querySelectorAll('[role=tab]')].map(tab => tab.id)).toEqual(['problems', 'request', 'network', 'head', 'env', 'images', 'performance', 'routes', 'other'].map(id => `kay-dev-tab-${id}`))
+    expect([...rail.querySelectorAll('[role=tab]')].map(tab => tab.id)).toEqual(['problems', 'request', 'network', 'head', 'env', 'images', 'performance', 'routes', 'not-found', 'other'].map(id => `kay-dev-tab-${id}`))
     expect(icons()).toEqual([['Copy this tab as Markdown', 'Copy this tab as Markdown', ''], ['Float', 'Float', ''], ['Dock to the bottom', 'Dock to the bottom', ''], ['Dock to the right', 'Dock to the right', ''], ['Fill the window', 'Fill the window', ''], ['Close', 'Close', '']])
 
     key({ key: 'K', code: 'KeyK', altKey: true, shiftKey: true })
@@ -888,6 +888,56 @@ describe('the dev tool', () => {
     finally {
       fetching.mockRestore()
       happyDOM.setURL(href)
+    }
+  })
+
+  it('lists the paths visitors found nothing at, each with its hosts and target, and turns one into a redirect, saying why it could not', async () => {
+    const calls: [string, string | undefined][] = []
+    let recorded = true
+    let refuse: string | undefined
+    const missing = [
+      { path: '/old', hits: 3, firstAt: 1, lastAt: 2, target: '/new', reason: 'slug', referrers: [{ host: 'a.example', hits: 3 }] },
+      { path: '/other', hits: 1, firstAt: 1, lastAt: 2, referrers: [] },
+    ]
+    const fetching = spyOn(window, 'fetch').mockImplementation((async (url: string, init?: RequestInit) => {
+      calls.push([`${init?.method ?? 'GET'} ${url}`, init?.body as string | undefined])
+
+      if (init?.method === 'POST')
+        return refuse === undefined ? Response.json({ redirect: { from: '/old', to: '/new' } }) : Response.json({ error: refuse }, { status: 400 })
+
+      return Response.json({ file: 'data/not-found.sqlite', recorded, missing: recorded ? missing : [] })
+    }) as unknown as typeof window.fetch)
+    const rows = () => [...shadow().querySelectorAll('#kay-dev-not-found .missing')].map(row => [row.querySelector('.name')!.textContent, row.querySelector('.pill')!.textContent, row.querySelector('.chips')?.textContent ?? '', row.querySelector('input')!.value, row.querySelector('.body > .note')!.textContent].join(' | '))
+
+    try {
+      tool = startDevTool()
+      shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-not-found')!.click()
+      await Bun.sleep(0)
+
+      expect(rows()).toEqual(['/old | 3 hits | from a.example | /new | Suggested target (slug): /new', '/other | 1 hit |  |  | No target suggested: name one to redirect.'])
+
+      const add = (index: number) => shadow().querySelectorAll<HTMLButtonElement>('#kay-dev-not-found .missing button.tool')[index]!
+
+      refuse = '/other has no suggested target'
+      add(1).click()
+      await Bun.sleep(0)
+      expect(shadow().querySelector('#kay-dev-not-found > .note')?.textContent).toBe('Could not add the redirect: /other has no suggested target')
+      expect(rows()).toHaveLength(2)
+
+      refuse = undefined
+      add(0).click()
+      await Bun.sleep(0)
+      expect(calls.at(-1)).toEqual(['POST /_kay/dev/not-found', JSON.stringify({ path: '/old', to: '/new' })])
+      expect(shadow().querySelector('#kay-dev-not-found > .note')?.textContent).toContain('Added to kay.config.ts')
+      expect(rows()).toHaveLength(1)
+
+      recorded = false
+      window.dispatchEvent(new CustomEvent('kay-dev-built', { detail: JSON.stringify({ changed: 'kay.config.ts', ms: 1 }) }))
+      await Bun.sleep(0)
+      expect(shadow().querySelector('#kay-dev-not-found .empty')?.textContent).toContain('kay dev records none')
+    }
+    finally {
+      fetching.mockRestore()
     }
   })
 
