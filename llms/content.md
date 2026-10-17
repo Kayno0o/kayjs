@@ -283,6 +283,7 @@ article
 
 - `localized: true` keeps each entry in a folder named after its locale, `fr/hello.md` and `en/hello.md` being translations of one entry, slug `hello`, with `i18n` in kay.config.ts (see locales).
 - `all()` and `get(slug)` read the request's locale, the default locale's entry standing in for one the locale lacks or keeps as a draft; `entry.locale` names the folder it came from and `entry.translations` the locales holding the slug.
+- `translation(entry, locale)` gives the entry of that locale paired with `entry` by slug or `translationKey`, whatever its own slug, or undefined, with no fallback: a language switcher links `entry.translations` through it.
 - Either takes a locale as last argument; outside a request `all()` gives every locale's entries and `get(slug, locale)` reads that locale's alone, with no fallback.
 - A page prerendering or listing the collection in its sitemap gets each slug once, in every locale.
 - The feed is served once per locale, `/en/blog/rss.xml`, listing only the entries written in it, its links in that locale; with domains each host serves its own at the path.

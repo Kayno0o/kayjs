@@ -130,6 +130,8 @@ export interface Collection<Data, Components extends Record<string, Component<ne
   all: (locale?: string) => Promise<Entry<Data>[]>
   // The entry with that slug, or undefined; in a localized collection the request's locale's or the one given.
   get: (slug: string, locale?: string) => Promise<Entry<Data> | undefined>
+  // In a localized collection, the entry of that locale paired with this one by slug or `translationKey`, whatever its own slug, or undefined when the locale has none: for a language switcher, with no fallback to the default locale.
+  translation: (entry: { slug: string, data: unknown }, locale: string) => Promise<Entry<Data> | undefined>
   // Loads the entries afresh on the next read: for a webhook a CMS calls once an entry changed. A loader's `store` passes it to every process sharing it.
   invalidate: () => void
 }
@@ -323,6 +325,11 @@ export function collection<Schema extends TSchema, Components extends Record<str
       const fallback = localeState()?.settings.defaultLocale
 
       const found = wanted === undefined ? shown(bySlug.get(slug)) : shown(byLocale.get(wanted)?.get(slug)) ?? (fallback === undefined ? undefined : shown(byLocale.get(fallback)?.get(slug)))
+
+      return found && editableEntries(name, [found])[0]
+    },
+    translation: async (entry, locale) => {
+      const found = shown((await loaded()).paired.get(locale)?.get(translationKey(entry)))
 
       return found && editableEntries(name, [found])[0]
     },

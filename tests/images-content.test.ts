@@ -388,6 +388,14 @@ describe('entry slugs', () => {
         'en/same': ['en', 'fr'],
         'fr/same': ['en', 'fr'],
       })
+
+      const [hello] = await posts.all('en').then(all => all.filter(found => found.slug === 'hello-world'))
+
+      expect((await posts.translation(hello!, 'fr'))?.slug).toBe('bonjour-le-monde')
+      expect((await posts.translation(hello!, 'en'))?.slug).toBe('hello-world')
+      expect(await posts.translation(hello!, 'de')).toBeUndefined()
+      expect(await posts.translation(hello!, 'it')).toBeUndefined()
+      expect((await posts.translation({ slug: 'same', data: {} }, 'fr'))?.slug).toBe('same')
     }
     finally {
       await restore()

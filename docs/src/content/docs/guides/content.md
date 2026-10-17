@@ -216,7 +216,7 @@ On a site with `i18n`, `localized: true` keeps each entry in a folder named afte
 
 `kay i18n translate fr` from the kayjs-ai library writes the entries `fr` lacks, as drafts (see [kayjs-ai](/libraries/kayjs-ai#translate-what-is-missing)).
 
-`entry.translations` lists the locales that have an entry with the slug. Use it for a language switcher that shows only the languages a post exists in.
+`entry.translations` lists the locales that have an entry with the slug. Use it for a language switcher that shows only the languages a post exists in. `posts.translation(post, 'fr')` gives the `fr` entry paired with it, whatever slug that one set, so the switcher can link to it.
 
 ```kay
 for code of post.translations ?? []
