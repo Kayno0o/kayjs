@@ -23,9 +23,15 @@ async function headed(): Promise<string | undefined> {
   if (entry === undefined)
     return undefined
 
-  const response = await fetch(entry, { method: 'HEAD', cache: 'no-store' })
+  try {
+    const response = await fetch(entry, { method: 'HEAD', cache: 'no-store' })
 
-  return response.headers.get(BUILD_HEADER) ?? undefined
+    return response.headers.get(BUILD_HEADER) ?? undefined
+  }
+  catch {
+    // An entry on another origin cannot be asked: the page itself can.
+    return undefined
+  }
 }
 
 // The build the server answers now: the header every answer of a production server carries, else, for a static host, the build its page for this URL names.

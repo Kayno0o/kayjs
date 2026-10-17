@@ -109,10 +109,14 @@ function forgedBuild() {
   const forged = { build: undefined as string | undefined, only: undefined as RegExp | undefined, seen: [] as string[] }
   const plugin = new Elysia()
     .onRequest(({ request }) => {
-      forged.seen.push(`${request.method} ${new URL(request.url).pathname}${new URL(request.url).search}`)
+      const { pathname, search } = new URL(request.url)
+
+      forged.seen.push(`${request.method} ${pathname}${search}`)
     })
     .mapResponse({ as: 'global' }, ({ request, responseValue }) => {
-      if (forged.build === undefined || !(responseValue instanceof Response) || !(forged.only ?? /./).test(new URL(request.url).pathname + new URL(request.url).search))
+      const { pathname, search } = new URL(request.url)
+
+      if (forged.build === undefined || !(responseValue instanceof Response) || !(forged.only ?? /./).test(pathname + search))
         return undefined
 
       const headers = new Headers(responseValue.headers)
@@ -123,6 +127,18 @@ function forgedBuild() {
     })
 
   return { forged, plugin }
+}
+
+// The requests for the page itself, which the browser makes through the proxy of a base as at the root.
+function pageRequests(seen: string[]): string[] {
+  return seen.filter(request => request === 'GET /')
+}
+
+async function until(condition: () => boolean): Promise<void> {
+  for (let tries = 0; tries < 100 && !condition(); tries++)
+    await Bun.sleep(50)
+
+  expect(condition()).toBe(true)
 }
 
 describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a page told of another build by an answer', () => {
@@ -179,19 +195,25 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a page tol
         try {
           const page = await opened(site, base)
 
+          // What a click costs while no deploy happened.
+          forged.seen.length = 0
+          await page.click('button.bump')
+          await until(() => forged.seen.includes('GET /'))
+          await Bun.sleep(300)
+
+          const refreshed = pageRequests(forged.seen).length
+
           forged.build = 'otherbuild'
           forged.seen.length = 0
           await page.click('button.bump')
-          await page.waitUntil(() => true)
+          await until(() => forged.seen.some(request => request.startsWith('HEAD ')))
 
-          const probed = () => forged.seen.filter(request => request.startsWith('HEAD '))
+          const probes = forged.seen.filter(request => request.startsWith('HEAD '))
 
-          for (let tries = 0; tries < 100 && probed().length === 0; tries++)
-            await Bun.sleep(50)
-
-          expect(probed()).toHaveLength(1)
-          expect(probed()[0]).toContain('/_kay/')
-          expect(forged.seen.filter(request => request.startsWith('GET ') && request.includes('/stale'))).toEqual([])
+          expect(probes).toHaveLength(1)
+          expect(probes[0]).toContain('/_kay/')
+          // Only the requests the island's own refresh makes, which a probe fetching the page would add one to.
+          expect(pageRequests(forged.seen)).toHaveLength(refreshed)
 
           await page.click('a.second')
           await page.waitFor('h1', { text: 'Second' })
@@ -210,15 +232,20 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a page tol
         try {
           const page = await opened(site, base)
 
+          forged.seen.length = 0
+          await page.click('button.bump')
+          await until(() => forged.seen.includes('GET /'))
+          await Bun.sleep(300)
+
+          const refreshed = pageRequests(forged.seen).length
+
           forged.build = 'otherbuild'
           forged.only = /\/_kay\/action\//
           forged.seen.length = 0
           await page.click('button.bump')
 
-          for (let tries = 0; tries < 100 && !forged.seen.some(request => request.startsWith('HEAD ')); tries++)
-            await Bun.sleep(50)
-
-          expect(forged.seen.some(request => request.startsWith('HEAD '))).toBe(true)
+          await until(() => forged.seen.some(request => request.startsWith('HEAD ')))
+          expect(pageRequests(forged.seen)).toHaveLength(refreshed)
           await page.click('a.second')
           await page.waitFor('h1', { text: 'Second' })
 
