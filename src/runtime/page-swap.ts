@@ -169,7 +169,7 @@ function policyOf(swap: Swap): Policy {
   if (swap.scroll && policy.scroll !== 'saved')
     policy.scroll = swap.scroll
 
-  if (swap.noTransition)
+  if (swap.transition === false)
     policy.transition = false
 
   return policy
@@ -177,6 +177,9 @@ function policyOf(swap: Swap): Policy {
 
 export async function go(url: URL, swap: Swap): Promise<void> {
   navigation.flush?.()
+
+  if (swap.link)
+    swap = { ...swap, scroll: swap.link.closest('[data-keep-scroll]') ? 'keep' : undefined, transition: !swap.link.closest('[data-no-transition]') }
 
   const token = ++navigation.current
 

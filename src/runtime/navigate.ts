@@ -119,9 +119,7 @@ export async function navigate(to: string | { query: QueryChanges }, options: Na
     return
   }
 
-  const own = { replace: options.replace, scroll: options.scroll, noTransition: options.transition === false }
-
-  await follow(url, typeof to === 'string' ? { intent: 'visit', ...own } : { intent: 'query', ...own, focused: document.activeElement })
+  await follow(url, typeof to === 'string' ? { ...options, intent: 'visit' } : { ...options, intent: 'query', focused: document.activeElement })
 }
 
 // Runs the page's loads again and shows what they return, keeping scroll, focus and every island whose props did not change.
@@ -216,7 +214,7 @@ function onClick(event: MouseEvent): void {
     return
 
   event.preventDefault()
-  void followAsked(url, { intent: 'visit', scroll: link.closest('[data-keep-scroll]') ? 'keep' : undefined, noTransition: Boolean(link.closest('[data-no-transition]')) })
+  void followAsked(url, { intent: 'visit', link })
 }
 
 async function followAsked(url: URL, swap: Swap): Promise<void> {
