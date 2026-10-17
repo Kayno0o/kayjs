@@ -28,7 +28,7 @@ a.skip-link(href="#content") Skip to the content
         a.repository(href={REPOSITORY} aria-label="kay's repository")
           Icon(icon={BrandGithub})
         ThemePicker(persist)
-      Search(persist nav={nav})
+      Search(persist groups={nav.groups} structure={nav.structure} components={nav.components})
       // Shown once the sidebar folds into a popover.
       Button(class="hidden max-[56rem]:inline-flex" label="Menu" icon="menu" popovertarget="sidebar")
     nav#sidebar.sidebar(popover aria-label="Documentation")
