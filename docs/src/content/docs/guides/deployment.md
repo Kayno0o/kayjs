@@ -19,7 +19,7 @@ bun run build
 NODE_ENV=production bun src/server.ts
 ```
 
-Without `NODE_ENV=production` the server warns at boot. It would bundle its browser code as it starts, and its API would answer a refused request with the schema it failed.
+Without `NODE_ENV=production` the server warns at boot. It would bundle its browser code as it starts, and its API would answer a refused request with the schema it failed. A name such as `staging` warns too: only `production` turns on the request log and compression, so set `NODE_ENV=production` everywhere the app is deployed and tell environments apart with another variable.
 
 To try a build before deploying, run `kay start`. It runs the last build on your machine, or the executable when the build compiled one.
 

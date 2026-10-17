@@ -125,6 +125,7 @@ Then `await welcomeMails.enqueue({ to: email })` in an action, or `enqueue(paylo
 
 ### Request logs
 
+- A server started with a NODE_ENV that is none of `development`, `production` and `test`, such as `staging`, warns once as it boots: only `production` turns on the request log, compression, the prebuilt browser bundle and the https fallback to the site's origin, so any other name runs without them; set `NODE_ENV=production` on every deployed environment and tell them apart with another variable.
 - A server started with no NODE_ENV warns as it boots, as it then bundles its browser code at boot and Elysia answers a refused API request with the schema it failed: set NODE_ENV=production where the app is deployed.
 - With NODE_ENV=production, a server's first line, once `.listen()` started it, says where it listens and what runs: `kay: listening on http://localhost:3000, kay 1.30.0 in production, 12 pages prerendered`.
 - Then every request kay or the app's routes registered after `.use(await pages())` answer is logged to stdout as one line: `GET /blog/hello 200 12ms AZnLe0vUe9qD0uXq9vLwZw`, the method, the path without its query string, which may carry tokens, the status, the milliseconds until the response was made, a streamed one's headers, and the request's id.

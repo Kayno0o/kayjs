@@ -620,6 +620,34 @@ console.log(JSON.stringify(seen))
     }
   })
 
+  it('warns a server started with a NODE_ENV kay does not know, naming what it runs without, and not for the three it does', async () => {
+    const warn = spyOn(console, 'warn').mockImplementation(() => undefined)
+    const env = process.env.NODE_ENV ?? 'test'
+    const warned = () => warn.mock.calls.filter(([message]) => String(message).includes('which kay does not know'))
+
+    try {
+      for (const name of ['staging', 'prod', '']) {
+        process.env.NODE_ENV = name
+        warn.mockClear()
+        await pages({ routes: ROUTES, prebuilt: false })
+        expect(warned()).toHaveLength(1)
+        expect(String(warned()[0]![0])).toContain('without the production defaults')
+        expect(String(warned()[0]![0])).toContain('compresses nothing')
+      }
+
+      for (const name of ['production', 'development', 'test']) {
+        process.env.NODE_ENV = name
+        warn.mockClear()
+        await pages({ routes: ROUTES, prebuilt: false })
+        expect(warned()).toHaveLength(0)
+      }
+    }
+    finally {
+      process.env.NODE_ENV = env
+      warn.mockRestore()
+    }
+  })
+
   it('warns once, on a production server, when it signs with the key of the process alone', async () => {
     const warned = async (secret: string) => {
       const script = `import { setLogSink } from ${JSON.stringify(join(import.meta.dir, '../src/runtime/log.ts'))}
