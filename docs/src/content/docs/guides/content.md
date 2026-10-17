@@ -183,7 +183,7 @@ export const posts = collection('content/posts', {
 })
 ```
 
-Add `format: 'atom'` for an Atom feed. `limit` is how many of the newest items it holds, 20 by default. `description` and `author` fill the feed's header, and Atom needs an author, so it uses the title when you set none. Return `undefined` from `item` to leave an entry out.
+Add `format: 'atom'` for an Atom feed. `limit` is how many of the newest items it holds, 20 by default. `description` and `author` fill the feed's header, and Atom needs an author, so it uses the title when you set none. Return `undefined` from `item` to leave an entry out. Item links and guids are written as `trailingSlash` writes the page's address, so they match its canonical URL.
 
 A link in a layout lets readers find the feed, and `kay check` accepts it when the path is written out.
 

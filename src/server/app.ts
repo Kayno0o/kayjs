@@ -354,7 +354,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   serveFiles(app, security)
   serveImages(app, imageRoute)
   serveCards(app, cards, imageRoute)
-  serveFeeds(app, served, collections, site, mode.dev, i18n)
+  serveFeeds(app, served, collections, site, mode.dev, i18n, options.trailingSlash)
   const editSite = { urls: entryUrls(routes, base, options.trailingSlash, i18n?.settings), locales: i18n?.settings.locales }
 
   registerEditSite(editSite)

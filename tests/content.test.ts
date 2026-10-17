@@ -232,6 +232,38 @@ describe('feeds', () => {
     expect(xml).toContain('<entry><title>A &lt;b>bold&lt;/b> move</title><link href="https://x.example/a"/><id>https://x.example/a</id><updated>2026-01-02T00:00:00.000Z</updated></entry>')
   })
 
+  describe('write links as trailingSlash writes the canonical URL', () => {
+    const entry = { slug: 'a', data: {}, headings: [], words: 0, readingTime: 0, Content: () => ({ t: '' }), file: 'a.md' }
+    const feed = (format: 'rss' | 'atom') => ({ path: '/feed.xml', title: 'T', format, item: () => ({ title: 'A', path: '/blog/a', date: new Date('2026-01-02') }) })
+
+    it.each(['rss', 'atom'] as const)('under always, in %s and under a base, a localized home too', (format) => {
+      const xml = feedXml([entry], feed(format), 'https://x.example/app', '/fr/', 'always')
+
+      expect(xml).toContain('https://x.example/app/blog/a/')
+      expect(xml).not.toContain('https://x.example/app/blog/a<')
+      expect(xml).not.toContain('https://x.example/app/blog/a"')
+      expect(xml).toContain('https://x.example/app/fr/')
+      expect(xml).toContain('https://x.example/app/feed.xml')
+    })
+
+    it.each(['never', 'ignore', undefined] as const)('as written under %s', (trailingSlash) => {
+      const xml = feedXml([entry], feed('rss'), 'https://x.example', '/', trailingSlash)
+
+      expect(xml).toContain('<guid>https://x.example/blog/a</guid>')
+    })
+
+    it('when served', async () => {
+      const posts = collection({ name: 'feed-slash', load: () => [{ slug: 'a', data: {} }] }, { schema: t.Object({}), feed: { path: '/slash.xml', title: 'S', item: entry => ({ title: 'A', path: `/${entry.slug}`, date: new Date('2026-01-01') }) } })
+      const feeds = new Elysia()
+
+      serveFeeds(feeds, new ServedPaths(), [posts], 'https://x.example', false, undefined, 'always')
+
+      const xml = await (await feeds.handle(new Request('http://localhost/slash.xml'))).text()
+
+      expect(xml).toContain('<guid>https://x.example/a/</guid>')
+    })
+  })
+
   it('need the site\'s URL, and a content config kay.config.ts names must exist', async () => {
     await expect(pages({ routes, content: 'tests/fixtures/content/src/missing.config.ts', prebuilt: false })).rejects.toThrow('names tests/fixtures/content/src/missing.config.ts as the content config, and there is no such file')
     await expect(pages({ routes, content, prebuilt: false })).rejects.toThrow('has a feed, whose links need the site\'s URL')

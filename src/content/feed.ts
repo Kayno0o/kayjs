@@ -1,6 +1,8 @@
+import type { TrailingSlash } from '../config'
 import type { Entry } from './index'
 import { KayError } from '../compiler/errors'
 import { escape as escapeHtml, escapeAttribute as escapeHtmlAttribute } from '../runtime/escape'
+import { slashedPath } from '../server/routes'
 
 export interface FeedItem {
   title: string
@@ -31,8 +33,8 @@ const DEFAULT_LIMIT = 20
 // eslint-disable-next-line no-control-regex
 const INVALID_XML = /[\u0000-\u0008\v\f\u000E-\u001F\uFFFE\uFFFF]/g
 
-// The feed's XML: its items newest first, every link absolute on the site's origin, the site's own at `home`, its locale's home page for a localized feed.
-export function feedXml<Data>(entries: Entry<Data>[], options: FeedOptions<Data>, origin: string, home = '/'): string {
+// The feed's XML: its items newest first, every link absolute on the site's origin and written as `trailingSlash` writes a page's canonical URL, the site's own at `home`, its locale's home page for a localized feed.
+export function feedXml<Data>(entries: Entry<Data>[], options: FeedOptions<Data>, origin: string, home = '/', trailingSlash?: TrailingSlash): string {
   const items = entries.flatMap((entry) => {
     const item = options.item(entry)
 
@@ -49,13 +51,13 @@ export function feedXml<Data>(entries: Entry<Data>[], options: FeedOptions<Data>
     return `<?xml version="1.0" encoding="utf-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom">
 <title>${escape(options.title)}</title>${options.description === undefined ? '' : `\n<subtitle>${escape(options.description)}</subtitle>`}
-<link href="${escapeAttribute(origin + home)}"/>
+<link href="${escapeAttribute(origin + slashedPath(home, trailingSlash))}"/>
 <link rel="self" href="${escapeAttribute(self)}"/>
 <id>${escape(self)}</id>
 <updated>${updated.toISOString()}</updated>
 <author><name>${escape(options.author ?? options.title)}</name></author>
 ${items.map((item) => {
-  const link = origin + item.path
+  const link = origin + slashedPath(item.path, trailingSlash)
 
   return `<entry><title>${escape(item.title)}</title><link href="${escapeAttribute(link)}"/><id>${escape(link)}</id><updated>${item.date.toISOString()}</updated>${item.description === undefined ? '' : `<summary>${escape(item.description)}</summary>`}${item.author === undefined ? '' : `<author><name>${escape(item.author)}</name></author>`}</entry>`
 }).join('\n')}
@@ -67,12 +69,12 @@ ${items.map((item) => {
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
 <channel>
 <title>${escape(options.title)}</title>
-<link>${escape(origin + home)}</link>
+<link>${escape(origin + slashedPath(home, trailingSlash))}</link>
 <description>${escape(options.description ?? options.title)}</description>
 <atom:link href="${escapeAttribute(self)}" rel="self" type="application/rss+xml"/>
 <lastBuildDate>${updated.toUTCString()}</lastBuildDate>
 ${items.map((item) => {
-  const link = origin + item.path
+  const link = origin + slashedPath(item.path, trailingSlash)
 
   return `<item><title>${escape(item.title)}</title><link>${escape(link)}</link><guid>${escape(link)}</guid><pubDate>${item.date.toUTCString()}</pubDate>${item.description === undefined ? '' : `<description>${escape(item.description)}</description>`}${item.author === undefined ? '' : `<dc:creator xmlns:dc="http://purl.org/dc/elements/1.1/">${escape(item.author)}</dc:creator>`}</item>`
 }).join('\n')}

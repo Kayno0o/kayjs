@@ -1,4 +1,5 @@
 import type { Elysia } from 'elysia'
+import type { TrailingSlash } from '../config'
 import type { I18n } from '../server/i18n'
 import type { ServedPaths } from '../server/served-paths'
 import type { CollectionFeed } from './claims'
@@ -147,7 +148,7 @@ function collectionFeed(collection: Collection<unknown>): CollectionFeed {
 
 // Serves each collection's feed at its path; one stays cached for an hour in production.
 // A localized collection's feed lists only the entries written in its locale, linking each at its path there.
-export function serveFeeds(app: Elysia, served: ServedPaths, collections: Collection<unknown>[], origin: string | undefined, dev = false, i18n?: I18n): void {
+export function serveFeeds(app: Elysia, served: ServedPaths, collections: Collection<unknown>[], origin: string | undefined, dev = false, i18n?: I18n, trailingSlash?: TrailingSlash): void {
   for (const collection of collections) {
     const { feed } = collection.options
 
@@ -179,7 +180,7 @@ export function serveFeeds(app: Elysia, served: ServedPaths, collections: Collec
         if (!i18n || collection.options.localized !== true) {
           const entries = await collection.all()
 
-          return new Response(once('', entries, () => feedXml(entries, feed, origin)), { headers })
+          return new Response(once('', entries, () => feedXml(entries, feed, origin, '/', trailingSlash)), { headers })
         }
 
         const { settings } = i18n
@@ -194,7 +195,7 @@ export function serveFeeds(app: Elysia, served: ServedPaths, collections: Collec
             return item && { ...item, path: localePath(settings, item.path, written, host) }
           } }
 
-          return new Response(once(written, entries, () => feedXml(entries, localized, host === undefined ? origin : onHost(origin, host), localePath(settings, '/', written, host))), { headers })
+          return new Response(once(written, entries, () => feedXml(entries, localized, host === undefined ? origin : onHost(origin, host), localePath(settings, '/', written, host), trailingSlash)), { headers })
         })
       })
     }

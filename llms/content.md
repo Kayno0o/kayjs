@@ -273,7 +273,7 @@ article
 
 #### Feeds
 
-- `feed` serves an RSS 2.0 feed at its path, `format: 'atom'` for Atom, its `author` the feed's title unless set: the newest `limit` items, 20 by default, that `item` returns, links absolute on the `site` kay.config.ts sets, which a feed needs.
+- `feed` serves an RSS 2.0 feed at its path, `format: 'atom'` for Atom, its `author` the feed's title unless set: the newest `limit` items, 20 by default, that `item` returns, links and guids absolute on the `site` kay.config.ts sets, which a feed needs, written as `trailingSlash` writes each page's canonical URL.
 - A link to its path, such as `link(rel="alternate" href="/blog/rss.xml")` in a layout, passes `kay check` when the path is written as a literal.
 
 #### Localized collections
