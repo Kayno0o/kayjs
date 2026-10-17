@@ -26,11 +26,10 @@ export interface TranslateOptions {
 }
 
 const PLACEHOLDER = /\{(\w+)\}/g
-// A tag, its quoted attribute values allowed to hold `>`.
-const TAG = /<\/?[A-Z][\w-]*\b(?:"[^"]*"|'[^']*'|[^<>"'])*>/gi
+// Where a browser may read a tag, and a comment, CDATA section, doctype or instruction, which hide what follows them from the check.
+const TAG_START = /<\/?[A-Z][\w-]*\b/gi
+const MARKUP_START = /<[!?]/g
 const ATTRIBUTE = /([^\s=/"'<>]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+)))?/g
-// Where a browser may read a tag, which the check holds to the tags it can compare: a start it cannot (an odd quote in it) is a tag hidden from the check.
-const TAG_START = /<\/?[A-Z]/gi
 const TAG_NAME = /^<\/?[\w-]+/
 // The attributes whose value is text a reader sees: a translation may change them, every other attribute is kept exactly.
 const VISIBLE_ATTRIBUTES = new Set(['title', 'alt', 'placeholder', 'aria-label'])
@@ -178,9 +177,48 @@ function tagShape(tag: string): string {
   return JSON.stringify([name.toLowerCase(), ...attributes.toSorted()])
 }
 
-// How many places read as the start of a tag that the tag pattern does not match.
-function hiddenTags(text: string): number {
-  return (text.match(TAG_START)?.length ?? 0) - (text.match(TAG)?.length ?? 0)
+// The tags of a text, their quoted attribute values allowed to hold `>`, and whether one starts that the scan cannot end (an odd quote, a `<` inside it): the scan stops at it, so a text holding one is never compared.
+function scanTags(text: string): { tags: string[], unreadable: boolean } {
+  const tags: string[] = []
+  let from = 0
+
+  for (;;) {
+    TAG_START.lastIndex = from
+
+    const start = TAG_START.exec(text)
+
+    if (!start)
+      return { tags, unreadable: false }
+
+    let end = start.index + start[0].length
+    let closed = false
+
+    while (end < text.length && !closed) {
+      const char = text[end]!
+
+      if (char === '"' || char === '\'') {
+        const close = text.indexOf(char, end + 1)
+
+        if (close === -1)
+          return { tags, unreadable: true }
+
+        end = close + 1
+      }
+      else if (char === '<') {
+        return { tags, unreadable: true }
+      }
+      else {
+        closed = char === '>'
+        end++
+      }
+    }
+
+    if (!closed)
+      return { tags, unreadable: true }
+
+    tags.push(text.slice(start.index, end))
+    from = end
+  }
 }
 
 function same(a: string[], b: string[]): boolean {
@@ -212,7 +250,13 @@ export function unitProblem(unit: Unit, value: unknown): string | undefined {
   if (!same(placeholders, kept))
     return 'changes how many times a placeholder appears'
 
-  if (!same(found(unit.text, TAG).map(tagShape).toSorted(), found(value, TAG).map(tagShape).toSorted()) || hiddenTags(unit.text) !== hiddenTags(value))
+  const source = scanTags(unit.text)
+  const reply = scanTags(value)
+
+  if (source.unreadable || reply.unreadable)
+    return 'holds a tag the check cannot read'
+
+  if (!same(source.tags.map(tagShape).toSorted(), reply.tags.map(tagShape).toSorted()) || unit.text.match(MARKUP_START)?.length !== value.match(MARKUP_START)?.length)
     return 'changes the tags of the source'
 
   if (unit.kind === 'markdown' && (!same(found(unit.text, LINK_TARGET), found(value, LINK_TARGET)) || unit.text.match(FENCE)?.length !== value.match(FENCE)?.length))

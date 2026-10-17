@@ -3,6 +3,8 @@ import { expect, it } from 'bun:test'
 import { ai } from '../src'
 import { estimateTokens, systemPrompt, translateUnits, unitProblem } from '../src/translation'
 
+const UNREADABLE = 'holds a tag the check cannot read'
+
 const message = (text: string) => ({ id: '1', text, kind: 'message' as const })
 
 it('is a kay command ai() adds as `kay i18n translate`', async () => {
@@ -62,15 +64,42 @@ it('lets the visible attributes of a tag be translated and holds every other one
   expect(unitProblem(html('<a class="a b" title="T">x</a>'), '<a class="a" title="T">x</a>')).toBe('changes the tags of the source')
   expect(unitProblem(html('<a title="Home">x</a>'), '<a title="Accueil"><img src=x onerror=y>x</a>')).toBe('changes the tags of the source')
   expect(unitProblem(html('<a title="Home">x</a>'), '<a title="a"><img src=x onerror=y> b">x</a>')).toBe('changes the tags of the source')
-  expect(unitProblem(html('<a title="Home">x</a>'), '<a title="Accueil"')).toBe('changes the tags of the source')
+  expect(unitProblem(html('<a title="Home">x</a>'), '<a title="Accueil"')).toBe(UNREADABLE)
 })
 
 it('rejects a tag a browser reads that the check cannot count, an odd quote hiding it', () => {
-  expect(unitProblem(message('Hello <b>world</b>'), 'Bonjour <b>monde</b><svg onload=alert(1) a\'b>')).toBe('changes the tags of the source')
-  expect(unitProblem(message('Hello'), 'Bonjour <img src=x"onerror=alert(1)>')).toBe('changes the tags of the source')
+  expect(unitProblem(message('Hello <b>world</b>'), 'Bonjour <b>monde</b><svg onload=alert(1) a\'b>')).toBe(UNREADABLE)
+  expect(unitProblem(message('Hello'), 'Bonjour <img src=x"onerror=alert(1)>')).toBe(UNREADABLE)
   expect(unitProblem(message('Hello'), 'Bonjour <a title="x">')).toBe('changes the tags of the source')
-  expect(unitProblem(message('a <b and c'), 'a <b et c')).toBeUndefined()
+  expect(unitProblem(message('a <b and c'), 'a <b et c')).toBe(UNREADABLE)
   expect(unitProblem(message('<a title="a b">x</a>'), '<a title="a" b>x</a>')).toBe('changes the tags of the source')
+})
+
+it('rejects a reply swapping, or a source holding, a tag the check cannot read', () => {
+  expect(unitProblem(message('It\'s <a b=\'c'), 'C\'est <svg onload=alert(1) q=\'c')).toBe(UNREADABLE)
+  expect(unitProblem(message('It\'s <a b=\'c'), 'It\'s <a b=\'c')).toBe(UNREADABLE)
+  expect(unitProblem(message('<a b="c'), '<a b="d')).toBe(UNREADABLE)
+  expect(unitProblem(message('<a b="c'), 'ok')).toBe(UNREADABLE)
+  expect(unitProblem(message('ok'), '<a b="c')).toBe(UNREADABLE)
+  expect(unitProblem(message('ok\n'), 'ok <svg\nonload=alert(1) a"b>')).toBe(UNREADABLE)
+  expect(unitProblem(message('ok'), 'ok <a b<c>')).toBe(UNREADABLE)
+  expect(unitProblem(message('<b>x</b>'), '<b>y</b> <a b=\'c')).toBe(UNREADABLE)
+})
+
+it('compares a tag split over lines, and the markup that is not a tag', () => {
+  expect(unitProblem(message('<a\n  href="/x"\n  title="T">x</a>'), '<a\n href="/x"\n title="U">y</a>')).toBeUndefined()
+  expect(unitProblem(message('<a\nhref="/x">x</a>'), '<a\nhref="/y">x</a>')).toBe('changes the tags of the source')
+  expect(unitProblem(message('a &lt;b&gt; c'), 'a &lt;b&gt; d')).toBeUndefined()
+  expect(unitProblem(message('a'), 'a &lt;script&gt;')).toBeUndefined()
+  expect(unitProblem(message('a'), 'a <script>alert(1)</script>')).toBe('changes the tags of the source')
+  expect(unitProblem(message('a'), 'a <svg onload=alert(1)>')).toBe('changes the tags of the source')
+  expect(unitProblem(message('a'), 'a <!-- x')).toBe('changes the tags of the source')
+  expect(unitProblem(message('a'), 'a <![CDATA[ x')).toBe('changes the tags of the source')
+  expect(unitProblem(message('a'), 'a <?x')).toBe('changes the tags of the source')
+  expect(unitProblem(message('<!-- c --> a'), '<!-- c --> b')).toBeUndefined()
+  expect(unitProblem(message('<!-- c --> a'), '<!-- c --> <!-- d --> b')).toBe('changes the tags of the source')
+  expect(unitProblem(message('<!-- <b> --> a'), '<!-- <i> --> b')).toBe('changes the tags of the source')
+  expect(unitProblem(message('a < b and c > d'), 'a < b et c > d')).toBeUndefined()
 })
 
 it('asks for the visible attributes to be translated', () => {
