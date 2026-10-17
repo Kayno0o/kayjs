@@ -108,6 +108,10 @@ export interface ElementPlan {
 export abstract class TemplateWriter {
   constructor(protected readonly b: CodeBuilder, protected readonly src: string, protected readonly facts: TemplateFacts) {}
 
+  // Whether a component's slots and children are handed over as a function building them: in the browser, so a slot read in an attribute, a test or a ternary builds nothing and claims no server markup while an island hydrates.
+  // The server hands over the markup itself, which an island reads its static slots off.
+  protected readonly lazySlots: boolean = false
+
   // Children rendered as the template renders them: markup on the server, a block in the browser.
   protected abstract rendered(nodes: Node[]): void
 
@@ -254,7 +258,7 @@ export abstract class TemplateWriter {
       }
       else {
         b.add(`get ${JSON.stringify(this.source(slot.name))}() { return `)
-        this.childrenValue(slot.children)
+        this.childrenValue(slot.children, this.lazySlots)
         b.add(' }')
       }
     }
@@ -264,7 +268,7 @@ export abstract class TemplateWriter {
     if (children.length > 0) {
       props.separate()
       b.add('get children() { return ')
-      this.childrenValue(children)
+      this.childrenValue(children, this.lazySlots)
       b.add(' }')
     }
 
@@ -412,12 +416,19 @@ export abstract class TemplateWriter {
   }
 
   // What a component receives as `children` or a slot: a lone line of text as its string or values, as JSX passes it, anything else rendered.
-  protected childrenValue(nodes: Node[]): void {
+  // With `lazy`, rendered children are a function building them, which `eachChild` calls where they are put.
+  protected childrenValue(nodes: Node[], lazy = false): void {
     const { b } = this
     const lone = nodes.length === 1 && nodes[0]!.kind === 'text' ? nodes[0] : undefined
 
     if (!lone || lone.parts.some(part => part.kind === 'element')) {
+      if (lazy)
+        b.add('() => (')
+
       this.rendered(nodes)
+
+      if (lazy)
+        b.add(')')
 
       return
     }

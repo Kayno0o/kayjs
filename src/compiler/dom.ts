@@ -31,6 +31,7 @@ type Binding = (variable: (node: TemplateNode) => string) => void
 
 // A template as code building its DOM in the browser, or claiming the server's markup of it when an island hydrates.
 export class DomTemplate extends TemplateWriter {
+  protected override readonly lazySlots = true
   private readonly templates: string[] = []
   private counter = 0
   // How many blocks of template `const`s the binding being emitted sits in: a node first reached there is declared with `var`, so the bindings after the block reach it too.

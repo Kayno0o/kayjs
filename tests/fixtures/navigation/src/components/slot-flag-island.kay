@@ -1,0 +1,14 @@
+---
+import SlotBadge from './slot-badge.kay'
+import SlotFlag from './slot-flag.kay'
+import { signal } from 'kay'
+
+const count = signal(0)
+---
+button.flag-bump(onClick={() => count.set(c => c + 1)}) Bumped {count()}
+SlotFlag
+  @side
+    p.flag-side
+      SlotBadge(label="Side")
+  @note
+    b.flag-note Noted

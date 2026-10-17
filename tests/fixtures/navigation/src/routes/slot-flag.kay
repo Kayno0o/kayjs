@@ -1,0 +1,5 @@
+---
+import SlotFlagIsland from '../components/slot-flag-island.kay'
+---
+h1 Slot flag
+SlotFlagIsland

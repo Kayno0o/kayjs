@@ -117,21 +117,6 @@ export function fresh<T>(render: () => T): T {
   }
 }
 
-// Runs `read` where it claims nothing: a condition reading a slot builds the slot's nodes only to test them, and would take the markup the slot's real read claims.
-// The ids it takes stay counted, as the server's read of the same condition counted them.
-function unclaimed<T>(read: () => T): T {
-  const previous = claim
-
-  claim = undefined
-
-  try {
-    return read()
-  }
-  finally {
-    claim = previous
-  }
-}
-
 function claimNode(): Node {
   const node = claim!.next
 
@@ -685,7 +670,7 @@ export function branches(element: Node | null, start: Node | null, end: Node | n
   const block = blockIn(new Region(element, start, end))
   const chosen = memo<[number, unknown]>(() => {
     for (const [index, [test]] of list.entries()) {
-      const value = test ? unclaimed(test) : true
+      const value = test ? test() : true
 
       if (Boolean(value) !== false)
         return [index, value]

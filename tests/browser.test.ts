@@ -155,6 +155,19 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay/test i
     expect(page.errors).toEqual([])
   }, 30_000)
 
+  it('hydrates an island whose component reads a slot in an attribute, a ternary and an if with an alias, as well as inserting it', async () => {
+    const page = await site.open('/slot-flag')
+
+    await page.click('button.flag-bump')
+    expect(await page.text('button.flag-bump')).toBe('Bumped 1')
+    expect(await page.text('.slot-flag-label')).toBe('with')
+    expect(await page.text('.slot-flag-ternary .flag-note')).toBe('Noted')
+    expect(await page.text('.slot-flag-shown .flag-side .slot-badge')).toBe('Side')
+    expect(await page.count('.flag-side')).toBe(1)
+    expect(await page.count('.flag-note')).toBe(1)
+    expect(page.errors).toEqual([])
+  }, 30_000)
+
   it('hydrates every island reading a value kept in localStorage on the markup the server rendered, then shows the value', async () => {
     const kept = await site.open('/kept')
 

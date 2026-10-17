@@ -1,0 +1,4 @@
+---
+const { label } = props<{ label: string }>()
+---
+em.slot-badge {label}

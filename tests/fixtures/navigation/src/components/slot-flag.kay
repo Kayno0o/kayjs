@@ -1,0 +1,11 @@
+---
+import type { JSX } from 'kay'
+
+const { side, note } = props<{ side?: JSX.Element, note?: JSX.Element }>()
+---
+div.slot-flag(data-side={side ? '' : undefined})
+  span.slot-flag-label {side ? 'with' : 'without'}
+  span.slot-flag-ternary {note ? note : 'no note'}
+  if side as shown
+    section.slot-flag-shown
+      | {shown}
