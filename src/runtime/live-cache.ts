@@ -5,6 +5,7 @@ import { dirtyGuard, navigation } from './navigation'
 import { decodeServerValue } from './wire'
 
 // The twin of `readEvents` in live.ts, kept apart so the code every page loads does not carry it: keep the backoffs alike.
+
 // The cached values a page follows (`cached(..., { live: true })`) are kept up to date by the route live values use, `POST /_kay/live`, through a reader of its own: this module stays out of the code every page loads, so it imports nothing of the runtime that code does not already reach.
 
 const ROUTE = '/_kay/live'
