@@ -31,6 +31,7 @@ ConfirmDelete(message="Tone?" failure="Could not" onConfirm={onDelete}  class="v
 ConfirmDelete(message="Tone?" failure="Could not" onConfirm={onDelete} variant="solid" class="v-solid")
 ConfirmDelete(message="Tone?" failure="Could not" onConfirm={onDelete} variant="ghost" class="v-ghost")
 ConfirmDelete(message="Tone?" failure="Could not" onConfirm={onDelete} variant="inline" class="v-inline")
+// kay-allow deprecated-ui-prop
 ConfirmDelete(message="Tone?" failure="Could not" onConfirm={onDelete} variant="danger" class="v-danger")
 ConfirmDelete(message="Tone?" failure="Could not" onConfirm={onDelete} tone="neutral" class="n-plain")
 ConfirmDelete(message="Tone?" failure="Could not" onConfirm={onDelete} tone="neutral" variant="solid" class="n-solid")
