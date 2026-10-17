@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import process from 'node:process'
 import { version as runningVersion } from '../../package.json'
+import { KAY_DIR } from '../build/assets'
 import { bunProblem } from '../bun'
 import { loadConfig } from '../config'
 import { readDevAddress } from '../dev/address'
@@ -24,7 +25,10 @@ const KAY_PACKAGE = '@kaynooo/kayjs'
 const LIBRARY_PREFIX = '@kaynooo/kayjs-'
 const DEPENDENCY_SECTIONS = ['dependencies', 'devDependencies', 'optionalDependencies'] as const
 // The build directories kay writes a manifest into: `kay build` and `kay dev`, with the command that makes each again.
-const BUILDS = [{ dir: '.kay/client', fix: 'run `kay build`' }, { dir: '.kay/dev', fix: 'restart `kay dev`' }]
+const BUILDS = [{ dir: `${KAY_DIR}/client`, fix: 'run `kay build`' }, { dir: `${KAY_DIR}/dev`, fix: 'restart `kay dev`' }]
+// A manifest `kay dev` or `kay build` is writing reads as half a file: it is read again after this long before it counts as unreadable.
+const MANIFEST_RETRY_MS = 150
+const DEFAULT_PORTS: Record<string, string> = { 'http:': '80', 'https:': '443' }
 const DEFAULT_PORT = 3000
 const LINE_BREAK = /\r?\n/
 const ASSIGNMENT = /^(?:export\s+)?([A-Z_]\w*)\s*=(.*)$/i
@@ -75,7 +79,7 @@ export async function diagnose(root: string, port?: string): Promise<Check[]> {
     versionsCheck(root),
     await configCheck(root),
     await envCheck(root, dotenv),
-    await portCheck(root, port ?? process.env.PORT ?? dotenv.PORT ?? String(DEFAULT_PORT)),
+    await portCheck(root, port ?? process.env.PORT ?? dotenv.PORT ?? String(DEFAULT_PORT), process.env.HOST ?? dotenv.HOST),
     await buildCheck(root),
   ]
 }
@@ -200,17 +204,21 @@ async function envCheck(root: string, dotenv: Record<string, string>): Promise<C
   }
 }
 
-async function portCheck(root: string, port: string): Promise<Check> {
+// `kay dev` listens on `localhost` whatever HOST says, and a server of the app on HOST when it is set, so the probe binds HOST or else `localhost`.
+async function portCheck(root: string, port: string, host?: string): Promise<Check> {
   if (!isPort(port))
     return { name: 'port', ok: false, message: `${port} is no port number`, fix: 'set PORT, or pass --port, to a number up to 65535' }
 
+  if (Number(port) === 0)
+    return { name: 'port', ok: true, message: 'PORT 0 lets the system pick a free port' }
+
   const dev = readDevAddress(root)
 
-  if (dev !== undefined && new URL(dev).port === port)
+  if (dev !== undefined && devPort(dev) === String(Number(port)))
     return { name: 'port', ok: true, message: `${port} is held by this project's kay dev` }
 
   try {
-    const server = Bun.serve({ port: Number(port), hostname: process.env.HOST ?? '0.0.0.0', fetch: () => new Response() })
+    const server = Bun.serve({ port: Number(port), hostname: host ?? 'localhost', fetch: () => new Response() })
 
     await server.stop(true)
 
@@ -224,13 +232,30 @@ async function portCheck(root: string, port: string): Promise<Check> {
   }
 }
 
+function devPort(address: string): string {
+  const url = new URL(address)
+
+  return url.port === '' ? DEFAULT_PORTS[url.protocol] ?? '' : url.port
+}
+
+export async function manifestOf(root: string, dir: string, wait: (ms: number) => Promise<unknown> = Bun.sleep) {
+  try {
+    return await readManifest(root, join(root, dir))
+  }
+  catch {
+    await wait(MANIFEST_RETRY_MS)
+
+    return readManifest(root, join(root, dir))
+  }
+}
+
 // The builds in `.kay` are stamped with the kay that wrote them; one by another kay, or by one before the stamp, is rebuilt.
 async function buildCheck(root: string): Promise<Check> {
   const built: string[] = []
 
   for (const { dir, fix } of BUILDS) {
     try {
-      const manifest = await readManifest(root, join(root, dir))
+      const manifest = await manifestOf(root, dir)
 
       if (manifest === undefined)
         continue

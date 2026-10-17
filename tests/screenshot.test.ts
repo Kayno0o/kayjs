@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readdirSync, rmSync, symlinkSync, utimesSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs'
 import { mkdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { dev } from '../src/dev'
 import { devAddressFile, readDevAddress, removeDevAddress, writeDevAddress } from '../src/dev/address'
 import { mountedAt } from '../src/dev/base-proxy'
-import { keep, locked, MAX_FILES, pagePath, prune, screenshot, SCREENSHOTS_DIR, shotName } from '../src/dev/screenshot'
+import { keep, locked, MAX_FILES, pagePath, prune, screenshot, SCREENSHOTS_DIR, shotName, takeOverStale } from '../src/dev/screenshot'
 import { diffPngs } from '../src/dev/screenshot-diff'
 import { McpServer } from '../src/mcp/protocol'
 import { projectCapabilities } from '../src/mcp/tools'
@@ -241,24 +241,83 @@ describe('keeping a shot', () => {
 
     try {
       const file = join(root, 'page')
+      const lock = `${file}.lock`
       const order: string[] = []
       let inside = 0
       let most = 0
-      const work = (name: string, ms: number) => async () => {
+      let refreshed = false
+      // Waits on the lock's mtime moving, which the holder's refresh does every third of the window, not on a fixed time.
+      const untilRefreshed = async () => {
+        const first = statSync(lock).mtimeMs
+
+        while (statSync(lock).mtimeMs === first)
+          await Bun.sleep(20)
+
+        refreshed = true
+      }
+
+      // Whoever gets in first holds the lock past the stale window, the others wait for it.
+      const work = (name: string) => async () => {
         most = Math.max(most, ++inside)
         order.push(`${name} in`)
-        await Bun.sleep(ms)
+
+        if (order.length === 1)
+          await untilRefreshed()
+
         order.push(`${name} out`)
         inside--
       }
 
-      await Bun.write(`${file}.lock`, '1')
-      utimesSync(`${file}.lock`, 1000, 1000)
-      await Promise.all([locked(file, work('a', 600), 300), locked(file, work('b', 50), 300), locked(file, work('c', 50), 300)])
+      await Bun.write(lock, '1')
+      utimesSync(lock, 1000, 1000)
+      await Promise.all([locked(file, work('a'), 3000), locked(file, work('b'), 3000), locked(file, work('c'), 3000)])
 
+      expect(refreshed).toBe(true)
       expect(most).toBe(1)
       expect(order).toHaveLength(6)
       expect(readdirSync(root).filter(name => name.includes('.lock'))).toEqual([])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('puts a fresh lock back without overwriting one a third process created meanwhile', async () => {
+    const root = await scratchDir('shots-putback-')
+
+    try {
+      const lock = join(root, 'page.lock')
+
+      await Bun.write(lock, 'holder')
+      utimesSync(lock, 1000, 1000)
+
+      // The first reading sees the lock stale, the second the same file fresh, and a third process takes the lock name in between.
+      const readings = [2_000_000, 1_000_000]
+      const clock = () => {
+        const reading = readings.shift() ?? 1_000_000
+
+        if (readings.length === 0)
+          writeFileSync(lock, 'third', { flag: 'wx' })
+
+        return reading
+      }
+
+      takeOverStale(lock, 300, clock)
+
+      expect(readFileSync(lock, 'utf8')).toBe('third')
+      expect(readdirSync(root)).toEqual(['page.lock'])
+
+      // Alone, a lock found fresh after the move is put back as it was.
+      rmSync(lock)
+      await Bun.write(lock, 'holder')
+      utimesSync(lock, 1000, 1000)
+
+      const alone = [2_000_000, 1_000_000]
+
+      takeOverStale(lock, 300, () => alone.shift() ?? 1_000_000)
+
+      expect(readFileSync(lock, 'utf8')).toBe('holder')
+      expect(readdirSync(root)).toEqual(['page.lock'])
     }
     finally {
       await rm(root, { recursive: true, force: true })

@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { version } from '../package.json'
+import { manifestOf } from '../src/commands/doctor'
 import { readManifest, writeManifest } from '../src/server/client'
 import { scratchDir } from './scratch'
 
@@ -135,7 +136,7 @@ describe('kay doctor', () => {
       expect(result.check('env').fix).toContain('.env')
     })
 
-    it('sees every schema of a module whose first one is unset, and a variable that is set but refused', async () => {
+    it('sees every schema of a module whose first one is unset', async () => {
       const second = 'import { s } from \'kay\'\nimport { defineEnv } from \'kay/server\'\n\nexport const first = defineEnv(s.Object({ FIRST_KEY: s.String() }))\nexport const second = defineEnv(s.Object({ SECOND_KEY: s.String() }))\n'
       const result = await doctor(await project({ 'src/env.ts': second }))
 
@@ -206,6 +207,37 @@ describe('kay doctor', () => {
       expect((await doctor(await project(), ['--port', String(after.port)])).check('port').ok).toBe(true)
     })
 
+    it('passes PORT 0 as the system\'s pick rather than as a free port, and the default port of the project\'s kay dev address', async () => {
+      const zero = await doctor(await project(), ['--port', '0'])
+
+      expect(zero.check('port').ok).toBe(true)
+      expect(zero.check('port').message).toContain('system')
+
+      const busy = await busyPort()
+      const root = await project()
+
+      try {
+        // An address without a port holds the protocol's default, which no test can bind: the check compares it as text.
+        await Bun.write(join(root, '.kay/dev', `server-${process.pid}.json`), JSON.stringify({ url: 'http://localhost', pid: process.pid }))
+
+        expect((await doctor(root, ['--port', '80'])).check('port').message).toContain('kay dev')
+        expect((await doctor(root, ['--port', String(busy.port)])).check('port').ok).toBe(false)
+      }
+      finally {
+        busy.release()
+      }
+    })
+
+    it('probes the HOST the app listens on, else localhost', async () => {
+      const free = await busyPort()
+
+      free.release()
+
+      expect((await doctor(await project(), ['--port', String(free.port)], { HOST: '203.0.113.1' })).check('port').message).toContain('cannot be listened on')
+      expect((await doctor(await project({ '.env': 'HOST=203.0.113.1\n' }), ['--port', String(free.port)])).check('port').ok).toBe(false)
+      expect((await doctor(await project(), ['--port', String(free.port)])).check('port').ok).toBe(true)
+    })
+
     it('fails a port that is no number', async () => {
       expect((await doctor(await project(), [], { PORT: 'http' })).check('port').ok).toBe(false)
       expect((await doctor(await project(), ['--port', '70000'])).code).toBe(1)
@@ -241,6 +273,22 @@ describe('kay doctor', () => {
 
       expect(unstamped.check('build').ok).toBe(false)
       expect(unstamped.check('build').fix).toContain('kay dev')
+    })
+
+    it('reads a manifest again once before it counts as unreadable, as one being written reads as half a file', async () => {
+      const root = await project({ '.kay/client/manifest.json': '{ "entryIm' })
+      const manifest = join(root, '.kay/client/manifest.json')
+      let waits = 0
+      const found = await manifestOf(root, '.kay/client', async () => {
+        waits++
+        await Bun.write(manifest, JSON.stringify({ entryImports: [], islands: {}, styles: {}, kay: version }))
+      })
+
+      expect(waits).toBe(1)
+      expect(found?.kay).toBe(version)
+
+      await Bun.write(manifest, '{ nope')
+      await expect(manifestOf(root, '.kay/client', async () => undefined)).rejects.toThrow()
     })
 
     it('fails a manifest it cannot read rather than throwing', async () => {

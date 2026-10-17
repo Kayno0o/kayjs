@@ -1,5 +1,5 @@
 import type { DevError } from '../server/dev-errors'
-import { mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs'
+import { linkSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import process from 'node:process'
 import { KAY_DIR, testWorker } from '../build/assets'
@@ -274,24 +274,27 @@ export async function locked<T>(file: string, run: () => Promise<T>, staleMs = L
   }
 }
 
-// Moves a stale lock aside by renaming it, which only one of several waiters seeing it can do, and puts it back when it turns out to be a fresh one taken since.
-function takeOverStale(lock: string, staleMs: number): void {
+// Moves a stale lock aside by renaming it, which only one of several waiters seeing it can do, and puts it back when it turns out to be a fresh one taken since: linking it back leaves a lock a third process created in between alone. `now` is the clock.
+export function takeOverStale(lock: string, staleMs: number, now = Date.now): void {
   try {
     const held = statSync(lock, { throwIfNoEntry: false })
 
-    if (held === undefined || Date.now() - held.mtimeMs <= staleMs)
+    if (held === undefined || now() - held.mtimeMs <= staleMs)
       return
 
     const aside = `${lock}.${process.pid}.stale`
 
     renameSync(lock, aside)
 
-    const moved = statSync(aside, { throwIfNoEntry: false })
+    try {
+      const moved = statSync(aside, { throwIfNoEntry: false })
 
-    if (moved !== undefined && Date.now() - moved.mtimeMs <= staleMs && !statSync(lock, { throwIfNoEntry: false }))
-      renameSync(aside, lock)
-    else
+      if (moved !== undefined && now() - moved.mtimeMs <= staleMs)
+        linkSync(aside, lock)
+    }
+    finally {
       rmSync(aside, { force: true })
+    }
   }
   catch {}
 }
