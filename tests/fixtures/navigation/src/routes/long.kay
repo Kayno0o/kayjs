@@ -1,0 +1,7 @@
+head
+  title The page whose title is long enough to wrap: a-segment-without-any-break-a-segment-without-any-break-a-segment-without-any-break-a-segment-without-any-break-a-segment-without-any-break-a-segment-without-any-break-end
+  meta(name="description" content="A description with one unbroken token: a-segment-without-any-break-a-segment-without-any-break-a-segment-without-any-break-a-segment-without-any-break-a-segment-without-any-break-a-segment-without-any-break-end")
+  link(rel="canonical" href="https://example.com/a-segment-without-any-break-a-segment-without-any-break-a-segment-without-any-break-a-segment-without-any-break-a-segment-without-any-break-a-segment-without-any-break-end")
+main
+  h1 Long
+  img(src="/a-segment-without-any-break-a-segment-without-any-break-a-segment-without-any-break-a-segment-without-any-break-a-segment-without-any-break-a-segment-without-any-break-end.svg" width="16" height="16" alt="")

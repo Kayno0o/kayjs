@@ -636,6 +636,42 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay dev in
 
     expect(shown.errors).toEqual([])
   }, 60_000)
+
+  it('scrolls no panel sideways, at the default width or a narrow one, whatever the values are', async () => {
+    const shown = await dev.open(`/long?${'query-without-a-break-'.repeat(8)}=1`, { strict: false })
+    const ids = await shown.evaluate(() => [...document.querySelector('kay-dev')!.shadowRoot!.querySelectorAll('[role=tab]')].map(tab => tab.id))
+    const wide: string[] = []
+
+    await shown.evaluate(() => document.querySelector('kay-dev')!.shadowRoot!.querySelector<HTMLButtonElement>('.bar > button')!.click())
+
+    for (const width of ['', '22rem']) {
+      await shown.evaluate((value: string) => {
+        document.querySelector('kay-dev')!.shadowRoot!.querySelector<HTMLElement>('.drawer')!.style.width = value
+      }, width)
+
+      for (const id of ids) {
+        await shown.evaluate((tab: string) => document.querySelector('kay-dev')!.shadowRoot!.getElementById(tab)!.click(), id)
+        // Head, Env and Routes ask the server, and Images looks each format up after drawing its rows.
+        await shown.waitUntil(() => {
+          const panel = document.querySelector('kay-dev')!.shadowRoot!.querySelector<HTMLElement>('.panel:not([hidden])')!
+
+          return panel.childElementCount > 0 && ![...panel.querySelectorAll('.chip')].some(chip => chip.textContent === 'format...')
+        })
+        await Bun.sleep(150)
+        wide.push(...await shown.evaluate((label: string) => {
+          const panel = document.querySelector('kay-dev')!.shadowRoot!.querySelector<HTMLElement>('.panel:not([hidden])')!
+          const edge = panel.getBoundingClientRect().right - Number.parseFloat(getComputedStyle(panel).paddingRight) + 1
+
+          if (panel.scrollWidth <= panel.clientWidth)
+            return []
+
+          return [...panel.querySelectorAll('*')].filter(element => element.getBoundingClientRect().right > edge).slice(0, 3).map(element => `${label} ${element.tagName.toLowerCase()}.${element.className}`)
+        }, `${width || 'default'} ${id}`))
+      }
+    }
+
+    expect(wide).toEqual([])
+  }, 60_000)
 })
 
 describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the dev patch in a browser', () => {
