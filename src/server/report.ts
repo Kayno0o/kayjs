@@ -33,7 +33,7 @@ export function useAppOnError(onError: KayConfig['onError']): void {
 }
 
 // How long a caller waits for the app's `onError` when it holds a queue worker or delays an exit: a tracker that hangs must not.
-export const ON_ERROR_TIMEOUT_MS = 10_000
+const ON_ERROR_TIMEOUT_MS = 10_000
 
 // Logs an error met outside any request, a scheduled, background or queued job or an `onStop` hook, and hands it to the app's `onError` with no request.
 // Resolves once `onError` returned, or after `timeout` ms with a log saying it did not, and never rejects, for a caller about to exit or to take its next job to await.

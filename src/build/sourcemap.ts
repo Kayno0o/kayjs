@@ -82,16 +82,7 @@ function compiledFor(file: string, registry = compiled): Compiled | undefined {
   let entry = registry.get(file)
 
   if (typeof entry === 'function') {
-    // A map that cannot be made leaves its frames as they are, rather than the log of the error that needed it failing.
-    try {
-      entry = entry()
-    }
-    catch {
-      registry.delete(file)
-
-      return undefined
-    }
-
+    entry = entry()
     registry.set(file, entry)
   }
 
@@ -219,7 +210,16 @@ export function mapStack(stack: string): string {
 }
 
 function mapPosition(file: string, line: string, column: string): string | undefined {
-  const module = compiledFor(file)
+  let module: Compiled | undefined
+
+  // A map that cannot be made leaves its frames as they are, rather than the log of the error that needed it failing.
+  try {
+    module = compiledFor(file)
+  }
+  catch {
+    compiled.delete(file)
+  }
+
   const position = module && toKay(module, Number(line), Number(column))
 
   return position ? `${withoutTwin(file)}:${position.line}:${position.column}` : undefined

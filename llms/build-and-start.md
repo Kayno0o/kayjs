@@ -52,7 +52,7 @@ kay build --static --outdir dist
   - The same, then bundles the server entry, every page, layout, special page, guard and API module, `kay.config.ts` and the client build and public files into one executable, which runs from anywhere as the production server would: `PORT=8080 ./server`.
   - `--verify` then starts the executable on a free port, waits for its health route and runs `--health`, failing the build with the server's own output: [Check the executable starts](production.md#check-the-executable-starts).
   - It carries its code as bytecode, so it starts without parsing it.
-  - It carries the maps of its code and of the browser build too, compressed (about 1.5 MB), so a stack in its logs and an island's report to `onError` point at your `.kay` lines as under `kay start`.
+  - It carries the maps of its code and of the browser build too, compressed (about 1.5 MB for a small app), so a stack in its logs and an island's report to `onError` point at your `.kay` lines as under `kay start`.
   - It reads nothing of the project from disk but a `.env` and `bunfig.toml` where it runs, as `bun` would, so a file a page reads at runtime by path, rather than importing it, is not in it; the root, routes and public directory it was built with win over the options given to `pages()`.
   - `--compile` and `--entry` are relative to the current directory.
   - The public directory cannot be named `client`.
