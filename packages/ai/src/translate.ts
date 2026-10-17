@@ -3,6 +3,7 @@ import type { DataValue, JsonSchema, KayCommand, LocalizedEntry } from 'kay/libr
 import type { Unit } from './translation'
 import process from 'node:process'
 import { localizedEntry, missingTranslations, writeDraftEntry, writeDraftMessages } from 'kay/library'
+import { splitMarkdown } from './split'
 import { estimateTokens, translateUnits } from './translation'
 
 type Path = (string | number)[]
@@ -10,6 +11,9 @@ type Path = (string | number)[]
 // Texts per request: a model keeps ids and placeholders straight in a short list.
 const BATCH_UNITS = 40
 const BATCH_CHARS = 8000
+// A body past this many characters is translated in parts, so no reply nears the token cap.
+const BODY_CHARS = 6000
+const BODY_PREFIX = 'body.'
 // The kinds of field a model translates: no kind is plain text; every other, built in (image, file, reference) or the app's own, holds data a component edits.
 const TRANSLATED_KINDS = new Set(['text', 'textarea', 'markdown'])
 
@@ -25,6 +29,8 @@ interface EntryPlan {
   entry: LocalizedEntry
   paths: Path[]
   units: Unit[]
+  // The ids of the body's parts in order, or none for an entry with no body.
+  body: string[]
 }
 
 type Message = Parameters<typeof writeDraftMessages>[3][string]
@@ -146,18 +152,33 @@ async function translateLocale({ root, config, locale, from, dryRun, signal }: R
 
 // Translates one entry and writes it; answers 1 when written, else 0 with why in `failures`.
 async function translateEntry({ root, config, locale, from, signal }: Pick<Run, 'root' | 'config' | 'locale' | 'from' | 'signal'>, plan: EntryPlan, failures: string[]): Promise<number> {
-  const result = await translateUnits(plan.units, { from, into: locale, signal })
+  const done = new Map<string, string>()
+  const failed = new Set<string>()
 
-  if (result.failed.size > 0) {
-    failures.push(`${plan.collection}/${plan.slug} ${[...new Set(result.failed.values())].join('; ')}`)
+  for (const batch of unitBatches(plan.units)) {
+    const result = await translateUnits(batch, { from, into: locale, signal })
+
+    for (const [id, text] of result.done)
+      done.set(id, text)
+
+    for (const why of result.failed.values())
+      failed.add(why)
+
+    // The rest of an entry that cannot be written is not worth a request.
+    if (failed.size > 0)
+      break
+  }
+
+  if (failed.size > 0) {
+    failures.push(`${plan.collection}/${plan.slug} ${[...failed].join('; ')}`)
 
     return 0
   }
 
-  const body = plan.entry.body === undefined ? undefined : result.done.get('body') ?? plan.entry.body
+  const body = plan.entry.body === undefined ? undefined : joinBody(plan, done)
 
   try {
-    await writeDraftEntry(root, config, plan.collection, locale, plan.slug, { data: translatedData(plan, result.done), body })
+    await writeDraftEntry(root, config, plan.collection, locale, plan.slug, { data: translatedData(plan, done), body })
 
     return 1
   }
@@ -168,9 +189,23 @@ async function translateEntry({ root, config, locale, from, signal }: Pick<Run, 
   }
 }
 
+// The translated body: its parts joined, each ending with the white space its source part ended with, which a reply may trim.
+function joinBody(plan: EntryPlan, done: Map<string, string>): string {
+  if (plan.body.length === 0)
+    return plan.entry.body!
+
+  const sources = new Map(plan.units.map(unit => [unit.id, unit.text]))
+
+  return plan.body.map((id) => {
+    const source = sources.get(id)!
+
+    return done.get(id)!.trimEnd() + source.slice(source.trimEnd().length)
+  }).join('')
+}
+
 function report(locale: string, from: string, keys: string[], plans: EntryPlan[], units: MessageUnit[], failures: string[]): number {
   const all = [...units, ...plans.flatMap(plan => plan.units)]
-  const tokens = estimateTokens(all, from, locale, batches(units).length + plans.length)
+  const tokens = estimateTokens(all, from, locale, batches(units).length + plans.reduce((sum, plan) => sum + unitBatches(plan.units).length, 0))
 
   console.log(`${locale}: would translate ${keys.length} ${keys.length === 1 ? 'message' : 'messages'} and ${plans.length} ${plans.length === 1 ? 'entry' : 'entries'}, about ${tokens.input} tokens in and ${tokens.output} out`)
 
@@ -190,7 +225,7 @@ function report(locale: string, from: string, keys: string[], plans: EntryPlan[]
 
 // The fields of an entry that would be translated, by path, `body` last.
 function fieldNames(plan: EntryPlan): string[] {
-  return [...plan.paths.map(path => path.join('.')), ...plan.units.some(unit => unit.id === 'body') ? ['body'] : []]
+  return [...plan.paths.map(path => path.join('.')), ...plan.body.length > 0 ? ['body'] : []]
 }
 
 // The texts of the messages: a plural's forms are one text each, numbered so that no key is ever put in a prompt.
@@ -223,6 +258,29 @@ function completeMessages(messages: [string, Message][], batch: MessageUnit[], d
   }
 
   return ready
+}
+
+// Groups the units of an entry so that no request is long, a unit past the limit alone in one.
+function unitBatches(units: Unit[]): Unit[][] {
+  const groups: Unit[][] = []
+  let current: Unit[] = []
+  let size = 0
+
+  for (const unit of units) {
+    if (current.length > 0 && (current.length >= BATCH_UNITS || size + unit.text.length > BATCH_CHARS)) {
+      groups.push(current)
+      current = []
+      size = 0
+    }
+
+    current.push(unit)
+    size += unit.text.length
+  }
+
+  if (current.length > 0)
+    groups.push(current)
+
+  return groups
 }
 
 // Groups the units so that no request is long: a message's plural forms stay together.
@@ -262,10 +320,18 @@ async function planEntry(root: string, config: Run['config'], collection: string
 
   const units: Unit[] = paths.map((path, index) => ({ id: String(index + 1), text: valueAt(entry.data, path) as string, kind: schemaAt(entry.schema, path)?.['x-kay']?.kind === 'markdown' ? 'markdown' : 'text' }))
 
-  if (entry.body !== undefined && entry.body.trim() !== '')
-    units.push({ id: 'body', text: entry.body, kind: 'markdown' })
+  const body: string[] = []
 
-  return { collection, slug, entry, paths, units }
+  if (entry.body !== undefined && entry.body.trim() !== '') {
+    for (const [index, text] of splitMarkdown(entry.body, BODY_CHARS).entries()) {
+      const id = `${BODY_PREFIX}${index + 1}`
+
+      body.push(id)
+      units.push({ id, text, kind: 'markdown' })
+    }
+  }
+
+  return { collection, slug, entry, paths, units, body }
 }
 
 // The schema of a field, a union with null read as its other branch; nothing for a union of several.

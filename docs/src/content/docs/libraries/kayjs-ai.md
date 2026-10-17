@@ -220,6 +220,8 @@ brand: untranslated(t.String())
 
 If the collection has `draft: 'field'`, that field is set to true, so the entry stays hidden in production until you publish it. Otherwise the entry starts with a `# draft` line in its header, which you delete once you have read it. Saving the entry from a CMS removes it too. Such an entry is shown at once, so read it before you deploy.
 
+A long body is translated in parts, cut between paragraphs and never inside a code block, and the entry is saved only when every part passed.
+
 A run that stops half way leaves whole files. Run it again to translate what is left.
 
 <ReadMore href="/llms/kayjs-ai-translating">The checks on a reply, which fields of an entry are translated, and how each kind of entry is marked.</ReadMore>

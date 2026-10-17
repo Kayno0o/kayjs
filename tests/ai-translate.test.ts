@@ -246,13 +246,44 @@ describe('kay i18n translate: entries', () => {
 
   it('rejects a body that changes a link target or drops a code fence, and writes no file for it', async () => {
     const root = await project({ ...entries, ...noMessages })
-    const bad = { over: { body: { replace: [['/more', '/plus'], ['```ts', '']] } } }
+    const bad = { over: { 'body.1': { replace: [['/more', '/plus'], ['```ts', '']] } } }
     const { code, err } = await run(root, ['fr'], [bad, bad, {}])
 
     expect(code).toBe(1)
     expect(err).toContain('changes the link targets or code fences')
     expect(await exists(root, 'src/content/docs/fr/guide.md')).toBe(false)
     expect(await exists(root, 'src/content/news/fr/launch.md')).toBe(true)
+  })
+
+  it('translates a body past the size of a request in parts, and joins them back', async () => {
+    const paragraphs = Array.from({ length: 6 }, (_, index) => `Part ${index + 1} [link ${index + 1}](/p${index + 1}) ${'word '.repeat(500)}`)
+    const long = { ...noMessages, 'src/content/docs/en/guide.md': `---\ntitle: Guide\n---\n${paragraphs.join('\n\n')}\n\n\`\`\`ts\nconst a = 1\n\n\n\`\`\`\n` }
+    const root = await project(long)
+    const { code, err, asked } = await run(root, ['fr'], Array.from({ length: 8 }, () => ({})))
+    const written = await read(root, 'src/content/docs/fr/guide.md')
+
+    expect(err).toBe('')
+    expect(code).toBe(0)
+    expect(asked.length).toBeGreaterThan(1)
+    for (const request of asked)
+      expect(request.messages[0]!.content.length).toBeLessThan(9000)
+    for (let index = 1; index <= 6; index++)
+      expect(written.includes(`Part ${index} [link ${index}](/p${index}) word`)).toBe(true)
+    expect(written.includes('```ts\nconst a = 1\n\n\n```')).toBe(true)
+    expect(written.match(/^FR /gm)?.length).toBeGreaterThan(1)
+    expect(written.includes('body')).toBe(false)
+  })
+
+  it('writes nothing for an entry when one part of its body fails its checks', async () => {
+    const paragraphs = Array.from({ length: 6 }, (_, index) => `Part ${index + 1} [link ${index + 1}](/p${index + 1}) ${'word '.repeat(500)}`)
+    const root = await project({ ...noMessages, 'src/content/docs/en/guide.md': `---\ntitle: Guide\n---\n${paragraphs.join('\n\n')}\n` })
+    const bad = { over: { 'body.2': { replace: [['/p', '/q']] } } }
+    const { code, err } = await run(root, ['fr'], [{}, bad, bad, bad, bad, bad])
+
+    expect(code).toBe(1)
+    expect(err).toContain('docs/guide')
+    expect(err).toContain('changes the link targets')
+    expect(await exists(root, 'src/content/docs/fr/guide.md')).toBe(false)
   })
 
   it('writes a YAML entry as YAML, marked by a first-line comment', async () => {
@@ -266,7 +297,7 @@ describe('kay i18n translate: entries', () => {
 
   it('rejects a body gaining raw HTML, and a text dropping one of two placeholders', async () => {
     const root = await project({ ...entries, ...noMessages })
-    const bad = { over: { body: { replace: [['Read', 'Read <img src=x onerror=alert(1)>']] } } }
+    const bad = { over: { 'body.1': { replace: [['Read', 'Read <img src=x onerror=alert(1)>']] } } }
     const { err } = await run(root, ['fr'], [bad, bad, {}])
 
     expect(err).toContain('changes the tags of the source')
