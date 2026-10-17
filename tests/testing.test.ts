@@ -121,7 +121,7 @@ describe('kay/test', () => {
     expect((await unset.visit('/origin')).html).toContain('<p class="origin">http://localhost</p>')
   })
 
-  it('goes on working once a test registered a DOM, as one of `mount` leaves it for every later file', async () => {
+  it('goes on working once a test registered a DOM, as one of `mountComponent` leaves it for every later file', async () => {
     GlobalRegistrator.register()
 
     try {

@@ -1,6 +1,6 @@
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 
-// Listed under `[test] preload` in bunfig.toml after `kay/test/preload`, so `mount()` renders into happy-dom's document in every test file.
+// Listed under `[test] preload` in bunfig.toml after `kay/test/preload`, so `mountComponent()` renders into happy-dom's document in every test file.
 GlobalRegistrator.register()
 
 // happy-dom has no popover API: an element shown keeps a flag, which `:popover-open` matches, and `toggle` fires as in a browser.

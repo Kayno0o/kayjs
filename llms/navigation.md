@@ -153,7 +153,7 @@ const dispose = mount(Panel, document.querySelector('#panel')!, { title: 'Ticket
 - Such a page still swaps itself in place: a link to it with another query, `navigate({ query })` and `refresh()` on it.
 - The swap prefetches as the speculation rules would, on the timing the `prefetch` setting gives (see [Project setup](project.md#project-setup)), and replaces them, so each page is fetched once: a hovered link's page is kept for 30 seconds and taken as the link is followed.
 - `data-no-prefetch` still opts a link out.
-- A link, or one inside an element, with `data-keep-scroll` swaps without scrolling to the top, and with `data-no-transition` without a view transition, as `navigate()`'s `scroll: 'keep'` and `transition: false` do; going back still restores the position saved.
+- A link, or one inside an element, with `data-keep-scroll` swaps without scrolling to the top, and with `data-no-transition` without a view transition, as `navigate()`'s `scroll: 'keep'` and `transition: false` do; going back still restores the position saved, and a hash in the URL is not scrolled to while the scroll is kept.
 - A stylesheet holding `@view-transition { navigation: auto; }` animates the swap where the browser has view transitions, as it animates full loads, the rule standing at the top level or inside an `@media` or `@supports` that holds.
 - A visitor asking for reduced motion (`prefers-reduced-motion: reduce`) gets no animation from the swap whatever the stylesheet says; a full load animates for them unless the rule sits in `@media (prefers-reduced-motion: no-preference)`, as the one `kay new` writes does.
 - `navigation: false` in `kay.config.ts` or `pages()` turns it off: pages load fully, and only pages with islands ship a script.

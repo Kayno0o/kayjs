@@ -20,7 +20,7 @@ export function click(element: Element | null): void {
 
 const STEP_MS = 10
 
-// A fake clock for a test of what a timer does. `mount` and `settle` wait on a real timer, so a component is mounted first and the clock started after; `clock.settle` stands for `settle` from then on, and `clock.stop` ends it.
+// A fake clock for a test of what a timer does. `mountComponent` and `settle` wait on a real timer, so a component is mounted first and the clock started after; `clock.settle` stands for `settle` from then on, and `clock.stop` ends it.
 export const clock = {
   faked: false,
   start() {
