@@ -31,7 +31,7 @@ async function remove(keys: string[]): Promise<boolean> {
 ---
 Table.kcms-uploads(columns={columns} rows={uploads} rowKey={upload => upload.key} selectable)
   @bulk(keys, clear)
-    ConfirmDelete(message={wording('cms.uploads.deleteMany', keys.length === 1 ? 'Delete 1 upload and its variants? Check that no page, unsaved form or older revision uses it: this cannot be undone.' : 'Delete {count} uploads and their variants? Check that no page, unsaved form or older revision uses them: this cannot be undone.', { count: keys.length })} label={wording('cms.uploads.deleteSelected', 'Delete {count} selected', { count: keys.length })} failure={wording('cms.save.deleteFailure', 'Could not delete')} size="sm" variant="ghost" onConfirm={async () => { if (await remove(keys.map(String))) clear() }})
+    ConfirmDelete(message={wording('cms.uploads.deleteMany', keys.length === 1 ? 'Delete 1 upload and their variants? Check that no page, unsaved form or older revision uses them: this cannot be undone.' : 'Delete {count} uploads and their variants? Check that no page, unsaved form or older revision uses them: this cannot be undone.', { count: keys.length })} label={wording('cms.uploads.deleteSelected', 'Delete {count} selected', { count: keys.length })} failure={wording('cms.save.deleteFailure', 'Could not delete')} size="sm" variant="ghost" onConfirm={async () => { if (await remove(keys.map(String))) clear() }})
   @cell(row, column)
     if column.key === 'key'
       a(href={row.url} target="_blank" rel="noopener") {row.key}

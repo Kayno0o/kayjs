@@ -17,10 +17,10 @@ import { collectionPath, entryPath, onPagePath } from '../listing'
 // An entry's form on its own screen, or a new entry's when `entry` is left out.
 const { prefix, collection, entry, locale } = props<{ prefix: string, collection: CollectionInfo, entry?: StoredEntry | undefined, locale?: string | undefined }>()
 
-// Nothing on this screen shows the entry rendered, so a change waits for no draft render.
 // Looks up what the form reads only once the page has loaded, so the page sends it.
 shipWords()
 
+// Nothing on this screen shows the entry rendered, so a change waits for no draft render.
 const drafts = createDrafts({ show: async () => ({}) })
 // A new entry's draft is kept under no slug until it is saved under the one typed.
 const ref: EntryRef = { collection: collection.name, slug: entry?.slug ?? '', locale: entry?.locale ?? locale }
