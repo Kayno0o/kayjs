@@ -72,3 +72,13 @@ test('words a refusal for size and emptiness once, for the editor and the server
   expect(tooLarge('a.pdf', 600, 500)).toBe('a.pdf is 600 bytes, over the 500 bytes an upload may be')
   expect(emptyFile('')).toBe('The file is empty')
 })
+
+test('refuses a maxSize the server would not take, Bun refusing a request body over 128 MB before the route sees it', () => {
+  const most = 128 * 1024 * 1024 - 64 * 1024
+
+  configure({ uploads: { maxSize: most } })
+  expect(uploadBodyLimit()).toBe(128 * 1024 * 1024)
+
+  for (const maxSize of [most + 1, '128mb', '200mb', 1e12])
+    expect(() => configure({ uploads: { maxSize } as never })).toThrow(/maxSize.*at most/)
+})

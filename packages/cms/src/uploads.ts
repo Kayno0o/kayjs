@@ -1,8 +1,5 @@
 import { wording } from 'kay/words'
-import { settings } from './settings'
-
-// What the multipart framing around the file adds to a request, so a file exactly at the limit is not refused for its envelope.
-const ENVELOPE = 64 * 1024
+import { ENVELOPE, settings } from './settings'
 
 const NAME_EXTENSION = /\.[a-z\d]{1,10}$/i
 const TYPE_PARAMETERS = /;.*$/

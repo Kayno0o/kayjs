@@ -21,7 +21,7 @@ export interface CmsOptions {
   guard?: Guard | LazyGuard | undefined
   // Where a folder entry's file goes: `forgejo(...)` on a deployed site, the working tree by default, for `kay dev`.
   files?: FileSaver | undefined
-  // The types an upload may have, exact or as `image/*`: PNG, JPEG, WebP, GIF, AVIF and PDF by default; `{ types, maxSize }` also sets the most an upload may weigh, in bytes or as `'50mb'`, 20 MB by default. The upload route takes that size whatever the app's `bodyLimit` is.
+  // The types an upload may have, exact or as `image/*`: PNG, JPEG, WebP, GIF, AVIF and PDF by default; `{ types, maxSize }` also sets the most an upload may weigh, in bytes or as `'50mb'`, 20 MB by default, 127.9 MB at most (Bun refuses a request body over 128 MB). The upload route takes that size whatever the app's `bodyLimit` is.
   uploads?: string[] | UploadOptions | undefined
   // Collections whose bodies may hold HTML that runs as the site, such as a `<script>` or an `onclick`, which a save is otherwise refused for.
   rawHtml?: string[] | undefined
@@ -45,6 +45,13 @@ const DEFAULT_UPLOADS = ['image/png', 'image/jpeg', 'image/webp', 'image/gif', '
 // A photo straight off a phone fits; kay's own limit of 1 MB would not.
 const DEFAULT_MAX_SIZE = 20 * 1024 * 1024
 
+// Bun refuses a request body over 128 MB, its default `maxRequestBodySize`, before the route reads it, and the multipart body is buffered in memory; the envelope around the file counts toward it.
+const BUN_BODY_LIMIT = 128 * 1024 * 1024
+
+// What the multipart framing around the file adds to a request, so a file exactly at the limit is not refused for its envelope.
+export const ENVELOPE = 64 * 1024
+const LARGEST_MAX_SIZE = BUN_BODY_LIMIT - ENVELOPE
+
 const TRAILING_SLASHES = /\/+$/
 
 let current: CmsSettings | undefined
@@ -66,6 +73,9 @@ function uploadSize(maxSize: ByteSize | undefined): number {
 
   if (!Number.isInteger(bytes))
     throw new Error(`kayjs-cms: \`cms({ uploads: { maxSize } })\` is ${JSON.stringify(maxSize)}, which is ${bytes} bytes; it takes a whole number of bytes`)
+
+  if (bytes > LARGEST_MAX_SIZE)
+    throw new Error(`kayjs-cms: \`cms({ uploads: { maxSize } })\` is ${JSON.stringify(maxSize)}, which is ${bytes} bytes; it takes at most ${LARGEST_MAX_SIZE} bytes, 128 MB less the multipart envelope, as Bun refuses a request body over 128 MB before the upload route sees it`)
 
   return bytes
 }

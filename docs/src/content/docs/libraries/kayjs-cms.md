@@ -59,7 +59,7 @@ A file field takes PNG, JPEG, WebP, GIF, AVIF and PDF files. Set `uploads` to li
 
 An upload may weigh 20 MB by default. `uploads: { types, maxSize }` sets either, `maxSize` in bytes or as a string such as `'50mb'`, for a site of videos or large PDFs, or `'2mb'` for a portfolio that wants less; a part left out keeps its default.
 
-The upload route takes `maxSize` whatever the app's `bodyLimit` is, so nothing else is raised. The editor refuses an oversized file before sending it, and the server stays the one that decides. A size that is zero, negative or not a whole number of bytes stops `kay.config.ts` from loading.
+The upload route takes `maxSize` whatever the app's `bodyLimit` is, so nothing else is raised. The editor refuses an oversized file before sending it, and the server stays the one that decides. A size that is zero, negative, not a whole number of bytes or over 128 MB less 64 KB stops `kay.config.ts` from loading: Bun refuses a request body over 128 MB before the route sees it, and the upload is buffered in memory.
 
 Replacing or removing a file leaves the old upload stored. The unused-uploads screen at `<prefix>/uploads` lists the uploads no entry mentions, and deletes only the ones you confirm, and only with a `guard`.
 
