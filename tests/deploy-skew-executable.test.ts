@@ -115,7 +115,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a tab of a
     upstream = before
   })
 
-  // A tab is only opened before a deploy once it has what it does about one, which it loads when idle.
+  // A tab is only opened before a deploy once it has what it does about one, which it has once its scripts ran.
   const open = async (): Promise<TestPage> => {
     upstream = before
     tab = await browse(front.url.origin, { path, strict: false })

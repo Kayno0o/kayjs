@@ -9,7 +9,7 @@ import { joinBase } from '../src/runtime/base'
 import { pages } from '../src/server'
 import { rebaseHtml } from '../src/server/base'
 import { IMAGE_LINK } from '../src/server/prerender'
-import { expectEagerJsWithin } from './eager-js'
+import { expectEagerJsWithin, lazyChunks } from './eager-js'
 import { fixtureCopy } from './scratch'
 
 const FIXTURE = resolve('tests/fixtures/static')
@@ -18,6 +18,7 @@ const BASE = '/repo'
 // The gzipped JS a page with one small island loads before anything is clicked, a few bytes above what it measures: a change growing it pays for its bytes with a cut elsewhere in the eager runtime, or, when none is clean and it buys speed or reliability in the browser, raises this.
 // The runtime is split by who imports each name, which costs the import statements between its chunks, about 12 bytes here.
 const EAGER_JS_BUDGET = 9_398
+const LAZY_CHUNKS = ['fetch-island', 'forms', 'live-cache', 'page-swap', 'reveal', 'static-slots']
 const SCRIPT_URL = /<(?:script type="module" src|link rel="modulepreload" href)="([^"]+)"/g
 
 let out: string
@@ -194,6 +195,8 @@ describe('kay build --static', () => {
     const holding = await Promise.all(chunks.map(async chunk => (await Bun.file(join(out, chunk)).text()).includes('kay-reloaded')))
 
     expect(eager.filter(code => code.includes('kay-reloaded'))).toHaveLength(1)
+    // A new chunk the entry imports is checked not to load on idle before it is listed here.
+    expect(lazyChunks(eager)).toEqual(LAZY_CHUNKS)
     // A chunk loaded later is gone once a deploy dropped the chunks, so the reload could not run from it.
     expect(holding.filter(Boolean)).toHaveLength(1)
   })

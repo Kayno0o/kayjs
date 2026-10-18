@@ -1,4 +1,5 @@
 import type { TestPage } from '../src/test'
+import { expect } from 'bun:test'
 
 interface Hydrating { $kayHydrate: (root?: ParentNode) => Promise<void> }
 
@@ -9,7 +10,7 @@ export async function ready(page: TestPage): Promise<void> {
 
 // Makes the page fetch `count` deferred server islands, whose answers it checks for the build they name, and returns once each answered.
 export async function askServerIslands(page: TestPage, count: number): Promise<void> {
-  await page.evaluate(async (total) => {
+  const pending = await page.evaluate(async (total) => {
     const slots: HTMLElement[] = []
 
     for (let index = 0; index < total; index++) {
@@ -26,9 +27,15 @@ export async function askServerIslands(page: TestPage, count: number): Promise<v
     for (let waited = 0; waited < 100 && slots.some(slot => slot.hasAttribute('inert')); waited++)
       await new Promise(resolve => setTimeout(resolve, 50))
 
+    const left = slots.filter(slot => slot.hasAttribute('inert')).length
+
     for (const slot of slots)
       slot.remove()
+
+    return left
   }, count)
+
+  expect(pending, 'server islands that never answered').toBe(0)
 }
 
 // Makes the page hydrate an island whose chunk is gone, as one a deploy dropped, which asks whether the page is stale.
@@ -47,7 +54,6 @@ export async function loadDroppedChunk(page: TestPage): Promise<void> {
       // The chunk is gone for good: the failure is what the island reports once the page is not stale.
     }
 
-    await new Promise(resolve => setTimeout(resolve, 600))
     slot.remove()
   })
 }

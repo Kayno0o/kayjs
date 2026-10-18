@@ -485,7 +485,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a tab open
     tab = undefined
   })
 
-  // A tab is only opened before a deploy once it has what it does about one, which it loads when idle.
+  // A tab is only opened before a deploy once it has what it does about one, which it has once its scripts ran.
   const open = async (): Promise<TestPage> => {
     tab = await browse(host.server.url.href, { path, strict: false })
     await ready(tab)
