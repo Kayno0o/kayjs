@@ -210,7 +210,9 @@ The dry run lists what would be translated, down to the fields of each entry, an
 
 A translation is kept only when it keeps what the original had. Every `{placeholder}` stays, with the same name. Plural messages get the forms the language needs, such as `few` and `many` in Russian. Tags such as `<b>` stay.
 
-In a tag only the text of `title`, `alt`, `aria-label` and `placeholder` is translated, and `href`, `src` and every other attribute stay as they were. A text, original or reply, holding a tag the check cannot read (an odd quote in it) is never written. A line break the original did not have is refused. A reply that does not pass is asked for once more, then dropped and reported. Nothing wrong is ever written.
+In a tag only the text of `title`, `alt`, `aria-label` and `placeholder` is translated, and `href`, `src` and every other attribute stay as they were. A text, original or reply, holding a tag the check cannot read (an odd quote in it) is never written, and an original holding one fails at once, without asking the model.
+
+The tags and comments of a reply must come in the order of the original. A line break the original did not have is refused. A reply that does not pass is asked for once more, then dropped and reported. Nothing wrong is ever written.
 
 Messages are saved with a `// draft` comment, so `kay check` warns until you read them and run `kay i18n accept fr`. An entry of a localized collection is saved in the `fr` folder, and never over an entry that is already there.
 

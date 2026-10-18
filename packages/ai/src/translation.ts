@@ -31,6 +31,8 @@ const TAG_START = /<\/?[A-Z][\w-]*\b/gi
 const MARKUP_START = /<[!?]/g
 // HTML whitespace is these five characters only: JS `\s` also matches a no-break space, which a browser reads as part of a value.
 const ATTRIBUTE = /([^\t\n\f\r =/"'<>]+)(?:[\t\n\f\r ]*=[\t\n\f\r ]*(?:"([^"]*)"|'([^']*)'|([^\t\n\f\r "'>]+)))?/g
+// A quote opens a value only right after `=`, spaces allowed: anywhere else a browser reads it as part of a name or an unquoted value.
+const OPENS_VALUE = /=[\t\n\f\r ]*$/
 const TAG_NAME = /^<\/?[\w-]+/
 // The attributes whose value is text a reader sees: a translation may change them, every other attribute is kept exactly.
 const VISIBLE_ATTRIBUTES = new Set(['title', 'alt', 'placeholder', 'aria-label'])
@@ -83,10 +85,18 @@ export function estimateTokens(units: Unit[], from: string, into: string, reques
   return { input: Math.ceil((payload + systemPrompt(from, into).length * requests) / CHARS_PER_TOKEN), output: Math.ceil(payload * OUTPUT_FACTOR / CHARS_PER_TOKEN) }
 }
 
-// Asks for the units to be translated, and asks again once for those whose reply failed its checks; a unit still failing is reported and never kept.
+// Asks for the units to be translated, never for one whose source the check cannot read, and asks again once for those whose reply failed its checks; a unit still failing is reported and never kept.
 export async function translateUnits(units: Unit[], { from, into, signal }: TranslateOptions): Promise<Translation> {
   const result: Translation = { done: new Map(), failed: new Map(), inputTokens: 0, outputTokens: 0 }
-  let pending = units
+  let pending: Unit[] = []
+
+  for (const unit of units) {
+    if (scanTags(unit.text).unreadable)
+      result.failed.set(unit.id, 'its source holds a tag the check cannot read')
+    else
+      pending.push(unit)
+  }
+
   let problems: string[] = []
 
   for (let attempt = 0; attempt < ATTEMPTS && pending.length > 0; attempt++) {
@@ -178,9 +188,9 @@ function tagShape(tag: string): string {
   return JSON.stringify([name.toLowerCase(), ...attributes.toSorted()])
 }
 
-// The tags of a text, their quoted attribute values allowed to hold `>`, and whether one starts that the scan cannot end (an odd quote, a `<` inside it): the scan stops at it, so a text holding one is never compared.
-function scanTags(text: string): { tags: string[], unreadable: boolean } {
-  const tags: string[] = []
+// The tags of a text with where each starts, their quoted attribute values allowed to hold `>`, and whether one starts that the scan cannot end (a quote not opening a value, an odd quote, a `<` inside it): the scan stops at it, so a text holding one is never compared.
+function scanTags(text: string): { tags: { tag: string, index: number }[], unreadable: boolean } {
+  const tags: { tag: string, index: number }[] = []
   let from = 0
 
   for (;;) {
@@ -198,6 +208,9 @@ function scanTags(text: string): { tags: string[], unreadable: boolean } {
       const char = text[end]!
 
       if (char === '"' || char === '\'') {
+        if (!OPENS_VALUE.test(text.slice(start.index, end)))
+          return { tags, unreadable: true }
+
         const close = text.indexOf(char, end + 1)
 
         if (close === -1)
@@ -217,9 +230,16 @@ function scanTags(text: string): { tags: string[], unreadable: boolean } {
     if (!closed)
       return { tags, unreadable: true }
 
-    tags.push(text.slice(start.index, end))
+    tags.push({ tag: text.slice(start.index, end), index: start.index })
     from = end
   }
+}
+
+// The tags and the starts of comments, CDATA sections and instructions in the order they stand, so a reply that reorders them, or moves one into or out of a comment, differs from its source.
+function structure(text: string, tags: { tag: string, index: number }[]): string[] {
+  const markup = Array.from(text.matchAll(MARKUP_START), ({ 0: start, index }) => ({ shape: start, index }))
+
+  return [...tags.map(({ tag, index }) => ({ shape: tagShape(tag), index })), ...markup].toSorted((a, b) => a.index - b.index).map(({ shape }) => shape)
 }
 
 function same(a: string[], b: string[]): boolean {
@@ -257,7 +277,7 @@ export function unitProblem(unit: Unit, value: unknown): string | undefined {
   if (source.unreadable || reply.unreadable)
     return 'holds a tag the check cannot read'
 
-  if (!same(source.tags.map(tagShape).toSorted(), reply.tags.map(tagShape).toSorted()) || unit.text.match(MARKUP_START)?.length !== value.match(MARKUP_START)?.length)
+  if (!same(structure(unit.text, source.tags), structure(value, reply.tags)))
     return 'changes the tags of the source'
 
   if (unit.kind === 'markdown' && (!same(found(unit.text, LINK_TARGET), found(value, LINK_TARGET)) || unit.text.match(FENCE)?.length !== value.match(FENCE)?.length))

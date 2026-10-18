@@ -107,7 +107,7 @@ it('reads attributes with HTML whitespace only, so no-break space cannot hide a 
 
   for (const space of ['\u00A0', '\u000B', '\uFEFF', '\u3000']) {
     for (const quote of ['"', '\''])
-      expect(unitProblem(source, `<a title=${space}${quote}> <img src=x onerror=alert(1)> ${quote}>x</a>`)).toBe('changes the tags of the source')
+      expect(unitProblem(source, `<a title=${space}${quote}> <img src=x onerror=alert(1)> ${quote}>x</a>`)).toBe(UNREADABLE)
   }
 
   expect(unitProblem(source, '<a title= "Accueil">x</a>')).toBeUndefined()
@@ -115,4 +115,51 @@ it('reads attributes with HTML whitespace only, so no-break space cannot hide a 
 
 it('asks for the visible attributes to be translated', () => {
   expect(systemPrompt('en', 'fr')).toContain('title, alt, aria-label')
+})
+
+it('rejects a reply that reorders the tags of the source, or moves one into or out of a comment', () => {
+  expect(unitProblem(message('<b>x</b> <i>y</i>'), '<i>y</i> <b>x</b>')).toBe('changes the tags of the source')
+  expect(unitProblem(message('<b>x</b> a'), '</b>a <b>x')).toBe('changes the tags of the source')
+  expect(unitProblem(message('<b>x</b> <i>y</i>'), '<b>x</b> <i>y</i>')).toBeUndefined()
+  expect(unitProblem(message('<b>x</b> <i>y</i>'), '<b>X</b> <i>Y</i>')).toBeUndefined()
+  expect(unitProblem(message('<b>x</b> <!-- c --> <i>y</i>'), '<!-- c --> <b>x</b> <i>y</i>')).toBe('changes the tags of the source')
+  expect(unitProblem(message('<!-- <b> --> x </b>'), '<b> <!-- x --> </b>')).toBe('changes the tags of the source')
+  expect(unitProblem(message('<!-- <b> --> x </b>'), '<!-- <b> --> y </b>')).toBeUndefined()
+  expect(unitProblem(message('<a title="Home" href="/x">x</a>'), '<a href="/x" title="Accueil">x</a>')).toBeUndefined()
+})
+
+it('opens a quoted span only after an equals sign, as a browser does', () => {
+  const source = message('<a title="Home">x</a>')
+
+  expect(unitProblem(source, '<a x"> <img src=x onerror=alert(1)> ">x</a>')).toBe(UNREADABLE)
+  expect(unitProblem(message('<a x">y</a>'), '<a x">y</a>')).toBe(UNREADABLE)
+  expect(unitProblem(source, '<a title=b"c>x</a>')).toBe(UNREADABLE)
+  expect(unitProblem(source, '<a title="Accueil" x\'>x</a>')).toBe(UNREADABLE)
+  expect(unitProblem(source, '<a title = "Accueil">x</a>')).toBeUndefined()
+  expect(unitProblem(source, '<a title=\'Accueil\'>x</a>')).toBeUndefined()
+})
+
+it('fails a unit whose source holds an unreadable tag up front, without a request', async () => {
+  const { fakeAi } = await import('../src')
+
+  fakeAi.clear()
+  fakeAi.reply('{ "1": "Salut" }')
+
+  const result = await translateUnits([message('Hi'), { id: '2', text: 'It\'s <a b=\'c', kind: 'message' }], { from: 'en', into: 'fr' })
+
+  expect([...result.done]).toEqual([['1', 'Salut']])
+  expect(result.failed.get('2')).toBe('its source holds a tag the check cannot read')
+  expect(fakeAi.asked).toHaveLength(1)
+  expect(Object.keys(JSON.parse(fakeAi.asked[0]!.messages.at(-1)!.content) as object)).toEqual(['1'])
+
+  fakeAi.clear()
+  fakeAi.reply('{ "2": "Salut" }')
+
+  const only = await translateUnits([{ id: '2', text: '<a b="c', kind: 'message' }], { from: 'en', into: 'fr' })
+
+  expect(only.done.size).toBe(0)
+  expect(only.failed.get('2')).toBe('its source holds a tag the check cannot read')
+  expect(fakeAi.asked).toHaveLength(0)
+  expect(only.inputTokens).toBe(0)
+  fakeAi.clear()
 })
