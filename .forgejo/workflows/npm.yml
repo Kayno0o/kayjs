@@ -37,7 +37,7 @@ jobs:
           key: bun-${{ runner.os }}-${{ hashFiles('bun.lock', 'bench/apps/*/bun.lock') }}
           restore-keys: bun-${{ runner.os }}-
 
-      # The checks below are skipped once the Tests workflow, which makes them all, passed this tree: on the tagged commit itself when code commits were pushed with it, as the runner takes one job at a time and ran Tests first, or on its parent when the tagged commit only changes the versions: those of kay and its libraries, their peer on kay and the lockfile recording them. Anything else, or a status that cannot be read, runs them all.
+      # The checks below are skipped once the Tests workflow passed this tree, which makes them all but the lint `just land` ran before pushing it: on the tagged commit itself when code commits were pushed with it, as the runner takes one job at a time and ran Tests first, or on its parent when the tagged commit only changes the versions: those of kay and its libraries, their peer on kay and the lockfile recording them. Anything else, or a status that cannot be read, runs them all.
       - name: Find whether this tree was already tested
         id: tested
         run: |
