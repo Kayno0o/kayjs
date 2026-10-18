@@ -11,6 +11,18 @@ bun run docs:start   # kay start docs --port 3000
 
 The docs can no longer be exported as static files: the chat page exports an action, which only a server can take.
 
+## Docker
+
+```sh
+docker compose -f docs/compose.yaml up -d --build   # from the repository root
+```
+
+`docs/Dockerfile` builds the docs on the repository checkout and runs `kay start`, not a compiled executable, as the chat reads `llms.txt`, `llms/` and the pages from disk. Compose publishes it on `127.0.0.1:3000` only, for nginx to proxy.
+
+## Environment
+
+The server reads `docs/.env`, which git ignores, with `bun run docs:start` and in Docker alike (compose passes it as `env_file`, and the image is built without it). Copy `docs/.env.example` there and fill in the key.
+
 ## The chat
 
 `/ask` answers questions about kay from `llms.txt`, and reads more through two actions it is offered as tools: `search_docs` and `read_page`. Its code is `src/routes/(docs)/ask.kay` and `src/chat-corpus.ts`.

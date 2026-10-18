@@ -1,0 +1,10 @@
+**/node_modules
+**/.kay
+**/.env
+**/.env.*
+.git
+.claude
+dist
+docs/dist
+examples/noticeboard/server
+examples/noticeboard/data

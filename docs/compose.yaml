@@ -1,0 +1,15 @@
+# Run from the root of kay's repository: docker compose -f docs/compose.yaml up -d --build
+name: kay-docs
+services:
+  docs:
+    build:
+      context: ..
+      dockerfile: docs/Dockerfile
+    restart: unless-stopped
+    # On the loopback only: `proxy: true` trusts X-Forwarded-For, so visitors reach the server through nginx alone.
+    ports:
+      - 127.0.0.1:3000:3000
+    # The chat's OPENAI_API_KEY, AI_BASE_URL and AI_MODEL, see README.md; without the file the site serves and the chat says it is not available.
+    env_file:
+      - path: .env
+        required: false
