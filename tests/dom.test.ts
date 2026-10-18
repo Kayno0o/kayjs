@@ -2109,6 +2109,73 @@ describe('the live reload script', () => {
       reload.mockRestore()
     }
   })
+
+  it('backs off to one connection every five seconds once the server stays down, and waits for a hidden tab to be shown', () => {
+    const sources: { closed: boolean, onerror?: () => void }[] = []
+    const delays: number[] = []
+    const due: (() => void)[] = []
+    const Source = class {
+      closed = false
+      onerror?: () => void
+      constructor() {
+        sources.push(this)
+      }
+
+      close() {
+        this.closed = true
+      }
+
+      addEventListener() {
+        return undefined
+      }
+    }
+    const fail = (times: number) => {
+      for (let time = 0; time < times; time++) {
+        sources.at(-1)!.onerror!()
+        due.shift()!()
+      }
+    }
+    const script = (/<script>([\s\S]*)<\/script>/).exec(liveReload())![1]!
+    let isHidden = false
+
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => isHidden })
+
+    // eslint-disable-next-line no-new-func -- runs the inline script a dev page carries
+    ;(new Function('EventSource', 'setTimeout', script) as (source: typeof Source, timeout: (run: () => void, delay: number) => void) => void)(Source, (run, delay) => {
+      delays.push(delay)
+      due.push(run)
+    })
+
+    try {
+      fail(300)
+
+      // A restart within ten seconds is met within a quarter second, and a server down for minutes is tried every five seconds.
+      const fast = delays.slice(0, 50 + 40).reduce((sum, delay) => sum + delay, 0)
+
+      expect(Math.max(...delays.slice(0, 90))).toBe(250)
+      expect(fast).toBeLessThan(12_000)
+      expect(delays.at(-1)).toBe(5000)
+      expect(Math.max(...delays)).toBe(5000)
+      expect(delays.slice(-100).reduce((sum, delay) => sum + delay, 0) / 100).toBe(5000)
+
+      // A hidden tab sets no timer, and connects at once when shown.
+      isHidden = true
+      const count = sources.length
+      const timers = delays.length
+
+      sources.at(-1)!.onerror!()
+      expect(delays).toHaveLength(timers)
+      expect(sources).toHaveLength(count)
+      isHidden = false
+      document.dispatchEvent(new Event('visibilitychange'))
+      expect(sources).toHaveLength(count + 1)
+      sources.at(-1)!.onerror!()
+      expect(delays.at(-1)).toBe(10)
+    }
+    finally {
+      delete (document as { hidden?: boolean }).hidden
+    }
+  })
 })
 
 describe('actions called from the browser', () => {

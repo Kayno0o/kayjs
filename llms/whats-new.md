@@ -12,6 +12,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - A page importing an `~icons/<set>/<name>` icon, or whose layouts, components or modules do, is prerendered like one importing an image, instead of being rendered per request ([Prerendering](prerendering.md#prerendering)).
 - A page importing an `~icons/<set>/<name>` icon of an installed set, or whose layouts, components or modules do, is prerendered like one importing an image, instead of being rendered per request ([Prerendering](prerendering.md#prerendering)).
 - The dev tool's Head, Images, Env and Not found tabs show their warning counts from the page load and after each page swap, without opening the tab ([dev server](dev-server.md)).
+- A tab left open on a stopped `kay dev` server, or behind a proxy answering 502 for it, retries its events stream every five seconds after ten seconds down instead of four times a second, still meets a restart within a quarter second, and a hidden tab waits until it is shown ([kay dev](dev-server.md)).
 
 ## 1.53.0
 

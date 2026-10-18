@@ -119,6 +119,8 @@ A change to a file at the project root, such as `.env` or `package.json`, starts
 
 These changes reload nothing: tests (`tests/`, `test/`, `e2e/`, `__tests__/`, and `*.test.*` and `*.spec.*` files anywhere), root files no server reads such as a README or a LICENSE, and the backup and temporary files an editor writes beside a source. A save that touches `.css` files alone restarts nothing and swaps the stylesheets in the open pages.
 
+A page whose server stopped tries to reconnect at once, then less often: four times a second for the first ten seconds, then every five seconds, so a tab left open on a stopped server stays quiet. A hidden tab waits until you show it.
+
 Open pages refresh by themselves, an edited island is swapped in place, and a project that fails to compile shows its errors in the browser. Every page carries the [dev tool and inspector](/guides/performance).
 
 | Option | Effect |
