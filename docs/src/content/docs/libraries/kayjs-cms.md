@@ -39,7 +39,7 @@ export default defineConfig({
 })
 ```
 
-The screens live at `/admin`. Set `prefix` to move them, to `/` if the site is only the screens. They stay closed without a `guard`.
+The screens live at `/admin`. Set `prefix` to move them, to `/` if the site is only the screens. They stay closed without a `guard`. They fit a phone, so a client can edit from one: the entry lists stack as cards and the controls stay big enough to tap.
 
 `guard` also takes the built guard itself, `auth.guard({ require: 'editor' })`. Then `kay.config.ts` imports `./src/auth`, and with it the app's database, for every `kay build` and `kay check`.
 
