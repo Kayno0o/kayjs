@@ -21,6 +21,15 @@ afterAll(async () => {
   await GlobalRegistrator.unregister()
 })
 
+// Each call is a chunk failing on its own, more than the seconds a confirmed build is believed after the last, which a page's earlier answer must not stand in for.
+let now = Date.now()
+
+async function probe(): Promise<boolean> {
+  now += 6000
+
+  return reloadIfStale()
+}
+
 // The page was rendered for build `aaa`; a response names the build the server runs.
 function answer(build: string | undefined, status = 200, body = ''): Response {
   return new Response(body, { status, headers: build === undefined ? {} : { [BUILD_HEADER]: build } })
@@ -29,6 +38,7 @@ function answer(build: string | undefined, status = 200, body = ''): Response {
 describe('a page noticing a deploy', () => {
   let reload: Mock<() => void>
   let fetched: Mock<typeof fetch>
+  let clock: Mock<typeof Date.now>
   const environment = process.env.NODE_ENV
 
   beforeEach(() => {
@@ -40,12 +50,15 @@ describe('a page noticing a deploy', () => {
     process.env.NODE_ENV = 'production'
     reload = spyOn(location, 'reload').mockImplementation(() => undefined)
     fetched = spyOn(globalThis, 'fetch')
+    now += 6000
+    clock = spyOn(Date, 'now').mockImplementation(() => now)
   })
 
   afterEach(() => {
     process.env.NODE_ENV = environment ?? 'test'
     reload.mockRestore()
     fetched.mockRestore()
+    clock.mockRestore()
   })
 
   it('reloads for an action the new build dropped, once, and keeps the next link a full load', async () => {
@@ -95,7 +108,7 @@ describe('a page noticing a deploy', () => {
   it('asks the server once for chunks of one page failing together', async () => {
     fetched.mockResolvedValue(answer('bbb'))
 
-    expect(await Promise.all([reloadIfStale(), reloadIfStale(), reloadIfStale()])).toEqual([true, true, true])
+    expect(await Promise.all([probe(), probe(), probe()])).toEqual([true, true, true])
     expect(fetched).toHaveBeenCalledTimes(1)
     expect(reload).toHaveBeenCalledTimes(1)
   })
@@ -103,11 +116,11 @@ describe('a page noticing a deploy', () => {
   it('reports the failure as it is when the server still runs this build, as a network that dropped does', async () => {
     fetched.mockResolvedValue(answer('aaa'))
 
-    expect(await reloadIfStale()).toBe(false)
+    expect(await probe()).toBe(false)
 
     fetched.mockRejectedValue(new TypeError('offline'))
 
-    expect(await reloadIfStale()).toBe(false)
+    expect(await probe()).toBe(false)
     expect(reload).not.toHaveBeenCalled()
     expect(navigation.stale).toBeUndefined()
   })
@@ -115,16 +128,16 @@ describe('a page noticing a deploy', () => {
   it('reads the build off the page of a static host, which names none in a header', async () => {
     fetched.mockResolvedValue(answer(undefined, 200, '<html><head><meta name="kay-build" content="bbb"></head></html>'))
 
-    expect(await reloadIfStale()).toBe(true)
+    expect(await probe()).toBe(true)
 
     sessionStorage.clear()
     fetched.mockResolvedValue(answer(undefined, 200, '<html><head><meta name="kay-build" content="aaa"></head></html>'))
 
-    expect(await reloadIfStale()).toBe(false)
+    expect(await probe()).toBe(false)
 
     fetched.mockResolvedValue(answer(undefined, 200, '<h1>A page with no build</h1>'))
 
-    expect(await reloadIfStale()).toBe(false)
+    expect(await probe()).toBe(false)
     expect(reload).toHaveBeenCalledTimes(1)
   })
 
@@ -132,21 +145,21 @@ describe('a page noticing a deploy', () => {
     document.body.innerHTML = '<form><input name="note" value="kept"><input type="checkbox" name="agree"></form>'
     fetched.mockResolvedValue(answer('bbb'))
 
-    expect(await reloadIfStale()).toBe(true)
+    expect(await probe()).toBe(true)
 
     reload.mockClear()
     sessionStorage.clear()
     delete navigation.stale
     document.querySelector('input')!.value = 'typed'
 
-    expect(await reloadIfStale()).toBe(false)
+    expect(await probe()).toBe(false)
     expect(reload).not.toHaveBeenCalled()
     expect(navigation.stale as boolean | undefined).toBe(true)
 
     document.querySelector('input')!.value = 'kept'
     document.querySelector<HTMLInputElement>('input[type=checkbox]')!.checked = true
 
-    expect(await reloadIfStale()).toBe(false)
+    expect(await probe()).toBe(false)
     expect(reload).not.toHaveBeenCalled()
   })
 
@@ -157,7 +170,7 @@ describe('a page noticing a deploy', () => {
     fetched.mockResolvedValue(answer('bbb'))
 
     try {
-      expect(await reloadIfStale()).toBe(false)
+      expect(await probe()).toBe(false)
       expect(reload).not.toHaveBeenCalled()
       expect(navigation.stale).toBe(true)
     }
@@ -179,7 +192,7 @@ describe('a page noticing a deploy', () => {
     })
 
     try {
-      expect(await reloadIfStale()).toBe(false)
+      expect(await probe()).toBe(false)
       expect(reload).not.toHaveBeenCalled()
     }
     finally {
@@ -189,13 +202,13 @@ describe('a page noticing a deploy', () => {
 
   it('reloads again a minute later, and not for another build within it, as replicas on two builds may alternate', async () => {
     fetched.mockResolvedValue(answer('bbb'))
-    expect(await reloadIfStale()).toBe(true)
+    expect(await probe()).toBe(true)
 
     fetched.mockResolvedValue(answer('ccc'))
-    expect(await reloadIfStale()).toBe(false)
+    expect(await probe()).toBe(false)
 
-    sessionStorage.setItem('kay-reloaded', String(Date.now() - 61_000))
-    expect(await reloadIfStale()).toBe(true)
+    sessionStorage.setItem('kay-reloaded', String(now - 61_000))
+    expect(await probe()).toBe(true)
     expect(reload).toHaveBeenCalledTimes(2)
   })
 
@@ -203,20 +216,20 @@ describe('a page noticing a deploy', () => {
     document.body.innerHTML = '<select name="kind"><option>a</option><option>b</option></select><select name="chosen"><option>a</option><option selected>b</option></select>'
     fetched.mockResolvedValue(answer('bbb'))
 
-    expect(await reloadIfStale()).toBe(true)
+    expect(await probe()).toBe(true)
 
     reload.mockClear()
     sessionStorage.clear()
     document.body.innerHTML = '<input name="search" value="">'
     document.querySelector('input')!.value = 'typed'
 
-    expect(await reloadIfStale()).toBe(false)
+    expect(await probe()).toBe(false)
     expect(reload).not.toHaveBeenCalled()
 
     sessionStorage.clear()
     document.body.innerHTML = '<select name="kind"><option>a</option><option>b</option></select>'
     document.querySelector('select')!.selectedIndex = 1
 
-    expect(await reloadIfStale()).toBe(false)
+    expect(await probe()).toBe(false)
   })
 })
