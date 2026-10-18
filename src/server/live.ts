@@ -3,7 +3,7 @@ import type { LiveConfig } from '../config'
 import type { LivePage, LiveRequest, LiveUpdate } from '../runtime/live-value'
 import type { ServerScope } from '../runtime/reactive'
 import { AsyncLocalStorage } from 'node:async_hooks'
-import { onKeysInvalidated, onLiveRead } from '../runtime/cache'
+import { broadcast, onClockHeard, onKeysInvalidated, onLiveRead } from '../runtime/cache'
 import { CACHE_LIVE_ID } from '../runtime/cache-live-id'
 import { checkLiveWrites, live, LIVE_ROUTE, liveSlot, PROOF_LIFETIME_MS, slotValue, watchSlot } from '../runtime/live-value'
 import { currentServerScope } from '../runtime/reactive'
@@ -41,6 +41,9 @@ export const LIVE_HEADER = 'x-kay-live'
 const MAX_STAMPED = 10_000
 // How many watched keys the eviction passes over before it gives up for now, so a set of watched keys does not make each read scan it whole.
 const MAX_SKIPS = 32
+// How far ahead of its clock a process tells the others it has dated reads, and the most it believes another's clock to be ahead of its own.
+const BEAT_MS = 1000
+const MAX_AHEAD_MS = 60_000
 
 interface CacheReads {
   // The time the render read each key it follows.
@@ -100,9 +103,29 @@ onLiveRead((key) => {
     throw new RangeError(`kay: cached('${key.slice(0, 40)}...') with live: true: a route follows keys up to about ${MAX_ROUTE_KEY_BYTES} bytes together, as its proof travels in a header`)
 
   reads.bytes += size
-  reads.at.set(key, Date.now())
+  const now = Date.now()
+
+  reads.at.set(key, now)
 
   remember(key)
+  announce(now)
+})
+
+// The latest clock reading this process told the other processes of, and the latest it heard of from them.
+let announced = 0
+let heardAhead = 0
+
+// Tells the processes sharing a store that this one dates reads up to a second ahead of its clock, at most once a second: a process whose clock is behind then stamps an invalidation after the read, not before it.
+function announce(now: number): void {
+  if (now < announced)
+    return
+
+  announced = now + BEAT_MS
+  broadcast({ keys: [], at: announced })
+}
+
+onClockHeard((at) => {
+  heardAhead = Math.max(heardAhead, Math.min(at, Date.now() + MAX_AHEAD_MS))
 })
 
 // Keeps a key's invalidation time from now on, whichever process rendered the page: the least recent ones go past the bound, but never one a connection watches.
@@ -136,7 +159,7 @@ export function followsCaches(): boolean {
   return (cacheReads.getStore()?.at.size ?? 0) > 0
 }
 
-// An invalidation, this process's or another's, tells the pages following what it dropped: each key gets the time, which only grows.
+// An invalidation, this process's or another's, tells the pages following what it dropped: each key gets the time, which only grows and is never before a read another process dated with a clock ahead of this one.
 onKeysInvalidated((matches) => {
   const slot = liveSlot(CACHE_LIVE_ID)
 
@@ -145,7 +168,7 @@ onKeysInvalidated((matches) => {
 
   for (const key of stamped) {
     if (matches(key))
-      stamps.set(key, Math.max(Date.now(), (slotValue(slot, key) as number) + 1))
+      stamps.set(key, Math.max(Date.now(), heardAhead, (slotValue(slot, key) as number) + 1))
   }
 
   return []

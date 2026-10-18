@@ -20,7 +20,8 @@ export interface CacheStore {
 }
 
 // What one process tells the others: cache keys it dropped, or prerendered page paths it marked stale.
-export type Invalidation = { keys: string[] } | { pages: string[] }
+// `at` is a clock reading of the sending process, which a message naming no key carries to say how far its clock reads.
+export type Invalidation = { keys: string[], at?: number } | { pages: string[] }
 
 export interface CacheOptions {
   // Keeps the value across restarts, and for every process sharing the store; the value must survive devalue, as session data does.
@@ -53,6 +54,8 @@ let tracker: Tracker | undefined
 let readListener: ((key: string) => void) | undefined
 let liveListener: ((key: string) => void) | undefined
 const keyListeners = new Set<(matches: (key: string) => boolean) => string[]>()
+// What hears the clock readings other processes tell of.
+const clockListeners = new Set<(at: number) => void>()
 
 // Stands for every key, in the reads of a render or a load that read more than the server tracks: any invalidation reaches it.
 export const ALL_READS = '\0all'
@@ -164,6 +167,11 @@ export function onKeysInvalidated(listener: (matches: (key: string) => boolean) 
   return () => void keyListeners.delete(listener)
 }
 
+// Hears the clock readings the other processes sharing a store tell of, so a stamp can be dated after a read their clocks made.
+export function onClockHeard(listener: (at: number) => void): void {
+  clockListeners.add(listener)
+}
+
 // A store `invalidate` empties too: each one a call names, and a `sqliteCache` as soon as it opens, so an action invalidating after a restart reaches what the store kept before any page asked for it.
 export function trackStore(store: CacheStore): void {
   if (stores.has(store))
@@ -253,6 +261,14 @@ function heard(message: string): void {
   const invalidation = JSON.parse(message) as Invalidation
 
   if ('keys' in invalidation) {
+    if (typeof invalidation.at === 'number') {
+      for (const listener of clockListeners)
+        listener(invalidation.at)
+    }
+
+    if (invalidation.keys.length === 0)
+      return
+
     const named = new Set(invalidation.keys)
 
     dropEntries(key => named.has(key))
