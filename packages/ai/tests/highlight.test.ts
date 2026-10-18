@@ -162,6 +162,24 @@ describe('highlighting', () => {
     expect(await next('```ts\na\n```\n\n```ts\na\n```\n')).toHaveLength(1)
   })
 
+  it('keeps streaming when highlighting a snapshot rejects', async () => {
+    async function* pieces() {
+      yield { text: 'A\n\n```ts\nx\n```\n' }
+      yield { text: 'B' }
+    }
+
+    const reply = createReply(pieces, [], () => async () => {
+      throw new Error('boom')
+    })
+    const seen = []
+
+    for await (const progress of reply.progress())
+      seen.push(progress)
+
+    expect(seen.at(-1)!.text).toEndWith('B')
+    expect(seen.some(progress => progress.code)).toBe(false)
+  })
+
   it('does not hold the text back while a block is highlighted', async () => {
     let release!: () => void
     const gate = new Promise<void>((resolve) => {

@@ -1,6 +1,9 @@
 import type { CodeBlock, Finish, Piece, Progress, Reply, ToolCall, Usage } from './types'
+import { logFrom } from 'kay'
 import { AiError } from './errors'
 import { highlighting } from './highlight'
+
+const log = logFrom('kayjs-ai')
 
 function snapshot(call: ToolCall): ToolCall {
   return { ...call, input: { ...call.input } }
@@ -177,6 +180,9 @@ export function createReply(open: (signal: AbortSignal) => AsyncIterable<Piece>,
       void (async () => {
         try {
           finished.push(...await highlighted(deltas.join('')))
+        }
+        catch (error) {
+          log.warn('highlighting a reply failed, so its code stays plain', error)
         }
         finally {
           working = false
