@@ -607,7 +607,7 @@ function namespaceMisuse(text: string): string[] {
 }
 
 // Whether a module imported by `specifier` from `source` may hold the export, or hand it on: it is the declaring module, a module naming it or re-exporting everything, or a project path that does not resolve. A package outside the project cannot.
-function reachesModule(specifier: string, source: SourceFile, name: string, declaredIn: string, sources: readonly SourceFile[]): boolean {
+function reachesModule(specifier: string, source: SourceFile, word: RegExp, declaredIn: string, sources: readonly SourceFile[]): boolean {
   if (BUILTIN_SPECIFIER.test(specifier))
     return false
 
@@ -618,14 +618,12 @@ function reachesModule(specifier: string, source: SourceFile, name: string, decl
 
   const target = sources.find(candidate => candidate.file === resolved)
 
-  return target !== undefined && (target.file === declaredIn || new RegExp(`(?<![\\w$])${name.replace(REGEX_CHARS, '\\$&')}(?![\\w$])`).test(target.text) || EXPORT_ALL.test(target.text))
+  return target !== undefined && (target.file === declaredIn || word.test(target.text) || EXPORT_ALL.test(target.text))
 }
 
 // Whether a dynamic import or a `require` in the file may hand over the export: its target is not a literal, or reaches the module holding it.
-function reachesByCall(source: SourceFile, name: string, declaredIn: string, sources: readonly SourceFile[]): boolean {
+function reachesByCall(source: SourceFile, word: RegExp, declaredIn: string, sources: readonly SourceFile[]): boolean {
   source.calls ??= [...source.text.matchAll(DYNAMIC)].map(call => call[2])
-
-  let word: RegExp | undefined
 
   for (const specifier of source.calls) {
     if (specifier === undefined)
@@ -646,8 +644,6 @@ function reachesByCall(source: SourceFile, name: string, declaredIn: string, sou
     if (target === undefined)
       continue
 
-    word ??= new RegExp(`(?<![\\w$])${name.replace(REGEX_CHARS, '\\$&')}(?![\\w$])`)
-
     if (target.file === declaredIn || word.test(target.text) || EXPORT_ALL.test(target.text))
       return true
   }
@@ -659,6 +655,7 @@ function reachesByCall(source: SourceFile, name: string, declaredIn: string, sou
 export function neverWritten(name: string, literal: Literal, declaredIn: string, sources: readonly SourceFile[]): boolean {
   const escaped = name.replace(REGEX_CHARS, '\\$&')
   const uses = new RegExp(`(?<![\\w$])${escaped}(?![\\w$])`, 'g')
+  const word = new RegExp(uses.source)
   const quotedImport = new RegExp(`['"]${escaped}['"]\\s+as\\s`)
 
   // A module outside the project is not read, so a write in it would go unseen.
@@ -671,7 +668,7 @@ export function neverWritten(name: string, literal: Literal, declaredIn: string,
 
     source.misuse ??= namespaceMisuse(source.text)
 
-    if (source.misuse.some(specifier => reachesModule(specifier, source, name, declaredIn, sources)) || reachesByCall(source, name, declaredIn, sources))
+    if (source.misuse.some(specifier => reachesModule(specifier, source, word, declaredIn, sources)) || reachesByCall(source, word, declaredIn, sources))
       return false
 
     if (!source.text.includes(name))

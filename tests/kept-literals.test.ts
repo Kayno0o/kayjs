@@ -565,3 +565,53 @@ describe('an import list with comments', () => {
     expect(await stopOf(files)).toEqual(expect.stringContaining('module state'))
   })
 })
+
+describe('a constant exported inside a default object or array, or later from a server fence', () => {
+  const DEFAULT_PAGE = '---\nimport info from \'../content\'\n---\np {info.CONTACT.email}\n'
+
+  it('stops for a constant exported inside a default object or array, which a write through the default import changes', async () => {
+    const exports: Record<string, string> = {
+      object: 'export default { CONTACT }\n',
+      shorthandMany: 'export default { A: 1, CONTACT, B: 2 }\n',
+      keyed: 'export default { CONTACT: CONTACT }\n',
+      array: 'export default [CONTACT]\n',
+      parenthesised: 'export default ({ CONTACT })\n',
+      asConst: 'export default { CONTACT } as const\n',
+      multiline: 'export default {\n  CONTACT,\n}\n',
+    }
+
+    for (const [key, exported] of Object.entries(exports))
+      expect([key, await stopOf({ 'src/content.ts': `const CONTACT = { email: 'a@b.fr' }\n${exported}`, 'src/routes/index.kay': DEFAULT_PAGE })]).toEqual([key, expect.stringContaining('module state')])
+  })
+
+  it('keeps a page when the default export holds no constant of the module, or the constant is not a container', async () => {
+    const contents: Record<string, string> = {
+      literal: 'const CONTACT = { email: \'a@b.fr\' }\nexport default { email: \'x\' }\n',
+      other: 'const CONTACT = { email: \'a@b.fr\' }\nconst OTHER = 1\nexport default { OTHER }\n',
+      scalar: 'const CONTACT = \'a@b.fr\'\nexport default { CONTACT }\n',
+    }
+
+    for (const [key, content] of Object.entries(contents))
+      expect([key, await stopOf({ 'src/content.ts': content, 'src/routes/index.kay': '---\nimport info from \'../content\'\n---\np {info.email ?? info.OTHER}\n' })]).toEqual([key, undefined])
+  })
+
+  it('judges a constant of a server fence exported later like an exported declaration', async () => {
+    const fences: Record<string, string> = {
+      named: 'const X = { a: 1 }\nexport { X }\n',
+      renamed: 'const X = { a: 1 }\nexport { X as Y }\n',
+      byDefault: 'const X = { a: 1 }\nexport default X\n',
+      inObject: 'const X = { a: 1 }\nexport default { X }\n',
+      declared: 'export const X = { a: 1 }\n',
+    }
+
+    for (const [key, fence] of Object.entries(fences)) {
+      // A rename or a default is followed by no importer, so it leaves the constant state as in a module.
+      const alone = key === 'named' || key === 'declared' ? undefined : expect.stringContaining('module state')
+
+      expect([key, await stopOf({ 'src/routes/index.kay': `--- server\n${fence}---\np {X.a}\n` })]).toEqual([key, alone])
+      expect([key, await stopOf({ 'src/routes/index.kay': `--- server\n${fence}X.a = 2\n---\np {X.a}\n` })]).toEqual([key, expect.stringContaining('module state')])
+    }
+
+    expect(await stopOf({ 'src/routes/index.kay': '--- server\nconst X = { a: 1 }\nX.a = 2\n---\np {X.a}\n' })).toBeUndefined()
+  })
+})

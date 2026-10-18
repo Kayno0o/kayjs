@@ -2,6 +2,10 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
+## Unreleased
+
+- A constant exported inside a default-exported object or array (`export default { CONTACT }`), or exported later from a `--- server` fence, is judged like one exported where it is declared, so a write through the default import keeps its pages per request ([Prerendering](prerendering.md#prerendering)).
+
 ## 1.54.0
 
 - `kay dev` restarts once for a save written in place: a second file event for a file whose content it already took in triggers nothing ([kay dev](dev-server.md)).

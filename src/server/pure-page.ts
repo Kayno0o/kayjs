@@ -7,7 +7,7 @@ import { PAGE, PAGE_SETTINGS } from '../compiler/page-settings'
 import { parseKay } from '../compiler/parser'
 import { analyzeServer } from '../compiler/script'
 import { neverWritten, parseLiteral } from './literal-writes'
-import { exposedBy, stateAt } from './module-state'
+import { exposedBy, laterExportAt, stateAt } from './module-state'
 import { routeChain } from './routes'
 
 // Every export of `kay` and whether a page importing it stays the same for every visitor and every moment: `free` reads no request, cookie, environment or clock; `request` does, or opens a route, a socket or a call that does.
@@ -166,7 +166,10 @@ function moduleStateAt(file: string, source: string, unchanged: Unchanged | unde
       return start + at
   }
 
-  return undefined
+  const fence = parseKay(source).server
+  const later = fence === undefined ? undefined : laterExportAt(source.slice(fence.start, fence.end), unchanged)
+
+  return fence === undefined || later === undefined ? undefined : fence.start + later
 }
 
 // An import or a re-export with what it takes, then one for its effect alone.

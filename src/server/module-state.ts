@@ -13,6 +13,8 @@ const CAST_TYPE = /\b(?:as|satisfies)\s+[\w$.]+$/
 // What may export a name apart from its declaration.
 const EXPORT_LATER = /\bexport\s*(?:\{|default\b)/
 const DEFAULT_NAME = /^export\s+default\s+([\w$]+)\s*(?:;\s*)?$/
+// An `export default` of an object or array, parenthesised or not, which holds whatever it names.
+const DEFAULT_CONTAINER = /^export\s+default\s+(?:\(+\s*)?[[{]/
 const TYPE_ENTRY = /^type\s/
 const NEW_CONTAINER = /^new\s+(?:Map|Set|WeakMap|WeakSet|Array|Object)\b/y
 const NEW_VALUE = /^(?:[[{]|new\s)/
@@ -41,6 +43,34 @@ export function stateAt(source: string, settings: ReadonlySet<string>, unchanged
       return at
 
     // A stray closer ends a statement without being part of it.
+    at = skipTrivia(source, Math.max(end, at + 1))
+  }
+
+  return undefined
+}
+
+// Where the first top-level `const` of a container that the module exports further down, `export { X }` or `export default X`, starts, or undefined when none does.
+// A server fence cannot export that way, but its constant is as open to a write as an exported one.
+export function laterExportAt(source: string, unchanged?: Unchanged): number | undefined {
+  const later = exportedLater(source)
+
+  if (later.size === 0)
+    return undefined
+
+  let at = skipTrivia(source, 0)
+
+  while (at < source.length) {
+    const end = statementEnd(source, at)
+
+    if (wordAt(source, at) === 'const') {
+      for (const { left, initializer } of declarators(source, skipTrivia(source, at + 5), end)) {
+        const name = declaredName(left.trim())
+
+        if (initializer !== undefined && name !== undefined && later.has(name) && holdsContainer(initializer, true) && unchanged?.(name, initializer) !== true)
+          return at
+      }
+    }
+
     at = skipTrivia(source, Math.max(end, at + 1))
   }
 
@@ -436,6 +466,16 @@ function declarationAt(source: string, start: number, end: number): Declaration 
   return { locals: [declared], exports: exported ? [{ name: declared, of: [declared] }] : [], text }
 }
 
+// The names an `export default` expression holds: the bare identifier, or every identifier of an object or array, which a write through the default import reaches.
+function defaultLocals(text: string): string[] {
+  const alone = DEFAULT_NAME.exec(text)?.[1]
+
+  if (alone !== undefined)
+    return [alone]
+
+  return DEFAULT_CONTAINER.test(text) ? text.match(IDENTIFIER) ?? [] : []
+}
+
 // The local names a module exports apart from their declaration: `export { X }`, `export { X as Y }`, `export default X`.
 function exportedLater(source: string): Set<string> {
   const names = new Set<string>()
@@ -445,9 +485,7 @@ function exportedLater(source: string): Set<string> {
 
   for (const { exports, text } of declarations(source)) {
     for (const { name, of } of exports) {
-      const alone = name === 'default' && of === undefined ? DEFAULT_NAME.exec(text)?.[1] : undefined
-
-      for (const local of alone === undefined ? of ?? [] : [alone])
+      for (const local of name === 'default' && of === undefined ? defaultLocals(text) : of ?? [])
         names.add(local)
     }
   }
