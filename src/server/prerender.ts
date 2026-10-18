@@ -273,7 +273,7 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
       continue
     }
 
-    const { stop, pathname } = asked ? { stop: undefined, pathname: false } : await stopOf(route, scans)
+    const { stop, pathname } = asked ? { stop: undefined, pathname: false } : await stopOf(route, scans, root)
     const auto = !asked && stop === undefined
 
     if (!asked && !auto) {
@@ -430,11 +430,11 @@ function firstLine(text: string): string {
 
 // What keeps the page from being kept: what its files read, or that it takes params, which `prerender` lists.
 // Gives too whether it reads the pathname, which a kept copy is served for only at the path it was rendered at.
-async function stopOf(route: Route, scans: Map<string, Promise<Scan>>): Promise<{ stop?: Stop | undefined, pathname: boolean }> {
+async function stopOf(route: Route, scans: Map<string, Promise<Scan>>, root: string): Promise<{ stop?: Stop | undefined, pathname: boolean }> {
   if (route.params.length > 0)
     return { stop: { file: route.file, line: 0, why: 'takes params, so `prerender` lists the pages to render' }, pathname: false }
 
-  return keptScan(route, scans)
+  return keptScan(route, scans, root)
 }
 
 // What a page module says of its own prerendering, read off its source once: the text of its `prerender` and whether it says `keep: true`.

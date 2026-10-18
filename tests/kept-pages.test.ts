@@ -19,6 +19,7 @@ const TSCONFIG = JSON.stringify({
   compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true },
   include: ['src', '.kay/types'],
 })
+const PACKAGE_WITH_TABLER = '{ "devDependencies": { "@iconify-json/tabler": "*" } }\n'
 const MESSAGES = { fr: 'export default { hello: \'Bonjour\' }\n', en: 'export default { hello: \'Hello\' }\n' }
 
 async function project(files: Record<string, string>): Promise<string> {
@@ -652,6 +653,7 @@ describe('what stops a page from being kept', () => {
     const icon = '~icons/tabler/arrow-left'
 
     const root = await project({
+      'package.json': PACKAGE_WITH_TABLER,
       'src/routes/direct.kay': `---\nimport ArrowLeft from '${icon}'\n---\nArrowLeft\n`,
       'src/routes/reexport.kay': '---\nimport { arrow } from \'../arrow\'\n---\narrow\n',
       'src/arrow.ts': `export { default as arrow } from '${icon}'\n`,
@@ -669,11 +671,14 @@ describe('what stops a page from being kept', () => {
       'src/routes/extension.kay': `---\nimport Arrow from '${icon}.ts'\n---\nArrow\n`,
       'src/routes/prefix.kay': '---\nimport Arrow from \'~iconsx/tabler/arrow-left\'\n---\nArrow\n',
       'src/routes/alike.kay': '---\nimport Arrow from \'icons/tabler/arrow-left\'\n---\nArrow\n',
+      'src/routes/uninstalled.kay': '---\nimport Mine from \'~icons/mine/thing\'\n---\nMine\n',
+      'src/routes/missing.kay': '---\nimport Missing from \'~icons/tabler/no-such-icon\'\n---\nMissing\n',
     })
 
     roots.push(root)
 
     const route = (file: string, ...layouts: string[]) => ({ file: join(root, file), layouts: layouts.map(layout => join(root, layout)) })
+    const keptStop = async (route: Route) => (await keptScan(route, undefined, root)).stop
 
     expect(await keptStop(route('src/routes/direct.kay'))).toBeUndefined()
     expect(await keptStop(route('src/routes/reexport.kay'))).toBeUndefined()
@@ -682,9 +687,23 @@ describe('what stops a page from being kept', () => {
     expect(await keptStop(route('src/routes/impure-beside.kay'))).toMatchObject({ line: 3, why: 'imports the package `dayjs`' })
     expect(await keptStop(route('src/routes/impure-in-component.kay'))).toMatchObject({ file: join(root, 'src/impure-back.kay'), why: 'reads `Date`' })
 
-    for (const [file, specifier] of [['deep', '~icons/tabler/arrow/left'], ['set-only', '~icons/tabler'], ['upper', '~icons/Tabler/arrow-left'], ['query', `${icon}?raw`], ['extension', `${icon}.ts`], ['prefix', '~iconsx/tabler/arrow-left'], ['alike', 'icons/tabler/arrow-left']] as const)
+    // A set the project does not install, or an icon it lacks, is left to the app's own resolution, which a tsconfig alias may send to code.
+    for (const [file, specifier] of [['uninstalled', '~icons/mine/thing'], ['missing', '~icons/tabler/no-such-icon'], ['deep', '~icons/tabler/arrow/left'], ['set-only', '~icons/tabler'], ['upper', '~icons/Tabler/arrow-left'], ['query', `${icon}?raw`], ['extension', `${icon}.ts`], ['prefix', '~iconsx/tabler/arrow-left'], ['alike', 'icons/tabler/arrow-left']] as const)
       expect(await keptStop(route(`src/routes/${file}.kay`))).toMatchObject({ line: 2, why: `imports the package \`${specifier}\`` })
   })
+
+  it('prerenders a page importing an installed icon, and renders the icon in it', async () => {
+    const root = await project({
+      'package.json': PACKAGE_WITH_TABLER,
+      'src/routes/index.kay': '---\nimport ArrowLeft from \'~icons/tabler/arrow-left\'\n---\nArrowLeft(aria-hidden="true")\n',
+      'src/routes/aliased.kay': '---\nimport Mine from \'~icons/mine/thing\'\n---\nMine\n',
+    })
+
+    roots.push(root)
+
+    expect(await built(root)).toEqual(['/'])
+    expect(await Bun.file(join(outputDir(root), 'pages', 'index.html')).text()).toContain('<svg')
+  }, 120_000)
 
   it('shows each route kept or on request in the build report, with what stopped it', async () => {
     const root = await project({

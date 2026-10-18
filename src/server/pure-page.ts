@@ -1,6 +1,6 @@
 import { relative } from 'node:path'
 import { resolveFrom } from '../build/files'
-import { ICON_IMPORT } from '../build/icons'
+import { ICON_IMPORT, iconProps, installedIconSets } from '../build/icons'
 import { PAGE, PAGE_SETTINGS } from '../compiler/page-settings'
 import { parseKay } from '../compiler/parser'
 import { analyzeServer } from '../compiler/script'
@@ -539,7 +539,7 @@ function lineAt(source: string, offset: number): number {
 // Whatever cannot be shown to is left to render per request: a package, any `kay` export `KAY_EXPORTS` does not class as free, a `ctx`, a clock, a `query` schema, module state.
 // `stop` is the first file of the page and its layouts, or of what they import, that reads something a request or the moment changes.
 // `scans` keeps what each file holds across the routes of one build.
-export async function keptScan(route: { layouts: string[], file: string }, scans = new Map<string, Promise<Scan>>()): Promise<{ stop?: Stop | undefined, pathname: boolean }> {
+export async function keptScan(route: { layouts: string[], file: string }, scans = new Map<string, Promise<Scan>>(), root?: string): Promise<{ stop?: Stop | undefined, pathname: boolean }> {
   const seen = new Set<string>()
   const queue = [...routeChain(route).files]
   let pathname = false
@@ -553,7 +553,7 @@ export async function keptScan(route: { layouts: string[], file: string }, scans
     let scan = scans.get(file)
 
     if (scan === undefined)
-      scans.set(file, scan = scanned(file))
+      scans.set(file, scan = scanned(file, root))
 
     const { stop, code, pathname: reads } = await scan
 
@@ -577,7 +577,25 @@ function withoutLastmod(file: string, source: string): string {
   return value === undefined ? source : source.slice(0, value.start) + source.slice(value.start, value.end).replace(NOT_LINE_BREAK, ' ') + source.slice(value.end)
 }
 
-async function scanned(file: string): Promise<Scan> {
+const installed = new Map<string, Map<string, string>>()
+
+function installedIcon(root: string, specifier: string): boolean {
+  const [, prefix, name] = ICON_IMPORT.exec(specifier) ?? []
+
+  if (prefix === undefined)
+    return false
+
+  let sets = installed.get(root)
+
+  if (sets === undefined)
+    installed.set(root, sets = installedIconSets(root))
+
+  const file = sets.get(prefix)
+
+  return file !== undefined && iconProps(file, name!) !== undefined
+}
+
+async function scanned(file: string, root: string | undefined): Promise<Scan> {
   const source = withoutLastmod(file, await Bun.file(file).text())
   const code: string[] = []
 
@@ -651,8 +669,8 @@ async function scanned(file: string): Promise<Scan> {
       continue
     }
 
-    // An icon of an installed set is a static SVG kay generates, which reads nothing from a request.
-    if (ICON_IMPORT.test(specifier))
+    // An icon of an installed set is a static SVG kay generates, which reads nothing from a request; any other `~icons/` name is left to the app's own resolution, which may reach code.
+    if (root !== undefined && installedIcon(root, specifier))
       continue
 
     if (!specifier.startsWith('.'))
