@@ -2086,8 +2086,13 @@ describe('action input', () => {
       expect((await bare.handle(new Request(`http://localhost/?next=${encodeURIComponent('/x\r\nset-cookie: a=b')}`))).status).toBe(500)
       expect(logged).toHaveBeenCalledWith(expect.stringContaining('holds a line break'))
 
+      for (const next of ['//evil.example', '/\\evil.example', '/%2F/evil.example'])
+        expect((await bare.handle(new Request(`http://localhost/?next=${encodeURIComponent(next)}`))).status, next).toBe(500)
+
+      expect(logged).toHaveBeenCalledWith(expect.stringContaining('reads as another site'))
+
       // Nor a NUL, which Bun refuses with its own message, nor a scheme a call would run as script.
-      for (const to of ['/a\0b', 'javascript:alert(1)', ' JavaScript:alert(1)', 'data:text/html,x']) {
+      for (const to of ['/a\0b', 'javascript:alert(1)', ' JavaScript:alert(1)', 'data:text/html,x', '//evil.example', '/\\evil.example', '\\\\evil.example', '/%2F/evil.example', ' //evil.example']) {
         const refused = await post('away', stringify({ to }), { 'content-type': 'application/json', 'x-kay-action': '1' })
 
         expect([refused.status, (parse(await refused.text()) as { errors: Record<string, string> }).errors['']]).toEqual([500, 'Something went wrong on our side; try again later'])

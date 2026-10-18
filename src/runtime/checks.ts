@@ -124,9 +124,11 @@ type CheckedTarget<Location extends string> = string extends Location
   ? unknown
   : Location extends `${string}${'\n' | '\r' | '\t' | '\0'}${string}`
     ? { kayError: 'A redirect target holds a line break or another control character' }
-    : Location extends `${infer Head}:${string}`
-      ? [SchemeOf<Head>] extends [never] ? unknown : SchemeOf<Head> extends 'http' | 'https' ? unknown : { kayError: `A redirect goes to a path or an http(s) URL, not to a ${SchemeOf<Head>}: URL` }
-      : unknown
+    : Location extends `${'/' | '\\'}${'/' | '\\'}${string}` | `\\${string}`
+      ? { kayError: 'A redirect target starting with // or a backslash is read by a browser as another site; use a full https:// URL' }
+      : Location extends `${infer Head}:${string}`
+        ? [SchemeOf<Head>] extends [never] ? unknown : SchemeOf<Head> extends 'http' | 'https' ? unknown : { kayError: `A redirect goes to a path or an http(s) URL, not to a ${SchemeOf<Head>}: URL` }
+        : unknown
 
 // `ctx.redirect`: a site path is checked like a link, so a redirect cannot point at a page that does not exist.
 export type Redirect = <const Location extends string>(location: Location & CheckedHref<Location> & CheckedTarget<Location>, status?: 301 | 302 | 303 | 307 | 308) => never

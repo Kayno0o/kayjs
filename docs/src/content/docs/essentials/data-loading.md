@@ -104,7 +104,7 @@ Guards, endpoints and actions use the same `ctx.redirect`, `ctx.notFound()` and 
 
 <Callout type="warning">
 
-`ctx.redirect` goes to any URL, `//other.example/` included. Pass a `?next=` param through `localPath(value, fallback)` from `kay`: `ctx.redirect(localPath(ctx.query.next, '/account'))`.
+`ctx.redirect` goes to any full `https://` URL, but refuses `//other.example/`, a backslash form and anything that decodes to one, with a server error. A `?next=` param can still send visitors to another site if it holds a full URL, so pass a `?next=` param through `localPath(value, fallback)` from `kay`: `ctx.redirect(localPath(ctx.query.next, '/account'))`.
 
 `localPath` gives `fallback` for anything that would leave the site, even once decoded, such as `/%2F/evil.example`.
 

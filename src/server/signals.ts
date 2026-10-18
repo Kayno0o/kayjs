@@ -1,4 +1,5 @@
 import type { RequestContext } from '../runtime'
+import { leavesSite } from '../runtime/base'
 import { nodeHttp } from './builtins'
 
 // Thrown by `ctx.redirect()`, `ctx.notFound()` and `ctx.deny()` to end a guard, page or action early; the server turns them into responses.
@@ -19,6 +20,12 @@ export class Redirect {
 
     if (OTHER_SCHEME.test(location.trimStart()))
       throw new TypeError(`kay: a redirect goes to a path or an http(s) URL, not to ${JSON.stringify(location)}`)
+
+    // A path starting with a slash or a backslash is of this site, so one a browser, a proxy or a second decoding would read as another host (`//evil.example`, `/\\evil.example`, `/%2F/evil.example`) is refused; a full URL names its host and is allowed.
+    const path = location.trimStart()
+
+    if ((path.startsWith('/') || path.startsWith('\\')) && (path.startsWith('\\') || leavesSite(path)))
+      throw new TypeError(`kay: the redirect to ${JSON.stringify(location)} is a path which a browser reads as another site; redirect to a full https:// URL for another site, and pass a ?next= param through localPath()`)
 
     this.location = location.toWellFormed().replace(NON_ASCII, encodeURI)
   }

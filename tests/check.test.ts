@@ -1100,6 +1100,8 @@ describe.concurrent('kay check, edge cases', () => {
       '    ctx.redirect(next)',
       '  if (code === \'e\')',
       '    ctx.redirect(\'https://example.com/done\')',
+      '  if (code === \'f\')',
+      '    ctx.redirect(\'//evil.example/x\')',
       '  ctx.redirect(\'javascript:alert(1)\')',
       '})',
       '',
@@ -1116,9 +1118,10 @@ describe.concurrent('kay check, edge cases', () => {
     try {
       expect((await check(root)).map(d => [d.line, d.message.match(/kayError: "([^"]+)"/)?.[1] ?? d.message])).toEqual([
         [12, 'ctx.fail takes an error status, from 400 to 599, not 200'],
-        [17, 'A redirect goes to a path or an http(s) URL, not to a javascript: URL'],
-        [21, 'A duration is positive, seconds or a string such as \'5m\', not 0'],
-        [23, 'A duration is positive, seconds or a string such as \'5m\', not 0m'],
+        [18, 'A redirect target starting with // or a backslash is read by a browser as another site; use a full https:// URL'],
+        [19, 'A redirect goes to a path or an http(s) URL, not to a javascript: URL'],
+        [23, 'A duration is positive, seconds or a string such as \'5m\', not 0'],
+        [25, 'A duration is positive, seconds or a string such as \'5m\', not 0m'],
       ])
     }
     finally {
