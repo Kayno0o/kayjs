@@ -117,7 +117,7 @@ let heardAhead = 0
 // The latest time an invalidation was stamped with.
 let lastStamp = 0
 
-// The time a read or an invalidation is dated with: never before the clock of a process this one heard of, nor the last invalidation, so a read is dated after every invalidation stamped before it and an invalidation after every read dated before it.
+// The time a read or an invalidation is dated with: never before the clock of a process this one heard of, nor the last invalidation, so a read is dated after every invalidation stamped before it and an invalidation not before any read dated before it. A burst of invalidations moves it a millisecond each, until the clock catches up.
 function stampNow(): number {
   return Math.max(Date.now(), heardAhead, lastStamp + 1)
 }
