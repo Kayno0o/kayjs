@@ -1258,6 +1258,7 @@ describe('preview mode', () => {
     }
   })
 
+  // Three builds of the fixture in a row, each several seconds on a loaded host.
   it('needs a long secret, and refuses its helpers without one', async () => {
     await expect(pages({ routes: options.routes, prebuilt: false, preview: { secret: 'short' } })).rejects.toThrow('kay: preview.secret in kay.config.ts is 5 characters long')
     await pages({ routes: options.routes, prebuilt: false })
@@ -1270,7 +1271,7 @@ describe('preview mode', () => {
     finally {
       await pages({ ...options, prebuilt: false })
     }
-  })
+  }, 60_000)
 })
 
 describe('showDraft', () => {
