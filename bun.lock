@@ -56,7 +56,7 @@
     },
     "packages/ai": {
       "name": "@kaynooo/kayjs-ai",
-      "version": "1.54.1",
+      "version": "1.54.2",
       "devDependencies": {
         "@kaynooo/eslint": "^7.0.4",
         "@types/bun": "^1.4.3",
@@ -68,7 +68,7 @@
     },
     "packages/auth": {
       "name": "@kaynooo/kayjs-auth",
-      "version": "1.54.1",
+      "version": "1.54.2",
       "dependencies": {
         "@kaynooo/utils": "^2.27.0",
         "@simplewebauthn/server": "^14.0.3",
@@ -96,7 +96,7 @@
     },
     "packages/cms": {
       "name": "@kaynooo/kayjs-cms",
-      "version": "1.54.1",
+      "version": "1.54.2",
       "devDependencies": {
         "@happy-dom/global-registrator": "^21.0.3",
         "@kaynooo/eslint": "^7.0.4",
@@ -113,7 +113,7 @@
     },
     "packages/mail": {
       "name": "@kaynooo/kayjs-mail",
-      "version": "1.54.1",
+      "version": "1.54.2",
       "dependencies": {
         "nodemailer": "^10.0.16",
       },
@@ -130,7 +130,7 @@
     },
     "packages/ui": {
       "name": "@kaynooo/kayjs-ui",
-      "version": "1.54.1",
+      "version": "1.54.2",
       "dependencies": {
         "@kaynooo/utils": "^2.30.1",
       },
