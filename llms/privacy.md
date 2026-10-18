@@ -29,9 +29,9 @@ export async function erase(userId: string) {
 }
 ```
 
-### Load analytics only once the visitor agreed
+### Load a script only once the visitor agreed
 
-An island keeps the answer in a persisted signal, loads the script once it is yes, and keeps a button that asks again, where refusing withdraws an earlier yes:
+For a script that needs the visitor's browser, such as a tracker that sets cookies, an island keeps the answer in a persisted signal, loads the script once it is yes, and keeps a button that asks again, where refusing withdraws an earlier yes:
 
 ```kay
 ---
@@ -65,6 +65,28 @@ else
   button(onClick={() => consent = ''}) Visit statistics: change my choice
 ```
 
+### Count visits through your own origin
+
+`analytics()` from `kay/analytics` serves a small tracker from the app and forwards each visit to the provider from the server, so the CSP needs no third-party host and an ad blocker has no provider domain to match:
+
+```ts
+import { defineConfig } from 'kay/server'
+import { analytics } from 'kay/analytics'
+
+export default defineConfig({
+  extensions: [analytics({ provider: 'plausible', domain: 'example.com' })],
+})
+```
+
+- `provider` is `'plausible'` (`domain`, else the visited host), `'umami'` (`websiteId`) or `'simpleanalytics'` (`hostname`, else the visited host); each takes `host` for a self-hosted instance. All three are cookieless, so they load at once. GA4, Matomo, Fathom and Cloudflare Web Analytics are not offered yet.
+- The tracker is `/_kay/analytics.js`, added to every page's head, and counts the page on load and on each page swap (`kay:navigate`), the page the visitor left as referrer. Visits go to `POST /_kay/analytics` under the `base`.
+- Only `NODE_ENV=production` forwards; `kay dev` and tests answer the same and send nothing.
+- Add the optional `consent: true` (or `{ text, agree, refuse }`, each a string or one per language: `{ text: { en: 'Count?', fr: 'Compter ?' } }`) to wait for the visitor's yes: a notice kay builds asks until they choose, the answer is the `kay_analytics` cookie (`yes` or `no`, a year, `SameSite=Lax`), and the server forwards nothing without `yes`, whatever the request claims.
+- Any element with `data-analytics-consent` reopens the notice, so a visitor changes their mind as easily as they chose. `window.kayAnalytics.consent()` reads the answer (`'yes'`, `'no'` or `''`) and `kay:consent` fires on `document` when it changes.
+- A visit is refused unless the page it names is on the host the request came to, or one in `hosts: ['www.example.com']`; a body past 4 KB (413), a cross-site post (403) and more than 120 visits a minute from one address (429) are refused too.
+- What a provider gets: the page URL without its hash and with only the `utm_*`, `ref` and `source` parameters of its query, the referrer without its query, the title, the screen size and language, and the visitor's `User-Agent`, cleaned of control characters. No cookie, `Referer` or `Authorization` of the visitor goes with it.
+- The visitor's address is sent only to a provider that needs it to tell visitors apart: Plausible as `X-Forwarded-For`, Umami as `ip` in the payload, Simple Analytics not at all. It is the one `proxy` yields, so set `proxy` behind a CDN or the provider sees the proxy's address.
+
 ### Keep failed jobs for less time
 
 A failed job keeps its payload, an address say, 30 days from when its last attempt was due; `keepFailed` shortens it:
@@ -96,6 +118,7 @@ export async function archive(scan: File) {
 - `kay_flash`: the message an action's redirect shows on the next page, read once; necessary, 60 seconds.
 - `kay_locale`: the locale a visitor picked, on a site with locales; necessary, a year. Named `kay-locale` before 1.52, which is still read.
 - Under a `base`, `kay_flash` and `kay_locale` are set for that path alone, as `kay_preview` is.
+- `kay_analytics`: the visitor's answer to the notice `analytics({ consent })` shows, `yes` or `no`; necessary to remember the choice, a year.
 - `kay_preview`: preview mode for an editor, set only by `enterPreview`; necessary, `preview.maxAge`, an hour by default.
 - Each `persisted(name, ...)` signal keeps its value in a cookie of that name for a year, or its `maxAge`, or in `localStorage` with `{ storage: 'local' }`; what it holds is the app's choice, so a preference is necessary and anything else waits for consent.
 

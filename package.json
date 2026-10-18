@@ -143,6 +143,10 @@
       "types": "./types/server/internal.d.ts",
       "default": "./src/server/internal.ts"
     },
+    "./analytics": {
+      "types": "./types/server/analytics.d.ts",
+      "default": "./src/server/analytics.ts"
+    },
     "./library": {
       "types": "./types/server/library.d.ts",
       "default": "./src/server/library.ts"

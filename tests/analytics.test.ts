@@ -1,0 +1,309 @@
+import type { AnalyticsOptions } from '../src/server/analytics'
+import { rm } from 'node:fs/promises'
+import { join } from 'node:path'
+import process from 'node:process'
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'bun:test'
+import { pages } from '../src/server'
+import { analytics } from '../src/server/analytics'
+import { scratchDir } from './scratch'
+
+interface Received { path: string, headers: Headers, body: unknown }
+
+// Assigning undefined to an environment variable stores the text "undefined".
+function restoreEnvironment(value: string | undefined): void {
+  if (value === undefined)
+    delete process.env.NODE_ENV
+  else
+    process.env.NODE_ENV = value
+}
+
+const PAGE = 'http://localhost/pricing?token=secret&utm_source=news&x=1#top'
+const CHROME = 'Mozilla/5.0 (X11; Linux x86_64) Chrome/130.0'
+
+let dir = ''
+let received: Received[] = []
+let answer = 202
+let provider: ReturnType<typeof Bun.serve>
+let before: string | undefined
+let counter = 0
+
+beforeAll(async () => {
+  before = process.env.NODE_ENV
+  process.env.NODE_ENV = 'production'
+  dir = await scratchDir('analytics-')
+  await Bun.write(join(dir, 'routes/index.kay'), 'h1 Home\n')
+  provider = Bun.serve({
+    port: 0,
+    async fetch(request) {
+      received.push({ path: new URL(request.url).pathname, headers: request.headers, body: await request.json() })
+
+      return Response.json({}, { status: answer })
+    },
+  })
+})
+
+afterAll(async () => {
+  await provider.stop(true)
+  restoreEnvironment(before)
+  await rm(dir, { recursive: true, force: true })
+})
+
+beforeEach(() => {
+  received = []
+  answer = 202
+})
+
+const sites = new Map<string, ReturnType<typeof pages>>()
+
+// Building a site costs most of a test, so one is built per setup.
+async function site(options: AnalyticsOptions) {
+  const key = JSON.stringify(options)
+  const kept = sites.get(key)
+
+  if (kept)
+    return kept
+
+  const built = pages({ routes: join(dir, 'routes'), prebuilt: false, extensions: [analytics(options)], proxy: { hops: 1 } })
+
+  sites.set(key, built)
+
+  return built
+}
+
+// Each call comes from an address of its own unless it names one, so the rate limit of one test never reaches another's.
+async function send(app: Awaited<ReturnType<typeof pages>>, body: unknown, headers: Record<string, string> = {}) {
+  const address = `203.0.113.${++counter % 250}`
+  const text = typeof body === 'string' ? body : JSON.stringify(body)
+
+  return app.handle(new Request('http://localhost/_kay/analytics', { method: 'POST', body: text, headers: { 'content-type': 'text/plain', 'user-agent': CHROME, 'x-forwarded-for': address, ...headers } }))
+}
+
+const visit = (more: Record<string, unknown> = {}) => ({ u: PAGE, r: 'https://news.example/story?id=7#c', t: 'Pricing', w: '1920x1080', l: 'fr-FR', ...more })
+const plausible = (more: object = {}): AnalyticsOptions => ({ provider: 'plausible', domain: 'example.com', host: `http://localhost:${provider.port}`, ...more })
+
+describe('the script and the page', () => {
+  it('serves the tracker from the app and puts it in every page', async () => {
+    const app = await site(plausible())
+    const script = await app.handle(new Request('http://localhost/_kay/analytics.js'))
+    const home = await (await app.handle(new Request('http://localhost/'))).text()
+
+    expect(script.headers.get('content-type')).toContain('javascript')
+    expect(await script.text()).toContain('kay:navigate')
+    expect(home).toContain('src="/_kay/analytics.js"')
+    expect(home).not.toContain('data-consent')
+  })
+
+  it('marks the script as waiting for consent, with the notice in each language', async () => {
+    const home = await (await (await site(plausible({ consent: { text: { en: 'Count?', fr: 'Compter ?' }, agree: 'Yes' } }))).handle(new Request('http://localhost/'))).text()
+
+    expect(home).toContain('data-consent')
+    expect(home).toContain('Compter ?')
+    expect(home).toContain('&quot;agree&quot;:&quot;Yes&quot;')
+  })
+})
+
+describe('what each provider is sent', () => {
+  it('sends Plausible the visit with the visitor\'s address and agent, the campaign kept and the rest of the query dropped', async () => {
+    const response = await send(await site(plausible()), visit(), { 'x-forwarded-for': '198.51.100.9' })
+    const [sent] = received
+
+    expect(response.status).toBe(204)
+    expect(sent!.path).toBe('/api/event')
+    expect(sent!.headers.get('x-forwarded-for')).toBe('198.51.100.9')
+    expect(sent!.headers.get('user-agent')).toBe(CHROME)
+    expect(sent!.body).toEqual({ name: 'pageview', url: 'http://localhost/pricing?utm_source=news', domain: 'example.com', referrer: 'https://news.example/story' })
+  })
+
+  it('names the site Plausible counts under by the page\'s host when none is set', async () => {
+    await send(await site(plausible({ domain: undefined })), visit())
+
+    expect((received[0]!.body as { domain: string }).domain).toBe('localhost')
+  })
+
+  it('sends Umami the visit as an event of its website, the address in the payload and none in a header', async () => {
+    await send(await site({ provider: 'umami', websiteId: 'site-id', host: `http://localhost:${provider.port}/` }), visit(), { 'x-forwarded-for': '198.51.100.9' })
+    const [sent] = received
+
+    expect(sent!.path).toBe('/api/send')
+    expect(sent!.headers.get('x-forwarded-for')).toBeNull()
+    expect(sent!.body).toEqual({ type: 'event', payload: { website: 'site-id', hostname: 'localhost', url: '/pricing?utm_source=news', title: 'Pricing', referrer: 'https://news.example/story', screen: '1920x1080', language: 'fr-FR', ip: '198.51.100.9' } })
+  })
+
+  it('sends Simple Analytics no address at all, in a header or in the body', async () => {
+    await send(await site({ provider: 'simpleanalytics', host: `http://localhost:${provider.port}` }), visit(), { 'x-forwarded-for': '198.51.100.9' })
+    const [sent] = received
+
+    expect(sent!.path).toBe('/events')
+    expect(sent!.headers.get('x-forwarded-for')).toBeNull()
+    expect(JSON.stringify(sent!.body)).not.toContain('198.51.100.9')
+    expect(sent!.body).toEqual({ type: 'pageview', hostname: 'localhost', event: 'pageview', path: '/pricing?utm_source=news', ua: CHROME, https: false, referrer: 'https://news.example/story', screen_width: 1920, screen_height: 1080, language: 'fr-FR' })
+  })
+
+  it('answers a visit as counted when the provider is down or refuses it', async () => {
+    answer = 500
+
+    expect((await send(await site(plausible()), visit())).status).toBe(204)
+    expect((await send(await site({ provider: 'plausible', host: 'http://localhost:1' }), visit())).status).toBe(204)
+  })
+})
+
+describe('when a visit is not forwarded', () => {
+  it('sends nothing outside production', async () => {
+    process.env.NODE_ENV = 'development'
+
+    try {
+      expect((await send(await site(plausible()), visit())).status).toBe(204)
+    }
+    finally {
+      process.env.NODE_ENV = 'production'
+    }
+
+    expect(received).toEqual([])
+  })
+
+  it('waits for the visitor\'s yes when the site asked for it, however the request arrives', async () => {
+    const app = await site(plausible({ consent: true }))
+
+    expect((await send(app, visit())).status).toBe(204)
+    expect((await send(app, visit(), { cookie: 'kay_analytics=no' })).status).toBe(204)
+    expect((await send(app, visit(), { cookie: 'kay_analytics=yes2' })).status).toBe(204)
+    expect(received).toEqual([])
+
+    await send(app, visit(), { cookie: 'a=1; kay_analytics=yes' })
+
+    expect(received).toHaveLength(1)
+  })
+
+  it('sends nothing for a request without a user agent', async () => {
+    expect((await send(await site(plausible()), visit(), { 'user-agent': '' })).status).toBe(204)
+    expect(received).toEqual([])
+  })
+})
+
+describe('hostile requests', () => {
+  it.each([
+    ['another host', { u: 'https://evil.example/pricing' }],
+    ['a host in the user part', { u: 'http://localhost@evil.example/' }],
+    ['a user and a password', { u: 'http://user:pass@localhost/' }],
+    ['a look-alike host', { u: 'http://localhost.evil.example/' }],
+    ['a protocol-relative path', { u: '//evil.example/pricing' }],
+    ['a path', { u: '/pricing' }],
+    ['another scheme', { u: 'javascript://localhost/%0Aalert(1)' }],
+    ['a file', { u: 'file://localhost/etc/passwd' }],
+    ['no page', { u: undefined }],
+    ['a page that is no string', { u: 5 }],
+    ['a page too long', { u: `http://localhost/${'a'.repeat(3000)}` }],
+    ['a title that is no string', { t: { a: 1 } }],
+    ['a referrer that is no string', { r: ['x'] }],
+  ])('refuses %s without forwarding anything', async (_, more) => {
+    expect((await send(await site(plausible()), visit(more))).status).toBe(400)
+    expect(received).toEqual([])
+  })
+
+  it.each([
+    ['not JSON', 'u=http://localhost/'],
+    ['an array', '[]'],
+    ['null', 'null'],
+    ['a string', '"x"'],
+    ['empty', ''],
+  ])('refuses a body that is %s', async (_, body) => {
+    expect((await send(await site(plausible()), body)).status).toBe(400)
+    expect(received).toEqual([])
+  })
+
+  it('refuses a body past its limit, whether or not content-length says so', async () => {
+    const app = await site(plausible())
+    const big = JSON.stringify(visit({ t: 'a'.repeat(5000) }))
+
+    expect((await send(app, big)).status).toBe(413)
+    expect((await send(app, big, { 'content-length': '10' })).status).toBe(413)
+    expect((await send(app, visit(), { 'content-length': '99999999' })).status).toBe(413)
+
+    const streamed = new ReadableStream({ start(controller) {
+      controller.enqueue(new TextEncoder().encode(big))
+      controller.close()
+    } })
+    const response = await app.handle(new Request('http://localhost/_kay/analytics', { method: 'POST', body: streamed, duplex: 'half', headers: { 'user-agent': CHROME, 'x-forwarded-for': '203.0.113.250' } } as RequestInit))
+
+    expect(response.status).toBe(413)
+    expect(received).toEqual([])
+  })
+
+  it('refuses a visit another site\'s page sent', async () => {
+    const app = await site(plausible())
+
+    expect((await send(app, visit(), { 'origin': 'https://evil.example', 'sec-fetch-site': 'cross-site' })).status).toBe(403)
+    expect((await send(app, visit(), { 'sec-fetch-site': 'cross-site' })).status).toBe(403)
+    expect(received).toEqual([])
+  })
+
+  it('answers 429 past 120 visits a minute from one address', async () => {
+    const app = await site(plausible())
+    const address = { 'x-forwarded-for': '198.51.100.77' }
+    const statuses = []
+
+    for (let at = 0; at < 122; at++)
+      statuses.push((await send(app, visit(), address)).status)
+
+    expect(statuses.filter(status => status === 429)).toHaveLength(2)
+    expect(received).toHaveLength(120)
+  })
+
+  it('serves the route to POST alone', async () => {
+    expect((await (await site(plausible())).handle(new Request('http://localhost/_kay/analytics'))).status).toBe(404)
+  })
+
+  it('forwards no header of the visitor\'s but its agent, and the address only as the provider needs it', async () => {
+    const response = await send(await site(plausible()), visit(), { 'cookie': 'session=abc; kay_analytics=yes', 'authorization': 'Bearer abc', 'referer': 'http://localhost/secret', 'x-evil': '1', 'x-real-ip': '10.9.9.9' })
+    const [sent] = received
+
+    expect(response.status).toBe(204)
+    expect([...sent!.headers.keys()].filter(name => ['cookie', 'authorization', 'referer', 'x-evil', 'x-real-ip'].includes(name))).toEqual([])
+  })
+
+  it('takes the address from the proxy it trusts, never from a header the visitor wrote', async () => {
+    const app = await pages({ routes: join(dir, 'routes'), prebuilt: false, extensions: [analytics(plausible())] })
+
+    await app.handle(new Request('http://localhost/_kay/analytics', { method: 'POST', body: JSON.stringify(visit()), headers: { 'user-agent': CHROME, 'x-forwarded-for': '10.1.1.1' } }))
+
+    expect(received).toHaveLength(1)
+    expect(received[0]!.headers.get('x-forwarded-for')).toBeNull()
+  })
+
+  it('keeps control characters of the agent, the title and the referrer out of what it forwards', async () => {
+    await send(await site(plausible()), visit({ t: 'a\r\nx-evil: 1‮', r: 'https://news.example/a\r\nx-evil: 1' }), { 'user-agent': `Agent\u0080/1 ${'z'.repeat(900)}` })
+    const [sent] = received
+    const agent = sent!.headers.get('user-agent')!
+
+    expect(sent!.headers.has('x-evil')).toBe(false)
+    expect(agent).not.toMatch(/\u0080/u)
+    expect(agent.length).toBeLessThanOrEqual(512)
+    expect(sent!.body).toMatchObject({ referrer: expect.not.stringContaining('\n') })
+  })
+
+  it('names the host the provider is reached on from the app\'s config alone', async () => {
+    await send(await site(plausible()), visit({ host: 'evil.example', endpoint: 'http://evil.example/', url: 'http://evil.example/' }))
+
+    expect(received).toHaveLength(1)
+    expect(received[0]!.path).toBe('/api/event')
+  })
+
+  it('lets a page of a host the app named count', async () => {
+    const app = await site(plausible({ hosts: ['www.example.com'] }))
+
+    expect((await send(app, visit({ u: 'https://www.example.com/a' }))).status).toBe(204)
+    expect(received).toHaveLength(1)
+  })
+})
+
+describe('the setup', () => {
+  it.each([
+    [{ provider: 'nope' }, 'takes provider'],
+    [{ provider: 'umami' }, 'websiteId'],
+    [{ provider: 'plausible', host: 'ftp://x.example' }, 'host is'],
+    [{ provider: 'plausible', host: 'https://u:p@x.example' }, 'host is'],
+    [{ provider: 'plausible', host: 'not a url' }, 'host is'],
+  ])('refuses %j', (options, message) => {
+    expect(() => analytics(options as never)).toThrow(message)
+  })
+})

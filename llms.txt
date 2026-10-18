@@ -57,4 +57,4 @@ To build a site, read [Build a site](llms/site.md) first: one page walking throu
 - [Upgrading, older releases](llms/upgrading-archive.md): the same for the minors before 1.45
 - [What's new](llms/whats-new.md): what each recent release adds, newest first, each feature with the doc covering it
 - [What's new, older releases](llms/whats-new-archive.md): the same for the releases before 1.46
-- [Privacy and personal data](llms/privacy.md): the cookies and data kay keeps and for how long, erasing a person, consent-gated analytics, photo metadata
+- [Privacy and personal data](llms/privacy.md): the cookies and data kay keeps and for how long, erasing a person, analytics through your origin, photo metadata

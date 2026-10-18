@@ -1,7 +1,7 @@
 ---
 title: Privacy
 order: 9.5
-description: What kay keeps about visitors and for how long, erasing a person who asks, analytics behind consent and photos without their metadata.
+description: What kay keeps about visitors and for how long, erasing a person who asks, counting visits through your own origin, analytics behind consent and photos without their metadata.
 ---
 
 Kay sets no cookie and keeps nothing about a visitor until the app uses a feature that does. Nothing it keeps follows a visitor across sites.
@@ -15,10 +15,11 @@ This page lists what each feature keeps, for a site's privacy notice and for the
 | `session`, `__Host-session` over https | a session the app writes to | 30 days unused, 90 at most, by default |
 | `kay_flash` | an action redirecting with a flash message | 60 seconds |
 | `kay_locale` | a visitor picking a locale | a year |
+| `kay_analytics` | the consent notice of `analytics({ consent })` | a year |
 | `kay_preview` | `enterPreview()`, for an editor | an hour by default |
 | the name given to `persisted()` | a persisted signal | a year, or its `maxAge` |
 
-The first four are necessary for what the visitor asked, so they need no consent. A persisted signal holds what the app puts in it. A theme or a language is necessary, and anything else waits for consent.
+The first four, and `kay_analytics`, which only remembers the visitor's answer, are necessary for what the visitor asked, so they need no consent. A persisted signal holds what the app puts in it. A theme or a language is necessary, and anything else waits for consent.
 
 Under a `base`, `kay_flash`, `kay_locale` and `kay_preview` are set for that path alone. Before 1.52 the locale cookie was `kay-locale`; kay still reads it.
 
@@ -60,9 +61,57 @@ export async function erase(userId: string) {
 
 Sessions kept in the cookie alone, without a store, cannot be listed. They end when they expire, or for everyone when the secret is replaced.
 
-## Analytics behind consent
+## Counting visits
 
-An island keeps the visitor's answer in a persisted signal and loads the script once it is yes. A button stays to ask again.
+Most analytics tools work the same way: a script from their domain posts each visit to their server. That asks you to paste a script, add the tool's domain to your content security policy, and lose the visits that ad blockers drop.
+
+`analytics()` skips all of it. kay serves a small script from your own site, and your server passes each visit on to the tool:
+
+```ts
+import { defineConfig } from 'kay/server'
+import { analytics } from 'kay/analytics'
+
+export default defineConfig({
+  extensions: [analytics({ provider: 'plausible', domain: 'example.com' })],
+})
+```
+
+Plausible, Umami (give it `websiteId`) and Simple Analytics (`provider: 'simpleanalytics'`) work today, each with `host` for a copy you run yourself. All three set no cookie, so they count from the first page. Google Analytics, Matomo, Fathom and Cloudflare Web Analytics are not offered yet.
+
+The script counts the page when it loads and again after each page swap. It does nothing while you run `kay dev` or tests: only a server with `NODE_ENV=production` passes visits on.
+
+### What the tool receives
+
+- The page address without its `#` part, and from its query only `utm_*`, `ref` and `source`, so a token or an email in a link never reaches the tool.
+- The page the visitor came from, without its query, plus the title, the screen size, the language and the browser's `User-Agent`.
+- The visitor's address only if the tool needs it to tell visitors apart. Plausible gets it as `X-Forwarded-For` and Umami in the data it receives. Simple Analytics never gets it. Behind a CDN or proxy, set `proxy` so the address is the visitor's and not the proxy's.
+- Nothing else: no cookie, no `Referer`, no `Authorization` header of the visitor.
+
+### Asking first
+
+Add `consent: true` and kay shows a notice until the visitor chooses. Nothing is counted before a yes, and the server checks that on every visit rather than trusting the page. The answer is kept in the `kay_analytics` cookie for a year.
+
+```ts
+analytics({
+  provider: 'umami',
+  websiteId: '0b2f4a52-0000-4000-8000-000000000000',
+  consent: {
+    text: { en: 'Can we count your visit?', fr: 'Pouvons-nous compter votre visite ?' },
+    agree: { en: 'Yes', fr: 'Oui' },
+    refuse: { en: 'No', fr: 'Non' },
+  },
+})
+```
+
+Give any element a `data-analytics-consent` attribute and a click on it shows the notice again, so a visitor can change their mind. Your own scripts read the answer with `window.kayAnalytics.consent()`, and a `kay:consent` event fires on `document` when it changes.
+
+### Who may post a visit
+
+The route is open to anyone, so it checks everything. It refuses a page that is not on your host (add other hosts with `hosts: ['www.example.com']`), a body over 4 KB, a post from another site, and more than 120 visits a minute from one address. The tool's address comes from your config alone, never from the request.
+
+## Another script behind consent
+
+For a script that needs the visitor's browser, such as a tracker that sets cookies, an island keeps the visitor's answer in a persisted signal and loads the script once it is yes. A button stays to ask again.
 
 Refusing after agreeing clears the script's cookie and reloads, so the visitor can withdraw as easily as they agreed.
 
