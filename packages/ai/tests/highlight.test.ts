@@ -69,7 +69,7 @@ describe('highlighting', () => {
 
   it('gives the highlighter a language that is a plain word only, and swaps two blocks of one code in two languages each', async () => {
     const languages: (string | undefined)[] = []
-    const blocks = await highlighting(async () => (code, language) => {
+    const blocks = await highlighting(async () => (_code, language) => {
       languages.push(language)
 
       return `<pre><code>${language}</code></pre>`
