@@ -1,11 +1,14 @@
+import { chmod } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Database } from 'bun:sqlite'
-import { describe, expect, it } from 'bun:test'
+import { beforeEach, describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
+import { openSqlite } from '../src/runtime/sqlite.server'
 import { pages } from '../src/server'
 import { addRuntimeRedirect, removeRuntimeRedirect, runtimeRedirects } from '../src/server/library'
-import { missingPaths } from '../src/server/not-found'
-import { answerFor, redirectSet } from '../src/server/runtime-redirects'
+import { dropStore, missingPaths, pageRequested, sharedStore } from '../src/server/not-found'
+import { knowRuntimeRules, redirectMissing } from '../src/server/runtime-redirect-api'
+import { answerFor, RedirectRefused, redirectSet } from '../src/server/runtime-redirects'
 import { scratchDir } from './scratch'
 
 const rules = { hosts: [] as string[], configured: {} as Record<string, string> }
@@ -117,10 +120,11 @@ describe('answering a missing path', () => {
     set.add('/p/:x', '/:x', undefined, rules)
 
     expect(answerFor(set, '/go//evil.example', '', [])?.location).toBe('/evil.example')
-    expect(answerFor(set, '/go/%2Fevil.example', '', [])?.location).toBe('/%2Fevil.example')
+    // Encoded slashes are refused too: an app or proxy that decodes before it resolves would read them as a second slash.
+    expect(answerFor(set, '/go/%2Fevil.example', '', [])).toBeUndefined()
     expect(answerFor(set, '/go/\\evil.example', '', [])).toBeUndefined()
-    expect(answerFor(set, '/go/%5Cevil.example', '', [])?.location).toBe('/%5Cevil.example')
-    expect(answerFor(set, '/p/%2F%2Fevil.example', '', [])?.location).toBe('/%2F%2Fevil.example')
+    expect(answerFor(set, '/go/%5Cevil.example', '', [])).toBeUndefined()
+    expect(answerFor(set, '/p/%2F%2Fevil.example', '', [])).toBeUndefined()
     expect(answerFor(set, '/p/%E0%A4%A', '', [])).toBeUndefined()
   })
 
@@ -191,6 +195,38 @@ describe('a served app', () => {
     expect((await served.handle(new Request('http://localhost/rt-slash2/'))).headers.get('location')).toBe('/bare/')
   })
 
+  it('writes the target without its slash under never and as written under ignore', async () => {
+    const never = await app({ trailingSlash: 'never' })
+
+    addRuntimeRedirect('/rt-never', '/bare/')
+    expect((await never.handle(new Request('http://localhost/rt-never'))).headers.get('location')).toBe('/bare')
+
+    const ignore = await app({ trailingSlash: 'ignore' })
+
+    addRuntimeRedirect('/rt-ignore', '/bare/')
+    expect((await ignore.handle(new Request('http://localhost/rt-ignore'))).headers.get('location')).toBe('/bare/')
+  })
+
+  it('leaves a page that is served alone, whatever the set holds for its path', async () => {
+    const served = await app()
+
+    addRuntimeRedirect('/bare', '/blog')
+    expect((await served.handle(new Request('http://localhost/bare'))).status).toBe(200)
+    removeRuntimeRedirect('/bare')
+  })
+
+  it('answers a path under a locale prefix as the visitor asked for it', async () => {
+    const served = new Elysia().use(await pages({ routes: 'tests/fixtures/i18n/src/routes', prebuilt: false, security: false, i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: 'tests/fixtures/i18n/src/messages' } }))
+
+    addRuntimeRedirect('/en/rt-loc-old', '/en')
+    addRuntimeRedirect('/rt-loc-bare', '/en')
+
+    const prefixed = await served.handle(new Request('http://localhost/en/rt-loc-old'))
+
+    expect([prefixed.status, prefixed.headers.get('location')]).toEqual([308, '/en'])
+    expect((await served.handle(new Request('http://localhost/fr/rt-loc-old'))).status).toBe(404)
+  })
+
   it('lets the config\'s redirects win and never touches a page that is served', async () => {
     const served = await app({ redirects: { '/rt-cfg': '/bare' } })
 
@@ -249,5 +285,104 @@ describe('a page that answers 404 itself', () => {
     expect([post.status, post.headers.get('location')]).toEqual([308, '/app/new'])
     expect([fallback.status, fallback.headers.get('location')]).toEqual([302, '/app/new'])
     expect((await served.handle(new Request('http://localhost/post/other'))).status).toBe(404)
+  })
+})
+
+describe('what an editor types', () => {
+  it('percent-encodes non-ASCII text, so a header can carry it, and refuses broken characters', () => {
+    const set = setOf()
+
+    expect(set.add('/vieux-café', '/café/ça', undefined, rules)).toMatchObject({ from: '/vieux-caf%C3%A9', to: '/caf%C3%A9/%C3%A7a' })
+    expect(() => set.add('/a', '/\uD800', undefined, rules)).toThrow()
+    expect(answerFor(set, '/vieux-caf%C3%A9', '', [])?.location).toBe('/caf%C3%A9/%C3%A7a')
+  })
+
+  it('stores the path as a visit is looked up: no query, hash nor trailing slash', () => {
+    const set = setOf()
+
+    expect(set.add('/old/', '/new', undefined, rules).from).toBe('/old')
+    expect(set.add('/old2?x=1#y', '/new', undefined, rules).from).toBe('/old2')
+    expect(answerFor(set, '/old2', '', [])?.location).toBe('/new')
+    expect(() => set.add('/cfg/', '/z', undefined, { ...rules, configured: { '/cfg': '/z' } })).toThrow(/kay\.config/)
+  })
+
+  it('answers the most specific pattern first', () => {
+    const set = setOf()
+
+    set.add('/docs/*', '/guide/*', undefined, rules)
+    set.add('/docs/old/*', '/archive/*', undefined, rules)
+
+    expect(answerFor(set, '/docs/old/a', '', [])?.location).toBe('/archive/a')
+    expect(answerFor(set, '/docs/new/a', '', [])?.location).toBe('/guide/new/a')
+  })
+})
+
+describe('the store on disk', () => {
+  // The rules of the last app served, none here: any target goes.
+  beforeEach(() => {
+    knowRuntimeRules({ redirects: {} })
+  })
+
+  it('lets a second connection see the first one\'s redirect, so opposite ones from two writers make a loop that is refused', async () => {
+    const root = await scratchDir('runtime-redirects-')
+    const file = join(root, 'data/not-found.sqlite')
+
+    addRuntimeRedirect('/rt-w-a', '/rt-w-b', { file })
+
+    expect(() => addRuntimeRedirect('/rt-w-b', '/rt-w-a', { file })).toThrow(/loop/)
+    expect(runtimeRedirects(file).map(row => row.from)).toEqual(['/rt-w-a'])
+  })
+
+  it('throws what the store says for a data folder nobody can write, apart from a refusal', async () => {
+    const root = await scratchDir('runtime-redirects-')
+    const file = join(root, 'data/not-found.sqlite')
+
+    addRuntimeRedirect('/rt-ro', '/rt-ro2', { file })
+    await chmod(file, 0o400)
+    await chmod(join(root, 'data'), 0o500)
+
+    try {
+      let thrown: unknown
+
+      try {
+        addRuntimeRedirect('/rt-ro3', '/rt-ro4', { file })
+      }
+      catch (error) {
+        thrown = error
+      }
+
+      expect(thrown).toBeInstanceOf(Error)
+      expect(thrown).not.toBeInstanceOf(RedirectRefused)
+    }
+    finally {
+      await chmod(join(root, 'data'), 0o700)
+    }
+  })
+
+  it('answers the 404 on, and keeps the store, when a stored target is no header', async () => {
+    const root = await scratchDir('runtime-redirects-')
+    const file = join(root, 'data/not-found.sqlite')
+
+    dropStore()
+
+    const served = redirectMissing(new Elysia(), { file }).get('/*', ({ request }) => {
+      pageRequested(request)
+
+      return new Response('gone', { status: 404, headers: { 'content-type': 'text/html' } })
+    })
+
+    const store = sharedStore(file, true)!
+
+    store.redirects.add('/rt-uni', '/ok', undefined, rules)
+    store.redirects.add('/rt-ok', '/rt-fine', undefined, rules)
+    // Written by other means, as a file edited by hand or an older kay could leave it.
+    const other = openSqlite(file)
+
+    other.run('UPDATE kay_redirects SET target = ? WHERE path = ?', ['/日本', '/rt-uni'])
+    other.close()
+
+    expect((await served.handle(new Request('http://localhost/rt-uni'))).status).toBe(404)
+    expect((await served.handle(new Request('http://localhost/rt-ok'))).status).toBe(308)
+    dropStore()
   })
 })

@@ -2,6 +2,7 @@ import type { Database } from 'bun:sqlite'
 import type { RedirectStatus } from './redirects'
 import { existsSync } from 'node:fs'
 import process from 'node:process'
+import { leavesSite } from '../runtime/base'
 import { fillTarget, readRedirects, redirectLocation, redirectProblems } from './redirects'
 import { withoutSlash } from './routes'
 
@@ -59,6 +60,18 @@ export function plainPath(path: string): string {
   return withoutSlash(path.replace(QUERY_OR_HASH, '').replace(TRAILING_SLASHES, '')) || '/'
 }
 
+const NON_ASCII = /\P{ASCII}/gu
+
+// Non-ASCII text percent-encoded as a browser sends it, since a header carries ASCII alone: `/café` is `/caf%C3%A9`, text already encoded kept as it is.
+function encoded(text: string): string {
+  try {
+    return text.replace(NON_ASCII, character => encodeURIComponent(character))
+  }
+  catch {
+    throw new RedirectRefused('a path and a target are text, not broken characters')
+  }
+}
+
 function isPattern(from: string): boolean {
   return DYNAMIC.test(from)
 }
@@ -72,11 +85,12 @@ function checkTarget(to: string, hosts: readonly string[]): void {
   if (UNSAFE.test(to))
     throw new RedirectRefused('a target holds no control character, space nor backslash')
 
-  if (to.startsWith('//'))
-    throw new RedirectRefused(`${to} is no target: it reads as another site's URL`)
+  if (to.startsWith('/')) {
+    if (leavesSite(to))
+      throw new RedirectRefused(`${to} is no target: it reads as another site's URL`)
 
-  if (to.startsWith('/'))
     return
+  }
 
   let url: URL
 
@@ -124,7 +138,7 @@ function check(set: RedirectSet, from: string, to: string, status: number, rules
     throw new RedirectRefused(error instanceof Error ? error.message.replace(KAY_PREFIX, '') : String(error))
   }
 
-  if (rules.configured[from] !== undefined)
+  if (rules.configured[plainPath(from)] !== undefined)
     throw new RedirectRefused(`${from} is a redirect of kay.config.ts already`)
 
   const origin = plainPath(from)
@@ -165,7 +179,8 @@ export function redirectSet(db: Database): RedirectSet {
 
   const all = db.query<Row, []>('SELECT path, target, status, added_at FROM kay_redirects ORDER BY added_at DESC, path')
   const one = db.query<Row, [string]>('SELECT path, target, status, added_at FROM kay_redirects WHERE path = ?')
-  const some = db.query<Row, []>('SELECT path, target, status, added_at FROM kay_redirects WHERE pattern = 1')
+  // The most specific first: the longest path, so `/docs/old/*` answers before `/docs/*`.
+  const some = db.query<Row, []>('SELECT path, target, status, added_at FROM kay_redirects WHERE pattern = 1 ORDER BY length(path) DESC, path')
   const count = db.query<{ total: number }, []>('SELECT COUNT(*) AS total FROM kay_redirects')
   const insert = db.query('INSERT INTO kay_redirects (path, target, status, pattern, added_at) VALUES (?1, ?2, ?3, ?4, ?5) ON CONFLICT (path) DO UPDATE SET target = ?2, status = ?3, pattern = ?4, added_at = ?5')
   const removed = db.query<{ path: string }, [string]>('DELETE FROM kay_redirects WHERE path = ? RETURNING path')
@@ -178,19 +193,25 @@ export function redirectSet(db: Database): RedirectSet {
       return row ? entry(row) : undefined
     },
     patterns: () => some.all().map(entry),
-    add(from, to, status = 308, rules) {
+    add(rawFrom, rawTo, status = 308, rules) {
       // Checked and written in one write transaction, so two editors adding at once cannot make a loop between them.
       const write = db.transaction(() => {
+        const to = encoded(rawTo)
+        const from = encoded(rawFrom)
+
         check(set, from, to, status, rules)
 
-        if (!one.get(from) && count.get()!.total >= MAX_RUNTIME_REDIRECTS)
+        // The path as a visit is looked up: `/old/` and `/old?x=1` are `/old`.
+        const key = plainPath(from)
+
+        if (!one.get(key) && count.get()!.total >= MAX_RUNTIME_REDIRECTS)
           throw new RedirectRefused(`the set holds ${MAX_RUNTIME_REDIRECTS} redirects, the most there is room for: remove some, or move them to kay.config.ts`)
 
         const addedAt = Date.now()
 
-        insert.run(from, to, status, isPattern(from) ? 1 : 0, addedAt)
+        insert.run(key, to, status, isPattern(key) ? 1 : 0, addedAt)
 
-        return { from, to, status, addedAt }
+        return { from: key, to, status, addedAt }
       })
 
       return write.immediate()
@@ -202,26 +223,35 @@ export function redirectSet(db: Database): RedirectSet {
 }
 
 interface Matcher {
-  redirect: RuntimeRedirect
   pattern: RegExp
   names: string[]
 }
 
-function matcherOf(redirect: RuntimeRedirect): Matcher | undefined {
+// The matcher of each pattern path, compiled once: a flood of missing paths would otherwise compile them for every one.
+const matchers = new Map<string, Matcher>()
+const MOST_MATCHERS = 2000
+
+function matcherOf(from: string): Matcher {
+  const known = matchers.get(from)
+
+  if (known)
+    return known
+
   const names: string[] = []
-  const star = redirect.from.endsWith('/*')
-  const body = (star ? redirect.from.slice(0, -2) : redirect.from).replace(REGEX_SPECIALS, '\\$&').replace(PARAM_SEGMENT, (part) => {
+  const star = from.endsWith('/*')
+  const body = (star ? from.slice(0, -2) : from).replace(REGEX_SPECIALS, '\\$&').replace(PARAM_SEGMENT, (part) => {
     names.push(part.slice(1))
 
     return '([^/]+)'
   })
+  const matcher = { pattern: new RegExp(`^${body}${star ? '(?:/(.*))?' : ''}$`), names }
 
-  try {
-    return { redirect, pattern: new RegExp(`^${body}${star ? '(?:/(.*))?' : ''}$`), names }
-  }
-  catch {
-    return undefined
-  }
+  if (matchers.size >= MOST_MATCHERS)
+    matchers.clear()
+
+  matchers.set(from, matcher)
+
+  return matcher
 }
 
 // Where an asked path goes, as `location`, when a redirect of the set answers it: an exact row first, then the first `:param` or `*` row it matches. Undefined when none does or the answer would leave where the rules allow, or send the visitor back to the path they asked.
@@ -236,10 +266,10 @@ export function answerFor(set: RedirectSet, asked: string, search: string, hosts
   }
   else {
     for (const row of set.patterns()) {
-      const matcher = matcherOf(row)
-      const match = matcher?.pattern.exec(path)
+      const matcher = matcherOf(row.from)
+      const match = matcher.pattern.exec(path)
 
-      if (!matcher || !match)
+      if (!match)
         continue
 
       try {

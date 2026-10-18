@@ -99,7 +99,8 @@
   overflow-wrap: anywhere;
 }
 
-.kcms-missing-target {
+.kcms-missing-target,
+.kcms-missing-add {
   display: inline-flex;
   flex-wrap: wrap;
   align-items: center;

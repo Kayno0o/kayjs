@@ -13,6 +13,7 @@ import { answerFor } from './runtime-redirects'
 const NOT_FOUND = 404
 const DOT_SEGMENT = /\.[^/]+$/
 const QUERY_OR_HASH = /[?#]/
+const TRAILING_SLASHES = /\/+$/
 
 let rules: RuntimeRules = { hosts: [], configured: {} }
 let hosts: readonly string[] = []
@@ -55,7 +56,7 @@ export function addRuntimeRedirect(from: string, to: string, options: { status?:
   return inStore(options.file, true, (store) => {
     const added = store.redirects.add(from, to, options.status, rules)
 
-    store.forget(from)
+    store.forget(added.from)
 
     return added
   })!
@@ -66,12 +67,15 @@ export function removeRuntimeRedirect(from: string, file?: string): boolean {
   return inStore(file, false, store => store.redirects.remove(from)) ?? false
 }
 
-// The target as `trailingSlash` writes a page's path: with a slash under `always`, as it is otherwise; a file's path and a target with a query keep theirs.
+// The target as `trailingSlash` writes a page's path: with a slash under `always`, without under `never`, as written under `ignore`; a file's path, a target with a query and another site's keep theirs.
 function slashed(location: string, trailingSlash: TrailingSlash | undefined): string {
-  if (!location.startsWith('/') || trailingSlash !== 'always' || location.endsWith('/') || QUERY_OR_HASH.test(location) || DOT_SEGMENT.test(location))
+  if (!location.startsWith('/') || QUERY_OR_HASH.test(location) || DOT_SEGMENT.test(location) || location === '/')
     return location
 
-  return `${location}/`
+  if (trailingSlash === 'always')
+    return location.endsWith('/') ? location : `${location}/`
+
+  return trailingSlash === 'ignore' ? location : location.replace(TRAILING_SLASHES, '')
 }
 
 // Answers a page request that found nothing with the redirect an editor added for its path, if there is one.
@@ -89,11 +93,12 @@ export function redirectMissing<App extends Elysia>(app: App, options: { file?: 
     if (path === undefined)
       return undefined
 
+    let found: ReturnType<typeof answerFor>
+
     try {
       const store = sharedStore(file, false)
-      const found = store && answerFor(store.redirects, path, requestUrl(request).search, hosts)
 
-      return found ? new Response(null, { status: found.status, headers: { location: joinBase(options.base ?? '', slashed(found.location, options.trailingSlash)) } }) : undefined
+      found = store && answerFor(store.redirects, path, requestUrl(request).search, hosts)
     }
     catch (error) {
       dropStore()
@@ -103,6 +108,17 @@ export function redirectMissing<App extends Elysia>(app: App, options: { file?: 
         kayLog('warn', `the redirects added while the site runs cannot be read from ${file}: ${error instanceof Error ? error.message : String(error)}`)
       }
 
+      return undefined
+    }
+
+    if (!found)
+      return undefined
+
+    // A location Bun refuses as a header answers the 404 it would have, and leaves the store open.
+    try {
+      return new Response(null, { status: found.status, headers: { location: joinBase(options.base ?? '', slashed(found.location, options.trailingSlash)) } })
+    }
+    catch {
       return undefined
     }
   }

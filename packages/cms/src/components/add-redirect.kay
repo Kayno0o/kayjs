@@ -1,0 +1,16 @@
+---
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
+import { wording } from 'kay/words'
+
+// The Add redirect control of a missing path: one button for the target kay suggests, else a box for the target to type, so every row can be redirected.
+const { path, suggested, onAdd } = props<{ path: string, suggested: string | undefined, onAdd: (from: string, to: string) => Promise<void> }>()
+
+const typed = signal('')
+---
+if suggested as target
+  Button(label={wording('cms.missing.add', 'Add redirect')} aria-label={wording('cms.missing.addLabel', 'Redirect {path} to {target}', { path, target })} size="sm" variant="ghost" onClick={async () => { await onAdd(path, target) }})
+else
+  .kcms-missing-add
+    TextInput(value={typed()} onInput={text => typed = text} placeholder="/" aria-label={wording('cms.missing.targetLabel', 'Target of the redirect from {path}', { path })} size={20})
+    Button(label={wording('cms.missing.add', 'Add redirect')} aria-label={wording('cms.missing.addLabel', 'Redirect {path} to {target}', { path, target: typed() })} size="sm" variant="ghost" disabled={typed().trim() === ''} onClick={async () => { await onAdd(path, typed().trim()) }})

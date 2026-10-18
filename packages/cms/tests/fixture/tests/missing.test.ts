@@ -85,3 +85,21 @@ test('adds the suggested redirect, which answers at once and is listed with its 
   expect((await post('/remove', { from: '/Empty' })).status).toBe(200)
   expect((await site.fetch('/Empty')).status).toBe(404)
 })
+
+test('offers a box for the target on a path with no suggestion', async () => {
+  await site.fetch('/zzz-nothing-like-it')
+
+  for (let waited = 0; waited < 3000; waited += 50) {
+    const page = await site.visit('/admin/not-found')
+
+    if (page.find('.kcms-missing-path').some(path => path.text === '/zzz-nothing-like-it')) {
+      expect(page.find('.kcms-missing-add input').length).toBeGreaterThan(0)
+
+      return
+    }
+
+    await Bun.sleep(50)
+  }
+
+  throw new Error('the path was never listed')
+})

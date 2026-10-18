@@ -1,7 +1,6 @@
 ---
 import type { Column } from '@kaynooo/kayjs-ui'
 import type { MissingRow } from '../missing'
-import Button from '@kaynooo/kayjs-ui/button.kay'
 import CopyButton from '@kaynooo/kayjs-ui/copy-button.kay'
 import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
 import Table from '@kaynooo/kayjs-ui/table.kay'
@@ -9,6 +8,7 @@ import { refresh } from 'kay'
 import { wording } from 'kay/words'
 import { addMissingRedirect } from '../editor/save'
 import { shipWords } from '../editor/words'
+import AddRedirect from './add-redirect.kay'
 
 // `hint` says why the list may be empty, which depends on the server's mode.
 const { rows, hint } = props<{ rows: MissingRow[], hint: string }>()
@@ -35,8 +35,7 @@ Table.kcms-missing(columns={columns} rows={rows} rowKey={row => row.path} sort={
     if column.key === 'path'
       code.kcms-missing-path {row.path}
     else if column.key === 'actions'
-      if row.target as target
-        Button(label={wording('cms.missing.add', 'Add redirect')} aria-label={wording('cms.missing.addLabel', 'Redirect {path} to {target}', { path: row.path, target })} size="sm" variant="ghost" onClick={async () => { await add(row.path, target) }})
+      AddRedirect(path={row.path} suggested={row.target} onAdd={add})
     else if row.target as target
       .kcms-missing-target
         code.kcms-missing-path {target}

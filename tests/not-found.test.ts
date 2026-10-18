@@ -411,6 +411,9 @@ describe('kay not-found', () => {
 
   it('with --runtime writes the redirect to the file the site reads, leaves kay.config.ts alone, and refuses what leaves the site', async () => {
     const root = await project()
+
+    await Bun.write(join(root, 'src/routes/new.kay'), 'main New\n')
+
     const config = await Bun.file(join(root, 'kay.config.ts')).text()
     const { stdout, code } = await run(['not-found', '--redirect', '/old', '--runtime'], root)
 
@@ -424,6 +427,7 @@ describe('kay not-found', () => {
       expect((await run(['not-found', '--redirect', '/other', '--to', to, '--runtime'], root)).code).toBe(1)
 
     expect((await run(['not-found', '--redirect', '/done', '--to', '/x', '--runtime'], root)).stderr).toContain('kay.config.ts')
+    expect((await run(['not-found', '--redirect', '/other', '--to', '/nothing-serves-this', '--runtime'], root)).stderr).toContain('nothing on the site serves')
     expect((await run(['not-found', '--runtime'], root)).code).toBe(1)
     expect(readRuntimeRedirects(join(root, 'data/not-found.sqlite'))).toHaveLength(1)
   })

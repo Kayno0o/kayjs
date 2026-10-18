@@ -381,8 +381,19 @@ async function servedProject(root: string, options: CheckOptions, problems: Chec
 }
 
 // Each redirect whose target on the site nothing serves; what kay serves itself counts, whether or not the project turns it on.
-function redirectChecks(root: string, options: CheckOptions, { routes, publicPaths, endpoints }: ServedProject): CheckDiagnostic[] {
-  const served = [...routes.flatMap(route => patternShapes(route.pattern)), ...publicPaths.map(file => file.url), ...kayPaths(options), ...endpoints.filter(endpoint => endpoint.params.length === 0).map(endpoint => endpoint.pattern)]
+function servedList(options: CheckOptions, { routes, publicPaths, endpoints }: ServedProject): string[] {
+  return [...routes.flatMap(route => patternShapes(route.pattern)), ...publicPaths.map(file => file.url), ...kayPaths(options), ...endpoints.filter(endpoint => endpoint.params.length === 0).map(endpoint => endpoint.pattern)]
+}
+
+// The paths the project serves as `kay check` knows them, for a command adding a redirect before a server runs.
+export async function servedPathsOf(projectRoot: string, options: CheckOptions): Promise<string[]> {
+  const root = resolve(projectRoot)
+
+  return servedList(options, await servedProject(root, options, [], routeMounts(root, options.extensions)))
+}
+
+function redirectChecks(root: string, options: CheckOptions, project: ServedProject): CheckDiagnostic[] {
+  const served = servedList(options, project)
 
   const added = readRuntimeRedirects(join(root, NOT_FOUND_FILE))
   const configured = redirectProblems(options.redirects ?? {}, served).map(message => ({ file: join(root, CONFIG_FILE), line: 1, column: 1, message }))

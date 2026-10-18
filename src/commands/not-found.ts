@@ -63,13 +63,18 @@ export const notFound: Command = {
             throw new Error(`${redirect} has no suggested target: name one with --to <path>`)
 
           if (runtime) {
-            store!.redirects.add(redirect, target, undefined, { hosts: config.runtimeRedirects?.hosts ?? [], configured: Object.fromEntries(Object.entries(config.redirects ?? {}).map(([from, to]) => [from, typeof to === 'string' ? to : to.to])) })
-            store!.forget(redirect)
+            // Loaded here: the type checker's modules are heavy, and only this path needs them.
+            const [{ configCheckOptions }, { servedPathsOf }] = await Promise.all([import('../check'), import('../check/shadow-types')])
+            const options = configCheckOptions(config)
+            const served = await servedPathsOf(root, options)
+            const added = store!.redirects.add(redirect, target, undefined, { hosts: config.runtimeRedirects?.hosts ?? [], configured: Object.fromEntries(Object.entries(config.redirects ?? {}).map(([from, to]) => [from, typeof to === 'string' ? to : to.to])), served: () => served })
+
+            store!.forget(added.from)
 
             if (format === 'json')
-              printDocument({ redirect: { from: redirect, to: target, runtime: true } })
+              printDocument({ redirect: { from: added.from, to: added.to, runtime: true } })
             else
-              console.log(`Added to ${relative(process.cwd(), file) || file}, which the running site reads: ${redirect} -> ${target}`)
+              console.log(`Added to ${relative(process.cwd(), file) || file}, which the running site reads: ${added.from} -> ${added.to}`)
 
             return 0
           }

@@ -83,7 +83,7 @@ export function localPath<const Fallback extends string>(value: unknown, fallbac
 }
 
 // The tab and line break a browser drops only after decoding (`/%09/evil.example`) can leave a second slash or a backslash up front, so each layer of encoding (`/%2509/...`) is decoded leniently, as `unescape` would, until decoding changes nothing; a path still decoding past `MOST_LAYERS` is no real one.
-function leavesSite(decoded: string): boolean {
+export function leavesSite(decoded: string): boolean {
   let current = decoded
 
   for (let layer = 0; layer <= MOST_LAYERS; layer++) {
