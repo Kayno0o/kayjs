@@ -4,6 +4,8 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- A `resource()` reading a route whose handler reads a `live` cached key asks the route again after `invalidate`, with nothing written ([live data](api-from-islands.md#following-cached-values)).
+- A collection with `live: true` shows an `invalidate()` or a CMS edit in every open page that read it ([content](content.md#drafts)).
 - A tool's input schema, and the OpenAPI document, describe `s.Integer()` and `s.Numeric()` as a number alone, and a tool's schema no longer requires a field with a `default` ([tools](api-routes.md)).
 - A stale tab believes the build the server named for 5 seconds, and a page an action post came back to as an error page (a 404, a guard's denial) carries `kay-posted` too, so a reload no longer posts it again ([a deploy under open tabs](production.md#a-deploy-under-open-tabs)).
 - `kay check` reports an entry of a localized collection opening on a `# draft` line, as `kay i18n translate` writes one, with the `draft-entry` lint ([lints](lints.md)).
@@ -38,8 +40,6 @@ What each release of kay and its libraries adds, newest first, each feature with
 ## 1.52.3
 
 - Claude Code lists an app's MCP tools: a list or a read in the 2026-07-28 revision says how long a client keeps it, `ttlMs` and `cacheScope`, as that revision requires ([API routes](api-routes.md#mcp)).
-- A `resource()` reading a route whose handler reads a `live` cached key asks the route again after `invalidate`, with nothing written ([live data](api-from-islands.md#following-cached-values)).
-- A collection with `live: true` shows an `invalidate()` or a CMS edit in every open page that read it ([content](content.md#drafts)).
 
 ## 1.52.2
 
