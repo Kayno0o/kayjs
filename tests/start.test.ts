@@ -10,6 +10,8 @@ import { scratchDir } from './scratch'
 
 const cli = join(import.meta.dir, '..', 'src', 'cli.ts')
 const LISTENING = /listening (\d+)/
+// How long one step of a server's life may take before the test fails naming it, short of the test's 60 s.
+const STEP_MS = 15_000
 
 // Prints what it runs as, so the test sees the environment `kay start` gave it.
 const SERVER = `import process from 'node:process'
@@ -37,19 +39,53 @@ function startGroup(dir: string, ...args: string[]): Subprocess<'ignore', 'pipe'
   return Bun.spawn([process.execPath, cli, 'start', dir, ...args], { stdin: 'ignore', stdout: 'pipe', stderr: 'pipe', detached: true })
 }
 
+// Fails naming the step, after STEP_MS, where a hang would otherwise run to the test's timeout and leave a process behind: `cleanup` kills what the step waited on.
+async function within<T>(step: () => string, work: Promise<T>, cleanup?: () => void): Promise<T> {
+  let timer: Timer | undefined
+
+  try {
+    return await Promise.race([work, new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        cleanup?.()
+        reject(new Error(`${step()} did not finish within ${STEP_MS} ms`))
+      }, STEP_MS)
+    })])
+  }
+  finally {
+    clearTimeout(timer)
+  }
+}
+
+// `kay start` with core dumps off, for a server that dies of a signal whose default action dumps one.
+function startWithoutCore(dir: string): Subprocess<'ignore', 'pipe', 'pipe'> {
+  return Bun.spawn(['sh', '-c', 'ulimit -c 0; exec "$@"', 'sh', process.execPath, cli, 'start', dir], { stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' })
+}
+
 // Runs `whileUp` once the server listens, then stops it with `signal`, as a deployment would: the port it listened on, what `kay start` warned, what the server printed after listening and how it exited.
 async function listening(child: Subprocess<'ignore', 'pipe', 'pipe'>, whileUp?: (port: string, printed: () => string) => Promise<void>, signal: NodeJS.Signals = 'SIGTERM', group = false): Promise<{ port: string, warned: string, printed: string, code: number }> {
   const reader = child.stdout.getReader()
   let output = ''
 
-  for (let match = LISTENING.exec(output); !match; match = LISTENING.exec(output)) {
-    const { value, done } = await reader.read()
+  const step = async <T>(name: string, work: Promise<T>): Promise<T> => within(() => `kay start (${signal}${group ? ' to the group' : ''}): ${name}, which had printed ${JSON.stringify(output)},`, work, () => {
+    try {
+      if (group)
+        process.kill(-child.pid, 'SIGKILL')
+    }
+    catch {}
 
-    if (done)
-      throw new Error(`kay start exited without listening: ${await new Response(child.stderr).text()}`)
+    child.kill('SIGKILL')
+  })
 
-    output += new TextDecoder().decode(value)
-  }
+  await step('booting until it prints "listening"', (async () => {
+    for (let match = LISTENING.exec(output); !match; match = LISTENING.exec(output)) {
+      const { value, done } = await reader.read()
+
+      if (done)
+        throw new Error(`kay start exited without listening: ${await new Response(child.stderr).text()}`)
+
+      output += new TextDecoder().decode(value)
+    }
+  })())
 
   const port = LISTENING.exec(output)![1]!
   const listened = output.indexOf('\n', LISTENING.exec(output)!.index) + 1
@@ -60,7 +96,7 @@ async function listening(child: Subprocess<'ignore', 'pipe', 'pipe'>, whileUp?: 
   })()
 
   try {
-    await whileUp?.(port, () => output.slice(listened))
+    await step('the test\'s own steps while it runs', whileUp?.(port, () => output.slice(listened)) ?? Promise.resolve())
   }
   finally {
     if (group)
@@ -69,9 +105,9 @@ async function listening(child: Subprocess<'ignore', 'pipe', 'pipe'>, whileUp?: 
       child.kill(signal)
   }
 
-  await pump
+  await step('closing stdout after the signal', pump)
 
-  const [warned, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
+  const [warned, code] = await step('exiting after the signal', Promise.all([new Response(child.stderr).text(), child.exited]))
 
   return { port, warned, printed: output.slice(listened), code }
 }
@@ -268,8 +304,10 @@ describe('kay start', () => {
       return relative(process.cwd(), join(dir, name))
     }
 
-    expect(await start(dir, '--entry', await entry('crash.ts', 'process.exit(3)\n')).exited).toBe(3)
-    expect(await start(dir, '--entry', await entry('killed.ts', 'process.kill(process.pid, \'SIGKILL\')\n')).exited).toBe(137)
+    const exits = async (name: string, child: Subprocess<'ignore', 'pipe', 'pipe'>): Promise<number> => within(() => `kay start ${name}`, child.exited, () => child.kill('SIGKILL'))
+
+    expect(await exits('on a server that crashes', start(dir, '--entry', await entry('crash.ts', 'process.exit(3)\n')))).toBe(3)
+    expect(await exits('on a server that kills itself', start(dir, '--entry', await entry('killed.ts', 'process.kill(process.pid, \'SIGKILL\')\n')))).toBe(137)
 
     for (const group of [false, true]) {
       const port = String(freePort())
@@ -280,8 +318,8 @@ describe('kay start', () => {
       expect(await released(port, 0)).toBe(true)
     }
 
-    // A server without kay's own handling dies of SIGQUIT, as it would run alone.
-    expect((await listening(start(dir), undefined, 'SIGQUIT')).code).toBe(131)
+    // A server without kay's own handling dies of SIGQUIT, as it would run alone. Its core dump is switched off, as writing one can outlast the test on a busy host.
+    expect((await listening(startWithoutCore(dir), undefined, 'SIGQUIT')).code).toBe(131)
   }, 60_000)
 
   it('passes a Ctrl-C sent to the whole group on once, and stops the server at a second one while it drains', async () => {
