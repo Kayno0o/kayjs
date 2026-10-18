@@ -29,6 +29,7 @@ export function followLog(container: Element | (() => Element | null | undefined
     let following = true
     let height = 0
     let viewport = 0
+    let position = 0
     let anchor: Anchor | undefined
 
     // Instant, so a container with `scroll-behavior: smooth` is not measured halfway.
@@ -42,6 +43,7 @@ export function followLog(container: Element | (() => Element | null | undefined
     const measure = (): void => {
       height = element.scrollHeight
       viewport = element.clientHeight
+      position = element.scrollTop
       following = away() <= threshold
       anchor = undefined
 
@@ -68,9 +70,9 @@ export function followLog(container: Element | (() => Element | null | undefined
       measure()
     }
 
-    // A scroll event arrives a frame late, so the container may have changed size since the last measure: that is settled, not read as the reader leaving the bottom.
+    // A scroll event arrives a frame late: when the position is still the one measured, it is our own scroll and a size change since is settled, not read as the reader leaving the bottom.
     const scrolled = (): void => {
-      if (element.scrollHeight !== height || element.clientHeight !== viewport)
+      if (element.scrollTop === position && (element.scrollHeight !== height || element.clientHeight !== viewport))
         settle()
       else
         measure()
