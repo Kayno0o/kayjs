@@ -283,7 +283,7 @@ describe.concurrent('kay dev reloading', () => {
       await entryWith(project, `import { readFileSync } from 'node:fs'\nprocess.on('SIGUSR2', () => {})\nprocess.once('beforeExit', () => {})\nconst run = readFileSync(${JSON.stringify(project.log)}, 'utf8').split('\\n').length\nsetInterval(() => appendFileSync(${JSON.stringify(ticks)}, \`\${run}\\n\`), 10)\nappendFileSync(${JSON.stringify(counts)}, \`\${process.listenerCount('SIGUSR2')} \${process.listenerCount('beforeExit')}\\n\`)\n`)
 
       for (let edit = 1; edit <= 20; edit++) {
-        await project.write('src/routes/index.kay', `h1 Edit ${edit}\n`)
+        await project.replace('src/routes/index.kay', `h1 Edit ${edit}\n`)
         await project.sees(`Edit ${edit}`)
       }
 
@@ -313,7 +313,7 @@ describe.concurrent('kay dev reloading', () => {
       await entryWith(project, `import { SQL } from 'bun'\nimport { sqliteRooms, sqliteStore } from 'kay/server'\nconst previous = (globalThis as any).kept\nlet state = 'none'\n;(globalThis as any).kept = { rooms: sqliteRooms(${JSON.stringify(join(project.root, 'rooms.sqlite'))}), store: sqliteStore(':memory:'), pool: new SQL('sqlite://:memory:') }\nif (previous) {\nstate = ''\n${check}\n}\nappendFileSync(${JSON.stringify(states)}, state.trim() + '\\n')\n`)
 
       for (let edit = 1; edit <= 20; edit++) {
-        await project.write('src/routes/index.kay', `h1 Edit ${edit}\n`)
+        await project.replace('src/routes/index.kay', `h1 Edit ${edit}\n`)
         await project.sees(`Edit ${edit}`)
       }
 
@@ -340,7 +340,7 @@ describe.concurrent('kay dev reloading', () => {
       await entryWith(project, `import { readdirSync, readlinkSync } from 'node:fs'\nimport { sqliteCache } from 'kay/cache'\nimport { sqliteJobs, sqliteRates } from 'kay/server'\nconst previous = (globalThis as any).kept\nlet state = 'none'\nconst store = sqliteJobs(${JSON.stringify(jobs)})\nstore.add({ id: crypto.randomUUID(), queue: 'q', payload: '1', attempts: 0, runAt: Date.now() })\n;(globalThis as any).kept = { cache: sqliteCache(${JSON.stringify(join(project.root, 'cache.sqlite'))}), rates: sqliteRates(${JSON.stringify(join(project.root, 'rates.sqlite'))}) }\nif (previous) {\nstate = ''\n${check}\n}\nappendFileSync(${JSON.stringify(states)}, state.trim() + ' ' + ${held} + '\\n')\n`)
 
       for (let edit = 1; edit <= 20; edit++) {
-        await project.write('src/routes/index.kay', `h1 Edit ${edit}\n`)
+        await project.replace('src/routes/index.kay', `h1 Edit ${edit}\n`)
         await project.sees(`Edit ${edit}`)
       }
 
