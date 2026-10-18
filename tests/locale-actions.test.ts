@@ -1,5 +1,5 @@
 import type { I18nConfig } from '../src/config'
-import { describe, expect, it } from 'bun:test'
+import { describe, expect, it, spyOn } from 'bun:test'
 import { Elysia } from 'elysia'
 import { pages } from '../src/server'
 
@@ -151,11 +151,30 @@ describe('an action\'s redirect under a base', () => {
     const app = await serve(variant)
 
     for (const how of POSTS) {
-      for (const target of ['https://other.example/x', 'http://localhost/dashboard', '//evil.example/x']) {
+      for (const target of ['https://other.example/x', 'http://localhost/dashboard']) {
         const { location, redirect } = await redirectTo(app, variant, how, target)
 
         expect(location ?? redirect).toBe(target)
       }
+    }
+  })
+
+  it('refuses a target a browser would read as another host, whichever way the call is made', async () => {
+    const variant = MOUNTED
+    const app = await serve(variant)
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+
+    try {
+      for (const how of POSTS) {
+        for (const target of ['//evil.example/x', '/\\evil.example/x']) {
+          const { location, redirect } = await redirectTo(app, variant, how, target)
+
+          expect([location, redirect]).toEqual([null, null])
+        }
+      }
+    }
+    finally {
+      logged.mockRestore()
     }
   })
 
