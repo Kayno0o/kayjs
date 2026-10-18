@@ -17,7 +17,7 @@ The docs can no longer be exported as static files: the chat page exports an act
 docker compose -f docs/compose.yaml up -d --build   # from the repository root
 ```
 
-`docs/Dockerfile` builds the docs on the repository checkout and runs `kay start`, not a compiled executable, as the chat reads `llms.txt`, `llms/` and the pages from disk. Compose publishes it on `127.0.0.1:3000` only, for nginx to proxy.
+`docs/Dockerfile` builds the docs on the repository checkout and runs `kay start`, not a compiled executable, as the chat reads `llms.txt`, `llms/` and the pages from disk. Compose publishes it on `127.0.0.1:3649` only, for nginx to proxy.
 
 ## Environment
 

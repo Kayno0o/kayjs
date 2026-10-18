@@ -11,7 +11,7 @@ WORKDIR /kay/docs
 RUN bun ../src/cli.ts build
 # The chat's counts live in data/, a volume; the build above may have opened its file.
 RUN rm -rf data && mkdir data
-ENV NODE_ENV=production PORT=3000
-EXPOSE 3000
-HEALTHCHECK --interval=30s --timeout=6s CMD ["bun", "-e", "process.exit((await fetch('http://127.0.0.1:3000/')).ok ? 0 : 1)"]
+ENV NODE_ENV=production PORT=3649
+EXPOSE 3649
+HEALTHCHECK --interval=30s --timeout=6s CMD ["bun", "-e", "process.exit((await fetch('http://127.0.0.1:3649/')).ok ? 0 : 1)"]
 CMD ["bun", "../src/cli.ts", "start"]
