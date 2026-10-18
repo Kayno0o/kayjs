@@ -1,0 +1,39 @@
+import { join, resolve } from 'node:path'
+import { describe, expect, it } from 'bun:test'
+import { eagerJs } from './eager-js'
+
+const ROOT = resolve(import.meta.dir, '..')
+const APP = join(ROOT, 'bench/apps/kay')
+const DIST = join(APP, '.kay/client/dist')
+const BASELINE = join(ROOT, 'bench/weight.json')
+// The gzip bytes a page may grow by before the baseline is raised, for the few bytes a chunk name or path moves the output by.
+const SLACK = 40
+
+interface Weight { gzip: number, files: number }
+interface Manifest { entry: string, entryImports: string[], islands: Record<string, string[]> }
+
+// The islands each bench page hydrates: the products page the counter, the table page the table.
+const PAGES: Record<string, string> = { products: 'components/counter.kay', table: 'components/table.kay' }
+
+describe('the bench app\'s JS', () => {
+  it('weighs no more, in bytes and in files, than the recorded baseline for each page', async () => {
+    const build = Bun.spawn([process.execPath, join(ROOT, 'src/cli.ts'), 'build', APP, '--no-check', '--quiet'], { cwd: ROOT, stdout: 'pipe', stderr: 'pipe' })
+    const [errors, code] = await Promise.all([new Response(build.stderr).text(), build.exited])
+
+    expect(code, errors).toBe(0)
+
+    const manifest = await Bun.file(join(APP, '.kay/client/manifest.json')).json() as Manifest
+    const baseline = await Bun.file(BASELINE).json() as Record<string, Weight>
+
+    for (const [page, island] of Object.entries(PAGES)) {
+      const urls = [manifest.entry, ...manifest.entryImports, ...manifest.islands[island]!]
+      const loaded = await eagerJs(urls, async url => Bun.file(join(DIST, url.replace(/^\/_kay\//, ''))).text())
+      const gzip = loaded.values().reduce((sum, { size }) => sum + size, 0)
+      const expected = baseline[page]!
+      const detail = `the ${page} page loads ${gzip} gzip bytes in ${loaded.size} files (${[...loaded.keys()].join(', ')}), baseline ${expected.gzip} in ${expected.files}: raise bench/weight.json only for a cost the change justifies`
+
+      expect(loaded.size, detail).toBeLessThanOrEqual(expected.files)
+      expect(gzip, detail).toBeLessThanOrEqual(expected.gzip + SLACK)
+    }
+  }, 120_000)
+})

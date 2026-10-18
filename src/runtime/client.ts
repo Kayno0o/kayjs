@@ -1,6 +1,6 @@
 import type { DevProblems } from './dev-boot'
 import { withBase } from './base'
-import { skew, warm } from './build'
+import { skew } from './build'
 import { dispatch, hydrate, render } from './dom'
 import { ISLAND } from './markers'
 import { batch, flush, ownSignal, recordSignals, reportError, root, setErrorReporter } from './reactive'
@@ -95,9 +95,6 @@ async function post(body: string): Promise<void> {
   catch {}
 }
 
-// Whether the tab already queued what it does about a deploy.
-let warming = false
-
 // Loads the code that keeps the cached values the page read with `live: true` up to date, only for a page that carries some.
 async function followCaches(): Promise<void> {
   following = true
@@ -112,11 +109,6 @@ async function followCaches(): Promise<void> {
 // Running it again over the same root leaves the islands it already took alone.
 export async function hydrateIslands(registry: IslandRegistry, root: ParentNode = document): Promise<void> {
   const eager: Promise<void>[] = []
-
-  if (!warming) {
-    warming = true
-    whenIdle(warm)
-  }
 
   if (following || document.querySelector(CACHE_SCRIPT))
     void followCaches()

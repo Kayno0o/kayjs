@@ -17,7 +17,7 @@ const CLI = resolve('src/cli.ts')
 const BASE = '/repo'
 // The gzipped JS a page with one small island loads before anything is clicked, a few bytes above what it measures: a change growing it pays for its bytes with a cut elsewhere in the eager runtime, or, when none is clean and it buys speed or reliability in the browser, raises this.
 // The runtime is split by who imports each name, which costs the import statements between its chunks, about 12 bytes here.
-const EAGER_JS_BUDGET = 8_757
+const EAGER_JS_BUDGET = 9_398
 const SCRIPT_URL = /<(?:script type="module" src|link rel="modulepreload" href)="([^"]+)"/g
 
 let out: string
@@ -185,6 +185,17 @@ describe('kay build --static', () => {
 
   it('keeps the JS a page loads up front within its budget', async () => {
     await expectEagerJsWithin(EAGER_JS_BUDGET, (await get('/')).text, async url => Bun.file(join(out, url.slice(BASE.length))).text())
+  })
+
+  it('keeps what reloads a tab opened before a deploy in the files loaded up front, and in no chunk loaded after idle', async () => {
+    const read = async (url: string) => Bun.file(join(out, url.slice(BASE.length))).text()
+    const eager = await expectEagerJsWithin(EAGER_JS_BUDGET, (await get('/')).text, read)
+    const chunks = await Array.fromAsync(new Bun.Glob('_kay/*.js').scan(out))
+    const holding = await Promise.all(chunks.map(async chunk => (await Bun.file(join(out, chunk)).text()).includes('kay-reloaded')))
+
+    expect(eager.filter(code => code.includes('kay-reloaded'))).toHaveLength(1)
+    // A chunk loaded later is gone once a deploy dropped the chunks, so the reload could not run from it.
+    expect(holding.filter(Boolean)).toHaveLength(1)
   })
 
   it.each([

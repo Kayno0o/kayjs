@@ -8,6 +8,7 @@ import { chromium } from 'playwright-core'
 import { BUILD_HEADER } from '../src/runtime/swap'
 import { browse, browserPath } from '../src/test'
 import { fixtureCopy } from './scratch'
+import { ready } from './skew-page'
 
 const CLI = join(import.meta.dir, '..', 'src', 'cli.ts')
 const LISTENING = /listening (\d+)/
@@ -118,7 +119,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a tab of a
   const open = async (): Promise<TestPage> => {
     upstream = before
     tab = await browse(front.url.origin, { path, strict: false })
-    await tab.waitUntil(() => performance.getEntriesByType('resource').some(entry => entry.name.includes('/stale-')))
+    await ready(tab)
 
     return tab
   }

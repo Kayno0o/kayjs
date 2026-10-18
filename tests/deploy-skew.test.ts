@@ -11,6 +11,7 @@ import { requestIdHeader } from '../src/server/protection'
 import { headerCopies, ownHeaders } from '../src/server/security'
 import { browse, browserPath, testSite } from '../src/test'
 import { fixtureCopy } from './scratch'
+import { askServerIslands, loadDroppedChunk, ready } from './skew-page'
 
 const CLI = join(import.meta.dir, '..', 'src', 'cli.ts')
 const path = browserPath() ?? (existsSync(chromium.executablePath()) ? chromium.executablePath() : undefined)
@@ -202,7 +203,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a page tol
       page = await browse(`${front.url.origin}${base}/`, { path })
     }
 
-    await page.waitUntil(() => performance.getEntriesByType('resource').some(entry => entry.name.includes('/stale-')))
+    await ready(page)
     await page.evaluate(() => {
       (window as { kayMark?: string }).kayMark = 'kept'
     })
@@ -301,18 +302,8 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a page tol
       forged.build = 'otherbuild'
       forged.seen.length = 0
 
-      const answers = await page.evaluate(async () => {
-        const entry = performance.getEntriesByType('resource').find(resource => resource.name.includes('/stale-'))!.name
-        const { noticed } = await import(entry) as { noticed: (response: Response) => Promise<boolean> }
-        const results: boolean[] = []
+      await askServerIslands(page, 5)
 
-        for (let count = 0; count < 5; count++)
-          results.push(await noticed(new Response('x', { headers: { 'x-kay-build': 'otherbuild' } })))
-
-        return results
-      })
-
-      expect(answers).toEqual([false, false, false, false, false])
       expect(forged.seen.filter(request => request.startsWith('HEAD '))).toHaveLength(1)
     }
     finally {
@@ -334,13 +325,8 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a page tol
       forged.build = 'otherbuild'
       forged.seen.length = 0
 
-      await page.evaluate(async () => {
-        const entry = performance.getEntriesByType('resource').find(resource => resource.name.includes('/stale-'))!.name
-        const { noticed, reloadIfStale } = await import(entry) as { noticed: (response: Response) => Promise<boolean>, reloadIfStale: () => Promise<boolean> }
-
-        await noticed(new Response('x', { headers: { 'x-kay-build': 'otherbuild' } }))
-        await reloadIfStale()
-      })
+      await askServerIslands(page, 1)
+      await loadDroppedChunk(page)
 
       expect(forged.seen.filter(request => request.startsWith('HEAD '))).toHaveLength(1)
     }
@@ -361,19 +347,9 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a page tol
       })
       forged.seen.length = 0
 
-      await page.evaluate(async () => {
-        const entry = performance.getEntriesByType('resource').find(resource => resource.name.includes('/stale-'))!.name
-        const { reloadIfStale } = await import(entry) as { reloadIfStale: () => Promise<boolean> }
-
-        await reloadIfStale()
-      })
+      await loadDroppedChunk(page)
       forged.build = 'otherbuild'
-      await page.evaluate(async () => {
-        const entry = performance.getEntriesByType('resource').find(resource => resource.name.includes('/stale-'))!.name
-        const { reloadIfStale } = await import(entry) as { reloadIfStale: () => Promise<boolean> }
-
-        await reloadIfStale()
-      })
+      await loadDroppedChunk(page)
 
       expect(forged.seen.filter(request => request.startsWith('HEAD '))).toHaveLength(2)
     }
@@ -392,14 +368,11 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a page tol
       forged.build = 'otherbuild'
       forged.seen.length = 0
 
-      await page.evaluate(async () => {
-        const entry = performance.getEntriesByType('resource').find(resource => resource.name.includes('/stale-'))!.name
-        const { noticed } = await import(entry) as { noticed: (response: Response) => Promise<boolean> }
-
+      await page.evaluate(() => {
         // A CDN's address, where nothing answers this origin's HEAD.
         document.querySelector<HTMLScriptElement>('script[type="module"][src*="/_kay/"]')!.src = 'http://127.0.0.1:1/_kay/entry.js'
-        await noticed(new Response('x', { headers: { 'x-kay-build': 'otherbuild' } }))
       })
+      await askServerIslands(page, 1)
 
       expect(forged.seen.some(request => request.startsWith('HEAD '))).toBe(false)
       expect(pageRequests(forged.seen)).toHaveLength(1)
@@ -430,14 +403,8 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a page tol
       })
       forged.build = 'otherbuild'
 
-      const reloaded = await page.evaluate(async () => {
-        const entry = performance.getEntriesByType('resource').find(resource => resource.name.includes('/stale-'))!.name
-        const { noticed } = await import(entry) as { noticed: (response: Response) => Promise<boolean> }
+      await loadDroppedChunk(page)
 
-        return noticed(new Response(null, { status: 404, headers: { 'x-kay-build': 'otherbuild' } }))
-      })
-
-      expect(reloaded).toBe(false)
       await Bun.sleep(500)
       expect(await page.evaluate(() => (window as { kayMark?: string }).kayMark)).toBe('kept')
     }
@@ -521,7 +488,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a tab open
   // A tab is only opened before a deploy once it has what it does about one, which it loads when idle.
   const open = async (): Promise<TestPage> => {
     tab = await browse(host.server.url.href, { path, strict: false })
-    await tab.waitUntil(() => performance.getEntriesByType('resource').some(entry => entry.name.includes('/stale-')))
+    await ready(tab)
 
     return tab
   }
