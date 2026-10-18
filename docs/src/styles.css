@@ -1,6 +1,8 @@
 /* The docs' colours are kayjs-ui's tokens, set by the palette picked (palettes.css), so one theme restyles the docs, the components on them and the code; light-dark() follows the reader's color scheme with no script. */
 :root {
   color-scheme: light dark;
+  /* Room for the page scrollbar on a short page too, so the column does not shift between a page that scrolls and one that does not. */
+  scrollbar-gutter: stable;
   --base: var(--color-kui-canvas);
   --mantle: var(--color-kui-mantle);
   --crust: light-dark(color-mix(in srgb, var(--color-kui-mantle) 95%, black), color-mix(in srgb, var(--color-kui-mantle) 72%, black));
