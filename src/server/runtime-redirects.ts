@@ -224,13 +224,13 @@ export function redirectSet(db: Database): RedirectSet {
 }
 
 interface Matcher {
-  pattern: RegExp
+  // Undefined for a path that cannot compile, which matches nothing.
+  pattern: RegExp | undefined
   names: string[]
 }
 
 // The matcher of each pattern path, compiled once: a flood of missing paths would otherwise compile them for every one.
 const matchers = new Map<string, Matcher>()
-const NEVER = /^\b$/
 
 function matcherOf(from: string): Matcher {
   const known = matchers.get(from)
@@ -245,14 +245,14 @@ function matcherOf(from: string): Matcher {
 
     return '([^/]+)'
   })
-  let pattern = NEVER
+  let pattern: RegExp | undefined
 
   // A path that cannot compile answers nothing, rather than throwing out of the lookup that serves a 404.
   try {
     pattern = new RegExp(`^${body}${star ? '(?:/(.*))?' : ''}$`)
   }
   catch {
-    // Left on the pattern that matches nothing.
+    // The row answers nothing.
   }
 
   const matcher = { pattern, names }
@@ -278,7 +278,7 @@ export function answerFor(set: RedirectSet, asked: string, search: string, hosts
   else {
     for (const row of set.patterns()) {
       const matcher = matcherOf(row.from)
-      const match = matcher.pattern.exec(path)
+      const match = matcher.pattern?.exec(path)
 
       if (!match)
         continue
