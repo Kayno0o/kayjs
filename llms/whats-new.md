@@ -2,7 +2,7 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
-## Unreleased
+## 1.53.1
 
 - kayjs-ai asks the provider to cache the prompt by default, so a chat and each step of a tool loop stop paying full price for the system prompt, tools and history: Anthropic gets automatic `cache_control`, an OpenAI-compatible server a `prompt_cache_key` per conversation (dropped when it refuses it), `ask(..., { cache: false | '1h' })` changes it, `reply.usage` reports `cacheReadTokens` and `cacheWriteTokens`, and the token budget counts them ([prompt caching](../packages/ai/llms/asking.md#prompt-caching)).
 - kayjs-ai streams from Mistral with only `AI_BASE_URL`, `OPENAI_API_KEY` and `AI_MODEL` set: a server refusing `stream_options` is asked again without it, array content keeps its text, and a stream ending on `error` fails the reply ([asking](../packages/ai/llms/asking.md)).
