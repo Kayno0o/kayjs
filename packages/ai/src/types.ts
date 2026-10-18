@@ -114,10 +114,18 @@ export interface ToolCall {
   result?: string | undefined
 }
 
-// The reply so far, for a chat to show: the text of all steps and every call, each as last seen.
+// The reply so far, for a chat to show: the text of all steps and every call, each as last seen, and the code blocks that were finished since the previous snapshot.
 export interface Progress {
   text: string
   calls: ToolCall[]
+  // The code blocks of the text closed since the previous snapshot, highlighted with the app's own highlighter (`markdown.highlight` in `kay.config.ts`) and sanitized; absent when there are none or the app has no highlighter.
+  code?: CodeBlock[] | undefined
+}
+
+// A finished code block: `markup` is how the chat renders it as Markdown, which `html` replaces.
+export interface CodeBlock {
+  markup: string
+  html: string
 }
 
 // A reply: `await` gives its whole text, `for await` its snapshots, each the text so far, which an `await` block and a streaming action take as they are.

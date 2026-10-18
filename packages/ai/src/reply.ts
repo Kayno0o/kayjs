@@ -1,5 +1,6 @@
 import type { Finish, Piece, Progress, Reply, ToolCall, Usage } from './types'
 import { AiError } from './errors'
+import { highlighting } from './highlight'
 
 function snapshot(call: ToolCall): ToolCall {
   return { ...call, input: { ...call.input } }
@@ -7,7 +8,7 @@ function snapshot(call: ToolCall): ToolCall {
 
 // A reply over what `open` yields once first read, with `signals` stopping it when any aborts.
 // The text is kept as it comes, so any number of readers (`await`, `for await`, `usage`) share one provider request.
-export function createReply(open: (signal: AbortSignal) => AsyncIterable<Piece>, signals: (AbortSignal | undefined)[]): Reply {
+export function createReply(open: (signal: AbortSignal) => AsyncIterable<Piece>, signals: (AbortSignal | undefined)[], highlight = highlighting): Reply {
   const controller = new AbortController()
   const deltas: string[] = []
   const waiters = new Set<() => void>()
@@ -161,6 +162,7 @@ export function createReply(open: (signal: AbortSignal) => AsyncIterable<Piece>,
   const progress = (): AsyncIterator<Progress> => {
     start()
 
+    const highlighted = highlight()
     let seen = 0
     let closed = false
 
@@ -173,7 +175,10 @@ export function createReply(open: (signal: AbortSignal) => AsyncIterable<Piece>,
           if (seen < version) {
             seen = version
 
-            return { done: false, value: { text: deltas.join(''), calls: calls.map(snapshot) } }
+            const text = deltas.join('')
+            const code = await highlighted(text)
+
+            return { done: false, value: { text, calls: calls.map(snapshot), ...code.length > 0 && { code } } }
           }
 
           if (ended) {

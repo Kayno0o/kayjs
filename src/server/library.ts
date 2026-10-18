@@ -1,5 +1,8 @@
 // What kay's own libraries share with kay, for their server code, not API: free to change with any minor, as every library peers on kay's exact minor.
 
+import type { Highlighter } from '../content/markdown'
+
+export type { Highlighter }
 export { underKayDev } from '../build/assets'
 export type { KayCommand, Parsed } from '../commands/command'
 export type { DataValue, JsonSchema } from '../content/edit'
@@ -49,6 +52,11 @@ export async function localizedEntry(...args: Parameters<Entries['localizedEntry
 
 export async function writeDraftEntry(...args: Parameters<Entries['writeDraftEntry']>): ReturnType<Entries['writeDraftEntry']> {
   return (await import('./entry-drafts')).writeDraftEntry(...args)
+}
+
+// The highlighter `kay.config.ts`'s `markdown.highlight` sets, which a library highlights code with as the app's Markdown does; undefined when the app has none.
+export async function configuredHighlighter(): Promise<Highlighter | undefined> {
+  return (await import('../content/load')).markdownOf({}).highlight
 }
 
 // The project root the running server serves: where `.kay` sits, and the content config's project, not the working directory a server may be started from.

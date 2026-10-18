@@ -1,6 +1,6 @@
 ---
 import type { Action, ActionStream, Failure, JSX, SanitizeOptions } from 'kay'
-import type { Message, Progress, ToolCall } from './types'
+import type { CodeBlock, Message, Progress, ToolCall } from './types'
 import { ActionError, effect, onCleanup, onMount, sanitizeHtml, signal, trustHtml, untrack } from 'kay'
 import { markdownHtml } from 'kay/markdown'
 import { posted, restored, stored } from './chat-history'
@@ -11,6 +11,9 @@ import './chat.css'
 const REPLY: SanitizeOptions = { tags: ['table', 'thead', 'tbody', 'tr', 'th', 'td'] }
 // How close to the end of the log the visitor must be for new text to keep it scrolled down.
 const PINNED_PX = 48
+// Stands in for a highlighted code block while the rest of the reply is sanitized.
+const MARK = '\uE100'
+const MARKED = /\uE100(\d+)\uE100/g
 const ATTRIBUTE_UNSAFE = /[&"<]/g
 // The opening tag `sanitizeHtml` writes for a link, which `linksOpenApart` rewrites: the two change together. The href is captured to tell a link of this site from another.
 const SANITIZED_LINK = /<a href="([^"]*)" rel="nofollow ugc">/g
@@ -26,6 +29,8 @@ interface Turn extends Message {
   stopped?: boolean | undefined
   // The tools the reply called, when the action streams `reply.progress()`.
   calls?: ToolCall[] | undefined
+  // The reply's code blocks the server highlighted.
+  code?: CodeBlock[] | undefined
 }
 
 const { action, initial = [], label = 'Chat', placeholder = 'Write a message…', sendLabel = 'Send', stopLabel = 'Stop', retryLabel = 'Try again', thinkingLabel = 'Thinking…', stoppedLabel = 'Stopped', errorMessage = 'The reply failed.', keep = 20, tableLabel = 'Table', toolDetails = true, greeting = 'How can I help?', suggestions = [], toolLabels = {}, sendIcon, stopIcon, remember, links = 'apart', runningLabel = 'Running', doneLabel = 'Done', failedLabel = 'Failed', argumentsLabel = 'Arguments', resultLabel = 'Result', class: className } = props<{
@@ -84,6 +89,8 @@ const streaming = signal<ActionStream<string | Progress> | undefined>(undefined)
 const partial = signal('')
 // The tool calls of the reply being written, as last seen.
 const calls = signal<ToolCall[]>([])
+// The code blocks of the reply being written that the server highlighted so far.
+const code = signal<CodeBlock[]>([])
 // What the status line said of the calls, one line each and added to it, since a line replaced before the screen reader reads it is lost.
 const spoken = signal<{ id: number, text: string }[]>([])
 const failure = signal<string | undefined>(undefined)
@@ -123,6 +130,9 @@ function show(value: string | Progress) {
   partial.set(value.text)
   calls.set(value.calls)
   announce(value.calls)
+
+  if (value.code)
+    code.set([...code(), ...value.code])
 }
 
 // A link of a reply opens in a new tab, as the conversation lives in this page and a page swap would drop it, unless `links` is `here` and the link leads to this site.
@@ -131,8 +141,18 @@ function linksOpenApart(html: string): string {
 }
 
 // A table is wrapped, once sanitized, in a box that scrolls sideways and takes the keyboard's focus, except in the turn being written, which is hidden from screen readers. Several tables of one reply are numbered, so no two groups share a name.
-function markdown(text: string, scrollable = true) {
-  const html = linksOpenApart(sanitizeHtml(markdownHtml(text), REPLY))
+// A code block the server highlighted (already sanitized there) takes the place of the plain one, which a marker holds through the sanitizing.
+function markdown(text: string, blocks: CodeBlock[] | undefined, scrollable = true) {
+  let source = markdownHtml(text) as string
+
+  for (const [index, block] of (blocks ?? []).entries())
+    source = source.replaceAll(block.markup, `${MARK}${index}${MARK}`)
+
+  let html = linksOpenApart(sanitizeHtml(source, REPLY))
+
+  if (blocks)
+    html = html.replace(MARKED, (whole, index: string) => blocks[Number(index)]?.html ?? whole)
+
   const tables = html.split('<table>').length - 1
 
   if (tables === 0)
@@ -163,13 +183,15 @@ function takeBack() {
 function finish(state: string) {
   const text = partial()
   const made = calls()
+  const highlighted = code()
 
   streaming.set(undefined)
   partial.set('')
   calls.set([])
+  code.set([])
 
   if (text !== '' || made.length > 0)
-    history.set([...history(), { id: nextId++, role: 'assistant', content: text, calls: made, stopped: state === 'closed' }])
+    history.set([...history(), { id: nextId++, role: 'assistant', content: text, calls: made, code: highlighted, stopped: state === 'closed' }])
 
   if (state === 'failed')
     failure.set(errorMessage)
@@ -246,6 +268,7 @@ async function send(again = false, question?: string) {
   takenBack.set(false)
   partial.set('')
   calls.set([])
+  code.set([])
   told.clear()
   spoken.set([])
   waiting.set(true)
@@ -293,6 +316,7 @@ function reset() {
   takenBack.set(false)
   partial.set('')
   calls.set([])
+  code.set([])
   spoken.set([])
   told.clear()
 }
@@ -368,7 +392,7 @@ section.kai-chat(class={className} onKeyDown={escape} data-empty={history().leng
           if turn.calls && turn.calls.length > 0
             Calls(calls={turn.calls} labels={toolLabels} details={toolDetails} runningLabel={runningLabel} doneLabel={doneLabel} failedLabel={failedLabel} argumentsLabel={argumentsLabel} resultLabel={resultLabel})
           if turn.content !== ''
-            .kai-chat-text(innerHTML={markdown(turn.content)})
+            .kai-chat-text(innerHTML={markdown(turn.content, turn.code)})
           if turn.stopped
             small.kai-chat-note {stoppedLabel}
     if busy()
@@ -376,7 +400,7 @@ section.kai-chat(class={className} onKeyDown={escape} data-empty={history().leng
         if calls().length > 0
           Calls(calls={calls()} labels={toolLabels} details={toolDetails} runningLabel={runningLabel} doneLabel={doneLabel} failedLabel={failedLabel} argumentsLabel={argumentsLabel} resultLabel={resultLabel})
         if partial() !== ''
-          .kai-chat-text(innerHTML={markdown(partial(), false)})
+          .kai-chat-text(innerHTML={markdown(partial(), code(), false)})
         else if calls().length === 0
           p.kai-chat-text.kai-chat-thinking {thinkingLabel}
   .kai-chat-status(role="status" aria-atomic="false")

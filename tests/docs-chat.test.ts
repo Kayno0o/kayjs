@@ -6,6 +6,7 @@ import { afterAll, afterEach, describe, expect, it } from 'bun:test'
 import { memoryRates } from 'kay/server'
 import { testSite } from 'kay/test'
 import { chatPages, partOfPage, readPage, searchPages, systemPrompt } from '../docs/src/chat-corpus'
+import { highlight } from '../docs/src/highlight'
 import { fakeAi } from '../packages/ai/src'
 import { forgetCounts } from '../packages/ai/src/limits'
 import { takeDocsBuild } from './docs-build'
@@ -21,6 +22,7 @@ const root = join(import.meta.dir, '../docs')
 const release = await takeDocsBuild()
 const site = await testSite({ root })
 const { reply, searchDocs, readDocsPage } = await import(join(root, 'src/routes/(docs)/_actions.kay')) as Ask
+const BUTTON = /<button[\s\S]*?<\/button>/
 const question = (content: string) => ({ messages: [{ role: 'user', content }] })
 
 // The settings docs/kay.config.ts gives `ai()`, read where the library keeps them.
@@ -173,6 +175,20 @@ describe('the tools', () => {
 })
 
 describe('the chat action', () => {
+  it('streams a finished code block highlighted as the docs pages are, and leaves a block still open plain', async () => {
+    const source = 'const count = signal(0)\n'
+
+    fakeAi.reply(`Try:\n\n\`\`\`ts\n${source}\`\`\`\n\nThen:\n\n\`\`\`ts\nconst x`)
+
+    const steps = await site.call(reply, question('Show a signal')) as { text: string, code?: { markup: string, html: string }[] }[]
+    const blocks = steps.flatMap(step => step.code ?? [])
+
+    expect(blocks).toHaveLength(1)
+    expect(blocks[0]!.html).toBe(highlight(source, 'ts').replace(BUTTON, ''))
+    expect(blocks[0]!.html).toContain('color:var(--shiki-token')
+    expect(blocks[0]!.markup).toContain('const count = signal(0)')
+  })
+
   it('answers from llms.txt, offers the two tools and lets the model read a page', async () => {
     fakeAi.reply({ text: 'Let me look. ', calls: [{ name: 'read_page', input: { path: '/essentials/islands' } }] })
     fakeAi.reply(asked => `See [Islands](/essentials/islands): ${asked.messages.at(-1)!.results![0]!.content.length > 500 ? 'read' : 'short'}`)

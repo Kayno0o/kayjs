@@ -5,6 +5,7 @@ import { ai } from '@kaynooo/kayjs-ai'
 import tailwind from 'bun-plugin-tailwind'
 import { analytics } from 'kay/analytics'
 import { defineConfig, sqliteRates } from 'kay/server'
+import { highlight } from './src/highlight'
 import { pageWeight } from './src/page-weight'
 import { THEME_SCRIPT } from './src/theme'
 
@@ -39,6 +40,8 @@ export default defineConfig({
   fonts: [{ fontsource: '@fontsource/inter', weights: [700] }],
   // kay's own mark, the kingfisher the docs' favicon shows too.
   images: { card: { background: '#17202e', color: '#eef2f7', logo: '../src/server/favicon.svg' } },
+  // Set once for every collection, and for the chat's code blocks, which the server highlights with it as well.
+  markdown: { highlight },
   search: true,
   // The theme picked in the header, put on the page before it paints.
   head: [{ tag: 'script', props: { children: THEME_SCRIPT } }],

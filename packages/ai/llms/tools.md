@@ -52,7 +52,7 @@ A model reads text an attacker may have written (a page, an email, a visitor's m
 
 ## Showing the calls
 
-- `reply.progress()` is an async iterable of `{ text, calls }`, the text so far and every call as last seen, one snapshot per change. It is plain data: an action returning it streams both to the island (`last()` is the latest), which is what a chat renders.
+- `reply.progress()` is an async iterable of `{ text, calls, code? }`, the text so far and every call as last seen, one snapshot per change; `code` lists the blocks highlighted since the previous snapshot ([Chat island](chat.md)). It is plain data: an action returning it streams both to the island (`last()` is the latest), which is what a chat renders.
 - `await reply.calls` is the final `ToolCall[]`, never rejects; reading it starts the reply.
 - `ToolCall` is `{ id, name, input, status, result? }`: `input` the parsed arguments (`{}` when they were not an object), `status` `running`, then `done` or `failed`, `result` the text the model was given. A call stopped while running stays `running`.
 - Results are the visitor's own data, run as them, but shown as is: a chat decides how much of `result` to render.

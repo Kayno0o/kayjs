@@ -198,7 +198,9 @@ To show the calls in a chat, return `reply.progress()` from the chat's action in
 
 The chat then lists each call before the text of its turn, with its status and, when opened, its arguments and result. Set `toolDetails={false}` on `Chat` to show names and statuses only.
 
-You can also read `reply.progress()` yourself. It gives the text so far and every tool call, again with each change. Each call is `{ id, name, input, status, result }`, its status `running`, then `done` or `failed`. `await reply.calls` gives the final list.
+Code in an answer is coloured the way the rest of your Markdown is. Once a code block is finished, the server highlights it with the `markdown.highlight` function from your `kay.config.ts`, the one your content pages use, and the chat swaps the plain block for the coloured one. The browser loads no highlighter. A block still being written stays plain, and so does code when your app has no highlighter. This works when the action returns `.progress()`.
+
+You can also read `reply.progress()` yourself. It gives the text so far and every tool call, again with each change, plus the code blocks that were highlighted since the last snapshot. Each call is `{ id, name, input, status, result }`, its status `running`, then `done` or `failed`. `await reply.calls` gives the final list.
 
 <ReadMore href="/llms/kayjs-ai-tools">What the model is told for each kind of failure, the limits, and how to test it.</ReadMore>
 

@@ -7,6 +7,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `kay dev` restarts once for a save written in place: a second file event for a file whose content it already took in triggers nothing ([kay dev](dev-server.md)).
 - An island's script no longer carries the icons of a module it imports without using them, and an island calling `signal()` alone no longer loads the value encoder `persisted()` and action calls share: a site of a few islands and a dozen icons loses about 1.8 KB of brotli ([Images](images.md)).
 - kayjs-ai's chat looks finished: `Chat` takes `greeting`, `suggestions` (questions an empty chat sends on a click), `toolLabels` (a reply's tool calls fold into one muted line such as `Searched the docs x2`) and `sendIcon`/`stopIcon`; `ChatLauncher` has a New conversation button and an Enlarge button in its panel header, a filled launcher button that turns into a close icon, a 36rem panel as tall as its content, and `--kai-chat-*` custom properties to theme it ([Chat island](../packages/ai/llms/chat.md#floating-chat)).
+- kayjs-ai's chat highlights the code of an answer once a block is finished, on the server with the app's own `markdown.highlight` from `kay.config.ts`, and ships no highlighter to the browser; an action returning `.progress()` streams it, an app without a highlighter shows plain code as before ([Chat island](../packages/ai/llms/chat.md)).
 
 ## 1.53.3
 
