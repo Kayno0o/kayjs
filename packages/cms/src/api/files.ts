@@ -25,7 +25,7 @@ export default api({ bodyLimit: uploadBodyLimit })
     if (body.file.size > maxSize)
       return status(413, tooLarge(body.file.name, body.file.size, maxSize))
 
-    const refusal = uploadRefusal(body.file)
+    const refusal = await uploadRefusal(body.file)
 
     if (refusal !== undefined)
       return status(415, refusal)

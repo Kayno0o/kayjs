@@ -122,6 +122,10 @@ An image pasted or dropped into a Markdown body is uploaded the same way and emb
 
 A file field takes PNG, JPEG, WebP, GIF, AVIF and PDF files. Set `uploads` to list others, such as `['image/*', 'application/pdf']`. The file picker offers only those types, and a file over the size limit or of another type is refused with its type or size in the message, an empty one too.
 
+The server also reads the file's first bytes. A file named `photo.png` that holds a web page, a JPEG or half a header is refused as not a real `image/png`, whatever name or type the browser sent, and the name counts in any case, so `PHOTO.PNG` is a PNG. PDF and SVG files are checked the same way. A type with no signature, such as a CSV, is taken as named.
+
+Storage serves anything but an image, video, audio, PDF or plain-text file as a download that cannot run as your site, so an SVG you allow is safe in an `img` and never opens as a page.
+
 An upload may weigh 20 MB by default. `uploads: { types, maxSize }` sets either, `maxSize` in bytes or as a string such as `'50mb'`, for a site of videos or large PDFs, or `'2mb'` for a portfolio that wants less; a part left out keeps its default.
 
 The upload route takes `maxSize` whatever the app's `bodyLimit` is, so nothing else is raised. The editor refuses an oversized file before sending it, and the server stays the one that decides. A size that is zero, negative, not a whole number of bytes or over 128 MB less 64 KB stops `kay.config.ts` from loading: Bun refuses a request body over 128 MB before the route sees it, and the upload is buffered in memory.

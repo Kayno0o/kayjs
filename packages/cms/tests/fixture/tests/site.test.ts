@@ -2,6 +2,7 @@ import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { beforeAll, expect, setSystemTime, test } from 'bun:test'
+import { files } from 'kay/server'
 import { testSite } from 'kay/test'
 import { fileVersion } from '../../../src/files'
 import { BODY, parseMarker } from '../../../src/markers'
@@ -485,11 +486,29 @@ test('the editor is told the types and the size an upload may have', async () =>
   expect(rules.maxBytes).toBe(64 * 1024)
 })
 
+test('an upload whose bytes are not its name\'s type is refused 415 and stored nowhere, in any case of the name', async () => {
+  const stored = async () => (await files.list({ folder: 'products' })).length
+  const before = await stored()
+
+  for (const [name, content] of [['x.png', '<!doctype html><script>alert(1)</script>'], ['X.PNG', '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>'], ['x.html.png', 'GIF89a']] as const) {
+    const form = new FormData()
+
+    form.append('file', new File([content], name, { type: 'image/png' }))
+
+    const response = await site.fetch('/api/cms/files/products', { method: 'POST', body: form })
+
+    expect(response.status).toBe(415)
+    expect(await response.text()).toBe(`${name} is not a real image/png`)
+  }
+
+  expect(await stored()).toBe(before)
+})
+
 test('an upload exactly at uploads.maxSize is stored, one byte over refused by the server whatever the editor checks, an empty one too', async () => {
   const post = async (size: number) => {
     const form = new FormData()
 
-    form.append('file', new File([new Uint8Array(size)], 'big.pdf', { type: 'application/pdf' }))
+    form.append('file', new File(size === 0 ? [] : [Buffer.from('%PDF-1.7\n'), new Uint8Array(Math.max(0, size - 9))], 'big.pdf', { type: 'application/pdf' }))
 
     return site.fetch('/api/cms/files/products', { method: 'POST', body: form })
   }

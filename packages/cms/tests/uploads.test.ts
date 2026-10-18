@@ -3,23 +3,83 @@ import { configure } from '../src/settings'
 import { emptyFile, tooLarge } from '../src/upload-text'
 import { uploadBodyLimit, uploadRefusal, uploadRules } from '../src/uploads'
 
-test('takes images and PDFs by default, read off the name as storage serves them, whatever type they were sent as', () => {
+const PNG = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52, 0, 0, 0, 1, 0, 0, 0, 1]
+const JPEG = [0xFF, 0xD8, 0xFF, 0xE0, 0, 16, 0x4A, 0x46, 0x49, 0x46]
+const GIF = [...Buffer.from('GIF89a'), 1, 0, 1, 0]
+const WEBP = [...Buffer.from('RIFF'), 0, 0, 0, 0, ...Buffer.from('WEBPVP8 ')]
+const AVIF = [0, 0, 0, 16, ...Buffer.from('ftypavif'), 0, 0, 0, 0]
+const PDF = [...Buffer.from('%PDF-1.7\n')]
+const HTML = '<!doctype html><script>fetch("/admin")</script>'
+const SVG_WITH_SCRIPT = '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>'
+
+function upload(name: string, content: string | number[], type = ''): File {
+  return new File([typeof content === 'string' ? content : new Uint8Array(content)], name, { type })
+}
+
+test('takes images and PDFs by default, read off the name as storage serves them, whatever type they were sent as', async () => {
   configure({})
 
-  expect(uploadRefusal(new File(['x'], 'photo.JPG', { type: 'text/html' }))).toBeUndefined()
-  expect(uploadRefusal(new File(['x'], 'brochure.pdf'))).toBeUndefined()
-  expect(uploadRefusal(new File(['x'], 'app.js', { type: 'image/png' }))).toContain('app.js is text/javascript')
-  expect(uploadRefusal(new File(['x'], 'drawing.svg'))).toContain('image/svg+xml')
-  expect(uploadRefusal(new File(['x'], 'noextension', { type: 'image/png' }))).toBeUndefined()
+  expect(await uploadRefusal(upload('photo.JPG', JPEG, 'text/html'))).toBeUndefined()
+  expect(await uploadRefusal(upload('brochure.pdf', PDF))).toBeUndefined()
+  expect(await uploadRefusal(upload('app.js', 'x', 'image/png'))).toContain('app.js is text/javascript')
+  expect(await uploadRefusal(upload('drawing.svg', SVG_WITH_SCRIPT))).toContain('image/svg+xml')
+  expect(await uploadRefusal(upload('noextension', PNG, 'image/png'))).toBeUndefined()
 })
 
-test('takes the types an app lists, exact or by family', () => {
+test('takes each image format by its bytes, the name in any case', async () => {
+  configure({})
+
+  for (const [name, bytes] of [['a.png', PNG], ['a.PNG', PNG], ['a.jpg', JPEG], ['a.jpeg', JPEG], ['a.JPG', JPEG], ['a.gif', GIF], ['a.webp', WEBP], ['a.avif', AVIF], ['a.pdf', PDF], ['a.PDF', PDF]] as const)
+    expect(await uploadRefusal(upload(name, bytes))).toBeUndefined()
+})
+
+test('refuses bytes that are not the type the name gives, whatever extension or declared type they come with', async () => {
+  configure({})
+
+  for (const file of [upload('x.png', HTML), upload('x.PNG', HTML, 'image/png'), upload('x.html.png', HTML), upload('x.png.png', HTML), upload('x.jpg', PNG), upload('x.png', JPEG), upload('x.gif', WEBP), upload('x.webp', GIF), upload('x.avif', PNG), upload('x.pdf', HTML), upload('x.pdf', PNG), upload('noextension', HTML, 'image/png'), upload('noextension', JPEG, 'image/png'), upload('x.png', ''), upload('x.png', PNG.slice(0, 5)), upload('x.png', PNG.slice(0, 14)), upload('x.png', JPEG.slice(0, 2))])
+    expect(await uploadRefusal(file)).toContain('is not a real')
+})
+
+test('names a refused file and the type it claims', async () => {
+  configure({})
+
+  expect(await uploadRefusal(upload('x.png', HTML))).toBe('x.png is not a real image/png')
+  expect(await uploadRefusal(upload('', HTML, 'image/png'))).toBe('The file is not a real image/png')
+})
+
+test('a double extension is judged by its last one', async () => {
+  configure({})
+
+  expect(await uploadRefusal(upload('x.png.html', HTML))).toContain('text/html, which uploads here do not take')
+  expect(await uploadRefusal(upload('x.html.png', PNG))).toBeUndefined()
+})
+
+test('takes an SVG only when uploads lists it, and only one that is an SVG', async () => {
+  configure({ uploads: ['image/svg+xml'] })
+
+  expect(await uploadRefusal(upload('logo.svg', SVG_WITH_SCRIPT))).toBeUndefined()
+  expect(await uploadRefusal(upload('logo.SVG', '<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg"/>'))).toBeUndefined()
+  expect(await uploadRefusal(upload('logo.svg', HTML))).toContain('is not a real image/svg+xml')
+  expect(await uploadRefusal(upload('logo.svg', PNG))).toContain('is not a real image/svg+xml')
+  expect(await uploadRefusal(upload('logo.png', SVG_WITH_SCRIPT))).toContain('which uploads here do not take')
+})
+
+test('checks each image type a family takes, and leaves a type it cannot recognise to its name', async () => {
+  configure({ uploads: ['image/*', 'text/csv', 'video/mp4'] })
+
+  expect(await uploadRefusal(upload('x.png', HTML))).toContain('is not a real')
+  expect(await uploadRefusal(upload('table.csv', 'a,b'))).toBeUndefined()
+  expect(await uploadRefusal(upload('clip.mp4', 'whatever'))).toBeUndefined()
+  expect(await uploadRefusal(upload('table.csv', 'a,b', 'image/png'))).toBeUndefined()
+})
+
+test('takes the types an app lists, exact or by family', async () => {
   configure({ uploads: ['image/*', 'text/csv'] })
 
-  expect(uploadRefusal(new File(['x'], 'drawing.svg'))).toBeUndefined()
-  expect(uploadRefusal(new File(['x'], 'table.csv'))).toBeUndefined()
-  expect(uploadRefusal(new File(['x'], 'table.csv', { type: '' }))).toBeUndefined()
-  expect(uploadRefusal(new File(['x'], 'brochure.pdf'))).toContain('which uploads here do not take: image/*, text/csv')
+  expect(await uploadRefusal(upload('drawing.svg', SVG_WITH_SCRIPT))).toBeUndefined()
+  expect(await uploadRefusal(upload('table.csv', 'x'))).toBeUndefined()
+  expect(await uploadRefusal(upload('table.csv', 'x', ''))).toBeUndefined()
+  expect(await uploadRefusal(upload('brochure.pdf', PDF))).toContain('which uploads here do not take: image/*, text/csv')
 })
 
 test('offers the picker the types uploads takes, an image field the image ones among them, with the size limit', () => {
