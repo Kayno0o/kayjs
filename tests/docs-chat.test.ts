@@ -184,7 +184,7 @@ describe('the chat action', () => {
     const blocks = steps.flatMap(step => step.code ?? [])
 
     expect(blocks).toHaveLength(1)
-    expect(blocks[0]!.html).toBe(highlight(source, 'ts').replace(BUTTON, ''))
+    expect(blocks[0]!.html).toBe((await highlight(source, 'ts')).replace(BUTTON, ''))
     expect(blocks[0]!.html).toContain('color:var(--shiki-token')
     expect(blocks[0]!.markup).toContain('const count = signal(0)')
   })

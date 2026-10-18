@@ -282,7 +282,7 @@ describe('the documentation\'s colours', () => {
       ['diff', '- removed\n+ added\n@@ -1 +1 @@'],
       ['toml', '# note\n[server]\nport = 3000\nname = "x"'],
     ]
-    const used = new Set(samples.flatMap(([language, code]) => [...highlight(code!, language).matchAll(SHIKI_COLOUR)].map(match => match[1]!)))
+    const used = new Set((await Promise.all(samples.map(async ([language, code]) => highlight(code!, language)))).flatMap(html => [...html.matchAll(SHIKI_COLOUR)].map(match => match[1]!)))
     const set = new Set([...SYNTAX.map(name => `--shiki-token-${name.slice(7)}`), ...[...styles.matchAll(SHIKI_ALIAS)].map(match => match[1]!)])
 
     expect([...used].filter(name => !set.has(name))).toEqual([])
