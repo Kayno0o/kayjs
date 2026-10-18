@@ -1,15 +1,12 @@
 import type { Signal } from './core'
 import type { Duration } from './duration'
 import type { PersistStorage } from './persist'
-import type { SignalOptions } from './reactive'
+import type { PlainValue, SignalOptions } from './reactive'
 import { keepValue } from './persist'
 import { keepParam } from './query-param'
 import { createSignal, untrack, withSetter } from './reactive'
 
 // Apart from `core.ts`, as a bundle puts a module in the chunk its importers share: with these in `core.ts`, every island calling `signal()` would load the persistence and the value encoder.
-
-// A function passed to `set` is an updater, so a signal holds no functions.
-type PlainValue<T> = Exclude<T, (...args: never[]) => unknown>
 
 export interface PersistedOptions<T> extends SignalOptions<T> {
   // `cookie`, the default, is read by the server too, so pages render with the value; `local` keeps it in localStorage, applied once the page has hydrated; `query` is `queryParam(name)`, the value given standing for the param left out, after the default of a `query` schema naming it.

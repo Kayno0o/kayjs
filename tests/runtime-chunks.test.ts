@@ -40,6 +40,26 @@ describe('the runtime modules a page loads', () => {
   }, 120_000)
 })
 
+describe('the page swap', () => {
+  it('keeps the code for streamed pages and refused forms in chunks of their own, loaded by the swaps needing them', async () => {
+    const root = resolve(await fixtureCopy('runtime-chunks'))
+
+    dirs.push(root)
+    const client = await buildClient(root)
+    const chunks = await Array.fromAsync(new Bun.Glob('*.js').scan(client.dir))
+    const texts = await Promise.all(chunks.map(async chunk => ({ chunk, text: await Bun.file(join(client.dir, chunk)).text() })))
+    const swap = texts.find(({ text }) => text.includes('startViewTransition'))!
+    const streamed = texts.filter(({ text }) => text.includes('kay-await:'))
+    const refusal = texts.filter(({ text }) => text.includes('aria-describedby') && text.includes('preventScroll'))
+
+    expect(swap.text).not.toContain('kay-await:')
+    expect(streamed.map(({ chunk }) => chunk)).not.toContain(swap.chunk)
+    expect(streamed).toHaveLength(1)
+    expect(swap.text).toContain('swap-streamed')
+    expect(refusal.map(({ chunk }) => chunk)).not.toContain(swap.chunk)
+  }, 120_000)
+})
+
 describe('the value encoder', () => {
   it('is loaded by the islands keeping a value, not by the ones calling signal() alone', async () => {
     const root = resolve(await fixtureCopy('runtime-chunks'))

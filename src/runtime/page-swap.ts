@@ -1,5 +1,4 @@
 import type { FetchedPage, HeadElement, Intent, Swap } from './navigation'
-import { focusInvalid } from './focus'
 import { ISLAND } from './markers'
 import { historyState, leave, leaving, navigation, pageKey, prefetched, restoreScroll, saveScroll, takeFormChecks } from './navigation'
 import { forgetPageData } from './page-data'
@@ -61,7 +60,7 @@ const BUILD_TAG = 'meta[name="kay-build"]'
 const UNMERGED = `title,${SPECULATION},${HISTORY},${BUILD_TAG}`
 // The attributes naming a meta, a head holding one per name and media.
 const META_NAMES = ['name', 'property', 'http-equiv']
-const SWAP_PATTERN = /\$kayAwait/
+const STREAMED_TEMPLATE = 'template[data-kay-await]'
 // Scripts the browser runs; any other type, such as `application/json` or `application/ld+json`, holds data of the page it came with.
 const RUNNABLE_TYPES = new Set(['', 'module', 'text/javascript', 'application/javascript', 'importmap'])
 const REDUCED_MOTION = '(prefers-reduced-motion: reduce)'
@@ -256,7 +255,23 @@ export async function show(page: FetchedPage, hash: string, swap: Swap, isCurren
     return
   }
 
-  applyStreamed(next)
+  // Only a page the server streamed carries the templates, so the code putting them in place loads for those alone.
+  if (next.querySelector(STREAMED_TEMPLATE)) {
+    try {
+      const { applyStreamed } = await import('./swap-streamed')
+
+      if (!isCurrent())
+        return
+
+      applyStreamed(next)
+    }
+    catch {
+      // A chunk a deploy replaced is gone: the page loads in full.
+      leave(target, replaces)
+
+      return
+    }
+  }
 
   const root = swapRoot(next)
   const head = mergeHead(next)
@@ -330,44 +345,6 @@ function writeHistory({ history: change }: Policy, target: URL): void {
 // The dev tool's scripts lead a page with no islands under `kay dev`, and are no build's entry.
 function entryOf(page: Document): string | undefined {
   return page.querySelector<HTMLScriptElement>(ENTRY_SCRIPT)?.getAttribute('src') ?? undefined
-}
-
-// What the server streamed after the first part arrives in templates the page's inline script would swap in; here they are put in place before the page is shown.
-function applyStreamed(page: Document): void {
-  for (const template of page.querySelectorAll<HTMLTemplateElement>('template[data-kay-await]')) {
-    const id = template.dataset.kayAwait
-    const walker = page.createTreeWalker(page.body, NodeFilter.SHOW_COMMENT)
-    let start: Node | null = null
-
-    while (walker.nextNode()) {
-      if ((walker.currentNode as Comment).data === `kay-await:${id}`) {
-        start = walker.currentNode
-
-        break
-      }
-    }
-
-    if (start) {
-      let node = start.nextSibling
-
-      while (node && !(node.nodeType === Node.COMMENT_NODE && (node as Comment).data === `/kay-await:${id}`)) {
-        const after = node.nextSibling
-
-        node.remove()
-        node = after
-      }
-
-      node?.remove()
-      ;(start as ChildNode).replaceWith(template.content)
-    }
-
-    template.remove()
-  }
-
-  for (const script of page.querySelectorAll('body script')) {
-    if (SWAP_PATTERN.test(script.textContent ?? ''))
-      script.remove()
-  }
 }
 
 // Changes on `<html>` what the server sets differently for the next page, read before the heads merge moves its meta, where a script left it as served: a name a script changed, as a theme toggle does, keeps its old served value and stays the script's. A class changes token by token, a token the server set being the server's, as nothing tells whether a script added it too.
@@ -846,7 +823,7 @@ function byName(element: Element | null): Element | null {
 
 // The element focused before, found again on a refreshed page or on Back and Forward between entries of one path; on a new page, its autofocus field, its heading or its main, so a screen reader starts there, the title announced. Back and Forward skip the autofocus field, which the visitor left already.
 async function moveFocus(swap: Swap, policy: Policy): Promise<void> {
-  if (policy.focus === 'refused' && swap.refused && await showRefusal(document.forms[swap.refused.form], swap.refused.control))
+  if (policy.focus === 'refused' && swap.refused && await showRefusal(swap.refused))
     return
 
   const traversed = swap.intent === 'traverse'
@@ -881,27 +858,14 @@ async function moveFocus(swap: Swap, policy: Policy): Promise<void> {
   announce(document.title)
 }
 
-// Focuses the refused form's first invalid field, which a screen reader reads with its error. Without one, announces the form's own message and focuses the control that posted it again, found by its place in the form.
-async function showRefusal(form: HTMLFormElement | undefined, control: number): Promise<boolean> {
-  if (!form)
+// A chunk a deploy replaced fails to load: the focus then goes the way a page without a refusal takes.
+async function showRefusal({ form, control }: { form: number, control: number }): Promise<boolean> {
+  try {
+    return await (await import('./swap-refusal')).showRefusal(document.forms[form], control, announce)
+  }
+  catch {
     return false
-
-  if (await focusInvalid(form))
-    return true
-
-  const message = form.getAttribute('aria-describedby')?.split(SPACES).map(id => document.getElementById(id)?.textContent?.trim()).filter(Boolean).join(' ')
-
-  if (message !== undefined && message !== '')
-    announce(message)
-
-  const again = form.elements[control]
-
-  if (!(again instanceof HTMLElement))
-    return false
-
-  again.focus({ preventScroll: true })
-
-  return true
+  }
 }
 
 // Pinned to the top corner: left where it falls, after the page, it would add a pixel to a layout filling the screen and give it a scrollbar.

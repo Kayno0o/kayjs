@@ -728,6 +728,9 @@ function dispose(node: Owner): void {
   node.state = DISPOSED
 }
 
+// A function passed to `set` is an updater, and a value reaches the browser as devalue does, so a signal holds no functions.
+export type PlainValue<T> = Exclude<T, (...args: never[]) => unknown>
+
 // A read function given the `set` of a signal, which takes a value or a function of the current one.
 export function withSetter<T>(read: () => T, write: (value: T) => void): Signal<T> {
   const set: Setter<T> = next => write(typeof next === 'function' ? (next as (current: T) => T)(untrack(read)) : next)

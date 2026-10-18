@@ -4,7 +4,7 @@ import type { Action, FailureOf, SuccessOf } from './action'
 import type { Deferred, Locals, Redirect, RouteParams } from './checks'
 import type { Duration } from './duration'
 import type { Locale } from './i18n'
-import type { SignalOptions } from './reactive'
+import type { PlainValue, SignalOptions } from './reactive'
 import { durationMs } from './duration'
 import { createSignal, effect, getOwner, memo, onCleanup, ownSignal, provideContext, readContext, runWithOwner, tracking, untrack, withSetter } from './reactive'
 
@@ -18,9 +18,6 @@ export interface Signal<T> {
 
 // What `memo` makes: a prop typed `Memo<T>` takes the memo itself, read by calling it, as a signal is.
 export type Memo<T> = () => T
-
-// A function passed to `set` is an updater, so a signal holds no functions.
-type PlainValue<T> = Exclude<T, (...args: never[]) => unknown>
 
 // A signal read as `count()` and written as `count.set(1)` or `count.set(c => c + 1)`.
 export function signal<T>(): Signal<T | undefined>

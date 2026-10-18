@@ -1,5 +1,5 @@
 import type { Setter } from './index'
-import type { ServerScope } from './reactive'
+import type { PlainValue, ServerScope } from './reactive'
 import { withBase } from './base'
 import { readEvents } from './live'
 import { pageData } from './page-data'
@@ -29,9 +29,6 @@ export interface LiveByKey<K extends LiveKey, T> {
 
 // What both halves return for either shape; `live()` types the two apart for the app.
 type Handle = Live<unknown> & LiveByKey<LiveKey, unknown>
-
-// A value reaches the browser as devalue does, so a function cannot be one.
-type PlainValue<T> = Exclude<T, (...args: never[]) => unknown>
 
 // The page's script of live values: the value of each as the server rendered it, with the signature that proves the page read those keys.
 export interface LivePage {

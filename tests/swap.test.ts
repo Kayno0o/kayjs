@@ -611,6 +611,14 @@ describe('page swap, checking a form in the browser', () => {
     }
   })
 
+  it('puts the templates a streamed page ended with in place of their holes, and drops the script that did it', async () => {
+    const { applyStreamed } = await import('../src/runtime/swap-streamed')
+    const page = new DOMParser().parseFromString('<body><p>before</p><!--kay-await:a1--><i>waiting</i><!--/kay-await:a1--><p>after</p><template data-kay-await="a1"><b>done</b></template><script>function $kayAwait(){}</script><script>$kayAwait()</script><script>keep()</script></body>', 'text/html')
+
+    applyStreamed(page)
+    expect(page.body.innerHTML).toBe('<p>before</p><b>done</b><p>after</p><script>keep()</script>')
+  })
+
   it('leaves markup a try block would not claim to its island, which renders afresh', () => {
     const element = document.createElement('div')
 
