@@ -234,6 +234,8 @@ A commit shows on the site once it has rebuilt from it. The Forgejo token needs 
 
 A save or a delete made over another save is refused rather than writing over it. So is one made over your own save before the site rebuilt from it. The refusal stays on the form, and its Keep my edits button lets the next save write your edits over that save.
 
+A loaded entry is protected the same way, and your loader does not have to give a version: kayjs-cms compares what the loader returns for the entry now with what the editor opened. If another editor or your app changed it meanwhile, the save or the delete is refused and the form offers Keep my edits. A save that leaves the content as it was does not count as a change. The check and the write are two steps, so two saves in the very same instant can still both go through.
+
 A save that takes over 15 seconds (`timeout`), or a forge out of reach, fails with the reason. It says so when the commit may still have gone through.
 
 A repository checked out with CRLF line endings, or using SHA-256 object names, gives files another version than the editor computes, so every save conflicts.

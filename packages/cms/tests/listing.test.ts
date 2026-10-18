@@ -1,5 +1,6 @@
 import type { CollectionInfo, EntryFilter, SourceEntry } from '../src/kay/contract'
 import { describe, expect, it } from 'bun:test'
+import { contentVersion } from '../src/files'
 import { collectionTitle, entryPath, newEntryPath, onPagePath, PAGE_SIZE, pageOf, pageRows, problemId, rowsOf, searchRows } from '../src/listing'
 
 const posts: CollectionInfo = {
@@ -93,7 +94,7 @@ describe('pageRows', () => {
 })
 
 describe('pageRows versions', () => {
-  it('gives each row of a folder collection the version its file had as listed, and a loaded one none', async () => {
+  it('gives each row of a folder collection the version its file had as listed, and a loaded one a hash of its entry as read', async () => {
     const stock: SourceEntry[] = [{ slug: 'a', data: { title: 'A' }, draft: false, path: 'content/a.md' }, { slug: 'b', data: { title: 'B' }, draft: false, path: 'content/b.md' }]
     const read = async () => stock
     const asked: string[] = []
@@ -104,7 +105,7 @@ describe('pageRows versions', () => {
     }
 
     expect((await pageRows({ ...posts, count: 2 }, '', 1, read, versionOf)).rows.map(row => row.version)).toEqual(['v-a', 'v-b'])
-    expect((await pageRows({ ...posts, kind: 'loaded', count: 2 }, '', 1, read, versionOf)).rows.map(row => row.version)).toEqual([undefined, undefined])
+    expect((await pageRows({ ...posts, kind: 'loaded', count: 2 }, '', 1, read, versionOf)).rows.map(row => row.version)).toEqual([contentVersion(stock[0]!), contentVersion(stock[1]!)])
     expect(asked).toEqual(['a', 'b'])
   })
 })

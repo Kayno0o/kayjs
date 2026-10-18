@@ -1,7 +1,7 @@
 import type { Commit, FileChange, Identity } from './files'
 import type { CollectionInfo, DraftEntry, EntryRef, Issue, ScreenCollection, StoredEntry } from './kay/contract'
 import { wording } from 'kay/words'
-import { fileVersion, ForgeError, SaveConflict } from './files'
+import { contentVersion, fileVersion, ForgeError, SaveConflict } from './files'
 import { collectionInfo, entries, entryFile, entrySource, removeEntry, saveEntry as saveLoaded } from './kay/content'
 import { log } from './log'
 import { movable, moveChanges, orderValue, sortOrdered } from './order'
@@ -75,8 +75,12 @@ export async function entryScreen(ref: EntryRef): Promise<{ collection: ScreenCo
 export async function entryOf(ref: EntryRef): Promise<StoredEntry | undefined> {
   const entry = (await entries(ref.collection, { slug: ref.slug, locale: ref.locale }))[0]
 
-  if (!entry || entry.path === undefined)
+  if (!entry)
     return entry
+
+  // A loaded entry has no file: its version is a hash of what its loader gave.
+  if (entry.path === undefined)
+    return { ...entry, version: contentVersion(entry) }
 
   const version = await versionOf(ref)
 
@@ -119,9 +123,18 @@ export async function saveEntry(entry: DraftEntry, { create = false, version, re
   }
 
   if (collection.kind === 'loaded') {
+    const versioned = required || version !== undefined
+    const stale = versioned && !create ? await staleLoaded(entry, version, required) : undefined
+
+    if (stale)
+      return stale
+
     const { issues } = await saveLoaded(collection.name, { slug: entry.slug, locale: entry.locale, data: entry.data, body: entry.body }, { create })
 
-    return issues !== undefined && issues.length > 0 ? { issues } : { saved: true }
+    if (issues !== undefined && issues.length > 0)
+      return { issues }
+
+    return versioned ? { saved: true, version: await loadedVersion(entry) } : { saved: true }
   }
 
   if (required && !create && version === undefined && await versionOf(entry) !== undefined)
@@ -148,6 +161,11 @@ export async function deleteEntry(ref: EntryRef, author?: Identity, { version, r
   const collection = await collectionNamed(ref.collection)
 
   if (collection.kind === 'loaded') {
+    const stale = required || version !== undefined ? await staleLoaded(ref, version, required, true) : undefined
+
+    if (stale)
+      return stale
+
     const { issues } = await removeEntry(collection.name, ref.slug, ref.locale)
 
     return issues !== undefined && issues.length > 0 ? { issues } : { saved: true }
@@ -234,6 +252,38 @@ async function commitChange(ref: EntryRef, change: FileChange): Promise<{ commit
 
     return refused(ref, error.message)
   }
+}
+
+// What a loaded entry is at now, as its loader gives it: undefined once it holds none.
+async function currentLoaded(ref: EntryRef): Promise<string | undefined> {
+  const found = (await entries(ref.collection, { slug: ref.slug, locale: ref.locale }))[0]
+
+  return found === undefined ? undefined : contentVersion(found)
+}
+
+// The version a save leaves a loaded entry at, for the editor's next save to name; none when the loader cannot be read again, which the save does not fail for.
+async function loadedVersion(ref: EntryRef): Promise<string | undefined> {
+  try {
+    return await currentLoaded(ref)
+  }
+  catch (error) {
+    log.error(`${ref.collection}/${ref.slug} failed to read after its save`, error)
+
+    return undefined
+  }
+}
+
+// Refuses a save or a delete of a loaded entry made over a change of it since the editor opened it, by another editor or by the app: the loader keeps no version, so the editor names the hash of the entry it showed.
+async function staleLoaded(ref: EntryRef, version: string | undefined, required: boolean, deleting = false): Promise<{ issues: Issue[], conflict?: { version: string | null } | undefined } | undefined> {
+  const current = await currentLoaded(ref)
+
+  if (version === undefined)
+    return required && current !== undefined ? unversioned(ref, deleting) : undefined
+
+  if (version === (current ?? null))
+    return undefined
+
+  return { ...refused(ref, wording('cms.store.changed', 'This entry was changed since you opened it, by another editor or by the app')), conflict: { version: current ?? null } }
 }
 
 // A delete naming none comes from an editor older than the server, or from one keeping its edits over a file deleted and made again since, which it never showed.

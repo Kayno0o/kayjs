@@ -48,6 +48,21 @@ export function fileVersion(bytes: Uint8Array | string): string {
   return new Bun.CryptoHasher('sha1').update(`blob ${content.byteLength}\0`).update(content).digest('hex')
 }
 
+// The version of a loaded entry, a hash of what its loader gave for it, so a save made over a change of the entry is told apart without the loader naming a version; the same content gives the same version, and a key order never changes it.
+export function contentVersion({ data, body }: { data?: unknown, body?: string | undefined }): string {
+  return new Bun.CryptoHasher('sha1').update(JSON.stringify({ data: canonical(data), body: body ?? '' })).digest('hex')
+}
+
+function canonical(value: unknown): unknown {
+  if (Array.isArray(value))
+    return value.map(canonical)
+
+  if (value !== null && typeof value === 'object' && !(value instanceof Date))
+    return Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b, 'en')).map(([key, each]) => [key, canonical(each)]))
+
+  return value
+}
+
 function checkBase(base: string | null | undefined, current: string | undefined): void {
   if (base !== undefined && base !== (current ?? null))
     throw new SaveConflict(current ?? null, base === null)

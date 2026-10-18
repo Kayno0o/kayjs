@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { beforeEach, describe, expect, mock, test } from 'bun:test'
 import { bodyHtml, MarkdownError } from 'kay/content'
 import { scratchDir } from 'kay/test'
-import { fileVersion, ForgeError, SaveConflict } from '../src/files'
+import { contentVersion, fileVersion, ForgeError, SaveConflict } from '../src/files'
 import { configure } from '../src/settings'
 
 const posts: CollectionInfo = { name: 'posts', kind: 'folder', dir: 'content/posts', schema: { type: 'object', properties: { title: { type: 'string' }, draft: { type: 'boolean' } } }, components: [], localized: false, draftField: 'draft' }
@@ -33,6 +33,8 @@ let removed: string[]
 let stored: Record<string, SourceEntry[]>
 let infoCalls: unknown[]
 let failing = false
+// Whether the loader keeps what it is handed, as a database would.
+let keeping = false
 
 // kay's content API, answering from `stored` and recording what a loader was handed.
 const content: typeof Content = {
@@ -54,6 +56,14 @@ const content: typeof Content = {
 
     loaded.push(entry)
 
+    if (keeping) {
+      const rows = stored[collection] ?? []
+      const row = rows.find(each => each.slug === entry.slug)
+      const kept: SourceEntry = { slug: entry.slug, data: entry.data as SourceEntry['data'], body: entry.body, draft: false }
+
+      stored[collection] = row ? rows.map(each => each === row ? kept : each) : [...rows, kept]
+    }
+
     return {}
   },
   entryFile: async (collection, slug) => {
@@ -70,6 +80,9 @@ const content: typeof Content = {
 
     removed.push(slug)
 
+    if (keeping)
+      stored[collection] = stored[collection].filter(entry => entry.slug !== slug)
+
     return {}
   },
 }
@@ -85,6 +98,7 @@ beforeEach(() => {
   removed = []
   infoCalls = []
   failing = false
+  keeping = false
   stored = { posts: [{ slug: 'hello', path: 'content/posts/hello.md', data: { title: 'Hello', draft: true }, body: 'Hi', draft: true }], products: [{ slug: 'mug', data: { name: 'Mug' }, draft: false }] }
   configure({ files: { save: async (change) => {
     saved.push(change)
@@ -198,7 +212,7 @@ describe('saveEntry', () => {
   })
 
   test('reads an entry screen\'s collection and entry together, the collection with its counts once', async () => {
-    expect(await entryScreen({ collection: 'products', slug: 'mug' })).toEqual({ collection: products, entry: stored.products![0] })
+    expect(await entryScreen({ collection: 'products', slug: 'mug' })).toEqual({ collection: products, entry: { ...stored.products![0]!, version: contentVersion(stored.products![0]!) } })
     expect(infoCalls).toEqual([['products', { counts: false }], ['products', undefined]])
     expect(await entryScreen({ collection: 'nothing', slug: 'x' })).toBeUndefined()
   })
@@ -271,6 +285,113 @@ describe('entryOf', () => {
     finally {
       await rm(dir, { recursive: true, force: true })
     }
+  })
+})
+
+describe('a loaded entry\'s version', () => {
+  const mug = { collection: 'products', slug: 'mug' }
+  const named = (name: string) => ({ ...mug, data: { name } })
+  const opened = async () => (await entryOf(mug))!.version!
+
+  beforeEach(() => {
+    keeping = true
+  })
+
+  test('is a hash of what the loader gave, the same for the same content whatever the key order', async () => {
+    const first = await opened()
+
+    stored.products = [{ slug: 'mug', data: { size: 1, name: 'Mug' }, draft: false }]
+
+    const second = await opened()
+
+    stored.products = [{ slug: 'mug', data: { name: 'Mug', size: 1 }, draft: false }]
+
+    expect(await opened()).toBe(second)
+    expect(second).not.toBe(first)
+    expect(first).toBe(contentVersion({ data: { name: 'Mug' } }))
+  })
+
+  test('refuses the save of the editor that saves second, naming the version the first left', async () => {
+    const [a, b] = [await opened(), await opened()]
+    const first = await saveEntry(named('From A'), { version: a, required: true })
+
+    expect(first).toEqual({ saved: true, version: contentVersion({ data: { name: 'From A' } }) })
+
+    const second = await saveEntry(named('From B'), { version: b, required: true })
+
+    expect(second).toMatchObject({ issues: [{ message: 'This entry was changed since you opened it, by another editor or by the app' }], conflict: { version: contentVersion({ data: { name: 'From A' } }) } })
+    expect(loaded.map(entry => entry.data)).toEqual([{ name: 'From A' }])
+  })
+
+  test('lets the editor that keeps its edits over the conflict save over it', async () => {
+    const b = await opened()
+
+    await saveEntry(named('From A'), { version: b, required: true })
+
+    const refused = await saveEntry(named('From B'), { version: b, required: true })
+    const conflict = (refused as { conflict: { version: string } }).conflict.version
+
+    expect(await saveEntry(named('From B'), { version: conflict, required: true })).toHaveProperty('saved', true)
+    expect(loaded.map(entry => entry.data)).toEqual([{ name: 'From A' }, { name: 'From B' }])
+  })
+
+  test('does not conflict with the same editor saving twice, each save naming the version the one before returned', async () => {
+    const first = await saveEntry(named('One'), { version: await opened(), required: true }) as { version: string }
+    const second = await saveEntry(named('Two'), { version: first.version, required: true })
+
+    expect(second).toHaveProperty('saved', true)
+    expect(loaded).toHaveLength(2)
+  })
+
+  test('does not conflict when the other saves left the entry as the editor saw it', async () => {
+    const version = await opened()
+
+    await saveEntry(named('Other'), { version, required: true })
+    await saveEntry(named('Mug'), { version: contentVersion({ data: { name: 'Other' } }), required: true })
+
+    expect(await saveEntry(named('Mine'), { version, required: true })).toHaveProperty('saved', true)
+  })
+
+  test('refuses a save of an entry deleted since, naming no version, so the editor writes it again as new', async () => {
+    const version = await opened()
+
+    await deleteEntry(mug, undefined, { version, required: true })
+    expect(await saveEntry(named('Late'), { version, required: true })).toMatchObject({ conflict: { version: null } })
+    expect(loaded).toEqual([])
+    expect(await saveEntry(named('Late'), { create: true, version: undefined, required: true })).toHaveProperty('saved', true)
+  })
+
+  test('refuses a delete of an entry saved since, and deletes one that is as the editor saw it', async () => {
+    const version = await opened()
+
+    await saveEntry(named('Saved'), { version, required: true })
+    expect(await deleteEntry(mug, undefined, { version, required: true })).toMatchObject({ issues: [{ message: 'This entry was changed since you opened it, by another editor or by the app' }], conflict: { version: contentVersion({ data: { name: 'Saved' } }) } })
+    expect(removed).toEqual([])
+    expect(await deleteEntry(mug, undefined, { version: contentVersion({ data: { name: 'Saved' } }), required: true })).toEqual({ saved: true })
+    expect(removed).toEqual(['mug'])
+  })
+
+  test('refuses a delete of an entry already deleted', async () => {
+    const version = await opened()
+
+    await deleteEntry(mug, undefined, { version, required: true })
+    expect(await deleteEntry(mug, undefined, { version, required: true })).toMatchObject({ conflict: { version: null } })
+  })
+
+  test('refuses a save or a delete naming no version of an entry the loader holds, when the editor must name one', async () => {
+    expect(await saveEntry(named('Old editor'), { required: true })).toHaveProperty('issues.0.message', expect.stringContaining('older than the server'))
+    expect(await deleteEntry(mug, undefined, { required: true })).toHaveProperty('issues.0.message', expect.stringContaining('reload the page'))
+    expect(loaded).toEqual([])
+    expect(removed).toEqual([])
+  })
+
+  test('saves and deletes without reading the loader again when no version is asked for', async () => {
+    expect(await saveEntry(named('Plain'))).toEqual({ saved: true })
+    expect(await deleteEntry(mug)).toEqual({ saved: true })
+  })
+
+  test('hands a new entry the version it was saved at', async () => {
+    expect(await saveEntry({ ...mug, slug: 'cup', data: { name: 'Cup' } }, { create: true, required: true })).toHaveProperty('version', contentVersion({ data: { name: 'Cup' } }))
   })
 })
 

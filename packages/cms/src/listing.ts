@@ -1,5 +1,6 @@
 import type { EntryFilter, EntryRef, ScreenCollection, SourceEntry } from './kay/contract'
 import { fieldsOf, humanize } from './fields'
+import { contentVersion } from './files'
 import { cellText, listColumns } from './layout'
 import { sortOrdered } from './order'
 import { screenPath } from './paths'
@@ -16,7 +17,7 @@ export interface EntryRow {
   problem?: string | undefined
   // The text of each column the collection's list names, by field key.
   cells?: Record<string, string> | undefined
-  // The version of a folder entry's file as the list read it, which a delete from the list names, so it never removes a file saved since.
+  // The version of an entry as the list read it, a folder entry's file or a loaded entry's content, which a delete from the list names, so it never removes an entry saved since.
   version?: string | undefined
   // In an ordered collection, whether the entry has one before or after it to swap places with, among the entries of its locale; absent while a search is on.
   move?: { up: boolean, down: boolean } | undefined
@@ -77,12 +78,33 @@ function pageAt(total: number, page: number, size: number): { page: number, page
 }
 
 // A page of the collection's rows: a search reads every entry to match their titles, a plain page its own entries alone.
-// `versionOf` reads the version of a folder entry's file, for the rows of the page shown alone.
+// `versionOf` reads the version of a folder entry's file, for the rows of the page shown alone; a loaded entry's is taken from the entries `read` gave.
 export async function pageRows(collection: ScreenCollection, search: string, page: number, read: (filter: EntryFilter) => Promise<SourceEntry[]>, versionOf: (ref: EntryRef) => Promise<string | undefined>, size = PAGE_SIZE): Promise<{ rows: EntryRow[], page: number, pages: number }> {
   if (collection.problem !== undefined)
     return pageOf([], 1, size)
 
+  const seen = new Map<string, SourceEntry>()
+  const key = (slug: string, locale: string | undefined) => JSON.stringify([slug, locale])
+  const list = async (filter: EntryFilter) => {
+    const found = await read(filter)
+
+    for (const entry of found)
+      seen.set(key(entry.slug, entry.locale), entry)
+
+    return found
+  }
+
   const versioned = async <T extends { rows: EntryRow[] }>(listed: T): Promise<T> => {
+    if (collection.kind === 'loaded') {
+      const rows = listed.rows.map((row) => {
+        const entry = seen.get(key(row.slug, row.locale))
+
+        return entry === undefined ? row : { ...row, version: contentVersion(entry) }
+      })
+
+      return { ...listed, rows }
+    }
+
     if (collection.kind !== 'folder')
       return listed
 
@@ -92,14 +114,14 @@ export async function pageRows(collection: ScreenCollection, search: string, pag
   }
 
   if (collection.orderField !== undefined)
-    return versioned(pageOf(orderedRows(collection, collection.orderField, await read({}), search), page, size))
+    return versioned(pageOf(orderedRows(collection, collection.orderField, await list({}), search), page, size))
 
   if (search.trim() !== '')
-    return versioned(pageOf(searchRows(rowsOf(collection, await read({})), search), page, size))
+    return versioned(pageOf(searchRows(rowsOf(collection, await list({})), search), page, size))
 
   const at = pageAt(collection.count ?? 0, page, size)
 
-  return versioned({ rows: rowsOf(collection, await read({ offset: at.offset, limit: size })), page: at.page, pages: at.pages })
+  return versioned({ rows: rowsOf(collection, await list({ offset: at.offset, limit: size })), page: at.page, pages: at.pages })
 }
 
 // The rows of an ordered collection in its order, every entry read so a page starts where the order says; each row that can move says which way, unless a search narrows the rows.
