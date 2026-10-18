@@ -4,7 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
-- An island's script no longer carries the icons of a module it imports without using them, and an island calling `signal()` alone no longer loads the value encoder `persisted()` and action calls share: babelraid's home page loses 1.8 KB of brotli ([Images](images.md)).
+- An island's script no longer carries the icons of a module it imports without using them, and an island calling `signal()` alone no longer loads the value encoder `persisted()` and action calls share: a site of a few islands and a dozen icons loses about 1.8 KB of brotli ([Images](images.md)).
 
 ## 1.53.3
 
