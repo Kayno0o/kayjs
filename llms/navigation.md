@@ -123,6 +123,23 @@ const dispose = mount(Panel, document.querySelector('#panel')!, { title: 'Ticket
 - kay sets `novalidate` itself on the other forms posting to an action, so the constraints a `field` writes for a visit without JavaScript give way to this check, and checks those the template wrote itself after it.
 - An island's `onSubmit` calling `event.preventDefault()` keeps kay from posting at all (see [Actions](actions.md)).
 
+### Follow a log
+
+`followLog` from `kay` keeps a scrolling list at its bottom while the reader is there, and the first item showing in place when items load above:
+
+```kay
+---
+import { followLog } from 'kay'
+
+let list: HTMLElement | undefined
+
+followLog(() => list)
+---
+ol(ref={element => list = element} style="height: 20rem; overflow-y: auto")
+  for line of lines()
+    li {line}
+```
+
 ### Navigating from code
 
 - `navigate('/todos/1')`, imported from `kay`, goes to a page as a link would, `{ replace: true }` taking the current history entry's place, `{ scroll: 'keep' }` leaving the window scrolled where it is instead of going to the top, `{ transition: false }` swapping without a view transition; another site's page loads, so a `?next=` param goes through `localPath()` as a redirect's does, and a `javascript:` URL throws, as it would run in the page; `mailto:`, `tel:` and other schemes go to the browser as a link would. A link or `navigate()` that a redirect takes to another site loads that page fully rather than swapping it in.
@@ -135,6 +152,7 @@ const dispose = mount(Panel, document.querySelector('#panel')!, { title: 'Ticket
 - A shortcut with `mod`, `ctrl`, `meta` or `alt` fires while a text field, select or `contenteditable` element has the focus; a bare key (`/`, `?`, `g`) does not, unless `{ inputs: true }`. `escape` and the function keys fire there too, and a bare `enter` or `space` is left to a focused button or link.
 - It cancels the browser's default (`mod+s` saving the page) unless `{ preventDefault: false }`, and skips a press that is part of an IME composition, a held key unless `{ repeat: true }`, and an event something already handled (`defaultPrevented`), so of two bindings on one key the innermost one, an element's before the page's, wins.
 - A letter or digit matches the character typed, else the physical key (`event.code`), so `mod+s` still works on a Cyrillic layout or with Option held on a Mac. An unknown modifier or an empty key throws.
+- `followLog(container, options?)` from `kay`, called in an island's script, watches the element that scrolls (an element, or a function returning it once the island mounted, as `() => list` for a `ref` variable) for as long as the island lives, and does nothing on the server. It starts the list at its bottom; after each change inside it (an item appended or prepended, a line's text growing, the list resized) it scrolls to the bottom while the reader was within `threshold` pixels of it (32 by default), else it moves the scroll so the first item showing keeps its place on screen. The items are the container's direct children, or the elements `items: 'li.turn'` selects. A reader who scrolls up stops being followed until they come back to the bottom.
 - `guardLeave(() => dirty())` from `kay`, called in an island's script, asks before the page is left while the function returns true, for as long as the island lives.
 - Under a guard, a link of the app, `navigate()` and going back or forward wait for the answer, a refused back or forward returning the URL and its history entry to the page, scroll and islands as they were.
 - A reload, closing the tab or a link loading fully gets the browser's own prompt, listened for only while a guard holds changes, so the page stays in the back-forward cache otherwise.

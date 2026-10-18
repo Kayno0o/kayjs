@@ -36,6 +36,7 @@ export const KAY_EXPORTS: Record<string, 'free' | 'request' | 'local'> = {
   localPath: 'free',
   markInvalid: 'free',
   focusInvalid: 'free',
+  followLog: 'free',
   guardLeave: 'free',
   shortcut: 'free',
   navigate: 'free',

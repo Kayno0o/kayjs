@@ -368,6 +368,27 @@ A shortcut with `mod`, `ctrl`, `meta` or `alt` also fires in a text field. A bar
 
 <ReadMore href="/llms/navigation">Which keys fire in a text field, how Shift and AltGr match, and the other options of `shortcut`.</ReadMore>
 
+## Following a log
+
+A log or a chat should stay at its bottom while the reader is there, and keep what they are reading in place when older items load above. `followLog` from `kay` does both for the element that scrolls.
+
+```kay
+---
+import { followLog } from 'kay'
+
+let list: HTMLElement | undefined
+
+followLog(() => list)
+---
+ol(ref={element => list = element} style="height: 20rem; overflow-y: auto")
+  for line of lines()
+    li {line}
+```
+
+The list starts at its bottom. When an item is added, a line grows or the list is resized, the list scrolls down if the reader was at the bottom. If the reader scrolled up, the first item they can see stays where it is, even when items are added above it. It does nothing on the server.
+
+<ReadMore href="/llms/navigation#follow-a-log">The `threshold` and `items` options.</ReadMore>
+
 ## A page kay does not serve
 
 A page bundled by something else, such as an HTML file `Bun.serve` imports, can render `.kay` components too. List `"kay/bun"` under `[serve.static] plugins` in `bunfig.toml`, or pass `kay({ root })` from `kay/bun` to `Bun.build`. Then render one with `mount` from `kay/mount`, which returns a function that removes it.
