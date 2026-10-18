@@ -25,6 +25,22 @@ The server reads `docs/.env`, which git ignores, with `bun run docs:start` and i
 
 `KAY_SECRET`, at least 32 random characters (`openssl rand -base64 32`), signs form stamps and keys the chat's counts: `docs/data/ai.sqlite` keeps each visitor's address only as an HMAC under it, so the file alone cannot be checked against a guessed address. Changing it starts every count afresh.
 
+## Visit counts
+
+The docs count visits with [Umami](https://umami.is), self-hosted by `docs/compose.yaml` as the services `umami` and `umami-db` (Postgres, its data on the `umami-data` volume), with the tags pinned. The visitor's browser never talks to Umami: `analytics({ provider: 'umami' })` in `kay.config.ts` serves a small script from the docs' own origin, and the docs server forwards each visit to Umami over the compose network.
+
+Umami's dashboard listens on `127.0.0.1:37888` only. Reach it through an SSH tunnel or a proxy of your own.
+
+First run:
+
+1. Set `UMAMI_DB_PASSWORD` and `UMAMI_APP_SECRET` in `docs/.env` (`openssl rand -hex 32` for each). Compose refuses to start without them.
+2. Start the stack with `docker compose -f docs/compose.yaml up -d --build`, and open the dashboard on port 37888.
+3. Sign in as `admin` with the password `umami`, and change the password at once.
+4. Add a website named `kayjs.kaynooo.fr` with that domain, and copy its id.
+5. Set `UMAMI_WEBSITE_ID` to the id in `docs/.env` and run the same compose command again. The id is part of the prerendered pages, so the image must be rebuilt.
+
+While `UMAMI_WEBSITE_ID` is empty, the docs count nothing and serve as before. `UMAMI_HOST` is only for running the docs outside Docker. What the docs tell visitors about all this is the page `/legal`.
+
 ## The chat
 
 The chat button at the bottom right of every page answers questions about kay from `llms.txt`, and reads more through two actions it is offered as tools: `search_docs` and `read_page`. Its code is `src/routes/(docs)/_actions.kay`, `src/chat-corpus.ts` and the `ChatLauncher` in the layout; `/ask` redirects to the home page.

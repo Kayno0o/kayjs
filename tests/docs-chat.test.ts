@@ -312,3 +312,17 @@ describe('when the chat has no key', () => {
     expect(fakeAi.asked).toEqual([])
   })
 })
+
+describe('the legal page', () => {
+  it('is linked from every footer and never holds the contact address as written', async () => {
+    const legal = await (await site.fetch('/legal')).text()
+    const home = await (await site.fetch('/')).text()
+
+    expect(legal).toContain('Legal notice')
+    expect(legal).toContain('contact at kaynooo dot fr')
+    expect(legal).not.toContain('contact@kaynooo.fr')
+    expect(legal).not.toContain('contact&#64;kaynooo.fr')
+    expect(home).toContain('href="/legal"')
+    expect(home).not.toContain('contact@kaynooo.fr')
+  })
+})

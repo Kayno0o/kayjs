@@ -8,6 +8,8 @@ WORKDIR /kay
 COPY --chown=bun:bun . .
 RUN bun install --frozen-lockfile
 WORKDIR /kay/docs
+# The analytics tag is rendered into the prerendered pages, so the build reads the website id.
+ARG UMAMI_WEBSITE_ID=
 RUN mkdir .kay
 # The build's cache (compiled components, share cards, compressed copies) is a BuildKit cache mount, so a rebuild after a small change reuses it; the mount is not in the image, so the same step copies it aside and the next one puts it back, as the server compiles from it at start-up.
 RUN --mount=type=cache,target=/kay/docs/.kay/cache,uid=1000,gid=1000 bun ../src/cli.ts build && mkdir /kay/docs/.kay/cache-image && cp -a /kay/docs/.kay/cache/. /kay/docs/.kay/cache-image/

@@ -5,6 +5,9 @@ services:
     build:
       context: ..
       dockerfile: docs/Dockerfile
+      # The tracker's tag is part of the prerendered pages, so the build needs the id the server runs with.
+      args:
+        UMAMI_WEBSITE_ID: ${UMAMI_WEBSITE_ID:-}
     restart: unless-stopped
     # On the loopback only: `proxy: true` trusts X-Forwarded-For, so visitors reach the server through nginx alone.
     ports:
@@ -13,8 +16,39 @@ services:
     env_file:
       - path: .env
         required: false
+    depends_on:
+      - umami
     # The chat's daily counts, kept over a restart.
     volumes:
       - chat-data:/kay/docs/data
+  # Counts the visits, without cookies: the docs forward each one to it over this network, see README.md for the first run.
+  umami:
+    image: ghcr.io/umami-software/umami:3.4.0
+    restart: unless-stopped
+    # The dashboard on the loopback only: reach it through an SSH tunnel or a proxy of your own.
+    ports:
+      - 127.0.0.1:37888:3000
+    environment:
+      DATABASE_URL: postgresql://umami:${UMAMI_DB_PASSWORD:?set UMAMI_DB_PASSWORD in docs/.env}@umami-db:5432/umami
+      APP_SECRET: ${UMAMI_APP_SECRET:?set UMAMI_APP_SECRET in docs/.env}
+      DISABLE_TELEMETRY: 1
+    depends_on:
+      umami-db:
+        condition: service_healthy
+  umami-db:
+    image: postgres:17.11-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: umami
+      POSTGRES_USER: umami
+      POSTGRES_PASSWORD: ${UMAMI_DB_PASSWORD:?set UMAMI_DB_PASSWORD in docs/.env}
+    volumes:
+      - umami-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U umami -d umami']
+      interval: 5s
+      timeout: 5s
+      retries: 5
 volumes:
   chat-data:
+  umami-data:

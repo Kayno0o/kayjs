@@ -1,0 +1,37 @@
+--- server
+export const page = { prerender: true }
+--- script
+import ContactAddress from '../../components/contact-address.kay'
+---
+head
+  title Legal notice and privacy · kay
+.page
+  header.page-head
+    p.eyebrow Docs
+    h1 Legal notice and privacy
+    p.lede Who runs this site, and what it keeps about you when you read it.
+  article.prose
+    h2 Legal notice
+    p This site is published by Kaynooo, a private individual who is not acting as a business.
+    p Contact: #[ContactAddress].
+    p The site is hosted on the publisher's own server, in France.
+    p The kay framework and this documentation are released under the #[a(href="https://git.kevyn.fr/kaynooo/kayjs/src/branch/main/LICENSE") MIT license].
+    h2 Privacy
+    p The short version: this site sets no cookie, shows no advertising and sells nothing. It does not follow you from one site to another.
+    h3 Reading the docs
+    p Like any web server, ours receives your IP address and browser details to send you the pages. The server in front of the docs may keep them in an access log for a limited time, to run and secure the site.
+    h3 Visit counts
+    p The docs count visits with Umami, which we run ourselves next to the docs. It stores nothing on your device, so there is no cookie to accept and no banner.
+    p Your browser never contacts Umami. Our server sends it each visit: the page address, the page title, the page you came from, your screen size, your language, your browser's User-Agent and your IP address.
+    p Umami uses your IP address to guess your country, region and city, and to build an anonymous visitor code from it. It does not store the address.
+    p Umami keeps the page, the referrer, your browser, system, device type, screen size, language and location, and the visitor code. The code uses a salt that changes every month. Within a month, the same browser reads as the same visitor. After that, it reads as a new one.
+    p Umami keeps these statistics until we delete them. They are used only to see which pages are read.
+    h3 The chat
+    p The chat on the #[a(href="/ask") Ask the docs] page sends your questions, and the conversation so far, to Mistral AI, a French company, so that its model can write an answer. Please do not type personal data into it.
+    p The docs do not save your questions or the answers. Your conversation lives in your browser, in the page or the tab, and goes when you close it.
+    p To keep the chat affordable, the docs count the questions and the amount of text each visitor asks for. The count is filed under a code made from your IP address with a secret key, so the stored value is not your address and cannot be turned back into it. Each count is dropped after at most a day.
+    h3 What stays in your browser
+    p Your choice of theme and colour scheme is kept in your browser's local storage, under the names kay-docs-scheme and kay-docs-palette. It never leaves your device. Clear it with your browser's site data settings.
+    h3 Your rights
+    p You can ask what we hold about you, ask us to erase it, or object to its use, by writing to #[ContactAddress]. The docs keep nothing that names you, so there is often nothing to find.
+    p If you think your data is mishandled, you can complain to the CNIL, the French data protection authority, at #[a(href="https://www.cnil.fr") cnil.fr].

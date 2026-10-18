@@ -1,10 +1,16 @@
 import { readdirSync } from 'node:fs'
 import { join } from 'node:path'
+import process from 'node:process'
 import { ai } from '@kaynooo/kayjs-ai'
 import tailwind from 'bun-plugin-tailwind'
+import { analytics } from 'kay/analytics'
 import { defineConfig, sqliteRates } from 'kay/server'
 import { pageWeight } from './src/page-weight'
 import { THEME_SCRIPT } from './src/theme'
+
+// The website id from Umami, see README.md; the docs count nothing while it is unset. The host is Umami's name on the compose network.
+const umamiWebsiteId = process.env.UMAMI_WEBSITE_ID?.trim()
+const umamiHost = process.env.UMAMI_HOST?.trim() || 'http://umami:3000'
 
 const MARKDOWN_EXTENSION = /\.md$/
 
@@ -23,7 +29,7 @@ export default defineConfig({
   // Behind the host's nginx, whose address every visitor would otherwise share: the chat's limits count the visitor.
   proxy: true,
   // The chat button on every page runs on Mistral's account, whose rate limit is low (about a request a second, and an answer takes up to five): 4 questions a minute per visitor, 60,000 tokens a day each (about a dozen full answers), 1,500,000 a day in all (a few euros a month at most). The counts are kept in docs/data, so a restart keeps them.
-  extensions: [pageWeight, ai({ limit: { max: 4, window: '1m', store: chatCounts }, budget: { tokens: 60_000, total: 1_500_000, window: '1d', store: chatCounts } })],
+  extensions: [pageWeight, ...umamiWebsiteId ? [analytics({ provider: 'umami', websiteId: umamiWebsiteId, host: umamiHost })] : [], ai({ limit: { max: 4, window: '1m', store: chatCounts }, budget: { tokens: 60_000, total: 1_500_000, window: '1d', store: chatCounts } })],
   site: 'https://kayjs.kaynooo.fr',
   seo: {
     name: 'kay',

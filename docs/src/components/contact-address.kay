@@ -1,0 +1,14 @@
+---
+import { signal } from 'kay'
+
+const address = signal('')
+
+// Written backwards and put together in the browser, so the built page never holds the address for a harvester to read.
+effect(() => {
+  address = 'rf.ooonyak@tcatnoc'.split('').reverse().join('')
+})
+---
+if address() === ''
+  span contact at kaynooo dot fr
+else
+  a(href={`mailto:${address()}`}) {address()}
