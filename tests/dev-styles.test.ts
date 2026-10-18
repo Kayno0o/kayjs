@@ -1,6 +1,7 @@
 import type { TestSite } from '../src/test'
 import tailwind from 'bun-plugin-tailwind'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
+import { neededClasses } from '../src/runtime/dev-styles'
 import { browserPath, testSite } from '../src/test'
 
 const path = browserPath()
@@ -50,5 +51,26 @@ describe('the class check of the dev server', () => {
     const page = await dev.open('/nested', { strict: false })
 
     expect(page.errors.filter(error => WARNING.test(error))).toEqual([])
+  })
+})
+
+describe('the classes a selector needs', () => {
+  const needed = (selector: string) => {
+    const found = new Set<string>()
+
+    neededClasses(selector, found)
+
+    return [...found]
+  }
+
+  it('leaves out those inside parentheses or brackets, and reads past a bracket held by an attribute string', () => {
+    expect(needed('.prose .a:is(.b, .c)')).toEqual(['prose', 'a'])
+    expect(needed('.group-open\\:rotate-90:is(:where(.group):is([open], :popover-open) *)')).toEqual(['group-open:rotate-90'])
+    expect(needed('a[title="("] .b')).toEqual(['b'])
+    expect(needed('a[title=\'\\\'(\'] .b')).toEqual(['b'])
+  })
+
+  it('reads hex escapes and non-ASCII names whole', () => {
+    expect(needed('.\\32 xl\\:flex > .café')).toEqual(['2xl:flex', 'café'])
   })
 })

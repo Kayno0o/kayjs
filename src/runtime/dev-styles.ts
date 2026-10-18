@@ -17,7 +17,7 @@ function unescape(name: string): string {
 }
 
 // The classes a selector needs outside any parentheses or brackets, as the build prunes by (`selectors` in src/build/class-rules.ts, which this mirrors without its imports): `.a :is(.b)` needs `a` alone, and the `:where(.group)` of a `group-open:` variant needs none, so a class only such rules mention has no rule of its own to be missing.
-function neededClasses(selector: string, into: Set<string>): void {
+export function neededClasses(selector: string, into: Set<string>): void {
   let depth = 0
 
   for (let at = 0; at < selector.length; at++) {
@@ -25,6 +25,12 @@ function neededClasses(selector: string, into: Set<string>): void {
 
     if (char === '\\') {
       at++
+    }
+    else if (char === '"' || char === '\'') {
+      at++
+
+      while (at < selector.length && selector[at] !== char)
+        at += selector[at] === '\\' ? 2 : 1
     }
     else if (char === '(' || char === '[') {
       depth++
