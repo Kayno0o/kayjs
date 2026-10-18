@@ -3,7 +3,7 @@ import { mkdir, rm, symlink } from 'node:fs/promises'
 import { join } from 'node:path'
 import tailwind from 'bun-plugin-tailwind'
 import { afterAll, describe, expect, it } from 'bun:test'
-import { clientDir } from '../src/build/assets'
+import { clientDir, outputDir } from '../src/build/assets'
 import { pruneNodes, selectors, styledClassNames } from '../src/build/class-rules'
 import { buildClient } from '../src/build/client'
 import { findKayLibraries } from '../src/build/libraries'
@@ -242,6 +242,22 @@ describe('a library\'s stylesheet in an app', () => {
     const again = await build(['src/routes/index.kay'])
 
     expect(libraryRules(await stylesheet(again.styles))).toEqual([...KEPT, '.ui-unused-too'].sort())
+  })
+
+  it('writes the class sets of the pages into the manifest of kay dev, and keeps them through a build that leaves the stylesheets alone', async () => {
+    const root = await newProject(PLAIN_CSS)
+    const build = devBuilder(root, {})
+    const uses = async () => (await Bun.file(join(outputDir(root), 'manifest.json')).json() as { styleUses?: { entries: Record<string, unknown> } }).styleUses
+
+    await build(null)
+
+    const first = await uses()
+
+    expect(Object.keys(first?.entries ?? {})).toContain('src/routes/index.kay')
+
+    await build([])
+
+    expect(await uses()).toEqual(first)
   })
 
   it('builds the stylesheets again in kay dev once a root Markdown file names a class it pruned, which the watcher reports without a restart', async () => {

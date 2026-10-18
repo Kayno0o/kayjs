@@ -892,7 +892,11 @@ function pageClassesBlock(client: ClientBuild, files: string[]): string {
   for (const file of files) {
     const own = uses.entries.get(file)
 
-    for (const index of own === true || own === undefined ? [] : own)
+    // A file with no names makes production link the whole sheet, so nothing is missing from the page: the check skips it.
+    if (own === true || own === undefined)
+      return ''
+
+    for (const index of own)
       names.add(uses.classes[index]!)
   }
 

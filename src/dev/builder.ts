@@ -1,5 +1,6 @@
 import type { ClientOptions, ClientSources } from '../build/client'
 import type { ImportGraph } from '../build/libraries'
+import type { StyleUses } from '../build/style-uses'
 import type { ClientManifest } from '../server/client'
 import type { ClassWords } from './tailwind'
 import { realpathSync } from 'node:fs'
@@ -51,6 +52,8 @@ interface Built {
   classes?: Promise<ClassWords | undefined> | undefined
   // The classes of a kay library's stylesheets whose rules the stylesheets left out, as nothing named them.
   unused: Set<string>
+  // Which classes each page and layout names, for the dev page to check what it sets against.
+  styleUses?: StyleUses | undefined
   // Reading them once the stylesheets are built, which the next build waits for.
   read: Promise<void>
   // The manifest as written: another one in its place, as a server building its own client writes, means building everything again.
@@ -156,7 +159,7 @@ export function devBuilder(root: string, options: ClientOptions): (changed: stri
     await writeClasses(root, sources.classes)
 
     const [scripts, styles] = await bothBundles(islandsAgain ? bundleIslands(root, sources.islands, options) : undefined, stylesAgain ? bundleStyles(root, sources, options) : undefined)
-    const manifest: ClientManifest = { ...scripts?.manifest ?? previous!.islands, styles: styles?.styles ?? previous!.styles, problems: sources.problems, options: key }
+    const manifest: ClientManifest = { ...scripts?.manifest ?? previous!.islands, styles: styles?.styles ?? previous!.styles, ...(styles ? styles.uses : previous!.styleUses) && { styleUses: (styles ? styles.uses : previous!.styleUses)! }, problems: sources.problems, options: key }
     const text = JSON.stringify(manifest)
 
     await Bun.write(join(output, MANIFEST), text)
@@ -190,6 +193,7 @@ export function devBuilder(root: string, options: ClientOptions): (changed: stri
       signatures,
       words,
       unused: styles?.unused ?? previous!.unused,
+      styleUses: styles ? styles.uses : previous!.styleUses,
       read: styles ? readInputs(styleInputs, signatures, words) : Promise.resolve(),
       classes: styles ? undefined : previous!.classes,
       manifest: text,

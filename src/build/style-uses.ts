@@ -184,14 +184,14 @@ function stylesheetClasses(file: string, kept: Set<string>, seen = new Set<strin
   return found
 }
 
-// `sheets` is the text of every stylesheet the build wrote, `shorthand` the classes each component writes as `div.flex.w-1/2`, which the words of its source cannot tell from a name with a dot.
-// `markup` lists the files that can write markup into a page without being a component it imports: scripts such as a Markdown plugin, Markdown and data files. A page rendering a collection's Markdown may show the classes of any of them, so it names theirs besides its components'.
-// `unresolved` receives the classes some file of the app sets from a value the build cannot read, as `runtimeClasses` finds them; `own` tells the app's files from a library's, which are not judged.
+// What the app hands `styleUses` besides its stylesheets: `unresolved` receives the classes some file of the app sets from a value the build cannot read, as `runtimeClasses` finds them; `own` tells the app's files from a library's, which are not judged.
 export interface StyleUsesOptions {
   own?: ((file: string) => boolean) | undefined
   unresolved?: ((found: { file: string, line: number, how: string, part: string }[]) => void) | undefined
 }
 
+// `sheets` is the text of every stylesheet the build wrote, `shorthand` the classes each component writes as `div.flex.w-1/2`, which the words of its source cannot tell from a name with a dot.
+// `markup` lists the files that can write markup into a page without being a component it imports: scripts such as a Markdown plugin, Markdown and data files. A page rendering a collection's Markdown may show the classes of any of them, so it names theirs besides its components'.
 export function styleUses(root: string, entries: Iterable<string>, sheets: Iterable<string>, reached: Reached, shorthand: ReadonlyMap<string, Iterable<string>>, markup: readonly string[] = [], options: StyleUsesOptions = {}): StyleUses {
   const styled = new Set<string>()
 

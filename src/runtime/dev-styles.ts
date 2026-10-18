@@ -48,7 +48,7 @@ function pageClasses(doc: Document): Set<string> | undefined {
 
 export function startStyleCheck(doc: Document = document): () => void {
   const warned = new Set<string>()
-  let styled: { sheets: number, set: Set<string> } | undefined
+  let styled: { sheets: CSSStyleSheet[], set: Set<string> } | undefined
   let known: { block: Element, set: Set<string> } | undefined
   const check = (element: Element) => {
     if (element.classList.length === 0)
@@ -73,8 +73,10 @@ export function startStyleCheck(doc: Document = document): () => void {
         continue
 
       // A stylesheet still loading has no rules yet, so what they style is read again when one arrived.
-      if (styled?.sheets !== doc.styleSheets.length)
-        styled = { sheets: doc.styleSheets.length, set: styledClasses(doc) }
+      const sheets = [...doc.styleSheets]
+
+      if (styled === undefined || styled.sheets.length !== sheets.length || styled.sheets.some((sheet, at) => sheet !== sheets[at]))
+        styled = { sheets, set: styledClasses(doc) }
 
       if (!styled.set.has(name))
         continue
