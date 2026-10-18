@@ -19,8 +19,8 @@ export default defineConfig({
   plugins: [tailwind],
   // Behind the host's nginx, whose address every visitor would otherwise share: the chat's limits count the visitor.
   proxy: true,
-  // The chat on /ask runs on Mistral's account, whose rate limit is low (about a request a second, and an answer takes up to five): 4 questions a minute per visitor, 250,000 tokens a day each, 4,000,000 a day in all (a few dollars at most).
-  extensions: [pageWeight, ai({ limit: { max: 4, window: '1m' }, budget: { tokens: 250_000, total: 4_000_000, window: '1d' } })],
+  // The chat on /ask runs on Mistral's account, whose rate limit is low (about a request a second, and an answer takes up to five): 4 questions a minute per visitor, 60,000 tokens a day each (about a dozen full answers), 4,000,000 a day in all (a few dollars at most).
+  extensions: [pageWeight, ai({ limit: { max: 4, window: '1m' }, budget: { tokens: 60_000, total: 4_000_000, window: '1d' } })],
   site: 'https://kayjs.kaynooo.fr',
   seo: {
     name: 'kay',

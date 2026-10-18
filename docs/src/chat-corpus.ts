@@ -174,6 +174,124 @@ export async function searchPages(query: string): Promise<Hit[]> {
   return scored.sort((a, b) => b.score - a.score).slice(0, MAX_HITS).map(one => one.hit)
 }
 
+const INLINE_CODE = /`([^`\n]+)`/g
+const PLURAL = /(?:es|s)$/
+// Words that say nothing of the topic: function words, the verbs of asking, and the ones a hostile ask leans on, in English and French.
+const FILLER = new Set(`a about above after again all also am an and any are as at be because been before being below between both but by can could did do does doing down during each else few for from further had has have having he her here hers him his how i if in into is it its just like me more most my no nor not now of off on once only or other our out over own please same she should so some such than that the their them then there these they this those through to too under until up us very was we were what when where which while who whom why will with would yes you your yours
+about anything give gives write writes written tell tells show shows explain explains say says make makes made need want wants help helps know tell talk ask asks asking question questions answer answers ignore ignoring instruction instructions rule rules previous pretend act roleplay forget stop sorry thanks thank hello hi hey ok okay good great best new old thing things something someone everything many much without list lists sort weight cover today world fix day docs doc documentation assistant bot
+le la les un une des du de au aux et ou mais donc or ni car que qui quoi dont où ce cet cette ces mon ma mes ton ta tes son sa ses notre nos votre vos leur leurs je tu il elle on nous vous ils elles me te se lui y en ne pas plus jamais rien est suis es sommes êtes sont étais était être avoir ai as avons avez ont fait faire fais peux peut peuvent veux veut voudrais dois doit comment pourquoi quand combien quel quelle quels quelles avec sans pour par sur sous dans chez vers entre très bien aussi alors donc si comme tout tous toute toutes mon peu trop encore déjà merci salut bonjour donne donnez dis dites explique expliquez écris écrire moi toi`.split(/\s+/))
+// What a French word means in kay's own terms, for the few words a French question about kay turns on.
+const GLOSSARY: Record<string, string[]> = {
+  île: ['island'],
+  îles: ['island'],
+  composant: ['component'],
+  composants: ['component'],
+  modèle: ['template'],
+  modèles: ['template'],
+  gabarit: ['template'],
+  formulaire: ['form'],
+  formulaires: ['form'],
+  chemin: ['path'],
+  serveur: ['server'],
+  navigateur: ['browser'],
+  déployer: ['deploy'],
+  déploiement: ['deploy'],
+  authentification: ['auth'],
+  connexion: ['auth', 'login'],
+  utilisateur: ['user'],
+  utilisateurs: ['user'],
+  erreur: ['error'],
+  erreurs: ['error'],
+  fichier: ['file'],
+  fichiers: ['file'],
+  lien: ['link'],
+  liens: ['link'],
+  traduire: ['translate'],
+  traduction: ['translate'],
+  langue: ['locale'],
+  langues: ['locale'],
+  données: ['data'],
+  courriel: ['mail'],
+  tâche: ['job'],
+  tâches: ['job'],
+  limite: ['limit'],
+  contenu: ['content'],
+  hydrater: ['hydrate'],
+  hydratation: ['hydrate'],
+  rendu: ['render'],
+  recherche: ['search'],
+}
+
+// How many pages a word of inline code must come in to count as a term of kay: a sample value (a country, a cat) comes in one or two, a term comes through the docs.
+const TERM_PAGES = 3
+// The words that tell a question is about kay: those of the page titles, and of the inline code that runs through several pages.
+let vocabulary: Promise<Set<string>> | undefined
+
+async function kayWords(): Promise<Set<string>> {
+  vocabulary ??= (async () => {
+    const known = new Set<string>()
+    const inCode = new Map<string, Set<string>>()
+
+    for (const page of await chatPages()) {
+      for (const word of words(page.title))
+        known.add(word)
+
+      let fenced = false
+
+      for (const line of page.text.split('\n')) {
+        if (FENCE.test(line)) {
+          fenced = !fenced
+
+          continue
+        }
+
+        if (fenced)
+          continue
+
+        for (const code of line.matchAll(INLINE_CODE)) {
+          for (const word of words(code[1]!)) {
+            const pages = inCode.get(word) ?? new Set<string>()
+
+            pages.add(page.href)
+            inCode.set(word, pages)
+          }
+        }
+      }
+    }
+
+    for (const [word, pages] of inCode) {
+      if (pages.size >= TERM_PAGES)
+        known.add(word)
+    }
+
+    for (const word of FILLER)
+      known.delete(word)
+
+    return known
+  })()
+
+  try {
+    return await vocabulary
+  }
+  catch (error) {
+    vocabulary = undefined
+
+    throw error
+  }
+}
+
+// Whether a question can be about kay, judged before the model is asked: one of its words, or the English of a French one, is a term the docs use. A question made of filler only ("and why?") has no topic of its own, so it is `followUp` when it comes after an answer. Borderline questions pass; the system prompt is the second layer.
+export async function isAboutKay(question: string, followUp: boolean): Promise<boolean> {
+  const content = words(question).filter(word => !FILLER.has(word) && !FILLER.has(word.replace(PLURAL, '')))
+
+  if (content.length === 0)
+    return followUp
+
+  const known = await kayWords()
+
+  return content.some(word => [word, word.replace(PLURAL, ''), ...GLOSSARY[word] ?? []].some(form => known.has(form)))
+}
+
 // What one part holds once escaped as JSON, which is how the loop reads a result, leaving room under the 20,000 characters it keeps for the path, title and counts beside the text.
 const PART_SIZE = 18_000
 

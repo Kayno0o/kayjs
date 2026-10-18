@@ -17,9 +17,13 @@ A language model writes the answers. It can misread a page, mix two of them up o
 
 The site stores no conversation. Yours lives in the page and is gone when you leave it. The limits count your questions in memory by network address and forget them when the server restarts. Each question is sent to the model provider together with the docs it reads, and nothing else about you.
 
+## Only kay
+
+The chat answers questions about kay and its libraries. Before the model is asked, the site checks that your question uses words from these docs. A question about a recipe or the weather gets a short reply saying so, and the model is never called. A short follow-up such as "and with a base path?" goes through.
+
 ## Limits
 
-The chat is free to use and paid for by the site, so each visitor may ask a few questions a minute and a fixed amount a day, and the site as a whole has a daily limit too. Past a limit it tells you how long to wait. When the chat is off, the page says so, and the search box (press Ctrl K) still works.
+The chat is free to use and paid for by the site, so each visitor may ask a few questions a minute and about a dozen full answers a day (60,000 tokens), and the site as a whole has a daily limit too. A question the chat refuses as off topic counts against none of them. Past a limit it tells you how long to wait. When the chat is off, the page says so, and the search box (press Ctrl K) still works.
 
 ## Build one for your own site
 

@@ -35,4 +35,4 @@ Environment variables of the server, Mistral Small 4 pinned to a dated model:
 
 Nothing else is set. Without them the site builds, prerenders and serves as usual, and the chat answers that it is not available. Behind nginx, `proxy: true` in `kay.config.ts` reads the visitor's address from `X-Forwarded-For`, so nginx must set it (`proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for`) and the server must not be reachable except through nginx.
 
-Limits, in `kay.config.ts`: 4 questions a minute per visitor, 250,000 tokens a day per visitor and 4,000,000 a day in all. They are kept in memory, so a restart resets them. Mistral accounts have low rate limits, about a request a second, and one question makes up to five requests.
+Limits, in `kay.config.ts`: 4 questions a minute per visitor, 60,000 tokens a day per visitor (about a dozen full answers) and 4,000,000 a day in all. They are kept in memory, so a restart resets them. Mistral accounts have low rate limits, about a request a second, and one question makes up to five requests.
