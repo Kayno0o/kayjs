@@ -1869,9 +1869,11 @@ function networkTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
       for (const fetched of early.splice(0))
         place(fetched, addressOf(fetched) === last.path ? last : navigations.findLast(candidate => candidate !== last && candidate.start <= fetched.startTime) ?? navigations[0]!)
 
-      // A swap that fetched nothing itself took the page from a prefetch, which an earlier navigation listed as it was reported.
-      if (!last.fetches.some(fetched => earlyPage(fetched) && addressOf(fetched) === last.path)) {
-        const prefetched = navigations.flatMap(navigation => navigation === last ? [] : navigation.fetches).filter(fetched => earlyPage(fetched) && addressOf(fetched) === last.path && last.start > fetched.startTime && last.start <= fetched.startTime + PREFETCH_TTL_MS).at(-1)
+      // A swap that fetched nothing itself took the page from a prefetch, which the page it left listed as it was reported and keeps listing, as it did fetch it there.
+      const left = navigations.at(-2)
+
+      if (left !== undefined && left.path !== last.path && !last.fetches.some(fetched => earlyPage(fetched) && addressOf(fetched) === last.path)) {
+        const prefetched = left.fetches.findLast(fetched => earlyPage(fetched) && addressOf(fetched) === last.path && last.start > fetched.startTime && last.start <= fetched.startTime + PREFETCH_TTL_MS)
 
         if (prefetched !== undefined)
           place(prefetched, last)
