@@ -131,7 +131,10 @@ export function s3Files(options: Bun.S3Options & { publicUrl?: string | undefine
 
   return {
     async write(key, data) {
-      await bucket.write(key, data, { type: data.type === '' ? Bun.file(key).type : data.type })
+      // The key's extension decides how the bucket serves the object, never the uploader's declared type, so a page or SVG uploaded from a browser never runs from the bucket's public URL.
+      const served = servedAs(key)
+
+      await bucket.write(key, data, { type: served.type, contentDisposition: served.inline ? 'inline' : `attachment; filename="${basename(key)}"` })
     },
     async read(key) {
       return await bucket.exists(key) ? bucket.file(key) : undefined
@@ -413,6 +416,14 @@ function linkSigned(key: string, query: URLSearchParams): boolean {
   return Number(until) > Date.now() / 1000 && signedText(SIGNING_USE, `${key}\n${until}`, query.get('sig') ?? '')
 }
 
+// The type a key's file is served with and whether a browser may show it in place, from its extension in any case; the one rule kay's route and a bucket both follow.
+function servedAs(key: string): { type: string, inline: boolean } {
+  const type = Bun.file(key.toLowerCase()).type
+  const inline = INLINE.test(type)
+
+  return { type: inline || IMAGE.test(type) ? type : 'application/octet-stream', inline }
+}
+
 // `own` finishes the headers of an answer from a route, which carries the context's headers itself.
 async function fileResponse(key: string, request: Request | undefined, cacheControl: string, own: (headers: Record<string, string>) => Record<string, string> = headers => headers): Promise<Response> {
   const data = await (await activeStore()).read(key)
@@ -420,10 +431,9 @@ async function fileResponse(key: string, request: Request | undefined, cacheCont
   if (!data)
     return new Response('Not Found', { status: 404, headers: own({ ...TEXT }) })
 
-  const type = Bun.file(key).type
-  const inline = INLINE.test(type)
+  const { type, inline } = servedAs(key)
   const headers: Record<string, string> = {
-    'content-type': inline || IMAGE.test(type) ? type : 'application/octet-stream',
+    'content-type': type,
     'x-content-type-options': 'nosniff',
     'content-disposition': inline ? 'inline' : `attachment; filename="${basename(key)}"`,
     'cache-control': cacheControl,

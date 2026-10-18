@@ -2,6 +2,10 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
+## Unreleased
+
+- `s3Files` stores each object with the type and `Content-Disposition` its key's extension gives, never the uploader's declared type, so an uploaded HTML page or SVG is a download from the bucket's `publicUrl` instead of running there; files stored by an earlier release must be put again ([Files](files.md)).
+
 ## 1.54.1
 
 - The `kay dev` class check no longer reports a class whose only rules mention it inside `:is()`, `:where()` or a variant (`.prose { & :is(.stats) }`, `group-open:`): it judges a class by the rules that need it, as the build does ([Styles and assets](styles-and-assets.md)).

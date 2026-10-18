@@ -83,6 +83,8 @@ export default defineConfig({
 
 `publicUrl` is where the bucket serves files itself. A static export links stored files there.
 
+The bucket serves each file by its extension, not by the type the visitor said it had. Images, video, audio, PDFs and plain text show in the page. Anything else, such as an uploaded HTML page or SVG, is stored as a download, so it never runs as part of your site. An SVG still works in an `img`. Files stored by an earlier release keep the type they were uploaded with, so put them again. Serve the bucket from a host that shares no cookies with your app.
+
 Under `bun test`, files stay in memory, each `testSite` with its own.
 
 ### Your own store

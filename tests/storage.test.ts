@@ -449,6 +449,81 @@ describe('s3Files', () => {
       await server.stop(true)
     }
   })
+
+  it('stores each object with the type and disposition its key\'s extension gives, whatever the upload declared', async () => {
+    const objects = new Map<string, { type: string, disposition: string }>()
+    const server = Bun.serve({
+      port: 0,
+      async fetch(request) {
+        await request.arrayBuffer()
+        objects.set(decodeURIComponent(new URL(request.url).pathname), { type: request.headers.get('content-type') ?? '', disposition: request.headers.get('content-disposition') ?? '' })
+
+        return new Response(null, { headers: { etag: '"1"' } })
+      },
+    })
+
+    try {
+      const store = s3Files({ bucket: 'site', endpoint: `http://localhost:${server.port}`, accessKeyId: 'id', secretAccessKey: 'secret', region: 'us-east-1' })
+      const cases: [key: string, declared: string, type: string, disposition: string][] = [
+        ['x.html', 'text/html', 'application/octet-stream', 'attachment; filename="x.html"'],
+        ['X.HTML', 'text/html', 'application/octet-stream', 'attachment; filename="X.HTML"'],
+        ['a.png.html', 'image/png', 'application/octet-stream', 'attachment; filename="a.png.html"'],
+        ['x.png', 'text/html', 'image/png', 'inline'],
+        ['X.PNG', 'text/html', 'image/png', 'inline'],
+        ['a.html.png', 'text/html', 'image/png', 'inline'],
+        ['x.svg', 'image/svg+xml', 'image/svg+xml', 'attachment; filename="x.svg"'],
+        ['x.svg', 'text/html', 'image/svg+xml', 'attachment; filename="x.svg"'],
+        ['x.js', 'text/javascript', 'application/octet-stream', 'attachment; filename="x.js"'],
+        ['noextension', 'text/html', 'application/octet-stream', 'attachment; filename="noextension"'],
+        ['x.txt', '', 'text/plain;charset=utf-8', 'inline'],
+        ['x.pdf', 'text/html', 'application/pdf', 'inline'],
+        ['private/x.html', 'text/html', 'application/octet-stream', 'attachment; filename="x.html"'],
+        ['photos/x.xhtml', 'application/xhtml+xml', 'application/octet-stream', 'attachment; filename="x.xhtml"'],
+      ]
+
+      for (const [key, declared] of cases)
+        await store.write(key, new Blob(['<script>alert(1)</script>'], { type: declared }))
+
+      for (const [key, declared, type, disposition] of cases) {
+        const stored = objects.get(`/site/${key}`)
+
+        expect(stored?.type, `${key} declared ${declared}`).toBe(type)
+        expect(stored?.disposition, `${key} declared ${declared}`).toBe(disposition)
+      }
+    }
+    finally {
+      await server.stop(true)
+    }
+  })
+
+  it('stores a file put with a spoofed type by its extension', async () => {
+    const objects = new Map<string, { type: string, disposition: string }>()
+    const server = Bun.serve({
+      port: 0,
+      async fetch(request) {
+        await request.arrayBuffer()
+        objects.set(decodeURIComponent(new URL(request.url).pathname), { type: request.headers.get('content-type') ?? '', disposition: request.headers.get('content-disposition') ?? '' })
+
+        return new Response(null, { headers: { etag: '"1"' } })
+      },
+    })
+
+    try {
+      setupStorage(s3Files({ bucket: 'site', endpoint: `http://localhost:${server.port}`, accessKeyId: 'id', secretAccessKey: 'secret', region: 'us-east-1' }), join(dir, 'cache'))
+
+      const page = await files.put(new File(['<script>alert(1)</script>'], 'Evil.HTML', { type: 'text/html' }))
+      const disguised = await files.put(new File(['<script>alert(1)</script>'], 'photo.png', { type: 'text/html' }))
+      const typeOnly = await files.put(new Blob(['<svg onload="alert(1)"/>'], { type: 'image/svg+xml' }))
+
+      expect(page.endsWith('.html')).toBe(true)
+      expect(objects.get(`/site/${page}`)).toEqual({ type: 'application/octet-stream', disposition: expect.stringMatching(/^attachment/) })
+      expect(objects.get(`/site/${disguised}`)).toEqual({ type: 'image/png', disposition: 'inline' })
+      expect(objects.get(`/site/${typeOnly}`)).toEqual({ type: 'image/svg+xml', disposition: expect.stringMatching(/^attachment/) })
+    }
+    finally {
+      await server.stop(true)
+    }
+  })
 })
 
 describe('kay/test', () => {
