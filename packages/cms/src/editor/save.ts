@@ -208,8 +208,8 @@ function settled(outcome: Outcome | undefined, done: string, refused: string): b
 }
 
 // Adds the redirect from a missing path to its target and says how it went; true once added. The rows are stale either way, the caller refreshing them.
-export async function addMissingRedirect(from: string, to: string): Promise<boolean> {
-  const done = await attempt(async () => call(redirectsApi, '/', { method: 'post', body: { from, to } }), wording('cms.redirects.addFailure', 'Could not add the redirect'))
+export async function addMissingRedirect(from: string, to: string, permanent: boolean): Promise<boolean> {
+  const done = await attempt(async () => call(redirectsApi, '/', { method: 'post', body: { from, to, permanent } }), wording('cms.redirects.addFailure', 'Could not add the redirect'))
 
   if (done)
     toast.success(wording('cms.redirects.added', 'Redirect added'))

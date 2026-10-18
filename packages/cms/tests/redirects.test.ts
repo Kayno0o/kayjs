@@ -7,10 +7,22 @@ describe('adding a redirect from the screen', () => {
 
     const screen = readMissing()
 
-    expect('added' in screen && screen.added).toContainEqual({ from: '/old-cms-page', to: '/new-page', status: 308 })
+    expect('added' in screen && screen.added).toContainEqual({ from: '/old-cms-page', to: '/new-page', status: 307 })
     expect(removeRedirect('/old-cms-page')).toBe(true)
     expect(removeRedirect('/old-cms-page')).toBe(false)
     expect('added' in readMissing() && readMissing()).toMatchObject({ added: [] })
+  })
+
+  test('answers 307, or 308 when made permanent', () => {
+    expect(addRedirect('/old-cms-a', '/new-page')).toBeUndefined()
+    expect(addRedirect('/old-cms-b', '/new-page', true)).toBeUndefined()
+
+    const screen = readMissing()
+    const added = 'added' in screen ? screen.added : []
+
+    expect(added.filter(row => row.from.startsWith('/old-cms-')).map(row => [row.from, row.status])).toEqual(expect.arrayContaining([['/old-cms-a', 307], ['/old-cms-b', 308]]))
+    expect(removeRedirect('/old-cms-a')).toBe(true)
+    expect(removeRedirect('/old-cms-b')).toBe(true)
   })
 
   test('words a refusal for an editor who aims at another site, a loop, or hostile text', () => {

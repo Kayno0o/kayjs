@@ -13,7 +13,7 @@ import { USAGES } from './usages'
 const REFERRER_LIMIT = 3
 
 // The paths visitors asked for and found nothing at, most hit first, read from the file the production server keeps.
-// `--redirect <path>` turns one into a redirect in kay.config.ts, to `--to` or to the suggested target; with `--runtime` it goes in the file instead, which the running site reads with no deploy.
+// `--redirect <path>` turns one into a redirect in kay.config.ts, to `--to` or to the suggested target; with `--runtime` it goes in the file instead, which the running site reads with no deploy, answering 307.
 export const notFound: Command = {
   usage: USAGES['not-found'],
   options: { format: { type: 'string' }, redirect: { type: 'string' }, to: { type: 'string' }, file: { type: 'string' }, runtime: { type: 'boolean' } },

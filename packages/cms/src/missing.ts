@@ -73,9 +73,10 @@ export function readMissing(): MissingScreen {
 }
 
 // Adds the redirect to the set the server reads while it runs, which forgets the path as missing; the reason it was refused, worded, or undefined once added.
-export function addRedirect(from: string, to: string): string | undefined {
+// A 307, which browsers do not keep, so the editor can still undo it; `permanent` makes it a 308.
+export function addRedirect(from: string, to: string, permanent = false): string | undefined {
   try {
-    addRuntimeRedirect(from, to)
+    addRuntimeRedirect(from, to, permanent ? { status: 308 } : {})
 
     return undefined
   }

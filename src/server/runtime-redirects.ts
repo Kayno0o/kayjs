@@ -194,7 +194,7 @@ export function redirectSet(db: Database): RedirectSet {
       return row ? entry(row) : undefined
     },
     patterns: () => some.all().map(entry),
-    add(rawFrom, rawTo, status = 308, rules) {
+    add(rawFrom, rawTo, status = 307, rules) {
       // Checked and written in one write transaction, so two editors adding at once cannot make a loop between them.
       const write = db.transaction(() => {
         const to = encoded(rawTo)

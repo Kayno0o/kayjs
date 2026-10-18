@@ -10,10 +10,10 @@ export default api()
     if (!settings().guard)
       return status(403, wording('cms.redirects.needsGuard', 'Redirects need cms({ guard })'))
 
-    const refusal = addRedirect(body.from, body.to)
+    const refusal = addRedirect(body.from, body.to, body.permanent)
 
     return refusal === undefined ? { added: true } : status(400, refusal)
-  }, { body: s.Object({ from: s.String({ maxLength: 512 }), to: s.String({ maxLength: 512 }) }) })
+  }, { body: s.Object({ from: s.String({ maxLength: 512 }), to: s.String({ maxLength: 512 }), permanent: s.Optional(s.Boolean()) }) })
   .post('/remove', ({ body, status }) => {
     if (!settings().guard)
       return status(403, wording('cms.redirects.needsGuard', 'Redirects need cms({ guard })'))

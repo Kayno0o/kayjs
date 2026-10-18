@@ -75,7 +75,7 @@ test('adds the suggested redirect, which answers at once and is listed with its 
 
   const answered = await site.fetch('/Empty', { redirect: 'manual' })
 
-  expect([answered.status, answered.headers.get('location')]).toEqual([308, '/empty'])
+  expect([answered.status, answered.headers.get('location')]).toEqual([307, '/empty'])
 
   const page = await site.visit('/admin/not-found')
 
@@ -84,6 +84,9 @@ test('adds the suggested redirect, which answers at once and is listed with its 
 
   expect((await post('/remove', { from: '/Empty' })).status).toBe(200)
   expect((await site.fetch('/Empty')).status).toBe(404)
+  expect((await post('', { from: '/Empty', to: '/empty', permanent: true })).status).toBe(200)
+  expect((await site.fetch('/Empty', { redirect: 'manual' })).status).toBe(308)
+  expect((await post('/remove', { from: '/Empty' })).status).toBe(200)
 })
 
 test('offers a box for the target on a path with no suggestion', async () => {

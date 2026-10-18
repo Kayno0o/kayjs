@@ -1,16 +1,21 @@
 ---
 import Button from '@kaynooo/kayjs-ui/button.kay'
+import Checkbox from '@kaynooo/kayjs-ui/checkbox.kay'
 import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
 import { wording } from 'kay/words'
 
 // The Add redirect control of a missing path: one button for the target kay suggests, else a box for the target to type, so every row can be redirected.
-const { path, suggested, onAdd } = props<{ path: string, suggested: string | undefined, onAdd: (from: string, to: string) => Promise<void> }>()
+// A redirect answers 307, which a browser does not keep, unless Permanent is ticked for a 308.
+const { path, suggested, onAdd } = props<{ path: string, suggested: string | undefined, onAdd: (from: string, to: string, permanent: boolean) => Promise<void> }>()
 
 const typed = signal('')
+const permanent = signal(false)
 ---
-if suggested as target
-  Button(label={wording('cms.missing.add', 'Add redirect')} aria-label={wording('cms.missing.addLabel', 'Redirect {path} to {target}', { path, target })} size="sm" variant="ghost" onClick={async () => { await onAdd(path, target) }})
-else
-  .kcms-missing-add
+.kcms-missing-add
+  if suggested as target
+    Checkbox(checked={permanent()} onChange={on => permanent = on} label={wording('cms.missing.permanent', 'Permanent')} aria-label={wording('cms.missing.permanentLabel', 'Make the redirect from {path} permanent (308)', { path })})
+    Button(label={wording('cms.missing.add', 'Add redirect')} aria-label={wording('cms.missing.addLabel', 'Redirect {path} to {target}', { path, target })} size="sm" variant="ghost" onClick={async () => { await onAdd(path, target, permanent()) }})
+  else
     TextInput(value={typed()} onInput={text => typed = text} placeholder="/" aria-label={wording('cms.missing.targetLabel', 'Target of the redirect from {path}', { path })} size={20})
-    Button(label={wording('cms.missing.add', 'Add redirect')} aria-label={wording('cms.missing.addLabel', 'Redirect {path} to {target}', { path, target: typed() })} size="sm" variant="ghost" disabled={typed().trim() === ''} onClick={async () => { await onAdd(path, typed().trim()) }})
+    Checkbox(checked={permanent()} onChange={on => permanent = on} label={wording('cms.missing.permanent', 'Permanent')} aria-label={wording('cms.missing.permanentLabel', 'Make the redirect from {path} permanent (308)', { path })})
+    Button(label={wording('cms.missing.add', 'Add redirect')} aria-label={wording('cms.missing.addLabel', 'Redirect {path} to {target}', { path, target: typed() })} size="sm" variant="ghost" disabled={typed().trim() === ''} onClick={async () => { await onAdd(path, typed().trim(), permanent()) }})

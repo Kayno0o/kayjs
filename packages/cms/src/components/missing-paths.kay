@@ -16,8 +16,8 @@ const { rows, hint } = props<{ rows: MissingRow[], hint: string }>()
 // Looks up what an addition says once the page has loaded, so the page sends it.
 shipWords()
 
-async function add(from: string, to: string): Promise<void> {
-  if (await addMissingRedirect(from, to))
+async function add(from: string, to: string, permanent: boolean): Promise<void> {
+  if (await addMissingRedirect(from, to, permanent))
     await refresh()
 }
 

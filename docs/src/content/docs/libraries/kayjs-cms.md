@@ -138,7 +138,9 @@ Check each upload before you confirm. A URL written by hand in a page, or a file
 
 When a visitor asks a production server for a page it does not have, kay counts the path. The screen at `<prefix>/not-found` lists those paths, the most visited first, with the sites visitors came from and, where kay can tell, the page they most likely meant. Paths that a redirect already answers are left out.
 
-Each path has an Add redirect button: one click for the suggested target, or a box to type the target of a path with no suggestion. The redirect is saved where the running server reads it, so it answers at once, with no deploy, and the path leaves the list. Below the list, the redirects added here show a Remove button that undoes one. A redirect answers with a 308, which browsers keep, so Remove does not reach a visitor who has followed it already. Both need the `guard` you gave `cms()`.
+Each path has an Add redirect button: one click for the suggested target, or a box to type the target of a path with no suggestion. The redirect is saved where the running server reads it, so it answers at once, with no deploy, and the path leaves the list. Below the list, the redirects added here show a Remove button that undoes one. Both need the `guard` you gave `cms()`.
+
+A redirect answers with a 307, which browsers do not keep, so Remove undoes it for everyone. Tick Permanent beside Add redirect for a 308 instead: browsers keep it, so Remove does not reach a visitor who has followed it already.
 
 A redirect added here can only go to a page of your site, and kay refuses a loop or a target no page serves. To allow another site, list its host in `runtimeRedirects` in `kay.config.ts`. You can also copy the line into `redirects` in `kay.config.ts`, or run `kay not-found --redirect <path>`, to keep the redirect in the repository.
 

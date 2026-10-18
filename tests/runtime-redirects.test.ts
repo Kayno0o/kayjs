@@ -223,7 +223,7 @@ describe('a served app', () => {
 
     const prefixed = await served.handle(new Request('http://localhost/en/rt-loc-old'))
 
-    expect([prefixed.status, prefixed.headers.get('location')]).toEqual([308, '/en'])
+    expect([prefixed.status, prefixed.headers.get('location')]).toEqual([307, '/en'])
     expect((await served.handle(new Request('http://localhost/fr/rt-loc-old'))).status).toBe(404)
   })
 
@@ -251,7 +251,7 @@ describe('a served app', () => {
     addRuntimeRedirect('/rt-post', '/bare')
     addRuntimeRedirect('/rt-wp/wp-login.php', '/bare')
 
-    expect((await served.handle(new Request('http://localhost/rt-post', { method: 'POST' }))).status).not.toBe(308)
+    expect((await served.handle(new Request('http://localhost/rt-post', { method: 'POST' }))).status).not.toBe(307)
     expect((await served.handle(new Request('http://localhost/rt-wp/wp-login.php'))).status).toBe(404)
   })
 
@@ -282,7 +282,7 @@ describe('a page that answers 404 itself', () => {
     const post = await served.handle(new Request('http://localhost/post/old'))
     const fallback = await served.handle(new Request('http://localhost/nowhere'))
 
-    expect([post.status, post.headers.get('location')]).toEqual([308, '/app/new'])
+    expect([post.status, post.headers.get('location')]).toEqual([307, '/app/new'])
     expect([fallback.status, fallback.headers.get('location')]).toEqual([302, '/app/new'])
     expect((await served.handle(new Request('http://localhost/post/other'))).status).toBe(404)
   })
@@ -295,6 +295,15 @@ describe('what an editor types', () => {
     expect(set.add('/vieux-café', '/café/ça', undefined, rules)).toMatchObject({ from: '/vieux-caf%C3%A9', to: '/caf%C3%A9/%C3%A7a' })
     expect(() => set.add('/a', '/\uD800', undefined, rules)).toThrow()
     expect(answerFor(set, '/vieux-caf%C3%A9', '', [])?.location).toBe('/caf%C3%A9/%C3%A7a')
+  })
+
+  it('answers 307 unless the editor picks 308 or another status', () => {
+    const set = setOf()
+
+    set.add('/a', '/new', undefined, rules)
+    set.add('/b', '/new', 308, rules)
+
+    expect([answerFor(set, '/a', '', [])?.status, answerFor(set, '/b', '', [])?.status]).toEqual([307, 308])
   })
 
   it('writes the hex of a percent-escape in upper case, as a browser sends it', () => {
@@ -389,7 +398,7 @@ describe('the store on disk', () => {
     other.close()
 
     expect((await served.handle(new Request('http://localhost/rt-uni'))).status).toBe(404)
-    expect((await served.handle(new Request('http://localhost/rt-ok'))).status).toBe(308)
+    expect((await served.handle(new Request('http://localhost/rt-ok'))).status).toBe(307)
     dropStore()
   })
 })
