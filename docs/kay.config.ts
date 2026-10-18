@@ -2,7 +2,7 @@ import { readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { ai } from '@kaynooo/kayjs-ai'
 import tailwind from 'bun-plugin-tailwind'
-import { defineConfig } from 'kay/server'
+import { defineConfig, sqliteRates } from 'kay/server'
 import { pageWeight } from './src/page-weight'
 import { THEME_SCRIPT } from './src/theme'
 
@@ -10,6 +10,9 @@ const MARKDOWN_EXTENSION = /\.md$/
 
 // The full reference moved from /reference to /llms; /reference/checks is the people's page on kay check now.
 const moved = readdirSync(join(import.meta.dir, '../llms')).map(file => file.replace(MARKDOWN_EXTENSION, '')).filter(topic => topic !== 'checks')
+
+// Beside this file whatever the folder the server starts from, so the build and the tests meet the one file `kay start` does.
+const chatCounts = sqliteRates(join(import.meta.dir, 'data/ai.sqlite'))
 
 // The migration guides moved from /guides to their own section.
 const migrations = ['astro', 'sveltekit', 'nextjs', 'laravel']
@@ -19,8 +22,8 @@ export default defineConfig({
   plugins: [tailwind],
   // Behind the host's nginx, whose address every visitor would otherwise share: the chat's limits count the visitor.
   proxy: true,
-  // The chat on /ask runs on Mistral's account, whose rate limit is low (about a request a second, and an answer takes up to five): 4 questions a minute per visitor, 60,000 tokens a day each (about a dozen full answers), 4,000,000 a day in all (a few dollars at most).
-  extensions: [pageWeight, ai({ limit: { max: 4, window: '1m' }, budget: { tokens: 60_000, total: 4_000_000, window: '1d' } })],
+  // The chat on /ask runs on Mistral's account, whose rate limit is low (about a request a second, and an answer takes up to five): 4 questions a minute per visitor, 60,000 tokens a day each (about a dozen full answers), 1,500,000 a day in all (a few euros a month at most). The counts are kept in docs/data, so a restart keeps them.
+  extensions: [pageWeight, ai({ limit: { max: 4, window: '1m', store: chatCounts }, budget: { tokens: 60_000, total: 1_500_000, window: '1d', store: chatCounts } })],
   site: 'https://kayjs.kaynooo.fr',
   seo: {
     name: 'kay',

@@ -47,11 +47,11 @@ const Messages = s.Object({
 export const reply = action(
   Messages,
   async ({ messages }, ctx) => {
-    // Judged on the latest question alone, so an off-topic ask after on-topic turns is refused too; the model is not asked and no tokens are counted.
-    if (!await isAboutKay(messages.findLast(message => message.role === 'user')?.content ?? '', messages.some(message => message.role === 'assistant')))
-      return refusal()
-
     try {
+      // Judged on the latest question alone, so an off-topic ask after on-topic turns is refused too; the model is not asked and no tokens are counted.
+      if (!await isAboutKay(messages.findLast(message => message.role === 'user')?.content ?? '', messages.some(message => message.role === 'assistant')))
+        return refusal()
+
       return ask(messages, { system: await systemPrompt(), tools: [searchDocs, readDocsPage], maxSteps: 4, maxTokens: 1500, temperature: 0.2 }).progress()
     }
     catch (error) {

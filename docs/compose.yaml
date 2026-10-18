@@ -13,3 +13,8 @@ services:
     env_file:
       - path: .env
         required: false
+    # The chat's daily counts, kept over a restart.
+    volumes:
+      - chat-data:/kay/docs/data
+volumes:
+  chat-data:

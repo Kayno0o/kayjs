@@ -15,7 +15,7 @@ A language model writes the answers. It can misread a page, mix two of them up o
 
 ## What is kept
 
-The site stores no conversation. Yours lives in the page and is gone when you leave it. The limits count your questions in memory by network address and forget them when the server restarts. Each question is sent to the model provider together with the docs it reads, and nothing else about you.
+The site stores no conversation. Yours lives in the page and is gone when you leave it. The limits count your questions by network address and keep the counts in a file on the server, so a restart does not reset them. Each question is sent to the model provider together with the docs it reads, and nothing else about you.
 
 ## Only kay
 

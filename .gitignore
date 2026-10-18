@@ -17,3 +17,5 @@ bench/apps/nuxt/.output
 bench/sites/results*.md
 
 codecs/avif/.cache
+
+docs/data/

@@ -23,7 +23,22 @@ const site = await testSite({ root })
 const { reply, searchDocs, readDocsPage } = await import(join(root, 'src/routes/(docs)/ask.kay')) as Ask
 const question = (content: string) => ({ messages: [{ role: 'user', content }] })
 
+// The settings docs/kay.config.ts gives `ai()`, read where the library keeps them.
+interface Counted {
+  settings: { budget?: { tokens: number, total: number | undefined, ms: number, store: ReturnType<typeof memoryRates> }, limit?: { max: number, ms: number, store: ReturnType<typeof memoryRates> } }
+}
+
+const counted = () => (globalThis as Record<symbol, Counted | undefined>)[Symbol.for('kayjs-ai.limits')]!.settings
+// The config keeps the counts in a file that outlives a run, which every test here would meet again: they count in memory instead.
+const kept = counted()
+const configured = { limit: kept.limit?.store, budget: kept.budget?.store }
+
+kept.limit!.store = memoryRates()
+kept.budget!.store = memoryRates()
+
 afterAll(async () => {
+  kept.limit!.store = configured.limit!
+  kept.budget!.store = configured.budget!
   await site.close()
   await release()
 })
@@ -187,14 +202,8 @@ describe('the chat action', () => {
   })
 })
 
-// The settings docs/kay.config.ts gives `ai()`, read where the library keeps them.
-interface Counted {
-  settings: { budget?: { tokens: number, total: number | undefined, ms: number, store: ReturnType<typeof memoryRates> }, limit?: { max: number, ms: number } }
-}
-
-const counted = () => (globalThis as Record<symbol, Counted | undefined>)[Symbol.for('kayjs-ai.limits')]!.settings
 const TOKENS = 60_000
-const TOTAL = 4_000_000
+const TOTAL = 1_500_000
 const DAY = 86_400_000
 
 describe('the caps set in docs/kay.config.ts', () => {
