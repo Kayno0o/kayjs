@@ -1,12 +1,16 @@
-import { chmod, lstat, mkdir, mkdtemp, writeFile } from 'node:fs/promises'
+import { chmod, lstat, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import process from 'node:process'
 
 const OTHERS = 0o077
-const PRIVATE_DIR = 0o700
+
+export const PRIVATE_DIR = 0o700
 
 export const PRIVATE_FILE = 0o600
+
+// The folder taken in place of a path that could not be used, kept so a reload of the server does not leave another behind.
+const fallbacks = new Map<string, string>()
 
 // This process's user, or undefined where the platform has none (the ownership checks are then skipped).
 const uid = process.getuid?.()
@@ -16,7 +20,7 @@ export async function isPrivate(path: string, kind: 'file' | 'directory'): Promi
   try {
     const found = await lstat(path)
 
-    return (kind === 'file' ? found.isFile() : found.isDirectory()) && (uid === undefined || found.uid === uid) && (found.mode & OTHERS) === 0
+    return (kind === 'file' ? found.isFile() : found.isDirectory()) && (uid === undefined || (found.uid === uid && (found.mode & OTHERS) === 0))
   }
   catch {
     return false
@@ -25,6 +29,20 @@ export async function isPrivate(path: string, kind: 'file' | 'directory'): Promi
 
 // A folder only this user can enter, `path` itself when it is or can be made one, else a fresh random one in the temp folder: a link, or a folder another user made first, is never written into.
 export async function privateDir(path: string): Promise<string> {
+  const chosen = fallbacks.get(path)
+
+  if (chosen !== undefined && await isPrivate(chosen, 'directory'))
+    return chosen
+
+  const dir = await openPrivateDir(path)
+
+  if (dir !== path)
+    fallbacks.set(path, dir)
+
+  return dir
+}
+
+async function openPrivateDir(path: string): Promise<string> {
   try {
     await mkdir(dirname(path), { recursive: true })
     await mkdir(path, { mode: PRIVATE_DIR })
@@ -55,4 +73,15 @@ export async function writePrivate(path: string, data: Blob | Uint8Array | strin
   await writeFile(path, '', { mode: PRIVATE_FILE })
   await chmod(path, PRIVATE_FILE)
   await Bun.write(path, data)
+}
+
+// The cache of a compiled executable before it was private, shared by every user at one fixed path; removed when it is this user's own, as it holds copies of private files.
+export async function dropOpenCache(): Promise<void> {
+  const old = join(tmpdir(), 'kay-images')
+
+  try {
+    if (uid !== undefined && (await lstat(old)).uid === uid)
+      await rm(old, { recursive: true, force: true })
+  }
+  catch {}
 }

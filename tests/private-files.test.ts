@@ -1,12 +1,13 @@
-import { symlinkSync } from 'node:fs'
+import { existsSync, symlinkSync } from 'node:fs'
 import { chmod, lstat, mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { testWorker } from '../src/build/assets'
 import { cacheDir } from '../src/project'
 import { diskFiles, memoryFiles, pages } from '../src/server'
-import { privateDir } from '../src/server/private-dir'
+import { dropOpenCache, privateDir } from '../src/server/private-dir'
 import { setupStorage, storedImage } from '../src/server/storage'
 import { scratchDir } from './scratch'
 
@@ -119,6 +120,28 @@ describe('the stored files cache', () => {
   })
 })
 
+describe('privateDir and the old shared cache', () => {
+  it('keeps the folder it fell back to, so a reload does not leave another', async () => {
+    const root = await scratchDir('private-dir-')
+    const path = join(root, 'images')
+
+    symlinkSync(root, path)
+    expect(await privateDir(path)).toBe(await privateDir(path))
+  })
+
+  it('removes the fixed shared cache an earlier executable made, when it is this user\'s', async () => {
+    const old = join(tmpdir(), 'kay-images')
+
+    if (existsSync(old))
+      return
+
+    await mkdir(join(old, 'stored/private'), { recursive: true })
+    await writeFile(join(old, 'stored/private/x.txt'), 'secret')
+    await dropOpenCache()
+    expect(existsSync(old)).toBe(false)
+  })
+})
+
 describe('diskFiles', () => {
   it('writes private files at 0600 in folders at 0700 under a umask of 000, public ones as before', async () => {
     const root = await scratchDir('private-disk-')
@@ -136,6 +159,14 @@ describe('diskFiles', () => {
     expect(await modeOf(join(root, 'private/photos'))).toBe(0o700)
     expect(await modeOf(join(root, OTHER))).toBe(0o666)
     expect(await readFile(join(root, KEY), 'utf8')).toBe('secret')
+  })
+
+  it('writes a key in any case of private into the folder of that case', async () => {
+    const root = await scratchDir('private-disk-')
+
+    await diskFiles(root).write(`Private/${'e'.repeat(20)}.txt`, new Blob(['secret']))
+    expect(await readdir(root)).toEqual(['Private'])
+    expect(await modeOf(join(root, 'Private'))).toBe(0o700)
   })
 
   it('closes the private folder an older kay made open, so files written before stay out of reach', async () => {
@@ -161,7 +192,7 @@ describe('the server', () => {
     const script = `
       import { registerBundle } from './src/server/bundle'
       import { projectSource } from './src/server/source'
-      import { privateDir } from './src/server/private-dir'
+      import { dropOpenCache, privateDir } from './src/server/private-dir'
       registerBundle({ root: '/x', routes: [], fallback: {}, modules: {}, config: {}, clientDir: '/x', publicDir: '/x' })
       const path = projectSource().imageCache('/x')
       console.log(JSON.stringify([path, await privateDir(path)]))

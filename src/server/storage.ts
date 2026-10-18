@@ -1,6 +1,6 @@
 import type { Elysia } from 'elysia'
 import type { Duration } from '../runtime/duration'
-import { chmod, mkdir, readdir, rm, stat } from 'node:fs/promises'
+import { chmod, lstat, mkdir, readdir, rm, stat } from 'node:fs/promises'
 import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import { writeAtomically } from '../build/files'
 import { KayError } from '../compiler/errors'
@@ -9,7 +9,7 @@ import { FILES_ROUTE } from '../runtime/image'
 import { kayLog } from '../runtime/log'
 import { imageHeader } from './image-format'
 import { holdsImageMetadata, stripImageMetadata } from './image-metadata'
-import { isPrivate, writePrivate } from './private-dir'
+import { isPrivate, PRIVATE_DIR, writePrivate } from './private-dir'
 import { requestUrl } from './request-url'
 import { headerCopies, ownedHeaders, ownHeaders, setSecurityHeaders } from './security'
 import { setupStampSecret, signedText, signText } from './stamp'
@@ -87,11 +87,11 @@ export function diskFiles(dir: string = DEFAULT_DIR): FileStore {
         return void await Bun.write(path(key), data)
 
       // Private files sit in folders and at a mode only this user can enter and read, whatever the umask or an older kay left.
-      const root = join(resolve(dir), 'private')
+      const root = join(resolve(dir), key.slice(0, 'private'.length))
 
       await mkdir(root, { recursive: true })
-      await chmod(root, 0o700)
-      await mkdir(dirname(path(key)), { recursive: true, mode: 0o700 })
+      await chmod(root, PRIVATE_DIR)
+      await mkdir(dirname(path(key)), { recursive: true, mode: PRIVATE_DIR })
       await writePrivate(path(key), data)
     },
     async read(key) {
@@ -382,6 +382,31 @@ export function serveFiles(app: Elysia, security: Record<string, string> | undef
   })
 }
 
+const copies = new Map<string, Promise<boolean>>()
+
+// Copies a stored file into the cache at 0600; the rename replaces whatever lies there, a link included, without following it.
+async function copyStored(store: FileStore, key: string, copy: string): Promise<boolean> {
+  const data = await store.read(key)
+
+  if (!data)
+    return false
+
+  await mkdir(dirname(copy), { recursive: true })
+
+  // Only a folder is in the way of a rename.
+  try {
+    if ((await lstat(copy)).isDirectory())
+      await rm(copy, { recursive: true, force: true })
+  }
+  catch {}
+
+  await writeAtomically(copy, async (draft) => {
+    await writePrivate(draft, data)
+  })
+
+  return true
+}
+
 // The file a stored image's URL names, as the image route reads it: in place on this disk, else copied once into the cache, since a key never changes.
 export async function storedImage(src: string): Promise<{ path: string, immutable: false, prefix: string, private: boolean } | { status: number, message: string } | undefined> {
   const url = URL.parse(src, 'http://kay')
@@ -405,16 +430,20 @@ export async function storedImage(src: string): Promise<{ path: string, immutabl
 
   // A copy another user planted, or one an older kay left readable by everyone, is replaced rather than served.
   if (!await isPrivate(copy, 'file')) {
-    const data = await store.read(key)
+    let copying = copies.get(copy)
 
-    if (!data)
-      return undefined
+    if (!copying) {
+      copying = copyStored(store, key, copy)
+      copies.set(copy, copying)
+    }
 
-    await rm(copy, { force: true, recursive: true })
-    await mkdir(dirname(copy), { recursive: true })
-    await writeAtomically(copy, async (draft) => {
-      await writePrivate(draft, data)
-    })
+    try {
+      if (!await copying)
+        return undefined
+    }
+    finally {
+      copies.delete(copy)
+    }
   }
 
   return { path: copy, immutable: false, prefix: storedVariants(key), private: locked }
