@@ -702,7 +702,7 @@ async function unchangedIn(file: string, source: string, root: string | undefine
 function importedBindings(source: string): Set<string> {
   const names = new Set<string>()
 
-  for (const [, clause] of source.matchAll(IMPORT_CLAUSE)) {
+  for (const [, clause] of withoutComments(source).matchAll(IMPORT_CLAUSE)) {
     if (clause!.includes('*') || TYPE_IMPORT.test(clause!))
       continue
 
@@ -740,9 +740,10 @@ async function scanned(file: string, root: string | undefined, scans: object): P
   const exposed = new Map([...exposedBy(source, risks)].map(([name, at]) => [name, lineAt(source, at)]))
   const taken = new Map<string, ReadonlySet<string> | 'all'>()
 
-  const imports = [...source.matchAll(FROM)].map(match => ({ clause: match[1]!, specifier: match[2]!, index: match.index, length: match[0].length }))
+  const bare = withoutComments(source)
+  const imports = [...bare.matchAll(FROM)].map(match => ({ clause: match[1]!, specifier: match[2]!, index: match.index, length: match[0].length }))
 
-  for (const match of source.matchAll(FOR_EFFECT))
+  for (const match of bare.matchAll(FOR_EFFECT))
     imports.push({ clause: '', specifier: match[1]!, index: match.index, length: match[0].length })
 
   // The first stop in the file is the one named.

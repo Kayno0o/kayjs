@@ -42,7 +42,7 @@ const CALLBACK = /^\s*\(\s*(?:async\s*)?(?:\(([^()]*)\)(?:\s*:[^=]*[^=\s])?|([\w
 const ARGUMENTS_END = /^\s*(?:,[^)]*)?\)/
 const PARAM = /^[A-Z_$][\w$]*$/i
 const PARAM_TYPE = /\s*[:=][\s\S]*$/
-const CALL_AFTER = /^\s*(?:\?\.\s*)?[(`]/
+const CALL_AFTER = /^\s*(?:\??\.\s*(?:call|apply|bind)\b|\?\.\s*[(`[]|[(`[])/
 const COMPUTED = /\s*(?:\?\.)?\[/y
 const WRITE_AFTER = /\s*(?:=(?![=>])|[-+*/%&|^]=|<<=|>>>?=|\*\*=|&&=|\|\|=|\?\?=|\+\+|--)/y
 const CONTINUES = /^\s*(?:\??\.|[([`])/
@@ -526,8 +526,8 @@ function readsOnly(text: string, at: number, name: string, literal: Literal): bo
       if (close === undefined || !flat(node))
         break
 
-      // A call on the result runs a method of the container itself when the key names one.
-      if (CALL_AFTER.test(text.slice(close, close + 8)))
+      // A call on the result, or a `call`, `apply`, `bind` or second key, runs a method of the container itself when the key names one.
+      if (CALL_AFTER.test(text.slice(close, close + TARGET_REACH)))
         return false
 
       node = VALUE

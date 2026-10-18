@@ -383,6 +383,13 @@ describe('a page importing an exported object or array no module writes to', () 
       expect([write, await stopOf({ 'src/content.ts': topics, 'src/writer.ts': `import { TOPICS } from './content'\n\nconst topic = 'a'\n${write}\n`, 'src/routes/index.kay': PAGE('TOPICS', 'TOPICS.a') })]).toEqual([write, expect.stringContaining('module state')])
   })
 
+  it('stops once a computed key names a method and it is called, however the call is written', async () => {
+    const calls = ['LIST[m](\'x\')', 'LIST[m]?.(\'x\')', 'LIST[m]`x`', 'LIST[m].call(LIST, \'x\')', 'LIST[m].apply(LIST, [\'x\'])', 'LIST[m].bind(LIST)(\'x\')', 'LIST[m]            (\'x\')', 'LIST[m] /* x */ (\'x\')', 'LIST[m]\n  (\'x\')', 'LIST[m][\'call\'](LIST, \'x\')']
+
+    for (const call of calls)
+      expect([call, await stopOf({ 'src/content.ts': LIST, 'src/writer.ts': `import { LIST } from './content'\n\nconst m = 'push'\n${call}\n`, 'src/routes/index.kay': PAGE('LIST', 'LIST.length') })]).toEqual([call, expect.stringContaining('module state')])
+  })
+
   it('prerenders pages reading a plain literal module, and none once a route writes to it', async () => {
     const files = {
       'src/content.ts': 'export const CONTACT = { email: \'contact@example.fr\', phone: \'01\' }\n',
@@ -538,6 +545,17 @@ describe('a constant exported by name after its declaration', () => {
 })
 
 describe('an import list with comments', () => {
+  it('still names what the page takes, whatever the comment holds', async () => {
+    for (const comment of ['// the user\'s phone', '// phone (mobile)', '// a = b; c', '/* "quoted" */']) {
+      const files = {
+        'src/content.ts': 'export const CONTACT = { email: \'a\' }\nexport const cache = new Map<string, string>()\nexport function put(): void {\n  cache.set(\'a\', \'b\')\n}\n',
+        'src/routes/index.kay': `---\nimport {\n  CONTACT, ${comment}\n  put,\n} from '../content'\n---\np {CONTACT.email}{put}\n`,
+      }
+
+      expect([comment, await stopOf(files)]).toEqual([comment, expect.stringContaining('module state')])
+    }
+  })
+
   it('still names what the page takes', async () => {
     const files = {
       'src/content.ts': 'export const CONTACT = { email: \'a\' }\nexport const cache = new Map<string, string>()\nexport function put(): void {\n  cache.set(\'a\', \'b\')\n}\n',
