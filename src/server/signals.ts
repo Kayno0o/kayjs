@@ -22,7 +22,7 @@ function isOwnHost(location: string): boolean {
 
   const host = location.slice(2).split(HOST_END, 1)[0]!.toLowerCase()
 
-  return Object.values(hosts).some(own => own.toLowerCase() === host)
+  return host !== '' && Object.values(hosts).some(own => own.toLowerCase() === host)
 }
 
 export class Redirect {

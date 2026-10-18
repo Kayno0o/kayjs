@@ -75,3 +75,11 @@ it('refuses every // when the app has no locale hosts', () => {
 
   expect(() => runInLocale(state, () => redirect(['//fr.example.com/x'][0]!))).toThrow('which a browser reads as another site')
 })
+
+it('ignores an empty configured host, so ///evil.com is refused', () => {
+  const { redirect } = stoppers(new Request('https://example.com/'))
+  const state = { settings: { locales: ['en', 'fr'], defaultLocale: 'en', prefixDefault: false, hosts: { en: 'example.com', fr: '' } } } as unknown as LocaleState
+
+  for (const location of ['///evil.com', '//?x', '//'])
+    expect(() => runInLocale(state, () => redirect(location)), location).toThrow('which a browser reads as another site')
+})
