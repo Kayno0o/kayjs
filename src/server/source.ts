@@ -121,7 +121,8 @@ function embeddedSource(bundle: Bundle): ProjectSource {
     editor: () => bundle.editor,
     // An executable is copied away from the project it was built in, to run where its files are.
     runtimeRoot: () => process.cwd(),
-    imageCache: () => join(tmpdir(), 'kay-images'),
+    // Per user and per executable, in a folder only that user can enter.
+    imageCache: () => join(tmpdir(), `kay-images-${process.getuid?.() ?? 'user'}-${Bun.hash(process.execPath).toString(36)}`),
     contentBuild: () => bundle.clientDir,
   }
 }

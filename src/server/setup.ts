@@ -23,6 +23,7 @@ import { implicitI18n, linkedSettings, loadI18n, routedSettings, serveLocales } 
 import { applyImageConfig } from './image'
 import { loadMatchers } from './params'
 import { setupPreview } from './preview'
+import { privateDir } from './private-dir'
 import { publicFiles } from './public'
 import { refuseClashes } from './route-table'
 import { routeMounts, styleChains } from './routes'
@@ -81,7 +82,8 @@ export async function setupPages(project: Project, loadClient: () => ClientBuild
   const maxDensity = applyImageConfig(config.images)
   const site = config.site === undefined ? undefined : siteOrigin(config.site) + base
 
-  const imageCache = source.imageCache(root)
+  // Holds copies of private files and their variants, so only this user may enter it.
+  const imageCache = await privateDir(source.imageCache(root))
 
   setSite(site, config.trailingSlash, prerendering)
   setContentMode(mode, paths.output)

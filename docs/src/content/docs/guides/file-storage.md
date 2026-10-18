@@ -67,6 +67,8 @@ The key that signs is made from the session's secret. Without `session()` it com
 
 A script that signs a link with no server running reads `KAY_SECRET`.
 
+On disk, private files are written readable by the server's user alone, and the folder where kay keeps copies and resized variants of them is closed to other users too. Nothing to set up.
+
 <ReadMore href="/llms/files#private-files">How a script outside the server reads the secret, and how a private image is resized, are in the full files reference.</ReadMore>
 
 ## Where files go

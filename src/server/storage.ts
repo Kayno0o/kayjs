@@ -1,7 +1,7 @@
 import type { Elysia } from 'elysia'
 import type { Duration } from '../runtime/duration'
-import { readdir, rm, stat } from 'node:fs/promises'
-import { basename, join, relative, resolve, sep } from 'node:path'
+import { chmod, mkdir, readdir, rm, stat } from 'node:fs/promises'
+import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import { writeAtomically } from '../build/files'
 import { KayError } from '../compiler/errors'
 import { durationSeconds } from '../runtime/duration'
@@ -9,6 +9,7 @@ import { FILES_ROUTE } from '../runtime/image'
 import { kayLog } from '../runtime/log'
 import { imageHeader } from './image-format'
 import { holdsImageMetadata, stripImageMetadata } from './image-metadata'
+import { isPrivate, writePrivate } from './private-dir'
 import { requestUrl } from './request-url'
 import { headerCopies, ownedHeaders, ownHeaders, setSecurityHeaders } from './security'
 import { setupStampSecret, signedText, signText } from './stamp'
@@ -82,7 +83,16 @@ export function diskFiles(dir: string = DEFAULT_DIR): FileStore {
 
   return {
     async write(key, data) {
-      await Bun.write(path(key), data)
+      if (!PRIVATE_SEGMENT.test(key))
+        return void await Bun.write(path(key), data)
+
+      // Private files sit in folders and at a mode only this user can enter and read, whatever the umask or an older kay left.
+      const root = join(resolve(dir), 'private')
+
+      await mkdir(root, { recursive: true })
+      await chmod(root, 0o700)
+      await mkdir(dirname(path(key)), { recursive: true, mode: 0o700 })
+      await writePrivate(path(key), data)
     },
     async read(key) {
       const file = Bun.file(path(key))
@@ -393,13 +403,18 @@ export async function storedImage(src: string): Promise<{ path: string, immutabl
 
   const copy = join(current.cacheDir!, key)
 
-  if (!await Bun.file(copy).exists()) {
+  // A copy another user planted, or one an older kay left readable by everyone, is replaced rather than served.
+  if (!await isPrivate(copy, 'file')) {
     const data = await store.read(key)
 
     if (!data)
       return undefined
 
-    await writeAtomically(copy, data)
+    await rm(copy, { force: true, recursive: true })
+    await mkdir(dirname(copy), { recursive: true })
+    await writeAtomically(copy, async (draft) => {
+      await writePrivate(draft, data)
+    })
   }
 
   return { path: copy, immutable: false, prefix: storedVariants(key), private: locked }
