@@ -1,4 +1,4 @@
-import type { Expression, ObjectExpression } from '@babel/types'
+import type { Expression, Node, ObjectExpression } from '@babel/types'
 import { parseExpression } from '@babel/parser'
 
 // A place where a source sets a class from a value the build cannot read: no page carries the rule of a class it ends up naming, unless the app lists it with `@source inline`.
@@ -123,6 +123,24 @@ interface Verdict {
 interface Scope {
   initializers: (name: string) => Expression[] | undefined
   props: ReadonlySet<string>
+  // The element the setter under judgement writes to, `el` of `el.className = x`: its own class is what it already holds.
+  receiver?: string | undefined
+}
+
+const TRAILING_DOT = /\??\.$/
+const RECEIVER = /[\w$]+(?:(?:\?\.|\.)[\w$]+)*$/
+
+// The chain `a.b.c` a node reads, or undefined for anything else.
+function chainOf(node: Node): string | undefined {
+  if (node.type === 'Identifier')
+    return node.name
+
+  if (node.type !== 'MemberExpression' && node.type !== 'OptionalMemberExpression')
+    return undefined
+
+  const inner = chainOf(node.object)
+
+  return inner === undefined || node.computed || node.property.type !== 'Identifier' ? undefined : `${inner}.${node.property.name}`
 }
 
 const CLOSED: Verdict = { parts: [], open: false }
@@ -163,6 +181,19 @@ function valuesOf(object: ObjectExpression, scope: Scope, depth: number): Verdic
   }))
 }
 
+// An argument of a class joiner: an object adds its keys, so a computed one is a name of the runtime.
+function joined(argument: Expression, scope: Scope, depth: number): Verdict {
+  if (argument.type !== 'ObjectExpression')
+    return verdictOf(argument, scope, depth)
+
+  return merged(argument.properties.map((property) => {
+    if (property.type === 'SpreadElement')
+      return OPEN
+
+    return 'computed' in property && property.computed ? verdictOf(property.key as Expression, scope, depth) : CLOSED
+  }))
+}
+
 // What an expression is made of: string literals and the quasis of a template are its parts, a ternary, a logical, a concatenation or an array is all of its branches, a prop is its parent's to name, a `const` is what it was given, and anything else is open.
 function verdictOf(node: Expression, scope: Scope, depth = 0): Verdict {
   if (node.type === 'StringLiteral')
@@ -199,8 +230,8 @@ function verdictOf(node: Expression, scope: Scope, depth = 0): Verdict {
     if (scope.props.has(root))
       return CLOSED
 
-    // What an element's `className` or `classList` holds is what the page already set on it.
-    if (node.type !== 'Identifier' && !node.computed && node.property.type === 'Identifier' && CLASS_READS.has(node.property.name))
+    // What the element being written holds in `className` or `classList` is what the page already set on it.
+    if (node.type !== 'Identifier' && !node.computed && node.property.type === 'Identifier' && CLASS_READS.has(node.property.name) && scope.receiver !== undefined && chainOf(node.object) === scope.receiver)
       return CLOSED
 
     // A member of a `const` object holding only literals is one of its values.
@@ -208,7 +239,7 @@ function verdictOf(node: Expression, scope: Scope, depth = 0): Verdict {
       const objects = scope.initializers(root)?.map(unwrapped)
 
       if (objects?.every(object => object.type === 'ObjectExpression') === true)
-        return merged((objects).map(object => valuesOf(object, scope, depth + 1)))
+        return merged(objects.map(object => valuesOf(object, scope, depth + 1)))
     }
 
     const initial = node.type === 'Identifier' && depth < RESOLVE_DEPTH ? scope.initializers(root) : undefined
@@ -218,12 +249,12 @@ function verdictOf(node: Expression, scope: Scope, depth = 0): Verdict {
 
   if (node.type === 'CallExpression') {
     if (node.callee.type === 'Identifier' && JOINERS.has(node.callee.name))
-      return merged(node.arguments.map(argument => argument.type === 'SpreadElement' || argument.type === 'ArgumentPlaceholder' ? OPEN : verdictOf(argument, scope, depth)))
+      return merged(node.arguments.map(argument => argument.type === 'SpreadElement' || argument.type === 'ArgumentPlaceholder' ? OPEN : joined(argument, scope, depth)))
 
     // `el.getAttribute('class')` reads back what the element has.
     const [argument] = node.arguments
 
-    if (node.callee.type === 'MemberExpression' && !node.callee.computed && node.callee.property.type === 'Identifier' && node.callee.property.name === 'getAttribute' && argument?.type === 'StringLiteral' && argument.value === 'class')
+    if (node.callee.type === 'MemberExpression' && !node.callee.computed && node.callee.property.type === 'Identifier' && node.callee.property.name === 'getAttribute' && argument?.type === 'StringLiteral' && argument.value === 'class' && scope.receiver !== undefined && chainOf(node.callee.object) === scope.receiver)
       return CLOSED
   }
 
@@ -234,10 +265,12 @@ function verdictOf(node: Expression, scope: Scope, depth = 0): Verdict {
 // `judge` tells whether the parts around the open value already make the build keep the rules it can name, as `btn-` of `btn-${kind}` does by completing to the styled classes starting with it: `covered`, `uncovered` when a part is the start or the end of a name that completes to none, `none` when no part is.
 export function runtimeClasses(text: string, judge: Judge): RuntimeClass[] {
   const found: RuntimeClass[] = []
-  const scope = scopeOf(text)
+  const whole = scopeOf(text)
 
   for (const match of text.matchAll(SETTER)) {
     const how = setterName(match[0])
+    const before = text.slice(0, match.index).replace(TRAILING_DOT, '')
+    const scope: Scope = { ...whole, receiver: RECEIVER.exec(before.slice(-120))?.[0].replaceAll('?.', '.') }
     let from = match.index + match[0].length
 
     for (let index = 0; index < classArguments(how); index++) {
@@ -281,36 +314,51 @@ function scopeOf(text: string): Scope {
     }
   }
 
+  const known = new Map<string, Expression[] | undefined>()
+
   return {
     props,
     initializers(name) {
-      const escaped = RegExp.escape(name)
-      const declared = new RegExp(`\\b(?:const|let|var)\\s+${escaped}\\b(?!\\s+(?:of|in)\\b)`)
-      const initialized = new RegExp(`\\b(?:const|let|var)\\s+${escaped}\\b\\s*(?::[^=\\n]+)?=(?![=>])\\s*`, 'g')
-      const assigned = new RegExp(`(?<![\\w$.])${escaped}\\s*(?:\\+|\\|\\||\\?\\?|&&)?=(?![=>])\\s*`, 'g')
-      const starts = new Set<number>()
+      if (known.has(name))
+        return known.get(name)
 
-      // A name some `for ... of` declares holds a value of the loop, which no initializer tells.
-      if (!declared.test(text) || new RegExp(`\\b(?:const|let|var)\\s+${escaped}\\s+(?:of|in)\\b`).test(text))
-        return undefined
+      const found = initializersOf(text, name)
 
-      for (const match of [...text.matchAll(initialized), ...text.matchAll(assigned)])
-        starts.add(match.index + match[0].length)
+      known.set(name, found)
 
-      const found: Expression[] = []
-
-      for (const from of starts) {
-        try {
-          found.push(parseExpression(text.slice(from, expressionEnd(text, from, true)), { plugins: ['typescript'] }))
-        }
-        catch {
-          return undefined
-        }
-      }
-
-      return found.length === 0 ? undefined : found
+      return found
     },
   }
+}
+
+// Every value a `const`, `let`, `var` or assignment gives `name`, undefined when it is also a parameter, a loop's variable, a destructuring target or a record some line writes into, whose values no initializer tells.
+function initializersOf(text: string, name: string): Expression[] | undefined {
+  const escaped = RegExp.escape(name)
+  const declared = new RegExp(`\\b(?:const|let|var)\\s+${escaped}\\b`)
+  const otherwise = new RegExp(`\\b(?:const|let|var)\\s+${escaped}\\s+(?:of|in)\\b|\\bfor\\s*\\(\\s*${escaped}\\s+(?:of|in)\\b|\\bfunction\\b[^(]*\\([^)]*(?<![\\w$.])${escaped}\\b|(?<![\\w$.])${escaped}\\s*=>|\\([^()]*(?<![\\w$.])${escaped}\\b[^()]*\\)\\s*(?::[^=>{;]+)?=>|\\[[^\\]]*(?<![\\w$.])${escaped}\\b[^\\]]*\\]\\s*=(?![=>])|\\{[^{}]*(?<![\\w$.])${escaped}\\b[^{}]*\\}\\s*=(?![=>])|(?<![\\w$.])${escaped}\\s*(?:\\[[^\\]]*\\]|\\.[\\w$]+)\\s*=(?![=>])`)
+
+  if (!declared.test(text) || otherwise.test(text))
+    return undefined
+
+  const initialized = new RegExp(`\\b(?:const|let|var)\\s+${escaped}\\b\\s*(?::[^=\\n]+)?=(?![=>])\\s*`, 'g')
+  const assigned = new RegExp(`(?<![\\w$.])${escaped}\\s*(?:\\+|\\|\\||\\?\\?|&&)?=(?![=>])\\s*`, 'g')
+  const starts = new Set<number>()
+
+  for (const match of [...text.matchAll(initialized), ...text.matchAll(assigned)])
+    starts.add(match.index + match[0].length)
+
+  const found: Expression[] = []
+
+  for (const from of starts) {
+    try {
+      found.push(parseExpression(text.slice(from, expressionEnd(text, from, true)), { plugins: ['typescript'] }))
+    }
+    catch {
+      return undefined
+    }
+  }
+
+  return found.length === 0 ? undefined : found
 }
 
 // `classList.toggle` takes a class and a flag, `replace` two classes, `add` any number.

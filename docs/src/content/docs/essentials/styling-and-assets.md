@@ -42,7 +42,7 @@ A page whose own rules are still over the size links a copy of the stylesheet in
 
 Some classes come from a value kay cannot read: `classList.add(name)`, `el.className = name`, or a class that arrives from your data. The page has no rule for them, so the element shows unstyled. A production build warns about the ones it spots, with the island, the line and the pages that reach it.
 
-A value picked from an object of class names you write out (`GLASS[tone]`), a value read back from the element (`el.className = el.className`), a name that only ever holds classes the file writes out, and `cn(...)`, `clsx(...)` or `twMerge(...)` of such values need no listing. A name that gets another value somewhere else in the file, a loop's variable or a function's result is judged by all of them. A static export has no server to render pages, so it gives none of these warnings.
+A value picked from an object of class names you write out (`GLASS[tone]`), a value read back from the element (`el.className = el.className`), a name that only ever holds classes the file writes out, and `cn(...)`, `clsx(...)` or `twMerge(...)` of such values need no listing. A name that gets another value somewhere else in the file, a loop's variable or a function's result is judged by all of them. A static export has no server to render pages, so it gives no warning for a class a server template builds.
 
 To fix it, list the classes in your CSS with Tailwind's `@source inline`. kay keeps them on every page.
 

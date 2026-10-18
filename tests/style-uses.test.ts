@@ -177,6 +177,14 @@ describe('which classes are set from a value the build cannot read', () => {
     expect(await unresolved('const GLASS = { red: \'mt-1\', ...others }\n---\np(class={GLASS[tone]}) a\n', '', 'page.kay')).toEqual(['3 class attribute mt-1'])
   })
 
+  it('still warns where the value comes from something else than the element or the names written out', async () => {
+    expect(await unresolved('el.classList.add(cn({ [kind]: true }))\nel.className = clsx({ [kind]: on, \'mt-1\': off })\n')).toEqual(['1 classList.add ', '2 className = '])
+    expect(await unresolved('el.className = item.className\nel.classList.add(cfg.className)\n')).toEqual(['1 className = ', '2 classList.add '])
+    expect(await unresolved('const tone = \'mt-1\'\nfunction paint(tone: string) {\n  el.className = tone\n}\n')).toEqual(['3 className = '])
+    expect(await unresolved('const tone = \'mt-1\'\nitems.forEach(tone => el.classList.add(tone))\n')).toEqual(['2 classList.add '])
+    expect(await unresolved('const GLASS = { a: \'mt-1\' }\nGLASS[key] = pick()\nel.className = GLASS[key]\n')).toEqual(['3 className = '])
+  })
+
   it('judges a name by every value it is given in the file', async () => {
     expect(await unresolved('const tone = \'mt-1\'\nfunction paint() {\n  const tone = read()\n  el.classList.add(tone)\n}\n')).toEqual(['4 classList.add mt-1'])
     expect(await unresolved('let tone = \'mt-1\'\ntone = read()\nel.className = tone\n')).toEqual(['3 className = mt-1'])

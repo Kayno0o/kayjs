@@ -40,4 +40,12 @@ describe('the classes a server builds from data, on pages rendered per request',
   it('tells of none in a static export, which renders nothing per request', () => {
     expect(warnedOf({ pages, unresolved: [unresolved('/app/item.kay')] }, [live, listed], true)).toEqual([])
   })
+
+  it('names the pages reaching the file, the first three and how many more', () => {
+    const many = { ...unresolved('/app/item.kay'), by: ['/app/a.kay', '/app/b.kay', '/app/c.kay', '/app/d.kay', '/app/e.kay'] }
+    const [message] = warnedOf({ pages, unresolved: [many] }, [route('/a', '/app/a.kay', [])])
+
+    expect(message).toContain('(reached from a.kay, b.kay, c.kay and 2 more)')
+    expect(warnedOf({ pages, unresolved: [unresolved('/app/item.kay')] }, [live])[0]).toContain('(reached from item.kay)')
+  })
 })
