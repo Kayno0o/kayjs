@@ -3,7 +3,7 @@ import type { Reached } from './styles'
 import { existsSync } from 'node:fs'
 import { dirname, relative, resolve } from 'node:path'
 import { styledClassNames } from './class-rules'
-import { runtimeClasses } from './dynamic-classes'
+import { classModules, runtimeClasses } from './dynamic-classes'
 import { CSS_FILE, readSource } from './files'
 import { parse } from './supports'
 
@@ -30,6 +30,8 @@ const CODE_SPAN = /`[^`\n]*`/g
 const SCRIPT_OR_KAY = /\.(?:kay|[cm]?[jt]sx?)$/
 // What kay's Markdown renderer puts on a code block, `language-ts`.
 const RENDERED_FRAGMENT = 'language-'
+// A relative named import, the only one whose values a class is read from.
+const IMPORTS_MODULE = /\bimport\s+(?:[\w$]+\s*,\s*)?\{[^}]*\}\s*from\s*["']\./
 const CSS_IMPORT = /@import\s*(?:url\(\s*)?["']([^"']+)["']/g
 // Tailwind 4.1's `@source inline("...")`, which names classes to generate whatever the sources say; `@source not inline` leaves them out and is not matched.
 const SOURCE_INLINE = /@source\s+inline\(\s*(["'])((?:\\.|(?!\1)[^\\])*)\1\s*\)/g
@@ -295,6 +297,12 @@ export function styleUses(root: string, entries: Iterable<string>, sheets: Itera
 
     // Markdown and data hold prose, where `btn-` is a word, not the start of a name built at runtime.
     if (SCRIPT_OR_KAY.test(file)) {
+      // A module a class is read from, `TONES[tone]` of `import { TONES } from './data'`, gives the page its rules even when the server code importing it is not followed.
+      for (const module of IMPORTS_MODULE.test(text) ? classModules(text, file) : []) {
+        for (const name of named(module))
+          found.add(name)
+      }
+
       for (const fragment of fragments) {
         for (const name of completing(fragment))
           found.add(name)
@@ -333,7 +341,7 @@ export function styleUses(root: string, entries: Iterable<string>, sheets: Itera
         return open ? 'uncovered' : 'none'
       }
 
-      for (const runtime of runtimeClasses(readSource(file).text, judge)) {
+      for (const runtime of runtimeClasses(readSource(file).text, judge, file)) {
         // A value with no part to match is the app's to vouch for with an `@source inline` of its own.
         if (runtime.part === '' && vouched.length > 0)
           continue

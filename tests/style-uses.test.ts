@@ -192,6 +192,79 @@ describe('which classes are set from a value the build cannot read', () => {
     expect(await unresolved('const GLASS = { red: \'mt-1\', ...others }\n---\np(class={GLASS[tone]}) a\n', '', 'page.kay')).toEqual(['3 class attribute mt-1'])
   })
 
+  // Several files of an app: the entry is the first, `edges` the imports the stylesheet build followed.
+  async function unresolvedIn(files: Record<string, string>, edges: Record<string, string[]> = {}): Promise<string[]> {
+    const root = await scratchDir('style-uses-modules-')
+    const names = Object.keys(files)
+    const found: UnresolvedClass[] = []
+
+    await Promise.all(names.map(async name => Bun.write(join(root, name), files[name]!)))
+    styleUses(root, [join(root, names[0]!)], [CSS], { edges: new Map(Object.entries(edges).map(([from, to]) => [join(root, from), to.map(path => join(root, path))])), open: new Set() }, new Map(), [], { own: () => true, unresolved: (all) => {
+      found.push(...all)
+    } })
+
+    return found.map(({ file, line, how, part }) => `${relative(root, file)}:${line} ${how} ${part}`)
+  }
+
+  it('reads a record beside a prop, and a const record imported from a module, typed or not', async () => {
+    expect(await unresolved('const { variant = \'primary\', class: className } = props<{ variant?: \'primary\' | \'outline\', class?: string }>()\n\nconst variants = { primary: \'btn-primary\', outline: \'mt-1\' }\n---\na(class={[variants[variant], className]}) a\n', '', 'page.kay')).toEqual([])
+    const page = '---\nimport { BG } from \'./data\'\n---\np(class={BG[info.swatch]}) a\n'
+
+    expect(await unresolvedIn({ 'page.kay': page, 'data.ts': 'export const BG: Record<Swatch, string> = { a: \'mt-1\', b: \'p-1\' }\n' })).toEqual([])
+    expect(await unresolvedIn({ 'page.kay': page.replace('{ BG }', '{ BG as other }').replace('BG[', 'other['), 'data.ts': 'export const BG = { a: \'mt-1\' } as const\n' })).toEqual([])
+    expect(await unresolvedIn({ 'island.ts': 'import { BG } from \'./lib/data.js\'\nel.className = BG[key]\n', 'lib/data.ts': 'export const BG = { a: \'mt-1\' }\n' })).toEqual([])
+    expect(await unresolvedIn({ 'island.ts': 'import { BG } from \'./lib\'\nel.className = BG[key]\n', 'lib/index.ts': 'export const BG = { a: \'mt-1\' }\n' })).toEqual([])
+  })
+
+  it('still warns of an imported record holding something open, or a module it cannot read', async () => {
+    const page = '---\nimport { BG } from \'./data\'\n---\np(class={BG[info.swatch]}) a\n'
+
+    expect(await unresolvedIn({ 'page.kay': page, 'data.ts': 'export const BG = { a: \'mt-1\', b: pick() }\n' })).toEqual(['page.kay:4 class attribute mt-1'])
+    expect(await unresolvedIn({ 'page.kay': page, 'data.ts': 'export let BG = { a: \'mt-1\' }\nBG.b = read()\n' })).toEqual(['page.kay:4 class attribute '])
+    expect(await unresolvedIn({ 'page.kay': page })).toEqual(['page.kay:4 class attribute '])
+    expect(await unresolvedIn({ 'page.kay': page.replace('./data', 'some-package'), 'data.ts': 'export const BG = { a: \'mt-1\' }\n' })).toEqual(['page.kay:4 class attribute '])
+    expect(await unresolvedIn({ 'page.kay': page.replace('import {', 'import type {'), 'data.ts': 'export const BG = { a: \'mt-1\' }\n' })).toEqual(['page.kay:4 class attribute '])
+    expect(await unresolvedIn({ 'page.kay': page, 'data.ts': 'export { BG } from \'./other\'\n', 'other.ts': 'export const BG = { a: \'mt-1\' }\n' })).toEqual(['page.kay:4 class attribute '])
+  })
+
+  it('reads a function whose every return is a literal, a ternary or a template of literals', async () => {
+    const island = (body: string) => `function position(i: number) {\n${body}\n}\n---\np(class={position(i)}) a\n`
+    const arrow = 'const position = (i: number) => i === 0 ? \'mt-1\' : \'p-1\'\n---\np(class={position(i)}) a\n'
+
+    expect(await unresolved(island('  if (i === current())\n    return \'mt-1\'\n\n  return i > current() ? \'p-1\' : \'-mt-1\''), '', 'page.kay')).toEqual([])
+    expect(await unresolved(island('  return `mt-1 ${i > 1 ? \'p-1\' : \'\'}`'), '', 'page.kay')).toEqual([])
+    expect(await unresolved(arrow, '', 'page.kay')).toEqual([])
+    expect(await unresolved('function position() {\n  const run = () => {\n    return shade()\n  }\n  return \'mt-1\'\n}\nel.className = position()\n')).toEqual([])
+    expect(await unresolvedIn({ 'page.kay': '---\nimport { position } from \'./data\'\n---\np(class={position(i)}) a\n', 'data.ts': 'export function position(i: number) {\n  return i ? \'mt-1\' : \'p-1\'\n}\n' })).toEqual([])
+  })
+
+  it('still warns of a function returning a parameter, a call or a value of the runtime', async () => {
+    const island = (body: string) => `function position(i: number) {\n${body}\n}\n---\np(class={position(i)}) a\n`
+
+    expect(await unresolved(island('  return i > 1 ? \'mt-1\' : i'), '', 'page.kay')).toEqual(['5 class attribute mt-1'])
+    expect(await unresolved(island('  return shade(i)'), '', 'page.kay')).toEqual(['5 class attribute '])
+    expect(await unresolved(island('  if (i)\n    return \'mt-1\''), '', 'page.kay')).toEqual([])
+    expect(await unresolved(island('  return `tone-${i}`'), '', 'page.kay')).toEqual(['5 class attribute tone-${}'])
+    expect(await unresolved('function position() {\n  return position()\n}\nel.className = position()\n')).toEqual(['4 className = '])
+    expect(await unresolved('el.className = position(i)\n')).toEqual(['1 className = '])
+  })
+
+  it('keeps the rules of the classes read from a record of a module the page imports, the server\'s included', async () => {
+    const root = await scratchDir('style-uses-ship-')
+    const page = join(root, 'page.kay')
+    const other = join(root, 'other.kay')
+
+    await Bun.write(page, '---\nimport { BG, pick } from \'./data\'\n---\np(class={BG[tone]}) a\np(class={pick(2)}) b\n')
+    await Bun.write(other, 'p a\n')
+    await Bun.write(join(root, 'data.ts'), 'export const BG: Record<string, string> = { a: \'mt-1\' }\nexport function pick(i: number) {\n  return i ? \'btn-primary\' : \'btn-primary\'\n}\n')
+
+    const { classes, entries } = styleUses(root, [page, other], [CSS], { edges: new Map(), open: new Set() }, new Map())
+    const named = (entry: string) => (entries[entry] as number[]).map(index => classes[index]!).sort()
+
+    expect(named('page.kay')).toEqual(['btn-primary', 'mt-1'])
+    expect(named('other.kay')).toEqual([])
+  })
+
   it('still warns where the value comes from something else than the element or the names written out', async () => {
     expect(await unresolved('el.classList.add(cn({ [kind]: true }))\nel.className = clsx({ [kind]: on, \'mt-1\': off })\n')).toEqual(['1 classList.add ', '2 className = '])
     expect(await unresolved('el.className = item.className\nel.classList.add(cfg.className)\n')).toEqual(['1 className = ', '2 classList.add '])
