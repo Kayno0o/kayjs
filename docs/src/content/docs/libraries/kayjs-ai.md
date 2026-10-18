@@ -96,6 +96,20 @@ Chat(action={reply} label="Assistant")
 
 A page, with or without a `server` fence, hands the action straight to `Chat`. The action has to be exported by a page or endpoint.
 
+- Enter sends and Shift+Enter starts a new line.
+- Stop, or Escape in the field, ends the reply. The words that came stay, marked as stopped. Stopped before the first word, the message goes back to the field.
+- A screen reader hears each finished turn once, not word by word, and each tool call as it starts and ends.
+- A table wider than its bubble scrolls sideways inside it, and the keyboard can scroll it.
+- A message the action's schema refuses (422) goes back to the field, also when it was a retry, and the refusal's message shows.
+- A link in a reply opens in a new tab, so following it never loses the conversation; `links="here"` opens a link to your own site in place, which `ChatLauncher` sets.
+- Images in a reply are not shown. A model that read a hostile page could point an image at a link carrying your visitor's conversation.
+
+Every label is a prop, so you can write them in your language: `placeholder`, `sendLabel`, `stopLabel`, `retryLabel`, `thinkingLabel`, `stoppedLabel`, `tableLabel` (a reply with several tables numbers them) and `errorMessage`. The action may also `ctx.fail`. A refusal from the action, such as a rate limit's message, shows instead of `errorMessage`. `initial` gives messages to start with.
+
+The chat posts its last 20 messages with each one; the `keep` prop changes that, and what is posted always opens on one of the visitor's, so an assistant greeting in `initial` is never the first message. Keep `maxItems` in the action's schema at least as high as `keep`, bound `content`, and add a rate limit.
+
+<ReadMore href="/llms/kayjs-ai-chat">The props, the markup and the rules for passing the action.</ReadMore>
+
 ### A chat button on every page
 
 `ChatLauncher` is the same chat behind a round button at the bottom right of the page, which opens it in a panel. Put it once in the root layout, in a `server` fence that gives it the action, and every page has the chat:
@@ -114,22 +128,9 @@ The chat's code loads the first time the panel opens, so a visitor who never ope
 
 The button works from the keyboard: Enter or Space opens the panel and puts the focus in the field, and Escape closes it and gives the focus back to the button. A reply under way stops on the first Escape.
 
-`openLabel` and `closeLabel` name the button, `@icon` and `@closeIcon` replace the two icons, and `@note` adds a line under the chat. The other props are `Chat`'s. The button has a `data-tooltip`, which shows when the layout renders kayjs-ui's `TooltipHost`.
+`openLabel` names the button and `closeLabel` its close button, `@icon` and `@closeIcon` replace the two icons, and `@note` adds a line under the chat. The other props are `Chat`'s. The button has a `data-tooltip`, which shows when the layout renders kayjs-ui's `TooltipHost`.
 
-- Enter sends and Shift+Enter starts a new line.
-- Stop, or Escape in the field, ends the reply. The words that came stay, marked as stopped. Stopped before the first word, the message goes back to the field.
-- A screen reader hears each finished turn once, not word by word, and each tool call as it starts and ends.
-- A screen reader hears each finished turn once, not word by word.
-- A table wider than its bubble scrolls sideways inside it, and the keyboard can scroll it.
-- A message the action's schema refuses (422) goes back to the field, also when it was a retry, and the refusal's message shows.
-- A link in a reply opens in a new tab, so following it never loses the conversation.
-- Images in a reply are not shown. A model that read a hostile page could point an image at a link carrying your visitor's conversation.
-
-Every label is a prop, so you can write them in your language: `placeholder`, `sendLabel`, `stopLabel`, `retryLabel`, `thinkingLabel`, `stoppedLabel`, `tableLabel` (a reply with several tables numbers them) and `errorMessage`. The action may also `ctx.fail`. A refusal from the action, such as a rate limit's message, shows instead of `errorMessage`. `initial` gives messages to start with.
-
-The chat posts its last 20 messages with each one; the `keep` prop changes that, and what is posted always opens on one of the visitor's, so an assistant greeting in `initial` is never the first message. Keep `maxItems` in the action's schema at least as high as `keep`, bound `content`, and add a rate limit.
-
-<ReadMore href="/llms/kayjs-ai-chat">The props, the markup and the rules for passing the action.</ReadMore>
+The conversation is kept in the tab's session storage under the `remember` prop (`kai-chat`), so on a site with sign-in, give it a key per visitor or clear it when they sign out.
 
 ## The reply
 

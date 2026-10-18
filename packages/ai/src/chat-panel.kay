@@ -21,7 +21,6 @@ let panel: HTMLElement | undefined
 
 function show() {
   open.set(true)
-  // The chat inside hydrates once the panel is shown, so the field it holds may be replaced after this: the panel takes the focus first and the chat's own field after.
   queueMicrotask(() => (panel?.querySelector<HTMLElement>('textarea') ?? panel)?.focus())
 }
 
@@ -32,19 +31,19 @@ function hide() {
 
 function keyDown(event: KeyboardEvent) {
   // A reply under way stops on Escape first, which the chat marks by preventing the event's default.
-  if (event.key === 'Escape' && open() && !event.defaultPrevented) {
+  if (event.key === 'Escape' && open() && !event.defaultPrevented && !event.isComposing) {
     event.preventDefault()
     hide()
   }
 }
 ---
 .kai-launcher(class={className} onKeyDown={keyDown})
-  section.kai-launcher-panel(id={panelId} role="dialog" aria-label={label} tabindex="-1" hidden={!open()} ref={element => { panel = element }})
+  section.kai-launcher-panel(id={panelId} role="dialog" aria-labelledby={`${panelId}-title`} tabindex="-1" hidden={!open()} ref={element => { panel = element }})
     header.kai-launcher-head
-      h2.kai-launcher-title {label}
+      h2.kai-launcher-title(id={`${panelId}-title`}) {label}
       button.kui-icon-btn(type="button" aria-label={closeLabel} data-tooltip={closeLabel} data-size="md" data-variant="ghost" data-tone="neutral" onClick={hide})
         | {closeIcon}
     .kai-launcher-body
       slot
-  button.kui-icon-btn.kai-launcher-button(type="button" ref={element => { button = element }} aria-label={open() ? closeLabel : openLabel} aria-expanded={open()} aria-controls={panelId} data-tooltip={open() ? closeLabel : openLabel} data-tooltip-placement="top span-left" data-size="lg" data-variant="solid" data-tone="accent" onClick={() => open() ? hide() : show()})
+  button.kui-icon-btn.kai-launcher-button(type="button" ref={element => { button = element }} aria-label={openLabel} aria-expanded={open()} aria-controls={panelId} data-tooltip={open() ? closeLabel : openLabel} data-tooltip-placement="top span-left" data-size="lg" data-variant="solid" data-tone="accent" onClick={() => open() ? hide() : show()})
     | {icon}

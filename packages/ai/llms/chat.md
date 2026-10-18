@@ -23,11 +23,12 @@ slot
 ChatLauncher(action={reply} label="Ask the docs")
 ```
 
-- It takes `Chat`'s props but `links`, which it sets to `here`, and: `openLabel` and `closeLabel` (`Open the chat`, `Close the chat`, the button's name and tooltip), `remember` (the session storage key, `kai-chat` by default), `class` on the wrapper, and blocks `@icon` and `@closeIcon` for the two icons (a chat bubble and a cross by default; any `Icon` or inline `svg`), and `@note` for a line under the chat. `label` heads the panel.
+- It takes `Chat`'s props but `links`, which it sets to `here`, and: `openLabel` (`Open the chat`, the button's name, and its tooltip while the panel is closed) and `closeLabel` (`Close the chat`, the name of the panel's close button and the button's tooltip while it is open), `remember` (the session storage key, `kai-chat` by default), `class` on the wrapper, and blocks `@icon` and `@closeIcon` for the two icons (a chat bubble and a cross by default; any `Icon` or inline `svg`), and `@note` for a line under the chat. `label` heads the panel.
 - The button and panel are one island marked `persist`, so the panel, open or closed, and the conversation stay across page swaps. The chat inside is an island of its own marked `hydrate="visible"` in a hidden panel: its JavaScript loads on the first open, and until then a page carries the button's script only.
 - Opening moves the focus to the chat's field, Escape closes the panel and returns the focus to the button (a reply under way stops on the first Escape instead), and the button carries `aria-expanded`, `aria-controls` and a `data-tooltip`, which shows when the app renders kayjs-ui's `TooltipHost`.
 - A link of a reply to a page of the site navigates in place, the panel following the reader; a link to another site opens in a new tab.
-- The conversation is kept in the tab's session storage under `remember`, so a reload finds it again; the tool calls of its replies are not kept.
+- The conversation is kept in the tab's session storage under `remember`, so a reload finds it again; the tool calls of its replies are not kept. A site with sign-in gives `remember` a key per visitor, or clears it on sign-out, as a second visitor in the same tab would read the first one's.
+- Without JavaScript the button does nothing, and the hidden chat's markup is in every page.
 - The panel is 28rem wide and fits a phone: `width: min(28rem, calc(100vw - 2rem))`, in `.kai-launcher-panel`.
 
 ## Use
@@ -64,7 +65,7 @@ Chat(action={reply} label="Assistant")
 ## Behaviour
 
 - The history lives in the island; each send posts all of it and the reply streams into a pending turn as markdown, joining the history when the stream ends.
-- Enter sends, Shift+Enter breaks the line. While a reply is under way Send becomes Stop, and Escape in the field stops too: it aborts the call, or closes the stream, and the words that came stay as a turn marked `stoppedLabel`. A Stop before the first word returns the message to the field, as a refused one, so the next send posts one user turn.
+- Enter sends, Shift+Enter breaks the line. While a reply is under way Send becomes Stop, and Escape anywhere in the chat stops too, its default prevented so a dialog or panel around it stays open: it aborts the call, or closes the stream, and the words that came stay as a turn marked `stoppedLabel`. A Stop before the first word returns the message to the field, as a refused one, so the next send posts one user turn.
 - A refused call or a stream that breaks off shows the refusal's message when the action gave one, else `errorMessage`, in a `kui-notice` alert with a retry button, when no word of the reply came, asking again with the same history, no second copy of the message; what a broken stream had delivered stays.
 - The log is `role="log"`; the turn being written is `aria-hidden` and a hidden polite status line says `thinkingLabel` and then each tool call as it starts and ends (`add_note: Running`, `add_note: Done`, in the call labels), one added line each, so a screen reader hears each finished turn and each call once, not word by word. The log scrolls with the reply unless the visitor scrolled up.
 - Tool calls: `ul.kai-chat-calls` before `.kai-chat-text` in the turn, one `li.kai-chat-call[data-status]` per call (`running`, `done`, `failed`) with `.kai-chat-call-name` and `.kai-chat-call-status`, and a `details` holding `pre.kai-chat-call-code` for the arguments and result. A turn that only called tools joins the history without text and is not posted back, since a provider refuses an empty message. Results are what the model was told, shown as is: keep a result you would not show the visitor out of the actions you offer, or set `toolDetails={false}`.

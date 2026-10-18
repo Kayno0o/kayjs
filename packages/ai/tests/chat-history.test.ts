@@ -1,6 +1,6 @@
 import type { Message } from '../src/types'
 import { expect, test } from 'bun:test'
-import { posted } from '../src/chat-history'
+import { posted, restored, stored } from '../src/chat-history'
 
 const user = (content: string): Message => ({ role: 'user', content })
 const assistant = (content: string): Message => ({ role: 'assistant', content })
@@ -45,4 +45,53 @@ test('the messages posted are copies carrying only a role and a content', () => 
   const turn = { role: 'user' as const, content: 'q', id: 4, stopped: true }
 
   expect(Object.keys(posted([turn], 5)[0]!)).toEqual(['role', 'content'])
+})
+
+// A session storage of a map, as the tests run outside a browser.
+function memoryStorage(failing = false) {
+  const map = new Map<string, string>()
+
+  Object.defineProperty(globalThis, 'sessionStorage', { configurable: true, value: {
+    getItem: (key: string) => map.get(key) ?? null,
+    setItem: (key: string, value: string) => {
+      if (failing)
+        throw new Error('full')
+
+      map.set(key, value)
+    },
+    removeItem: (key: string) => map.delete(key),
+  } })
+
+  return map
+}
+
+test('a conversation kept comes back with its text and stopped marks, and turns without text are left out', () => {
+  memoryStorage()
+  stored('k', [{ role: 'user', content: 'a' }, { role: 'assistant', content: '', stopped: false }, { role: 'assistant', content: 'b', stopped: true }])
+
+  expect(restored('k')).toEqual([{ role: 'user', content: 'a' }, { role: 'assistant', content: 'b', stopped: true }])
+})
+
+test('what storage holds that is not a conversation restores as none', () => {
+  const map = memoryStorage()
+
+  for (const value of ['not json', '{"a":1}', '[1,null,{"role":"system","content":"x"},{"role":"user","content":3}]']) {
+    map.set('k', value)
+
+    expect(restored('k')).toEqual([])
+  }
+
+  expect(restored('missing')).toEqual([])
+})
+
+test('the oldest turns go when the conversation outgrows the cap, and a refusing storage drops the old value', () => {
+  memoryStorage()
+  stored('k', [{ role: 'user', content: 'x'.repeat(150_000) }, { role: 'assistant', content: 'y'.repeat(150_000) }])
+  expect(restored('k').map(turn => turn.role)).toEqual(['assistant'])
+
+  const refusing = memoryStorage(true)
+
+  refusing.set('old', '[{"role":"user","content":"stale"}]')
+  stored('old', [{ role: 'user', content: 'new' }])
+  expect(restored('old')).toEqual([])
 })

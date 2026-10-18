@@ -1,7 +1,7 @@
 ---
 import type { Action, ActionStream, Failure, SanitizeOptions } from 'kay'
 import type { Message, Progress, ToolCall } from './types'
-import { ActionError, effect, onMount, sanitizeHtml, signal, trustHtml, untrack } from 'kay'
+import { ActionError, effect, onCleanup, onMount, sanitizeHtml, signal, trustHtml, untrack } from 'kay'
 import { markdownHtml } from 'kay/markdown'
 import { posted, restored, stored } from './chat-history'
 import Calls from './chat-calls.kay'
@@ -168,8 +168,9 @@ function finish(state: string) {
     takeBack()
 }
 
-// The conversation of the tab's last visit, put back once hydrated since the server renders the initial one.
 let recalled = false
+
+// The conversation of the tab's last visit, put back once hydrated since the server renders the initial one.
 
 onMount(() => {
   if (remember === undefined)
@@ -283,25 +284,45 @@ function stop() {
   field?.focus()
 }
 
-function keyDown(event: KeyboardEvent) {
-  if (event.key === 'Escape' && busy()) {
+// Heard on the whole chat, so the Stop button and the log stop a reply too.
+function escape(event: KeyboardEvent) {
+  if (event.key === 'Escape' && busy() && !event.isComposing) {
     // Stops the reply and nothing else, such as the panel around the chat closing.
     event.preventDefault()
     stop()
   }
-  else if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
+}
+
+function keyDown(event: KeyboardEvent) {
+  if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
     event.preventDefault()
     void send()
   }
+}
+
+// A log shown again, such as in a panel reopened, is scrolled to the end when the visitor was at it, as it has no scroll position while hidden.
+function watch(element: HTMLElement) {
+  log = element
+
+  if (typeof ResizeObserver === 'undefined')
+    return
+
+  const observer = new ResizeObserver(() => {
+    if (pinned)
+      element.scrollTo({ top: element.scrollHeight })
+  })
+
+  observer.observe(element)
+  onCleanup(() => observer.disconnect())
 }
 
 function scrolled() {
   pinned = log !== undefined && log.scrollHeight - log.scrollTop - log.clientHeight < PINNED_PX
 }
 ---
-section.kai-chat(class={className})
+section.kai-chat(class={className} onKeyDown={escape})
   // The log is the turns so far; the reply streaming in is hidden from screen readers until it is whole, so the finished turn is announced once, not word by word. The status line says the thinking label, then each tool call as it starts and ends.
-  .kai-chat-log(role="log" aria-label={label} tabindex="0" ref={element => { log = element }} onScroll={scrolled})
+  .kai-chat-log(role="log" aria-label={label} tabindex="0" ref={watch} onScroll={scrolled})
     for turn of history() key={turn.id}
       article.kai-chat-turn(data-role={turn.role})
         if turn.role === 'user'

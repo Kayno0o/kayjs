@@ -15,7 +15,6 @@ const sections = [
 ]
 const { previous, next } = neighbours(await components.all(), component.slug, slug => `/ui/${slug}`)
 --- script
-import TooltipHost from '@kaynooo/kayjs-ui/tooltip-host.kay'
 import Pager from '../../../components/pager.kay'
 import Toc from '../../../components/toc.kay'
 ---
@@ -66,5 +65,3 @@ head
     else
       p It takes no props.
   Pager(previous={previous} next={next} source={`${libraryRoot('kayjs-ui')}/src/${component.slug}.kay`})
-.ui-stage
-  TooltipHost

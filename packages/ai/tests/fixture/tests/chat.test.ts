@@ -401,11 +401,11 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
 
       const before = await chunks(page)
 
+      expect(await page.evaluate(chatHydrated)).toBe(false)
+
       await page.evaluate(() => document.querySelector<HTMLElement>('.kai-launcher-button')?.focus())
       await page.press('Enter')
       await page.waitFor(opened)
-
-      expect(await page.evaluate(chatHydrated)).toBe(false)
 
       await page.waitUntil(chatHydrated)
 
@@ -468,6 +468,26 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
 
       await page.press('Escape')
       await page.waitFor(closed)
+    })
+
+    test('a panel reopened shows the latest of a long conversation', async () => {
+      const page = await site.open('/launcher/one', { height: 500 })
+
+      await page.click('.kai-launcher-button')
+      await page.waitUntil(chatHydrated)
+      fakeAi.reply(Array.from({ length: 60 }, (_, line) => `Line ${line}\n\n`))
+      await page.fill('textarea', 'Long')
+      await page.press('Enter')
+      await page.waitFor('[data-pending]', { gone: true })
+      await page.waitFor('.kai-chat-text', { text: 'Line 59' })
+      await page.click('.kai-launcher-button')
+      await page.waitFor(closed)
+      await page.click('.kai-launcher-button')
+      await page.waitUntil(() => {
+        const log = document.querySelector('.kai-chat-log')!
+
+        return log.scrollHeight > log.clientHeight && log.scrollHeight - log.scrollTop - log.clientHeight < 8
+      })
     })
 
     test('the panel fits a 400px phone and the empty list draws no border', async () => {

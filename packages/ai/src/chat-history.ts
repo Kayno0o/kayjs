@@ -10,7 +10,7 @@ export function posted(turns: readonly Message[], keep: number): Message[] {
 }
 
 // What a stopped or finished conversation keeps in session storage: the text of each turn, not the tool calls, whose arguments and results may be large.
-const KEPT_BYTES = 200_000
+const KEPT_CHARACTERS = 200_000
 
 interface KeptTurn extends Message {
   stopped?: boolean | undefined
@@ -30,7 +30,7 @@ export function restored(key: string): KeptTurn[] {
 
       const { role, content, stopped } = turn as Record<string, unknown>
 
-      return (role === 'user' || role === 'assistant') && typeof content === 'string' ? [{ role, content, ...stopped === true && { stopped } }] : []
+      return (role === 'user' || role === 'assistant') && typeof content === 'string' && content !== '' ? [{ role, content, ...stopped === true && { stopped } }] : []
     })
   }
   catch {
@@ -38,18 +38,24 @@ export function restored(key: string): KeptTurn[] {
   }
 }
 
-// Keeps the latest turns that fit; storage that is full or unavailable keeps nothing, and the chat goes on.
+// Keeps the latest turns with text that fit; storage that is full or unavailable keeps nothing, and the chat goes on.
 export function stored(key: string, turns: readonly KeptTurn[]): void {
   try {
-    let kept = turns.map(({ role, content, stopped }) => ({ role, content, ...stopped === true && { stopped } }))
+    let kept = turns.filter(({ content }) => content !== '').map(({ role, content, stopped }) => ({ role, content, ...stopped === true && { stopped } }))
     let text = JSON.stringify(kept)
 
-    while (text.length > KEPT_BYTES && kept.length > 1) {
+    while (text.length > KEPT_CHARACTERS && kept.length > 0) {
       kept = kept.slice(1)
       text = JSON.stringify(kept)
     }
 
     sessionStorage.setItem(key, text)
   }
-  catch {}
+  catch {
+    // The value kept before would come back as an older conversation.
+    try {
+      sessionStorage.removeItem(key)
+    }
+    catch {}
+  }
 }
