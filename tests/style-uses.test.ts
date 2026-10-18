@@ -219,7 +219,7 @@ describe('which classes are set from a value the build cannot read', () => {
   it('still warns of an imported record holding something open, or a module it cannot read', async () => {
     const page = '---\nimport { BG } from \'./data\'\n---\np(class={BG[info.swatch]}) a\n'
 
-    expect(await unresolvedIn({ 'page.kay': page, 'data.ts': 'export const BG = { a: \'mt-1\', b: pick() }\n' })).toEqual(['page.kay:4 class attribute mt-1${}mt-1${}mt-1'])
+    expect(await unresolvedIn({ 'page.kay': page, 'data.ts': 'export const BG = { a: \'mt-1\', b: pick() }\n' })).toEqual(['page.kay:4 class attribute mt-1'])
     expect(await unresolvedIn({ 'page.kay': page, 'data.ts': 'export let BG = { a: \'mt-1\' }\nBG.b = read()\n' })).toEqual(['page.kay:4 class attribute '])
     expect(await unresolvedIn({ 'page.kay': page })).toEqual(['page.kay:4 class attribute '])
     expect(await unresolvedIn({ 'page.kay': page.replace('./data', 'some-package'), 'data.ts': 'export const BG = { a: \'mt-1\' }\n' })).toEqual(['page.kay:4 class attribute '])
