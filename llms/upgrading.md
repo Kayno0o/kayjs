@@ -6,7 +6,7 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ### A class kay cannot see has no rule
 
-- A page no longer loads the whole stylesheet after the paint: a class built from a value the build cannot read (`classList.add(x)`, `className = x`, `class={fromData}`) shows unstyled. A production build warns of the ones in an island's script; list the classes in your CSS with `@source inline("...")`, which kay keeps on every page. No lint can see it, as the class is a runtime value.
+- A page no longer loads the whole stylesheet after the paint: a class built from a value the build cannot read (`classList.add(x)`, `className = x`, `class={fromData}`) shows unstyled. A production build warns of the ones in an island's script; list the classes in your CSS with `@source inline("...")`, which kay keeps on every page. No lint can see it, as the class is a runtime value. To get the old behaviour back at once, set `lateStyles: true` in `kay.config.ts`: a page then links the whole stylesheet after its own rules again, and the build warns of nothing.
 
 ## 1.53.0
 

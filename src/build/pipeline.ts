@@ -48,6 +48,7 @@ import { inSignalsScope } from './signals'
 import { exportStatic, refuseStaticConfig } from './static'
 import { pruneCompileCache } from './transform'
 import { verifyExecutable } from './verify'
+import { warnServerClasses } from './warn-classes'
 
 const JSON_EXTENSION = /\.json$/
 
@@ -391,6 +392,8 @@ async function outputStage(project: Project, exported: boolean, client: ClientBu
   const routes: Route[] = []
   const stops = new Map<string, KeptStop>()
   const prerendered = await prerenderPages(project, client, { exportAll: exported, rendered, others, routes, stops, onRoute: (done, total) => report({ step: 'prerendering', done, total, unit: 'routes' }) })
+
+  warnServerClasses(root, client, routes)
 
   if (config.search === true) {
     report({ step: 'indexing for search' })

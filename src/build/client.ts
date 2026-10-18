@@ -6,7 +6,7 @@ import type { FontFallback } from '../server/fonts'
 import type { ImportGraph, KayLibrary } from './libraries'
 import type { BrowserRole } from './promotion'
 import type { ChunkInputs, IslandWhy } from './report'
-import type { StyleUses } from './style-uses'
+import type { StyleUses, UnresolvedClass } from './style-uses'
 import type { Reached } from './styles'
 import type { FileDiagnostic } from './transform'
 import { existsSync } from 'node:fs'
@@ -61,6 +61,8 @@ export interface ClientOptions {
   navigation?: boolean | undefined
   // How far ahead of the viewport an island marked `hydrate="visible"` starts to hydrate, and a deferred server island starts to load, as CSS root margins; `200px` and `100% 0px` by default.
   hydration?: { visible?: string | undefined, serverIslands?: string | undefined } | undefined
+  // `lateStyles` is on: every page loads the whole stylesheet, so the build has no class to warn of.
+  lateStyles?: boolean | undefined
   // `search` is on: a page opened from a search hit marks the words searched for.
   search?: boolean | undefined
   // The app has locales: the links its islands write go to the page's locale's copy, as the server writes them.
@@ -97,6 +99,9 @@ const STARTS_WORKER = /\bnew\s+(?:Shared)?Worker\(/
 const OBJECT_URL = /\bcreateObjectURL\(/
 // A worker bundle, as kay names it from a chunk or from another worker.
 const WORKER_URL = /["']\.\/(?:assets\/)?([\w.~-]+\.js)["']/g
+// kay's own sources, when it runs from a checkout rather than from `node_modules`.
+const KAY_SOURCE = `${resolve(import.meta.dir, '..')}${sep}`
+
 // Every builtin, the ones Bun polyfills included: one whose polyfill lacks an export would fail the build that only looks for the way to the others.
 const BUILTINS = [...builtinModules, 'node:*', 'bun', 'bun:*']
 
@@ -149,6 +154,8 @@ async function bundleClient(root: string, options: ClientOptions): Promise<Clien
   await writeManifest(root, manifest)
 
   const built = fromManifest(root, manifest)
+
+  built.unresolved = styles.server
   const bundled = Object.values(scripts.inputs).flatMap(inputs => Object.entries(inputs).filter(([, input]) => (input.bytesInOutput ?? 0) > 0).map(([input]) => input))
 
   built.packages = packagesOf([...bundled, ...styles.inputs])
@@ -454,9 +461,9 @@ async function refuseBuiltinImports(root: string, logs: Bun.BuildOutput['logs'],
 // Each page and layout is an entry whose code shrinks to its imports, so what comes out is the stylesheet of everything it renders: each one's URL by the file relative to the root, and every module the build read, `followed` adding the ones it shrank to their imports, which the bundler's list of inputs leaves out.
 // The rules of a kay library's stylesheets needing a class nothing names are left out, `unused` listing those classes.
 // `uses` tells which of the classes the stylesheets style each page and layout names, for a production server to leave the rules of the rest out of a page's head; development links the stylesheets whole and compares what the page sets with it.
-export async function bundleStyles(root: string, { pages, libraries, classes, shorthand, islands }: Pick<ClientSources, 'pages' | 'libraries' | 'classes' | 'shorthand' | 'islands'>, options: ClientOptions): Promise<{ styles: Record<string, string>, inputs: string[], followed: string[], unused: Set<string>, uses?: StyleUses }> {
+export async function bundleStyles(root: string, { pages, libraries, classes, shorthand, islands }: Pick<ClientSources, 'pages' | 'libraries' | 'classes' | 'shorthand' | 'islands'>, options: ClientOptions): Promise<{ styles: Record<string, string>, inputs: string[], followed: string[], unused: Set<string>, uses?: StyleUses, server: UnresolvedClass[] }> {
   if (pages.length === 0)
-    return { styles: {}, inputs: [], followed: [], unused: new Set() }
+    return { styles: {}, inputs: [], followed: [], unused: new Set(), server: [] }
 
   const shrunk = new Set<string>()
   const reached: Reached = { edges: new Map(), open: new Set() }
@@ -486,11 +493,19 @@ export async function bundleStyles(root: string, { pages, libraries, classes, sh
       styles[relative(root, file)] = assetUrl(meta.cssBundle!)
   }
 
+  const server: UnresolvedClass[] = []
   const markup = reached.open.size > 0 ? await findProjectFiles(root, MARKUP_FILE, { project: true, ownKayOnly: true }) : []
   const uses = styleUses(root, pages, await Promise.all(build.outputs.filter(output => CSS_FILE.test(output.path)).map(async output => Bun.file(output.path).text())), reached, shorthand, markup, {
-    own: file => !file.includes(`${sep}node_modules${sep}`) && !libraries.some(library => file.startsWith(`${library.dir}${sep}`) || file.startsWith(`${library.realDir}${sep}`)),
-    // A development build links the whole stylesheet and warns in the browser instead.
-    unresolved: options.hot === true ? undefined : found => warnUnresolved(root, found, new Set(islands.values())),
+    // kay's own runtime sets the classes of the pages it swaps in, which the pages name.
+    own: file => !file.startsWith(KAY_SOURCE) && !file.includes(`${sep}node_modules${sep}`) && !libraries.some(library => file.startsWith(`${library.dir}${sep}`) || file.startsWith(`${library.realDir}${sep}`)),
+    islands: islands.values(),
+    // A development build links the whole stylesheet and warns in the browser instead. What runs on the server is the prerendered pages' to vouch for, which `kay build` weighs once they are rendered.
+    unresolved: options.hot === true || options.lateStyles === true
+      ? undefined
+      : (found) => {
+        warnUnresolved(root, found.filter(unresolved => unresolved.client), new Set(islands.values()))
+        server.push(...found.filter(unresolved => !unresolved.client))
+      },
   })
 
   // The code the entries shrank to is only a vehicle for their stylesheets.
@@ -507,15 +522,15 @@ export async function bundleStyles(root: string, { pages, libraries, classes, sh
     }))
   }
 
-  return { styles, inputs: Object.keys(build.metafile!.inputs).map(input => resolve(input)), followed: [...shrunk], unused, uses }
+  return { styles, inputs: Object.keys(build.metafile!.inputs).map(input => resolve(input)), followed: [...shrunk], unused, uses, server }
 }
 
 // Tells the app which classes it sets after load that no page carries the rule of, with the fix.
-function warnUnresolved(root: string, found: { file: string, line: number, how: string, part: string }[], islands: Set<string>): void {
-  for (const { file, line, how, part } of found) {
+export function warnUnresolved(root: string, found: UnresolvedClass[], islands: ReadonlySet<string>): void {
+  for (const { file, line, how, part, expression } of found) {
     const where = `${islands.has(file) ? 'island ' : ''}${relative(root, file)}:${line}`
 
-    kayLog('warn', `${where} sets a class from a value the build cannot read (${how}${part === '' ? '' : `, ${JSON.stringify(part)}`}), so no page carries its rule: write the classes out as literals, or list them in your stylesheet with @source inline("...")`)
+    kayLog('warn', `${where} sets a class from a value the build cannot read (${how} \`${expression}\`${part === '' ? '' : `, ${JSON.stringify(part)}`}), so no page carries its rule: write the classes out as literals, list them in your stylesheet with @source inline("..."), or set \`lateStyles: true\` in kay.config.ts to load the whole stylesheet after paint`)
   }
 }
 

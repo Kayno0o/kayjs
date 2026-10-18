@@ -1,4 +1,5 @@
-import { join } from 'node:path'
+import type { UnresolvedClass } from '../src/build/style-uses'
+import { join, relative } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 import { expandInline, styleUses } from '../src/build/style-uses'
 import { scratchDir } from './scratch'
@@ -104,7 +105,7 @@ describe('which classes are set from a value the build cannot read', () => {
     const root = await scratchDir('style-uses-runtime-')
     const page = join(root, file)
     const sheet = join(root, 'app.css')
-    const found: { file: string, line: number, how: string, part: string }[] = []
+    const found: UnresolvedClass[] = []
 
     await Bun.write(page, source)
     await Bun.write(sheet, css)
@@ -128,9 +129,33 @@ describe('which classes are set from a value the build cannot read', () => {
     expect(await unresolved('el.className = \'tone-\' + kind\n', '@source inline("tone-{a,b}");')).toEqual([])
   })
 
-  it('judges a class attribute only when it builds a name from an open part', async () => {
-    expect(await unresolved('p(class={tone}) a\np(class={`card ${props.class}`}) b\np(class={`btn-${kind}`}) c\n', '', 'page.kay')).toEqual([])
+  it('judges a class attribute by what its value is made of', async () => {
+    // A prop is named by the component using this one, a `btn-` fragment completes, a class written out is read as it is.
+    expect(await unresolved('const { tone } = props<{ tone: string }>()\n---\np(class={tone}) a\np(class={`card ${props.class}`}) b\np(class={`btn-${kind}`}) c\np(class={on ? \'p-1\' : \'mt-1\'}) d\n', '', 'page.kay')).toEqual([])
+    expect(await unresolved('const tone = on ? \'p-1\' : \'mt-1\'\n---\np(class={tone}) a\n', '', 'page.kay')).toEqual([])
+    expect(await unresolved('const { shade: tone } = props<{ shade: string }>()\n---\np(class={tone}) a\n', '', 'page.kay')).toEqual([])
+  })
+
+  it('finds a class attribute a server builds from a value, a bare one included', async () => {
+    expect(await unresolved('p(class={tone}) a\n', '', 'page.kay')).toEqual(['1 class attribute '])
+    expect(await unresolved('const tone = [\'ring\', 4].join(\'-\')\n---\np(class={tone}) a\n', '', 'page.kay')).toEqual(['3 class attribute '])
+    expect(await unresolved('const type = kinds[0]\n---\naside(class={`callout ${type}`}) a\n', '', 'page.kay')).toEqual(['3 class attribute callout ${}'])
     expect(await unresolved('p(class={`tone-${kind}`}) c\n', '', 'page.kay')).toEqual(['1 class attribute tone-${}'])
+    expect(await unresolved('p(class={tone}) a\n', '@source inline("btn-primary");', 'page.kay')).toEqual([])
+  })
+
+  it('tells the expression, whether a file runs in the browser, and the entries reaching it', async () => {
+    const root = await scratchDir('style-uses-runtime-')
+    const page = join(root, 'page.kay')
+    const island = join(root, 'island.kay')
+    const found: UnresolvedClass[] = []
+
+    await Bun.write(page, 'p(class={tone}) a\n')
+    await Bun.write(island, 'p(class={shade(on)}) b\n')
+    styleUses(root, [page], [CSS], { edges: new Map([[page, [island]]]), open: new Set() }, new Map(), [], { own: () => true, islands: [island], unresolved: (all) => {
+      found.push(...all)
+    } })
+    expect(found.map(({ file, expression, client, by }) => [relative(root, file), expression, client, by.map(entry => relative(root, entry))])).toEqual([['page.kay', 'tone', false, ['page.kay']], ['island.kay', 'shade(on)', true, ['page.kay']]])
   })
 
   it('leaves out files that are not the app\'s', async () => {

@@ -19,7 +19,7 @@ import { runInLocale } from '../runtime/locale-state'
 import { standInReads } from '../runtime/site'
 import { withPageToken } from '../runtime/uid.server'
 import { projectApi } from './api-modules'
-import { PRERENDERED_DIR, readManifest, writeManifest } from './client'
+import { keepClasses, missingClasses, PRERENDERED_DIR, readManifest, styleUsesOf, writeManifest } from './client'
 import { exportedEndpoints } from './endpoints'
 import { localeCopies, stateFor } from './i18n'
 import { LIVE_MARK } from './live'
@@ -29,7 +29,7 @@ import { matchedParams } from './params'
 import { listedIn, listedParams, pageEtag, pageToken, pathOf, storedHeaders } from './prerendered'
 import { keptScan } from './pure-page'
 import { renderPage } from './render'
-import { scanEndpoints, slashedPath } from './routes'
+import { routeChain, scanEndpoints, slashedPath } from './routes'
 import { serverIslandModes } from './server-islands'
 import { setupPages } from './setup'
 import { STAMP_HOLE } from './stamp'
@@ -97,6 +97,8 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
   const tokens = new Set<string>()
   // The files of pages kept without being asked for, which a page that was asked for takes the place of.
   const kept = new Set<string>()
+  // Whether a page showed a class its head had no rule for, which the manifest then keeps.
+  let restyled = false
   // What each file read, for the next route to reach it again.
   const scans = new Map<string, Promise<Scan>>()
 
@@ -164,7 +166,16 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
           return { response: rendered, html: await rendered.text() }
         }
         const once = async () => withPageToken(token, read)
-        const { result: { response, html }, reads: dataRead } = await readsOf(once)
+        const { result: first, reads: dataRead } = await readsOf(once)
+        let { response, html } = first
+        // What the page shows that its source does not spell out, a class built from data, is kept in its head: the rules come from the page as it rendered.
+        const shown = missingClasses(client, routeChain(route).files, html)
+
+        if (shown.length > 0) {
+          await keepClasses(client, routeChain(route).files, shown)
+          restyled = true
+          ;({ response, html } = await once())
+        }
 
         if (auto && response.status !== 200)
           return skip(`answers ${response.status} when rendered without a request`)
@@ -319,7 +330,7 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
   if (problems.length > 0 || apiProblems.length > 0 || endpointProblems.length > 0)
     throw new ExportError(`kay: ${PARTS.format([count(problems.length, 'page'), count(endpointProblems.length, 'endpoint'), count(apiProblems.length, 'API module')].filter(part => part !== ''))} cannot be exported to static files, which no server answers for:\n${[...problems, ...endpointProblems, ...apiProblems].map(problem => `  ${problem.message}`).join('\n')}`, [...problems, ...endpointProblems, ...apiProblems])
 
-  await writeManifest(root, { ...manifest, pages, site }, output)
+  await writeManifest(root, { ...manifest, pages, site, ...restyled && client.styleUses ? { styleUses: styleUsesOf(root, client.styleUses) } : {} }, output)
   client.pages = new Map(Object.entries(pages))
 
   return Object.keys(pages).length

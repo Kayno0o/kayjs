@@ -49,7 +49,21 @@ To fix it, list the classes in your CSS with Tailwind's `@source inline`. kay ke
 @source inline("{hover:,}bg-{red,green}-{100,500}");
 ```
 
-The warning goes away for a class whose fixed part matches one of them. In `kay dev` the whole stylesheet is linked, so nothing looks wrong there. Instead, the browser console logs an error when an element gets a class that the stylesheet styles but its page has no rule for.
+The warning goes away for a class whose fixed part matches one of them.
+
+A class your server builds from data, such as `class={tone}`, is read too. When the page is rendered at build time, kay reads its HTML and keeps the rules of the classes it shows, so you list nothing. A page rendered for each request cannot be read ahead, so the build warns about it with the expression and the line.
+
+#### Load the whole stylesheet anyway
+
+If you would rather not list classes, set `lateStyles` in `kay.config.ts`.
+
+```ts
+export default defineConfig({
+  lateStyles: true,
+})
+```
+
+A page then links the whole stylesheet after its own rules, loaded once the first paint is done, as kay did before. Every class gets its style, and the build warns about none. The cost is the whole stylesheet's bytes on a first visit, so it is off by default. In `kay dev` the whole stylesheet is linked, so nothing looks wrong there. Instead, the browser console logs an error when an element gets a class that the stylesheet styles but its page has no rule for.
 
 A page that shows Markdown counts the classes the Markdown, the scripts that write markup into it and its components name. Text in a code block does not count. A class that Markdown gets at run time, through the CMS or from a plugin in a package, is named by none of those, so write it in a file of your project too. With `offline` on, pages link the shared stylesheet, which the worker keeps.
 

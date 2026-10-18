@@ -1,3 +1,4 @@
+import type { Judge, RuntimeClass } from './dynamic-classes'
 import type { Reached } from './styles'
 import { existsSync } from 'node:fs'
 import { dirname, relative, resolve } from 'node:path'
@@ -184,10 +185,35 @@ function stylesheetClasses(file: string, kept: Set<string>, seen = new Set<strin
   return found
 }
 
+// Every file the given ones reach through the imports.
+function closure(from: Iterable<string>, reached: Reached): Set<string> {
+  const found = new Set<string>()
+  const pending = [...from]
+
+  for (const file of pending) {
+    if (found.has(file))
+      continue
+
+    found.add(file)
+    pending.push(...reached.edges.get(file) ?? [])
+  }
+
+  return found
+}
+
 // What the app hands `styleUses` besides its stylesheets: `unresolved` receives the classes some file of the app sets from a value the build cannot read, as `runtimeClasses` finds them; `own` tells the app's files from a library's, which are not judged.
 export interface StyleUsesOptions {
   own?: ((file: string) => boolean) | undefined
-  unresolved?: ((found: { file: string, line: number, how: string, part: string }[]) => void) | undefined
+  // The islands' files: what they reach runs in the browser, where the markup a page was rendered with no longer says which classes it sets.
+  islands?: Iterable<string> | undefined
+  unresolved?: ((found: UnresolvedClass[]) => void) | undefined
+}
+
+// A place that sets a class from a value the build cannot read, with whether it runs in the browser and the pages and layouts that reach its file.
+export interface UnresolvedClass extends RuntimeClass {
+  file: string
+  client: boolean
+  by: string[]
 }
 
 // `sheets` is the text of every stylesheet the build wrote, `shorthand` the classes each component writes as `div.flex.w-1/2`, which the words of its source cannot tell from a name with a dot.
@@ -265,14 +291,14 @@ export function styleUses(root: string, entries: Iterable<string>, sheets: Itera
   }
   let written: Set<string> | undefined
   // The runtime classes of the app's scripts and components that nothing makes the build keep the rules of.
-  const unresolvedClasses = (files: Iterable<string>, own: StyleUsesOptions['own'], listed: ReadonlySet<string>, complete: (fragment: string) => string[]) => {
-    const found: { file: string, line: number, how: string, part: string }[] = []
+  const unresolvedClasses = (files: Iterable<string>, own: StyleUsesOptions['own'], listed: ReadonlySet<string>, complete: (fragment: string) => string[], client: ReadonlySet<string>, reachedBy: ReadonlyMap<string, Set<string>>) => {
+    const found: UnresolvedClass[] = []
 
     for (const file of files) {
       if (own?.(file) !== true || !SCRIPT_OR_KAY.test(file) || !existsSync(file))
         continue
 
-      const judge = (parts: string[]): 'covered' | 'uncovered' | 'none' => {
+      const judge: Judge = (parts) => {
         let open = false
 
         for (const part of parts) {
@@ -297,7 +323,7 @@ export function styleUses(root: string, entries: Iterable<string>, sheets: Itera
         if (runtime.part === '' && listed.size > 0)
           continue
 
-        found.push({ file, ...runtime })
+        found.push({ file, ...runtime, client: client.has(file), by: [...reachedBy.get(file) ?? []] })
       }
     }
 
@@ -319,6 +345,8 @@ export function styleUses(root: string, entries: Iterable<string>, sheets: Itera
 
   const used = new Map<string, Set<string>>()
   const everything = new Set<string>()
+  // The entries whose pages reach each file.
+  const reachedBy = new Map<string, Set<string>>()
 
   for (const entry of entries) {
     const seen = new Set<string>()
@@ -332,6 +360,13 @@ export function styleUses(root: string, entries: Iterable<string>, sheets: Itera
 
       seen.add(file)
       everything.add(file)
+
+      let by = reachedBy.get(file)
+
+      if (by === undefined)
+        reachedBy.set(file, by = new Set())
+
+      by.add(entry)
       open ||= reached.open.has(file)
 
       for (const name of named(file))
@@ -357,7 +392,7 @@ export function styleUses(root: string, entries: Iterable<string>, sheets: Itera
   }
 
   if (options.unresolved !== undefined)
-    options.unresolved(unresolvedClasses(everything, options.own, kept, completing))
+    options.unresolved(unresolvedClasses(everything, options.own, kept, completing, closure(options.islands ?? [], reached), reachedBy))
 
   const classes = [...new Set([...used.values()].flatMap(names => [...names]))].sort()
   const index = new Map(classes.map((name, at) => [name, at]))

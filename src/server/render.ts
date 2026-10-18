@@ -140,6 +140,8 @@ export interface RenderOptions {
   serverTiming?: boolean | undefined
   // Registers the service worker `offline` turns on.
   offline?: boolean | undefined
+  // Whether pages load the whole stylesheet after paint, so no class lacks its rule.
+  lateStyles?: boolean | undefined
   // The `.kay` island an extension gives as `editor`, which a page in edit mode renders last.
   editor?: string | undefined
 }
@@ -847,7 +849,7 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
   // The browser's form check words a refusal as the server does, so a page with a checked form sends the `kay.invalid.*` messages too.
   const words = checked === '' ? islands.messages : new Set([...islands.messages, ...invalidKeys()])
   const islandData = (hasIslands || (checked !== '' && words.size > 0) ? messagesScript(words, true) : '') + (hasIslands ? outcomeScript(rendering.carried()) + queryScript(rules) : '') + liveText
-  const written = `${htmlOpen(lang, head.root)}<head>${headStart(head)}${stylesheets(client, styled)}${head.html}${scripts}${islandData}${kayMetas(options, hasIslands)}${shipsEntry && client.build !== undefined ? `<meta name="${BUILD_META}" content="${client.build}">` : ''}${speculationRules(options.prefetch, options.base)}${client.navigation === true && !shipsEntry ? historyScript : ''}${options.offline ? registerScript(options.base ?? '') : ''}${options.dev ? devScripts(client, styled) + (options.prerendering ? '' : requestBlock(files, rendering, options.base ?? '')) : ''}</head><body>${body}`
+  const written = `${htmlOpen(lang, head.root)}<head>${headStart(head)}${stylesheets(client, styled)}${head.html}${scripts}${islandData}${kayMetas(options, hasIslands)}${shipsEntry && client.build !== undefined ? `<meta name="${BUILD_META}" content="${client.build}">` : ''}${speculationRules(options.prefetch, options.base)}${client.navigation === true && !shipsEntry ? historyScript : ''}${options.offline ? registerScript(options.base ?? '') : ''}${options.dev ? devScripts(client, styled, options.lateStyles === true) + (options.prerendering ? '' : requestBlock(files, rendering, options.base ?? '')) : ''}</head><body>${body}`
   const start = marks === undefined ? written : placeFieldMarks(written, marks)
 
   if (!streamed)
@@ -876,8 +878,8 @@ function kayMetas(options: RenderOptions, hasIslands: boolean): string {
   return `${base}${options.maxDensity !== undefined && options.maxDensity !== DEFAULT_MAX_DENSITY ? `<meta name="kay-max-density" content="${options.maxDensity}">` : ''}${options.imageWidths === undefined ? '' : `<meta name="kay-image-widths" content="${options.imageWidths.join(',')}">`}${options.resolvedImages === true ? `<meta name="${RESOLVED_META}">` : ''}`
 }
 
-function devScripts(client: ClientBuild, files: string[]): string {
-  return problemsBlock(client.problems) + liveReload() + DEV_BOOT + devToolScripts() + A11Y_SCRIPT + pageClassesBlock(client, files) + STYLES_SCRIPT
+function devScripts(client: ClientBuild, files: string[], late: boolean): string {
+  return problemsBlock(client.problems) + liveReload() + DEV_BOOT + devToolScripts() + A11Y_SCRIPT + (late ? '' : pageClassesBlock(client, files) + STYLES_SCRIPT)
 }
 
 // The classes the page's own files name, which production writes the rules of, for the dev page to check what it sets against.

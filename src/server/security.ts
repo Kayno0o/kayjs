@@ -15,6 +15,7 @@ export interface SecurityOptions {
   dev?: boolean | undefined
   base?: string | undefined
   offline?: KayConfig['offline'] | undefined
+  lateStyles?: KayConfig['lateStyles'] | undefined
   // The sources the islands need, added to kay's directives and the app's own: see ClientManifest.
   islands?: Record<string, string[]> | undefined
   // The inline scripts and styles kay writes in every head, such as the fonts' rules.
@@ -80,7 +81,7 @@ export function securityHeaders(options: SecurityOptions, pages: PageSecurity[] 
   const headers: Record<string, string> = { ...HEADERS }
   const { csp, reports, reportOnly } = options.security ?? {}
   const base = basePath(options.base)
-  const hashes = [...inlineScriptHashes({ prefetch: options.prefetch, dev: options.dev, base, offline: offlineOf(options, { dev: options.dev === true }) }), ...(options.scripts ?? []).map(sourceHash)]
+  const hashes = [...inlineScriptHashes({ prefetch: options.prefetch, dev: options.dev, base, offline: offlineOf(options, { dev: options.dev === true }), lateStyles: options.lateStyles }), ...(options.scripts ?? []).map(sourceHash)]
   const styles = [...new Set((options.styles ?? []).map(sourceHash))]
   const reportTo = reports === true ? `${base}${CSP_REPORTS}` : reports
 

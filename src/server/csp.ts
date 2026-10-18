@@ -1,4 +1,5 @@
 import type { Prefetch } from './speculation'
+import { restScript } from './client'
 import { DEV_BOOT, liveReload } from './dev'
 import { historyScript } from './history'
 import { hydrationScript } from './hydration'
@@ -14,14 +15,16 @@ export interface ScriptHashOptions {
   base?: string | undefined
   // Adds the script registering the service worker `offline` turns on.
   offline?: boolean | undefined
+  // Adds the script letting the whole stylesheet of a page apply, which `lateStyles` links.
+  lateStyles?: boolean | undefined
 }
 
 const SCRIPT_BODY = /<script[^>]*>([\s\S]*?)<\/script>/g
 
-// The `'sha256-...'` sources a `script-src` needs for every inline script kay writes: the hydration bootstrap, the history script of a page without one of kay's, the speculation rules, the streamed-block swap and the service worker's registration.
+// The `'sha256-...'` sources a `script-src` needs for every inline script kay writes: the hydration bootstrap, the history script of a page without one of kay's, the one letting the stylesheets of a page's shared rules apply, the speculation rules, the streamed-block swap and the service worker's registration.
 // Each is the same on every page, so a strict policy allows them without `'unsafe-inline'` or a nonce.
 export function inlineScriptHashes(options: ScriptHashOptions = {}): string[] {
-  const html = hydrationScript + historyScript + speculationRules(options.prefetch, options.base) + (options.dev ? liveReload() + DEV_BOOT : '') + (options.offline ? registerScript(options.base ?? '') : '')
+  const html = hydrationScript + historyScript + (options.lateStyles ? restScript : '') + speculationRules(options.prefetch, options.base) + (options.dev ? liveReload() + DEV_BOOT : '') + (options.offline ? registerScript(options.base ?? '') : '')
   const scripts = [...[...html.matchAll(SCRIPT_BODY)].map(match => match[1]!), SWAP_SCRIPT, SWAP_CALL]
 
   return scripts.map(sourceHash)
