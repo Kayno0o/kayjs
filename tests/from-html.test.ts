@@ -142,6 +142,11 @@ const SNIPPETS: Record<string, string> = {
   <li class="flex py-4">Second</li>
 </ul>
 <table><thead><tr><th scope="col">Name</th></tr></thead><tbody><tr><td>Ada</td></tr></tbody></table>`,
+  'text beside elements': `<button class="a">Save <svg viewBox="0 0 1 1"><path d="M0 0"/></svg></button>
+<label>Name <input name="n"> and <br> more</label>
+<p>Hello <img src="/a.png" alt=""> world</p>
+<p>See <a href="/x">x</a> <button type="button">b</button></p>`,
+  'markup inside attribute values': `<div data-bs-content="<b>Bold</b><br> and <!-- c -->" title='a < b'>x</div>`,
   'custom data attributes and aria': `<div data-controller="x" data-x-target='a "b"' aria-labelledby="t" hidden tabindex=0 style="color: red; margin: 0">text</div>`,
 }
 
@@ -178,6 +183,12 @@ describe('kay fmt --from-html', () => {
     expect(code).toBe('div\n  button.y Open\n')
     expect(notes.map(note => note.line)).toEqual([2, 2])
     expect(notes[0]!.message).toContain('@click')
+  })
+
+  it('lowers shouted tag names, reads a trailing slash of an unquoted value as part of it and notes whitespace it collapses', () => {
+    expect(htmlToKay('<DIV><A HREF=/foo/>go</A></DIV>').code).toBe('div\n  a(HREF="/foo/") go\n')
+    expect(htmlToKay('<pre>a\n  b</pre>').notes.map(note => note.message)).toEqual([expect.stringContaining('pre keeps its whitespace')])
+    expect(htmlToKay('<p>&amp;lt; &amp;</p>').code).toBe('p {\'&\'}lt; &\n')
   })
 
   it('throws a MarkupError for HTML JSX cannot read, such as a tag left open', () => {

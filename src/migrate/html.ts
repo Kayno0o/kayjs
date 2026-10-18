@@ -16,7 +16,9 @@ const ATTRIBUTE = /([^\s"'<>/=]+)(?:\s*=\s*("[^"]*"|'[^']*'|[^\s"'=<>`]+))?/g
 const JSX_ATTRIBUTE = /^[A-Z_$][\w$-]*(?::[A-Z_$][\w$-]*)?$/i
 const QUOTED = /^["']/
 const TEXT_UNSAFE = /[{}>]/g
-const TRAILING_SLASH = /\/\s*$/
+// A `/` closing the tag: after a space or a quote, else it ends an unquoted value such as `href=/foo/`.
+const TRAILING_SLASH = /(^|[\s"'])\/\s*$/
+const SHOUTED = /^[A-Z][A-Z0-9]*$/
 const ENTITIES: Record<string, string> = { '{': '&#123;', '}': '&#125;', '>': '&gt;' }
 
 // The attributes of one tag as JSX reads them: every value quoted, a name JSX cannot hold left out and noted.
@@ -30,7 +32,8 @@ function attributesOf(raw: string, note: (message: string) => void): string {
       continue
     }
 
-    out += ` ${name}${value === undefined ? '' : `=${QUOTED.test(value) ? value : `"${value}"`}`}`
+    // A `<` in a value is written as an entity, where the comment and void tag rewrites after this would read it as markup.
+    out += ` ${name}${value === undefined ? '' : `=${(QUOTED.test(value) ? value : `"${value}"`).replaceAll('<', '&lt;')}`}`
   }
 
   return out
@@ -49,12 +52,15 @@ function prepare(html: string, note: (line: number, message: string) => void): s
       return `<${raw}${attributesOf(rawAttributes!, noteHere)}>${content}</${raw}>`
 
     if (tag !== undefined) {
+      // HTML does not care for case, and a name starting upper case would be a component.
+      const name = SHOUTED.test(tag) ? tag.toLowerCase() : tag
+
       if (closing !== '')
-        return `</${tag}>`
+        return `</${name}>`
 
       const selfClosed = TRAILING_SLASH.test(attributes!)
 
-      return `<${tag}${attributesOf(selfClosed ? attributes!.replace(TRAILING_SLASH, '') : attributes!, noteHere)}${selfClosed ? ' /' : ''}>`
+      return `<${name}${attributesOf(selfClosed ? attributes!.replace(TRAILING_SLASH, '$1') : attributes!, noteHere)}${selfClosed ? ' /' : ''}>`
     }
 
     if (token === '<')

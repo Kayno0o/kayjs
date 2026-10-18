@@ -13,6 +13,14 @@ interface Converted {
 const html = signal('')
 const converted = signal<Converted>({ code: '', notes: [] })
 
+// Starts loading the translation on focus; a failed load is reported when the box is used.
+async function preload() {
+  try {
+    await loadConverter()
+  }
+  catch {}
+}
+
 async function convert(value: string) {
   html.set(value)
 
@@ -22,13 +30,13 @@ async function convert(value: string) {
     return
   }
 
-  const { htmlToKay } = await loadConverter()
-
-  // A later keystroke answers before this one finished loading.
-  if (value !== html())
-    return
-
   try {
+    const { htmlToKay } = await loadConverter()
+
+    // A later keystroke answers before this one finished loading.
+    if (value !== html())
+      return
+
     converted.set(htmlToKay(value))
   }
   catch (error) {
@@ -39,7 +47,7 @@ async function convert(value: string) {
 .html-converter
   label.html-converter-input
     span HTML
-    Textarea(rows={12} spellcheck={false} placeholder="Paste HTML here" value={html()} onInput={value => void convert(value)} onFocus={() => void loadConverter()})
+    Textarea(rows={12} spellcheck={false} placeholder="Paste HTML here" value={html()} onInput={value => void convert(value)} onFocus={() => void preload()})
   .code.html-converter-output
     .code-bar
       span kay

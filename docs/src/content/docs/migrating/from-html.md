@@ -39,4 +39,5 @@ The conversion lists what it left out, one line each. Look at these.
 - An attribute that kay cannot name, such as Alpine's `@click` or Vue's `:class`. Write it as an event or a binding in an island.
 - `lang` on `<html>`, which belongs in `kay.config.ts`, and the attributes of `<body>`, which kay writes itself.
 - A tag HTML lets you leave open, such as `<li>` or `<p>` without its end tag. Close it first, as the conversion fails on it.
+- Whitespace inside `<pre>` and `<textarea>`, which the template collapses; the conversion notes each one.
 - Anything dynamic. The result is static markup: turn repeated items into a `for`, and values into props.

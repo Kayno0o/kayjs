@@ -11,6 +11,10 @@ const DOCTYPE = /<!doctype[^>]*>/gi
 const HTML_COMMENT = /<!--([\s\S]*?)-->/g
 const VOID_TAG = /<(area|base|br|col|embed|hr|img|input|link|meta|param|source|track|wbr)\b((?:[^>"'{/]|"[^"]*"|'[^']*'|\{[^}]*\}|\/(?!>))*)(\/?)>/gi
 const BRACE = /[{}]/g
+const ENTITY_START = /&(?=#?\w+;)/g
+const PRESERVED_SPACE = /\n|[ \t]{2}/
+const LEADING_SPACE = /^[ \t\n\r\f]*/
+const TRAILING_SPACE = /[ \t\n\r\f]*$/
 const INTERPOLATION = /#\[/g
 const EVENT_ATTRIBUTE = /^on[a-z]+$/
 
@@ -27,6 +31,8 @@ const COMMENT_END = /\*\//g
 const TEMPLATE_UNSAFE = /[`\\]|\$\{/g
 const ATTRIBUTE_PART = /\s([\w:-]+)(?:=("[^"]*"|'[^']*'))?/g
 // Elements that read as part of a line of text, rendered inline as `#[strong text]`.
+// Elements that stand on lines of their own, so the space between one and a text beside it does not show.
+const BLOCK_TAGS = new Set(['address', 'article', 'aside', 'blockquote', 'details', 'dd', 'div', 'dl', 'dt', 'fieldset', 'figure', 'footer', 'form', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'header', 'hr', 'li', 'main', 'nav', 'ol', 'p', 'pre', 'section', 'summary', 'table', 'tbody', 'td', 'tfoot', 'th', 'thead', 'tr', 'ul'])
 const INLINE = new Set(['a', 'abbr', 'b', 'br', 'code', 'em', 'i', 'kbd', 'mark', 's', 'small', 'span', 'strong', 'sub', 'sup', 'time', 'u'])
 const HYDRATE: Record<string, string | undefined> = { 'client:load': undefined, 'client:idle': 'idle', 'client:visible': 'visible' }
 // Attributes Astro reads and kay has no use for: the page swap is kay's own, and an inline script is the only kind.
@@ -181,13 +187,13 @@ class Translator {
   }
 
   private block(children: Child[]): string[] {
-    return this.meaningful(children).flatMap(child => this.child(child))
+    return this.meaningful(children).flatMap((child, index, all) => this.child(child, all[index - 1], all[index + 1]))
   }
 
-  private child(child: Child): string[] {
+  private child(child: Child, before?: Child, after?: Child): string[] {
     switch (child.type) {
       case 'JSXText':
-        return trimSpace(child.value) === '' ? [] : [`| ${trimSpace(text(child.value))}`]
+        return this.textLine(child.value, before, after)
       case 'JSXElement':
         return this.element(child)
       case 'JSXFragment':
@@ -197,6 +203,21 @@ class Translator {
       case 'JSXExpressionContainer':
         return this.container(child)
     }
+  }
+
+  // A line of text, keeping the space it has against an element or value beside it, which would otherwise run into the text.
+  private textLine(value: string, before: Child | undefined, after: Child | undefined): string[] {
+    const body = trimSpace(text(value))
+    const space = (edge: string, other: Child | undefined) => edge !== '' && other !== undefined && !this.isBlock(other) && (this.html || !edge.includes('\n')) ? '{\' \'}' : ''
+
+    if (body === '')
+      return before !== undefined && after !== undefined && !value.includes('\n') && space(value, before) !== '' && space(value, after) !== '' ? ['| {\' \'}'] : []
+
+    return [`| ${space(LEADING_SPACE.exec(value)![0], before)}${body}${space(TRAILING_SPACE.exec(value)![0], after)}`]
+  }
+
+  private isBlock(child: Child): boolean {
+    return child.type === 'JSXElement' && BLOCK_TAGS.has(this.tagName(child))
   }
 
   private container(container: t.JSXExpressionContainer): string[] {
@@ -295,6 +316,9 @@ class Translator {
     if (name === 'slot' && !this.html)
       return this.slot(element)
 
+    if (this.html && (name === 'pre' || name === 'textarea') && element.children.some(inner => inner.type === 'JSXText' && PRESERVED_SPACE.test(inner.value)))
+      this.note(this.line(element), `${name} keeps its whitespace in HTML: the template collapses it to single spaces, so write its text with \`\\n\` by hand`)
+
     const tag = this.imports.image.has(name) ? 'img' : name
     const head = this.head(element, tag)
     const children = this.meaningful(element.children)
@@ -317,16 +341,16 @@ class Translator {
   // A component's children given to a named slot, `<h2 slot="title">`, become its `@title` block.
   private componentChildren(element: t.JSXElement, children: Child[]): string[] {
     if (!UPPERCASE_START.test(this.tagName(element)))
-      return children.flatMap(child => this.child(child))
+      return children.flatMap((child, index) => this.child(child, children[index - 1], children[index + 1]))
 
     const named = new Map<string, string[]>()
     const rest: string[] = []
 
-    for (const child of children) {
+    for (const [index, child] of children.entries()) {
       const slot = child.type === 'JSXElement' ? child.openingElement.attributes.find((attribute): attribute is t.JSXAttribute => attribute.type === 'JSXAttribute' && this.attributeName(attribute) === 'slot' && attribute.value?.type === 'StringLiteral') : undefined
 
       if (!slot) {
-        rest.push(...this.child(child))
+        rest.push(...this.child(child, children[index - 1], children[index + 1]))
 
         continue
       }
@@ -543,7 +567,7 @@ function trimSpace(value: string): string {
 
 // Text as kay writes it on a line: its whitespace collapsed, a brace, which would open an expression, written as one, and `#[`, which would open an inline element, escaped.
 function text(value: string): string {
-  return value.replace(HTML_SPACE, ' ').replace(BRACE, brace => `{'${brace}'}`).replace(INTERPOLATION, '\\#[')
+  return value.replace(HTML_SPACE, ' ').replace(BRACE, brace => `{'${brace}'}`).replace(INTERPOLATION, '\\#[').replace(ENTITY_START, '{\'&\'}')
 }
 
 function containsJsx(node: t.Node): boolean {
