@@ -381,7 +381,7 @@ if (found.ok) {
 - `listUsers({ search, offset, limit })` gives the users newest first, with `total`. `getUser(id)` gives one.
 - `grantRole(id, role)` and `revokeRole(id, role)` take a role your `roles` option declares.
 - `banUser(id, { reason, until })` bars the user from signing in and signs them out everywhere. `until` leaves it for good when left out. `unbanUser(id)` lifts it. An admin cannot ban themselves or another admin.
-- `deleteUser(id)` deletes the user as `deleteAccount` does.
+- `deleteUser(id)` deletes the user as `deleteAccount` does, so it answers `last-owner` for the only owner of an organization with other members.
 - `impersonate(id)` signs the admin in as the user. `impersonator()` gives the admin, to show a banner, and `stopImpersonating()` signs back in as themselves.
 - `adminAuditLog({ userId, before, limit })` reads everyone's audit log, or one user's.
 
@@ -405,7 +405,9 @@ createAuth({
 })
 ```
 
-Whoever creates an organization holds `owner`. The last owner cannot leave or lose the role. `manage` is the role that renames, invites and removes members. It is `owner` by default.
+Whoever creates an organization holds `owner`. The last owner cannot leave, lose the role or delete their account: `deleteAccount` and the admin's `deleteUser` answer `last-owner` until another member is made an owner.
+
+An owner who is the only member deletes the organization along with the account. `deletionImpact()` lists both kinds of organization by name, and the account page shows them before the user confirms. `manage` is the role that renames, invites and removes members. It is `owner` by default.
 
 ```ts
 const made = await auth.createOrganization({ name: 'Acme' })

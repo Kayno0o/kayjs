@@ -14,7 +14,7 @@ afterEach(() => {
   setSystemTime()
 })
 
-async function setup(options: { invitationPage?: string | undefined, create?: 'admin', invitationMaxAge?: Duration } = {}) {
+async function setup(options: { invitationPage?: string | undefined, create?: 'admin', invitationMaxAge?: Duration } = {}, extra: { onDelete?: () => Promise<void> } = {}) {
   const mails: Mail[] = []
   const events: [AuthEvent, string | null, string | undefined, string | undefined][] = []
   // What `onAuthEvent` hears of the same events: the event, who it happened to, its fields and who acted.
@@ -39,6 +39,7 @@ async function setup(options: { invitationPage?: string | undefined, create?: 'a
       invitationPage: '/invitation',
       ...options,
     },
+    ...extra,
     onEvent: (event, user: User, detail, context) => {
       if (ORG_EVENTS.has(event))
         events.push([event, user.email, detail, context.actor?.email ?? undefined])
@@ -295,6 +296,111 @@ describe('organizations', () => {
     expect(await grace.browser.call('deleteAccount', { password: PASSWORD })).toEqual({ ok: true })
     expect(await store.invitations!.listByEmail('grace@example.com')).toEqual([])
     expect(await store.invitations!.listByEmail('alan@example.com')).toHaveLength(1)
+  })
+
+  test('a sole owner with other members cannot delete their account, before the proof is spent, until another owner exists', async () => {
+    const { ada, org, person, join, store } = await setup()
+    const grace = await person('grace@example.com')
+
+    await join(ada, grace, 'grace@example.com')
+
+    expect(await ada.browser.call('deleteAccount', { password: 'wrong password here' })).toEqual({ ok: false, error: 'last-owner' })
+    expect(await ada.browser.call('deleteAccount', { password: PASSWORD })).toEqual({ ok: false, error: 'last-owner' })
+    expect(await store.users.get(ada.id)).toBeTruthy()
+    expect(await store.members!.get(org, ada.id)).toBeTruthy()
+    expect(await ada.browser.call('deletionImpact')).toEqual({ deleted: [], blocked: ['Acme'] })
+
+    await ada.browser.callOk('setMemberRoles', org, grace.id, ['owner'])
+
+    expect(await ada.browser.call('deleteAccount', { password: PASSWORD })).toEqual({ ok: true })
+    expect((await store.members!.listByOrganization(org)).map(member => member.userId)).toEqual([grace.id])
+    expect(await store.organizations!.get(org)).toBeTruthy()
+  })
+
+  test('a sole owner alone in an organization deletes it with their account, its slug freed', async () => {
+    const { ada, org, person, store } = await setup()
+
+    expect(await ada.browser.call('deletionImpact')).toEqual({ deleted: ['Acme'], blocked: [] })
+    expect(await ada.browser.call('deleteAccount', { password: PASSWORD })).toEqual({ ok: true })
+    expect(await store.organizations!.get(org)).toBeUndefined()
+    expect(await store.organizations!.findBySlug('acme')).toBeUndefined()
+    expect(await store.members!.listByOrganization(org)).toEqual([])
+
+    const grace = await person('grace@example.com')
+
+    expect((await grace.browser.callOk('createOrganization', { name: 'Acme', slug: 'acme' })).membership.organization.slug).toBe('acme')
+  })
+
+  test('one of two owners, or a member who is not an owner, deletes their account and the organization stays', async () => {
+    const { ada, org, person, join, store } = await setup()
+    const grace = await person('grace@example.com')
+    const alan = await person('alan@example.com')
+
+    await join(ada, grace, 'grace@example.com', ['owner'])
+    await join(ada, alan, 'alan@example.com')
+
+    expect(await alan.browser.call('deleteAccount', { password: PASSWORD })).toEqual({ ok: true })
+    expect(await ada.browser.call('deleteAccount', { password: PASSWORD })).toEqual({ ok: true })
+    expect((await store.members!.listByOrganization(org)).map(member => member.userId)).toEqual([grace.id])
+    expect(await grace.browser.call('deletionImpact')).toEqual({ deleted: ['Acme'], blocked: [] })
+  })
+
+  test('a sole owner of several organizations is refused for the one with members, and loses none when refused', async () => {
+    const { ada, org, person, join, store } = await setup()
+    const grace = await person('grace@example.com')
+    const { membership } = await ada.browser.callOk('createOrganization', { name: 'Solo', slug: 'solo' })
+
+    await join(ada, grace, 'grace@example.com')
+
+    expect(await ada.browser.call('deletionImpact')).toEqual({ deleted: ['Solo'], blocked: ['Acme'] })
+    expect(await ada.browser.call('deleteAccount', { password: PASSWORD })).toEqual({ ok: false, error: 'last-owner' })
+    expect(await store.organizations!.get(membership.organization.id)).toBeTruthy()
+
+    await ada.browser.callOk('setMemberRoles', org, grace.id, ['owner'])
+
+    expect(await ada.browser.call('deleteAccount', { password: PASSWORD })).toEqual({ ok: true })
+    expect(await store.organizations!.get(membership.organization.id)).toBeUndefined()
+    expect(await store.organizations!.get(org)).toBeTruthy()
+  })
+
+  test('two owners deleting their accounts one after the other keep the organization an owner', async () => {
+    const { ada, org, person, join, store } = await setup()
+    const grace = await person('grace@example.com')
+    const alan = await person('alan@example.com')
+
+    await join(ada, grace, 'grace@example.com', ['owner'])
+    await join(ada, alan, 'alan@example.com')
+
+    expect(await ada.browser.call('deleteAccount', { password: PASSWORD })).toEqual({ ok: true })
+    expect(await grace.browser.call('deleteAccount', { password: PASSWORD })).toEqual({ ok: false, error: 'last-owner' })
+    expect((await store.members!.listByOrganization(org)).map(member => member.userId)).toEqual([grace.id, alan.id])
+  })
+
+  test('two owners whose deletions overlap, each having seen the other, still leave the organization an owner', async () => {
+    const { ada, org, person, join, store } = await setup({}, { onDelete: async () => Bun.sleep(30) })
+    const grace = await person('grace@example.com')
+    const alan = await person('alan@example.com')
+
+    await join(ada, grace, 'grace@example.com', ['owner'])
+    await join(ada, alan, 'alan@example.com')
+
+    const answers = await Promise.all([ada.browser.call('deleteAccount', { password: PASSWORD }), grace.browser.call('deleteAccount', { password: PASSWORD })])
+    const left = await store.members!.listByOrganization(org)
+
+    expect(answers).toEqual([{ ok: true }, { ok: true }])
+    expect(left.map(member => member.userId)).toEqual([alan.id])
+    expect(left[0]!.roles).toContain('owner')
+  })
+
+  test('two owners alone deleting at once leave no organization behind', async () => {
+    const { ada, org, person, join, store } = await setup({}, { onDelete: async () => Bun.sleep(30) })
+    const grace = await person('grace@example.com')
+
+    await join(ada, grace, 'grace@example.com', ['owner'])
+    await Promise.all([ada.browser.call('deleteAccount', { password: PASSWORD }), grace.browser.call('deleteAccount', { password: PASSWORD })])
+
+    expect(await store.members!.listByOrganization(org)).toEqual([])
+    expect(await store.organizations!.get(org)).toBeUndefined()
   })
 
   test('a gate and a guard let through members holding the role in the organization the route names, and a guard without params refuses', async () => {

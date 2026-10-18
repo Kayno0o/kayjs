@@ -42,6 +42,7 @@ import { pwnedPassword } from './breached'
 import { admit, captchaChallenge, captchaRequired, proofOfWork } from './captcha'
 import { banned, homeOf, newUserRecord, publicUser } from './core'
 import { changeEmail, confirmEmailChange, pendingCode, requestMagicLink, requestPasswordReset, resetPassword, sendVerification, signInWithEmailCode, signInWithMagicLink, tokenLifetimes, verifyEmail, verifyEmailCode } from './email'
+import { soleOwned } from './erase'
 import { auditEntries, report } from './events'
 import { exportData } from './export'
 import { createGate, scopeAllows } from './gate'
@@ -661,9 +662,17 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     return unlink(this[STATE], provider, proof)
   }
 
-  // Deletes the signed-in user, calling `onDelete` for the app's own records, and signs this session out; the last admin is refused.
-  async deleteAccount(proof: Proof): Promise<{ ok: true } | { ok: false, error: ProofFailure | 'last-admin' }> {
+  // Deletes the signed-in user, calling `onDelete` for the app's own records, and signs this session out; the last admin and the only owner of an organization with other members are refused, an organization they are alone in is deleted with them.
+  async deleteAccount(proof: Proof): Promise<{ ok: true } | { ok: false, error: ProofFailure | 'last-admin' | 'last-owner' }> {
     return deleteAccount(this[STATE], proof, async () => this.signOut())
+  }
+
+  // The organizations deleting the signed-in user's account touches, by name: `deleted` are the ones they are the only member of, which go with them, `blocked` the ones they solely own with other members, which refuse the deletion (`last-owner`) until another owner is named.
+  async deletionImpact(): Promise<{ deleted: string[], blocked: string[] }> {
+    const record = await this[STATE].current()
+    const owned = record ? await soleOwned(this[STATE].core, record) : []
+
+    return { deleted: owned.filter(organization => organization.alone).map(organization => organization.name), blocked: owned.filter(organization => !organization.alone).map(organization => organization.name) }
   }
 
   // A bearer token for a device or an API client of the signed-in user, shown this once; minted from a session only, never from another token.

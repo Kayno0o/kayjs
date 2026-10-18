@@ -7,7 +7,7 @@ import { hashPassword } from '@kaynooo/utils'
 import { lastAdmin } from './admin'
 import { newPasswordProblem } from './breached'
 import { publicUser } from './core'
-import { eraseLeavingUser } from './erase'
+import { eraseLeavingUser, soleOwned } from './erase'
 import { notify } from './notify'
 import { normalizeUsername, usernameProblem } from './rules'
 import { endOtherSessions } from './sessions'
@@ -109,19 +109,26 @@ export async function unlink(state: RequestState, provider: string, proof: Proof
   return { ok: true }
 }
 
-// Deletes the signed-in user and everything kayjs-auth keeps for them, then signs this session out. The last admin is refused before the proof is spent.
-export async function deleteAccount(state: RequestState, proof: Proof, signOut: () => Promise<void>): Promise<{ ok: true } | { ok: false, error: ProofFailure | 'last-admin' }> {
+// Deletes the signed-in user and everything kayjs-auth keeps for them, then signs this session out. The last admin, and the only owner of an organization with other members, are refused before the proof is spent; an organization the user is alone in is deleted with them.
+export async function deleteAccount(state: RequestState, proof: Proof, signOut: () => Promise<void>): Promise<{ ok: true } | { ok: false, error: ProofFailure | 'last-admin' | 'last-owner' }> {
   const current = await state.current()
 
   if (current && await lastAdmin(state, current))
     return { ok: false, error: 'last-admin' }
+
+  if (current && (await soleOwned(state.core, current)).some(organization => !organization.alone))
+    return { ok: false, error: 'last-owner' }
 
   const proved = await reprove(state, proof)
 
   if (!proved.ok)
     return proved
 
-  await eraseLeavingUser(state, proved.record)
+  const erased = await eraseLeavingUser(state, proved.record)
+
+  if (!erased.ok)
+    return erased
+
   await signOut()
 
   return { ok: true }

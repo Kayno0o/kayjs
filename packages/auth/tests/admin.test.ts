@@ -207,6 +207,31 @@ describe('admin', () => {
     expect(await store.users.get(other.id)).toBeTruthy()
   })
 
+  test('an admin cannot delete the only owner of an organization with other members, and deletes one who is alone, organization included', async () => {
+    const { admin, ada, member, store } = await setup({
+      url: 'https://site.test',
+      site: 'Site',
+      organizations: { roles: { owner: ['member'], member: [] }, owner: 'owner', defaultRoles: ['member'], invitationPage: '/invitation' },
+      email: { mailer: { send: () => undefined }, links: { 'verify-email': '/verify', 'reset-password': '/reset', 'magic-link': '/magic', 'change-email': '/confirm-email' }, requireVerified: false },
+    })
+    const grace = await member('grace@example.com')
+
+    await store.users.update(ada.id, { emailVerifiedAt: new Date() })
+
+    const { membership } = await ada.browser.callOk('createOrganization', { name: 'Acme' })
+    const org = membership.organization.id
+
+    await store.members!.add({ organizationId: org, userId: grace.id, roles: ['member'], createdAt: new Date() })
+
+    expect(await admin.browser.call('deleteUser', ada.id)).toEqual({ ok: false, error: 'last-owner' })
+    expect(await store.users.get(ada.id)).toBeTruthy()
+
+    await store.members!.delete(org, grace.id)
+
+    expect(await admin.browser.call('deleteUser', ada.id)).toEqual({ ok: true })
+    expect(await store.organizations!.get(org)).toBeUndefined()
+  })
+
   test('deleting a user removes them, tells the app, mails them and logs the admin as the actor', async () => {
     const deleted: User[] = []
     const mails: Mail[] = []

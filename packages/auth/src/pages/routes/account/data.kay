@@ -41,6 +41,7 @@ const notProved = ctx.failed(prove)?.data?.error
 const proved = await auth.provedLately()
 // Neither proof form can pass: an admin acting as the user proves nothing, and an account with nothing to prove it by has only its sign-in, now old.
 const impersonated = await auth.impersonator() !== null
+const impact = await auth.deletionImpact()
 const stale = !proved && !user.hasPassword && !user.twoFactor
 ---
 if impersonated
@@ -70,6 +71,10 @@ else
     else
       form.flex.flex-col.gap-3(action={remove})
         p {t('auth.account.data.deleteIntro')}
+        if impact.deleted.length > 0
+          p {t('auth.account.data.deleteOrganizations', { names: impact.deleted.join(', ') })}
+        if impact.blocked.length > 0
+          p {t('auth.account.data.deleteBlocked', { names: impact.blocked.join(', ') })}
         Proof(user={user})
         if refused
           Message(text={failure(refused)})
