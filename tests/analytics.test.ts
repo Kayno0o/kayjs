@@ -210,6 +210,104 @@ describe('when a visit is not forwarded', () => {
   })
 })
 
+describe('consent by provider', () => {
+  const ASKING = [
+    ['ga4', { provider: 'ga4', measurementId: 'G-ABC123', apiSecret: 'sec_ret-1', host: 'http://localhost:1' }],
+    ['fathom', { provider: 'fathom', siteId: 'ABCDEFGH' }],
+    ['cloudflare', { provider: 'cloudflare', token: 'tok-123' }],
+    ['custom', { provider: 'custom', script: 'http://localhost:1/script.js', endpoint: 'http://localhost:1/collect' }],
+  ] as const
+  const ga4 = (more: object = {}): AnalyticsOptions => ({ provider: 'ga4', measurementId: 'G-ABC123', apiSecret: 'sec_ret-1', host: `http://localhost:${provider.port}/`, ...more })
+  const page = async (options: AnalyticsOptions) => (await (await site(options)).handle(new Request('http://localhost/'))).text()
+
+  it.each(ASKING)('%s asks before anything loads when consent is left out, as with consent true', async (_name, options) => {
+    const unset = await page(options)
+    const asked = await page({ ...options, consent: true })
+
+    expect(unset).toContain('data-consent')
+    expect(unset).not.toContain('data-info')
+    expect(unset).toBe(asked)
+    expect(unset).not.toContain('src="https://cdn.usefathom.com/script.js"')
+    expect(unset).not.toContain('src="https://static.cloudflareinsights.com')
+  })
+
+  it.each(ASKING)('%s counts without asking once the app wrote consent false, kay\'s script showing the opt-out only where it counts', async (name, options) => {
+    const html = await page({ ...options, consent: false })
+
+    expect(html).not.toContain('data-consent')
+    expect(html.includes('data-info')).toBe(name === 'ga4')
+  })
+
+  it('sends a ga4 visit only after a yes when consent is left out, and with consent false whatever the cookie but an opt-out', async () => {
+    const unset = await site(ga4())
+
+    await send(unset, visit())
+    await send(unset, visit(), { cookie: 'kay_analytics=no' })
+    expect(received).toEqual([])
+    await send(unset, visit(), { cookie: 'kay_analytics=yes' })
+    expect(received).toHaveLength(1)
+    received = []
+
+    const open = await site(ga4({ consent: false }))
+
+    await send(open, visit())
+    expect(received).toHaveLength(1)
+    await send(open, visit(), { cookie: 'kay_analytics=no' })
+    expect(received).toHaveLength(1)
+  })
+
+  it('posts nothing to a custom endpoint before a yes when consent is left out', async () => {
+    const app = await site({ provider: 'custom', script: `http://localhost:${provider.port}/script.js`, endpoint: `http://localhost:${provider.port}/collect` })
+    const collect = async (headers: Record<string, string> = {}) => app.handle(new Request('http://localhost/_kay/analytics/collect', { method: 'POST', body: '{}', headers: { 'content-type': 'application/json', 'user-agent': CHROME, 'x-forwarded-for': `203.0.113.${++counter % 250}`, ...headers } }))
+
+    expect((await collect()).status).toBe(204)
+    await forwardsSettled()
+    expect(received).toEqual([])
+    await collect({ cookie: 'kay_analytics=yes' })
+    expect(received).toHaveLength(1)
+  })
+
+  it.each(['plausible', 'umami', 'simpleanalytics', 'matomo'] as const)('%s counts at once and shows the information line and its opt-out', async (name) => {
+    const options = { plausible: { provider: 'plausible' }, umami: { provider: 'umami', websiteId: 'w' }, simpleanalytics: { provider: 'simpleanalytics' }, matomo: { provider: 'matomo', siteId: 1, host: 'https://m.example' } }[name] as AnalyticsOptions
+    const html = await page(options)
+
+    expect(html).toContain('data-info')
+    expect(html).not.toContain('data-consent')
+    expect(html).toContain('Opt out')
+  })
+
+  it('translates the information line, and leaves it out with info false or consent false and nothing to say', async () => {
+    const said = await page(plausible({ info: { text: { en: 'Counting', fr: 'Comptage' }, optOut: { en: 'No', fr: 'Non' } } }))
+
+    expect(said).toContain('Comptage')
+    expect(said).toContain('&quot;refuse&quot;:&quot;Non&quot;')
+    expect(await page(plausible({ info: false }))).not.toContain('data-info')
+  })
+
+  it('stops counting a visitor who opted out of an ungated provider, and counts the rest', async () => {
+    const app = await site(plausible())
+
+    await send(app, visit(), { cookie: 'kay_analytics=no' })
+    expect(received).toEqual([])
+    await send(app, visit())
+    await send(app, visit(), { cookie: 'kay_analytics=yes' })
+    expect(received).toHaveLength(2)
+  })
+
+  it('asks no one outside production and sends nothing, whatever the provider', async () => {
+    process.env.NODE_ENV = 'development'
+
+    try {
+      expect((await send(await site(ga4({ consent: false })), visit(), { cookie: 'kay_analytics=yes' })).status).toBe(204)
+    }
+    finally {
+      process.env.NODE_ENV = 'production'
+    }
+
+    expect(received).toEqual([])
+  })
+})
+
 describe('hostile requests', () => {
   it.each([
     ['another host', { u: 'https://evil.example/pricing' }],
@@ -408,7 +506,7 @@ describe('Matomo', () => {
 })
 
 describe('Google Analytics 4', () => {
-  const ga4 = (more: object = {}): AnalyticsOptions => ({ provider: 'ga4', measurementId: 'G-ABC123', apiSecret: 'sec_ret-1', host: `http://localhost:${provider.port}/`, ...more })
+  const ga4 = (more: object = {}): AnalyticsOptions => ({ provider: 'ga4', measurementId: 'G-ABC123', apiSecret: 'sec_ret-1', host: `http://localhost:${provider.port}/`, consent: false, ...more })
 
   it('is sent a page_view through the Measurement Protocol, the secret in the query and no cookie asked of the browser', async () => {
     const response = await send(await site(ga4({ address: true })), visit(), { 'x-forwarded-for': '198.51.100.9' })
@@ -494,7 +592,7 @@ describe('Fathom and Cloudflare Web Analytics', () => {
   }
 
   it('puts Fathom\'s script in the head, the CSP opened for its domain', async () => {
-    const { html, policy } = await home({ provider: 'fathom', siteId: 'ABCDEFGH' })
+    const { html, policy } = await home({ provider: 'fathom', siteId: 'ABCDEFGH', consent: false })
 
     expect(html).toContain('src="https://cdn.usefathom.com/script.js"')
     expect(html).toContain('data-site="ABCDEFGH"')
@@ -503,7 +601,7 @@ describe('Fathom and Cloudflare Web Analytics', () => {
   })
 
   it('puts the Cloudflare beacon in the head, the CSP opened as Cloudflare documents', async () => {
-    const { html, policy } = await home({ provider: 'cloudflare', token: 'tok-123' })
+    const { html, policy } = await home({ provider: 'cloudflare', token: 'tok-123', consent: false })
 
     expect(html).toContain('src="https://static.cloudflareinsights.com/beacon.min.js"')
     expect(html).toContain('data-cf-beacon="{&quot;token&quot;:&quot;tok-123&quot;}"')
@@ -523,7 +621,7 @@ describe('Fathom and Cloudflare Web Analytics', () => {
 })
 
 describe('a custom provider', () => {
-  const custom = (more: object = {}): AnalyticsOptions => ({ provider: 'custom', script: `http://localhost:${provider.port}/script.js`, endpoint: `http://localhost:${provider.port}/collect`, ...more })
+  const custom = (more: object = {}): AnalyticsOptions => ({ provider: 'custom', script: `http://localhost:${provider.port}/script.js`, endpoint: `http://localhost:${provider.port}/collect`, consent: false, ...more })
   const collect = async (app: Awaited<ReturnType<typeof pages>>, body: BodyInit, headers: Record<string, string> = {}) => app.handle(new Request('http://localhost/_kay/analytics/collect', { method: 'POST', body, headers: { 'content-type': 'application/json', 'user-agent': CHROME, 'x-forwarded-for': `203.0.113.${++counter % 250}`, ...headers } }))
 
   it('serves the script from the app with the endpoint pointed at the app', async () => {

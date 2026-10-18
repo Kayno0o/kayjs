@@ -15,7 +15,7 @@ This page lists what each feature keeps, for a site's privacy notice and for the
 | `session`, `__Host-session` over https | a session the app writes to | 30 days unused, 90 at most, by default |
 | `kay_flash` | an action redirecting with a flash message | 60 seconds |
 | `kay_locale` | a visitor picking a locale | a year |
-| `kay_analytics` | the consent notice of `analytics({ consent })` | a year |
+| `kay_analytics` | the consent notice or information line of `analytics()` | a year |
 | `kay_preview` | `enterPreview()`, for an editor | an hour by default |
 | the name given to `persisted()` | a persisted signal | a year, or its `maxAge` |
 
@@ -76,9 +76,9 @@ export default defineConfig({
 })
 ```
 
-Plausible, Umami (give it `websiteId`), Simple Analytics (`provider: 'simpleanalytics'`) and Matomo (`siteId` and `host`) work this way. All four set no cookie, so they count from the first page. Matomo only gets the visitor's address if you give it a `tokenAuth` of a user with write access to the site, as Matomo requires; without one it sees your server's address.
+Plausible, Umami (give it `websiteId`), Simple Analytics (`provider: 'simpleanalytics'`) and Matomo (`siteId` and `host`) work this way. All four set no cookie and can be run on your own server, so they count from the first page, with an information line and a way to opt out (see below). Matomo only gets the visitor's address if you give it a `tokenAuth` of a user with write access to the site, as Matomo requires; without one it sees your server's address.
 
-Fathom and Cloudflare Web Analytics are different. They take data only from their own scripts, so kay cannot send for them. `provider: 'fathom'` (`siteId`) and `provider: 'cloudflare'` (`token`) add their script to your pages and open the content security policy for their domains. Their data does not pass through your site.
+Fathom and Cloudflare Web Analytics are different. Like Google Analytics and `custom`, they wait for the visitor's yes unless you write `consent: false`. They take data only from their own scripts, so kay cannot send for them. `provider: 'fathom'` (`siteId`) and `provider: 'cloudflare'` (`token`) add their script to your pages and open the content security policy for their domains. Their data does not pass through your site.
 
 For any other tracker that is a script posting to an endpoint, use `provider: 'custom'` with `script` and `endpoint`. kay serves a copy of the script from your site with the endpoint in it pointed at your site, and passes what the script posts on. The endpoint must appear in the script exactly as you write it.
 
@@ -92,7 +92,9 @@ The script counts the page when it loads and again after each page swap. It need
 analytics({ provider: 'ga4', measurementId: 'G-ABC123XYZ', apiSecret: 'secret', consent: true })
 ```
 
-Google normally keeps a visitor's id in a cookie, which would need consent before it is set. kay sets none. Your server makes the id from the visitor's address and browser with a random key that changes every day and is never stored, so the id tells a visitor apart for one day and cannot be turned back into an address. Two servers behind a balancer count one visitor twice. With `consent` on, no id is made and nothing is sent until the visitor said yes.
+Google normally keeps a visitor's id in a cookie. kay sets none, but that does not remove the need to ask: the script still reads the visitor's screen and language, and Google Analytics is never exempt from consent.
+
+Your server makes the id from the visitor's address and browser with a random key that changes every day and is never stored, so the id tells a visitor apart for one day and cannot be turned back into an address. Two servers behind a balancer count one visitor twice. No id is made and nothing is sent until the visitor said yes, which is the default for Google Analytics.
 
 Google does not get the visitor's address unless you give `address: true`, which sends it as `ip_override` so Google can place the visit; otherwise Google places every visit at your server.
 
@@ -107,7 +109,7 @@ Behind a CDN or proxy set `proxy`, or every visitor shares the proxy's address a
 
 ### Asking first
 
-Add `consent: true` and kay shows a notice until the visitor chooses. Nothing is counted before a yes, and the server checks that on every visit rather than trusting the page. The answer is kept in the `kay_analytics` cookie for a year, for your `base` path.
+Google Analytics, Fathom, Cloudflare and `custom` ask by default, as if you wrote `consent: true`; for Plausible, Umami, Simple Analytics and Matomo you add it. Kay shows a notice until the visitor chooses. Nothing is counted before a yes, and the server checks that on every visit rather than trusting the page. The answer is kept in the `kay_analytics` cookie for a year, for your `base` path.
 
 ```ts
 analytics({
@@ -124,6 +126,37 @@ analytics({
 The notice is a labelled region that Tab reaches, and kay never moves the focus to it. With Fathom or Cloudflare, a refusal after the script loaded reloads the page so it runs no more.
 
 Give any element a `data-analytics-consent` attribute and a click on it shows the notice again, so a visitor can change their mind. Your own scripts read the answer with `window.kayAnalytics.consent()`, and a `kay:consent` event fires on `document` when it changes. An app with its own banner uses `consent` instead, below.
+
+### Counting without asking
+
+Plausible, Umami, Simple Analytics and Matomo count at once, and kay shows a short information line with an `OK` button and an `Opt out` button. Opting out writes `kay_analytics=no`, and your server then passes on nothing for that visitor, on any page. Word it with `info: { text, ok, optOut }`, each a string or one per language. If your site already informs visitors and lets them object, write `info: false`.
+
+To count Google Analytics, Fathom, Cloudflare or a custom tracker without asking, write `consent: false`. You then answer for it yourself: kay shows no notice for Fathom, Cloudflare or a custom tracker, and only the information line for Google Analytics. Before 1.55 these counted every visit without asking, and `kay check` reports the ones that did not say which they want.
+
+### The CNIL exemption, and what it asks
+
+Not asking is lawful only where an exemption applies, and a cookieless id is not one by itself: reading the visitor's screen, language and title falls under the same ePrivacy rule as a cookie. The French CNIL exempts audience measurement when all of this holds:
+
+- The numbers are anonymous statistics for your own site, used for nothing else.
+- The tool does not reuse the data and does not follow a visitor across sites.
+- Visitors are told, and can object easily.
+- Data is kept 25 months at most.
+
+This is one regulator's position. Other countries may ask for consent anyway. Plausible, Umami and Matomo get the visitor's address to tell visitors apart, so the exemption holds only if the tool drops it: run it yourself, or check its terms. Google Analytics is never exempt. The information line and the opt-out are the notice and the objection the exemption asks for, not the whole of it.
+
+### Processors, agreements and transfers
+
+Whichever tool you use, your privacy notice names it, what it is for and how long the data stays, and you sign its data processing agreement before counting a visit. Check each provider's current terms, as these change.
+
+| Provider | Your legal basis | Who it is | Agreement and transfer |
+| --- | --- | --- | --- |
+| Plausible, Umami, Simple Analytics or Matomo on your own server | The exemption above, or consent | You, with no third party | None to sign, and no transfer if your server is in the EU |
+| Plausible Cloud, Simple Analytics, Matomo Cloud | The same | A processor working for you | An agreement the provider offers, with EU hosting |
+| Umami Cloud | The same | A processor | An agreement the provider offers, US hosting, so a transfer mechanism is needed |
+| Google Analytics | Consent, always | Google, a processor (and for some uses a controller) | Google's data processing terms, accepted in your account, and a US transfer under the Data Privacy Framework or standard clauses |
+| Fathom | Consent | A processor (Fathom Analytics, Canada) | An agreement the provider offers, and a transfer to Canada |
+| Cloudflare Web Analytics | Consent | Cloudflare, a processor | Cloudflare's agreement in its customer terms, and a US transfer under the Data Privacy Framework or standard clauses |
+| `custom` | Consent | Whoever runs the endpoint | Your own agreement with them |
 
 ### Asking in your own banner
 

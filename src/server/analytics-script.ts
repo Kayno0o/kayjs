@@ -7,6 +7,7 @@ export const ANALYTICS_SCRIPT = `(() => {
   const scope = path.slice(0, -'/_kay/analytics'.length) || '/'
   const name = 'kay_analytics'
   const gated = data.consent !== undefined
+  const informed = data.info !== undefined
   const silent = data.silent !== undefined
   const texts = data.texts ? JSON.parse(data.texts) : {}
   const load = data.load ? JSON.parse(data.load) : undefined
@@ -20,8 +21,13 @@ export const ANALYTICS_SCRIPT = `(() => {
     return found ? found.slice(name.length + 1) : ''
   }
 
+  // Waiting for a yes, or counting until the visitor opts out.
+  function blocked() {
+    return gated ? choice() !== 'yes' : choice() === 'no'
+  }
+
   async function view(url) {
-    if (gated && choice() !== 'yes')
+    if (blocked())
       return
 
     const body = JSON.stringify({ u: url, r: last, t: document.title, w: screen.width + 'x' + screen.height, l: navigator.language })
@@ -36,7 +42,7 @@ export const ANALYTICS_SCRIPT = `(() => {
 
   // A provider that takes no visits from here runs its own script, loaded once the visitor agreed.
   function start() {
-    if (gated && choice() !== 'yes')
+    if (blocked())
       return
 
     if (!load) {
@@ -80,7 +86,7 @@ export const ANALYTICS_SCRIPT = `(() => {
   }
 
   function ask() {
-    if (banner || silent || !gated)
+    if (banner || silent || !(gated || informed))
       return
 
     const lang = document.documentElement.lang.split('-')[0]
@@ -110,11 +116,11 @@ export const ANALYTICS_SCRIPT = `(() => {
     document.addEventListener('kay:navigate', event => void view(event.detail.url))
 
   document.addEventListener('click', event => {
-    if (gated && event.target instanceof Element && event.target.closest('[data-analytics-consent]'))
+    if ((gated || informed) && event.target instanceof Element && event.target.closest('[data-analytics-consent]'))
       ask()
   })
 
-  if (gated && choice() === '')
+  if ((gated || informed) && choice() === '')
     ask()
 
   start()

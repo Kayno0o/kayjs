@@ -6,7 +6,7 @@ import process from 'node:process'
 import { Elysia } from 'elysia'
 import { kayLog } from '../runtime/log'
 import { isCrossSite } from './actions'
-import { ANALYTICS_PATH, ANALYTICS_SCRIPT_PATH, CUSTOM_COLLECT_PATH, CUSTOM_SCRIPT_PATH } from './analytics'
+import { ANALYTICS_PATH, ANALYTICS_SCRIPT_PATH, CUSTOM_COLLECT_PATH, CUSTOM_SCRIPT_PATH, isGated } from './analytics'
 import { ANALYTICS_SCRIPT } from './analytics-script'
 import { readCapped } from './errors'
 import { clientAddress, overLimit } from './protection'
@@ -31,6 +31,7 @@ const COLLECTS_PER_MINUTE = 600
 const SCRIPT_TTL_MS = 3_600_000
 const COLLECT_TYPES = new Set(['application/json', 'text/plain', 'application/x-www-form-urlencoded'])
 const CONSENT_COOKIE = 'kay_analytics=yes'
+const OPT_OUT_COOKIE = 'kay_analytics=no'
 // What a visit may carry from its query string: the campaign a link names, and nothing a page holds for one visitor, such as a token or an address.
 const KEPT_PARAMETERS = /^(?:utm_[a-z]+|ref|source)$/
 const CONTROL_CHARACTERS = /[\p{Cc}\p{Zl}\p{Zp}\p{Bidi_Control}]+/gu
@@ -176,7 +177,7 @@ export function warningsReset(): void {
 }
 
 export function analyticsServer(options: AnalyticsOptions): AnyElysia {
-  const gated = options.consent !== undefined && options.consent !== false
+  const gated = isGated(options)
 
   const tracker = new Elysia({ name: 'kay-analytics' })
     .get(ANALYTICS_SCRIPT_PATH, () => new Response(ANALYTICS_SCRIPT, { headers: { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'public, max-age=3600' } }))
@@ -210,8 +211,8 @@ export function analyticsServer(options: AnalyticsOptions): AnyElysia {
       if (visit === undefined)
         return new Response(null, { status: 400 })
 
-      // A development server, a test and a visitor who has not agreed (the cookie is theirs to send, so a request without it is one the notice never asked) are answered as a counted visit, so nothing tells them apart.
-      if (process.env.NODE_ENV !== 'production' || (gated && !hasConsent(request)) || visit.userAgent === '')
+      // A development server, a test, a visitor who has not agreed where a yes is needed (the cookie is theirs to send, so a request without it is one the notice never asked) and one who opted out are answered as a counted visit, so nothing tells them apart.
+      if (process.env.NODE_ENV !== 'production' || declined(request, gated) || visit.userAgent === '')
         return new Response(null, { status: 204 })
 
       const address = options.provider === 'ga4' || needsAddress(options) ? clientAddress(request, server) : ''
@@ -283,7 +284,7 @@ function customServer(options: Extract<AnalyticsOptions, { provider: 'custom' }>
       if (body === undefined)
         return new Response(null, { status: 413 })
 
-      if (process.env.NODE_ENV !== 'production' || (gated && !hasConsent(request)))
+      if (process.env.NODE_ENV !== 'production' || declined(request, gated))
         return new Response(null, { status: 204 })
 
       const address = options.address === true ? clientAddress(request, server) : undefined
@@ -321,8 +322,11 @@ async function fetchScript(url: string): Promise<string | undefined> {
   }
 }
 
-function hasConsent(request: Request): boolean {
-  return (request.headers.get('cookie') ?? '').split(';').some(cookie => cookie.trim() === CONSENT_COOKIE)
+// A gated provider needs the visitor's yes; one counting without asking stops for a visitor who opted out.
+function declined(request: Request, gated: boolean): boolean {
+  const cookies = new Set((request.headers.get('cookie') ?? '').split(';').map(cookie => cookie.trim()))
+
+  return gated ? !cookies.has(CONSENT_COOKIE) : cookies.has(OPT_OUT_COOKIE)
 }
 
 // The visit a browser reported, or undefined when anything is off: the page must be one of this site's own, so the route forwards for no other host.

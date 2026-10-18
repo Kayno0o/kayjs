@@ -344,6 +344,15 @@ export const LINTS = {
     wrong: 'discordProvider({ apiBase: \'https://proxy.example.com/discord\' })',
     right: 'discordProvider({ url: \'https://proxy.example.com/discord\' })',
   },
+  'deprecated-analytics-consent': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.55',
+    site: true,
+    summary: '`analytics({ provider })` of `ga4`, `fathom`, `cloudflare` or `custom` with no `consent`, which counted every visit from the first page before 1.55 and waits for the visitor\'s yes since, with kay\'s notice: the fix writes `consent: true`, which is what a missing `consent` means now. Write `consent: false` instead to count without asking, which the app then answers for. `plausible`, `umami`, `simpleanalytics` and `matomo` still count at once, with an information line and an opt-out. Found in the project\'s `.ts` files importing `kay/analytics`, for a call with an object literal and no spread.',
+    wrong: 'analytics({ provider: \'fathom\', siteId: \'ABCDEFGH\' })',
+    right: 'analytics({ provider: \'fathom\', siteId: \'ABCDEFGH\', consent: true })',
+  },
   'deprecated-store-verb': {
     level: 'warn',
     group: 'deprecated',

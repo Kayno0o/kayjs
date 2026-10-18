@@ -2520,6 +2520,29 @@ describe.concurrent('kay check, unused code', () => {
     }
   })
 
+  it('reports an analytics provider that now asks for consent and was left without it, and --fix writes consent: true', async () => {
+    const root = await scratchProject({
+      'src/a.ts': 'import { analytics } from \'kay/analytics\'\n\nexport const a = analytics({ provider: \'ga4\', measurementId: \'G-ABCD\', apiSecret: \'x\' })\nexport const b = analytics({ provider: \'fathom\', siteId: \'ABCDEFGH\', consent: false })\nexport const c = analytics({ provider: \'plausible\' })\n',
+      'src/b.ts': 'import * as stats from \'kay/analytics\'\n\nconst more = {}\n\nexport const d = stats.analytics({ provider: \'cloudflare\', token: \'tok\' })\nexport const e = stats.analytics({ provider: \'custom\', ...more })\n',
+      'src/mine.ts': 'export function analytics(options: { provider: string }): string {\n  return options.provider\n}\n',
+      'src/c.ts': 'import { analytics } from \'./mine\'\n\nexport const f = analytics({ provider: \'ga4\' })\n',
+    })
+
+    try {
+      const { output } = await runCheck(root)
+
+      expect(output.match(/deprecated-analytics-consent/g)).toHaveLength(2)
+      expect(output).not.toContain('src/c.ts')
+      await runCheck(root, '--fix')
+      expect(await Bun.file(join(root, 'src/a.ts')).text()).toContain('analytics({ consent: true, provider: \'ga4\'')
+      expect(await Bun.file(join(root, 'src/b.ts')).text()).toContain('stats.analytics({ consent: true, provider: \'cloudflare\'')
+      expect((await runCheck(root)).output).not.toContain('deprecated-analytics-consent')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('reports discordProvider\'s apiBase as url, and --fix renames the key unless it is a shorthand or url is given too', async () => {
     const root = await scratchProject({
       'src/a.ts': 'import { discordProvider } from \'@kaynooo/kayjs-auth\'\n\nexport const a = discordProvider({ apiBase: \'https://proxy.test\' })\n',

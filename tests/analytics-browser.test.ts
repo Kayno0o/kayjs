@@ -267,3 +267,48 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the consen
     expect(opened.errors).toEqual([])
   })
 })
+
+describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a counter that asks no one, in a browser', () => {
+  let open: TestSite
+  let opened: TestPage
+
+  beforeAll(async () => {
+    before = process.env.NODE_ENV
+    process.env.NODE_ENV = 'production'
+    provider = fakeProvider()
+    received.length = 0
+    open = await testSite({
+      routes: 'tests/fixtures/navigation/src/routes',
+      browser: { path },
+      onError: () => undefined,
+      extensions: [analytics({ provider: 'plausible', domain: 'example.com', host: `http://localhost:${provider.port}`, info: { text: 'Counting', ok: 'Fine', optOut: 'Stop' } })],
+    })
+    opened = await open.open('/')
+  }, 60_000)
+
+  afterAll(async () => {
+    await open?.close()
+    await provider?.stop(true)
+    restoreEnvironment(before)
+  })
+
+  it('counts the first page at once and shows the information line with its opt-out', async () => {
+    await opened.waitFor('section[aria-labelledby] button')
+
+    expect(await opened.text('#kay-analytics-notice')).toBe('Counting')
+    expect((await visits(1))[0]!.body.url).toMatch(/\/$/)
+    expect(await opened.a11y('section[aria-labelledby]')).toEqual([])
+  })
+
+  it('counts no more once the visitor opts out, across a page swap', async () => {
+    await opened.click('section[aria-labelledby] button:last-of-type')
+
+    expect(await opened.evaluate(() => document.cookie)).toContain('kay_analytics=no')
+    await opened.click('a.second')
+    await opened.waitFor('h1', { text: 'Second' })
+    await Bun.sleep(300)
+
+    expect(received).toHaveLength(1)
+    expect(opened.errors).toEqual([])
+  })
+})

@@ -16,9 +16,22 @@ export interface AnalyticsConsent {
   notice?: boolean | undefined
 }
 
+// The line shown while a visit is counted without asking, with the button that opts out.
+export interface AnalyticsInfo {
+  text?: AnalyticsText | undefined
+  // The button that closes the line.
+  ok?: AnalyticsText | undefined
+  // The button that stops the counting for this visitor.
+  optOut?: AnalyticsText | undefined
+}
+
 interface Common {
-  // Waits for the visitor's yes before counting a visit, with a notice kay shows until they chose; `true` for the notice in English. A provider that sets cookies on its own would need this on, the ones here set none.
+  // Waits for the visitor's yes before counting a visit, with a notice kay shows until they chose; `true` for the notice in English.
+  // Left out, `ga4`, `fathom`, `cloudflare` and `custom` ask like `true`, as they are not self-hostable cookieless counters; `consent: false` counts them without asking, which the app answers for.
+  // Left out or `false`, `plausible`, `umami`, `simpleanalytics` and `matomo` count at once and show `info`.
   consent?: boolean | AnalyticsConsent | undefined
+  // The information line and opt-out kay shows where visits are counted without asking, `false` when the app informs and lets visitors object itself.
+  info?: false | AnalyticsInfo | undefined
   // Hosts besides the one a page is served from that a visit may name, such as `www.example.com` for a site also served at `example.com`.
   hosts?: string[] | undefined
 }
@@ -113,6 +126,14 @@ const TOKEN = /^[\w-]{1,128}$/
 const MEASUREMENT_ID = /^G-[A-Z\d]{4,20}$/i
 
 const DEFAULT_TEXT = { text: 'We count visits to improve this site, without cookies that follow you. Do you agree?', agree: 'Agree', refuse: 'Refuse' }
+const DEFAULT_INFO = { text: 'We count visits to improve this site, without cookies that follow you. You can opt out.', agree: 'OK', refuse: 'Opt out' }
+// The providers that wait for a yes unless the app wrote `consent: false`.
+const ASKS_BY_DEFAULT: ReadonlySet<string> = new Set(['ga4', 'fathom', 'cloudflare', 'custom'])
+
+// Whether a visit waits for the visitor's yes: the app's `consent`, else the provider's default.
+export function isGated(options: AnalyticsOptions): boolean {
+  return options.consent === undefined ? ASKS_BY_DEFAULT.has(options.provider) : options.consent !== false
+}
 
 // Counts the site's visits with a provider, through the site's own origin where the provider takes visits from a server: the browser loads one small script from the app and posts to a route of the app, which forwards each visit to the provider, so the CSP needs no third-party host and ad blockers have nothing to match.
 // Fathom and Cloudflare Web Analytics take data only from their own scripts, so those load from their domains and the CSP is opened for them.
@@ -120,8 +141,14 @@ const DEFAULT_TEXT = { text: 'We count visits to improve this site, without cook
 export function analytics(options: AnalyticsOptions): KayExtension {
   checked(options)
 
-  const texts = options.consent === undefined || options.consent === false ? undefined : noticeOf(options.consent === true ? {} : options.consent)
-  const gate = texts && { 'data-consent': '', 'data-texts': JSON.stringify(texts), ...typeof options.consent === 'object' && options.consent.notice === false && { 'data-silent': '' } }
+  const asking = isGated(options)
+  const informs = !asking && options.info !== false && options.provider !== 'fathom' && options.provider !== 'cloudflare' && options.provider !== 'custom'
+  const given = typeof options.consent === 'object' ? options.consent : {}
+  const info = typeof options.info === 'object' ? options.info : {}
+  const words = asking ? noticeOf(given, DEFAULT_TEXT) : noticeOf({ text: info.text, agree: info.ok, refuse: info.optOut }, DEFAULT_INFO)
+  const gate = asking
+    ? { 'data-consent': '', 'data-texts': JSON.stringify(words), ...given.notice === false && { 'data-silent': '' } }
+    : informs && { 'data-info': '', 'data-texts': JSON.stringify(words) }
 
   if (options.provider !== 'fathom' && options.provider !== 'cloudflare' && options.provider !== 'custom') {
     return {
@@ -134,12 +161,12 @@ export function analytics(options: AnalyticsOptions): KayExtension {
 
   const loaded = options.provider === 'custom' ? { src: CUSTOM_SCRIPT_PATH, attrs: {} } : scriptOf(options)
   // Without a notice the provider's script goes in the head as it is; behind one, kay's script loads it once the visitor said yes.
-  const tag = gate ? { 'src': ANALYTICS_SCRIPT_PATH, 'defer': true, ...gate, 'data-load': JSON.stringify(loaded) } : { src: loaded.src, defer: true, ...loaded.attrs }
+  const tag = asking ? { 'src': ANALYTICS_SCRIPT_PATH, 'defer': true, ...gate, 'data-load': JSON.stringify(loaded) } : { src: loaded.src, defer: true, ...loaded.attrs }
 
   // The provider's own script needs no route of ours, except the one that shows the notice and loads it.
   return {
     name: 'kay/analytics',
-    ...(options.provider === 'custom' || gate) && { needsServer: true, server: async () => (await import('./analytics-server')).analyticsServer(options) },
+    ...(options.provider === 'custom' || asking) && { needsServer: true, server: async () => (await import('./analytics-server')).analyticsServer(options) },
     config: {
       head: [{ tag: 'script', props: tag }],
       ...options.provider !== 'custom' && { security: { csp: cspOf(options) } },
@@ -164,14 +191,14 @@ function cspOf(options: FathomOptions | CloudflareOptions): Record<string, strin
 }
 
 // One entry per language the notice is written in, `en` alone when every text is a plain string; a text a language lacks falls back to the English default.
-function noticeOf(consent: AnalyticsConsent): Record<string, { text: string, agree: string, refuse: string }> {
+function noticeOf(consent: { text?: AnalyticsText | undefined, agree?: AnalyticsText | undefined, refuse?: AnalyticsText | undefined }, defaults: { text: string, agree: string, refuse: string }): Record<string, { text: string, agree: string, refuse: string }> {
   const given = [consent.text, consent.agree, consent.refuse].flatMap(value => typeof value === 'object' ? Object.keys(value) : [])
   const read = (value: AnalyticsText | undefined, language: string, fallback: string) => typeof value === 'string' ? value : value?.[language] ?? fallback
 
   return Object.fromEntries((given.length === 0 ? ['en'] : [...new Set(given)]).map(language => [language, {
-    text: read(consent.text, language, DEFAULT_TEXT.text),
-    agree: read(consent.agree, language, DEFAULT_TEXT.agree),
-    refuse: read(consent.refuse, language, DEFAULT_TEXT.refuse),
+    text: read(consent.text, language, defaults.text),
+    agree: read(consent.agree, language, defaults.agree),
+    refuse: read(consent.refuse, language, defaults.refuse),
   }]))
 }
 
