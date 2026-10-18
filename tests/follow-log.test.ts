@@ -50,6 +50,19 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('followLog 
     expect(page.errors).toEqual([])
   }, 30_000)
 
+  it('keeps following when the container shrinks', async () => {
+    const page = await open()
+
+    await page.evaluate(() => {
+      document.querySelector<HTMLElement>('ol.list')!.style.height = '100px'
+    })
+    await page.click('button.append')
+    await page.waitFor('ol.list li:last-child', { text: '41' })
+
+    expect((await page.evaluate(reading)).away).toBe(0)
+    expect(page.errors).toEqual([])
+  }, 30_000)
+
   it('leaves the reader where they are on an append while away from the bottom', async () => {
     const page = await open()
 

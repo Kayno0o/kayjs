@@ -28,6 +28,7 @@ export function followLog(container: Element | (() => Element | null | undefined
     const threshold = options.threshold ?? DEFAULT_THRESHOLD
     let following = true
     let height = 0
+    let viewport = 0
     let anchor: Anchor | undefined
 
     // Instant, so a container with `scroll-behavior: smooth` is not measured halfway.
@@ -35,10 +36,12 @@ export function followLog(container: Element | (() => Element | null | undefined
 
     const items = (): Element[] => options.items === undefined ? [...element.children] : [...element.querySelectorAll(options.items)]
 
-    const away = (): number => height - element.scrollTop - element.clientHeight
+    // Against the sizes measured last, so only the reader's scrolling can end the following, never the container shrinking.
+    const away = (): number => height - element.scrollTop - viewport
 
     const measure = (): void => {
       height = element.scrollHeight
+      viewport = element.clientHeight
       following = away() <= threshold
       anchor = undefined
 
