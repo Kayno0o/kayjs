@@ -50,6 +50,19 @@ describe('icons', () => {
     expect(html).toContain(`<svg viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" data-name="home" class="size-5"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="${HOME_PATH}"/>`)
   })
 
+  it('leaves out an icon only an export the browser code never reads holds', async () => {
+    const data = join(scratch, 'icon-data.ts')
+
+    await Bun.write(data, 'import home from \'~icons/tabler/home\'\nimport mail from \'~icons/tabler/mail\'\nexport const USED = [home]\nexport const UNUSED = [mail]\n')
+
+    const result = await bundle(`import { USED } from ${JSON.stringify(data)}\nconsole.log(USED)\n`)
+    const code = await result.outputs[0]!.text()
+
+    expect(result.success).toBe(true)
+    expect(code).toContain(HOME_PATH)
+    expect(code.match(/viewBox/g)).toHaveLength(1)
+  })
+
   it('bundles only the icons the browser code imports', async () => {
     const result = await bundle('import home from \'~icons/tabler/home\'\nconsole.log(home)\n')
     const code = await result.outputs[0]!.text()

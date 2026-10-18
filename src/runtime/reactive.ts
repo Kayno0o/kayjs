@@ -1,6 +1,8 @@
 // Kay's reactive core: signals hold values, memos derive them, effects react to them.
 // Writes apply at once; effects that depend on what changed run batched in a microtask, or right away through `flush()`.
 
+import type { Setter, Signal } from './core'
+
 type Equals<T> = false | ((previous: T, next: T) => boolean)
 
 export interface SignalOptions<T> {
@@ -724,4 +726,11 @@ function dispose(node: Owner): void {
   }
 
   node.state = DISPOSED
+}
+
+// A read function given the `set` of a signal, which takes a value or a function of the current one.
+export function withSetter<T>(read: () => T, write: (value: T) => void): Signal<T> {
+  const set: Setter<T> = next => write(typeof next === 'function' ? (next as (current: T) => T)(untrack(read)) : next)
+
+  return Object.assign(read, { set })
 }

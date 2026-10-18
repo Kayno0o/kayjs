@@ -2,6 +2,10 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
+## Unreleased
+
+- An island's script no longer carries the icons of a module it imports without using them, and an island calling `signal()` alone no longer loads the value encoder `persisted()` and action calls share: babelraid's home page loses 1.8 KB of brotli ([Images](images.md)).
+
 ## 1.53.3
 
 - kayjs-ai's `ChatLauncher` puts the chat behind a button at the bottom right of every page, opening it in a panel whose JavaScript loads on the first open, keeping the conversation across page swaps and reloads of the tab; `Chat` takes `remember` and `links="here"` for it ([Chat island](../packages/ai/llms/chat.md#floating-chat)). The docs' chat moved from `/ask` to that button. Escape anywhere in a `Chat` stops a reply under way and prevents the event's default, so a dialog or panel around it stays open.

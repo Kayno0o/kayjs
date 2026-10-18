@@ -208,7 +208,7 @@ The tag is the `svg` spreading the icon, `svg({...Home} class="size-5")`, which 
 
 - The import gives the `viewBox`, the markup inlined as `innerHTML` (a `SafeHtml`, so a spread accepts it), `aria-hidden="true"`, and a height of `1em` with the width of the icon's ratio, so it sizes to the text around it and takes its colour from `currentColor`; a class or style sizes it otherwise.
 - An icon that means something on its own, with no text beside it, takes `role="img"` and an `aria-label`.
-- Only the icons a page or an island imports are in the build; an alias renders as the icon it points at.
+- Only the icons a page or an island imports are in the build, and an island's script holds those it uses: an icon in an export or a module it never reads is dropped from it. An alias renders as the icon it points at.
 - `kay check` declares every icon of the installed sets in `.kay/types/kay-icons.d.ts`, so a misspelt name is reported as a module it cannot find; a bundle naming one fails with the set and the name.
 - kay reads `@iconify-json/<prefix>` packages, not the all-in-one `@iconify/json`: each icon of an installed set is one declaration there and one virtual module the server registers at boot (Tabler, 6,400 icons, takes about 10 ms).
 

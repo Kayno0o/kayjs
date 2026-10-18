@@ -26,6 +26,13 @@ export function vouch(markup: string, always = false): SafeHtml {
   return markup as SafeHtml
 }
 
+// An icon's props with their markup vouched for for good.
+export function vouchedIcon<T extends { innerHTML: string }>(icon: T): T {
+  icon.innerHTML = vouch(icon.innerHTML, true)
+
+  return icon
+}
+
 // Whether `value` is markup something vouched for with `trustHtml`, `sanitizeHtml` or an icon import; markup with nothing in it always is. A use keeps it unless `touch` is false.
 export function isVouched(value: unknown, touch = true): value is SafeHtml {
   if (typeof value !== 'string')

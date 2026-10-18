@@ -281,6 +281,8 @@ a(href="/")
 
 The icon sizes to the surrounding text and takes its colour from `currentColor`.
 
+An island's script carries only the icons it draws. An icon in a list or a module that the island does not read is left out, even when the island imports that module.
+
 An icon without text beside it needs `role="img"` and an `aria-label`.
 
 ### An icon known at runtime

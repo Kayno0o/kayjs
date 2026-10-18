@@ -72,7 +72,8 @@ export function iconModule(sets: Map<string, string>, specifier: string): string
   if (!props)
     throw new KayError('icon-unresolved', `kay: ${ICONIFY_PACKAGE}${prefix} has no icon named ${name}`)
 
-  return `import { vouch } from ${JSON.stringify(VOUCH_MODULE)}\nconst icon = ${JSON.stringify(props)}\nicon.innerHTML = vouch(icon.innerHTML, true)\nexport default icon\n`
+  // The call is marked pure, so a bundle drops an icon nothing uses, which a statement setting `innerHTML` beside the object would keep.
+  return `import { vouchedIcon } from ${JSON.stringify(VOUCH_MODULE)}\nexport default /* @__PURE__ */ vouchedIcon(${JSON.stringify(props)})\n`
 }
 
 // One module declaration per icon of the installed sets, so a misspelt name fails to type-check as a missing module.

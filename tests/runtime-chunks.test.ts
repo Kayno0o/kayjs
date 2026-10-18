@@ -14,6 +14,8 @@ afterAll(async () => {
 
 // The error ActionError builds its message from, which only the chunk holding the action runtime carries.
 const ACTION_RUNTIME = 'Action failed with'
+// The error sendValue throws with, which only the chunk holding the encoder carries.
+const ENCODER = 'cannot be sent to the server'
 
 async function chunkText(client: Awaited<ReturnType<typeof buildClient>>, url: string): Promise<string> {
   return Bun.file(join(client.dir, url.slice('/_kay/'.length))).text()
@@ -35,6 +37,22 @@ describe('the runtime modules a page loads', () => {
     // The names every island shares stay in the one runtime chunk: an island's chunks are its own and that.
     expect(plain).toHaveLength(2)
     expect(failing.length).toBeGreaterThanOrEqual(2)
+  }, 120_000)
+})
+
+describe('the value encoder', () => {
+  it('is loaded by the islands keeping a value, not by the ones calling signal() alone', async () => {
+    const root = resolve(await fixtureCopy('runtime-chunks'))
+
+    dirs.push(root)
+    await Bun.write(join(root, 'src/components/kept.kay'), '---\nimport { persisted } from \'kay\'\n\nconst theme = persisted(\'theme\', \'light\', { storage: \'local\' })\n---\nbutton.kept(onClick={() => theme.set(\'dark\')}) Kept {theme()}\n')
+    await Bun.write(join(root, 'src/routes/kept.kay'), '--- script\nimport Kept from \'../components/kept.kay\'\n---\nh1 Kept\nKept\n')
+
+    const client = await buildClient(root)
+    const loaded = async (chunks: string[]) => (await Promise.all(chunks.map(async chunk => chunkText(client, chunk)))).join('\n')
+
+    expect(await loaded(client.islands['src/components/plain-one.kay']!)).not.toContain(ENCODER)
+    expect(await loaded(client.islands['src/components/kept.kay']!)).toContain(ENCODER)
   }, 120_000)
 })
 

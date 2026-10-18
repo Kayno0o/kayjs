@@ -4,12 +4,9 @@ import type { Action, FailureOf, SuccessOf } from './action'
 import type { Deferred, Locals, Redirect, RouteParams } from './checks'
 import type { Duration } from './duration'
 import type { Locale } from './i18n'
-import type { PersistStorage } from './persist'
 import type { SignalOptions } from './reactive'
 import { durationMs } from './duration'
-import { keepValue } from './persist'
-import { keepParam } from './query-param'
-import { createSignal, effect, getOwner, memo, onCleanup, ownSignal, provideContext, readContext, runWithOwner, tracking, untrack } from './reactive'
+import { createSignal, effect, getOwner, memo, onCleanup, ownSignal, provideContext, readContext, runWithOwner, tracking, untrack, withSetter } from './reactive'
 
 // Writes a value, or what a function makes of the current one.
 export type Setter<T> = (next: T | ((current: T) => T)) => void
@@ -25,13 +22,6 @@ export type Memo<T> = () => T
 // A function passed to `set` is an updater, so a signal holds no functions.
 type PlainValue<T> = Exclude<T, (...args: never[]) => unknown>
 
-export interface PersistedOptions<T> extends SignalOptions<T> {
-  // `cookie`, the default, is read by the server too, so pages render with the value; `local` keeps it in localStorage, applied once the page has hydrated; `query` is `queryParam(name)`, the value given standing for the param left out, after the default of a `query` schema naming it.
-  storage?: PersistStorage | undefined
-  // How long a cookie is kept after the last write, a year by default: `'30d'`. Only the cookie takes one; `local` and `query` keep no time.
-  maxAge?: Duration | undefined
-}
-
 // A signal read as `count()` and written as `count.set(1)` or `count.set(c => c + 1)`.
 export function signal<T>(): Signal<T | undefined>
 export function signal<T>(value: PlainValue<T>, options?: SignalOptions<T>): Signal<T>
@@ -39,34 +29,6 @@ export function signal<T>(value?: PlainValue<T>, options?: SignalOptions<T | und
   const [read, write] = createSignal<T | undefined>(value, options)
 
   return withSetter(read, write)
-}
-
-// A signal whose value is kept across pages and visits under `name`, the cookie's or the localStorage key's, or in the URL under the query param `name`, which the default leaves out.
-// A string unless `T` says otherwise, for a param the page's `query` schema reads as another type: the URL holds text.
-export function persisted<T = string>(name: string, value: NoInfer<PlainValue<T>>, options: Omit<PersistedOptions<NoInfer<T>>, 'maxAge'> & { storage: 'query' }): Signal<T>
-export function persisted<T>(name: string, value: PlainValue<T>, options?: PersistedOptions<T> & { storage?: 'cookie' | undefined } | Omit<PersistedOptions<T>, 'maxAge'> & { storage: 'local' }): Signal<T>
-export function persisted<T>(name: string, value: PlainValue<T>, options?: PersistedOptions<T>): Signal<T> {
-  const [own, write] = createSignal<T>(value, options)
-  const storage = options?.storage ?? 'cookie'
-  // The same as `queryParam(name)`, `value` standing for the param left out.
-  const kept = storage === 'query' ? keepParam(name, own, write, value as T) : keepValue(name, storage, own, write, options?.maxAge)
-
-  return withSetter(kept.read, (next) => {
-    write(next)
-    kept.save(untrack(own))
-  })
-}
-
-// A signal holding the page's query param `name`, read as the `query` schemas of the page and its layouts read it, so `queryParam<number>('page')` holds a number; the schema's default when the param is left out or refused, which writing leaves out of the URL.
-// Without a schema naming the param, its text, as `persisted(name, '', { storage: 'query' })` keeps it.
-export function queryParam<T = string | undefined>(name: string): Signal<T> {
-  const [own, write] = createSignal<T>(undefined as T)
-  const kept = keepParam(name, own, write)
-
-  return withSetter(kept.read, (next) => {
-    write(next)
-    kept.save(untrack(own))
-  })
 }
 
 export interface EveryOptions {
@@ -193,12 +155,6 @@ export function linked<T>(source: () => T): Signal<T> {
   }
 
   return withSetter(read, value => write({ at: untrack(generation), value }))
-}
-
-function withSetter<T>(read: () => T, write: (value: T) => void): Signal<T> {
-  const set: Setter<T> = next => write(typeof next === 'function' ? (next as (current: T) => T)(untrack(read)) : next)
-
-  return Object.assign(read, { set })
 }
 
 export interface Context<T> {
