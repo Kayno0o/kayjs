@@ -57,7 +57,7 @@ async function main(args: string[]): Promise<number> {
   const own = ownCommand(args)
 
   if (own !== undefined)
-    return runCommand(await COMMANDS[own](), args.slice(own.split(' ').length), USAGE)
+    return runCommand(await COMMANDS[own](), args.slice(own.split(' ').length), usageOf([USAGES[own]]))
 
   return runExtensionCommand(args)
 }

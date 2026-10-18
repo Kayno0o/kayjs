@@ -2107,6 +2107,14 @@ describe('the build report', () => {
     expect(second.previous!.routes['/']).toEqual({ js: byRoute['/']!.js, css: byRoute['/']!.css, estimated: false })
     expect(formatBuildReport(second.report, second.summary, { previous: second.previous })).not.toContain('[')
 
+    // `fresh` reads nothing an earlier build cached, yet still compares to the last build's sizes.
+    const fresh = (await build({ fresh: true })).built!
+    const recompiled = fresh.summary.caches.find(cache => cache.name === 'components')!
+
+    expect(recompiled.made).toBeGreaterThan(0)
+    expect(recompiled.made).toBe(first.summary.caches.find(cache => cache.name === 'components')!.made)
+    expect(fresh.previous).toBeDefined()
+
     // A failed build, the check refusing it, leaves the sizes of the last good one for the next to compare to.
     const kept = await Bun.file(stored).text()
 

@@ -3,7 +3,7 @@ title: CLI
 order: 1
 description: The kay commands to scaffold, run, check, build and format a project.
 ---
-Every command takes an optional project directory, the current one by default, and prints its usage for `--help`.
+Every command takes an optional project directory, the current one by default, and prints its usage for `--help`. An option or argument a command does not take prints that command's usage alone, and names the nearest option for a typo. `kay --help` lists every command.
 
 ```sh
 bunx -p @kaynooo/kayjs kay new my-app
@@ -244,6 +244,7 @@ The build runs `kay check` first and keeps the last build when the check or the 
 | `--static` | Also writes the whole site as static files, see [Static export](/guides/static-export) |
 | `--outdir <dir>` | Where `--static` writes, `dist` by default |
 | `--no-check` | Skips the check |
+| `--no-cache` | Empties `.kay/cache` first, so everything is compiled, encoded and fetched again; the chunks kept for open tabs stay |
 | `--analyze` | Lists the modules weighing most in the entry and each island, see [Performance](/guides/performance#find-the-heavy-modules) |
 | `--deny-warnings` | Fails the build on a warning of the check or of a lint too, such as `over-budget` |
 | `-p <tsconfig>` | Names another tsconfig |

@@ -72,6 +72,8 @@ export interface BuildOptions {
   // Bundles the server, `entry` or the project's own, and all of it into one executable.
   // `verify` then starts it as a deploy would and waits for its health route, failing the stage with the server's own output.
   compile?: { outfile: string, entry?: string | undefined, verify?: boolean | undefined } | undefined
+  // Empties `.kay/cache` first, so nothing an earlier build left there is read; the chunks kept for open tabs and the last build's sizes stay.
+  fresh?: boolean | undefined
   // Breaks the size report down by module.
   analyze?: boolean | undefined
   // Fails the build on a warning, the check's or a lint of the output's, as an error does.
@@ -118,6 +120,10 @@ async function runBuild(root: string, config: KayConfig, options: BuildOptions):
   let bundleMs = 0
 
   resetCacheCounts()
+
+  if (options.fresh)
+    await rm(project.paths.cache, { recursive: true, force: true })
+
   // A callback throwing while the last build waits aside puts it back, as a failing stage does.
   const reportAside = async (stage: BuildStage) => {
     try {

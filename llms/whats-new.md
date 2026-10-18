@@ -2,6 +2,10 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
+## Unreleased
+
+- A command refused for an option or argument it does not take prints its own usage line alone, `kay build: unknown option --no-chek, did you mean --no-check?` without `parseArgs`'s hint, and `kay build --no-cache` builds without reading what earlier builds left in `.kay/cache` ([Build and start](build-and-start.md)).
+
 ## 1.53.1
 
 - kayjs-ai asks the provider to cache the prompt by default, so a chat and each step of a tool loop stop paying full price for the system prompt, tools and history: Anthropic gets automatic `cache_control`, an OpenAI-compatible server a `prompt_cache_key` per conversation (dropped when it refuses it), `ask(..., { cache: false | '1h' })` changes it, `reply.usage` reports `cacheReadTokens` and `cacheWriteTokens`, and the token budget counts them ([prompt caching](../packages/ai/llms/asking.md#prompt-caching)).

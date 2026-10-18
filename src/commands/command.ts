@@ -17,6 +17,9 @@ const SHELL_SAFE = /^[\w@%+=:,./-]+$/
 const COMMAND_DATA = /[%\r\n]/g
 const COMMAND_PROPERTY = /[%\r\n:,]/g
 const PORT = /^\d{1,5}$/
+const LEADING_DASHES = /^-+/
+const UNKNOWN_OPTION = /^Unknown option '(-[^'=]*)(?:=[^']*)?'/
+const COMMAND_WORDS = /^[a-z][\w-]*(?: [a-z][\w-]*(?= [<[-]|$))*/
 // What the console writes to stdout.
 const STDOUT_METHODS = ['log', 'info', 'debug', 'dir', 'dirxml', 'table', 'group', 'groupCollapsed', 'groupEnd', 'count', 'countReset', 'time', 'timeEnd', 'timeLog']
 // Colours a report as rustc does when stderr is a terminal that takes colours, and leaves it plain otherwise.
@@ -46,13 +49,14 @@ export interface KayCommand extends Omit<Command, 'run'> {
   run: (parsed: Parsed, refuse: (reason?: string) => number, project: { root: string, config: KayConfig }) => Promise<number> | number
 }
 
-// Runs a command on its arguments, or prints the usage: to stdout for `--help`, to stderr for an option or argument the command does not take.
+// Runs a command on its arguments, or prints its `usage`: to stdout for `--help`, to stderr for an option or argument the command does not take.
 export async function runCommand(command: Command, args: string[], usage: string): Promise<number> {
-  const refuse = (reason?: string) => {
-    console.error(reason === undefined ? usage : `kay: ${reason}\n${usage}`)
+  const fail = (message?: string) => {
+    console.error(message === undefined ? usage : `${message}\n${usage}`)
 
     return 1
   }
+  const refuse = (reason?: string) => fail(reason === undefined ? undefined : `kay: ${reason}`)
   let parsed: Parsed
 
   try {
@@ -70,10 +74,38 @@ export async function runCommand(command: Command, args: string[], usage: string
     parsed = { values, positionals }
   }
   catch (error) {
-    return refuse(error instanceof Error ? error.message : String(error))
+    return unknownOption(error, command, fail) ?? refuse(error instanceof Error ? error.message : String(error))
   }
 
   return command.run(parsed, refuse)
+}
+
+// An option the command does not take, as `kay build: unknown option --no-cache` without `parseArgs`'s hint about `--`, naming the option the command has nearest to a mistyped one.
+function unknownOption(error: unknown, command: Command, fail: (message: string) => number): number | undefined {
+  const unknown = error instanceof Error ? UNKNOWN_OPTION.exec(error.message)?.[1] : undefined
+
+  if (unknown === undefined)
+    return undefined
+
+  const typed = unknown.replace(LEADING_DASHES, '')
+  const [near] = [...Object.keys(command.options), 'help'].map(option => ({ option, distance: editDistance(typed, option) })).filter(({ distance }) => distance <= Math.min(2, Math.ceil(typed.length / 3))).sort((a, b) => a.distance - b.distance)
+
+  return fail(`kay ${COMMAND_WORDS.exec(command.usage)?.[0] ?? command.usage}: unknown option ${unknown}${near === undefined || !unknown.startsWith('--') ? '' : `, did you mean --${near.option}?`}`)
+}
+
+function editDistance(a: string, b: string): number {
+  let row = Array.from({ length: b.length + 1 }, (_, index) => index)
+
+  for (let i = 1; i <= a.length; i++) {
+    const next = [i]
+
+    for (let j = 1; j <= b.length; j++)
+      next[j] = Math.min(row[j]! + 1, next[j - 1]! + 1, row[j - 1]! + (a[i - 1] === b[j - 1] ? 0 : 1))
+
+    row = next
+  }
+
+  return row[b.length]!
 }
 
 // The directory a command works on, or nothing once it said, in `format`, that the path is none.

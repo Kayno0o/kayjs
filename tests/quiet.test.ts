@@ -116,7 +116,7 @@ describe('--quiet', () => {
     const { code, stderr } = await kay(['explain', '--quiet'], process.cwd())
 
     expect(code).toBe(1)
-    expect(stderr).toStartWith('kay: Unknown option \'--quiet\'')
+    expect(stderr).toStartWith('kay explain: unknown option --quiet\nUsage: kay explain [lint|error|group]')
   })
 })
 
@@ -141,5 +141,46 @@ describe('colour and control codes', () => {
     expect(takesControlCodes({ isTTY: true }, { TERM: 'dumb' })).toBe(false)
     // Colour is asked for, but a redrawn line or a cleared screen in a pipe would garble it still.
     expect(takesControlCodes({ isTTY: false }, { FORCE_COLOR: '1' })).toBe(false)
+  })
+})
+
+describe('usage on a refusal', () => {
+  it('is the command\'s own line alone, both words for a subcommand', async () => {
+    const root = await project({})
+    const build = await kay(['build', '--bogus'], root)
+    const missing = await kay(['i18n', 'missing', '--bogus'], root)
+    const extra = await kay(['upgrade', 'a', 'b'], root)
+
+    expect(build.code).toBe(1)
+    expect(build.stderr).toStartWith('kay build: unknown option --bogus\nUsage: kay build [dir]')
+    expect(build.stderr).not.toContain('kay start')
+    expect(build.stderr).not.toContain('--\' ')
+    expect(build.stderr.trimEnd().split('\n')).toHaveLength(2)
+    expect(missing.stderr).toBe('kay i18n missing: unknown option --bogus\nUsage: kay i18n missing [locale] [dir] [--format text|json]\n')
+    expect(extra.stderr).toBe('kay: unexpected argument b\nUsage: kay upgrade [dir] [--dry-run]\n')
+  })
+
+  it('names a near option, and prints that command alone for --help', async () => {
+    const root = await project({})
+    const typo = await kay(['build', '--no-chek'], root)
+    const help = await kay(['build', '--help'], root)
+
+    expect(typo.stderr).toStartWith('kay build: unknown option --no-chek, did you mean --no-check?\n')
+    expect(help.code).toBe(0)
+    expect(help.stdout).toStartWith('Usage: kay build [dir]')
+    expect(help.stdout).toContain('[--no-cache]')
+    expect(help.stdout.trimEnd().split('\n')).toHaveLength(1)
+  })
+
+  it('stays every command for kay --help and an unknown command', async () => {
+    const root = await project({})
+    const help = await kay(['--help'], root)
+    const unknown = await kay(['bogus'], root)
+
+    expect(help.stdout).toContain('kay build')
+    expect(help.stdout).toContain('kay mcp')
+    expect(unknown.code).toBe(1)
+    expect(unknown.stderr).toContain('kay start')
+    expect(unknown.stderr).toContain('kay mcp')
   })
 })
