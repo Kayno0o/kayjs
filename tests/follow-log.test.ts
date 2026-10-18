@@ -109,4 +109,67 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('followLog 
     expect((await page.evaluate(reading)).away).toBe(0)
     expect(page.errors).toEqual([])
   }, 30_000)
+
+  // Two animation frames, so a scroll event the reader's move queued has been delivered and the observers have run.
+  const frames = async (page: Awaited<ReturnType<typeof open>>) => page.evaluate(async () => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))))
+
+  it('leaves a reader who scrolls up a few pixels while the container shrinks where they scrolled', async () => {
+    const page = await open()
+    const set = await page.evaluate(() => {
+      const list = document.querySelector<HTMLElement>('ol.list')!
+
+      list.style.height = '100px'
+      list.scrollTop -= 10
+
+      return list.scrollTop
+    })
+
+    await frames(page)
+
+    const after = await page.evaluate(reading)
+
+    expect(await page.evaluate(() => document.querySelector<HTMLElement>('ol.list')!.scrollTop)).toBe(set)
+    expect(after.away).toBeGreaterThan(0)
+    expect(page.errors).toEqual([])
+  }, 30_000)
+
+  it('leaves a reader who scrolls up while the container grows where they scrolled', async () => {
+    const page = await open()
+    const set = await page.evaluate(() => {
+      const list = document.querySelector<HTMLElement>('ol.list')!
+
+      list.style.height = '300px'
+      list.scrollTop -= 60
+
+      return list.scrollTop
+    })
+
+    await frames(page)
+    expect(await page.evaluate(() => document.querySelector<HTMLElement>('ol.list')!.scrollTop)).toBe(set)
+    expect(page.errors).toEqual([])
+  }, 30_000)
+
+  it('leaves a reader away from the bottom where they scrolled when a line above the first showing changes size', async () => {
+    const page = await open()
+
+    await page.evaluate(() => {
+      document.querySelector<HTMLElement>('ol.list')!.scrollTop = 250
+    })
+    await page.waitUntil(() => document.querySelector<HTMLElement>('ol.list')!.scrollTop === 250)
+
+    const set = await page.evaluate(() => {
+      const list = document.querySelector<HTMLElement>('ol.list')!
+
+      const first = list.firstElementChild as HTMLElement
+
+      first.style.minHeight = '40px'
+      list.scrollTop += 60
+
+      return list.scrollTop
+    })
+
+    await frames(page)
+    expect(await page.evaluate(() => document.querySelector<HTMLElement>('ol.list')!.scrollTop)).toBe(set)
+    expect(page.errors).toEqual([])
+  }, 30_000)
 })
