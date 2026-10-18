@@ -1,0 +1,5 @@
+--- server
+const tone = ['ring', 4].join('-')
+---
+h1(class="font-bold") Home
+p.tone(class={tone}) named nowhere on this page

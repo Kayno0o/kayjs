@@ -1,0 +1,5 @@
+---
+import Late from '../components/late.kay'
+---
+h1 Late
+Late

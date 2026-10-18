@@ -1,0 +1,48 @@
+import type { TestSite } from '../src/test'
+import tailwind from 'bun-plugin-tailwind'
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
+import { browserPath, testSite } from '../src/test'
+
+const path = browserPath()
+const WARNING = /^\[kay\] the class "([^"]+)" is set on <(\w+)>/
+
+describe('the class check of the dev server', () => {
+  let dev: TestSite
+
+  beforeAll(async () => {
+    dev = await testSite({ routes: 'tests/fixtures/dev-styles/src/routes', plugins: [tailwind], browser: path === undefined ? false : { path }, dev: true, onError: () => undefined })
+  }, 120_000)
+
+  afterAll(async () => dev?.close())
+
+  it('loads on its pages with the classes the page carries a rule for', async () => {
+    const html = (await dev.visit('/')).html
+
+    expect(html).toContain('<script type="module" src="/_kay/dev/styles.js"></script>')
+    expect(html).toMatch(/<script type="application\/json" data-kay-page-classes>\[[^\]]*"font-bold"[^\]]*\]<\/script>/)
+    expect(html).not.toMatch(/data-kay-page-classes>[^<]*"ring-4"/)
+    expect(await (await dev.fetch('/_kay/dev/styles.js')).text()).toContain('startStyleCheck()')
+  })
+
+  it.skipIf(path === undefined)('logs a class the whole stylesheet styles but the page carries no rule for, once', async () => {
+    const page = await dev.open('/', { strict: false })
+
+    await page.waitUntil(() => document.querySelector('.tone') !== null)
+
+    const found = page.errors.map(error => WARNING.exec(error)).filter(match => match !== null)
+
+    expect(found.map(match => [match[1], match[2]])).toEqual([['ring-4', 'p']])
+  })
+
+  it.skipIf(path === undefined)('stays quiet for the classes a page carries a rule for, those an island adds on a click included', async () => {
+    const quiet = await dev.open('/other', { strict: false })
+
+    expect(quiet.errors.filter(error => WARNING.test(error))).toEqual([])
+
+    const page = await dev.open('/late', { strict: false })
+
+    await page.click('.late')
+    await page.waitUntil(() => getComputedStyle(document.querySelector('.late')!).fontSize === '20px')
+    expect(page.errors.filter(error => WARNING.test(error))).toEqual([])
+  })
+})

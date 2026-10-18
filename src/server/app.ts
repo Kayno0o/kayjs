@@ -32,7 +32,7 @@ import { serveBuildFiles } from './build-files'
 import { serveCards } from './card'
 import { compressResponse, fixedTexts } from './compress'
 import { remoteLimits } from './config-limits'
-import { DEV_A11Y, DEV_AXE, DEV_EVENTS, DEV_HEAD, DEV_INSPECTOR, DEV_NOT_FOUND, DEV_OPEN, DEV_PATCH, DEV_ROUTES, DEV_SIZES, DEV_TOOL, devA11y, devAxe, devEvents, devInspector, devPatch, devRoutes, devTool, devToolFile, devToolFiles, followBuilds, hotSwap, openInEditor, recordResponses, refuseForeignHosts, rememberBoot, trackRunning } from './dev'
+import { DEV_A11Y, DEV_AXE, DEV_EVENTS, DEV_HEAD, DEV_INSPECTOR, DEV_NOT_FOUND, DEV_OPEN, DEV_PATCH, DEV_ROUTES, DEV_SIZES, DEV_STYLES, DEV_TOOL, devA11y, devAxe, devEvents, devInspector, devPatch, devRoutes, devStyles, devTool, devToolFile, devToolFiles, followBuilds, hotSwap, openInEditor, recordResponses, refuseForeignHosts, rememberBoot, trackRunning } from './dev'
 import { clearDevErrorsOnAnswer } from './dev-errors'
 import { claimEndpoints } from './endpoint-claims'
 import { serveEndpoints } from './endpoints'
@@ -145,6 +145,7 @@ function serveDevRoutes(app: App, root: string, client: ClientBuild, mode: Mode,
     app.get(url, async () => devToolFile(file))
 
   app.get(DEV_A11Y, () => devA11y())
+  app.get(DEV_STYLES, () => devStyles())
   app.get(DEV_AXE, () => devAxe())
   recordResponses(app, base)
 

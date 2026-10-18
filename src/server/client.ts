@@ -9,7 +9,7 @@ import { ASSET_PREFIX, clientDir, outputDir } from '../build/assets'
 import { pruneUnescaped } from '../build/class-rules'
 import { writeIfChanged } from '../build/files'
 import { parse, print } from '../build/supports'
-import { joinBase, NOWHERE } from '../runtime/base'
+import { NOWHERE } from '../runtime/base'
 import { kayLog } from '../runtime/log'
 import { unrebaseCss } from './base'
 
@@ -226,19 +226,14 @@ export async function chooseInlineStyles(client: ClientBuild, base: string, sett
   }
 
   if (client.styleUses !== undefined)
-    client.pageStyles = await pageStyles(client, base, texts, chains, copies)
+    client.pageStyles = await pageStyles(client, texts, chains, copies)
 }
-
-// Run while the head is parsed, which puts the shared stylesheets on the page the moment they load rather than after it is printed.
-export const restScript = '<script data-kay-rest>for(const l of document.querySelectorAll("link[data-kay-rest]"))l.media="all"</script>'
 
 interface StyleGroup {
   urls: string[]
   unused: Set<string>
   // The rules of the classes its components name, for the head to write when they fit.
   inline: string[]
-  // The stylesheets with a rule left out of the inline ones, which the head links.
-  rest: string[]
   size: number
   chains: number
   // Each stylesheet's lighter copy for this group, by URL.
@@ -319,10 +314,10 @@ async function writeRouteStyles(client: ClientBuild, groups: StyleGroup[]): Prom
   }
 }
 
-// The head of each chain whose full stylesheets are too heavy to inline: the rules for the classes its components name, written inline when they fit, then the full stylesheets linked without holding the first paint back.
-// A class no component names, or one built at runtime, has its rule in the linked stylesheet, which applies when it arrives, and at once without scripts. It follows the inline rules so it keeps the place it has in the whole stylesheet.
+// The head of each chain whose full stylesheets are too heavy to inline: the rules for the classes its components name, islands and what they set after load included, written inline when they fit and nothing else, so a page ships only its own rules.
+// A class built at runtime from nothing the build can read has no rule on the page unless the app lists it with `@source inline`; the build warns of the ones it spots.
 // A route whose own rules pass the limit links a copy of each stylesheet without the rules of the classes its files leave out instead, when that saves enough.
-async function pageStyles(client: ClientBuild, base: string, texts: Map<string, string>, chains: string[][], copies: boolean): Promise<Map<string, PageStyles>> {
+async function pageStyles(client: ClientBuild, texts: Map<string, string>, chains: string[][], copies: boolean): Promise<Map<string, PageStyles>> {
   const { classes, entries } = client.styleUses!
   const found = new Map<string, PageStyles>()
   const parsed = new Map<string, Node[]>()
@@ -355,7 +350,6 @@ async function pageStyles(client: ClientBuild, base: string, texts: Map<string, 
     if (group === undefined) {
       const unused = new Set(classes.filter((_name, index) => !used.has(index)))
       const own: string[] = []
-      const left: string[] = []
       let weight = 0
 
       for (const url of urls) {
@@ -367,9 +361,6 @@ async function pageStyles(client: ClientBuild, base: string, texts: Map<string, 
 
         const pruned = print(pruneUnescaped(nodes, unused))
 
-        if (pruned.length !== css.length)
-          left.push(url)
-
         if (pruned.trim() === '')
           continue
 
@@ -377,7 +368,7 @@ async function pageStyles(client: ClientBuild, base: string, texts: Map<string, 
         weight += Bun.gzipSync(pruned).length
       }
 
-      group = { urls, unused, inline: own, rest: left, size: weight, chains: 0, routes: new Map() }
+      group = { urls, unused, inline: own, size: weight, chains: 0, routes: new Map() }
       groups.set(shared, group)
     }
 
@@ -391,7 +382,7 @@ async function pageStyles(client: ClientBuild, base: string, texts: Map<string, 
     await writeRouteStyles(client, [...groups.values()])
 
   for (const { key, group } of planned) {
-    const { inline, rest, size, urls, routes } = group
+    const { inline, size, urls, routes } = group
     const linked = (url: string) => routes.get(url) ?? url
 
     if (routes.size > 0) {
@@ -403,11 +394,7 @@ async function pageStyles(client: ClientBuild, base: string, texts: Map<string, 
     if (size > INLINE_LIMIT)
       continue
 
-    const links = rest.map(url => `<link rel="stylesheet" href="${linked(url)}" media="print" data-kay-rest>`).join('')
-    // A noscript holds text for the rewriter that puts the mount point on links, so its hrefs carry it already.
-    const plain = rest.map(url => `<link rel="stylesheet" href="${joinBase(base, linked(url))}">`).join('')
-
-    found.set(key, { html: `${inline.map(css => `<style>${css}</style>`).join('')}${links}${rest.length === 0 ? '' : `${restScript}<noscript>${plain}</noscript>`}`, inline, links: urls.map(linked) })
+    found.set(key, { html: inline.map(css => `<style>${css}</style>`).join(''), inline, links: [] })
   }
 
   return found

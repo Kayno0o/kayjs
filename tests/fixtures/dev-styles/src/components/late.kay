@@ -1,0 +1,6 @@
+---
+function mark(event: MouseEvent) {
+  (event.currentTarget as HTMLElement).classList.add('bg-amber-200', 'text-xl')
+}
+---
+button.late(onClick={mark}) mark

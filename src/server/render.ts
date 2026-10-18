@@ -39,7 +39,7 @@ import { importModule, onForgetModules } from './bundle'
 import { INLINE_LIMIT, islandChunks } from './client'
 import { preferredEncoding, wholeResponse } from './compress'
 import { cookieJar, requestCookies } from './cookies'
-import { A11Y_SCRIPT, DEV_BOOT, devToolScripts, errorPageScripts, liveReload, problemsBlock } from './dev'
+import { A11Y_SCRIPT, DEV_BOOT, devToolScripts, errorPageScripts, liveReload, problemsBlock, STYLES_SCRIPT } from './dev'
 import { noteRedirect } from './dev-notes'
 import { FLASH_COOKIE, flashPath, handedOverFlash, readFlash } from './flash'
 import { formsScript } from './forms'
@@ -847,7 +847,7 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
   // The browser's form check words a refusal as the server does, so a page with a checked form sends the `kay.invalid.*` messages too.
   const words = checked === '' ? islands.messages : new Set([...islands.messages, ...invalidKeys()])
   const islandData = (hasIslands || (checked !== '' && words.size > 0) ? messagesScript(words, true) : '') + (hasIslands ? outcomeScript(rendering.carried()) + queryScript(rules) : '') + liveText
-  const written = `${htmlOpen(lang, head.root)}<head>${headStart(head)}${stylesheets(client, styled)}${head.html}${scripts}${islandData}${kayMetas(options, hasIslands)}${shipsEntry && client.build !== undefined ? `<meta name="${BUILD_META}" content="${client.build}">` : ''}${speculationRules(options.prefetch, options.base)}${client.navigation === true && !shipsEntry ? historyScript : ''}${options.offline ? registerScript(options.base ?? '') : ''}${options.dev ? devScripts(client) + (options.prerendering ? '' : requestBlock(files, rendering, options.base ?? '')) : ''}</head><body>${body}`
+  const written = `${htmlOpen(lang, head.root)}<head>${headStart(head)}${stylesheets(client, styled)}${head.html}${scripts}${islandData}${kayMetas(options, hasIslands)}${shipsEntry && client.build !== undefined ? `<meta name="${BUILD_META}" content="${client.build}">` : ''}${speculationRules(options.prefetch, options.base)}${client.navigation === true && !shipsEntry ? historyScript : ''}${options.offline ? registerScript(options.base ?? '') : ''}${options.dev ? devScripts(client, styled) + (options.prerendering ? '' : requestBlock(files, rendering, options.base ?? '')) : ''}</head><body>${body}`
   const start = marks === undefined ? written : placeFieldMarks(written, marks)
 
   if (!streamed)
@@ -876,8 +876,27 @@ function kayMetas(options: RenderOptions, hasIslands: boolean): string {
   return `${base}${options.maxDensity !== undefined && options.maxDensity !== DEFAULT_MAX_DENSITY ? `<meta name="kay-max-density" content="${options.maxDensity}">` : ''}${options.imageWidths === undefined ? '' : `<meta name="kay-image-widths" content="${options.imageWidths.join(',')}">`}${options.resolvedImages === true ? `<meta name="${RESOLVED_META}">` : ''}`
 }
 
-function devScripts(client: ClientBuild): string {
-  return problemsBlock(client.problems) + liveReload() + DEV_BOOT + devToolScripts() + A11Y_SCRIPT
+function devScripts(client: ClientBuild, files: string[]): string {
+  return problemsBlock(client.problems) + liveReload() + DEV_BOOT + devToolScripts() + A11Y_SCRIPT + pageClassesBlock(client, files) + STYLES_SCRIPT
+}
+
+// The classes the page's own files name, which production writes the rules of, for the dev page to check what it sets against.
+function pageClassesBlock(client: ClientBuild, files: string[]): string {
+  const uses = client.styleUses
+
+  if (uses === undefined)
+    return ''
+
+  const names = new Set<string>()
+
+  for (const file of files) {
+    const own = uses.entries.get(file)
+
+    for (const index of own === true || own === undefined ? [] : own)
+      names.add(uses.classes[index]!)
+  }
+
+  return `<script type="application/json" data-kay-page-classes>${JSON.stringify([...names]).replaceAll('<', '\\u003c')}</script>`
 }
 
 // What the dev tool's Request tab shows: the route matched, the files that rendered, the params, the status, and how long each load took, the matched route's when another page shows its error.

@@ -1,9 +1,8 @@
 // First paint of a route's stylesheet copy against its inline rules, `bun run bench:paint` after `bun run docs:build`: it drives Chromium (BUN_CHROME_PATH) over throttled networks and prints a table.
-// The docs' guide pages sit in the band where #988 links a copy; the inline form is made from the same page: the copy's rules in a `<style>`, the shared stylesheet linked as rest, as `pageStyles` writes it.
+// The docs' guide pages sit in the band where #988 links a copy; the inline form is made from the same page: the copy's rules in a `<style>` and nothing else, as `pageStyles` writes it.
 import type { Browser, CDPSession } from 'playwright-core'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { restScript } from '../src/server/client'
 import { launch } from './browser'
 import { kilobytes, median, milliseconds, table } from './format'
 
@@ -63,7 +62,7 @@ function inlineForm(html: string): string {
 
   const rules = readFileSync(built(`${match[1]}${match[2]}`), 'utf8')
 
-  return html.replace(COPY_LINK, () => `<style>${rules}</style><link rel="stylesheet" href="${match[1]}.css" media="print" data-kay-rest>${restScript}`)
+  return html.replace(COPY_LINK, () => `<style>${rules}</style>`)
 }
 
 for (const page of [FIRST, SECOND]) {

@@ -32,11 +32,24 @@ In production, a page with small styles writes them into its head, so the browse
 
 The size counts a page's styles together with its layouts'. Two pages of one app can differ. `kay dev` always links them.
 
-When a page's styles are over that size, kay still tries to inline what the page uses. It writes into the head only the rules for the classes its components write, Tailwind's included, if they fit under the same size.
+When a page's styles are over that size, kay still inlines what the page uses. It writes into the head only the rules for the classes its components write, Tailwind's included, if they fit under the same size. A page never loads the whole stylesheet after it paints, so a light page stays light.
 
-kay links the full stylesheet for the rest. The browser fetches it without holding the first paint back. Once it arrives, every rule is there, so a class built at runtime or coming from your data still gets its style. You need no safelist and no setting.
+The classes your islands set after load count too. kay reads them from the island's script and template, from the props a parent passes, and from the components of a library it renders. A name built in a template string, such as `` `btn-${kind}` ``, keeps the rules of every class that starts or ends with its fixed part.
 
-Until that stylesheet arrives, such a class shows unstyled. A class no page names, from Markdown for instance, stays inline on every page. A page whose own rules are still over the size links a copy of the stylesheet instead. The copy has the same rules in the same order, without the rules of components the page never renders. A page links it only when it is a quarter lighter or more, so a site with similar pages keeps one cached file.
+A page whose own rules are still over the size links a copy of the stylesheet instead. The copy has the same rules in the same order, without the rules of components the page never renders. A page links it only when it is a quarter lighter or more, so a site with similar pages keeps one cached file.
+
+### A class kay cannot see
+
+Some classes come from a value kay cannot read: `classList.add(name)`, `el.className = name`, or a class that arrives from your data. The page has no rule for them, so the element shows unstyled. A production build warns about the ones it spots, with the island and the line.
+
+To fix it, list the classes in your CSS with Tailwind's `@source inline`. kay keeps them on every page.
+
+```css
+@import "tailwindcss";
+@source inline("{hover:,}bg-{red,green}-{100,500}");
+```
+
+The warning goes away for a class whose fixed part matches one of them. In `kay dev` the whole stylesheet is linked, so nothing looks wrong there. Instead, the browser console logs an error when an element gets a class that the stylesheet styles but its page has no rule for.
 
 A page that shows Markdown counts the classes the Markdown, the scripts that write markup into it and its components name. Text in a code block does not count. A class that Markdown gets at run time, through the CMS or from a plugin in a package, is named by none of those, so write it in a file of your project too. With `offline` on, pages link the shared stylesheet, which the worker keeps.
 

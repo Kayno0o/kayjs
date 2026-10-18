@@ -88,7 +88,8 @@ export async function routeSizes(root: string, client: ClientBuild, routes: Rout
     const stop = stops.get(route.pattern)
     const why = stop === undefined ? undefined : describeStop(stop, root)
     const files = [...route.layouts, route.file]
-    const css = await total(new Set(client.pageStyles?.get(files.join('\n'))?.links ?? files.flatMap(file => client.styles.get(file) ?? [])))
+    const own = client.pageStyles?.get(files.join('\n'))
+    const css = await total(new Set(own?.links ?? files.flatMap(file => client.styles.get(file) ?? []))) + (own?.inline ?? []).reduce((sum, text) => sum + Bun.gzipSync(text).length, 0)
 
     if (pages.length > 0) {
       const each = await Promise.all(pages.map(async page => total(new Set([...page.html.matchAll(SCRIPT_URL)].map(match => match[1]!)))))

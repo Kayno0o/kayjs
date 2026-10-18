@@ -38,6 +38,7 @@ const DEV_EXTENSION = '/_kay/dev/extension/'
 export const DEV_INSPECTOR = '/_kay/dev/inspector.js'
 export const DEV_OPEN = '/_kay/dev/open'
 export const DEV_A11Y = '/_kay/dev/a11y.js'
+export const DEV_STYLES = '/_kay/dev/styles.js'
 export const DEV_AXE = '/_kay/dev/axe.js'
 export const DEV_ROUTES = '/_kay/dev/routes'
 export const DEV_HEAD = '/_kay/dev/head'
@@ -51,6 +52,7 @@ const PATCH_SOURCE = resolve(import.meta.dir, '../runtime/dev-patch.ts')
 const TOOL_SOURCE = resolve(import.meta.dir, '../runtime/dev-tool.ts')
 const INSPECTOR_SOURCE = resolve(import.meta.dir, '../runtime/dev-inspector.ts')
 const A11Y_SOURCE = resolve(import.meta.dir, '../runtime/dev-a11y.ts')
+const STYLES_SOURCE = resolve(import.meta.dir, '../runtime/dev-styles.ts')
 // What the inspector sends, which a page of another site cannot without a preflight nothing answers.
 const OPEN_HEADER = 'x-kay-dev'
 const LIVE_RELOAD_HEADER = 'x-kay-live-reload'
@@ -216,6 +218,13 @@ export const A11Y_SCRIPT = `<script type="module" src="${DEV_A11Y}"></script>`
 
 export function devA11y(): Response {
   return devModule(A11Y_SOURCE, '\nstartA11y()\n')
+}
+
+// Warns when an element gets a class the whole stylesheet styles but its page's rules, as production writes them, lack.
+export const STYLES_SCRIPT = `<script type="module" src="${DEV_STYLES}"></script>`
+
+export function devStyles(): Response {
+  return devModule(STYLES_SOURCE, '\nstartStyleCheck()\n')
 }
 
 // Read where the dependency installed, never imported, so a compiled server leaves it out.

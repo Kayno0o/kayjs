@@ -2,6 +2,7 @@ import type { Reached } from './styles'
 import { existsSync } from 'node:fs'
 import { dirname, relative, resolve } from 'node:path'
 import { styledClassNames } from './class-rules'
+import { runtimeClasses } from './dynamic-classes'
 import { CSS_FILE, readSource } from './files'
 import { parse } from './supports'
 
@@ -29,6 +30,12 @@ const SCRIPT_OR_KAY = /\.(?:kay|[cm]?[jt]sx?)$/
 // What kay's Markdown renderer puts on a code block, `language-ts`.
 const RENDERED_FRAGMENT = 'language-'
 const CSS_IMPORT = /@import\s*(?:url\(\s*)?["']([^"']+)["']/g
+// Tailwind 4.1's `@source inline("...")`, which names classes to generate whatever the sources say; `@source not inline` leaves them out and is not matched.
+const SOURCE_INLINE = /@source\s+inline\(\s*(["'])((?:\\.|(?!\1)[^\\])*)\1\s*\)/g
+const BRACE_RANGE = /^(-?\d+)\.\.(-?\d+)(?:\.\.(\d+))?$/
+// The most classes one `@source inline` pattern expands to.
+const EXPANSION_LIMIT = 10_000
+const SPACES = /\s+/
 
 // The words of a source, and the fragments of names built at runtime among them: `btn-` from `btn-${kind}` or `:flex` from `${screen}:flex`.
 function readWords(text: string, into: Set<string>, fragments: Set<string>): void {
@@ -81,7 +88,71 @@ function withoutCode(markdown: string): string {
   return kept.concat(pending).join('\n').replace(CODE_SPAN, '')
 }
 
-function stylesheetClasses(file: string, seen = new Set<string>()): Set<string> {
+// The classes a pattern like `{hover:,}bg-red-{50,{100..900..100}}` names, as Tailwind expands it.
+export function expandInline(pattern: string): string[] {
+  const open = pattern.indexOf('{')
+
+  if (open === -1)
+    return [pattern]
+
+  let depth = 0
+  let close = -1
+  const cuts = [open]
+
+  for (let at = open; at < pattern.length && close === -1; at++) {
+    if (pattern[at] === '{')
+      depth++
+    else if (pattern[at] === '}' && --depth === 0)
+      close = at
+    else if (pattern[at] === ',' && depth === 1)
+      cuts.push(at)
+  }
+
+  if (close === -1)
+    return [pattern]
+
+  cuts.push(close)
+
+  const inner = pattern.slice(open + 1, close)
+  const range = BRACE_RANGE.exec(inner)
+  const choices: string[] = []
+
+  if (range === null) {
+    for (let index = 0; index < cuts.length - 1; index++)
+      choices.push(pattern.slice(cuts[index]! + 1, cuts[index + 1]))
+  }
+  else {
+    const from = Number(range[1])
+    const to = Number(range[2])
+    const step = Math.max(1, Number(range[3] ?? 1))
+
+    for (let value = from; from <= to ? value <= to : value >= to; value += from <= to ? step : -step) {
+      choices.push(String(value))
+
+      if (choices.length > EXPANSION_LIMIT)
+        break
+    }
+  }
+
+  const before = pattern.slice(0, open)
+  const after = expandInline(pattern.slice(close + 1))
+  const found: string[] = []
+
+  for (const choice of choices) {
+    for (const middle of expandInline(choice)) {
+      for (const end of after) {
+        found.push(`${before}${middle}${end}`)
+
+        if (found.length > EXPANSION_LIMIT)
+          return found
+      }
+    }
+  }
+
+  return found
+}
+
+function stylesheetClasses(file: string, kept: Set<string>, seen = new Set<string>()): Set<string> {
   const found = new Set<string>()
 
   if (seen.has(file) || !existsSync(file))
@@ -94,11 +165,18 @@ function stylesheetClasses(file: string, seen = new Set<string>()): Set<string> 
   for (const name of styledClassNames(parse(text)))
     found.add(name)
 
+  for (const [, , pattern] of text.matchAll(SOURCE_INLINE)) {
+    for (const word of pattern!.split(SPACES)) {
+      for (const name of expandInline(word))
+        kept.add(name)
+    }
+  }
+
   for (const match of text.matchAll(CSS_IMPORT)) {
     const imported = resolve(dirname(file), match[1]!)
 
     if (CSS_FILE.test(imported)) {
-      for (const name of stylesheetClasses(imported, seen))
+      for (const name of stylesheetClasses(imported, kept, seen))
         found.add(name)
     }
   }
@@ -108,7 +186,13 @@ function stylesheetClasses(file: string, seen = new Set<string>()): Set<string> 
 
 // `sheets` is the text of every stylesheet the build wrote, `shorthand` the classes each component writes as `div.flex.w-1/2`, which the words of its source cannot tell from a name with a dot.
 // `markup` lists the files that can write markup into a page without being a component it imports: scripts such as a Markdown plugin, Markdown and data files. A page rendering a collection's Markdown may show the classes of any of them, so it names theirs besides its components'.
-export function styleUses(root: string, entries: Iterable<string>, sheets: Iterable<string>, reached: Reached, shorthand: ReadonlyMap<string, Iterable<string>>, markup: readonly string[] = []): StyleUses {
+// `unresolved` receives the classes some file of the app sets from a value the build cannot read, as `runtimeClasses` finds them; `own` tells the app's files from a library's, which are not judged.
+export interface StyleUsesOptions {
+  own?: ((file: string) => boolean) | undefined
+  unresolved?: ((found: { file: string, line: number, how: string, part: string }[]) => void) | undefined
+}
+
+export function styleUses(root: string, entries: Iterable<string>, sheets: Iterable<string>, reached: Reached, shorthand: ReadonlyMap<string, Iterable<string>>, markup: readonly string[] = [], options: StyleUsesOptions = {}): StyleUses {
   const styled = new Set<string>()
 
   // Identical texts, as the stylesheets of two entries often are, are read once.
@@ -130,6 +214,8 @@ export function styleUses(root: string, entries: Iterable<string>, sheets: Itera
     return found
   }
   const byModule = new Map<string, Set<string>>()
+  // The classes the app lists with `@source inline`, which every page keeps.
+  const kept = new Set<string>()
   const named = (file: string): Set<string> => {
     let found = byModule.get(file)
 
@@ -143,7 +229,7 @@ export function styleUses(root: string, entries: Iterable<string>, sheets: Itera
       return found
 
     if (CSS_FILE.test(file)) {
-      for (const name of stylesheetClasses(file)) {
+      for (const name of stylesheetClasses(file, kept)) {
         if (styled.has(name))
           found.add(name)
       }
@@ -178,6 +264,45 @@ export function styleUses(root: string, entries: Iterable<string>, sheets: Itera
     return found
   }
   let written: Set<string> | undefined
+  // The runtime classes of the app's scripts and components that nothing makes the build keep the rules of.
+  const unresolvedClasses = (files: Iterable<string>, own: StyleUsesOptions['own'], listed: ReadonlySet<string>, complete: (fragment: string) => string[]) => {
+    const found: { file: string, line: number, how: string, part: string }[] = []
+
+    for (const file of files) {
+      if (own?.(file) !== true || !SCRIPT_OR_KAY.test(file) || !existsSync(file))
+        continue
+
+      const judge = (parts: string[]): 'covered' | 'uncovered' | 'none' => {
+        let open = false
+
+        for (const part of parts) {
+          const words = new Set<string>()
+          const fragments = new Set<string>()
+
+          readWords(part, words, fragments)
+
+          for (const fragment of fragments) {
+            open = true
+
+            if (complete(fragment).length > 0 || [...listed].some(name => ENDS_OPEN.test(fragment) ? name.startsWith(fragment) : name.endsWith(fragment)))
+              return 'covered'
+          }
+        }
+
+        return open ? 'uncovered' : 'none'
+      }
+
+      for (const runtime of runtimeClasses(readSource(file).text, judge)) {
+        // A value with no part to match is the app's to vouch for with an `@source inline` of its own.
+        if (runtime.part === '' && listed.size > 0)
+          continue
+
+        found.push({ file, ...runtime })
+      }
+    }
+
+    return found
+  }
   // The classes Markdown renders and the files that write markup name, which only a page rendering a collection's Markdown can show.
   const markupNames = (): Set<string> => {
     if (written === undefined) {
@@ -193,6 +318,7 @@ export function styleUses(root: string, entries: Iterable<string>, sheets: Itera
   }
 
   const used = new Map<string, Set<string>>()
+  const everything = new Set<string>()
 
   for (const entry of entries) {
     const seen = new Set<string>()
@@ -205,6 +331,7 @@ export function styleUses(root: string, entries: Iterable<string>, sheets: Itera
         continue
 
       seen.add(file)
+      everything.add(file)
       open ||= reached.open.has(file)
 
       for (const name of named(file))
@@ -220,6 +347,17 @@ export function styleUses(root: string, entries: Iterable<string>, sheets: Itera
 
     used.set(entry, names)
   }
+
+  // What the app lists with `@source inline` is on every page, as it is meant for classes no source names.
+  const always = [...kept].filter(name => styled.has(name))
+
+  for (const names of used.values()) {
+    for (const name of always)
+      names.add(name)
+  }
+
+  if (options.unresolved !== undefined)
+    options.unresolved(unresolvedClasses(everything, options.own, kept, completing))
 
   const classes = [...new Set([...used.values()].flatMap(names => [...names]))].sort()
   const index = new Map(classes.map((name, at) => [name, at]))

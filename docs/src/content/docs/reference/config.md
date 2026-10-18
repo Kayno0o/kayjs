@@ -81,7 +81,7 @@ Every option is optional. The tables give each option's default. The full refere
 | `fonts` | Self-hosted fonts, from files or a Fontsource package |
 | `plugins` | Bun plugins the browser build runs, such as Tailwind's |
 | `budget` | The most JavaScript (`js`) and CSS (`css`) one page may load, compressed, as `'20kb'`. `kay build` warns with `over-budget` for a page over it. Both are off until set. See [Set a budget](/guides/performance#set-a-budget) |
-| `inlineStyles` | `true` writes every page's styles into its head in production, `false` links them. Unset, a page inlines them when they compress under about 14 KB, or else the rules its own components use, linking the full stylesheet for the rest. See [Styling and assets](/essentials/styling-and-assets#linked-or-inlined-styles) |
+| `inlineStyles` | `true` writes every page's styles into its head in production, `false` links them. Unset, a page inlines them when they compress under about 14 KB, or else only the rules its own components use. See [Styling and assets](/essentials/styling-and-assets#linked-or-inlined-styles) |
 | `minify` | Minifies the browser build. On for `kay build`, off for `kay dev` unless set to `true` |
 | `publicEnv` | The environment variables islands may read, as a schema. No other variable reaches the browser |
 | `settings` | A module for a kay library's settings, such as `{ '@kaynooo/kayjs-ui': './src/ui-settings.ts' }`. See [kayjs-ui](/libraries/kayjs-ui) |

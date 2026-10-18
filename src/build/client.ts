@@ -12,7 +12,7 @@ import type { FileDiagnostic } from './transform'
 import { existsSync } from 'node:fs'
 import { mkdir, rm } from 'node:fs/promises'
 import { builtinModules } from 'node:module'
-import { basename, join, relative, resolve } from 'node:path'
+import { basename, join, relative, resolve, sep } from 'node:path'
 import { formatDiagnostic } from '../compiler'
 import { buildFailure, errorCodeOf, KayError, raisedMark } from '../compiler/errors'
 import { projectPaths } from '../project'
@@ -453,8 +453,8 @@ async function refuseBuiltinImports(root: string, logs: Bun.BuildOutput['logs'],
 
 // Each page and layout is an entry whose code shrinks to its imports, so what comes out is the stylesheet of everything it renders: each one's URL by the file relative to the root, and every module the build read, `followed` adding the ones it shrank to their imports, which the bundler's list of inputs leaves out.
 // The rules of a kay library's stylesheets needing a class nothing names are left out, `unused` listing those classes.
-// `uses` tells which of the classes the stylesheets style each page and layout names, for a production server to leave the rules of the rest out of a page's head; development links the stylesheets whole.
-export async function bundleStyles(root: string, { pages, libraries, classes, shorthand }: Pick<ClientSources, 'pages' | 'libraries' | 'classes' | 'shorthand'>, options: ClientOptions): Promise<{ styles: Record<string, string>, inputs: string[], followed: string[], unused: Set<string>, uses?: StyleUses }> {
+// `uses` tells which of the classes the stylesheets style each page and layout names, for a production server to leave the rules of the rest out of a page's head; development links the stylesheets whole and compares what the page sets with it.
+export async function bundleStyles(root: string, { pages, libraries, classes, shorthand, islands }: Pick<ClientSources, 'pages' | 'libraries' | 'classes' | 'shorthand' | 'islands'>, options: ClientOptions): Promise<{ styles: Record<string, string>, inputs: string[], followed: string[], unused: Set<string>, uses?: StyleUses }> {
   if (pages.length === 0)
     return { styles: {}, inputs: [], followed: [], unused: new Set() }
 
@@ -486,8 +486,12 @@ export async function bundleStyles(root: string, { pages, libraries, classes, sh
       styles[relative(root, file)] = assetUrl(meta.cssBundle!)
   }
 
-  const markup = options.hot !== true && reached.open.size > 0 ? await findProjectFiles(root, MARKUP_FILE, { project: true, ownKayOnly: true }) : []
-  const uses = options.hot === true ? undefined : styleUses(root, pages, await Promise.all(build.outputs.filter(output => CSS_FILE.test(output.path)).map(async output => Bun.file(output.path).text())), reached, shorthand, markup)
+  const markup = reached.open.size > 0 ? await findProjectFiles(root, MARKUP_FILE, { project: true, ownKayOnly: true }) : []
+  const uses = styleUses(root, pages, await Promise.all(build.outputs.filter(output => CSS_FILE.test(output.path)).map(async output => Bun.file(output.path).text())), reached, shorthand, markup, {
+    own: file => !file.includes(`${sep}node_modules${sep}`) && !libraries.some(library => file.startsWith(`${library.dir}${sep}`) || file.startsWith(`${library.realDir}${sep}`)),
+    // A development build links the whole stylesheet and warns in the browser instead.
+    unresolved: options.hot === true ? undefined : found => warnUnresolved(root, found, new Set(islands.values())),
+  })
 
   // The code the entries shrank to is only a vehicle for their stylesheets.
   await Promise.all(build.outputs.filter(output => output.kind === 'entry-point' && JS_OUTPUT.test(output.path)).map(async output => rm(output.path)))
@@ -503,7 +507,16 @@ export async function bundleStyles(root: string, { pages, libraries, classes, sh
     }))
   }
 
-  return { styles, inputs: Object.keys(build.metafile!.inputs).map(input => resolve(input)), followed: [...shrunk], unused, ...uses && { uses } }
+  return { styles, inputs: Object.keys(build.metafile!.inputs).map(input => resolve(input)), followed: [...shrunk], unused, uses }
+}
+
+// Tells the app which classes it sets after load that no page carries the rule of, with the fix.
+function warnUnresolved(root: string, found: { file: string, line: number, how: string, part: string }[], islands: Set<string>): void {
+  for (const { file, line, how, part } of found) {
+    const where = `${islands.has(file) ? 'island ' : ''}${relative(root, file)}:${line}`
+
+    kayLog('warn', `${where} sets a class from a value the build cannot read (${how}${part === '' ? '' : `, ${JSON.stringify(part)}`}), so no page carries its rule: write the classes out as literals, or list them in your stylesheet with @source inline("...")`)
+  }
 }
 
 function islandManifest(root: string, outputs: Outputs, islands: Map<string, string>, entry: string, hot: boolean): Omit<ClientManifest, 'styles'> {

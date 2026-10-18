@@ -53,7 +53,6 @@ const SPECULATION = 'script[type="speculationrules"]'
 // The line a page without kay's script carries for Back after a reload, which a swapped-in page leaves to this one.
 const HISTORY = 'script[data-kay-history]'
 const ENTRY_SCRIPT = 'script[type="module"][src]:not([src*="/_kay/dev/"])'
-const REST_LINK = 'link[data-kay-rest]'
 // The head elements a swap leaves to itself rather than merging.
 // The meta naming the build the page's code belongs to stays through every swap, as that code does.
 const BUILD_TAG = 'meta[name="kay-build"]'
@@ -410,11 +409,8 @@ function serialized(markup: string): string {
   return template.innerHTML
 }
 
-// How the server put a head element in, whatever a script or the parser did to its markup since: a shared stylesheet is the same before and after its media is set, and a noscript holds its markup as text in a page and as elements in a parsed one.
+// How the server put a head element in, whatever a script or the parser did to its markup since: a noscript holds its markup as text in a page and as elements in a parsed one.
 function headKey(element: Element): string {
-  if (element.matches(REST_LINK))
-    return `<link data-kay-rest href="${element.getAttribute('href')}">`
-
   if (element.tagName === 'NOSCRIPT')
     return `<noscript>${element.firstElementChild === null ? serialized(element.textContent ?? '') : element.innerHTML}</noscript>`
 
@@ -451,7 +447,7 @@ function mergeHead(next: Document): { loaded: Promise<unknown>, commit: () => vo
       continue
 
     // A stylesheet `kay dev` swapped in for an edited one, and what the page's own scripts only touch the markup of, are the server's as they stand.
-    if (element.matches(`[data-kay-dev],${REST_LINK},noscript`))
+    if (element.matches('[data-kay-dev],noscript'))
       element._$s = html(element)
 
     const key = element._$s
@@ -478,18 +474,10 @@ function mergeHead(next: Document): { loaded: Promise<unknown>, commit: () => vo
 
     added._$s = key
 
-    if (added instanceof HTMLLinkElement && added.matches(REST_LINK))
-      added.media = 'all'
-    else if (added instanceof HTMLLinkElement && added.rel === 'stylesheet')
+    if (added instanceof HTMLLinkElement && added.rel === 'stylesheet')
       loading.push(loaded(added))
 
-    // The shared stylesheet comes last, so a rule it holds that a page's own styles also write keeps the place it had in the whole stylesheet.
-    const rest = added.matches(REST_LINK) ? null : document.head.querySelector(REST_LINK)
-
-    if (rest !== null && (added.tagName === 'STYLE' || added instanceof HTMLLinkElement))
-      rest.before(added)
-    else
-      document.head.append(added)
+    document.head.append(added)
   }
 
   return {
