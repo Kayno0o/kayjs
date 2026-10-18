@@ -30,7 +30,7 @@ function browserState(): NonNullable<typeof state> {
     const [read, write] = createSignal<Consent>(cookieValue())
 
     document.addEventListener('kay:consent', (event) => {
-      write(answer((event as CustomEvent<{ consent?: string }>).detail.consent))
+      write(answer((event as CustomEvent<{ consent?: string } | null>).detail?.consent))
     })
     state = { read, write }
   }

@@ -2,7 +2,7 @@ import type { AnalyticsOptions } from '../src/server/analytics'
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'bun:test'
+import { afterAll, beforeAll, beforeEach, describe, expect, it, spyOn } from 'bun:test'
 import { pages } from '../src/server'
 import { analytics } from '../src/server/analytics'
 import { forwardsSettled, warningsReset } from '../src/server/analytics-server'
@@ -411,7 +411,7 @@ describe('Google Analytics 4', () => {
   const ga4 = (more: object = {}): AnalyticsOptions => ({ provider: 'ga4', measurementId: 'G-ABC123', apiSecret: 'sec_ret-1', host: `http://localhost:${provider.port}/`, ...more })
 
   it('is sent a page_view through the Measurement Protocol, the secret in the query and no cookie asked of the browser', async () => {
-    const response = await send(await site(ga4()), visit(), { 'x-forwarded-for': '198.51.100.9' })
+    const response = await send(await site(ga4({ address: true })), visit(), { 'x-forwarded-for': '198.51.100.9' })
     const [sent] = received
     const body = sent!.body as Record<string, unknown> & { client_id: string }
 
@@ -429,8 +429,8 @@ describe('Google Analytics 4', () => {
     })
   })
 
-  it('gives one visitor one id and another visitor another, and leaves the address out with address: false', async () => {
-    const app = await site(ga4({ address: false }))
+  it('gives one visitor one id and another visitor another, and leaves the address out unless asked', async () => {
+    const app = await site(ga4())
 
     await send(app, visit(), { 'x-forwarded-for': '198.51.100.9' })
     await send(app, visit(), { 'x-forwarded-for': '198.51.100.9' })
@@ -443,6 +443,24 @@ describe('Google Analytics 4', () => {
     expect(new Set(ids).size).toBe(3)
     expect(JSON.stringify(received)).not.toContain('198.51.100')
     expect(received.every(sent => !('ip_override' in (sent.body as object)))).toBe(true)
+  })
+
+  it('keeps the secret out of the log when Google cannot be reached', async () => {
+    const logged: string[] = []
+    const spies = (['warn', 'error', 'log'] as const).map(level => spyOn(console, level).mockImplementation((...parts: unknown[]) => void logged.push(parts.map(String).join(' '))))
+
+    warningsReset()
+
+    try {
+      await send(await site(ga4({ host: 'http://localhost:1' })), visit())
+    }
+    finally {
+      for (const spy of spies)
+        spy.mockRestore()
+    }
+
+    expect(logged.join('\n')).toContain('ga4 provider did not take a visit')
+    expect(logged.join('\n')).not.toContain('sec_ret-1')
   })
 
   it('makes no id for a visitor who has not agreed', async () => {
@@ -638,5 +656,14 @@ describe('the setup', () => {
     [{ provider: 'custom', script: 'https://x.example/s.js', endpoint: 'https://u:p@x.example/c' }, 'endpoint is'],
   ])('refuses %j', (options, message) => {
     expect(() => analytics(options as never)).toThrow(message)
+  })
+})
+
+describe('the consent signal on the server', () => {
+  it('refuses to be set there, and says why', async () => {
+    const { consent } = await import('../src/runtime/consent')
+
+    expect(consent()).toBe('')
+    expect(() => consent.set('yes')).toThrow('from the browser')
   })
 })

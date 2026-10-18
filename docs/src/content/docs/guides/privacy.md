@@ -94,13 +94,15 @@ analytics({ provider: 'ga4', measurementId: 'G-ABC123XYZ', apiSecret: 'secret', 
 
 Google normally keeps a visitor's id in a cookie, which would need consent before it is set. kay sets none. Your server makes the id from the visitor's address and browser with a random key that changes every day and is never stored, so the id tells a visitor apart for one day and cannot be turned back into an address. Two servers behind a balancer count one visitor twice. With `consent` on, no id is made and nothing is sent until the visitor said yes.
 
-Google gets the address as `ip_override`, so it can place the visit. Give `address: false` to keep it out; Google then places every visit at your server. Because there is no Google tag on the page, check Realtime and the engagement numbers in your reports, which Google builds partly from tag data. A very long page address may also be cut by Google's limit of 100 characters per value.
+Google does not get the visitor's address unless you give `address: true`, which sends it as `ip_override` so Google can place the visit; otherwise Google places every visit at your server.
+
+Behind a CDN or proxy set `proxy`, or every visitor shares the proxy's address and one id. Keep `host` on https, as the secret travels in the request. Because there is no Google tag on the page, check Realtime and the engagement numbers in your reports, which Google builds partly from tag data. A very long page address may also be cut by Google's limit of 100 characters per value.
 
 ### What the tool receives
 
 - The page address without its `#` part, and from its query only `utm_*`, `ref` and `source`, so a token or an email in a link never reaches the tool.
 - The page the visitor came from, without its query, plus the title, the screen size, the language and the browser's `User-Agent`.
-- The visitor's address only if the tool needs it to tell visitors apart. Plausible gets it as `X-Forwarded-For`, Umami and Google Analytics in the data they receive. Simple Analytics never gets it. Behind a CDN or proxy, set `proxy` so the address is the visitor's and not the proxy's: without it Plausible sees one visitor, and the limit below is shared by your whole site.
+- The visitor's address only if the tool needs it to tell visitors apart. Plausible gets it as `X-Forwarded-For` and Umami in the data it receives. Matomo with a `tokenAuth`, Google Analytics with `address: true` and a custom tracker with `address: true` get it too. Simple Analytics never gets it. Behind a CDN or proxy, set `proxy` so the address is the visitor's and not the proxy's: without it Plausible sees one visitor, and the limit below is shared by your whole site.
 - Nothing else: no cookie, no `Referer`, no `Authorization` header of the visitor.
 
 ### Asking first
@@ -143,6 +145,10 @@ if consent() === ''
 else
   button(onClick={() => consent.set('')}) Visit statistics: {consent() === 'yes' ? 'on' : 'off'}, change
 ```
+
+`consent` works only with the `consent` option on `analytics()`.
+
+A page that calls `consent()` is rendered for each visitor, so read it in the island that needs it rather than in a layout every page shares, which a CDN could no longer cache.
 
 It is the same cookie kay's notice writes, so the two never disagree, and the server still sends nothing without a yes. A page is rendered with the answer already in the request, so the banner does not flash for a visitor who answered. The answer is shared by every island and survives page swaps. `consent.set` works in the browser only, in a handler or an effect; on the server `consent()` only reads.
 

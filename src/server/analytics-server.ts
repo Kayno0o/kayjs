@@ -143,9 +143,9 @@ const PROVIDERS = {
   },
 }
 
-// The providers that need the visitor's address to tell visitors apart; no other is sent it. Matomo takes it only with a token.
+// The providers that need the visitor's address to tell visitors apart or place them, or were told to pass it (GA4 with `address: true`); no other is sent it. Matomo takes it only with a token.
 function needsAddress(options: VisitOptions): boolean {
-  return options.provider === 'plausible' || options.provider === 'umami' || (options.provider === 'ga4' && options.address !== false) || (options.provider === 'matomo' && options.tokenAuth !== undefined)
+  return options.provider === 'plausible' || options.provider === 'umami' || (options.provider === 'ga4' && options.address === true) || (options.provider === 'matomo' && options.tokenAuth !== undefined)
 }
 
 // A visitor's id for GA4, with no cookie or storage in the browser: a keyed hash of the address and the browser, the key being a random one that changes each UTC day and lives in this process only, so the id tells a visitor apart for a day and cannot be turned back into an address.
@@ -378,7 +378,8 @@ async function forward(options: VisitOptions, visit: Visit): Promise<void> {
     await fetch(url, { method, headers, ...body !== undefined && { body: JSON.stringify(body) }, redirect: 'manual', signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS) })
   }
   catch (error) {
-    warn('provider', `analytics: the ${options.provider} provider did not take a visit`, error)
+    // Bun's error carries the request URL as `path`, which holds a GA4 secret or a Matomo token, so only its message is logged.
+    warn('provider', `analytics: the ${options.provider} provider did not take a visit`, error instanceof Error ? error.message : undefined)
   }
 }
 

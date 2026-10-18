@@ -67,7 +67,7 @@ export interface Ga4Options extends Common {
   apiSecret: string
   // Where Google takes events, `https://www.google-analytics.com` by default; `https://region1.google-analytics.com` for EU data collection.
   host?: string | undefined
-  // Passes the visitor's address on as `ip_override` so Google places the visit; `false` leaves Google with this server's.
+  // Passes the visitor's address on as `ip_override` so Google places the visit; off by default, Google then places visits at this server.
   address?: boolean | undefined
 }
 

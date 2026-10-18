@@ -59,6 +59,9 @@ export const ANALYTICS_SCRIPT = `(() => {
 
   // An empty value takes the answer back, so the visitor is asked again.
   function decide(value) {
+    if (value !== 'yes' && value !== 'no' && value !== '')
+      return
+
     const counted = choice() === 'yes'
 
     document.cookie = name + '=' + value + '; max-age=' + (value === '' ? 0 : 31536000) + '; path=' + scope + '; samesite=lax' + (location.protocol === 'https:' ? '; secure' : '')
@@ -66,7 +69,7 @@ export const ANALYTICS_SCRIPT = `(() => {
     banner = undefined
     document.dispatchEvent(new CustomEvent('kay:consent', { detail: { consent: value } }))
 
-    if (value === 'yes' && !counted)
+    if (value === 'yes' && !counted && gated)
       start()
 
     // A script that already ran cannot be taken back, so the page loads again without it.
