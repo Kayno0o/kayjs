@@ -193,7 +193,7 @@ Every `testSite()` call builds the islands for the browser. It throws that build
 
 The build goes to `.kay/test-client`, so what `kay build` wrote stays as it was. It runs once per process while the files under `src`, your routes and your API are unchanged.
 
-The `kay/test/preload` in your bunfig.toml gives every test and hook 20 seconds, so a hook that stops the server or drops a database does not fail on a busy machine. Set `timeout` under `[test]` in bunfig.toml to choose another time for tests; hooks then keep Bun's 5 seconds. On a large app the build may outlast 20 seconds. Pass `testSite({ islands: false })` to skip it, or a longer timeout to `beforeAll`.
+The `kay/test/preload` in your bunfig.toml gives every test and hook 20 seconds, so a hook that stops the server or drops a database does not fail on a busy machine. Set `timeout` under `[test]` in bunfig.toml to choose another time, which hooks then follow too. The `--timeout` flag does the same on Linux. On a large app the build may outlast 20 seconds. Pass `testSite({ islands: false })` to skip it, or a longer timeout to `beforeAll`.
 
 ## In a browser
 
