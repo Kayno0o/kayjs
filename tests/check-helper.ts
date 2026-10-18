@@ -1,5 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { join, relative } from 'node:path'
+import process from 'node:process'
 import { check } from '../src/commands/check'
 import { runCommand } from '../src/commands/command'
 import { USAGES } from '../src/commands/usages'
@@ -21,6 +22,9 @@ function install(): void {
     return
 
   installed = true
+  // The spawned command always wrote to pipes, so never in colour; this process may sit on a terminal.
+  delete process.env.FORCE_COLOR
+  process.env.NO_COLOR = '1'
 
   for (const [methods, stream] of [[STDOUT, 'stdout'], [STDERR, 'stderr']] as const) {
     for (const name of methods) {
