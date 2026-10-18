@@ -413,10 +413,11 @@
 }
 
 .kai-launcher-note {
-  font-size: 0.6875rem;
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
   line-height: 1.4;
   color: var(--color-kui-muted);
-  text-align: center;
+  text-align: start;
 }
 
 .kai-launcher-note :where(a) {
