@@ -5,6 +5,7 @@ import Icon from '@kaynooo/kayjs-ui/icon.kay'
 import TabNav from '@kaynooo/kayjs-ui/tab-nav.kay'
 import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
 import BrandGithub from '~icons/tabler/brand-github'
+import MessageCircle from '~icons/tabler/message-circle'
 import { FORGE, RELEASES, REPOSITORY } from '../forge'
 import { partOf } from '../sections'
 import CodeCopy from './code-copy.kay'
@@ -29,6 +30,9 @@ a.skip-link(href="#content") Skip to the content
           Icon(icon={BrandGithub})
         ThemePicker(persist hydrate="idle")
       Search(persist hydrate="idle" groups={nav.groups} structure={nav.structure} components={nav.components})
+      a.ask-link(href="/ask")
+        MessageCircle
+        span Ask the docs
       // Shown once the sidebar folds into a popover.
       Button(class="hidden max-[56rem]:inline-flex" label="Menu" icon="menu" popovertarget="sidebar")
     nav#sidebar.sidebar(popover aria-label="Documentation")

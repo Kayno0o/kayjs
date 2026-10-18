@@ -50,6 +50,7 @@
       "name": "kay-docs",
       "devDependencies": {
         "@iconify-json/tabler": "^1.2.42",
+        "@kaynooo/kayjs-ai": "workspace:*",
         "@kaynooo/kayjs-ui": "workspace:*",
       },
     },

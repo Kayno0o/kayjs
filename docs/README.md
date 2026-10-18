@@ -1,0 +1,26 @@
+# kay docs
+
+The documentation site, built with kay itself. It is a server, not a static export: every page is prerendered at build time, and the chat on `/ask` answers through an action.
+
+## Build and run
+
+```sh
+bun run docs:build   # kay build docs
+bun run docs:start   # kay start docs --port 3000
+```
+
+`bun run docs:export` writes the old static copy to `docs/dist`, which the chat page cannot be part of: an action needs a server.
+
+## The chat
+
+`/ask` answers questions about kay from `llms.txt`, and reads more through two actions it is offered as tools: `search_docs` and `read_page`. Its code is `src/routes/(docs)/ask.kay` and `src/chat-corpus.ts`.
+
+Environment variables of the server, Mistral Small 4 pinned to a dated model:
+
+- `OPENAI_API_KEY`: the Mistral API key.
+- `AI_BASE_URL=https://api.mistral.ai/v1`
+- `AI_MODEL=mistral-small-2603`
+
+Nothing else is set. Without them the site builds, prerenders and serves as usual, and the chat answers that it is not available. Behind nginx, `proxy: true` in `kay.config.ts` reads the visitor's address from `X-Forwarded-For`, so nginx must set it (`proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for`) and the server must not be reachable except through nginx.
+
+Limits, in `kay.config.ts`: 4 questions a minute per visitor, 250,000 tokens a day per visitor and 4,000,000 a day in all. They are kept in memory, so a restart resets them. Mistral accounts have low rate limits, about a request a second, and one question makes up to five requests.

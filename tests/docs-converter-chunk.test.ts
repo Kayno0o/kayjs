@@ -1,8 +1,6 @@
-import { rm } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
-import { scratchDir } from './scratch'
+import { beforeAll, describe, expect, it } from 'bun:test'
 
 const CLI = resolve('src/cli.ts')
 const CHUNK_NAME = /[\w-]+\.js/g
@@ -12,7 +10,7 @@ const DYNAMIC_IMPORT = /\bimport\("\.\/([\w-]+\.js)"\)/g
 // The page's file, and its folder's index when the build writes both.
 const CONVERTER_PAGES = ['migrating/from-html.html', 'migrating/from-html/index.html']
 
-let out: string
+const CLIENT = join(import.meta.dir, '../docs/.kay/client')
 const chunks = new Map<string, string>()
 const pages = new Map<string, string>()
 
@@ -40,27 +38,21 @@ function chunksOf(html: string): string[] {
 // The converter of `kay fmt --from-html` is a chunk only the box on the converter page fetches, so the build is read for who can reach it.
 describe('the docs converter chunk', () => {
   beforeAll(async () => {
-    out = await scratchDir('docs-converter-')
-
-    const child = Bun.spawn([process.execPath, CLI, 'build', 'docs', '--no-check', '--static', '--outdir', out], { stdout: 'ignore', stderr: 'pipe' })
+    const child = Bun.spawn([process.execPath, CLI, 'build', 'docs', '--no-check'], { stdout: 'ignore', stderr: 'pipe' })
     const [errors, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
 
     if (code !== 0)
       throw new Error(errors)
 
-    for await (const file of new Bun.Glob('_kay/*.js').scan(out))
-      chunks.set(file.slice('_kay/'.length), await Bun.file(join(out, file)).text())
+    for await (const file of new Bun.Glob('*.js').scan(join(CLIENT, 'dist')))
+      chunks.set(file, await Bun.file(join(CLIENT, 'dist', file)).text())
 
-    for await (const file of new Bun.Glob('**/*.html').scan(out))
-      pages.set(file, await Bun.file(join(out, file)).text())
+    for await (const file of new Bun.Glob('**/*.html').scan(join(CLIENT, 'pages')))
+      pages.set(file, await Bun.file(join(CLIENT, 'pages', file)).text())
   }, 180_000)
 
-  afterAll(async () => {
-    await rm(out, { recursive: true, force: true })
-  })
-
   it('is fetched by the converter box alone and reached by no other page', () => {
-    // The export also carries the chunks kept from earlier builds, which no page of this one links.
+    // The build also carries the chunks kept from earlier builds, which no page of this one links.
     const linked = reachable([...pages.values()].flatMap(chunksOf))
     const box = [...linked].filter(name => name.startsWith('html-converter-'))
 

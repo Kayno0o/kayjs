@@ -1,5 +1,6 @@
 import { readdirSync } from 'node:fs'
 import { join } from 'node:path'
+import { ai } from '@kaynooo/kayjs-ai'
 import tailwind from 'bun-plugin-tailwind'
 import { defineConfig } from 'kay/server'
 import { pageWeight } from './src/page-weight'
@@ -16,7 +17,10 @@ const migrations = ['astro', 'sveltekit', 'nextjs', 'laravel']
 export default defineConfig({
   log: false,
   plugins: [tailwind],
-  extensions: [pageWeight],
+  // Behind the host's nginx, whose address every visitor would otherwise share: the chat's limits count the visitor.
+  proxy: true,
+  // The chat on /ask runs on Mistral's account, whose rate limit is low (about a request a second, and an answer takes up to five): 4 questions a minute per visitor, 250,000 tokens a day each, 4,000,000 a day in all (a few dollars at most).
+  extensions: [pageWeight, ai({ limit: { max: 4, window: '1m' }, budget: { tokens: 250_000, total: 4_000_000, window: '1d' } })],
   site: 'https://kayjs.kaynooo.fr',
   seo: {
     name: 'kay',

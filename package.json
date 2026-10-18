@@ -205,7 +205,9 @@
     "bench:sites": "$npm_execpath bench/sites/run.ts",
     "bench:soak": "$npm_execpath bench/soak.ts",
     "bench:test": "$npm_execpath test ./bench",
-    "docs:build": "$npm_execpath src/cli.ts build docs --static",
+    "docs:build": "$npm_execpath src/cli.ts build docs",
+    "docs:export": "$npm_execpath src/cli.ts build docs --static",
+    "docs:start": "$npm_execpath src/cli.ts start docs",
     "bench:check": "$npm_execpath run bench:check:kay && $npm_execpath run bench:check:apps",
     "bench:check:kay": "$npm_execpath src/cli.ts check bench/apps/kay",
     "bench:check:apps": "bun src/tsgo.ts --noEmit -p bench/apps/solid && bun src/tsgo.ts --noEmit -p bench/apps/svelte && bun src/tsgo.ts --noEmit -p bench/apps/next && $npm_execpath --cwd=bench/apps/nuxt --bun run check && $npm_execpath --cwd=bench/apps/astro --bun run check"

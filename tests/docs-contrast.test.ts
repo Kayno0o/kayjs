@@ -1,59 +1,59 @@
 import type { TestPage } from '../src/test'
 import { existsSync } from 'node:fs'
-import { rm } from 'node:fs/promises'
-import { join, resolve } from 'node:path'
+import { resolve } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { chromium } from 'playwright-core'
 import { browse, browserPath } from '../src/test'
-import { scratchDir } from './scratch'
 
 const CLI = resolve('src/cli.ts')
-// Home, a guide, a UI component's page with its demos, and a Structure page: each layout the docs have.
-const PAGES = ['/', '/guides/api-routes', '/ui/button', '/structure/app-css']
+// Home, a guide, a UI component's page with its demos, a Structure page and the chat: each layout the docs have.
+const PAGES = ['/', '/guides/api-routes', '/ui/button', '/structure/app-css', '/ask']
 const SCHEMES = ['light', 'dark'] as const
 
 // Without BUN_CHROME_PATH or a Chrome on the PATH, the Chromium playwright-core installed for the other browser tests.
 const path = browserPath() ?? (existsSync(chromium.executablePath()) ? chromium.executablePath() : undefined)
 
-let out: string
-let server: ReturnType<typeof Bun.serve>
+async function reachable(url: string): Promise<boolean> {
+  try {
+    return (await fetch(url)).ok
+  }
+  catch {
+    return false
+  }
+}
+
+let server: Bun.Subprocess
+let origin: string
 let page: TestPage
 
-// The contrast tests in docs.test.ts read the palettes' values, so this one reads the colours the built pages render, whatever the build made of them.
+// The contrast tests in docs.test.ts read the palettes' values, so this one reads the colours the built pages render, served by `kay start` as the docs are, whatever the build made of them.
 describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the docs as built', () => {
   beforeAll(async () => {
-    out = await scratchDir('docs-contrast-')
-
-    const child = Bun.spawn([process.execPath, CLI, 'build', 'docs', '--no-check', '--static', '--outdir', out], { stdout: 'ignore', stderr: 'pipe' })
+    const child = Bun.spawn([process.execPath, CLI, 'build', 'docs', '--no-check'], { stdout: 'ignore', stderr: 'pipe' })
     const [errors, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
 
     if (code !== 0)
       throw new Error(errors)
 
-    server = Bun.serve({
-      port: 0,
-      async fetch(request) {
-        const pathname = decodeURIComponent(new URL(request.url).pathname)
+    const probe = Bun.serve({ port: 0, fetch: () => new Response() })
+    const port = probe.port!
 
-        for (const candidate of [pathname, `${pathname}.html`, join(pathname, 'index.html')]) {
-          const file = Bun.file(join(out, candidate))
+    await probe.stop(true)
+    server = Bun.spawn([process.execPath, CLI, 'start', 'docs', '--port', String(port)], { stdout: 'ignore', stderr: 'ignore' })
+    origin = `http://localhost:${port}/`
 
-          if (!candidate.endsWith('/') && await file.exists())
-            return new Response(file)
-        }
+    for (let tries = 0; tries < 100 && !await reachable(origin); tries++)
+      await Bun.sleep(100)
 
-        return new Response(Bun.file(join(out, '404.html')), { status: 404 })
-      },
-    })
     // Wide enough for the sidebar and the table of contents to show.
-    page = await browse(server.url.href, { path, width: 1440, height: 900 })
+    page = await browse(origin, { path, width: 1440, height: 900 })
   }, 120_000)
 
   afterAll(async () => {
     page?.close()
-    await server?.stop(true)
-    await rm(out, { recursive: true, force: true })
+    server?.kill()
+    await server?.exited
   })
 
   for (const scheme of SCHEMES) {

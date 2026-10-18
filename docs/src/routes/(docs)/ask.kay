@@ -1,0 +1,58 @@
+--- server
+import { ask } from '@kaynooo/kayjs-ai'
+import { s } from 'kay'
+import { readPage, searchPages, systemPrompt } from '../../chat-corpus'
+
+export const page = { prerender: true, search: { weight: 0.5 } }
+
+// The tools' own limits sit well above what one question needs, so the chat's `ai({ limit })` is what a visitor meets first.
+const TOOL_LIMIT = { max: 60, window: '1m' } as const
+
+export const searchDocs = action(
+  s.Object({ query: s.String({ minLength: 2, maxLength: 200 }) }),
+  async ({ query }) => ({ hits: await searchPages(query) }),
+  { tool: 'Searches the documentation and returns the best matching sections, each with the path of its page', rateLimit: TOOL_LIMIT },
+)
+
+export const readDocsPage = action(
+  s.Object({ path: s.String({ minLength: 1, maxLength: 200 }) }),
+  async ({ path }, ctx) => {
+    const found = await readPage(path)
+
+    if (found === undefined)
+      return ctx.fail(404, `There is no page at ${path.slice(0, 80)}; use a path from the list or from search_docs`)
+
+    return { path: found.href, title: found.title, text: found.text }
+  },
+  { tool: { name: 'read_page', description: 'Reads one documentation page in full, given its path such as /essentials/islands or /llms/actions' }, rateLimit: TOOL_LIMIT },
+)
+
+const Messages = s.Object({
+  messages: s.Array(s.Object({ role: s.UnionEnum(['user', 'assistant']), content: s.String({ maxLength: 2000 }) }), { minItems: 1, maxItems: 20 }),
+})
+
+export const reply = action(
+  Messages,
+  async ({ messages }, ctx) => {
+    try {
+      return ask(messages, { system: await systemPrompt(), tools: [searchDocs, readDocsPage], maxSteps: 5, maxTokens: 1500, temperature: 0.2 }).progress()
+    }
+    catch {
+      return ctx.fail(503, 'The chat is not available on this site right now. Search the docs with Ctrl K instead.')
+    }
+  },
+  { rateLimit: { max: 8, window: '1m' } },
+)
+--- script
+import Chat from '@kaynooo/kayjs-ai/chat.kay'
+---
+head
+  title Ask the docs · kay
+.page
+  header.page-head
+    p.eyebrow Docs
+    h1 Ask the docs
+    p.lede Ask how to do something with kay. The answer is written from the docs and links the pages it rests on.
+  article.prose
+    Chat(action={reply} label="Ask the docs" placeholder="How do I...")
+    p.chat-note An AI model writes the answers from these docs, and it can be wrong. Check the pages it links before you rely on one. #[a(href="/guides/ask-the-docs") How the chat works].

@@ -262,3 +262,7 @@ expect(fakeAi.last()?.messages).toEqual([{ role: 'user', content: 'Hi' }])
 `fakeAi.reply({ calls: [{ name: 'add_note', input: { title: 'Milk' } }] })` makes the model call a tool, and the next script answers once the results are back. `fakeAi.fail(error)` makes the next ask fail, and `fakeAi.clear()` forgets everything. With nothing scripted, the fake answers `Fake reply to:` followed by your last message. In development the fake answers too, until a provider is configured.
 
 <ReadMore href="/llms/kayjs-ai-testing-and-errors">Scripting the fake, every error kind, and building a provider by hand.</ReadMore>
+
+## An example
+
+The chat on these docs is built with it: [Ask the docs](/guides/ask-the-docs) says what it reads, and its source is a single page.
