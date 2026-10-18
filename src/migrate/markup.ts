@@ -30,9 +30,9 @@ const UPPERCASE_START = /^[A-Z]/
 const COMMENT_END = /\*\//g
 const TEMPLATE_UNSAFE = /[`\\]|\$\{/g
 const ATTRIBUTE_PART = /\s([\w:-]+)(?:=("[^"]*"|'[^']*'))?/g
-// Elements that read as part of a line of text, rendered inline as `#[strong text]`.
 // Elements that stand on lines of their own, so the space between one and a text beside it does not show.
 const BLOCK_TAGS = new Set(['address', 'article', 'aside', 'blockquote', 'details', 'dd', 'div', 'dl', 'dt', 'fieldset', 'figure', 'footer', 'form', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'header', 'hr', 'li', 'main', 'nav', 'ol', 'p', 'pre', 'section', 'summary', 'table', 'tbody', 'td', 'tfoot', 'th', 'thead', 'tr', 'ul'])
+// Elements that read as part of a line of text, rendered inline as `#[strong text]`.
 const INLINE = new Set(['a', 'abbr', 'b', 'br', 'code', 'em', 'i', 'kbd', 'mark', 's', 'small', 'span', 'strong', 'sub', 'sup', 'time', 'u'])
 const HYDRATE: Record<string, string | undefined> = { 'client:load': undefined, 'client:idle': 'idle', 'client:visible': 'visible' }
 // Attributes Astro reads and kay has no use for: the page swap is kay's own, and an inline script is the only kind.
