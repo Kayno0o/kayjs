@@ -1,6 +1,7 @@
 import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { beforeAll, describe, expect, it } from 'bun:test'
+import { outputDir } from '../src/build/assets'
 import { takeDocsBuild } from './docs-build'
 
 const CLI = resolve('src/cli.ts')
@@ -11,7 +12,8 @@ const DYNAMIC_IMPORT = /\bimport\("\.\/([\w-]+\.js)"\)/g
 // The page's file, and its folder's index when the build writes both.
 const CONVERTER_PAGES = ['migrating/from-html.html', 'migrating/from-html/index.html']
 
-const CLIENT = join(import.meta.dir, '../docs/.kay/client')
+// A worker of `bun test --parallel` builds into `.kay/client-<id>`, which the spawned build inherits, so the folder comes from `outputDir`.
+const CLIENT = outputDir(join(import.meta.dir, '../docs'))
 const chunks = new Map<string, string>()
 const pages = new Map<string, string>()
 
