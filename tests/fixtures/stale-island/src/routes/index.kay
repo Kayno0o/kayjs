@@ -1,0 +1,9 @@
+---
+import Counter from '../components/counter.kay'
+import Stamp from '../components/stamp.kay'
+---
+h1 Home
+a.second(href="/second") Second
+Stamp(server="defer")
+div(style="height: 3000px")
+Counter(hydrate="visible")

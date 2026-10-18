@@ -1033,7 +1033,7 @@ async function renderBack(app: Elysia, base: string, request: Request, headers: 
   try {
     page = await visitAs(request, new Request(new URL(`${path}${from.search}`, request.url), { headers: sent }), server, async visit => app.handle(visit))
 
-    if (page.ok && HTML.test(page.headers.get('content-type') ?? ''))
+    if (HTML.test(page.headers.get('content-type') ?? ''))
       html = await page.text()
   }
   finally {
@@ -1048,6 +1048,20 @@ async function renderBack(app: Elysia, base: string, request: Request, headers: 
   }
 
   const swapped = request.headers.get(NAVIGATE_HEADER) === '1'
+
+  // A page that rendered an error (a guard's denial page, a 404) answers the post as a document too: it keeps its status and carries the mark, but is not the failure.
+  if (!page.ok) {
+    const error = new Headers(page.headers)
+
+    for (const cookie of headers.getSetCookie())
+      error.append('set-cookie', cookie)
+
+    error.delete('content-length')
+    error.delete('etag')
+
+    return new Response(swapped ? html : html.replace(HEAD_START, tag => `${tag}<meta name="kay-posted">`), { status: page.status, headers: error })
+  }
+
   const answer = new Headers(page.headers)
 
   for (const [name, value] of headers)

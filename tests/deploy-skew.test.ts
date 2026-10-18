@@ -48,6 +48,31 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a producti
   })
 })
 
+describe('a native post answered by a page', () => {
+  it('marks the document of a post that came back to a page rendering an error, as it does the one of a rendered failure', async () => {
+    const site = await testSite({ routes: 'tests/fixtures/site/src/routes' })
+
+    try {
+      const post = async (back: string) => site.fetch(`/_kay/action/tests/fixtures/site/src/routes/index.kay/add?kay_back=${encodeURIComponent(back)}`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded', 'origin': 'http://localhost' }, body: 'title=' })
+
+      const error = await post('/nowhere')
+      const html = await error.text()
+
+      expect(error.status).toBe(404)
+      expect(html).toContain('Nothing here')
+      expect(html).toContain('<meta name="kay-posted">')
+
+      const rendered = await post('/')
+
+      expect(rendered.status).toBe(422)
+      expect(await rendered.text()).toContain('<meta name="kay-posted">')
+    }
+    finally {
+      await site.close()
+    }
+  }, 60_000)
+})
+
 describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a page of the build the server runs', () => {
   it('keeps swapping after a form post and an island\'s call, whose answers name its own build', async () => {
     const site = await testSite({ routes: 'tests/fixtures/navigation/src/routes', browser: { path } })
@@ -257,6 +282,66 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a page tol
       }, 60_000)
     })
   }
+
+  it('asks the server once for the answers of a few seconds, however many name another build', async () => {
+    const { forged, plugin } = forgedBuild()
+    const site = await testSite({ routes: 'tests/fixtures/navigation/src/routes', browser: { path }, use: [plugin] })
+
+    try {
+      const page = await opened(site)
+
+      forged.build = 'otherbuild'
+      forged.seen.length = 0
+
+      const answers = await page.evaluate(async () => {
+        const entry = performance.getEntriesByType('resource').find(resource => resource.name.includes('/stale-'))!.name
+        const { noticed } = await import(entry) as { noticed: (response: Response) => Promise<boolean> }
+        const results: boolean[] = []
+
+        for (let count = 0; count < 5; count++)
+          results.push(await noticed(new Response('x', { headers: { 'x-kay-build': 'otherbuild' } })))
+
+        return results
+      })
+
+      expect(answers).toEqual([false, false, false, false, false])
+      expect(forged.seen.filter(request => request.startsWith('HEAD '))).toHaveLength(1)
+    }
+    finally {
+      await site.close()
+    }
+  }, 60_000)
+
+  it('asks the page itself for a tab whose entry chunk is on another origin, which a HEAD cannot read', async () => {
+    const { forged, plugin } = forgedBuild()
+    const site = await testSite({ routes: 'tests/fixtures/navigation/src/routes', browser: { path }, use: [plugin] })
+
+    try {
+      const page = await opened(site)
+
+      forged.build = 'otherbuild'
+      forged.seen.length = 0
+
+      await page.evaluate(async () => {
+        const entry = performance.getEntriesByType('resource').find(resource => resource.name.includes('/stale-'))!.name
+        const { noticed } = await import(entry) as { noticed: (response: Response) => Promise<boolean> }
+
+        // A CDN's address, where nothing answers this origin's HEAD.
+        document.querySelector<HTMLScriptElement>('script[type="module"][src*="/_kay/"]')!.src = 'http://127.0.0.1:1/_kay/entry.js'
+        await noticed(new Response('x', { headers: { 'x-kay-build': 'otherbuild' } }))
+      })
+
+      expect(forged.seen.some(request => request.startsWith('HEAD '))).toBe(false)
+      expect(pageRequests(forged.seen)).toHaveLength(1)
+      await page.click('a.second')
+      await page.waitFor('h1', { text: 'Second' })
+
+      expect(await page.evaluate(() => (window as { kayMark?: string }).kayMark)).toBeUndefined()
+    }
+    finally {
+      await site.close()
+    }
+  }, 60_000)
 
   it('does not reload a document that was the answer of a native post, which the browser would ask to resubmit', async () => {
     const { forged, plugin } = forgedBuild()

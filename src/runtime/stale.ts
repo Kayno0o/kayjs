@@ -13,7 +13,11 @@ const STORAGE_KEY = 'kay-reloaded'
 // A page is not reloaded again within this time, whatever it still says: a cache in front of the server may keep serving the old page, and replicas on two builds may alternate.
 const REPEAT_MS = 60_000
 
+// How long the build the server confirmed is believed, which only the answers of an HTTP cache or a replayed island ask again.
+const CONFIRMED_MS = 5000
+
 let reloading: Promise<boolean> | undefined
+let confirmed: { build: string, at: number } | undefined
 let asking: Promise<string | undefined> | undefined
 
 // The build a production server answers now, from the header of a request for the entry chunk this page loaded: a file, so nothing renders, and one that is gone after a deploy still answers 404 with the header.
@@ -55,11 +59,19 @@ async function served(): Promise<string | undefined> {
   return page.querySelector(BUILD_TAG)?.getAttribute('content') ?? undefined
 }
 
-// Asked once at a time, whoever needs it.
-async function current(): Promise<string | undefined> {
+// Asked once at a time, whoever needs it, and a build the server named is kept for a few seconds unless `fresh`, so a page of cached answers costs one request.
+async function current(fresh = false): Promise<string | undefined> {
+  if (!fresh && confirmed !== undefined && Date.now() - confirmed.at < CONFIRMED_MS)
+    return confirmed.build
+
   asking ??= (async () => {
     try {
-      return await served()
+      const build = await served()
+
+      if (build !== undefined)
+        confirmed = { build, at: Date.now() }
+
+      return build
     }
     catch {
       return undefined
@@ -148,7 +160,8 @@ export async function noticed(response: Response): Promise<boolean> {
 export async function reloadIfStale(): Promise<boolean> {
   reloading ??= (async () => {
     try {
-      const build = await current()
+      // A chunk that is gone is asked about afresh: a deploy may have come since the last answer.
+      const build = await current(true)
 
       return build !== undefined && !onPage(build) && reload()
     }

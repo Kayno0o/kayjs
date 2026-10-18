@@ -118,9 +118,11 @@ A deploy replaces the JavaScript files of the site. A tab opened before it still
 
 Kay handles this without setup. Every answer of a production server names its build in an `x-kay-build` header. When a tab fails to load a file, it asks the server which build it runs now, with a request for its own entry file, which renders no page. If that is another one, the tab reloads the current page, and the browser keeps the scroll position.
 
-A tab with something typed in it is not reloaded under the visitor, and neither is a page that answered a form sent without JavaScript, as the browser would ask to send it again. The next link they follow loads the new page in full instead of swapping it in. The same goes for a tab whose action call or server island was answered by the new build, once the server confirms it, as a cached answer may name an old one. An action the new build dropped reloads the tab at once.
+A tab with something typed in it is not reloaded under the visitor, and neither is a page that answered a form sent without JavaScript, an error page included, as the browser would ask to send it again. The next link they follow loads the new page in full instead of swapping it in. The same goes for a tab whose action call or server island was answered by the new build, once the server confirms it, as a cached answer may name an old one. An action the new build dropped reloads the tab at once.
 
 A tab reloads once a minute at most, so a cache that keeps serving the old page cannot loop it. Static exports work the same way, with the tab reading the build off the host's page.
+
+The server's answer is believed for five seconds, so a page of cached answers costs one request. If your scripts are served from a CDN on another origin, or from a path outside `/_kay/`, the tab cannot ask for its entry file and asks for the page itself instead.
 
 Kay also keeps the script, stylesheet and asset files of the last three builds in `.kay/client`, so an old tab finds the files it loads until it reloads, for a few deploys. This needs the `.kay` folder to survive from one build to the next, as it does on your machine and not on a clean CI checkout: keep `.kay/client` and `.kay/client-kept` between builds there. Static exports and executables carry the kept files too.
 
