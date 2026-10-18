@@ -1,9 +1,12 @@
+import type { SourceFile } from './literal-writes'
+import type { Unchanged } from './module-state'
 import { relative } from 'node:path'
-import { resolveFrom } from '../build/files'
+import { findProjectFiles, resolveFrom } from '../build/files'
 import { ICON_IMPORT, iconProps, installedIconSets } from '../build/icons'
 import { PAGE, PAGE_SETTINGS } from '../compiler/page-settings'
 import { parseKay } from '../compiler/parser'
 import { analyzeServer } from '../compiler/script'
+import { neverWritten, parseLiteral } from './literal-writes'
 import { stateAt } from './module-state'
 import { routeChain } from './routes'
 
@@ -103,6 +106,8 @@ export const IMAGE_EXPORTS: Record<string, 'free'> = {
 // The same for `kay/i18n`: messages and formats go by the locale, which is part of the key a copy is kept under; the relative time ones read the clock.
 const PURE_I18N_NAMES = new Set(['t', 'T', 'locale', 'locales', 'localeName', 'localize', 'alternate', 'formatNumber', 'formatDate', 'formatList', 'direction', 'defineMessages'])
 const CODE_FILE = /\.(?:kay|[cm]?[jt]sx?)$/
+// An exported `const` that may hold an object or array literal, to spare reading the project to a file that has none.
+const EXPORTED_CONTAINER = /\bexport\s+const\b/
 // What a file imported for its bytes holds the same on every render; a database, a native module or a wasm file does not.
 const STATIC_FILE = /\.(?:png|jpe?g|gif|webp|avif|svg|ico|woff2?|ttf|otf|json|css|txt|md|html|toml|ya?ml|csv)$/i
 // Every way a file reads the request or the moment besides `ctx`, which `ctxRead` judges: a clock, a random number, the environment, the file system through Bun, a network fetch, a dynamic import, or a `query` schema, which has the page read the URL's search params.
@@ -131,9 +136,9 @@ const MAYBE_STATE = /\b(?:let|var|export)\b|=\s*(?:\[\s*\]|\{\s*\}|new\b)/
 
 // A `.kay` file runs its scripts and server fence for each render, so a `let` or an empty container there is state only when the compiler moves its statement to module level, as it does one an export of the server fence reads.
 // The offset of the module state in a file, if it holds any.
-function moduleStateAt(file: string, source: string): number | undefined {
+function moduleStateAt(file: string, source: string, unchanged: Unchanged | undefined): number | undefined {
   if (!file.endsWith('.kay'))
-    return stateAt(source, SETTING_NAMES)
+    return stateAt(source, SETTING_NAMES, unchanged)
 
   if (!MAYBE_STATE.test(source))
     return undefined
@@ -148,7 +153,7 @@ function moduleStateAt(file: string, source: string): number | undefined {
     return MODULE_EXPORT.exec(source)?.index
 
   for (const { start, end } of server.exports) {
-    const at = stateAt(source.slice(start, end), SETTING_NAMES)
+    const at = stateAt(source.slice(start, end), SETTING_NAMES, unchanged)
 
     if (at !== undefined)
       return start + at
@@ -561,7 +566,7 @@ export async function keptScan(route: { layouts: string[], file: string }, scans
     let scan = scans.get(file)
 
     if (scan === undefined)
-      scans.set(file, scan = scanned(file, root))
+      scans.set(file, scan = scanned(file, root, scans))
 
     const { stop, code, pathname: reads } = await scan
 
@@ -603,7 +608,39 @@ function installedIcon(root: string, specifier: string): boolean {
   return file !== undefined && iconProps(file, name!) !== undefined
 }
 
-async function scanned(file: string, root: string | undefined): Promise<Scan> {
+// Every code file of the project with its comments blanked, read once per build: an exported literal is unchanged only if none of them writes to it.
+const projects = new WeakMap<object, Promise<SourceFile[]>>()
+
+async function projectSources(root: string, scans: object): Promise<SourceFile[]> {
+  let sources = projects.get(scans)
+
+  if (sources === undefined)
+    projects.set(scans, sources = readSources(root))
+
+  return sources
+}
+
+async function readSources(root: string): Promise<SourceFile[]> {
+  const files = await findProjectFiles(root, CODE_FILE, { project: true })
+
+  return Promise.all(files.map(async file => ({ file, text: withoutComments(await Bun.file(file).text()) })))
+}
+
+// Judges an exported object or array literal: unchanged when it is made of literals and no file of the project writes to it or hands it on; without a root nothing is shown.
+async function unchangedIn(file: string, source: string, root: string | undefined, scans: object): Promise<Unchanged | undefined> {
+  if (root === undefined || !EXPORTED_CONTAINER.test(source))
+    return undefined
+
+  const sources = await projectSources(root, scans)
+
+  return (name, initializer) => {
+    const literal = parseLiteral(initializer)
+
+    return literal !== undefined && neverWritten(name, literal, file, sources)
+  }
+}
+
+async function scanned(file: string, root: string | undefined, scans: object): Promise<Scan> {
   const source = withoutLastmod(file, await Bun.file(file).text())
   const code: string[] = []
 
@@ -616,7 +653,7 @@ async function scanned(file: string, root: string | undefined): Promise<Scan> {
   if (context.stop !== undefined)
     return { stop: { file, line: lineAt(source, context.stop), why: 'reads `ctx`' }, code }
 
-  const state = moduleStateAt(file, source)
+  const state = moduleStateAt(file, source, await unchangedIn(file, source, root, scans))
 
   if (state !== undefined)
     return { stop: { file, line: lineAt(source, state), why: 'declares module state, a `let`, an empty container it fills or an export another module can change' }, code }

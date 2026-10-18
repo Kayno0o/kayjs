@@ -120,6 +120,8 @@ export const page = { prerender: true }
 
 You often need no flag. `kay build` also keeps a page that reads nothing from its request or the clock, and serves it from memory. Importing an icon from `~icons/` of an installed icon set does not stop it, as the icon is plain markup that reads nothing. The same goes for `image`, `shareImage` and `shareCard` from `kay/image`, which only turn an image into its attributes or its URL.
 
+A module of site constants, such as `export const CONTACT = { email: 'a@b.fr', phone: '01 02' }`, does not stop it either, as long as nothing in the project changes it. If any file assigns into it, pushes to it, or passes it to a function that might, the build cannot tell and renders the page per request, naming the line of the export.
+
 `kay build` shows what it decided. Its route table says `prerendered`, `kept` or `on request` for each route. Under an `on request` page it names the file and line that stopped it, such as `src/routes/clock.kay:2 reads Date`.
 
 To be told when a page stops being kept, say so in the page.

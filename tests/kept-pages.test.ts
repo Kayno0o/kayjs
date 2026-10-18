@@ -107,7 +107,7 @@ const READING: Record<string, string> = {
   'src/routes/database.kay': '---\nimport { rows } from \'../rows\'\n---\np {rows.length}\n',
   'src/lib.ts': 'export * from \'./clock-time\'\n',
   'src/clock-time.ts': 'export function now(): string {\n  return new Date().toISOString()\n}\n',
-  'src/todos.ts': 'export const todos: string[] = [\'first\']\n',
+  'src/todos.ts': 'export const todos: string[] = [\'first\']\n\nexport function add(todo: string): void {\n  todos.push(todo)\n}\n',
   'src/cache.ts': 'const seen = new Map<string, number>()\n\nexport function lookup(key: string): number {\n  seen.set(key, (seen.get(key) ?? 0) + 1)\n\n  return seen.size\n}\n',
   'src/rows.ts': 'import db from \'./app.db\' with { type: \'sqlite\' }\n\nexport const rows = db.query(\'select 1\').all()\n',
   'src/app.db': '',

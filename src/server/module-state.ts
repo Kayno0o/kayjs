@@ -1,3 +1,5 @@
+import { declaredName } from './literal-writes'
+
 // What a module declares at its top level that a second render could find changed: a `let` or `var`, a `const` holding an empty array, object, `Map`, `Set` or the like, which a cache fills, and an exported one holding any array, object or `new`, which another module can change.
 // `settings` are the names of exports read as written, which are not state.
 // Read statement by statement at bracket depth 0, with strings, templates and comments set aside, so a declarator is told from a default value, a parameter or a quoted comma.
@@ -6,6 +8,8 @@ const TYPE_ARGUMENT = /[\w$\s,.[\]|&?:'"{}()<>=]/
 const WHITESPACE = /\s/
 const BRACKETS = /^(?:\[\s*\]|\{\s*\})/
 const CAST = /^(?:as|satisfies)\s/
+// The end of a cast's type name, whose `<` opens type arguments.
+const CAST_TYPE = /\b(?:as|satisfies)\s+[\w$.]+$/
 const NEW_CONTAINER = /^new\s+(?:Map|Set|WeakMap|WeakSet|Array|Object)\b/y
 const NEW_VALUE = /^(?:[[{]|new\s)/
 const WORD = /[\w$]/
@@ -17,14 +21,17 @@ const TRAILING = ',=+-*/%&|^<>?:.(['
 const REGEX_AFTER = '(,=:[!&|?{};+-*%<>~^'
 const LEADING = '.?:,+-*/%&|=<>'
 
+// Judges whether an exported literal, given its name and initializer, is shown never to change: then it is no state.
+export type Unchanged = (name: string, initializer: string) => boolean
+
 // Where the first statement declaring state starts, or undefined when none does.
-export function stateAt(source: string, settings: ReadonlySet<string>): number | undefined {
+export function stateAt(source: string, settings: ReadonlySet<string>, unchanged?: Unchanged): number | undefined {
   let at = skipTrivia(source, 0)
 
   while (at < source.length) {
     const end = statementEnd(source, at)
 
-    if (statementDeclaresState(source, at, end, settings))
+    if (statementDeclaresState(source, at, end, settings, unchanged))
       return at
 
     // A stray closer ends a statement without being part of it.
@@ -183,7 +190,7 @@ function statementEnd(source: string, at: number): number {
   return source.length
 }
 
-function statementDeclaresState(source: string, start: number, end: number, settings: ReadonlySet<string>): boolean {
+function statementDeclaresState(source: string, start: number, end: number, settings: ReadonlySet<string>, unchanged: Unchanged | undefined): boolean {
   let i = start
   let word = wordAt(source, i)
   let exported = false
@@ -197,7 +204,7 @@ function statementDeclaresState(source: string, start: number, end: number, sett
   if (word === 'let' || word === 'var')
     return true
 
-  return word === 'const' && declaratorsHoldContainer(source, skipTrivia(source, i + word.length), end, exported, settings)
+  return word === 'const' && declaratorsHoldContainer(source, skipTrivia(source, i + word.length), end, exported, settings, unchanged)
 }
 
 function wordAt(source: string, at: number): string {
@@ -210,7 +217,7 @@ function wordAt(source: string, at: number): string {
 }
 
 // Whether a declarator of the list from `from` to `end` is initialised with an empty container.
-function declaratorsHoldContainer(source: string, from: number, end: number, exported: boolean, settings: ReadonlySet<string>): boolean {
+function declaratorsHoldContainer(source: string, from: number, end: number, exported: boolean, settings: ReadonlySet<string>, unchanged: Unchanged | undefined): boolean {
   let declarator = from
   let depth = 0
   let initial = -1
@@ -237,15 +244,19 @@ function declaratorsHoldContainer(source: string, from: number, end: number, exp
     else if (depth === 0 && angle === 0 && initial < 0 && char === '=' && source[i + 1] !== '>') {
       initial = i + 1
     }
-    else if (depth === 0 && char === '<' && (initial < 0 || angle > 0 || genericCall(source, i) > 0)) {
+    else if (depth === 0 && char === '<' && (initial < 0 || angle > 0 || genericCall(source, i) > 0 || CAST_TYPE.test(source.slice(Math.max(0, i - 80), i)))) {
       angle++
     }
     else if (depth === 0 && char === '>' && source[i - 1] !== '=' && angle > 0) {
       angle--
     }
     else if (depth === 0 && angle === 0 && char === ',') {
-      if (initial >= 0 && !settings.has(source.slice(declarator, initial - 1).trim()) && holdsContainer(source.slice(skipTrivia(source, initial), i), exported))
-        return true
+      if (initial >= 0 && !settings.has(source.slice(declarator, initial - 1).trim())) {
+        const initializer = source.slice(skipTrivia(source, initial), i)
+
+        if (holdsContainer(initializer, exported) && !(exported && provenUnchanged(source.slice(declarator, initial - 1), initializer, unchanged)))
+          return true
+      }
 
       initial = -1
       declarator = i + 1
@@ -253,6 +264,12 @@ function declaratorsHoldContainer(source: string, from: number, end: number, exp
   }
 
   return false
+}
+
+function provenUnchanged(declarator: string, initializer: string, unchanged: Unchanged | undefined): boolean {
+  const name = declaredName(declarator.trim())
+
+  return name !== undefined && unchanged?.(name, initializer) === true
 }
 
 // Whether an initializer is an empty container, or for an export any array, object or `new`.

@@ -6,6 +6,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 - A command refused for an option or argument it does not take prints its own usage line alone, `kay build: unknown option --no-chek, did you mean --no-check?` without `parseArgs`'s hint, and `kay build --no-cache` builds without reading what earlier builds left in `.kay/cache` ([Build and start](build-and-start.md)).
 - A page importing `image`, `shareImage` or `shareCard` from `kay/image`, or whose layouts, components or modules do, is prerendered like one importing an image, instead of being rendered per request ([Prerendering](prerendering.md#prerendering)).
+- A page importing an exported object or array literal of strings, numbers and booleans, such as `export const CONTACT = { email: '...' }`, is prerendered when no file of the project writes to it or hands it on, instead of treating it as module state ([Prerendering](prerendering.md#prerendering)).
 
 ## 1.53.1
 
