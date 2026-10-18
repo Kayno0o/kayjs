@@ -5,13 +5,12 @@ import type { Diagnostic, Span } from './ast'
 import type { SignalKind } from './module-signals'
 import type { PageSettingName } from './page-settings'
 import { parse } from '@babel/parser'
+import { eachNode } from './each-node'
 import { SENDABLE_CLASSES } from './expression'
 import { PAGE, PAGE_SETTINGS } from './page-settings'
 import { loadTraverse, POSITION_SUFFIX } from './rewrite'
 
 // What `kay` exports that a static component may use and stay static.
-// The keys of a Babel node that say where it is written, or hold its comments, rather than its children.
-const NOT_CHILDREN = new Set(['loc', 'start', 'end', 'extra', 'leadingComments', 'trailingComments', 'innerComments'])
 // A broken module whose first statement, comments aside, is a static import.
 const STATIC_IMPORT_START = /^(?:\s*(?:\/\/.*\n|\/\*(?:[^*]|\*(?!\/))*\*\/))*\s*import\b(?!\s*[.(])/
 const WHITESPACE = /\s/
@@ -1051,27 +1050,6 @@ function leftmost(name: t.Node): string | undefined {
     return leftmost(name.left)
 
   return name.type === 'Identifier' ? name.name : undefined
-}
-
-// Visits every node under `node`, parents first, its comments left out; the visitor returns false to skip what is under one.
-export function eachNode(node: t.Node | null | undefined, visit: (node: t.Node, parent: t.Node | undefined) => boolean | void, parent?: t.Node): void {
-  if (!node || typeof node.type !== 'string' || visit(node, parent) === false)
-    return
-
-  for (const key of Object.keys(node)) {
-    if (NOT_CHILDREN.has(key))
-      continue
-
-    const value = node[key as keyof t.Node] as unknown
-
-    if (Array.isArray(value)) {
-      for (const child of value)
-        eachNode(child as t.Node, visit, node)
-    }
-    else if (value !== null && typeof value === 'object') {
-      eachNode(value as t.Node, visit, node)
-    }
-  }
 }
 
 // A type is hoisted above the function so it is visible everywhere, but one taking the `typeof` a name the body declares has to stay in the body, and so does one built from such a type.

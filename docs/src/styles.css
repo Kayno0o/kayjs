@@ -1218,3 +1218,33 @@ pre code {
 .theme-tokens {
   margin-block: 1rem 0.75rem;
 }
+
+/* The HTML converter: the box and the template side by side, one above the other on a phone. */
+.html-converter {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+  gap: 1rem;
+  margin-block: 1rem;
+}
+
+.html-converter-input {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.html-converter-output pre {
+  min-height: 15rem;
+}
+
+.html-converter-error,
+.html-converter-notes {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.html-converter-error {
+  color: var(--color-kui-error);
+}

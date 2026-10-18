@@ -15,7 +15,7 @@ export const USAGES = {
   'doctor': 'doctor [dir] [--port <port>] [--format text|json]',
   'explain': 'explain [lint|error|group] [--format text|json]',
   'types': 'types [dir] [--quiet]',
-  'fmt': 'fmt [paths...] [--check] [--format text|json] [--quiet]',
+  'fmt': 'fmt [paths...] [--check] [--format text|json] [--quiet] | fmt --from-html [file] [--format text|json]',
   'lint': 'lint [keslint arguments]...',
   'i18n missing': 'i18n missing [locale] [dir] [--format text|json]',
   'i18n accept': 'i18n accept <locale> [dir]',

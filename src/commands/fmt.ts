@@ -1,4 +1,4 @@
-import type { Command } from './command'
+import type { Command, ProblemFormat } from './command'
 import { relative } from 'node:path'
 import process from 'node:process'
 import { fromCompile } from '../check/shadow-types'
@@ -7,10 +7,43 @@ import { formatFiles } from '../format'
 import { count, done, formatOption, printDocument, printedProblems, printFailure, problemCounts, toStderr } from './command'
 import { USAGES } from './usages'
 
+// `--from-html`: the HTML in a file, or on stdin, printed as a `.kay` template, what could not be translated listed on stderr.
+async function fromHtml(paths: string[], check: boolean, format: ProblemFormat): Promise<number> {
+  if (check || paths.length > 1) {
+    printFailure('fmt', check ? '--from-html prints a template and has nothing to check' : '--from-html reads one file, or stdin', format)
+
+    return 1
+  }
+
+  try {
+    const [path] = paths
+    const { htmlToKay } = await import('../migrate/html')
+    const { code, notes } = htmlToKay(await (path === undefined || path === '-' ? Bun.stdin.text() : Bun.file(path).text()))
+
+    if (format === 'json') {
+      printDocument({ code, notes })
+
+      return 0
+    }
+
+    process.stdout.write(code)
+
+    for (const note of notes)
+      console.error(`line ${note.line}: ${note.message}`)
+
+    return 0
+  }
+  catch (error) {
+    printFailure('fmt', error instanceof Error ? error.message : error, format)
+
+    return 1
+  }
+}
+
 // Formats in place, or with `--check` lists the files that are not formatted and fails.
 export const fmt: Command = {
   usage: USAGES.fmt,
-  options: { check: { type: 'boolean' }, format: { type: 'string' }, quiet: { type: 'boolean' } },
+  options: { 'check': { type: 'boolean' }, 'from-html': { type: 'boolean' }, 'format': { type: 'string' }, 'quiet': { type: 'boolean' } },
   positionals: Infinity,
   run: async ({ values, positionals: paths }) => {
     const write = values.check !== true
@@ -19,6 +52,9 @@ export const fmt: Command = {
 
     if (format === undefined)
       return 1
+
+    if (values['from-html'] === true)
+      return fromHtml(paths, values.check === true, format)
 
     try {
       result = await formatFiles(paths.length > 0 ? paths : ['.'], { write })

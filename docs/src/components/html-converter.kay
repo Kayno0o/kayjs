@@ -1,0 +1,54 @@
+---
+import CopyButton from '@kaynooo/kayjs-ui/copy-button.kay'
+import Textarea from '@kaynooo/kayjs-ui/textarea.kay'
+import { signal } from 'kay'
+import { loadConverter } from '../html-to-kay'
+
+interface Converted {
+  code: string
+  notes: { line: number, message: string }[]
+  error?: string | undefined
+}
+
+const html = signal('')
+const converted = signal<Converted>({ code: '', notes: [] })
+
+async function convert(value: string) {
+  html.set(value)
+
+  if (value.trim() === '') {
+    converted.set({ code: '', notes: [] })
+
+    return
+  }
+
+  const { htmlToKay } = await loadConverter()
+
+  // A later keystroke answers before this one finished loading.
+  if (value !== html())
+    return
+
+  try {
+    converted.set(htmlToKay(value))
+  }
+  catch (error) {
+    converted.set({ code: '', notes: [], error: error instanceof Error ? error.message : String(error) })
+  }
+}
+---
+.html-converter
+  label.html-converter-input
+    span HTML
+    Textarea(rows={12} spellcheck={false} placeholder="Paste HTML here" value={html()} onInput={value => void convert(value)} onFocus={() => void loadConverter()})
+  .code.html-converter-output
+    .code-bar
+      span kay
+      CopyButton(text={converted().code} label="Copy")
+    pre
+      code {converted().code}
+  if converted().error as message
+    p.html-converter-error(role="alert") {message}
+  if converted().notes.length > 0
+    ul.html-converter-notes
+      for note of converted().notes key={note.line + note.message}
+        li Line {note.line}: {note.message}

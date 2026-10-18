@@ -133,6 +133,21 @@ const { comment } = props<{ comment: string }>()
 div(innerHTML={sanitizeHtml(comment)})
 ```
 
+### Write HTML and convert it
+
+HTML from Tailwind UI, Flowbite, a designer or an LLM becomes a template with `kay fmt --from-html page.html` (or stdin), which prints it formatted; paste the result in a `.kay` file and keep the dynamic parts to write by hand:
+
+```sh
+echo '<div class="rounded-md px-3.5"><a href="/terms">Terms</a></div>' | kay fmt --from-html
+```
+
+```kay
+.rounded-md(class="px-3.5")
+  a(href="/terms") Terms
+```
+
+An agent may write the markup as HTML and convert it rather than learn the indentation rules; see [kay fmt](check-and-tools.md).
+
 ## Reference
 
 ### Template lines

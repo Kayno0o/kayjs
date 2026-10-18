@@ -116,6 +116,10 @@ kay fmt --check
   - List the lints with their groups and default levels and the errors with theirs, or a group's, or print one: a lint with an example it reports and the same written right, an error with where its fix is written.
 - `kay fmt [paths...] [--check] [--format text|json] [--quiet]`:
   - Format `.kay` files; `--check` lists unformatted files and fails.
+- `kay fmt --from-html [file] [--format text|json]`:
+  - Print the HTML in `file`, or on stdin (`-` too), as a formatted `.kay` template, through the translation `kay migrate astro` uses: tag shorthand, static classes as `.class` and the id as `#id`, `class="..."` kept for classes the shorthand cannot hold (`py-0.5`, `md:w-[200px]`), attributes in parentheses, text on its element's line with inline elements as `#[tag text]`, `<script>` and `<style>` as their text, an HTML comment as a `//` comment (not rendered), a document's `head` children in a `head` block.
+  - What the template cannot hold is listed on stderr as `line N: ...` and left out: an attribute JSX cannot name (`@click`, `:class`), a `lang` on `html` (set it in `kay.config.ts`) and the attributes of `body`. HTML that needs an end tag it lacks (an unclosed `<p>` or `<li>`) fails with exit 1.
+  - `--format json` prints `{ code, notes }` on one line. It takes no `--check` and one file at most. The docs site has the same conversion in a box ([Migrating from HTML](https://kayjs.kaynooo.fr/migrating/from-html)).
 - `kay lint [keslint arguments]...`:
   - Write the types the lint of `.kay` files reads, as `kay check` does, then run the project's `keslint` with the arguments, so linting needs no check before it; its exit code is `keslint`'s (see [Linting](checks.md#linting)).
 - `kay types [dir] [--quiet]`:

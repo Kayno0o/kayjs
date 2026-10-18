@@ -5,9 +5,10 @@ import type * as t from '@babel/types'
 import type { Diagnostic, Fix } from './ast'
 import type { PageSettings, ParsedFence, SeparateSetting, ServerAnalysis } from './script'
 import { isSecret } from '../runtime/form'
+import { eachNode } from './each-node'
 import { PAGE } from './page-settings'
 import { loadTraverse } from './rewrite'
-import { eachNode, parseFence } from './script'
+import { parseFence } from './script'
 
 // A line break before a line with text: a blank line moving into `page` stays blank.
 const LINE_WITH_TEXT = /\n(?=[^\n])/g

@@ -33,7 +33,7 @@ This needs Bun to know the registry first, see [Installation](/getting-started/i
 | `kay i18n missing [locale] [dir]` | List what each locale lacks against the default one |
 | `kay i18n accept <locale> [dir]` | Accept a locale's draft messages |
 | `kay explain [lint\|error\|group]` | List the lints and the errors, or a group's, or explain one |
-| `kay fmt [paths]` | Format `.kay` files |
+| `kay fmt [paths]` | Format `.kay` files, or with `--from-html` turn HTML into a template |
 | `kay lint [args]` | Run ESLint with the types it reads for `.kay` files |
 | `kay migrate astro [dir]` | Translate an Astro project into a kay one |
 | `kay lsp --stdio` | The language server behind the editor extension |
@@ -454,10 +454,13 @@ kay explain positional-key   # one lint, with an example and the fix
 kay explain --format json    # every lint, for a tool to read
 kay fmt src                  # format a folder
 kay fmt --check              # list unformatted files and fail
+kay fmt --from-html card.html   # print HTML as a .kay template
 kay lint --fix --cache       # ESLint, with the types it reads written first
 ```
 
 `kay lint` writes the types ESLint reads for `.kay` files, then runs the project's `keslint` with the arguments you give it. The `lint` script of a new project is `kay lint --cache`.
+
+`kay fmt --from-html` reads a file, or stdin, and prints the HTML as a template, with what it could not carry over listed on stderr. [Migrating from HTML](/migrating/from-html) shows what it writes.
 
 `kay explain` and `kay fmt` take `--format json` too, see [Output for tools](#output-for-tools).
 
