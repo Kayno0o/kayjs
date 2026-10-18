@@ -1,5 +1,6 @@
 import { chmod } from 'node:fs/promises'
 import { join } from 'node:path'
+import process from 'node:process'
 import { Database } from 'bun:sqlite'
 import { beforeEach, describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
@@ -349,7 +350,8 @@ describe('the store on disk', () => {
     expect(runtimeRedirects(file).map(row => row.from)).toEqual(['/rt-w-a'])
   })
 
-  it('throws what the store says for a data folder nobody can write, apart from a refusal', async () => {
+  // Root writes through any mode, as in CI.
+  it.skipIf(process.getuid?.() === 0)('throws what the store says for a data folder nobody can write, apart from a refusal', async () => {
     const root = await scratchDir('runtime-redirects-')
     const file = join(root, 'data/not-found.sqlite')
 
