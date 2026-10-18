@@ -1,4 +1,4 @@
-/* A chat on kayjs-ui's tokens: the app imports its theme.css, and nothing else is needed. A site restyles it through these custom properties on any ancestor, all optional: --kai-chat-radius, --kai-chat-shadow, --kai-chat-accent, --kai-chat-bubble (the visitor's message), --kai-chat-width, --kai-chat-width-large. */
+/* A chat on kayjs-ui's tokens: the app imports its theme.css, and nothing else is needed. A site restyles it through these custom properties on any ancestor, all optional: --kai-chat-radius, --kai-chat-shadow, --kai-chat-accent, --kai-chat-bubble (the visitor's message), --kai-chat-width, --kai-chat-width-large, --kai-chat-height, --kai-chat-height-large. */
 .kai-chat {
   display: flex;
   flex-direction: column;
@@ -351,7 +351,7 @@
   gap: 0.5rem;
   box-sizing: border-box;
   width: min(var(--kai-chat-width, 36rem), calc(100vw - 2rem));
-  max-height: min(40rem, calc(100dvh - 7.5rem));
+  height: min(var(--kai-chat-height, 40rem), calc(100dvh - 7.5rem));
   padding: 0 1rem 0.75rem;
   border: 1px solid var(--color-kui-surface2);
   border-radius: calc(var(--kai-chat-radius, 0.75rem) + 0.25rem);
@@ -362,7 +362,7 @@
 
 .kai-launcher-panel[data-large] {
   width: min(var(--kai-chat-width-large, 56rem), calc(100vw - 2rem));
-  max-height: calc(100dvh - 7.5rem);
+  height: min(var(--kai-chat-height-large, 100dvh), calc(100dvh - 7.5rem));
 }
 
 .kai-launcher-panel[hidden] {
@@ -409,7 +409,17 @@
 
 .kai-launcher-body .kai-chat-log {
   flex: 1;
+  min-height: 0;
   max-height: none;
+}
+
+/* The panel's height is fixed, so the form stays at the bottom while the greeting, or the log, fills what is above it. */
+.kai-launcher-body .kai-chat-form {
+  margin-top: auto;
+}
+
+.kai-launcher-body .kai-chat-empty {
+  overflow-y: auto;
 }
 
 .kai-launcher-note {

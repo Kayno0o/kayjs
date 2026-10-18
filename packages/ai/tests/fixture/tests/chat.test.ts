@@ -541,6 +541,80 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
       expect(page.errors).toEqual([])
     })
 
+    test('the panel keeps one height empty, with a short answer and a long one, with the form at its bottom', async () => {
+      const page = await site.open('/launcher/one', { height: 900 })
+      const measure = () => page.evaluate(() => {
+        const panel = document.querySelector('.kai-launcher-panel')!.getBoundingClientRect()
+        const form = document.querySelector('.kai-chat-form')!.getBoundingClientRect()
+        const log = document.querySelector('.kai-chat-log')!
+
+        return { height: panel.height, formBottom: panel.bottom - form.bottom, scrolls: log.scrollHeight > log.clientHeight }
+      })
+
+      await page.click('.kai-launcher-button')
+      await page.waitUntil(chatHydrated)
+
+      const empty = await measure()
+
+      expect(empty.height).toBe(640)
+      expect(empty.formBottom).toBeLessThan(48)
+
+      fakeAi.reply('Short')
+      await page.click('.kai-chat-suggestion')
+      await page.waitFor('.kai-chat-text', { text: 'Short' })
+      await page.waitFor('[data-pending]', { gone: true })
+
+      const short = await measure()
+
+      expect(short).toMatchObject({ height: empty.height, scrolls: false })
+      expect(short.formBottom).toBeCloseTo(empty.formBottom, 0)
+
+      fakeAi.reply(Array.from({ length: 60 }, (_, line) => `Line ${line}\n\n`))
+      await page.fill('textarea', 'Long')
+      await page.press('Enter')
+      await page.waitFor('.kai-chat-text', { text: 'Line 59' })
+      await page.waitFor('[data-pending]', { gone: true })
+
+      const long = await measure()
+
+      expect(long).toMatchObject({ height: empty.height, scrolls: true })
+      expect(long.formBottom).toBeCloseTo(empty.formBottom, 0)
+
+      await page.click('.kai-launcher-expand')
+
+      const large = await measure()
+
+      expect(large.height).toBeGreaterThan(empty.height)
+      expect(large.formBottom).toBeCloseTo(empty.formBottom, 0)
+
+      await page.click('.kai-launcher-actions button')
+      await page.waitFor('.kai-chat-empty')
+
+      expect(await measure()).toMatchObject({ height: large.height })
+    })
+
+    test('the panel is as tall as the window leaves it on a short one, and --kai-chat-height sets it', async () => {
+      const page = await site.open('/launcher/one', { height: 500 })
+      const height = () => page.evaluate(() => document.querySelector('.kai-launcher-panel')!.getBoundingClientRect().height)
+
+      await page.click('.kai-launcher-button')
+      await page.waitFor(opened)
+
+      const short = await height()
+
+      expect(short).toBeLessThan(500)
+      expect(short).toBeGreaterThan(100)
+
+      await page.evaluate(() => document.documentElement.style.setProperty('--kai-chat-height', '20rem'))
+      await page.evaluate(() => document.documentElement.style.setProperty('--kai-chat-height-large', '22rem'))
+
+      expect(await height()).toBeLessThanOrEqual(320)
+
+      await page.click('.kai-launcher-expand')
+
+      expect(await height()).toBeLessThanOrEqual(352)
+    })
+
     test('the panel fits a 400px phone and the empty chat shows no list', async () => {
       const page = await site.open('/launcher/one', { width: 400, height: 700 })
 
