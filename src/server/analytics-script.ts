@@ -8,6 +8,8 @@ export const ANALYTICS_SCRIPT = `(() => {
   const name = 'kay_analytics'
   const gated = data.consent !== undefined
   const texts = data.texts ? JSON.parse(data.texts) : {}
+  const load = data.load ? JSON.parse(data.load) : undefined
+  let loaded = false
   let last = document.referrer
   let banner
 
@@ -31,6 +33,29 @@ export const ANALYTICS_SCRIPT = `(() => {
     catch {}
   }
 
+  // A provider that takes no visits from here runs its own script, loaded once the visitor agreed.
+  function start() {
+    if (gated && choice() !== 'yes')
+      return
+
+    if (!load) {
+      void view(location.href)
+
+      return
+    }
+
+    const element = document.createElement('script')
+
+    element.src = load.src
+    element.defer = true
+
+    for (const [key, value] of Object.entries(load.attrs))
+      element.setAttribute(key, value)
+
+    document.head.append(element)
+    loaded = true
+  }
+
   function decide(value) {
     const counted = choice() === 'yes'
 
@@ -40,7 +65,11 @@ export const ANALYTICS_SCRIPT = `(() => {
     document.dispatchEvent(new CustomEvent('kay:consent', { detail: { consent: value } }))
 
     if (value === 'yes' && !counted)
-      void view(location.href)
+      start()
+
+    // A script that already ran cannot be taken back, so the page loads again without it.
+    if (value === 'no' && loaded)
+      location.reload()
   }
 
   function ask() {
@@ -60,16 +89,19 @@ export const ANALYTICS_SCRIPT = `(() => {
       return element
     }
 
-    banner = make('aside', '')
-    banner.setAttribute('aria-label', words.text ?? '')
+    banner = make('section', '')
+    banner.setAttribute('aria-labelledby', 'kay-analytics-notice')
     banner.style.cssText = 'position:fixed;inset:auto 1rem 1rem 1rem;max-width:36rem;margin-inline:auto;padding:1rem;display:flex;flex-wrap:wrap;gap:.75rem;align-items:center;background:Canvas;color:CanvasText;border:1px solid;border-radius:.5rem;z-index:2147483647'
     banner.append(make('p', words.text ?? ''), button(words.agree ?? 'Agree', 'yes'), button(words.refuse ?? 'Refuse', 'no'))
+    banner.firstChild.id = 'kay-analytics-notice'
     banner.firstChild.style.cssText = 'margin:0;flex:1 1 14rem'
     document.body.append(banner)
   }
 
   window.kayAnalytics = { consent: choice, decide, ask }
-  document.addEventListener('kay:navigate', event => void view(event.detail.url))
+  if (!load)
+    document.addEventListener('kay:navigate', event => void view(event.detail.url))
+
   document.addEventListener('click', event => {
     if (gated && event.target instanceof Element && event.target.closest('[data-analytics-consent]'))
       ask()
@@ -78,6 +110,6 @@ export const ANALYTICS_SCRIPT = `(() => {
   if (gated && choice() === '')
     ask()
 
-  void view(location.href)
+  start()
 })()
 `

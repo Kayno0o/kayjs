@@ -5,10 +5,11 @@ import process from 'node:process'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'bun:test'
 import { pages } from '../src/server'
 import { analytics } from '../src/server/analytics'
+import { forwardsSettled } from '../src/server/analytics-server'
 import { testSite } from '../src/test'
 import { scratchDir } from './scratch'
 
-interface Received { path: string, headers: Headers, body: unknown }
+interface Received { method: string, path: string, search: string, headers: Headers, body: unknown }
 
 // Assigning undefined to an environment variable stores the text "undefined".
 function restoreEnvironment(value: string | undefined): void {
@@ -36,9 +37,16 @@ beforeAll(async () => {
   provider = Bun.serve({
     port: 0,
     async fetch(request) {
-      received.push({ path: new URL(request.url).pathname, headers: request.headers, body: await request.json() })
+      const url = new URL(request.url)
 
-      return Response.json({}, { status: answer })
+      if (url.pathname === '/script.js')
+        return new Response(`window.t = (data) => fetch("http://localhost:${provider.port}/collect", { method: 'POST', body: data })`, { headers: { 'content-type': 'text/javascript' } })
+
+      const text = await request.text()
+
+      received.push({ method: request.method, path: url.pathname, search: url.search, headers: request.headers, body: request.headers.get('content-type')?.includes('json') === true ? JSON.parse(text) : text })
+
+      return Response.json({ ok: true }, { status: answer })
     },
   })
 })
@@ -76,7 +84,11 @@ async function send(app: Awaited<ReturnType<typeof pages>>, body: unknown, heade
   const address = `203.0.113.${++counter % 250}`
   const text = typeof body === 'string' ? body : JSON.stringify(body)
 
-  return app.handle(new Request('http://localhost/_kay/analytics', { method: 'POST', body: text, headers: { 'content-type': 'text/plain', 'user-agent': CHROME, 'x-forwarded-for': address, ...headers } }))
+  const response = await app.handle(new Request('http://localhost/_kay/analytics', { method: 'POST', body: text, headers: { 'content-type': 'text/plain', 'user-agent': CHROME, 'x-forwarded-for': address, ...headers } }))
+
+  await forwardsSettled()
+
+  return response
 }
 
 const visit = (more: Record<string, unknown> = {}) => ({ u: PAGE, r: 'https://news.example/story?id=7#c', t: 'Pricing', w: '1920x1080', l: 'fr-FR', ...more })
@@ -266,6 +278,7 @@ describe('hostile requests', () => {
     const app = await pages({ routes: join(dir, 'routes'), prebuilt: false, extensions: [analytics(plausible())] })
 
     await app.handle(new Request('http://localhost/_kay/analytics', { method: 'POST', body: JSON.stringify(visit()), headers: { 'user-agent': CHROME, 'x-forwarded-for': '10.1.1.1' } }))
+    await forwardsSettled()
 
     expect(received).toHaveLength(1)
     expect(received[0]!.headers.get('x-forwarded-for')).toBeNull()
@@ -308,12 +321,186 @@ describe('under a base and a trailing slash', () => {
 
       expect(home).toContain('src="/shop/_kay/analytics.js"')
       expect(script.status).toBe(200)
+      await forwardsSettled()
+
       expect(sent.status).toBe(204)
       expect((received[0]!.body as { url: string }).url).toBe('http://localhost/shop/pricing/')
     }
     finally {
       await mounted.close()
     }
+  })
+})
+
+describe('answering at once', () => {
+  it('answers a visit before a slow provider does', async () => {
+    const slow = Bun.serve({ port: 0, async fetch() {
+      await Bun.sleep(1500)
+
+      return Response.json({})
+    } })
+
+    try {
+      const app = await site({ provider: 'plausible', host: `http://localhost:${slow.port}` })
+      const started = performance.now()
+
+      const response = await app.handle(new Request('http://localhost/_kay/analytics', { method: 'POST', body: JSON.stringify(visit()), headers: { 'user-agent': CHROME, 'x-forwarded-for': '203.0.113.240' } }))
+
+      expect(response.status).toBe(204)
+      expect(performance.now() - started).toBeLessThan(1000)
+      await forwardsSettled()
+    }
+    finally {
+      await slow.stop(true)
+    }
+  })
+})
+
+describe('Matomo', () => {
+  const matomo = (more: object = {}): AnalyticsOptions => ({ provider: 'matomo', siteId: 7, host: `http://localhost:${provider.port}/`, ...more })
+
+  it('is sent the visit through its tracking API, with no visitor id and no address', async () => {
+    await send(await site(matomo()), visit(), { 'x-forwarded-for': '198.51.100.9' })
+    const [sent] = received
+    const query = new URLSearchParams(sent!.search)
+
+    expect(sent!.method).toBe('GET')
+    expect(sent!.path).toBe('/matomo.php')
+    expect(Object.fromEntries(query)).toMatchObject({ idsite: '7', rec: '1', apiv: '1', url: 'http://localhost/pricing?utm_source=news', action_name: 'Pricing', urlref: 'https://news.example/story', res: '1920x1080', lang: 'fr-FR', ua: CHROME })
+    expect(query.has('_id')).toBe(false)
+    expect(query.has('cip')).toBe(false)
+    expect(query.has('token_auth')).toBe(false)
+    expect(sent!.headers.get('x-forwarded-for')).toBeNull()
+  })
+
+  it('passes the visitor\'s address with the token Matomo asks for it, and not otherwise', async () => {
+    await send(await site(matomo({ tokenAuth: 'a1b2c3' })), visit(), { 'x-forwarded-for': '198.51.100.9' })
+
+    expect(Object.fromEntries(new URLSearchParams(received[0]!.search))).toMatchObject({ cip: '198.51.100.9', token_auth: 'a1b2c3' })
+  })
+
+  it('keeps a query value of the visit from adding a parameter', async () => {
+    await send(await site(matomo()), visit({ t: 'x&token_auth=stolen&idsite=1' }))
+
+    const query = new URLSearchParams(received[0]!.search)
+
+    expect(query.getAll('idsite')).toEqual(['7'])
+    expect(query.has('token_auth')).toBe(false)
+    expect(query.get('action_name')).toBe('x&token_auth=stolen&idsite=1')
+  })
+})
+
+describe('Fathom and Cloudflare Web Analytics', () => {
+  const home = async (options: AnalyticsOptions) => {
+    const response = await (await site(options)).handle(new Request('http://localhost/'))
+
+    return { html: await response.text(), policy: response.headers.get('content-security-policy') ?? '' }
+  }
+
+  it('puts Fathom\'s script in the head, the CSP opened for its domain', async () => {
+    const { html, policy } = await home({ provider: 'fathom', siteId: 'ABCDEFGH' })
+
+    expect(html).toContain('src="https://cdn.usefathom.com/script.js"')
+    expect(html).toContain('data-site="ABCDEFGH"')
+    expect(html).toContain('data-spa="auto"')
+    expect(policy).toContain('https://cdn.usefathom.com')
+  })
+
+  it('puts the Cloudflare beacon in the head, the CSP opened as Cloudflare documents', async () => {
+    const { html, policy } = await home({ provider: 'cloudflare', token: 'tok-123' })
+
+    expect(html).toContain('src="https://static.cloudflareinsights.com/beacon.min.js"')
+    expect(html).toContain('data-cf-beacon="{&quot;token&quot;:&quot;tok-123&quot;}"')
+    expect(policy).toMatch(/script-src[^;]*https:\/\/static\.cloudflareinsights\.com/)
+    expect(policy).toMatch(/connect-src[^;]*https:\/\/cloudflareinsights\.com/)
+  })
+
+  it('leaves the provider\'s script out of the page until the visitor agrees, kay\'s script loading it', async () => {
+    const { html } = await home({ provider: 'fathom', siteId: 'ABCDEFGH', consent: true })
+
+    expect(html).not.toContain('src="https://cdn.usefathom.com/script.js"')
+    expect(html).toContain('src="/_kay/analytics.js"')
+    expect(html).toContain('data-load=')
+    expect(html).toContain('data-consent')
+    expect((await (await site({ provider: 'fathom', siteId: 'ABCDEFGH', consent: true })).handle(new Request('http://localhost/_kay/analytics.js'))).status).toBe(200)
+  })
+})
+
+describe('a custom provider', () => {
+  const custom = (more: object = {}): AnalyticsOptions => ({ provider: 'custom', script: `http://localhost:${provider.port}/script.js`, endpoint: `http://localhost:${provider.port}/collect`, ...more })
+  const collect = async (app: Awaited<ReturnType<typeof pages>>, body: BodyInit, headers: Record<string, string> = {}) => app.handle(new Request('http://localhost/_kay/analytics/collect', { method: 'POST', body, headers: { 'content-type': 'application/json', 'user-agent': CHROME, 'x-forwarded-for': `203.0.113.${++counter % 250}`, ...headers } }))
+
+  it('serves the script from the app with the endpoint pointed at the app', async () => {
+    const app = await site(custom())
+    const script = await app.handle(new Request('http://localhost/_kay/analytics/script.js'))
+    const text = await script.text()
+
+    expect(script.headers.get('content-type')).toContain('javascript')
+    expect(text).toContain('fetch("/_kay/analytics/collect"')
+    expect(text).not.toContain(`localhost:${provider.port}`)
+    expect(await (await app.handle(new Request('http://localhost/'))).text()).toContain('src="/_kay/analytics/script.js"')
+  })
+
+  it('passes what the script posts to the endpoint, the visitor\'s agent with it and no address', async () => {
+    const response = await collect(await site(custom()), '{"e":"view"}', { cookie: 'session=abc' })
+
+    expect(response.status).toBe(202)
+    expect(received[0]).toMatchObject({ method: 'POST', path: '/collect', body: { e: 'view' } })
+    expect(received[0]!.headers.get('user-agent')).toBe(CHROME)
+    expect(received[0]!.headers.get('x-forwarded-for')).toBeNull()
+    expect(received[0]!.headers.get('cookie')).toBeNull()
+  })
+
+  it('passes the address on when the app said the tracker needs it', async () => {
+    await collect(await site(custom({ address: true })), '{}', { 'x-forwarded-for': '198.51.100.9' })
+
+    expect(received[0]!.headers.get('x-forwarded-for')).toBe('198.51.100.9')
+  })
+
+  it('waits for the visitor\'s yes when asked to, and loads the script only then', async () => {
+    const app = await site(custom({ consent: true }))
+
+    expect((await collect(app, '{}')).status).toBe(204)
+    expect(received).toEqual([])
+    expect((await collect(app, '{}', { cookie: 'kay_analytics=yes' })).status).toBe(202)
+    expect(await (await app.handle(new Request('http://localhost/'))).text()).toContain('data-load=')
+  })
+
+  it('refuses a body past 64 KB, a content type that is no text, and a post from another site', async () => {
+    const app = await site(custom())
+
+    expect((await collect(app, 'x'.repeat(70_000))).status).toBe(413)
+    expect((await collect(app, 'x', { 'content-length': '999999' })).status).toBe(413)
+    expect((await collect(app, 'x', { 'content-type': 'multipart/form-data; boundary=x' })).status).toBe(415)
+    expect((await collect(app, '{}', { 'sec-fetch-site': 'cross-site' })).status).toBe(403)
+    expect(received).toEqual([])
+  })
+
+  it('posts only to the endpoint of the config, whatever the request names', async () => {
+    const app = await site(custom())
+    const response = await app.handle(new Request('http://localhost/_kay/analytics/collect?to=http://evil.example/x', { method: 'POST', body: '{}', headers: { 'content-type': 'application/json', 'user-agent': CHROME, 'x-forwarded-for': '203.0.113.99', 'host': 'localhost', 'x-forwarded-host': 'evil.example' } }))
+
+    expect(response.status).toBe(202)
+    expect(received.map(({ path, search }) => path + search)).toEqual(['/collect'])
+  })
+
+  it('sends nothing outside production', async () => {
+    process.env.NODE_ENV = 'development'
+
+    try {
+      expect((await collect(await site(custom()), '{}')).status).toBe(204)
+    }
+    finally {
+      process.env.NODE_ENV = 'production'
+    }
+
+    expect(received).toEqual([])
+  })
+
+  it('answers 502 when the script cannot be fetched', async () => {
+    const app = await site(custom({ script: 'http://localhost:1/script.js' }))
+
+    expect((await app.handle(new Request('http://localhost/_kay/analytics/script.js'))).status).toBe(502)
   })
 })
 
@@ -324,6 +511,13 @@ describe('the setup', () => {
     [{ provider: 'plausible', host: 'ftp://x.example' }, 'host is'],
     [{ provider: 'plausible', host: 'https://u:p@x.example' }, 'host is'],
     [{ provider: 'plausible', host: 'not a url' }, 'host is'],
+    [{ provider: 'matomo', siteId: 1 }, 'host is'],
+    [{ provider: 'matomo', siteId: '', host: 'https://m.example' }, 'siteId'],
+    [{ provider: 'matomo', siteId: 1, host: 'https://m.example', tokenAuth: 'a&b' }, 'tokenAuth'],
+    [{ provider: 'fathom', siteId: 'A B' }, 'siteId'],
+    [{ provider: 'cloudflare', token: '"><script>' }, 'token'],
+    [{ provider: 'custom', script: 'ftp://x.example/s.js', endpoint: 'https://x.example/c' }, 'script is'],
+    [{ provider: 'custom', script: 'https://x.example/s.js', endpoint: 'https://u:p@x.example/c' }, 'endpoint is'],
   ])('refuses %j', (options, message) => {
     expect(() => analytics(options as never)).toThrow(message)
   })

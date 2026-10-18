@@ -76,7 +76,11 @@ export default defineConfig({
 })
 ```
 
-Plausible, Umami (give it `websiteId`) and Simple Analytics (`provider: 'simpleanalytics'`) work today, each with `host` for a copy you run yourself. All three set no cookie, so they count from the first page. Google Analytics, Matomo, Fathom and Cloudflare Web Analytics are not offered yet.
+Plausible, Umami (give it `websiteId`), Simple Analytics (`provider: 'simpleanalytics'`) and Matomo (`siteId` and `host`) work this way. All four set no cookie, so they count from the first page. Matomo only gets the visitor's address if you give it a `tokenAuth` of a user with write access to the site, as Matomo requires; without one it sees your server's address.
+
+Fathom and Cloudflare Web Analytics are different. They take data only from their own scripts, so kay cannot send for them. `provider: 'fathom'` (`siteId`) and `provider: 'cloudflare'` (`token`) add their script to your pages and open the content security policy for their domains. Their data does not pass through your site.
+
+For any other tracker that is a script posting to an endpoint, use `provider: 'custom'` with `script` and `endpoint`. kay serves a copy of the script from your site with the endpoint in it pointed at your site, and passes what the script posts on. The endpoint must appear in the script exactly as you write it. Google Analytics is not offered: it needs a secret and its own visitor ids.
 
 The script counts the page when it loads and again after each page swap. It needs a running server, so `kay build --static` warns that an exported site cannot count. It does nothing while you run `kay dev` or tests: only a server with `NODE_ENV=production` passes visits on.
 
@@ -102,6 +106,8 @@ analytics({
   },
 })
 ```
+
+The notice is a labelled region that Tab reaches, and kay never moves the focus to it. With Fathom or Cloudflare, a refusal after the script loaded reloads the page so it runs no more.
 
 Give any element a `data-analytics-consent` attribute and a click on it shows the notice again, so a visitor can change their mind. Your own scripts read the answer with `window.kayAnalytics.consent()`, and a `kay:consent` event fires on `document` when it changes.
 
