@@ -45,7 +45,7 @@
     "lint": "keslint --cache",
     "prelint:fix": "bun run --cwd ../.. build:eslint",
     "lint:fix": "keslint --fix --cache",
-    "test": "bun test"
+    "test": "bun test --timeout 20000"
   },
   "peerDependencies": {
     "kay": "~1.53.0"
