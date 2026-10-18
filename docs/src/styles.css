@@ -285,8 +285,15 @@ kbd {
 
 /* Page: one centered column with its sections in a block above the text, until wide screens give them a column of their own. */
 main {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
   padding: 2.75rem clamp(1rem, 4vw, 3.5rem) 5rem;
+}
+
+/* Takes the height a short page leaves, so the footer sits at the bottom of the screen on every page. */
+.main-body {
+  flex: 1;
 }
 
 .page {

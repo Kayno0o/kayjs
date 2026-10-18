@@ -58,7 +58,8 @@ a.skip-link(href="#content") Skip to the content
               li
                 a(href={link.href}) {link.title}
   main#content
-    slot
+    .main-body
+      slot
     footer.site-foot
       p Built with #[a(href={REPOSITORY}) kay] {nav.version}, under the #[a(href={`${FORGE}/LICENSE`}) MIT license]. #[span(data-page-weight)]
       p See #[a(href={RELEASES}) what changed in each release], or ask a question or report a bug in #[a(href={`${REPOSITORY}/issues`}) the issues].
