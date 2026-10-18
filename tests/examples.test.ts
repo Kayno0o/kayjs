@@ -6,6 +6,7 @@ import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { check } from '../src/check'
 import { loadConfig } from '../src/config'
+import { takeDocsBuild } from './docs-build'
 
 const CLI = join(import.meta.dir, '../src/cli.ts')
 const ROOT = join(import.meta.dir, '..')
@@ -29,7 +30,15 @@ describe('the shipped apps', () => {
       // The tutorial's app is the one the guide builds without a site description, so its config's lints would not be the tutorial's.
       const config = app.endsWith('/reading-list') ? undefined : await loadConfig(app)
 
-      expect({ app, problems: await check(app, config) }).toEqual({ app, problems: [] })
+      // The check writes under docs/.kay, which the tests building the docs wipe and read.
+      const release = app === join(ROOT, 'docs') ? await takeDocsBuild() : undefined
+
+      try {
+        expect({ app, problems: await check(app, config) }).toEqual({ app, problems: [] })
+      }
+      finally {
+        await release?.()
+      }
     }
   }, 120_000)
 })

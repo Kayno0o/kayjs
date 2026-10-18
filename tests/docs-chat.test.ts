@@ -6,6 +6,7 @@ import { testSite } from 'kay/test'
 import { chatPages, partOfPage, readPage, searchPages, systemPrompt } from '../docs/src/chat-corpus'
 import { fakeAi } from '../packages/ai/src'
 import { forgetCounts } from '../packages/ai/src/limits'
+import { takeDocsBuild } from './docs-build'
 
 interface Ask {
   reply: Action<{ messages: { role: string, content: string }[] }, unknown>
@@ -14,11 +15,16 @@ interface Ask {
 }
 
 const root = join(import.meta.dir, '../docs')
+// The site renders from docs/.kay, which a build of the docs wipes: no build runs while this file does.
+const release = await takeDocsBuild()
 const site = await testSite({ root })
 const { reply, searchDocs, readDocsPage } = await import(join(root, 'src/routes/(docs)/ask.kay')) as Ask
 const question = (content: string) => ({ messages: [{ role: 'user', content }] })
 
-afterAll(async () => site.close())
+afterAll(async () => {
+  await site.close()
+  await release()
+})
 afterEach(() => {
   fakeAi.clear()
   forgetCounts()
