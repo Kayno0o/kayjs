@@ -178,6 +178,18 @@ export async function report(state: RequestState, record: UserRecord, event: Aut
   }
 }
 
+// Runs `task` without making the request wait on it, a failure only logged: what the request did differs for a held address and a free one, and the time it takes must not tell which.
+export function afterResponse(what: string, task: () => Promise<void>): void {
+  void (async () => {
+    try {
+      await task()
+    }
+    catch (error) {
+      log.error(`${what} failed`, error)
+    }
+  })()
+}
+
 // A cursor as an app may hand it on after a JSON hop, which leaves a `Date` as its ISO text.
 export type AuditCursorInput = AuditCursor | string | { at: Date | string, id: string }
 

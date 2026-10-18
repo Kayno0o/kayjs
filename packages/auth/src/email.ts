@@ -5,13 +5,13 @@ import type { EmailProblem, PasswordProblem } from './rules'
 import type { RequestState } from './state'
 import type { CodeType, LinkType, TokenType, UserRecord } from './store'
 import type { Proof, ProofFailure } from './twoFactor'
-import { comparePasswords, hashPassword, nanoid } from '@kaynooo/utils'
+import { hashPassword, nanoid } from '@kaynooo/utils'
 import { localPath } from 'kay'
 import { durationSeconds } from 'kay/library'
 import { newPasswordProblem } from './breached'
 import { admit } from './captcha'
 import { banned, homeOf } from './core'
-import { forgive, startGuess } from './guesses'
+import { forgive, passwordMatches, startGuess } from './guesses'
 import { digest, randomToken } from './keys'
 import { spend, typedKey } from './limits'
 import { log } from './log'
@@ -171,7 +171,7 @@ export async function verifyEmail(state: RequestState, token: string, password?:
 
 // Counted as a sign-in attempt on the account, since it is one.
 async function holdsPassword(state: RequestState, record: UserRecord, password: string | undefined): Promise<true | 'confirm' | 'limited'> {
-  if (password === undefined || record.passwordHash === null || record.passwordHash === '')
+  if (password === undefined)
     return 'confirm'
 
   const guess = await startGuess(state, record, '')
@@ -179,7 +179,8 @@ async function holdsPassword(state: RequestState, record: UserRecord, password: 
   if (guess === 'limited')
     return 'limited'
 
-  if (!await comparePasswords(password, record.passwordHash))
+  // An account without a password is checked against a decoy, so the time does not tell it has none.
+  if (!await passwordMatches(record, password))
     return 'confirm'
 
   await forgive(state, guess)

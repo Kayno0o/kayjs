@@ -2,16 +2,15 @@ import type { Core, User } from './core'
 import type { EmailProblem, PasswordProblem, UsernameProblem } from './rules'
 import type { RequestState } from './state'
 import type { UserRecord } from './store'
-import { comparePasswords, hashPassword, passwordNeedsRehash } from '@kaynooo/utils'
+import { hashPassword, passwordNeedsRehash } from '@kaynooo/utils'
 import { localPath } from 'kay'
 import { newPasswordProblem } from './breached'
 import { admit } from './captcha'
 import { homeOf, newUserRecord, publicUser } from './core'
 import { warnHolder, welcome } from './email'
 import { eraseUser } from './erase'
-import { report } from './events'
-import { forgive, startGuess } from './guesses'
-import { randomToken } from './keys'
+import { afterResponse, report } from './events'
+import { forgive, passwordMatches, startGuess } from './guesses'
 import { validLocale } from './locale'
 import { emailProblem, normalizeEmail, normalizeUsername, PASSWORD_MAX_LENGTH, usernameProblem } from './rules'
 
@@ -68,8 +67,6 @@ export interface PasswordSignInInput {
 // `invalid` whether no account matches or the password is wrong, so the answer tells nothing of which accounts exist.
 // `unverified` once the password is right, when the app wants the address verified first.
 export type PasswordSignInResult = { ok: true, redirect: string } | { ok: false, error: 'invalid' | 'limited' | 'captcha' | 'unverified' | 'banned' }
-
-let decoy: Promise<string> | undefined
 
 // A new user with a password, signed in on this session; a guest signed in becomes it, keeping their id.
 export async function register(state: RequestState, input: RegisterInput): Promise<RegisterResult> {
@@ -252,8 +249,9 @@ export async function signInWithPassword(state: RequestState, input: PasswordSig
     return { ok: false, error: 'limited' }
 
   if (tooLong || !(await passwordMatches(record, input.password))) {
+    // Off the response's path: the hooks and the audit log run for a held address only, and their time would tell it.
     if (record)
-      await report(state, record, 'sign-in-failed', 'password')
+      afterResponse('reporting a failed sign-in', async () => report(state, record, 'sign-in-failed', 'password'))
 
     return { ok: false, error: 'invalid' }
   }
@@ -272,17 +270,6 @@ export async function signInWithPassword(state: RequestState, input: PasswordSig
     await store.users.update(record!.id, { passwordHash: await hashPassword(input.password) })
 
   return state.complete(record!, localPath(input.redirect, homeOf(state.core)), 'password')
-}
-
-// Spends as long on an account without a password as on a wrong one, so the time taken tells nothing either.
-async function passwordMatches(record: UserRecord | undefined, password: string): Promise<boolean> {
-  if (record?.passwordHash != null && record.passwordHash !== '')
-    return comparePasswords(password, record.passwordHash)
-
-  decoy ??= hashPassword(randomToken())
-  await comparePasswords(password, await decoy)
-
-  return false
 }
 
 function withoutUndefined(errors: RegisterErrors): RegisterErrors {

@@ -1,5 +1,8 @@
 import type { RequestState } from './state'
 import type { UserRecord } from './store'
+import { comparePasswords, hashPassword } from '@kaynooo/utils'
+import { afterResponse } from './events'
+import { randomToken } from './keys'
 import { notify } from './notify'
 
 // The counts one password guess is held to: a hard stop for this client on this account, and a looser ceiling for the account from every client together.
@@ -26,7 +29,7 @@ export async function startGuess(state: RequestState, record: UserRecord | undef
   if (all > core.limits.signInAccountAll.max) {
     // Once per lockout: only the first attempt past the ceiling mails, and the holder is the one who gets it.
     if (all === core.limits.signInAccountAll.max + 1 && record)
-      await notify(state, record, 'sign-in-locked')
+      afterResponse('reporting a sign-in lockout', async () => notify(state, record, 'sign-in-locked'))
 
     return 'limited'
   }
@@ -38,4 +41,17 @@ export async function startGuess(state: RequestState, record: UserRecord | undef
 export async function forgive(state: RequestState, guess: Guess): Promise<void> {
   for (const key of guess.keys)
     await state.core.store.attempts.reset(key)
+}
+
+let decoy: Promise<string> | undefined
+
+// Spends as long on an account without a password as on a wrong one, so the time taken tells nothing either.
+export async function passwordMatches(record: UserRecord | undefined, password: string): Promise<boolean> {
+  if (record?.passwordHash != null && record.passwordHash !== '')
+    return comparePasswords(password, record.passwordHash)
+
+  decoy ??= hashPassword(randomToken())
+  await comparePasswords(password, await decoy)
+
+  return false
 }
