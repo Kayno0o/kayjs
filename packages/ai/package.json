@@ -1,7 +1,7 @@
 {
   "name": "@kaynooo/kayjs-ai",
   "type": "module",
-  "version": "1.52.3",
+  "version": "1.53.0",
   "description": "Call an LLM from kay apps with no SDK and no streaming code: Anthropic and OpenAI-compatible providers over HTTP, replies that stream into await blocks and actions, and a scripted fake in development and tests",
   "author": "Kaynooo <https://github.com/Kayno0o>",
   "license": "MIT",
@@ -48,7 +48,7 @@
     "test": "bun test"
   },
   "peerDependencies": {
-    "kay": "~1.52.0"
+    "kay": "~1.53.0"
   },
   "devDependencies": {
     "@kaynooo/eslint": "^7.0.4",

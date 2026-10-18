@@ -1,7 +1,7 @@
 {
   "name": "@kaynooo/kayjs",
   "type": "module",
-  "version": "1.52.3",
+  "version": "1.53.0",
   "description": "A Bun web framework: one .kay file per component, pages rendered to plain HTML on the server, interactive islands in the browser",
   "author": "Kaynooo <https://github.com/Kayno0o>",
   "license": "MIT",
