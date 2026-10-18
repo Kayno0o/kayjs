@@ -232,6 +232,7 @@ describe('onAuthEvent', () => {
       'oauth-client-approved': [['Claude Code', { client: 'Claude Code' }]],
       'oauth-client-revoked': [['Claude Code', { client: 'Claude Code' }]],
       'new-sign-in': [[undefined, {}]],
+      'sign-in-locked': [[undefined, {}]],
       'password-changed': [[undefined, {}]],
       'email-changed': [['ada@new.test', { email: 'ada@new.test' }]],
       'two-factor-enabled': [[undefined, {}]],

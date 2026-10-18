@@ -88,6 +88,11 @@ export default defineMessages({
         lead: 'Your {site} account was just signed into from a device or network it had not used before.',
         ending: 'If this was not you, reset your password and check your account at once.',
       },
+      'sign-in-locked': {
+        subject: 'Sign-in locked on {site}',
+        lead: 'Too many wrong passwords were tried on your {site} account, so signing in to it is paused for a while.',
+        ending: 'If this was not you, reset your password and check your account at once.',
+      },
       'password-changed': {
         subject: 'Password changed on {site}',
         lead: 'The password of your {site} account was changed, and its other sessions signed out.',

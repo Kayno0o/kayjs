@@ -87,6 +87,11 @@ export default defineMessages({
         lead: 'Votre compte {site} vient d\'être utilisé depuis un appareil ou un réseau qu\'il n\'avait jamais utilisé.',
         ending: 'Si ce n\'était pas vous, réinitialisez votre mot de passe et vérifiez votre compte sans attendre.',
       },
+      'sign-in-locked': {
+        subject: 'Connexion suspendue sur {site}',
+        lead: 'Trop de mots de passe incorrects ont été essayés sur votre compte {site} : la connexion est suspendue pour un moment.',
+        ending: 'Si ce n\'était pas vous, réinitialisez votre mot de passe et vérifiez votre compte sans attendre.',
+      },
       'password-changed': {
         subject: 'Mot de passe modifié sur {site}',
         lead: 'Le mot de passe de votre compte {site} a été modifié, et ses autres sessions déconnectées.',

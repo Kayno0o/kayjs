@@ -14,9 +14,11 @@ export interface Limit {
 }
 
 // Loose per client address, which an office or a carrier may share, and tight per account, which only one person guesses at.
+// Wrong passwords only count: `signInAccount` stops one client on one account, so it never keeps the holder out, and `signInAccountAll` is the looser ceiling on the account from every client together.
 export const DEFAULT_LIMITS = {
   signIn: { max: 40, window: 15 * MINUTE },
   signInAccount: { max: 6, window: 15 * MINUTE },
+  signInAccountAll: { max: 60, window: 15 * MINUTE },
   register: { max: 6, window: HOUR },
   // Each of these mails a way into an account, so none may flood an inbox someone else owns.
   resend: { max: 12, window: HOUR },

@@ -92,6 +92,7 @@ if failure
 A change to what protects an account is mailed to its verified address, never an unverified one, and handed to `onAuthEvent` (see Events and the audit log). A mailer or an `onAuthEvent` that throws is logged, never turned into a failed sign-in:
 
 - `new-sign-in`: a device or network the account had not used before; the first sign-in has nothing to compare against. The mail links to `sessionsPage` when the app has one.
+- `sign-in-locked`: too many wrong passwords were tried on the account, mailed once per lockout (see Limits).
 - `password-changed`, `two-factor-enabled`, `two-factor-disabled`, `recovery-code-used`, `recovery-codes-regenerated`, `account-deleted`.
 - `signed-out-everywhere`, from `signOutEverywhere` and the sessions page's button, `keptThisOne` whether the session asking stayed signed in.
 - `email-changed`, mailed to the address left, `email` the new one.

@@ -11,6 +11,7 @@ import { durationSeconds } from 'kay/library'
 import { newPasswordProblem } from './breached'
 import { admit } from './captcha'
 import { banned, homeOf } from './core'
+import { forgive, startGuess } from './guesses'
 import { digest, randomToken } from './keys'
 import { spend, typedKey } from './limits'
 import { log } from './log'
@@ -173,10 +174,17 @@ async function holdsPassword(state: RequestState, record: UserRecord, password: 
   if (password === undefined || record.passwordHash === null || record.passwordHash === '')
     return 'confirm'
 
-  if (await spend(state.core.store, `sign-in-account:${record.id}`, state.core.limits.signInAccount))
+  const guess = await startGuess(state, record, '')
+
+  if (guess === 'limited')
     return 'limited'
 
-  return await comparePasswords(password, record.passwordHash) ? true : 'confirm'
+  if (!await comparePasswords(password, record.passwordHash))
+    return 'confirm'
+
+  await forgive(state, guess)
+
+  return true
 }
 
 export async function requestPasswordReset(state: RequestState, email: string, captcha?: string): Promise<MailRequestResult> {

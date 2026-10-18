@@ -41,6 +41,7 @@ export interface EventFields {
   'oauth-client-approved': { client: string }
   'oauth-client-revoked': { client: string }
   'new-sign-in': Record<never, never>
+  'sign-in-locked': Record<never, never>
   'password-changed': Record<never, never>
   // `email` is the new address.
   'email-changed': { email: string }
@@ -125,6 +126,7 @@ export function eventFields(event: AuthEvent, detail: string | undefined): Event
     case 'impersonation-started':
     case 'impersonation-ended':
     case 'new-sign-in':
+    case 'sign-in-locked':
     case 'password-changed':
     case 'two-factor-enabled':
     case 'two-factor-disabled':

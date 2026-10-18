@@ -10,8 +10,8 @@ import { homeOf, newUserRecord, publicUser } from './core'
 import { warnHolder, welcome } from './email'
 import { eraseUser } from './erase'
 import { report } from './events'
+import { forgive, startGuess } from './guesses'
 import { randomToken } from './keys'
-import { spend, typedKey } from './limits'
 import { validLocale } from './locale'
 import { emailProblem, normalizeEmail, normalizeUsername, PASSWORD_MAX_LENGTH, usernameProblem } from './rules'
 
@@ -233,7 +233,7 @@ async function answerHeld(state: RequestState, holder: UserRecord, password: str
 }
 
 export async function signInWithPassword(state: RequestState, input: PasswordSignInInput): Promise<PasswordSignInResult> {
-  const { store, limits } = state.core
+  const { store } = state.core
   const byEmail = input.identifier.includes('@')
   const identifier = byEmail ? normalizeEmail(input.identifier) : normalizeUsername(input.identifier)
 
@@ -245,11 +245,10 @@ export async function signInWithPassword(state: RequestState, input: PasswordSig
   // No password this long was ever accepted, and hashing it would cost the server for nothing. A ceiling the app lowered later still lets an older, longer one sign in.
   const tooLong = input.password.length > Math.max(PASSWORD_MAX_LENGTH, state.core.rules.password.max)
   const record = tooLong ? undefined : await (byEmail ? store.users.findByEmail(identifier) : store.users.findByUsername(identifier))
-  // Counted against the account, so its email and every spelling of its name share one count, or against what was typed when none matches, so a guess at a missing account runs out the same way.
-  const accountKey = record ? `sign-in-account:${record.id}` : typedKey(state.core, 'sign-in-account', identifier.toLowerCase())
+  // Counted before the password is checked, against the account so its email and every spelling of its name share one count.
+  const guess = await startGuess(state, record, identifier)
 
-  // Spent before the password is checked, so a burst of parallel guesses cannot all pass a count that only a failure would raise.
-  if (await spend(store, accountKey, limits.signInAccount))
+  if (guess === 'limited')
     return { ok: false, error: 'limited' }
 
   if (tooLong || !(await passwordMatches(record, input.password))) {
@@ -259,7 +258,7 @@ export async function signInWithPassword(state: RequestState, input: PasswordSig
     return { ok: false, error: 'invalid' }
   }
 
-  await store.attempts.reset(accountKey)
+  await forgive(state, guess)
 
   if (state.core.email?.requireVerified && record!.emailVerifiedAt === null) {
     // The password is proven: this browser may have the verification link resent, and confirm it, as the one that registered.

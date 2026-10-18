@@ -293,6 +293,7 @@ const rows: Row[] = [
 // Walked in the file of the feature they guard, where the rest of that feature's behaviour is.
 const elsewhere: Partial<Record<keyof Limits, string>> = {
   export: 'pages.test.ts',
+  signInAccountAll: 'signInLockout.test.ts',
   invite: 'organizations.test.ts',
   inviteAddress: 'organizations.test.ts',
   oauthRegister: 'oauthHardening.test.ts',

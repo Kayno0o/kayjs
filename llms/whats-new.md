@@ -5,6 +5,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 ## Unreleased
 
 - `s3Files` stores each object with the type and `Content-Disposition` its key's extension gives, never the uploader's declared type, so an uploaded HTML page or SVG is a download from the bucket's `publicUrl` instead of running there; files stored by an earlier release must be put again ([Files](files.md)).
+- kayjs-auth counts wrong passwords against an account per client (6) and in total (60), so a stranger can no longer keep a holder locked out by guessing at their email from another address; the total mails the holder once, as the new `sign-in-locked` event, and a right password costs nothing ([kayjs-auth](../packages/auth/llms.txt)).
 
 ## 1.54.1
 
