@@ -1,9 +1,17 @@
+import type { Resolver } from './address'
 import type { RemoteLimits } from './config-limits'
 import { mkdir, readdir, rm, stat } from 'node:fs/promises'
+import { request as httpRequest } from 'node:http'
+import { request as httpsRequest } from 'node:https'
+import { isIP } from 'node:net'
 import { join } from 'node:path'
+import { Readable } from 'node:stream'
 import { JSON_FILE, writeAtomically } from '../build/files'
+import { isPublicAddress, pinnedLookup, PrivateAddressError, resolveHost } from './address'
 import { FETCH_TIMEOUT_MS, MAX_REMOTE_BYTES } from './config-limits'
 import { overLimit } from './protection'
+
+export type { Resolver } from './address'
 
 // One entry of `images.remote`: the origin, a `*.` subdomain wildcard allowed, and the path every URL starts with.
 export interface RemotePattern {
@@ -11,6 +19,8 @@ export interface RemotePattern {
   host: string
   wildcard: boolean
   path: string
+  // An entry naming one address (`http://10.0.0.5:9000`) or `localhost` is the app saying that host is its own, so it may be private; every other host must resolve to public addresses only.
+  private: boolean
 }
 
 // A remote original kept on disk, with the key its variants are named after, or why the route answers without one.
@@ -29,6 +39,71 @@ interface Stored {
 const PATTERN = /^(https?:)\/\/(\*\.)?([^/*?#@]+)(\/[^*?#]*)?$/i
 const MAX_AGE = /(?:^|,)\s*max-age=(\d+)/i
 const NO_CACHE = /(?:^|,)\s*(?:no-cache|no-store)\b/i
+
+// Suffixes of more than one label under which anyone registers or deploys a subdomain, which a `*.` wildcard must not cover. A single label (`com`, `uk`) is refused already; this is the list of the common ones, not the whole Public Suffix List.
+const PUBLIC_SUFFIXES = new Set([
+  'co.uk',
+  'org.uk',
+  'me.uk',
+  'ac.uk',
+  'gov.uk',
+  'com.au',
+  'net.au',
+  'org.au',
+  'co.nz',
+  'co.jp',
+  'ne.jp',
+  'or.jp',
+  'co.kr',
+  'co.in',
+  'co.il',
+  'co.za',
+  'com.br',
+  'com.cn',
+  'com.mx',
+  'com.ar',
+  'com.tr',
+  'com.sg',
+  'com.hk',
+  'com.tw',
+  'github.io',
+  'gitlab.io',
+  'vercel.app',
+  'now.sh',
+  'netlify.app',
+  'pages.dev',
+  'workers.dev',
+  'web.app',
+  'firebaseapp.com',
+  'appspot.com',
+  'herokuapp.com',
+  'onrender.com',
+  'fly.dev',
+  'railway.app',
+  'surge.sh',
+  'ngrok.io',
+  'ngrok-free.app',
+  'glitch.me',
+  'repl.co',
+  'replit.app',
+  'azurewebsites.net',
+  'azurestaticapps.net',
+  'cloudfront.net',
+  'amazonaws.com',
+  'elasticbeanstalk.com',
+  'blogspot.com',
+  'wordpress.com',
+  'myshopify.com',
+  'github.dev',
+  'githubusercontent.com',
+  'netlify.com',
+  'ondigitalocean.app',
+  'deno.dev',
+  'pythonanywhere.com',
+  'weebly.com',
+  'wixsite.com',
+  'carrd.co',
+])
 
 const MAX_REDIRECTS = 3
 // How long an original stays fresh when the host sends no `max-age`, and the bounds one it sends is held to.
@@ -58,11 +133,11 @@ export function remotePatterns(entries: readonly string[] = []): RemotePattern[]
     if (!url)
       throw new Error(`images.remote holds ${entry}, which is no URL`)
 
-    // `*.com` would let any site of a whole top-level domain have the server download from it.
-    if (wildcard && !url.hostname.slice(2).includes('.'))
-      throw new Error(`images.remote holds ${entry}: a *. wildcard covers the subdomains of one domain, never a whole top-level domain such as *.com`)
+    // `*.com` would let any site of a whole top-level domain have the server download from it, and so would `*.co.uk` or `*.vercel.app`, whose subdomains belong to anyone.
+    if (wildcard && (!url.hostname.slice(2).includes('.') || PUBLIC_SUFFIXES.has(url.hostname.slice(2))))
+      throw new Error(`images.remote holds ${entry}: a *. wildcard covers the subdomains of one domain, never a whole public suffix such as *.com, *.co.uk or *.vercel.app`)
 
-    return { protocol: url.protocol, host: wildcard ? url.host.slice(2) : url.host, wildcard, path: url.pathname }
+    return { protocol: url.protocol, host: wildcard ? url.host.slice(2) : url.host, wildcard, path: url.pathname, private: !wildcard && (isIP(url.hostname.replace(/^\[|\]$/g, '')) !== 0 || url.hostname === 'localhost') }
   })
 }
 
@@ -73,10 +148,14 @@ export function remoteAllowed(src: string | URL, patterns: readonly RemotePatter
   if (!url || url.username !== '' || url.password !== '')
     return false
 
+  return patterns.some(pattern => covers(pattern, url))
+}
+
+function covers(pattern: RemotePattern, url: URL): boolean {
   const host = url.host.toLowerCase()
 
   // A path without its final slash covers itself and what is below it, never `/uploads-private` for `/uploads`.
-  return patterns.some(pattern => url.protocol === pattern.protocol && (pattern.wildcard ? host.endsWith(`.${pattern.host}`) : host === pattern.host) && (url.pathname === pattern.path || url.pathname.startsWith(pattern.path.endsWith('/') ? pattern.path : `${pattern.path}/`)))
+  return url.protocol === pattern.protocol && (pattern.wildcard ? host.endsWith(`.${pattern.host}`) : host === pattern.host) && (url.pathname === pattern.path || url.pathname.startsWith(pattern.path.endsWith('/') ? pattern.path : `${pattern.path}/`))
 }
 
 // How the image route's variants of a remote original start, so evicting it finds them.
@@ -86,7 +165,7 @@ export function remoteVariants(key: string): string {
 
 // Downloads an image another host serves, or keeps the copy `dir` holds while it is fresh, asking the host whether it changed once it is not. A host that fails leaves the last copy served, and is asked again a minute later.
 // `variantsDir` holds what the image route made of the originals, named after `remoteVariants`, removed with the original they came from.
-export function remoteImages(dir: string, patterns: readonly RemotePattern[], variantsDir?: string, maxOriginals = MAX_ORIGINALS, limits: RemoteLimits = { bytes: MAX_REMOTE_BYTES, timeoutMs: FETCH_TIMEOUT_MS }): RemoteImages {
+export function remoteImages(dir: string, patterns: readonly RemotePattern[], variantsDir?: string, maxOriginals = MAX_ORIGINALS, limits: RemoteLimits = { bytes: MAX_REMOTE_BYTES, timeoutMs: FETCH_TIMEOUT_MS }, resolve: Resolver = resolveHost): RemoteImages {
   const stored = new Map<string, Stored>()
   const failedUntil = new Map<string, number>()
   const pending = new Map<string, Promise<RemoteOriginal>>()
@@ -204,9 +283,9 @@ export function remoteImages(dir: string, patterns: readonly RemotePattern[], va
     try {
       const signal = AbortSignal.timeout(limits.timeoutMs)
 
-      // Each hop is checked against the list, so a listed host cannot send the server to another.
+      // Each hop is checked against the list and resolved to public addresses, so a listed host cannot send the server to another or to a private one.
       for (let hops = 0; ; hops++) {
-        response = await fetch(url, { headers, signal, redirect: 'manual' })
+        response = await pinnedGet(new URL(url), headers, signal, resolve, patterns.some(pattern => pattern.private && covers(pattern, new URL(url))))
 
         const location = response.headers.get('location')
 
@@ -243,12 +322,49 @@ export function remoteImages(dir: string, patterns: readonly RemotePattern[], va
       if (!await saveCapped(response, path, limits.bytes))
         return { status: 413, message: `The image is over ${limits.bytes} bytes` }
     }
-    catch {
+    catch (error) {
+      if (error instanceof PrivateAddressError)
+        return { status: 502, message: 'The host is at an address that is not public' }
+
       return { status: 502, message: 'The host did not give the image' }
     }
 
     return { etag: response.headers.get('etag') ?? undefined, lastModified: response.headers.get('last-modified') ?? undefined, freshUntil: freshUntil(response.headers) }
   }
+}
+
+// One GET that resolves the host itself and connects to the address it checked, never one `fetch` would resolve again after the check. A literal address is checked as it stands.
+async function pinnedGet(url: URL, headers: Record<string, string>, signal: AbortSignal, resolve: Resolver, allowPrivate: boolean): Promise<Response> {
+  const hostname = url.hostname.replace(/^\[|\]$/g, '')
+
+  if (!allowPrivate && isIP(hostname) !== 0 && !isPublicAddress(hostname))
+    throw new PrivateAddressError(`${hostname} is not a public address`)
+
+  const send = url.protocol === 'https:' ? httpsRequest : httpRequest
+
+  return new Promise((done, fail) => {
+    const request = send(url, { method: 'GET', headers: { ...headers, 'accept-encoding': 'identity' }, signal, lookup: pinnedLookup(resolve, allowPrivate) as never }, (incoming) => {
+      const answer = new Headers()
+
+      for (const [name, value] of Object.entries(incoming.headers)) {
+        for (const each of Array.isArray(value) ? value : [value]) {
+          if (each !== undefined)
+            answer.append(name, each)
+        }
+      }
+
+      const status = incoming.statusCode ?? 502
+      const empty = status === 204 || status === 205 || status === 304
+
+      if (empty)
+        incoming.resume()
+
+      done(new Response(empty ? null : Readable.toWeb(incoming) as unknown as ReadableStream, { status, headers: answer }))
+    })
+
+    request.on('error', fail)
+    request.end()
+  })
 }
 
 // False once the body passed the cap, leaving no file behind.

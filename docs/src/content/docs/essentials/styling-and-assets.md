@@ -236,6 +236,8 @@ export default defineConfig({
 })
 ```
 
+kay only downloads from public addresses. It looks the host up itself, connects to the address it checked, and does the same for each redirect, so a listed name cannot lead the server to `localhost`, a cloud metadata address or a private network. A wildcard such as `*.co.uk` or `*.vercel.app` is refused, since anyone can own a subdomain there. A host you run on a private network is listed by its address (`http://10.0.0.5:9000`) or as `localhost`, which says it is yours.
+
 `image(url, { width, height })` then works as above. kay downloads the image once and keeps a copy. A host that is not listed is refused, so the route is no open proxy.
 
 List only hosts you trust. kay does not check where a listed name points.
