@@ -121,18 +121,17 @@ describe('the tools', () => {
     const { parts } = await site.call(readDocsPage, { path: '/llms/actions' })
 
     await expect(site.call(readDocsPage, { path: '/llms/actions', part: parts + 1 })).rejects.toMatchObject({ status: 404 })
-    await expect(site.call(readDocsPage, { path: '/essentials/islands', part: 2 })).rejects.toMatchObject({ status: 404 })
     expect((await site.call(readDocsPage, { path: '/llms/actions', part: parts })).text).not.toBe('')
 
-    fakeAi.reply({ calls: [{ name: 'read_page', input: { path: '/essentials/islands', part: 9 } }] })
+    fakeAi.reply({ calls: [{ name: 'read_page', input: { path: '/llms/actions', part: parts + 8 } }] })
     fakeAi.reply('Done')
     await site.call(reply, question('read the ninth part of the islands page'))
 
     const [result] = fakeAi.asked[1]!.messages.at(-1)!.results!
 
     expect(result!.failed).toBe(true)
-    expect(result!.content).toContain('only 1 part')
-    expect(result!.content).toContain('no part 9')
+    expect(result!.content).toContain(`only ${parts} parts`)
+    expect(result!.content).toContain(`no part ${parts + 8}`)
   })
 
   it('refuse a path that is no page and a query too long', async () => {

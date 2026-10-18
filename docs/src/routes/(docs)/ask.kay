@@ -27,7 +27,7 @@ export const readDocsPage = action(
     const { text, parts } = partOfPage(found.text, part)
 
     if (part !== undefined && part > parts)
-      return ctx.fail(404, `${found.href} has ${parts === 1 ? 'only 1 part' : `only ${parts} parts`}, so there is no part ${part}; ask for a part from 1 to ${parts}`)
+      return ctx.fail(404, `${found.href} has ${parts === 1 ? 'only 1 part' : `only ${parts} parts`}, so there is no part ${part}; ${parts === 1 ? 'ask for part 1' : `ask for a part from 1 to ${parts}`}`)
 
     return { path: found.href, title: found.title, part: part ?? 1, parts, text }
   },

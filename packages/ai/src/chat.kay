@@ -12,6 +12,7 @@ const REPLY: SanitizeOptions = { tags: ['table', 'thead', 'tbody', 'tr', 'th', '
 // How close to the end of the log the visitor must be for new text to keep it scrolled down.
 const PINNED_PX = 48
 const ATTRIBUTE_UNSAFE = /[&"<]/g
+// The opening tag `sanitizeHtml` writes for a link, which `linksOpenApart` rewrites: the two change together.
 const SANITIZED_LINK = /<a href="[^"]*" rel="nofollow ugc">/g
 const ENTITIES: Record<string, string> = { '&': '&amp;', '"': '&quot;', '<': '&lt;' }
 
