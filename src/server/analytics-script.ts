@@ -4,6 +4,7 @@ export const ANALYTICS_SCRIPT = `(() => {
   const script = document.currentScript
   const data = script.dataset
   const path = new URL(script.src).pathname.slice(0, -3)
+  const scope = path.slice(0, -'/_kay/analytics'.length) || '/'
   const name = 'kay_analytics'
   const gated = data.consent !== undefined
   const texts = data.texts ? JSON.parse(data.texts) : {}
@@ -31,14 +32,14 @@ export const ANALYTICS_SCRIPT = `(() => {
   }
 
   function decide(value) {
-    const first = choice() === ''
+    const counted = choice() === 'yes'
 
-    document.cookie = name + '=' + value + '; max-age=31536000; path=/; samesite=lax' + (location.protocol === 'https:' ? '; secure' : '')
+    document.cookie = name + '=' + value + '; max-age=31536000; path=' + scope + '; samesite=lax' + (location.protocol === 'https:' ? '; secure' : '')
     banner?.remove()
     banner = undefined
     document.dispatchEvent(new CustomEvent('kay:consent', { detail: { consent: value } }))
 
-    if (value === 'yes' && first)
+    if (value === 'yes' && !counted)
       void view(location.href)
   }
 
@@ -70,7 +71,7 @@ export const ANALYTICS_SCRIPT = `(() => {
   window.kayAnalytics = { consent: choice, decide, ask }
   document.addEventListener('kay:navigate', event => void view(event.detail.url))
   document.addEventListener('click', event => {
-    if (event.target instanceof Element && event.target.closest('[data-analytics-consent]'))
+    if (gated && event.target instanceof Element && event.target.closest('[data-analytics-consent]'))
       ask()
   })
 

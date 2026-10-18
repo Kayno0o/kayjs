@@ -13,6 +13,7 @@ import { cacheDir, resolveProject } from '../project'
 import { joinBase } from '../runtime/base'
 import { escape, escapeAttribute } from '../runtime/escape'
 import { localePath, splitLocale, untranslatedPath } from '../runtime/i18n'
+import { kayLog } from '../runtime/log'
 import { pagesApp } from '../server/app'
 import { basePath } from '../server/base'
 import { PRERENDERED_DIR } from '../server/client'
@@ -104,6 +105,11 @@ export async function exportStatic(project: Project, client: ClientBuild, outdir
 
   // What kay serves itself comes from the app, as a server would answer it.
   // The extensions' server plugins are left out, since nothing a static site serves runs them and one may open a database.
+  for (const { name, needsServer } of config.extensions ?? []) {
+    if (needsServer === true)
+      kayLog('warn', `the extension ${name} needs a running server, which a static export has none of: its pages and tags are exported, but what they call answers 404`)
+  }
+
   const extensions = config.extensions?.map(({ server: _, ...extension }) => extension)
   const pages = await pagesApp(resolveProject(root, { ...config, extensions, log: false, health: false, security: false, compress: false }, project.mode), () => client, true)
   const app = new Elysia().use(pages.app)

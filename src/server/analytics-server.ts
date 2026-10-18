@@ -91,8 +91,8 @@ const PROVIDERS = {
   },
 }
 
-// Whether the provider needs the visitor's address, which no other provider is sent.
-const NEEDS_ADDRESS = new Set(['plausible', 'umami'])
+// The providers that need the visitor's address to tell visitors apart; no other is sent it.
+const NEEDS_ADDRESS: ReadonlySet<string> = new Set<keyof typeof PROVIDERS>(['plausible', 'umami'])
 
 export function analyticsServer(options: AnalyticsOptions): AnyElysia {
   const hosts = new Set((options.hosts ?? []).map(host => host.toLowerCase()))
@@ -156,8 +156,11 @@ function readVisit(text: string, request: Request, hosts: ReadonlySet<string>): 
   if (page === null || (page.protocol !== 'https:' && page.protocol !== 'http:') || page.username !== '' || page.password !== '')
     return undefined
 
-  if (page.hostname !== new URL(request.url).hostname && !hosts.has(page.hostname))
+  if (page.hostname !== new URL(request.url).hostname && !hosts.has(page.hostname)) {
+    warn(`analytics: a visit names ${page.hostname} but the request came to ${new URL(request.url).hostname}, so it was dropped; a proxy that rewrites Host needs the host listed in hosts`)
+
     return undefined
+  }
 
   if ([r, t, w, l].some(value => value !== undefined && typeof value !== 'string'))
     return undefined
@@ -186,9 +189,14 @@ async function forward(options: AnalyticsOptions, visit: Visit): Promise<void> {
     await fetch(url, { method: 'POST', headers, body: JSON.stringify(body), redirect: 'manual', signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS) })
   }
   catch (error) {
-    if (Date.now() - lastWarning > MINUTE_MS) {
-      lastWarning = Date.now()
-      kayLog('warn', `analytics: the ${options.provider} provider did not take a visit`, error)
-    }
+    warn(`analytics: the ${options.provider} provider did not take a visit`, error)
   }
+}
+
+function warn(message: string, error?: unknown): void {
+  if (Date.now() - lastWarning <= MINUTE_MS)
+    return
+
+  lastWarning = Date.now()
+  kayLog('warn', message, error)
 }

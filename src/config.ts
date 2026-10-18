@@ -349,6 +349,8 @@ export interface I18nConfig {
 // What a library hands the app to list in `extensions`: pages it serves, the texts they show, the config it needs and the server plugin they run on, as if they were the app's own.
 export interface KayExtension<Server extends AnyElysia = AnyElysia> {
   name: string
+  // Set when the extension does nothing without a running server, as a tracker posting to a route of its own: `kay build --static` warns of it, as that export runs no extension's server.
+  needsServer?: boolean | undefined
   // An Elysia plugin `pages()` uses before the pages, actions and API modules, so its derives reach their `ctx.locals` and `kay check` types them; scoped or global hooks reach them, local ones only the plugin's own routes.
   // Given as a function, it is called only when `pages()` builds the app, never when `kay check`, the editor or `kay build` read the config: the way to hand a plugin built on a database or the server's environment.
   server?: Server | (() => Server | Promise<Server>) | undefined

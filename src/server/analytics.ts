@@ -46,7 +46,7 @@ export type AnalyticsOptions = PlausibleOptions | UmamiOptions | SimpleAnalytics
 
 export const ANALYTICS_PATH = '/_kay/analytics'
 export const ANALYTICS_SCRIPT_PATH = `${ANALYTICS_PATH}.js`
-const PROVIDERS = new Set(['plausible', 'umami', 'simpleanalytics'])
+export const ANALYTICS_PROVIDERS: ReadonlySet<string> = new Set(['plausible', 'umami', 'simpleanalytics'])
 
 const DEFAULT_TEXT = { text: 'We count visits to improve this site, without cookies that follow you. Do you agree?', agree: 'Agree', refuse: 'Refuse' }
 
@@ -59,6 +59,7 @@ export function analytics(options: AnalyticsOptions): KayExtension {
 
   return {
     name: 'kay/analytics',
+    needsServer: true,
     server: async () => (await import('./analytics-server')).analyticsServer(options),
     config: {
       head: [{
@@ -86,7 +87,7 @@ function checked(options: AnalyticsOptions): void {
     throw new KayError('config-invalid', `kay: analytics ${reason}`)
   }
 
-  if (!PROVIDERS.has(options.provider))
+  if (!ANALYTICS_PROVIDERS.has(options.provider))
     refuse(`takes provider 'plausible', 'umami' or 'simpleanalytics'; got ${JSON.stringify((options as { provider: unknown }).provider)}`)
 
   if (options.provider === 'umami' && (typeof options.websiteId !== 'string' || options.websiteId.trim() === ''))

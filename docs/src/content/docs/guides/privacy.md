@@ -78,18 +78,18 @@ export default defineConfig({
 
 Plausible, Umami (give it `websiteId`) and Simple Analytics (`provider: 'simpleanalytics'`) work today, each with `host` for a copy you run yourself. All three set no cookie, so they count from the first page. Google Analytics, Matomo, Fathom and Cloudflare Web Analytics are not offered yet.
 
-The script counts the page when it loads and again after each page swap. It does nothing while you run `kay dev` or tests: only a server with `NODE_ENV=production` passes visits on.
+The script counts the page when it loads and again after each page swap. It needs a running server, so `kay build --static` warns that an exported site cannot count. It does nothing while you run `kay dev` or tests: only a server with `NODE_ENV=production` passes visits on.
 
 ### What the tool receives
 
 - The page address without its `#` part, and from its query only `utm_*`, `ref` and `source`, so a token or an email in a link never reaches the tool.
 - The page the visitor came from, without its query, plus the title, the screen size, the language and the browser's `User-Agent`.
-- The visitor's address only if the tool needs it to tell visitors apart. Plausible gets it as `X-Forwarded-For` and Umami in the data it receives. Simple Analytics never gets it. Behind a CDN or proxy, set `proxy` so the address is the visitor's and not the proxy's.
+- The visitor's address only if the tool needs it to tell visitors apart. Plausible gets it as `X-Forwarded-For` and Umami in the data it receives. Simple Analytics never gets it. Behind a CDN or proxy, set `proxy` so the address is the visitor's and not the proxy's: without it Plausible sees one visitor, and the limit below is shared by your whole site.
 - Nothing else: no cookie, no `Referer`, no `Authorization` header of the visitor.
 
 ### Asking first
 
-Add `consent: true` and kay shows a notice until the visitor chooses. Nothing is counted before a yes, and the server checks that on every visit rather than trusting the page. The answer is kept in the `kay_analytics` cookie for a year.
+Add `consent: true` and kay shows a notice until the visitor chooses. Nothing is counted before a yes, and the server checks that on every visit rather than trusting the page. The answer is kept in the `kay_analytics` cookie for a year, for your `base` path.
 
 ```ts
 analytics({
@@ -107,7 +107,7 @@ Give any element a `data-analytics-consent` attribute and a click on it shows th
 
 ### Who may post a visit
 
-The route is open to anyone, so it checks everything. It refuses a page that is not on your host (add other hosts with `hosts: ['www.example.com']`), a body over 4 KB, a post from another site, and more than 120 visits a minute from one address. The tool's address comes from your config alone, never from the request.
+The route is open to anyone, so it checks everything. It refuses a page that is not on your host (add other hosts with `hosts: ['www.example.com']`; a proxy that rewrites the `Host` header needs your real host there, and kay logs a warning when it drops a visit for this), a body over 4 KB, a post from another site, and more than 120 visits a minute from one address. The tool's address comes from your config alone, never from the request.
 
 ## Another script behind consent
 

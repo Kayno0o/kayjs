@@ -5,6 +5,7 @@ import process from 'node:process'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'bun:test'
 import { pages } from '../src/server'
 import { analytics } from '../src/server/analytics'
+import { testSite } from '../src/test'
 import { scratchDir } from './scratch'
 
 interface Received { path: string, headers: Headers, body: unknown }
@@ -293,6 +294,26 @@ describe('hostile requests', () => {
 
     expect((await send(app, visit({ u: 'https://www.example.com/a' }))).status).toBe(204)
     expect(received).toHaveLength(1)
+  })
+})
+
+describe('under a base and a trailing slash', () => {
+  it('serves the tracker, the page tag and the post under the base', async () => {
+    const mounted = await testSite({ routes: join(dir, 'routes'), islands: false, base: '/shop', trailingSlash: 'always', extensions: [analytics(plausible({ consent: true }))], proxy: { hops: 1 } })
+
+    try {
+      const home = await (await mounted.fetch('/')).text()
+      const script = await mounted.fetch('/_kay/analytics.js')
+      const sent = await mounted.fetch('/_kay/analytics', { method: 'POST', body: JSON.stringify(visit({ u: 'http://localhost/shop/pricing/' })), headers: { 'user-agent': CHROME, 'x-forwarded-for': '198.51.100.20', 'cookie': 'kay_analytics=yes' } })
+
+      expect(home).toContain('src="/shop/_kay/analytics.js"')
+      expect(script.status).toBe(200)
+      expect(sent.status).toBe(204)
+      expect((received[0]!.body as { url: string }).url).toBe('http://localhost/shop/pricing/')
+    }
+    finally {
+      await mounted.close()
+    }
   })
 })
 
