@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- The `kay dev` class check no longer reports a class whose only rules mention it inside `:is()`, `:where()` or a variant (`.prose { & :is(.stats) }`, `group-open:`): it judges a class by the rules that need it, as the build does ([Styles and assets](styles-and-assets.md)).
 - A constant exported inside a default-exported object or array (`export default { CONTACT }`), or exported later from a `--- server` fence, is judged like one exported where it is declared, so a write through the default import keeps its pages per request ([Prerendering](prerendering.md#prerendering)).
 - The build warns of fewer classes it can read: a value read back from the element's own class, `cn`/`clsx`/`twMerge` of names the source writes, a member of a `const` record of literals (`GLASS[tone]`), a `let` or `const` read by all its values, and a static export are no longer warned about, and a head's route stylesheet copy no longer outlives the page that replaced it, and a warning names the pages reaching the file ([Styles and assets](styles-and-assets.md)).
 

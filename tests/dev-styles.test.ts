@@ -45,4 +45,10 @@ describe('the class check of the dev server', () => {
     await page.waitUntil(() => getComputedStyle(document.querySelector('.late')!).fontSize === '20px')
     expect(page.errors.filter(error => WARNING.test(error))).toEqual([])
   })
+
+  it.skipIf(path === undefined)('stays quiet for a class only a nested :is() or a variant of another class styles, and for one nothing styles', async () => {
+    const page = await dev.open('/nested', { strict: false })
+
+    expect(page.errors.filter(error => WARNING.test(error))).toEqual([])
+  })
 })

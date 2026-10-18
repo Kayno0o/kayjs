@@ -1,0 +1,10 @@
+.prose
+  dl.stats
+    dt Posts
+  details.group
+    summary(class="group-open:rotate-90") More
+    p text
+  label.peer(for="x") toggle
+  input#x.peer.sr-only(type="checkbox")
+  p(class="peer-checked:font-bold") shown
+  p.styled-nowhere nothing styles me

@@ -1,9 +1,34 @@
 // Loaded by every page the dev server serves, which links the whole stylesheet: a production page carries only the rules of the classes its files name, so an element getting a class the stylesheet styles but the page's set lacks would be unstyled there.
 // Each page's set comes in a `data-kay-page-classes` block of its head; an element carrying a class it lacks logs a `[kay]` error once.
 const DATA = 'script[data-kay-page-classes]'
-const SELECTOR_CLASS = /\.((?:\\.|[\w-])+)/g
+const CLASS_NAME = /^(?:\\.|[\w-])+/
 const ESCAPE = /\\(.)/g
 const LISTED = 'list it in your stylesheet with @source inline("...") or write it out as a literal in a component'
+
+// The classes a selector needs outside any parentheses or brackets, as the build prunes by: `.a :is(.b)` needs `a` alone, and the `:where(.group)` of a `group-open:` variant needs none, so a class only such rules mention has no rule of its own to be missing.
+function neededClasses(selector: string, into: Set<string>): void {
+  let depth = 0
+
+  for (let at = 0; at < selector.length; at++) {
+    const char = selector[at]!
+
+    if (char === '\\') {
+      at++
+    }
+    else if (char === '(' || char === '[') {
+      depth++
+    }
+    else if ((char === ')' || char === ']') && depth > 0) {
+      depth--
+    }
+    else if (char === '.' && depth === 0) {
+      const name = CLASS_NAME.exec(selector.slice(at + 1))?.[0] ?? ''
+
+      into.add(name.replace(ESCAPE, '$1'))
+      at += name.length
+    }
+  }
+}
 
 // Every class some rule of the document's stylesheets styles.
 function styledClasses(doc: Document): Set<string> {
@@ -11,8 +36,7 @@ function styledClasses(doc: Document): Set<string> {
   const walk = (rules: CSSRuleList) => {
     for (const rule of rules) {
       if (rule instanceof CSSStyleRule) {
-        for (const [, name] of rule.selectorText.matchAll(SELECTOR_CLASS))
-          found.add(name!.replace(ESCAPE, '$1'))
+        neededClasses(rule.selectorText, found)
       }
 
       if ('cssRules' in rule)

@@ -1,1 +1,7 @@
 @import "tailwindcss" source("..");
+
+.prose {
+  & :is(.chart, .stats) {
+    display: grid;
+  }
+}
