@@ -130,6 +130,49 @@ describe.concurrent('kay dev reloading', () => {
     }
   })
 
+  it('restarts nothing for a second event of a save whose content it already took in, and again for a real second edit, a deletion and a file back', async () => {
+    const project = await served({
+      'src/routes/index.kay': '---\nimport Greeting from \'../greeting.kay\'\n---\nh1 Home\nGreeting\n',
+      'src/greeting.kay': 'p Hello\n',
+      'src/api/hello.ts': 'import { api } from \'kay/server\'\n\nexport default api().get(\'/\', () => ({ hello: \'one\' }))\n',
+      'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({})\n',
+    })
+    const rebuilds = () => project.lines.filter(line => (/(?:reloaded|restarted) in/).test(line)).length
+    // The file written in place as an editor does, once, then the same content again a debounce later: the late second event of one save.
+    const saved = async (path: string, content: string, expected: number) => {
+      await Bun.write(join(project.root, path), content)
+      await until(() => rebuilds() >= expected)
+      await project.quiet()
+      await Bun.write(join(project.root, path), content)
+      await Bun.sleep(300)
+      expect(rebuilds()).toBe(expected)
+    }
+
+    try {
+      await saved('src/greeting.kay', 'p Bonjour\n', 1)
+      await saved('src/routes/index.kay', '---\nimport Greeting from \'../greeting.kay\'\n---\nh1 Accueil\nGreeting\n', 2)
+      await saved('src/api/hello.ts', 'import { api } from \'kay/server\'\n\nexport default api().get(\'/\', () => ({ hello: \'two\' }))\n', 3)
+      await saved('kay.config.ts', 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ lang: \'fr\' })\n', 4)
+      expect(project.children).toHaveLength(2)
+
+      // A real second edit right after the first goes through, then the file deleted and written back with the content it had.
+      await Bun.write(join(project.root, 'src/greeting.kay'), 'p Salut\n')
+      await project.sees('Salut')
+      await project.quiet()
+      expect(rebuilds()).toBe(5)
+
+      await rm(join(project.root, 'src/greeting.kay'))
+      await until(() => rebuilds() >= 6)
+      await project.quiet()
+      await Bun.write(join(project.root, 'src/greeting.kay'), 'p Salut\n')
+      await until(() => rebuilds() >= 7)
+      await project.sees('Salut')
+    }
+    finally {
+      await project.cleanup()
+    }
+  }, 60_000)
+
   it('shows an edit of a page, a component and an API module without a new process, and stops the app it replaced', async () => {
     const project = await served({
       'src/routes/index.kay': '---\nimport Greeting from \'../greeting.kay\'\n---\nh1 Home\nGreeting\n',

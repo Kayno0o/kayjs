@@ -3,7 +3,7 @@ import type { Readable } from 'node:stream'
 import type { KayConfig } from '../config'
 import type { BuildOutcome } from './builder'
 import type { ClientBuilder } from './client'
-import { existsSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, statSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { networkInterfaces } from 'node:os'
 import { join, resolve, sep } from 'node:path'
@@ -118,6 +118,8 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   let reloads = 0
   // Every file changed since the last restart began, stylesheets included.
   let touched = new Set<string>()
+  // The content each file had when a restart took it in, so a late second event of the same save, its content unchanged, restarts nothing.
+  const taken = new Map<string, number | bigint>()
   // The config the types are written from, read again once kay.config.ts changes.
   let typesConfig = options.config
   // The types are written beside the restarts, one run at a time and one more once it ends when changes came meanwhile.
@@ -528,6 +530,15 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     touched = new Set()
     forced = false
 
+    for (const file of files) {
+      const hash = contentHash(join(root, file))
+
+      if (hash === undefined)
+        taken.delete(file)
+      else
+        taken.set(file, hash)
+    }
+
     if (!asked && await swapStylesheets(files))
       return
 
@@ -627,6 +638,9 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     restarting ??= drain()
   }
   const stopWatching = watchProject(root, (file) => {
+    if (taken.has(file) && contentHash(join(root, file)) === taken.get(file))
+      return
+
     startupChanged ||= STARTUP_FILE.test(file)
 
     if (STARTUP_FILE.test(file) || file === CONFIG_FILE || builder?.loaded(file) === true) {
@@ -781,6 +795,16 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   }
 
   return stop
+}
+
+// The hash of a file's content, or none for a file that is missing or a directory.
+function contentHash(path: string): number | bigint | undefined {
+  try {
+    return Bun.hash(readFileSync(path))
+  }
+  catch {
+    return undefined
+  }
 }
 
 // The files a change left in place, which leaves out the directories holding them and an editor's temporary files; a deletion names what is gone.
