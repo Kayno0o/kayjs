@@ -9,6 +9,7 @@ export interface AnalyticsConsent {
   text?: AnalyticsText | undefined
   agree?: AnalyticsText | undefined
   refuse?: AnalyticsText | undefined
+  notice?: boolean | undefined
 }
 
 interface Common {
@@ -52,6 +53,20 @@ export interface MatomoOptions extends Common {
   tokenAuth?: string | undefined
 }
 
+// Google Analytics 4 through its Measurement Protocol, sent from the server: no Google script, cookie or CSP exception.
+// The visitor's client id is made on the server from a salt that changes every day, so nothing is stored in the browser, and a visitor is told apart for a day at most.
+export interface Ga4Options extends Common {
+  provider: 'ga4'
+  // The web data stream's measurement id, `G-XXXXXXXXXX`.
+  measurementId: string
+  // A secret made under the data stream's Measurement Protocol API secrets in Google Analytics; it stays on the server.
+  apiSecret: string
+  // Where Google takes events, `https://www.google-analytics.com` by default; `https://region1.google-analytics.com` for EU data collection.
+  host?: string | undefined
+  // Passes the visitor's address on as `ip_override` so Google places the visit; `false` leaves Google with this server's.
+  address?: boolean | undefined
+}
+
 // Fathom has no API to send a visit to, so its own script is loaded: from Fathom's domain, which the CSP then allows, and after the visitor's yes when `consent` is set.
 export interface FathomOptions extends Common {
   provider: 'fathom'
@@ -79,7 +94,7 @@ export interface CustomOptions extends Common {
   address?: boolean | undefined
 }
 
-export type AnalyticsOptions = PlausibleOptions | UmamiOptions | SimpleAnalyticsOptions | MatomoOptions | FathomOptions | CloudflareOptions | CustomOptions
+export type AnalyticsOptions = PlausibleOptions | UmamiOptions | SimpleAnalyticsOptions | MatomoOptions | Ga4Options | FathomOptions | CloudflareOptions | CustomOptions
 
 // The providers that take visits from the app's server.
 export type VisitOptions = Exclude<AnalyticsOptions, FathomOptions | CloudflareOptions | CustomOptions>
@@ -88,9 +103,10 @@ export const ANALYTICS_PATH = '/_kay/analytics'
 export const ANALYTICS_SCRIPT_PATH = `${ANALYTICS_PATH}.js`
 export const CUSTOM_SCRIPT_PATH = `${ANALYTICS_PATH}/script.js`
 export const CUSTOM_COLLECT_PATH = `${ANALYTICS_PATH}/collect`
-export const ANALYTICS_PROVIDERS: ReadonlySet<string> = new Set(['plausible', 'umami', 'simpleanalytics', 'matomo', 'fathom', 'cloudflare', 'custom'])
+export const ANALYTICS_PROVIDERS: ReadonlySet<string> = new Set(['plausible', 'umami', 'simpleanalytics', 'matomo', 'ga4', 'fathom', 'cloudflare', 'custom'])
 const SITE_ID = /^[A-Z\d]{1,32}$/i
 const TOKEN = /^[\w-]{1,128}$/
+const MEASUREMENT_ID = /^G-[A-Z\d]{4,20}$/i
 
 const DEFAULT_TEXT = { text: 'We count visits to improve this site, without cookies that follow you. Do you agree?', agree: 'Agree', refuse: 'Refuse' }
 
@@ -161,7 +177,7 @@ function checked(options: AnalyticsOptions): void {
   }
 
   if (!ANALYTICS_PROVIDERS.has(options.provider))
-    refuse(`takes provider 'plausible', 'umami', 'simpleanalytics', 'matomo', 'fathom', 'cloudflare' or 'custom'; got ${JSON.stringify((options as { provider: unknown }).provider)}`)
+    refuse(`takes provider 'plausible', 'umami', 'simpleanalytics', 'matomo', 'ga4', 'fathom', 'cloudflare' or 'custom'; got ${JSON.stringify((options as { provider: unknown }).provider)}`)
 
   if (options.provider === 'umami' && (typeof options.websiteId !== 'string' || options.websiteId.trim() === ''))
     refuse('needs the websiteId of the website in Umami')
@@ -184,6 +200,14 @@ function checked(options: AnalyticsOptions): void {
 
     if (options.tokenAuth !== undefined && !TOKEN.test(options.tokenAuth))
       refuse('takes a tokenAuth of letters and digits')
+  }
+
+  if (options.provider === 'ga4') {
+    if (!MEASUREMENT_ID.test(String(options.measurementId)))
+      refuse(`needs the measurementId of the web data stream, such as G-XXXXXXXXXX; got ${JSON.stringify(options.measurementId)}`)
+
+    if (!TOKEN.test(String(options.apiSecret)))
+      refuse('needs the apiSecret of the data stream\'s Measurement Protocol')
   }
 
   if (options.provider === 'fathom' && !SITE_ID.test(String(options.siteId)))

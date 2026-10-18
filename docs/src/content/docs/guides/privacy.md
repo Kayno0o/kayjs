@@ -80,15 +80,27 @@ Plausible, Umami (give it `websiteId`), Simple Analytics (`provider: 'simpleanal
 
 Fathom and Cloudflare Web Analytics are different. They take data only from their own scripts, so kay cannot send for them. `provider: 'fathom'` (`siteId`) and `provider: 'cloudflare'` (`token`) add their script to your pages and open the content security policy for their domains. Their data does not pass through your site.
 
-For any other tracker that is a script posting to an endpoint, use `provider: 'custom'` with `script` and `endpoint`. kay serves a copy of the script from your site with the endpoint in it pointed at your site, and passes what the script posts on. The endpoint must appear in the script exactly as you write it. Google Analytics is not offered: it needs a secret and its own visitor ids.
+For any other tracker that is a script posting to an endpoint, use `provider: 'custom'` with `script` and `endpoint`. kay serves a copy of the script from your site with the endpoint in it pointed at your site, and passes what the script posts on. The endpoint must appear in the script exactly as you write it.
 
 The script counts the page when it loads and again after each page swap. It needs a running server, so `kay build --static` warns that an exported site cannot count. It does nothing while you run `kay dev` or tests: only a server with `NODE_ENV=production` passes visits on.
+
+### Google Analytics 4
+
+`provider: 'ga4'` sends each page view to Google Analytics from your server, through its Measurement Protocol. It needs the `measurementId` of your web data stream (`G-` and letters) and an `apiSecret`, which you make in Google Analytics under the data stream's Measurement Protocol API secrets. The secret stays on your server. Use `host: 'https://region1.google-analytics.com'` to collect in the EU.
+
+```ts
+analytics({ provider: 'ga4', measurementId: 'G-ABC123XYZ', apiSecret: 'secret', consent: true })
+```
+
+Google normally keeps a visitor's id in a cookie, which would need consent before it is set. kay sets none. Your server makes the id from the visitor's address and browser with a random key that changes every day and is never stored, so the id tells a visitor apart for one day and cannot be turned back into an address. Two servers behind a balancer count one visitor twice. With `consent` on, no id is made and nothing is sent until the visitor said yes.
+
+Google gets the address as `ip_override`, so it can place the visit. Give `address: false` to keep it out; Google then places every visit at your server. Because there is no Google tag on the page, check Realtime and the engagement numbers in your reports, which Google builds partly from tag data. A very long page address may also be cut by Google's limit of 100 characters per value.
 
 ### What the tool receives
 
 - The page address without its `#` part, and from its query only `utm_*`, `ref` and `source`, so a token or an email in a link never reaches the tool.
 - The page the visitor came from, without its query, plus the title, the screen size, the language and the browser's `User-Agent`.
-- The visitor's address only if the tool needs it to tell visitors apart. Plausible gets it as `X-Forwarded-For` and Umami in the data it receives. Simple Analytics never gets it. Behind a CDN or proxy, set `proxy` so the address is the visitor's and not the proxy's: without it Plausible sees one visitor, and the limit below is shared by your whole site.
+- The visitor's address only if the tool needs it to tell visitors apart. Plausible gets it as `X-Forwarded-For`, Umami and Google Analytics in the data they receive. Simple Analytics never gets it. Behind a CDN or proxy, set `proxy` so the address is the visitor's and not the proxy's: without it Plausible sees one visitor, and the limit below is shared by your whole site.
 - Nothing else: no cookie, no `Referer`, no `Authorization` header of the visitor.
 
 ### Asking first

@@ -1,5 +1,6 @@
 import type { AnyElysia } from 'elysia'
 import type { AnalyticsOptions, VisitOptions } from './analytics'
+import { createHmac, randomBytes } from 'node:crypto'
 import { isIP } from 'node:net'
 import process from 'node:process'
 import { Elysia } from 'elysia'
@@ -21,6 +22,9 @@ const PROVIDER_TIMEOUT_MS = 5000
 const RATE_NAME = 'kay:analytics'
 const COLLECT_RATE_NAME = 'kay:analytics-collect'
 const MAX_PENDING = 200
+const DAY_MS = 86_400_000
+// A GA4 session is a half hour of one visitor's page views.
+const SESSION_MS = 1_800_000
 const MAX_COLLECT_BYTES = 64 * 1024
 const MAX_SCRIPT_BYTES = 512 * 1024
 const COLLECTS_PER_MINUTE = 600
@@ -46,6 +50,8 @@ interface Visit {
   userAgent: string
   // The visitor's address, only when the provider needs it to tell visitors apart and place them.
   address: string | undefined
+  // A provider that wants an id for the visitor gets one made on the server, see `visitorId`.
+  visitor?: string | undefined
 }
 
 interface Forward {
@@ -58,6 +64,7 @@ interface Forward {
 // How each provider takes a visit. Plausible: https://plausible.io/docs/events-api (User-Agent and X-Forwarded-For tell visitors apart).
 // Umami: POST /api/send with `{ type: 'event', payload }` and a User-Agent, https://umami.is/docs/api/sending-stats; its payload may carry the visitor's `ip`.
 // Simple Analytics: https://docs.simpleanalytics.com/events-api, a JSON body with the user agent and no address.
+// Google Analytics 4: the Measurement Protocol, https://developers.google.com/analytics/devguides/collection/protocol/ga4/sending-events: POST `/mp/collect?measurement_id&api_secret` with `client_id` and `events`; `ip_override` places the visit, `device` carries the language and screen.
 // Matomo: the tracking HTTP API, https://developer.matomo.org/api-reference/tracking-api: `matomo.php` with `idsite`, `rec`, `url`, `ua` and the rest, and `cip` for the address only with a `token_auth`; no visitor id is sent, so Matomo tells visitors apart without a cookie.
 const PROVIDERS = {
   plausible: (options: Extract<AnalyticsOptions, { provider: 'plausible' }>, visit: Visit): Forward => ({
@@ -101,6 +108,23 @@ const PROVIDERS = {
       },
     }
   },
+  ga4: (options: Extract<AnalyticsOptions, { provider: 'ga4' }>, visit: Visit): Forward => ({
+    method: 'POST',
+    url: `${(options.host ?? 'https://www.google-analytics.com').replace(TRAILING_SLASH, '')}/mp/collect?${new URLSearchParams({ measurement_id: options.measurementId, api_secret: options.apiSecret })}`,
+    headers: { 'content-type': 'application/json' },
+    body: {
+      client_id: visit.visitor,
+      events: [{ name: 'page_view', params: {
+        page_location: visit.page.href,
+        page_referrer: visit.referrer,
+        page_title: visit.title,
+        session_id: String(Math.floor(Date.now() / SESSION_MS) * SESSION_MS / 1000),
+        engagement_time_msec: 100,
+      } }],
+      ...visit.address !== undefined && { ip_override: visit.address },
+      ...(visit.screen !== undefined || visit.language !== undefined) && { device: { ...visit.language !== undefined && { language: visit.language }, ...visit.screen !== undefined && { screen_resolution: visit.screen } } },
+    },
+  }),
   matomo: (options: Extract<AnalyticsOptions, { provider: 'matomo' }>, visit: Visit): Forward => {
     const query = new URLSearchParams({ idsite: String(options.siteId), rec: '1', apiv: '1', rand: Math.random().toString(36).slice(2), url: visit.page.href, action_name: visit.title, urlref: visit.referrer, ua: visit.userAgent })
 
@@ -121,7 +145,22 @@ const PROVIDERS = {
 
 // The providers that need the visitor's address to tell visitors apart; no other is sent it. Matomo takes it only with a token.
 function needsAddress(options: VisitOptions): boolean {
-  return options.provider === 'plausible' || options.provider === 'umami' || (options.provider === 'matomo' && options.tokenAuth !== undefined)
+  return options.provider === 'plausible' || options.provider === 'umami' || (options.provider === 'ga4' && options.address !== false) || (options.provider === 'matomo' && options.tokenAuth !== undefined)
+}
+
+// A visitor's id for GA4, with no cookie or storage in the browser: a keyed hash of the address and the browser, the key being a random one that changes each UTC day and lives in this process only, so the id tells a visitor apart for a day and cannot be turned back into an address.
+// It only exists once the visit passed the consent check, so a visitor who has not agreed never gets one; two processes behind a balancer count a visitor twice.
+let salt: { day: number, key: Buffer } | undefined
+
+function visitorId(address: string, userAgent: string): string {
+  const day = Math.floor(Date.now() / DAY_MS)
+
+  if (salt?.day !== day)
+    salt = { day, key: randomBytes(32) }
+
+  const hash = createHmac('sha256', salt.key).update(`${address}\n${userAgent}`).digest()
+
+  return `${hash.readUInt32BE(0)}.${hash.readUInt32BE(4)}`
 }
 
 // Visits being passed on, so a test can wait for them and a flood cannot pile up more than a few at a time.
@@ -175,9 +214,10 @@ export function analyticsServer(options: AnalyticsOptions): AnyElysia {
       if (process.env.NODE_ENV !== 'production' || (gated && !hasConsent(request)) || visit.userAgent === '')
         return new Response(null, { status: 204 })
 
-      const address = needsAddress(options) ? clientAddress(request, server) : undefined
+      const address = options.provider === 'ga4' || needsAddress(options) ? clientAddress(request, server) : ''
 
-      send(options, { ...visit, address: address !== undefined && isIP(address) !== 0 ? address : undefined })
+      // The id is made from the address even when the address is not passed on.
+      send(options, { ...visit, address: needsAddress(options) && isIP(address) !== 0 ? address : undefined, ...options.provider === 'ga4' && { visitor: visitorId(address, visit.userAgent) } })
 
       return new Response(null, { status: 204, headers: { 'cache-control': 'no-store' } })
     }, { parse: 'none' })

@@ -397,6 +397,67 @@ describe('Matomo', () => {
   })
 })
 
+describe('Google Analytics 4', () => {
+  const ga4 = (more: object = {}): AnalyticsOptions => ({ provider: 'ga4', measurementId: 'G-ABC123', apiSecret: 'sec_ret-1', host: `http://localhost:${provider.port}/`, ...more })
+
+  it('is sent a page_view through the Measurement Protocol, the secret in the query and no cookie asked of the browser', async () => {
+    const response = await send(await site(ga4()), visit(), { 'x-forwarded-for': '198.51.100.9' })
+    const [sent] = received
+    const body = sent!.body as Record<string, unknown> & { client_id: string }
+
+    expect(response.status).toBe(204)
+    expect(response.headers.get('set-cookie')).toBeNull()
+    expect(sent!.method).toBe('POST')
+    expect(sent!.path).toBe('/mp/collect')
+    expect(sent!.search).toBe('?measurement_id=G-ABC123&api_secret=sec_ret-1')
+    expect(body.client_id).toMatch(/^\d+\.\d+$/)
+    expect(body).toEqual({
+      client_id: body.client_id,
+      events: [{ name: 'page_view', params: { page_location: 'http://localhost/pricing?utm_source=news', page_referrer: 'https://news.example/story', page_title: 'Pricing', session_id: expect.stringMatching(/^\d+$/), engagement_time_msec: 100 } }],
+      ip_override: '198.51.100.9',
+      device: { language: 'fr-FR', screen_resolution: '1920x1080' },
+    })
+  })
+
+  it('gives one visitor one id and another visitor another, and leaves the address out with address: false', async () => {
+    const app = await site(ga4({ address: false }))
+
+    await send(app, visit(), { 'x-forwarded-for': '198.51.100.9' })
+    await send(app, visit(), { 'x-forwarded-for': '198.51.100.9' })
+    await send(app, visit(), { 'x-forwarded-for': '198.51.100.10' })
+    await send(app, visit(), { 'x-forwarded-for': '198.51.100.9', 'user-agent': 'Firefox/130.0' })
+
+    const ids = received.map(sent => (sent.body as { client_id: string }).client_id)
+
+    expect(ids[0]).toBe(ids[1])
+    expect(new Set(ids).size).toBe(3)
+    expect(JSON.stringify(received)).not.toContain('198.51.100')
+    expect(received.every(sent => !('ip_override' in (sent.body as object)))).toBe(true)
+  })
+
+  it('makes no id for a visitor who has not agreed', async () => {
+    const app = await site(ga4({ consent: true }))
+
+    await send(app, visit())
+    await send(app, visit(), { cookie: 'kay_analytics=no' })
+
+    expect(received).toEqual([])
+
+    await send(app, visit(), { cookie: 'kay_analytics=yes' })
+
+    expect(received).toHaveLength(1)
+  })
+
+  it('keeps the secret out of the page and the tracker', async () => {
+    const app = await site(ga4())
+    const page = await (await app.handle(new Request('http://localhost/'))).text()
+    const script = await (await app.handle(new Request('http://localhost/_kay/analytics.js'))).text()
+
+    expect(page + script).not.toContain('sec_ret-1')
+    expect(page).not.toContain('google')
+  })
+})
+
 describe('Fathom and Cloudflare Web Analytics', () => {
   const home = async (options: AnalyticsOptions) => {
     const response = await (await site(options)).handle(new Request('http://localhost/'))
@@ -559,6 +620,8 @@ describe('the setup', () => {
     [{ provider: 'matomo', siteId: 1 }, 'host is'],
     [{ provider: 'matomo', siteId: '', host: 'https://m.example' }, 'siteId'],
     [{ provider: 'matomo', siteId: 1, host: 'https://m.example', tokenAuth: 'a&b' }, 'tokenAuth'],
+    [{ provider: 'ga4', measurementId: 'UA-1', apiSecret: 'abc' }, 'measurementId'],
+    [{ provider: 'ga4', measurementId: 'G-ABC123', apiSecret: 'a&b' }, 'apiSecret'],
     [{ provider: 'fathom', siteId: 'A B' }, 'siteId'],
     [{ provider: 'cloudflare', token: '"><script>' }, 'token'],
     [{ provider: 'custom', script: 'ftp://x.example/s.js', endpoint: 'https://x.example/c' }, 'script is'],
