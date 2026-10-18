@@ -29,6 +29,7 @@ const PLACEHOLDER = /\{(\w+)\}/g
 // Where a browser may read a tag, and a comment, CDATA section, doctype or instruction, which hide what follows them from the check.
 const TAG_START = /<\/?[A-Z][\w-]*\b/gi
 const MARKUP_START = /<[!?]/g
+const COMMENT_END = /--!?>/g
 // HTML whitespace is these five characters only: JS `\s` also matches a no-break space, which a browser reads as part of a value.
 const ATTRIBUTE = /([^\t\n\f\r =/"'<>]+)(?:[\t\n\f\r ]*=[\t\n\f\r ]*(?:"([^"]*)"|'([^']*)'|([^\t\n\f\r "'>]+)))?/g
 // A quote opens a value only right after `=`, spaces allowed: anywhere else a browser reads it as part of a name or an unquoted value.
@@ -188,38 +189,75 @@ function tagShape(tag: string): string {
   return JSON.stringify([name.toLowerCase(), ...attributes.toSorted()])
 }
 
-// The tags of a text with where each starts, their quoted attribute values allowed to hold `>`, and whether one starts that the scan cannot end (a quote not opening a value, an odd quote, a `<` inside it): the scan stops at it, so a text holding one is never compared.
-function scanTags(text: string): { tags: { tag: string, index: number }[], unreadable: boolean } {
-  const tags: { tag: string, index: number }[] = []
+// What a comment, CDATA section, doctype or instruction is called in the comparison, and where it ends: a comment at `-->`, `--!>` or its abrupt `>` and `->` forms, the others at the first `>`.
+function skipMarkup(text: string, start: number): { kind: string, end: number } | undefined {
+  if (text.startsWith('<!--', start)) {
+    const body = start + 4
+
+    if (text.startsWith('>', body))
+      return { kind: '<!--', end: body + 1 }
+
+    if (text.startsWith('->', body))
+      return { kind: '<!--', end: body + 2 }
+
+    COMMENT_END.lastIndex = body
+
+    const close = COMMENT_END.exec(text)
+
+    return close ? { kind: '<!--', end: close.index + close[0].length } : undefined
+  }
+
+  const close = text.indexOf('>', start)
+
+  return close === -1 ? undefined : { kind: text.startsWith('<![CDATA[', start) ? '<![CDATA[' : text.slice(start, start + 2), end: close + 1 }
+}
+
+// The tags of a text and the comments, CDATA sections and instructions between them, in the order they stand. A tag's quoted attribute values may hold `>`, and what a comment holds is not read, as a browser does not. Also whether one starts that the scan cannot end (a quote not opening a value, an odd quote, a `<` inside a tag, an unclosed comment): the scan stops at it, so a text holding one is never compared.
+function scanTags(text: string): { parts: { markup: boolean, text: string }[], unreadable: boolean } {
+  const parts: { markup: boolean, text: string }[] = []
   let from = 0
 
   for (;;) {
     TAG_START.lastIndex = from
+    MARKUP_START.lastIndex = from
 
-    const start = TAG_START.exec(text)
+    const tag = TAG_START.exec(text)
+    const markup = MARKUP_START.exec(text)
 
-    if (!start)
-      return { tags, unreadable: false }
+    if (markup && (!tag || markup.index < tag.index)) {
+      const skipped = skipMarkup(text, markup.index)
 
-    let end = start.index + start[0].length
+      if (!skipped)
+        return { parts, unreadable: true }
+
+      parts.push({ markup: true, text: skipped.kind })
+      from = skipped.end
+
+      continue
+    }
+
+    if (!tag)
+      return { parts, unreadable: false }
+
+    let end = tag.index + tag[0].length
     let closed = false
 
     while (end < text.length && !closed) {
       const char = text[end]!
 
       if (char === '"' || char === '\'') {
-        if (!OPENS_VALUE.test(text.slice(start.index, end)))
-          return { tags, unreadable: true }
+        if (!OPENS_VALUE.test(text.slice(tag.index, end)))
+          return { parts, unreadable: true }
 
         const close = text.indexOf(char, end + 1)
 
         if (close === -1)
-          return { tags, unreadable: true }
+          return { parts, unreadable: true }
 
         end = close + 1
       }
       else if (char === '<') {
-        return { tags, unreadable: true }
+        return { parts, unreadable: true }
       }
       else {
         closed = char === '>'
@@ -228,18 +266,16 @@ function scanTags(text: string): { tags: { tag: string, index: number }[], unrea
     }
 
     if (!closed)
-      return { tags, unreadable: true }
+      return { parts, unreadable: true }
 
-    tags.push({ tag: text.slice(start.index, end), index: start.index })
+    parts.push({ markup: false, text: text.slice(tag.index, end) })
     from = end
   }
 }
 
-// The tags and the starts of comments, CDATA sections and instructions in the order they stand, so a reply that reorders them, or moves one into or out of a comment, differs from its source.
-function structure(text: string, tags: { tag: string, index: number }[]): string[] {
-  const markup = Array.from(text.matchAll(MARKUP_START), ({ 0: start, index }) => ({ shape: start, index }))
-
-  return [...tags.map(({ tag, index }) => ({ shape: tagShape(tag), index })), ...markup].toSorted((a, b) => a.index - b.index).map(({ shape }) => shape)
+// The scan as the check compares it: a tag by its shape, other markup by its kind, so a reply that reorders them, or moves a tag into or out of a comment, differs from its source.
+function structure(parts: { markup: boolean, text: string }[]): string[] {
+  return parts.map(part => part.markup ? part.text : tagShape(part.text))
 }
 
 function same(a: string[], b: string[]): boolean {
@@ -277,7 +313,7 @@ export function unitProblem(unit: Unit, value: unknown): string | undefined {
   if (source.unreadable || reply.unreadable)
     return 'holds a tag the check cannot read'
 
-  if (!same(structure(unit.text, source.tags), structure(value, reply.tags)))
+  if (!same(structure(source.parts), structure(reply.parts)))
     return 'changes the tags of the source'
 
   if (unit.kind === 'markdown' && (!same(found(unit.text, LINK_TARGET), found(value, LINK_TARGET)) || unit.text.match(FENCE)?.length !== value.match(FENCE)?.length))
