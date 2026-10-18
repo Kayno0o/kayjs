@@ -25,7 +25,7 @@ export type AdminFailure = 'forbidden' | 'not-found'
 // `stale` when the admin's session neither signed in nor re-proved in the last ten minutes.
 export type AdminChangeFailure = AdminFailure | 'stale'
 
-export type RoleResult = { ok: true, user: ManagedUser } | { ok: false, error: AdminChangeFailure | 'unknown-role' | 'self' }
+export type RoleResult = { ok: true, user: ManagedUser } | { ok: false, error: AdminChangeFailure | 'unknown-role' | 'self' | 'last-admin' }
 
 export type BanResult = { ok: true, user: ManagedUser } | { ok: false, error: AdminChangeFailure | 'self' | 'admin' | 'until' }
 
@@ -67,20 +67,21 @@ export async function isAdmin(state: RequestState, record: UserRecord): Promise<
 
 // Whether `record` is the only user meeting the `admin` option, so losing them leaves the deployment with no admin.
 export async function lastAdmin(state: RequestState, record: UserRecord): Promise<boolean> {
-  if (!(await isAdmin(state, record)))
-    return false
+  return await isAdmin(state, record) && !await anotherAdmin(state, record.id)
+}
 
-  // Read a page at a time and stopped at the first other admin; the total is never read, so the store need not count.
+// Read a page at a time and stopped at the first admin other than `exceptId`; the total is never read, so the store need not count.
+async function anotherAdmin(state: RequestState, exceptId: string): Promise<boolean> {
   for (let offset = 0; ; offset += USER_PAGE_MAX) {
     const { users } = await state.core.store.users.list({ offset, limit: USER_PAGE_MAX, total: false })
 
     for (const user of users) {
-      if (user.id !== record.id && await isAdmin(state, user))
-        return false
+      if (user.id !== exceptId && await isAdmin(state, user))
+        return true
     }
 
     if (users.length < USER_PAGE_MAX)
-      return true
+      return false
   }
 }
 
@@ -134,6 +135,13 @@ export async function changeRole(state: RequestState, userId: string, role: stri
     return { ok: false, error: 'self' }
 
   const updated = await state.core.store.users.update(record.id, { roles }) ?? { ...record, roles }
+
+  // Two admins revoking each other both see the other still there: when none is left, the role goes back.
+  if (!granted && await isAdmin(state, record) && !await isAdmin(state, updated) && !await anotherAdmin(state, '')) {
+    await state.core.store.users.update(record.id, { roles: record.roles })
+
+    return { ok: false, error: 'last-admin' }
+  }
 
   await report(state, updated, granted ? 'role-granted' : 'role-revoked', role, actor)
 

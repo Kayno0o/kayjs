@@ -312,6 +312,10 @@ export async function setMemberRoles(state: RequestState, ref: string, userId: s
     return { ok: false, error: 'last-owner' }
 
   await store.members.update(found.organization.id, userId, { roles: [...new Set(roles)] })
+
+  if (target.roles.includes(config.owner) && !roles.includes(config.owner) && !await ownerKept(config, store, found.organization.id, async () => store.members.update(found.organization.id, userId, { roles: target.roles })))
+    return { ok: false, error: 'last-owner' }
+
   await reportOn(state, userId, 'member-roles-changed', `${found.organization.id} ${roles.join(' ')}`, found.record)
 
   return { ok: true }
@@ -338,6 +342,9 @@ export async function removeMember(state: RequestState, ref: string, userId: str
     return { ok: false, error: 'last-owner' }
 
   await store.members.delete(found.organization.id, userId)
+
+  if (target.roles.includes(config.owner) && !await ownerKept(config, store, found.organization.id, async () => store.members.add(target)))
+    return { ok: false, error: 'last-owner' }
 
   if (self)
     await report(state, found.record, 'member-left', found.organization.id)
@@ -544,8 +551,20 @@ function reaches(config: OrganizationsCore, held: string[], roles: string[]): bo
   return roles.every(role => config.isGranted(role, held))
 }
 
-async function lastOwner(config: OrganizationsCore, store: Stores, organizationId: string): Promise<boolean> {
-  return (await store.members.listByOrganization(organizationId)).filter(member => member.roles.includes(config.owner)).length <= 1
+async function lastOwner(config: OrganizationsCore, store: Stores, organizationId: string, atMost = 1): Promise<boolean> {
+  return (await store.members.listByOrganization(organizationId)).filter(member => member.roles.includes(config.owner)).length <= atMost
+}
+
+// Checked again after the write, as two requests can each see the other owner still there: when none is left, `restore` puts the member back, so of two racing the last owners at least one stays.
+async function ownerKept(config: OrganizationsCore, store: Stores, organizationId: string, restore: () => Promise<unknown>): Promise<boolean> {
+  if (!await lastOwner(config, store, organizationId, 0))
+    return true
+
+  // An organization deleted meanwhile has nothing to put the member back in.
+  if (await store.organizations.get(organizationId))
+    await restore()
+
+  return false
 }
 
 async function live(store: Stores, invitationId: string): Promise<InvitationRecord | undefined> {

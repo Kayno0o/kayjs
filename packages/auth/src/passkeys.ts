@@ -12,6 +12,7 @@ import { spend } from './limits'
 import { notify } from './notify'
 import { endOtherSessions } from './sessions'
 import { reprove } from './twoFactor'
+import { hasWayIn } from './wayIn'
 import { generateAuthenticationOptions, generateRegistrationOptions, verifyAuthenticationResponse, verifyRegistrationResponse } from './webauthn'
 
 const CHALLENGE_MAX_AGE_MS = 5 * 60 * 1000
@@ -176,6 +177,14 @@ export async function removePasskey(state: RequestState, id: string, proof: Proo
     return { ok: false, error: 'last-way-in' }
 
   await core.store.passkeys.delete(record.id, id)
+
+  // Two requests can each see the other way in still there: when none is left, the passkey goes back.
+  if (!await hasWayIn(core, record.id)) {
+    await core.store.passkeys.create(passkey)
+
+    return { ok: false, error: 'last-way-in' }
+  }
+
   await endOtherSessions(state, record)
   await notify(state, record, 'passkey-removed', passkey.name)
 
