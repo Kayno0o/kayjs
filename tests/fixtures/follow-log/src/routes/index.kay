@@ -10,6 +10,6 @@ head
   title Log
 button.append(type="button" onClick={() => lines.set([...lines(), lines()[lines().length - 1]! + 1])}) append
 button.prepend(type="button" onClick={() => lines.set([lines()[0]! - 1, ...lines()])}) prepend
-ol.list(ref={element => list = element} style="height: 200px; overflow-y: auto; margin: 0; padding: 0; list-style: none")
+ol.list(ref={element => list = element} style="height: 200px; overflow-y: auto; margin: 0; padding: 0; list-style: none; overflow-anchor: none")
   for line of lines()
     li(style="min-height: 20px") {line}

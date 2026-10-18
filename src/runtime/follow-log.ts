@@ -27,37 +27,65 @@ export function followLog(container: Element | (() => Element | null | undefined
 
     const threshold = options.threshold ?? DEFAULT_THRESHOLD
     let following = true
+    let height = 0
     let anchor: Anchor | undefined
 
-    const toBottom = (): void => {
-      element.scrollTop = element.scrollHeight
-    }
+    // Instant, so a container with `scroll-behavior: smooth` is not measured halfway.
+    const scrollTo = (top: number): void => element.scrollTo({ top, behavior: 'instant' })
 
     const items = (): Element[] => options.items === undefined ? [...element.children] : [...element.querySelectorAll(options.items)]
 
+    const away = (): number => height - element.scrollTop - element.clientHeight
+
     const measure = (): void => {
+      height = element.scrollHeight
+      following = away() <= threshold
+      anchor = undefined
+
+      if (following)
+        return
+
       const top = element.getBoundingClientRect().top
       const item = items().find(each => each.getBoundingClientRect().bottom > top)
 
-      following = element.scrollHeight - element.scrollTop - element.clientHeight < threshold
       anchor = item && { item, offset: item.getBoundingClientRect().top - top }
     }
 
     const settle = (): void => {
-      if (following) {
-        toBottom()
+      // A scroll event comes a frame after the reader's wheel, so what the reader did since the last measure is read from the scroll position against the height measured then.
+      const wasFollowing = following && away() <= threshold
+
+      if (wasFollowing) {
+        scrollTo(element.scrollHeight)
       }
       else if (anchor?.item.isConnected) {
-        element.scrollTop += anchor.item.getBoundingClientRect().top - element.getBoundingClientRect().top - anchor.offset
+        scrollTo(element.scrollTop + anchor.item.getBoundingClientRect().top - element.getBoundingClientRect().top - anchor.offset)
       }
 
       measure()
     }
 
-    const changes = new MutationObserver(settle)
     const resizes = new ResizeObserver(settle)
 
-    toBottom()
+    // A line growing without a change to the DOM, as an image or a font loading does, resizes its item.
+    const watch = (node: Node): void => {
+      if (node instanceof Element && (options.items === undefined ? node.parentElement === element : node.matches(options.items)))
+        resizes.observe(node)
+    }
+
+    const changes = new MutationObserver((records) => {
+      for (const record of records) {
+        for (const node of record.addedNodes)
+          watch(node)
+      }
+
+      settle()
+    })
+
+    for (const item of items())
+      watch(item)
+
+    scrollTo(element.scrollHeight)
     measure()
     element.addEventListener('scroll', measure, { passive: true })
     changes.observe(element, { childList: true, subtree: true, characterData: true })

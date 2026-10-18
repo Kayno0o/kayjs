@@ -125,7 +125,7 @@ const dispose = mount(Panel, document.querySelector('#panel')!, { title: 'Ticket
 
 ### Follow a log
 
-`followLog` from `kay` keeps a scrolling list at its bottom while the reader is there, and the first item showing in place when items load above:
+`followLog` from `kay` keeps a scrolling list at its bottom while the reader is there, and the first item showing in place when items load above. The options are `threshold` (pixels from the bottom that still count as there, 32) and `items` (a selector for the items, the container's direct children by default):
 
 ```kay
 ---
