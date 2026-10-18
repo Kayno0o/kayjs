@@ -2,6 +2,10 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
+## Unreleased
+
+- The `Chat` island opens the links of a reply in a new tab, so following a source no longer swaps the page and drops the conversation ([Chat island](../packages/ai/llms/chat.md)).
+
 ## 1.53.2
 
 - A command refused for an option or argument it does not take prints its own usage line alone, `kay build: unknown option --no-chek, did you mean --no-check?` without `parseArgs`'s hint, and `kay build --no-cache` builds without reading what earlier builds left in `.kay/cache` ([Build and start](build-and-start.md)).

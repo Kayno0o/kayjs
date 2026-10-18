@@ -26,6 +26,9 @@ export const readDocsPage = action(
 
     const { text, parts } = partOfPage(found.text, part)
 
+    if (part !== undefined && part > parts)
+      return ctx.fail(404, `${found.href} has ${parts === 1 ? 'only 1 part' : `only ${parts} parts`}, so there is no part ${part}; ask for a part from 1 to ${parts}`)
+
     return { path: found.href, title: found.title, part: part ?? 1, parts, text }
   },
   { tool: { name: 'read_page', description: 'Reads one documentation page in full, given its path such as /essentials/islands or /llms/actions. A long page comes in parts: the result says how many there are, and part picks the next one' }, rateLimit: TOOL_LIMIT },

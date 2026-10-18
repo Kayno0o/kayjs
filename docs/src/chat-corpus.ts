@@ -174,22 +174,41 @@ export async function searchPages(query: string): Promise<Hit[]> {
   return scored.sort((a, b) => b.score - a.score).slice(0, MAX_HITS).map(one => one.hit)
 }
 
-// What one tool result holds, under the 20,000 characters the loop keeps of a result once escaped.
-const PART_SIZE = 14_000
+// What one part holds once escaped as JSON, which is how the loop reads a result, leaving room under the 20,000 characters it keeps for the path, title and counts beside the text.
+const PART_SIZE = 18_000
 
-// The part `part` of a page's text (1 for the first) cut at line ends, and how many parts the page has.
+// How long the text is inside a JSON string, quotes and line breaks escaped.
+const escapedLength = (text: string) => JSON.stringify(text).length - 2
+
+// The start of a line that fits a part once escaped, cut as the loop would a longer one.
+function fitted(line: string): string {
+  let cut = line.slice(0, PART_SIZE)
+
+  while (escapedLength(cut) > PART_SIZE)
+    cut = cut.slice(0, Math.floor(cut.length * PART_SIZE / escapedLength(cut)) - 1)
+
+  return cut
+}
+
+// The part `part` of a page's text (1 for the first) cut at line ends, and how many parts the page has; the text is empty for a part the page does not have.
 export function partOfPage(text: string, part = 1): { text: string, parts: number } {
   const parts: string[] = []
   let current = ''
+  let size = 0
 
   for (const line of text.split('\n')) {
-    if (current !== '' && current.length + line.length >= PART_SIZE) {
+    const kept = fitted(line)
+    // The line break after it escapes to two characters.
+    const length = escapedLength(kept) + 2
+
+    if (current !== '' && size + length > PART_SIZE) {
       parts.push(current)
       current = ''
+      size = 0
     }
 
-    // A line longer than a part is cut, as the loop would.
-    current += `${line.slice(0, PART_SIZE)}\n`
+    current += `${kept}\n`
+    size += length
   }
 
   parts.push(current)

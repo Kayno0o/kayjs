@@ -11,7 +11,7 @@ The chat starts from `llms.txt`, the short guide to kay written for coding agent
 
 ## Answers can be wrong
 
-A language model writes the answers. It can misread a page, mix two of them up or miss a detail. Each answer ends with the pages it rests on: open them to check anything you are about to build on. When the docs do not cover your question, it says so and points to the closest page.
+A language model writes the answers. It can misread a page, mix two of them up or miss a detail. Each answer ends with the pages it rests on: open them to check anything you are about to build on. They open in a new tab, so the conversation stays where it is. When the docs do not cover your question, it says so and points to the closest page.
 
 ## What is kept
 

@@ -102,6 +102,7 @@ A page, with or without a `server` fence, hands the action straight to `Chat`. T
 - A screen reader hears each finished turn once, not word by word.
 - A table wider than its bubble scrolls sideways inside it, and the keyboard can scroll it.
 - A message the action's schema refuses (422) goes back to the field, also when it was a retry, and the refusal's message shows.
+- A link in a reply opens in a new tab, so following it never loses the conversation.
 - Images in a reply are not shown. A model that read a hostile page could point an image at a link carrying your visitor's conversation.
 
 Every label is a prop, so you can write them in your language: `placeholder`, `sendLabel`, `stopLabel`, `retryLabel`, `thinkingLabel`, `stoppedLabel`, `tableLabel` (a reply with several tables numbers them) and `errorMessage`. The action may also `ctx.fail`. A refusal from the action, such as a rate limit's message, shows instead of `errorMessage`. `initial` gives messages to start with.

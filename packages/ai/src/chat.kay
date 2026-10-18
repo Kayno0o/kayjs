@@ -12,6 +12,7 @@ const REPLY: SanitizeOptions = { tags: ['table', 'thead', 'tbody', 'tr', 'th', '
 // How close to the end of the log the visitor must be for new text to keep it scrolled down.
 const PINNED_PX = 48
 const ATTRIBUTE_UNSAFE = /[&"<]/g
+const SANITIZED_LINK = /<a href="[^"]*" rel="nofollow ugc">/g
 const ENTITIES: Record<string, string> = { '&': '&amp;', '"': '&quot;', '<': '&lt;' }
 
 const attribute = (text: string) => text.replace(ATTRIBUTE_UNSAFE, char => ENTITIES[char]!)
@@ -108,13 +109,18 @@ function show(value: string | Progress) {
   announce(value.calls)
 }
 
+// A link of a reply opens in a new tab, as the conversation lives in this page and a page swap would drop it.
+function linksOpenApart(html: string): string {
+  return html.replaceAll(SANITIZED_LINK, tag => tag.replace('rel="nofollow ugc"', 'target="_blank" rel="nofollow ugc noopener"'))
+}
+
 // A table is wrapped, once sanitized, in a box that scrolls sideways and takes the keyboard's focus, except in the turn being written, which is hidden from screen readers. Several tables of one reply are numbered, so no two groups share a name.
 function markdown(text: string, scrollable = true) {
-  const html = sanitizeHtml(markdownHtml(text), REPLY)
+  const html = linksOpenApart(sanitizeHtml(markdownHtml(text), REPLY))
   const tables = html.split('<table>').length - 1
 
   if (tables === 0)
-    return html
+    return trustHtml(html)
 
   let count = 0
 

@@ -35,6 +35,9 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
     // No image goes into the page, since its URL could carry the conversation out.
     expect(await page.count('.kai-chat-text img')).toBe(0)
     expect(await page.count('.kai-chat-text a')).toBe(1)
+    // A link opens in a new tab, so following it does not swap the page and drop the conversation.
+    expect(await page.evaluate(() => document.querySelector('.kai-chat-text a')?.getAttribute('target'))).toBe('_blank')
+    expect(await page.evaluate(() => document.querySelector('.kai-chat-text a')?.getAttribute('rel'))).toBe('nofollow ugc noopener')
     expect(await page.value('textarea')).toBe('')
 
     fakeAi.reply('Second answer')

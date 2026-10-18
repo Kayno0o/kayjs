@@ -1,7 +1,9 @@
 import type { Action } from 'kay'
 import type { ToolAction } from '../packages/ai/src'
 import { join } from 'node:path'
+import process from 'node:process'
 import { afterAll, afterEach, describe, expect, it } from 'bun:test'
+import { memoryRates } from 'kay/server'
 import { testSite } from 'kay/test'
 import { chatPages, partOfPage, readPage, searchPages, systemPrompt } from '../docs/src/chat-corpus'
 import { fakeAi } from '../packages/ai/src'
@@ -89,7 +91,48 @@ describe('the tools', () => {
 
     expect(joined.trimEnd()).toBe(page.text.trimEnd())
     expect(partOfPage('a\nb', 2)).toEqual({ text: '', parts: 1 })
-    expect(partOfPage('x'.repeat(50_000)).text.length).toBeLessThan(14_100)
+    expect(partOfPage('x'.repeat(50_000)).text.length).toBeLessThan(18_100)
+  })
+
+  it('keep every part of every page under the loop\'s clip once escaped, however many quotes and line breaks the text has', async () => {
+    const whole = [...(await chatPages()).map(page => page.text), Array.from({ length: 4000 }).fill('"a" \\ \t').join('\n'), `"${'\n'.repeat(30_000)}"`]
+    // A single line past a part is cut, so these keep only the start of their line.
+    const cut = ['\\'.repeat(60_000), '"'.repeat(20_000)]
+
+    for (const text of [...whole, ...cut]) {
+      const { parts } = partOfPage(text)
+      let joined = ''
+
+      for (let part = 1; part <= parts; part++) {
+        const read = partOfPage(text, part)
+
+        expect(JSON.stringify({ path: '/llms/actions', title: 'Actions', part, parts, text: read.text }).length).toBeLessThan(20_000)
+        joined += read.text
+      }
+
+      expect(parts).toBeLessThanOrEqual(50)
+
+      if (whole.includes(text))
+        expect(joined).toBe(`${text}\n`)
+    }
+  })
+
+  it('answer a part past the last with an error that says how many parts the page has', async () => {
+    const { parts } = await site.call(readDocsPage, { path: '/llms/actions' })
+
+    await expect(site.call(readDocsPage, { path: '/llms/actions', part: parts + 1 })).rejects.toMatchObject({ status: 404 })
+    await expect(site.call(readDocsPage, { path: '/essentials/islands', part: 2 })).rejects.toMatchObject({ status: 404 })
+    expect((await site.call(readDocsPage, { path: '/llms/actions', part: parts })).text).not.toBe('')
+
+    fakeAi.reply({ calls: [{ name: 'read_page', input: { path: '/essentials/islands', part: 9 } }] })
+    fakeAi.reply('Done')
+    await site.call(reply, question('read the ninth part of the islands page'))
+
+    const [result] = fakeAi.asked[1]!.messages.at(-1)!.results!
+
+    expect(result!.failed).toBe(true)
+    expect(result!.content).toContain('only 1 part')
+    expect(result!.content).toContain('no part 9')
   })
 
   it('refuse a path that is no page and a query too long', async () => {
@@ -142,5 +185,105 @@ describe('the chat action', () => {
     await expect(asks('203.0.113.1')).rejects.toMatchObject({ status: 429 })
     await asks('203.0.113.2')
     expect(fakeAi.asked).toHaveLength(5)
+  })
+})
+
+// The settings docs/kay.config.ts gives `ai()`, read where the library keeps them.
+interface Counted {
+  settings: { budget?: { tokens: number, total: number | undefined, ms: number, store: ReturnType<typeof memoryRates> }, limit?: { max: number, ms: number } }
+}
+
+const counted = () => (globalThis as Record<symbol, Counted | undefined>)[Symbol.for('kayjs-ai.limits')]!.settings
+const TOKENS = 250_000
+const TOTAL = 4_000_000
+const DAY = 86_400_000
+
+describe('the caps set in docs/kay.config.ts', () => {
+  const asks = async (address: string) => site.call(reply, question('hi'), { headers: { 'x-forwarded-for': address } })
+
+  // Starts every test from empty counts, and puts the store back after it.
+  const fresh = async (run: (store: ReturnType<typeof memoryRates>) => Promise<void>) => {
+    const { budget } = counted()
+    const kept = budget!.store
+    const store = memoryRates()
+
+    budget!.store = store
+
+    try {
+      await run(store)
+    }
+    finally {
+      budget!.store = kept
+    }
+  }
+
+  it('holds the numbers the comment above them promises', () => {
+    const { budget, limit } = counted()
+
+    expect(budget).toMatchObject({ tokens: TOKENS, total: TOTAL, ms: DAY })
+    expect(limit).toMatchObject({ max: 4, ms: 60_000 })
+  })
+
+  it('refuses a visitor who used the daily tokens and lets another visitor ask', async () => {
+    await fresh(async (store) => {
+      await store.hit('ai:budget\naddress:203.0.113.20', DAY, TOKENS)
+
+      await expect(asks('203.0.113.20')).rejects.toMatchObject({ status: 429 })
+      expect(fakeAi.asked).toEqual([])
+      await asks('203.0.113.21')
+      expect(fakeAi.asked).toHaveLength(1)
+    })
+  })
+
+  it('lets a visitor ask until the tokens used reach the budget, the answer that crosses it finishing', async () => {
+    await fresh(async (store) => {
+      await store.hit('ai:budget\naddress:203.0.113.22', DAY, TOKENS - 1)
+      await asks('203.0.113.22')
+      expect(fakeAi.asked).toHaveLength(1)
+      await expect(asks('203.0.113.22')).rejects.toMatchObject({ status: 429 })
+      expect(fakeAi.asked).toHaveLength(1)
+    })
+  })
+
+  it('counts what an answer used against the visitor and against the total', async () => {
+    await fresh(async (store) => {
+      await asks('203.0.113.24')
+
+      const visitor = await store.peek('ai:budget\naddress:203.0.113.24')
+      const total = await store.peek('ai:budget\ntotal')
+
+      expect(visitor?.count).toBeGreaterThan(1000)
+      expect(total?.count).toBe(visitor!.count)
+    })
+  })
+
+  it('refuses every visitor once the day\'s total is used, whoever they are', async () => {
+    await fresh(async (store) => {
+      await store.hit('ai:budget\ntotal', DAY, TOTAL)
+
+      await expect(asks('203.0.113.25')).rejects.toMatchObject({ status: 429 })
+      await expect(asks('203.0.113.26')).rejects.toMatchObject({ status: 429 })
+      expect(fakeAi.asked).toEqual([])
+    })
+  })
+})
+
+describe('when the chat has no key', () => {
+  it('says it is not available, with a status under 500, and never reaches a model', async () => {
+    const env = { ...process.env }
+
+    process.env.NODE_ENV = 'production'
+
+    for (const name of ['ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'AI_BASE_URL', 'AI_MODEL', 'AI_PROVIDER'])
+      delete process.env[name]
+
+    try {
+      await expect(site.call(reply, question('How do I make an island?'))).rejects.toMatchObject({ status: 400, message: expect.stringContaining('not available') })
+    }
+    finally {
+      Object.assign(process.env, env)
+    }
+
+    expect(fakeAi.asked).toEqual([])
   })
 })
