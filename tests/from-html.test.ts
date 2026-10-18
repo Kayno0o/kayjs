@@ -170,6 +170,15 @@ describe('kay fmt --from-html', () => {
     expect(htmlToKay('<script>const a = 1</script>').notes).toEqual([])
   })
 
+  it('comments out a web component\'s slot, which kay\'s own slot cannot write, and keeps kay\'s in Astro', () => {
+    const { code, notes } = htmlToKay('<my-card><slot name="a"></slot></my-card>')
+
+    expect(code).toBe('my-card\n  // kay migrate: a web component\'s `<slot>`: kay\'s `slot` renders a wrapper\'s children, so it cannot write the element\n    <slot name="a"></slot>\n')
+    expect(notes).toHaveLength(1)
+    expect(formatKay(code).diagnostics).toEqual([])
+    expect(migrateAstro('<slot />\n', { role: 'component', rewriteImport: () => undefined }).code).toBe('slot\n')
+  })
+
   it('moves a document\'s head and body children into a head block and the template, noting its lang', () => {
     const { code, notes } = htmlToKay('<!doctype html>\n<html lang="fr">\n<head><meta charset="utf-8"><title>Hi</title></head>\n<body class="x"><main>Body</main></body>\n</html>')
 
@@ -201,6 +210,40 @@ describe('kay fmt --from-html', () => {
 
     expect(astro.code).toBe('.a.b\n  p Hi #[b there] {1 + 1}\n')
     expect(htmlToKay('<div class="a b"><p>Hi <b>there</b></p></div>').code).toBe('.a.b\n  p Hi #[b there]\n')
+  })
+})
+
+// Whitespace is what a browser renders, so the rendered text is compared with its spaces, which canonical() drops between elements.
+function spaced(html: string): string {
+  const { document } = new Window()
+
+  document.body.innerHTML = html
+
+  return document.body.textContent.replace(SPACE, ' ').trim()
+}
+
+describe('whitespace between inline siblings', () => {
+  const CASES = ['<p><b>a</b>\n<i>b</i></p>', '<p>\n<a href="/">a</a>\n<a href="/b">b</a>\n</p>', '<div><button>a</button>\n<button>b</button></div>']
+
+  it.each(CASES)('renders %j as the browser does', async (html) => {
+    const { code } = htmlToKay(html)
+
+    expect(formatKay(code)).toEqual({ code, diagnostics: [] })
+    expect(spaced(await render(code))).toBe(spaced(html))
+    expect(canonical(await render(code))).toBe(canonical(html))
+  })
+
+  it('adds none beside a block or a br, which render apart', async () => {
+    for (const html of ['<p><b>a</b>\n<br>\n<i>b</i></p>', '<div><div>a</div>\n<span>b</span></div>', '<ul>\n<li>a</li>\n<li>b</li>\n</ul>'])
+      expect(canonical(await render(htmlToKay(html).code))).toBe(canonical(html))
+  })
+
+  it('keeps the space on one line and in Astro, and none beside a block or a br', () => {
+    expect(htmlToKay('<p><b>a</b>\n<i>b</i></p>').code).toBe('p #[b a] #[i b]\n')
+    expect(migrateAstro('<p><b>a</b>\n<i>b</i></p>\n', { role: 'component', rewriteImport: () => undefined }).code).toBe('p #[b a] #[i b]\n')
+    expect(htmlToKay('<div><button>a</button>\n<button>b</button></div>').code).toBe('div\n  button a\n  | {\' \'}\n  button b\n')
+    expect(htmlToKay('<div><div>a</div>\n<span>b</span></div>').code).toBe('div\n  div a\n  span b\n')
+    expect(htmlToKay('<p><b>a</b>\n<br>\n<i>b</i></p>').code).toBe('p\n  b a\n  br\n  i b\n')
   })
 })
 

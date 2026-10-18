@@ -34,6 +34,8 @@ const ATTRIBUTE_PART = /\s([\w:-]+)(?:=("[^"]*"|'[^']*'))?/g
 const BLOCK_TAGS = new Set(['address', 'article', 'aside', 'blockquote', 'details', 'dd', 'div', 'dl', 'dt', 'fieldset', 'figure', 'footer', 'form', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'header', 'hr', 'li', 'main', 'nav', 'ol', 'p', 'pre', 'section', 'summary', 'table', 'tbody', 'td', 'tfoot', 'th', 'thead', 'tr', 'ul'])
 // Elements that read as part of a line of text, rendered inline as `#[strong text]`.
 const INLINE = new Set(['a', 'abbr', 'b', 'br', 'code', 'em', 'i', 'kbd', 'mark', 's', 'small', 'span', 'strong', 'sub', 'sup', 'time', 'u'])
+// Elements whose line break beside another renders as a space: `br` is left out, a break there collapses.
+const FLOW_TAGS = new Set([...INLINE].filter(tag => tag !== 'br').concat(['audio', 'bdi', 'bdo', 'button', 'canvas', 'cite', 'data', 'del', 'dfn', 'iframe', 'img', 'input', 'ins', 'label', 'picture', 'q', 'samp', 'select', 'svg', 'textarea', 'var', 'video']))
 const HYDRATE: Record<string, string | undefined> = { 'client:load': undefined, 'client:idle': 'idle', 'client:visible': 'visible' }
 // Attributes Astro reads and kay has no use for: the page swap is kay's own, and an inline script is the only kind.
 const DROPPED = new Set(['is:inline', 'is:raw', 'transition:animate', 'transition:name', 'transition:persist', 'transition:persist-props'])
@@ -63,7 +65,9 @@ export interface MarkupHost {
   note: (line: number, message: string) => void
   lang: (line: number, value: string) => void
   expression: (node: t.Node, code: string) => string
-  // Set for HTML, which it makes safe to read as JSX; its `slot` and `key` attributes, scripts and styles then stay as written.
+  // HTML keeps its `slot` and `key` attributes, scripts and styles as written, and a `<slot>` is a web component's, not kay's.
+  mode: 'astro' | 'html'
+  // Makes HTML safe to read as JSX.
   prepare?: ((markup: string) => string) | undefined
 }
 
@@ -105,7 +109,7 @@ class Translator {
   }
 
   private get html(): boolean {
-    return this.host.prepare !== undefined
+    return this.host.mode === 'html'
   }
 
   private text(node: t.Node): string {
@@ -177,9 +181,18 @@ class Translator {
     return `${lines.join('\n')}\n`
   }
 
-  // Children dropping the whitespace between lines, which JSX would too, and keeping a space between values on one line.
+  // Children dropping the whitespace between lines, which JSX would too, except between two inline siblings, where HTML renders a space.
   private meaningful(children: Child[]): Child[] {
-    return children.filter(child => !(child.type === 'JSXText' && trimSpace(child.value) === '' && child.value.includes('\n')) && !(child.type === 'JSXExpressionContainer' && child.expression.type === 'JSXEmptyExpression' && !this.hasComment(child)))
+    const kept = children.filter(child => !(child.type === 'JSXExpressionContainer' && child.expression.type === 'JSXEmptyExpression' && !this.hasComment(child)))
+
+    return kept.filter((child, index) => !(child.type === 'JSXText' && trimSpace(child.value) === '' && child.value.includes('\n')) || (index > 0 && index < kept.length - 1 && this.isFlow(kept[index - 1]!) && this.isFlow(kept[index + 1]!)))
+  }
+
+  private isFlow(child: Child): boolean {
+    if (child.type === 'JSXElement')
+      return FLOW_TAGS.has(this.tagName(child))
+
+    return child.type === 'JSXExpressionContainer' && child.expression.type !== 'JSXEmptyExpression' && !containsJsx(child.expression)
   }
 
   private hasComment(container: t.JSXExpressionContainer): boolean {
@@ -211,7 +224,7 @@ class Translator {
     const space = (edge: string, other: Child | undefined) => edge !== '' && other !== undefined && !this.isBlock(other) && (this.html || !edge.includes('\n')) ? '{\' \'}' : ''
 
     if (body === '')
-      return before !== undefined && after !== undefined && !value.includes('\n') && space(value, before) !== '' && space(value, after) !== '' ? ['| {\' \'}'] : []
+      return before !== undefined && after !== undefined && (value.includes('\n') || (space(value, before) !== '' && space(value, after) !== '')) ? ['| {\' \'}'] : []
 
     return [`| ${space(LEADING_SPACE.exec(value)![0], before)}${body}${space(TRAILING_SPACE.exec(value)![0], after)}`]
   }
@@ -313,8 +326,11 @@ class Translator {
     if (name === 'Fragment')
       return this.fragment(element)
 
-    if (name === 'slot' && !this.html)
-      return this.slot(element)
+    if (name === 'slot') {
+      return this.html
+        ? this.untranslated(element, 'a web component\'s `<slot>`: kay\'s `slot` renders a wrapper\'s children, so it cannot write the element')
+        : this.slot(element)
+    }
 
     if (this.html && (name === 'pre' || name === 'textarea') && element.children.some(inner => inner.type === 'JSXText' && PRESERVED_SPACE.test(inner.value)))
       this.note(this.line(element), `${name} keeps its whitespace in HTML: the template collapses it to single spaces, so write its text with \`\\n\` by hand`)

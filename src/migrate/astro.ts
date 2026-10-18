@@ -76,7 +76,7 @@ function migrateTemplate(markup: string, options: MigrateOptions, imports: Impor
   const expression = (node: t.Node, code: string) => applyEdits(code, astroEdits(node, code, node.start!, options.role, 'template', note))
 
   try {
-    return translateMarkup(markup, { note, lang, expression }, imports)
+    return translateMarkup(markup, { mode: 'astro', note, lang, expression }, imports)
   }
   catch (error) {
     if (!(error instanceof MarkupError))

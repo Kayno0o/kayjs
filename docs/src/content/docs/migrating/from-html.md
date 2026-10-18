@@ -26,6 +26,7 @@ It shares its translation with [`kay migrate astro`](/migrating/from-astro), so 
 - Tag names, `.class` and `#id` as kay's shorthand, so `<div class="flex gap-2" id="top">` becomes `#top.flex.gap-2`.
 - Classes the shorthand cannot hold, such as `py-0.5` or `md:w-[200px]`, stay in a `class="..."` attribute.
 - Attributes in parentheses, text on the element's line, and inline elements such as `<strong>` and `<a>` inside the text as `#[strong text]`.
+- The space a browser shows between two inline elements on separate lines, such as two links, kept as a space.
 - `<script>` and `<style>` with their content kept as it was.
 - An HTML comment as a `//` comment. Those are template comments, so they are not in the rendered page.
 - The children of a document's `<head>` in a `head` block, and the children of `<body>` as the template.
@@ -39,5 +40,6 @@ The conversion lists what it left out, one line each. Look at these.
 - An attribute that kay cannot name, such as Alpine's `@click` or Vue's `:class`. Write it as an event or a binding in an island.
 - `lang` on `<html>`, which belongs in `kay.config.ts`, and the attributes of `<body>`, which kay writes itself.
 - A tag HTML lets you leave open, such as `<li>` or `<p>` without its end tag. Close it first, as the conversion fails on it.
+- A web component's `<slot>`, which kay cannot write as an element, as a comment with a note.
 - Whitespace inside `<pre>` and `<textarea>`, which the template collapses; the conversion notes each one.
 - Anything dynamic. The result is static markup: turn repeated items into a `for`, and values into props.
