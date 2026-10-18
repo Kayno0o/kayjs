@@ -118,7 +118,7 @@ export const page = { prerender: true }
 ---
 ```
 
-You often need no flag. `kay build` also keeps a page that reads nothing from its request or the clock, and serves it from memory.
+You often need no flag. `kay build` also keeps a page that reads nothing from its request or the clock, and serves it from memory. Importing an icon from `~icons/` does not stop it, as the icon is plain markup that reads nothing.
 
 `kay build` shows what it decided. Its route table says `prerendered`, `kept` or `on request` for each route. Under an `on request` page it names the file and line that stopped it, such as `src/routes/clock.kay:2 reads Date`.
 

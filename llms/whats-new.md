@@ -9,6 +9,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `analytics({ provider: 'ga4', measurementId, apiSecret })` sends Google Analytics 4 page views from the server through its Measurement Protocol, with a visitor id made on the server and no cookie ([Privacy](privacy.md#count-visits-through-your-own-origin)).
 - `consent` from `kay/analytics` reads and sets the visitor's analytics answer from an island or a server render, and `consent: { notice: false }` leaves the asking to the app's own banner ([Privacy](privacy.md#ask-for-analytics-consent-in-your-own-ui)).
 - A `live: true` cached key refreshes its pages even when the replicas sharing a `CacheStore` run on machines whose clocks differ by a few seconds, once they have heard each other (half a second with `sqliteCache`), the store's `publish` relaying a clock reading ([cache stores](rendering.md#caching)).
+- A page importing an `~icons/<set>/<name>` icon, or whose layouts, components or modules do, is prerendered like one importing an image, instead of being rendered per request ([Prerendering](prerendering.md#prerendering)).
 
 ## 1.53.0
 

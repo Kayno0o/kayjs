@@ -1,5 +1,6 @@
 import { relative } from 'node:path'
 import { resolveFrom } from '../build/files'
+import { ICON_IMPORT } from '../build/icons'
 import { PAGE, PAGE_SETTINGS } from '../compiler/page-settings'
 import { parseKay } from '../compiler/parser'
 import { analyzeServer } from '../compiler/script'
@@ -649,6 +650,10 @@ async function scanned(file: string): Promise<Scan> {
 
       continue
     }
+
+    // An icon of an installed set is a static SVG kay generates, which reads nothing from a request.
+    if (ICON_IMPORT.test(specifier))
+      continue
 
     if (!specifier.startsWith('.'))
       return stop(`imports the package \`${specifier}\``)

@@ -648,6 +648,44 @@ describe('what stops a page from being kept', () => {
     expect(await at('src/routes/fine.kay')).toBeUndefined()
   })
 
+  it('keeps a page importing an ~icons icon, from the page, a component, a layout or a module, and stops at what only looks like one', async () => {
+    const icon = '~icons/tabler/arrow-left'
+
+    const root = await project({
+      'src/routes/direct.kay': `---\nimport ArrowLeft from '${icon}'\n---\nArrowLeft\n`,
+      'src/routes/reexport.kay': '---\nimport { arrow } from \'../arrow\'\n---\narrow\n',
+      'src/arrow.ts': `export { default as arrow } from '${icon}'\n`,
+      'src/routes/through-component.kay': '---\nimport Back from \'../back.kay\'\n---\nBack\n',
+      'src/back.kay': `---\nimport ArrowLeft from '${icon}'\n---\nArrowLeft\n`,
+      'src/routes/layout/_layout.kay': `---\nimport ArrowLeft from '${icon}'\n---\nArrowLeft\nslot\n`,
+      'src/routes/layout/index.kay': 'p Page\n',
+      'src/routes/impure-beside.kay': `---\nimport ArrowLeft from '${icon}'\nimport { format } from 'dayjs'\n---\nArrowLeft\n`,
+      'src/routes/impure-in-component.kay': '---\nimport Back from \'../impure-back.kay\'\n---\nBack\n',
+      'src/impure-back.kay': `---\nimport ArrowLeft from '${icon}'\n---\np {new Date().toISOString()}\n`,
+      'src/routes/deep.kay': '---\nimport Arrow from \'~icons/tabler/arrow/left\'\n---\nArrow\n',
+      'src/routes/set-only.kay': '---\nimport Arrow from \'~icons/tabler\'\n---\nArrow\n',
+      'src/routes/upper.kay': '---\nimport Arrow from \'~icons/Tabler/arrow-left\'\n---\nArrow\n',
+      'src/routes/query.kay': `---\nimport Arrow from '${icon}?raw'\n---\nArrow\n`,
+      'src/routes/extension.kay': `---\nimport Arrow from '${icon}.ts'\n---\nArrow\n`,
+      'src/routes/prefix.kay': '---\nimport Arrow from \'~iconsx/tabler/arrow-left\'\n---\nArrow\n',
+      'src/routes/alike.kay': '---\nimport Arrow from \'icons/tabler/arrow-left\'\n---\nArrow\n',
+    })
+
+    roots.push(root)
+
+    const route = (file: string, ...layouts: string[]) => ({ file: join(root, file), layouts: layouts.map(layout => join(root, layout)) })
+
+    expect(await keptStop(route('src/routes/direct.kay'))).toBeUndefined()
+    expect(await keptStop(route('src/routes/reexport.kay'))).toBeUndefined()
+    expect(await keptStop(route('src/routes/through-component.kay'))).toBeUndefined()
+    expect(await keptStop(route('src/routes/layout/index.kay', 'src/routes/layout/_layout.kay'))).toBeUndefined()
+    expect(await keptStop(route('src/routes/impure-beside.kay'))).toMatchObject({ line: 3, why: 'imports the package `dayjs`' })
+    expect(await keptStop(route('src/routes/impure-in-component.kay'))).toMatchObject({ file: join(root, 'src/impure-back.kay'), why: 'reads `Date`' })
+
+    for (const [file, specifier] of [['deep', '~icons/tabler/arrow/left'], ['set-only', '~icons/tabler'], ['upper', '~icons/Tabler/arrow-left'], ['query', `${icon}?raw`], ['extension', `${icon}.ts`], ['prefix', '~iconsx/tabler/arrow-left'], ['alike', 'icons/tabler/arrow-left']] as const)
+      expect(await keptStop(route(`src/routes/${file}.kay`))).toMatchObject({ line: 2, why: `imports the package \`${specifier}\`` })
+  })
+
   it('shows each route kept or on request in the build report, with what stopped it', async () => {
     const root = await project({
       'src/routes/index.kay': 'p Home\n',
