@@ -1,0 +1,10 @@
+---
+import Counter from '../components/counter.kay'
+---
+main
+  h1 Flagged more
+  a(href="/flagged") Back
+  img(src="/mark.png" alt="")
+  img(src="/mark.png?b" alt="")
+  img(src="/mark.png?c" alt="")
+  Counter

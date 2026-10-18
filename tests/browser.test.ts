@@ -302,7 +302,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay/test i
 
 // The problems the panel lists, but the accessibility check's.
 async function logged(shown: TestPage): Promise<string[]> {
-  return shown.evaluate(() => [...document.querySelector('kay-dev')?.shadowRoot!.querySelectorAll('.problem pre') ?? []].map(pre => pre.textContent).filter(problem => !problem.startsWith('a11y ')))
+  return shown.evaluate(() => [...document.querySelector('kay-dev')?.shadowRoot!.querySelectorAll('#kay-dev-problems .problem pre') ?? []].map(pre => pre.textContent).filter(problem => !problem.startsWith('a11y ')))
 }
 
 describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('history after a reload', () => {
@@ -393,7 +393,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay dev in
     const shown = await dev.open('/mismatch', { strict: false })
 
     // The accessibility check lists its own problems once the page settles.
-    await shown.waitUntil(() => [...document.querySelector('kay-dev')?.shadowRoot!.querySelectorAll('.problem pre') ?? []].some(pre => pre.textContent.startsWith('a11y ')))
+    await shown.waitUntil(() => [...document.querySelector('kay-dev')?.shadowRoot!.querySelectorAll('#kay-dev-problems .problem pre') ?? []].some(pre => pre.textContent.startsWith('a11y ')))
 
     expect(await logged(shown)).toEqual([expect.stringMatching(/^island tests\/fixtures\/navigation\/src\/components\/mismatch\.kay did not match its server markup, rendering it again: /)])
     expect(shown.errors).toHaveLength(1)
@@ -411,12 +411,12 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay dev in
     // Dismissed, they stay so for the browser tab, a new one showing.
     await shown.evaluate(() => [...document.querySelector('kay-dev')!.shadowRoot!.querySelectorAll<HTMLButtonElement>('button.tool')].find(button => button.textContent === 'Dismiss all')!.click())
 
-    expect(await shown.evaluate(() => document.querySelector('kay-dev')!.shadowRoot!.querySelectorAll('.problem pre').length)).toBe(0)
+    expect(await shown.evaluate(() => document.querySelector('kay-dev')!.shadowRoot!.querySelectorAll('#kay-dev-problems .problem pre').length)).toBe(0)
 
     await shown.evaluate(() => console.error('[kay] no locale has the message "late"'))
-    await shown.waitUntil(() => document.querySelector('kay-dev')!.shadowRoot!.querySelector('.problem pre') !== null)
+    await shown.waitUntil(() => document.querySelector('kay-dev')!.shadowRoot!.querySelector('#kay-dev-problems .problem pre') !== null)
 
-    expect(await shown.evaluate(() => [...document.querySelector('kay-dev')!.shadowRoot!.querySelectorAll('.problem pre')].map(problem => problem.textContent))).toEqual(['no locale has the message "late"'])
+    expect(await shown.evaluate(() => [...document.querySelector('kay-dev')!.shadowRoot!.querySelectorAll('#kay-dev-problems .problem pre')].map(problem => problem.textContent))).toEqual(['no locale has the message "late"'])
     expect(await shown.evaluate(() => [...document.querySelector('kay-dev')!.shadowRoot!.querySelectorAll('.bar > button:not([hidden])')].map(button => button.textContent))).toEqual(['kay', '1 problem'])
 
     await shown.click('a.home')
@@ -446,7 +446,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay dev in
       document.body.append(image)
       void Promise.reject(new Error('rejected later'))
     })
-    await shown.waitUntil(() => document.querySelector('kay-dev')!.shadowRoot!.querySelectorAll('.problem pre').length >= 3)
+    await shown.waitUntil(() => document.querySelector('kay-dev')!.shadowRoot!.querySelectorAll('#kay-dev-problems .problem pre').length >= 3)
 
     expect(await logged(shown)).toEqual([
       expect.stringMatching(/^Error: thrown later\n {4}at /),
@@ -505,7 +505,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay dev in
 
     await shown.waitUntil(() => document.querySelector('kay-dev')?.shadowRoot!.textContent.includes('a11y color-contrast'))
 
-    expect(await shown.evaluate(() => [...document.querySelector('kay-dev')!.shadowRoot!.querySelectorAll('.problem pre')].map(pre => pre.textContent))).toContain('a11y color-contrast: Elements must meet minimum color contrast ratio thresholds\n  .faint\n  p\nhttps://dequeuniversity.com/rules/axe/4.14/color-contrast?application=axeAPI')
+    expect(await shown.evaluate(() => [...document.querySelector('kay-dev')!.shadowRoot!.querySelectorAll('#kay-dev-problems .problem pre')].map(pre => pre.textContent))).toContain('a11y color-contrast: Elements must meet minimum color contrast ratio thresholds\n  .faint\n  p\nhttps://dequeuniversity.com/rules/axe/4.14/color-contrast?application=axeAPI')
     // The dev tool is kay's, no part of the page a test checks.
     expect((await shown.a11y()).flatMap(violation => violation.nodes.map(node => node.target))).not.toContainEqual(expect.stringContaining('kay-dev'))
     expect(shown.errors).toEqual([])
@@ -1499,7 +1499,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the dev to
           radius,
           moved: [Math.round(moved.left - start.left), Math.round(moved.top - start.top)],
           padded: getComputedStyle(document.documentElement).paddingBottom,
-          problems: [...root.querySelectorAll('.problem pre')].map(pre => pre.textContent).filter(problem => !problem.startsWith('a11y ')),
+          problems: [...root.querySelectorAll('#kay-dev-problems .problem pre')].map(pre => pre.textContent).filter(problem => !problem.startsWith('a11y ')),
           violations,
         }
       })
@@ -1609,6 +1609,46 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the dev to
       const rows = await view.evaluate(() => [...document.querySelector('kay-dev')!.shadowRoot!.querySelectorAll('#kay-dev-network .group')].map(group => [...group.querySelectorAll('.fetch')].map(row => `${row.querySelector('.name')!.textContent} ${row.querySelector('.chip')!.textContent}`)))
 
       expect(rows[0]).toContain('/next page')
+    }
+    finally {
+      view.close()
+    }
+  }, 60_000)
+
+  it('counts the Head and Images warnings on their tabs before either is opened, and follows a page swap', async () => {
+    const view = await dev.open('/flagged', { height: 900 })
+    const counts = async () => view.evaluate(() => {
+      const shadow = document.querySelector('kay-dev')!.shadowRoot!
+      const count = (id: string) => shadow.querySelector<HTMLElement>(`#kay-dev-tab-${id} .count`)!
+
+      return { head: count('head').hidden === true ? '' : count('head').textContent, images: count('images').hidden === true ? '' : count('images').textContent }
+    })
+
+    try {
+      // The drawer open on another tab, neither Head nor Images clicked.
+      await view.waitUntil(() => document.querySelector('kay-dev')?.shadowRoot?.querySelector('#kay-dev-tab-env') != null)
+      await view.evaluate(() => document.querySelector('kay-dev')!.shadowRoot!.querySelector<HTMLButtonElement>('#kay-dev-tab-env')!.click())
+      await view.waitUntil(() => document.querySelector('kay-dev')!.shadowRoot!.querySelector('#kay-dev-tab-images .count:not([hidden])') !== null)
+      await view.waitUntil(() => document.querySelector('kay-dev')!.shadowRoot!.querySelector('#kay-dev-tab-head .count:not([hidden])') !== null)
+
+      const first = await counts()
+
+      expect(Number(first.head)).toBeGreaterThan(0)
+      expect(Number(first.images)).toBeGreaterThan(0)
+
+      // Swapped in place: the counts follow the page brought.
+      await view.waitUntil(() => (document.querySelector('slot[data-component]') as { _$k?: boolean } | null)?._$k === true)
+      await view.click('a[href="/flagged-more"]')
+      await view.waitUntil(() => document.querySelector('kay-dev')!.shadowRoot!.querySelector('#kay-dev-tab-images .count:not([hidden])')?.textContent === '4')
+
+      // A tab opened, then the page swapped.
+      await view.evaluate(() => document.querySelector('kay-dev')!.shadowRoot!.querySelector<HTMLButtonElement>('#kay-dev-tab-images')!.click())
+      await view.click('a[href="/flagged"]')
+      await view.waitUntil(() => document.querySelector('kay-dev')!.shadowRoot!.querySelector('#kay-dev-tab-images .count:not([hidden])')?.textContent === '2')
+      await view.evaluate(() => document.querySelector('kay-dev')!.shadowRoot!.querySelector<HTMLButtonElement>('#kay-dev-tab-head')!.click())
+      await view.click('a[href="/flagged-more"]')
+      await view.waitUntil(() => document.querySelector('kay-dev')!.shadowRoot!.querySelector('#kay-dev-tab-images .count:not([hidden])')?.textContent === '4')
+      expect((await counts()).images).toBe('4')
     }
     finally {
       view.close()

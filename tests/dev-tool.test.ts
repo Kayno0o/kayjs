@@ -749,7 +749,8 @@ describe('the dev tool', () => {
     }
     const asked: string[] = []
     const fetching = spyOn(window, 'fetch').mockImplementation((async (url: string) => {
-      asked.push(url)
+      if (url.startsWith('/_kay/dev/request'))
+        asked.push(url)
 
       return recorded ? new Response(JSON.stringify(recorded)) : new Response(null, { status: 404 })
     }) as unknown as typeof window.fetch)
@@ -900,7 +901,8 @@ describe('the dev tool', () => {
 
     happyDOM.setURL('http://localhost/broken')
     const fetching = spyOn(window, 'fetch').mockImplementation((async (url: string) => {
-      fetched.push(url)
+      if (url === '/_kay/dev/routes')
+        fetched.push(url)
 
       return new Response(JSON.stringify({ notes: ['`seo` is set but not the origin, so there is no sitemap or robots.txt.'], routes: [
         { kind: 'page', method: 'GET', path: '/broken', file: 'src/routes/broken.kay', href: '/broken' },
@@ -1030,6 +1032,12 @@ describe('the dev tool', () => {
 
     try {
       tool = startDevTool()
+      await Bun.sleep(0)
+
+      // The count is there before the tab is opened, and opening it reads again.
+      expect(asked).toHaveLength(1)
+      expect(shadow().querySelector<HTMLElement>('#kay-dev-tab-head .count')!.textContent).toBe('1')
+      asked.length = 0
       shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-head')!.click()
       await Bun.sleep(0)
 
@@ -1127,17 +1135,17 @@ describe('the dev tool', () => {
       tool = startDevTool()
       shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-head')!.click()
       await Bun.sleep(0)
-      // The tab is hidden when the page swaps, so no read follows the swap.
-      shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-request')!.click()
       document.head.innerHTML = '<title>About</title><meta name="description" content="Other"><meta property="og:title" content="About">'
       await Bun.sleep(0)
       release()
       await Bun.sleep(0)
       await Bun.sleep(0)
 
-      expect(panel().textContent).toContain('Home | Shop')
-      expect(panel().textContent).not.toContain('About')
-      expect(panel().textContent).not.toContain('Other')
+      // The swap asks again and the latest snapshot wins, never a mix of the two heads.
+      expect(panel().textContent).toContain('About')
+      expect(panel().textContent).toContain('Other')
+      expect(panel().textContent).not.toContain('Home | Shop')
+      expect(panel().textContent).not.toContain('The shop')
     }
     finally {
       fetching.mockRestore()
@@ -1175,6 +1183,7 @@ describe('the dev tool', () => {
     try {
       happyDOM.setURL('http://localhost/')
       tool = startDevTool()
+      asked.length = 0
       shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-env')!.click()
       await Bun.sleep(20)
 
@@ -1289,6 +1298,8 @@ describe('the dev tool', () => {
 
     try {
       tool = startDevTool()
+      asked.length = 0
+      signals.length = 0
       observed.report('largest-contentful-paint', [{ startTime: 900, renderTime: 900, element: document.getElementById('hero')! }])
       shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-images')!.click()
       await Bun.sleep(20)
@@ -1497,6 +1508,7 @@ describe('the dev tool', () => {
 
     try {
       tool = startDevTool()
+      fetching.mockClear()
       observed.report('largest-contentful-paint', [])
       shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-images')!.click()
       await Bun.sleep(20)
@@ -1550,7 +1562,9 @@ describe('the dev tool', () => {
 
     const performance = spyOn(window.performance, 'getEntriesByType').mockImplementation(((type: string) => type === 'resource' ? loaded.map(path => ({ name: `http://localhost${path}` })) : []) as unknown as typeof window.performance.getEntriesByType)
     const fetching = spyOn(window, 'fetch').mockImplementation((async (url: string) => {
-      fetched.push(new URL(url, 'http://localhost').pathname)
+      // The Head, Env and Not found tabs read as the tool starts, to count their warnings.
+      if (!['/_kay/dev/head', '/_kay/env.js', '/_kay/dev/not-found'].includes(url))
+        fetched.push(new URL(url, 'http://localhost').pathname)
 
       return new Response(files[new URL(url, 'http://localhost').pathname])
     }) as unknown as typeof window.fetch)

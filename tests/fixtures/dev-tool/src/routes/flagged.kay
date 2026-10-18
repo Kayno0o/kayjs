@@ -1,0 +1,8 @@
+---
+import Counter from '../components/counter.kay'
+---
+main
+  h1 Flagged
+  a(href="/flagged-more") More
+  img(src="/mark.png" alt="")
+  Counter

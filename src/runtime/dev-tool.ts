@@ -2195,7 +2195,7 @@ function headTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
   let scheduled = false
   // A page swap patches the head in place, in many small changes: one read follows them.
   const swaps = new MutationObserver(() => {
-    if (tab.panel.hidden === true || scheduled)
+    if (scheduled)
       return
 
     scheduled = true
@@ -2207,6 +2207,8 @@ function headTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
 
   swaps.observe(doc.head, { childList: true, subtree: true, characterData: true, attributes: true })
   signal.addEventListener('abort', () => swaps.disconnect())
+  // The tab's count is there from the start, not once it is opened.
+  void read()
 }
 
 // Names a variable of a secret goes by, and the shapes of the values of one: a URL carrying a password, a token with a well-known prefix, a long run of random-looking characters.
@@ -2332,10 +2334,8 @@ function envTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
 
   reread = () => void read()
   tab.panel.append(bar.element, content)
-  win.addEventListener(BUILT_EVENT, () => {
-    if (tab.panel.hidden === false)
-      reread()
-  }, { signal })
+  win.addEventListener(BUILT_EVENT, reread, { signal })
+  reread()
 }
 
 // An image served more than this many times the pixels it is drawn with is flagged: the ladder's widths are at most 2 apart, so a variant picked for the size drawn is under 2 times as wide, 4 times the pixels, even at its worst.
@@ -2592,7 +2592,7 @@ function imagesTab(doc: Document, tool: DevTool, vitals: Vitals, signal: AbortSi
   const slots = limiter(IMAGE_REQUESTS)
   let scheduled = false
   const schedule = () => {
-    if (tab.panel.hidden === true || scheduled)
+    if (scheduled)
       return
 
     scheduled = true
@@ -2615,6 +2615,11 @@ function imagesTab(doc: Document, tool: DevTool, vitals: Vitals, signal: AbortSi
     const flagged = images.filter(info => info.flags.length > 0).length
 
     tab.count(images.reduce((sum, info) => sum + info.flags.length, 0), flagged > 0 ? 'warn' : undefined)
+
+    // Closed, the tab only keeps its count; the rows and the format lookups wait for it to be opened.
+    if (tab.panel.hidden === true)
+      return
+
     tool.hideOutline()
 
     bar.element.hidden = images.length === 0
@@ -2705,6 +2710,7 @@ function imagesTab(doc: Document, tool: DevTool, vitals: Vitals, signal: AbortSi
 
   changes.observe(doc.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['src', 'srcset', 'sizes', 'loading', 'width', 'height'] })
   signal.addEventListener('abort', () => changes.disconnect())
+  schedule()
 }
 
 // A limit on how many calls of a kind run at once; the rest wait their turn.
@@ -3224,10 +3230,8 @@ function notFoundTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
 
   reread = () => void list()
   tab.panel.append(bar.element, status, body)
-  win.addEventListener(BUILT_EVENT, () => {
-    if (tab.panel.hidden === false)
-      void list()
-  }, { signal })
+  win.addEventListener(BUILT_EVENT, reread, { signal })
+  reread()
 }
 
 function routeRow(tool: DevTool, route: DevRoute, here: Location): HTMLElement {
