@@ -25,6 +25,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `s3Files` stores each object with the type and `Content-Disposition` its key's extension gives, never the uploader's declared type, so an uploaded HTML page or SVG is a download from the bucket's `publicUrl` instead of running there; files stored by an earlier release must be put again ([Files](files.md)).
 - kayjs-auth counts wrong passwords against an account per client (6) and in total (60), so a stranger can no longer keep a holder locked out by guessing at their email from another address; the total mails the holder once, as the new `sign-in-locked` event, and a right password costs nothing ([kayjs-auth](../packages/auth/llms.txt)).
 - kayjs-auth counts wrong passwords against an account per client (`signInAccount`, 6, now per client rather than account-wide) and in total (`signInAccountAll`, 60), so a stranger can no longer keep a holder locked out by guessing at their email from another address; the total mails the holder once, as the new `sign-in-locked` event, and a right password costs nothing ([kayjs-auth](../packages/auth/llms.txt)).
+- An `onRequest` hook, param matcher, `rewrite` or extension hook that throws is answered with a logged 500 and handed to `onError`, instead of a 200 whose body is the error message ([API routes](api-routes.md)).
 
 ## 1.54.1
 

@@ -3,8 +3,17 @@ import { kayLog } from '../runtime/log'
 import { recordRequestError } from './dev-errors'
 import { logMessage } from './log'
 
+const reported = new WeakMap<Request, unknown[]>()
+
 // Logs an error kay caught while answering `request`, under that request, and hands it to the app's `onError`, without holding the response for it.
 export function reportServerError(error: unknown, request: Request, onError: KayConfig['onError']): void {
+  const seen = reported.get(request)
+
+  // Reported once per request, as the catch-all for errors no route caught meets the ones a route's own handler reported already.
+  if (seen?.includes(error))
+    return
+
+  reported.set(request, [...seen ?? [], error])
   logMessage('error', '', error, request)
   recordRequestError(error, request)
 

@@ -1014,7 +1014,7 @@ function perOwner<Owner extends object>(): (owner: Owner, key: string, make: () 
   }
 }
 
-function describeError(error: unknown, dev = false): PageError {
+export function describeError(error: unknown, dev = false): PageError {
   if (!dev)
     return { status: 500, message: 'Internal Server Error' }
 

@@ -31,6 +31,7 @@ A route at the path of a page, a public file, an endpoint or a redirect stops th
 ## Errors
 
 A handler that throws is logged with its stack and handed to `onError`, like a page's error. The answer is 500 with `Internal Server Error` in production and the message in development.
+A hook that throws before a route is chosen is answered the same way. That covers an Elysia `onRequest` of your own, a param matcher, `rewrite` and a hook from an extension. A `Response` the hook throws is sent as given, and an `onError` of your own that answers comes first.
 
 A module's own `onError` that answers the error comes first. A body its schema refuses, or a thrown `status()`, keeps the answer Elysia gives, unlogged.
 

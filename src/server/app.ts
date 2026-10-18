@@ -70,6 +70,7 @@ import { setupPages } from './setup'
 import { serveSitemap } from './sitemap'
 import { trackPrerendered } from './stale-pages'
 import { serveFiles } from './storage'
+import { answerUncaught } from './uncaught'
 import { serveViolationReports } from './violations'
 import { agreeOnWildcards } from './wildcards'
 
@@ -369,6 +370,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
     serveMcp(app, document, { title: (document.info as { title: string }).title, version: (document.info as { version: string }).version, base, guards: await covering(true), actions: actionOptions, metadataPaths, path: mcpAt })
 
   useAppOnError(options.onError)
+  answerUncaught(app, { dev: mode.dev, onError: options.onError })
   serveErrorReports(app, options.onError, mode.dev ? undefined : join(client.dir, '..', MAPS_DIR))
   serveLive(app, options.live)
 
