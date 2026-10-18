@@ -75,7 +75,7 @@ export const ANALYTICS_SCRIPT = `(() => {
     banner = undefined
     document.dispatchEvent(new CustomEvent('kay:consent', { detail: { consent: value } }))
 
-    if (value === 'yes' && !counted && gated)
+    if (value === 'yes' && !counted && (gated || informed))
       start()
 
     // A script that already ran cannot be taken back, so the page loads again without it.

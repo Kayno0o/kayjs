@@ -131,7 +131,11 @@ Give any element a `data-analytics-consent` attribute and a click on it shows th
 
 Plausible, Umami, Simple Analytics and Matomo count at once, and kay shows a short information line with an `OK` button and an `Opt out` button. Opting out writes `kay_analytics=no`, and your server then passes on nothing for that visitor, on any page. Word it with `info: { text, ok, optOut }`, each a string or one per language. If your site already informs visitors and lets them object, write `info: false`.
 
-To count Google Analytics, Fathom, Cloudflare or a custom tracker without asking, write `consent: false`. You then answer for it yourself: kay shows no notice for Fathom, Cloudflare or a custom tracker, and only the information line for Google Analytics. Before 1.55 these counted every visit without asking, and `kay check` reports the ones that did not say which they want.
+To count Google Analytics, Fathom, Cloudflare or a custom tracker without asking, write `consent: false`. You then answer for it yourself: kay shows no notice for Fathom, Cloudflare or a custom tracker, and only the information line for Google Analytics.
+
+Before 1.55 these counted every visit without asking, and `kay check` reports the ones that did not say which they want.
+
+A site built with `kay build --static` has no server for kay's notice, so write `consent: false` after answering for it, or ask in an island of your own.
 
 ### The CNIL exemption, and what it asks
 
@@ -140,21 +144,22 @@ Not asking is lawful only where an exemption applies, and a cookieless id is not
 - The numbers are anonymous statistics for your own site, used for nothing else.
 - The tool does not reuse the data and does not follow a visitor across sites.
 - Visitors are told, and can object easily.
-- Data is kept 25 months at most.
+- Data is kept 25 months at most, and an identifier lives 13 months at most (`kay_analytics` lasts a year).
+- An address is truncated or dropped by the tool.
 
 This is one regulator's position. Other countries may ask for consent anyway. Plausible, Umami and Matomo get the visitor's address to tell visitors apart, so the exemption holds only if the tool drops it: run it yourself, or check its terms. Google Analytics is never exempt. The information line and the opt-out are the notice and the objection the exemption asks for, not the whole of it.
 
 ### Processors, agreements and transfers
 
-Whichever tool you use, your privacy notice names it, what it is for and how long the data stays, and you sign its data processing agreement before counting a visit. Check each provider's current terms, as these change.
+Whichever tool you use, your privacy notice names it, what it is for and how long the data stays, and you sign its data processing agreement before counting a visit. Check each provider's current terms, as these change. The table is kay's cautious default: Fathom and Cloudflare call themselves cookieless, and writing `consent: false` is yours to answer for.
 
 | Provider | Your legal basis | Who it is | Agreement and transfer |
 | --- | --- | --- | --- |
-| Plausible, Umami, Simple Analytics or Matomo on your own server | The exemption above, or consent | You, with no third party | None to sign, and no transfer if your server is in the EU |
-| Plausible Cloud, Simple Analytics, Matomo Cloud | The same | A processor working for you | An agreement the provider offers, with EU hosting |
-| Umami Cloud | The same | A processor | An agreement the provider offers, US hosting, so a transfer mechanism is needed |
+| Plausible, Umami or Matomo on your own server | The exemption above, or consent | You, with no third party | None to sign, and no transfer if your server is in the EU |
+| Plausible Cloud, Matomo Cloud, Simple Analytics | The same | A processor working for you | An agreement the provider offers, with an EU region available. Simple Analytics never gets a visitor's address from kay |
+| Umami Cloud | The same | A processor | An agreement the provider offers. Check its hosting region for a transfer |
 | Google Analytics | Consent, always | Google, a processor (and for some uses a controller) | Google's data processing terms, accepted in your account, and a US transfer under the Data Privacy Framework or standard clauses |
-| Fathom | Consent | A processor (Fathom Analytics, Canada) | An agreement the provider offers, and a transfer to Canada |
+| Fathom | Consent | A processor (Fathom Analytics, Canada) | An agreement the provider offers. Check the transfer to Canada |
 | Cloudflare Web Analytics | Consent | Cloudflare, a processor | Cloudflare's agreement in its customer terms, and a US transfer under the Data Privacy Framework or standard clauses |
 | `custom` | Consent | Whoever runs the endpoint | Your own agreement with them |
 

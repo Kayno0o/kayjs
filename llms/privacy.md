@@ -78,7 +78,7 @@ export default defineConfig({
 })
 ```
 
-- `provider` is `'plausible'` (`domain`, else the visited host), `'umami'` (`websiteId`), `'simpleanalytics'` (`hostname`, else the visited host) or `'matomo'` (`siteId`, `host`, optional `tokenAuth`); each but Matomo takes `host` for a self-hosted instance. All four are cookieless and take visits from the server, so they count at once, with an information line and an opt-out (see the `info` bullet). Matomo gets the visitor's address (`cip`) only with a `tokenAuth` of a user with write access, else it sees this server's.
+- `provider` is `'plausible'` (`domain`, else the visited host), `'umami'` (`websiteId`), `'simpleanalytics'` (`hostname`, else the visited host) or `'matomo'` (`siteId`, `host`, optional `tokenAuth`); each but Matomo takes `host` for a self-hosted instance or another endpoint. All four are cookieless and take visits from the server, so they count at once, with an information line and an opt-out (see the `info` bullet). Matomo gets the visitor's address (`cip`) only with a `tokenAuth` of a user with write access, else it sees this server's.
 - `'fathom'` (`siteId`, `spa`) and `'cloudflare'` (`token`) take data only from their own scripts (Cloudflare says so for its endpoint), so they are the exception to "through your origin": their script is added to the head and the CSP opened for their domains (`cdn.usefathom.com`; `static.cloudflareinsights.com` and `cloudflareinsights.com`). With `consent`, kay's script loads theirs after the yes, and a refusal after it loaded reloads the page without it.
 - `'custom'` (`script`, `endpoint`, optional `address: true`) is any tracker that is a script posting to an endpoint: kay fetches `script` (an hour cached, 512 KB at most), serves it at `/_kay/analytics/script.js` with every `endpoint` written in it replaced by `/_kay/analytics/collect`, and passes what it posts to `endpoint`: a body of 64 KB at most, JSON, text or form content only, the visitor's `User-Agent` and, with `address: true`, `X-Forwarded-For`. The tracker counts page swaps itself, and the endpoint must appear in the script as written.
 - `'ga4'` (`measurementId` as `G-XXXXXXXXXX`, `apiSecret` from the data stream's Measurement Protocol API secrets, optional `host` such as `https://region1.google-analytics.com` for EU collection, optional `address: true`) sends a `page_view` to `/mp/collect` from the server: no Google script, cookie or CSP exception, and the secret stays on the server. There is no browser cookie to hold Google's `client_id`, so the server makes one (`<digits>.<digits>`) as a keyed hash of the visitor's address and `User-Agent` with a random key that changes every UTC day and lives in the process: it tells a visitor apart for a day, cannot be turned back into an address, and exists only for a visit that passed the consent check. Two processes behind a balancer count a visitor twice. `session_id` is the half hour the visit falls in and `engagement_time_msec` a fixed 100. The address is not passed on unless `address: true`, which sends it as `ip_override` so Google places the visit; otherwise Google places visits at this server. Behind a CDN set `proxy`, else every visitor shares the proxy's address and one id. Keep `host` on https, as the secret is in the request. Google reports Measurement Protocol events without a tag only in part (Realtime and engagement metrics are the ones to check), and a long `page_location` may be cut by Google's 100 character value limit.
@@ -99,13 +99,15 @@ Reading the device (screen, language, title) and storing on it fall under ePriva
 
 | Provider | Basis kay assumes | Role | DPA and transfer (check the provider's current terms) |
 | --- | --- | --- | --- |
-| `plausible`, `umami`, `simpleanalytics`, `matomo` with `host` | CNIL exemption (ungated) or consent | self-hosted: the app is controller and processor, no third party | none to sign, no transfer if the host is in the EU |
-| Plausible Cloud, Simple Analytics, Matomo Cloud | the same | processor for the app | DPA offered by the provider, hosted in the EU |
-| Umami Cloud | the same | processor | DPA offered, US-hosted: needs a transfer mechanism |
+| `plausible`, `umami`, `matomo` with your own `host` | CNIL exemption (ungated) or consent | the app runs it, no third party | none to sign, no transfer if the host is in the EU |
+| Plausible Cloud, Matomo Cloud, Simple Analytics | the same | processor for the app | DPA offered by the provider, an EU region available; Simple Analytics gets no visitor address from kay |
+| Umami Cloud | the same | processor | DPA offered, check its hosting region for a transfer |
 | `ga4` | consent, always | Google a processor (and for some uses a controller) | Google's data processing terms accepted in the account, US transfer under the Data Privacy Framework or SCCs |
-| `fathom` | consent | processor (Fathom Analytics, Canada) | DPA offered, transfer to Canada |
+| `fathom` | consent | processor (Fathom Analytics, Canada) | DPA offered, check the transfer to Canada |
 | `cloudflare` | consent | Cloudflare a processor | Cloudflare's DPA in its customer agreement, US transfer under the Data Privacy Framework or SCCs |
 | `custom` | consent | whoever runs the endpoint | the app's own DPA with it |
+
+The table is kay's conservative default, not a finding that a provider cannot be exempt: Fathom and Cloudflare call themselves cookieless, and `consent: false` is the app's to answer for. The CNIL also caps a tracer's life at 13 months (`kay_analytics` lasts one year) and wants an address truncated or dropped. Terms change: check each before relying on the table.
 
 The privacy notice names the provider, the purpose and the retention, and the app signs the DPA before counting a visit.
 
