@@ -5,10 +5,12 @@ import { Elysia } from 'elysia'
 import { check } from '../src/check'
 import { joinBase, localPath } from '../src/runtime/base'
 import { integer } from '../src/runtime/params'
+import { openSqlite } from '../src/runtime/sqlite.server'
 import { pages } from '../src/server'
 import { routerShapes, shapeParams } from '../src/server/params'
 import { readRedirects, redirectProblems } from '../src/server/redirects'
 import { routeChain, routeOf } from '../src/server/routes'
+import { redirectSet } from '../src/server/runtime-redirects'
 import { prerendered } from './prerendered'
 import { fixtureCopy } from './scratch'
 
@@ -242,6 +244,19 @@ describe('kay check', () => {
     const diagnostics = await check(FIXTURE, { redirects: { '/x': '/sitemap.xml', '/y': '/nowhere' } })
 
     expect(diagnostics.map(diagnostic => diagnostic.message)).toEqual(['the redirect from /y goes to /nowhere, which nothing on the site serves'])
+  })
+
+  it('reports a redirect added while the site runs to a page nothing serves', async () => {
+    const copy = await fixtureCopy('routing')
+    const db = openSqlite(join(copy, 'data/not-found.sqlite'))
+
+    redirectSet(db).add('/old-a', '/bare', undefined, { hosts: [], configured: {} })
+    redirectSet(db).add('/old-b', '/nowhere', undefined, { hosts: [], configured: {} })
+    db.close()
+
+    const messages = (await check(copy, { redirects: { '/x': '/sitemap.xml' } })).map(diagnostic => diagnostic.message)
+
+    expect(messages).toEqual(['the redirect added while the site runs from /old-b goes to /nowhere, which nothing on the site serves'])
   })
 
   it('reports a matcher nobody provides at the page naming it', async () => {

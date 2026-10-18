@@ -1,0 +1,294 @@
+import type { Database } from 'bun:sqlite'
+import type { RedirectStatus } from './redirects'
+import { existsSync } from 'node:fs'
+import process from 'node:process'
+import { fillTarget, readRedirects, redirectLocation, redirectProblems } from './redirects'
+import { withoutSlash } from './routes'
+
+// The most redirects an editor adds: a lookup runs for every missing path, so the set stays small.
+export const MAX_RUNTIME_REDIRECTS = 1000
+const MAX_LENGTH = 512
+const MAX_HOPS = 16
+const UNSAFE = /[\p{Cc}\s\\]/u
+const QUERY_OR_HASH = /[?#].*$/
+const TRAILING_SLASHES = /\/+$/
+const DYNAMIC = /[:*]/
+const KAY_PREFIX = /^kay: /
+const PARAM_SEGMENT = /:[A-Z_$][\w$]*/gi
+const REGEX_SPECIALS = /[.*+?^${}()|[\]\\]/g
+
+// Why a redirect was not added, worded for the editor who asked: any other error is the store's, which they are not told.
+export class RedirectRefused extends Error {}
+
+// A redirect an editor added while the site runs, in the same file as the paths visitors found nothing at.
+export interface RuntimeRedirect {
+  // As in `redirects` of kay.config.ts: `:name` for a segment, a final `*` for the rest.
+  from: string
+  to: string
+  status: RedirectStatus
+  addedAt: number
+}
+
+// What the app's config says about the redirects an editor may add.
+export interface RuntimeRules {
+  // The hosts other than the site's own a target may name, none by default.
+  hosts: readonly string[]
+  // The config's redirects, which win over the runtime ones and so count in a chain.
+  configured: Record<string, string>
+  // Every path the site serves, when the server knows them, to refuse a target nothing serves.
+  served?: (() => string[]) | undefined
+}
+
+export interface RedirectSet {
+  list: () => RuntimeRedirect[]
+  find: (from: string) => RuntimeRedirect | undefined
+  // Those with a `:name` or a final `*`.
+  patterns: () => RuntimeRedirect[]
+  add: (from: string, to: string, status: RedirectStatus | undefined, rules: RuntimeRules) => RuntimeRedirect
+  remove: (from: string) => boolean
+}
+
+interface Row { path: string, target: string, status: number, added_at: number }
+
+function entry(row: Row): RuntimeRedirect {
+  return { from: row.path, to: row.target, status: row.status as RedirectStatus, addedAt: row.added_at }
+}
+
+// The path as it is compared: no query, hash nor trailing slash.
+export function plainPath(path: string): string {
+  return withoutSlash(path.replace(QUERY_OR_HASH, '').replace(TRAILING_SLASHES, '')) || '/'
+}
+
+function isPattern(from: string): boolean {
+  return DYNAMIC.test(from)
+}
+
+// Whether a target stays on the site, or names a host the app allows; throws, saying why, for anything else.
+// `/\evil.example` and `//evil.example` are other hosts to a browser.
+function checkTarget(to: string, hosts: readonly string[]): void {
+  if (to === '' || to.length > MAX_LENGTH)
+    throw new RedirectRefused(`a target is 1 to ${MAX_LENGTH} characters`)
+
+  if (UNSAFE.test(to))
+    throw new RedirectRefused('a target holds no control character, space nor backslash')
+
+  if (to.startsWith('//'))
+    throw new RedirectRefused(`${to} is no target: it reads as another site's URL`)
+
+  if (to.startsWith('/'))
+    return
+
+  let url: URL
+
+  try {
+    url = new URL(to)
+  }
+  catch {
+    throw new RedirectRefused(`${to} is no target: it starts with / or is an allowed site's URL`)
+  }
+
+  if ((url.protocol !== 'https:' && url.protocol !== 'http:') || url.username !== '' || url.password !== '' || !hosts.includes(url.host.toLowerCase()))
+    throw new RedirectRefused(`${to} is no target: only this site's paths and the hosts of runtimeRedirects.hosts in kay.config.ts are allowed`)
+}
+
+// Whether a location a redirect built stays where it may: the same checks as a target, on what a `*` or a param filled in.
+export function safeLocation(location: string, hosts: readonly string[]): boolean {
+  try {
+    checkTarget(location, hosts)
+
+    return true
+  }
+  catch {
+    return false
+  }
+}
+
+// Throws, saying why, unless `from` and `to` make a redirect that cannot loop and cannot leave the site but where the app allows.
+function check(set: RedirectSet, from: string, to: string, status: number, rules: RuntimeRules): void {
+  if (status !== 301 && status !== 302 && status !== 307 && status !== 308)
+    throw new RedirectRefused(`status ${String(status)} is none of 301, 302, 307 and 308`)
+
+  if (!from.startsWith('/') || from.startsWith('//') || from.length > MAX_LENGTH || UNSAFE.test(from))
+    throw new RedirectRefused(`${from} is no path to redirect: it starts with one / and holds no control character, space nor backslash`)
+
+  if (from.startsWith('/_kay/'))
+    throw new RedirectRefused('the paths under /_kay/ are kay\'s')
+
+  checkTarget(to, rules.hosts)
+
+  // Names the param or `*` a target uses without the path having it.
+  try {
+    readRedirects({ [from]: to })
+  }
+  catch (error) {
+    throw new RedirectRefused(error instanceof Error ? error.message.replace(KAY_PREFIX, '') : String(error))
+  }
+
+  if (rules.configured[from] !== undefined)
+    throw new RedirectRefused(`${from} is a redirect of kay.config.ts already`)
+
+  const origin = plainPath(from)
+  let at = to
+  const seen = new Set<string>()
+
+  // The target followed through the redirects that would answer it: back at the path is a loop, and a chain is as long as it goes.
+  for (let hop = 0; at.startsWith('/') && hop <= MAX_HOPS; hop++) {
+    const path = plainPath(at)
+
+    if (path === origin)
+      throw new RedirectRefused(`${from} to ${to} is a redirect loop`)
+
+    if (seen.has(path))
+      break
+
+    seen.add(path)
+
+    const next = rules.configured[path] ?? set.find(path)?.to
+
+    if (next === undefined || isPattern(path))
+      break
+
+    at = next
+  }
+
+  if (rules.served) {
+    const known = [...rules.served(), ...Object.keys(rules.configured), ...set.list().map(row => row.from)]
+    const [problem] = redirectProblems({ [from]: to }, known)
+
+    if (problem !== undefined)
+      throw new RedirectRefused(`${problem}; redirect to a page that exists`)
+  }
+}
+
+export function redirectSet(db: Database): RedirectSet {
+  db.run('CREATE TABLE IF NOT EXISTS kay_redirects (path TEXT PRIMARY KEY, target TEXT NOT NULL, status INTEGER NOT NULL, pattern INTEGER NOT NULL, added_at INTEGER NOT NULL)')
+
+  const all = db.query<Row, []>('SELECT path, target, status, added_at FROM kay_redirects ORDER BY added_at DESC, path')
+  const one = db.query<Row, [string]>('SELECT path, target, status, added_at FROM kay_redirects WHERE path = ?')
+  const some = db.query<Row, []>('SELECT path, target, status, added_at FROM kay_redirects WHERE pattern = 1')
+  const count = db.query<{ total: number }, []>('SELECT COUNT(*) AS total FROM kay_redirects')
+  const insert = db.query('INSERT INTO kay_redirects (path, target, status, pattern, added_at) VALUES (?1, ?2, ?3, ?4, ?5) ON CONFLICT (path) DO UPDATE SET target = ?2, status = ?3, pattern = ?4, added_at = ?5')
+  const removed = db.query<{ path: string }, [string]>('DELETE FROM kay_redirects WHERE path = ? RETURNING path')
+
+  const set: RedirectSet = {
+    list: () => all.all().map(entry),
+    find(from) {
+      const row = one.get(from)
+
+      return row ? entry(row) : undefined
+    },
+    patterns: () => some.all().map(entry),
+    add(from, to, status = 308, rules) {
+      // Checked and written in one write transaction, so two editors adding at once cannot make a loop between them.
+      const write = db.transaction(() => {
+        check(set, from, to, status, rules)
+
+        if (!one.get(from) && count.get()!.total >= MAX_RUNTIME_REDIRECTS)
+          throw new RedirectRefused(`the set holds ${MAX_RUNTIME_REDIRECTS} redirects, the most there is room for: remove some, or move them to kay.config.ts`)
+
+        const addedAt = Date.now()
+
+        insert.run(from, to, status, isPattern(from) ? 1 : 0, addedAt)
+
+        return { from, to, status, addedAt }
+      })
+
+      return write.immediate()
+    },
+    remove: from => removed.get(from) !== null,
+  }
+
+  return set
+}
+
+interface Matcher {
+  redirect: RuntimeRedirect
+  pattern: RegExp
+  names: string[]
+}
+
+function matcherOf(redirect: RuntimeRedirect): Matcher | undefined {
+  const names: string[] = []
+  const star = redirect.from.endsWith('/*')
+  const body = (star ? redirect.from.slice(0, -2) : redirect.from).replace(REGEX_SPECIALS, '\\$&').replace(PARAM_SEGMENT, (part) => {
+    names.push(part.slice(1))
+
+    return '([^/]+)'
+  })
+
+  try {
+    return { redirect, pattern: new RegExp(`^${body}${star ? '(?:/(.*))?' : ''}$`), names }
+  }
+  catch {
+    return undefined
+  }
+}
+
+// Where an asked path goes, as `location`, when a redirect of the set answers it: an exact row first, then the first `:param` or `*` row it matches. Undefined when none does or the answer would leave where the rules allow, or send the visitor back to the path they asked.
+export function answerFor(set: RedirectSet, asked: string, search: string, hosts: readonly string[]): { location: string, status: RedirectStatus } | undefined {
+  const path = plainPath(asked)
+  const exact = set.find(path)
+  let location: string | undefined
+  let found = exact
+
+  if (exact) {
+    location = redirectLocation(exact.to, search)
+  }
+  else {
+    for (const row of set.patterns()) {
+      const matcher = matcherOf(row)
+      const match = matcher?.pattern.exec(path)
+
+      if (!matcher || !match)
+        continue
+
+      try {
+        const params = new Map(matcher.names.map((name, index) => [name, decodeURIComponent(match[index + 1]!)]))
+        const rest = match[matcher.names.length + 1] ?? ''
+
+        location = redirectLocation(fillTarget(row.to, name => encodeURIComponent(params.get(name) ?? ''), rest), search)
+        found = row
+
+        break
+      }
+      catch {
+        // A param that does not decode answers nothing.
+        return undefined
+      }
+    }
+  }
+
+  if (!found || location === undefined || !safeLocation(found.to, hosts) || !safeLocation(location.replace(QUERY_OR_HASH, ''), hosts))
+    return undefined
+
+  // Two editors adding opposite redirects at once: the pair sends a visitor round, so neither answers.
+  if (location.startsWith('/')) {
+    const back = set.find(plainPath(location))
+
+    if (back && !isPattern(back.from) && plainPath(back.to) === path)
+      return undefined
+  }
+
+  return { location, status: found.status }
+}
+
+// The redirects a file holds, read without opening it for writing or creating anything: none for a file that is missing, has no such table or cannot be read.
+export function readRuntimeRedirects(file: string): RuntimeRedirect[] {
+  if (!existsSync(file))
+    return []
+
+  const sqlite = process.getBuiltinModule('bun:sqlite') as typeof import('bun:sqlite')
+  let db: Database | undefined
+
+  try {
+    db = new sqlite.Database(file, { readonly: true })
+
+    return db.query<Row, []>('SELECT path, target, status, added_at FROM kay_redirects ORDER BY path').all().map(entry)
+  }
+  catch {
+    return []
+  }
+  finally {
+    db?.close()
+  }
+}

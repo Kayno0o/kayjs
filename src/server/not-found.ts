@@ -2,6 +2,7 @@ import type { Database } from 'bun:sqlite'
 import type { Elysia } from 'elysia'
 import type { TrailingSlash } from '../config'
 import type { LocaleSettings } from '../runtime/i18n'
+import type { RedirectSet } from './runtime-redirects'
 import { existsSync } from 'node:fs'
 import { localePath, splitLocale } from '../runtime/i18n'
 import { kayLog } from '../runtime/log'
@@ -9,6 +10,7 @@ import { openSqlite } from '../runtime/sqlite.server'
 import { pathOf } from './log'
 import { onReload } from './reload'
 import { slashedPath, withoutSlash } from './routes'
+import { redirectSet } from './runtime-redirects'
 
 // Where the production server keeps the paths visitors asked for and found nothing at, next to the job store.
 export const NOT_FOUND_FILE = 'data/not-found.sqlite'
@@ -57,6 +59,8 @@ export interface MissingStore {
   hit: (path: string, referrer: string | undefined, suggest: (path: string) => Suggestion | undefined) => void
   list: () => MissingPath[]
   forget: (path: string) => void
+  // The redirects an editor added, which share the file.
+  redirects: RedirectSet
   close: () => void
 }
 
@@ -274,6 +278,8 @@ export function missingStore(path: string, closedByReload = true): MissingStore 
   const removed = db.query('DELETE FROM kay_missing WHERE path = ?')
   const removedHosts = db.query('DELETE FROM kay_missing_referrers WHERE path = ?')
 
+  const redirects = redirectSet(db)
+
   // A reload runs the module that opened the store again, which opens its own.
   if (closedByReload)
     onReload(() => db.close())
@@ -312,6 +318,7 @@ export function missingStore(path: string, closedByReload = true): MissingStore 
       removed.run(path)
       removedHosts.run(path)
     },
+    redirects,
     close: () => db.close(),
   }
 }
@@ -324,6 +331,40 @@ export function pageRequested(request: Request): void {
   pageRequests.add(request)
 }
 
+// The store this process's server holds open, opened when `create` or the file exists: what a request for a missing path reads and counts in.
+export function sharedStore(file: string, create: boolean): MissingStore | undefined {
+  if (current)
+    return current
+
+  if (!create && file !== ':memory:' && !existsSync(file))
+    return undefined
+
+  current = missingStore(file)
+
+  return current
+}
+
+// Closes the shared store after it failed, so the next request opens it again.
+export function dropStore(): void {
+  try {
+    current?.close()
+  }
+  catch {
+    // Closed already.
+  }
+
+  current = undefined
+}
+
+// The file the server keeps its store in: memory under test.
+export function storeFile(file?: string): string {
+  return file ?? (process.env.NODE_ENV === 'test' ? ':memory:' : NOT_FOUND_FILE)
+}
+
+export function isPageRequest(request: Request): boolean {
+  return pageRequests.has(request)
+}
+
 // The paths counted so far by this process's server, for the tests of the server.
 export function missingPaths(): MissingPath[] {
   return current?.list() ?? []
@@ -334,7 +375,7 @@ export function missingPaths(): MissingPath[] {
 export function countMissing<App extends Elysia>(app: App, options: { known: () => Iterable<string>, settings?: LocaleSettings | undefined, trailingSlash?: TrailingSlash | undefined, file?: string | undefined }): App {
   let suggest: ReturnType<typeof suggester> | undefined
   let told = false
-  const file = options.file ?? (process.env.NODE_ENV === 'test' ? ':memory:' : NOT_FOUND_FILE)
+  const file = storeFile(options.file)
 
   // Global, as a plugin's hook reaches the routes the app adds after it too: only what no route took, or a page route, is counted.
   app.onAfterResponse({ as: 'global' }, ({ request, set, responseValue, route }) => {
@@ -350,8 +391,7 @@ export function countMissing<App extends Elysia>(app: App, options: { known: () 
       return
 
     try {
-      current ??= missingStore(file)
-      current.hit(path, referrerHost(request.headers.get('referer')), (missing) => {
+      sharedStore(file, true)!.hit(path, referrerHost(request.headers.get('referer')), (missing) => {
         suggest ??= suggester(options.known(), options.settings)
 
         const found = suggest(missing)
@@ -361,14 +401,7 @@ export function countMissing<App extends Elysia>(app: App, options: { known: () 
     }
     catch (error) {
       // Counting never costs a visitor their answer; a store that failed is opened again by the next one, and the first failure is told.
-      try {
-        current?.close()
-      }
-      catch {
-        // Closed already.
-      }
-
-      current = undefined
+      dropStore()
 
       if (!told) {
         told = true

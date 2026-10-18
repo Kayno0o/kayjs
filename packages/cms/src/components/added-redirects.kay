@@ -1,0 +1,34 @@
+---
+import type { Column } from '@kaynooo/kayjs-ui'
+import type { AddedRedirect } from '../missing'
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import Table from '@kaynooo/kayjs-ui/table.kay'
+import { refresh } from 'kay'
+import { wording } from 'kay/words'
+import { removeAddedRedirect } from '../editor/save'
+import { shipWords } from '../editor/words'
+
+// The redirects added from the missing pages screen, each with a Remove that makes its path answer 404 again.
+const { redirects } = props<{ redirects: AddedRedirect[] }>()
+
+// Looks up what a removal says once the page has loaded, so the page sends it.
+shipWords()
+
+async function remove(from: string): Promise<void> {
+  if (await removeAddedRedirect(from))
+    await refresh()
+}
+
+const columns: Column<AddedRedirect>[] = [
+  { key: 'from', header: wording('cms.redirects.from', 'Path'), cell: true },
+  { key: 'to', header: wording('cms.redirects.to', 'Redirects to'), cell: true },
+  { key: 'status', header: wording('cms.redirects.status', 'Status') },
+  { key: 'actions', header: wording('cms.table.actions', 'Actions'), align: 'end', cell: true },
+]
+---
+Table.kcms-missing(columns={columns} rows={redirects} rowKey={row => row.from})
+  @cell(row, column)
+    if column.key === 'actions'
+      Button(label={wording('cms.redirects.remove', 'Remove')} aria-label={wording('cms.redirects.removeLabel', 'Remove the redirect from {path}', { path: row.from })} size="sm" variant="ghost" onClick={async () => { await remove(row.from) }})
+    else
+      code.kcms-missing-path {column.key === 'from' ? row.from : row.to}

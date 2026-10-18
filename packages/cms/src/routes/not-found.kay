@@ -5,6 +5,7 @@ import Notice from '@kaynooo/kayjs-ui/notice.kay'
 import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
 import { underKayDev } from 'kay/library'
 import { wording } from 'kay/words'
+import AddedRedirects from '../components/added-redirects.kay'
 import MissingPaths from '../components/missing-paths.kay'
 import { readMissing } from '../missing'
 import { screenPath } from '../paths'
@@ -23,7 +24,10 @@ PageSection(title={wording('cms.missing.title', 'Missing pages')} level={1})
   if 'failure' in screen
     EmptyState(title={wording('cms.missing.unreadable', 'Missing pages cannot be listed')} description={screen.failure})
   else
-    Notice(tone="info" label={wording('cms.missing.notice', 'The pages visitors asked for and found nothing at, most visited first, as the production server counted them. Paths a redirect answers are left out. Copy a suggested redirect into the redirects of kay.config.ts, or run kay not-found --redirect with the path.')})
+    Notice(tone="info" label={wording('cms.missing.notice', 'The pages visitors asked for and found nothing at, most visited first, as the production server counted them. Paths a redirect answers are left out. Add a suggested redirect here and it answers at once, or copy it into the redirects of kay.config.ts, or run kay not-found --redirect with the path.')})
     if screen.total > screen.rows.length
       Notice(tone="warning" label={wording('cms.missing.truncated', 'Showing the {shown} most visited of {total} paths.', { shown: screen.rows.length, total: screen.total })})
     MissingPaths(rows={screen.rows} hint={hint})
+    if screen.added.length > 0
+      PageSection(title={wording('cms.redirects.title', 'Redirects added here')} level={2})
+        AddedRedirects(redirects={screen.added})

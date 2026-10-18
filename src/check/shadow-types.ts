@@ -23,9 +23,11 @@ import { CONFIG_FILE } from '../config'
 import { projectPaths } from '../project'
 import { projectApi } from '../server/api-modules'
 import { localePrefixes, localeSettings } from '../server/i18n'
+import { NOT_FOUND_FILE } from '../server/not-found'
 import { htmlFallbacks, publicFiles } from '../server/public'
 import { redirectProblems } from '../server/redirects'
 import { extensionEditor, patternShapes, routeMounts, scanEndpoints, scanRoutes, servedPaths } from '../server/routes'
+import { readRuntimeRedirects } from '../server/runtime-redirects'
 import { ownFile } from './diagnose'
 import { ASSET_TYPES, environmentTypes, kayPaths, packageTypes } from './env-types'
 import { CONTENT_CHECK, EXPORTS_CHECK, exportsCheck, SETTINGS_CHECK, settingsCheck } from './generated'
@@ -382,7 +384,12 @@ async function servedProject(root: string, options: CheckOptions, problems: Chec
 function redirectChecks(root: string, options: CheckOptions, { routes, publicPaths, endpoints }: ServedProject): CheckDiagnostic[] {
   const served = [...routes.flatMap(route => patternShapes(route.pattern)), ...publicPaths.map(file => file.url), ...kayPaths(options), ...endpoints.filter(endpoint => endpoint.params.length === 0).map(endpoint => endpoint.pattern)]
 
-  return redirectProblems(options.redirects ?? {}, served).map(message => ({ file: join(root, CONFIG_FILE), line: 1, column: 1, message }))
+  const added = readRuntimeRedirects(join(root, NOT_FOUND_FILE))
+  const configured = redirectProblems(options.redirects ?? {}, served).map(message => ({ file: join(root, CONFIG_FILE), line: 1, column: 1, message }))
+  // The redirects added while the site runs are held to the same rule, whoever added them, and may chain on the config's.
+  const runtime = redirectProblems(Object.fromEntries(added.map(({ from, to }) => [from, to])), [...served, ...Object.keys(options.redirects ?? {})]).map(message => ({ file: join(root, NOT_FOUND_FILE), line: 1, column: 1, message: message.replace('the redirect from', 'the redirect added while the site runs from') }))
+
+  return [...configured, ...runtime]
 }
 
 // Whether a component renders as an island, through the build's cache of compiles.

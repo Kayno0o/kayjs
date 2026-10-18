@@ -13,10 +13,10 @@ import { USAGES } from './usages'
 const REFERRER_LIMIT = 3
 
 // The paths visitors asked for and found nothing at, most hit first, read from the file the production server keeps.
-// `--redirect <path>` turns one into a redirect in kay.config.ts, to `--to` or to the suggested target.
+// `--redirect <path>` turns one into a redirect in kay.config.ts, to `--to` or to the suggested target; with `--runtime` it goes in the file instead, which the running site reads with no deploy.
 export const notFound: Command = {
   usage: USAGES['not-found'],
-  options: { format: { type: 'string' }, redirect: { type: 'string' }, to: { type: 'string' }, file: { type: 'string' } },
+  options: { format: { type: 'string' }, redirect: { type: 'string' }, to: { type: 'string' }, file: { type: 'string' }, runtime: { type: 'boolean' } },
   positionals: 1,
   run: async ({ values, positionals: [path] }, refuse) => {
     const format = formatOption('not-found', values.format)
@@ -35,6 +35,11 @@ export const notFound: Command = {
     if (to !== undefined && redirect === undefined)
       return refuse('--to goes with --redirect')
 
+    const runtime = values.runtime === true
+
+    if (runtime && redirect === undefined)
+      return refuse('--runtime goes with --redirect')
+
     const file = typeof values.file === 'string' ? values.file : join(root, NOT_FOUND_FILE)
 
     buildingWithoutEnv()
@@ -43,7 +48,7 @@ export const notFound: Command = {
       const config = await withStdoutOnStderr(async () => loadConfig(root))
       const redirects = Object.keys(config.redirects ?? {})
       const redirected = new Set(redirects)
-      const store = existsSync(file) ? missingStore(file) : undefined
+      const store = existsSync(file) || runtime ? missingStore(file, false) : undefined
 
       try {
         const all = store?.list() ?? []
@@ -56,6 +61,18 @@ export const notFound: Command = {
 
           if (target === undefined)
             throw new Error(`${redirect} has no suggested target: name one with --to <path>`)
+
+          if (runtime) {
+            store!.redirects.add(redirect, target, undefined, { hosts: config.runtimeRedirects?.hosts ?? [], configured: Object.fromEntries(Object.entries(config.redirects ?? {}).map(([from, to]) => [from, typeof to === 'string' ? to : to.to])) })
+            store!.forget(redirect)
+
+            if (format === 'json')
+              printDocument({ redirect: { from: redirect, to: target, runtime: true } })
+            else
+              console.log(`Added to ${relative(process.cwd(), file) || file}, which the running site reads: ${redirect} -> ${target}`)
+
+            return 0
+          }
 
           checkRedirect(redirect, target, redirected)
 

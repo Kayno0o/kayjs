@@ -54,7 +54,7 @@ describe('the API guard', () => {
     expect(await admitted(context('POST', '/preview/exit', true))).toBe(true)
     expect(await admitted(context('HEAD', '/entries/posts/hello', true))).toBe(true)
 
-    for (const [method, path] of [['POST', '/entries/posts/hello'], ['PUT', '/entries/posts/hello'], ['PATCH', '/entries/posts/hello'], ['DELETE', '/entries/posts/hello'], ['POST', '/files/posts'], ['POST', '/entries/preview/exit'], ['DELETE', '/preview/exit']] as const)
+    for (const [method, path] of [['POST', '/entries/posts/hello'], ['PUT', '/entries/posts/hello'], ['PATCH', '/entries/posts/hello'], ['DELETE', '/entries/posts/hello'], ['POST', '/files/posts'], ['POST', '/redirects'], ['POST', '/redirects/remove'], ['POST', '/entries/preview/exit'], ['DELETE', '/preview/exit']] as const)
       expect(await admitted(context(method, path, true))).toBe(false)
 
     const signedIn = context('POST', '/entries/posts/hello', true)

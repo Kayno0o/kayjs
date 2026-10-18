@@ -226,6 +226,10 @@ The list starts with the most hit. A path asked for twice also gets a suggestion
 
 In `kay dev`, the dev tool's Not found tab shows the same list from the file a production run left, with a field for the target and an Add redirect button on each path. It writes the same line to `kay.config.ts`. `kay dev` counts nothing itself, so the tab is empty until that file exists.
 
+A redirect in `kay.config.ts` needs a deploy. To add one to the running site instead, run `kay not-found --redirect /old --runtime`. kay writes it to the same `data/not-found.sqlite`, and the server answers it from the next request. The config's redirects and your pages always win over it, and it is only looked up for a path that would have been a 404.
+
+An added redirect can only go to a page of your site. kay refuses a target like `//evil.example` or `https://evil.example/`, a redirect back to its own path (also through other redirects), and a target no page serves. To allow another site, list its host in `runtimeRedirects` in `kay.config.ts`: `runtimeRedirects: { hosts: ['example.org'] }`. Use `redirects` for what belongs in the repository, and this for what an editor adds while the site runs.
+
 Requests for `.php`, `.env` and similar files are ignored, as bots send them to every site. The list holds 1,000 paths; the least hit give way to new ones.
 
 ### Rewrite a request to another path

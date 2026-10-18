@@ -89,6 +89,8 @@ export interface KayConfig {
   rewrite?: Rewrite | undefined
   // Old paths sent elsewhere with a 308, or a 307 with `permanent: false`, or the 301 or 302 older clients and some crawlers expect with `status`: `{ '/blog/:slug': '/posts/:slug', '/docs/*': '/guide/*', '/old': { to: '/new', status: 301 } }`. `kay check` reports a target no page serves.
   redirects?: Redirects | undefined
+  // The hosts besides the site's own that a redirect added while the site runs, from a library's screen or `kay not-found --runtime`, may send to: `{ hosts: ['example.org'] }`. None by default, which keeps an editor's redirect on the site.
+  runtimeRedirects?: { hosts?: string[] | undefined } | undefined
   // What the live values' connections may cost one client address: how many at once and how many opened a minute.
   live?: LiveConfig | undefined
   // The header a request's id comes in on from a trusted proxy and goes out on, `x-request-id` by default: `'x-correlation-id'`.

@@ -63,6 +63,7 @@ import { reportServerError, useAppOnError } from './report'
 import { rewriteRequests } from './rewrite'
 import { routeMatch, routeTable } from './route-table'
 import { READ_METHODS } from './routes'
+import { knowRuntimeRules, redirectMissing } from './runtime-redirect-api'
 import { securityHeaders, setSecurityHeaders } from './security'
 import { ServedPaths } from './served-paths'
 import { setupPages } from './setup'
@@ -328,6 +329,11 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   const servesOpenApi = openapi !== undefined && (openapi.dev !== true || mode.dev)
 
   knowRedirects(Object.keys(options.redirects ?? {}))
+  knowRuntimeRules({
+    redirects: Object.fromEntries(Object.entries(options.redirects ?? {}).map(([from, target]) => [from, typeof target === 'string' ? target : target.to])),
+    hosts: options.runtimeRedirects?.hosts,
+    served: () => [...served.paths(), ...client.pages.keys(), ...table.paths.keys()],
+  })
   claimRedirects(served, redirects)
   claimApi(served, api.mounted, servesOpenApi ? openapi : undefined)
 
@@ -423,6 +429,9 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   serveRedirects(app, redirects, mode.dev)
 
   // Before the page routes, which a hook registered after them does not reach.
+  if (!exported)
+    redirectMissing(app, { trailingSlash: options.trailingSlash, base })
+
   if (!mode.dev && !exported)
     countMissing(app, { known: () => [...client.pages.keys(), ...[...table.paths.keys()].filter(path => !DYNAMIC_PATH.test(path))], settings: i18n?.settings, trailingSlash: options.trailingSlash })
 

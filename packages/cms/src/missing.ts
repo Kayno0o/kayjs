@@ -1,5 +1,5 @@
-import type { MissingPath } from 'kay/library'
-import { unansweredPaths } from 'kay/library'
+import type { MissingPath, RuntimeRedirect } from 'kay/library'
+import { addRuntimeRedirect, RedirectRefused, removeRuntimeRedirect, runtimeRedirects, unansweredPaths } from 'kay/library'
 import { wording } from 'kay/words'
 import { log } from './log'
 
@@ -21,7 +21,14 @@ export interface MissingRow {
   line: string | undefined
 }
 
-export type MissingScreen = { rows: MissingRow[], total: number } | { failure: string }
+// A redirect added from the screen, as it is listed with its Remove button.
+export interface AddedRedirect {
+  from: string
+  to: string
+  status: number
+}
+
+export type MissingScreen = { rows: MissingRow[], total: number, added: AddedRedirect[] } | { failure: string }
 
 function quoted(text: string): string {
   return `'${text.replaceAll('\\', '\\\\').replaceAll('\'', '\\\'')}'`
@@ -56,11 +63,32 @@ export function missingRows(paths: MissingPath[]): { rows: MissingRow[], total: 
 // What the production server recorded, minus the paths a redirect answers; a store that cannot be read says so and logs why.
 export function readMissing(): MissingScreen {
   try {
-    return missingRows(unansweredPaths())
+    return { ...missingRows(unansweredPaths()), added: runtimeRedirects().map(({ from, to, status }: RuntimeRedirect) => ({ from, to, status })) }
   }
   catch (error) {
     log.warn('the paths visitors found nothing at cannot be read', error)
 
     return { failure: wording('cms.missing.failure', 'The recorded paths cannot be read: see the server\'s log.') }
   }
+}
+
+// Adds the redirect to the set the server reads while it runs, which forgets the path as missing; the reason it was refused, worded, or undefined once added.
+export function addRedirect(from: string, to: string): string | undefined {
+  try {
+    addRuntimeRedirect(from, to)
+
+    return undefined
+  }
+  catch (error) {
+    if (error instanceof RedirectRefused)
+      return error.message
+
+    log.warn(`the redirect from ${from} was not added`, error)
+
+    return wording('cms.redirects.failure', 'The redirect could not be added: see the server\'s log.')
+  }
+}
+
+export function removeRedirect(from: string): boolean {
+  return removeRuntimeRedirect(from)
 }

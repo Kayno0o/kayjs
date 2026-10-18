@@ -5,6 +5,7 @@ import { call } from 'kay'
 import { wording } from 'kay/words'
 import entriesApi from '../api/entries'
 import filesApi from '../api/files'
+import redirectsApi from '../api/redirects'
 import { entryKey } from '../markers'
 
 type Outcome = { issues: Issue[], conflict?: { version: string | null } | undefined } | { saved: true, commit?: unknown, version?: string | undefined }
@@ -204,4 +205,24 @@ function settled(outcome: Outcome | undefined, done: string, refused: string): b
   toast.success(outcome.commit === undefined ? done : wording('cms.save.rebuild', '{done}. The site shows it once it has rebuilt.', { done }))
 
   return true
+}
+
+// Adds the redirect from a missing path to its target and says how it went; true once added. The rows are stale either way, the caller refreshing them.
+export async function addMissingRedirect(from: string, to: string): Promise<boolean> {
+  const done = await attempt(async () => call(redirectsApi, '/', { method: 'post', body: { from, to } }), wording('cms.redirects.addFailure', 'Could not add the redirect'))
+
+  if (done)
+    toast.success(wording('cms.redirects.added', 'Redirect added'))
+
+  return done !== undefined
+}
+
+// Removes a redirect added from the screen, so its path answers 404 again; true once removed.
+export async function removeAddedRedirect(from: string): Promise<boolean> {
+  const done = await attempt(async () => call(redirectsApi, '/remove', { method: 'post', body: { from } }), wording('cms.redirects.removeFailure', 'Could not remove the redirect'))
+
+  if (done)
+    toast.success(wording('cms.redirects.removed', 'Redirect removed'))
+
+  return done !== undefined
 }

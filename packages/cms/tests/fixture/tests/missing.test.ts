@@ -61,3 +61,27 @@ test('a path with and without its trailing slash is one row with two visits and 
   expect(page.find('.kcms-missing tbody tr:first-child td:nth-child(1)').map(cell => cell.text.trim())).toEqual(['Path/Empty'])
   expect(page.find('.kcms-missing tbody tr:first-child td:nth-child(2)').map(cell => cell.text.trim())).toEqual(['Visits2'])
 })
+
+test('adds the suggested redirect, which answers at once and is listed with its Remove, then undoes it; a hostile target is refused', async () => {
+  const post = async (path: string, body: object, headers: Record<string, string> = {}) => site.fetch(`/api/cms/redirects${path}`, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body) })
+
+  expect((await post('', { from: '/Empty', to: '/empty' }, { 'x-deny': '1' })).status).toBe(403)
+
+  for (const to of ['//evil.example', 'https://evil.example/', '/\\evil.example', '/nothing-serves-this'])
+    expect((await post('', { from: '/Empty', to })).status).toBe(400)
+
+  expect((await site.fetch('/Empty')).status).toBe(404)
+  expect((await post('', { from: '/Empty', to: '/empty' })).status).toBe(200)
+
+  const answered = await site.fetch('/Empty', { redirect: 'manual' })
+
+  expect([answered.status, answered.headers.get('location')]).toEqual([308, '/empty'])
+
+  const page = await site.visit('/admin/not-found')
+
+  expect(page.find('.kcms-missing-path').map(path => path.text)).toContain('/empty')
+  expect(page.text('main')).toContain('Redirects added here')
+
+  expect((await post('/remove', { from: '/Empty' })).status).toBe(200)
+  expect((await site.fetch('/Empty')).status).toBe(404)
+})

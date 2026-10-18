@@ -8,6 +8,7 @@ import { pages } from '../src/server'
 import { devNotFound, devRedirect } from '../src/server/dev-not-found'
 import { answeredBy, countedPath, countMissing, knowRedirects, missingPaths, missingStore, pageRequested, referrerHost, suggester, unansweredPaths } from '../src/server/not-found'
 import { withRedirect } from '../src/server/not-found-config'
+import { readRuntimeRedirects } from '../src/server/runtime-redirects'
 import { scratchDir } from './scratch'
 
 const known = ['/', '/about', '/blog/hello-world', '/blog/second-post', '/news/launch', '/fr/a-propos', '/fr/blog/hello-world']
@@ -406,6 +407,25 @@ describe('kay not-found', () => {
     expect(stdout).toContain('\'/old\': \'/new\',')
     expect(await Bun.file(join(root, 'kay.config.ts')).text()).toContain('redirects: {\n    \'/old\': \'/new\',')
     expect((await run(['not-found', '--format', 'json'], root)).stdout).not.toContain('"/old"')
+  })
+
+  it('with --runtime writes the redirect to the file the site reads, leaves kay.config.ts alone, and refuses what leaves the site', async () => {
+    const root = await project()
+    const config = await Bun.file(join(root, 'kay.config.ts')).text()
+    const { stdout, code } = await run(['not-found', '--redirect', '/old', '--runtime'], root)
+
+    expect(code).toBe(0)
+    expect(stdout).toContain('/old -> /new')
+    expect(await Bun.file(join(root, 'kay.config.ts')).text()).toBe(config)
+    expect(readRuntimeRedirects(join(root, 'data/not-found.sqlite')).map(({ from, to }) => [from, to])).toEqual([['/old', '/new']])
+    expect((await run(['not-found', '--format', 'json'], root)).stdout).not.toContain('"/old"')
+
+    for (const to of ['//evil.example', 'https://evil.example/', '/\\evil.example'])
+      expect((await run(['not-found', '--redirect', '/other', '--to', to, '--runtime'], root)).code).toBe(1)
+
+    expect((await run(['not-found', '--redirect', '/done', '--to', '/x', '--runtime'], root)).stderr).toContain('kay.config.ts')
+    expect((await run(['not-found', '--runtime'], root)).code).toBe(1)
+    expect(readRuntimeRedirects(join(root, 'data/not-found.sqlite'))).toHaveLength(1)
   })
 
   it('quotes a hostile path in the hint it prints, and leaves out what a pattern redirect answers', async () => {

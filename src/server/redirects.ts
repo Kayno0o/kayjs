@@ -132,16 +132,26 @@ export function claimRedirects(served: ServedPaths, redirects: Redirect[]): void
   }
 }
 
+// The target with its `:name` parts filled by `param` and its `*` by `rest`.
+export function fillTarget(to: string, param: (name: string) => string, rest: string): string {
+  return to.replaceAll(TARGET_PART, (_part, name: string | undefined) => name === undefined ? rest : param(name))
+}
+
+// Where a redirect to `target` goes: a target on the site loses extra leading slashes, which would read as another host, and the request's query is carried over unless the target gives its own.
+export function redirectLocation(target: string, search: string): string {
+  const path = target.startsWith('/') ? target.replace(LEADING_SLASHES, '/') : target
+
+  return search !== '' && !path.includes('?') ? `${path}${search}` : path
+}
+
 // Registered before the pages, the query carried over unless the target gives its own.
 export function serveRedirects(app: Elysia, redirects: Redirect[], dev?: boolean): void {
   for (const redirect of redirects) {
     app.get(redirect.path, ({ params, request }) => {
-      const values = params as Record<string, string>
+      const values = (params ?? {}) as Record<string, string>
       // Named params arrive decoded, so they are encoded again; the `*` arrives as the browser sent it.
-      const target = redirect.to.replaceAll(TARGET_PART, (_part, name: string | undefined) => name === undefined ? values['*'] ?? '' : encodeURIComponent(values[redirect.names.get(name)!] ?? ''))
-      const { search } = requestUrl(request)
-      const path = target.startsWith('/') ? target.replace(LEADING_SLASHES, '/') : target
-      const location = search !== '' && !path.includes('?') ? `${path}${search}` : path
+      const target = fillTarget(redirect.to, name => encodeURIComponent(values[redirect.names.get(name)!] ?? ''), values['*'] ?? '')
+      const location = redirectLocation(target, requestUrl(request).search)
 
       noteRedirect(dev, request, `the redirect from ${redirect.path}`)
 
