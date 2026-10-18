@@ -1,5 +1,6 @@
 import type { KayExtension } from '../config'
 import { KayError } from '../compiler/errors'
+import { ANALYTICS_SCRIPT } from './analytics-script'
 
 export { consent } from '../runtime/consent'
 export type { Consent } from '../runtime/consent'
@@ -166,7 +167,10 @@ export function analytics(options: AnalyticsOptions): KayExtension {
   // The provider's own script needs no route of ours, except the one that shows the notice and loads it.
   return {
     name: 'kay/analytics',
-    ...(options.provider === 'custom' || asking) && { needsServer: true, server: async () => (await import('./analytics-server')).analyticsServer(options) },
+    // Fathom and Cloudflare only need the notice's script, which a static export writes itself.
+    ...asking && options.provider !== 'custom' && { staticFiles: { [ANALYTICS_SCRIPT_PATH]: ANALYTICS_SCRIPT } },
+    ...options.provider === 'custom' && { needsServer: true },
+    ...(options.provider === 'custom' || asking) && { server: async () => (await import('./analytics-server')).analyticsServer(options) },
     config: {
       head: [{ tag: 'script', props: tag }],
       ...options.provider !== 'custom' && { security: { csp: cspOf(options) } },

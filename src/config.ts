@@ -355,6 +355,8 @@ export interface KayExtension<Server extends AnyElysia = AnyElysia> {
   name: string
   // Set when the extension does nothing without a running server, as a tracker posting to a route of its own: `kay build --static` warns of it, as that export runs no extension's server.
   needsServer?: boolean | undefined
+  // Files a static export writes into the site, by their path, for what the extension's server would otherwise serve as a constant, such as a script every page loads: `kay build --static` runs no server plugin.
+  staticFiles?: Record<string, string> | undefined
   // An Elysia plugin `pages()` uses before the pages, actions and API modules, so its derives reach their `ctx.locals` and `kay check` types them; scoped or global hooks reach them, local ones only the plugin's own routes.
   // Given as a function, it is called only when `pages()` builds the app, never when `kay check`, the editor or `kay build` read the config: the way to hand a plugin built on a database or the server's environment.
   server?: Server | (() => Server | Promise<Server>) | undefined

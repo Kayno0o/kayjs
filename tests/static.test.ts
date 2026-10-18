@@ -187,6 +187,34 @@ describe('kay build --static', () => {
     await expectEagerJsWithin(EAGER_JS_BUDGET, (await get('/')).text, async url => Bun.file(join(out, url.slice(BASE.length))).text())
   })
 
+  it.each([
+    ['fathom', '{ provider: \'fathom\', siteId: \'ABCDEFGH\' }', true],
+    ['cloudflare', '{ provider: \'cloudflare\', token: \'tok-123\', consent: true }', true],
+    ['fathom with consent false', '{ provider: \'fathom\', siteId: \'ABCDEFGH\', consent: false }', false],
+  ])('asks before %s loads on a static site too, kay\'s notice script written beside the pages', async (_name, options, asks) => {
+    const fixture = await fixtureCopy('static')
+    const elsewhere = await mkdtemp(join(tmpdir(), 'kay-static-'))
+    const config = join(fixture, 'kay.config.ts')
+
+    try {
+      await Bun.write(config, (await Bun.file(config).text()).replace('extensions: [{', `extensions: [analytics(${options}), {`).replace('import { defineConfig }', 'import { analytics } from \'kay/analytics\'\nimport { defineConfig }'))
+
+      const { code, errors } = await exportSite(elsewhere, fixture)
+
+      expect(code).toBe(0)
+      expect(errors).not.toContain('needs a running server')
+
+      const home = await Bun.file(join(elsewhere, 'index.html')).text()
+
+      expect(home.includes('data-consent')).toBe(asks)
+      expect(existsSync(join(elsewhere, '_kay/analytics.js'))).toBe(asks)
+      expect(home.includes('src="https://cdn.usefathom.com/script.js"')).toBe(!asks && options.includes('fathom'))
+    }
+    finally {
+      await rm(elsewhere, { recursive: true, force: true })
+    }
+  })
+
   it('ships the island title code to the page setting one alone, with the template it wraps the title in', async () => {
     const fixture = await fixtureCopy('static')
     const elsewhere = await mkdtemp(join(tmpdir(), 'kay-static-'))

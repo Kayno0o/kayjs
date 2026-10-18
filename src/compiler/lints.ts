@@ -349,7 +349,7 @@ export const LINTS = {
     group: 'deprecated',
     since: '1.55',
     site: true,
-    summary: '`analytics({ provider })` of `ga4`, `fathom`, `cloudflare` or `custom` with no `consent`, which counted every visit from the first page before 1.55 and waits for the visitor\'s yes since, with kay\'s notice: the fix writes `consent: true`, which is what a missing `consent` means now. Write `consent: false` instead to count without asking, which the app then answers for. `plausible`, `umami`, `simpleanalytics` and `matomo` still count at once, with an information line and an opt-out. On a `kay build --static` site the notice has no server, so write `consent: false` or ask in an island of your own. Found in the project\'s `.ts` files importing `kay/analytics`, for a call with an object literal and no spread.',
+    summary: '`analytics({ provider })` of `ga4`, `fathom`, `cloudflare` or `custom` with no `consent`, which counted every visit from the first page before 1.55 and waits for the visitor\'s yes since, with kay\'s notice: the fix writes `consent: true`, which is what a missing `consent` means now. Write `consent: false` instead to count without asking, which the app then answers for. `plausible`, `umami`, `simpleanalytics` and `matomo` still count at once, with an information line and an opt-out. Found in the project\'s `.ts` files importing `kay/analytics`, for a call with an object literal and no spread.',
     wrong: 'analytics({ provider: \'fathom\', siteId: \'ABCDEFGH\' })',
     right: 'analytics({ provider: \'fathom\', siteId: \'ABCDEFGH\', consent: true })',
   },

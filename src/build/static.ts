@@ -103,6 +103,16 @@ export async function exportStatic(project: Project, client: ClientBuild, outdir
     written.push(...(await publicFiles(publicDir)).map(file => join(out, relative(publicDir, file.path))))
   }
 
+  for (const { staticFiles } of config.extensions ?? []) {
+    for (const [path, text] of Object.entries(staticFiles ?? {})) {
+      const target = join(out, path)
+
+      await mkdir(dirname(target), { recursive: true })
+      await Bun.write(target, text)
+      written.push(target)
+    }
+  }
+
   for (const { name, needsServer } of config.extensions ?? []) {
     if (needsServer === true)
       kayLog('warn', `the extension ${name} needs a running server, which a static export has none of: its pages and tags are exported, but what they call answers 404`)

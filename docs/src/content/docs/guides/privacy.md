@@ -135,7 +135,7 @@ To count Google Analytics, Fathom, Cloudflare or a custom tracker without asking
 
 Before 1.55 these counted every visit without asking, and `kay check` reports the ones that did not say which they want.
 
-A site built with `kay build --static` has no server for kay's notice, so write `consent: false` after answering for it, or ask in an island of your own.
+A site built with `kay build --static` asks the same for Fathom and Cloudflare: kay writes the notice's script beside the pages. Google Analytics and a custom tracker still need a server.
 
 ### The CNIL exemption, and what it asks
 
