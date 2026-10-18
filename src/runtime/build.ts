@@ -22,7 +22,7 @@ export async function skew(response?: Response): Promise<boolean> {
   try {
     const { noticed, reloadIfStale } = await stale()
 
-    return response ? noticed(response) : await reloadIfStale()
+    return await (response ? noticed(response) : reloadIfStale())
   }
   catch {
     return false
