@@ -68,6 +68,14 @@ export function followLog(container: Element | (() => Element | null | undefined
       measure()
     }
 
+    // A scroll event arrives a frame late, so the container may have changed size since the last measure: that is settled, not read as the reader leaving the bottom.
+    const scrolled = (): void => {
+      if (element.scrollHeight !== height || element.clientHeight !== viewport)
+        settle()
+      else
+        measure()
+    }
+
     const resizes = new ResizeObserver(settle)
 
     // A line growing without a change to the DOM, as an image or a font loading does, resizes its item.
@@ -90,11 +98,11 @@ export function followLog(container: Element | (() => Element | null | undefined
 
     scrollTo(element.scrollHeight)
     measure()
-    element.addEventListener('scroll', measure, { passive: true })
+    element.addEventListener('scroll', scrolled, { passive: true })
     changes.observe(element, { childList: true, subtree: true, characterData: true })
     resizes.observe(element)
     onCleanup(() => {
-      element.removeEventListener('scroll', measure)
+      element.removeEventListener('scroll', scrolled)
       changes.disconnect()
       resizes.disconnect()
     })
