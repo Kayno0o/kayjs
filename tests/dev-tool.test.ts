@@ -192,10 +192,13 @@ describe('the dev tool', () => {
       expect(shadow().activeElement).toBe(focused)
 
       // A swap opens a navigation of its own, named once it ends, its own fetch in it though it starts just before the tool hears of it; the tool's own fetch of the env is left out, the page's own script for it kept.
-      const start = performance.now()
+      // The clock is pinned while the tool hears of the swap, so a slow machine does not move the navigation's start past its requests.
+      const start = 1_000_000
+      const clock = spyOn(window.performance, 'now').mockReturnValue(start)
 
       document.documentElement.setAttribute('aria-busy', 'true')
       await Bun.sleep(0)
+      clock.mockRestore()
 
       await copiedBy(shadow().querySelector<HTMLButtonElement>('#kay-dev-network .fetch .copy')!)
       spyOn(window, 'fetch').mockImplementation((async () => new Response('')) as unknown as typeof window.fetch)
