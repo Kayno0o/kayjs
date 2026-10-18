@@ -13,6 +13,8 @@ export class TypesProcess {
   private lines: AsyncIterator<string> | undefined
   private idle: ReturnType<typeof setTimeout> | undefined
   private closed = false
+  // The writes run one at a time, as the process answers one line before it reads the next.
+  private turn: Promise<unknown> = Promise.resolve()
   // The server entry the config named at the last write, when no `--entry` did.
   configuredEntry: string | undefined
 
@@ -21,6 +23,22 @@ export class TypesProcess {
   // Writes the tree and answers the exit code of the write. `fresh` boots a new process first, as the config or a module it imports may have changed.
   // A kept process that went since the last write is replaced and the write sent again, so no write is lost.
   async write(fresh: boolean, refuse: string, command = WRITE): Promise<number> {
+    const previous = this.turn
+    const mine = (async () => {
+      try {
+        await previous
+      }
+      catch {}
+
+      return this.run(fresh, refuse, command)
+    })()
+
+    this.turn = mine
+
+    return mine
+  }
+
+  private async run(fresh: boolean, refuse: string, command: string): Promise<number> {
     clearTimeout(this.idle)
 
     if (fresh)
@@ -36,7 +54,7 @@ export class TypesProcess {
       return answer
     }
 
-    return kept && !this.closed ? this.write(true, refuse, command) : 1
+    return kept && !this.closed ? this.run(true, refuse, command) : 1
   }
 
   // Ends it for good: a write waiting on it answers at once, and none starts another.

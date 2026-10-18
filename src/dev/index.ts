@@ -145,6 +145,9 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   }
   let configRefused = false
   const writeTypes = async () => {
+    // Any write of the tree is the first one, so none is left waiting for a server.
+    writeFirstTree = undefined
+    clearTimeout(treeTimer)
     typesAgain = true
     typesWriting ??= (async () => {
       while (typesAgain) {
@@ -797,6 +800,10 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
       }
       treeTimer = setTimeout(() => writeFirstTree?.(), FIRST_TREE_WAIT_MS)
       treeTimer.unref()
+
+      // A server started ahead of the answer may be listening already.
+      if (address !== undefined)
+        writeFirstTree()
     }
     else {
       await writeTypes()

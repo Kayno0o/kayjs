@@ -133,7 +133,7 @@ Open pages refresh by themselves, an edited island is swapped in place, and a pr
 | `--quiet` | Leaves out the line per restart and stylesheet swap |
 | `--format text\|json` | `json` prints each line as one JSON object on stdout, with an `event` field |
 
-The server starts as soon as the config is read. The editor types in `.kay/types` are written once it listens, so the first page does not wait for them.
+The server starts as soon as the config is read. The editor types in `.kay/types` are written once it listens, or after three seconds if it does not, so the first page does not wait for them.
 
 The terminal shows the address once, then one line per change, with how long it took.
 

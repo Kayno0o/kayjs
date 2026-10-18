@@ -372,6 +372,26 @@ describe.concurrent('kay dev', () => {
     }
   }, 60_000)
 
+  it('runs a write asked for while the config is being loaded after the load, on a process of its own', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
+
+    await Bun.write(join(root, 'src/routes/index.kay'), 'p Home\n')
+    await Bun.write(join(root, 'kay.config.ts'), 'export default { publicDir: \'one\' }\n')
+
+    const types = new TypesProcess(root, undefined)
+
+    try {
+      const answers = await Promise.all([types.write(false, '', 'load'), types.write(true, '')])
+
+      expect(answers).toEqual([0, 0])
+      expect(readShadowSettings(root).publicDir).toBe(join(root, 'one'))
+    }
+    finally {
+      types.close()
+      await rm(root, { recursive: true, force: true })
+    }
+  }, 60_000)
+
   it.serial('boots a new types process when r is pressed, as the config or a module it imports may have changed', async () => {
     const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
     const keys = new PassThrough()

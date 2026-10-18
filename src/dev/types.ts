@@ -9,10 +9,12 @@ import { ANSWER, CONFIG_REFUSED, ENTRY, LOAD, REFUSE } from './refuse'
 // It stays up between writes: each line `kay dev` sends but `load` writes the tree once more with the config this process loaded, and the line it answers with is the exit code that write would have had.
 const [root, entry, refuse] = process.argv.slice(2)
 let loaded: KayConfig | undefined
+// The `load` before this write reported why the config does not load, so the write that tries again stays quiet about it.
+let reported = false
 
 // A config that fails to load, halfway through an edit say, is reported and the tree written with the defaults, so the components keep their types; the server reports it too.
 // It is tried again on the next write rather than kept.
-async function currentConfig(): Promise<{ config: KayConfig, refused: boolean }> {
+async function currentConfig(quiet = false): Promise<{ config: KayConfig, refused: boolean }> {
   if (loaded !== undefined)
     return { config: loaded, refused: false }
 
@@ -22,7 +24,8 @@ async function currentConfig(): Promise<{ config: KayConfig, refused: boolean }>
     return { config: loaded, refused: false }
   }
   catch (error) {
-    console.error(error)
+    if (!quiet)
+      console.error(error)
 
     return { config: {}, refused: refuse === REFUSE }
   }
@@ -32,6 +35,8 @@ async function currentConfig(): Promise<{ config: KayConfig, refused: boolean }>
 async function load(): Promise<number> {
   const { config, refused } = await currentConfig()
 
+  reported = loaded === undefined
+
   if (!refused)
     process.stdout.write(`\n${ENTRY}${projectPaths(root!, { ...config, entry: entry === '' ? config.entry : entry }).entry}\n`)
 
@@ -40,7 +45,11 @@ async function load(): Promise<number> {
 
 async function write(): Promise<number> {
   try {
-    const { config, refused } = await currentConfig()
+    const quiet = reported
+
+    reported = false
+
+    const { config, refused } = await currentConfig(quiet)
 
     const named = entry === '' ? config.entry : entry
 
