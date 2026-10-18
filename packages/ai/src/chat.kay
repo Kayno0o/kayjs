@@ -224,15 +224,18 @@ effect(() => {
     queueMicrotask(() => log?.scrollTo({ top: log.scrollHeight }))
 })
 
-async function send(again = false) {
-  const text = draft().trim()
+async function send(again = false, question?: string) {
+  const text = question ?? draft().trim()
 
   if (busy() || (!again && text === ''))
     return
 
   if (!again) {
     history.set([...history(), { id: nextId++, role: 'user', content: text }])
-    draft.set('')
+
+    // A suggestion leaves what the visitor was typing.
+    if (question === undefined)
+      draft.set('')
   }
 
   const mine = new AbortController()
@@ -295,8 +298,7 @@ function reset() {
 }
 
 function ask(question: string) {
-  draft.set(question)
-  void send()
+  void send(false, question)
 }
 
 function stop() {
