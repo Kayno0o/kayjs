@@ -126,7 +126,7 @@ A test file that writes to a constant does not count, as a test runs apart from 
 
 Lists of objects are fine too. A nav can loop over `export const NAV = [{ id: 'team', label: 'Team' }]` with `for link of NAV` or `NAV.map(link => link.id)`, and the list can hold imported icons, as long as the loop only reads each item.
 
-Handing an item to a function, copying it, or calling `filter`, `find` or `sort` on the list makes the build unsure, and the page is rendered per request.
+Handing an item to a function, or calling `filter`, `find` or `sort` on the list makes the build unsure, and the page is rendered per request.
 
 A constant exported further down with `export { CONTACT }` counts like one exported where it is declared. Exporting it under another name, or as the default, leaves the build unsure.
 

@@ -42,6 +42,7 @@ const CALLBACK = /^\s*\(\s*(?:async\s*)?(?:\(([^()]*)\)(?:\s*:[^=]*[^=\s])?|([\w
 const ARGUMENTS_END = /^\s*(?:,[^)]*)?\)/
 const PARAM = /^[A-Z_$][\w$]*$/i
 const PARAM_TYPE = /\s*[:=][\s\S]*$/
+const CALL_AFTER = /^\s*(?:\?\.\s*)?[(`]/
 const COMPUTED = /\s*(?:\?\.)?\[/y
 const WRITE_AFTER = /\s*(?:=(?![=>])|[-+*/%&|^]=|<<=|>>>?=|\*\*=|&&=|\|\|=|\?\?=|\+\+|--)/y
 const CONTINUES = /^\s*(?:\??\.|[([`])/
@@ -380,7 +381,7 @@ function merge(a: Literal, b: Literal): Literal | undefined {
   return undefined
 }
 
-// The names that use `name` as the item of a loop over the container at [start, end), and the text they are read in: a `for (const item of NAME)` statement or a template's `for item of NAME` block.
+// The binding that holds each item of a loop over the container at [start, end), and the text they are read in: a `for (const item of NAME)` statement or a template's `for item of NAME` block.
 function loopOver(text: string, start: number, end: number): { binding: string, from: number, to: number } | undefined {
   const before = text.slice(Math.max(0, start - 200), start)
   const script = SCRIPT_LOOP.exec(before)
@@ -393,7 +394,8 @@ function loopOver(text: string, start: number, end: number): { binding: string, 
 
     const from = end + header[0].length
     const body = skipSpace(text, from)
-    const to = text[body] === '{' ? closeAt(text, body) : statementEnd(text, body)
+    // A body without braces may go on over several lines, so it is not followed.
+    const to = text[body] === '{' ? closeAt(text, body) : undefined
 
     return to === undefined ? undefined : { binding: script[1]!, from, to }
   }
@@ -418,24 +420,6 @@ function loopOver(text: string, start: number, end: number): { binding: string, 
   }
 
   return { binding: template[2]!, from: end, to: to < 0 ? text.length : to }
-}
-
-// The end of the statement at `at`: its `;`, or the end of its line where no bracket is open.
-function statementEnd(text: string, at: number): number {
-  let depth = 0
-
-  for (let i = at; i < text.length; i++) {
-    const char = text[i]!
-
-    if (char === '(' || char === '[' || char === '{')
-      depth++
-    else if (char === ')' || char === ']' || char === '}')
-      depth--
-    else if ((char === ';' || char === '\n') && depth <= 0)
-      return i
-  }
-
-  return text.length
 }
 
 // Whether every use of `binding` within [from, to) only reads what an item of the container holds.
@@ -476,12 +460,13 @@ function callbackReads(text: string, cursor: number, method: string, items: read
 
   const close = ARGUMENTS_END.exec(text.slice(to, to + 400))
 
-  if (close === null || (!reduces && close[0].includes(',')))
+  // Without a starting value the first item is the accumulator, which the callback may write to.
+  if (close === null || reduces !== close[0].includes(','))
     return false
 
   const binding = params[reduces ? 1 : 0]
 
-  return binding === undefined || itemsRead(text, binding, from, to, item)
+  return binding !== undefined && itemsRead(text, binding, from, to, item)
 }
 
 // The end of the arrow function body expression at `at`: a `,` or `)` that closes nothing it opened.
@@ -540,6 +525,10 @@ function readsOnly(text: string, at: number, name: string, literal: Literal): bo
 
       if (close === undefined || !flat(node))
         break
+
+      // A call on the result runs a method of the container itself when the key names one.
+      if (CALL_AFTER.test(text.slice(close, close + 8)))
+        return false
 
       node = VALUE
       cursor = close

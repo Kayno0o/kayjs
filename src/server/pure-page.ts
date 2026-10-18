@@ -173,6 +173,7 @@ function moduleStateAt(file: string, source: string, unchanged: Unchanged | unde
 const IMPORT_CLAUSE = /\bimport\b([^'";(=]*)\sfrom\s*['"]/g
 const FROM = /\b(?:import|export)\b([^'";(=]*)\sfrom\s*['"]([^'"]+)['"]/g
 const FOR_EFFECT = /\bimport\s*['"]([^'"]+)['"]/g
+const COMMENTS = /\/\/[^\n]*|\/\*[\s\S]*?\*\//g
 const BRACES = /\{([^}]*)\}/
 const AS_PREFIX = /^.*\sas\s+/
 const QUOTES = /^['"]|['"]$/g
@@ -831,7 +832,7 @@ async function scanned(file: string, root: string | undefined, scans: object): P
 
 // The entries an import or export clause lists in braces, a `type` one left out.
 function importList(clause: string): string[] {
-  return (BRACES.exec(clause)?.[1] ?? '').split(',').map(entry => entry.trim()).filter(entry => entry !== '' && !TYPE_NAME.test(entry))
+  return (BRACES.exec(clause.replace(COMMENTS, ' '))?.[1] ?? '').split(',').map(entry => entry.trim()).filter(entry => entry !== '' && !TYPE_NAME.test(entry))
 }
 
 // The names an import or re-export clause takes: `{ A, B as C }` takes A and B, a default `default`, and a namespace, a bare `import` or a `*` everything.

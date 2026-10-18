@@ -460,7 +460,6 @@ describe('a page reading the items of an exported array of objects', () => {
       ['', 'ul\n  for link, index of NAV key={link.id}\n    li(data-icon={link.icon}) {link.label}{index}\n    if link.id === \'a\'\n      span {link.tags.length}'],
       ['', 'for row of GRID\n  for cell of row.cells key={cell.n}\n    p {cell.n}'],
       ['for (const link of NAV) {\n  console.log(link.id, link.label)\n}'],
-      ['for (const link of NAV)\n  console.log(link.id)'],
       ['const ids = NAV.map(link => link.id)\nconst total = NAV.reduce((sum, link) => sum + link.tags.length, 0)'],
       ['const ids = NAV.map((link, index): string => `${link.id}${index}`)\nconst some = NAV.some(link => link.label === \'A\')'],
       ['const out: string[] = []\nNAV.forEach((link) => {\n  out.push(link.id)\n})'],
@@ -488,6 +487,12 @@ describe('a page reading the items of an exported array of objects', () => {
       ['NAV.map(link => link.id, NAV)'],
       ['NAV.map(function (link) { return link.id })'],
       ['const rows = GRID.map(row => row.cells)'],
+      ['for (const link of NAV)\n  console.log(link.id)'],
+      ['const m = \'push\'\n;(NAV as any)[m]({})'],
+      ['const m = \'sort\'\nNAV[m]()'],
+      ['NAV.reduce((acc, link) => { acc.n += 1; return acc })'],
+      ['NAV.reduce(acc => acc)'],
+      ['const leak: unknown[] = []\nfor (const link of NAV) if (link.id)\n  leak.push(link)'],
     ]
 
     for (const [fence, template] of stops)
@@ -529,5 +534,16 @@ describe('a constant exported by name after its declaration', () => {
     const untaken = { 'src/content.ts': `${CONTENT}${LIST}export default CONTACT\nexport { CONTACT as INFO }\n`, 'src/routes/index.kay': PAGE('LIST', 'LIST.length') }
 
     expect(await stopOf(untaken)).toBeUndefined()
+  })
+})
+
+describe('an import list with comments', () => {
+  it('still names what the page takes', async () => {
+    const files = {
+      'src/content.ts': 'export const CONTACT = { email: \'a\' }\nexport const cache = new Map<string, string>()\nexport function put(): void {\n  cache.set(\'a\', \'b\')\n}\n',
+      'src/routes/index.kay': '---\nimport {\n  CONTACT, // phone\n  put,\n} from \'../content\'\n---\np {CONTACT.email}{put}\n',
+    }
+
+    expect(await stopOf(files)).toEqual(expect.stringContaining('module state'))
   })
 })
