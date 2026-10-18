@@ -1,16 +1,34 @@
-import { mkdir, rm, stat } from 'node:fs/promises'
+import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import process from 'node:process'
 
 const LOCK = join(import.meta.dir, '../docs/.kay/build.lock')
-// A lock older than this belongs to a test that died.
-const STALE_MS = 5 * 60_000
+const HOLDER = join(LOCK, 'pid')
 
-async function modifiedAgo(): Promise<number> {
+// A lock whose holder is no longer running belongs to a test that died; one still running keeps it however long its build takes.
+async function heldByTheDead(): Promise<boolean> {
+  let pid: number
+
   try {
-    return Date.now() - (await stat(LOCK)).mtimeMs
+    pid = Number(await readFile(HOLDER, 'utf8'))
   }
   catch {
-    return 0
+    // Taken an instant ago, its pid not written yet, unless its holder died in between.
+    try {
+      return Date.now() - (await stat(LOCK)).mtimeMs > 10_000
+    }
+    catch {
+      return false
+    }
+  }
+
+  try {
+    process.kill(pid, 0)
+
+    return false
+  }
+  catch {
+    return true
   }
 }
 
@@ -21,13 +39,12 @@ export async function takeDocsBuild(): Promise<() => Promise<void>> {
   for (;;) {
     try {
       await mkdir(LOCK)
+      await writeFile(HOLDER, String(process.pid))
 
       return async () => rm(LOCK, { recursive: true, force: true })
     }
     catch {
-      const age = await modifiedAgo()
-
-      if (age > STALE_MS)
+      if (await heldByTheDead())
         await rm(LOCK, { recursive: true, force: true })
 
       await Bun.sleep(200)
