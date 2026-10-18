@@ -19,7 +19,7 @@ head
     h2 Privacy
     p The short version: this site sets no cookie, shows no advertising and sells nothing. It does not follow you from one site to another.
     h3 Reading the docs
-    p Like any web server, ours receives your IP address and browser details to send you the pages. The server in front of the docs may keep them in an access log for a limited time, to run and secure the site.
+    p Like any web server, ours receives your IP address and browser details to send you the pages. The server in front of the docs keeps an access log of the address, the time, the page and your browser for 14 days, to run and secure the site.
     h3 Visit counts
     p The docs count visits with Umami, which we run ourselves next to the docs. It stores nothing on your device, so there is no cookie to accept and no banner.
     p Your browser never contacts Umami. Our server sends it each visit: the page address, the page title, the page you came from, your screen size, your language, your browser's User-Agent and your IP address.
