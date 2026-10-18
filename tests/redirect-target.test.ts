@@ -48,8 +48,8 @@ it('keeps the paths of the site, full URLs and a query holding slashes', () => {
     expect(() => new Redirect(location, 302), location).not.toThrow()
 })
 
-it('turns the //host a locale on its own host gives into a full URL, and only for the app\'s own hosts', () => {
-  const state = { settings: { locales: ['en', 'fr'], defaultLocale: 'en', prefixDefault: false, hosts: { en: 'example.com', fr: 'exemple.fr' } } } as unknown as LocaleState
+it('keeps the //host of a locale on its own host, and refuses every other //', () => {
+  const state = { settings: { locales: ['en', 'fr'], defaultLocale: 'en', prefixDefault: false, hosts: { en: 'example.com', fr: 'fr.example.com' } } } as unknown as LocaleState
   const { redirect } = stoppers(new Request('https://example.com/pricing'))
   const to = (location: string): string => {
     try {
@@ -60,8 +60,18 @@ it('turns the //host a locale on its own host gives into a full URL, and only fo
     }
   }
 
-  expect(to('//exemple.fr/tarifs')).toBe('https://exemple.fr/tarifs')
-  expect(to('//exemple.fr')).toBe('https://exemple.fr')
-  expect(to('//evil.example/x')).toContain('which a browser reads as another site')
-  expect(to('//exemple.fr.evil.example/x')).toContain('which a browser reads as another site')
+  expect(to('//fr.example.com/tarifs')).toBe('//fr.example.com/tarifs')
+  expect(to('//fr.example.com')).toBe('//fr.example.com')
+  expect(to('//FR.example.com/x')).toBe('//FR.example.com/x')
+  expect(to('//fr.example.com?a=1')).toBe('//fr.example.com?a=1')
+
+  for (const hostile of ['//fr.example.com.evil.com/x', '//fr.example.com@evil.com/x', '//fr.example.com:8080/x', '//evil.com/x', '//fr.example.com\\@evil.com', '//fr.example.com\\evil.com', ' //fr.example.com/x', '///fr.example.com/x'])
+    expect(to(hostile), hostile).toContain('which a browser reads as another site')
+})
+
+it('refuses every // when the app has no locale hosts', () => {
+  const { redirect } = stoppers(new Request('https://example.com/'))
+  const state = { settings: { locales: ['en'], defaultLocale: 'en', prefixDefault: false } } as unknown as LocaleState
+
+  expect(() => runInLocale(state, () => redirect(['//fr.example.com/x'][0]!))).toThrow('which a browser reads as another site')
 })

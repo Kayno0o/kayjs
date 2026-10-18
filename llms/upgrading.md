@@ -11,9 +11,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 - `analytics({ provider: 'ga4' | 'fathom' | 'cloudflare' | 'custom' })` with no `consent` counted every production visit from the first page; it now behaves as `consent: true`, so kay's notice asks and nothing is sent or loaded before a yes. Keep it by writing `consent: true` (or your own wording / `notice: false`), or write `consent: false` to count without asking, which the app then answers for. `kay check` reports the call as `deprecated-analytics-consent` and `kay check --fix` (or `kay upgrade`) writes `consent: true`. A `kay build --static` site asks the same for Fathom and Cloudflare, kay writing the notice's script into the export; Google Analytics and `custom` need a server there, as before.
 - `plausible`, `umami`, `simpleanalytics` and `matomo` still count at once, and now show an information line with an opt-out (`kay_analytics=no` stops the counting for that visitor): word it with `info: { text, ok, optOut }` or write `info: false` when the site informs visitors itself. No lint, as no old code is wrong.
+
 ### `ctx.redirect` refuses `//host` and backslash forms
 
-- `ctx.redirect('//other.example/')` and its relatives (`/\other.example`, `\\other.example`, `/%2F/other.example`) now throw, answering a server error, as a browser reads them as another host. Redirect to the full `https://other.example/` instead, and pass a `?next=` param through `localPath()`. `kay check` reports a literal one as a type error; no `deprecated` lint is added, as a computed target is a runtime value `kay check` cannot read.
+- `ctx.redirect('//other.example/')` and its relatives (`/\other.example`, `\\other.example`, `/%2F/other.example`) now throw, answering a server error, as a browser reads them as another host. The `//host` that `localize()` gives for an `i18n.domains` host stays allowed. Redirect to the full `https://other.example/` instead, and pass a `?next=` param through `localPath()`. `kay check` reports a literal one as a type error; no `deprecated` lint is added, as a computed target is a runtime value `kay check` cannot read.
 
 ## 1.54.0
 

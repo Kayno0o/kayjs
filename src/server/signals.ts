@@ -13,6 +13,18 @@ const OTHER_SCHEME = /^(?!https?:)[a-z][a-z\d+.-]*:/i
 const NON_ASCII = /[^\0-\x7F]+/g
 const HOST_END = /[/?#]/
 
+// `localize()` and `alternate()` give `//host/path` for a locale served on its own host, which keeps the scheme the page came over; the host must be exactly one of those the app configures, so a port, userinfo or longer name is no match.
+function isOwnHost(location: string): boolean {
+  const hosts = localeState()?.settings.hosts
+
+  if (hosts === undefined || !location.startsWith('//'))
+    return false
+
+  const host = location.slice(2).split(HOST_END, 1)[0]!.toLowerCase()
+
+  return Object.values(hosts).some(own => own.toLowerCase() === host)
+}
+
 export class Redirect {
   readonly location: string
 
@@ -26,7 +38,7 @@ export class Redirect {
     // A path starting with a slash or a backslash is of this site, so one a browser, a proxy or a second decoding would read as another host (`//evil.example`, `/\\evil.example`, `/%2F/evil.example`) is refused; a full URL names its host and is allowed.
     const path = location.trimStart()
 
-    if (path.startsWith('\\') || (path.startsWith('/') && leavesSite(path)))
+    if (!isOwnHost(location) && (path.startsWith('\\') || (path.startsWith('/') && leavesSite(path))))
       throw new TypeError(`kay: the redirect to ${JSON.stringify(location)} is a path which a browser reads as another site; redirect to a full https:// URL for another site, and pass a ?next= param through localPath()`)
 
     this.location = location.toWellFormed().replace(NON_ASCII, encodeURI)
@@ -43,25 +55,13 @@ export class Denied {
   }
 }
 
-// `localize()` and `alternate()` give `//host/path` for a locale served on its own host; that host is the app's own, so it goes out as a full URL on the scheme of the request.
-function ownHost(location: string, request: Request): string {
-  const hosts = localeState()?.settings.hosts
-
-  if (hosts === undefined || !location.startsWith('//'))
-    return location
-
-  const host = location.slice(2).split(HOST_END, 1)[0]!
-
-  return Object.values(hosts).includes(host) ? `${new URL(request.url).protocol}${location}` : location
-}
-
 // What `ctx.redirect`, `ctx.notFound` and `ctx.deny` do in every kind of context: a read is redirected with 302, a post with 303.
 export function stoppers(request: Request): Pick<RequestContext, 'redirect' | 'notFound' | 'deny'> {
   const status = request.method === 'GET' || request.method === 'HEAD' ? 302 : 303
 
   return {
     redirect: (location, code = status) => {
-      throw new Redirect(ownHost(location, request), code)
+      throw new Redirect(location, code)
     },
     notFound: () => {
       throw new NotFound()
