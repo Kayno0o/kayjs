@@ -5,7 +5,7 @@ import process from 'node:process'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'bun:test'
 import { pages } from '../src/server'
 import { analytics } from '../src/server/analytics'
-import { forwardsSettled } from '../src/server/analytics-server'
+import { forwardsSettled, warningsReset } from '../src/server/analytics-server'
 import { testSite } from '../src/test'
 import { scratchDir } from './scratch'
 
@@ -28,6 +28,7 @@ let answer = 202
 let provider: ReturnType<typeof Bun.serve>
 let before: string | undefined
 let counter = 0
+let scriptFetches = 0
 
 beforeAll(async () => {
   before = process.env.NODE_ENV
@@ -38,6 +39,12 @@ beforeAll(async () => {
     port: 0,
     async fetch(request) {
       const url = new URL(request.url)
+
+      if (url.pathname === '/script.js') {
+        scriptFetches++
+
+        await Bun.sleep(30)
+      }
 
       if (url.pathname === '/script.js')
         return new Response(`window.t = (data) => fetch("http://localhost:${provider.port}/collect", { method: 'POST', body: data })`, { headers: { 'content-type': 'text/javascript' } })
@@ -497,10 +504,48 @@ describe('a custom provider', () => {
     expect(received).toEqual([])
   })
 
+  it('fetches the script once for concurrent requests on an empty cache', async () => {
+    const app = await site(custom({ script: `http://localhost:${provider.port}/script.js?once=1` }))
+    const before = scriptFetches
+    const answers = await Promise.all([1, 2, 3, 4].map(async () => app.handle(new Request('http://localhost/_kay/analytics/script.js'))))
+
+    expect(answers.map(response => response.status)).toEqual([200, 200, 200, 200])
+    expect(scriptFetches - before).toBe(1)
+  })
+
   it('answers 502 when the script cannot be fetched', async () => {
     const app = await site(custom({ script: 'http://localhost:1/script.js' }))
 
     expect((await app.handle(new Request('http://localhost/_kay/analytics/script.js'))).status).toBe(502)
+  })
+})
+
+describe('the warnings', () => {
+  it('limits each kind to one a minute, a burst of one not hiding another', async () => {
+    const logged: string[] = []
+    const sink = Symbol.for('kay.log')
+    const global = globalThis as Record<symbol, unknown>
+    const previous = global[sink]
+
+    global[sink] = (_level: string, message: string) => logged.push(message)
+    warningsReset()
+
+    try {
+      const app = await site({ provider: 'plausible', host: 'http://localhost:1' })
+
+      await send(app, { u: 'http://other.example/' })
+      await send(app, { u: 'http://other.example/' })
+      await send(app, { u: 'http://other.example/' })
+
+      await send(app, { u: PAGE })
+      await send(app, { u: PAGE })
+    }
+    finally {
+      global[sink] = previous
+    }
+
+    expect(logged.filter(message => message.includes('names other.example'))).toHaveLength(1)
+    expect(logged.filter(message => message.includes('did not take a visit'))).toHaveLength(1)
   })
 })
 

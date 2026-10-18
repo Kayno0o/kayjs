@@ -33,8 +33,8 @@ const CONTROL_CHARACTERS = /[\p{Cc}\p{Zl}\p{Zp}\p{Bidi_Control}]+/gu
 const SCREEN = /^\d{1,5}x\d{1,5}$/
 const LANGUAGE = /^[a-z]{2,3}(?:-[a-z\d]{2,8}){0,3}$/i
 const TRAILING_SLASH = /\/$/
-// Logged once a minute at most, so a provider that is down does not fill the log with a line per visit.
-let lastWarning = 0
+// Logged once a minute at most per kind, so a provider that is down does not fill the log with a line per visit and a burst of one kind does not hide another.
+const lastWarnings = new Map<string, number>()
 
 // What a visit says of the page and the browser, checked: nothing of it reaches a provider unchecked.
 interface Visit {
@@ -131,6 +131,11 @@ export async function forwardsSettled(): Promise<void> {
   await Promise.allSettled(pending)
 }
 
+// Lets a test see a warning again that an earlier one already logged within the minute.
+export function warningsReset(): void {
+  lastWarnings.clear()
+}
+
 export function analyticsServer(options: AnalyticsOptions): AnyElysia {
   const gated = options.consent !== undefined && options.consent !== false
 
@@ -181,7 +186,7 @@ export function analyticsServer(options: AnalyticsOptions): AnyElysia {
 // Passes a visit on in the background, the visitor's answer not waiting for the provider; past 200 waiting at once, a visit is dropped rather than queued.
 function send(options: VisitOptions, visit: Visit): void {
   if (pending.size >= MAX_PENDING) {
-    warn('analytics: the provider is too slow, so visits are being dropped')
+    warn('slow', 'analytics: the provider is too slow, so visits are being dropped')
 
     return
   }
@@ -195,11 +200,17 @@ function send(options: VisitOptions, visit: Visit): void {
 // The script and the endpoint are the app's config: nothing in a request chooses where kay fetches from or posts to.
 function customServer(options: Extract<AnalyticsOptions, { provider: 'custom' }>, gated: boolean) {
   let script: { text: string, at: number } | undefined
+  // One fetch in flight at a time, so concurrent requests on an empty cache share it.
+  let fetching: Promise<string | undefined> | undefined
 
   return new Elysia({ name: 'kay-analytics-custom' })
     .get(CUSTOM_SCRIPT_PATH, async ({ request }) => {
       if (script === undefined || Date.now() - script.at > SCRIPT_TTL_MS) {
-        const text = await fetchScript(options.script)
+        fetching ??= fetchScript(options.script).finally(() => {
+          fetching = undefined
+        })
+
+        const text = await fetching
 
         if (text === undefined)
           return new Response(null, { status: 502 })
@@ -246,7 +257,7 @@ function customServer(options: Extract<AnalyticsOptions, { provider: 'custom' }>
         return new Response(text ?? null, { status: answer.status >= 200 && answer.status < 600 ? answer.status : 502, headers: { 'content-type': answer.headers.get('content-type')?.startsWith('application/json') === true ? 'application/json' : 'text/plain', 'cache-control': 'no-store' } })
       }
       catch (error) {
-        warn('analytics: the custom provider did not take a request', error)
+        warn('custom', 'analytics: the custom provider did not take a request', error)
 
         return new Response(null, { status: 502 })
       }
@@ -259,12 +270,12 @@ async function fetchScript(url: string): Promise<string | undefined> {
     const text = answer.ok ? await readCapped(new Request('http://nowhere.invalid', { method: 'POST', body: answer.body }), MAX_SCRIPT_BYTES) : undefined
 
     if (text === undefined)
-      warn(`analytics: the tracker script at ${url} could not be fetched, answering ${answer.status} or too large`)
+      warn('script', `analytics: the tracker script at ${url} could not be fetched, answering ${answer.status} or too large`)
 
     return text
   }
   catch (error) {
-    warn(`analytics: the tracker script at ${url} could not be fetched`, error)
+    warn('script', `analytics: the tracker script at ${url} could not be fetched`, error)
 
     return undefined
   }
@@ -295,7 +306,7 @@ function readVisit(text: string, request: Request, hosts: ReadonlySet<string>): 
     return undefined
 
   if (page.hostname !== new URL(request.url).hostname && !hosts.has(page.hostname)) {
-    warn(`analytics: a visit names ${page.hostname} but the request came to ${new URL(request.url).hostname}, so it was dropped; a proxy that rewrites Host needs the host listed in hosts`)
+    warn('host', `analytics: a visit names ${page.hostname} but the request came to ${new URL(request.url).hostname}, so it was dropped; a proxy that rewrites Host needs the host listed in hosts`)
 
     return undefined
   }
@@ -327,14 +338,14 @@ async function forward(options: VisitOptions, visit: Visit): Promise<void> {
     await fetch(url, { method, headers, ...body !== undefined && { body: JSON.stringify(body) }, redirect: 'manual', signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS) })
   }
   catch (error) {
-    warn(`analytics: the ${options.provider} provider did not take a visit`, error)
+    warn('provider', `analytics: the ${options.provider} provider did not take a visit`, error)
   }
 }
 
-function warn(message: string, error?: unknown): void {
-  if (Date.now() - lastWarning <= MINUTE_MS)
+function warn(kind: string, message: string, error?: unknown): void {
+  if (Date.now() - (lastWarnings.get(kind) ?? 0) <= MINUTE_MS)
     return
 
-  lastWarning = Date.now()
+  lastWarnings.set(kind, Date.now())
   kayLog('warn', message, error)
 }
