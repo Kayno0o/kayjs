@@ -8,18 +8,36 @@ const current = ctx.url.pathname.replace(/\/$/, '') || '/'
 import ChatLauncher from '@kaynooo/kayjs-ai/chat-launcher.kay'
 import Icon from '@kaynooo/kayjs-ui/icon.kay'
 import TooltipHost from '@kaynooo/kayjs-ui/tooltip-host.kay'
+import ArrowUp from '~icons/tabler/arrow-up'
+import ArrowsMaximize from '~icons/tabler/arrows-maximize'
+import ArrowsMinimize from '~icons/tabler/arrows-minimize'
 import MessageCircle from '~icons/tabler/message-circle'
+import Plus from '~icons/tabler/plus'
+import PlayerStopFilled from '~icons/tabler/player-stop-filled'
 import X from '~icons/tabler/x'
 import Shell from '../../components/shell.kay'
 import '../../site.css'
+
+const SUGGESTIONS = ['How do I add a page with a form?', 'What is an island?', 'How do I deploy a kay app?']
+const TOOL_LABELS = { search_docs: 'Searched the docs', read_page: 'Read a page' }
 ---
 Shell(nav={nav} current={current})
   slot
 TooltipHost(persist hydrate="idle")
-ChatLauncher(action={reply} label="Ask the docs" placeholder="How do I..." toolDetails={false} openLabel="Ask the docs" closeLabel="Close the chat")
+ChatLauncher(action={reply} label="Ask the docs" greeting="What do you want to know about kay?" suggestions={SUGGESTIONS} toolLabels={TOOL_LABELS} placeholder="How do I..." toolDetails={false} openLabel="Ask the docs" closeLabel="Close the chat")
   @icon
     Icon(icon={MessageCircle})
   @closeIcon
     Icon(icon={X})
+  @newIcon
+    Icon(icon={Plus})
+  @expandIcon
+    Icon(icon={ArrowsMaximize})
+  @collapseIcon
+    Icon(icon={ArrowsMinimize})
+  @sendIcon
+    Icon(icon={ArrowUp})
+  @stopIcon
+    Icon(icon={PlayerStopFilled})
   @note
     | An AI model writes the answers from these docs, and it can be wrong. Check the pages it links before you rely on one. #[a(href="/guides/ask-the-docs") How the chat works].

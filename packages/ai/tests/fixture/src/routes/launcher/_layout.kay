@@ -4,6 +4,6 @@ import { reply } from '../chat.kay'
 import ChatLauncher from '@kaynooo/kayjs-ai/chat-launcher.kay'
 ---
 slot
-ChatLauncher(action={reply} label="Assistant")
+ChatLauncher(action={reply} label="Assistant" suggestions={['What is it?', 'How does it work?']})
   @note
     | Answers can be wrong.

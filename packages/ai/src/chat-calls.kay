@@ -1,8 +1,10 @@
 ---
 import type { ToolCall } from './types'
 
-const { calls, details, runningLabel, doneLabel, failedLabel, argumentsLabel, resultLabel } = props<{
+const { calls, labels, details, runningLabel, doneLabel, failedLabel, argumentsLabel, resultLabel } = props<{
   calls: ToolCall[]
+  // The phrase for a tool by its name, in the folded line.
+  labels: Record<string, string>
   // Whether a call opens to its arguments and result.
   details: boolean
   runningLabel: string
@@ -17,22 +19,40 @@ const LABELS = { running: runningLabel, done: doneLabel, failed: failedLabel }
 function status(call: ToolCall) {
   return LABELS[call.status]
 }
+
+// The calls in one line, each tool once with its count: `Searched the docs x2, read_page`, ended by the status of what is not done.
+function summary() {
+  const counts = new Map<string, number>()
+
+  for (const call of calls)
+    counts.set(call.name, (counts.get(call.name) ?? 0) + 1)
+
+  const line = [...counts].map(([name, count]) => `${labels[name] ?? name}${count > 1 ? ` x${count}` : ''}`).join(', ')
+  const failed = calls.some(call => call.status === 'failed')
+
+  if (calls.some(call => call.status === 'running'))
+    return `${line} (${LABELS.running})`
+
+  return failed ? `${line} (${LABELS.failed})` : line
+}
 ---
-ul.kai-chat-calls
-  for call of calls key={call.id}
-    li.kai-chat-call(data-status={call.status})
-      if details
-        details
-          summary
-            span.kai-chat-call-name {call.name}
-            |
-            span.kai-chat-call-status {status(call)}
-          p.kai-chat-call-title {argumentsLabel}
-          pre.kai-chat-call-code {JSON.stringify(call.input, null, 2)}
-          if call.result !== undefined
-            p.kai-chat-call-title {resultLabel}
-            pre.kai-chat-call-code {call.result}
-      else
-        span.kai-chat-call-name {call.name}
-        |
-        span.kai-chat-call-status {status(call)}
+details.kai-chat-calls
+  summary.kai-chat-calls-summary {summary()}
+  ul.kai-chat-calls-list
+    for call of calls key={call.id}
+      li.kai-chat-call(data-status={call.status})
+        if details
+          details
+            summary
+              span.kai-chat-call-name {call.name}
+              |
+              span.kai-chat-call-status {status(call)}
+            p.kai-chat-call-title {argumentsLabel}
+            pre.kai-chat-call-code {JSON.stringify(call.input, null, 2)}
+            if call.result !== undefined
+              p.kai-chat-call-title {resultLabel}
+              pre.kai-chat-call-code {call.result}
+        else
+          span.kai-chat-call-name {call.name}
+          |
+          span.kai-chat-call-status {status(call)}

@@ -76,14 +76,14 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
     await page.press('Enter')
     await page.waitFor('[data-pending] .kai-chat-text', { text: 'Working' })
     // Send turns into Stop while the reply is under way.
-    expect(await page.text('.kai-chat-form button')).toBe('Stop')
+    expect(await page.evaluate(() => document.querySelector('.kai-chat-form button')?.getAttribute('aria-label'))).toBe('Stop')
 
     await page.press('Escape')
     await page.waitFor('[data-pending]', { gone: true })
 
     expect((await page.text('.kai-chat-turn[data-role="assistant"] .kai-chat-text'))?.trim()).toBe('Working')
     expect(await page.text('.kai-chat-note')).toBe('Stopped')
-    expect(await page.text('.kai-chat-form button')).toBe('Send')
+    expect(await page.evaluate(() => document.querySelector('.kai-chat-form button')?.getAttribute('aria-label'))).toBe('Send')
     expect(await page.count('[role="alert"]')).toBe(0)
     expect(page.errors).toEqual([])
   })
@@ -105,6 +105,8 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
     expect(await page.text(`${turn} .kai-chat-call:nth-child(1) .kai-chat-call-status`)).toBe('Done')
     expect(await page.text(`${turn} .kai-chat-call:nth-child(2) .kai-chat-call-status`)).toBe('Failed')
     expect(await page.text(`${turn} .kai-chat-call:nth-child(1) pre`)).toContain('"title": "Milk"')
+    // The calls fold into one line.
+    expect(await page.text(`${turn} .kai-chat-calls-summary`)).toBe('add_note, breaks (Failed)')
     // The calls come before the text, and a call's markup is text, never HTML.
     expect(await page.evaluate(() => document.querySelector('.kai-chat-calls')?.nextElementSibling?.classList.contains('kai-chat-text'))).toBe(true)
     expect(await page.text(`${turn} .kai-chat-call:nth-child(2) pre:last-of-type`)).toContain('Something went wrong on our side')
@@ -163,7 +165,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
 
     expect(await slow.count('.kai-chat-turn[data-role="user"]')).toBe(1)
     expect(await slow.value('textarea')).toBe('Second')
-    expect(await slow.text('.kai-chat-form button')).toBe('Stop')
+    expect(await slow.evaluate(() => document.querySelector('.kai-chat-form button')?.getAttribute('aria-label'))).toBe('Stop')
 
     await slow.press('Escape')
     await slow.waitFor('[data-pending]', { gone: true })
@@ -348,7 +350,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
     await page.waitFor('[data-pending]', { gone: true })
 
     expect((await page.text('.kai-chat-turn[data-role="assistant"] .kai-chat-text'))?.trim()).toBe('Half a reply')
-    expect(await page.text('.kai-chat-form button')).toBe('Send')
+    expect(await page.evaluate(() => document.querySelector('.kai-chat-form button')?.getAttribute('aria-label'))).toBe('Send')
     // The words that came stay and the message was answered, so there is nothing to ask again.
     expect(await page.count('[role="alert"] button')).toBe(0)
     expect(await page.evaluate(() => document.activeElement?.tagName)).toBe('TEXTAREA')
@@ -366,7 +368,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
     expect(await page.count('[role="alert"]')).toBe(0)
     expect(await page.count('.kai-chat-turn')).toBe(0)
     expect(await page.value('textarea')).toBe('Go')
-    expect(await page.text('.kai-chat-form button')).toBe('Send')
+    expect(await page.evaluate(() => document.querySelector('.kai-chat-form button')?.getAttribute('aria-label'))).toBe('Send')
     expect(await page.evaluate(() => document.activeElement?.tagName)).toBe('TEXTAREA')
 
     // Sent again, it is the one user turn there is, not a second beside the stopped one.
@@ -490,7 +492,37 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
       })
     })
 
-    test('the panel fits a 400px phone and the empty list draws no border', async () => {
+    test('a suggestion sends, New conversation clears the log and the kept history, and the panel enlarges', async () => {
+      const page = await site.open('/launcher/one')
+
+      await page.click('.kai-launcher-button')
+      await page.waitUntil(chatHydrated)
+
+      expect(await page.count('.kai-chat-suggestion')).toBe(2)
+
+      fakeAi.reply('Answer')
+      await page.click('.kai-chat-suggestion')
+      await page.waitFor('.kai-chat-turn[data-role="assistant"]', { text: 'Answer' })
+
+      expect(fakeAi.last()?.messages[0]?.content).toBe('What is it?')
+      expect(await page.count('.kai-chat-suggestion')).toBe(0)
+
+      const width = () => page.evaluate(() => document.querySelector('.kai-launcher-panel')!.getBoundingClientRect().width)
+      const small = await width()
+
+      await page.click('.kai-launcher-expand')
+
+      expect(await width()).toBeGreaterThan(small)
+
+      await page.click('.kai-launcher-actions button')
+      await page.waitFor('.kai-chat-empty')
+
+      expect(await page.count('.kai-chat-turn')).toBe(0)
+      expect(await page.evaluate(() => sessionStorage.getItem('kai-chat'))).toBe('[]')
+      expect(page.errors).toEqual([])
+    })
+
+    test('the panel fits a 400px phone and the empty chat shows no list', async () => {
       const page = await site.open('/launcher/one', { width: 400, height: 700 })
 
       await page.click('.kai-launcher-button')
@@ -499,10 +531,10 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
       const fit = await page.evaluate(() => {
         const box = document.querySelector('.kai-launcher-panel')!.getBoundingClientRect()
 
-        return { left: box.left >= 0, right: box.right <= window.innerWidth, top: box.top >= 0, bottom: box.bottom <= window.innerHeight, scrolls: document.documentElement.scrollWidth > window.innerWidth, border: getComputedStyle(document.querySelector('.kai-chat-log')!).borderTopColor }
+        return { left: box.left >= 0, right: box.right <= window.innerWidth, top: box.top >= 0, bottom: box.bottom <= window.innerHeight, scrolls: document.documentElement.scrollWidth > window.innerWidth, log: getComputedStyle(document.querySelector('.kai-chat-log')!).display }
       })
 
-      expect(fit).toMatchObject({ left: true, right: true, top: true, bottom: true, scrolls: false, border: 'rgba(0, 0, 0, 0)' })
+      expect(fit).toMatchObject({ left: true, right: true, top: true, bottom: true, scrolls: false, log: 'none' })
     })
   })
 })

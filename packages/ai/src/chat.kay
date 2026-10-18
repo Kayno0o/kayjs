@@ -1,5 +1,5 @@
 ---
-import type { Action, ActionStream, Failure, SanitizeOptions } from 'kay'
+import type { Action, ActionStream, Failure, JSX, SanitizeOptions } from 'kay'
 import type { Message, Progress, ToolCall } from './types'
 import { ActionError, effect, onCleanup, onMount, sanitizeHtml, signal, trustHtml, untrack } from 'kay'
 import { markdownHtml } from 'kay/markdown'
@@ -28,7 +28,7 @@ interface Turn extends Message {
   calls?: ToolCall[] | undefined
 }
 
-const { action, initial = [], label = 'Chat', placeholder = 'Write a message…', sendLabel = 'Send', stopLabel = 'Stop', retryLabel = 'Try again', thinkingLabel = 'Thinking…', stoppedLabel = 'Stopped', errorMessage = 'The reply failed.', keep = 20, tableLabel = 'Table', toolDetails = true, remember, links = 'apart', runningLabel = 'Running', doneLabel = 'Done', failedLabel = 'Failed', argumentsLabel = 'Arguments', resultLabel = 'Result', class: className } = props<{
+const { action, initial = [], label = 'Chat', placeholder = 'Write a message…', sendLabel = 'Send', stopLabel = 'Stop', retryLabel = 'Try again', thinkingLabel = 'Thinking…', stoppedLabel = 'Stopped', errorMessage = 'The reply failed.', keep = 20, tableLabel = 'Table', toolDetails = true, greeting = 'How can I help?', suggestions = [], toolLabels = {}, sendIcon, stopIcon, remember, links = 'apart', runningLabel = 'Running', doneLabel = 'Done', failedLabel = 'Failed', argumentsLabel = 'Arguments', resultLabel = 'Result', class: className } = props<{
   // The page's streaming action, `action(schema, ({ messages }) => ask(messages))`, which may also `ctx.fail`; the chat posts the latest messages to it and reads the reply as it streams.
   // Returning `ask(messages, { tools }).progress()` instead streams the tool calls as well, which the chat shows before the text of their turn.
   action: Action<{ messages: Message[] }, AsyncIterable<string | Progress> | Failure<unknown>>
@@ -50,6 +50,15 @@ const { action, initial = [], label = 'Chat', placeholder = 'Write a message…'
   tableLabel?: string | undefined
   // Whether each tool call opens to its arguments and result, shown as plain text; false shows its name and status only.
   toolDetails?: boolean | undefined
+  // Said in the empty chat above the suggestions.
+  greeting?: string | undefined
+  // Questions offered in the empty chat; a click sends one.
+  suggestions?: string[] | undefined
+  // What the tools of a reply are called in the one line they fold into, by tool name such as `{ search_docs: 'Searched the docs' }`; a tool without one shows its own name, and a tool called more than once adds `x2`.
+  toolLabels?: Record<string, string> | undefined
+  // What the send and stop buttons draw, in place of an arrow and a square.
+  sendIcon?: JSX.Element
+  stopIcon?: JSX.Element
   // The status of a tool call, and the names of its two parts.
   runningLabel?: string | undefined
   doneLabel?: string | undefined
@@ -272,6 +281,24 @@ async function send(again = false) {
   }
 }
 
+// Starts the conversation over: what is under way stops, and the log, the field and the kept history are cleared.
+function reset() {
+  stop()
+  history.set([])
+  draft.set('')
+  failure.set(undefined)
+  takenBack.set(false)
+  partial.set('')
+  calls.set([])
+  spoken.set([])
+  told.clear()
+}
+
+function ask(question: string) {
+  draft.set(question)
+  void send()
+}
+
 function stop() {
   const stream = streaming()
 
@@ -320,7 +347,15 @@ function scrolled() {
   pinned = log !== undefined && log.scrollHeight - log.scrollTop - log.clientHeight < PINNED_PX
 }
 ---
-section.kai-chat(class={className} onKeyDown={escape})
+section.kai-chat(class={className} onKeyDown={escape} data-empty={history().length === 0 && !busy()} ref={element => element.addEventListener('kai-chat-new', reset)})
+  if history().length === 0 && !busy()
+    .kai-chat-empty
+      p.kai-chat-greeting {greeting}
+      if suggestions.length > 0
+        ul.kai-chat-suggestions
+          for question of suggestions key={question}
+            li
+              button.kai-chat-suggestion(type="button" onClick={() => ask(question)}) {question}
   // The log is the turns so far; the reply streaming in is hidden from screen readers until it is whole, so the finished turn is announced once, not word by word. The status line says the thinking label, then each tool call as it starts and ends.
   .kai-chat-log(role="log" aria-label={label} tabindex="0" ref={watch} onScroll={scrolled})
     for turn of history() key={turn.id}
@@ -329,7 +364,7 @@ section.kai-chat(class={className} onKeyDown={escape})
           p.kai-chat-text {turn.content}
         else
           if turn.calls && turn.calls.length > 0
-            Calls(calls={turn.calls} details={toolDetails} runningLabel={runningLabel} doneLabel={doneLabel} failedLabel={failedLabel} argumentsLabel={argumentsLabel} resultLabel={resultLabel})
+            Calls(calls={turn.calls} labels={toolLabels} details={toolDetails} runningLabel={runningLabel} doneLabel={doneLabel} failedLabel={failedLabel} argumentsLabel={argumentsLabel} resultLabel={resultLabel})
           if turn.content !== ''
             .kai-chat-text(innerHTML={markdown(turn.content)})
           if turn.stopped
@@ -337,7 +372,7 @@ section.kai-chat(class={className} onKeyDown={escape})
     if busy()
       article.kai-chat-turn(data-role="assistant" data-pending="" aria-hidden="true")
         if calls().length > 0
-          Calls(calls={calls()} details={toolDetails} runningLabel={runningLabel} doneLabel={doneLabel} failedLabel={failedLabel} argumentsLabel={argumentsLabel} resultLabel={resultLabel})
+          Calls(calls={calls()} labels={toolLabels} details={toolDetails} runningLabel={runningLabel} doneLabel={doneLabel} failedLabel={failedLabel} argumentsLabel={argumentsLabel} resultLabel={resultLabel})
         if partial() !== ''
           .kai-chat-text(innerHTML={markdown(partial(), false)})
         else if calls().length === 0
@@ -356,6 +391,12 @@ section.kai-chat(class={className} onKeyDown={escape})
   form.kai-chat-form(onSubmit={event => { event.preventDefault(); void send() }})
     textarea.kui-field-input(ref={element => { field = element }} bind:value={draft} rows="1" aria-label={label} placeholder={placeholder} onKeyDown={keyDown})
     if busy()
-      button.kui-btn(type="button" onClick={stop}) {stopLabel}
+      button.kai-chat-send(type="button" aria-label={stopLabel} data-tooltip={stopLabel} onClick={stop})
+        slot stopIcon
+          svg.kui-icon(viewBox="0 0 24 24" fill="currentColor" aria-hidden="true")
+            rect(x="6" y="6" width="12" height="12" rx="2")
     else
-      button.kui-btn(type="submit") {sendLabel}
+      button.kai-chat-send(type="submit" aria-label={sendLabel} data-tooltip={sendLabel})
+        slot sendIcon
+          svg.kui-icon(viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true")
+            path(d="M12 19V5M5 12l7-7 7 7")

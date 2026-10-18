@@ -5,7 +5,7 @@ import Panel from './chat-panel.kay'
 
 type ChatProps = typeof Chat extends Component<infer Props> ? Props : never
 
-const { icon, closeIcon, note, openLabel, closeLabel, remember = 'kai-chat', class: className, ...chat } = props<Omit<ChatProps, 'class' | 'links' | 'remember'> & {
+const { icon, closeIcon, sendIcon, stopIcon, newIcon, expandIcon, collapseIcon, note, openLabel, closeLabel, newLabel, expandLabel, collapseLabel, remember = 'kai-chat', class: className, ...chat } = props<Omit<ChatProps, 'class' | 'links' | 'remember' | 'sendIcon' | 'stopIcon'> & {
   // The text of the button while the panel is closed and while it is open; `Open the chat` and `Close the chat` by default. The chat's `label` heads the panel.
   openLabel?: string | undefined
   closeLabel?: string | undefined
@@ -14,6 +14,17 @@ const { icon, closeIcon, note, openLabel, closeLabel, remember = 'kai-chat', cla
   // What the button and the panel's close button draw, in place of a chat bubble and a cross.
   icon?: JSX.Element
   closeIcon?: JSX.Element
+  // The header's two other buttons, which clear the conversation and enlarge the panel: a new-chat plus, and a pair of arrows out and in.
+  newIcon?: JSX.Element
+  // The chat's round buttons, as `Chat` takes them.
+  sendIcon?: JSX.Element
+  stopIcon?: JSX.Element
+  expandIcon?: JSX.Element
+  collapseIcon?: JSX.Element
+  // Names and tooltips of those buttons: `New conversation`, `Enlarge the chat` and `Shrink the chat`.
+  newLabel?: string | undefined
+  expandLabel?: string | undefined
+  collapseLabel?: string | undefined
   // A line under the chat, such as a warning that its answers can be wrong.
   note?: JSX.Element
   // On the button and panel's wrapper.
@@ -21,7 +32,7 @@ const { icon, closeIcon, note, openLabel, closeLabel, remember = 'kai-chat', cla
 }>()
 ---
 // The panel keeps its state across page swaps, and the chat inside hydrates, and so loads, when the panel is first shown.
-Panel(persist label={chat.label} openLabel={openLabel} closeLabel={closeLabel} class={className})
+Panel(persist label={chat.label} openLabel={openLabel} closeLabel={closeLabel} newLabel={newLabel} expandLabel={expandLabel} collapseLabel={collapseLabel} class={className})
   @icon
     if icon
       | {icon}
@@ -35,7 +46,37 @@ Panel(persist label={chat.label} openLabel={openLabel} closeLabel={closeLabel} c
     else
       svg.kui-icon(viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true")
         path(d="M18 6L6 18M6 6l12 12")
+  @newIcon
+    if newIcon
+      | {newIcon}
+    else
+      svg.kui-icon(viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true")
+        path(d="M12 5v14M5 12h14")
+  @expandIcon
+    if expandIcon
+      | {expandIcon}
+    else
+      svg.kui-icon(viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true")
+        path(d="M15 4h5v5M9 20H4v-5M20 4l-6 6M4 20l6-6")
+  @collapseIcon
+    if collapseIcon
+      | {collapseIcon}
+    else
+      svg.kui-icon(viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true")
+        path(d="M20 9h-5V4M4 15h5v5M15 9l5-5M9 15l-5 5")
   Chat(hydrate="visible" {...chat} remember={remember} links="here")
+    @sendIcon
+      if sendIcon
+        | {sendIcon}
+      else
+        svg.kui-icon(viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true")
+          path(d="M12 19V5M5 12l7-7 7 7")
+    @stopIcon
+      if stopIcon
+        | {stopIcon}
+      else
+        svg.kui-icon(viewBox="0 0 24 24" fill="currentColor" aria-hidden="true")
+          rect(x="6" y="6" width="12" height="12" rx="2")
   if note
     .kai-launcher-note
       | {note}

@@ -99,7 +99,10 @@ A page, with or without a `server` fence, hands the action straight to `Chat`. T
 - Enter sends and Shift+Enter starts a new line.
 - Stop, or Escape in the field, ends the reply. The words that came stay, marked as stopped. Stopped before the first word, the message goes back to the field.
 - A screen reader hears each finished turn once, not word by word, and each tool call as it starts and ends.
-- A table wider than its bubble scrolls sideways inside it, and the keyboard can scroll it.
+- An empty chat says `greeting` and offers the `suggestions` you give it, a few questions that send on a click.
+- The visitor's messages are bubbles at the right; answers take the full width. The tools a reply used fold into one muted line, such as `Searched the docs x2, Read a page`, which opens to the list; `toolLabels` words each tool, `{ search_docs: 'Searched the docs' }`, and a tool without one shows its name.
+- Send and Stop are round icon buttons, `@sendIcon` and `@stopIcon` replacing the arrow and the square.
+- A table wider than the chat scrolls sideways inside it, and the keyboard can scroll it.
 - A message the action's schema refuses (422) goes back to the field, also when it was a retry, and the refusal's message shows.
 - A link in a reply opens in a new tab, so following it never loses the conversation; `links="here"` opens a link to your own site in place, which `ChatLauncher` sets.
 - Images in a reply are not shown. A model that read a hostile page could point an image at a link carrying your visitor's conversation.
@@ -128,7 +131,11 @@ The chat's code loads the first time the panel opens, so a visitor who never ope
 
 The button works from the keyboard: Enter or Space opens the panel and puts the focus in the field, and Escape closes it and gives the focus back to the button. A reply under way stops on the first Escape.
 
-`openLabel` names the button and `closeLabel` its close button, `@icon` and `@closeIcon` replace the two icons, and `@note` adds a line under the chat. The other props are `Chat`'s. The button has a `data-tooltip`, which shows when the layout renders kayjs-ui's `TooltipHost`.
+The panel is as tall as its content needs, up to a maximum.
+
+Its header has a New conversation button, which clears the log and the kept history, and an Enlarge button for code-heavy answers (hidden on a phone). `openLabel` names the button and `closeLabel` its close button, `newLabel`, `expandLabel` and `collapseLabel` name the two others, `@icon`, `@closeIcon`, `@newIcon`, `@expandIcon` and `@collapseIcon` replace the icons, and `@note` adds a line under the chat. The button turns into a close icon while the panel is open.
+
+A site restyles the panel with custom properties, all optional: `--kai-chat-accent`, `--kai-chat-bubble`, `--kai-chat-radius`, `--kai-chat-shadow`, `--kai-chat-width` and `--kai-chat-width-large`. The other props are `Chat`'s. The button has a `data-tooltip`, which shows when the layout renders kayjs-ui's `TooltipHost`.
 
 The conversation is kept in the tab's session storage under the `remember` prop (`kai-chat`), so on a site with sign-in, give it a key per visitor or clear it when they sign out.
 
