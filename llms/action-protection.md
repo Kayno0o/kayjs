@@ -70,7 +70,7 @@ export default guard(async ({ request, headers, deny }) => {
 - `ctx` holds `request`, `locale`, `cookies`, `locals` and `client`. The limit counts before the guards and the app's `resolve` hooks, so `locals` holds what `derive` adds, a `session()` say, and not what a guard sets; `count: 'succeeded'` counts under the key the check used.
 - Counts live in the process unless `store` names a shared one, for at most 10,000 windows per limit, the expired ones dropped first and the oldest past that.
 - `store: sqliteData(path)` in kay.config.ts (or `store: { rates }`) is where every limit naming no `store` counts, kay's own login-less routes aside, so one line shares the counts of all of them between replicas.
-- `rateLimit: { max: 5, window: '1m', store: sqliteRates('data/rates.sqlite') }`, `sqliteRates` from `kay/server`, counts every process of the machine opening that file together, which stores each key pseudonymised, hashed with a salt it keeps and keyed by the session's, the app's (`secret`, `KAY_SECRET`) or the preview's secret once one is set.
+- `rateLimit: { max: 5, window: '1m', store: sqliteRates('data/rates.sqlite') }`, `sqliteRates` from `kay/server`, counts every process of the machine opening that file together, which stores each key pseudonymised as an HMAC keyed by the session's, the app's (`secret`, `KAY_SECRET`) or the preview's secret once one is set, else by a random key in `<path>.key` beside the file.
 - `RateStore`, a `hit(key, windowMs, weight)` method adding `weight` (one unless given) to the count and giving `{ count, resetAt }` and, for a limit counting what went through, a `peek(key)` giving the open window without counting or `undefined`, is the shape of an app's own.
 
 #### Honeypot

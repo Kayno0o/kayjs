@@ -4,7 +4,7 @@ import type { ByteSize } from '../src/runtime/byte-size'
 import type { ClientBuild } from '../src/server/client'
 import type { LogEntry } from '../src/server/log'
 import type { ProtectionRefusal } from '../src/server/protection'
-import { mkdtemp, rm, stat } from 'node:fs/promises'
+import { mkdtemp, readdir, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
@@ -882,25 +882,75 @@ process.exit(0)
     }
   })
 
-  it('keys the hash of a stored rate key with the session\'s secret once one is set', async () => {
+  it('never stores a rate key as a plain hash of its input, with no secret, a secret or a restart', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'kay-rates-'))
     const script = `import { Database } from 'bun:sqlite'
+import { readFileSync } from 'node:fs'
 import { sqliteRates } from ${JSON.stringify(join(import.meta.dir, '../src/server/protection.ts'))}
 import { useStampSecret } from ${JSON.stringify(join(import.meta.dir, '../src/server/stamp.ts'))}
 const path = ${JSON.stringify(join(dir, 'rates.sqlite'))}
-const store = sqliteRates(path)
-store.hit('before', 60_000)
+const inputs = ['203.0.113.7', 'ada@example.com', 'login\\nkey:ada@example.com', 'login\\n203.0.113.7']
+const sha = (...parts) => { const hasher = new Bun.CryptoHasher('sha256'); for (const part of parts) hasher.update(part); return hasher.digest('base64url') }
+const first = sqliteRates(path)
+const hits = []
+for (const input of inputs) hits.push(first.hit(input, 60_000).count)
+// A restart within the window: a new store on the same file counts on.
+const second = sqliteRates(path)
+for (const input of inputs) hits.push(second.hit(input, 60_000).count)
+const noSecret = new Set(new Database(path).query('SELECT key FROM kay_rates').all().map(row => row.key))
+const keyFile = readFileSync(path + '.key', 'utf8')
+const guesses = inputs.flatMap(input => [sha(input), sha(keyFile, input), sha(Buffer.from(keyFile, 'base64url'), input)])
+const plain = guesses.filter(guess => noSecret.has(guess)).length
 useStampSecret('a session secret, long enough too', 'session')
-store.hit('after', 60_000)
-const db = new Database(path)
-const salt = db.query('SELECT salt FROM kay_rates_salt').get().salt
-const plain = key => new Bun.CryptoHasher('sha256').update(salt).update(key).digest('base64url')
-const keys = new Set(db.query('SELECT key FROM kay_rates').all().map(row => row.key))
-console.log(JSON.stringify([keys.has(plain('before')), keys.has(plain('after')), keys.size]))
+second.hit('after', 60_000)
+const withSecret = new Set(new Database(path).query('SELECT key FROM kay_rates').all().map(row => row.key))
+const hasSalt = new Database(path).query("SELECT name FROM sqlite_master WHERE name = 'kay_rates_salt'").all().length
+console.log(JSON.stringify({ hits, plain, size: noSecret.size, after: withSecret.size, plainAfter: withSecret.has(sha('after')), hasSalt }))
 `
 
     try {
-      expect(await isolated(script)).toEqual([true, false, 2])
+      expect(await isolated(script)).toEqual({ hits: [1, 1, 1, 1, 2, 2, 2, 2], plain: 0, size: 4, after: 5, plainAfter: false, hasSalt: 0 })
+      expect((await stat(join(dir, 'rates.sqlite.key'))).mode & 0o777).toBe(0o600)
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('shares one key file between processes opening a store at once, and between restarts', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kay-rates-'))
+    const path = join(dir, 'rates.sqlite')
+    const script = `import { sqliteRates } from ${JSON.stringify(join(import.meta.dir, '../src/server/protection.ts'))}
+const store = sqliteRates(${JSON.stringify(path)})
+console.log(JSON.stringify(store.hit('203.0.113.7', 60_000).count))
+`
+
+    try {
+      const counts = await Promise.all(Array.from({ length: 6 }, async () => isolated(script)))
+
+      // Six processes with six different keys would each count 1.
+      expect((counts as number[]).toSorted()).toEqual([1, 2, 3, 4, 5, 6])
+      expect(await isolated(script)).toBe(7)
+      expect((await readdir(dir)).filter(name => name.includes('.key'))).toEqual(['rates.sqlite.key'])
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('makes no key file while the app\'s secret is set', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kay-rates-'))
+    const script = `import { sqliteRates } from ${JSON.stringify(join(import.meta.dir, '../src/server/protection.ts'))}
+import { useStampSecret } from ${JSON.stringify(join(import.meta.dir, '../src/server/stamp.ts'))}
+useStampSecret('a session secret, long enough too', 'session')
+const store = sqliteRates(${JSON.stringify(join(dir, 'rates.sqlite'))})
+store.hit('ada@example.com', 60_000)
+console.log(JSON.stringify(store.hit('ada@example.com', 60_000).count))
+`
+
+    try {
+      expect(await isolated(script)).toBe(2)
+      expect(await readdir(dir)).not.toContain('rates.sqlite.key')
     }
     finally {
       await rm(dir, { recursive: true, force: true })

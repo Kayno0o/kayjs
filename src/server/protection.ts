@@ -4,6 +4,8 @@ import type { BlockList } from 'node:net'
 import type { ProxyConfig } from '../config'
 import type { ActionRateLimit, RateKey, RateKeyContext, RateLimit, RateStore, RateWindow, ServerAction } from '../runtime/action'
 import type { Duration } from '../runtime/duration'
+import { linkSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import process from 'node:process'
 import { KayError } from '../compiler/errors'
 import { honeypotField, minTimeOf, STAMP_FIELD } from '../runtime/action'
 import { durationSeconds } from '../runtime/duration'
@@ -148,19 +150,68 @@ export function memoryRates(): { hit: (key: string, windowMs: number, weight?: n
   }
 }
 
+const RATES_KEY_BYTES = 32
+
+// The random key every process opening `path` shares when no secret is set: created once beside the file, race-free, and never written into the store itself.
+function ratesKeyFile(path: string): Buffer {
+  if (path === ':memory:' || path === '')
+    return Buffer.from(crypto.getRandomValues(new Uint8Array(RATES_KEY_BYTES)))
+
+  const file = `${path}.key`
+  const read = () => {
+    try {
+      const key = Buffer.from(readFileSync(file, 'utf8').trim(), 'base64url')
+
+      return key.length === RATES_KEY_BYTES ? key : undefined
+    }
+    catch {
+      return undefined
+    }
+  }
+  const existing = read()
+
+  if (existing)
+    return existing
+
+  const key = Buffer.from(crypto.getRandomValues(new Uint8Array(RATES_KEY_BYTES)))
+  const temp = `${file}.${process.pid}.${crypto.randomUUID()}`
+
+  writeFileSync(temp, key.toString('base64url'), { mode: 0o600 })
+
+  try {
+    // A hard link fails when another process won the race, where a rename would replace its key.
+    linkSync(temp, file)
+
+    return key
+  }
+  catch {
+    // A file that is there but unreadable as a key is replaced; one another process just made is read.
+    const won = read()
+
+    if (won)
+      return won
+
+    renameSync(temp, file)
+
+    return key
+  }
+  finally {
+    rmSync(temp, { force: true })
+  }
+}
+
 // Windows kept in a SQLite file, so every process of the machine opening it counts the same attempts.
-// A key is stored pseudonymised: hashed with a salt the file keeps, under an HMAC keyed by the session's or the preview's secret once one is set, so the file alone cannot be checked against a guessed address.
+// A key is stored pseudonymised: an HMAC keyed by the session's, the app's or the preview's secret once one is set, else by a random key kept in a file beside the store (`<path>.key`, the server's user alone), so the store's file alone cannot be checked against a guessed address.
 export function sqliteRates(path: string): RateStore {
   const db = openSqlite(path)
 
   db.run('CREATE TABLE IF NOT EXISTS kay_rates (key TEXT PRIMARY KEY, count INTEGER NOT NULL, reset_at INTEGER NOT NULL)')
   // The sweep deletes by `reset_at`, so an index keeps it off a scan of every key.
   db.run('CREATE INDEX IF NOT EXISTS kay_rates_reset ON kay_rates (reset_at)')
-  db.run('CREATE TABLE IF NOT EXISTS kay_rates_salt (id INTEGER PRIMARY KEY CHECK (id = 1), salt TEXT NOT NULL)')
-  db.query('INSERT OR IGNORE INTO kay_rates_salt (id, salt) VALUES (1, ?)').run(crypto.randomUUID())
 
-  const salt = db.query<{ salt: string }, []>('SELECT salt FROM kay_rates_salt').get()!.salt
-  const hashed = (key: string) => new Bun.CryptoHasher('sha256', sharedKey('rates')).update(salt).update(key).digest('base64url')
+  // Read on the first key hashed without a secret, so an app with one never makes the file.
+  let ownKey: Buffer | undefined
+  const hashed = (key: string) => new Bun.CryptoHasher('sha256', sharedKey('rates') ?? (ownKey ??= ratesKeyFile(path))).update(key).digest('base64url')
 
   // The row's old values are what both cases read: a closed window opens afresh, an open one counts the weight more.
   const hit = db.query<{ count: number, reset_at: number }, [string, number, number, number]>('INSERT INTO kay_rates (key, count, reset_at) VALUES (?1, ?4, ?2 + ?3) ON CONFLICT (key) DO UPDATE SET count = CASE WHEN reset_at <= ?2 THEN ?4 ELSE count + ?4 END, reset_at = CASE WHEN reset_at <= ?2 THEN ?2 + ?3 ELSE reset_at END RETURNING count, reset_at')

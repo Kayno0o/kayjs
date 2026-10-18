@@ -147,7 +147,7 @@ import { sqliteRates } from 'kay/server'
 rateLimit: { max: 5, window: '1m', store: sqliteRates('data/rates.sqlite') }
 ```
 
-`sqliteRates` stores each key hashed, so the file alone cannot be checked against a guessed address.
+`sqliteRates` stores each key hashed under a secret the file does not hold: the app's, else a random key kay keeps in a `.key` file beside it, so the file alone cannot be checked against a guessed address.
 
 ### Your own store
 
