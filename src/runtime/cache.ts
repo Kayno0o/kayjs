@@ -20,8 +20,8 @@ export interface CacheStore {
 }
 
 // What one process tells the others: cache keys it dropped, or prerendered page paths it marked stale.
-// `at` is a clock reading of the sending process, which a message naming no key carries to say how far its clock reads.
-export type Invalidation = { keys: string[], at?: number } | { pages: string[] }
+// `at` is a clock reading of the sending process, carried by a message naming no page: older processes read it as pages marked stale, none.
+export type Invalidation = { keys: string[] } | { pages: string[], at?: number }
 
 export interface CacheOptions {
   // Keeps the value across restarts, and for every process sharing the store; the value must survive devalue, as session data does.
@@ -261,14 +261,6 @@ function heard(message: string): void {
   const invalidation = JSON.parse(message) as Invalidation
 
   if ('keys' in invalidation) {
-    if (typeof invalidation.at === 'number') {
-      for (const listener of clockListeners)
-        listener(invalidation.at)
-    }
-
-    if (invalidation.keys.length === 0)
-      return
-
     const named = new Set(invalidation.keys)
 
     dropEntries(key => named.has(key))
@@ -277,6 +269,14 @@ function heard(message: string): void {
       listener(key => named.has(key))
   }
   else {
+    if (typeof invalidation.at === 'number') {
+      for (const listener of clockListeners)
+        listener(invalidation.at)
+    }
+
+    if (invalidation.pages.length === 0)
+      return
+
     for (const listener of pageListeners)
       listener(invalidation.pages)
   }

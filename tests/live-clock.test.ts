@@ -51,6 +51,9 @@ async function start(script: string, store: string, behind: number): Promise<Rep
 
   reader.releaseLock()
 
+  if (value === undefined)
+    throw new Error('a replica ended before it listened')
+
   return { url: `http://127.0.0.1:${new TextDecoder().decode(value).trim()}`, child }
 }
 
@@ -81,11 +84,14 @@ describe('replicas whose clocks disagree', () => {
     const feed = new Feed(await fetch(`${invalidator.url}/_kay/live`, { ...JSON_POST, body: JSON.stringify({ proofs: proofsOf(pagesOf(html)), watch } satisfies LiveRequest) }))
 
     expect(await feed.next()).toEqual([[CACHE_LIVE_ID, key, 0]])
-    // The replicas hear each other every half second.
-    await Bun.sleep(1200)
-    await fetch(`${invalidator.url}/__invalidate`)
+    let stamp = 0
 
-    const [[, , stamp]] = await feed.next() as [[string, string, number]]
+    // The replicas hear each other every half second: an invalidation before the clock reading arrives may still date before the read.
+    for (let attempt = 0; attempt < 10 && stamp < readAt; attempt++) {
+      await Bun.sleep(300)
+      await fetch(`${invalidator.url}/__invalidate`)
+      ;[[, , stamp]] = await feed.next() as [[string, string, number]]
+    }
 
     expect(stamp).toBeGreaterThanOrEqual(readAt)
     await feed.close()

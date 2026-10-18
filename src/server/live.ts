@@ -41,9 +41,11 @@ export const LIVE_HEADER = 'x-kay-live'
 const MAX_STAMPED = 10_000
 // How many watched keys the eviction passes over before it gives up for now, so a set of watched keys does not make each read scan it whole.
 const MAX_SKIPS = 32
-// How far ahead of its clock a process tells the others it has dated reads, and the most it believes another's clock to be ahead of its own.
-const BEAT_MS = 1000
-const MAX_AHEAD_MS = 60_000
+// A clock a little ahead of the server's still dates a proof the server made.
+const SKEW_MS = 5000
+// How far ahead of its clock a process tells the others it has dated reads, and the most it believes another's clock to be ahead of its own: the skew a proof tolerates and a beat.
+const BEAT_MS = 250
+const MAX_AHEAD_MS = SKEW_MS + BEAT_MS
 
 interface CacheReads {
   // The time the render read each key it follows.
@@ -115,13 +117,13 @@ onLiveRead((key) => {
 let announced = 0
 let heardAhead = 0
 
-// Tells the processes sharing a store that this one dates reads up to a second ahead of its clock, at most once a second: a process whose clock is behind then stamps an invalidation after the read, not before it.
+// Tells the processes sharing a store that this one dates reads up to a quarter of a second ahead of its clock, at most four times a second: a process whose clock is behind then stamps an invalidation after the read, not before it.
 function announce(now: number): void {
   if (now < announced)
     return
 
   announced = now + BEAT_MS
-  broadcast({ keys: [], at: announced })
+  broadcast({ pages: [], at: announced })
 }
 
 onClockHeard((at) => {
@@ -174,8 +176,6 @@ onKeysInvalidated((matches) => {
   return []
 })
 
-// A clock a little ahead of the server's still dates a proof the server made.
-const SKEW_MS = 5000
 const open = new Map<string, number>()
 
 // The proof that a page read these keys of these values: whoever holds it is let watch exactly them, as whoever rendered the page was.
