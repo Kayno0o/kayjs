@@ -385,4 +385,104 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
     expect(await page.evaluate(() => document.querySelector('[role="log"]')?.getAttribute('aria-label'))).toBe('Assistant')
     expect(await page.evaluate(() => document.querySelector('.kai-chat')?.hasAttribute('aria-label'))).toBe(false)
   })
+
+  describe('the launcher', () => {
+    const chunks = (page: Awaited<ReturnType<typeof site.open>>) => page.evaluate(() => performance.getEntriesByType('resource').map(entry => entry.name).filter(name => name.endsWith('.js')).length)
+    // The chat inside the panel is an island of its own, marked `_$k` once hydrated.
+    const chatHydrated = () => document.querySelector('.kai-launcher-body [data-component]') && (document.querySelector('.kai-launcher-body [data-component]') as unknown as { _$k?: boolean })._$k === true
+    const closed = '.kai-launcher-panel[hidden]'
+    const opened = '.kai-launcher-panel:not([hidden])'
+
+    test('the chat loads and hydrates on the first open only, and the button opens and closes the panel by keyboard', async () => {
+      const page = await site.open('/launcher/one')
+
+      expect(await page.count(closed)).toBe(1)
+      expect(await page.evaluate(() => document.querySelector('.kai-launcher-button')?.getAttribute('aria-expanded'))).toBe('false')
+
+      const before = await chunks(page)
+
+      await page.evaluate(() => document.querySelector<HTMLElement>('.kai-launcher-button')?.focus())
+      await page.press('Enter')
+      await page.waitFor(opened)
+
+      expect(await page.evaluate(chatHydrated)).toBe(false)
+
+      await page.waitUntil(chatHydrated)
+
+      expect(await chunks(page)).toBeGreaterThan(before)
+      expect(await page.evaluate(() => document.querySelector('.kai-launcher-button')?.getAttribute('aria-expanded'))).toBe('true')
+      expect(await page.evaluate(() => document.activeElement?.closest('.kai-launcher-panel') !== null)).toBe(true)
+      expect(await page.a11y('.kai-launcher')).toEqual([])
+
+      await page.press('Escape')
+      await page.waitFor(closed)
+
+      expect(await page.evaluate(() => document.activeElement?.classList.contains('kai-launcher-button'))).toBe(true)
+      expect(page.errors).toEqual([])
+    })
+
+    test('the conversation stays across a page swap, a source link navigates in place, and a reload of the tab finds it again', async () => {
+      const page = await site.open('/launcher/one')
+
+      await page.click('.kai-launcher-button')
+      await page.waitUntil(chatHydrated)
+      fakeAi.reply('See [two](/launcher/two) or [elsewhere](https://example.com).')
+      await page.fill('textarea', 'Hello')
+      await page.press('Enter')
+      await page.waitFor('[data-pending]', { gone: true })
+      await page.waitFor('.kai-chat-text a', { text: 'two' })
+
+      expect(await page.evaluate(() => [...document.querySelectorAll('.kai-chat-text a')].map(link => link.getAttribute('target')))).toEqual([null, '_blank'])
+
+      await page.evaluate(() => {
+        (window as unknown as { marker: string }).marker = 'same document'
+      })
+      await page.click('.kai-chat-text a')
+      await page.waitFor('h1', { text: 'Two' })
+
+      expect(await page.evaluate(() => (window as unknown as { marker?: string }).marker)).toBe('same document')
+      expect(await page.count(opened)).toBe(1)
+      expect(await page.count('.kai-chat-turn')).toBe(2)
+
+      await page.reload()
+      await page.click('.kai-launcher-button')
+      await page.waitUntil(chatHydrated)
+      await page.waitFor('.kai-chat-turn[data-role="user"]', { text: 'Hello' })
+
+      expect(await page.count('.kai-chat-turn')).toBe(2)
+      expect(page.errors).toEqual([])
+    })
+
+    test('Escape stops a reply under way before it closes the panel', async () => {
+      const page = await site.open('/launcher/one')
+
+      await page.click('.kai-launcher-button')
+      await page.waitUntil(chatHydrated)
+      await page.fill('textarea', 'Go')
+      await page.press('Enter')
+      await page.waitFor('[data-pending]')
+      await page.press('Escape')
+      await page.waitFor('[data-pending]', { gone: true })
+
+      expect(await page.count(opened)).toBe(1)
+
+      await page.press('Escape')
+      await page.waitFor(closed)
+    })
+
+    test('the panel fits a 400px phone and the empty list draws no border', async () => {
+      const page = await site.open('/launcher/one', { width: 400, height: 700 })
+
+      await page.click('.kai-launcher-button')
+      await page.waitFor(opened)
+
+      const fit = await page.evaluate(() => {
+        const box = document.querySelector('.kai-launcher-panel')!.getBoundingClientRect()
+
+        return { left: box.left >= 0, right: box.right <= window.innerWidth, top: box.top >= 0, bottom: box.bottom <= window.innerHeight, scrolls: document.documentElement.scrollWidth > window.innerWidth, border: getComputedStyle(document.querySelector('.kai-chat-log')!).borderTopColor }
+      })
+
+      expect(fit).toMatchObject({ left: true, right: true, top: true, bottom: true, scrolls: false, border: 'rgba(0, 0, 0, 0)' })
+    })
+  })
 })

@@ -22,7 +22,7 @@ export default defineConfig({
   plugins: [tailwind],
   // Behind the host's nginx, whose address every visitor would otherwise share: the chat's limits count the visitor.
   proxy: true,
-  // The chat on /ask runs on Mistral's account, whose rate limit is low (about a request a second, and an answer takes up to five): 4 questions a minute per visitor, 60,000 tokens a day each (about a dozen full answers), 1,500,000 a day in all (a few euros a month at most). The counts are kept in docs/data, so a restart keeps them.
+  // The chat button on every page runs on Mistral's account, whose rate limit is low (about a request a second, and an answer takes up to five): 4 questions a minute per visitor, 60,000 tokens a day each (about a dozen full answers), 1,500,000 a day in all (a few euros a month at most). The counts are kept in docs/data, so a restart keeps them.
   extensions: [pageWeight, ai({ limit: { max: 4, window: '1m', store: chatCounts }, budget: { tokens: 60_000, total: 1_500_000, window: '1d', store: chatCounts } })],
   site: 'https://kayjs.kaynooo.fr',
   seo: {
@@ -39,5 +39,5 @@ export default defineConfig({
   // kay's own docs wear kay's mark.
   lints: { 'default-favicon': 'allow' },
   // /docs is where a visitor, or an agent, guesses the docs are.
-  redirects: { '/docs': '/getting-started/introduction', ...Object.fromEntries(migrations.map(framework => [`/guides/migrating-from-${framework}`, `/migrating/from-${framework}`])), ...Object.fromEntries(moved.map(topic => [`/reference/${topic}`, `/llms/${topic}`])) },
+  redirects: { '/docs': '/getting-started/introduction', '/ask': '/', ...Object.fromEntries(migrations.map(framework => [`/guides/migrating-from-${framework}`, `/migrating/from-${framework}`])), ...Object.fromEntries(moved.map(topic => [`/reference/${topic}`, `/llms/${topic}`])) },
 })

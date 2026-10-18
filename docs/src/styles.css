@@ -262,27 +262,6 @@ kbd {
   background: var(--mantle);
 }
 
-/* The link to the chat, under the search box. */
-.ask-link {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.25rem 0.6rem;
-  color: var(--muted);
-  font-size: 0.875rem;
-  text-decoration: none;
-}
-
-.ask-link:hover {
-  color: var(--text);
-}
-
-.chat-note {
-  margin-top: 1rem;
-  color: var(--muted);
-  font-size: 0.875rem;
-}
-
 /* Page: one centered column with its sections in a block above the text, until wide screens give them a column of their own. */
 main {
   display: flex;

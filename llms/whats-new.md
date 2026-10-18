@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## 1.53.3
 
+- kayjs-ai's `ChatLauncher` puts the chat behind a button at the bottom right of every page, opening it in a panel whose JavaScript loads on the first open, keeping the conversation across page swaps and reloads of the tab; `Chat` takes `remember` and `links="here"` for it ([Chat island](../packages/ai/llms/chat.md#floating-chat)). The docs' chat moved from `/ask` to that button.
 - The `Chat` island opens the links of a reply in a new tab, so following a source no longer swaps the page and drops the conversation ([Chat island](../packages/ai/llms/chat.md)).
 - A page is prerendered when the module it imports holds an exported container the build cannot vouch for, as long as the page takes none of it: only the pages importing that export, or something built from it, stay per request. A list of objects such as `export const NAV = [{ id, label, icon }]` (imported icons allowed) read by `for item of NAV`, `NAV.map(item => item.id)` and the like, a constant read by a computed key, and a test that writes to a constant or uses `import * as` on an unrelated module no longer make a module state, and a constant exported by `export { X }`, `export { X as Y }` or `export default X` is judged like one exported where it is declared ([Prerendering](prerendering.md#prerendering)).
 

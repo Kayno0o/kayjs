@@ -19,6 +19,7 @@
   "exports": {
     "./add": "./src/add.ts",
     "./chat.kay": "./src/chat.kay",
+    "./chat-launcher.kay": "./src/chat-launcher.kay",
     ".": {
       "types": "./types/index.d.ts",
       "default": "./src/index.ts"

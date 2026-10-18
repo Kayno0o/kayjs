@@ -1,11 +1,25 @@
 --- server
 import { navigation } from '../../pages'
+import { reply } from './_actions.kay'
 
 const nav = await navigation()
 const current = ctx.url.pathname.replace(/\/$/, '') || '/'
 --- script
+import ChatLauncher from '@kaynooo/kayjs-ai/chat-launcher.kay'
+import Icon from '@kaynooo/kayjs-ui/icon.kay'
+import TooltipHost from '@kaynooo/kayjs-ui/tooltip-host.kay'
+import MessageCircle from '~icons/tabler/message-circle'
+import X from '~icons/tabler/x'
 import Shell from '../../components/shell.kay'
 import '../../site.css'
 ---
 Shell(nav={nav} current={current})
   slot
+TooltipHost(persist hydrate="idle")
+ChatLauncher(action={reply} label="Ask the docs" placeholder="How do I..." toolDetails={false} openLabel="Ask the docs" closeLabel="Close the chat")
+  @icon
+    Icon(icon={MessageCircle})
+  @closeIcon
+    Icon(icon={X})
+  @note
+    | An AI model writes the answers from these docs, and it can be wrong. Check the pages it links before you rely on one. #[a(href="/guides/ask-the-docs") How the chat works].

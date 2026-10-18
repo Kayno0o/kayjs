@@ -1,0 +1,41 @@
+---
+import type { Component, JSX } from 'kay'
+import Chat from './chat.kay'
+import Panel from './chat-panel.kay'
+
+type ChatProps = typeof Chat extends Component<infer Props> ? Props : never
+
+const { icon, closeIcon, note, openLabel, closeLabel, remember = 'kai-chat', class: className, ...chat } = props<Omit<ChatProps, 'class' | 'links' | 'remember'> & {
+  // The text of the button while the panel is closed and while it is open; `Open the chat` and `Close the chat` by default. The chat's `label` heads the panel.
+  openLabel?: string | undefined
+  closeLabel?: string | undefined
+  // The tab's session storage key the conversation is kept under, so a reload finds it; `kai-chat` by default.
+  remember?: string | undefined
+  // What the button and the panel's close button draw, in place of a chat bubble and a cross.
+  icon?: JSX.Element
+  closeIcon?: JSX.Element
+  // A line under the chat, such as a warning that its answers can be wrong.
+  note?: JSX.Element
+  // On the button and panel's wrapper.
+  class?: string | undefined
+}>()
+---
+// The panel keeps its state across page swaps, and the chat inside hydrates, and so loads, when the panel is first shown.
+Panel(persist label={chat.label} openLabel={openLabel} closeLabel={closeLabel} class={className})
+  @icon
+    if icon
+      | {icon}
+    else
+      svg.kui-icon(viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true")
+        path(d="M3 20l1.3-3.9A9 8 0 1 1 7.7 19.3L3 20")
+        path(d="M12 12v.01M8 12v.01M16 12v.01")
+  @closeIcon
+    if closeIcon
+      | {closeIcon}
+    else
+      svg.kui-icon(viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true")
+        path(d="M18 6L6 18M6 6l12 12")
+  Chat(hydrate="visible" {...chat} remember={remember} links="here")
+  if note
+    .kai-launcher-note
+      | {note}

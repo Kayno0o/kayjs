@@ -1,9 +1,9 @@
 ---
 import type { Action, ActionStream, Failure, SanitizeOptions } from 'kay'
 import type { Message, Progress, ToolCall } from './types'
-import { ActionError, effect, sanitizeHtml, signal, trustHtml, untrack } from 'kay'
+import { ActionError, effect, onMount, sanitizeHtml, signal, trustHtml, untrack } from 'kay'
 import { markdownHtml } from 'kay/markdown'
-import { posted } from './chat-history'
+import { posted, restored, stored } from './chat-history'
 import Calls from './chat-calls.kay'
 import './chat.css'
 
@@ -12,8 +12,10 @@ const REPLY: SanitizeOptions = { tags: ['table', 'thead', 'tbody', 'tr', 'th', '
 // How close to the end of the log the visitor must be for new text to keep it scrolled down.
 const PINNED_PX = 48
 const ATTRIBUTE_UNSAFE = /[&"<]/g
-// The opening tag `sanitizeHtml` writes for a link, which `linksOpenApart` rewrites: the two change together.
-const SANITIZED_LINK = /<a href="[^"]*" rel="nofollow ugc">/g
+// The opening tag `sanitizeHtml` writes for a link, which `linksOpenApart` rewrites: the two change together. The href is captured to tell a link of this site from another.
+const SANITIZED_LINK = /<a href="([^"]*)" rel="nofollow ugc">/g
+// A path of this site, or an anchor in the page: `//host` is another site.
+const LOCAL_HREF = /^(?:\/(?!\/)|#)/
 const ENTITIES: Record<string, string> = { '&': '&amp;', '"': '&quot;', '<': '&lt;' }
 
 const attribute = (text: string) => text.replace(ATTRIBUTE_UNSAFE, char => ENTITIES[char]!)
@@ -26,7 +28,7 @@ interface Turn extends Message {
   calls?: ToolCall[] | undefined
 }
 
-const { action, initial = [], label = 'Chat', placeholder = 'Write a message…', sendLabel = 'Send', stopLabel = 'Stop', retryLabel = 'Try again', thinkingLabel = 'Thinking…', stoppedLabel = 'Stopped', errorMessage = 'The reply failed.', keep = 20, tableLabel = 'Table', toolDetails = true, runningLabel = 'Running', doneLabel = 'Done', failedLabel = 'Failed', argumentsLabel = 'Arguments', resultLabel = 'Result', class: className } = props<{
+const { action, initial = [], label = 'Chat', placeholder = 'Write a message…', sendLabel = 'Send', stopLabel = 'Stop', retryLabel = 'Try again', thinkingLabel = 'Thinking…', stoppedLabel = 'Stopped', errorMessage = 'The reply failed.', keep = 20, tableLabel = 'Table', toolDetails = true, remember, links = 'apart', runningLabel = 'Running', doneLabel = 'Done', failedLabel = 'Failed', argumentsLabel = 'Arguments', resultLabel = 'Result', class: className } = props<{
   // The page's streaming action, `action(schema, ({ messages }) => ask(messages))`, which may also `ctx.fail`; the chat posts the latest messages to it and reads the reply as it streams.
   // Returning `ask(messages, { tools }).progress()` instead streams the tool calls as well, which the chat shows before the text of their turn.
   action: Action<{ messages: Message[] }, AsyncIterable<string | Progress> | Failure<unknown>>
@@ -56,6 +58,10 @@ const { action, initial = [], label = 'Chat', placeholder = 'Write a message…'
   resultLabel?: string | undefined
   // Shown when the call is refused or the stream breaks off.
   errorMessage?: string | undefined
+  // A name under which the conversation is kept in the tab's session storage, so a reload of the tab finds it again; the tool calls of the replies are not kept. Without it, a reload starts afresh.
+  remember?: string | undefined
+  // Where a link of a reply opens: `apart` in a new tab, so following it does not swap the page and drop a conversation that lives in it; `here` for a link of this site opens in place, for a chat that survives a swap (kept by `persist`, or by `remember`), while a link to another site still opens apart.
+  links?: 'apart' | 'here' | undefined
   class?: string | undefined
 }>()
 
@@ -110,9 +116,9 @@ function show(value: string | Progress) {
   announce(value.calls)
 }
 
-// A link of a reply opens in a new tab, as the conversation lives in this page and a page swap would drop it.
+// A link of a reply opens in a new tab, as the conversation lives in this page and a page swap would drop it, unless `links` is `here` and the link leads to this site.
 function linksOpenApart(html: string): string {
-  return html.replaceAll(SANITIZED_LINK, tag => tag.replace('rel="nofollow ugc"', 'target="_blank" rel="nofollow ugc noopener"'))
+  return html.replaceAll(SANITIZED_LINK, (tag, href: string) => links === 'here' && LOCAL_HREF.test(href) ? tag : tag.replace('rel="nofollow ugc"', 'target="_blank" rel="nofollow ugc noopener"'))
 }
 
 // A table is wrapped, once sanitized, in a box that scrolls sideways and takes the keyboard's focus, except in the turn being written, which is hidden from screen readers. Several tables of one reply are numbered, so no two groups share a name.
@@ -161,6 +167,29 @@ function finish(state: string) {
   else if (state === 'closed' && text === '' && made.length === 0)
     takeBack()
 }
+
+// The conversation of the tab's last visit, put back once hydrated since the server renders the initial one.
+let recalled = false
+
+onMount(() => {
+  if (remember === undefined)
+    return
+
+  const turns = restored(remember)
+
+  recalled = true
+
+  if (turns.length > 0)
+    history.set(turns.map(turn => ({ ...turn, id: nextId++ })))
+})
+
+effect(() => {
+  const turns = history()
+
+  // Before the last visit's turns are back, the history would overwrite them with the initial one.
+  if (remember !== undefined && recalled)
+    stored(remember, turns)
+})
 
 effect(() => {
   const stream = streaming()
@@ -256,6 +285,8 @@ function stop() {
 
 function keyDown(event: KeyboardEvent) {
   if (event.key === 'Escape' && busy()) {
+    // Stops the reply and nothing else, such as the panel around the chat closing.
+    event.preventDefault()
     stop()
   }
   else if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {

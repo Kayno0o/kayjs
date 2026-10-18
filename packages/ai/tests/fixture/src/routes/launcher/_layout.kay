@@ -1,0 +1,9 @@
+--- server
+import { reply } from '../chat.kay'
+--- script
+import ChatLauncher from '@kaynooo/kayjs-ai/chat-launcher.kay'
+---
+slot
+ChatLauncher(action={reply} label="Assistant")
+  @note
+    | Answers can be wrong.

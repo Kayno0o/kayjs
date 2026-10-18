@@ -4,8 +4,6 @@ import { s } from 'kay'
 import { logFrom } from 'kay'
 import { partOfPage, readPage, searchPages, systemPrompt } from '../../chat-corpus'
 
-export const page = { prerender: true, search: { weight: 0.5 } }
-
 // The tools' own limits sit well above what one question needs, so the chat's `ai({ limit })` is what a visitor meets first.
 const TOOL_LIMIT = { max: 20, window: '1m' } as const
 const log = logFrom('docs-chat')
@@ -53,16 +51,4 @@ export const reply = action(
   },
   { rateLimit: { max: 8, window: '1m' } },
 )
---- script
-import Chat from '@kaynooo/kayjs-ai/chat.kay'
 ---
-head
-  title Ask the docs · kay
-.page
-  header.page-head
-    p.eyebrow Docs
-    h1 Ask the docs
-    p.lede Ask how to do something with kay. The answer is written from the docs and links the pages it rests on.
-  article.prose
-    Chat(action={reply} label="Ask the docs" placeholder="How do I..." toolDetails={false})
-    p.chat-note An AI model writes the answers from these docs, and it can be wrong. Check the pages it links before you rely on one. #[a(href="/guides/ask-the-docs") How the chat works].

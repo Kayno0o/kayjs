@@ -26,7 +26,7 @@ export async function brokenLinks(overrides: ReadonlyMap<string, string> = new M
   const llms = await read('llms.txt')
   const docsRoot = join(ROOT, 'docs/src/content')
   const files = [...new Bun.Glob('**/*.md').scanSync(docsRoot)]
-  const served = new Map<string, Set<string> | undefined>([['/', undefined], ['/ask', undefined], ['/llms', undefined]])
+  const served = new Map<string, Set<string> | undefined>([['/', undefined], ['/llms', undefined]])
   const headings = async (markdown: string) => new Set((await renderMarkdown(markdown)).headings.map(heading => heading.id))
 
   for (const file of files.filter(file => file.startsWith('docs/')))

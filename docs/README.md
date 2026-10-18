@@ -1,6 +1,6 @@
 # kay docs
 
-The documentation site, built with kay itself. It is a server, not a static export: every page is prerendered at build time, and the chat on `/ask` answers through an action.
+The documentation site, built with kay itself. It is a server, not a static export: every page is prerendered at build time, and the chat button on every page answers through an action.
 
 ## Build and run
 
@@ -27,7 +27,7 @@ The server reads `docs/.env`, which git ignores, with `bun run docs:start` and i
 
 ## The chat
 
-`/ask` answers questions about kay from `llms.txt`, and reads more through two actions it is offered as tools: `search_docs` and `read_page`. Its code is `src/routes/(docs)/ask.kay` and `src/chat-corpus.ts`.
+The chat button at the bottom right of every page answers questions about kay from `llms.txt`, and reads more through two actions it is offered as tools: `search_docs` and `read_page`. Its code is `src/routes/(docs)/_actions.kay`, `src/chat-corpus.ts` and the `ChatLauncher` in the layout; `/ask` redirects to the home page.
 
 Environment variables of the server, Mistral Small 4 pinned to a dated model:
 

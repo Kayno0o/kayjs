@@ -8,3 +8,48 @@ export function posted(turns: readonly Message[], keep: number): Message[] {
 
   return first === -1 ? [] : latest.slice(first)
 }
+
+// What a stopped or finished conversation keeps in session storage: the text of each turn, not the tool calls, whose arguments and results may be large.
+const KEPT_BYTES = 200_000
+
+interface KeptTurn extends Message {
+  stopped?: boolean | undefined
+}
+
+// The turns a tab kept under `key`, or none when storage is unavailable or holds something else.
+export function restored(key: string): KeptTurn[] {
+  try {
+    const value: unknown = JSON.parse(sessionStorage.getItem(key) ?? '[]')
+
+    if (!Array.isArray(value))
+      return []
+
+    return value.flatMap((turn: unknown) => {
+      if (typeof turn !== 'object' || turn === null)
+        return []
+
+      const { role, content, stopped } = turn as Record<string, unknown>
+
+      return (role === 'user' || role === 'assistant') && typeof content === 'string' ? [{ role, content, ...stopped === true && { stopped } }] : []
+    })
+  }
+  catch {
+    return []
+  }
+}
+
+// Keeps the latest turns that fit; storage that is full or unavailable keeps nothing, and the chat goes on.
+export function stored(key: string, turns: readonly KeptTurn[]): void {
+  try {
+    let kept = turns.map(({ role, content, stopped }) => ({ role, content, ...stopped === true && { stopped } }))
+    let text = JSON.stringify(kept)
+
+    while (text.length > KEPT_BYTES && kept.length > 1) {
+      kept = kept.slice(1)
+      text = JSON.stringify(kept)
+    }
+
+    sessionStorage.setItem(key, text)
+  }
+  catch {}
+}

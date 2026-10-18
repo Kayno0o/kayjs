@@ -8,8 +8,8 @@ import { browse, browserPath } from '../src/test'
 import { takeDocsBuild } from './docs-build'
 
 const CLI = resolve('src/cli.ts')
-// Home, a guide, a UI component's page with its demos, a Structure page and the chat: each layout the docs have.
-const PAGES = ['/', '/guides/api-routes', '/ui/button', '/structure/app-css', '/ask']
+// Home, a guide, a UI component's page with its demos and a Structure page: each layout the docs have; the chat panel is opened on the last.
+const PAGES = ['/', '/guides/api-routes', '/ui/button', '/structure/app-css']
 const SCHEMES = ['light', 'dark'] as const
 
 // Without BUN_CHROME_PATH or a Chrome on the PATH, the Chromium playwright-core installed for the other browser tests.
@@ -80,6 +80,16 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the docs a
           if (violation.id === 'color-contrast')
             found.push(...violation.nodes.map(node => `${at} ${node.target}`))
         }
+      }
+
+      // The chat panel, opened: its field is the chat's own once the panel's first opening hydrated it.
+      await page.click('.kai-launcher-button')
+      await page.waitFor('.kai-launcher-panel:not([hidden]) .kai-chat-form')
+      await page.waitUntil(() => document.getAnimations().every(animation => animation.playState !== 'running'))
+
+      for (const violation of await page.a11y()) {
+        if (violation.id === 'color-contrast')
+          found.push(...violation.nodes.map(node => `chat ${node.target}`))
       }
 
       expect(found).toEqual([])

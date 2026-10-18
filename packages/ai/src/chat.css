@@ -178,3 +178,89 @@
   white-space: pre-wrap;
   font-family: ui-monospace, monospace;
 }
+
+/* Before the first message the list is an empty box: it draws no frame yet. */
+.kai-chat-log:not(:has(.kai-chat-turn)) {
+  border-color: transparent;
+}
+
+/* The launcher: a button at the bottom right of the page and the panel it opens above it. */
+.kai-launcher {
+  position: fixed;
+  inset-block-end: max(1rem, env(safe-area-inset-bottom));
+  inset-inline-end: max(1rem, env(safe-area-inset-right));
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.75rem;
+  max-width: calc(100vw - 2rem);
+}
+
+.kai-launcher-button {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 9999px;
+  border: 1px solid var(--color-kui-accent);
+  background-color: var(--color-kui-surface0);
+}
+
+.kai-launcher-button .kui-icon {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+.kai-launcher-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  box-sizing: border-box;
+  width: min(28rem, calc(100vw - 2rem));
+  height: min(40rem, calc(100dvh - 6rem));
+  padding: 0.75rem;
+  border: 1px solid var(--color-kui-surface2);
+  background-color: var(--color-kui-canvas);
+  color: var(--color-kui-text);
+  box-shadow: 0 0.5rem 2rem rgb(0 0 0 / 25%);
+}
+
+.kai-launcher-panel[hidden] {
+  display: none;
+}
+
+.kai-launcher-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.kai-launcher-title {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.kai-launcher-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.kai-launcher-body .kai-chat {
+  flex: 1;
+}
+
+.kai-launcher-body .kai-chat-log {
+  flex: 1;
+  max-height: none;
+}
+
+.kai-launcher-note {
+  font-size: 0.8125rem;
+  color: var(--color-kui-muted);
+}
+
+.kai-launcher-note :where(a) {
+  color: var(--color-kui-accent-hi);
+}

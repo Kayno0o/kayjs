@@ -20,7 +20,7 @@ const root = join(import.meta.dir, '../docs')
 // The site renders from docs/.kay, which a build of the docs wipes: no build runs while this file does.
 const release = await takeDocsBuild()
 const site = await testSite({ root })
-const { reply, searchDocs, readDocsPage } = await import(join(root, 'src/routes/(docs)/ask.kay')) as Ask
+const { reply, searchDocs, readDocsPage } = await import(join(root, 'src/routes/(docs)/_actions.kay')) as Ask
 const question = (content: string) => ({ messages: [{ role: 'user', content }] })
 
 // The settings docs/kay.config.ts gives `ai()`, read where the library keeps them.
@@ -45,6 +45,23 @@ afterAll(async () => {
 afterEach(() => {
   fakeAi.clear()
   forgetCounts()
+})
+
+describe('the chat button', () => {
+  it('sits on every docs page and loads the chat only when opened, while /ask leads to the home page', async () => {
+    const home = await (await site.fetch('/')).text()
+    const guide = await (await site.fetch('/guides/ask-the-docs')).text()
+
+    for (const html of [home, guide]) {
+      expect(html).toContain('kai-launcher-button')
+      expect(html).toContain('data-hydrate="visible"')
+    }
+
+    const moved = await site.fetch('/ask', { redirect: 'manual' })
+
+    expect([307, 308]).toContain(moved.status)
+    expect(new URL(moved.headers.get('location')!, 'http://docs.test').pathname).toBe('/')
+  })
 })
 
 describe('what the chat reads', () => {

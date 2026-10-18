@@ -96,6 +96,26 @@ Chat(action={reply} label="Assistant")
 
 A page, with or without a `server` fence, hands the action straight to `Chat`. The action has to be exported by a page or endpoint.
 
+### A chat button on every page
+
+`ChatLauncher` is the same chat behind a round button at the bottom right of the page, which opens it in a panel. Put it once in the root layout, in a `server` fence that gives it the action, and every page has the chat:
+
+```kay
+--- server
+import { reply } from './reply.kay'
+--- script
+import ChatLauncher from '@kaynooo/kayjs-ai/chat-launcher.kay'
+---
+slot
+ChatLauncher(action={reply} label="Ask the docs")
+```
+
+The chat's code loads the first time the panel opens, so a visitor who never opens it downloads the button and nothing more. The panel stays open across pages, with the conversation in it, and a link in an answer to a page of your site opens in place instead of in a new tab. A reload of the tab finds the conversation again, kept in the tab's session storage.
+
+The button works from the keyboard: Enter or Space opens the panel and puts the focus in the field, and Escape closes it and gives the focus back to the button. A reply under way stops on the first Escape.
+
+`openLabel` and `closeLabel` name the button, `@icon` and `@closeIcon` replace the two icons, and `@note` adds a line under the chat. The other props are `Chat`'s. The button has a `data-tooltip`, which shows when the layout renders kayjs-ui's `TooltipHost`.
+
 - Enter sends and Shift+Enter starts a new line.
 - Stop, or Escape in the field, ends the reply. The words that came stay, marked as stopped. Stopped before the first word, the message goes back to the field.
 - A screen reader hears each finished turn once, not word by word, and each tool call as it starts and ends.
@@ -266,4 +286,4 @@ expect(fakeAi.last()?.messages).toEqual([{ role: 'user', content: 'Hi' }])
 
 ## An example
 
-The chat on these docs is built with it: [Ask the docs](/guides/ask-the-docs) says what it reads, and its source is a single page.
+The chat on these docs is built with it: [Ask the docs](/guides/ask-the-docs) says what it reads, and its source is a layout with one `ChatLauncher`.
