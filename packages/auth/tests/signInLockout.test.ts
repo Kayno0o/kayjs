@@ -115,6 +115,18 @@ describe('guessing at an account', () => {
     expect(app.notices()).toHaveLength(0)
   })
 
+  test('a success clears the ceiling too', async () => {
+    const app = await account({ signInAccountAll: { max: 3, window: 900 } })
+
+    for (let round = 0; round < 3; round++) {
+      await attempt(app, `10.0.5.${round}a`, WRONG)
+      await attempt(app, `10.0.5.${round}b`, WRONG)
+      expect(await attempt(app, `10.0.5.${round}c`, PASSWORD)).toMatchObject({ ok: true })
+    }
+
+    expect(app.notices()).toHaveLength(0)
+  })
+
   test('a burst of parallel guesses from many addresses cannot pass the ceiling', async () => {
     const app = await account({ signInAccount: { max: 2, window: 900 }, signInAccountAll: { max: 4, window: 900 } })
     const answers = await Promise.all(Array.from({ length: 12 }, async (_, i) => attempt(app, `10.0.4.${i + 1}`, WRONG)))
@@ -134,7 +146,7 @@ describe('guessing at an account', () => {
     const answer = await attempt(app, '10.0.0.2', PASSWORD)
 
     expect(answer).toMatchObject({ ok: true })
-    expect(answer).not.toHaveProperty('redirect', '/')
+    expect(answer).toMatchObject({ ok: true, redirect: expect.stringContaining('two-factor') })
   })
 
   test('confirming an address with the password counts as the same client\'s guess', async () => {
