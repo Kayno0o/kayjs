@@ -13,6 +13,16 @@ afterAll(async () => {
   await Promise.all(opened.map(async db => db.close()))
 })
 
+// The database `docker compose up -d` starts, as in pgStore.test.ts; real Postgres lets writes interleave as SQLite does not.
+const URL = process.env.KAYJS_AUTH_TEST_DATABASE_URL ?? 'postgres://test:test@127.0.0.1:8533/kayjs_auth_test'
+const postgres = new Database({ url: URL, tables: [...authTables] })
+const reachable = await postgres.ping()
+
+if (reachable)
+  await postgres.sync({ allowDestructive: true })
+
+opened.push(postgres)
+
 const backends: [string, () => Promise<AuthStore>][] = [
   ['memoryStore', async () => memoryStore()],
   ['pgStore on SQLite', async () => {
@@ -23,6 +33,13 @@ const backends: [string, () => Promise<AuthStore>][] = [
 
     return pgStore(db)
   }],
+  ...reachable
+    ? [['pgStore on Postgres', async () => {
+      await postgres.raw(`TRUNCATE ${authTables.map(table => `"${table.name}"`).join(', ')} CASCADE`, [])
+
+      return pgStore(postgres)
+    }] as [string, () => Promise<AuthStore>]]
+    : [],
 ]
 
 // Holds the writes of the gated verbs once armed until `parties` of them are waiting, so every request has read the store before any writes: the overlap a race needs, which running them one after the other never has.
