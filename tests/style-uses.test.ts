@@ -26,6 +26,21 @@ describe('which classes a page names', () => {
     expect(await namedBy('p(class={`${screen}:flex`}) hello\n')).toEqual(['md:flex'])
   })
 
+  it('reads a file again once it was edited', async () => {
+    const root = await scratchDir('style-uses-edit-')
+    const page = join(root, 'page.kay')
+    const names = () => {
+      const { classes, entries } = styleUses(root, [page], [CSS], { edges: new Map(), open: new Set() }, new Map())
+
+      return (entries['page.kay'] as number[]).map(index => classes[index]!)
+    }
+
+    await Bun.write(page, 'p.mt-1 hello\n')
+    expect(names()).toEqual(['mt-1'])
+    await Bun.write(page, 'p.p-1 hello there\n')
+    expect(names()).toEqual(['p-1'])
+  })
+
   it('does not take a number such as the -1 of a comparison for the end of a class', async () => {
     expect(await namedBy('--- server\nconst found = [1].indexOf(1) !== -1\n---\np hello\n')).toEqual([])
   })

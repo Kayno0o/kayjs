@@ -38,6 +38,24 @@ const BRACE_RANGE = /^(-?\d+)\.\.(-?\d+)(?:\.\.(\d+))?$/
 const EXPANSION_LIMIT = 10_000
 const SPACES = /\s+/
 
+// What a file's text holds, read again only when the file changed: `kay dev` computes the uses on every styles rebuild.
+const tokens = new WeakMap<object, { text: string, words: Set<string>, fragments: Set<string> }>()
+
+function tokensOf(file: string): { text: string, words: Set<string>, fragments: Set<string> } {
+  const read = readSource(file)
+  let found = tokens.get(read)
+
+  if (found === undefined) {
+    const text = MARKDOWN_FILE.test(file) ? withoutCode(read.text) : read.text
+
+    found = { text, words: new Set(), fragments: new Set() }
+    readWords(text, found.words, found.fragments)
+    tokens.set(read, found)
+  }
+
+  return found
+}
+
 // The words of a source, and the fragments of names built at runtime among them: `btn-` from `btn-${kind}` or `:flex` from `${screen}:flex`.
 function readWords(text: string, into: Set<string>, fragments: Set<string>): void {
   for (const token of text.split(COARSE)) {
@@ -263,18 +281,14 @@ export function styleUses(root: string, entries: Iterable<string>, sheets: Itera
       return found
     }
 
-    const words = new Set<string>(shorthand.get(file) ?? [])
-    const fragments = new Set<string>()
-    const text = MARKDOWN_FILE.test(file) ? withoutCode(readSource(file).text) : readSource(file).text
-
-    readWords(text, words, fragments)
+    const { text, words, fragments } = tokensOf(file)
 
     for (const name of spanning) {
       if (text.includes(name))
         found.add(name)
     }
 
-    for (const word of words) {
+    for (const word of [...shorthand.get(file) ?? [], ...words]) {
       if (styled.has(word))
         found.add(word)
     }
