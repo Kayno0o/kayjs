@@ -300,6 +300,13 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a counter 
     expect(await opened.a11y('section[aria-labelledby]')).toEqual([])
   })
 
+  it('counts nothing more when the visitor closes the line with OK', async () => {
+    await opened.click('section[aria-labelledby] button:first-of-type')
+    await Bun.sleep(300)
+
+    expect(received).toHaveLength(1)
+  })
+
   it('counts no more once the visitor opts out, across a page swap', async () => {
     await opened.click('section[aria-labelledby] button:last-of-type')
 

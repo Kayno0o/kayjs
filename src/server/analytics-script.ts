@@ -68,14 +68,14 @@ export const ANALYTICS_SCRIPT = `(() => {
     if (value !== 'yes' && value !== 'no' && value !== '')
       return
 
-    const counted = choice() === 'yes'
+    const before = choice()
 
     document.cookie = name + '=' + value + '; max-age=' + (value === '' ? 0 : 31536000) + '; path=' + scope + '; samesite=lax' + (location.protocol === 'https:' ? '; secure' : '')
     banner?.remove()
     banner = undefined
     document.dispatchEvent(new CustomEvent('kay:consent', { detail: { consent: value } }))
 
-    if (value === 'yes' && !counted && (gated || informed))
+    if (value === 'yes' && (gated ? before !== 'yes' : before === 'no'))
       start()
 
     // A script that already ran cannot be taken back, so the page loads again without it.
