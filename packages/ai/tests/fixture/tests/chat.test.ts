@@ -479,9 +479,9 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
 
       await page.click('.kai-launcher-button')
       await page.waitUntil(chatHydrated)
-      await page.fill('textarea', 'Go')
+      await page.fill('textarea', 'Hold')
       await page.press('Enter')
-      await page.waitFor('[data-pending]')
+      await page.waitFor('[data-pending] .kai-chat-text', { text: 'Working' })
       await page.press('Escape')
       await page.waitFor('[data-pending]', { gone: true })
 
