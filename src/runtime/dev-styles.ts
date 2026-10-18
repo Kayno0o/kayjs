@@ -1,11 +1,22 @@
 // Loaded by every page the dev server serves, which links the whole stylesheet: a production page carries only the rules of the classes its files name, so an element getting a class the stylesheet styles but the page's set lacks would be unstyled there.
 // Each page's set comes in a `data-kay-page-classes` block of its head; an element carrying a class it lacks logs a `[kay]` error once.
 const DATA = 'script[data-kay-page-classes]'
-const CLASS_NAME = /^(?:\\.|[\w-])+/
-const ESCAPE = /\\(.)/g
+const CLASS_NAME = /^(?:\\[\da-f]{1,6}[ \t\n\r\f]?|\\[^\da-f]|[\w\u0080-\uFFFF-])+/i
+const ESCAPE = /\\(?:([\da-f]{1,6})[ \t\n\r\f]?|([^\da-f]))/gi
 const LISTED = 'list it in your stylesheet with @source inline("...") or write it out as a literal in a component'
 
-// The classes a selector needs outside any parentheses or brackets, as the build prunes by: `.a :is(.b)` needs `a` alone, and the `:where(.group)` of a `group-open:` variant needs none, so a class only such rules mention has no rule of its own to be missing.
+function unescape(name: string): string {
+  return name.replace(ESCAPE, (_match, hex: string | undefined, char: string | undefined) => {
+    if (hex === undefined)
+      return char!
+
+    const code = Number.parseInt(hex, 16)
+
+    return code === 0 || code > 0x10FFFF || (code >= 0xD800 && code <= 0xDFFF) ? '\uFFFD' : String.fromCodePoint(code)
+  })
+}
+
+// The classes a selector needs outside any parentheses or brackets, as the build prunes by (`selectors` in src/build/class-rules.ts, which this mirrors without its imports): `.a :is(.b)` needs `a` alone, and the `:where(.group)` of a `group-open:` variant needs none, so a class only such rules mention has no rule of its own to be missing.
 function neededClasses(selector: string, into: Set<string>): void {
   let depth = 0
 
@@ -24,13 +35,15 @@ function neededClasses(selector: string, into: Set<string>): void {
     else if (char === '.' && depth === 0) {
       const name = CLASS_NAME.exec(selector.slice(at + 1))?.[0] ?? ''
 
-      into.add(name.replace(ESCAPE, '$1'))
+      if (name !== '')
+        into.add(unescape(name))
+
       at += name.length
     }
   }
 }
 
-// Every class some rule of the document's stylesheets styles.
+// Every class some rule of the document's stylesheets needs.
 function styledClasses(doc: Document): Set<string> {
   const found = new Set<string>()
   const walk = (rules: CSSRuleList) => {

@@ -46,7 +46,7 @@ describe('the class check of the dev server', () => {
     expect(page.errors.filter(error => WARNING.test(error))).toEqual([])
   })
 
-  it.skipIf(path === undefined)('stays quiet for a class only a nested :is() or a variant of another class styles, and for one nothing styles', async () => {
+  it.skipIf(path === undefined)('stays quiet for a class only a nested :is() or a variant of another class styles, and for one nothing styles at all', async () => {
     const page = await dev.open('/nested', { strict: false })
 
     expect(page.errors.filter(error => WARNING.test(error))).toEqual([])
