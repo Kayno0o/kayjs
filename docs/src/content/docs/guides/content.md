@@ -163,7 +163,7 @@ Images with a relative path, `![A cat](./cat.png)`, work in the body too, when t
 
 Their `sizes` is `100vw`, which `imageSizes` in `markdown` or on a collection changes, and a tag's own `sizes="..."` wins for that image. A tag that sets its own `width`, `height` or `srcset`, an SVG, an absolute path or a URL is left as written.
 
-Without a highlighter, a code block is `<pre><code class="language-ts">`. Give the collection a `highlight` function and it returns the whole `<pre>` instead, such as Shiki's `codeToHtml`. It runs when the entries compile, at build time.
+Without a highlighter, a code block is `<pre><code class="language-ts">`. Give the collection a `highlight` function and it returns the whole `<pre>` instead, such as Shiki's `codeToHtml`. It runs when the entries compile, at build time, and the `markdown.highlight` of `kay.config.ts` also runs on the server for the code of a chat answer, so it must work at runtime too.
 
 ```ts
 import { codeToHtml } from 'shiki'

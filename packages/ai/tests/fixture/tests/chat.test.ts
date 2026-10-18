@@ -114,6 +114,25 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
     expect(page.errors).toEqual([])
   })
 
+  test('a finished code block is swapped for the highlighted one, while the reply streams and in the finished turn, and a block left open stays plain', async () => {
+    const page = await site.open('/helper')
+
+    fakeAi.reply('Try:\n\n```ts\nconst a = 1 < 2\n```\n\nand\n\n```html\n<img src=x onerror=alert(1)>\n```\n\nthen\n\n```ts\nopen')
+    await page.fill('textarea', 'Show code')
+    await page.press('Enter')
+    await page.waitFor('[data-pending]', { gone: true })
+
+    const turn = '.kai-chat-turn[data-role="assistant"] .kai-chat-text'
+
+    expect(await page.count(`${turn} pre.hl`)).toBe(2)
+    expect(await page.text(`${turn} pre.hl .tok`)).toContain('const a = 1 < 2')
+    expect(await page.evaluate(() => document.querySelector('pre.hl .tok')?.getAttribute('style'))).toBe('color:#c00')
+    // The block of the open fence and the hostile one stay inert: the open one stays plain, no element made from the code.
+    expect(await page.count(`${turn} > pre:not(.hl)`)).toBe(1)
+    expect(await page.count(`${turn} img`)).toBe(0)
+    expect(page.errors).toEqual([])
+  })
+
   test('the polite status line says each tool call start and end once while the reply is hidden', async () => {
     const page = await site.open('/helper')
 

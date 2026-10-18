@@ -32,6 +32,12 @@ describe('safeCode', () => {
     expect(safeCode(html)).toBe(html)
   })
 
+  it('keeps the variables of a Shiki dual theme and drops only the declarations that are not colours', () => {
+    expect(safeCode('<span style="--shiki-light:#a;--shiki-dark:#b">x</span>')).toBe('<span style="--shiki-light:#a;--shiki-dark:#b">x</span>')
+    expect(safeCode('<span style="color:#D73A49;--shiki-dark:#F97583;position:fixed">x</span>')).toBe('<span style="color:#D73A49;--shiki-dark:#F97583">x</span>')
+    expect(safeCode('<span style="position:fixed">x</span>')).toBe('<span>x</span>')
+  })
+
   it('drops what injects markup or loads something, whatever the highlighter wrote', () => {
     const hostile = '<pre><code><script>alert(1)</script><img src=x onerror=alert(1)><a href="javascript:alert(1)">x</a><span onclick="a()" style="color:red;background:url(//evil/x)" class="k">y</span><span style="position:fixed;inset:0;color:red">z</span><span style="color:expression(alert(1))">w</span><button>b</button><iframe src="//evil"></iframe><span data-style="position:fixed">d</span></code></pre>'
     const safe = safeCode(hostile)
@@ -59,6 +65,18 @@ describe('highlighting', () => {
     expect(clientMarkdown(FENCED)).toContain(block!.markup)
     expect(await next(FENCED)).toEqual([])
     expect(await next('```ts\nopen')).toEqual([])
+  })
+
+  it('gives the highlighter a language that is a plain word only, and swaps two blocks of one code in two languages each', async () => {
+    const languages: (string | undefined)[] = []
+    const blocks = await highlighting(async () => (code, language) => {
+      languages.push(language)
+
+      return `<pre><code>${language}</code></pre>`
+    })('```x fixed inset-0\na\n```\n\n```ts\na\n```\n\n```py\na\n```\n\n```ts\na\n```')
+
+    expect(languages).toEqual(['x', 'ts', 'py', 'ts'])
+    expect(blocks.map(block => block.html)).toEqual(['<pre><code>x</code></pre>', '<pre><code>ts</code></pre>', '<pre><code>py</code></pre>', '<pre><code>ts</code></pre>'])
   })
 
   it('highlights nothing without a highlighter, and a block stays plain when the highlighter throws', async () => {

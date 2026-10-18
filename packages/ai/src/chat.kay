@@ -145,8 +145,9 @@ function linksOpenApart(html: string): string {
 function markdown(text: string, blocks: CodeBlock[] | undefined, scrollable = true) {
   let source = markdownHtml(text) as string
 
+  // Each block takes the first plain one of its markup left, in the order they were written, so two blocks of one code in two languages each get theirs.
   for (const [index, block] of (blocks ?? []).entries())
-    source = source.replaceAll(block.markup, `${MARK}${index}${MARK}`)
+    source = source.replace(block.markup, `${MARK}${index}${MARK}`)
 
   let html = linksOpenApart(sanitizeHtml(source, REPLY))
 

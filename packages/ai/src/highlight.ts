@@ -15,8 +15,10 @@ const ENTITY = /&(amp|lt|gt|quot);/g
 const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"' }
 const STYLE = /(<[a-z][^<>]*?)\sstyle="/gi
 const KEPT_STYLE = /(<[a-z][^<>]*?)\sdata-style="([^"]*)"/gi
-// Colours and text decoration only, in a value that holds no URL, escape or quote: all a highlighter's spans need, and nothing that loads or covers the page.
-const DECLARATION = /^\s*(?:color|background-color|font-style|font-weight|text-decoration)\s*:[\w#%.,\s()-]+$/i
+// Colours, font style and weight, text decoration and custom properties (the variables of a Shiki theme), in a value that holds no URL, escape or quote: all a highlighter's spans need, and nothing that loads or covers the page.
+const DECLARATION = /^\s*(?:color|background-color|font-style|font-weight|text-decoration|--[\w-]+)\s*:[\w#%.,\s()-]+$/i
+// What the info string may name, which a highlighter may write into a class.
+const LANGUAGE = /^[\w+#.-]{1,30}$/
 const UNSAFE_VALUE = /url|expression|image|\bimport/i
 const MAX_BLOCKS = 40
 const SANITIZE = {
@@ -53,7 +55,11 @@ export function closedFences(text: string): { source: string, language: string |
 }
 
 function styled(markup: string): string {
-  return markup.replace(KEPT_STYLE, (_, tag: string, value: string) => !UNSAFE_VALUE.test(value) && value.split(';').every(declaration => declaration.trim() === '' || DECLARATION.test(declaration)) ? `${tag} style="${value}"` : tag)
+  return markup.replace(KEPT_STYLE, (_, tag: string, value: string) => {
+    const kept = value.split(';').filter(declaration => !UNSAFE_VALUE.test(declaration) && DECLARATION.test(declaration))
+
+    return kept.length === 0 ? tag : `${tag} style="${kept.join(';')}"`
+  })
 }
 
 // A highlighter's HTML kept to what code needs, without the copy button of a docs-style frame, which the page's listener would have to answer: its tags are sanitized as the rest of a reply is, and its `style` attributes, which `sanitizeHtml` never keeps, only when they hold colours.
@@ -68,10 +74,10 @@ async function render(source: string, language: string | undefined, highlight: H
     return undefined
 
   try {
-    return { markup: whole, html: safeCode(await highlight(unescaped(inner!), language)) }
+    return { markup: whole, html: safeCode(await highlight(unescaped(inner!), language !== undefined && LANGUAGE.test(language) ? language : undefined)) }
   }
   catch (error) {
-    log.error('the app\'s highlighter failed on a block of a reply, which stays plain', error)
+    log.warn('the app\'s highlighter failed on a block of a reply, which stays plain', error)
 
     return undefined
   }
@@ -93,10 +99,21 @@ export function highlighting(resolve: () => Promise<Highlighter | undefined> = c
     if (found === undefined)
       return []
 
-    const fresh = closedFences(text).filter(({ source }) => !seen.has(source)).slice(0, MAX_BLOCKS)
+    // The same block written twice is told apart by its turn, so the chat swaps each one.
+    const turns = new Map<string, number>()
+    const fresh = closedFences(text).filter(({ source }) => {
+      const turn = (turns.get(source) ?? 0) + 1
+      const key = `${turn}:${source}`
 
-    for (const { source } of fresh)
-      seen.add(source)
+      turns.set(source, turn)
+
+      if (seen.has(key))
+        return false
+
+      seen.add(key)
+
+      return true
+    }).slice(0, MAX_BLOCKS)
 
     return (await Promise.all(fresh.map(async ({ source, language }) => render(source, language, found)))).filter(block => block !== undefined)
   }

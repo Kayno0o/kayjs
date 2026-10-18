@@ -14,7 +14,7 @@ const highlighter = await createHighlighter({
 
 const languages = new Set(highlighter.getLoadedLanguages())
 
-// Runs at build time only; code-copy.kay answers the copy button.
+// Runs when the content compiles and, for the chat's answers, on the server per finished code block (which drops the copy button); code-copy.kay answers the copy button on the pages.
 export function highlight(code: string, language: string | undefined): string {
   const lang = language !== undefined && languages.has(language) ? language : 'text'
   // Inside the function: kay caches compiled pages by this function's source, so a change here recompiles them.
