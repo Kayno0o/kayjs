@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## 1.53.0
 
+- kayjs-ai streams from Mistral with only `AI_BASE_URL`, `OPENAI_API_KEY` and `AI_MODEL` set: a server refusing `stream_options` is asked again without it, array content keeps its text, and a stream ending on `error` fails the reply ([asking](../packages/ai/llms/asking.md)).
 - A `resource()` reading a route whose handler reads a `live` cached key asks the route again after `invalidate`, with nothing written ([live data](api-from-islands.md#following-cached-values)).
 - A collection with `live: true` shows an `invalidate()` or a CMS edit in every open page that read it ([content](content.md#drafts)).
 - `followLog(() => list)` from `kay` keeps a log or chat list at its bottom while the reader is there and the first item showing in place when items load above ([Follow a log](navigation.md#follow-a-log)).

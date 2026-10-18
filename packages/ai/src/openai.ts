@@ -1,3 +1,4 @@
+import type { ServerEvent } from './http'
 import type { Finish, Piece, Provider, ProviderMessage } from './types'
 import { AiError } from './errors'
 import { json, postEvents } from './http'
@@ -13,6 +14,9 @@ export interface OpenAiOptions {
 
 export const OPENAI_URL = 'https://api.openai.com/v1'
 const TRAILING_SLASHES = /\/+$/
+
+// Servers that refused `stream_options` once, by API root, so only the first ask of a process pays the retry.
+const withoutUsageOption = new Set<string>()
 
 const FINISHES: Record<string, Finish> = { length: 'length', content_filter: 'filtered' }
 
@@ -35,6 +39,17 @@ function failureOf(failure: { message?: unknown, type?: unknown, code?: unknown 
     return new AiError('auth', `openai refused the key${said}`)
 
   return new AiError('invalid', `openai refused the request mid-reply${said}`)
+}
+
+// The text of a delta's content: a string, or on Mistral an array of chunks of which only the `text` ones are the reply.
+function textOf(content: unknown): string {
+  if (typeof content === 'string')
+    return content
+
+  if (!Array.isArray(content))
+    return ''
+
+  return content.map(part => typeof part === 'object' && part !== null && (part as { type?: unknown }).type === 'text' && typeof (part as { text?: unknown }).text === 'string' ? (part as { text: string }).text : '').join('')
 }
 
 function usageOf(value: unknown): Piece[] {
@@ -75,18 +90,43 @@ export function openai({ baseUrl = OPENAI_URL, apiKey, model }: OpenAiOptions = 
         model: request.model,
         messages,
         stream: true,
-        stream_options: { include_usage: true },
         // OpenAI's reasoning models refuse the older name, and the servers imitating it know no other.
         [official ? 'max_completion_tokens' : 'max_tokens']: request.maxTokens,
         ...request.tools === undefined || request.tools.length === 0 ? {} : { tools: request.tools.map(({ name, description, inputSchema }) => ({ type: 'function', function: { name, description, parameters: inputSchema } })) },
         ...request.temperature === undefined ? {} : { temperature: request.temperature },
       }
+      const headers = apiKey === undefined ? {} : { authorization: `Bearer ${apiKey}` }
+      const url = `${root}/chat/completions`
       let finished = false
       // Tool calls arrive in pieces keyed by their index, the id and name first and the arguments after; some servers send one whole, and one that reuses an index for another id starts another call.
       const calls = new Map<number, { index: number, id: string, name: string, arguments: string }>()
       const byIndex = new Map<number, number>()
 
-      for await (const { data } of postEvents('openai', `${root}/chat/completions`, apiKey === undefined ? {} : { authorization: `Bearer ${apiKey}` }, body, request.timeouts, signal, apiKey)) {
+      // OpenAI and Ollama count tokens only when asked; Mistral refuses the parameter and sends usage unasked. Asked first, the request goes again without it when the server answers 400 or 422, and the root is remembered once that works.
+      const open = (usage: boolean) => postEvents('openai', url, headers, usage ? { ...body, stream_options: { include_usage: true } } : body, request.timeouts, signal, apiKey)
+      let events = open(!withoutUsageOption.has(root))
+      let first: IteratorResult<ServerEvent>
+
+      try {
+        first = await events.next()
+      }
+      catch (error) {
+        if (withoutUsageOption.has(root) || !(error instanceof AiError) || (error.status !== 400 && error.status !== 422))
+          throw error
+
+        events = open(false)
+        first = await events.next()
+        withoutUsageOption.add(root)
+      }
+
+      const received = (async function* () {
+        if (!first.done)
+          yield first.value
+
+        yield* events
+      })()
+
+      for await (const { data } of received) {
         if (data === '[DONE]')
           return
 
@@ -97,7 +137,7 @@ export function openai({ baseUrl = OPENAI_URL, apiKey, model }: OpenAiOptions = 
           throw failureOf(failure)
 
         const choice = (chunk.choices as { delta?: { content?: unknown, tool_calls?: unknown }, finish_reason?: unknown }[] | undefined)?.[0]
-        const text = choice?.delta?.content
+        const text = textOf(choice?.delta?.content)
 
         if (Array.isArray(choice?.delta?.tool_calls)) {
           for (const piece of choice.delta.tool_calls as { index?: unknown, id?: unknown, function?: { name?: unknown, arguments?: unknown } }[]) {
@@ -133,10 +173,14 @@ export function openai({ baseUrl = OPENAI_URL, apiKey, model }: OpenAiOptions = 
           }
         }
 
-        if (typeof text === 'string' && text !== '')
+        if (text !== '')
           yield { text }
 
         if (typeof choice?.finish_reason === 'string') {
+          // Mistral ends a stream that failed on `error`.
+          if (choice.finish_reason === 'error')
+            throw new AiError('unavailable', 'openai failed mid-reply')
+
           finished = true
 
           yield* [...calls.values()].sort((a, b) => a.index - b.index).map(({ id, name, arguments: raw }) => ({ toolUse: { id, name, arguments: raw } }))

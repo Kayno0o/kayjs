@@ -8,6 +8,8 @@
 - `AI_MODEL`: the default model, `ask(..., { model })` overrides it. Required in production, which `kay env` shows as such once `ai()` is in `extensions`.
 - `AI_PROVIDER` (`anthropic` or `openai`): only needed when both keys are set, as `ask` throws rather than pick an account to bill.
 
+Mistral: `AI_BASE_URL=https://api.mistral.ai/v1`, its key in `OPENAI_API_KEY`, `AI_MODEL=mistral-small-2603`. Pin a dated model id: an alias such as `mistral-small-latest` moves to the next model and bills at its price. Nothing else is set: kay drops the `stream_options` Mistral refuses, reads its array content for the text, and counts the usage it sends unasked.
+
 The provider is `AI_BASE_URL` when set, else the one key set. Nothing is read at import: a missing variable throws at the `ask()` call, naming what to set, and never while `kay build` runs.
 
 ## ask

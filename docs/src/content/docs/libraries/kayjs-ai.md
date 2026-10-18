@@ -38,6 +38,8 @@ Then pick a provider with environment variables:
 - `AI_BASE_URL` uses any server that speaks the OpenAI API, such as Ollama at `http://localhost:11434/v1`.
 - `AI_MODEL` is the model to ask. It is required in production, and no model name is built in.
 
+For Mistral, set `AI_BASE_URL=https://api.mistral.ai/v1`, put its key in `OPENAI_API_KEY` and set `AI_MODEL` to a dated model such as `mistral-small-2603`. Avoid an alias like `mistral-small-latest`: it moves to the next model, and you pay that model's price. Nothing else is needed.
+
 With both keys set, add `AI_PROVIDER=anthropic` or `openai` to say which one to use. kay stops rather than guess which account to bill.
 
 ## Ask in a page
