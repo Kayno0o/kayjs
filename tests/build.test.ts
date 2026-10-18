@@ -878,6 +878,15 @@ describe('kay build checks the project first', () => {
     return { report, code }
   }
 
+  const documented = async (root: string, ...args: string[]) => {
+    const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', root, ...args], { stdout: 'pipe', stderr: 'pipe' })
+    const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+
+    expect(stdout.trimEnd().split('\n'), stderr).toHaveLength(1)
+
+    return { document: JSON.parse(stdout) as { errors: number, warnings: number, failed?: { stage: string }, built?: unknown, problems: { file?: string, severity: string, code: string | null, message: string }[] }, stdout, stderr, code }
+  }
+
   it('lints the heads of the pages it prerenders on a public site, failing on a lint the config denies', async () => {
     const config = (lints: string) => `export default { site: 'https://example.com', favicon: false, seo: { image: '/og.png' }, lints: ${lints} }\n`
     const root = await scratchProject({
@@ -903,30 +912,43 @@ describe('kay build checks the project first', () => {
     expect(refused.report.match(/^\w+\[[\w-]+\]/gm)).toEqual(['error[duplicate-title]'])
     expect(refused.report).toContain('kay build: nothing built, as the prerendered pages break the lints above; --no-check builds anyway')
     expect(refused.code).toBe(1)
-  }, 60_000)
 
-  it('prints what the check found before what the prerendered pages log, and though their code ends the process', async () => {
-    const root = await scratchProject({
-      'tsconfig.json': tsconfig,
-      'src/routes/index.kay': '--- server\nimport process from \'node:process\'\n\nexport const page = { prerender: true }\nconsole.error(\'prerendering\')\nprocess.exit(3)\n---\nh1 Home\nh3 Skipped\n',
-    })
+    // The same refusal as a document, the output as the stage the lints stopped.
+    const { document, code } = await documented(root, '--format', 'json')
 
-    const { report, code } = await build(root)
-
-    expect(code).toBe(3)
-    expect(report).toContain('warning[skipped-heading]')
-    expect(report.indexOf('warning[skipped-heading]')).toBeLessThan(report.indexOf('prerendering'))
+    expect(code).toBe(1)
+    expect(document.failed).toEqual({ stage: 'output' })
+    expect(document.problems.map(problem => problem.code)).toEqual(['duplicate-title'])
   }, 60_000)
 
   describe('--format json and github', () => {
-    const documented = async (root: string, ...args: string[]) => {
-      const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', root, ...args], { stdout: 'pipe', stderr: 'pipe' })
-      const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+    it('prints what the check found before what the prerendered pages log, and gives the problems found so far, though their code ends the process', async () => {
+      const root = await scratchProject({
+        'tsconfig.json': tsconfig,
+        'src/routes/index.kay': '--- server\nimport process from \'node:process\'\n\nexport const page = { prerender: true }\nconsole.log(\'logged\')\nconsole.error(\'prerendering\')\nprocess.exit(3)\n---\nh1 Home\nh3 Skipped\n',
+      })
 
-      expect(stdout.trimEnd().split('\n'), stderr).toHaveLength(1)
+      try {
+        const { report, code } = await build(root)
 
-      return { document: JSON.parse(stdout) as { errors: number, warnings: number, failed?: { stage: string }, built?: unknown, problems: { file?: string, severity: string, code: string | null, message: string }[] }, stdout, stderr, code }
-    }
+        expect(code).toBe(3)
+        expect(report).toContain('warning[skipped-heading]')
+        expect(report.indexOf('warning[skipped-heading]')).toBeLessThan(report.indexOf('prerendering'))
+
+        // The same project as a document: the check is cached, and what the page logs goes to stderr to leave stdout one document.
+        const { document, stderr, code: exited } = await documented(root, '--format', 'json')
+
+        expect(exited).toBe(3)
+        expect(stderr).toContain('logged')
+        expect(stderr).toContain('prerendering')
+        expect(document.failed).toEqual({ stage: 'output' })
+        expect(document.problems.map(problem => problem.code ?? problem.message)).toEqual(['skipped-heading', 'the build ended with exit code 3 before it was done'])
+        expect([document.errors, document.warnings]).toEqual([1, 1])
+      }
+      finally {
+        await rm(root, { recursive: true, force: true })
+      }
+    }, 60_000)
 
     it('gives what the check found in its shape, and the check as the stage that stopped the build', async () => {
       const root = await scratchProject({
@@ -943,46 +965,6 @@ describe('kay build checks the project first', () => {
         expect(document.built).toBeUndefined()
         expect(document.errors).toBeGreaterThan(0)
         expect(document.problems[0]).toMatchObject({ file: relative(process.cwd(), join(root, 'src/routes/index.kay')), severity: 'error' })
-      }
-      finally {
-        await rm(root, { recursive: true, force: true })
-      }
-    }, 60_000)
-
-    it('gives the lints of the prerendered pages, the output as the stage they stopped', async () => {
-      const root = await scratchProject({
-        'tsconfig.json': tsconfig,
-        'kay.config.ts': 'export default { site: \'https://example.com\', favicon: false, seo: { image: \'/og.png\' }, lints: { seo: \'allow\', \'duplicate-title\': \'deny\' } }\n',
-        'src/routes/index.kay': '--- server\nexport const page = { prerender: true }\n---\nhead\n  title Home\n  meta(name="description" content="Home")\np Home\n',
-        'src/routes/about.kay': '--- server\nexport const page = { prerender: true }\n---\nhead\n  title Home\n  meta(name="description" content="Who we are")\np About\n',
-      })
-
-      try {
-        const { document, code } = await documented(root, '--format', 'json')
-
-        expect(code).toBe(1)
-        expect(document.failed).toEqual({ stage: 'output' })
-        expect(document.problems.map(problem => problem.code)).toEqual(['duplicate-title'])
-      }
-      finally {
-        await rm(root, { recursive: true, force: true })
-      }
-    }, 60_000)
-
-    it('gives the problems found so far once a prerendered page ends the process', async () => {
-      const root = await scratchProject({
-        'tsconfig.json': tsconfig,
-        'src/routes/index.kay': '--- server\nimport process from \'node:process\'\n\nexport const page = { prerender: true }\nconsole.log(\'prerendering\')\nprocess.exit(3)\n---\nh1 Home\nh3 Skipped\n',
-      })
-
-      try {
-        const { document, stderr, code } = await documented(root, '--format', 'json')
-
-        expect(code).toBe(3)
-        expect(stderr).toContain('prerendering')
-        expect(document.failed).toEqual({ stage: 'output' })
-        expect(document.problems.map(problem => problem.code ?? problem.message)).toEqual(['skipped-heading', 'the build ended with exit code 3 before it was done'])
-        expect([document.errors, document.warnings]).toEqual([1, 1])
       }
       finally {
         await rm(root, { recursive: true, force: true })
@@ -1703,13 +1685,20 @@ async function counterFrame(maps: string): Promise<{ chunk: string, frame: strin
 }
 
 describe('a compiled server\'s errors', () => {
-  it('maps the stacks of a server error and of an island\'s report to .kay lines with its sources gone, and leaves no map file beside it', async () => {
+  it('maps the stacks of a server error and of an island\'s report to .kay lines with its sources gone, to the column for a library, a static component in an island, and a build run from another folder, and leaves no map file beside it', async () => {
+    const throwing = (name: string) => `---\nconst here = 1\n\nif (here === 1)\n  throw new Error('${name} boom')\n---\np ${name}\n`
     const root = await scratchProject({
       'package.json': JSON.stringify({ name: 'exe-errors', private: true, dependencies: { elysia: '*' } }),
       'tsconfig.json': tsconfig,
       'kay.config.ts': 'export default { favicon: false }\n',
-      'src/counter.kay': '---\nimport { signal } from \'kay\'\n\nconst n = signal(0)\n---\nbutton(type="button" onClick={() => n.set(n() + 1)}) {n()}\n',
+      'node_modules/kaylib/package.json': JSON.stringify({ name: 'kaylib', version: '1.0.0', exports: { './*': './*' } }),
+      'node_modules/kaylib/lib-box.kay': throwing('library'),
+      'src/plain.kay': throwing('plain'),
+      'src/counter.kay': '---\nimport { signal } from \'kay\'\nimport Plain from \'./twin.kay\'\n\nconst n = signal(0)\n---\nbutton(type="button" onClick={() => n.set(n() + 1)}) {n()}\nPlain\n',
+      'src/twin.kay': throwing('twin'),
       'src/routes/index.kay': '---\nimport Counter from \'../counter.kay\'\n---\nCounter\n',
+      'src/routes/library.kay': '---\nimport Box from \'kaylib/lib-box.kay\'\n---\nBox\n',
+      'src/routes/plain.kay': '---\nimport Plain from \'../plain.kay\'\n---\nPlain\n',
       'src/routes/boom.kay': '--- server\nfunction explode() {\n  throw new Error(\'server boom\')\n}\n\nif (ctx.request.headers.has(\'x-boom\'))\n  explode()\n---\np fine\n',
       'src/server.ts': `import process from 'node:process'
 import { Elysia } from 'elysia'
@@ -1721,13 +1710,17 @@ const app = new Elysia().use(await pages({ security: false, log: entry => entry.
 const status = (await app.handle(new Request('http://localhost/boom', { headers: { 'x-boom': '1' } }))).status
 const island = await app.handle(new Request('http://localhost/_kay/error', { method: 'POST', headers: { 'content-type': 'application/json', 'origin': 'http://localhost' }, body: JSON.stringify({ name: 'TypeError', message: 'x', url: '/', stack: \`TypeError: x\\n\${process.env.FRAME}\\n    at https://h/_kay/gone.js:1:2\\n    at fn (https://h/_kay/..%2Fcounter.js:1:1)\` }) }))
 
+for (const path of ['library', 'plain', ''])
+  await app.handle(new Request(\`http://localhost/\${path}\`))
+
 await Bun.sleep(20)
 console.log(JSON.stringify({ status, island: island.status, logged, reported }))
 process.exit(0)
 `,
     })
 
-    const [report, code] = await printed(Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', root, '--no-check', '--compile', join(root, 'server')], { stdout: 'pipe', stderr: 'pipe' }))
+    const elsewhere = await scratchDir('kay-elsewhere-')
+    const [report, code] = await printed(Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', root, '--no-check', '--compile', join(root, 'server')], { cwd: elsewhere, stdout: 'pipe', stderr: 'pipe' }))
 
     expect(report).not.toContain('error')
     expect(code).toBe(0)
@@ -1751,8 +1744,15 @@ process.exit(0)
     // The server error's log reads the line of the throw in the `.kay` file, not the generated code around it.
     expect(result.logged.find(stack => stack.startsWith('Error: server boom'))).toMatch(/\n {4}at explode \(.*src\/routes\/boom\.kay:3:\d+\)/)
     // The island's report is mapped before it reaches onError, a chunk with no map and a name leaving the directory as they were.
-    expect(result.reported.at(-1)).toBe(`TypeError: x\n${expected}\n    at https://h/_kay/gone.js:1:2\n    at fn (https://h/_kay/..%2Fcounter.js:1:1)`)
-  }, 60_000)
+    expect(result.reported.find(stack => stack.startsWith('TypeError: x'))).toBe(`TypeError: x\n${expected}\n    at https://h/_kay/gone.js:1:2\n    at fn (https://h/_kay/..%2Fcounter.js:1:1)`)
+
+    // The throw is on line 5 of each file, its `new Error` at column 13.
+    const framed = (name: string) => result.logged.find(stack => stack.startsWith(`Error: ${name} boom`))?.split('\n').at(1)
+
+    expect(framed('library')).toMatch(/lib-box\.kay:5:13\)?$/)
+    expect(framed('plain')).toMatch(/plain\.kay:5:13\)?$/)
+    expect(framed('twin')).toMatch(/twin\.kay:5:13\)?$/)
+  }, 90_000)
 
   it('keeps the map an executable carries beside the cached code, so a warm cache compiles nothing for it', async () => {
     const dir = await scratchDir('kay-embedded-')
@@ -1772,55 +1772,6 @@ process.exit(0)
     // The source or the code changing is a new key.
     await expect(embeddedMapCached(`${source}\n`, file, code, dir)).rejects.toThrow('compiled again')
   })
-
-  it('maps the frame of a server error to the column of its .kay file for a library, a static component in an island, and a build run from another folder', async () => {
-    const throwing = (name: string) => `---\nconst here = 1\n\nif (here === 1)\n  throw new Error('${name} boom')\n---\np ${name}\n`
-    const root = await scratchProject({
-      'package.json': JSON.stringify({ name: 'exe-frames', private: true, dependencies: { elysia: '*' } }),
-      'tsconfig.json': tsconfig,
-      'kay.config.ts': 'export default { favicon: false }\n',
-      'node_modules/kaylib/package.json': JSON.stringify({ name: 'kaylib', version: '1.0.0', exports: { './*': './*' } }),
-      'node_modules/kaylib/lib-box.kay': throwing('library'),
-      'src/plain.kay': throwing('plain'),
-      'src/counter.kay': '---\nimport { signal } from \'kay\'\nimport Plain from \'./twin.kay\'\n\nconst n = signal(0)\n---\nbutton(type="button" onClick={() => n.set(n() + 1)}) {n()}\nPlain\n',
-      'src/twin.kay': throwing('twin'),
-      'src/routes/library.kay': '---\nimport Box from \'kaylib/lib-box.kay\'\n---\nBox\n',
-      'src/routes/plain.kay': '---\nimport Plain from \'../plain.kay\'\n---\nPlain\n',
-      'src/routes/twin.kay': '---\nimport Counter from \'../counter.kay\'\n---\nCounter\n',
-      'src/server.ts': `import process from 'node:process'
-import { Elysia } from 'elysia'
-import { pages } from 'kay/server'
-
-const logged: string[] = []
-const app = new Elysia().use(await pages({ security: false, log: entry => entry.type === 'message' && entry.error?.stack !== undefined && logged.push(entry.error.stack) }))
-
-for (const path of ['library', 'plain', 'twin'])
-  await app.handle(new Request(\`http://localhost/\${path}\`))
-
-console.log(JSON.stringify({ logged }))
-process.exit(0)
-`,
-    })
-
-    const elsewhere = await scratchDir('kay-elsewhere-')
-    const [report, code] = await printed(Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', root, '--no-check', '--compile', join(root, 'server')], { cwd: elsewhere, stdout: 'pipe', stderr: 'pipe' }))
-
-    expect(report).not.toContain('error')
-    expect(code).toBe(0)
-
-    const child = Bun.spawn([join(root, 'server')], { cwd: root, env: { ...process.env, NODE_ENV: 'production' }, stdout: 'pipe', stderr: 'pipe' })
-    const [output, , exited] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
-
-    expect(exited).toBe(0)
-
-    const { logged } = JSON.parse(output.trim().split('\n').at(-1)!) as { logged: string[] }
-    const frame = (name: string) => logged.find(stack => stack.startsWith(`Error: ${name} boom`))?.split('\n').at(1)
-
-    // The throw is on line 5 of each file, its `new Error` at column 13.
-    expect(frame('library')).toMatch(/lib-box\.kay:5:13\)?$/)
-    expect(frame('plain')).toMatch(/plain\.kay:5:13\)?$/)
-    expect(frame('twin')).toMatch(/twin\.kay:5:13\)?$/)
-  }, 90_000)
 
   it('maps a frame an executable prints relative to where it was built, in either form, and leaves a map that cannot be read', async () => {
     const file = join(await scratchDir('kay-frames-'), 'frames.kay')
@@ -2098,8 +2049,9 @@ describe('the build report', () => {
     expect(first.summary.caches.find(cache => cache.name === 'components')!.made).toBeGreaterThan(0)
     expect(existsSync(stored)).toBe(true)
 
+    // The builds after the first and the refused one run without the check, which they are not about.
     // Built again with nothing edited, everything compiled comes from the cache and the sizes are the same.
-    const second = (await build()).built!
+    const second = (await build({ check: false })).built!
     const components = second.summary.caches.find(cache => cache.name === 'components')!
 
     expect(components.cached).toBeGreaterThan(0)
@@ -2108,7 +2060,7 @@ describe('the build report', () => {
     expect(formatBuildReport(second.report, second.summary, { previous: second.previous })).not.toContain('[')
 
     // `fresh` reads nothing an earlier build cached, yet still compares to the last build's sizes.
-    const fresh = (await build({ fresh: true })).built!
+    const fresh = (await build({ fresh: true, check: false })).built!
     const recompiled = fresh.summary.caches.find(cache => cache.name === 'components')!
 
     expect(recompiled.made).toBeGreaterThan(0)
@@ -2125,16 +2077,16 @@ describe('the build report', () => {
     await Bun.write(join(root, 'src/routes/plain.kay'), '--- server\nexport const page = { prerender: true }\n---\nhead\n  title Plain\n  meta(name="description" content="Plain")\np Plain\n')
     await Bun.write(join(root, 'src/routes/extra.kay'), '--- server\nexport const page = { prerender: true }\n---\nhead\n  title Extra\n  meta(name="description" content="Extra")\np Extra\n')
 
-    const third = (await build()).built!
+    const third = (await build({ check: false })).built!
 
     expect(third.previous!.routes['/extra']).toBeUndefined()
     expect(formatBuildReport(third.report, third.summary, { previous: third.previous })).toMatch(/^ {2}\/extra +prerendered +0\.0 KB \[new\] +0\.0 KB \[new\]$/m)
 
     // A static export weighs differently, so it is not compared to a server build.
-    expect((await build({ exportTo: 'dist' })).built!.previous).toBeUndefined()
-    expect((await build({ exportTo: 'dist' })).built!.previous).toBeDefined()
+    expect((await build({ exportTo: 'dist', check: false })).built!.previous).toBeUndefined()
+    expect((await build({ exportTo: 'dist', check: false })).built!.previous).toBeDefined()
     // And each kind keeps its own, so switching between them loses neither.
-    expect((await build()).built!.previous).toBeDefined()
+    expect((await build({ check: false })).built!.previous).toBeDefined()
   }, 120_000)
 })
 
@@ -2321,7 +2273,7 @@ describe('a compiled server\'s images', () => {
 
     await Bun.write(join(root, 'src/hero.png'), encodePng(new Uint8Array(96 * 64 * 4).map((_, at) => at % 4 === 3 ? 255 : (at * 37) % 251), 96, 64))
 
-    const [report, code] = await printed(Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', root, '--compile', join(root, 'server')], { stdout: 'pipe', stderr: 'pipe' }))
+    const [report, code] = await printed(Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', root, '--no-check', '--compile', join(root, 'server')], { stdout: 'pipe', stderr: 'pipe' }))
 
     expect(report).not.toContain('error')
     expect(code).toBe(0)
