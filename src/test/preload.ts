@@ -3,6 +3,8 @@ import { testRoot } from './root'
 import './natives'
 // Closes the browser of the pages tests open once they ran.
 import './browser'
+// Every test and hook takes a timeout that holds on a busy machine.
+import './timeout'
 
 // Listed under `[test] preload` in bunfig.toml, so test files can import `.kay` pages and their actions.
 // The developer's own `.env` is dropped first, and kay's server code imported after, so no module reads it.

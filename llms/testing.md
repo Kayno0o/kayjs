@@ -267,7 +267,7 @@ expect(jar.cookies.has('session')).toBe(true)
 - Without `browser`, pages render their islands' markup without scripts.
 - `testSite()` still builds the islands for the browser, unminified, into `.kay/test-client` (`.kay/test-client-<n>` in a `bun test --parallel` worker), leaving what `kay build` wrote in `.kay/client` alone, and throws that build's error when one fails, such as an island reaching a Bun builtin or a server module (`browser-builtin-import`), which no server-side render meets.
 - It runs once per process (once per file under `bun test --isolate`) for as long as the files under `src`, the routes and the API stay unchanged, one at a time, and `browser: true` shares it; `kay.config.ts`, `public` and library sources are not watched.
-- On a large app the build may outlast a hook's 5 second timeout: pass `testSite({ islands: false })` there, or a longer timeout to `beforeAll`.
+- `kay/test/preload` sets a 20 second default timeout for tests and hooks (Bun's `[test] timeout` does not reach hooks), unless bunfig.toml sets `[test] timeout`. On a large app the build may outlast it: pass `testSite({ islands: false })` there, or a longer timeout to `beforeAll`.
 - Test files import `.kay` files directly, `import { add } from '../src/routes/index.kay'`, through `[test] preload = ["kay/test/preload"]` in `bunfig.toml`, which `kay new` writes along with a first test.
 - They are typed through `.kay/types` as any `.ts` file's imports are, so `kay check` passes them, and a bare `tsgo` resolves them only once `kay check` has written that tree, which a check script runs first.
 - `bun test` loads the project's `.env` as well as `.env.test` and `.env.test.local`, whatever `NODE_ENV` says.
