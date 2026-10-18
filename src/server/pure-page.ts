@@ -92,6 +92,14 @@ export const CONTENT_EXPORTS: Record<string, 'free' | 'request' | 'folder'> = {
   repositoryRoot: 'request',
 }
 
+// The same for `kay/image`: each export is a function of its arguments and of the build's image settings, which a request does not change.
+// `shareCard` signs its URL with the build's own key and reads the page's locale, which a kept copy is stored per.
+export const IMAGE_EXPORTS: Record<string, 'free'> = {
+  image: 'free',
+  shareImage: 'free',
+  shareCard: 'free',
+}
+
 // The same for `kay/i18n`: messages and formats go by the locale, which is part of the key a copy is kept under; the relative time ones read the clock.
 const PURE_I18N_NAMES = new Set(['t', 'T', 'locale', 'locales', 'localeName', 'localize', 'alternate', 'formatNumber', 'formatDate', 'formatList', 'direction', 'defineMessages'])
 const CODE_FILE = /\.(?:kay|[cm]?[jt]sx?)$/
@@ -644,6 +652,16 @@ async function scanned(file: string, root: string | undefined): Promise<Scan> {
 
       if (imported.length === 0 || impure.length > 0)
         return stop(`imports ${imported.length === 0 ? 'the whole module' : impure.map(name => `\`${name}\``).join(', ')} from \`${specifier}\`, which a request or the clock can change`)
+
+      continue
+    }
+
+    if (specifier === 'kay/image') {
+      const imported = (BRACES.exec(clause)?.[1] ?? '').split(',').map(name => name.trim()).filter(name => name !== '' && !TYPE_NAME.test(name))
+      const impure = imported.filter(name => !Object.hasOwn(IMAGE_EXPORTS, name.replace(AS_NAME, '')))
+
+      if (imported.length === 0 || impure.length > 0)
+        return stop(`imports ${imported.length === 0 ? 'the whole module' : impure.map(name => `\`${name}\``).join(', ')} from \`kay/image\`, which a request can change`)
 
       continue
     }
