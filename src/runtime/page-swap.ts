@@ -257,20 +257,23 @@ export async function show(page: FetchedPage, hash: string, swap: Swap, isCurren
 
   // Only a page the server streamed carries the templates, so the code putting them in place loads for those alone.
   if (next.querySelector(STREAMED_TEMPLATE)) {
+    let streamed: typeof import('./swap-streamed') | undefined
+
     try {
-      const { applyStreamed } = await import('./swap-streamed')
-
-      if (!isCurrent())
-        return
-
-      applyStreamed(next)
+      streamed = await import('./swap-streamed')
     }
     catch {
-      // A chunk a deploy replaced is gone: the page loads in full.
-      leave(target, replaces)
+      // A chunk a deploy replaced is gone: the page loads in full, unless another navigation took over.
+      if (isCurrent())
+        leave(target, replaces)
 
       return
     }
+
+    if (!isCurrent())
+      return
+
+    streamed.applyStreamed(next)
   }
 
   const root = swapRoot(next)
@@ -823,7 +826,7 @@ function byName(element: Element | null): Element | null {
 
 // The element focused before, found again on a refreshed page or on Back and Forward between entries of one path; on a new page, its autofocus field, its heading or its main, so a screen reader starts there, the title announced. Back and Forward skip the autofocus field, which the visitor left already.
 async function moveFocus(swap: Swap, policy: Policy): Promise<void> {
-  if (policy.focus === 'refused' && swap.refused && await showRefusal(swap.refused))
+  if (policy.focus === 'refused' && swap.refused && await showRefusal(document.forms[swap.refused.form], swap.refused.control))
     return
 
   const traversed = swap.intent === 'traverse'
@@ -858,14 +861,18 @@ async function moveFocus(swap: Swap, policy: Policy): Promise<void> {
   announce(document.title)
 }
 
-// A chunk a deploy replaced fails to load: the focus then goes the way a page without a refusal takes.
-async function showRefusal({ form, control }: { form: number, control: number }): Promise<boolean> {
+// The form is read before the chunk loads, which a navigation may outlast. A chunk a deploy replaced fails to load: the focus then goes the way a page without a refusal takes.
+async function showRefusal(form: HTMLFormElement | undefined, control: number): Promise<boolean> {
+  let refusal: typeof import('./swap-refusal')
+
   try {
-    return await (await import('./swap-refusal')).showRefusal(document.forms[form], control, announce)
+    refusal = await import('./swap-refusal')
   }
   catch {
     return false
   }
+
+  return refusal.showRefusal(form, control, announce)
 }
 
 // Pinned to the top corner: left where it falls, after the page, it would add a pixel to a layout filling the screen and give it a scrollbar.

@@ -56,6 +56,7 @@ describe('the page swap', () => {
     expect(streamed.map(({ chunk }) => chunk)).not.toContain(swap.chunk)
     expect(streamed).toHaveLength(1)
     expect(swap.text).toContain('swap-streamed')
+    expect(refusal).toHaveLength(1)
     expect(refusal.map(({ chunk }) => chunk)).not.toContain(swap.chunk)
   }, 120_000)
 })
