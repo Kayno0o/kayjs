@@ -240,7 +240,7 @@ kay only downloads from public addresses. It looks the host up itself, connects 
 
 `image(url, { width, height })` then works as above. kay downloads the image once and keeps a copy. A host that is not listed is refused, so the route is no open proxy.
 
-List only hosts you trust. kay does not check where a listed name points.
+kay asks the host directly, without an `HTTP_PROXY`, and does not accept a compressed answer.
 
 ### Private images
 

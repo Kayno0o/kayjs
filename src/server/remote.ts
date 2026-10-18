@@ -105,6 +105,9 @@ const PUBLIC_SUFFIXES = new Set([
   'carrd.co',
 ])
 
+const BRACKETS = /^\[|\]$/g
+const TRAILING_DOT = /\.$/
+
 const MAX_REDIRECTS = 3
 // How long an original stays fresh when the host sends no `max-age`, and the bounds one it sends is held to.
 const DEFAULT_FRESH_MS = 60 * 60_000
@@ -134,10 +137,12 @@ export function remotePatterns(entries: readonly string[] = []): RemotePattern[]
       throw new Error(`images.remote holds ${entry}, which is no URL`)
 
     // `*.com` would let any site of a whole top-level domain have the server download from it, and so would `*.co.uk` or `*.vercel.app`, whose subdomains belong to anyone.
-    if (wildcard && (!url.hostname.slice(2).includes('.') || PUBLIC_SUFFIXES.has(url.hostname.slice(2))))
+    const base = url.hostname.slice(2).replace(TRAILING_DOT, '')
+
+    if (wildcard && (!base.includes('.') || PUBLIC_SUFFIXES.has(base)))
       throw new Error(`images.remote holds ${entry}: a *. wildcard covers the subdomains of one domain, never a whole public suffix such as *.com, *.co.uk or *.vercel.app`)
 
-    return { protocol: url.protocol, host: wildcard ? url.host.slice(2) : url.host, wildcard, path: url.pathname, private: !wildcard && (isIP(url.hostname.replace(/^\[|\]$/g, '')) !== 0 || url.hostname === 'localhost') }
+    return { protocol: url.protocol, host: wildcard ? url.host.slice(2) : url.host, wildcard, path: url.pathname, private: !wildcard && (isIP(url.hostname.replace(BRACKETS, '')) !== 0 || url.hostname === 'localhost') }
   })
 }
 
@@ -285,7 +290,9 @@ export function remoteImages(dir: string, patterns: readonly RemotePattern[], va
 
       // Each hop is checked against the list and resolved to public addresses, so a listed host cannot send the server to another or to a private one.
       for (let hops = 0; ; hops++) {
-        response = await pinnedGet(new URL(url), headers, signal, resolve, patterns.some(pattern => pattern.private && covers(pattern, new URL(url))))
+        const target = new URL(url)
+
+        response = await pinnedGet(target, headers, signal, resolve, patterns.some(pattern => pattern.private && covers(pattern, target)))
 
         const location = response.headers.get('location')
 
@@ -300,6 +307,14 @@ export function remoteImages(dir: string, patterns: readonly RemotePattern[], va
           return { status: 502, message: 'The host redirects to one images.remote does not list' }
 
         url = next.href
+      }
+
+      const encoding = response.headers.get('content-encoding')
+
+      if (encoding !== null && encoding !== 'identity') {
+        await response.body?.cancel()
+
+        return { status: 502, message: 'The host sent the image compressed' }
       }
 
       if (response.status === 304 && previous)
@@ -335,7 +350,7 @@ export function remoteImages(dir: string, patterns: readonly RemotePattern[], va
 
 // One GET that resolves the host itself and connects to the address it checked, never one `fetch` would resolve again after the check. A literal address is checked as it stands.
 async function pinnedGet(url: URL, headers: Record<string, string>, signal: AbortSignal, resolve: Resolver, allowPrivate: boolean): Promise<Response> {
-  const hostname = url.hostname.replace(/^\[|\]$/g, '')
+  const hostname = url.hostname.replace(BRACKETS, '')
 
   if (!allowPrivate && isIP(hostname) !== 0 && !isPublicAddress(hostname))
     throw new PrivateAddressError(`${hostname} is not a public address`)
@@ -343,23 +358,30 @@ async function pinnedGet(url: URL, headers: Record<string, string>, signal: Abor
   const send = url.protocol === 'https:' ? httpsRequest : httpRequest
 
   return new Promise((done, fail) => {
-    const request = send(url, { method: 'GET', headers: { ...headers, 'accept-encoding': 'identity' }, signal, lookup: pinnedLookup(resolve, allowPrivate) as never }, (incoming) => {
-      const answer = new Headers()
+    const request = send(url, { method: 'GET', headers: { 'user-agent': 'kay', 'accept': 'image/*', ...headers, 'accept-encoding': 'identity' }, signal, lookup: pinnedLookup(resolve, allowPrivate) as never }, (incoming) => {
+      try {
+        const answer = new Headers()
 
-      for (const [name, value] of Object.entries(incoming.headers)) {
-        for (const each of Array.isArray(value) ? value : [value]) {
-          if (each !== undefined)
-            answer.append(name, each)
+        for (const [name, value] of Object.entries(incoming.headers)) {
+          for (const each of Array.isArray(value) ? value : [value]) {
+            if (each !== undefined)
+              answer.append(name, each)
+          }
         }
+
+        const status = incoming.statusCode ?? 502
+        const empty = status === 204 || status === 205 || status === 304
+
+        if (empty)
+          incoming.resume()
+
+        done(new Response(empty ? null : Readable.toWeb(incoming) as unknown as ReadableStream, { status, headers: answer }))
       }
-
-      const status = incoming.statusCode ?? 502
-      const empty = status === 204 || status === 205 || status === 304
-
-      if (empty)
-        incoming.resume()
-
-      done(new Response(empty ? null : Readable.toWeb(incoming) as unknown as ReadableStream, { status, headers: answer }))
+      catch (error) {
+        // A status `Response` refuses, such as 999, would otherwise throw inside the event and leave the promise pending.
+        incoming.destroy()
+        fail(error)
+      }
     })
 
     request.on('error', fail)

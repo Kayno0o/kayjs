@@ -1,4 +1,5 @@
 import { rm } from 'node:fs/promises'
+import { createServer } from 'node:net'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { isPublicAddress, pinnedLookup, PrivateAddressError } from '../src/server/address'
@@ -204,5 +205,52 @@ describe('remote images and private addresses', () => {
 
     expect(() => remotePatterns(['https://*.example.co.uk', 'https://*.cdn.vercel.app'])).not.toThrow()
     expect(remotePatterns(['http://127.0.0.1:8080', 'http://[::1]:8080', 'http://10.0.0.5', 'http://localhost:9000', 'https://img.example.com', 'https://*.example.com']).map(pattern => pattern.private)).toEqual([true, true, true, true, false, false])
+  })
+
+  it('connects a trusted name to the address the resolver gave, and sends a user agent', async () => {
+    const seen: (string | null)[] = []
+    const local = Bun.serve({ port: 0, hostname: '127.0.0.1', fetch: (request) => {
+      seen.push(request.headers.get('user-agent'))
+
+      return new Response(Bun.file(HERO), { headers: { 'content-type': 'image/png' } })
+    } })
+
+    try {
+      const entry = `http://localhost:${local.port}/`
+      const result = await remoteImages(join(dir, 'named'), remotePatterns([entry]), undefined, undefined, undefined, async () => [{ address: '127.0.0.1', family: 4 }])(`${entry}hero.png`)
+
+      expect('path' in result).toBe(true)
+      expect(seen).toEqual(['kay'])
+    }
+    finally {
+      await local.stop(true)
+    }
+  })
+
+  it('answers 502 to a status no Response holds, and to a compressed body, without crashing', async () => {
+    const raw = createServer((socket) => {
+      socket.on('data', () => socket.end('HTTP/1.1 999 Odd\r\ncontent-length: 0\r\n\r\n'))
+      socket.on('error', () => socket.destroy())
+    })
+
+    await new Promise<void>(done => raw.listen(0, '127.0.0.1', done))
+
+    const gzip = Bun.serve({ port: 0, hostname: '127.0.0.1', fetch: () => new Response(Bun.gzipSync(new Uint8Array(10)), { headers: { 'content-encoding': 'gzip' } }) })
+
+    try {
+      const odd = `http://127.0.0.1:${(raw.address() as { port: number }).port}/`
+      const zipped = `http://127.0.0.1:${gzip.port}/`
+
+      expect((await remoteImages(join(dir, 'odd'), remotePatterns([odd]))(`${odd}a.png`))).toEqual({ status: 502, message: 'The host did not give the image' })
+      expect((await remoteImages(join(dir, 'zipped'), remotePatterns([zipped]))(`${zipped}a.png`))).toEqual({ status: 502, message: 'The host sent the image compressed' })
+    }
+    finally {
+      raw.close()
+      await gzip.stop(true)
+    }
+  })
+
+  it('refuses a wildcard on a public suffix written with a trailing dot', () => {
+    expect(() => remotePatterns(['https://*.co.uk.'])).toThrow('images.remote holds')
   })
 })
