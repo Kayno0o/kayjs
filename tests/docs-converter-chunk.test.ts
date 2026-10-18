@@ -60,7 +60,9 @@ describe('the docs converter chunk', () => {
   })
 
   it('is fetched by the converter box alone and reached by no other page', () => {
-    const box = [...chunks.keys()].filter(name => name.startsWith('html-converter-'))
+    // The export also carries the chunks kept from earlier builds, which no page of this one links.
+    const linked = reachable([...pages.values()].flatMap(chunksOf))
+    const box = [...linked].filter(name => name.startsWith('html-converter-'))
 
     expect(box).toHaveLength(1)
 
@@ -71,7 +73,7 @@ describe('the docs converter chunk', () => {
     expect(chunks.get(converter[0]!)).toContain('the HTML does not parse')
     expect(pages.has(CONVERTER_PAGES[0]!)).toBe(true)
 
-    const reaching = [...chunks].filter(([name, code]) => name !== island && [...code.matchAll(CHUNK_IMPORT)].some(([, next]) => next === island || next === converter[0])).map(([name]) => name)
+    const reaching = [...chunks].filter(([name, code]) => linked.has(name) && name !== island && [...code.matchAll(CHUNK_IMPORT)].some(([, next]) => next === island || next === converter[0])).map(([name]) => name)
 
     expect(reaching).toEqual([])
     expect([...pages].filter(([, html]) => reachable(chunksOf(html)).has(converter[0]!)).map(([file]) => file)).toEqual(CONVERTER_PAGES.filter(page => pages.has(page)))
