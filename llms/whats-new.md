@@ -2,19 +2,20 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
-## 1.53.0
+## Unreleased
 
 - kayjs-ai asks the provider to cache the prompt by default, so a chat and each step of a tool loop stop paying full price for the system prompt, tools and history: Anthropic gets automatic `cache_control`, an OpenAI-compatible server a `prompt_cache_key` per conversation (dropped when it refuses it), `ask(..., { cache: false | '1h' })` changes it, `reply.usage` reports `cacheReadTokens` and `cacheWriteTokens`, and the token budget counts them ([prompt caching](../packages/ai/llms/asking.md#prompt-caching)).
 - kayjs-ai streams from Mistral with only `AI_BASE_URL`, `OPENAI_API_KEY` and `AI_MODEL` set: a server refusing `stream_options` is asked again without it, array content keeps its text, and a stream ending on `error` fails the reply ([asking](../packages/ai/llms/asking.md)).
 - `analytics({ provider: 'ga4', measurementId, apiSecret })` sends Google Analytics 4 page views from the server through its Measurement Protocol, with a visitor id made on the server and no cookie ([Privacy](privacy.md#count-visits-through-your-own-origin)).
 - `consent` from `kay/analytics` reads and sets the visitor's analytics answer from an island or a server render, and `consent: { notice: false }` leaves the asking to the app's own banner ([Privacy](privacy.md#ask-for-analytics-consent-in-your-own-ui)).
-- A `live: true` cached key refreshes its pages even when the replicas sharing a `CacheStore` run on machines whose clocks differ by a few seconds, the store's `publish` relaying a clock reading ([cache stores](rendering.md#caching)).
 - A `live: true` cached key refreshes its pages even when the replicas sharing a `CacheStore` run on machines whose clocks differ by a few seconds, once they have heard each other (half a second with `sqliteCache`), the store's `publish` relaying a clock reading ([cache stores](rendering.md#caching)).
+
+## 1.53.0
+
 - A `resource()` reading a route whose handler reads a `live` cached key asks the route again after `invalidate`, with nothing written ([live data](api-from-islands.md#following-cached-values)).
 - A collection with `live: true` shows an `invalidate()` or a CMS edit in every open page that read it ([content](content.md#drafts)).
 - `followLog(() => list)` from `kay` keeps a log or chat list at its bottom while the reader is there and the first item showing in place when items load above ([Follow a log](navigation.md#follow-a-log)).
 - `kay fmt --from-html [file]` prints HTML, from a file or stdin, as a formatted `.kay` template through the translation `kay migrate astro` uses, and the docs site converts a pasted snippet in the browser; the translation keeps a no-break space and writes `#[` in text as `\#[` ([kay fmt](check-and-tools.md), [Template lines](templates.md#write-html-and-convert-it)).
-- `analytics()` from `kay/analytics` counts visits with Plausible, Umami or Simple Analytics through the app's own origin, with no pasted script or CSP exception, page swaps counted, an optional consent notice and the visitor's address sent only where the provider needs it ([Privacy](privacy.md#count-visits-through-your-own-origin)).
 - `analytics()` from `kay/analytics` counts visits with Plausible, Umami, Simple Analytics or Matomo through the app's own origin, with no pasted script or CSP exception, page swaps counted, an optional consent notice and the visitor's address sent only where the provider needs it, plus Fathom, Cloudflare Web Analytics and any tracker script by `script` and `endpoint` ([Privacy](privacy.md#count-visits-through-your-own-origin)).
 - `kay migrate astro` and `kay fmt --from-html` keep the space a line break makes between two inline siblings (`#[b a] #[i b]`) and comment out a web component's `<slot>` ([kay fmt](check-and-tools.md)).
 - Redirects can be added while the site runs: `kay not-found --redirect /old --runtime` and kayjs-cms's missing pages screen write them to `data/not-found.sqlite`, which the server reads for a path no page serves; they stay on the site unless `runtimeRedirects.hosts` lists a host, and `kay check` reports a target nothing serves ([Redirects](routing.md#redirects), [kayjs-cms](../packages/cms/llms.txt)).
