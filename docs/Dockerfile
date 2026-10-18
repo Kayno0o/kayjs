@@ -8,7 +8,10 @@ WORKDIR /kay
 COPY --chown=bun:bun . .
 RUN bun install --frozen-lockfile
 WORKDIR /kay/docs
-RUN bun ../src/cli.ts build
+RUN mkdir .kay
+# The build's cache (compiled components, share cards, compressed copies) is a BuildKit cache mount, so a rebuild after a small change reuses it; the mount is not in the image, so the same step copies it aside and the next one puts it back, as the server compiles from it at start-up.
+RUN --mount=type=cache,target=/kay/docs/.kay/cache,uid=1000,gid=1000 bun ../src/cli.ts build && mkdir /kay/docs/.kay/cache-image && cp -a /kay/docs/.kay/cache/. /kay/docs/.kay/cache-image/
+RUN cp -a .kay/cache-image/. .kay/cache/ && rm -rf .kay/cache-image
 # The chat's counts live in data/, a volume; the build above may have opened its file.
 RUN rm -rf data && mkdir data
 ENV NODE_ENV=production PORT=3649
