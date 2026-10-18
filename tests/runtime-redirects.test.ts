@@ -297,6 +297,13 @@ describe('what an editor types', () => {
     expect(answerFor(set, '/vieux-caf%C3%A9', '', [])?.location).toBe('/caf%C3%A9/%C3%A7a')
   })
 
+  it('writes the hex of a percent-escape in upper case, as a browser sends it', () => {
+    const set = setOf()
+
+    expect(set.add('/caf%c3%a9', '/ok%2f%c3%a9', undefined, rules)).toMatchObject({ from: '/caf%C3%A9', to: '/ok%2F%C3%A9' })
+    expect(answerFor(set, '/caf%C3%A9', '', [])?.location).toBe('/ok%2F%C3%A9')
+  })
+
   it('stores the path as a visit is looked up: no query, hash nor trailing slash', () => {
     const set = setOf()
 

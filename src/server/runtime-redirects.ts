@@ -61,11 +61,12 @@ export function plainPath(path: string): string {
 }
 
 const NON_ASCII = /\P{ASCII}/gu
+const PERCENT_ESCAPE = /%[\da-f]{2}/gi
 
-// Non-ASCII text percent-encoded as a browser sends it, since a header carries ASCII alone: `/café` is `/caf%C3%A9`, text already encoded kept as it is.
+// Non-ASCII text percent-encoded as a browser sends it, since a header carries ASCII alone: `/café` is `/caf%C3%A9`, and the escapes already there get their hex in upper case (`%c3%a9` is `%C3%A9`).
 function encoded(text: string): string {
   try {
-    return text.replace(NON_ASCII, character => encodeURIComponent(character))
+    return text.replace(NON_ASCII, character => encodeURIComponent(character)).replace(PERCENT_ESCAPE, escape => escape.toUpperCase())
   }
   catch {
     throw new RedirectRefused('a path and a target are text, not broken characters')
@@ -229,7 +230,7 @@ interface Matcher {
 
 // The matcher of each pattern path, compiled once: a flood of missing paths would otherwise compile them for every one.
 const matchers = new Map<string, Matcher>()
-const MOST_MATCHERS = 2000
+const NEVER = /^\b$/
 
 function matcherOf(from: string): Matcher {
   const known = matchers.get(from)
@@ -244,9 +245,19 @@ function matcherOf(from: string): Matcher {
 
     return '([^/]+)'
   })
-  const matcher = { pattern: new RegExp(`^${body}${star ? '(?:/(.*))?' : ''}$`), names }
+  let pattern = NEVER
 
-  if (matchers.size >= MOST_MATCHERS)
+  // A path that cannot compile answers nothing, rather than throwing out of the lookup that serves a 404.
+  try {
+    pattern = new RegExp(`^${body}${star ? '(?:/(.*))?' : ''}$`)
+  }
+  catch {
+    // Left on the pattern that matches nothing.
+  }
+
+  const matcher = { pattern, names }
+
+  if (matchers.size >= MAX_RUNTIME_REDIRECTS)
     matchers.clear()
 
   matchers.set(from, matcher)
