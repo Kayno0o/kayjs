@@ -246,6 +246,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a page tol
           expect(probes[0]).toContain('/_kay/')
           // Only the requests the island's own refresh makes, which a probe fetching the page would add one to.
           await settled(forged.seen, refreshed)
+          expect(forged.seen.filter(request => request.startsWith('HEAD '))).toHaveLength(1)
 
           await page.click('a.second')
           await page.waitFor('h1', { text: 'Second' })
@@ -342,6 +343,39 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a page tol
       })
 
       expect(forged.seen.filter(request => request.startsWith('HEAD '))).toHaveLength(1)
+    }
+    finally {
+      await site.close()
+    }
+  }, 60_000)
+
+  it('asks the server again for a dropped chunk when the last answer named the page\'s own build', async () => {
+    const { forged, plugin } = forgedBuild()
+    const site = await testSite({ routes: 'tests/fixtures/navigation/src/routes', browser: { path }, use: [plugin] })
+
+    try {
+      const page = await opened(site)
+
+      await page.evaluate(() => {
+        document.head.insertAdjacentHTML('beforeend', '<meta name="kay-posted">')
+      })
+      forged.seen.length = 0
+
+      await page.evaluate(async () => {
+        const entry = performance.getEntriesByType('resource').find(resource => resource.name.includes('/stale-'))!.name
+        const { reloadIfStale } = await import(entry) as { reloadIfStale: () => Promise<boolean> }
+
+        await reloadIfStale()
+      })
+      forged.build = 'otherbuild'
+      await page.evaluate(async () => {
+        const entry = performance.getEntriesByType('resource').find(resource => resource.name.includes('/stale-'))!.name
+        const { reloadIfStale } = await import(entry) as { reloadIfStale: () => Promise<boolean> }
+
+        await reloadIfStale()
+      })
+
+      expect(forged.seen.filter(request => request.startsWith('HEAD '))).toHaveLength(2)
     }
     finally {
       await site.close()
