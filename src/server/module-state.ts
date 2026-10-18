@@ -10,6 +10,9 @@ const BRACKETS = /^(?:\[\s*\]|\{\s*\})/
 const CAST = /^(?:as|satisfies)\s/
 // The end of a cast's type name, whose `<` opens type arguments.
 const CAST_TYPE = /\b(?:as|satisfies)\s+[\w$.]+$/
+// What may export a name apart from its declaration.
+const EXPORT_LATER = /\bexport\s*(?:\{|default\b)/
+const DEFAULT_NAME = /^export\s+default\s+([\w$]+)\s*(?:;\s*)?$/
 const TYPE_ENTRY = /^type\s/
 const NEW_CONTAINER = /^new\s+(?:Map|Set|WeakMap|WeakSet|Array|Object)\b/y
 const NEW_VALUE = /^(?:[[{]|new\s)/
@@ -28,12 +31,13 @@ export type Unchanged = (name: string, initializer: string) => boolean
 // Where the first statement declaring state starts, or undefined when none does.
 // With `risks`, an exported container nothing proves unchanged is no state of the module: it is noted there by name, with where it starts, for a page to be stopped by only when it takes it.
 export function stateAt(source: string, settings: ReadonlySet<string>, unchanged?: Unchanged, risks?: Map<string, number>): number | undefined {
+  const later = risks === undefined ? new Set<string>() : exportedLater(source)
   let at = skipTrivia(source, 0)
 
   while (at < source.length) {
     const end = statementEnd(source, at)
 
-    if (statementDeclaresState(source, at, end, settings, unchanged, risks))
+    if (statementDeclaresState(source, at, end, settings, unchanged, risks, later))
       return at
 
     // A stray closer ends a statement without being part of it.
@@ -192,7 +196,7 @@ function statementEnd(source: string, at: number): number {
   return source.length
 }
 
-function statementDeclaresState(source: string, start: number, end: number, settings: ReadonlySet<string>, unchanged: Unchanged | undefined, risks: Map<string, number> | undefined): boolean {
+function statementDeclaresState(source: string, start: number, end: number, settings: ReadonlySet<string>, unchanged: Unchanged | undefined, risks: Map<string, number> | undefined, later: ReadonlySet<string>): boolean {
   let i = start
   let word = wordAt(source, i)
   let exported = false
@@ -206,7 +210,7 @@ function statementDeclaresState(source: string, start: number, end: number, sett
   if (word === 'let' || word === 'var')
     return true
 
-  return word === 'const' && declaratorsHoldContainer(source, skipTrivia(source, i + word.length), end, exported, settings, unchanged, risks, start)
+  return word === 'const' && declaratorsHoldContainer(source, skipTrivia(source, i + word.length), end, exported, settings, unchanged, risks, start, later)
 }
 
 function wordAt(source: string, at: number): string {
@@ -265,10 +269,13 @@ function declarators(source: string, from: number, end: number): { left: string,
 }
 
 // Whether a declarator of the list from `from` to `end` is initialised with an empty container, or for an export one nothing shows unchanged.
-function declaratorsHoldContainer(source: string, from: number, end: number, exported: boolean, settings: ReadonlySet<string>, unchanged: Unchanged | undefined, risks: Map<string, number> | undefined, start: number): boolean {
+function declaratorsHoldContainer(source: string, from: number, end: number, declaredExported: boolean, settings: ReadonlySet<string>, unchanged: Unchanged | undefined, risks: Map<string, number> | undefined, start: number, later: ReadonlySet<string>): boolean {
   for (const { left, initializer } of declarators(source, from, end)) {
     if (initializer === undefined || settings.has(left.trim()))
       continue
+
+    // A `const` exported further down by `export { X }` or `export default X` is as open to another module as one exported where it is declared.
+    const exported = declaredExported || later.has(declaredName(left.trim()) ?? '')
 
     if (holdsContainer(initializer, exported) && !(exported && provenUnchanged(left, initializer, unchanged))) {
       const name = exported ? declaredName(left.trim()) : undefined
@@ -427,6 +434,25 @@ function declarationAt(source: string, start: number, end: number): Declaration 
     return undefined
 
   return { locals: [declared], exports: exported ? [{ name: declared, of: [declared] }] : [], text }
+}
+
+// The local names a module exports apart from their declaration: `export { X }`, `export { X as Y }`, `export default X`.
+function exportedLater(source: string): Set<string> {
+  const names = new Set<string>()
+
+  if (!EXPORT_LATER.test(source))
+    return names
+
+  for (const { exports, text } of declarations(source)) {
+    for (const { name, of } of exports) {
+      const alone = name === 'default' && of === undefined ? DEFAULT_NAME.exec(text)?.[1] : undefined
+
+      for (const local of alone === undefined ? of ?? [] : [alone])
+        names.add(local)
+    }
+  }
+
+  return names
 }
 
 // Which exports of a module lean on the exported containers of `risks`, a name to where the first container it leans on starts: the container itself, a function or a value built from it, a default or a renamed export of either.

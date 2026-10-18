@@ -494,3 +494,40 @@ describe('a page reading the items of an exported array of objects', () => {
       expect([fence, template, await stopOfPage(fence, template)]).toEqual([fence, template, expect.stringContaining('module state')])
   })
 })
+
+describe('a constant exported by name after its declaration', () => {
+  const CONTENT = 'const CONTACT = { email: \'a@b.fr\', phone: \'01\' }\n'
+
+  it('is kept while nothing writes to it, and stops once a module or its own does', async () => {
+    const kept = { 'src/content.ts': `${CONTENT}export { CONTACT }\n`, 'src/routes/index.kay': PAGE('CONTACT') }
+    const early = { 'src/content.ts': `export { CONTACT }\n${CONTENT}`, 'src/routes/index.kay': PAGE('CONTACT') }
+
+    expect(await stopOf(kept)).toBeUndefined()
+    expect(await stopOf(early)).toBeUndefined()
+
+    const writers: Record<string, Record<string, string>> = {
+      module: { 'src/writer.ts': 'import { CONTACT } from \'./content\'\n\nCONTACT.email = \'x\'\n' },
+      own: { 'src/content.ts': `${CONTENT}export { CONTACT }\nCONTACT.email = 'x'\n` },
+      early: { 'src/content.ts': `export { CONTACT }\n${CONTENT}`, 'src/writer.ts': 'import { CONTACT } from \'./content\'\n\nCONTACT.email = \'x\'\n' },
+      push: { 'src/content.ts': 'const LIST = [\'a\']\nexport { LIST }\n', 'src/writer.ts': 'import { LIST } from \'./content\'\n\nLIST.push(\'b\')\n', 'src/routes/index.kay': PAGE('LIST', 'LIST.length') },
+    }
+
+    for (const [key, files] of Object.entries(writers))
+      expect([key, await stopOf({ ...kept, ...files })]).toEqual([key, expect.stringContaining('module state')])
+  })
+
+  it('stops under another name or as the default, which no importer is followed through, and not for what no page takes', async () => {
+    const pages: Record<string, [string, string]> = {
+      renamed: ['export { CONTACT as INFO }\n', '---\nimport { INFO } from \'../content\'\n---\np {INFO.email}\n'],
+      default: ['export default CONTACT\n', '---\nimport info from \'../content\'\n---\np {info.email}\n'],
+      asDefault: ['export { CONTACT as default }\n', '---\nimport info from \'../content\'\n---\np {info.email}\n'],
+    }
+
+    for (const [key, [exported, page]] of Object.entries(pages))
+      expect([key, await stopOf({ 'src/content.ts': `${CONTENT}${exported}`, 'src/routes/index.kay': page })]).toEqual([key, expect.stringContaining('module state')])
+
+    const untaken = { 'src/content.ts': `${CONTENT}${LIST}export default CONTACT\nexport { CONTACT as INFO }\n`, 'src/routes/index.kay': PAGE('LIST', 'LIST.length') }
+
+    expect(await stopOf(untaken)).toBeUndefined()
+  })
+})

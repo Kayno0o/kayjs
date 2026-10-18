@@ -110,7 +110,7 @@ const CODE_FILE = /\.(?:kay|[cm]?[jt]sx?)$/
 const SOURCE_BATCH = 64
 // A test runs in a process of its own, so what it writes reaches no page.
 const TEST_FILE = /\.(?:test|spec)\.[cm]?[jt]sx?$/
-const EXPORTED_CONTAINER = /\bexport\s+const\b/
+const EXPORTED_CONTAINER = /\bexport\s*(?:const\b|default\b|\{)/
 // What a file imported for its bytes holds the same on every render; a database, a native module or a wasm file does not.
 const STATIC_FILE = /\.(?:png|jpe?g|gif|webp|avif|svg|ico|woff2?|ttf|otf|json|css|txt|md|html|toml|ya?ml|csv)$/i
 // Every way a file reads the request or the moment besides `ctx`, which `ctxRead` judges: a clock, a random number, the environment, the file system through Bun, a network fetch, a dynamic import, or a `query` schema, which has the page read the URL's search params.
@@ -705,12 +705,8 @@ function importedBindings(source: string): Set<string> {
     if (clause!.includes('*') || TYPE_IMPORT.test(clause!))
       continue
 
-    for (const entry of (BRACES.exec(clause!)?.[1] ?? '').split(',')) {
-      const name = entry.trim()
-
-      if (name !== '' && !TYPE_NAME.test(name))
-        names.add(name.replace(AS_PREFIX, ''))
-    }
+    for (const entry of importList(clause!))
+      names.add(entry.replace(AS_PREFIX, ''))
 
     const fallback = clause!.replace(BRACES, '').replaceAll(',', '').trim()
 
@@ -758,7 +754,7 @@ async function scanned(file: string, root: string | undefined, scans: object): P
     const stop = (why: string): Scan => ({ stop: { file, line: lineAt(source, index), why }, code })
 
     if (specifier === 'kay' || specifier === 'kay/i18n') {
-      const imported = (BRACES.exec(clause)?.[1] ?? '').split(',').map(name => name.trim()).filter(name => name !== '' && !TYPE_NAME.test(name))
+      const imported = importList(clause)
 
       const impure = imported.filter((name) => {
         const own = name.replace(AS_NAME, '')
@@ -779,7 +775,7 @@ async function scanned(file: string, root: string | undefined, scans: object): P
     }
 
     if (specifier === 'kay/image') {
-      const imported = (BRACES.exec(clause)?.[1] ?? '').split(',').map(name => name.trim()).filter(name => name !== '' && !TYPE_NAME.test(name))
+      const imported = importList(clause)
       const impure = imported.filter(name => !Object.hasOwn(IMAGE_EXPORTS, name.replace(AS_NAME, '')))
 
       if (imported.length === 0 || impure.length > 0)
@@ -789,7 +785,7 @@ async function scanned(file: string, root: string | undefined, scans: object): P
     }
 
     if (specifier === 'kay/content') {
-      const imported = (BRACES.exec(clause)?.[1] ?? '').split(',').map(name => name.trim()).filter(name => name !== '' && !TYPE_NAME.test(name))
+      const imported = importList(clause)
 
       const impure = imported.filter((name) => {
         const own = name.replace(AS_NAME, '')
@@ -833,12 +829,17 @@ async function scanned(file: string, root: string | undefined, scans: object): P
   return { code, pathname: context.pathname, exposed, taken }
 }
 
+// The entries an import or export clause lists in braces, a `type` one left out.
+function importList(clause: string): string[] {
+  return (BRACES.exec(clause)?.[1] ?? '').split(',').map(entry => entry.trim()).filter(entry => entry !== '' && !TYPE_NAME.test(entry))
+}
+
 // The names an import or re-export clause takes: `{ A, B as C }` takes A and B, a default `default`, and a namespace, a bare `import` or a `*` everything.
 function importedNames(clause: string): ReadonlySet<string> | 'all' {
   if (clause.includes('*') || clause.trim() === '')
     return 'all'
 
-  const names = new Set((BRACES.exec(clause)?.[1] ?? '').split(',').map(entry => entry.trim()).filter(entry => entry !== '' && !TYPE_NAME.test(entry)).map(entry => entry.replace(AS_NAME, '').replace(QUOTES, '')))
+  const names = new Set(importList(clause).map(entry => entry.replace(AS_NAME, '').replace(QUOTES, '')))
 
   if (clause.replace(BRACES, '').replaceAll(',', '').trim() !== '')
     names.add('default')

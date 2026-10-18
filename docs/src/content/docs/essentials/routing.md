@@ -128,6 +128,8 @@ Lists of objects are fine too. A nav can loop over `export const NAV = [{ id: 't
 
 Handing an item to a function, copying it, or calling `filter`, `find` or `sort` on the list makes the build unsure, and the page is rendered per request.
 
+A constant exported further down with `export { CONTACT }` counts like one exported where it is declared. Exporting it under another name, or as the default, leaves the build unsure.
+
 A constant the build cannot vouch for, such as a list with a function call in it, only matters to the pages that use it. A page that imports `CONTACT` from a module also exporting such a list is still prerendered.
 
 `kay build` shows what it decided. Its route table says `prerendered`, `kept` or `on request` for each route. Under an `on request` page it names the file and line that stopped it, such as `src/routes/clock.kay:2 reads Date`.
