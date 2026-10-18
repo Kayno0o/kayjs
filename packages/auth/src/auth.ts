@@ -788,7 +788,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     return changeRole(this[STATE], userId, role, true)
   }
 
-  // Takes a role back; one that would leave the admin asking no longer an admin is refused (`self`).
+  // Takes a role back; one that would leave the admin asking no longer an admin is refused (`self`), and one that races another admin's revoke and would leave none is undone (`last-admin`).
   async revokeRole(userId: string, role: Role): Promise<RoleResult> {
     return changeRole(this[STATE], userId, role, false)
   }

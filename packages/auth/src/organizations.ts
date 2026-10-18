@@ -561,8 +561,14 @@ async function ownerKept(config: OrganizationsCore, store: Stores, organizationI
     return true
 
   // An organization deleted meanwhile has nothing to put the member back in.
-  if (await store.organizations.get(organizationId))
-    await restore()
+  if (await store.organizations.get(organizationId)) {
+    try {
+      await restore()
+    }
+    catch {
+      // The member is back already, or gone with their account: nothing is left to undo.
+    }
+  }
 
   return false
 }

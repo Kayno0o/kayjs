@@ -117,10 +117,11 @@ describe.each(backends)('%s: requests racing for the last', (_, make) => {
     await join(grace, ['owner'])
     race.arm()
 
-    await Promise.all([ada.browser.call('setMemberRoles', org, ada.id, ['admin']), grace.browser.call('removeMember', org, grace.id)])
+    const answers = await Promise.all([ada.browser.call('setMemberRoles', org, ada.id, ['admin']), grace.browser.call('removeMember', org, grace.id)])
 
     expect(race.overlapped()).toBe(true)
     expect((await owners()).length).toBeGreaterThanOrEqual(1)
+    expect(answers.filter(answer => !answer.ok).every(answer => !answer.ok && answer.error === 'last-owner')).toBe(true)
   })
 
   test('two owners demoting each other keep one', async () => {
@@ -129,10 +130,11 @@ describe.each(backends)('%s: requests racing for the last', (_, make) => {
 
     await join(grace, ['owner'])
     race.arm()
-    await Promise.all([ada.browser.call('setMemberRoles', org, grace.id, ['admin']), grace.browser.call('setMemberRoles', org, ada.id, ['admin'])])
+    const answers = await Promise.all([ada.browser.call('setMemberRoles', org, grace.id, ['admin']), grace.browser.call('setMemberRoles', org, ada.id, ['admin'])])
 
     expect(race.overlapped()).toBe(true)
     expect((await owners()).length).toBeGreaterThanOrEqual(1)
+    expect(answers.filter(answer => !answer.ok).every(answer => !answer.ok && answer.error === 'last-owner')).toBe(true)
   })
 
   test('an owner leaving while the other deletes their account keeps the organization owned', async () => {
@@ -208,9 +210,10 @@ describe.each(backends)('%s: requests racing for the last', (_, make) => {
     await ada.fetch('/sign-in/u1', POST)
     race.arm()
 
-    await Promise.all([ada.call('unlink', 'discord', {}), ada.call('removePasskey', 'key', {})])
+    const answers = await Promise.all([ada.call('unlink', 'discord', {}), ada.call('removePasskey', 'key', {})])
 
     expect(race.overlapped()).toBe(true)
+    expect(answers.filter(answer => !answer.ok).every(answer => !answer.ok && answer.error === 'last-way-in')).toBe(true)
     expect((await app.store.identities.listByUser('u1')).length + (await app.store.passkeys.listByUser('u1')).length).toBeGreaterThanOrEqual(1)
   })
 })

@@ -12,7 +12,7 @@ import { notify } from './notify'
 import { normalizeUsername, usernameProblem } from './rules'
 import { endOtherSessions } from './sessions'
 import { reprove } from './twoFactor'
-import { hasWayIn } from './wayIn'
+import { hasWayIn, putBack } from './wayIn'
 
 // Sets the signed-in user's password, or a first one, and ends their other sessions.
 export async function changePassword(state: RequestState, proof: Proof, password: string): Promise<{ ok: true } | { ok: false, error: ProofFailure } | { ok: false, errors: { password: PasswordProblem | 'breached' } }> {
@@ -107,7 +107,7 @@ export async function unlink(state: RequestState, provider: string, proof: Proof
 
   // Two requests can each see the other way in still there: when none is left, the identity goes back.
   if (!await hasWayIn(state.core, record.id)) {
-    await state.core.store.identities.create(identity)
+    await putBack(async () => state.core.store.identities.create(identity))
 
     return { ok: false, error: 'last-way-in' }
   }

@@ -14,3 +14,11 @@ export async function hasWayIn(core: Core, userId: string): Promise<boolean> {
 
   return (await core.store.identities.listByUser(userId)).length > 0 || (await core.store.passkeys.listByUser(userId)).length > 0
 }
+
+// Puts a removed identity or passkey back; a request racing this one may have done so already, which leaves nothing to undo.
+export async function putBack(restore: () => unknown): Promise<void> {
+  try {
+    await restore()
+  }
+  catch {}
+}
