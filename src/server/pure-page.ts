@@ -150,9 +150,10 @@ function moduleStateAt(file: string, source: string, unchanged: Unchanged | unde
   if (!MAYBE_STATE.test(source))
     return undefined
 
-  const server = analyzeServer(source, parseKay(source).server)
+  const fence = parseKay(source).server
+  const server = analyzeServer(source, fence)
 
-  if (server === undefined)
+  if (fence === undefined || server === undefined)
     return undefined
 
   // A fence being typed, whose statements the compiler cannot place, is judged by the file as before.
@@ -166,10 +167,9 @@ function moduleStateAt(file: string, source: string, unchanged: Unchanged | unde
       return start + at
   }
 
-  const fence = parseKay(source).server
-  const later = fence === undefined ? undefined : laterExportAt(source.slice(fence.start, fence.end), unchanged)
+  const later = laterExportAt(source.slice(fence.start, fence.end), SETTING_NAMES, unchanged)
 
-  return fence === undefined || later === undefined ? undefined : fence.start + later
+  return later === undefined ? undefined : fence.start + later
 }
 
 // An import or a re-export with what it takes, then one for its effect alone.

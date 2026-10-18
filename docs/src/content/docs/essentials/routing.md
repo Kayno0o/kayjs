@@ -128,7 +128,7 @@ Lists of objects are fine too. A nav can loop over `export const NAV = [{ id: 't
 
 Handing an item to a function, or calling `filter`, `find` or `sort` on the list makes the build unsure, and the page is rendered per request.
 
-A constant exported further down with `export { CONTACT }` counts like one exported where it is declared. Exporting it under another name, or as the default, leaves the build unsure. A constant listed inside a default-exported object or array is treated the same way, and so is one a server fence exports further down.
+A constant exported further down with `export { CONTACT }` counts like one exported where it is declared. Exporting it under another name, or as the default, leaves the build unsure. A constant listed inside a default-exported object or array always leaves the build unsure. One a server fence exports further down is judged like one exported where it is declared, so only a write stops the page.
 
 A constant the build cannot vouch for, such as a list with a function call in it, only matters to the pages that use it. A page that imports `CONTACT` from a module also exporting such a list is still prerendered.
 

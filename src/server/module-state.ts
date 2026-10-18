@@ -49,9 +49,9 @@ export function stateAt(source: string, settings: ReadonlySet<string>, unchanged
   return undefined
 }
 
-// Where the first top-level `const` of a container that the module exports further down, `export { X }` or `export default X`, starts, or undefined when none does.
+// Where the first top-level `const` holding an object, array or `new` that the module lists in an export further down starts, or undefined when none does.
 // A server fence cannot export that way, but its constant is as open to a write as an exported one.
-export function laterExportAt(source: string, unchanged?: Unchanged): number | undefined {
+export function laterExportAt(source: string, settings: ReadonlySet<string>, unchanged?: Unchanged): number | undefined {
   const later = exportedLater(source)
 
   if (later.size === 0)
@@ -66,7 +66,7 @@ export function laterExportAt(source: string, unchanged?: Unchanged): number | u
       for (const { left, initializer } of declarators(source, skipTrivia(source, at + 5), end)) {
         const name = declaredName(left.trim())
 
-        if (initializer !== undefined && name !== undefined && later.has(name) && holdsContainer(initializer, true) && unchanged?.(name, initializer) !== true)
+        if (initializer !== undefined && name !== undefined && !settings.has(name) && later.has(name) && holdsContainer(initializer, true) && unchanged?.(name, initializer) !== true)
           return at
       }
     }
