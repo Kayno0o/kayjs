@@ -1,5 +1,5 @@
 import type { ServerEvent } from './http'
-import type { Finish, Piece, Provider, ProviderMessage } from './types'
+import type { Finish, Piece, Provider, ProviderMessage, ProviderRequest } from './types'
 import { AiError } from './errors'
 import { json, postEvents } from './http'
 import { MAX_ARGUMENTS, MAX_STREAMED_CALLS } from './tool-limits'
@@ -15,8 +15,11 @@ export interface OpenAiOptions {
 export const OPENAI_URL = 'https://api.openai.com/v1'
 const TRAILING_SLASHES = /\/+$/
 
-// Servers that refused `stream_options` once, by API root, so only the first ask of a process pays the retry.
-const withoutUsageOption = new Set<string>()
+// The parameters a server may refuse, which the request is sent again without: `stream_options` to count tokens, `prompt_cache_key` to raise cache hits.
+type Optional = 'stream_options' | 'prompt_cache_key'
+
+// Those a server refused once, by API root, so only the first ask of a process pays the retry.
+const refused = new Map<string, Set<Optional>>()
 
 const FINISHES: Record<string, Finish> = { length: 'length', content_filter: 'filtered' }
 
@@ -56,9 +59,20 @@ function usageOf(value: unknown): Piece[] {
   if (typeof value !== 'object' || value === null)
     return []
 
-  const { prompt_tokens: input, completion_tokens: output } = value as { prompt_tokens?: unknown, completion_tokens?: unknown }
+  const { prompt_tokens: input, completion_tokens: output, prompt_tokens_details: details } = value as { prompt_tokens?: unknown, completion_tokens?: unknown, prompt_tokens_details?: { cached_tokens?: unknown } | null }
+  const cached = typeof details?.cached_tokens === 'number' ? details.cached_tokens : undefined
 
-  return [{ usage: { ...typeof input === 'number' ? { inputTokens: input } : {}, ...typeof output === 'number' ? { outputTokens: output } : {} } }]
+  // `prompt_tokens` holds the cached tokens, which come apart here as Anthropic's do.
+  return [{ usage: { ...typeof input === 'number' ? { inputTokens: cached === undefined ? input : Math.max(0, input - cached) } : {}, ...typeof output === 'number' ? { outputTokens: output } : {}, ...cached === undefined ? {} : { cacheReadTokens: cached } } }]
+}
+
+// One key for a whole conversation, derived from its system prompt and first message so the app sets nothing: every turn and tool step shares it, which sends them to the machine holding their cache, while conversations differ so no key takes more than a server routes to one machine.
+function cacheKeyOf(request: ProviderRequest): string {
+  const hasher = new Bun.CryptoHasher('sha256')
+
+  hasher.update(`${request.system ?? ''}\0${request.messages[0]?.content ?? ''}`)
+
+  return `kay-${hasher.digest('hex').slice(0, 32)}`
 }
 
 // A turn as the API takes it: the calls an assistant made ride on its message, and each result is a message of its own.
@@ -102,22 +116,33 @@ export function openai({ baseUrl = OPENAI_URL, apiKey, model }: OpenAiOptions = 
       const calls = new Map<number, { index: number, id: string, name: string, arguments: string }>()
       const byIndex = new Map<number, number>()
 
-      // OpenAI and Ollama count tokens only when asked; Mistral refuses the parameter and sends usage unasked. Asked first, the request goes again without it when the server answers 400 or 422, and the root is remembered once that works.
-      const open = (usage: boolean) => postEvents('openai', url, headers, usage ? { ...body, stream_options: { include_usage: true } } : body, request.timeouts, signal, apiKey)
-      let events = open(!withoutUsageOption.has(root))
+      // OpenAI and Ollama count tokens only when asked; Mistral refuses the parameter and sends usage unasked. Both optional parameters go first, and on a 400 or 422 the request goes again without the one the error names (else without both), the root remembered once that works.
+      const known = refused.get(root) ?? new Set<Optional>()
+      const optional = (['stream_options', 'prompt_cache_key'] as const).filter(name => !known.has(name) && (name === 'stream_options' || request.cache !== false))
+      const open = (sent: readonly Optional[]) => postEvents('openai', url, headers, { ...body, ...sent.includes('stream_options') ? { stream_options: { include_usage: true } } : {}, ...sent.includes('prompt_cache_key') ? { prompt_cache_key: cacheKeyOf(request) } : {} }, request.timeouts, signal, apiKey)
+      let sent: readonly Optional[] = optional
+      let events = open(sent)
       let first: IteratorResult<ServerEvent>
 
-      try {
-        first = await events.next()
-      }
-      catch (error) {
-        if (withoutUsageOption.has(root) || !(error instanceof AiError) || (error.status !== 400 && error.status !== 422))
-          throw error
+      for (;;) {
+        try {
+          first = await events.next()
 
-        events = open(false)
-        first = await events.next()
-        withoutUsageOption.add(root)
+          break
+        }
+        catch (error) {
+          if (sent.length === 0 || !(error instanceof AiError) || (error.status !== 400 && error.status !== 422))
+            throw error
+
+          const named = sent.filter(name => error.message.includes(name))
+
+          sent = named.length === 0 ? [] : sent.filter(name => !named.includes(name))
+          events = open(sent)
+        }
       }
+
+      if (sent.length < optional.length)
+        refused.set(root, new Set([...known, ...optional.filter(name => !sent.includes(name))]))
 
       const received = (async function* () {
         if (!first.done)

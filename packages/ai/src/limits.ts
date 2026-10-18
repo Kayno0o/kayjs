@@ -262,7 +262,10 @@ function tokensUsed(usage: Partial<Usage>, sent: number, received: number, stopp
   if (usage.inputTokens === undefined && usage.outputTokens === undefined && received === 0 && !stopped)
     return 0
 
-  return (usage.inputTokens ?? Math.ceil(sent / CHARS_PER_TOKEN)) + (usage.outputTokens ?? Math.ceil(received / CHARS_PER_TOKEN))
+  // Every token counts as one, cached reads and cache writes included, so the budget stays a cap on tokens and not a price; weighing them by price would change this line alone.
+  const cached = (usage.cacheReadTokens ?? 0) + (usage.cacheWriteTokens ?? 0)
+
+  return (usage.inputTokens ?? Math.ceil(sent / CHARS_PER_TOKEN)) + cached + (usage.outputTokens ?? Math.ceil(received / CHARS_PER_TOKEN))
 }
 
 // The pieces `open` yields, once the settings of `ai()` let the ask through and until the reply ends, when its tokens are counted whether it finished, failed or was stopped.

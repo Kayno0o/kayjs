@@ -20,12 +20,22 @@ function count(value: unknown): number | undefined {
   return typeof value === 'number' ? value : undefined
 }
 
+// `input_tokens` leaves out what was read from or written to the cache, which come apart.
 function usageOf(value: unknown): Piece[] {
-  const { input_tokens: input, output_tokens: output } = (value ?? {}) as { input_tokens?: unknown, output_tokens?: unknown }
+  const { input_tokens: input, output_tokens: output, cache_read_input_tokens: read, cache_creation_input_tokens: written } = (value ?? {}) as Record<string, unknown>
   const inputTokens = count(input)
   const outputTokens = count(output)
+  const cacheReadTokens = count(read)
+  const cacheWriteTokens = count(written)
 
-  return [{ usage: { ...inputTokens === undefined ? {} : { inputTokens }, ...outputTokens === undefined ? {} : { outputTokens } } }]
+  return [{
+    usage: {
+      ...inputTokens === undefined ? {} : { inputTokens },
+      ...outputTokens === undefined ? {} : { outputTokens },
+      ...cacheReadTokens === undefined ? {} : { cacheReadTokens },
+      ...cacheWriteTokens === undefined ? {} : { cacheWriteTokens },
+    },
+  }]
 }
 
 function failureOf(event: Record<string, unknown>): AiError {
@@ -86,6 +96,8 @@ export function anthropic({ apiKey, baseUrl = ANTHROPIC_URL, model }: AnthropicO
         max_tokens: request.maxTokens,
         messages: request.messages.map(turnOf),
         stream: true,
+        // Automatic caching: the API puts the breakpoint on the last cacheable block, so later turns and tool steps read the prefix; a prompt under the model's minimum is simply not cached.
+        ...request.cache === false ? {} : { cache_control: request.cache === '1h' ? { type: 'ephemeral', ttl: '1h' } : { type: 'ephemeral' } },
         ...request.system === undefined ? {} : { system: request.system },
         ...request.tools === undefined || request.tools.length === 0 ? {} : { tools: request.tools.map(({ name, description, inputSchema }) => ({ name, description, input_schema: inputSchema })) },
         ...request.temperature === undefined ? {} : { temperature: request.temperature },

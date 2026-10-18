@@ -15,7 +15,9 @@ export interface Asked {
 // A step of the model that calls tools, after the text it says first: a string `input` is sent as the arguments as they are, to see what a model garbling its JSON does.
 export interface Calls {
   text?: string | string[] | undefined
-  calls: { name: string, input?: unknown, id?: string | undefined }[]
+  calls?: { name: string, input?: unknown, id?: string | undefined }[] | undefined
+  // Input tokens the step reports as read from the provider's prompt cache and written to it, on top of the ones it counts itself.
+  cache?: { read?: number | undefined, written?: number | undefined } | undefined
   // Why the step ended, `stop` unless given, such as `length` for a reply cut by the token cap.
   finish?: Finish | undefined
 }
@@ -28,7 +30,7 @@ export interface Fake extends Provider {
   // Every ask the fake answered, oldest first.
   readonly asked: readonly Asked[]
   last: () => Asked | undefined
-  // The next ask read is answered with this (scripts go to asks in the order they are read, not made): a text, split into words, the pieces as they should come, or `{ text?, calls }` to call tools (a tool loop reads one script per step); a function reads what was asked. Scripts are used in order, then the default reply returns.
+  // The next ask read is answered with this (scripts go to asks in the order they are read, not made): a text, split into words, the pieces as they should come, or `{ text?, calls?, cache? }` to call tools or report cache reads and writes (a tool loop reads one script per step); a function reads what was asked. Scripts are used in order, then the default reply returns.
   reply: (script: Script) => void
   // The next ask fails with this error.
   fail: (error: Error) => void
@@ -93,13 +95,14 @@ function createFake(): Fake {
         throw script
 
       const chosen = typeof script === 'function' ? script(question) : script
-      const calls = typeof chosen === 'object' && !Array.isArray(chosen) ? chosen.calls : []
+      const calls = typeof chosen === 'object' && !Array.isArray(chosen) ? chosen.calls ?? [] : []
+      const cache = typeof chosen === 'object' && !Array.isArray(chosen) ? chosen.cache : undefined
       const said = typeof chosen === 'object' && !Array.isArray(chosen) ? chosen.text ?? [] : chosen
       const parts = typeof said === 'string' ? pieces(said) : said
       const pace = process.env.NODE_ENV === 'development' ? DEV_PACE_MS : 0
       const input = request.messages.reduce((sum, message) => sum + tokens(message.content) + (message.results ?? []).reduce((all, result) => all + tokens(result.content), 0), 0) + tokens(request.system ?? '')
 
-      yield { usage: { inputTokens: input } }
+      yield { usage: { inputTokens: input, ...cache?.read === undefined ? {} : { cacheReadTokens: cache.read }, ...cache?.written === undefined ? {} : { cacheWriteTokens: cache.written } } }
 
       for (const text of parts) {
         await pause(pace, signal)

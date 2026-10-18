@@ -7,8 +7,12 @@ export interface Message {
 }
 
 export interface Usage {
+  // The input read at full price: what the provider did not take from its cache, nor write to it.
   inputTokens: number
   outputTokens: number
+  // Input tokens read from the provider's prompt cache, and written to it (Anthropic bills the write above a plain token); absent when the provider reported none.
+  cacheReadTokens?: number | undefined
+  cacheWriteTokens?: number | undefined
 }
 
 // What the model is told of a tool it may call.
@@ -46,6 +50,8 @@ export interface ProviderRequest {
   model: string
   maxTokens: number
   temperature: number | undefined
+  // Whether to ask the provider to cache the prompt: on when absent, `'1h'` for Anthropic's 1 hour lifetime.
+  cache?: boolean | '1h' | undefined
   // Milliseconds a provider may take to answer, and to send the next chunk once it did.
   timeouts: Timeouts
 }
@@ -81,6 +87,8 @@ export interface AskOptions {
   // 4096 by default, as Anthropic requires one.
   maxTokens?: number | undefined
   temperature?: number | undefined
+  // Asks the provider to cache the prompt so the next turn and tool step read it at a fraction of the price: on by default, `false` turns it off and `'1h'` keeps an Anthropic cache for an hour instead of 5 minutes.
+  cache?: boolean | '1h' | undefined
   // Stops the reply when it aborts, as the request being answered does on its own.
   signal?: AbortSignal | undefined
   // How long to wait, as a duration: `connect` for the provider to start answering (`'30s'` by default), `idle` for the next chunk of a reply once it began (`'60s'` by default). A stall past either fails the reply with a `timeout` error. Each step of a tool loop counts them anew.
@@ -117,7 +125,7 @@ export interface Progress {
 export interface Reply extends PromiseLike<string>, AsyncIterable<string> {
   // The pieces as they came, not the text so far.
   deltas: () => AsyncIterable<string>
-  // The token counts once the reply ended, or undefined when the provider gave none or the reply failed; never rejects. Reading it starts the reply.
+  // The token counts once the reply ended (with the cache reads and writes when the provider reported them), or undefined when the provider gave none or the reply failed; never rejects. Reading it starts the reply.
   readonly usage: Promise<Usage | undefined>
   // Why the reply ended, undefined when it failed or the provider said nothing; a reply stopped by `maxTokens` is `length`, which `await` returns as if it were whole. Never rejects, and reading it starts the reply.
   readonly finish: Promise<Finish | undefined>

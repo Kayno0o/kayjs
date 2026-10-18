@@ -45,6 +45,13 @@ describe('actions as tools', () => {
     expect(outcome.finish).toBe('stop')
   })
 
+  it('sums the cache reads and writes of the steps', async () => {
+    fakeAi.reply({ calls: [{ name: 'add_note', input: { title: 'Milk' } }], cache: { read: 100, written: 40 } })
+    fakeAi.reply({ text: 'done', cache: { read: 140 } })
+
+    expect(await conversation()).toMatchObject({ usage: { cacheReadTokens: 240, cacheWriteTokens: 40 } })
+  })
+
   it('sends the assistant turn that called and the results with it, and sums the tokens of the steps', async () => {
     fakeAi.reply({ calls: [{ name: 'add_note', input: { title: 'Milk' }, id: 'x1' }] })
     fakeAi.reply('Done')

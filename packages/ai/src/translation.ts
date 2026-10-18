@@ -108,7 +108,7 @@ export async function translateUnits(units: Unit[], { from, into, signal }: Tran
     const text = await reply
     const [finish, usage] = await Promise.all([reply.finish, reply.usage])
 
-    result.inputTokens += usage?.inputTokens ?? 0
+    result.inputTokens += (usage?.inputTokens ?? 0) + (usage?.cacheReadTokens ?? 0) + (usage?.cacheWriteTokens ?? 0)
     result.outputTokens += usage?.outputTokens ?? 0
 
     const checked = finish === 'length' ? { problem: 'the reply was cut by the token cap' } : readReply(text, pending)

@@ -73,7 +73,7 @@ export function createReply(open: (signal: AbortSignal) => AsyncIterable<Piece>,
         signal?.removeEventListener('abort', stop)
 
       ended = true
-      counted.resolve(failure === undefined && total.inputTokens !== undefined && total.outputTokens !== undefined ? { inputTokens: total.inputTokens, outputTokens: total.outputTokens } : undefined)
+      counted.resolve(failure === undefined && total.inputTokens !== undefined && total.outputTokens !== undefined ? { ...total, inputTokens: total.inputTokens, outputTokens: total.outputTokens } : undefined)
       ending.resolve(failure === undefined ? reason : undefined)
       notify()
     }

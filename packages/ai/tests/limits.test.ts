@@ -325,6 +325,23 @@ describe('ai({ budget })', () => {
     expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(3)
   })
 
+  it('counts cache reads and writes as tokens, the same for every provider', async () => {
+    const store = tracking()
+
+    ai({ budget: { tokens: 10_000, window: '1m', store } })
+    await ask('a', { visitor: 'v', provider: saying([{ usage: { inputTokens: 30, outputTokens: 12, cacheReadTokens: 800, cacheWriteTokens: 200 } }, { finish: 'stop' }]) })
+    expect(store.count()).toBe(1042)
+  })
+
+  it('counts what the fake reports as cached', async () => {
+    const store = tracking()
+
+    ai({ budget: { tokens: 10_000, window: '1m', store } })
+    fakeAi.reply({ text: 'abcd', cache: { read: 500 } })
+    await ask('abcd', { visitor: 'v' })
+    expect(store.count()).toBe(1 + 500 + 1)
+  })
+
   it('counts the input and output tokens the provider reported', async () => {
     const store = tracking()
 

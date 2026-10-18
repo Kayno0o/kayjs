@@ -23,13 +23,21 @@ ask([{ role: 'user', content: 'Hi' }, { role: 'assistant', content: 'Hello' }, {
 
 `ask(prompt | messages, options?)` returns a `Reply` at once. A prompt is one user message; messages are `{ role: 'user' | 'assistant', content: string }`, other fields dropped.
 
-Options: `system`, `model`, `maxTokens` (4096 by default, as Anthropic requires one), `temperature`, `signal`, `timeout`, `tools` and `maxSteps` ([Actions as tools](tools.md)), and `provider` to ask a provider built by hand.
+Options: `system`, `model`, `maxTokens` (4096 by default, as Anthropic requires one), `temperature`, `cache`, `signal`, `timeout`, `tools` and `maxSteps` ([Actions as tools](tools.md)), and `provider` to ask a provider built by hand.
+
+## Prompt caching
+
+On by default, so a chat does not pay full price for its system prompt, tools and history on every turn and tool step. Anthropic gets the top-level `cache_control: { type: 'ephemeral' }` (automatic caching: the breakpoint moves to the last cacheable block); a prompt under the model's minimum is simply not cached. An OpenAI-compatible server gets a `prompt_cache_key`, a hash of the system prompt and the first message, so every turn and tool step of a conversation shares one key and no two conversations do. It caches long prompts on its own either way. A server refusing the key (400 or 422, Ollama or a strict gateway) is asked again without it, once per process and base URL, with nothing set.
+
+`cache: false` turns it off for an ask; `cache: '1h'` keeps an Anthropic cache for an hour instead of 5 minutes, written at twice the input price, so it pays off for a prompt reused after more than 5 minutes. Other providers ignore `'1h'`.
+
+`reply.usage` then has `cacheReadTokens` and `cacheWriteTokens` when the provider reported them. `inputTokens` is only the input read at full price: OpenAI's cached tokens are taken out of its `prompt_tokens`, Anthropic's `input_tokens` already leaves them out. The budget counts all of them, [one token each](limits.md#when-it-counts). In tests, a fake script `{ text, cache: { read, written } }` reports them.
 
 ## The reply
 
 - `await reply` is the full text; it throws the `AiError` the provider failed with.
 - `for await (const text of reply)` yields snapshots, each the text so far; `reply.deltas()` yields the pieces alone.
-- `await reply.usage` is `{ inputTokens, outputTokens }`, or undefined when the provider gave none or the reply failed; it never rejects, and reading it starts the reply.
+- `await reply.usage` is `{ inputTokens, outputTokens }`, plus `cacheReadTokens` and `cacheWriteTokens` when the provider reported a cache, or undefined when the provider gave none or the reply failed; it never rejects, and reading it starts the reply.
 - `await reply.finish` is why it ended: `stop`, `length` (the `maxTokens` cap, the text returned as it is), `filtered` (the provider's filter or refusal) or `steps` (the tool loop ran out of `maxSteps` with the model still calling tools); undefined when it failed. Check it when a long answer matters.
 - `reply.stop()` aborts the provider request, what came staying the text of `await`. A stop is not an error: `await` resolves to the partial text.
 - A provider that stalls fails the reply with an `AiError` of kind `timeout`: after 30 s without an answer (`timeout.connect`), or 60 s without a chunk of the stream once it began (`timeout.idle`; `partial` holds what came). Both take a duration (`'10s'`, `500`, seconds), at most about 24 days; each step of a tool loop counts anew.

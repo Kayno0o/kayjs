@@ -106,7 +106,7 @@ describe('Anthropic\'s provider', () => {
     expect(server.seen[0]!.url).toBe('/v1/messages')
     expect(server.seen[0]!.headers.get('x-api-key')).toBe('sk-ant')
     expect(server.seen[0]!.headers.get('anthropic-version')).toBe('2023-06-01')
-    expect(server.seen[0]!.body).toEqual({ model: 'claude-x', max_tokens: 4096, stream: true, system: 'Be brief', messages: [{ role: 'user', content: 'Hi' }] })
+    expect(server.seen[0]!.body).toEqual({ model: 'claude-x', max_tokens: 4096, stream: true, cache_control: { type: 'ephemeral' }, system: 'Be brief', messages: [{ role: 'user', content: 'Hi' }] })
   })
 
   it('reads an error event mid-reply as the provider failing', async () => {

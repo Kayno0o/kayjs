@@ -73,7 +73,7 @@ export function ask(prompt: string | Message[], options: AskOptions = {}): Reply
 
   const answering = currentRequest()
   const maxTokens = options.maxTokens ?? DEFAULT_MAX_TOKENS
-  const request = { messages, system: options.system, model, maxTokens, temperature: options.temperature, timeouts: timeoutsOf(options.timeout) }
+  const request = { messages, system: options.system, model, maxTokens, temperature: options.temperature, cache: options.cache, timeouts: timeoutsOf(options.timeout) }
   const asker = { request: answering, visitor: options.visitor, chars: messages.reduce((sum, message) => sum + message.content.length, options.system?.length ?? 0), maxTokens }
   const signals = [answering?.signal, options.signal]
 

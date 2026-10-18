@@ -115,7 +115,7 @@ The chat posts its last 20 messages with each one; the `keep` prop changes that,
 - `await reply` is the whole text.
 - `for await (const text of reply)` gives the text so far, again and again.
 - `reply.deltas()` gives only the new pieces.
-- `await reply.usage` gives the token counts when the reply is over.
+- `await reply.usage` gives the token counts when the reply is over, with `cacheReadTokens` and `cacheWriteTokens` when the provider reported a prompt cache.
 - `await reply.finish` says why it ended: `stop`, `length` when the `maxTokens` cap cut it, `filtered`, or `steps` when the model was still calling tools after `maxSteps`.
 - `reply.stop()` cancels the request. The reply then resolves to the text that came so far, not an error.
 
@@ -126,6 +126,16 @@ A provider that stalls fails the reply with an `AiError` of kind `timeout`. kay 
 `ask` also takes `model`, `maxTokens` (4096 by default), `temperature` and a `signal`.
 
 <ReadMore href="/llms/kayjs-ai-asking">Every variable, how the provider is picked, and the options of `ask`.</ReadMore>
+
+## Prompt caching
+
+Providers bill a repeated prompt at a fraction of the price when they cached it. kayjs-ai asks for that on every `ask`, so a chat does not pay full price for its system prompt, tools and earlier messages on each turn and each tool step. You set nothing. A prompt shorter than the provider's minimum is simply not cached.
+
+Pass `cache: false` to turn it off for one ask. Pass `cache: '1h'` to keep an Anthropic cache for an hour instead of 5 minutes, which costs more to write and pays off when the same prompt comes back after a longer gap.
+
+With an OpenAI-compatible server, kay sends a `prompt_cache_key` that is the same for every turn of a conversation. A server that refuses the key, such as Ollama, is asked again without it, and kay remembers that for the rest of the run.
+
+`await reply.usage` then holds `cacheReadTokens` and `cacheWriteTokens`. `inputTokens` is only the input that was neither read from the cache nor written to it. In tests, script `fakeAi.reply({ text: 'ok', cache: { read: 800 } })` to report a cache.
 
 ## Let the model call your actions
 
@@ -185,7 +195,7 @@ A visitor is counted by address, or by user when kayjs-auth is in `extensions`: 
 
 To count users from a session of your own instead, pass `visitor`, a function from the request to the user's id; it wins over kayjs-auth. Never take it from a header or cookie the visitor can set, or they get a fresh budget on every request. A free signup gives each account its own budget, which only `total` caps. In a job with no request, name the visitor with `ask(prompt, { visitor })`, or leave it out: only `total` counts then.
 
-The budget counts tokens, not money, because prices change too often to ship a table. Pick `tokens` from the price of your model.
+The budget counts tokens, not money, because prices change too often to ship a table. Pick `tokens` from the price of your model. Tokens the provider read from its prompt cache, or wrote to it, count like any other, so a cached chat cannot spend past its budget unseen, even though a cache read costs less.
 
 The count lives in memory and starts over with the server. Give `store` a `sqliteRates(path)` to keep it across restarts and share it between processes. A budget store must be able to `peek`, as both of kay's stores can.
 

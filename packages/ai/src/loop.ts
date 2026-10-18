@@ -77,6 +77,8 @@ async function run(tools: Map<string, LibraryTool>, use: ToolUse, input: Record<
   }
 }
 
+const USAGE_FIELDS = ['inputTokens', 'outputTokens', 'cacheReadTokens', 'cacheWriteTokens'] as const
+
 // Asks the provider, answers the tools the model calls as the visitor, and asks again with their results until the model answers in text or `maxSteps` requests were made.
 // Text of one step is separated from the next by a blank line, and the token counts are the sum of the steps.
 export async function* converse(provider: Provider, base: ProviderRequest, offered: Offered[], maxSteps: number, request: Request, signal: AbortSignal): AsyncGenerator<Piece> {
@@ -128,11 +130,10 @@ export async function* converse(provider: Provider, base: ProviderRequest, offer
       }
     }
 
-    if (used.inputTokens !== undefined)
-      total.inputTokens = (total.inputTokens ?? 0) + used.inputTokens
-
-    if (used.outputTokens !== undefined)
-      total.outputTokens = (total.outputTokens ?? 0) + used.outputTokens
+    for (const field of USAGE_FIELDS) {
+      if (used[field] !== undefined)
+        total[field] = (total[field] ?? 0) + used[field]
+    }
 
     yield { usage: { ...total } }
 
