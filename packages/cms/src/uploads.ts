@@ -58,6 +58,7 @@ function holdsType(bytes: Uint8Array, type: string): boolean {
   }
 }
 
+// Kept beside the check rather than imported, as kay does not export its own.
 // An AVIF names itself in its `ftyp` box, as its major brand or among its compatible ones.
 function isAvif(bytes: Uint8Array): boolean {
   if (text(bytes, 4, 4) !== 'ftyp')
@@ -78,7 +79,7 @@ function startsWith(bytes: Uint8Array, at: number, signature: number[]): boolean
 }
 
 function text(bytes: Uint8Array, at: number, length: number): string {
-  return String.fromCharCode(...bytes.subarray(at, at + length))
+  return Buffer.from(bytes.subarray(at, at + length)).toString('latin1')
 }
 
 // What the pickers offer, as `accept` attributes: every type `uploads` takes, and for an image field the image ones, else all.

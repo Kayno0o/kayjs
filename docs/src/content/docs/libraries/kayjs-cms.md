@@ -124,7 +124,7 @@ A file field takes PNG, JPEG, WebP, GIF, AVIF and PDF files. Set `uploads` to li
 
 The server also reads the file's first bytes. A file named `photo.png` that holds a web page, a JPEG or half a header is refused as not a real `image/png`, whatever name or type the browser sent, and the name counts in any case, so `PHOTO.PNG` is a PNG. PDF and SVG files are checked the same way. A type with no signature, such as a CSV, is taken as named.
 
-Storage serves anything but an image, video, audio, PDF or plain-text file as a download that cannot run as your site, so an SVG you allow is safe in an `img` and never opens as a page.
+Storage serves anything but a PNG, JPEG, WebP, GIF, AVIF, video, audio, PDF or plain-text file as a download that cannot run as your site, so an SVG you allow is safe in an `img` and never opens as a page.
 
 An upload may weigh 20 MB by default. `uploads: { types, maxSize }` sets either, `maxSize` in bytes or as a string such as `'50mb'`, for a site of videos or large PDFs, or `'2mb'` for a portfolio that wants less; a part left out keeps its default.
 

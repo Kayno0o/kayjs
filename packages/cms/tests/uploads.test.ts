@@ -33,6 +33,14 @@ test('takes each image format by its bytes, the name in any case', async () => {
     expect(await uploadRefusal(upload(name, bytes))).toBeUndefined()
 })
 
+test('takes an AVIF that lists its brand among the compatible ones, and refuses one that lists none', async () => {
+  configure({})
+
+  expect(await uploadRefusal(upload('a.avif', [0, 0, 0, 24, ...Buffer.from('ftypmif1'), 0, 0, 0, 0, ...Buffer.from('mif1avif')]))).toBeUndefined()
+  expect(await uploadRefusal(upload('a.avif', [0, 0, 0, 16, ...Buffer.from('ftypmif1'), 0, 0, 0, 0]))).toContain('is not a real')
+  expect(await uploadRefusal(upload('a.avif', [0, 0, 0, 4, ...Buffer.from('ftypavif')]))).toContain('is not a real')
+})
+
 test('refuses bytes that are not the type the name gives, whatever extension or declared type they come with', async () => {
   configure({})
 
