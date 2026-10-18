@@ -2,6 +2,7 @@
 export const page = { prerender: true }
 --- script
 import ContactAddress from '../../components/contact-address.kay'
+import { FORGE } from '../../forge'
 ---
 head
   title Legal notice and privacy · kay
@@ -15,7 +16,7 @@ head
     p This site is published by Kaynooo, a private individual who is not acting as a business.
     p Contact: #[ContactAddress].
     p The site is hosted on the publisher's own server, in France.
-    p The kay framework and this documentation are released under the #[a(href="https://git.kevyn.fr/kaynooo/kayjs/src/branch/main/LICENSE") MIT license].
+    p The kay framework and this documentation are released under the #[a(href={`${FORGE}/LICENSE`}) MIT license].
     h2 Privacy
     p The short version: this site sets no cookie, shows no advertising and sells nothing. It does not follow you from one site to another.
     h3 Reading the docs
@@ -27,7 +28,7 @@ head
     p Umami keeps the page, the referrer, your browser, system, device type, screen size, language and location, and the visitor code. The code uses a salt that changes every month. Within a month, the same browser reads as the same visitor. After that, it reads as a new one.
     p Umami keeps these statistics until we delete them. They are used only to see which pages are read.
     h3 The chat
-    p The chat on the #[a(href="/ask") Ask the docs] page sends your questions, and the conversation so far, to Mistral AI, a French company, so that its model can write an answer. Please do not type personal data into it.
+    p The chat, opened by the button at the bottom right of every page, sends your questions, and the conversation so far, to Mistral AI, a French company, so that its model can write an answer. Please do not type personal data into it.
     p The docs do not save your questions or the answers. Your conversation lives in your browser, in the page or the tab, and goes when you close it.
     p To keep the chat affordable, the docs count the questions and the amount of text each visitor asks for. The count is filed under a code made from your IP address with a secret key, so the stored value is not your address and cannot be turned back into it. Each count is dropped after at most a day.
     h3 What stays in your browser
