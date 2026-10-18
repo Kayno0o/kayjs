@@ -31,6 +31,37 @@ describe('which classes a page names', () => {
   })
 })
 
+describe('which classes a page gets from the components it renders', () => {
+  // The page at `page.kay` renders the other files, each reached through the imports.
+  async function reaching(page: string, others: Record<string, string>): Promise<string[]> {
+    const root = await scratchDir('style-uses-reach-')
+    const entry = join(root, 'page.kay')
+    const files = Object.keys(others).map(name => join(root, name))
+
+    await Bun.write(entry, page)
+    await Promise.all(Object.entries(others).map(async ([name, source]) => Bun.write(join(root, name), source)))
+
+    const { classes, entries } = styleUses(root, [entry], [CSS], { edges: new Map([[entry, files]]), open: new Set() }, new Map())
+
+    return (entries['page.kay'] as number[]).map(index => classes[index]!).sort()
+  }
+
+  it('takes the literal a parent passes as a prop, whichever side writes it', async () => {
+    expect(await reaching('Card(tone="btn-primary")\n', { 'card.kay': 'const { tone } = props<{ tone: string }>()\n---\np(class={tone}) a\n' })).toEqual(['btn-primary'])
+  })
+
+  it('takes every branch of a ternary and every literal of a list a map walks', async () => {
+    expect(await reaching('p(class={on ? \'mt-1\' : \'p-1\'}) a\n', {})).toEqual(['mt-1', 'p-1'])
+    expect(await reaching('--- server\nconst tones = [\'mt-1\', \'btn-primary\']\n---\np(class={tones[0]}) a\n', {})).toEqual(['btn-primary', 'mt-1'])
+    expect(await reaching('Card\n', { 'card.kay': '--- server\nconst tones = [\'mt-1\', \'p-1\']\n---\np(class={tones.map(tone => tone).join(\' \')}) a\n' })).toEqual(['mt-1', 'p-1'])
+  })
+
+  it('takes the classes of a kayjs-ui or kayjs-ai component under node_modules or packages', async () => {
+    expect(await reaching('Button\n', { 'node_modules/kayjs-ui/src/button.kay': 'button.btn-primary a\n' })).toEqual(['btn-primary'])
+    expect(await reaching('Chat\n', { 'packages/ai/src/chat.kay': 'div(class={`md:flex ${props.class}`}) a\n' })).toEqual(['md:flex'])
+  })
+})
+
 describe('which classes a page rendering Markdown names', () => {
   it('takes in the words of the files writing markup, but not text in a code block or span', async () => {
     const root = await scratchDir('style-uses-open-')
@@ -127,6 +158,30 @@ describe('which classes are set from a value the build cannot read', () => {
     expect(await unresolved('el.classList.add(tone)\n', '@source inline("btn-primary");')).toEqual([])
     expect(await unresolved('el.className = \'tone-\' + kind\n', '@source inline("btn-primary");')).toEqual(['1 className = tone-'])
     expect(await unresolved('el.className = \'tone-\' + kind\n', '@source inline("tone-{a,b}");')).toEqual([])
+  })
+
+  it('keeps quiet on a class read back from the element or joined from names the source writes', async () => {
+    expect(await unresolved('const previous = el.className\nel.classList.add(\'mt-1\')\nel.className = previous\n')).toEqual([])
+    expect(await unresolved('el.setAttribute(\'class\', el.getAttribute(\'class\'))\n')).toEqual([])
+    expect(await unresolved('el.classList.add(cn(\'mt-1\', on && \'p-1\'))\n')).toEqual([])
+    expect(await unresolved('const { tone } = props<{ tone: string }>()\n---\np(class={cn(\'mt-1\', tone)}) a\n', '', 'page.kay')).toEqual([])
+    expect(await unresolved('el.classList.add(cn(\'mt-1\', shade(on)))\n')).toEqual(['1 classList.add mt-1'])
+  })
+
+  it('reads a member of a const object holding only literals as one of its values', async () => {
+    expect(await unresolved('const GLASS: Record<string, string> = { red: \'mt-1\', white: \'p-1\' }\n---\np(class={[\'mb-1\', GLASS[tone]]}) a\n', '', 'page.kay')).toEqual([])
+    expect(await unresolved('const GLASS = { red: \'mt-1\', white: \'p-1\' } as const\n---\np(class={GLASS[tone]}) a\n', '', 'page.kay')).toEqual([])
+    expect(await unresolved('const GLASS = { red: \'mt-1\' } satisfies Tones\n---\np(class={GLASS.red}) a\n', '', 'page.kay')).toEqual([])
+    expect(await unresolved('const GLASS = {\n  red: { bg: \'mt-1\' },\n  white: { bg: \'p-1\' },\n}\n---\np(class={GLASS[tone].bg}) a\n', '', 'page.kay')).toEqual([])
+    expect(await unresolved('const GLASS = { red: \'mt-1\', white: pick() }\n---\np(class={GLASS[tone]}) a\n', '', 'page.kay')).toEqual(['3 class attribute mt-1'])
+    expect(await unresolved('const GLASS = { red: \'mt-1\', ...others }\n---\np(class={GLASS[tone]}) a\n', '', 'page.kay')).toEqual(['3 class attribute mt-1'])
+  })
+
+  it('judges a name by every value it is given in the file', async () => {
+    expect(await unresolved('const tone = \'mt-1\'\nfunction paint() {\n  const tone = read()\n  el.classList.add(tone)\n}\n')).toEqual(['4 classList.add mt-1'])
+    expect(await unresolved('let tone = \'mt-1\'\ntone = read()\nel.className = tone\n')).toEqual(['3 className = mt-1'])
+    expect(await unresolved('const tone = \'mt-1\'\nfor (const tone of tones) el.classList.add(tone)\n')).toEqual(['2 classList.add '])
+    expect(await unresolved('let tone: string\nif (on)\n  tone = \'mt-1\'\nelse\n  tone = \'p-1\'\nel.className = tone\n')).toEqual([])
   })
 
   it('judges a class attribute by what its value is made of', async () => {

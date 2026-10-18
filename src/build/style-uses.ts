@@ -293,6 +293,7 @@ export function styleUses(root: string, entries: Iterable<string>, sheets: Itera
   // The runtime classes of the app's scripts and components that nothing makes the build keep the rules of.
   const unresolvedClasses = (files: Iterable<string>, own: StyleUsesOptions['own'], listed: ReadonlySet<string>, complete: (fragment: string) => string[], client: ReadonlySet<string>, reachedBy: ReadonlyMap<string, Set<string>>) => {
     const found: UnresolvedClass[] = []
+    const vouched = [...listed]
 
     for (const file of files) {
       if (own?.(file) !== true || !SCRIPT_OR_KAY.test(file) || !existsSync(file))
@@ -310,7 +311,7 @@ export function styleUses(root: string, entries: Iterable<string>, sheets: Itera
           for (const fragment of fragments) {
             open = true
 
-            if (complete(fragment).length > 0 || [...listed].some(name => ENDS_OPEN.test(fragment) ? name.startsWith(fragment) : name.endsWith(fragment)))
+            if (complete(fragment).length > 0 || vouched.some(name => ENDS_OPEN.test(fragment) ? name.startsWith(fragment) : name.endsWith(fragment)))
               return 'covered'
           }
         }
@@ -320,7 +321,7 @@ export function styleUses(root: string, entries: Iterable<string>, sheets: Itera
 
       for (const runtime of runtimeClasses(readSource(file).text, judge)) {
         // A value with no part to match is the app's to vouch for with an `@source inline` of its own.
-        if (runtime.part === '' && listed.size > 0)
+        if (runtime.part === '' && vouched.length > 0)
           continue
 
         found.push({ file, ...runtime, client: client.has(file), by: [...reachedBy.get(file) ?? []] })

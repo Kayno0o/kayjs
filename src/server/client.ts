@@ -3,6 +3,7 @@ import type { SizeReport } from '../build/report'
 import type { StyleUses, UnresolvedClass } from '../build/style-uses'
 import type { Node } from '../build/supports'
 import type { ServerIslandMode } from '../runtime/html'
+import { readdir, rm } from 'node:fs/promises'
 import { join, relative, resolve } from 'node:path'
 import { version } from '../../package.json'
 import { ASSET_PREFIX, clientDir, outputDir } from '../build/assets'
@@ -427,6 +428,40 @@ async function writeRouteStyles(client: ClientBuild, groups: StyleGroup[]): Prom
 
     group.routes.set(url, linked)
   }
+}
+
+const ROUTE_COPY = /\.r-[a-z0-9]+\.css$/
+
+// Removes the route copies no head and no page links: choosing a chain's head again after a page showed more classes writes a new copy, and the first one stays on disk when every page rendered since links the new one.
+export async function dropOrphanCopies(client: ClientBuild, pagesDir: string, pages: Record<string, PrerenderedPage>): Promise<void> {
+  let names: string[] = []
+
+  try {
+    names = await readdir(client.dir)
+  }
+  catch {}
+
+  const copies = names.filter(name => ROUTE_COPY.test(name))
+
+  if (copies.length === 0)
+    return
+
+  const linked = [...client.pageStyles?.values() ?? []].map(head => head.html).join('\n')
+  const orphans = new Set(copies.filter(name => !linked.includes(name)))
+
+  for (const page of Object.values(pages)) {
+    if (orphans.size === 0)
+      break
+
+    const html = await Bun.file(join(pagesDir, page.file)).text()
+
+    for (const name of orphans) {
+      if (html.includes(name))
+        orphans.delete(name)
+    }
+  }
+
+  await Promise.all([...orphans].map(async name => rm(join(client.dir, name), { force: true })))
 }
 
 // The head of each chain whose full stylesheets are too heavy to inline: the rules for the classes its components name, islands and what they set after load included, written inline when they fit and nothing else, so a page ships only its own rules.

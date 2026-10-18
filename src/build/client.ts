@@ -525,12 +525,15 @@ export async function bundleStyles(root: string, { pages, libraries, classes, sh
   return { styles, inputs: Object.keys(build.metafile!.inputs).map(input => resolve(input)), followed: [...shrunk], unused, uses, server }
 }
 
+const PAGES_NAMED = 3
+
 // Tells the app which classes it sets after load that no page carries the rule of, with the fix.
 export function warnUnresolved(root: string, found: UnresolvedClass[], islands: ReadonlySet<string>): void {
-  for (const { file, line, how, part, expression } of found) {
+  for (const { file, line, how, part, expression, by } of found) {
     const where = `${islands.has(file) ? 'island ' : ''}${relative(root, file)}:${line}`
+    const pages = by.length === 0 ? '' : ` (reached from ${by.slice(0, PAGES_NAMED).map(page => relative(root, page)).join(', ')}${by.length > PAGES_NAMED ? ` and ${by.length - PAGES_NAMED} more` : ''})`
 
-    kayLog('warn', `${where} sets a class from a value the build cannot read (${how} \`${expression}\`${part === '' ? '' : `, ${JSON.stringify(part)}`}), so no page carries its rule: write the classes out as literals, list them in your stylesheet with @source inline("..."), or set \`lateStyles: true\` in kay.config.ts to load the whole stylesheet after paint`)
+    kayLog('warn', `${where} sets a class from a value the build cannot read (${how} \`${expression}\`${part === '' ? '' : `, ${JSON.stringify(part)}`}), so no page carries its rule${pages}: write the classes out as literals, list them in your stylesheet with @source inline("..."), or set \`lateStyles: true\` in kay.config.ts to load the whole stylesheet after paint`)
   }
 }
 

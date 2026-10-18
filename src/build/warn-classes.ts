@@ -3,11 +3,11 @@ import type { Route } from '../server/routes'
 import { routeChain, styleChains } from '../server/routes'
 import { warnUnresolved } from './client'
 
-// Tells of the classes a server sets from a value the build cannot read, for the pages rendered per request: a prerendered page was rendered, so its head carries the rules of the classes it shows.
-export function warnServerClasses(root: string, client: ClientBuild, routes: Route[]): void {
+// Tells of the classes a server sets from a value the build cannot read, for the pages rendered per request: a prerendered page was rendered, so its head carries the rules of the classes it shows, and a static export renders nothing per request. A route with params stays told of: kay cannot tell that every value a request may carry was listed.
+export function warnServerClasses(root: string, client: ClientBuild, routes: Route[], exported = false): void {
   const found = client.unresolved ?? []
 
-  if (found.length === 0)
+  if (found.length === 0 || exported)
     return
 
   const prerendered = new Set([...client.pages.values()].map(page => page.pattern))

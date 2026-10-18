@@ -19,7 +19,7 @@ import { runInLocale } from '../runtime/locale-state'
 import { standInReads } from '../runtime/site'
 import { withPageToken } from '../runtime/uid.server'
 import { projectApi } from './api-modules'
-import { keepClasses, missingClasses, PRERENDERED_DIR, readManifest, styleUsesOf, writeManifest } from './client'
+import { dropOrphanCopies, keepClasses, missingClasses, PRERENDERED_DIR, readManifest, styleUsesOf, writeManifest } from './client'
 import { exportedEndpoints } from './endpoints'
 import { localeCopies, stateFor } from './i18n'
 import { LIVE_MARK } from './live'
@@ -329,6 +329,9 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
 
   if (problems.length > 0 || apiProblems.length > 0 || endpointProblems.length > 0)
     throw new ExportError(`kay: ${PARTS.format([count(problems.length, 'page'), count(endpointProblems.length, 'endpoint'), count(apiProblems.length, 'API module')].filter(part => part !== ''))} cannot be exported to static files, which no server answers for:\n${[...problems, ...endpointProblems, ...apiProblems].map(problem => `  ${problem.message}`).join('\n')}`, [...problems, ...endpointProblems, ...apiProblems])
+
+  if (restyled)
+    await dropOrphanCopies(client, dir, pages)
 
   await writeManifest(root, { ...manifest, pages, site, ...restyled && client.styleUses ? { styleUses: styleUsesOf(root, client.styleUses) } : {} }, output)
   client.pages = new Map(Object.entries(pages))

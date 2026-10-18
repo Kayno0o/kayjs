@@ -3,7 +3,7 @@ import type { PagesOptions } from '../src/server/app'
 import type { ClientBuild } from '../src/server/client'
 import type { Route } from '../src/server/routes'
 import { existsSync } from 'node:fs'
-import { mkdir, rm } from 'node:fs/promises'
+import { mkdir, readdir, rm } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
 import tailwind from 'bun-plugin-tailwind'
@@ -551,6 +551,22 @@ describe('a class a server builds from data', () => {
 
     expect(copy).not.toBeNull()
     expect(hasRule(await Bun.file(join(client.dir, copy![1]!.slice('/_kay/'.length))).text(), 'ring-4')).toBe(true)
+  }, 120_000)
+
+  it('leaves no stylesheet copy that no page or head links', async () => {
+    await prerendered()
+
+    const pagesDir = join(outputDir(root), 'pages')
+    const linking = [...(client.pageStyles?.values() ?? [])].map(head => head.html)
+
+    for (const name of (await readdir(pagesDir, { recursive: true })).filter(entry => entry.endsWith('.html')))
+      linking.push(await Bun.file(join(pagesDir, name)).text())
+
+    const copies = (await readdir(client.dir)).filter(name => (/\.r-[a-z0-9]+\.css$/).test(name))
+
+    expect(copies.length).toBeGreaterThan(0)
+    for (const copy of copies)
+      expect(linking.some(html => html.includes(copy)), copy).toBe(true)
   }, 120_000)
 
   it('warns of the same expression on a page rendered per request, and of none on a page that was rendered', async () => {

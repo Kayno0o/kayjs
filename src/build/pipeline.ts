@@ -393,7 +393,7 @@ async function outputStage(project: Project, exported: boolean, client: ClientBu
   const stops = new Map<string, KeptStop>()
   const prerendered = await prerenderPages(project, client, { exportAll: exported, rendered, others, routes, stops, onRoute: (done, total) => report({ step: 'prerendering', done, total, unit: 'routes' }) })
 
-  warnServerClasses(root, client, routes)
+  warnServerClasses(root, client, routes, exported)
 
   if (config.search === true) {
     report({ step: 'indexing for search' })

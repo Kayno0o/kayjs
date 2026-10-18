@@ -1,4 +1,4 @@
-import type { Expression } from '@babel/types'
+import type { Expression, ObjectExpression } from '@babel/types'
 import { parseExpression } from '@babel/parser'
 
 // A place where a source sets a class from a value the build cannot read: no page carries the rule of a class it ends up naming, unless the app lists it with `@source inline`.
@@ -14,7 +14,8 @@ export interface RuntimeClass {
 }
 
 // What the parts of a value around what is open come to, see `runtimeClasses`.
-export type Judge = (parts: string[]) => 'covered' | 'uncovered' | 'none'
+export type JudgeResult = 'covered' | 'uncovered' | 'none'
+export type Judge = (parts: string[]) => JudgeResult
 
 // A setter of the class attribute in a script, and its argument list or right-hand side.
 const SETTER = /\bclassList\s*\.\s*(?:add|toggle|replace)\s*\(|\.className\s*\+?=(?!=)|\bsetAttribute\s*\(\s*(["'])class\1\s*,|\bclass\s*=\s*\{/g
@@ -24,6 +25,10 @@ const WHITESPACE = /\s+/g
 const CONTINUED = /\s*(?:[?:.+]|&&|\|\|)/y
 // A destructured prop, `a`, `b: c`, `d = 1` or `...rest`: its name and the one it is renamed to.
 const PROP_NAME = /^\s*(?:\.\.\.)?(\w+)(?:\s*:\s*(\w+))?/
+// A function joining class names, whose result is made of its arguments.
+const JOINERS = new Set(['cn', 'cx', 'clsx', 'classNames', 'classnames', 'twMerge', 'twJoin'])
+// An element's own class, read back to be set again.
+const CLASS_READS = new Set(['className', 'classList'])
 const PROPS = /\b(?:const|let)\s*\{([^}]*)\}\s*=\s*props\b/g
 const EXPRESSION_LIMIT = 80
 const RESOLVE_DEPTH = 3
@@ -114,9 +119,9 @@ interface Verdict {
   open: boolean
 }
 
-// What a name stands for in the source: the initializer of the `const` declaring it, and the props the component takes.
+// What a name stands for in the source: every value given to it by a `const`, `let` or assignment, and the props the component takes.
 interface Scope {
-  initializer: (name: string) => Expression | undefined
+  initializers: (name: string) => Expression[] | undefined
   props: ReadonlySet<string>
 }
 
@@ -135,6 +140,27 @@ function rootOf(node: Expression): string | undefined {
     current = current.object
 
   return current.type === 'Identifier' ? current.name : undefined
+}
+
+function unwrapped(node: Expression): Expression {
+  let current = node
+
+  while (current.type === 'ParenthesizedExpression' || current.type === 'TSAsExpression' || current.type === 'TSSatisfiesExpression' || current.type === 'TSNonNullExpression' || current.type === 'TSTypeAssertion')
+    current = current.expression
+
+  return current
+}
+
+// Every value of an object literal, those of the objects nested in it included, each judged as an expression: a spread or a method is open.
+function valuesOf(object: ObjectExpression, scope: Scope, depth: number): Verdict {
+  return merged(object.properties.map((property) => {
+    if (property.type !== 'ObjectProperty')
+      return OPEN
+
+    const value = unwrapped(property.value as Expression)
+
+    return value.type === 'ObjectExpression' ? valuesOf(value, scope, depth) : verdictOf(value, scope, depth)
+  }))
 }
 
 // What an expression is made of: string literals and the quasis of a template are its parts, a ternary, a logical, a concatenation or an array is all of its branches, a prop is its parent's to name, a `const` is what it was given, and anything else is open.
@@ -157,7 +183,7 @@ function verdictOf(node: Expression, scope: Scope, depth = 0): Verdict {
   if (node.type === 'BinaryExpression')
     return node.operator === '+' && node.left.type !== 'PrivateName' ? merged([verdictOf(node.left, scope, depth), verdictOf(node.right, scope, depth)]) : OPEN
 
-  if (node.type === 'ParenthesizedExpression' || node.type === 'TSAsExpression' || node.type === 'TSNonNullExpression')
+  if (node.type === 'ParenthesizedExpression' || node.type === 'TSAsExpression' || node.type === 'TSSatisfiesExpression' || node.type === 'TSNonNullExpression')
     return verdictOf(node.expression, scope, depth)
 
   if (node.type === 'ArrayExpression')
@@ -173,9 +199,32 @@ function verdictOf(node: Expression, scope: Scope, depth = 0): Verdict {
     if (scope.props.has(root))
       return CLOSED
 
-    const initial = node.type === 'Identifier' && depth < RESOLVE_DEPTH ? scope.initializer(root) : undefined
+    // What an element's `className` or `classList` holds is what the page already set on it.
+    if (node.type !== 'Identifier' && !node.computed && node.property.type === 'Identifier' && CLASS_READS.has(node.property.name))
+      return CLOSED
 
-    return initial === undefined ? OPEN : verdictOf(initial, scope, depth + 1)
+    // A member of a `const` object holding only literals is one of its values.
+    if (node.type !== 'Identifier' && depth < RESOLVE_DEPTH) {
+      const objects = scope.initializers(root)?.map(unwrapped)
+
+      if (objects?.every(object => object.type === 'ObjectExpression') === true)
+        return merged((objects).map(object => valuesOf(object, scope, depth + 1)))
+    }
+
+    const initial = node.type === 'Identifier' && depth < RESOLVE_DEPTH ? scope.initializers(root) : undefined
+
+    return initial === undefined ? OPEN : merged(initial.map(value => verdictOf(value, scope, depth + 1)))
+  }
+
+  if (node.type === 'CallExpression') {
+    if (node.callee.type === 'Identifier' && JOINERS.has(node.callee.name))
+      return merged(node.arguments.map(argument => argument.type === 'SpreadElement' || argument.type === 'ArgumentPlaceholder' ? OPEN : verdictOf(argument, scope, depth)))
+
+    // `el.getAttribute('class')` reads back what the element has.
+    const [argument] = node.arguments
+
+    if (node.callee.type === 'MemberExpression' && !node.callee.computed && node.callee.property.type === 'Identifier' && node.callee.property.name === 'getAttribute' && argument?.type === 'StringLiteral' && argument.value === 'class')
+      return CLOSED
   }
 
   return OPEN
@@ -219,7 +268,7 @@ function shortened(source: string): string {
   return flat.length > EXPRESSION_LIMIT ? `${flat.slice(0, EXPRESSION_LIMIT)}...` : flat
 }
 
-// The names a `const { a, b: c } = props<...>()` of the source takes, and the `const` initializers it can be asked for.
+// The names a `const { a, b: c } = props<...>()` of the source takes, and every value a `const`, `let` or assignment gives a name, wherever in the file it sits, so a name declared twice or reassigned is judged by all its values.
 function scopeOf(text: string): Scope {
   const props = new Set<string>(['props'])
 
@@ -234,20 +283,32 @@ function scopeOf(text: string): Scope {
 
   return {
     props,
-    initializer(name) {
-      const declaration = new RegExp(`\\b(?:const|let)\\s+${RegExp.escape(name)}\\b\\s*(?::[^=\\n]+)?=(?![=>])\\s*`).exec(text)
+    initializers(name) {
+      const escaped = RegExp.escape(name)
+      const declared = new RegExp(`\\b(?:const|let|var)\\s+${escaped}\\b(?!\\s+(?:of|in)\\b)`)
+      const initialized = new RegExp(`\\b(?:const|let|var)\\s+${escaped}\\b\\s*(?::[^=\\n]+)?=(?![=>])\\s*`, 'g')
+      const assigned = new RegExp(`(?<![\\w$.])${escaped}\\s*(?:\\+|\\|\\||\\?\\?|&&)?=(?![=>])\\s*`, 'g')
+      const starts = new Set<number>()
 
-      if (declaration === null)
+      // A name some `for ... of` declares holds a value of the loop, which no initializer tells.
+      if (!declared.test(text) || new RegExp(`\\b(?:const|let|var)\\s+${escaped}\\s+(?:of|in)\\b`).test(text))
         return undefined
 
-      const from = declaration.index + declaration[0].length
+      for (const match of [...text.matchAll(initialized), ...text.matchAll(assigned)])
+        starts.add(match.index + match[0].length)
 
-      try {
-        return parseExpression(text.slice(from, expressionEnd(text, from, true)), { plugins: ['typescript'] })
+      const found: Expression[] = []
+
+      for (const from of starts) {
+        try {
+          found.push(parseExpression(text.slice(from, expressionEnd(text, from, true)), { plugins: ['typescript'] }))
+        }
+        catch {
+          return undefined
+        }
       }
-      catch {
-        return undefined
-      }
+
+      return found.length === 0 ? undefined : found
     },
   }
 }
