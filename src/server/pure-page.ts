@@ -7,7 +7,7 @@ import { PAGE, PAGE_SETTINGS } from '../compiler/page-settings'
 import { parseKay } from '../compiler/parser'
 import { analyzeServer } from '../compiler/script'
 import { neverWritten, parseLiteral } from './literal-writes'
-import { stateAt } from './module-state'
+import { exposedBy, stateAt } from './module-state'
 import { routeChain } from './routes'
 
 // Every export of `kay` and whether a page importing it stays the same for every visitor and every moment: `free` reads no request, cookie, environment or clock; `request` does, or opens a route, a socket or a call that does.
@@ -108,6 +108,8 @@ const PURE_I18N_NAMES = new Set(['t', 'T', 'locale', 'locales', 'localeName', 'l
 const CODE_FILE = /\.(?:kay|[cm]?[jt]sx?)$/
 // An exported `const` that may hold an object or array literal, to spare reading the project to a file that has none.
 const SOURCE_BATCH = 64
+// A test runs in a process of its own, so what it writes reaches no page.
+const TEST_FILE = /\.(?:test|spec)\.[cm]?[jt]sx?$/
 const EXPORTED_CONTAINER = /\bexport\s+const\b/
 // What a file imported for its bytes holds the same on every render; a database, a native module or a wasm file does not.
 const STATIC_FILE = /\.(?:png|jpe?g|gif|webp|avif|svg|ico|woff2?|ttf|otf|json|css|txt|md|html|toml|ya?ml|csv)$/i
@@ -118,6 +120,7 @@ const SETTING_NAMES = new Set<string>([PAGE, ...PAGE_SETTINGS])
 // For a server fence the compiler cannot parse, the part of the rule left: it declares state only when it exports something besides a type or a page setting, which may read it.
 const MODULE_EXPORT = new RegExp(`^export (?!(?:type|interface) )(?!(?:async )?(?:const|let|var|function) (?:${[...SETTING_NAMES].join('|')})\\b)`, 'm')
 
+const STATE = 'declares module state, a `let`, an empty container it fills or an export another module can change'
 const WHITESPACE = /\s+/g
 const NOT_LINE_BREAK = /[^\n]/g
 const WORD_CHAR = /[\w$]/
@@ -140,9 +143,9 @@ const MAYBE_STATE = /\b(?:let|var|export)\b|=\s*(?:\[\s*\]|\{\s*\}|new\b)/
 
 // A `.kay` file runs its scripts and server fence for each render, so a `let` or an empty container there is state only when the compiler moves its statement to module level, as it does one an export of the server fence reads.
 // The offset of the module state in a file, if it holds any.
-function moduleStateAt(file: string, source: string, unchanged: Unchanged | undefined): number | undefined {
+function moduleStateAt(file: string, source: string, unchanged: Unchanged | undefined, risks: Map<string, number>): number | undefined {
   if (!file.endsWith('.kay'))
-    return stateAt(source, SETTING_NAMES, unchanged)
+    return stateAt(source, SETTING_NAMES, unchanged, risks)
 
   if (!MAYBE_STATE.test(source))
     return undefined
@@ -167,10 +170,12 @@ function moduleStateAt(file: string, source: string, unchanged: Unchanged | unde
 }
 
 // An import or a re-export with what it takes, then one for its effect alone.
+const IMPORT_CLAUSE = /\bimport\b([^'";(=]*)\sfrom\s*['"]/g
 const FROM = /\b(?:import|export)\b([^'";(=]*)\sfrom\s*['"]([^'"]+)['"]/g
 const FOR_EFFECT = /\bimport\s*['"]([^'"]+)['"]/g
 const BRACES = /\{([^}]*)\}/
 const AS_PREFIX = /^.*\sas\s+/
+const QUOTES = /^['"]|['"]$/g
 const AS_NAME = /\s+as\s+(?:\S.*)?$/
 const TYPE_NAME = /^type\s/
 const TYPE_IMPORT = /^\s*type\b/
@@ -447,6 +452,10 @@ export interface Scan {
   code: string[]
   // It reads `ctx.url.pathname`, so a copy of the page is right only for the pathname it was rendered at.
   pathname?: boolean | undefined
+  // The line of the exported container nothing proves unchanged that each of its exports leans on, which stops a page only when it takes that export.
+  exposed?: Map<string, number> | undefined
+  // The names it takes from each file it imports, or all of them.
+  taken?: Map<string, ReadonlySet<string> | 'all'> | undefined
 }
 
 // A stop as it reads in a report, its file relative to the project: `src/routes/index.kay:3 reads Date`.
@@ -573,6 +582,7 @@ function lineAt(source: string, offset: number): number {
 export async function keptScan(route: { layouts: string[], file: string }, scans = new Map<string, Promise<Scan>>(), root?: string): Promise<{ stop?: Stop | undefined, pathname: boolean }> {
   const seen = new Set<string>()
   const queue = [...routeChain(route).files]
+  const takes = new Map<string, ReadonlySet<string> | 'all'>()
   let pathname = false
 
   for (let file = queue.pop(); file !== undefined; file = queue.pop()) {
@@ -586,13 +596,26 @@ export async function keptScan(route: { layouts: string[], file: string }, scans
     if (scan === undefined)
       scans.set(file, scan = scanned(file, root, scans))
 
-    const { stop, code, pathname: reads } = await scan
+    const { stop, code, pathname: reads, taken } = await scan
 
     if (stop !== undefined)
       return { stop, pathname }
 
     pathname ||= reads === true
     queue.push(...code)
+
+    for (const [imported, names] of taken ?? [])
+      takes.set(imported, merged(takes.get(imported), names))
+  }
+
+  // An exported container nothing proves unchanged stops a page that takes it, or what leans on it.
+  for (const file of seen) {
+    const { exposed } = await scans.get(file)!
+    const names = takes.get(file)
+    const line = names === 'all' ? exposed?.values().next().value : [...names ?? []].map(name => exposed?.get(name)).find(at => at !== undefined)
+
+    if (line !== undefined)
+      return { stop: { file, line, why: STATE }, pathname }
   }
 
   return { pathname }
@@ -639,7 +662,7 @@ async function projectSources(root: string, scans: object): Promise<SourceFile[]
 }
 
 async function readSources(root: string): Promise<SourceFile[]> {
-  const files = await findProjectFiles(root, CODE_FILE, { project: true })
+  const files = (await findProjectFiles(root, CODE_FILE, { project: true })).filter(file => !TEST_FILE.test(file))
   const sources: SourceFile[] = []
 
   for (let from = 0; from < files.length; from += SOURCE_BATCH) {
@@ -665,12 +688,37 @@ async function unchangedIn(file: string, source: string, root: string | undefine
     return undefined
 
   const sources = await projectSources(root, scans)
+  const imported = importedBindings(source)
 
   return (name, initializer) => {
-    const literal = parseLiteral(initializer)
+    const literal = parseLiteral(initializer, imported)
 
     return literal !== undefined && neverWritten(name, literal, file, sources)
   }
+}
+
+// The names a module's imports bind, a namespace and a type apart.
+function importedBindings(source: string): Set<string> {
+  const names = new Set<string>()
+
+  for (const [, clause] of source.matchAll(IMPORT_CLAUSE)) {
+    if (clause!.includes('*') || TYPE_IMPORT.test(clause!))
+      continue
+
+    for (const entry of (BRACES.exec(clause!)?.[1] ?? '').split(',')) {
+      const name = entry.trim()
+
+      if (name !== '' && !TYPE_NAME.test(name))
+        names.add(name.replace(AS_PREFIX, ''))
+    }
+
+    const fallback = clause!.replace(BRACES, '').replaceAll(',', '').trim()
+
+    if (fallback !== '')
+      names.add(fallback)
+  }
+
+  return names
 }
 
 async function scanned(file: string, root: string | undefined, scans: object): Promise<Scan> {
@@ -686,10 +734,14 @@ async function scanned(file: string, root: string | undefined, scans: object): P
   if (context.stop !== undefined)
     return { stop: { file, line: lineAt(source, context.stop), why: 'reads `ctx`' }, code }
 
-  const state = moduleStateAt(file, source, await unchangedIn(file, source, root, scans))
+  const risks = new Map<string, number>()
+  const state = moduleStateAt(file, source, await unchangedIn(file, source, root, scans), risks)
 
   if (state !== undefined)
-    return { stop: { file, line: lineAt(source, state), why: 'declares module state, a `let`, an empty container it fills or an export another module can change' }, code }
+    return { stop: { file, line: lineAt(source, state), why: STATE }, code }
+
+  const exposed = new Map([...exposedBy(source, risks)].map(([name, at]) => [name, lineAt(source, at)]))
+  const taken = new Map<string, ReadonlySet<string> | 'all'>()
 
   const imports = [...source.matchAll(FROM)].map(match => ({ clause: match[1]!, specifier: match[2]!, index: match.index, length: match[0].length }))
 
@@ -769,11 +821,31 @@ async function scanned(file: string, root: string | undefined, scans: object): P
     if (imported === undefined)
       return stop(`imports \`${specifier}\`, which does not resolve`)
 
-    if (CODE_FILE.test(imported))
+    if (CODE_FILE.test(imported)) {
       code.push(imported)
-    else if (!STATIC_FILE.test(imported))
+      taken.set(imported, merged(taken.get(imported), importedNames(clause)))
+    }
+    else if (!STATIC_FILE.test(imported)) {
       return stop(`imports \`${specifier}\`, which is neither code nor a data file`)
+    }
   }
 
-  return { code, pathname: context.pathname }
+  return { code, pathname: context.pathname, exposed, taken }
+}
+
+// The names an import or re-export clause takes: `{ A, B as C }` takes A and B, a default `default`, and a namespace, a bare `import` or a `*` everything.
+function importedNames(clause: string): ReadonlySet<string> | 'all' {
+  if (clause.includes('*') || clause.trim() === '')
+    return 'all'
+
+  const names = new Set((BRACES.exec(clause)?.[1] ?? '').split(',').map(entry => entry.trim()).filter(entry => entry !== '' && !TYPE_NAME.test(entry)).map(entry => entry.replace(AS_NAME, '').replace(QUOTES, '')))
+
+  if (clause.replace(BRACES, '').replaceAll(',', '').trim() !== '')
+    names.add('default')
+
+  return names
+}
+
+function merged(before: ReadonlySet<string> | 'all' | undefined, names: ReadonlySet<string> | 'all'): ReadonlySet<string> | 'all' {
+  return before === 'all' || names === 'all' ? 'all' : new Set([...before ?? [], ...names])
 }

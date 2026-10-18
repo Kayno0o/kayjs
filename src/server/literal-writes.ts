@@ -12,8 +12,8 @@ export interface SourceFile {
   code: string
   // A file that could not be read, which may write to anything.
   unreadable?: boolean | undefined
-  // Whether a namespace import in it is used in a way the scan cannot follow, found once.
-  misuse?: boolean | undefined
+  // The specifiers of its namespaces used in a way the scan cannot follow, found once.
+  misuse?: string[] | undefined
   // The specifiers of its dynamic imports and `require`s, undefined for one that is not a string, found once.
   calls?: (string | undefined)[] | undefined
 }
@@ -34,6 +34,15 @@ const PROTOTYPE_KEYS = new Set(['__proto__', 'constructor', 'prototype'])
 // What a chain of members can end in without handing out a reference to the container: a method that only reads, on a container of values, and takes no callback, which is given the container as its last argument.
 const READERS = new Set(['length', 'join', 'includes', 'indexOf', 'lastIndexOf', 'slice', 'at', 'flat', 'concat', 'entries', 'keys', 'values', 'toString', 'toLocaleString', 'toSorted', 'toReversed', 'toSpliced', 'with', 'hasOwnProperty'])
 const SEGMENT = /\s*(?:\??\.\s*([A-Z_$][\w$]*)|(?:\?\.)?\[\s*(?:(\d+)|'([^'\\]*)'|"([^"\\]*)")\s*\])/iy
+const SCRIPT_LOOP = /\bfor\s*(?:await\s*)?\(\s*(?:const|let|var)\s+([\w$]+)\s+of\s*$/
+const TEMPLATE_LOOP = /^([ \t]*)for\s+([\w$]+)(?:\s*,\s*[\w$]+)?\s+of\s*$/
+// The methods that call back with each item and give back nothing of the container but what the callback computes.
+const CALLBACKS = new Set(['map', 'forEach', 'some', 'every', 'findIndex', 'findLastIndex', 'reduce', 'reduceRight'])
+const CALLBACK = /^\s*\(\s*(?:async\s*)?(?:\(([^()]*)\)(?:\s*:[^=]*[^=\s])?|([\w$]+))\s*=>/
+const ARGUMENTS_END = /^\s*(?:,[^)]*)?\)/
+const PARAM = /^[A-Z_$][\w$]*$/i
+const PARAM_TYPE = /\s*[:=][\s\S]*$/
+const COMPUTED = /\s*(?:\?\.)?\[/y
 const WRITE_AFTER = /\s*(?:=(?![=>])|[-+*/%&|^]=|<<=|>>>?=|\*\*=|&&=|\|\|=|\?\?=|\+\+|--)/y
 const CONTINUES = /^\s*(?:\??\.|[([`])/
 const ASSIGNED = /^\s*=(?![=>])/
@@ -62,7 +71,7 @@ const REGEX_CHARS = /[$()*+.?[\\\]^{|}]/g
 const TARGET_REACH = 4000
 
 const EVALUATES = /\beval\b|\bFunction\b/
-const EXPORT_NAMESPACE = /\bexport\s*\*\s*as\s/
+const EXPORT_NAMESPACE = /\bexport\s*\*\s*as\s+[\w$]+\s*from\s*['"]([^'"]+)['"]/g
 const NON_NULL = /^\s*!(?!=)/
 const ITERATION = /^\s*(?:of|in)\b/
 const ASSIGN_CLOSER = /([}\]])\s*=\s*$/
@@ -102,27 +111,29 @@ function matchAt(pattern: RegExp, text: string, at: number): string | undefined 
 }
 
 // The literal and where it ends, or undefined for anything that is not made of strings, numbers, booleans, `null`, `undefined` and arrays and objects of them.
-function parseValue(text: string, from: number): { literal: Literal, end: number } | undefined {
+function parseValue(text: string, from: number, imported: ReadonlySet<string>): { literal: Literal, end: number } | undefined {
   const at = skipSpace(text, from)
   const char = text[at]
 
   if (char === '[')
-    return parseArray(text, at + 1)
+    return parseArray(text, at + 1, imported)
 
   if (char === '{')
-    return parseObject(text, at + 1)
+    return parseObject(text, at + 1, imported)
 
-  const scalar = matchAt(STRING, text, at) ?? matchAt(NUMBER, text, at) ?? matchAt(KEYWORD, text, at)
+  // An imported binding is another module's value, which stops a page that takes it if that module holds it changeable.
+  const word = matchAt(WORD, text, at)
+  const scalar = matchAt(STRING, text, at) ?? matchAt(NUMBER, text, at) ?? matchAt(KEYWORD, text, at) ?? (word !== undefined && imported.has(word) ? word : undefined)
 
   return scalar === undefined ? undefined : { literal: VALUE, end: at + scalar.length }
 }
 
-function parseArray(text: string, from: number): { literal: Literal, end: number } | undefined {
+function parseArray(text: string, from: number, imported: ReadonlySet<string>): { literal: Literal, end: number } | undefined {
   const items: Literal[] = []
   let at = skipSpace(text, from)
 
   while (text[at] !== ']') {
-    const item = parseValue(text, at)
+    const item = parseValue(text, at, imported)
 
     if (item === undefined)
       return undefined
@@ -139,7 +150,7 @@ function parseArray(text: string, from: number): { literal: Literal, end: number
   return { literal: { kind: 'array', items }, end: at + 1 }
 }
 
-function parseObject(text: string, from: number): { literal: Literal, end: number } | undefined {
+function parseObject(text: string, from: number, imported: ReadonlySet<string>): { literal: Literal, end: number } | undefined {
   const props = new Map<string, Literal>()
   let at = skipSpace(text, from)
 
@@ -153,10 +164,16 @@ function parseObject(text: string, from: number): { literal: Literal, end: numbe
 
     at = skipSpace(text, at + raw.length)
 
-    if (PROTOTYPE_KEYS.has(key) || text[at] !== ':')
+    if (PROTOTYPE_KEYS.has(key))
       return undefined
 
-    const value = parseValue(text, at + 1)
+    // `{ icon }` for an imported `icon` is `{ icon: icon }`.
+    const shorthand = (text[at] === ',' || text[at] === '}') && imported.has(key)
+
+    if (text[at] !== ':' && !shorthand)
+      return undefined
+
+    const value = shorthand ? { literal: VALUE, end: at } : parseValue(text, at + 1, imported)
 
     if (value === undefined)
       return undefined
@@ -173,9 +190,9 @@ function parseObject(text: string, from: number): { literal: Literal, end: numbe
   return { literal: { kind: 'object', props }, end: at + 1 }
 }
 
-// The object or array literal an initializer is, `as const`, `satisfies` and a type annotation allowed, or undefined when it is anything else.
-export function parseLiteral(initializer: string): Literal | undefined {
-  const parsed = parseValue(initializer, 0)
+// The object or array literal an initializer is, its values imported bindings among others, `as const`, `satisfies` and a type annotation allowed, or undefined when it is anything else.
+export function parseLiteral(initializer: string, imported: ReadonlySet<string> = new Set()): Literal | undefined {
+  const parsed = parseValue(initializer, 0, imported)
 
   if (parsed === undefined || parsed.literal.kind === 'value')
     return undefined
@@ -289,6 +306,206 @@ function specifierUse(text: string, at: number, end: number, name: string): bool
   return bare.test(entry) || renamedTo.test(entry)
 }
 
+// The index after the bracket closing the one opening at `at`, or undefined when it does not close. A quote that closes on no line of its own is prose.
+function closeAt(text: string, at: number): number | undefined {
+  let depth = 0
+
+  for (let i = at; i < Math.min(text.length, at + TARGET_REACH); i++) {
+    const char = text[i]
+
+    if (char === '"' || char === '\'' || char === '`') {
+      const start = i
+
+      for (i++; i < text.length && text[i] !== char; i++) {
+        if (text[i] === '\\')
+          i++
+        else if (text[i] === '\n' && char !== '`')
+          break
+      }
+
+      if (text[i] !== char)
+        i = start
+    }
+    else if (char === '[' || char === '(' || char === '{') {
+      depth++
+    }
+    else if ((char === ']' || char === ')' || char === '}') && --depth === 0) {
+      return i + 1
+    }
+  }
+
+  return undefined
+}
+
+// The merged shape of the items of an array literal, or undefined when they differ in kind.
+function itemOf(items: readonly Literal[]): Literal | undefined {
+  let merged: Literal | undefined = items[0]
+
+  for (const item of items.slice(1)) {
+    if (merged === undefined)
+      return undefined
+
+    merged = merge(merged, item)
+  }
+
+  return merged ?? VALUE
+}
+
+function merge(a: Literal, b: Literal): Literal | undefined {
+  if (a.kind === 'value' && b.kind === 'value')
+    return a
+
+  if (a.kind === 'object' && b.kind === 'object') {
+    const props = new Map(a.props)
+
+    for (const [key, value] of b.props) {
+      const same = props.get(key)
+      const both = same === undefined ? value : merge(same, value)
+
+      if (both === undefined)
+        return undefined
+
+      props.set(key, both)
+    }
+
+    return { kind: 'object', props }
+  }
+
+  if (a.kind === 'array' && b.kind === 'array') {
+    const item = itemOf([...a.items, ...b.items])
+
+    return item === undefined ? undefined : { kind: 'array', items: [item] }
+  }
+
+  return undefined
+}
+
+// The names that use `name` as the item of a loop over the container at [start, end), and the text they are read in: a `for (const item of NAME)` statement or a template's `for item of NAME` block.
+function loopOver(text: string, start: number, end: number): { binding: string, from: number, to: number } | undefined {
+  const before = text.slice(Math.max(0, start - 200), start)
+  const script = SCRIPT_LOOP.exec(before)
+
+  if (script !== null) {
+    const header = CLOSING.exec(text.slice(end, end + 12))
+
+    if (header === null)
+      return undefined
+
+    const from = end + header[0].length
+    const body = skipSpace(text, from)
+    const to = text[body] === '{' ? closeAt(text, body) : statementEnd(text, body)
+
+    return to === undefined ? undefined : { binding: script[1]!, from, to }
+  }
+
+  const line = before.slice(before.lastIndexOf('\n') + 1)
+  const template = TEMPLATE_LOOP.exec(line)
+
+  if (template === null)
+    return undefined
+
+  const indent = template[1]!.length
+  let to = text.indexOf('\n', end)
+
+  while (to >= 0) {
+    const next = text.indexOf('\n', to + 1)
+    const row = text.slice(to + 1, next < 0 ? text.length : next)
+
+    if (row.trim() !== '' && row.length - row.trimStart().length <= indent)
+      break
+
+    to = next
+  }
+
+  return { binding: template[2]!, from: end, to: to < 0 ? text.length : to }
+}
+
+// The end of the statement at `at`: its `;`, or the end of its line where no bracket is open.
+function statementEnd(text: string, at: number): number {
+  let depth = 0
+
+  for (let i = at; i < text.length; i++) {
+    const char = text[i]!
+
+    if (char === '(' || char === '[' || char === '{')
+      depth++
+    else if (char === ')' || char === ']' || char === '}')
+      depth--
+    else if ((char === ';' || char === '\n') && depth <= 0)
+      return i
+  }
+
+  return text.length
+}
+
+// Whether every use of `binding` within [from, to) only reads what an item of the container holds.
+function itemsRead(text: string, binding: string, from: number, to: number, item: Literal): boolean {
+  const uses = new RegExp(`(?<![\\w$.])${binding.replace(REGEX_CHARS, '\\$&')}(?![\\w$])`, 'g')
+  const scope = text.slice(0, to)
+
+  uses.lastIndex = from
+
+  for (const use of scope.matchAll(uses)) {
+    if (use.index >= from && !readsOnly(scope, use.index, binding, item))
+      return false
+  }
+
+  return true
+}
+
+// Whether the callback of `NAME.method(` at `cursor` only reads its item, and gives back nothing but what its body computes: a reader of the items that takes no more than the item, its index and a result so far, and no `this`.
+function callbackReads(text: string, cursor: number, method: string, items: readonly Literal[]): boolean {
+  const item = itemOf(items)
+  const head = CALLBACK.exec(text.slice(cursor, cursor + 400))
+
+  if (item === undefined || head === null)
+    return false
+
+  const reduces = method === 'reduce' || method === 'reduceRight'
+  const params = (head[1] ?? head[2]!).split(',').map(param => param.trim().replace(PARAM_TYPE, '')).filter(param => param !== '')
+
+  if (params.length > (reduces ? 3 : 2) || params.some(param => !PARAM.test(param)))
+    return false
+
+  const from = cursor + head[0].length
+  const body = skipSpace(text, from)
+  const to = text[body] === '{' ? closeAt(text, body) : expressionEnd(text, body)
+
+  if (to === undefined)
+    return false
+
+  const close = ARGUMENTS_END.exec(text.slice(to, to + 400))
+
+  if (close === null || (!reduces && close[0].includes(',')))
+    return false
+
+  const binding = params[reduces ? 1 : 0]
+
+  return binding === undefined || itemsRead(text, binding, from, to, item)
+}
+
+// The end of the arrow function body expression at `at`: a `,` or `)` that closes nothing it opened.
+function expressionEnd(text: string, at: number): number {
+  let depth = 0
+
+  for (let i = at; i < text.length; i++) {
+    const char = text[i]!
+
+    if (char === '(' || char === '[' || char === '{') {
+      depth++
+    }
+    else if (char === ')' || char === ']' || char === '}') {
+      if (--depth < 0)
+        return i
+    }
+    else if (char === ',' && depth === 0) {
+      return i
+    }
+  }
+
+  return text.length
+}
+
 // Whether the use of `name` at `at` only reads what the literal holds.
 function readsOnly(text: string, at: number, name: string, literal: Literal): boolean {
   const end = at + name.length
@@ -314,8 +531,21 @@ function readsOnly(text: string, at: number, name: string, literal: Literal): bo
 
     const found = SEGMENT.exec(text)
 
-    if (found === null)
-      break
+    if (found === null) {
+      // A key that is no literal reads one value of a container of values, which a prototype key cannot make a write: whatever follows is judged below.
+      COMPUTED.lastIndex = cursor
+
+      const computed = COMPUTED.exec(text)
+      const close = computed === null ? undefined : closeAt(text, COMPUTED.lastIndex - 1)
+
+      if (close === undefined || !flat(node))
+        break
+
+      node = VALUE
+      cursor = close
+
+      continue
+    }
 
     const key = found[1] ?? found[3] ?? found[4] ?? found[2]!
 
@@ -347,17 +577,26 @@ function readsOnly(text: string, at: number, name: string, literal: Literal): bo
   if (member === 'length')
     return true
 
-  if (member === undefined)
-    return readBare(text, at, cursor, flat(node))
+  if (member === undefined) {
+    if (readBare(text, at, cursor, flat(node)))
+      return true
+
+    const loop = node.kind === 'array' ? loopOver(text, at, cursor) : undefined
+    const item = node.kind === 'array' ? itemOf(node.items) : undefined
+
+    return loop !== undefined && item !== undefined && itemsRead(text, loop.binding, loop.from, loop.to, item)
+  }
+
+  if (node.kind === 'array' && CALLBACKS.has(member) && callbackReads(text, cursor, member, node.items))
+    return true
 
   // A member the literal does not hold reads as undefined unless it is called or followed on, which a built-in method could do.
   return (flat(node) && READERS.has(member)) || !CONTINUES.test(text.slice(cursor, cursor + 12))
 }
 
-function namespaceMisuse(text: string): boolean {
-  // A namespace exported from a barrel is a binding only its importers see.
-  if (EXPORT_NAMESPACE.test(text))
-    return true
+// The specifiers of the namespaces in the text that are used whole or by a computed key, or exported from a barrel, which only their importers see.
+function namespaceMisuse(text: string): string[] {
+  const specifiers = [...text.matchAll(EXPORT_NAMESPACE)].map(match => match[1]!)
 
   for (const [, binding, specifier] of text.matchAll(NAMESPACE_IMPORT)) {
     if (BUILTIN_SPECIFIER.test(specifier!))
@@ -367,12 +606,30 @@ function namespaceMisuse(text: string): boolean {
       const rest = text.slice(use.index + binding!.length)
 
       // The import's own binding, followed by `from`, is no use.
-      if (!DOT_MEMBER.test(rest) && !IMPORT_FROM.test(rest))
-        return true
+      if (!DOT_MEMBER.test(rest) && !IMPORT_FROM.test(rest)) {
+        specifiers.push(specifier!)
+
+        break
+      }
     }
   }
 
-  return false
+  return specifiers
+}
+
+// Whether a module imported by `specifier` from `source` may hold the export, or hand it on: it is the declaring module, a module naming it or re-exporting everything, or a project path that does not resolve. A package outside the project cannot.
+function reachesModule(specifier: string, source: SourceFile, name: string, declaredIn: string, sources: readonly SourceFile[]): boolean {
+  if (BUILTIN_SPECIFIER.test(specifier))
+    return false
+
+  const resolved = resolveFrom(specifier, source.file)
+
+  if (resolved === undefined)
+    return specifier.startsWith('.') || PROJECT_ALIAS.test(specifier)
+
+  const target = sources.find(candidate => candidate.file === resolved)
+
+  return target !== undefined && (target.file === declaredIn || new RegExp(`(?<![\\w$])${name.replace(REGEX_CHARS, '\\$&')}(?![\\w$])`).test(target.text) || EXPORT_ALL.test(target.text))
 }
 
 // Whether a dynamic import or a `require` in the file may hand over the export: its target is not a literal, or reaches the module holding it.
@@ -425,7 +682,7 @@ export function neverWritten(name: string, literal: Literal, declaredIn: string,
 
     source.misuse ??= namespaceMisuse(source.text)
 
-    if (source.misuse || reachesByCall(source, name, declaredIn, sources))
+    if (source.misuse.some(specifier => reachesModule(specifier, source, name, declaredIn, sources)) || reachesByCall(source, name, declaredIn, sources))
       return false
 
     if (!source.text.includes(name))

@@ -122,6 +122,14 @@ You often need no flag. `kay build` also keeps a page that reads nothing from it
 
 A module of site constants, such as `export const CONTACT = { email: 'a@b.fr', phone: '01 02' }`, does not stop it either, as long as nothing in the project changes it. If any file assigns into it, pushes to it, or passes it to a function that might, the build cannot tell and renders the page per request, naming the line of the export.
 
+A test file that writes to a constant does not count, as a test runs apart from the site. Neither does a file that uses the whole of an unrelated module, such as `import * as mail from './mail'`.
+
+Lists of objects are fine too. A nav can loop over `export const NAV = [{ id: 'team', label: 'Team' }]` with `for link of NAV` or `NAV.map(link => link.id)`, and the list can hold imported icons, as long as the loop only reads each item.
+
+Handing an item to a function, copying it, or calling `filter`, `find` or `sort` on the list makes the build unsure, and the page is rendered per request.
+
+A constant the build cannot vouch for, such as a list with a function call in it, only matters to the pages that use it. A page that imports `CONTACT` from a module also exporting such a list is still prerendered.
+
 `kay build` shows what it decided. Its route table says `prerendered`, `kept` or `on request` for each route. Under an `on request` page it names the file and line that stopped it, such as `src/routes/clock.kay:2 reads Date`.
 
 To be told when a page stops being kept, say so in the page.

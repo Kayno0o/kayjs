@@ -45,6 +45,7 @@ async function built(root: string): Promise<string[]> {
 
 const PAGE = (name: string, use = `${name}.email`) => `---\nimport { ${name} } from '../content'\n---\np {${use}}\n`
 const CONTACT = 'export const CONTACT = { email: \'a@b.fr\', phone: \'01\', address: { city: \'Brest\', zip: \'29200\' } }\n'
+const ICON = 'export function icon(): void {}\n'
 const LIST = 'export const LIST = [\'a\', \'b\']\n'
 
 describe('a page importing an exported object or array no module writes to', () => {
@@ -211,7 +212,7 @@ describe('a page importing an exported object or array no module writes to', () 
       kept.push([use, await stopOf({ 'src/content.ts': content, 'src/routes/index.kay': PAGE(name, use) })])
 
     expect(kept).toEqual([
-      ['NAV.map(link => link.href).join()', expect.stringContaining('module state')],
+      ['NAV.map(link => link.href).join()', undefined],
       ['NAV.length', undefined],
       ['[...NAV].length', expect.stringContaining('module state')],
       ['SITE.social', expect.stringContaining('module state')],
@@ -259,6 +260,129 @@ describe('a page importing an exported object or array no module writes to', () 
     expect(stop?.why).toContain('module state')
   })
 
+  it('is kept when a file uses the namespace of another module whole, since that module holds none of the literal', async () => {
+    const files = {
+      'src/content.ts': CONTACT,
+      'src/mail.ts': 'export function send(): void {}\n',
+      'src/spy.ts': 'import * as mail from \'./mail\'\n\nmutate(mail)\nexport * as again from \'./mail\'\n',
+      'src/routes/index.kay': PAGE('CONTACT'),
+    }
+
+    expect(await stopOf(files)).toBeUndefined()
+  })
+
+  it('stops when a namespace used whole is of a module that holds the literal, re-exports it or cannot be resolved', async () => {
+    const cases: Record<string, Record<string, string>> = {
+      direct: { 'src/spy.ts': 'import * as content from \'./content\'\n\nmutate(content)\n' },
+      barrel: { 'src/barrel.ts': 'export * from \'./content\'\n', 'src/spy.ts': 'import * as barrel from \'./barrel\'\n\nmutate(barrel)\n' },
+      namedBarrel: { 'src/barrel.ts': 'export { CONTACT } from \'./content\'\n', 'src/spy.ts': 'import * as barrel from \'./barrel\'\n\nmutate(barrel)\n' },
+      missing: { 'src/spy.ts': 'import * as missing from \'./not-there\'\n\nmutate(missing)\n' },
+      exported: { 'src/barrel.ts': 'export * as content from \'./content\'\n' },
+    }
+
+    for (const [key, files] of Object.entries(cases))
+      expect([key, await stopOf({ 'src/content.ts': CONTACT, 'src/routes/index.kay': PAGE('CONTACT'), ...files })]).toEqual([key, expect.stringContaining('module state')])
+  })
+
+  it('is kept when only a test file writes to it, as a test runs in a process of its own', async () => {
+    const files = {
+      'src/content.ts': CONTACT,
+      'tests/content.test.ts': 'import { CONTACT } from \'../src/content\'\n\nCONTACT.email = \'x\'\n',
+      'src/other.spec.ts': 'import { CONTACT } from \'./content\'\n\nCONTACT.email = \'y\'\n',
+      'src/routes/index.kay': PAGE('CONTACT'),
+    }
+
+    expect(await stopOf(files)).toBeUndefined()
+  })
+
+  it('is kept for the content module of a real site: icons, sibling exports that are no literal and every way a page reads the literal', async () => {
+    const content = [
+      'import type { IconProps } from \'kay/icons\'',
+      'import { brandIcon, carIcon } from \'./icons\'',
+      '',
+      'export const DEPARTURE = \'2027-01-30\'',
+      '',
+      'export const CONTACT = {',
+      '  association: \'Association d\\\'exemple\',',
+      '  street: \'1 rue de l\\\'Exemple\',',
+      '  city: \'12345 Exemple\',',
+      '  email: \'contact@example.fr\',',
+      '  phone: \'01 02 03 04 05\',',
+      '  phoneHref: \'+33102030405\',',
+      '}',
+      '',
+      'export const TOPICS = { sponsoring: \'Sponsoring\', autre: \'Autre\' } as const',
+      '',
+      'export type Topic = keyof typeof TOPICS',
+      '',
+      'export interface Network { icon: IconProps, label: string, href?: string }',
+      '',
+      'export const NETWORKS: Network[] = [',
+      '  { icon: brandIcon, label: \'Facebook\' },',
+      ']',
+      '',
+      'const SKILLS = [\'a\', \'b\']',
+      '',
+      'function ratings(values: number[]): number[] {',
+      '  return SKILLS.map((_, index) => values[index] ?? 0)',
+      '}',
+      '',
+      'export const CREW = [{ name: \'A\', ratings: ratings([1, 2]) }]',
+      '',
+      'export const PROGRAMME = [{ title: \'Route\', icon: carIcon }]',
+      '',
+      'export const BUDGET = [{ label: \'Car\', euros: 2000 }]',
+      '',
+      'export const BUDGET_TOTAL = BUDGET.reduce((sum, line) => sum + line.euros, 0)',
+      '',
+    ].join('\n')
+
+    const page = [
+      '---',
+      'import { CONTACT, TOPICS } from \'../content\'',
+      '',
+      'const [postalCode, locality] = String(CONTACT.city).split(\' \')',
+      'const [zip] = CONTACT.city.split(\' \')',
+      'const jsonLd = { \'@type\': \'Organization\', \'name\': CONTACT.association, \'email\': CONTACT.email, \'address\': { \'postalCode\': postalCode, \'addressLocality\': locality } }',
+      'const mail = `mailto:${CONTACT.email}`',
+      '---',
+      'p {CONTACT.association}, {CONTACT.street}',
+      'a(href={`mailto:${CONTACT.email}`}) {CONTACT.email}',
+      'a(href={`tel:${CONTACT.phoneHref}`}) {CONTACT.phone}',
+      'p L\'association répond à toute demande.',
+      'p {zip}{mail}{TOPICS.autre}{JSON.stringify(jsonLd)}',
+      '',
+    ].join('\n')
+
+    const files = {
+      'src/content.ts': content,
+      'src/mail.ts': 'export function send(): void {}\n',
+      'src/icons.ts': 'export function brandIcon(): void {}\nexport function carIcon(): void {}\n',
+      'src/routes/index.kay': page,
+      'src/routes/legal.kay': PAGE('CONTACT'),
+      'tests/contact.test.ts': 'import { expect, it, spyOn } from \'bun:test\'\nimport * as mail from \'../src/mail\'\n\nit(\'sends\', () => {\n  spyOn(mail, \'send\')\n  expect(mail).toBeDefined()\n})\n',
+    }
+
+    expect(await stopOf(files, 'src/routes/legal.kay')).toBeUndefined()
+    expect(await stopOf(files)).toBeUndefined()
+  })
+
+  it('is kept for a computed key read of a container of values, and stops once it is written through one', async () => {
+    const topics = 'export const TOPICS = { a: \'A\', b: \'B\' } as const\n'
+    const reads = ['TOPICS[topic]', 'TOPICS[props.topic as string].toLowerCase()', 'TOPICS[`${prefix}-a`]']
+    const kept = []
+
+    for (const use of reads)
+      kept.push(await stopOf({ 'src/content.ts': topics, 'src/routes/index.kay': `---\nimport { TOPICS } from '../content'\n\nconst topic = 'a'\nconst props = { topic }\nconst prefix = 'x'\n---\np {${use}}\n` }))
+
+    expect(kept).toEqual([undefined, undefined, undefined])
+
+    const writes = ['TOPICS[topic] = \'x\'', 'TOPICS[topic].polluted = 1', 'TOPICS[topic]++']
+
+    for (const write of writes)
+      expect([write, await stopOf({ 'src/content.ts': topics, 'src/writer.ts': `import { TOPICS } from './content'\n\nconst topic = 'a'\n${write}\n`, 'src/routes/index.kay': PAGE('TOPICS', 'TOPICS.a') })]).toEqual([write, expect.stringContaining('module state')])
+  })
+
   it('prerenders pages reading a plain literal module, and none once a route writes to it', async () => {
     const files = {
       'src/content.ts': 'export const CONTACT = { email: \'contact@example.fr\', phone: \'01\' }\n',
@@ -271,4 +395,102 @@ describe('a page importing an exported object or array no module writes to', () 
     expect(await built(await project(files))).toEqual(['/', '/other'])
     expect(await built(await project(written))).toEqual([])
   }, 120_000)
+})
+
+describe('a page importing a module that exports a container nothing proves unchanged', () => {
+  const NETWORKS = 'import { icon } from \'./icon\'\n\nexport const NETWORKS = [{ icon: icon(), label: \'Facebook\' }]\n'
+
+  const content = (more = ''): string => `${NETWORKS}${CONTACT}export function networkLabels(): string[] {\n  return NETWORKS.map(network => network.label)\n}\n\nexport const COUNT = NETWORKS.length + 1\n${more}`
+
+  it('is kept while it imports none of them, nor anything built from them', async () => {
+    const files = { 'src/icon.ts': ICON, 'src/content.ts': content(), 'src/routes/index.kay': PAGE('CONTACT') }
+
+    expect(await stopOf(files)).toBeUndefined()
+  })
+
+  it('stops once it imports one, a function reading one, a value computed from one, or the whole module', async () => {
+    const pages: Record<string, string> = {
+      direct: '---\nimport { NETWORKS } from \'../content\'\n---\np {NETWORKS.length}\n',
+      renamed: '---\nimport { NETWORKS as networks } from \'../content\'\n---\np {networks.length}\n',
+      reader: '---\nimport { networkLabels } from \'../content\'\n---\np {networkLabels().length}\n',
+      computed: '---\nimport { COUNT } from \'../content\'\n---\np {COUNT}\n',
+      namespace: '---\nimport * as content from \'../content\'\n---\np {content.CONTACT.email}\n',
+      throughBarrel: '---\nimport { NETWORKS } from \'../barrel\'\n---\np {NETWORKS.length}\n',
+      throughStar: '---\nimport { CONTACT } from \'../star\'\n---\np {CONTACT.email}\n',
+    }
+
+    for (const [key, page] of Object.entries(pages)) {
+      const files = { 'src/icon.ts': ICON, 'src/content.ts': content(), 'src/barrel.ts': 'export { NETWORKS } from \'./content\'\n', 'src/star.ts': 'export * from \'./content\'\n', 'src/routes/index.kay': page }
+
+      expect([key, await stopOf(files)]).toEqual([key, expect.stringContaining('module state')])
+    }
+  })
+
+  it('stops for a module that hands one out under another name, as a default or through a helper it keeps to itself', async () => {
+    const contents: Record<string, [string, string]> = {
+      aliased: [`${NETWORKS}${CONTACT}export { NETWORKS as LINKS }\n`, 'LINKS'],
+      defaulted: [`${NETWORKS}${CONTACT}export default NETWORKS\n`, 'default'],
+      helper: [`${NETWORKS}${CONTACT}const labels = (): string[] => NETWORKS.map(network => network.label)\nexport const first = (): string | undefined => labels()[0]\n`, 'first'],
+    }
+
+    for (const [key, [source, name]] of Object.entries(contents)) {
+      const page = name === 'default' ? '---\nimport networks from \'../content\'\n---\np {networks.length}\n' : `---\nimport { ${name} } from '../content'\n---\np {${name}}\n`
+
+      expect([key, await stopOf({ 'src/icon.ts': ICON, 'src/content.ts': source, 'src/routes/index.kay': page })]).toEqual([key, expect.stringContaining('module state')])
+      expect([key, await stopOf({ 'src/icon.ts': ICON, 'src/content.ts': source, 'src/routes/index.kay': PAGE('CONTACT') })]).toEqual([key, undefined])
+    }
+  })
+
+  it('stops whatever it imports for a let or an empty container the module fills', async () => {
+    for (const state of ['export let counter = 0\n', 'const cache = new Map<string, string>()\nexport function remember(): void {}\n'])
+      expect(await stopOf({ 'src/icon.ts': ICON, 'src/content.ts': `${content()}${state}`, 'src/routes/index.kay': PAGE('CONTACT') })).toEqual(expect.stringContaining('module state'))
+  })
+})
+
+describe('a page reading the items of an exported array of objects', () => {
+  const NAV = 'import { icon } from \'./icon\'\n\nexport const NAV = [{ id: \'a\', label: \'A\', icon, tags: [\'x\'] }, { id: \'b\', label: \'B\', icon, tags: [] }]\nexport const GRID = [{ cells: [{ n: 1 }, { n: 2 }] }]\n'
+  const ICON = 'export function icon(): void {}\n'
+
+  const page = (fence: string, template = 'p'): string => `---\nimport { GRID, NAV } from '../content'\n\n${fence}\n---\n${template}\n`
+
+  const stopOfPage = async (fence: string, template?: string): Promise<string | undefined> => stopOf({ 'src/icon.ts': ICON, 'src/content.ts': NAV, 'src/routes/index.kay': page(fence, template) })
+
+  it('is kept while a loop or a callback only reads each item', async () => {
+    const reads: [string, string?][] = [
+      ['', 'ul\n  for link, index of NAV key={link.id}\n    li(data-icon={link.icon}) {link.label}{index}\n    if link.id === \'a\'\n      span {link.tags.length}'],
+      ['', 'for row of GRID\n  for cell of row.cells key={cell.n}\n    p {cell.n}'],
+      ['for (const link of NAV) {\n  console.log(link.id, link.label)\n}'],
+      ['for (const link of NAV)\n  console.log(link.id)'],
+      ['const ids = NAV.map(link => link.id)\nconst total = NAV.reduce((sum, link) => sum + link.tags.length, 0)'],
+      ['const ids = NAV.map((link, index): string => `${link.id}${index}`)\nconst some = NAV.some(link => link.label === \'A\')'],
+      ['const out: string[] = []\nNAV.forEach((link) => {\n  out.push(link.id)\n})'],
+    ]
+
+    for (const [fence, template] of reads)
+      expect([fence, template, await stopOfPage(fence, template)]).toEqual([fence, template, undefined])
+  })
+
+  it('stops once a loop or a callback writes to an item, hands it out, copies it or reaches the array itself', async () => {
+    const stops: [string, string?][] = [
+      ['', 'for link of NAV\n  p {link.id = \'x\'}'],
+      ['', 'for link of NAV\n  p {link.tags.push(\'x\')}'],
+      ['', 'for link of NAV\n  p {track(link)}'],
+      ['', 'for link of NAV\n  p {link.tags.sort()}'],
+      ['for (const link of NAV) {\n  link.label = \'x\'\n}'],
+      ['for (const link of NAV)\n  keep(link)'],
+      ['for (const link of NAV) {\n  const copy = link\n  copy.id = \'x\'\n}'],
+      ['NAV.forEach((link) => { link.id = \'x\' })'],
+      ['NAV.forEach((link, index, all) => { all.pop() })'],
+      ['const same = NAV.map(link => link)'],
+      ['const found = NAV.find(link => link.id === \'a\')'],
+      ['const some = NAV.filter(link => link.id === \'a\')'],
+      ['NAV.sort((a, b) => a.id.localeCompare(b.id))'],
+      ['NAV.map(link => link.id, NAV)'],
+      ['NAV.map(function (link) { return link.id })'],
+      ['const rows = GRID.map(row => row.cells)'],
+    ]
+
+    for (const [fence, template] of stops)
+      expect([fence, template, await stopOfPage(fence, template)]).toEqual([fence, template, expect.stringContaining('module state')])
+  })
 })
