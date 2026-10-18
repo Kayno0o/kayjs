@@ -231,7 +231,10 @@ describe('kay command line', () => {
       const runs = await Promise.all([['--help'], ['-h'], ['build', '--help'], ['check', '-h'], ['new', '--help'], ['fmt', '--help'], ['dev', '--help'], ['lsp', '--help']].map(async args => ({ args, ...await kay(args, dir) })))
 
       for (const { args, stdout, stderr, code } of runs)
-        expect({ args, stdout: stdout.startsWith('Usage: kay new'), stderr, code }).toEqual({ args, stdout: true, stderr: '', code: 0 })
+        expect({ args, stdout: stdout.startsWith(`Usage: kay ${args[0] === '--help' || args[0] === '-h' ? 'new' : args[0]}`), stderr, code }).toEqual({ args, stdout: true, stderr: '', code: 0 })
+
+      expect(runs.find(run => run.args[0] === '--help')!.stdout).toContain('kay lsp --stdio')
+      expect(runs.find(run => run.args[0] === 'build')!.stdout.trimEnd().split('\n')).toHaveLength(1)
 
       expect(await readdir(dir)).toEqual([])
     }
@@ -247,7 +250,7 @@ describe('kay command line', () => {
       const runs = await Promise.all([['new', '--bogus', 'app'], ['fmt', '--bogus'], ['build', '--bogus'], ['check', '--bogus'], ['dev', '--bogus'], ['build', 'a', 'b'], ['check', '-p'], ['new', 'a', 'b']].map(async args => ({ args, ...await kay(args, dir) })))
 
       for (const { args, stdout, stderr, code } of runs)
-        expect({ args, stdout, usage: stderr.includes('Usage: kay new'), code }).toEqual({ args, stdout: '', usage: true, code: 1 })
+        expect({ args, stdout, usage: stderr.includes(`Usage: kay ${args[0]}`), code }).toEqual({ args, stdout: '', usage: true, code: 1 })
 
       expect(await readdir(dir)).toEqual([])
     }
