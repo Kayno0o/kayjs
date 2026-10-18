@@ -105,17 +105,22 @@ onLiveRead((key) => {
     throw new RangeError(`kay: cached('${key.slice(0, 40)}...') with live: true: a route follows keys up to about ${MAX_ROUTE_KEY_BYTES} bytes together, as its proof travels in a header`)
 
   reads.bytes += size
-  const now = Date.now()
-
-  reads.at.set(key, now)
+  reads.at.set(key, stampNow())
 
   remember(key)
-  announce(now)
+  announce(Date.now())
 })
 
 // The latest clock reading this process told the other processes of, and the latest it heard of from them.
 let announced = 0
 let heardAhead = 0
+// The latest time an invalidation was stamped with.
+let lastStamp = 0
+
+// The time a read or an invalidation is dated with: never before the clock of a process this one heard of, nor the last invalidation, so a read is dated after every invalidation stamped before it and an invalidation after every read dated before it.
+function stampNow(): number {
+  return Math.max(Date.now(), heardAhead, lastStamp + 1)
+}
 
 // Tells the processes sharing a store that this one dates reads up to a quarter of a second ahead of its clock, at most four times a second: a process whose clock is behind then stamps an invalidation after the read, not before it.
 function announce(now: number): void {
@@ -168,9 +173,13 @@ onKeysInvalidated((matches) => {
   if (slot === undefined)
     return []
 
+  const at = stampNow()
+
   for (const key of stamped) {
-    if (matches(key))
-      stamps.set(key, Math.max(Date.now(), heardAhead, (slotValue(slot, key) as number) + 1))
+    if (matches(key)) {
+      lastStamp = at
+      stamps.set(key, at)
+    }
   }
 
   return []
