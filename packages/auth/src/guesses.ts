@@ -29,7 +29,7 @@ export async function startGuess(state: RequestState, record: UserRecord | undef
   if (all > core.limits.signInAccountAll.max) {
     // Once per lockout: only the first attempt past the ceiling mails, and the holder is the one who gets it.
     if (all === core.limits.signInAccountAll.max + 1 && record)
-      afterResponse('reporting a sign-in lockout', async () => notify(state, record, 'sign-in-locked'))
+      await afterResponse('reporting a sign-in lockout', async () => notify(state, record, 'sign-in-locked'))
 
     return 'limited'
   }

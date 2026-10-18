@@ -2,7 +2,7 @@
 
 ## Events and the audit log
 
-`onAuthEvent(info)` hears every security mail's event above, mailed or not, and these, never mailed. `info` is one object, `{ event, user, context, ...fields }`: `context` is `{ ip, userAgent, actor }`, and the fields are the event's own, as below. Switch on `info.event` and the fields are typed.
+`onAuthEvent(info)` hears every security mail's event above, mailed or not, and these, never mailed. `info` is one object, `{ event, user, context, ...fields }`: `context` is `{ ip, userAgent, actor }`, and the fields are the event's own, as below. Switch on `info.event` and the fields are typed. A failed password sign-in is reported after the response, so a hook or an audit read right after the call may not see it yet.
 
 - `signed-in`, `method` how: `password`, `register`, `reset-password`, `magic-link`, `email-code`, `oauth` with the `provider`, `passkey`, `guest`, or `app` for `auth.signIn`. A sign-in through the second factor is heard once it is answered, with its first factor.
 - `signed-out`.

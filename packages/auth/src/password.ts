@@ -251,7 +251,7 @@ export async function signInWithPassword(state: RequestState, input: PasswordSig
   if (tooLong || !(await passwordMatches(record, input.password))) {
     // Off the response's path: the hooks and the audit log run for a held address only, and their time would tell it.
     if (record)
-      afterResponse('reporting a failed sign-in', async () => report(state, record, 'sign-in-failed', 'password'))
+      await afterResponse('reporting a failed sign-in', async () => report(state, record, 'sign-in-failed', 'password'))
 
     return { ok: false, error: 'invalid' }
   }

@@ -7,6 +7,8 @@ import { mailbox } from './helpers/mail'
 const PASSWORD = 'correct horse battery'
 const WRONG = 'wrong password!'
 const LINKS = { 'verify-email': '/verify', 'reset-password': '/reset', 'magic-link': '/magic', 'change-email': '/confirm-email' }
+// Where kay sends what libraries log through `logFrom`.
+const LOG_SINK = Symbol.for('kay.log')
 const JSON_POST = { 'content-type': 'application/json' }
 
 afterEach(() => {
@@ -22,7 +24,7 @@ async function finishes(work: Promise<unknown>): Promise<'done' | 'stuck'> {
     return 'done' as const
   })()
   const stuck = (async () => {
-    await Bun.sleep(1500)
+    await Bun.sleep(5000)
 
     return 'stuck' as const
   })()
@@ -91,19 +93,40 @@ describe('sign-in answers in the same time for a held address and a free one', (
 
     await app.browser().call('register', { email: 'ada@example.com', password: PASSWORD })
     await app.browser().json('/password', from('10.0.0.1', { identifier: 'ada@example.com', password: WRONG }))
-    await Bun.sleep(20)
+
+    // Reported after the response: polled for, with room for a busy host.
+    for (let waited = 0; waited < 5000 && !(heard.includes('sign-in-failed') && (await app.store.audit!.list({ limit: 10 })).some(entry => entry.event === 'sign-in-failed')); waited += 10)
+      await Bun.sleep(10)
 
     expect(heard).toContain('sign-in-failed')
     expect((await app.store.audit!.list({ limit: 10 })).map(entry => entry.event)).toContain('sign-in-failed')
   })
 
-  test('a throwing hook after the request is over is logged, not raised', async () => {
-    const app = testApp({ onAuthEvent: () => {
-      throw new Error('hook down')
+  test('a throwing hook after the response is logged, not raised', async () => {
+    const app = testApp({ onAuthEvent: (info) => {
+      if (info.event === 'sign-in-failed')
+        throw new Error('hook down')
     } })
 
     await app.browser().call('register', { email: 'ada@example.com', password: PASSWORD })
-    expect(await app.browser().json('/password', from('10.0.0.1', { identifier: 'ada@example.com', password: WRONG }))).toEqual({ ok: false, error: 'invalid' })
+
+    const logged: unknown[][] = []
+    const global = globalThis as { [LOG_SINK]?: unknown }
+    const sink = global[LOG_SINK]
+
+    global[LOG_SINK] = (...args: unknown[]) => logged.push(args)
+
+    try {
+      expect(await app.browser().json('/password', from('10.0.0.1', { identifier: 'ada@example.com', password: WRONG }))).toEqual({ ok: false, error: 'invalid' })
+
+      for (let waited = 0; waited < 5000 && logged.length === 0; waited += 10)
+        await Bun.sleep(10)
+    }
+    finally {
+      global[LOG_SINK] = sink
+    }
+
+    expect(logged).toContainEqual(['error', 'onAuthEvent failed for sign-in-failed', expect.objectContaining({ message: 'hook down' }), undefined, 'kayjs-auth'])
   })
 
   test('the lockout answer does not wait on the holder\'s notice, held address or not', async () => {

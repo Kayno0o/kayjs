@@ -178,16 +178,28 @@ export async function report(state: RequestState, record: UserRecord, event: Aut
   }
 }
 
+const AFTER_MAX = 200
+let after = 0
+
 // Runs `task` without making the request wait on it, a failure only logged: what the request did differs for a held address and a free one, and the time it takes must not tell which.
-export function afterResponse(what: string, task: () => Promise<void>): void {
-  void (async () => {
+// With 200 tasks pending already, as when a hook hangs, the request waits on this one: a stalled hook slows requests rather than piling up without bound.
+export async function afterResponse(what: string, task: () => Promise<void>): Promise<void> {
+  const run = (async () => {
+    after++
+
     try {
       await task()
     }
     catch (error) {
       log.error(`${what} failed`, error)
     }
+    finally {
+      after--
+    }
   })()
+
+  if (after >= AFTER_MAX)
+    await run
 }
 
 // A cursor as an app may hand it on after a JSON hop, which leaves a `Date` as its ISO text.
