@@ -541,6 +541,37 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
       expect(page.errors).toEqual([])
     })
 
+    test('a suggestion clicked the moment the panel opens still sends, once', async () => {
+      const page = await site.open('/launcher/one')
+
+      fakeAi.reply('Answer')
+      await page.click('.kai-launcher-button')
+      await page.click('.kai-chat-suggestion')
+      await page.waitFor('.kai-chat-turn[data-role="assistant"]', { text: 'Answer' })
+      await page.waitFor('[data-pending]', { gone: true })
+
+      expect(fakeAi.asked.length).toBe(1)
+      expect(await page.count('.kai-chat-turn[data-role="user"]')).toBe(1)
+      expect(await page.count(opened)).toBe(1)
+      expect(page.errors).toEqual([])
+    })
+
+    // The suggestion leaves the page as the question is sent, and the reply it asked for must not end with it.
+    test('a suggestion\'s reply streams in whole, not stopped when the suggestions leave', async () => {
+      const page = await site.open('/launcher/one')
+
+      await page.click('.kai-launcher-button')
+      await page.waitUntil(chatHydrated)
+      fakeAi.reply(['One ', 'two ', 'three ', 'four ', 'five.'])
+      await page.click('.kai-chat-suggestion')
+      await page.waitFor('[data-pending]', { gone: true })
+      await page.waitFor('.kai-chat-turn[data-role="assistant"]', { text: 'One two three four five.' })
+
+      expect(await page.count('.kai-chat-note')).toBe(0)
+      expect(await page.count('.kai-chat-turn')).toBe(2)
+      expect(page.errors).toEqual([])
+    })
+
     test('the panel keeps one height empty, with a short answer and a long one, with the form at its bottom', async () => {
       const page = await site.open('/launcher/one', { height: 900 })
       const measure = () => page.evaluate(() => {
