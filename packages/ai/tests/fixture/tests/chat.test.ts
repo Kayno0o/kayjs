@@ -655,10 +655,10 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
       const fit = await page.evaluate(() => {
         const box = document.querySelector('.kai-launcher-panel')!.getBoundingClientRect()
 
-        return { left: box.left >= 0, right: box.right <= window.innerWidth, top: box.top >= 0, bottom: box.bottom <= window.innerHeight, scrolls: document.documentElement.scrollWidth > window.innerWidth, log: getComputedStyle(document.querySelector('.kai-chat-log')!).display }
+        return { left: box.left >= 0, right: box.right <= window.innerWidth, top: box.top >= 0, bottom: box.bottom <= window.innerHeight, scrolls: document.documentElement.scrollWidth > window.innerWidth, fills: Math.abs(box.height - (window.innerHeight - 120)) < 1, formInside: document.querySelector('.kai-chat-form')!.getBoundingClientRect().bottom <= box.bottom, log: getComputedStyle(document.querySelector('.kai-chat-log')!).display }
       })
 
-      expect(fit).toMatchObject({ left: true, right: true, top: true, bottom: true, scrolls: false, log: 'none' })
+      expect(fit).toMatchObject({ left: true, right: true, top: true, bottom: true, scrolls: false, formInside: true, fills: true, log: 'none' })
     })
   })
 })
