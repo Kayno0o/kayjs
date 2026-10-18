@@ -13,6 +13,7 @@ import { nativeExe } from '../src/compiler/native-typescript'
 import { loadConfig } from '../src/config'
 import { formatFiles } from '../src/format'
 import { createProject, detectHost, FEATURE_NAMES, PRESETS, toggle } from '../src/new'
+import { lintInProcess } from './scaffold-lint'
 
 const repo = join(import.meta.dir, '..')
 const LISTENING = /localhost:(\d+)/
@@ -544,7 +545,7 @@ describe('kay new', () => {
     }
 
     expect((await formatFiles([join(dir, 'src')], { write: false })).changed).toEqual([])
-    expect((await lint(dir, '.')).flatMap(result => result.messages)).toEqual([])
+    expect((await lintInProcess(dir, '.')).flatMap(result => result.messages)).toEqual([])
 
     // What this test adds to the scaffold the compile test shares is removed whatever its asserts find.
     try {
@@ -662,7 +663,7 @@ describe('kay new', () => {
       await installKay(dir)
       expect(await checked(dir)).toEqual([])
       expect((await formatFiles([join(dir, 'src')], { write: false })).changed).toEqual([])
-      expect((await lint(dir, '.')).flatMap(result => result.messages)).toEqual([])
+      expect((await lintInProcess(dir, '.')).flatMap(result => result.messages)).toEqual([])
 
       // The first start of a fresh app, as in development (bun test sets NODE_ENV=test, which reads .env.test): `pg-orm apply` makes the members table, which the second run finds applied.
       for (let run = 0; run < 2; run++) {
@@ -721,7 +722,7 @@ describe('kay new', () => {
       await installKay(dir)
       expect(await checked(dir)).toEqual([])
       expect((await formatFiles([join(dir, 'src')], { write: false })).changed).toEqual([])
-      expect((await lint(dir, '.')).flatMap(result => result.messages)).toEqual([])
+      expect((await lintInProcess(dir, '.')).flatMap(result => result.messages)).toEqual([])
 
       const demoSignIn = async (env: Record<string, string>) => {
         const child = Bun.spawn([process.execPath, '-e', 'console.log((await import(\'./src/env\')).demoSignIn)'], { cwd: dir, stdout: 'pipe', stderr: 'pipe', env: { ...process.env, DEMO_SIGN_IN: '', ...env } })
@@ -819,7 +820,7 @@ describe('kay new', () => {
         expect({ features, problems: await checked(dir) }).toEqual({ features, problems: [] })
 
         if (variant.has('eslint'))
-          expect({ features, messages: (await lint(dir, '.')).flatMap(result => result.messages) }).toEqual({ features, messages: [] })
+          expect({ features, messages: (await lintInProcess(dir, '.')).flatMap(result => result.messages) }).toEqual({ features, messages: [] })
 
         if (variant.has('tests')) {
           const tests = Bun.spawn([process.execPath, 'run', 'test'], { cwd: dir, stdout: 'pipe', stderr: 'pipe' })
