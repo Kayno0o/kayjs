@@ -46,12 +46,23 @@ async function doctor(cwd: string, args: string[] = [], env: Record<string, stri
 }
 
 // A port nothing else holds, kept busy until `release`.
-async function busyPort(): Promise<{ port: number, release: () => void }> {
+async function busyPort(address = '0.0.0.0'): Promise<{ port: number, release: () => void }> {
   const server = createServer()
 
-  await new Promise<void>(resolve => server.listen(0, '0.0.0.0', resolve))
+  await new Promise<void>(resolve => server.listen(0, address, resolve))
 
   return { port: (server.address() as { port: number }).port, release: () => server.close() }
+}
+
+function hasIpv6(): boolean {
+  try {
+    Bun.listen({ hostname: '::1', port: 0, socket: { data: () => undefined } }).stop(true)
+
+    return true
+  }
+  catch {
+    return false
+  }
 }
 
 describe('kay doctor', () => {
@@ -182,6 +193,21 @@ describe('kay doctor', () => {
       }
       finally {
         busy.release()
+      }
+    })
+
+    it.skipIf(!hasIpv6())('refuses a port held on an IPv6 address', async () => {
+      for (const address of ['::', '::1']) {
+        const busy = await busyPort(address)
+
+        try {
+          const result = await doctor(await project(), ['--port', String(busy.port)])
+
+          expect(result.check('port').ok, address).toBe(false)
+        }
+        finally {
+          busy.release()
+        }
       }
     })
 

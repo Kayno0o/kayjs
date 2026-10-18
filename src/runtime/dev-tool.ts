@@ -23,6 +23,8 @@ const MAX_NAVIGATIONS = 5
 const MAX_FETCHES = 300
 // How long before the dev tool hears of a swap its own fetch may start, as the page calls fetch in the task marking itself busy.
 const SWAP_SLACK_MS = 20
+// How long before a swap the page it brings may have been prefetched, as the swap keeps a prefetch for this long.
+const PREFETCH_TTL_MS = 30_000
 // The Server-Timing entry dev.ts answers the live reload's fetches with.
 const LIVE_RELOAD_TIMING = 'kay-live-reload'
 const RELOAD_START_MS = 50
@@ -1760,22 +1762,27 @@ function networkTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
 
     return !ACTION_PATH.test(url.pathname) && !url.searchParams.has(ISLAND_PARAM)
   }
+  const addressOf = (fetched: PerformanceResourceTiming) => {
+    const url = new URL(fetched.name)
+
+    return `${url.pathname}${url.search}`
+  }
   // Whether the request was kept, in the navigation it started in: only a swap's own page fetch, which starts a moment before the tool hears of the swap, goes in the swap's, matched by its address.
   const add = (fetched: PerformanceResourceTiming) => {
     if (DEV_PATH.test(fetched.name) || ((fetched.initiatorType === 'fetch' || fetched.initiatorType === 'xmlhttprequest') && (OWN_FETCHES.has(fetched.name) || reloadFetch(fetched))))
       return false
 
     const swap = navigations.at(-1)!
-    const slack = swap.start > fetched.startTime && swap.start <= fetched.startTime + SWAP_SLACK_MS && earlyPage(fetched)
+    const before = swap.start > fetched.startTime && earlyPage(fetched)
 
-    if (slack && swap.path === '') {
+    if (before && swap.start <= fetched.startTime + SWAP_SLACK_MS && swap.path === '') {
       early.push(fetched)
 
       return false
     }
 
-    const url = slack ? new URL(fetched.name) : undefined
-    const own = url !== undefined && `${url.pathname}${url.search}` === swap.path
+    // The page the swap went to, fetched by the swap or a prefetch before it, which may be reported once the swap has ended.
+    const own = before && swap.path !== '' && swap.start <= fetched.startTime + PREFETCH_TTL_MS && addressOf(fetched) === swap.path
     const navigation = navigations.findLast(candidate => candidate.start <= fetched.startTime || (own && candidate === swap)) ?? navigations[0]!
 
     place(fetched, navigation)
@@ -1859,10 +1866,15 @@ function networkTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
     else if (!busy && last.path === '') {
       last.path = here()
 
-      for (const fetched of early.splice(0)) {
-        const url = new URL(fetched.name)
+      for (const fetched of early.splice(0))
+        place(fetched, addressOf(fetched) === last.path ? last : navigations.findLast(candidate => candidate !== last && candidate.start <= fetched.startTime) ?? navigations[0]!)
 
-        place(fetched, `${url.pathname}${url.search}` === last.path ? last : navigations.findLast(candidate => candidate !== last && candidate.start <= fetched.startTime) ?? navigations[0]!)
+      // A swap that fetched nothing itself took the page from a prefetch, which an earlier navigation listed as it was reported.
+      if (!last.fetches.some(fetched => earlyPage(fetched) && addressOf(fetched) === last.path)) {
+        const prefetched = navigations.flatMap(navigation => navigation === last ? [] : navigation.fetches).filter(fetched => earlyPage(fetched) && addressOf(fetched) === last.path && last.start > fetched.startTime && last.start <= fetched.startTime + PREFETCH_TTL_MS).at(-1)
+
+        if (prefetched !== undefined)
+          place(prefetched, last)
       }
     }
     else {

@@ -1577,6 +1577,8 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the dev to
       await view.evaluate(() => document.querySelector('kay-dev')!.shadowRoot!.querySelector<HTMLButtonElement>('#kay-dev-tab-network')!.click())
       await view.click('a[href="/next"]')
       await view.waitUntil(() => document.querySelector('kay-dev')!.shadowRoot!.querySelector('#kay-dev-network h3')?.textContent.startsWith('This page, /next') === true)
+      // The browser reports a request after it is done, so the row can come a moment after the page.
+      await view.waitUntil(() => [...document.querySelector('kay-dev')!.shadowRoot!.querySelectorAll('#kay-dev-network .group')[0]?.querySelectorAll('.fetch .name') ?? []].some(name => name.textContent === '/next'))
 
       const sections = await view.evaluate(() => [...document.querySelector('kay-dev')!.shadowRoot!.querySelectorAll('#kay-dev-network .group')].map(group => [group.querySelector('h3')!.firstChild!.textContent, [...group.querySelectorAll('.fetch')].map(row => `${row.querySelector('.name')!.textContent} ${row.querySelector('.chip')!.textContent}`)]))
 
@@ -1584,6 +1586,29 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the dev to
       expect(sections[0]![1]).toContain('/next page')
       expect(sections[1]![0]).toBe('Before, /')
       expect(sections[1]![1]).toContain('/ document')
+    }
+    finally {
+      view.close()
+    }
+  }, 60_000)
+
+  it('lists the page a swap took from a prefetch under the page it brings', async () => {
+    const view = await dev.open('/')
+
+    try {
+      await view.waitUntil(() => (document.querySelector('slot[data-component]') as { _$k?: boolean } | null)?._$k === true)
+      await view.evaluate(() => document.querySelector('kay-dev')!.shadowRoot!.querySelector<HTMLButtonElement>('#kay-dev-tab-network')!.click())
+      // A hover long enough prefetches the page, well before the click that swaps to it.
+      await view.evaluate(() => document.querySelector('a[href="/next"]')!.dispatchEvent(new PointerEvent('pointerover', { bubbles: true })))
+      await view.waitUntil(() => performance.getEntriesByType('resource').some(entry => entry.name.endsWith('/next')))
+      await view.evaluate(async () => new Promise(resolve => setTimeout(resolve, 100)))
+      await view.click('a[href="/next"]')
+      await view.waitUntil(() => document.querySelector('kay-dev')!.shadowRoot!.querySelector('#kay-dev-network h3')?.textContent.startsWith('This page, /next') === true)
+      await view.waitUntil(() => [...document.querySelector('kay-dev')!.shadowRoot!.querySelectorAll('#kay-dev-network .group')[0]?.querySelectorAll('.fetch .name') ?? []].some(name => name.textContent === '/next'))
+
+      const rows = await view.evaluate(() => [...document.querySelector('kay-dev')!.shadowRoot!.querySelectorAll('#kay-dev-network .group')].map(group => [...group.querySelectorAll('.fetch')].map(row => `${row.querySelector('.name')!.textContent} ${row.querySelector('.chip')!.textContent}`)))
+
+      expect(rows[0]).toContain('/next page')
     }
     finally {
       view.close()

@@ -381,7 +381,7 @@ kay doctor --port 4000
 | `versions` | `@kaynooo/kayjs` or a `@kaynooo/kayjs-*` library listed in `package.json` is not installed, or a library is not on kay's minor |
 | `config` | `kay.config.ts` does not load |
 | `env` | A variable the project declares as required is set neither in the shell nor in the project's `.env` files. `kay env` lists them |
-| `port` | The port is in use. It is `--port`, else `PORT`, else 3000. The port of this project's own `kay dev` passes. It is tried on `HOST` when set, else on `localhost`, and `0` passes as a port the system picks |
+| `port` | The port is in use. It is `--port`, else `PORT`, else 3000. The port of this project's own `kay dev` passes. It is tried on `HOST` when set, else on every IPv4 address and on both loopback addresses (IPv4 and IPv6), and `0` passes as a port the system picks |
 | `build` | `.kay/client` or `.kay/dev` was built by another kay, which `kay build` or a restart of `kay dev` fixes |
 
 `--format json` prints `{ checks }`, each with its `name`, `ok`, `message` and, on a failure, its `fix`.

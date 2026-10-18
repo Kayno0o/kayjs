@@ -7,6 +7,7 @@ import { KAY_DIR } from '../build/assets'
 import { bunProblem } from '../bun'
 import { loadConfig } from '../config'
 import { readDevAddress } from '../dev/address'
+import { loopbackTaken } from '../dev/loopback'
 import { readManifest } from '../server/client'
 import { buildingWithoutEnv } from '../server/env-state'
 import { formatOption, isPort, printDocument, projectRoot, withStdoutOnStderr } from './command'
@@ -204,7 +205,7 @@ async function envCheck(root: string, dotenv: Record<string, string>): Promise<C
   }
 }
 
-// `kay dev` listens on `localhost` whatever HOST says, and a server of the app on HOST when it is set, so the probe binds HOST or else `localhost`.
+// `kay dev` listens on both loopback addresses whatever HOST says, and a server of the app on HOST when it is set, else on every IPv4 address, so the probe binds HOST or else each of those.
 async function portCheck(root: string, port: string, host?: string): Promise<Check> {
   if (!isPort(port))
     return { name: 'port', ok: false, message: `${port} is no port number`, fix: 'set PORT, or pass --port, to a number up to 65535' }
@@ -218,7 +219,10 @@ async function portCheck(root: string, port: string, host?: string): Promise<Che
     return { name: 'port', ok: true, message: `${port} is held by this project's kay dev` }
 
   try {
-    const server = Bun.serve({ port: Number(port), hostname: host ?? 'localhost', fetch: () => new Response() })
+    if (host === undefined && loopbackTaken(Number(port)))
+      throw Object.assign(new Error('taken on a loopback address'), { code: 'EADDRINUSE' })
+
+    const server = Bun.serve({ port: Number(port), ...host !== undefined && { hostname: host }, fetch: () => new Response() })
 
     await server.stop(true)
 
