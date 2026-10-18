@@ -17,6 +17,7 @@ import { isErrorCode } from '../src/compiler/errors'
 import { SHADOW_DIR } from '../src/project'
 import { limiter } from '../src/server/limit'
 import { alive } from './alive'
+import { kayCheck, keepBuildInfo, warmBuildInfo } from './check-helper'
 import { fixtureCopy, scratchDir } from './scratch'
 
 const fixtures = join(import.meta.dir, 'fixtures')
@@ -27,8 +28,21 @@ const turn = limiter(4)
 
 setDefaultTimeout(90_000)
 
+// With no build info lent to the project, for a test that reads the build info as the proof tsgo ran.
+async function checkCold(root: string): ReturnType<typeof checkProject> {
+  return turn(async () => checkProject(root))
+}
+
 async function check(root: string, options?: CheckOptions): ReturnType<typeof checkProject> {
-  return turn(async () => checkProject(root, options))
+  return turn(async () => {
+    await warmBuildInfo(root)
+
+    const diagnostics = await checkProject(root, options)
+
+    await keepBuildInfo(root)
+
+    return diagnostics
+  })
 }
 
 // Runs the kay CLI as a user would, in its turn, answering its exit code, what it did on stdout and the problems it found on stderr.
@@ -60,22 +74,22 @@ describe('kay check', () => {
     const entries = async () => (await readdir(cache)).filter(name => (/-(?:shadow|renders-island|analysis-check)\.json$/).test(name)).toSorted()
 
     try {
-      expect((await runCheck(root)).code).toBe(0)
+      expect((await cliCheck(root)).code).toBe(0)
 
       const live = await entries()
 
       await Bun.write(join(root, 'src/gone.kay'), 'p Gone\n')
-      expect((await runCheck(root)).code).toBe(0)
+      expect((await cliCheck(root)).code).toBe(0)
 
       const both = await entries()
 
       expect(both.length).toBeGreaterThan(live.length)
 
       await rm(join(root, 'src/gone.kay'))
-      expect((await runCheck(root, join(root, 'src/todo-item.kay'))).code).toBe(0)
+      expect((await cliCheck(root, join(root, 'src/todo-item.kay'))).code).toBe(0)
       expect(await entries()).toEqual(both)
 
-      expect((await runCheck(root)).code).toBe(0)
+      expect((await cliCheck(root)).code).toBe(0)
       expect(await entries()).toEqual(live)
     }
     finally {
@@ -219,7 +233,20 @@ const tsconfig = JSON.stringify({
   include: ['src', '.kay/types'],
 })
 
+// `kay check` in this process, in its turn, for a test of what a check reports; `cliCheck` spawns the program for the few that are about it.
 async function runCheck(root: string, ...flags: string[]): Promise<{ code: number, output: string, report: string }> {
+  return turn(async () => {
+    await warmBuildInfo(root)
+
+    const run = await kayCheck([root, ...flags])
+
+    await keepBuildInfo(root)
+
+    return run
+  })
+}
+
+async function cliCheck(root: string, ...flags: string[]): Promise<{ code: number, output: string, report: string }> {
   return kay(['check', root, ...flags])
 }
 
@@ -742,15 +769,15 @@ describe.concurrent('kay check, edge cases', () => {
     const buildInfo = join(root, '.kay/cache/check/tsbuildinfo')
 
     try {
-      expect(await check(root)).toEqual([])
+      expect(await checkCold(root)).toEqual([])
       // An hour, so a file of kay's sources or node_modules in the checkout, which another test file may touch meanwhile, never counts as changed.
       await startedLater(root, 3_600_000)
       await rm(buildInfo)
-      expect(await check(root)).toEqual([])
+      expect(await checkCold(root)).toEqual([])
       expect(await Bun.file(buildInfo).exists()).toBe(false)
 
       await Bun.write(join(root, 'src/b.ts'), 'export const b: number = \'b\'\n')
-      expect((await check(root)).map(d => [basename(d.file), d.code])).toEqual([['b.ts', 'TS2322']])
+      expect((await checkCold(root)).map(d => [basename(d.file), d.code])).toEqual([['b.ts', 'TS2322']])
     }
     finally {
       await rm(root, { recursive: true, force: true })
