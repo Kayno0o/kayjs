@@ -1988,7 +1988,7 @@ function metaContent(head: HTMLHeadElement, key: string): string | undefined {
   return content === '' ? undefined : content
 }
 
-// The page's head as it is now: the search result it makes, its title, description, canonical link, alternates and robots tag, its og and twitter tags with the card image, and its JSON-LD blocks, each parsed or with its error; what `kay check` would flag in it comes from the server, which also says whether the sitemap lists the page. Read as the tab shows and again after each page swap.
+// The page's head as it is now: the search result it makes, its title, description, canonical link, alternates and robots tag, its og and twitter tags with the card image, and its JSON-LD blocks, each parsed or with its error; what `kay check` would flag in it comes from the server, which also says whether the sitemap lists the page. Read as the tool starts and again after each page swap, so its count is there before the tab is opened.
 function headTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
   const win = doc.defaultView!
   let reread: () => void = () => undefined
