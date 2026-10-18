@@ -1329,39 +1329,67 @@ describe('kay lsp project checks after a save', () => {
 
     await Promise.all(Object.entries(files).map(async ([path, text]) => Bun.write(join(dir, path), text)))
 
-    // Waits until the counts stay as they are for a while, however slow the machine.
-    const quiet = async (atLeast = 1000) => {
-      await Bun.sleep(atLeast)
+    // The project checks are in-process, so the test follows the server's own debounce timer and runs rather than guessing a quiet spell.
+    const internals = server as unknown as { scheduleProjectChecks: () => void, runProjectChecks: () => Promise<void> }
+    const schedule = internals.scheduleProjectChecks.bind(server)
+    const run = internals.runProjectChecks.bind(server)
+    const checks = { scheduled: 0, due: false, running: 0 }
+    let changed = Promise.withResolvers<void>()
+    const touch = () => {
+      changed.resolve()
+      changed = Promise.withResolvers<void>()
+    }
 
-      for (let seen = ''; seen !== JSON.stringify(ran);) {
-        seen = JSON.stringify(ran)
-        await Bun.sleep(700)
+    internals.scheduleProjectChecks = () => {
+      checks.scheduled++
+      checks.due = true
+      schedule()
+      touch()
+    }
+    internals.runProjectChecks = async () => {
+      checks.due = false
+      checks.running++
+      touch()
+
+      try {
+        await run()
       }
+      finally {
+        checks.running--
+        touch()
+      }
+    }
+
+    // Waits until a save after `scheduled` was heard, its checks ran and none is due or running.
+    const quiet = async (scheduled: number) => {
+      while (checks.scheduled <= scheduled || checks.due || checks.running > 0)
+        await changed.promise
 
       return { ...ran }
     }
     // Writes a file, tells the server and waits for the project checks it makes.
     const save = async (path: string, text: string) => {
+      const scheduled = checks.scheduled
+
       await Bun.write(join(dir, path), text)
       client.notify('workspace/didChangeWatchedFiles', { changes: [{ uri: pathToFileURL(join(dir, path)).href, type: 2 }] })
 
-      return quiet()
+      return quiet(scheduled)
     }
     const removed = async (path: string) => {
+      const scheduled = checks.scheduled
+
       await rm(join(dir, path))
       client.notify('workspace/didChangeWatchedFiles', { changes: [{ uri: pathToFileURL(join(dir, path)).href, type: 3 }] })
 
-      return quiet()
+      return quiet(scheduled)
     }
 
     try {
       await client.request('initialize', { processId: process.pid, rootUri: pathToFileURL(dir).href, capabilities: {} })
       client.notify('initialized', {})
 
-      while (ran.content === 0 || ran.messages === 0)
-        await Bun.sleep(50)
-
-      expect(await quiet()).toEqual({ content: 1, messages: 1 })
+      expect(await quiet(0)).toEqual({ content: 1, messages: 1 })
 
       // A component neither the collections nor the messages use.
       expect(await save(unrelated, 'p two\n')).toEqual({ content: 1, messages: 1 })
