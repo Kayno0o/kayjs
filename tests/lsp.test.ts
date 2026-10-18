@@ -1365,6 +1365,9 @@ describe('kay lsp project checks after a save', () => {
       while (checks.scheduled <= scheduled || checks.due || checks.running > 0)
         await changed.promise
 
+      // A save schedules the checks once, so a further run it caused would show here.
+      expect(checks.scheduled).toBe(scheduled + 1)
+
       return { ...ran }
     }
     // Writes a file, tells the server and waits for the project checks it makes.
