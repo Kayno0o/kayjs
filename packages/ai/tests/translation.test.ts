@@ -91,7 +91,7 @@ it('compares a tag split over lines, and the markup that is not a tag', () => {
   expect(unitProblem(message('<a\nhref="/x">x</a>'), '<a\nhref="/y">x</a>')).toBe('changes the tags of the source')
   expect(unitProblem(message('a &lt;b&gt; c'), 'a &lt;b&gt; d')).toBeUndefined()
   expect(unitProblem(message('a'), 'a &lt;script&gt;')).toBeUndefined()
-  expect(unitProblem(message('a'), 'a <script>alert(1)</script>')).toBe('changes the tags of the source')
+  expect(unitProblem(message('a'), 'a <script>alert(1)</script>')).toBe(UNREADABLE)
   expect(unitProblem(message('a'), 'a <svg onload=alert(1)>')).toBe('changes the tags of the source')
   expect(unitProblem(message('a'), 'a <!-- x')).toBe(UNREADABLE)
   expect(unitProblem(message('a'), 'a <![CDATA[ x')).toBe(UNREADABLE)
@@ -179,4 +179,42 @@ it('reads a comment as a browser does, so a quote inside it cannot hide a live t
   expect(unitProblem(source, '<![CDATA[ c ]]> <a title="Accueil">x</a>')).toBe('changes the tags of the source')
   expect(unitProblem(source, '<!-- c <a title="Accueil">x</a>')).toBe(UNREADABLE)
   expect(unitProblem(message('<?x?> a'), '<!x> a')).toBe('changes the tags of the source')
+})
+
+it('reads `</` and a non-letter as a bogus comment, as a browser does', () => {
+  const source = message('<a title="Home">x</a>')
+
+  for (const start of ['</ ', '</3', '</>', '</"', '</!', '</-'])
+    expect(unitProblem(source, `${start}<a title=" > <img onerror=alert(1)> ">x</a>`)).toBe('changes the tags of the source')
+
+  expect(unitProblem(source, '</ never closed')).toBe(UNREADABLE)
+  expect(unitProblem(source, '</')).toBe(UNREADABLE)
+  expect(unitProblem(message('a </ b > <a title="Home">x</a>'), 'a </ c > <a title="Accueil">x</a>')).toBeUndefined()
+  expect(unitProblem(message('a'), 'a </é>')).toBe('changes the tags of the source')
+  expect(unitProblem(message('a < b'), 'a < c')).toBeUndefined()
+  expect(unitProblem(message('a <3 b'), 'a <3 c')).toBeUndefined()
+})
+
+it('does not read what follows a raw text element as markup, it holds the element as unreadable', () => {
+  for (const name of ['script', 'style', 'textarea', 'title', 'xmp', 'iframe', 'noembed', 'noframes', 'plaintext', 'noscript', 'SCRIPT']) {
+    expect(unitProblem(message(`<${name}>a</${name}>`), `<${name}>b</${name}>`)).toBe(UNREADABLE)
+    expect(unitProblem(message('a'), `a <${name}>`)).toBe(UNREADABLE)
+  }
+
+  expect(unitProblem(message('<scripts>a</scripts>'), '<scripts>b</scripts>')).toBeUndefined()
+})
+
+it('reads the other tag-open states as a browser does', () => {
+  const source = message('<a title="Home">x</a>')
+
+  expect(unitProblem(source, '<a/title="Accueil">x</a>')).toBeUndefined()
+  expect(unitProblem(source, '<a\ttitle="Accueil">x</a>')).toBeUndefined()
+  expect(unitProblem(source, '<a title=>x</a>')).toBeUndefined()
+  expect(unitProblem(source, '<a href=>x</a>')).toBe('changes the tags of the source')
+  expect(unitProblem(source, '<a title=x<y>x</a>')).toBe(UNREADABLE)
+  expect(unitProblem(source, '<a"b title="Accueil">x</a>')).toBe(UNREADABLE)
+  expect(unitProblem(source, '<a title="Accueil"/>x</a>')).toBeUndefined()
+  expect(unitProblem(source, '<?xml title=" ?> <img onerror=alert(1)> ">x</a>')).toBe('changes the tags of the source')
+  expect(unitProblem(source, '<![CDATA[ " ]]> <a title="Accueil">x</a>')).toBe('changes the tags of the source')
+  expect(unitProblem(message('<svg><![CDATA[ a > b ]]></svg>'), '<svg><![CDATA[ a > c ]]></svg>')).toBeUndefined()
 })

@@ -28,7 +28,10 @@ export interface TranslateOptions {
 const PLACEHOLDER = /\{(\w+)\}/g
 // Where a browser may read a tag, and a comment, CDATA section, doctype or instruction, which hide what follows them from the check.
 const TAG_START = /<\/?[A-Z][\w-]*\b/gi
-const MARKUP_START = /<[!?]/g
+// A bogus comment starts at `<!`, `<?` and `</` followed by anything but a letter.
+const MARKUP_START = /<(?:[!?]|\/(?![A-Z]))/gi
+// The elements whose content a browser reads as text, not markup, which the scan cannot follow.
+const RAW_TEXT = /^<(?:script|style|textarea|title|xmp|iframe|noembed|noframes|plaintext|noscript)$/i
 const COMMENT_END = /--!?>/g
 // HTML whitespace is these five characters only: JS `\s` also matches a no-break space, which a browser reads as part of a value.
 const ATTRIBUTE = /([^\t\n\f\r =/"'<>]+)(?:[\t\n\f\r ]*=[\t\n\f\r ]*(?:"([^"]*)"|'([^']*)'|([^\t\n\f\r "'>]+)))?/g
@@ -265,7 +268,7 @@ function scanTags(text: string): { parts: { markup: boolean, text: string }[], u
       }
     }
 
-    if (!closed)
+    if (!closed || RAW_TEXT.test(TAG_NAME.exec(tag[0])![0]))
       return { parts, unreadable: true }
 
     parts.push({ markup: false, text: text.slice(tag.index, end) })
