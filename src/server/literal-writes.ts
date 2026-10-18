@@ -239,7 +239,6 @@ function inPattern(text: string, from: number): boolean {
   return false
 }
 
-// Whether the bare container at [start, end) is only read: listed by key or turned into a string, which hands out nothing, or, for a container of values, spread, iterated, listed or destructured from a declaration.
 // Whether the use at `start` is the right side of a `const`, `let` or `var` declaration whose left side is a destructuring pattern.
 function destructuredFrom(text: string, start: number): boolean {
   const before = text.slice(Math.max(0, start - DECLARATION_REACH), start)
@@ -262,6 +261,7 @@ function destructuredFrom(text: string, start: number): boolean {
   return false
 }
 
+// Whether the bare container at [start, end) is only read: listed by key or turned into a string, which hands out nothing, or, for a container of values, spread, iterated, listed or destructured from a declaration.
 function readBare(text: string, start: number, end: number, values: boolean): boolean {
   const before = text.slice(Math.max(0, start - 300), start)
   const after = text.slice(end, end + 12)
