@@ -2,19 +2,13 @@
 import { ask } from '@kaynooo/kayjs-ai'
 import { s } from 'kay'
 import { logFrom } from 'kay'
-import { isAboutKay, partOfPage, readPage, searchPages, systemPrompt } from '../../chat-corpus'
+import { partOfPage, readPage, searchPages, systemPrompt } from '../../chat-corpus'
 
 export const page = { prerender: true, search: { weight: 0.5 } }
 
 // The tools' own limits sit well above what one question needs, so the chat's `ai({ limit })` is what a visitor meets first.
 const TOOL_LIMIT = { max: 20, window: '1m' } as const
 const log = logFrom('docs-chat')
-const REFUSAL = 'I only answer questions about kay, the Bun web framework, and its libraries. Ask how to do something with kay, such as adding an island or protecting an action, or search the docs with Ctrl K.'
-
-// The fixed reply, shaped as the snapshots `ask(...).progress()` streams so that the chat shows it like any other.
-async function* refusal() {
-  yield { text: REFUSAL, calls: [] }
-}
 
 export const searchDocs = action(
   s.Object({ query: s.String({ minLength: 2, maxLength: 200 }) }),
@@ -48,10 +42,6 @@ export const reply = action(
   Messages,
   async ({ messages }, ctx) => {
     try {
-      // Judged on the latest question alone, so an off-topic ask after on-topic turns is refused too; the model is not asked and no tokens are counted.
-      if (!await isAboutKay(messages.findLast(message => message.role === 'user')?.content ?? '', messages.some(message => message.role === 'assistant')))
-        return refusal()
-
       return ask(messages, { system: await systemPrompt(), tools: [searchDocs, readDocsPage], maxSteps: 4, maxTokens: 1500, temperature: 0.2 }).progress()
     }
     catch (error) {
