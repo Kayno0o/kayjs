@@ -2,6 +2,7 @@ import type { CacheStore } from '../src/runtime/cache'
 import type { ServedPage } from '../src/server/render'
 import { afterEach, describe, expect, it } from 'bun:test'
 import { cached, invalidate, noteRead, onKeysInvalidated } from '../src/runtime/cache'
+import { logSink, setLogSink } from '../src/runtime/log'
 import { readsOf } from '../src/server/page-reads'
 import { revalidateStale } from '../src/server/revalidate'
 import { invalidationCount, revalidationOf, trackPrerendered } from '../src/server/stale-pages'
@@ -230,5 +231,66 @@ describe('onKeysInvalidated', () => {
     stop()
     invalidate('a')
     expect(heard).toBe(1)
+  })
+})
+
+describe('broadcast', () => {
+  it('logs a failing publish once per streak, and again after one succeeds', async () => {
+    const mod = await restart('streak')
+    let failing = true
+    const store: CacheStore = {
+      get: () => undefined,
+      set: () => undefined,
+      delete: () => undefined,
+      keys: () => [],
+      publish: () => {
+        if (failing)
+          throw new Error('database is locked')
+      },
+    }
+    const logged: string[] = []
+    const previous = logSink()
+
+    setLogSink((_level, message) => void logged.push(message))
+    mod.trackStore(store)
+
+    try {
+      mod.broadcast({ pages: [] })
+      mod.broadcast({ pages: [] })
+      expect(logged).toHaveLength(1)
+
+      failing = false
+      mod.broadcast({ pages: [] })
+      failing = true
+      mod.broadcast({ pages: [] })
+      expect(logged).toHaveLength(2)
+    }
+    finally {
+      mod.untrackStore(store)
+
+      if (previous)
+        setLogSink(previous)
+      else
+        delete (globalThis as Record<symbol, unknown>)[Symbol.for('kay.log')]
+    }
+  })
+})
+
+describe('onClockHeard', () => {
+  it('gives back what stops it listening', async () => {
+    const bus = new Set<(message: string) => void>()
+    const mine = memoryStore(undefined, bus)
+    const theirs = memoryStore(mine.rows, bus)
+    const mod = await restart('clock')
+    const heard: number[] = []
+
+    mod.trackStore(mine.store)
+    const stop = mod.onClockHeard(at => void heard.push(at))
+
+    theirs.store.publish!(JSON.stringify({ pages: [], at: 5 }))
+    stop()
+    theirs.store.publish!(JSON.stringify({ pages: [], at: 6 }))
+    mod.untrackStore(mine.store)
+    expect(heard).toEqual([5])
   })
 })

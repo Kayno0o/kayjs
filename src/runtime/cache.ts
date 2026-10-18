@@ -168,8 +168,11 @@ export function onKeysInvalidated(listener: (matches: (key: string) => boolean) 
 }
 
 // Hears the clock readings the other processes sharing a store tell of, so a stamp can be dated after a read their clocks made.
-export function onClockHeard(listener: (at: number) => void): void {
+// Gives back what stops it listening, as `onKeysInvalidated` does.
+export function onClockHeard(listener: (at: number) => void): () => void {
   clockListeners.add(listener)
+
+  return () => void clockListeners.delete(listener)
 }
 
 // A store `invalidate` empties too: each one a call names, and a `sqliteCache` as soon as it opens, so an action invalidating after a restart reaches what the store kept before any page asked for it.
@@ -239,15 +242,22 @@ function dropEntries(matches: (key: string) => boolean): string[] {
   return names
 }
 
+// The stores whose last publish failed: a streak logs once, as a clock beat publishes up to four times a second.
+const failing = new WeakSet<CacheStore>()
+
 export function broadcast(invalidation: Invalidation): void {
   const message = JSON.stringify(invalidation)
 
   for (const store of stores) {
     try {
       store.publish?.(message)
+      failing.delete(store)
     }
     catch (error) {
-      kayLog('error', 'an invalidation could not reach the other processes', error)
+      if (!failing.has(store))
+        kayLog('error', 'an invalidation could not reach the other processes', error)
+
+      failing.add(store)
     }
   }
 }
