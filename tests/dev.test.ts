@@ -306,11 +306,12 @@ describe.concurrent('kay dev', () => {
     const stop = await dev(root, { onRestart: child => children.push(child) })
 
     // The restart the edit made, and a moment more for a types process it would have started.
+    // An edit written in two steps may restart twice between two polls, so the count only has to pass the one before.
     const restarted = async (edit: () => Promise<unknown>) => {
       const count = children.length
 
       await edit()
-      await until(() => children.length === count + 1, 20_000)
+      await until(() => children.length > count, 20_000)
       await Bun.sleep(1500)
     }
 
