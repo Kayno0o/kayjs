@@ -1,4 +1,4 @@
-import type { Finish, Piece, Progress, Reply, ToolCall, Usage } from './types'
+import type { CodeBlock, Finish, Piece, Progress, Reply, ToolCall, Usage } from './types'
 import { AiError } from './errors'
 import { highlighting } from './highlight'
 
@@ -165,6 +165,25 @@ export function createReply(open: (signal: AbortSignal) => AsyncIterable<Piece>,
     const highlighted = highlight()
     let seen = 0
     let closed = false
+    // Highlighting runs beside the stream: a snapshot carries the text at once and the blocks finished since, so a slow highlighter never holds the text back.
+    let working = false
+    let stale = false
+    let finished: CodeBlock[] = []
+
+    const scan = () => {
+      working = true
+      stale = false
+
+      void (async () => {
+        try {
+          finished.push(...await highlighted(deltas.join('')))
+        }
+        finally {
+          working = false
+          notify()
+        }
+      })()
+    }
 
     return {
       async next() {
@@ -172,16 +191,32 @@ export function createReply(open: (signal: AbortSignal) => AsyncIterable<Piece>,
           if (closed)
             return { done: true, value: undefined }
 
+          if (finished.length > 0) {
+            const code = finished
+
+            finished = []
+
+            return { done: false, value: { text: deltas.join(''), calls: calls.map(snapshot), code } }
+          }
+
           if (seen < version) {
             seen = version
 
-            const text = deltas.join('')
-            const code = await highlighted(text)
+            if (working)
+              stale = true
+            else
+              scan()
 
-            return { done: false, value: { text, calls: calls.map(snapshot), ...code.length > 0 && { code } } }
+            return { done: false, value: { text: deltas.join(''), calls: calls.map(snapshot) } }
           }
 
-          if (ended) {
+          if (stale && !working) {
+            scan()
+
+            continue
+          }
+
+          if (ended && !working) {
             closed = true
 
             if (failure !== undefined)

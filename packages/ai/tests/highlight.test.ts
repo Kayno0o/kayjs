@@ -1,6 +1,8 @@
+import type { Progress } from '../src/types'
 import { describe, expect, it } from 'bun:test'
 import { markdownHtml as clientMarkdown } from '../../../src/runtime/markdown.client'
-import { closedFences, highlighting, safeCode } from '../src/highlight'
+import { closedFences, highlighting, safeCode, scanFences } from '../src/highlight'
+import { MARK, withoutMarker } from '../src/marker'
 import { createReply } from '../src/reply'
 
 const FENCED = 'Intro\n\n```ts\nconst a = 1 < 2 && "x"\n```\n\nAfter'
@@ -22,6 +24,16 @@ describe('closedFences', () => {
     expect(closedFences('- item\n  ```js\n  a\n  ```')).toHaveLength(1)
     expect(closedFences('> ```js\n> a\n> ```')).toHaveLength(1)
     expect(closedFences('```a`b\ntext\n```')).toEqual([])
+  })
+
+  it('reads a fence indented up to 3 columns past its container only', () => {
+    expect(closedFences('   ```js\n   a\n   ```')).toHaveLength(1)
+    expect(closedFences('    ```js\n    a\n    ```')).toEqual([])
+    expect(closedFences('Text\n\n    ```\n    code\n\n```ts\nreal\n```')).toEqual([{ source: '```ts\nreal\n```', language: 'ts' }])
+    expect(closedFences('> ```js\n>     a\n> ```')).toHaveLength(1)
+    expect(closedFences('>     ```js\n>     a\n>     ```')).toEqual([])
+    expect(closedFences('1. item\n\n   ```js\n   a\n   ```')).toHaveLength(1)
+    expect(closedFences('```\n    ```\n```')).toEqual([{ source: '```\n    ```\n```', language: undefined }])
   })
 })
 
@@ -107,5 +119,94 @@ describe('highlighting', () => {
 
     expect(seen.filter(progress => progress.code).map(progress => progress.code!.length)).toEqual([1])
     expect(seen.at(-1)!.text).toContain('```\ny')
+  })
+
+  it('scans only what follows the last closed block', async () => {
+    const calls: string[] = []
+    const next = highlighting(async () => (code) => {
+      calls.push(code)
+
+      return `<pre><code>${code}</code></pre>`
+    })
+    const text = `${'filler line\n'.repeat(500)}\n\`\`\`ts\na\n\`\`\`\n`
+    const grown = `${text}${'more\n'.repeat(500)}`
+
+    expect(await next(text)).toHaveLength(1)
+    expect(await next(grown)).toEqual([])
+    expect(await next(`${grown}\n\`\`\`py\nb\n\`\`\``)).toHaveLength(1)
+    expect(calls).toHaveLength(2)
+
+    const { end } = scanFences(text, 0)
+
+    expect(end).toBeGreaterThan(text.indexOf('```ts'))
+    expect(scanFences(`${text}\`\`\`py\nb\n\`\`\``, end).blocks.map(block => block.language)).toEqual(['py'])
+  })
+
+  it('leaves the blocks plain, logging once, when the highlighter cannot be loaded', async () => {
+    let loads = 0
+    const next = highlighting(async () => {
+      loads++
+
+      throw new Error('no shiki')
+    })
+
+    expect(await next(FENCED)).toEqual([])
+    expect(await next(`${FENCED}\n\n\`\`\`py\nb\n\`\`\``)).toEqual([])
+    expect(loads).toBe(1)
+  })
+
+  it('keeps two equal blocks apart across calls', async () => {
+    const next = highlighting(async () => upper)
+
+    expect(await next('```ts\na\n```\n')).toHaveLength(1)
+    expect(await next('```ts\na\n```\n\n```ts\na\n```\n')).toHaveLength(1)
+  })
+
+  it('does not hold the text back while a block is highlighted', async () => {
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+
+    async function* pieces() {
+      yield { text: 'A\n\n```ts\nx\n```\n\nB' }
+      await gate
+      yield { text: ' C' }
+    }
+
+    const reply = createReply(pieces, [], () => highlighting(async () => async (code, language) => {
+      await gate
+
+      return upper(code, language)
+    }))
+    const iterator = reply.progress()[Symbol.asyncIterator]()
+    const first = await Promise.race([iterator.next(), (async () => {
+      await Bun.sleep(500)
+
+      return 'stalled' as const
+    })()])
+
+    expect(first).not.toBe('stalled')
+
+    const { value } = first as { value: Progress }
+
+    expect(value.text).toContain('B')
+    expect(value.code).toBeUndefined()
+    release()
+
+    const rest = []
+
+    for (let step = await iterator.next(); !step.done; step = await iterator.next())
+      rest.push(step.value)
+
+    expect(rest.flatMap(progress => progress.code ?? [])).toHaveLength(1)
+    expect(rest.at(-1)!.text).toEndWith(' C')
+  })
+})
+
+describe('withoutMarker', () => {
+  it('removes the private marker a model\'s text could carry', () => {
+    expect(withoutMarker(`a${MARK}0${MARK}b`)).toBe('a0b')
+    expect(withoutMarker('plain')).toBe('plain')
   })
 })

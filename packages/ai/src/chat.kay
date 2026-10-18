@@ -3,6 +3,7 @@ import type { Action, ActionStream, Failure, JSX, SanitizeOptions } from 'kay'
 import type { CodeBlock, Message, Progress, ToolCall } from './types'
 import { ActionError, effect, onCleanup, onMount, sanitizeHtml, signal, trustHtml, untrack } from 'kay'
 import { markdownHtml } from 'kay/markdown'
+import { MARK, MARKED, withoutMarker } from './marker'
 import { posted, restored, stored } from './chat-history'
 import Calls from './chat-calls.kay'
 import './chat.css'
@@ -11,9 +12,6 @@ import './chat.css'
 const REPLY: SanitizeOptions = { tags: ['table', 'thead', 'tbody', 'tr', 'th', 'td'] }
 // How close to the end of the log the visitor must be for new text to keep it scrolled down.
 const PINNED_PX = 48
-// Stands in for a highlighted code block while the rest of the reply is sanitized.
-const MARK = '\uE100'
-const MARKED = /\uE100(\d+)\uE100/g
 const ATTRIBUTE_UNSAFE = /[&"<]/g
 // The opening tag `sanitizeHtml` writes for a link, which `linksOpenApart` rewrites: the two change together. The href is captured to tell a link of this site from another.
 const SANITIZED_LINK = /<a href="([^"]*)" rel="nofollow ugc">/g
@@ -143,11 +141,11 @@ function linksOpenApart(html: string): string {
 // A table is wrapped, once sanitized, in a box that scrolls sideways and takes the keyboard's focus, except in the turn being written, which is hidden from screen readers. Several tables of one reply are numbered, so no two groups share a name.
 // A code block the server highlighted (already sanitized there) takes the place of the plain one, which a marker holds through the sanitizing.
 function markdown(text: string, blocks: CodeBlock[] | undefined, scrollable = true) {
-  let source = markdownHtml(text) as string
+  let source = markdownHtml(withoutMarker(text)) as string
 
   // Each block takes the first plain one of its markup left, in the order they were written, so two blocks of one code in two languages each get theirs.
   for (const [index, block] of (blocks ?? []).entries())
-    source = source.replace(block.markup, `${MARK}${index}${MARK}`)
+    source = source.replace(withoutMarker(block.markup), `${MARK}${index}${MARK}`)
 
   let html = linksOpenApart(sanitizeHtml(source, REPLY))
 
