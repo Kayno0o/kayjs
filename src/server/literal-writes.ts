@@ -5,14 +5,17 @@ import { resolveFrom } from '../build/files'
 
 export type Literal = { kind: 'value' } | { kind: 'array', items: Literal[] } | { kind: 'object', props: Map<string, Literal> }
 
-// A source file of the project with its comments blanked.
+// A source file of the project: its text with the comments blanked, and `code` with the inside of its quoted strings blanked too, which hold no use of a name.
 export interface SourceFile {
   file: string
   text: string
-  // The text with the inside of its quoted strings blanked, which hold no use of a name, found once.
-  code?: string | undefined
+  code: string
+  // A file that could not be read, which may write to anything.
+  unreadable?: boolean | undefined
   // Whether a namespace import in it is used in a way the scan cannot follow, found once.
   misuse?: boolean | undefined
+  // The specifiers of its dynamic imports and `require`s, undefined for one that is not a string, found once.
+  calls?: (string | undefined)[] | undefined
 }
 
 const VALUE: Literal = { kind: 'value' }
@@ -28,8 +31,8 @@ const SPACE = /\s/
 const CAST_START = /^(?:as|satisfies)\s/
 const TYPE_CHARS = /^[\w$.<>[\]\s|&,'"{}:;-]+$/
 const PROTOTYPE_KEYS = new Set(['__proto__', 'constructor', 'prototype'])
-// What a chain of members can end in without handing out a reference to the container: a method that only reads, on a container of values.
-const READERS = new Set(['length', 'map', 'forEach', 'filter', 'find', 'findIndex', 'findLast', 'findLastIndex', 'some', 'every', 'reduce', 'reduceRight', 'join', 'includes', 'indexOf', 'lastIndexOf', 'slice', 'at', 'flatMap', 'flat', 'concat', 'entries', 'keys', 'values', 'toString', 'toLocaleString', 'toSorted', 'toReversed', 'toSpliced', 'with', 'hasOwnProperty'])
+// What a chain of members can end in without handing out a reference to the container: a method that only reads, on a container of values, and takes no callback, which is given the container as its last argument.
+const READERS = new Set(['length', 'join', 'includes', 'indexOf', 'lastIndexOf', 'slice', 'at', 'flat', 'concat', 'entries', 'keys', 'values', 'toString', 'toLocaleString', 'toSorted', 'toReversed', 'toSpliced', 'with', 'hasOwnProperty'])
 const SEGMENT = /\s*(?:\??\.\s*([A-Z_$][\w$]*)|(?:\?\.)?\[\s*(?:(\d+)|'([^'\\]*)'|"([^"\\]*)")\s*\])/iy
 const WRITE_AFTER = /\s*(?:=(?![=>])|[-+*/%&|^]=|<<=|>>>?=|\*\*=|&&=|\|\|=|\?\?=|\+\+|--)/y
 const CONTINUES = /^\s*(?:\??\.|[([`])/
@@ -46,9 +49,6 @@ const CLOSING = /^\s*\)/
 const NEXT_ARGUMENT = /^\s*,/
 const OBJECT_READ = /\b(?:Object\.(?:values|entries)|Array\.from)\s*\(\s*$/
 const ARGUMENT_END = /^\s*[,)]/
-const DESTRUCTURED = /\b(?:const|let|var)\s*[{[][^;]*[}\]]\s*=\s*$/
-const TEMPLATE_HOLE = /\$\{\s*$/
-const HOLE_END = /^\s*\}/
 const SPECIFIER_HEAD = /(?:^|[;\s}])(?:import|export)\s+(?:type\s+)?(?:[\w$]+\s*,\s*)?$/
 const NAMESPACE_IMPORT = /\b(?:import|export)\s*(?:[\w$]+\s*,\s*)?\*\s*as\s+([\w$]+)\s*from\s*['"]([^'"]+)['"]/g
 const IMPORT_FROM = /^\s+from\s*['"]/
@@ -61,58 +61,14 @@ const REGEX_CHARS = /[$()*+.?[\\\]^{|}]/g
 // How far past a member an assignment target is looked for.
 const TARGET_REACH = 4000
 
-const NOT_NEWLINE = /[^\n]/g
-const WORD_CHAR = /[\w$]/
-const OPENING_BRACKET = /\[\s*$/
-const CLOSING_BRACKET = /^\s*\]/
-const EVALUATES = /\b(?:eval|Function)\s*\(/
-
-// The text with the inside of each single or double quoted string that closes on its line blanked, but for a key written as `['name']`: a name in a string is no use of it, and a quote after a word is a prose apostrophe.
-// Templates are left as they are, their holes holding code.
-export function maskStrings(text: string): string {
-  let result = ''
-
-  for (let at = 0; at < text.length; at++) {
-    const char = text[at]!
-
-    if (char === '`') {
-      let end = at + 1
-
-      for (; end < text.length && text[end] !== '`'; end++) {
-        if (text[end] === '\\')
-          end++
-      }
-
-      result += text.slice(at, end + 1)
-      at = end
-
-      continue
-    }
-
-    if ((char === '"' || char === '\'') && !WORD_CHAR.test(text[at - 1] ?? '')) {
-      let end = at + 1
-
-      for (; end < text.length && text[end] !== char && text[end] !== '\n'; end++) {
-        if (text[end] === '\\')
-          end++
-      }
-
-      if (text[end] === char) {
-        const content = text.slice(at + 1, end)
-        const key = OPENING_BRACKET.test(result.slice(-20)) && CLOSING_BRACKET.test(text.slice(end + 1, end + 8))
-
-        result += char + (key ? content : content.replace(NOT_NEWLINE, ' ')) + char
-        at = end
-
-        continue
-      }
-    }
-
-    result += char
-  }
-
-  return result
-}
+const EVALUATES = /\beval\b|\bFunction\b/
+const EXPORT_NAMESPACE = /\bexport\s*\*\s*as\s/
+const NON_NULL = /^\s*!(?!=)/
+const ITERATION = /^\s*(?:of|in)\b/
+const ASSIGN_CLOSER = /([}\]])\s*=\s*$/
+const DECLARATION_HEAD = /(?:^|[^\w$.])(?:const|let|var)\s*$/
+// How far back the head of a destructuring declaration is looked for.
+const DECLARATION_REACH = 2000
 
 function skipSpace(text: string, at: number): number {
   let i = at
@@ -245,7 +201,7 @@ function flat(literal: Literal): boolean {
   return children.every(child => child.kind === 'value')
 }
 
-// Whether the expression ending at `from` sits inside a `[ ]` or `{ }` that is then assigned to, so it is a target of a destructuring assignment.
+// Whether the expression ending at `from` sits inside a `[ ]`, `{ }` or `( )` that is then assigned to or iterated into, so it is a target of an assignment: `[a.b] = c`, `(a.b as any) = c`, `for ({ k: a.b } of c)`.
 function inPattern(text: string, from: number): boolean {
   let depth = 0
 
@@ -267,11 +223,13 @@ function inPattern(text: string, from: number): boolean {
 
       depth = 0
 
+      const after = text.slice(at + 1, at + 40)
+
+      if (ASSIGNED.test(after) || ITERATION.test(after))
+        return true
+
       if (char === ')')
         return false
-
-      if (ASSIGNED.test(text.slice(at + 1, at + 40)))
-        return true
     }
     else if (char === ';') {
       return false
@@ -281,18 +239,37 @@ function inPattern(text: string, from: number): boolean {
   return false
 }
 
-// Whether the bare container at [start, end) is only read: written into a string or measured, which hands out nothing, or, for a container of values, spread, iterated, listed or destructured from.
+// Whether the bare container at [start, end) is only read: listed by key or turned into a string, which hands out nothing, or, for a container of values, spread, iterated, listed or destructured from a declaration.
+// Whether the use at `start` is the right side of a `const`, `let` or `var` declaration whose left side is a destructuring pattern.
+function destructuredFrom(text: string, start: number): boolean {
+  const before = text.slice(Math.max(0, start - DECLARATION_REACH), start)
+  const closer = ASSIGN_CLOSER.exec(before)
+
+  if (closer === null)
+    return false
+
+  let depth = 0
+
+  for (let at = closer.index; at >= 0; at--) {
+    const char = before[at]!
+
+    if (char === '}' || char === ']' || char === ')')
+      depth++
+    else if ((char === '{' || char === '[' || char === '(') && --depth === 0)
+      return DECLARATION_HEAD.test(before.slice(Math.max(0, at - 10), at))
+  }
+
+  return false
+}
+
 function readBare(text: string, start: number, end: number, values: boolean): boolean {
   const before = text.slice(Math.max(0, start - 300), start)
   const after = text.slice(end, end + 12)
 
-  if (TEMPLATE_HOLE.test(before) && HOLE_END.test(after))
-    return true
-
   if ((SUMMARY_READ.test(before) && CLOSING.test(after)) || (HAS_OWN.test(before) && NEXT_ARGUMENT.test(after)))
     return true
 
-  return values && (SPREAD.test(before) || ITERATED.test(before) || (OBJECT_READ.test(before) && ARGUMENT_END.test(after)) || DESTRUCTURED.test(before))
+  return values && (SPREAD.test(before) || ITERATED.test(before) || (OBJECT_READ.test(before) && ARGUMENT_END.test(after)) || destructuredFrom(text, start))
 }
 
 // Whether an import or export specifier list holds the use at `at` without renaming it, or is only a rename to the name.
@@ -361,7 +338,7 @@ function readsOnly(text: string, at: number, name: string, literal: Literal): bo
     node = child
   }
 
-  if (matchAt(WRITE_AFTER, text, cursor) !== undefined || inPattern(text, cursor))
+  if (matchAt(WRITE_AFTER, text, cursor) !== undefined || NON_NULL.test(text.slice(cursor, cursor + 8)) || inPattern(text, cursor))
     return false
 
   if (node.kind === 'value')
@@ -378,6 +355,10 @@ function readsOnly(text: string, at: number, name: string, literal: Literal): bo
 }
 
 function namespaceMisuse(text: string): boolean {
+  // A namespace exported from a barrel is a binding only its importers see.
+  if (EXPORT_NAMESPACE.test(text))
+    return true
+
   for (const [, binding, specifier] of text.matchAll(NAMESPACE_IMPORT)) {
     if (BUILTIN_SPECIFIER.test(specifier!))
       continue
@@ -396,11 +377,11 @@ function namespaceMisuse(text: string): boolean {
 
 // Whether a dynamic import or a `require` in the file may hand over the export: its target is not a literal, or reaches the module holding it.
 function reachesByCall(source: SourceFile, name: string, declaredIn: string, sources: readonly SourceFile[]): boolean {
-  const word = new RegExp(`(?<![\\w$])${name.replace(REGEX_CHARS, '\\$&')}(?![\\w$])`)
+  source.calls ??= [...source.text.matchAll(DYNAMIC)].map(call => call[2])
 
-  for (const call of source.text.matchAll(DYNAMIC)) {
-    const specifier = call[2]
+  let word: RegExp | undefined
 
+  for (const specifier of source.calls) {
     if (specifier === undefined)
       return true
 
@@ -416,7 +397,12 @@ function reachesByCall(source: SourceFile, name: string, declaredIn: string, sou
     const resolved = resolveFrom(specifier, source.file)
     const target = resolved === undefined ? undefined : sources.find(candidate => candidate.file === resolved)
 
-    if (target !== undefined && (target.file === declaredIn || word.test(target.text) || EXPORT_ALL.test(target.text)))
+    if (target === undefined)
+      continue
+
+    word ??= new RegExp(`(?<![\\w$])${name.replace(REGEX_CHARS, '\\$&')}(?![\\w$])`)
+
+    if (target.file === declaredIn || word.test(target.text) || EXPORT_ALL.test(target.text))
       return true
   }
 
@@ -425,18 +411,28 @@ function reachesByCall(source: SourceFile, name: string, declaredIn: string, sou
 
 // Whether `name`, exported from `declaredIn` as `literal`, is read and never written, handed on or reached some other way by any of `sources`.
 export function neverWritten(name: string, literal: Literal, declaredIn: string, sources: readonly SourceFile[]): boolean {
-  const uses = new RegExp(`(?<![\\w$])${name.replace(REGEX_CHARS, '\\$&')}(?![\\w$])`, 'g')
+  const escaped = name.replace(REGEX_CHARS, '\\$&')
+  const uses = new RegExp(`(?<![\\w$])${escaped}(?![\\w$])`, 'g')
+  const quotedImport = new RegExp(`['"]${escaped}['"]\\s+as\\s`)
+
+  // A module outside the project is not read, so a write in it would go unseen.
+  if (!sources.some(source => source.file === declaredIn))
+    return false
 
   for (const source of sources) {
+    if (source.unreadable === true)
+      return false
+
     source.misuse ??= namespaceMisuse(source.text)
 
-    if (source.misuse || reachesByCall(source, name, declaredIn, sources) || (EVALUATES.test(source.text) && source.text.includes(name)))
+    if (source.misuse || reachesByCall(source, name, declaredIn, sources))
       return false
 
     if (!source.text.includes(name))
       continue
 
-    source.code ??= maskStrings(source.text)
+    if (EVALUATES.test(source.text) || quotedImport.test(source.text))
+      return false
 
     for (const use of source.code.matchAll(uses)) {
       if (!readsOnly(source.code, use.index, name, literal))

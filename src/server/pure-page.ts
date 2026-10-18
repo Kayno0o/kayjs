@@ -107,6 +107,7 @@ export const IMAGE_EXPORTS: Record<string, 'free'> = {
 const PURE_I18N_NAMES = new Set(['t', 'T', 'locale', 'locales', 'localeName', 'localize', 'alternate', 'formatNumber', 'formatDate', 'formatList', 'direction', 'defineMessages'])
 const CODE_FILE = /\.(?:kay|[cm]?[jt]sx?)$/
 // An exported `const` that may hold an object or array literal, to spare reading the project to a file that has none.
+const SOURCE_BATCH = 64
 const EXPORTED_CONTAINER = /\bexport\s+const\b/
 // What a file imported for its bytes holds the same on every render; a database, a native module or a wasm file does not.
 const STATIC_FILE = /\.(?:png|jpe?g|gif|webp|avif|svg|ico|woff2?|ttf|otf|json|css|txt|md|html|toml|ya?ml|csv)$/i
@@ -119,6 +120,9 @@ const MODULE_EXPORT = new RegExp(`^export (?!(?:type|interface) )(?!(?:async )?(
 
 const WHITESPACE = /\s+/g
 const NOT_LINE_BREAK = /[^\n]/g
+const WORD_CHAR = /[\w$]/
+const OPENING_BRACKET = /\[\s*$/
+const CLOSING_BRACKET = /^\s*\]/
 const SPACE = /\s/
 const CTX = /\bctx\b/g
 const CTX_PATHNAME = /\s*\??\.\s*url\s*\??\.\s*pathname(?![\w$])(?![ \t]*(?:\+\+|--))(?!\s*(?:=(?!=)|[-+*/%&|^]=|<<=|>>>?=|\*\*=|&&=|\|\|=|\?\?=))/y
@@ -308,8 +312,8 @@ function regexEnd(source: string, at: number): number | undefined {
   return undefined
 }
 
-// The source with its comments blanked out, strings, regex literals and templates kept (a `${ }` inside one is scanned as code), so a word in a comment is no use of a name and a comment inside a call's arguments hides nothing.
-function withoutComments(source: string): string {
+// The source with its comments blanked out, and with `mask` the inside of its single or double quoted strings too, as a name in one is no use of it; strings, regex literals and templates kept (a `${ }` inside one is scanned as code), so a word in a comment is no use of a name and a comment inside a call's arguments hides nothing.
+function withoutComments(source: string, mask = false): string {
   let result = ''
   // The brace depth each open `${ }` was entered at, to know which `}` closes it.
   const holes: number[] = []
@@ -355,8 +359,22 @@ function withoutComments(source: string): string {
           end++
       }
 
-      result += source.slice(at, end + 1)
-      at = end
+      // Masking blanks only a string that closes on its line and does not follow a word, so an apostrophe in prose opens none.
+      const closed = source[end] === char && !source.slice(at, end).includes('\n') && !WORD_CHAR.test(source[at - 1] ?? '')
+
+      if (mask && !closed) {
+        result += char
+      }
+      else if (mask) {
+        const key = OPENING_BRACKET.test(result.slice(-20)) && CLOSING_BRACKET.test(source.slice(end + 1, end + 8))
+
+        result += char + (key ? source.slice(at + 1, end) : source.slice(at + 1, end).replace(NOT_LINE_BREAK, ' ')) + char
+        at = end
+      }
+      else {
+        result += source.slice(at, end + 1)
+        at = end
+      }
     }
     else if (char === '/' && (next === '/' || next === '*')) {
       const line = next === '/'
@@ -622,8 +640,23 @@ async function projectSources(root: string, scans: object): Promise<SourceFile[]
 
 async function readSources(root: string): Promise<SourceFile[]> {
   const files = await findProjectFiles(root, CODE_FILE, { project: true })
+  const sources: SourceFile[] = []
 
-  return Promise.all(files.map(async file => ({ file, text: withoutComments(await Bun.file(file).text()) })))
+  for (let from = 0; from < files.length; from += SOURCE_BATCH) {
+    sources.push(...await Promise.all(files.slice(from, from + SOURCE_BATCH).map(async (file): Promise<SourceFile> => {
+      try {
+        const text = await Bun.file(file).text()
+
+        return { file, text: withoutComments(text), code: withoutComments(text, true) }
+      }
+      catch {
+        // A file that cannot be read may write to anything.
+        return { file, text: '', code: '', unreadable: true }
+      }
+    })))
+  }
+
+  return sources
 }
 
 // Judges an exported object or array literal: unchanged when it is made of literals and no file of the project writes to it or hands it on; without a root nothing is shown.

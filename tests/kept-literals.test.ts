@@ -78,7 +78,7 @@ describe('a page importing an exported object or array no module writes to', () 
   it('is kept when it iterates, spreads, destructures or lists a flat one', async () => {
     const files = {
       'src/content.ts': `${CONTACT}${LIST}export const FLAT = { email: 'a', phone: '1' }\nexport type Contact = typeof CONTACT\nexport const keys = Object.keys(CONTACT)\n`,
-      'src/routes/index.kay': '---\nimport { CONTACT, FLAT, LIST } from \'../content\'\nimport type { Contact } from \'../content\'\n\nconst { email, phone } = FLAT\nconst copy = { ...CONTACT.address }\nconst more = [...LIST, \'c\']\nconst joined = LIST.map(item => item.toUpperCase()).join(\', \')\n---\nul\n  for (const item of LIST)\n    li {item}\np {email}{phone}{copy.city}{more.length}{joined}{Object.entries(CONTACT.address).length}{`${LIST[0]}`}{JSON.stringify(LIST)}\n',
+      'src/routes/index.kay': '---\nimport { CONTACT, FLAT, LIST } from \'../content\'\nimport type { Contact } from \'../content\'\n\nconst { email, phone } = FLAT\nconst copy = { ...CONTACT.address }\nconst more = [...LIST, \'c\']\nconst joined = LIST.join(\', \')\n---\nul\n  for (const item of LIST)\n    li {item}\np {email}{phone}{copy.city}{more.length}{joined}{Object.entries(CONTACT.address).length}{`${LIST[0]}`}{JSON.stringify(LIST)}\n',
     }
 
     expect(await stopOf(files)).toBeUndefined()
@@ -142,6 +142,22 @@ describe('a page importing an exported object or array no module writes to', () 
       dynamicPath: [CONTACT, 'const content = await import(path)\ncontent.CONTACT.email = \'x\''],
       required: [CONTACT, 'const content = require(\'./content\')\ncontent[\'CONTACT\'].email = \'x\''],
       renamedImport: [CONTACT, 'import { CONTACT as C } from \'./content\'\nC.email = \'x\''],
+      callbackArray: [LIST, 'LIST.forEach((item, index, all) => { all.push(item) })'],
+      callbackNested: ['export const CONTACT = { tags: [\'a\'] }\n', 'CONTACT.tags.map((tag, index, all) => all.pop())'],
+      parenthesised: [CONTACT, '(CONTACT.email) = \'x\''],
+      nonNull: [CONTACT, 'CONTACT.address.city! = \'x\''],
+      cast: [CONTACT, '(CONTACT.email as any) = \'x\''],
+      angleCast: [CONTACT, '(<any>CONTACT.email) = \'x\''],
+      loopArrayTarget: [CONTACT, 'for ([CONTACT.email] of [[\'x\']]) {}'],
+      loopObjectTarget: [CONTACT, 'for ({ a: CONTACT.email } of [{ a: \'x\' }]) {}'],
+      regexQuote: [LIST, 'const quote = /"/; LIST.push("x")'],
+      regexApostrophe: [LIST, 'const quote = /\'/g; LIST.push(\'x\')'],
+      lookalikeDestructuring: [LIST, 'const [first] = other()\nregistry[id] = LIST\nregistry[id].push(1)'],
+      exportedNamespace: [CONTACT, 'export * as content from \'./content\''],
+      quotedSpecifier: [CONTACT, 'import { \'CONTACT\' as C } from \'./content\'\nC.email = \'x\''],
+      taggedTemplate: [LIST, 'html`${LIST}`'],
+      templateHole: [LIST, 'const text = `${LIST}`'],
+      indirectEval: [LIST, '(0, eval)(\'LIST.push(1)\')'],
       evaluated: [CONTACT, 'eval(\'CONTACT.email = 1\')'],
       reexportRenamed: [CONTACT, 'export { CONTACT as C } from \'./content\''],
     }
@@ -226,6 +242,14 @@ describe('a page importing an exported object or array no module writes to', () 
 
       expect([key, await stopOf(files)]).toEqual([key, expect.stringContaining('module state')])
     }
+  })
+
+  it('stops when the exporting module lies outside the project, as a write in it is not read', async () => {
+    const outer = await project({ 'shared/content.ts': 'export const CONTACT = { email: \'a\' }\nexport function bump(): void {\n  CONTACT.email = \'x\'\n}\n', 'app/kay.config.ts': CONFIG, 'app/src/routes/index.kay': '---\nimport { CONTACT } from \'../../../shared/content\'\n---\np {CONTACT.email}\n' })
+    const root = join(outer, 'app')
+    const { stop } = await keptScan({ file: join(root, 'src/routes/index.kay'), layouts: [] }, undefined, root)
+
+    expect(stop?.why).toContain('module state')
   })
 
   it('is not decided without the project root, since a writer cannot be ruled out', async () => {
