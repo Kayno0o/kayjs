@@ -68,7 +68,9 @@ const store: CacheStore = {
 
 `get` returns `{ text, freshUntil }`, where `text` is the value kay serialized and `freshUntil` is a time in ms since the epoch. A store never parses `text`.
 
-Two methods are optional. `dependencies()` reads which keys each value was built from without reading the values, which makes `invalidate` faster. `publish(message)` and `subscribe(listener)` let processes sharing the store tell each other what they invalidated. Pass every message on exactly as it came, and never back to the process that published it: some carry only a clock reading, which lets pages that follow a key with `live: true` refresh even when the machines' clocks differ by a few seconds, once they have heard each other.
+Two methods are optional. `dependencies()` reads which keys each value was built from without reading the values, which makes `invalidate` faster. `publish(message)` and `subscribe(listener)` let processes sharing the store tell each other what they invalidated.
+
+Pass every message on exactly as it came, and never back to the process that published it: some carry only a clock reading, which lets pages that follow a key with `live: true` refresh even when the machines' clocks differ by a few seconds, once they have heard each other.
 
 <Callout type="note">
 
