@@ -198,6 +198,7 @@
     "test": "bun test --parallel --timings=tests/timings.json",
     "test:timings": "bun test --parallel --timings=tests/timings.json --update-timings",
     "bench": "$npm_execpath bench/run.ts",
+    "bench:paint": "$npm_execpath bench/paint.ts",
     "bench:origins": "$npm_execpath bench/origins.ts",
     "bench:server": "$npm_execpath bench/server-cost.ts",
     "bench:sites": "$npm_execpath bench/sites/run.ts",

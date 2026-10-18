@@ -265,11 +265,11 @@ async function writeRouteStyles(client: ClientBuild, groups: StyleGroup[]): Prom
   const found: { group: StyleGroup, url: string, text: string, saved: number }[] = []
 
   for (const group of groups) {
-    // A head inlines little at no cost to the page, but more than this on every view weighs more than a copy a cache keeps.
-    if (group.size <= INLINE_LIMIT / 2)
+    // A head inlines up to the limit: a first view paints sooner with the rules in the page than waiting for a stylesheet (`bun run bench:paint`), which a copy's cache only repays on later views.
+    if (group.size <= INLINE_LIMIT)
       continue
 
-    for (const url of group.size > INLINE_LIMIT ? group.urls : group.rest) {
+    for (const url of group.urls) {
       let own = whole.get(url)
 
       if (own === undefined) {
@@ -321,7 +321,7 @@ async function writeRouteStyles(client: ClientBuild, groups: StyleGroup[]): Prom
 
 // The head of each chain whose full stylesheets are too heavy to inline: the rules for the classes its components name, written inline when they fit, then the full stylesheets linked without holding the first paint back.
 // A class no component names, or one built at runtime, has its rule in the linked stylesheet, which applies when it arrives, and at once without scripts. It follows the inline rules so it keeps the place it has in the whole stylesheet.
-// A route whose own rules weigh more than half the limit links a copy of each stylesheet without the rules of the classes its files leave out instead, when that saves enough.
+// A route whose own rules pass the limit links a copy of each stylesheet without the rules of the classes its files leave out instead, when that saves enough.
 async function pageStyles(client: ClientBuild, base: string, texts: Map<string, string>, chains: string[][], copies: boolean): Promise<Map<string, PageStyles>> {
   const { classes, entries } = client.styleUses!
   const found = new Map<string, PageStyles>()

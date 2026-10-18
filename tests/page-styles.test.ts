@@ -24,6 +24,8 @@ const bulk = (seed: number) => Array.from({ length: 1800 }, (_, index) => `bg-[#
 const BULK = bulk(0)
 // A second page with as many rules of its own, so each of the two leaves out the other's.
 const OTHER_BULK = bulk(5000)
+// Rules weighing between half the limit and the limit, which a head still inlines.
+const HALF = bulk(9000).split(' ').slice(0, 900).join(' ')
 const LISTENING = /port (\d+)/
 const STYLE = /<style>([\s\S]*?)<\/style>/g
 const ROUTE_COPY = /\/_kay\/[^/]+\.r-[a-z0-9]+\.css$/
@@ -41,6 +43,7 @@ async function copyOfFixture(): Promise<string> {
   const dir = resolve(await fixtureCopy('page-styles'))
 
   await Bun.write(join(dir, 'src/routes/bulk.kay'), `h1 Bulk\na.to-other(href="/other-bulk") other\np(class="${BULK}") bulk\n`)
+  await Bun.write(join(dir, 'src/routes/half.kay'), `h1 Half\np(class="${HALF}") half\n`)
   await Bun.write(join(dir, 'src/routes/other-bulk.kay'), `h1 Other\np(class="${OTHER_BULK}") other\n`)
   // A failure and a missing page have chains of their own, and a page rendering a collection's Markdown may name any class.
   await Bun.write(join(dir, 'src/routes/_404.kay'), 'h1 Gone\np.italic nothing here\n')
@@ -263,6 +266,18 @@ describe('a page\'s head', () => {
 
     expect(copy).toContain('@layer theme')
     expect(copy).toContain('@property')
+  })
+
+  it('inlines the rules of a route weighing between half the limit and the limit instead of linking a copy, which paints the first view sooner', async () => {
+    const half = await head(await serve(), '/half')
+    const size = Bun.gzipSync(half.styles).length
+
+    expect(size).toBeGreaterThan(INLINE_LIMIT / 2)
+    expect(size).toBeLessThanOrEqual(INLINE_LIMIT)
+    expect(half.blocking).toEqual([])
+    expect(half.rest).toHaveLength(1)
+    expect(half.rest[0]).not.toMatch(ROUTE_COPY)
+    expect(half.styles).toContain(escaped(firstOf(HALF)))
   })
 
   it('keeps the rules of a route copy in the order of the shared stylesheet', async () => {
