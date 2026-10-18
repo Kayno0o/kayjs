@@ -1,4 +1,6 @@
+import type { LocaleState } from '../src/runtime/locale-state'
 import { expect, it } from 'bun:test'
+import { runInLocale } from '../src/runtime/locale-state'
 import { Redirect, stoppers } from '../src/server/signals'
 
 const HOSTILE = [
@@ -35,7 +37,7 @@ it('refuses them from the stopper a guard, a page and an action share, for a rea
   for (const method of ['GET', 'POST']) {
     const { redirect } = stoppers(new Request('http://localhost/', { method }))
 
-    const target = '//evil.com'
+    const target = ['//evil.com'][0]!
 
     expect(() => redirect(target), method).toThrow('which a browser reads as another site')
   }
@@ -46,6 +48,20 @@ it('keeps the paths of the site, full URLs and a query holding slashes', () => {
     expect(() => new Redirect(location, 302), location).not.toThrow()
 })
 
-it('puts a path under a base as it is, since the base is added only to a path of the site', () => {
-  expect(new Redirect('/docs/about', 302).location).toBe('/docs/about')
+it('turns the //host a locale on its own host gives into a full URL, and only for the app\'s own hosts', () => {
+  const state = { settings: { locales: ['en', 'fr'], defaultLocale: 'en', prefixDefault: false, hosts: { en: 'example.com', fr: 'exemple.fr' } } } as unknown as LocaleState
+  const { redirect } = stoppers(new Request('https://example.com/pricing'))
+  const to = (location: string): string => {
+    try {
+      return runInLocale(state, () => redirect(location))
+    }
+    catch (error) {
+      return error instanceof Redirect ? error.location : String(error)
+    }
+  }
+
+  expect(to('//exemple.fr/tarifs')).toBe('https://exemple.fr/tarifs')
+  expect(to('//exemple.fr')).toBe('https://exemple.fr')
+  expect(to('//evil.example/x')).toContain('which a browser reads as another site')
+  expect(to('//exemple.fr.evil.example/x')).toContain('which a browser reads as another site')
 })
