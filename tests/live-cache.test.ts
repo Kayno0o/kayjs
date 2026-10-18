@@ -293,6 +293,8 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a cached
   const connections: string[] = []
   // The pages of `/` asked for, a refusal the connection meets while `refuse` holds, and a response of `/plain` held back until `gate` resolves.
   const loads: string[] = []
+  // The loads of a test's own tab, which carries a query of its own: a tab an earlier test closed may still answer the invalidation of this one with a load.
+  const ownLoads = (tag: string) => loads.filter(url => url.endsWith(`?${tag}`))
   const latestLoads: string[] = []
   let refuse = false
   let gate: Promise<void> | undefined
@@ -406,14 +408,11 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a cached
     connections.length = 0
     loads.length = 0
 
-    await using page = await site.open('/')
+    await using page = await site.open('/?backoff')
 
     // The page loaded, the connection refused, the page loaded again for a new proof, the connection refused again, then retried after a delay.
-    for (let waited = 0; connections.length < 3 && waited < 15_000; waited += 25)
-      await Bun.sleep(25)
-
-    expect(connections.length).toBeGreaterThanOrEqual(3)
-    expect(loads).toHaveLength(2)
+    await waitFor(() => connections.length >= 3 && ownLoads('backoff').length >= 2)
+    expect(ownLoads('backoff')).toHaveLength(2)
     refuse = false
     change(9)
     await page.waitUntil(...shows(9))
@@ -427,11 +426,11 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a cached
     loads.length = 0
     latestLoads.length = 0
 
-    await using page = await site.open('/')
+    await using page = await site.open('/?limit')
 
     // The refusal of the first connection loads the page for a new proof; the next one, within the limit, only backs off.
-    await waitFor(() => connections.length >= 2)
-    expect(loads).toHaveLength(2)
+    await waitFor(() => connections.length >= 2 && ownLoads('limit').length >= 2)
+    expect(ownLoads('limit')).toHaveLength(2)
     refuse = false
     // An accepted connection delivering an event ends the refusals.
     change(13)

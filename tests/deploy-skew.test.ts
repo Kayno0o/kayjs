@@ -159,6 +159,13 @@ function pageRequests(seen: string[]): string[] {
   return seen.filter(request => request === 'GET /')
 }
 
+// The refresh an action answer starts asks for the page after the probe, so the page requests are waited for to reach what a refresh makes, then held there for as long as a probe fetching the page would take to add one.
+async function settled(seen: string[], expected: number): Promise<void> {
+  await until(() => pageRequests(seen).length >= expected)
+  await Bun.sleep(300)
+  expect(pageRequests(seen)).toHaveLength(expected)
+}
+
 async function until(condition: () => boolean): Promise<void> {
   for (let tries = 0; tries < 100 && !condition(); tries++)
     await Bun.sleep(50)
@@ -238,7 +245,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a page tol
           expect(probes).toHaveLength(1)
           expect(probes[0]).toContain('/_kay/')
           // Only the requests the island's own refresh makes, which a probe fetching the page would add one to.
-          expect(pageRequests(forged.seen)).toHaveLength(refreshed)
+          await settled(forged.seen, refreshed)
 
           await page.click('a.second')
           await page.waitFor('h1', { text: 'Second' })
@@ -270,7 +277,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a page tol
           await page.click('button.bump')
 
           await until(() => forged.seen.some(request => request.startsWith('HEAD ')))
-          expect(pageRequests(forged.seen)).toHaveLength(refreshed)
+          await settled(forged.seen, refreshed)
           await page.click('a.second')
           await page.waitFor('h1', { text: 'Second' })
 
@@ -305,6 +312,35 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a page tol
       })
 
       expect(answers).toEqual([false, false, false, false, false])
+      expect(forged.seen.filter(request => request.startsWith('HEAD '))).toHaveLength(1)
+    }
+    finally {
+      await site.close()
+    }
+  }, 60_000)
+
+  it('asks the server once when an answer naming another build comes just before a chunk the deploy dropped', async () => {
+    const { forged, plugin } = forgedBuild()
+    const site = await testSite({ routes: 'tests/fixtures/navigation/src/routes', browser: { path }, use: [plugin] })
+
+    try {
+      const page = await opened(site)
+
+      // A document that a reload would resubmit is never reloaded, so the page stays for the count.
+      await page.evaluate(() => {
+        document.head.insertAdjacentHTML('beforeend', '<meta name="kay-posted">')
+      })
+      forged.build = 'otherbuild'
+      forged.seen.length = 0
+
+      await page.evaluate(async () => {
+        const entry = performance.getEntriesByType('resource').find(resource => resource.name.includes('/stale-'))!.name
+        const { noticed, reloadIfStale } = await import(entry) as { noticed: (response: Response) => Promise<boolean>, reloadIfStale: () => Promise<boolean> }
+
+        await noticed(new Response('x', { headers: { 'x-kay-build': 'otherbuild' } }))
+        await reloadIfStale()
+      })
+
       expect(forged.seen.filter(request => request.startsWith('HEAD '))).toHaveLength(1)
     }
     finally {

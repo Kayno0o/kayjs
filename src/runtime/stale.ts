@@ -59,9 +59,9 @@ async function served(): Promise<string | undefined> {
   return page.querySelector(BUILD_TAG)?.getAttribute('content') ?? undefined
 }
 
-// Asked once at a time, whoever needs it, and a build the server named is kept for a few seconds unless `fresh`, so a page of cached answers costs one request.
+// Asked once at a time, whoever needs it, and a build the server named is kept for a few seconds, so a page of cached answers costs one request. `fresh` asks again unless that build is another than the page's: a deploy that already happened is not undone by a later answer.
 async function current(fresh = false): Promise<string | undefined> {
-  if (!fresh && confirmed !== undefined && Date.now() - confirmed.at < CONFIRMED_MS)
+  if (confirmed !== undefined && Date.now() - confirmed.at < CONFIRMED_MS && (!fresh || !onPage(confirmed.build)))
     return confirmed.build
 
   asking ??= (async () => {
