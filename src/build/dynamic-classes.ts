@@ -2,7 +2,7 @@ import type { Expression, Node, ObjectExpression } from '@babel/types'
 import { existsSync, statSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { parseExpression } from '@babel/parser'
-import { readSource } from './files'
+import { readSource, SCRIPT_FILE } from './files'
 
 // A place where a source sets a class from a value the build cannot read: no page carries the rule of a class it ends up naming, unless the app lists it with `@source inline`.
 export interface RuntimeClass {
@@ -142,7 +142,6 @@ interface Reads {
   scopes: Map<string, Scope>
 }
 
-const SCRIPT_MODULE = /\.[cm]?[jt]sx?$/
 const EXTENSION = /\.\w+$/
 const ASYNC_BEFORE = /\basync\s*$/
 const TRAILING_DOT = /\??\.$/
@@ -212,9 +211,9 @@ function joined(argument: Expression, scope: Scope, depth: number): Verdict {
   }))
 }
 
-// Where a name is declared: in this scope, else in the module it is imported from.
+// Where a name is declared: the module it is imported from, else this scope.
 function lookup(name: string, scope: Scope): { scope: Scope, name: string } | undefined {
-  return scope.initializers(name) !== undefined || scope.functions(name) !== undefined ? { scope, name } : scope.imported(name)
+  return scope.imported(name) ?? (scope.initializers(name) !== undefined || scope.functions(name) !== undefined ? { scope, name } : undefined)
 }
 
 const FUNCTION_TYPES = new Set(['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression', 'ObjectMethod', 'ClassMethod', 'ClassPrivateMethod', 'ClassDeclaration', 'ClassExpression'])
@@ -263,9 +262,39 @@ function returnsOf(fn: FunctionNode): Expression[] | undefined {
 function callVerdict(fns: FunctionNode[], scope: Scope, depth: number): Verdict {
   return merged(fns.map((fn) => {
     const returns = returnsOf(fn)
+    const params = new Set<string>()
 
-    return returns === undefined ? OPEN : merged(returns.map(value => verdictOf(value, scope, depth + 1)))
+    for (const param of fn.params)
+      parameterNames(param, params)
+
+    // A parameter is the caller's to give, whatever a prop of the same name is.
+    const inner: Scope = { ...scope, props: new Set([...scope.props].filter(name => !params.has(name))) }
+
+    return returns === undefined ? OPEN : merged(returns.map(value => verdictOf(value, inner, depth + 1)))
   }))
+}
+
+// The names a parameter binds, destructuring and defaults included.
+function parameterNames(node: Node, into: Set<string>): void {
+  if (node.type === 'Identifier') {
+    into.add(node.name)
+  }
+  else if (node.type === 'AssignmentPattern') {
+    parameterNames(node.left, into)
+  }
+  else if (node.type === 'RestElement') {
+    parameterNames(node.argument, into)
+  }
+  else if (node.type === 'ObjectPattern') {
+    for (const property of node.properties) {
+      parameterNames(property.type === 'RestElement' ? property : property.value, into)
+    }
+  }
+  else if (node.type === 'ArrayPattern') {
+    for (const element of node.elements) {
+      element && parameterNames(element, into)
+    }
+  }
 }
 
 // What an expression is made of: string literals and the quasis of a template are its parts, a ternary, a logical, a concatenation or an array is all of its branches, a prop is its parent's to name, a `const` is what it was given, and anything else is open.
@@ -318,9 +347,9 @@ function verdictOf(node: Expression, scope: Scope, depth = 0): Verdict {
         return merged(objects.map(object => valuesOf(object, found.scope, depth + 1)))
     }
 
-    const initial = node.type === 'Identifier' ? found?.scope.initializers(found.name) : undefined
+    const initial = node.type === 'Identifier' && found !== undefined ? found.scope.initializers(found.name) : undefined
 
-    return initial === undefined ? OPEN : merged(initial.map(value => verdictOf(value, found!.scope, depth + 1)))
+    return found === undefined || initial === undefined ? OPEN : merged(initial.map(value => verdictOf(value, found.scope, depth + 1)))
   }
 
   if (node.type === 'CallExpression') {
@@ -467,7 +496,7 @@ function importedFrom(text: string, file: string, name: string, reads: Reads): {
     return undefined
 
   for (const [, names, , specifier] of text.matchAll(IMPORT)) {
-    if (!specifier!.startsWith('.') || (EXTENSION.test(specifier!) && !SCRIPT_MODULE.test(specifier!)))
+    if (!specifier!.startsWith('.') || (EXTENSION.test(specifier!) && !SCRIPT_FILE.test(specifier!)))
       continue
 
     for (const entry of names!.split(',')) {

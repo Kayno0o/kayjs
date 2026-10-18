@@ -219,7 +219,7 @@ describe('which classes are set from a value the build cannot read', () => {
   it('still warns of an imported record holding something open, or a module it cannot read', async () => {
     const page = '---\nimport { BG } from \'./data\'\n---\np(class={BG[info.swatch]}) a\n'
 
-    expect(await unresolvedIn({ 'page.kay': page, 'data.ts': 'export const BG = { a: \'mt-1\', b: pick() }\n' })).toEqual(['page.kay:4 class attribute mt-1'])
+    expect(await unresolvedIn({ 'page.kay': page, 'data.ts': 'export const BG = { a: \'mt-1\', b: pick() }\n' })).toEqual(['page.kay:4 class attribute mt-1${}mt-1${}mt-1'])
     expect(await unresolvedIn({ 'page.kay': page, 'data.ts': 'export let BG = { a: \'mt-1\' }\nBG.b = read()\n' })).toEqual(['page.kay:4 class attribute '])
     expect(await unresolvedIn({ 'page.kay': page })).toEqual(['page.kay:4 class attribute '])
     expect(await unresolvedIn({ 'page.kay': page.replace('./data', 'some-package'), 'data.ts': 'export const BG = { a: \'mt-1\' }\n' })).toEqual(['page.kay:4 class attribute '])
@@ -247,6 +247,22 @@ describe('which classes are set from a value the build cannot read', () => {
     expect(await unresolved(island('  return `tone-${i}`'), '', 'page.kay')).toEqual(['5 class attribute tone-${}'])
     expect(await unresolved('function position() {\n  return position()\n}\nel.className = position()\n')).toEqual(['4 className = '])
     expect(await unresolved('el.className = position(i)\n')).toEqual(['1 className = '])
+  })
+
+  it('judges a parameter by its caller even when a prop has its name, and the import before an unrelated local name', async () => {
+    const props = 'const { tone } = props<{ tone: string }>()\n'
+
+    expect(await unresolved(`${props}function f(tone: string) {\n  return tone\n}\n---\np(class={f(x)}) a\n`, '', 'page.kay')).toEqual(['6 class attribute '])
+    expect(await unresolved(`${props}const f = ({ tone }: Tone) => tone\n---\np(class={f(x)}) a\n`, '', 'page.kay')).toEqual(['4 class attribute '])
+    expect(await unresolvedIn({ 'page.kay': '---\nimport { BG } from \'./d\'\nfunction other() {\n  const BG = { a: \'mt-1\' }\n}\n---\np(class={BG[k]}) a\n', 'd.ts': 'export const BG = { a: dyn() }\n' })).toEqual(['page.kay:7 class attribute '])
+  })
+
+  it('leaves an async function, a generator, a namespace or default import, a method and an import cycle open', async () => {
+    expect(await unresolved('async function f() {\n  return \'mt-1\'\n}\n---\np(class={f()}) a\n', '', 'page.kay')).toEqual(['5 class attribute '])
+    expect(await unresolved('function* f() {\n  return \'mt-1\'\n}\n---\np(class={f()}) a\n', '', 'page.kay')).toEqual(['5 class attribute '])
+    expect(await unresolvedIn({ 'page.kay': 'import * as d from \'./d\'\nimport BG from \'./d\'\n---\np(class={d.BG[k]}) a\np(class={BG[k]}) b\n', 'd.ts': 'export const BG = { a: \'mt-1\' }\nexport default BG\n' })).toEqual(['page.kay:4 class attribute ', 'page.kay:5 class attribute '])
+    expect(await unresolvedIn({ 'page.kay': '---\nimport { A } from \'./a\'\n---\np(class={A[k]}) a\n', 'a.ts': 'import { B } from \'./b\'\nexport const A = { x: B.y }\n', 'b.ts': 'import { A } from \'./a\'\nexport const B = { y: A.x }\n' })).toEqual(['page.kay:4 class attribute '])
+    expect(await unresolvedIn({ 'page.kay': '---\nimport { f } from \'./d\'\n---\np(class={f(1)}) a\n', 'd.ts': 'export function f(i: number) {\n  return i ? f(i - 1) : \'mt-1\'\n}\n' })).toEqual(['page.kay:4 class attribute mt-1${}mt-1${}mt-1'])
   })
 
   it('keeps the rules of the classes read from a record of a module the page imports, the server\'s included', async () => {
