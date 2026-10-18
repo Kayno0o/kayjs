@@ -1,7 +1,7 @@
 import type { Subprocess } from 'bun'
 import { join } from 'node:path'
 import process from 'node:process'
-import { ANSWER, ENTRY } from './refuse'
+import { ANSWER, ENTRY, WRITE } from './refuse'
 
 const TYPES = join(import.meta.dir, 'types.ts')
 // How long the process writing the types waits for the next edit before it exits, so a project left alone holds no memory for it.
@@ -20,14 +20,14 @@ export class TypesProcess {
 
   // Writes the tree and answers the exit code of the write. `fresh` boots a new process first, as the config or a module it imports may have changed.
   // A kept process that went since the last write is replaced and the write sent again, so no write is lost.
-  async write(fresh: boolean, refuse: string): Promise<number> {
+  async write(fresh: boolean, refuse: string, command = WRITE): Promise<number> {
     clearTimeout(this.idle)
 
     if (fresh)
       this.kill()
 
     const kept = this.child !== undefined
-    const answer = await this.ask(refuse)
+    const answer = await this.ask(refuse, command)
 
     if (answer !== undefined) {
       this.idle = setTimeout(() => this.kill(), IDLE_MS)
@@ -36,7 +36,7 @@ export class TypesProcess {
       return answer
     }
 
-    return kept && !this.closed ? this.write(true, refuse) : 1
+    return kept && !this.closed ? this.write(true, refuse, command) : 1
   }
 
   // Ends it for good: a write waiting on it answers at once, and none starts another.
@@ -52,14 +52,14 @@ export class TypesProcess {
   }
 
   // The exit code the process answered, or undefined once it went before it did.
-  private async ask(refuse: string): Promise<number | undefined> {
+  private async ask(refuse: string, command: string): Promise<number | undefined> {
     if (this.closed)
       return undefined
 
     const child = this.child ?? this.spawn(refuse)
 
     try {
-      await child.stdin.write('write\n')
+      await child.stdin.write(`${command}\n`)
       await child.stdin.flush()
 
       for (;;) {

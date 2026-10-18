@@ -478,7 +478,7 @@ describe.concurrent('kay dev', () => {
     const stop = await dev(root)
 
     try {
-      await until(() => readShadowSettings(root).lints?.['unread-name'] === 'allow')
+      await until(() => readShadowSettings(root).lints?.['unread-name'] === 'allow', 20_000)
       await Bun.write(lints, 'export const lints = { \'unread-name\': \'deny\' } as const\n')
       await until(() => readShadowSettings(root).lints?.['unread-name'] === 'deny')
     }
@@ -623,13 +623,36 @@ describe.concurrent('kay dev', () => {
     const stop = await dev(root)
 
     try {
-      expect(await Bun.file(join(root, '.kay/types/src/routes/index.kay.tsx')).exists()).toBe(true)
+      // The tree is written once the first server listens, or after a wait for one that does not.
+      await until(() => existsSync(join(root, '.kay/types/src/routes/index.kay.tsx')), 20_000)
     }
     finally {
       await stop()
       await rm(root, { recursive: true, force: true })
     }
-  })
+  }, 30_000)
+
+  it('serves the first page before the tree is written, then writes it once the server listens', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
+    const shadow = join(root, '.kay/types/kay-shadow.json')
+    const seen: { event: string, written: boolean }[] = []
+
+    await Bun.write(join(root, 'src/server.ts'), 'Bun.serve({ port: 0, fetch: () => new Response() })\n')
+    await Bun.write(join(root, 'src/routes/index.kay'), 'p Home\n')
+    await Bun.write(join(root, 'kay.config.ts'), 'export default {}\n')
+
+    const stop = await dev(root, { refuseConfig: true, format: 'json', log: line => void seen.push({ event: (JSON.parse(line) as { event: string }).event, written: existsSync(shadow) }), onRestart: () => void seen.push({ event: 'spawned', written: existsSync(shadow) }) })
+
+    try {
+      await until(() => seen.some(entry => entry.event === 'ready'), 20_000)
+      expect(seen.filter(entry => entry.event === 'ready' || entry.event === 'spawned').map(entry => entry.written)).toEqual([false, false])
+      await until(() => existsSync(shadow), 20_000)
+    }
+    finally {
+      await stop()
+      await rm(root, { recursive: true, force: true })
+    }
+  }, 40_000)
 
   it('loads the .kay modules and globs the entry imports before it calls pages()', async () => {
     const base = join(import.meta.dir, '../node_modules/.cache')

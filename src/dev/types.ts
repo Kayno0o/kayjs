@@ -3,10 +3,10 @@ import process from 'node:process'
 import { configCheckOptions, writeShadowTypes } from '../check'
 import { loadConfig } from '../config'
 import { projectPaths } from '../project'
-import { ANSWER, CONFIG_REFUSED, ENTRY, REFUSE } from './refuse'
+import { ANSWER, CONFIG_REFUSED, ENTRY, LOAD, REFUSE } from './refuse'
 
 // Writes the shadow tree of the project for `kay dev` from the config as it is now, in a process of its own so `kay dev` holds no checker and every module the config imports is read again.
-// It stays up between writes: each line `kay dev` sends writes the tree once more with the config this process loaded, and the line it answers with is the exit code that write would have had.
+// It stays up between writes: each line `kay dev` sends but `load` writes the tree once more with the config this process loaded, and the line it answers with is the exit code that write would have had.
 const [root, entry, refuse] = process.argv.slice(2)
 let loaded: KayConfig | undefined
 
@@ -26,6 +26,16 @@ async function currentConfig(): Promise<{ config: KayConfig, refused: boolean }>
 
     return { config: {}, refused: refuse === REFUSE }
   }
+}
+
+// Reads the config alone, which is all the first server waits for.
+async function load(): Promise<number> {
+  const { config, refused } = await currentConfig()
+
+  if (!refused)
+    process.stdout.write(`\n${ENTRY}${projectPaths(root!, { ...config, entry: entry === '' ? config.entry : entry }).entry}\n`)
+
+  return refused ? CONFIG_REFUSED : 0
 }
 
 async function write(): Promise<number> {
@@ -50,5 +60,5 @@ async function write(): Promise<number> {
 
 for await (const line of console) {
   if (line !== '')
-    process.stdout.write(`\n${ANSWER}${await write()}\n`)
+    process.stdout.write(`\n${ANSWER}${await (line === LOAD ? load() : write())}\n`)
 }

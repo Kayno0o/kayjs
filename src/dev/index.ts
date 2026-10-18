@@ -14,7 +14,7 @@ import { projectPaths, savedPublicDir } from '../project'
 import { removeDevAddress, writeDevAddress } from './address'
 import { startClientBuilder } from './client'
 import { inspectorProxy } from './inspector'
-import { CONFIG_REFUSED, REFUSE } from './refuse'
+import { CONFIG_REFUSED, LOAD, REFUSE } from './refuse'
 import { environmentWithoutDotenv, PAGES_ENTRY, stylesOnly, watchProject } from './sources'
 import { TypesProcess } from './types-process'
 
@@ -62,6 +62,8 @@ const MAX_RELOADS = 200
 const TYPES_GRACE_MS = 2000
 // How long a restart for an edited config waits for the types to say its entry, a config that does not load being none to wait for.
 const ENTRY_WAIT_MS = 3000
+// How long the first tree waits for the first server to listen before it is written anyway, as for a server that never does.
+const FIRST_TREE_WAIT_MS = 3000
 
 // The root files Bun reads as a process starts.
 const STARTUP_FILE = /^(?:\.env.*|package\.json|bunfig\.toml|tsconfig\.json)$/
@@ -129,6 +131,9 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   const typesProcess = new TypesProcess(root, options.entry)
   let typesFresh = true
   let startedTypes = false
+  // Writes the first tree, which waits for the first server to listen so the page comes first; the editors need it, the page does not.
+  let writeFirstTree: (() => void) | undefined
+  let treeTimer: Timer | undefined
   // The shadow tree and the declarations read the project's sources, config and the names of its public files, so an edit of the contents of a stylesheet, a markdown entry or a media file leaves them as they are.
   const typesRead = (files: string[]) => {
     if (files.length === 0 || files.some(file => !TYPE_FREE.test(file)))
@@ -250,6 +255,8 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     pagePort = port
 
     if (address === undefined) {
+      writeFirstTree?.()
+
       const network = ANY_ADDRESS.test(message.listening) ? networkAddress() : undefined
       const reached = network === undefined ? undefined : url.replace('//localhost', `//${network}`)
 
@@ -289,6 +296,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     await verified.promise
 
     if (server === child && !stopping && !STOP_SIGNALS.has(server.signalCode)) {
+      writeFirstTree?.()
       reloadAnswer?.('exited')
       say('exit', { code }, `${stamp()} the server exited with code ${code}, waiting for a change`)
     }
@@ -724,6 +732,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     }
 
     clearTimeout(timer)
+    clearTimeout(treeTimer)
     stopWatching()
     removeDevAddress(root)
     await restarting
@@ -771,8 +780,27 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   else
     start()
 
+  // Given no config, the process writing the types reads it first, which is all the first server waits for.
+  const deferred = options.config === undefined
+
   try {
-    await writeTypes()
+    if (deferred) {
+      configRefused = await typesProcess.write(false, options.refuseConfig === true ? REFUSE : '', LOAD) === CONFIG_REFUSED
+      typesFresh = false
+      startedTypes = true
+      writeFirstTree = () => {
+        writeFirstTree = undefined
+        clearTimeout(treeTimer)
+
+        if (!stopping)
+          void writeTypes()
+      }
+      treeTimer = setTimeout(() => writeFirstTree?.(), FIRST_TREE_WAIT_MS)
+      treeTimer.unref()
+    }
+    else {
+      await writeTypes()
+    }
   }
   finally {
     typesSettled = true
