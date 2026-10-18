@@ -18,6 +18,7 @@ async function setup(options: { store?: AuthStore, onDelete?: (user: User) => vo
   const app = testApp({
     store,
     guests: { maxAge: '1d' },
+    organizations: { roles: { owner: [], member: [] }, owner: 'owner' },
     onDelete: async (user) => {
       deleted.push(user.id)
       await options.onDelete?.(user)
@@ -52,6 +53,20 @@ describe('pruning guests', () => {
     expect(await store.users.get('young')).toBeDefined()
     // Signed in still, though older than maxAge.
     expect(await store.users.get(live.user.id)).toBeDefined()
+  })
+
+  test('a stale guest who solely owned an organization with a member hands it to that member', async () => {
+    const { store, start, prune } = await setup()
+
+    await store.users.create(userRecord({ id: 'stale', guest: true, createdAt: new Date(start - 1000) }))
+    await store.users.create(userRecord({ id: 'grace', email: 'grace@example.com', createdAt: new Date(start - 1000) }))
+    await store.organizations!.create({ id: 'org', name: 'Acme', slug: 'acme', createdAt: new Date(start) })
+    await store.members!.add({ organizationId: 'org', userId: 'stale', roles: ['owner'], createdAt: new Date(start - 2000) })
+    await store.members!.add({ organizationId: 'org', userId: 'grace', roles: ['member'], createdAt: new Date(start - 1000) })
+    await prune(MAX_AGE_MS + PRUNE_EVERY_MS)
+
+    expect(await store.users.get('stale')).toBeUndefined()
+    expect((await store.members!.listByOrganization('org')).map(member => [member.userId, member.roles])).toEqual([['grace', ['member', 'owner']]])
   })
 
   test('a guest exactly maxAge old stays, one a millisecond older goes', async () => {

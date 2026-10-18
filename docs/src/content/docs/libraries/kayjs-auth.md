@@ -407,7 +407,9 @@ createAuth({
 
 Whoever creates an organization holds `owner`. The last owner cannot leave, lose the role or delete their account: `deleteAccount` and the admin's `deleteUser` answer `last-owner` until another member is made an owner.
 
-An owner who is the only member deletes the organization along with the account. `deletionImpact()` lists both kinds of organization by name, and the account page shows them before the user confirms. `manage` is the role that renames, invites and removes members. It is `owner` by default.
+An owner who is the only member deletes the organization along with the account. `deletionImpact()` lists both kinds of organization by name, and the account page shows them before the user confirms.
+
+A guest or an unverified account that is dropped without anyone asking passes an organization it solely owned to its longest-standing member. `manage` is the role that renames, invites and removes members. It is `owner` by default.
 
 ```ts
 const made = await auth.createOrganization({ name: 'Acme' })
