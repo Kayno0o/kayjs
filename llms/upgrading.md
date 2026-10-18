@@ -2,6 +2,12 @@
 
 What each minor release breaks, and what an app changes to move to it. kay and its libraries share one version, so one section covers them all; a patch breaks nothing, and a minor missing here broke nothing.
 
+## 1.55.0
+
+### Deleting an account can answer `last-owner`
+
+- kayjs-auth's `deleteAccount` and `deleteUser` (`DeleteResult`) now answer `{ ok: false, error: 'last-owner' }` for the only owner of an organization with other members. An app that maps their errors exhaustively adds a case for it; the built-in pages already do. No lint can see it, as the result is a runtime value.
+
 ## 1.54.0
 
 ### A class kay cannot see has no rule
