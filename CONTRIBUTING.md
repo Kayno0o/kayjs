@@ -54,7 +54,7 @@ A change under `packages/<name>` also runs `bun run check` and `bun run test` in
 
 A test that writes into a fixture works on `fixtureCopy()` from `tests/scratch.ts`, so it never changes the checkout.
 
-`bun run docs:build` builds the documentation site into `docs/dist`.
+`bun run docs:build` builds the documentation site into `docs/.kay`, and `bun run docs:start` serves it.
 
 ## What a change includes
 

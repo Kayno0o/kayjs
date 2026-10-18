@@ -68,11 +68,18 @@ interface Section {
   page: ChatPage
   heading: string | undefined
   text: string
+  title: Set<string>
+  headingWords: Set<string>
+  // Each word of the text with how many times it comes.
+  body: Map<string, number>
 }
 
+const words = (text: string) => text.toLowerCase().match(WORD) ?? []
+
 function sectionsOf(page: ChatPage): Section[] {
-  const sections: Section[] = []
-  let current: Section = { page, heading: undefined, text: '' }
+  const title = new Set(words(page.title))
+  const raw: { heading: string | undefined, text: string }[] = []
+  let current: { heading: string | undefined, text: string } = { heading: undefined, text: '' }
   let fenced = false
 
   for (const line of page.text.split('\n')) {
@@ -87,22 +94,44 @@ function sectionsOf(page: ChatPage): Section[] {
       continue
     }
 
-    sections.push(current)
-    current = { page, heading: heading[1]!, text: '' }
+    raw.push(current)
+    current = { heading: heading[1]!, text: '' }
   }
 
-  sections.push(current)
+  raw.push(current)
 
-  return sections
+  return raw.map(({ heading, text }) => {
+    const body = new Map<string, number>()
+
+    for (const word of words(text))
+      body.set(word, (body.get(word) ?? 0) + 1)
+
+    return { page, heading, text, title, headingWords: new Set(words(heading ?? '')), body }
+  })
 }
-
-const words = (text: string) => text.toLowerCase().match(WORD) ?? []
 
 function snippetOf(text: string, query: string[]): string {
   const flat = text.replace(SPACES, ' ').trim()
-  const at = Math.max(0, query.map(word => flat.toLowerCase().indexOf(word)).filter(index => index >= 0).sort((a, b) => a - b)[0] ?? 0)
+  const lower = flat.toLowerCase()
+  const at = Math.max(0, query.map(word => lower.indexOf(word)).filter(index => index >= 0).sort((a, b) => a - b)[0] ?? 0)
 
   return flat.slice(Math.max(0, at - 40), Math.max(0, at - 40) + SNIPPET)
+}
+
+let indexed: Promise<Section[]> | undefined
+
+// The sections of every page with their words counted, once: a search is a public call and only scores them.
+async function sections(): Promise<Section[]> {
+  indexed ??= (async () => (await chatPages()).flatMap(sectionsOf))()
+
+  try {
+    return await indexed
+  }
+  catch (error) {
+    indexed = undefined
+
+    throw error
+  }
 }
 
 // The sections of the pages ranked by the words of the query they hold, a word of a title or heading counting most. The site's own search index is read in the browser, so the server ranks the Markdown itself.
@@ -114,34 +143,58 @@ export async function searchPages(query: string): Promise<Hit[]> {
 
   const scored: { score: number, hit: Hit }[] = []
 
-  for (const page of await chatPages()) {
-    for (const section of sectionsOf(page)) {
-      const title = new Set(words(page.title))
-      const heading = new Set(words(section.heading ?? ''))
-      const body = words(section.text)
-      let score = 0
-      let matched = 0
+  for (const section of await sections()) {
+    let score = 0
+    let matched = 0
 
-      for (const word of wanted) {
-        const inBody = body.filter(one => one === word || one.startsWith(word)).length
-        const own = (title.has(word) ? 6 : 0) + (heading.has(word) ? 4 : 0) + Math.min(inBody, 5)
+    for (const word of wanted) {
+      let inBody = section.body.get(word) ?? 0
 
-        if (own > 0)
-          matched++
-
-        score += own
+      for (const [one, count] of section.body) {
+        if (one !== word && one.startsWith(word))
+          inBody += count
       }
 
-      if (matched === 0)
-        continue
+      const own = (section.title.has(word) ? 6 : 0) + (section.headingWords.has(word) ? 4 : 0) + Math.min(inBody, 5)
 
-      // A section holding every word beats one holding a few of them many times.
-      score *= matched / wanted.length
-      scored.push({ score, hit: { href: page.href, page: page.title, heading: section.heading, snippet: snippetOf(section.text === '' ? page.description : section.text, wanted) } })
+      if (own > 0)
+        matched++
+
+      score += own
     }
+
+    if (matched === 0)
+      continue
+
+    // A section holding every word beats one holding a few of them many times.
+    score *= matched / wanted.length
+    scored.push({ score, hit: { href: section.page.href, page: section.page.title, heading: section.heading, snippet: snippetOf(section.text === '' ? section.page.description : section.text, wanted) } })
   }
 
   return scored.sort((a, b) => b.score - a.score).slice(0, MAX_HITS).map(one => one.hit)
+}
+
+// What one tool result holds, under the 20,000 characters the loop keeps of a result once escaped.
+const PART_SIZE = 14_000
+
+// The part `part` of a page's text (1 for the first) cut at line ends, and how many parts the page has.
+export function partOfPage(text: string, part = 1): { text: string, parts: number } {
+  const parts: string[] = []
+  let current = ''
+
+  for (const line of text.split('\n')) {
+    if (current !== '' && current.length + line.length >= PART_SIZE) {
+      parts.push(current)
+      current = ''
+    }
+
+    // A line longer than a part is cut, as the loop would.
+    current += `${line.slice(0, PART_SIZE)}\n`
+  }
+
+  parts.push(current)
+
+  return { text: parts[part - 1] ?? '', parts: parts.length }
 }
 
 // The page at `href`, as the chat reads it; undefined for a path that is no page.

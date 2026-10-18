@@ -4,7 +4,7 @@
 
 A Bun web framework. A `.kay` file is one component: TypeScript fences, then a pug-like indented template. Pages render to plain HTML strings on the server, islands run on kay's own signals and DOM runtime, and an Elysia plugin serves it all, with typed form actions and type checking down to the `.kay` line.
 
-The full reference, written for people and coding agents alike, starts at [llms.txt](llms.txt): the rules most often got wrong, then one line per topic linking its doc in [llms/](llms). The site at [kayjs.kaynooo.fr](https://kayjs.kaynooo.fr) is the documentation written for people, short pages each opening on an example, with this reference beside it under `/llms`; it is built with kay itself by `bun run docs:build` into `docs/dist`, its pages in `docs/src/content`; the tutorial's app is [examples/reading-list](examples/reading-list), and [examples/noticeboard](examples/noticeboard) runs kay with kayjs-auth, kayjs-mail, kayjs-ui and Postgres together.
+The full reference, written for people and coding agents alike, starts at [llms.txt](llms.txt): the rules most often got wrong, then one line per topic linking its doc in [llms/](llms). The site at [kayjs.kaynooo.fr](https://kayjs.kaynooo.fr) is the documentation written for people, short pages each opening on an example, with this reference beside it under `/llms`; it is built with kay itself by `bun run docs:build`, served by `bun run docs:start`, its pages in `docs/src/content`; the tutorial's app is [examples/reading-list](examples/reading-list), and [examples/noticeboard](examples/noticeboard) runs kay with kayjs-auth, kayjs-mail, kayjs-ui and Postgres together.
 
 ## Start a project
 

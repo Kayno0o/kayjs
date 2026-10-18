@@ -5,6 +5,7 @@ import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { chromium } from 'playwright-core'
 import { browse, browserPath } from '../src/test'
+import { takeDocsBuild } from './docs-build'
 
 const CLI = resolve('src/cli.ts')
 // Home, a guide, a UI component's page with its demos, a Structure page and the chat: each layout the docs have.
@@ -26,10 +27,13 @@ async function reachable(url: string): Promise<boolean> {
 let server: Bun.Subprocess
 let origin: string
 let page: TestPage
+let release: (() => Promise<void>) | undefined
 
 // The contrast tests in docs.test.ts read the palettes' values, so this one reads the colours the built pages render, served by `kay start` as the docs are, whatever the build made of them.
 describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the docs as built', () => {
   beforeAll(async () => {
+    release = await takeDocsBuild()
+
     const child = Bun.spawn([process.execPath, CLI, 'build', 'docs', '--no-check'], { stdout: 'ignore', stderr: 'pipe' })
     const [errors, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
 
@@ -46,14 +50,18 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the docs a
     for (let tries = 0; tries < 100 && !await reachable(origin); tries++)
       await Bun.sleep(100)
 
+    if (!await reachable(origin))
+      throw new Error('kay start did not serve the docs')
+
     // Wide enough for the sidebar and the table of contents to show.
     page = await browse(origin, { path, width: 1440, height: 900 })
-  }, 120_000)
+  }, 300_000)
 
   afterAll(async () => {
     page?.close()
     server?.kill()
     await server?.exited
+    await release?.()
   })
 
   for (const scheme of SCHEMES) {

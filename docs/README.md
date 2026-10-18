@@ -9,7 +9,7 @@ bun run docs:build   # kay build docs
 bun run docs:start   # kay start docs --port 3000
 ```
 
-`bun run docs:export` writes the old static copy to `docs/dist`, which the chat page cannot be part of: an action needs a server.
+The docs can no longer be exported as static files: the chat page exports an action, which only a server can take.
 
 ## The chat
 

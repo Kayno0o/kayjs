@@ -1,6 +1,7 @@
 import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { beforeAll, describe, expect, it } from 'bun:test'
+import { takeDocsBuild } from './docs-build'
 
 const CLI = resolve('src/cli.ts')
 const CHUNK_NAME = /[\w-]+\.js/g
@@ -38,6 +39,17 @@ function chunksOf(html: string): string[] {
 // The converter of `kay fmt --from-html` is a chunk only the box on the converter page fetches, so the build is read for who can reach it.
 describe('the docs converter chunk', () => {
   beforeAll(async () => {
+    const release = await takeDocsBuild()
+
+    try {
+      await read()
+    }
+    finally {
+      await release()
+    }
+  }, 300_000)
+
+  async function read() {
     const child = Bun.spawn([process.execPath, CLI, 'build', 'docs', '--no-check'], { stdout: 'ignore', stderr: 'pipe' })
     const [errors, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
 
@@ -49,7 +61,7 @@ describe('the docs converter chunk', () => {
 
     for await (const file of new Bun.Glob('**/*.html').scan(join(CLIENT, 'pages')))
       pages.set(file, await Bun.file(join(CLIENT, 'pages', file)).text())
-  }, 180_000)
+  }
 
   it('is fetched by the converter box alone and reached by no other page', () => {
     // The build also carries the chunks kept from earlier builds, which no page of this one links.

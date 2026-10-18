@@ -1,12 +1,14 @@
 --- server
 import { ask } from '@kaynooo/kayjs-ai'
 import { s } from 'kay'
-import { readPage, searchPages, systemPrompt } from '../../chat-corpus'
+import { logFrom } from 'kay'
+import { partOfPage, readPage, searchPages, systemPrompt } from '../../chat-corpus'
 
 export const page = { prerender: true, search: { weight: 0.5 } }
 
 // The tools' own limits sit well above what one question needs, so the chat's `ai({ limit })` is what a visitor meets first.
-const TOOL_LIMIT = { max: 60, window: '1m' } as const
+const TOOL_LIMIT = { max: 20, window: '1m' } as const
+const log = logFrom('docs-chat')
 
 export const searchDocs = action(
   s.Object({ query: s.String({ minLength: 2, maxLength: 200 }) }),
@@ -15,16 +17,18 @@ export const searchDocs = action(
 )
 
 export const readDocsPage = action(
-  s.Object({ path: s.String({ minLength: 1, maxLength: 200 }) }),
-  async ({ path }, ctx) => {
+  s.Object({ path: s.String({ minLength: 1, maxLength: 200 }), part: s.Optional(s.Integer({ minimum: 1, maximum: 50 })) }),
+  async ({ path, part }, ctx) => {
     const found = await readPage(path)
 
     if (found === undefined)
       return ctx.fail(404, `There is no page at ${path.slice(0, 80)}; use a path from the list or from search_docs`)
 
-    return { path: found.href, title: found.title, text: found.text }
+    const { text, parts } = partOfPage(found.text, part)
+
+    return { path: found.href, title: found.title, part: part ?? 1, parts, text }
   },
-  { tool: { name: 'read_page', description: 'Reads one documentation page in full, given its path such as /essentials/islands or /llms/actions' }, rateLimit: TOOL_LIMIT },
+  { tool: { name: 'read_page', description: 'Reads one documentation page in full, given its path such as /essentials/islands or /llms/actions. A long page comes in parts: the result says how many there are, and part picks the next one' }, rateLimit: TOOL_LIMIT },
 )
 
 const Messages = s.Object({
@@ -35,10 +39,13 @@ export const reply = action(
   Messages,
   async ({ messages }, ctx) => {
     try {
-      return ask(messages, { system: await systemPrompt(), tools: [searchDocs, readDocsPage], maxSteps: 5, maxTokens: 1500, temperature: 0.2 }).progress()
+      return ask(messages, { system: await systemPrompt(), tools: [searchDocs, readDocsPage], maxSteps: 4, maxTokens: 1500, temperature: 0.2 }).progress()
     }
-    catch {
-      return ctx.fail(503, 'The chat is not available on this site right now. Search the docs with Ctrl K instead.')
+    catch (error) {
+      log.error('the chat could not start an ask', error)
+
+      // Below 500, as the chat shows the message of a refusal under that and a generic one past it.
+      return ctx.fail(400, 'The chat is not available on this site right now. Search the docs with Ctrl K instead.')
     }
   },
   { rateLimit: { max: 8, window: '1m' } },
@@ -54,5 +61,5 @@ head
     h1 Ask the docs
     p.lede Ask how to do something with kay. The answer is written from the docs and links the pages it rests on.
   article.prose
-    Chat(action={reply} label="Ask the docs" placeholder="How do I...")
+    Chat(action={reply} label="Ask the docs" placeholder="How do I..." toolDetails={false})
     p.chat-note An AI model writes the answers from these docs, and it can be wrong. Check the pages it links before you rely on one. #[a(href="/guides/ask-the-docs") How the chat works].

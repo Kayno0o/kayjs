@@ -1,4 +1,4 @@
-// First paint of a route's stylesheet copy against its inline rules, `bun run bench:paint` after `bun run docs:export`: it drives Chromium (BUN_CHROME_PATH) over throttled networks and prints a table.
+// First paint of a route's stylesheet copy against its inline rules, `bun run bench:paint` after `bun run docs:build`: it drives Chromium (BUN_CHROME_PATH) over throttled networks and prints a table.
 // The docs' guide pages sit in the band where #988 links a copy; the inline form is made from the same page: the copy's rules in a `<style>`, the shared stylesheet linked as rest, as `pageStyles` writes it.
 import type { Browser, CDPSession } from 'playwright-core'
 import { readFileSync } from 'node:fs'
@@ -26,7 +26,11 @@ interface Sample {
 
 type Form = 'copy' | 'inline'
 
-const DIST = join(import.meta.dir, '..', 'docs', 'dist')
+const CLIENT = join(import.meta.dir, '..', 'docs', '.kay', 'client')
+const KAY_PREFIX = '/_kay/'
+
+// A file the page links under `/_kay/`, as the server build keeps it.
+const built = (pathname: string) => join(CLIENT, 'dist', pathname.slice(KAY_PREFIX.length))
 const FIRST = process.env.FIRST ?? 'guides/i18n'
 const SECOND = process.env.SECOND ?? 'guides/security'
 const ROUNDS = Number(process.env.ROUNDS ?? 15)
@@ -55,15 +59,15 @@ function inlineForm(html: string): string {
   const match = COPY_LINK.exec(html)
 
   if (match === null)
-    throw new Error('the page links no stylesheet copy: export the docs first, `bun run docs:export`')
+    throw new Error('the page links no stylesheet copy: build the docs first, `bun run docs:build`')
 
-  const rules = readFileSync(join(DIST, `${match[1]}${match[2]}`), 'utf8')
+  const rules = readFileSync(built(`${match[1]}${match[2]}`), 'utf8')
 
   return html.replace(COPY_LINK, () => `<style>${rules}</style><link rel="stylesheet" href="${match[1]}.css" media="print" data-kay-rest>${restScript}`)
 }
 
 for (const page of [FIRST, SECOND]) {
-  const html = readFileSync(join(DIST, page, 'index.html'), 'utf8')
+  const html = readFileSync(join(CLIENT, 'pages', `${page}.html`), 'utf8')
 
   add(`/copy/${page}/`, 'text/html; charset=utf-8', html)
   add(`/inline/${page}/`, 'text/html; charset=utf-8', inlineForm(html))
@@ -76,7 +80,7 @@ const server = Bun.serve({
     let file = files.get(pathname)
 
     if (file === undefined && pathname.startsWith('/_kay/')) {
-      const local = Bun.file(join(DIST, pathname))
+      const local = Bun.file(built(pathname))
 
       if (await local.exists())
         files.set(pathname, file = { type: local.type, body: new Uint8Array(Bun.gzipSync(new Uint8Array(await local.arrayBuffer()))) })

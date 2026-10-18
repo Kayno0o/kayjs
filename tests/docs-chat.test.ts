@@ -3,14 +3,14 @@ import type { ToolAction } from '../packages/ai/src'
 import { join } from 'node:path'
 import { afterAll, afterEach, describe, expect, it } from 'bun:test'
 import { testSite } from 'kay/test'
-import { chatPages, readPage, searchPages, systemPrompt } from '../docs/src/chat-corpus'
+import { chatPages, partOfPage, readPage, searchPages, systemPrompt } from '../docs/src/chat-corpus'
 import { fakeAi } from '../packages/ai/src'
 import { forgetCounts } from '../packages/ai/src/limits'
 
 interface Ask {
   reply: Action<{ messages: { role: string, content: string }[] }, unknown>
   searchDocs: ToolAction & Action<{ query: string }, { hits: { href: string }[] }>
-  readDocsPage: ToolAction & Action<{ path: string }, { path: string, text: string }>
+  readDocsPage: ToolAction & Action<{ path: string, part?: number }, { path: string, text: string, part: number, parts: number }>
 }
 
 const root = join(import.meta.dir, '../docs')
@@ -63,6 +63,27 @@ describe('the tools', () => {
   it('search through an action and read a page through another', async () => {
     expect((await site.call(searchDocs, { query: 'islands' })).hits.length).toBeGreaterThan(0)
     expect((await site.call(readDocsPage, { path: '/essentials/islands' })).text).toContain('island')
+  })
+
+  it('give a long page in parts, each under what the loop keeps of a result, that together hold all of it', async () => {
+    const page = (await readPage('/llms/actions'))!
+    const first = await site.call(readDocsPage, { path: '/llms/actions' })
+
+    expect(page.text.length).toBeGreaterThan(20_000)
+    expect(first.parts).toBeGreaterThan(1)
+
+    let joined = ''
+
+    for (let part = 1; part <= first.parts; part++) {
+      const read = await site.call(readDocsPage, { path: '/llms/actions', part })
+
+      expect(JSON.stringify(read).length).toBeLessThan(20_000)
+      joined += read.text
+    }
+
+    expect(joined.trimEnd()).toBe(page.text.trimEnd())
+    expect(partOfPage('a\nb', 2)).toEqual({ text: '', parts: 1 })
+    expect(partOfPage('x'.repeat(50_000)).text.length).toBeLessThan(14_100)
   })
 
   it('refuse a path that is no page and a query too long', async () => {

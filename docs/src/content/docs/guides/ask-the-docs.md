@@ -7,7 +7,7 @@ The [chat](/ask) answers questions such as "how do I protect an action from bots
 
 ## What it reads
 
-The chat starts from `llms.txt`, the short guide to kay written for coding agents. When your question needs more, it searches these docs and reads whole pages: the guides written for people, the full reference written for agents, and the page of each library. It reads only what is on this site, so it knows the version of kay the docs describe.
+The chat starts from `llms.txt`, the short guide to kay written for coding agents. When your question needs more, it searches these docs and reads whole pages: the guides written for people, the full reference written for agents, and the page of each library. It does not read the pages of the kayjs-ui components, but the reference of the library covers them. It reads only what is on this site, so it knows the version of kay the docs describe.
 
 ## Answers can be wrong
 
@@ -23,4 +23,4 @@ The chat is free to use and paid for by the site, so each visitor may ask a few 
 
 ## Build one for your own site
 
-This chat is a kay page of about forty lines with the `Chat` component of [kayjs-ai](/libraries/kayjs-ai). Its source is in kay's repository, in `docs/src/routes/(docs)/ask.kay`.
+This chat is a single kay page with the `Chat` component of [kayjs-ai](/libraries/kayjs-ai). Its source is in kay's repository, in `docs/src/routes/(docs)/ask.kay`.

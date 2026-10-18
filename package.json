@@ -206,7 +206,6 @@
     "bench:soak": "$npm_execpath bench/soak.ts",
     "bench:test": "$npm_execpath test ./bench",
     "docs:build": "$npm_execpath src/cli.ts build docs",
-    "docs:export": "$npm_execpath src/cli.ts build docs --static",
     "docs:start": "$npm_execpath src/cli.ts start docs",
     "bench:check": "$npm_execpath run bench:check:kay && $npm_execpath run bench:check:apps",
     "bench:check:kay": "$npm_execpath src/cli.ts check bench/apps/kay",
