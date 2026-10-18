@@ -120,6 +120,16 @@ describe('the script and the page', () => {
     expect(home).toContain('Compter ?')
     expect(home).toContain('&quot;agree&quot;:&quot;Yes&quot;')
   })
+
+  it('marks the notice as silent when the app asks in its own UI, the gate staying', async () => {
+    const home = await (await (await site(plausible({ consent: { notice: false } }))).handle(new Request('http://localhost/'))).text()
+
+    expect(home).toContain('data-silent')
+    expect(home).toContain('data-consent')
+    const asking = await (await site(plausible({ consent: true }))).handle(new Request('http://localhost/'))
+
+    expect(await asking.text()).not.toContain('data-silent')
+  })
 })
 
 describe('what each provider is sent', () => {

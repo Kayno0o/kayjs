@@ -1,6 +1,9 @@
 import type { KayExtension } from '../config'
 import { KayError } from '../compiler/errors'
 
+export { consent } from '../runtime/consent'
+export type { Consent } from '../runtime/consent'
+
 // A text for the consent notice, or one per language: `{ en: 'We count visits', fr: 'Nous comptons les visites' }`, the page's `lang` picking one and the first listed when none fits.
 export type AnalyticsText = string | Record<string, string>
 
@@ -9,6 +12,7 @@ export interface AnalyticsConsent {
   text?: AnalyticsText | undefined
   agree?: AnalyticsText | undefined
   refuse?: AnalyticsText | undefined
+  // `false` shows no notice and opens none from `data-analytics-consent`: the app asks in its own UI and answers with `consent.set('yes')` from `kay/analytics`, while the server still forwards nothing without the yes.
   notice?: boolean | undefined
 }
 
@@ -117,7 +121,7 @@ export function analytics(options: AnalyticsOptions): KayExtension {
   checked(options)
 
   const texts = options.consent === undefined || options.consent === false ? undefined : noticeOf(options.consent === true ? {} : options.consent)
-  const gate = texts && { 'data-consent': '', 'data-texts': JSON.stringify(texts) }
+  const gate = texts && { 'data-consent': '', 'data-texts': JSON.stringify(texts), ...typeof options.consent === 'object' && options.consent.notice === false && { 'data-silent': '' } }
 
   if (options.provider !== 'fathom' && options.provider !== 'cloudflare' && options.provider !== 'custom') {
     return {

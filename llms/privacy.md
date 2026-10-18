@@ -86,10 +86,40 @@ export default defineConfig({
 - It needs a running server: `kay build --static` warns, since the exported pages would call a route that answers 404. Only `NODE_ENV=production` forwards; `kay dev` and tests answer the same and send nothing.
 - A visit is answered at once and passed on in the background (200 waiting at most, then dropped).
 - Add the optional `consent: true` (or `{ text, agree, refuse }`, each a string or one per language: `{ text: { en: 'Count?', fr: 'Compter ?' } }`) to wait for the visitor's yes: a notice kay builds (a labelled `section` at the end of the body, reached by Tab, focus never moved to it) asks until they choose, the answer is the `kay_analytics` cookie (`yes` or `no`, a year, `SameSite=Lax`, for the `base` path), and the server forwards nothing without `yes`, whatever the request claims.
-- Any element with `data-analytics-consent` reopens the notice, so a visitor changes their mind as easily as they chose. `window.kayAnalytics.consent()` reads the answer (`'yes'`, `'no'` or `''`) and `kay:consent` fires on `document` when it changes.
+- Any element with `data-analytics-consent` reopens the notice, so a visitor changes their mind as easily as they chose. `window.kayAnalytics.consent()` reads the answer (`'yes'`, `'no'` or `''`) and `kay:consent` fires on `document` when it changes. An app with its own banner or settings page uses `consent` instead, see the next section.
 - A visit is refused unless the page it names is on the host the request came to, or one in `hosts: ['www.example.com']`, which a proxy rewriting `Host` needs for the real one (a dropped visit logs a warning, once a minute at most); a body past 4 KB (413), a cross-site post (403) and more than 120 visits a minute from one address (429) are refused too.
 - What a provider gets: the page URL without its hash and with only the `utm_*`, `ref` and `source` parameters of its query, the referrer without its query, the title, the screen size and language, and the visitor's `User-Agent`, cleaned of control characters. No cookie, `Referer` or `Authorization` of the visitor goes with it.
 - The visitor's address is sent only to a provider that needs it to tell visitors apart: Plausible as `X-Forwarded-For`, Umami as `ip` in the payload, Simple Analytics not at all. It is the one `proxy` yields, so set `proxy` behind a CDN: without it every visitor shares the proxy's address, Plausible counts one visitor and the 120 a minute limit is shared by the whole site.
+
+### Ask for analytics consent in your own UI
+
+`consent` from `kay/analytics` is a signal holding the visitor's answer to `analytics({ consent })`: `'yes'`, `'no'` or `''` while they have not chosen. Read it as `consent()`, answer with `consent.set('yes')`, `'no'`, or `''` to ask again. It reads and writes the `kay_analytics` cookie kay's own notice uses, so the two never disagree and the server still forwards nothing without the yes. Pass `consent: { notice: false }` to show no notice of kay's (a `data-analytics-consent` click opens none either) and ask in your own UI:
+
+```ts
+import { defineConfig } from 'kay/server'
+import { analytics } from 'kay/analytics'
+
+export default defineConfig({
+  extensions: [analytics({ provider: 'ga4', measurementId: 'G-ABC123XYZ', apiSecret: 'secret', consent: { notice: false } })],
+})
+```
+
+```kay
+---
+import { consent } from 'kay/analytics'
+---
+if consent() === ''
+  aside(aria-label="Visit statistics")
+    p We count visits only if you agree.
+    button(onClick={() => consent.set('yes')}) Agree
+    button(onClick={() => consent.set('no')}) Refuse
+else
+  button(onClick={() => consent.set('')}) Visit statistics: {consent() === 'yes' ? 'on' : 'off'}, change
+```
+
+- A page renders with the answer in the request's cookie and an island starts with the same, so nothing flashes; the signal follows `kay:consent`, so a change made anywhere, a page swap included, reaches every island reading it.
+- `consent.set('yes')` starts counting at once (a Fathom or Cloudflare script loads); `'no'` or `''` after a yes reloads the page when a provider's script already ran, and `''` shows kay's notice again unless `notice: false`.
+- `consent.set` is for the browser, in a handler or an effect; on the server it throws, and `consent()` only reads.
 
 ### Keep failed jobs for less time
 

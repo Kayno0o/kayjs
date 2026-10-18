@@ -121,7 +121,30 @@ analytics({
 
 The notice is a labelled region that Tab reaches, and kay never moves the focus to it. With Fathom or Cloudflare, a refusal after the script loaded reloads the page so it runs no more.
 
-Give any element a `data-analytics-consent` attribute and a click on it shows the notice again, so a visitor can change their mind. Your own scripts read the answer with `window.kayAnalytics.consent()`, and a `kay:consent` event fires on `document` when it changes.
+Give any element a `data-analytics-consent` attribute and a click on it shows the notice again, so a visitor can change their mind. Your own scripts read the answer with `window.kayAnalytics.consent()`, and a `kay:consent` event fires on `document` when it changes. An app with its own banner uses `consent` instead, below.
+
+### Asking in your own banner
+
+If your site already has a cookie banner or a settings page, ask there. Pass `consent: { notice: false }` so kay shows no notice of its own, and use `consent` from `kay/analytics` in an island. `consent()` is the visitor's answer, `'yes'`, `'no'` or `''` while they have not chosen. `consent.set('yes')`, `'no'` or `''` records a new one; an empty answer asks again.
+
+```ts
+analytics({ provider: 'ga4', measurementId: 'G-ABC123XYZ', apiSecret: 'secret', consent: { notice: false } })
+```
+
+```kay
+---
+import { consent } from 'kay/analytics'
+---
+if consent() === ''
+  aside(aria-label="Visit statistics")
+    p We count visits only if you agree.
+    button(onClick={() => consent.set('yes')}) Agree
+    button(onClick={() => consent.set('no')}) Refuse
+else
+  button(onClick={() => consent.set('')}) Visit statistics: {consent() === 'yes' ? 'on' : 'off'}, change
+```
+
+It is the same cookie kay's notice writes, so the two never disagree, and the server still sends nothing without a yes. A page is rendered with the answer already in the request, so the banner does not flash for a visitor who answered. The answer is shared by every island and survives page swaps. `consent.set` works in the browser only, in a handler or an effect; on the server `consent()` only reads.
 
 ### Who may post a visit
 

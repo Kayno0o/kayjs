@@ -145,6 +145,7 @@
     },
     "./analytics": {
       "types": "./types/server/analytics.d.ts",
+      "browser": "./src/runtime/analytics.client.ts",
       "default": "./src/server/analytics.ts"
     },
     "./library": {

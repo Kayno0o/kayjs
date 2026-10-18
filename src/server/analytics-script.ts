@@ -7,6 +7,7 @@ export const ANALYTICS_SCRIPT = `(() => {
   const scope = path.slice(0, -'/_kay/analytics'.length) || '/'
   const name = 'kay_analytics'
   const gated = data.consent !== undefined
+  const silent = data.silent !== undefined
   const texts = data.texts ? JSON.parse(data.texts) : {}
   const load = data.load ? JSON.parse(data.load) : undefined
   let loaded = false
@@ -56,10 +57,11 @@ export const ANALYTICS_SCRIPT = `(() => {
     loaded = true
   }
 
+  // An empty value takes the answer back, so the visitor is asked again.
   function decide(value) {
     const counted = choice() === 'yes'
 
-    document.cookie = name + '=' + value + '; max-age=31536000; path=' + scope + '; samesite=lax' + (location.protocol === 'https:' ? '; secure' : '')
+    document.cookie = name + '=' + value + '; max-age=' + (value === '' ? 0 : 31536000) + '; path=' + scope + '; samesite=lax' + (location.protocol === 'https:' ? '; secure' : '')
     banner?.remove()
     banner = undefined
     document.dispatchEvent(new CustomEvent('kay:consent', { detail: { consent: value } }))
@@ -68,12 +70,14 @@ export const ANALYTICS_SCRIPT = `(() => {
       start()
 
     // A script that already ran cannot be taken back, so the page loads again without it.
-    if (value === 'no' && loaded)
+    if (value !== 'yes' && loaded)
       location.reload()
+    else if (value === '')
+      ask()
   }
 
   function ask() {
-    if (banner)
+    if (banner || silent || !gated)
       return
 
     const lang = document.documentElement.lang.split('-')[0]

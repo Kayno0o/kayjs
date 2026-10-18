@@ -1,0 +1,9 @@
+--- script
+import { consent } from 'kay/analytics'
+---
+p.state {consent() || 'asking'}
+button.yes(onClick={() => consent.set('yes')}) Yes
+button.no(onClick={() => consent.set('no')}) No
+button.reset(onClick={() => consent.set('')}) Reset
+a.next(href="/second") Next
+slot
