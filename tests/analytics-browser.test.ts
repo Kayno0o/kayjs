@@ -308,6 +308,15 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a counter 
   })
 
   it('counts no more once the visitor opts out, across a page swap', async () => {
+    await opened.evaluate(() => {
+      const link = document.createElement('button')
+
+      link.setAttribute('data-analytics-consent', '')
+      link.id = 'settings'
+      document.body.append(link)
+    })
+    await opened.click('#settings')
+    await opened.waitFor('section[aria-labelledby] button')
     await opened.click('section[aria-labelledby] button:last-of-type')
 
     expect(await opened.evaluate(() => document.cookie)).toContain('kay_analytics=no')
