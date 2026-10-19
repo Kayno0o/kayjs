@@ -45,6 +45,14 @@ function fakeProvider(): ReturnType<typeof Bun.serve> {
   return server
 }
 
+// Polls until a condition holds, five seconds at most.
+async function waitUntil(done: () => Promise<boolean>): Promise<void> {
+  const until = Date.now() + 5000
+
+  while (Date.now() < until && !await done())
+    await Bun.sleep(25)
+}
+
 // The visits reaching the provider so far, once `count` have.
 async function visits(count: number): Promise<Received[]> {
   const until = Date.now() + 5000
@@ -710,9 +718,8 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a script p
       expect(await opened.count(selector)).toBe(1)
 
       await opened.click('section[aria-labelledby] button:last-of-type')
-      await Bun.sleep(500)
+      await waitUntil(async () => await opened.count(selector) === 0)
 
-      expect(await opened.count(selector)).toBe(0)
       expect(await opened.evaluate(() => document.cookie)).toContain('kay_analytics=no')
       expect(await opened.count('section[aria-labelledby]')).toBe(0)
     }
@@ -722,7 +729,6 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a script p
   }, 60_000)
 
   it('copies a CSP nonce to the provider\'s script and the line, and counts a custom tracker until the opt-out', async () => {
-    before = process.env.NODE_ENV
     provider = fakeProvider()
     received.length = 0
 
@@ -755,13 +761,12 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a script p
       expect(await nonceOf('script[src$="/notice.js"]')).toBe('n0nce')
 
       await opened.click('section[aria-labelledby] button:last-of-type')
-      await Bun.sleep(500)
+      await waitUntil(async () => await opened.count('script[src$="/_kay/analytics/script.js"]') === 0)
 
-      expect(await opened.count('script[src$="/_kay/analytics/script.js"]')).toBe(0)
       expect(received).toHaveLength(1)
     }
     finally {
-      await nonced.close()
+      await nonced?.close()
       await provider.stop(true)
     }
   }, 60_000)

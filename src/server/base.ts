@@ -5,7 +5,7 @@ import { REDIRECT_HEADER } from '../runtime/swap'
 import { URL_ATTRIBUTES } from '../runtime/url-attributes'
 
 // What may only start a mount point: one slash, then segments; no query, hash or trailing slash.
-const BASE_PATH = /^(?:\/[\w.~-]+)+$/
+export const BASE_PATH = /^(?:\/[\w.~-]+)+$/
 // Where a redirect is named: a plain post's `location`, and the header a call or the page swap reads instead.
 const REDIRECT_HEADERS = ['location', REDIRECT_HEADER]
 const CSS_URL = /url\(\s*(["']?)(\/(?!\/)[^"')\s]*)\1\s*\)/g

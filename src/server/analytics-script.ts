@@ -1,4 +1,4 @@
-// The tracker every page loads: a page view on load and on each page swap, sent to the app's own origin, behind the consent gate when the app set one.
+// The tracker every page loads: a page view on load and on each page swap, sent to the app's own origin, behind the consent gate when the app set one, or until the visitor opts out.
 // Plain JavaScript in a string because the browser loads it as a file the server serves, and it must stay small: every page pays for it.
 export const ANALYTICS_SCRIPT = `(() => {
   const script = document.currentScript
@@ -50,7 +50,7 @@ export const ANALYTICS_SCRIPT = `(() => {
     catch {}
   }
 
-  // A provider that takes no visits from here runs its own script, loaded once the visitor agreed.
+  // A provider that takes no visits from here runs its own script, loaded once the visitor agreed or, with the information line, until they opt out.
   function start() {
     if (blocked())
       return
@@ -89,7 +89,7 @@ export const ANALYTICS_SCRIPT = `(() => {
       start()
 
     // A script that already ran cannot be taken back, so the page loads again without it.
-    if (value !== 'yes' && loaded)
+    if (value !== 'yes' && value !== '' && loaded)
       location.reload()
     else if (value === '')
       ask()

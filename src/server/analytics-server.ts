@@ -8,6 +8,7 @@ import { kayLog } from '../runtime/log'
 import { isCrossSite } from './actions'
 import { ANALYTICS_PATH, ANALYTICS_SCRIPT_PATH, CUSTOM_COLLECT_PATH, CUSTOM_SCRIPT_PATH, isGated, NOTICE_SCRIPT_PATH } from './analytics'
 import { ANALYTICS_SCRIPT, NOTICE_SCRIPT } from './analytics-script'
+import { BASE_PATH } from './base'
 import { readCapped } from './errors'
 import { clientAddress, overLimit } from './protection'
 
@@ -36,8 +37,6 @@ const OPT_OUT_COOKIE = 'kay_analytics=no'
 const KEPT_PARAMETERS = /^(?:utm_[a-z]+|ref|source)$/
 const CONTROL_CHARACTERS = /[\p{Cc}\p{Zl}\p{Zp}\p{Bidi_Control}]+/gu
 const SCREEN = /^\d{1,5}x\d{1,5}$/
-// A mount point as the app's `base` allows it, `/shop` or `/a/b`.
-const BASE = /^(?:\/[\w~-][\w.~-]*)+$/
 const LANGUAGE = /^[a-z]{2,3}(?:-[a-z\d]{2,8}){0,3}$/i
 const TRAILING_SLASH = /\/$/
 // Logged once a minute at most per kind, so a provider that is down does not fill the log with a line per visit and a burst of one kind does not hide another.
@@ -266,7 +265,7 @@ function customServer(options: Extract<AnalyticsOptions, { provider: 'custom' }>
       }
 
       // The base a proxy took off, which kay's own script names in the query; anything but a plain path is ignored.
-      const named = typeof query.base === 'string' && BASE.test(query.base) ? query.base : ''
+      const named = typeof query.base === 'string' && BASE_PATH.test(query.base) ? query.base : ''
       const prefix = new URL(request.url).pathname.slice(0, -CUSTOM_SCRIPT_PATH.length) || named
 
       return new Response(script.text.replaceAll(options.endpoint, `${prefix}${CUSTOM_COLLECT_PATH}`), { headers: { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'public, max-age=3600' } })

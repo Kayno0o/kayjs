@@ -158,7 +158,7 @@ Write `info: false` if your own page informs and lets visitors object, and the t
 
 Before 1.55 these counted every visit without asking, and `kay check` reports the ones that did not say which they want.
 
-A site built with `kay build --static` asks the same for Fathom and Cloudflare: kay writes the notice's script beside the pages. Google Analytics and a custom tracker still need a server.
+A site built with `kay build --static` asks the same for Fathom and Cloudflare, and shows their information line and opt-out with `consent: false`: kay writes the notice's script beside the pages. Google Analytics and a custom tracker still need a server.
 
 ### The CNIL exemption, and what it asks
 

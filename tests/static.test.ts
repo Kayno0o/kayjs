@@ -228,7 +228,7 @@ describe('kay build --static', () => {
     ['fathom with consent false', '{ provider: \'fathom\', siteId: \'ABCDEFGH\', consent: false }', false],
     ['fathom with consent false and no line', '{ provider: \'fathom\', siteId: \'ABCDEFGH\', consent: false, info: false }', false],
     ['cloudflare with consent false', '{ provider: \'cloudflare\', token: \'tok-123\', consent: false }', false],
-  ])('asks before %s loads on a static site too, kay\'s notice script written beside the pages', async (_name, options, asks) => {
+  ])('writes kay\'s notice script beside the pages of a static site for %s when it asks or shows the line', async (_name, options, asks) => {
     const fixture = await fixtureCopy('static')
     const elsewhere = await mkdtemp(join(tmpdir(), 'kay-static-'))
     const config = join(fixture, 'kay.config.ts')
