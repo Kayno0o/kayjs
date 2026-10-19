@@ -37,4 +37,27 @@ describe('a server waiting for the client build of kay dev', () => {
     await child.exited
     expect(spent).toBeLessThan(WAIT_MS / 3)
   }, 30_000)
+
+  // Fails once Bun waits idle on a released channel (oven-sh/bun#46050): `askKayDev` in src/server/dev.ts can then stop holding it.
+  it('needs the channel held, as Bun still spins on a released one', async () => {
+    const root = await scratchDir('dev-client-spin-')
+
+    await Bun.write(join(root, 'waiter.ts'), `process.channel!.unref()
+const before = process.cpuUsage()
+await new Promise(resolve => process.once('message', resolve))
+const spent = process.cpuUsage(before)
+console.log(Math.round((spent.user + spent.system) / 1000))
+process.exit(0)
+`)
+
+    const child = Bun.spawn([process.execPath, 'waiter.ts'], { cwd: root, stdout: 'pipe', stderr: 'inherit', ipc: () => undefined })
+
+    await Bun.sleep(WAIT_MS)
+    child.send('go')
+
+    const spent = Number((await new Response(child.stdout).text()).trim())
+
+    await child.exited
+    expect(spent).toBeGreaterThan(WAIT_MS / 3)
+  }, 30_000)
 })
