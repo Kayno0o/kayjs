@@ -807,6 +807,37 @@ describe('a custom provider', () => {
 })
 
 describe('the warnings', () => {
+  it('warns once per provider and status when the provider answers 4xx or 5xx, and logs no secret', async () => {
+    const logged: string[] = []
+    const sink = Symbol.for('kay.log')
+    const global = globalThis as Record<symbol, unknown>
+    const previous = global[sink]
+
+    global[sink] = (_level: string, message: string) => logged.push(message)
+    warningsReset()
+
+    try {
+      const app = await site(plausible())
+
+      answer = 401
+      await send(app, visit())
+      await send(app, visit())
+      answer = 503
+      await send(app, visit())
+      answer = 202
+      await send(app, visit())
+    }
+    finally {
+      global[sink] = previous
+    }
+
+    const warned = logged.filter(message => message.includes('provider answered'))
+
+    expect(warned).toHaveLength(2)
+    expect(warned[0]).toContain('plausible provider answered 401')
+    expect(warned[1]).toContain('answered 503')
+  })
+
   it('limits each kind to one a minute, a burst of one not hiding another', async () => {
     const logged: string[] = []
     const sink = Symbol.for('kay.log')

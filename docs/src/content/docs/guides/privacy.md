@@ -98,6 +98,8 @@ Your server makes the id from the visitor's address and browser with a random ke
 
 Google does not get the visitor's address unless you give `address: true`, which sends it as `ip_override` so Google can place the visit; otherwise Google places every visit at your server.
 
+If the provider refuses a visit, for example because of a wrong site id, domain or secret, kay logs a warning naming the provider and the status, at most once a minute for each. Check the log when your stats stay empty.
+
 Behind a CDN or proxy set `proxy`, or every visitor shares the proxy's address and one id. Keep `host` on https, as the secret travels in the request. Because there is no Google tag on the page, check Realtime and the engagement numbers in your reports, which Google builds partly from tag data. A very long page address may also be cut by Google's limit of 100 characters per value.
 
 ### What the tool receives
