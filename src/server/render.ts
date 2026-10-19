@@ -585,6 +585,13 @@ export async function renderUnmatched(special: SpecialPages, context: RequestCon
   return withOutcome(rendering.outcome, async () => renderFailure(new NotFound(), special, rendering, new Map(), client, options))
 }
 
+// An error thrown before any page was chosen, by a hook of the app or kay, answered by the routes directory's own `_error.kay` as a 500, in the default locale; `renderFailure` reports it.
+export async function renderUncaught(error: unknown, special: SpecialPages, context: RequestContext, client: ClientBuild, options: RenderOptions = {}): Promise<Response> {
+  const rendering = createRendering(context, {}, options)
+
+  return withOutcome(rendering.outcome, async () => renderFailure(error, special, rendering, new Map(), client, options))
+}
+
 function createRendering(context: RequestContext, params: Record<string, unknown>, { prerendering = false, lang = DEFAULT_LANG, base = '' }: RenderOptions): Rendering {
   const { request } = context
   const jar = cookieJar(request)

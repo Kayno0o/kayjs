@@ -59,6 +59,7 @@ import { requestId, requestIdHeader, setRequestIdHeader, trustProxy } from './pr
 import { claimPublic, publicCacheRules, servePublic } from './public'
 import { claimRedirects, readRedirects, serveRedirects } from './redirects'
 import { remoteImages, remotePatterns } from './remote'
+import { renderUncaught } from './render'
 import { reportServerError, useAppOnError } from './report'
 import { rewriteRequests } from './rewrite'
 import { routeMatch, routeTable } from './route-table'
@@ -370,7 +371,6 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
     serveMcp(app, document, { title: (document.info as { title: string }).title, version: (document.info as { version: string }).version, base, guards: await covering(true), actions: actionOptions, metadataPaths, path: mcpAt })
 
   useAppOnError(options.onError)
-  answerUncaught(app, { dev: mode.dev, onError: options.onError })
   serveErrorReports(app, options.onError, mode.dev ? undefined : join(client.dir, '..', MAPS_DIR))
   serveLive(app, options.live)
 
@@ -440,7 +440,10 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
 
   const respond = withPageHeaders(pageResponder({ client, renderOptions, prerendered, writes: countWrites(app), settings: i18n?.settings, transforms: pageHooks(options.extensions), pageFile: assetFiles({ clientDir: client.dir, publicDir: paths.public, base, aspects: options.images?.aspects }) }), securityOptions, security)
 
-  servePageRoutes(app, { table, served, matchers, i18n, locales, client, renderOptions, trailingSlash: options.trailingSlash ?? 'never', fallback: source.fallback(paths.routes, mounts), respond })
+  const fallback = source.fallback(paths.routes, mounts)
+
+  servePageRoutes(app, { table, served, matchers, i18n, locales, client, renderOptions, trailingSlash: options.trailingSlash ?? 'never', fallback, respond })
+  answerUncaught(app, { dev: mode.dev, onError: options.onError, page: async (error, context) => renderUncaught(error, fallback, context, client, renderOptions) })
   agreeOnWildcards(app)
 
   return { app, served, locale: locales.settings.defaultLocale }

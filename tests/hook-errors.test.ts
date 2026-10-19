@@ -148,6 +148,36 @@ describe('an onRequest hook that throws', () => {
     }
   })
 
+  it('draws the app\'s own error page for a page request, and plain text for the others', async () => {
+    const own = await scratchDir('hook-errors-page-')
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+
+    try {
+      await Promise.all([
+        Bun.write(join(own, 'routes/index.kay'), 'p Home\n'),
+        Bun.write(join(own, 'routes/_error.kay'), '--- server\nconst { status, message } = ctx.error\n---\nh1 Oops {status}\np.message {message}\n'),
+        Bun.write(join(own, 'api/hello.ts'), 'import { api } from \'kay/server\'\n\nexport default api().get(\'/\', () => \'hello\')\n'),
+      ])
+
+      for (const dev of [false, true]) {
+        const kay = await pages({ routes: join(own, 'routes'), api: join(own, 'api'), prebuilt: false, dev, log: false })
+        const app = new Elysia().onRequest(hook).use(kay)
+        const page = await ask(app, TARGETS[0], 'error')
+        const api = await ask(app, TARGETS[1], 'error')
+
+        expect(page.status).toBe(500)
+        expect(page.type).toContain('text/html')
+        expect(page.body).toContain('<h1>Oops 500</h1>')
+        expect(page.body.includes('hunter2')).toBe(dev)
+        expect(api).toMatchObject({ status: 500, type: expect.stringContaining('text/plain') })
+      }
+    }
+    finally {
+      logged.mockRestore()
+      await rm(own, { recursive: true, force: true })
+    }
+  })
+
   it('keeps the security headers on the answer', async () => {
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
 
