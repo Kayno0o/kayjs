@@ -8,6 +8,8 @@ import { log } from './log'
 const TURNSTILE_URL = 'https://challenges.cloudflare.com/turnstile/v0/siteverify'
 const HCAPTCHA_URL = 'https://api.hcaptcha.com/siteverify'
 const TIMEOUT_MS = 5000
+// The documented test secrets of Turnstile (`1x0...AA`, `2x...`, `3x...`) and hCaptcha (all zeros): their answers name a fixed hostname and action of their own, so those are not compared.
+const TEST_SECRET = /^(?:[123]x0+AA|0x0+)$/
 // Doubling the difficulty with each attempt past the threshold stops at 16 times.
 const MOST_DOUBLINGS = 4
 
@@ -182,6 +184,9 @@ async function siteverify(url: string, secret: string, token: string, action: Ca
 
   if (answer.success !== true)
     return false
+
+  if (TEST_SECRET.test(secret))
+    return true
 
   if (context?.hostname !== undefined && (typeof answer.hostname !== 'string' || answer.hostname.toLowerCase() !== context.hostname.toLowerCase()))
     return false

@@ -6,7 +6,7 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ### kayjs-auth checks CAPTCHA hostnames and refuses plain-http providers at an https site
 
-- `turnstile()` and `hcaptcha()` refuse a token the provider says was made for a hostname other than `url`'s, so a site served from more than one hostname, or Cloudflare's and hCaptcha's test keys against a `localhost` url, need a `verify` of their own. A custom `verify(token, action, { hostname })` gets the site's hostname as a third argument.
+- `turnstile()` and `hcaptcha()` refuse a token the provider says was made for a hostname other than `url`'s, so a site served from more than one hostname needs a `verify` of its own. Cloudflare's and hCaptcha's documented test secrets are not held to it, and a dev site at `localhost` passes. A custom `verify(token, action, { hostname })` gets the site's hostname as a third argument.
 - A site whose `url` is https refuses an OAuth or OpenID Connect provider on plain `http://` in every environment, not only in production.
 - `GET /auth/<provider>` answers `?error=oauth` while the signed-in user has a provider link in flight, and a repeated identical start goes on with the flow in flight.
 

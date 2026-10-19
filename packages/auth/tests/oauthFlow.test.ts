@@ -571,3 +571,58 @@ describe('a guest signing in with a provider', () => {
     expect(await other.json('/me')).toMatchObject({ id: user.id })
   })
 })
+
+describe('reporting a failed OAuth sign-in', () => {
+  function reported() {
+    const heard: string[] = []
+    const app = setup({
+      onAuthEvent: (info) => {
+        if (info.event === 'sign-in-failed')
+          heard.push(`${info.user.id}:${info.method}`)
+      },
+    })
+
+    return { ...app, heard }
+  }
+
+  test('a banned account refused at the provider\'s return is reported as an oauth failure', async () => {
+    providers({ 1: { id: '1', username: 'ada' } })
+    const { browser, store, heard } = reported()
+    const ada = browser()
+
+    await signInWith(ada, 'discord', '1')
+
+    const user = (await store.identities.find('discord', '1'))!.userId
+
+    await store.users.update(user, { bannedAt: new Date() })
+
+    const { response } = await signInWith(browser(), 'discord', '1')
+
+    expect(response.headers.get('location')).toBe('/login?error=banned')
+    expect(heard).toEqual([`${user}:oauth`])
+  })
+
+  test('linking an account another user has linked is reported against the user who tried', async () => {
+    providers({ 1: { id: '1', username: 'ada' }, 2: { id: '2', username: 'bob' } })
+    const { browser, store, heard } = reported()
+    const ada = browser()
+
+    await signInWith(ada, 'discord', '1')
+    await signInWith(browser(), 'discord', '2')
+    await linkWith(ada, 'discord', '2')
+
+    expect(heard).toEqual([`${(await store.identities.find('discord', '1'))!.userId}:oauth`])
+  })
+
+  test('starting the same sign-in again keeps the PKCE challenge and nonce, and its callback lands', async () => {
+    providers({ 1: { id: '1', username: 'ada' } })
+    const { browser } = setup()
+    const visitor = browser()
+    const first = new URL((await visitor.fetch('/auth/discord')).headers.get('location')!)
+    const again = new URL((await visitor.fetch('/auth/discord')).headers.get('location')!)
+
+    expect(again.searchParams.get('code_challenge')).toBe(first.searchParams.get('code_challenge'))
+    expect(again.searchParams.get('state')).toBe(first.searchParams.get('state'))
+    expect((await visitor.fetch(`/auth/discord/callback?code=code-1&state=${again.searchParams.get('state')}`)).headers.get('location')).toBe('/')
+  })
+})

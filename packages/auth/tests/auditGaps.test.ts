@@ -224,6 +224,22 @@ describe('CAPTCHA siteverify', () => {
     expect(await check('t', 'register', context)).toBe(false)
   })
 
+  test('the documented test secrets are not held to the site\'s hostname or action', async () => {
+    answer({ success: true, hostname: 'localhost', action: 'test' })
+    expect(await turnstile('1x0000000000000000000000000000000AA')('t', 'register', { hostname: 'site.test' })).toBe(true)
+    answer({ success: true, hostname: 'dummy-key-pass' })
+    expect(await hcaptcha('0x0000000000000000000000000000000000000000')('t', 'register', { hostname: 'site.test' })).toBe(true)
+    answer({ success: false, hostname: 'localhost' })
+    expect(await turnstile('2x0000000000000000000000000000000AA')('t', 'register', { hostname: 'site.test' })).toBe(false)
+    answer({ success: true, hostname: 'localhost', action: 'test' })
+    expect(await turnstile('a-real-secret')('t', 'register', { hostname: 'site.test' })).toBe(false)
+  })
+
+  test('a dev site on localhost passes with the hostname the provider reports', async () => {
+    answer({ success: true, hostname: 'localhost', action: 'register' })
+    expect(await turnstile('a-real-secret')('t', 'register', { hostname: 'localhost' })).toBe(true)
+  })
+
   test('a token is checked without a hostname when the app has no url', async () => {
     answer({ success: true, hostname: 'anything.test' })
     expect(await turnstile('s')('t', 'register')).toBe(true)

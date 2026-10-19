@@ -4,6 +4,7 @@ import { afterEach, describe, expect, setSystemTime, test } from 'bun:test'
 import { totpCode, totpStep } from '../src/totp'
 import { testApp, userRecord } from './helpers/app'
 import { authenticator } from './helpers/authenticator'
+import { mailbox } from './helpers/mail'
 
 const PASSWORD = 'correct horse battery'
 
@@ -11,12 +12,13 @@ afterEach(() => {
   setSystemTime()
 })
 
-async function setup(passkeys?: NonNullable<Parameters<typeof testApp>[0]>['passkeys']) {
+async function setup(passkeys?: NonNullable<Parameters<typeof testApp>[0]>['passkeys'], extra: Parameters<typeof testApp>[0] = {}) {
   const events: { event: AuthEvent, detail: string | undefined }[] = []
   const app = testApp({
     url: 'https://site.test',
     site: 'Site',
     ...passkeys && { passkeys },
+    ...extra,
     onEvent: (event, _user, detail) => {
       events.push({ event, detail })
     },
@@ -198,6 +200,30 @@ describe('signing in with a passkey', () => {
 })
 
 describe('a passkey as second factor and as proof', () => {
+  test('guesses at the passkey second factor past the account\'s cap mail the holder once, as code guesses do', async () => {
+    const box = mailbox()
+    const app = await setup(undefined, { limits: { twoFactorAccount: { max: 2, window: 900 } }, email: { mailer: box.mailer, links: { 'verify-email': '/verify', 'reset-password': '/reset', 'magic-link': '/magic', 'change-email': '/confirm-email' }, requireVerified: false } })
+
+    await addPasskey(await registered(app))
+
+    const user = (await app.store.users.findByEmail('ada@example.com'))!
+
+    await app.store.users.update(user.id, { totpEnabledAt: new Date(), emailVerifiedAt: new Date() })
+
+    const visitor = app.browser()
+
+    await visitor.post('/password', { identifier: 'ada@example.com', password: PASSWORD })
+
+    const answers: unknown[] = []
+
+    for (let guess = 0; guess < 5; guess++)
+      answers.push(await visitor.call('verifyTwoFactorPasskey', {} as never))
+
+    expect(answers.at(-1)).toEqual({ ok: false, error: 'limited' })
+    await Bun.sleep(20)
+    expect(box.mails.filter(mail => mail.kind === 'sign-in-locked').map(mail => mail.to)).toEqual(['ada@example.com'])
+  })
+
   test('a sign-in waiting for its second factor takes a passkey in place of a code', async () => {
     const app = await setup()
     const { device } = await addPasskey(await registered(app))

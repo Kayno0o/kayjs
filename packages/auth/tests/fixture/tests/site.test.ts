@@ -1,6 +1,7 @@
 import { join } from 'node:path'
 import { afterEach, describe, expect, setSystemTime, spyOn, test } from 'bun:test'
 import { testSite } from 'kay/test'
+import { turnstileWidget } from '../../../src/captcha'
 import { totpCode, totpStep } from '../../../src/totp'
 import { auth, mails, profiles, store } from '../src/auth'
 
@@ -25,6 +26,7 @@ const { end, endOthers } = await import(join(PAGES, 'account', 'sessions.kay'))
 const { create, revoke } = await import(join(PAGES, 'account', 'tokens.kay'))
 const { prove, remove, signInAgain } = await import(join(PAGES, 'account', 'data.kay'))
 const { confirm } = await import(join(PAGES, 'confirm-email.kay'))
+const { default: Captcha } = await import(join(PAGES, '..', 'components', 'captcha.kay'))
 const { magicLink, passkey, password } = await import(join(PAGES, 'sign-in.kay'))
 const { register } = await import(join(PAGES, 'register.kay'))
 const { request, reset } = await import(join(PAGES, 'reset-password.kay'))
@@ -203,6 +205,14 @@ describe('the prebuilt pages', () => {
     expect(text(await visitor.submit(register, fields, { from: await visitor.visit('/auth/register'), openedFor: 0 }), '[role="alert"]')).toBe('Wait a moment, then send it again.')
     expect((await visitor.submit(register, { ...fields, website: 'https://spam.example' }, { from: await visitor.visit('/auth/register') })).status).toBe(422)
     expect(await store.users.findByEmail('bot@example.com')).toBeFalsy()
+  })
+
+  test('a third party\'s widget carries the action its form is for, which the check compares', async () => {
+    const html = String(((Captcha as (props: unknown) => { t: string })({ widget: turnstileWidget('site-key'), action: 'magic-link' })).t)
+
+    expect(html).toContain('class="cf-turnstile"')
+    expect(html).toContain('data-sitekey="site-key"')
+    expect(html).toContain('data-action="magic-link"')
   })
 
   test('the sign-in page asks for the browser\'s check once a client has failed three times', async () => {
