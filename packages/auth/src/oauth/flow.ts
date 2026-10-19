@@ -259,6 +259,23 @@ export async function providerToken(state: RequestState, provider: string): Prom
   })
 }
 
+// Ends the provider's grant held in `identity`, its refresh token first as that is the grant's root. Logged, not thrown: a provider out of reach must not keep a user from unlinking or leaving, and one without a revocation endpoint leaves it to the user.
+export async function revokeUpstream(core: Core, identity: IdentityRecord): Promise<void> {
+  const client = core.oauth.get(identity.provider)?.client
+  const sealed = identity.refreshToken ?? identity.accessToken
+  const token = !client || sealed === null || sealed === '' ? undefined : core.keys.decrypt(sealed, identityContext(identity.provider, identity.providerId))
+
+  if (!client || token === undefined)
+    return
+
+  try {
+    await client.revokeToken(token)
+  }
+  catch (error) {
+    log.error(`revoking a ${identity.provider} token failed`, error)
+  }
+}
+
 // What a provider's tokens are encrypted against, so they open for that identity only.
 export function identityContext(provider: string, providerId: string): string {
   return `identity:${provider}:${providerId}`
@@ -275,7 +292,7 @@ export function sealTokens(core: Core, provider: string, providerId: string, tok
 }
 
 async function saveIdentity(core: Core, identity: IdentityRecord | undefined, userId: string, profile: Profile, tokens: OAuthTokens, replace = false): Promise<void> {
-  const sealed = sealTokens(core, profile.provider, profile.providerId, tokens)
+  const sealed = sealTokens(core, profile.provider, profile.providerId, core.oauth.get(profile.provider)?.app.keepTokens === true ? tokens : null)
 
   if (identity && !replace) {
     await core.store.identities.update(profile.provider, profile.providerId, sealed)

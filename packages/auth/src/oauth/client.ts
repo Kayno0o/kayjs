@@ -199,6 +199,25 @@ export function createOAuthClient<Raw = unknown, User = unknown>(provider: OAuth
       }))))
     },
 
+    /** Revokes a token at the provider (RFC 7009); false when the provider has no revocation endpoint. A refused or unreachable provider throws. */
+    async revokeToken(token: string): Promise<boolean> {
+      const url = (await endpoints()).revokeUrl
+
+      if (url === undefined)
+        return false
+
+      const { res, text } = await askProvider(provider.name, 'token revocation', url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json' },
+        body: await withCredentials(new URLSearchParams({ token })),
+      })
+
+      if (!res.ok)
+        throw new OAuthExchangeError(res.status, `OAuth token revocation failed (${provider.name}): ${res.status} ${redactBody(text)}`)
+
+      return true
+    },
+
     /** Fetches and normalizes the provider user. */
     async fetchUser(accessToken: string): Promise<User> {
       return provider.normalizeUser(await completed(await userInfo(accessToken, (await endpoints()).userUrl) as Raw, accessToken, undefined), {})

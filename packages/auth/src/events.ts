@@ -3,6 +3,7 @@ import type { SecurityEvent } from './mail'
 import type { RequestState } from './state'
 import type { AuditCursor, UserRecord } from './store'
 import { clamp } from '@kaynooo/utils'
+import { truncatedAddress } from './address'
 import { publicUser } from './core'
 import { log } from './log'
 import { PRUNE_EVERY_MS } from './prune'
@@ -170,7 +171,7 @@ export async function report(state: RequestState, record: UserRecord, event: Aut
     return
 
   try {
-    await audit(core).add({ id: Bun.randomUUIDv7(), userId: record.id, event, detail: detail ?? null, ip: state.address, userAgent: state.userAgent, actorId: actor?.id ?? null, at: new Date() })
+    await audit(core).add({ id: Bun.randomUUIDv7(), userId: record.id, event, detail: detail ?? null, ip: core.audit.ip === 'full' ? state.address : truncatedAddress(state.address), userAgent: state.userAgent, actorId: actor?.id ?? null, at: new Date() })
     await prune(core)
   }
   catch (error) {

@@ -108,17 +108,19 @@ describe('pruning guests', () => {
     expect(await store.sessions.listByUser(guest.user.id)).toEqual([])
   })
 
-  test('guests are kept without the option, as before', async () => {
+  test('guests are deleted after 30 days without the option', async () => {
     const store = memoryStore()
     const { browser } = testApp({ store })
     const start = Date.now()
 
-    await store.users.create(userRecord({ id: 'old', guest: true, createdAt: new Date(start - 365 * MAX_AGE_MS) }))
+    await store.users.create(userRecord({ id: 'old', guest: true, createdAt: new Date(start - 31 * MAX_AGE_MS) }))
+    await store.users.create(userRecord({ id: 'recent', guest: true, createdAt: new Date(start - 29 * MAX_AGE_MS) }))
     setSystemTime(start + PRUNE_EVERY_MS)
     await browser().json('/me')
     await new Promise(resolve => setTimeout(resolve, 20))
 
-    expect(await store.users.get('old')).toBeDefined()
+    expect(await store.users.get('old')).toBeUndefined()
+    expect(await store.users.get('recent')).toBeDefined()
   })
 
   test('a store that lists no stale guests keeps them', async () => {

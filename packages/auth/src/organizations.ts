@@ -470,6 +470,28 @@ export async function myInvitations(state: RequestState): Promise<Invitation[]> 
   return invitations
 }
 
+// Every invitation that names the signed-in user: those to their address, expired ones included, and those they sent from the organizations they belong to.
+export async function exportedInvitations(state: RequestState): Promise<{ received: Invitation[], sent: Invitation[] }> {
+  const { store } = organizationsOf(state.core)
+  const record = await state.current()
+  const none = { received: [], sent: [] }
+
+  if (!record)
+    return none
+
+  const received = record.email === null || record.email === '' ? [] : await store.invitations.listByEmail(record.email)
+  const held = (await store.members.listByUser(record.id)).map(member => member.organizationId)
+  const sent = (await Promise.all(held.map(async id => store.invitations.listByOrganization(id)))).flat().filter(invitation => invitation.invitedBy === record.id)
+  const organizations = await organizationsById(store.organizations, [...new Set([...received, ...sent].map(invitation => invitation.organizationId))])
+  const named = (invitations: InvitationRecord[]) => invitations.flatMap((invitation) => {
+    const organization = organizations.get(invitation.organizationId)
+
+    return organization ? [publicInvitation(invitation, organization)] : []
+  })
+
+  return { received: named(received), sent: named(sent) }
+}
+
 // What the link's page shows anyone holding it: which organization, for which address; null once revoked, spent or expired.
 export async function getInvitation(state: RequestState, invitationId: string): Promise<Invitation | null> {
   const { store } = organizationsOf(state.core)

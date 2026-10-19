@@ -54,6 +54,8 @@ export interface OAuthApp {
   clientSecret?: string | undefined
   // What a sign-in button calls the provider, over the preset's own label.
   label?: string | undefined
+  // Keeps the provider's access and refresh tokens, encrypted, for `providerToken()`; false by default, so a sign-in that only needs the profile stores no token.
+  keepTokens?: boolean | undefined
 }
 
 // A provider account as kayjs-auth reads it; `email` is set only when the provider says it is verified.
@@ -118,14 +120,16 @@ export interface Core {
   onSignUp?: ((user: User, profile: Profile | undefined) => void | Promise<void>) | undefined
   onProviderProfile?: ((user: User, profile: Profile) => void | Promise<void>) | undefined
   onDelete?: ((user: User) => void | Promise<void>) | undefined
-  // Seconds a guest is kept once their sessions are gone; for good when undefined.
-  guestMaxAge?: number | undefined
+  // Seconds a guest is kept once their sessions are gone.
+  guestMaxAge: number
+  // Seconds an account registered and never verified is kept, where unverified accounts cannot sign in; for good when undefined.
+  unverifiedMaxAge?: number | undefined
   onExport?: ((user: User) => unknown) | undefined
   onAuthEvent?: ((info: AuthEventInfo) => void | Promise<void>) | undefined
   onEvent?: ((event: AuthEvent, user: User, detail: string | undefined, context: EventContext) => void | Promise<void>) | undefined
   organizations?: OrganizationsCore | undefined
   // Kept with the `audit` option: entries live `maxAge` seconds.
-  audit?: { maxAge: number, prunedAt: number } | undefined
+  audit?: { maxAge: number, prunedAt: number, ip: 'full' | 'truncated' } | undefined
   // When the store last pruned what expired, and that run while it lasts.
   pruned: { at: number, running: Promise<void> }
 }

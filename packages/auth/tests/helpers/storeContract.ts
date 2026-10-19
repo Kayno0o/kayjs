@@ -450,6 +450,37 @@ export function storeContract(name: string, fresh: () => Promise<AuthStore>) {
       expect((await store.users.staleGuests!(at(10), 10)).map(user => user.id)).toEqual(['g1', 'g2', 'g3', 'live'])
     })
 
+    test('staleUnverified lists users with an email never verified, no session and no identity, created before an instant, oldest first, up to a limit', async () => {
+      const at = (minutes: number) => new Date(Date.UTC(2026, 5, 1, 0, minutes))
+      const session = (id: string, userId: string) => ({ id, userId, version: 0, userAgent: 'ua', ip: '127.0.0.1', createdAt: at(0), lastSeenAt: at(0), maxAge: null })
+
+      for (const [id, fields] of [
+        ['u3', { email: 'u3@example.com', createdAt: at(3) }],
+        ['u1', { email: 'u1@example.com', createdAt: at(1) }],
+        ['u2', { email: 'u2@example.com', createdAt: at(2) }],
+        ['exact', { email: 'exact@example.com', createdAt: at(10) }],
+        ['verified', { email: 'v@example.com', emailVerifiedAt: at(0), createdAt: at(1) }],
+        ['guest', { guest: true, createdAt: at(1) }],
+        ['nomail', { createdAt: at(1) }],
+        ['live', { email: 'live@example.com', createdAt: at(4) }],
+        ['linked', { email: 'linked@example.com', createdAt: at(5) }],
+      ] as const)
+        await store.users.create(userRecord({ id, ...fields }))
+
+      await store.sessions.create(session('s1', 'live'))
+      await store.identities.create({ provider: 'discord', providerId: '1', userId: 'linked', accessToken: null, refreshToken: null, tokenExpiresAt: null, createdAt: at(0) })
+
+      expect((await store.users.staleUnverified!(at(10), 10)).map(user => user.id)).toEqual(['u1', 'u2', 'u3'])
+      expect((await store.users.staleUnverified!(at(10), 2)).map(user => user.id)).toEqual(['u1', 'u2'])
+      expect(await store.users.staleUnverified!(at(1), 10)).toEqual([])
+      expect((await store.users.staleUnverified!(at(10), 1))[0]).toEqual(await store.users.get('u1'))
+
+      await store.sessions.delete('live', 's1')
+      await store.identities.delete('discord', '1')
+
+      expect((await store.users.staleUnverified!(at(10), 10)).map(user => user.id)).toEqual(['u1', 'u2', 'u3', 'live', 'linked'])
+    })
+
     describe('the OAuth server', () => {
       const bearer = (id: string, oauth?: { clientId: string, family: string }) => ({ id, userId: 'u1', label: id, digest: `d-${id}`, scopes: ['posts:read'], createdAt: new Date('2026-01-01T00:00:00Z'), lastUsedAt: null, expiresAt: null, ...oauth && { oauth } })
       const refresh = (digest: string, fields: Partial<OAuthRefreshRecord> = {}): OAuthRefreshRecord => ({ digest, userId: 'u1', clientId: 'c1', scopes: ['posts:read'], family: 'f1', createdAt: new Date('2026-01-01T00:00:00Z'), expiresAt: new Date('2030-01-01T00:00:00Z'), usedAt: null, ...fields })

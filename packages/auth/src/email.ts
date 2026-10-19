@@ -78,13 +78,15 @@ export interface EmailOptions {
   translations?: Record<string, Partial<Templates>> | undefined
   // Refuses password sign-in until the address is verified, and signs no one in on registering, so registering answers alike whether or not the address is held. On by default; `false` signs in on registering and answers `'taken'` for a held address.
   requireVerified?: boolean | undefined
+  // How long an account registered and never verified is kept before it is deleted, `onDelete` first: seconds or a string such as '7d'. 30 days by default with `requireVerified`; without it accounts are kept unless this is set, as an unverified one may be in use.
+  unverifiedMaxAge?: Duration | undefined
   // How long each link and code works, over the defaults: `{ 'verify-email': '7d' }` for invited users. The keys are the four links, `verify-email`, `reset-password`, `magic-link` and `change-email`, and the two codes, `sign-in-code` and `verify-code`; the mails state what is set.
   expires?: Partial<Record<TokenType, Duration>> | undefined
   // Whether magic links and verification mails carry a code, for both kinds at once or for each: `'both'`, `{ 'magic-link': 'code' }`. A link only by default.
   codes?: CodeMode | Partial<Record<CodedLink, CodeMode>> | undefined
 }
 
-export type EmailCore = Required<Omit<EmailOptions, 'links' | 'templates' | 'requireVerified' | 'codes' | 'locales' | 'translations' | 'expires'>> & { expires: Record<TokenType, number>, links: Record<LinkType, string>, requireVerified: boolean, locales: string[], templates: Record<string, Templates>, codes: Record<CodedLink, CodeMode> }
+export type EmailCore = Required<Omit<EmailOptions, 'links' | 'templates' | 'requireVerified' | 'unverifiedMaxAge' | 'codes' | 'locales' | 'translations' | 'expires'>> & { expires: Record<TokenType, number>, links: Record<LinkType, string>, requireVerified: boolean, locales: string[], templates: Record<string, Templates>, codes: Record<CodedLink, CodeMode> }
 
 // A code waiting in the session that asked for it, which alone can spend it.
 export interface PendingCode {

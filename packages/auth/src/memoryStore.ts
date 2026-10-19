@@ -96,6 +96,16 @@ export function memoryStore(): AuthStore {
           .slice(0, limit)
           .map(user => copy(user)!)
       },
+      staleUnverified(createdBefore, limit) {
+        const withSession = new Set([...sessions.values()].map(session => session.userId))
+        const withIdentity = new Set([...identities.values()].map(identity => identity.userId))
+
+        return [...users.values()]
+          .filter(user => !user.guest && user.email !== null && user.emailVerifiedAt === null && user.createdAt < createdBefore && !withSession.has(user.id) && !withIdentity.has(user.id))
+          .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+          .slice(0, limit)
+          .map(user => copy(user)!)
+      },
       delete(id) {
         users.delete(id)
 

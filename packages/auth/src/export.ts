@@ -1,15 +1,17 @@
+import type { ApprovedClient } from './authorize/grants'
 import type { BearerToken } from './bearer'
 import type { User } from './core'
 import type { AuditEntry } from './events'
-import type { Membership } from './organizations'
+import type { Invitation, Membership } from './organizations'
 import type { Passkey } from './passkeys'
 import type { UserSession } from './sessions'
 import type { RequestState } from './state'
+import { approvedClients } from './authorize/grants'
 import { listTokens } from './bearer'
 import { publicUser } from './core'
 import { impersonatorOf } from './events'
 import { spend } from './limits'
-import { listMemberships } from './organizations'
+import { exportedInvitations, listMemberships } from './organizations'
 import { listPasskeys } from './passkeys'
 import { listSessions } from './sessions'
 import { provedLately } from './twoFactor'
@@ -26,8 +28,14 @@ export interface DataExport {
   passkeys: Passkey[]
   tokens: BearerToken[]
   recoveryCodesLeft: number
+  // The apps the user approved to act as them; empty without an OAuth server.
+  grants: ApprovedClient[]
+  // The last ban an admin set, with the reason given, once its time has passed: a user under a ban in force cannot sign in to export. Null when never barred.
+  ban: { at: Date, until: Date | null, reason: string | null } | null
   // Empty without the `organizations` option.
   organizations: Membership[]
+  // The invitations to the user's address, expired ones included, and those they sent; empty without the `organizations` option.
+  invitations: { received: Invitation[], sent: Invitation[] }
   // Empty without the `audit` option.
   audit: AuditEntry[]
   app: unknown
@@ -63,7 +71,10 @@ export async function exportData(state: RequestState): Promise<{ ok: true, data:
       passkeys: await listPasskeys(state),
       tokens: await listTokens(state),
       recoveryCodesLeft: await core.store.recoveryCodes.count(record.id),
+      grants: await approvedClients(state),
+      ban: record.bannedAt === null ? null : { at: record.bannedAt, until: record.bannedUntil, reason: record.banReason },
       organizations: core.organizations ? await listMemberships(state) : [],
+      invitations: core.organizations ? await exportedInvitations(state) : { received: [], sent: [] },
       audit: core.audit ? (await core.store.audit!.list({ userId: record.id, limit: AUDIT_EXPORT_MAX })).map(entry => ({ ...entry, event: entry.event as AuditEntry['event'] })) : [],
       app: await core.onExport?.(user) ?? null,
     },

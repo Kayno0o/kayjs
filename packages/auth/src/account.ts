@@ -9,6 +9,7 @@ import { newPasswordProblem } from './breached'
 import { publicUser } from './core'
 import { eraseLeavingUser, soleOwned } from './erase'
 import { notify } from './notify'
+import { revokeUpstream } from './oauth/flow'
 import { normalizeUsername, usernameProblem } from './rules'
 import { endOtherSessions } from './sessions'
 import { reprove } from './twoFactor'
@@ -112,6 +113,7 @@ export async function unlink(state: RequestState, provider: string, proof: Proof
     return { ok: false, error: 'last-way-in' }
   }
 
+  await revokeUpstream(state.core, identity)
   await endOtherSessions(state, record)
   await notify(state, record, 'provider-unlinked', provider)
 

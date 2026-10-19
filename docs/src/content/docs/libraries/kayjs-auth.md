@@ -191,7 +191,9 @@ form(action={start})
   button Continue as a guest
 ```
 
-When the guest registers, the account keeps their id, so the app's data stays theirs. `user.guest` is `true` until then. A guest whose session ends is left in the store, and `listUsers` shows them. `guests: { maxAge: '30d' }` in `createAuth` deletes a guest older than that who has no session left, calling `onDelete` as for any user. Without it guests are kept for good.
+When the guest registers, the account keeps their id, so the app's data stays theirs. `user.guest` is `true` until then. A guest whose session ends is left in the store, and `listUsers` shows them, until they are deleted: 30 days after they were made by default, or `guests: { maxAge: '7d' }` in `createAuth`. Only a guest with no session left goes, and `onDelete` is called as for any user.
+
+An account registered and never verified goes the same way, 30 days after it was made, when `requireVerified` is on, as nobody can sign in to it. Set `email: { unverifiedMaxAge: '7d' }` to change that, or to turn it on without `requireVerified`. An account with a session, a linked provider or a role beyond `defaultRoles` stays.
 
 A guest costs nothing to make, so kayjs-auth does not name it to other libraries: kayjs-ai's limits count a guest by address, and a signed-in user by id.
 
@@ -328,7 +330,7 @@ form(action={register})
   button Create the account
 ```
 
-A proof of work costs a bot CPU rather than proving a human. A site bots target anyway sets Turnstile or hCaptcha as `captcha` instead; their tokens count only when the provider says they were made for your site's hostname, and for Turnstile the form they were shown on. `captcha: false` turns it off.
+A proof of work costs a bot CPU rather than proving a human. A site bots target anyway sets Turnstile or hCaptcha as `captcha` instead; their tokens count only when the provider says they were made for your site's hostname, and for Turnstile the form they were shown on. Those send the visitor's address and browser to the provider: the widget runs in their browser and talks to Cloudflare or hCaptcha directly. Your server sends the provider only your secret and the token. Name them in the site's privacy notice. The proof of work calls nobody. `captcha: false` turns it off.
 
 The proof needs kay's script in the browser. A client without it sets Turnstile or hCaptcha too, such as a plain Elysia app's own pages, a mobile app, or a form with `navigation: false` and no island.
 
@@ -363,7 +365,9 @@ Before 1.52 this was `onEvent(event, user, detail, context)`, with the fields pa
 
 A failed sign-in is reported after the response is sent. Your `onAuthEvent` and the audit log can be slow without telling anyone which addresses have an account.
 
-With `audit: true`, the same events are kept in the store for a year. Pass `audit: { maxAge: '90d' }`, seconds or a string, to change it. `auth.auditLog({ before, limit })` gives the signed-in user their own, newest first. Pass the last entry of a page as `before` for the next one.
+With `audit: true`, the same events are kept in the store for a year. Pass `audit: { maxAge: '90d' }`, seconds or a string, to change it.
+
+Each entry keeps the address cut to its network, the first three bytes of an IPv4 address and the first three groups of an IPv6 one. Pass `audit: { ip: 'full' }` to keep the whole address. Deleting an account removes the address and browser from its entries, and fails with the account still there if the store cannot. `auth.auditLog({ before, limit })` gives the signed-in user their own, newest first. Pass the last entry of a page as `before` for the next one.
 
 `describeAuditEntry(entry, { locale })` words an entry for a person, such as `Role editor granted`, in English or French.
 
@@ -465,6 +469,8 @@ createAuth({
 ```kay
 a(href="/auth/discord?redirect=/account" data-no-prefetch) Sign in with Discord
 ```
+
+A sign-in stores none of the provider's tokens unless the app asks. Set `keepTokens: true` on the entry to keep them, encrypted, for `providerToken('discord')`. Unlinking a provider and deleting the account then revoke the token at the provider when it has a revocation endpoint (Discord, Google, GitLab, Apple, and OpenID Connect providers that list one). GitHub and Microsoft have none, so the user ends the grant in their provider settings.
 
 Opening that link again while a sign-in is under way goes on with it, and never cancels a provider being linked to an account.
 

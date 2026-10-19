@@ -32,7 +32,7 @@ export interface OAuthClient {
 export type DocumentFetcher = (url: string) => Promise<unknown>
 
 // The 16 bytes of an IPv6 address, an embedded dotted IPv4 tail included.
-function v6Bytes(address: string): number[] | undefined {
+export function v6Bytes(address: string): number[] | undefined {
   let text = address.toLowerCase()
   const zone = text.indexOf('%')
 

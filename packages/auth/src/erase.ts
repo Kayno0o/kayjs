@@ -3,6 +3,7 @@ import type { UserRecord } from './store'
 import { publicUser } from './core'
 import { log } from './log'
 import { notify } from './notify'
+import { revokeUpstream } from './oauth/flow'
 
 type Core = RequestState['core']
 
@@ -47,7 +48,7 @@ export async function soleOwned(core: Core, record: UserRecord): Promise<SoleOwn
   return owned
 }
 
-// Deletes the user with everything kayjs-auth keeps for them. The app's records go first, so an `onDelete` that throws leaves the account in place, to delete again. The audit log keeps what happened under a new random name, without the addresses, browsers and details that lead back to the user.
+// Deletes the user with everything kayjs-auth keeps for them. The app's records go first, so an `onDelete` that throws leaves the account in place, to delete again. The audit log keeps what happened under a new random name, without the addresses, browsers and details that lead back to the user, and the provider tokens held are revoked upstream.
 // For an account nobody leaves, as an unverified one a registration replaces or a guest past `guests.maxAge`: the address's invitations stay for whoever proves it, and no mail goes out.
 // An organization it solely owned with other members passes to its longest-standing member, as it cannot be refused.
 export async function eraseUser(core: Core, record: UserRecord): Promise<void> {
@@ -68,7 +69,7 @@ export async function eraseLeavingUser(state: RequestState, record: UserRecord, 
   })
 }
 
-// `afterDelete` runs once the user is gone and before the audit log forgets them, so what it records still names them.
+// `afterDelete` runs once the user is gone, and what it records is forgotten after it. The audit log forgets the user before and after, and a failure of either fails the erase, so none of their data stays behind unreported.
 async function eraseThen(core: Core, record: UserRecord, handOver: boolean, afterDelete?: () => Promise<void>): Promise<{ ok: true } | { ok: false, error: 'last-owner' }> {
   const { store } = core
 
@@ -76,10 +77,19 @@ async function eraseThen(core: Core, record: UserRecord, handOver: boolean, afte
     return { ok: false, error: 'last-owner' }
 
   const owners = await owning(core, record)
+  const pseudonym = crypto.randomUUID()
 
   await core.onDelete?.(publicUser(record))
+  await Promise.all((await store.identities.listByUser(record.id)).map(async identity => revokeUpstream(core, identity)))
+  // Before the account goes, so a store that cannot strip the audit log fails the erase with the account still there to delete again.
+  await forget(core, record, pseudonym)
   await store.users.delete(record.id)
-  await afterDelete?.()
+
+  if (afterDelete) {
+    await afterDelete()
+    // What `afterDelete` recorded still names them.
+    await forget(core, record, pseudonym)
+  }
 
   // Logged, not thrown: the account is gone by then, and a retry would find nothing to delete.
   try {
@@ -89,17 +99,12 @@ async function eraseThen(core: Core, record: UserRecord, handOver: boolean, afte
     log.error('handing over a deleted user\'s organizations failed', error)
   }
 
-  if (!core.audit)
-    return { ok: true }
-
-  try {
-    await store.audit?.forget(record.id, crypto.randomUUID())
-  }
-  catch (error) {
-    log.error('stripping a deleted user from the audit log failed', error)
-  }
-
   return { ok: true }
+}
+
+async function forget(core: Core, record: UserRecord, pseudonym: string): Promise<void> {
+  if (core.audit)
+    await core.store.audit?.forget(record.id, pseudonym)
 }
 
 // Runs once the user is gone, so it also catches two owners deleted at the same moment, each having seen the other still there: an organization left empty is deleted, one left with members but no owner passes to the one who joined first.

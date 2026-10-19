@@ -33,6 +33,8 @@ export interface OpenIdCheck {
 export interface OAuthEndpoints {
   authorizeUrl?: string | undefined
   tokenUrl?: string | undefined
+  /** Where a token is revoked (RFC 7009), so unlinking or deleting a user ends the provider's grant; a provider without one leaves it to the user. */
+  revokeUrl?: string | undefined
   userUrl?: string | undefined
   openId?: OpenIdCheck | undefined
   /** The URL the endpoints are discovered from, such as an OpenID Connect issuer, checked like an endpoint. */

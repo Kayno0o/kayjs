@@ -77,6 +77,8 @@ const USER_FRESH_MS = 30 * 1000
 const TRAILING_SLASH = /\/$/
 const DEFAULT_REMEMBER_MAX_AGE = 90 * 24 * 60 * 60
 const DEFAULT_AUDIT_MAX_AGE = 365 * 24 * 60 * 60
+const DEFAULT_GUEST_MAX_AGE = 30 * 24 * 60 * 60
+const DEFAULT_UNVERIFIED_MAX_AGE = 30 * 24 * 60 * 60
 const LINK_TYPES: LinkType[] = ['verify-email', 'reset-password', 'magic-link', 'change-email']
 // The close code of a socket whose user is gone: a policy violation.
 const SOCKET_USER_GONE = 1008
@@ -144,7 +146,7 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   onProviderProfile?: ((user: User, profile: Profile) => void | Promise<void>) | undefined
   // Called once a user is deleted, to delete the app's own records for them.
   onDelete?: ((user: User) => void | Promise<void>) | undefined
-  // Deletes a guest whose account is older than `maxAge` (seconds or a string such as '30d') and who has no session left, calling `onDelete` as for any user; guests are kept for good without it.
+  // Deletes a guest whose account is older than `maxAge` (seconds or a string such as '30d') and who has no session left, calling `onDelete` as for any user; 30 days by default.
   guests?: { maxAge: Duration } | undefined
   // What the app keeps about a user, added to their `exportData()` as `app`: their posts, their orders.
   onExport?: ((user: User) => unknown) | undefined
@@ -152,8 +154,8 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   onAuthEvent?: ((info: AuthEventInfo) => void | Promise<void>) | undefined
   /** @deprecated Renamed `onAuthEvent`, which gets one object with the detail's parts as fields: `onEvent` still works for now and logs a warning. */
   onEvent?: ((event: AuthEvent, user: User, detail: string | undefined, context: EventContext) => void | Promise<void>) | undefined
-  // Keeps the same events in the store's audit log, for `auditLog()`; `maxAge` seconds or a string such as '365d', a year by default.
-  audit?: boolean | { maxAge?: Duration } | undefined
+  // Keeps the same events in the store's audit log, for `auditLog()`; `maxAge` seconds or a string such as '365d', a year by default. Each entry keeps the address cut to its /24 (IPv4) or /48 (IPv6) unless `ip` is 'full'.
+  audit?: boolean | { maxAge?: Duration, ip?: 'full' | 'truncated' } | undefined
   // What a bearer token may be limited to, such as `['posts:read', 'posts:write']`: a route asks for one with `scope:`.
   scopes?: readonly Scope[] | undefined
   // Each role and the roles it includes: `{ admin: ['editor'], editor: [] }`.
@@ -1321,7 +1323,18 @@ function wholeSeconds(value: Duration, what: string): number {
   return Math.ceil(durationSeconds(value, what, 'kayjs-auth'))
 }
 
-function auditMaxAge(audit: true | { maxAge?: Duration }): number {
+// Seconds an account never verified is kept: only where unverified accounts cannot sign in, as one that can is an account in use.
+function unverifiedMaxAge(email: EmailOptions | undefined): number | undefined {
+  if (!email)
+    return undefined
+
+  if (email.unverifiedMaxAge !== undefined)
+    return wholeSeconds(email.unverifiedMaxAge, 'email.unverifiedMaxAge')
+
+  return email.requireVerified ?? true ? DEFAULT_UNVERIFIED_MAX_AGE : undefined
+}
+
+function auditMaxAge(audit: true | { maxAge?: Duration, ip?: 'full' | 'truncated' }): number {
   return audit === true || audit.maxAge === undefined ? DEFAULT_AUDIT_MAX_AGE : wholeSeconds(audit.maxAge, 'audit.maxAge')
 }
 
@@ -1418,13 +1431,14 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
     onSignUp: options.onSignUp,
     onProviderProfile: options.onProviderProfile,
     onDelete: options.onDelete,
-    guestMaxAge: options.guests === undefined ? undefined : wholeSeconds(options.guests.maxAge, 'guests.maxAge'),
+    guestMaxAge: options.guests === undefined ? DEFAULT_GUEST_MAX_AGE : wholeSeconds(options.guests.maxAge, 'guests.maxAge'),
+    unverifiedMaxAge: unverifiedMaxAge(options.email),
     onExport: options.onExport,
     onAuthEvent: options.onAuthEvent,
     onEvent: options.onEvent,
     organizations: options.organizations && organizationsCore(options.organizations),
     pruned: { at: 0, running: Promise.resolve() },
-    audit: options.audit == null || options.audit === false ? undefined : { maxAge: auditMaxAge(options.audit), prunedAt: 0 },
+    audit: options.audit == null || options.audit === false ? undefined : { maxAge: auditMaxAge(options.audit), prunedAt: 0, ip: options.audit === true ? 'truncated' : options.audit.ip ?? 'truncated' },
   }
 
   for (const [name, { client }] of oauth) {

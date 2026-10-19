@@ -6,15 +6,15 @@ import { log } from './log'
 // What expired is deleted at most this often.
 export const PRUNE_EVERY_MS = 60 * 60 * 1000
 const BEARER_EXPIRED_KEPT_MS = 30 * 24 * 60 * 60 * 1000
-// Guests listed at once, and the most batches one run goes through; a larger backlog goes on with the next run.
-const GUESTS_PER_BATCH = 500
-const GUEST_BATCHES_PER_RUN = 20
+// Accounts listed at once, and the most batches one run goes through; a larger backlog goes on with the next run.
+const STALE_PER_BATCH = 500
+const STALE_BATCHES_PER_RUN = 20
 
 // Starts the store's pruning when it is due, without making the request wait for it; `core.pruned.running` is the run while it lasts. A failure is logged, and the next try is an hour away.
 export function pruneWhenDue(core: Core, settings: SessionSettings): void {
   const now = Date.now()
 
-  if ((!core.store.prune && !guestsPruned(core)) || now - core.pruned.at < PRUNE_EVERY_MS)
+  if ((!core.store.prune && !staleKept(core)) || now - core.pruned.at < PRUNE_EVERY_MS)
     return
 
   core.pruned.at = now
@@ -29,42 +29,58 @@ async function prune(core: Core, settings: SessionSettings, now: number): Promis
     log.error('pruning what expired failed', error)
   }
 
-  await pruneGuests(core, now)
+  await pruneStale(core, now, 'guest')
+  await pruneStale(core, now, 'unverified')
 }
 
-function guestsPruned(core: Core): boolean {
-  return core.guestMaxAge !== undefined && core.store.users.staleGuests !== undefined
+function staleKept(core: Core): boolean {
+  return core.store.users.staleGuests !== undefined || (core.unverifiedMaxAge !== undefined && core.store.users.staleUnverified !== undefined)
 }
 
-// Guests older than `guests.maxAge` whose sessions ended go as any deleted user does, `onDelete` first. One whose `onDelete` fails stays, to be tried again the next run.
-async function pruneGuests(core: Core, now: number): Promise<void> {
-  if (core.guestMaxAge === undefined || !core.store.users.staleGuests)
+// Guests older than `guests.maxAge` whose sessions ended, and with `requireVerified` the accounts registered and never verified for `email.unverifiedMaxAge`, go as any deleted user does, `onDelete` first. One whose `onDelete` fails stays, to be tried again the next run.
+async function pruneStale(core: Core, now: number, kind: 'guest' | 'unverified'): Promise<void> {
+  const maxAge = kind === 'guest' ? core.guestMaxAge : core.unverifiedMaxAge
+  const list = kind === 'guest' ? core.store.users.staleGuests : core.store.users.staleUnverified
+
+  if (maxAge === undefined || !list)
     return
 
   try {
-    for (let batch = 0; batch < GUEST_BATCHES_PER_RUN; batch++) {
-      const guests = await core.store.users.staleGuests(new Date(now - core.guestMaxAge * 1000), GUESTS_PER_BATCH)
+    for (let batch = 0; batch < STALE_BATCHES_PER_RUN; batch++) {
+      const stale = await list(new Date(now - maxAge * 1000), STALE_PER_BATCH)
       let deleted = 0
 
-      for (const guest of guests) {
+      for (const account of stale) {
         try {
-          // A guest registered since the list was read is a real account.
-          if ((await core.store.users.get(guest.id))?.guest === true) {
-            await eraseUser(core, guest)
+          if (await stillStale(core, account.id, kind)) {
+            await eraseUser(core, account)
             deleted++
           }
         }
         catch (error) {
-          log.error('deleting a stale guest failed', error)
+          log.error(`deleting a stale ${kind} failed`, error)
         }
       }
 
       // A short list is the end of them, and a batch deleting none would only come back as it was.
-      if (guests.length < GUESTS_PER_BATCH || deleted === 0)
+      if (stale.length < STALE_PER_BATCH || deleted === 0)
         return
     }
   }
   catch (error) {
-    log.error('listing the stale guests failed', error)
+    log.error(`listing the stale ${kind}s failed`, error)
   }
+}
+
+// Read again just before the erase: a guest registered since the list was read is a real account, and an unverified one given a role beyond the default ones was set up on purpose, as registering again does not replace it.
+async function stillStale(core: Core, id: string, kind: 'guest' | 'unverified'): Promise<boolean> {
+  const current = await core.store.users.get(id)
+
+  if (!current)
+    return false
+
+  if (kind === 'guest')
+    return current.guest
+
+  return !current.guest && current.emailVerifiedAt === null && current.roles.every(role => core.defaultRoles.includes(role))
 }

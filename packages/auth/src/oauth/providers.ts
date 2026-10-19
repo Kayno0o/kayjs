@@ -49,6 +49,7 @@ export function discordProvider(opts: ProviderOptions & {
     label: 'Discord',
     authorizeUrl: 'https://discord.com/oauth2/authorize',
     tokenUrl: `${apiBase}/oauth2/token`,
+    revokeUrl: `${apiBase}/oauth2/token/revoke`,
     userUrl: `${apiBase}/users/@me`,
     scopes: opts.scopes ?? ['identify', 'email'],
     ...opts.params === undefined ? {} : { authorizeParams: opts.params },
@@ -203,7 +204,7 @@ export function oidcProvider(opts: OpenIdOptions & { issuer: string, name?: stri
           throw new Error(`discovery document has no ${field}`)
       }
 
-      for (const field of ['authorization_endpoint', 'token_endpoint', 'userinfo_endpoint', 'jwks_uri']) {
+      for (const field of ['authorization_endpoint', 'token_endpoint', 'userinfo_endpoint', 'revocation_endpoint', 'jwks_uri']) {
         if (typeof doc[field] === 'string')
           requireHttps(doc[field], `the discovery document's ${field}`)
       }
@@ -212,6 +213,7 @@ export function oidcProvider(opts: OpenIdOptions & { issuer: string, name?: stri
         authorizeUrl: doc.authorization_endpoint as string,
         tokenUrl: doc.token_endpoint as string,
         userUrl: typeof doc.userinfo_endpoint === 'string' ? doc.userinfo_endpoint : undefined,
+        revokeUrl: typeof doc.revocation_endpoint === 'string' ? doc.revocation_endpoint : undefined,
         openId: { issuer: doc.issuer, jwksUrl: doc.jwks_uri as string, algorithms: opts.algorithms },
       }
     },
@@ -227,6 +229,7 @@ export function googleProvider(opts: OpenIdOptions = {}): OAuthProvider<OpenIdCl
     label: 'Google',
     authorizeUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
     tokenUrl: 'https://oauth2.googleapis.com/token',
+    revokeUrl: 'https://oauth2.googleapis.com/revoke',
     openId: { issuer: ['https://accounts.google.com', 'accounts.google.com'], jwksUrl: 'https://www.googleapis.com/oauth2/v3/certs', algorithms: opts.algorithms },
     scopes: opts.scopes ?? OPENID_SCOPES,
     ...opts.params === undefined ? {} : { authorizeParams: opts.params },
@@ -285,6 +288,7 @@ export function gitlabProvider(opts: OpenIdOptions & { url?: string } = {}): OAu
     label: 'GitLab',
     authorizeUrl: `${base}/oauth/authorize`,
     tokenUrl: `${base}/oauth/token`,
+    revokeUrl: `${base}/oauth/revoke`,
     userUrl: `${base}/oauth/userinfo`,
     openId: { issuer: base, jwksUrl: `${base}/oauth/discovery/keys`, algorithms: opts.algorithms },
     scopes: opts.scopes ?? OPENID_SCOPES,
@@ -304,6 +308,7 @@ export function appleProvider(opts: Pick<ProviderOptions, 'scopes' | 'params'> &
     label: 'Apple',
     authorizeUrl: 'https://appleid.apple.com/auth/authorize',
     tokenUrl: 'https://appleid.apple.com/auth/token',
+    revokeUrl: 'https://appleid.apple.com/auth/revoke',
     openId: { issuer: 'https://appleid.apple.com', jwksUrl: 'https://appleid.apple.com/auth/keys' },
     scopes: opts.scopes ?? ['name', 'email'],
     // Apple answers a request for the name or the email only through a POST back to the callback.
