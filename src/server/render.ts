@@ -56,7 +56,7 @@ import { matchesEtag } from './public'
 import { chainQuery, queryRules, queryScript, readQuery, readQueryLeniently } from './query'
 import { reportServerError } from './report'
 import { guardUrl, routeChain } from './routes'
-import { inServerScope, readPersonally, wasReadPersonally, withOutcome } from './scope'
+import { inServerScope, markPrivate, readPersonally, wasReadPersonally, withOutcome } from './scope'
 import { Denied, NotFound, Redirect, stoppers } from './signals'
 import { speculationRules } from './speculation'
 import { formChecks, renderBlock, renderStatic, settle, streamDocument } from './stream'
@@ -195,7 +195,6 @@ const stylesheetsOf = perOwner<ClientBuild['styles']>()
 const TEXT = { 'content-type': 'text/plain; charset=utf-8' }
 // Header values are bytes, so a file name outside ASCII is escaped.
 const NOT_ASCII = /[^\x20-\x7E]/g
-const VARY_COOKIE = /(?:^|,)\s*cookie\s*(?:,|$)/i
 
 // The params come resolved, each matcher's value in place of its text.
 export async function renderPage(route: ServedRoute, context: RequestContext, params: Record<string, unknown>, client: ClientBuild, options: RenderOptions = {}): Promise<Response> {
@@ -225,11 +224,11 @@ async function renderRoute(route: ServedRoute, rendering: Rendering, client: Cli
 
 // The response a guard refusing the request gives, if one does.
 async function refused(route: ServedRoute, rendering: Rendering, client: ClientBuild, options: RenderOptions): Promise<Response | undefined> {
-  // The page keeps the URL as sent; its guards read it spelled one way.
   // Behind a guard the answer is for whoever passed it, whatever the guard read of the request.
   if (route.guards.length > 0)
     readPersonally(rendering.ctx.request)
 
+  // The page keeps the URL as sent; its guards read it spelled one way.
   const refusal = route.guards.length > 0 ? await runGuards(route.guards, Object.create(rendering.ctx, { url: { value: guardUrl(rendering.ctx.url) } }) as typeof rendering.ctx) : undefined
 
   if (options.dev) {
@@ -699,10 +698,7 @@ function keepPersonal({ headers, ctx, prerendering }: Rendering): void {
   if (prerendering || headers.has('cache-control') || !wasReadPersonally(ctx.request))
     return
 
-  headers.set('cache-control', 'private, no-cache')
-
-  if (!VARY_COOKIE.test(headers.get('vary') ?? ''))
-    headers.append('vary', 'cookie')
+  markPrivate(headers)
 }
 
 function pageErrorOf(error: unknown, dev: boolean | undefined): PageError {

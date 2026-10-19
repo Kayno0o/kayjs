@@ -44,6 +44,19 @@ export function withOutcome<T>(read: () => Outcome | null, run: () => T): T {
   return outcomes.run(read, run)
 }
 
+export const VARY_COOKIE = /(?:^|,)\s*cookie\s*(?:,|$)/i
+
+// Keeps every shared cache from storing an answer meant for one caller, unless it set its own caching.
+export function markPrivate(headers: Headers): void {
+  if (headers.has('cache-control'))
+    return
+
+  headers.set('cache-control', 'private, no-cache')
+
+  if (!VARY_COOKIE.test(headers.get('vary') ?? ''))
+    headers.append('vary', 'cookie')
+}
+
 export function readPersonally(request: Request): void {
   personal.add(request)
 }

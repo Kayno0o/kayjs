@@ -29,7 +29,7 @@ import { sharedContext } from './render'
 import { reportServerError } from './report'
 import { requestUrl } from './request-url'
 import { apiRoutePath, withoutSlash } from './routes'
-import { wasReadPersonally } from './scope'
+import { VARY_COOKIE, wasReadPersonally } from './scope'
 import { carriedNames, carryContext } from './security'
 import { answered, failed, SERVER_SPAN, startSpan } from './trace'
 
@@ -236,19 +236,23 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
   return { limits, routeLimits, mounted }
 }
 
-const VARY_COOKIE = /(?:^|,)\s*cookie\s*(?:,|$)/i
-
 // An answer to a request whose guards or session read who sent it is for that caller alone, unless the route set its own caching; a Response of the route's own keeps its headers, as the context's never overwrite them.
 function privateAnswer(request: Request, headers: Record<string, unknown>): void {
-  if (!wasReadPersonally(request) || headers['cache-control'] !== undefined)
+  if (!wasReadPersonally(request))
+    return
+
+  const named = (name: string) => Object.keys(headers).find(key => key.toLowerCase() === name)
+
+  if (named('cache-control') !== undefined)
     return
 
   headers['cache-control'] = 'private, no-cache'
 
-  const vary = headers.vary === undefined ? '' : [headers.vary].flat().join(', ')
+  const key = named('vary') ?? 'vary'
+  const vary = headers[key] === undefined ? '' : [headers[key]].flat().join(', ')
 
   if (!VARY_COOKIE.test(vary))
-    headers.vary = vary === '' ? 'cookie' : `${vary}, cookie`
+    headers[key] = vary === '' ? 'cookie' : `${vary}, cookie`
 }
 
 // A status as a number: Elysia accepts its names (`'Bad Request'`) too, and a name it does not know counts as a failure.

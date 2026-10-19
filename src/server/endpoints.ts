@@ -15,7 +15,7 @@ import { listedParams, pathOf } from './prerendered'
 import { sharedContext } from './render'
 import { reportServerError } from './report'
 import { routerKey } from './routes'
-import { readPersonally, wasReadPersonally } from './scope'
+import { markPrivate, readPersonally, wasReadPersonally } from './scope'
 import { Denied, NotFound, Redirect, stoppers } from './signals'
 
 type Handler = (ctx: EndpointContext) => unknown
@@ -134,10 +134,8 @@ async function answer(endpoint: ServedEndpoint, context: { request: Request }, p
 
 // A redirect, a denial or a 404 thrown after the cookies were read is for that visitor alone too, unless it sets its own `cache-control`.
 function markedPrivate(response: Response, request: Request): Response {
-  if (wasReadPersonally(request) && !response.headers.has('cache-control')) {
-    response.headers.set('cache-control', 'private, no-cache')
-    response.headers.append('vary', 'cookie')
-  }
+  if (wasReadPersonally(request))
+    markPrivate(response.headers)
 
   return response
 }

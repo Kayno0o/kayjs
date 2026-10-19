@@ -11,6 +11,7 @@ import { inLocale, passGuards } from './actions'
 import { API_PREFIX, openApiPaths } from './api-modules'
 import { sharedContext } from './render'
 import { apiRoutePath } from './routes'
+import { markPrivate } from './scope'
 import { toolSettings } from './tool-settings'
 
 export interface OpenApiConfig {
@@ -416,7 +417,15 @@ export async function guardRefusal(guards: LoadedGuard[], context: { request: Re
 // The document at `/api/openapi.json`, and the reference page when asked for, behind the guard of the API directory itself when it has one.
 export function serveOpenApi(app: Elysia, document: Schema, config: OpenApiConfig, guards: LoadedGuard[], options: ActionOptions): void {
   const json = JSON.stringify(document)
-  const admitted = async (context: { request: Request }, answer: () => Response) => (await guardRefusal(guards, context, options)) ?? answer()
+  const admitted = async (context: { request: Request }, answer: () => Response) => {
+    const response = (await guardRefusal(guards, context, options)) ?? answer()
+
+    // Guards that ran make the answer, document included, for that caller alone.
+    if (guards.length > 0)
+      markPrivate(response.headers)
+
+    return response
+  }
 
   const paths = openApiPaths(config)
 

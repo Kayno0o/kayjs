@@ -7,7 +7,7 @@ import { scratchDir } from './scratch'
 // Reads a header and nothing else: `x-deny` refuses, `x-go` redirects.
 const GUARD = 'import { guard } from \'kay\'\n\nexport default guard(({ request, deny, redirect }) => {\n  request.headers.get(\'authorization\')\n\n  if (request.headers.has(\'x-deny\'))\n    deny(401, \'Sign in\')\n\n  if (request.headers.has(\'x-go\'))\n    redirect(\'/login\')\n})\n'
 const ENDPOINT = 'export function GET({ headers, request }) {\n  if (request.headers.has(\'x-cache\'))\n    headers.set(\'cache-control\', \'public, max-age=60\')\n\n  return \'ok\'\n}\n'
-const API = 'import { api } from \'kay/server\'\n\nexport default api()\n  .get(\'/\', () => ({ ok: true }))\n  .get(\'/own\', () => new Response(\'own\', { headers: { \'cache-control\': \'public, max-age=60\' } }))\n  .get(\'/text\', () => \'text\')\n'
+const API = 'import { api } from \'kay/server\'\n\nexport default api()\n  .get(\'/\', () => ({ ok: true }))\n  .get(\'/own\', () => new Response(\'own\', { headers: { \'cache-control\': \'public, max-age=60\' } }))\n  .get(\'/text\', () => \'text\')\n  .get(\'/cased\', ({ set }) => {\n    set.headers[\'Cache-Control\'] = \'public, max-age=60\'\n\n    return \'cased\'\n  })\n  .get(\'/missing\', ({ status }) => status(404, \'none\'))\n'
 const PAGE = '--- server\nif (ctx.request.headers.has(\'x-cache\')) ctx.headers.set(\'cache-control\', \'public, max-age=60\')\n---\nh1 Page\n'
 
 describe('a guarded route is private', () => {
@@ -31,6 +31,8 @@ describe('a guarded route is private', () => {
       Bun.write(join(dir, 'api/private/_guard.ts'), GUARD),
       Bun.write(join(dir, 'api/private/index.ts'), API),
       Bun.write(join(dir, 'api/seen.ts'), 'import { api, memoryStore, session } from \'kay/server\'\n\nexport default api()\n  .use(session({ secret: \'a-secret-of-at-least-32-characters-long\', store: memoryStore() }))\n  .get(\'/\', async ({ session }) => String(await session.get(\'user\') ?? \'none\'))\n'),
+      Bun.write(join(dir, 'documented/_guard.ts'), GUARD),
+      Bun.write(join(dir, 'documented/index.ts'), 'import { api } from \'kay/server\'\n\nexport default api().get(\'/\', () => ({ ok: true }))\n'),
       Bun.write(join(dir, 'api/open.ts'), 'import { api } from \'kay/server\'\n\nexport default api().get(\'/\', () => ({ ok: true }))\n'),
     ])
 
@@ -39,10 +41,18 @@ describe('a guarded route is private', () => {
 
     servers.production = await pages({ routes, api, prebuilt: false, security: false })
     servers.dev = await pages({ routes, api, prebuilt: false, security: false, dev: true })
+    servers.documented = await pages({ routes, api: join(dir, 'documented'), prebuilt: false, security: false, openapi: { reference: true } })
     servers.mounted = await pages({ routes, api, prebuilt: false, security: false, base: '/app' })
   })
 
   afterAll(async () => rm(dir, { recursive: true, force: true }))
+
+  it('marks the API document and reference page behind a guard, and their refusals', async () => {
+    for (const path of ['/api/openapi.json', '/api/reference']) {
+      expect(await answer('documented', path, { headers: { authorization: 'Bearer token' } })).toEqual([200, 'private, no-cache', 'cookie'])
+      expect(await answer('documented', path, { headers: { 'x-deny': '1' } })).toEqual([401, 'private, no-cache', 'cookie'])
+    }
+  })
 
   describe.each([['production', ''], ['dev', ''], ['mounted', '']])('%s', (name, base) => {
     const authorized = { headers: { authorization: 'Bearer token' } }
@@ -78,6 +88,8 @@ describe('a guarded route is private', () => {
       expect((await answer(name, `${base}/api/private`, { headers: { 'x-deny': '1' } }))[1]).toBe('private, no-cache')
       expect((await answer(name, `${base}/api/private`, { headers: { 'x-go': '1' } }))[1]).toBe('private, no-cache')
       expect((await answer(name, `${base}/api/private/own`, authorized))[1]).toBe('public, max-age=60')
+      expect((await answer(name, `${base}/api/private/cased`, authorized))[1]).toBe('public, max-age=60')
+      expect(await answer(name, `${base}/api/private/missing`, authorized)).toEqual([404, 'private, no-cache', 'cookie'])
     })
 
     it('marks an API answer that read the session', async () => {
