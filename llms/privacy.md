@@ -147,13 +147,13 @@ else
 
 ### Keep failed jobs for less time
 
-A failed job keeps its payload, an address say, 30 days from when its last attempt was due; `keepFailed` shortens it:
+A failed job keeps its payload, an address say, 30 days from when its last attempt was due; `keepFailed` shortens it and `redact` keeps less of it (kayjs-mail's queue does both by default):
 
 ```ts
 import { queue } from 'kay/server'
 import { sendMail } from './mail'
 
-export const mail = queue('mail', sendMail, { keepFailed: '7d' })
+export const mail = queue('mail', sendMail, { keepFailed: '7d', redact: ({ to }) => ({ to, body: '' }) })
 ```
 
 ### Keep a photo's metadata

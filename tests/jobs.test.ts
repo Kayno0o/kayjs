@@ -1002,6 +1002,74 @@ describe('queue', () => {
     }
   })
 
+  it.each(['memory', 'sqlite', 'without payload'])('keeps a job given up as redact leaves it, and whole when redact throws, in a %s store', async (kind) => {
+    const store = kind === 'sqlite' ? sqliteJobs(await jobsPath()) : memoryJobs()
+    const fail = store.fail
+
+    if (kind === 'without payload')
+      store.fail = async (id, error) => fail(id, error)
+
+    const seen: unknown[] = []
+    const redacting = queue<{ to: string, body: string }>('redacted', () => {
+      throw new Error('no such mailbox')
+    }, { store, attempts: 1, redact: ({ to }) => ({ to, body: '' }), onFailed: payload => void seen.push(payload) })
+    const throwing = queue<{ to: string, body: string }>('throwing', () => {
+      throw new Error('no such mailbox')
+    }, { store, attempts: 1, redact: () => {
+      throw new Error('redact bug')
+    }, onFailed: () => undefined })
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+
+    try {
+      await redacting.enqueue({ to: 'ada@example.com', body: 'https://example.com/reset?token=secret' })
+      await throwing.enqueue({ to: 'grace@example.com', body: 'whole' })
+      await redacting.drain()
+      await throwing.drain()
+      expect((await redacting.failed()).map(job => job.payload)).toEqual(kind === 'without payload' ? [{ to: 'ada@example.com', body: 'https://example.com/reset?token=secret' }] : [{ to: 'ada@example.com', body: '' }])
+      expect((await throwing.failed()).map(job => job.payload)).toEqual([{ to: 'grace@example.com', body: 'whole' }])
+      // The app's own onFailed still gets the payload as it was.
+      expect(seen).toEqual([{ to: 'ada@example.com', body: 'https://example.com/reset?token=secret' }])
+    }
+    finally {
+      logged.mockRestore()
+    }
+  })
+
+  it.each(['memory', 'sqlite'])('drops expired failed jobs when a process with no worker enqueues, lists or removes, in a %s store', async (kind) => {
+    const store = kind === 'sqlite' ? sqliteJobs(await jobsPath()) : memoryJobs()
+    const make = (name: string) => queue(name, () => {
+      throw new Error('down')
+    }, { store, attempts: 1, keepFailed: '1d', onFailed: () => undefined })
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+
+    try {
+      for (const touch of ['enqueue', 'failed', 'remove'] as const) {
+        const jobs = make(`idle-${kind}-${touch}`)
+
+        await jobs.enqueue('ada@example.com')
+        await jobs.drain()
+        expect(await jobs.failed()).toHaveLength(1)
+
+        // Past the keep and the hour between purges, with nothing but the call under test to notice.
+        setSystemTime(Date.now() + 2 * 24 * 3_600_000)
+
+        if (touch === 'enqueue')
+          await jobs.enqueue('grace@example.com', { delay: '1h' })
+        else if (touch === 'remove')
+          await jobs.remove('nothing')
+        else
+          await jobs.failed()
+
+        expect((await store.failed(`idle-${kind}-${touch}`))).toHaveLength(0)
+        setSystemTime()
+      }
+    }
+    finally {
+      setSystemTime()
+      logged.mockRestore()
+    }
+  })
+
   it.each(['memory', 'sqlite'])('removes a job by id, or every waiting and failed job whose payload matches, from a %s store', async (kind) => {
     const mail = queue('erase', (to: string) => {
       if (to === 'bounce@example.com')

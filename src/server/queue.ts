@@ -38,8 +38,8 @@ export interface JobStore {
   retry: (id: string, runAt: number, error: string) => Maybe<void>
   // Gives a job back untouched, its attempt not counted, for the next process to take: a run stopped by a shutdown. Only while the hold `until` it was claimed with is still the job's, so a late release never clears another process's claim. A store without it has the job retried after its backoff as any failed run.
   release?: ((id: string, until: number) => Maybe<void>) | undefined
-  // Keeps it as failed, out of the queue.
-  fail: (id: string, error: string) => Maybe<void>
+  // Keeps it as failed, out of the queue, with `payload` in place of the stored one when the queue redacts what it keeps; a store ignoring it keeps the payload whole.
+  fail: (id: string, error: string, payload?: string) => Maybe<void>
   // Removes the failed jobs of the queue whose time came before `before`, and resolves with how many went; a store without it has them listed with `failed` and removed one by one.
   purge?: ((queue: string, before: number) => Maybe<number>) | undefined
   failed: (queue: string) => Maybe<StoredJob[]>
@@ -68,6 +68,8 @@ export interface QueueOptions<Payload> {
   idlePoll?: Duration | undefined
   // How long a failed job is kept, its payload included, from when its last attempt was due: 30 days by default, `false` until removed.
   keepFailed?: Duration | false | undefined
+  // What a failed job keeps in place of its payload, such as a mail without its body: applied once it is given up, so a failed job holds no more than the app needs to see what went wrong. The payload is kept whole when it throws.
+  redact?: ((payload: Payload) => Payload) | undefined
   // Gets a job that failed its last attempt, once it is kept as failed.
   onFailed?: ((payload: Payload, error: unknown) => unknown) | undefined
 }
@@ -152,8 +154,8 @@ export function sqliteJobs(path: string): JobStore {
     release(id, until) {
       open(true)!.release.run(id, until)
     },
-    fail(id, error) {
-      open(true)!.fail.run(error, id)
+    fail(id, error, payload) {
+      open(true)!.fail.run(error, payload ?? null, id)
     },
     purge(queue, before) {
       return open(false)?.purge.run(queue, before).changes ?? 0
@@ -195,7 +197,7 @@ function prepareJobs(db: Database) {
   const remove = db.query('DELETE FROM kay_jobs WHERE id = ?')
   const retry = db.query('UPDATE kay_jobs SET run_at = ?, held_until = NULL, error = ? WHERE id = ?')
   const release = db.query('UPDATE kay_jobs SET held_until = NULL, attempts = attempts - 1 WHERE id = ? AND held_until = ?')
-  const fail = db.query('UPDATE kay_jobs SET failed = 1, held_until = NULL, error = ? WHERE id = ?')
+  const fail = db.query('UPDATE kay_jobs SET failed = 1, held_until = NULL, error = ?, payload = coalesce(?, payload) WHERE id = ?')
   const purge = db.query('DELETE FROM kay_jobs WHERE queue = ? AND failed = 1 AND run_at < ?')
   const failed = db.query<JobRow, [string]>('SELECT id, queue, payload, attempts, run_at, error FROM kay_jobs WHERE queue = ? AND failed = 1 ORDER BY run_at')
   const all = db.query<JobRow, [string]>('SELECT id, queue, payload, attempts, run_at, error FROM kay_jobs WHERE queue = ? ORDER BY run_at')
@@ -242,8 +244,8 @@ export function memoryJobs(): JobStore {
         job.attempts--
       }
     },
-    fail(id, error) {
-      Object.assign(jobs.get(id) ?? {}, { failed: true, error, heldUntil: undefined })
+    fail(id, error, payload) {
+      Object.assign(jobs.get(id) ?? {}, { failed: true, error, heldUntil: undefined, ...payload !== undefined && { payload } })
     },
     purge(queue, before) {
       const purged = [...jobs.values()].filter(job => job.queue === queue && job.failed && job.runAt < before)
@@ -341,6 +343,21 @@ export function queue<Payload>(name: string, handler: (payload: Payload, signal:
     }
   }
 
+  // The payload a failed job keeps, undefined to keep it whole.
+  const redacted = (job: StoredJob): string | undefined => {
+    if (!options.redact)
+      return undefined
+
+    try {
+      return stringify(options.redact(parse(job.payload) as Payload))
+    }
+    catch (error) {
+      kayLog('error', `redact of queue('${name}') failed, so its failed job keeps its payload`, error)
+
+      return undefined
+    }
+  }
+
   // A run that outlasts `lostAfter` fails and its signal aborts, so its worker takes the next job and a handler listening to the signal stops rather than run beside the retry.
   // It ends a moment before the hold does, so no other process takes the job while this one still marks how it went.
   const withinLostAfter = async (run: unknown, held: number, ended: AbortController): Promise<void> => {
@@ -380,7 +397,7 @@ export function queue<Payload>(name: string, handler: (payload: Payload, signal:
     if (job.attempts > attempts) {
       const message = `it was taken ${job.attempts - 1} times, as many as its ${attempts} attempts, its last run never finishing`
 
-      await store().fail(job.id, message)
+      await store().fail(job.id, message, redacted(job))
       kayLog('error', `a job of queue('${name}') is kept as failed without running: ${message}`)
       await reportFailed(job, new Error(message))
 
@@ -426,7 +443,7 @@ export function queue<Payload>(name: string, handler: (payload: Payload, signal:
         return true
       }
 
-      await store().fail(job.id, message)
+      await store().fail(job.id, message, redacted(job))
       await reportBackgroundError(`a job of queue('${name}') failed ${job.attempts} times and is kept as failed`, error)
       await reportFailed(job, error)
     }
@@ -439,7 +456,7 @@ export function queue<Payload>(name: string, handler: (payload: Payload, signal:
 
   let purged = 0
 
-  // Drops the failed jobs whose last attempt is older than `keepFailed`, once an hour at most, whichever worker or drain gets there first.
+  // Drops the failed jobs whose last attempt is older than `keepFailed`, once an hour at most, whichever worker, drain, enqueue or read of the failed jobs gets there first, so a process with no worker of the queue purges it too.
   const purgeFailed = async () => {
     const now = Date.now()
 
@@ -459,6 +476,16 @@ export function queue<Payload>(name: string, handler: (payload: Payload, signal:
     for (const job of await current.failed(name)) {
       if (job.runAt < now - keepFailed)
         await current.complete(job.id)
+    }
+  }
+
+  // The purge outside a worker: a store that fails here is the caller's own business to learn of when it reads or writes, so it is logged and not thrown.
+  const tidy = async () => {
+    try {
+      await purgeFailed()
+    }
+    catch (error) {
+      kayLog('warn', `queue('${name}') could not drop its expired failed jobs`, error)
     }
   }
 
@@ -548,6 +575,7 @@ export function queue<Payload>(name: string, handler: (payload: Payload, signal:
       const delay = enqueueOptions.delay === undefined ? 0 : durationSeconds(enqueueOptions.delay, `queue('${name}')'s delay`) * 1000
 
       await store().add({ id, queue: name, payload: stringify(payload), attempts: 0, runAt: Date.now() + delay })
+      await tidy()
 
       // A delayed job too: the worker looking for jobs sleeps until the next one is due, which this may precede.
       wakePoller()
@@ -564,8 +592,14 @@ export function queue<Payload>(name: string, handler: (payload: Payload, signal:
 
       return ran
     },
-    failed: async () => (await store().failed(name)).map(job => ({ id: job.id, payload: parse(job.payload) as Payload, attempts: job.attempts, error: job.error ?? '' })),
+    failed: async () => {
+      await tidy()
+
+      return (await store().failed(name)).map(job => ({ id: job.id, payload: parse(job.payload) as Payload, attempts: job.attempts, error: job.error ?? '' }))
+    },
     remove: async (match: string | ((payload: Payload) => boolean)) => {
+      await tidy()
+
       const listed = store().jobs?.(name)
 
       if (typeof match !== 'string' && !listed)

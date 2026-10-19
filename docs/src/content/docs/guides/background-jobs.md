@@ -93,6 +93,8 @@ A failed job is kept 30 days, its payload included, or as long as `keepFailed` s
 welcomeMails.remove(job => job.to === email)
 ```
 
+The queue drops expired ones whenever you enqueue, list or remove jobs too, so a process with no worker still cleans up. `redact` gives what a failed job keeps instead of its payload, such as a mail without its body. `onFailed` still gets the whole payload, and a custom `JobStore` stores the redacted one only if its `fail` takes a third argument.
+
 Jobs wait in a SQLite file shared by the server processes on one machine. Under `bun test` they stay in memory, and `site.runJobs()` from `kay/test` runs them.
 
 An idle queue looks for a job from one worker. A job another process enqueued waits 10 seconds at worst, the default `idlePoll`.

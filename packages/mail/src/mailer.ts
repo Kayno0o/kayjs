@@ -56,7 +56,7 @@ export interface MailerOptions {
   smtp?: SmtpOverrides | undefined
   // The language mails are written in unless one names its own: the locale their component renders `t()` in, and the `<html lang>` of the document. The site's default locale (the request's, while one runs) when left out.
   lang?: string | undefined
-  // The queue `enqueue` hands mails to, `mail` unless named, retried as kay's queues are.
+  // The queue `enqueue` hands mails to, `mail` unless named, retried as kay's queues are. A mail given up is kept 7 days (`keepFailed`) without its body, links, headers and attachments (`redact`); both can be set here.
   queue?: QueueOptions<Mail> & { name?: string | undefined } | undefined
   // Logs each mail's recipients in full rather than their count and domains, such as while setting up a site's mail.
   logRecipients?: boolean | undefined
@@ -90,10 +90,17 @@ export type Mailer = Elysia & {
   render: <P extends object>(message: Message<P>) => Promise<Mail>
   // Sends every queued mail whose time has come, here and now, as a script or a test does without the server running the queue.
   drain: () => Promise<number>
-  // The queued mails given up after their last attempt, each with why it failed, kept as long as `queue.keepFailed` says.
+  // The queued mails given up after their last attempt, each with why it failed, kept 7 days unless `queue.keepFailed` says otherwise, with the recipients and subject but not the body.
   failed: () => Promise<FailedJob<Mail>[]>
   // Removes the queued mail of that id, every one, waiting or failed, sent to `{ recipient }` among its to, cc and bcc, a person's once they asked to be erased say, or every one `match` returns true for; resolves with how many went.
   remove: (match: string | { recipient: string } | ((mail: Mail) => boolean)) => Promise<number>
+}
+
+// A mail given up keeps 7 days, its body and links dropped: who it was for and why it failed is what an app needs to see.
+const FAILED_KEPT = '7d'
+
+function withoutBody(mail: Mail): Mail {
+  return { ...mail, html: undefined, text: '', headers: {}, attachments: [] }
 }
 
 const DOCTYPE = /^\s*<!doctype/i
@@ -403,6 +410,8 @@ export function mailer(options: MailerOptions = {}): Mailer {
 
   const { name = 'mail', onFailed, ...queueOptions } = options.queue ?? {}
   const jobs = queue<Mail>(name, deliver, {
+    keepFailed: FAILED_KEPT,
+    redact: withoutBody,
     ...queueOptions,
     onFailed: async (mail, error) => {
       log.error(`${quoted(mail.subject)} to ${whom(recipientsOf(mail))} is given up after its last attempt`, error)

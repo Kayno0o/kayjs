@@ -28,7 +28,7 @@ Under a `base`, `kay_flash`, `kay_locale` and `kay_preview` are set for that pat
 - **Request logs**: method, path without its query string, status, duration and request id. No address, user agent or cookie.
 - **Sessions** with a store: until they expire or the visitor signs out. `sqliteStore` drops expired ones every hour.
 - **Rate limits**: counted by address in memory, or in `sqliteRates(path)` pseudonymised: each key is hashed under the app's secret once one is set, else under a random key kay keeps in a `.key` file beside the store, never in the store itself, so a copy of the store alone cannot be checked against a guessed address (a backup of the whole folder holds both, so set a secret to keep the key off the disk, and keep the `.key` file out of git). Windows are dropped once their window closes.
-- **Jobs**: a waiting job's payload until it runs, a failed one's for 30 days from when its last attempt was due, or what the queue's `keepFailed` says.
+- **Jobs**: a waiting job's payload until it runs, a failed one's for 30 days from when its last attempt was due, or what the queue's `keepFailed` says (7 days for kayjs-mail, without the body).
 - **Rooms**: a message 30 seconds in `sqliteRooms`.
 - **Uploads**: until the app deletes them, without the metadata a camera writes in a JPEG, PNG or WebP.
 
