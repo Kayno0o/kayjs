@@ -1,16 +1,16 @@
 import type { Message } from './types'
 
-// The most characters a send posts, under the 50,000 `ask` takes by default.
-const POSTED_CHARACTERS = 40_000
+// The most characters a send posts unless the chat is told otherwise, under the 50,000 `ask` takes by default.
+export const POSTED_CHARACTERS = 40_000
 
 // What a send posts: the latest `keep` messages that have text, from the first user message on, since a provider refuses a history opening on the assistant. The last message is the visitor's, so one is always posted.
-export function posted(turns: readonly Message[], keep: number): Message[] {
+export function posted(turns: readonly Message[], keep: number, maxChars = POSTED_CHARACTERS): Message[] {
   const said = turns.filter(({ content }) => content !== '').map(({ role, content }) => ({ role, content }))
   let latest = said.slice(-Math.max(1, keep))
   let size = latest.reduce((sum, { content }) => sum + content.length, 0)
 
-  // Long answers must not push the history past what `ask` takes (`maxInputChars`, 50,000): the oldest turns go first, the last message stays.
-  while (size > POSTED_CHARACTERS && latest.length > 1) {
+  // Long answers must not push the history past what `ask` takes (`maxInputChars`): the oldest turns go first, the last message stays.
+  while (size > maxChars && latest.length > 1) {
     size -= latest[0]!.content.length
     latest = latest.slice(1)
   }

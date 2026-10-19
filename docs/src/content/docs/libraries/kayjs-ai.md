@@ -111,6 +111,8 @@ Every label is a prop, so you can write them in your language: `placeholder`, `s
 
 The chat posts its last 20 messages with each one; the `keep` prop changes that, and what is posted always opens on one of the visitor's, so an assistant greeting in `initial` is never the first message. Keep `maxItems` in the action's schema at least as high as `keep`, bound `content`, and add a rate limit.
 
+Each send also posts at most 40,000 characters, dropping the oldest messages first. If your `ask` sets a lower `maxInputChars`, give the chat the same number as `maxChars`, or a long conversation is refused with a 413.
+
 <ReadMore href="/llms/kayjs-ai-chat">The props, the markup and the rules for passing the action.</ReadMore>
 
 ### A chat button on every page

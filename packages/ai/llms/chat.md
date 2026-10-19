@@ -56,6 +56,7 @@ Chat(action={reply} label="Assistant")
 
 - `action`: the streaming action, typed `Action<{ messages: Message[] }, AsyncIterable<string | Progress> | Failure<unknown>>`, so `kay check` refuses one whose schema wants more or whose handler answers anything but a stream.
 - `keep`: how many of the latest messages each send posts (20), so a long chat stays under the schema's `maxItems`. The history posted opens on a user message, so an assistant one at its start, such as a greeting in `initial`, is left out; turns without text are not counted.
+- `maxChars`: the most characters each send posts (40,000), the oldest messages leaving first and the last staying; set it to the action's `maxInputChars` when that is lower, else a long conversation is refused with a 413 `too-long`.
 - `initial`: `Message[]` shown to start with and sent with the first message.
 - `label`: names the message list and the field for screen readers (`Chat`).
 - `disclosure` (`You are talking to an AI. Your messages are sent to its provider to answer.`, the `ai.chat.disclosure` message): the line under the log, `p.kai-chat-disclosure`; `''` hides it, [personal data](personal-data.md).

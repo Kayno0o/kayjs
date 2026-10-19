@@ -104,3 +104,12 @@ test('long turns drop the oldest first so a send stays under what ask takes, kee
   expect(posted(turns, 20).reduce((sum, { content }) => sum + content.length, 0)).toBeLessThanOrEqual(40_000)
   expect(posted([user('x'.repeat(60_000))], 20)).toHaveLength(1)
 })
+
+test('maxChars trims the oldest turns to an app cap below the default, and the last message stays whatever its size', () => {
+  const turns = [user('a'.repeat(300)), assistant('b'.repeat(300)), user('c'.repeat(300)), assistant('d'.repeat(300)), user('e'.repeat(300))]
+
+  expect(posted(turns, 20, 1000).map(({ content }) => content[0])).toEqual(['c', 'd', 'e'])
+  expect(posted(turns, 20, 400).map(({ content }) => content[0])).toEqual(['e'])
+  expect(posted(turns, 20, 10).map(({ content }) => content[0])).toEqual(['e'])
+  expect(posted(turns, 20, 39_999)).toHaveLength(5)
+})
