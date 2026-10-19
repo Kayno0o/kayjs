@@ -705,7 +705,7 @@ import { defineEnv } from 'kay/server'
 
 // Read once as the server boots; \`kay new\` wrote a secret and the development database to .env, and production sets its own.
 export const env = defineEnv(s.Object({
-  SESSION_SECRET: s.String({ minLength: 32 }),
+  SESSION_SECRET: s.Secret(),
   DATABASE_URL: s.String(),
   PORT: s.Integer({ default: 3000 }),
   HOST: s.Optional(s.String()),

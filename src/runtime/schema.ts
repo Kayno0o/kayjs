@@ -1,4 +1,11 @@
 import { t as schema } from 'elysia'
 
-// Elysia's schema builder, re-exported so an action's schema needs no import of its own.
-export const s: typeof schema = schema
+type Builder = typeof schema
+
+// A string of at least 32 characters that production must set, and development and tests derive from the project path, so a secret needs no placeholder in the app: read it with `defineEnv`.
+function Secret(options: Parameters<Builder['String']>[0] = {}): ReturnType<Builder['String']> {
+  return schema.String({ minLength: 32, ...options, requiredInProduction: true, secret: true })
+}
+
+// Elysia's schema builder, re-exported so an action's schema needs no import of its own, with `Secret` for `defineEnv`.
+export const s: Builder & { Secret: typeof Secret } = { ...schema, Secret }

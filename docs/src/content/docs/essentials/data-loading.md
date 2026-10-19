@@ -157,16 +157,26 @@ A module that builds its own environment passes the variables as a second argume
 
 To read other values in a test, use `overrideEnv` from `kay/test` ([Testing](/guides/testing)).
 
-Give a secret that development and tests can do without, and production must have, `requiredInProduction: true`.
+Give a variable that development and tests can do without, and production must have, `requiredInProduction: true`.
 
-Under `NODE_ENV=production` a missing value stops the boot, whatever the default. Anywhere else the default applies, or the variable is left out when its field is `s.Optional`.
+Under `NODE_ENV=production` a missing value stops the boot, whatever the default. Anywhere else the default applies, the variable is left out when its field is `s.Optional`, or it is an empty string.
 
 `NODE_ENV=production kay build` counts as production too. A prerendered page reading such a variable needs it set for the build.
 
+A field with no default keeps its type `string`: in development it is an empty string. Add `s.Optional` when your code handles a missing value, and the type becomes `string | undefined`.
+
 ```ts
 export const env = defineEnv(s.Object({
-  SESSION_SECRET: s.String({ default: 'dev-secret', requiredInProduction: true }),
+  DISCORD_CLIENT_ID: s.String({ requiredInProduction: true }),
   SMTP_HOST: s.Optional(s.String({ requiredInProduction: true })),
+}))
+```
+
+For a secret, use `s.Secret()`. It is a string of at least 32 characters that production must set. In development and tests kay derives a value from the project path, so sessions survive a restart and no placeholder is committed. That value is never used in production.
+
+```ts
+export const env = defineEnv(s.Object({
+  SESSION_SECRET: s.Secret(),
 }))
 ```
 

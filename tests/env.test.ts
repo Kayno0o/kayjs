@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { t } from 'elysia'
+import { s } from '../src/runtime/schema'
 import { defineEnv } from '../src/server'
 import { overrideEnv } from '../src/test'
 import { scratchDir } from './scratch'
@@ -57,6 +58,56 @@ describe('a variable required in production only', () => {
   })
 })
 
+describe('s.Secret and a required-in-production string with no default', () => {
+  const secret = s.Object({ SESSION_SECRET: s.Secret(), HOST_NAME: s.String({ requiredInProduction: true, pattern: '^[a-z]+$' }), SMTP: s.Optional(s.String({ requiredInProduction: true })) })
+
+  it('is derived in development and tests, the same twice, and as long as a secret', () => {
+    const first = defineEnv(secret, {})
+    const typed: string = first.SESSION_SECRET
+
+    expect(typed.length).toBeGreaterThanOrEqual(32)
+    expect(defineEnv(secret, { NODE_ENV: 'test' }).SESSION_SECRET).toBe(typed)
+    expect(first.HOST_NAME).toBe('')
+    expect(first.SMTP).toBeUndefined()
+    expect(defineEnv(s.Object({ OTHER: s.Secret() }), {}).OTHER).not.toBe(typed)
+  })
+
+  it('differs between project paths', async () => {
+    const run = async (cwd: string) => (await Bun.$`bun -e ${`import { s } from ${JSON.stringify(join(import.meta.dir, '../src/runtime/schema'))}; import { defineEnv } from ${JSON.stringify(join(import.meta.dir, '../src/server'))}; console.log(defineEnv(s.Object({ A: s.Secret() }), {}).A)`}`.cwd(cwd).quiet().text()).trim()
+    const a = await project({ 'a.txt': '' })
+    const b = await project({ 'a.txt': '' })
+
+    expect(await run(a)).toBe(await run(a))
+    expect(await run(a)).not.toBe(await run(b))
+  })
+
+  it('takes a set value, an empty one counting as unset, and refuses a short one', () => {
+    const long = 'x'.repeat(40)
+
+    expect(defineEnv(secret, { SESSION_SECRET: long, HOST_NAME: 'abc' })).toMatchObject({ SESSION_SECRET: long, HOST_NAME: 'abc' })
+    expect(defineEnv(secret, { SESSION_SECRET: '' }).SESSION_SECRET).toHaveLength(64)
+    expect(() => defineEnv(secret, { SESSION_SECRET: 'short' })).toThrow('SESSION_SECRET')
+    expect(() => defineEnv(secret, { HOST_NAME: 'A1' })).toThrow('HOST_NAME')
+  })
+
+  it('never uses the derived value in production', () => {
+    const dev = defineEnv(secret, {}).SESSION_SECRET
+
+    expect(() => defineEnv(secret, { NODE_ENV: 'production' })).toThrow(/SESSION_SECRET: .*\n.*HOST_NAME: .*\n.*SMTP: /)
+    expect(() => defineEnv(secret, { NODE_ENV: 'production', SESSION_SECRET: 'short', HOST_NAME: 'a', SMTP: 'x' })).toThrow('SESSION_SECRET')
+    expect(defineEnv(secret, { NODE_ENV: 'production', SESSION_SECRET: `${dev}z`, HOST_NAME: 'a', SMTP: 'x' }).SESSION_SECRET).toBe(`${dev}z`)
+  })
+
+  it('still works with overrideEnv', () => {
+    const env = defineEnv(secret, {})
+
+    using override = overrideEnv(env, { SESSION_SECRET: 'y'.repeat(32) })
+
+    expect(env.SESSION_SECRET).toBe('y'.repeat(32))
+    expect(override).toBeDefined()
+  })
+})
+
 describe('kay env', () => {
   const files = {
     'kay.config.ts': 'import { Elysia, t } from \'elysia\'\n\nconst lib = { name: \'lib\', env: t.Object({ LIB_KEY: t.String({ description: \'the library\\\'s key\', requiredInProduction: true }), LIB_MODE: t.String({ default: \'fast\' }) }) }\n\nexport default { favicon: false, extensions: [lib], publicEnv: t.Object({ MAP_KEY: t.Numeric({ default: 1 }), SITE: t.Optional(t.String({ format: \'uri\' })) }) }\n',
@@ -64,6 +115,20 @@ describe('kay env', () => {
     'src/env.ts': 'import { s } from \'kay\'\nimport { defineEnv } from \'kay/server\'\n\nconsole.log(\'loading the env\')\n\nexport const env = defineEnv(s.Object({\n  DATABASE_URL: s.String(),\n  SESSION_SECRET: s.String({ default: \'dev\', requiredInProduction: true }),\n  PORT: s.Integer({ default: 8080 }),\n  DEBUG: s.Optional(s.Boolean()),\n}))\n',
     'src/broken.ts': 'import { defineEnv } from \'kay/server\'\nimport \'./missing\'\n\nexport const env = defineEnv({} as never)\n',
   }
+
+  it('marks s.Secret as a secret required in production, with kay env and kay build run without it', async () => {
+    const root = await project({
+      'kay.config.ts': 'export default { favicon: false }\n',
+      'src/env.ts': 'import { s } from \'kay\'\nimport { defineEnv } from \'kay/server\'\n\nexport const env = defineEnv(s.Object({ SESSION_SECRET: s.Secret(), CLIENT_ID: s.String({ requiredInProduction: true }) }))\n',
+    })
+    const { stdout, code } = await kay(['env', '--format', 'json'], root)
+    const rows = (JSON.parse(stdout) as { variables: Record<string, unknown>[] }).variables
+
+    expect(code).toBe(0)
+    expect(rows.find(row => row.name === 'SESSION_SECRET')).toEqual({ name: 'SESSION_SECRET', source: 'src/env.ts', type: 'string', required: 'production', secret: true })
+    expect(rows.find(row => row.name === 'CLIENT_ID')).toEqual({ name: 'CLIENT_ID', source: 'src/env.ts', type: 'string', required: 'production' })
+    expect((await kay(['env'], root)).stdout).toContain('SESSION_SECRET  src/env.ts  string (secret)  production')
+  })
 
   it('lists the variables of the app\'s schemas and of the extensions\', and kay\'s own, with whether each is required and its default, without the environment', async () => {
     const root = await project(files)

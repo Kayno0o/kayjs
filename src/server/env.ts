@@ -16,14 +16,14 @@ export type EnvSchema = TSchema & { properties: Record<string, TSchema> }
 
 // The environment read once against `schema`, as the server boots: numbers and booleans from their text, defaults filled in, and every variable missing or refused named in the error that stops it.
 // Holds the declared names only, so logging it never shows the rest of the environment.
-// A field with `requiredInProduction: true`, such as `s.String({ default: 'dev-secret', requiredInProduction: true })`, takes its default or `s.Optional` outside production, and is required there with the default dropped; `kay env` lists it as required in production.
+// A field with `requiredInProduction: true` is required in production with its default dropped, and outside production takes its default, stays `undefined` under `s.Optional`, or is `''` when it has neither; `s.Secret()` is one that development and tests give a value derived from the project path; `kay env` lists each as required in production.
 export function defineEnv<Schema extends EnvSchema>(declared: Schema, source: Record<string, string | undefined> = process.env): Static<Schema> {
   recordEnv(declared, defineEnv)
 
-  const schema = source.NODE_ENV === 'production' ? requiredInProduction(declared) : declared
+  const production = source.NODE_ENV === 'production'
   const input: Record<string, string> = {}
 
-  for (const name of Object.keys(schema.properties)) {
+  for (const name of Object.keys(declared.properties)) {
     const value = source[name]
 
     // An empty variable is how a `.env` file says it is not set, so the default or `s.Optional` applies rather than `''` failing the schema; nothing tells `KEY=` from `KEY=""` by the time it is read.
@@ -31,17 +31,20 @@ export function defineEnv<Schema extends EnvSchema>(declared: Schema, source: Re
       input[name] = value
   }
 
+  // Outside production a required-in-production field left out is not read against the schema: its placeholder is added to the result, so a pattern or minLength cannot refuse it.
+  const placeholders = production ? {} : placeholdersFor(declared, input)
+  const schema = production ? requiredInProduction(declared) : without(declared, placeholders)
   const read = readFields(schema, input, false)
 
   if (!('refused' in read))
-    return read.value
+    return { ...read.value, ...placeholders }
 
   if (!building())
     throw new KayError('env-invalid', `kay: the environment does not match its schema\n${[...read.refused].map(([name, message]) => `  ${name}: ${message}`).join('\n')}`)
 
   // The variables the build has, read on their own; a refusal of the whole object, named '', is left to the server.
   const valid = t.Object(Object.fromEntries(Object.entries(schema.properties).filter(([name]) => !read.refused.has(name))))
-  const env = (readFields(valid, input, false) as { value: Record<string, unknown> }).value
+  const env = { ...(readFields(valid, input, false) as { value: Record<string, unknown> }).value, ...placeholders }
 
   for (const [name, message] of read.refused) {
     if (name === '')
@@ -56,6 +59,34 @@ export function defineEnv<Schema extends EnvSchema>(declared: Schema, source: Re
   }
 
   return env
+}
+
+function without<Schema extends EnvSchema>(schema: Schema, placeholders: Record<string, string>): Schema {
+  if (Object.keys(placeholders).length === 0)
+    return schema
+
+  return t.Object(Object.fromEntries(Object.entries(schema.properties).filter(([name]) => !(name in placeholders)))) as unknown as Schema
+}
+
+// What development and tests give a `requiredInProduction` string with no default that the environment leaves out: a derived value for a secret, `''` otherwise.
+function placeholdersFor(schema: EnvSchema, input: Record<string, string>): Record<string, string> {
+  const placeholders: Record<string, string> = {}
+
+  for (const [name, field] of Object.entries(schema.properties)) {
+    const { requiredInProduction: production, default: fallback, secret, type } = field as { requiredInProduction?: unknown, default?: unknown, secret?: unknown, type?: unknown }
+
+    if (production !== true || name in input || fallback !== undefined || OPTIONAL in field || type !== 'string')
+      continue
+
+    placeholders[name] = secret === true ? devSecret(name) : ''
+  }
+
+  return placeholders
+}
+
+// Stable for a project and a name, so a session signed before a restart still reads, and never written anywhere.
+function devSecret(name: string): string {
+  return new Bun.CryptoHasher('sha256').update(`kay dev secret\0${process.cwd()}\0${name}`).digest('hex')
 }
 
 // The schema with every `requiredInProduction` field made required and stripped of its default.
@@ -84,6 +115,8 @@ export interface EnvVariable {
   required: 'always' | 'production' | false
   default?: unknown
   description?: string
+  // A value no visitor may read, which development and tests derive from the project path.
+  secret?: true
 }
 
 // What a schema declares, as `defineEnv` reads it: each name with its type, whether it is required and its default.
@@ -91,7 +124,7 @@ export function describeEnv(schema: EnvSchemaRecord): EnvVariable[] {
   const required = new Set((schema as { required?: string[] }).required ?? [])
 
   return Object.entries(schema.properties).map(([name, field]) => {
-    const { default: fallback, description, requiredInProduction: production, type, anyOf, format } = field as { default?: unknown, description?: unknown, requiredInProduction?: unknown, type?: unknown, anyOf?: { type?: unknown }[], format?: unknown }
+    const { default: fallback, description, requiredInProduction: production, secret, type, anyOf, format } = field as { default?: unknown, description?: unknown, requiredInProduction?: unknown, secret?: unknown, type?: unknown, anyOf?: { type?: unknown }[], format?: unknown }
     // A number or boolean is a union with its text, the form it is read from.
     const parts = anyOf?.map(part => part.type).filter(part => typeof part === 'string') ?? []
     const kinds = parts.length > 1 ? parts.filter(part => part !== 'string') : parts
@@ -105,6 +138,7 @@ export function describeEnv(schema: EnvSchemaRecord): EnvVariable[] {
       required: production === true ? 'production' : always && 'always',
       ...fallback !== undefined && { default: fallback },
       ...typeof description === 'string' && { description },
+      ...secret === true && { secret: true as const },
     }
   })
 }

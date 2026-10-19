@@ -108,7 +108,7 @@ function described(schema: EnvSchemaRecord, source: string): Listed[] {
 }
 
 function formatListing(variables: Listed[]): string {
-  const rows = variables.map(variable => [variable.name, variable.source, variable.type, variable.required === false ? 'optional' : variable.required, variable.default === undefined ? '' : JSON.stringify(variable.default), variable.description === undefined ? '' : `# ${variable.description}`])
+  const rows = variables.map(variable => [variable.name, variable.source, variable.secret === true ? `${variable.type} (secret)` : variable.type, variable.required === false ? 'optional' : variable.required, variable.default === undefined ? '' : JSON.stringify(variable.default), variable.description === undefined ? '' : `# ${variable.description}`])
   const widths = [0, 1, 2, 3, 4].map(column => Math.max(...rows.map(row => row[column]!.length)))
 
   return rows.map(row => row.map((cell, column) => column === 5 ? cell : cell.padEnd(widths[column]!)).join('  ').trimEnd()).join('\n')

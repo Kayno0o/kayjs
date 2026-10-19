@@ -28,8 +28,10 @@ async function browserBundle(source: string): Promise<string> {
 }
 
 describe('s from kay', () => {
-  it('is Elysia\'s own schema builder on the server', () => {
-    expect(s).toBe(elysiaSchema)
+  it('is Elysia\'s own schema builder on the server, with Secret added', () => {
+    expect(s.Object).toBe(elysiaSchema.Object)
+    expect(s.String).toBe(elysiaSchema.String)
+    expect(s.Secret().minLength).toBe(32)
     expect(s.Object({ title: s.String() }).type).toBe('object')
   })
 
