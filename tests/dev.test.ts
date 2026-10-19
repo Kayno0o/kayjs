@@ -2190,7 +2190,9 @@ describe.concurrent('kay dev', () => {
     const root = await mkdtemp(join(scratch, 'dev-builder-idle-'))
     const real = realpathSync(root)
     const island = (label: string) => `---\nconst count = signal(0)\n---\nbutton(onClick={() => count.set(count() + 1)}) ${label} {count()}\n`
-    const chunks = () => readdirSync(join(root, '.kay/dev/dist')).filter(file => file.endsWith('.js')).map(file => readFileSync(join(root, '.kay/dev/dist', file), 'utf8')).join('\n')
+    // Each worker of a parallel run builds into a directory of its own.
+    const dist = join(root, '.kay', `dev${testWorker()}`, 'dist')
+    const chunks = () => readdirSync(dist).filter(file => file.endsWith('.js')).map(file => readFileSync(join(dist, file), 'utf8')).join('\n')
 
     await Bun.write(join(root, 'kay.config.ts'), 'export default {}\n')
     await Bun.write(join(root, 'src/one.kay'), island('one'))
@@ -2199,7 +2201,7 @@ describe.concurrent('kay dev', () => {
     const builder = startClientBuilder(root, process.env, 'inherit', false, 300)
 
     try {
-      expect(await builder.build(null)).toBeDefined()
+      expect((await builder.build(null))?.failed).toBe(false)
       expect(chunks()).toContain('two')
 
       const [first] = childrenRunning(real, 'builder.ts')
