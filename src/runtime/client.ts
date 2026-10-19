@@ -23,16 +23,12 @@ const SERVER_ISLAND = 'slot[data-kay-server]'
 const started = new WeakSet<HTMLElement>()
 // What disposes each hydrated island, so a page swap can end the ones it takes away: their effects, timers and connections.
 const disposers = new WeakMap<Node, () => void>()
-// Where the browser sends the errors it meets, for the server's `onError`.
-const ERROR_URL = '/_kay/error'
 const CACHE_SCRIPT = 'script[data-kay-cache]'
 // Whether a page carried cached values to follow, so the page swapped in after it lets go of them.
 let following = false
 
 // Defined by `kay build --static`, whose host has no server to take the reports. Tested where it is read, not through a constant, so the bundler drops the code sending them.
 declare const KAY_STATIC_EXPORT: true | undefined
-const MAX_REPORTS = 10
-const reported = new Set<string>()
 // Set in development: renders an island noting its signals, for an edited version of it to take their values back.
 let rendering: (<T>(element: HTMLElement, run: () => T, values?: unknown[]) => T) | undefined
 const signalsOf = new WeakMap<HTMLElement, () => unknown[]>()
@@ -57,33 +53,22 @@ setErrorReporter((error, island) => {
     (globalThis as { $kayProblems?: DevProblems }).$kayProblems?.push({ level: 'error', kind: 'uncaught', text: String(error), error, island })
 
   if (typeof KAY_STATIC_EXPORT === 'undefined')
-    sendError(error, island)
+    void sendError(error, island)
 })
 
 if (typeof window !== 'undefined' && typeof KAY_STATIC_EXPORT === 'undefined') {
   // An error with no error object is another origin's script, whose details the browser hides: nothing to report.
   window.addEventListener('error', (event) => {
     if (event.error !== undefined && event.error !== null)
-      sendError(event.error)
+      void sendError(event.error)
   })
-  window.addEventListener('unhandledrejection', event => sendError(event.reason))
+  window.addEventListener('unhandledrejection', event => void sendError(event.reason))
 }
 
-// Sends an error to the server once per message and place, a few per page load at most, with the page's path only: its query and hash may hold what the user typed.
-function sendError(error: unknown, island?: string): void {
-  const { name, message, stack } = error instanceof Error ? error : { name: 'Error', message: String(error), stack: undefined }
-  const key = `${message}\n${stack}`
-
-  if (reported.has(key) || reported.size >= MAX_REPORTS)
-    return
-
-  reported.add(key)
-  void post(JSON.stringify({ name, message, stack, island, url: location.origin + location.pathname }))
-}
-
-async function post(body: string): Promise<void> {
+// Loads the code posting errors to the server on the first one, so a page that never fails never ships it.
+async function sendError(error: unknown, island?: string): Promise<void> {
   try {
-    await fetch(withBase(ERROR_URL), { method: 'POST', keepalive: true, headers: { 'content-type': 'application/json' }, body })
+    (await import('./report-error')).sendError(error, island)
   }
   catch {}
 }

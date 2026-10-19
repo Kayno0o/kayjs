@@ -176,6 +176,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     // Fetched once, when hovered: the swap took that response rather than asking again, and the browser's own prefetch was off.
     expect(fetched).toEqual(['GET'])
     expect(await page.evaluate(() => document.querySelector('script[type="speculationrules"]'))).toBeNull()
+    expect(await page.evaluate(() => performance.getEntriesByType('resource').some(entry => (/\/prefetch-[^/]*\.js$/).test(entry.name)))).toBe(true)
     expect(await page.evaluate(() => getComputedStyle(document.querySelector('h1')!).color)).toBe('rgb(1, 2, 3)')
     expect(await page.evaluate(() => document.activeElement?.tagName)).toBe('H1')
     expect(await page.textContent('button.player')).toBe('Played 2')
@@ -192,6 +193,34 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     await page.click('a.second')
     await page.locator('h1', { hasText: 'Second' }).waitFor()
     expect(errors).toEqual([])
+  })
+
+  it('loads no prefetch code on a page without speculation rules, and fetches nothing when a link is hovered', async () => {
+    const fresh = await browser.newPage()
+    const fetched: string[] = []
+
+    await fresh.route(`${origin}/`, async (route) => {
+      const response = await route.fetch()
+
+      await route.fulfill({ response, body: (await response.text()).replace(/<script type="speculationrules">.*?<\/script>/, '') })
+    })
+    fresh.on('request', (request) => {
+      if (new URL(request.url()).pathname === '/second')
+        fetched.push(request.method())
+    })
+
+    try {
+      await fresh.goto(origin)
+      await fresh.hover('a.second')
+      await settled(fresh)
+      await Bun.sleep(400)
+
+      expect(fetched).toEqual([])
+      expect(await fresh.evaluate(() => performance.getEntriesByType('resource').some(entry => (/\/prefetch-[^/]*\.js$/).test(entry.name)))).toBe(false)
+    }
+    finally {
+      await fresh.close()
+    }
   })
 
   it('loads the form checks once a form is used, and checks a form submitted before they loaded', async () => {

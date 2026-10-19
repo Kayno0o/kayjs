@@ -6,12 +6,8 @@ import { busyForms, dirtyGuard, dropScrollSave, historyState, leave, mayLeave, n
 // Everything here runs in the browser only, started by the entry; without JavaScript links and forms load pages as they always did.
 // This part only listens: the swap itself, in `./page-swap`, loads once a visitor points at a link or calls `navigate`, and form posting, in `./forms`, once a form takes focus or is submitted, so a page nobody leaves never fetches them.
 
-type Eagerness = 'conservative' | 'moderate' | 'eager' | false
+export const SPECULATION = 'script[type="speculationrules"]'
 
-const HOVER_DELAY_MS = 200
-const SPECULATION = 'script[type="speculationrules"]'
-
-let eagerness: Eagerness = false
 let swapModule: Promise<typeof import('./page-swap')> | undefined
 let formsModule: Promise<typeof import('./forms')> | undefined
 // A traversal undone while the guards are asked about it: where it went, and how far.
@@ -25,7 +21,6 @@ export function startNavigation(given: NavigationHooks): void {
     return
 
   navigation.hooks = given
-  eagerness = speculationEagerness()
 
   navigation.shown = pageKey(new URL(location.href))
 
@@ -40,9 +35,11 @@ export function startNavigation(given: NavigationHooks): void {
     history.replaceState(historyState(), '')
   }
 
-  // The swap would never use what the browser prefetches for a full load, so it prefetches the same links itself.
-  for (const script of document.querySelectorAll(SPECULATION))
-    script.remove()
+  // The swap would never use what the browser prefetches for a full load, so it prefetches the same links itself, from code only a site with speculation rules loads.
+  const rules = document.querySelector(SPECULATION)
+
+  if (rules)
+    void startPrefetch(rules)
 
   for (const element of document.head.children as HTMLCollectionOf<HeadElement>)
     element._$s = element.outerHTML
@@ -58,17 +55,9 @@ export function startNavigation(given: NavigationHooks): void {
   // Pointing at a link, or pressing one on a touch screen, is the moment to fetch the swap: the click follows.
   document.addEventListener('pointerover', onPointLink, { passive: true })
   document.addEventListener('pointerdown', onPointLink, { passive: true })
-
-  if (eagerness === 'conservative') {
-    document.addEventListener('pointerdown', onPrefetchHint, { passive: true })
-  }
-  else if (eagerness !== false) {
-    document.addEventListener('pointerover', onHover, { passive: true })
-    document.addEventListener('focusin', onPrefetchHint)
-  }
 }
 
-async function loadSwap(): Promise<typeof import('./page-swap')> {
+export async function loadSwap(): Promise<typeof import('./page-swap')> {
   return swapModule ??= import('./page-swap')
 }
 
@@ -80,6 +69,13 @@ async function loadForms(): Promise<typeof import('./forms')> {
 async function preloadSwap(): Promise<void> {
   try {
     await loadSwap()
+  }
+  catch {}
+}
+
+async function startPrefetch(rules: Element): Promise<void> {
+  try {
+    (await import('./prefetch')).startPrefetch(rules.textContent)
   }
   catch {}
 }
@@ -107,26 +103,14 @@ export async function follow(url: URL, swap: Swap): Promise<void> {
   await swapper.go(url, swap)
 }
 
-// How eagerly the server's speculation rules prefetch, which the swap follows.
-function speculationEagerness(): Eagerness {
-  const script = document.querySelector(SPECULATION)
-
-  try {
-    return (JSON.parse(script?.textContent ?? '') as { prefetch: { eagerness: Eagerness }[] }).prefetch[0]?.eagerness ?? false
-  }
-  catch {
-    return false
-  }
-}
-
-function linkOf(event: Event): HTMLAnchorElement | undefined {
+export function linkOf(event: Event): HTMLAnchorElement | undefined {
   const link = (event.target as Element | null)?.closest?.('a[href]')
 
   return link instanceof HTMLAnchorElement ? link : undefined
 }
 
 // A link the swap may follow: a plain click on one of the app's pages, opening in this tab, with nothing opting it out.
-function followable(link: HTMLAnchorElement): URL | undefined {
+export function followable(link: HTMLAnchorElement): URL | undefined {
   if ((link.target !== '' && link.target !== '_self') || link.hasAttribute('download') || link.closest('[data-reload]'))
     return undefined
 
@@ -211,36 +195,6 @@ function onPointLink(event: PointerEvent): void {
 
   if (link && followable(link))
     void preloadSwap()
-}
-
-let hoverTimer: ReturnType<typeof setTimeout> | undefined
-
-function onHover(event: PointerEvent): void {
-  clearTimeout(hoverTimer)
-
-  const link = linkOf(event)
-
-  if (link)
-    hoverTimer = setTimeout((target: HTMLAnchorElement) => void prefetch(target), eagerness === 'eager' ? 0 : HOVER_DELAY_MS, link)
-}
-
-function onPrefetchHint(event: Event): void {
-  const link = linkOf(event)
-
-  if (link)
-    void prefetch(link)
-}
-
-async function prefetch(link: HTMLAnchorElement): Promise<void> {
-  const url = followable(link)
-
-  if (!url)
-    return
-
-  try {
-    ;(await loadSwap()).prefetch(url, link)
-  }
-  catch {}
 }
 
 function onSubmit(event: SubmitEvent): void {
