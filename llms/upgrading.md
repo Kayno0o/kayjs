@@ -7,7 +7,7 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 ### kayjs-auth tokens expire by default and adopted ones need 32 characters
 
 - `createToken` and `issueToken` now expire a token after 90 days when `expiresIn` is left out; pass `expiresIn: null` for one that never does. Existing tokens keep the expiry they were made with. The account page's "Never" choice passes `null` itself. `kay check` cannot recognise the old form, so there is no lint.
-- `issueToken({ token })` refuses an adopted token under 32 characters with `'token'`, where 16 passed.
+- `issueToken({ token })` refuses an adopted token under 32 characters with `'token'`, where 16 passed, and one with fewer than 10 distinct characters. An adopted token expires after 90 days too: pass `expiresIn: null` to keep legacy devices working.
 - New tokens start with `kat_`; existing ones are untouched.
 
 ### kayjs-auth checks CAPTCHA hostnames and refuses plain-http providers at an https site

@@ -12,6 +12,7 @@ import { reprove } from './twoFactor'
 const LABEL_MAX_LENGTH = 64
 const BEARER = /^Bearer\s+(\S+)$/i
 const TOKEN = /^\S{32,4096}$/
+const MIN_DISTINCT_CHARACTERS = 10
 const TOKEN_PREFIX = 'kat_'
 const DEFAULT_EXPIRY_SECONDS = 90 * 24 * 60 * 60
 
@@ -65,8 +66,17 @@ function tokenProblem(core: Core, name: string, options: TokenOptions): TokenPro
   return options.expiresIn != null && expirySeconds(options.expiresIn) === undefined ? 'expiry' : undefined
 }
 
+// The seconds a token lives: the default when left out, null for never.
+function lifetime(expiresIn: Duration | null | undefined): number | null {
+  if (expiresIn === undefined)
+    return DEFAULT_EXPIRY_SECONDS
+
+  return expiresIn === null ? null : expirySeconds(expiresIn)!
+}
+
 async function storeToken(core: Core, userId: string, name: string, options: TokenOptions, token: string): Promise<string> {
   const id = crypto.randomUUID()
+  const seconds = lifetime(options.expiresIn)
 
   await core.store.bearerTokens.create({
     id,
@@ -76,7 +86,7 @@ async function storeToken(core: Core, userId: string, name: string, options: Tok
     scopes: options.scopes ? [...new Set(options.scopes)] : null,
     createdAt: new Date(),
     lastUsedAt: null,
-    expiresAt: options.expiresIn === null ? null : new Date(Date.now() + (options.expiresIn === undefined ? DEFAULT_EXPIRY_SECONDS : expirySeconds(options.expiresIn)!) * 1000),
+    expiresAt: seconds === null ? null : new Date(Date.now() + seconds * 1000),
   })
 
   return id
@@ -114,7 +124,7 @@ export async function issueToken(core: Core, userId: string, label: string, opti
   if (problem)
     return { ok: false, error: problem }
 
-  if (options.token !== undefined && !TOKEN.test(options.token))
+  if (options.token !== undefined && (!TOKEN.test(options.token) || new Set(options.token).size < MIN_DISTINCT_CHARACTERS))
     return { ok: false, error: 'token' }
 
   const record = await core.store.users.get(userId)

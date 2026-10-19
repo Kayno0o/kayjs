@@ -318,7 +318,10 @@ describe('token hygiene', () => {
     expect(byId.get((issuedForever as { id: string }).id)!.expiresAt).toBeNull()
     expect(byId.get((issuedDefault as { id: string }).id)!.expiresAt).toBeInstanceOf(Date)
 
-    setSystemTime(Date.now() + 91 * DAY_MS)
+    setSystemTime(Date.now() + 89 * DAY_MS)
+    expect(await browser().json('/me', { headers: bearer })).toMatchObject({ email: 'ada@example.com' })
+
+    setSystemTime(Date.now() + 2 * DAY_MS)
 
     expect(await browser().json('/me', { headers: bearer })).toBe('anonymous')
     expect(await auth.userFromToken(minted.token)).toBeNull()
@@ -333,15 +336,16 @@ describe('token hygiene', () => {
       expect(await auth.issueToken(id, 'Phone', { expiresIn })).toEqual({ ok: false, error: 'expiry' })
   })
 
-  test('an adopted token needs 32 characters, and keeps its own form without the prefix', async () => {
+  test('an adopted token needs 32 characters of at least 10 kinds, and keeps its own form without the prefix', async () => {
     const { ada, auth, browser } = await withToken()
     const { id } = await ada.json('/me') as { id: string }
     const thirtyOne = 'a'.repeat(31)
-    const thirtyTwo = 'b'.repeat(32)
+    const thirtyTwo = 'abcdefghijklmnopqrstuvwxyz012345'
 
     expect(await auth.issueToken(id, 'Old', { token: thirtyOne })).toEqual({ ok: false, error: 'token' })
     expect(await auth.issueToken(id, 'Old', { token: thirtyTwo })).toMatchObject({ ok: true, token: thirtyTwo })
     expect(await browser().json('/me', { headers: { authorization: `Bearer ${thirtyTwo}` } })).toMatchObject({ email: 'ada@example.com' })
     expect(await auth.issueToken(id, 'Old', { token: 'c'.repeat(4097) })).toEqual({ ok: false, error: 'token' })
+    expect(await auth.issueToken(id, 'Old', { token: 'abcabcabc'.repeat(4) })).toEqual({ ok: false, error: 'token' })
   })
 })
