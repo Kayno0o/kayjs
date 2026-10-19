@@ -239,6 +239,34 @@ describe('app data and provider ids on the user', () => {
     expect(seen.at(-1)).toEqual({ discord: { id: '1' } })
   })
 
+  test('an event reads no identities without onAuthEvent, and a failing read keeps the audit entry', async () => {
+    providers({ 1: { id: '1', username: 'ada' } })
+    const { browser, store } = setup({ audit: true, onProviderProfile: undefined })
+    const ada = browser()
+    const listed = spyOn(store.identities, 'listByUser')
+
+    await signInWith(ada, 'discord', '1')
+
+    expect(listed).not.toHaveBeenCalled()
+
+    const failing = setup({ audit: true, onProviderProfile: undefined, onAuthEvent: () => undefined })
+    const error = spyOn(console, 'error').mockImplementation(() => undefined)
+
+    spyOn(failing.store.identities, 'listByUser').mockImplementation(async () => {
+      throw new Error('down')
+    })
+
+    try {
+      await signInWith(failing.browser(), 'discord', '1')
+      await Bun.sleep(20)
+
+      expect((await failing.store.audit!.list({ limit: 10 })).length).toBeGreaterThan(0)
+    }
+    finally {
+      error.mockRestore()
+    }
+  })
+
   test('a result over the size cap is not stored and is logged', async () => {
     providers({ 1: { id: '1', username: 'ada' } })
     const error = spyOn(console, 'error').mockImplementation(() => undefined)

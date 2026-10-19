@@ -156,14 +156,16 @@ export async function report(state: RequestState, record: UserRecord, event: Aut
 
 // `report` for what happens outside a request, as a hand-over when a prune deletes an account: `where` is empty, so the entry names no address or browser.
 export async function reportFrom(core: Core, where: { address: string, userAgent: string }, record: UserRecord, event: AuthEvent, detail?: string, actor?: UserRecord): Promise<void> {
-  const user = await linkedUser(core, record)
-  const context: EventContext = { ip: where.address, userAgent: where.userAgent, actor: actor ? await linkedUser(core, actor) : null }
+  if (core.onAuthEvent) {
+    try {
+      const user = await linkedUser(core, record)
+      const context: EventContext = { ip: where.address, userAgent: where.userAgent, actor: actor ? await linkedUser(core, actor) : null }
 
-  try {
-    await core.onAuthEvent?.({ event, user, context, ...eventFields(event, detail) } as AuthEventInfo)
-  }
-  catch (error) {
-    log.error(`onAuthEvent failed for ${event}`, error)
+      await core.onAuthEvent({ event, user, context, ...eventFields(event, detail) } as AuthEventInfo)
+    }
+    catch (error) {
+      log.error(`onAuthEvent failed for ${event}`, error)
+    }
   }
 
   if (!core.audit)
