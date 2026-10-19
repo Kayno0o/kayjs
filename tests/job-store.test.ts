@@ -21,8 +21,8 @@ const REQUIRED = <T>(value: T | undefined): T => value as T
 
 // Holds are read against a clock the store picks (Postgres: its own), so the cases take real time and leases long enough to stay held or short enough to wait out.
 const LONG = 60_000
-const SHORT = 250
-const SHORT_PAST = 320
+const SHORT = 700
+const SHORT_PAST = 800
 
 async function claimFor(store: JobStore, lease = LONG, queue = 'q'): Promise<StoredJob | undefined> {
   const now = Date.now()
