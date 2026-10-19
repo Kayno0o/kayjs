@@ -31,6 +31,7 @@ export { RedirectRefused } from './runtime-redirects'
 export type { RuntimeRedirect } from './runtime-redirects'
 export { GENERATE_SECRET, MIN_SECRET_LENGTH, openWith, sameText, sealWith, weakSecrets } from './seal'
 export { stoppers } from './signals'
+export { keyedDigest } from './stamp'
 export type { MissingTranslations } from './translations'
 
 type Translations = typeof import('./translations')

@@ -47,7 +47,7 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 - `files.put` refuses a JPEG, PNG, WebP, AVIF or HEIC it cannot read through with an `image-invalid` error, where it stored the file with its metadata and logged a warning: catch it in the action, or pass `keepMetadata: true` for an archive. An AVIF or HEIC now has its EXIF and XMP blanked.
 - kayjs-mail's log lines say `A mail` where they named the subject, so a search for one by subject finds nothing: `mailer({ logSubjects: true })` brings it back. `kay check` cannot recognise log reading.
-- Attempt counts in the auth tables and in a custom kayjs-ai store are keyed by a digest, not the address or user id, so a window in flight starts over once and any code reading those keys changes.
+- Attempt counts in the auth tables and in a custom kayjs-ai store are keyed by a digest, not the address or user id, so a window in flight starts over once, any code reading those keys changes, and each user's next sign-in mails one new-sign-in notice, as the device fingerprint changes once.
 
 ### Rendered values carry a mark
 

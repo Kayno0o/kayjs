@@ -1,10 +1,9 @@
 import type { Duration, RateStore } from 'kay'
 import type { AiLimit } from './errors'
 import type { Piece, Usage } from './types'
-import { createHash } from 'node:crypto'
 import process from 'node:process'
 import { logFrom } from 'kay'
-import { durationSeconds, userOf } from 'kay/library'
+import { durationSeconds, keyedDigest, userOf } from 'kay/library'
 import { clientAddress, memoryRates, rateKey } from 'kay/server'
 import { AiError } from './errors'
 
@@ -179,9 +178,9 @@ async function visitorKey(visitor: Settings['visitor'], { request, visitor: name
   return request ? `address:${hashed(rateKey(clientAddress(request, undefined)))}` : undefined
 }
 
-// A store shared by processes, a database say, then holds no address nor user id, only a digest to count under.
+// A store shared by processes, a database say, then holds no address nor user id, only a digest keyed by the app's secret to count under.
 export function hashed(text: string): string {
-  return createHash('sha256').update(text).digest('base64url').slice(0, 22)
+  return keyedDigest('ai-visitor', text)
 }
 
 function seconds(resetAt: number): number {

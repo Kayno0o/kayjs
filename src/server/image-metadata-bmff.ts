@@ -6,6 +6,8 @@ const KEPT_ITEMS = new Set(['av01', 'hvc1', 'hev1', 'avc1', 'grid', 'iovl', 'ide
 const KEPT_META = new Set(['hdlr', 'dinf', 'pitm', 'iinf', 'iloc', 'iprp', 'iref', 'idat', 'grpl'])
 const KEPT_TOP = new Set(['ftyp', 'meta', 'mdat', 'moov'])
 const FREE = new TextEncoder().encode('free')
+// Far past what any image's items hold, so a file of countless tiny extents costs no more than a few of them.
+const MAX_EXTENTS = 10_000
 const FULL_BOX_HEADER = 4
 const BOX_HEADER = 8
 const WIDE_BOX_HEADER = 16
@@ -54,11 +56,17 @@ function stripMeta(out: Uint8Array<ArrayBuffer>, view: DataView, meta: Box): voi
   for (const box of children) {
     if (box.type === 'iinf')
       dropItems(out, view, box, dropped)
-    else if (box.type === 'iloc')
-      extents = locations(view, box)
     else if (box.type === 'idat')
       idat = box.body
   }
+
+  const iloc = children.find(box => box.type === 'iloc')
+
+  if (iloc)
+    extents = locations(view, iloc, dropped)
+
+  // Overlapping extents would make a small file zero the same megabytes again and again.
+  let zeroed = 0
 
   for (const id of dropped) {
     for (const { offset, length, method } of extents.get(id) ?? []) {
@@ -69,6 +77,11 @@ function stripMeta(out: Uint8Array<ArrayBuffer>, view: DataView, meta: Box): voi
 
       if (start + length > out.length)
         throw new Error('an item past the end of the file')
+
+      zeroed += length
+
+      if (zeroed > out.length)
+        throw new Error('items larger than the file')
 
       out.fill(0, start, start + length)
     }
@@ -108,7 +121,8 @@ function dropItems(out: Uint8Array, view: DataView, iinf: Box, dropped: Set<numb
   }
 }
 
-function locations(view: DataView, iloc: Box): Map<number, Extent[]> {
+// The extents of the items in `wanted`, read from the item table.
+function locations(view: DataView, iloc: Box, wanted: Set<number>): Map<number, Extent[]> {
   const version = view.getUint8(iloc.body)
 
   if (version > 2)
@@ -137,6 +151,8 @@ function locations(view: DataView, iloc: Box): Map<number, Extent[]> {
     return value
   }
 
+  let total = 0
+
   for (let item = version < 2 ? read(2) : read(4); item > 0; item--) {
     const id = version < 2 ? read(2) : read(4)
     const method = version === 0 ? 0 : read(2) & 0xF
@@ -147,12 +163,28 @@ function locations(view: DataView, iloc: Box): Map<number, Extent[]> {
     const base = read(baseSize)
     const list: Extent[] = []
 
-    for (let extents = read(2); extents > 0; extents--) {
+    const extents = read(2)
+
+    // An extent of no bytes could be repeated 65535 times in a few of them.
+    if (extents > 0 && indexSize + offsetSize + lengthSize === 0)
+      throw new Error('extents of no size')
+
+    total += extents
+
+    if (total > MAX_EXTENTS)
+      throw new Error(`more than ${MAX_EXTENTS} extents`)
+
+    for (let extent = extents; extent > 0; extent--) {
       read(indexSize)
-      list.push({ offset: base + read(offsetSize), length: read(lengthSize), method })
+
+      const where = { offset: base + read(offsetSize), length: read(lengthSize), method }
+
+      if (wanted.has(id))
+        list.push(where)
     }
 
-    found.set(id, list)
+    if (wanted.has(id))
+      found.set(id, list)
   }
 
   return found

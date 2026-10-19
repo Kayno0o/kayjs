@@ -182,7 +182,7 @@ const WEB_ONLY = String.raw`(?:[\u0000-\u0020]*[Hh][Tt][Tt][Pp][Ss]?:|(?![\u0000
 function webOnly(options: StringOptions): NonNullable<StringOptions> {
   const own = options?.pattern
 
-  return { ...options, pattern: own === undefined ? `^${WEB_ONLY}` : `^(?=${WEB_ONLY})(?=[\\s\\S]*?(?:${own}))` }
+  return { error: own === undefined ? 'must be a path or an http(s) address' : 'must be a path or an http(s) address, and match its pattern', ...options, pattern: own === undefined ? `^${WEB_ONLY}` : `^(?=${WEB_ONLY})(?=[\\s\\S]*?(?:${own}))` }
 }
 
 // A string field holding the path the site serves an image at, an upload's `files.url(key)` say, which a CMS edits by uploading or picking one.

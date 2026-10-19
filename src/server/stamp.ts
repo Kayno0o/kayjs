@@ -54,6 +54,13 @@ export function sharedKey(use: string): Buffer | undefined {
   return secret.from === 'process' ? undefined : nodeCrypto().createHmac('sha256', secret.key).update(`kay-key\0${use}`).digest()
 }
 
+// A digest of `text` for a store to count under, keyed by the shared secret so a copy of the store cannot be checked against a guessed address; a plain digest while none is set.
+export function keyedDigest(use: string, text: string): string {
+  const key = sharedKey(use)
+
+  return (key === undefined ? new Bun.CryptoHasher('sha256') : new Bun.CryptoHasher('sha256', key)).update(text).digest('base64url').slice(0, 22)
+}
+
 // The value a prerendered page holds in place of a stamp, with the action it is for: the server signs one each time it serves the page.
 const STAMP_MARK = 'kay-stamp:'
 

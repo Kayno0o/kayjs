@@ -962,11 +962,11 @@ function box(type: string, ...parts: (Uint8Array | string | number[])[]): Uint8A
 }
 
 // An AVIF (or HEIC) of `types.length` items, item `n + 1` holding `data[n]`, located by an `iloc` of version 0.
-function heif(types: string[], data: string[], brand = 'avif'): Uint8Array<ArrayBuffer> {
+function heif(types: string[], data: string[], brand = 'avif', place: (index: number, offset: number) => [offset: number, length: number] = (index, offset) => [offset, data[index]!.length]): Uint8Array<ArrayBuffer> {
   const infes = types.map((type, index) => box('infe', [2, 0, 0, 0], u16(index + 1), u16(0), type, 'item\0'))
   const iinf = box('iinf', [0, 0, 0, 0], u16(types.length), ...infes)
   const ftyp = box('ftyp', brand, u32(0), brand, 'mif1')
-  const build = (offsets: number[]) => box('meta', [0, 0, 0, 0], iinf, box('iloc', [0, 0, 0, 0], [0x44, 0x00], u16(types.length), ...data.map((item, index) => bytesOf(u16(index + 1), u16(0), u16(1), u32(offsets[index]!), u32(item.length)))))
+  const build = (offsets: number[]) => box('meta', [0, 0, 0, 0], iinf, box('iloc', [0, 0, 0, 0], [0x44, 0x00], u16(types.length), ...data.map((_item, index) => bytesOf(u16(index + 1), u16(0), u16(1), u32(place(index, offsets[index]!)[0]), u32(place(index, offsets[index]!)[1])))))
   const first = ftyp.length + build(data.map(() => 0)).length + 8
   const offsets = data.map((_, index) => first + data.slice(0, index).reduce((total, item) => total + item.length, 0))
 
@@ -1126,6 +1126,20 @@ describe('stripImageMetadata', () => {
     expect(holds(stripped, PIXELS)).toBe(true)
     expect(stripped.length).toBe(tagged.length)
     expect(holds(stripImageMetadata(heif(['hvc1'], [PIXELS], 'heic')), PIXELS)).toBe(true)
+  })
+
+  it('refuses a HEIF of countless empty extents, and of dropped items that overlap to zero more than the file', () => {
+    const base = heif(['av01', 'Exif', 'mime'], [PIXELS, GPS, GPS])
+    const overlapping = heif(['av01', 'Exif', 'mime'], [PIXELS, GPS, GPS], 'avif', (_index, offset) => [0, offset])
+    // The iloc's sizes byte, 0x44 for 4-byte offsets and lengths, set to 0 and its first item given 65535 extents.
+    const at = base.findIndex((byte, index) => byte === 0x44 && base[index + 1] === 0 && base[index - 4] === 0 && base[index - 1] === 0)
+    const empty = base.slice()
+
+    empty[at] = 0
+    empty.set(u16(65_535), at + 2 + 2 + 2 + 2 + 2)
+
+    expect(() => stripImageMetadata(empty)).toThrow('extents of no size')
+    expect(() => stripImageMetadata(overlapping)).toThrow('items larger than the file')
   })
 
   it('blanks the top-level boxes of an AVIF that are no picture, and refuses a cut one', () => {

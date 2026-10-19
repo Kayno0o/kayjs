@@ -225,6 +225,8 @@ describe('the collections a CMS edits', () => {
         expect(check.Check(value)).toBe(false)
     }
 
+    expect((JSON.parse(JSON.stringify(imageField())) as { error: string }).error).toBe('must be a path or an http(s) address')
+
     const own = TypeCompiler.Compile(imageField({ pattern: '\\.png$' }))
 
     expect(own.Check('/a.png')).toBe(true)

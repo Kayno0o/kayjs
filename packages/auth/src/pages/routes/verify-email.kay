@@ -7,8 +7,8 @@ import Button from '@kaynooo/kayjs-ui/button.kay'
 import FormField from '@kaynooo/kayjs-ui/form-field.kay'
 
 // Visitors reach this page before signing in, so none of the app's guards run here, whatever they check: one asking for a session would keep everyone out.
-// The link's token sits in the address, which no Referer header may carry to another site.
-export const page = { guards: false, security: { headers: { 'referrer-policy': 'no-referrer' } } }
+// The link's token sits in the address, which no Referer header may carry to another site; `same-origin` still lets a form post carry its Origin.
+export const page = { guards: false, security: { headers: { 'referrer-policy': 'same-origin' } } }
 
 // The link only shows this button, so a mail scanner opening it spends nothing.
 export const verify = action(schemas.verify, async ({ token, password }, ctx) => {
