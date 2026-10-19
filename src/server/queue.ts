@@ -93,6 +93,21 @@ export interface QueueOptions<Payload> {
 export interface EnqueueOptions {
   // Runs it this long from now rather than as soon as a worker can.
   delay?: Duration | undefined
+  // Names the job: while one of this queue with the key is waiting or running, enqueue keeps nothing and resolves with its id, so a sync asked for twice runs once; once it completed or failed the key is free. `state(key)` reads it back.
+  key?: string | undefined
+}
+
+// Where a job stands, as the app reads it back.
+export interface JobState<Progress> {
+  id: string
+  // `running` while a process holds it, `waiting` for a job due or waiting for a retry, `failed` once given up.
+  status: 'waiting' | 'running' | 'failed'
+  // Runs started so far.
+  attempts: number
+  // What its last run reported.
+  progress?: Progress
+  // Why its last run failed.
+  error?: string
 }
 
 export interface FailedJob<Payload> {
@@ -102,9 +117,11 @@ export interface FailedJob<Payload> {
   error: string
 }
 
-export type Queue<Payload> = Elysia & {
+export type Queue<Payload, Progress = unknown> = Elysia & {
   // Keeps the job for a worker to run, surviving a restart; resolves with its id once stored.
   enqueue: (payload: Payload, options?: EnqueueOptions) => Promise<string>
+  // The waiting or running job with that key, else the last one with it that failed, or the job of that id; undefined for one that completed or never was. Needs a store with `state`, as `sqliteJobs`, `memoryJobs` and `pgJobs` have.
+  state: (job: string | { id: string }) => Promise<JobState<Progress> | undefined>
   // Runs every job whose time has come, here and now, until none is left: for a test, or a script with no server.
   drain: () => Promise<number>
   failed: () => Promise<FailedJob<Payload>[]>
@@ -376,7 +393,7 @@ export function defaultJobStore(): JobStore {
 
 // A queue of jobs the server runs in the background, each surviving a restart: `enqueue` from an action, `app.use(queue)` in the server to run them.
 // A run that throws is retried later, waiting `backoff` then twice as long each time, until `attempts` runs failed: it is then kept as failed, logged and handed to `onFailed`.
-export function queue<Payload>(name: string, handler: (payload: Payload, signal: AbortSignal) => unknown, options: QueueOptions<Payload> = {}): Queue<Payload> {
+export function queue<Payload, Progress = unknown>(name: string, handler: (payload: Payload, signal: AbortSignal) => unknown, options: QueueOptions<Payload> = {}): Queue<Payload, Progress> {
   const attempts = options.attempts ?? DEFAULT_ATTEMPTS
   const backoff = durationSeconds(options.backoff ?? DEFAULT_BACKOFF, `queue('${name}')'s backoff`) * 1000
   const lostAfter = durationSeconds(options.lostAfter ?? DEFAULT_LOST_AFTER, `queue('${name}')'s lostAfter`) * 1000
@@ -663,14 +680,41 @@ export function queue<Payload>(name: string, handler: (payload: Payload, signal:
     enqueue: async (payload: Payload, enqueueOptions: EnqueueOptions = {}) => {
       const id = crypto.randomUUID()
       const delay = enqueueOptions.delay === undefined ? 0 : durationSeconds(enqueueOptions.delay, `queue('${name}')'s delay`) * 1000
+      const { key } = enqueueOptions
 
-      await store().add({ id, queue: name, payload: stringify(payload), attempts: 0, runAt: Date.now() + delay })
+      if (key !== undefined && key === '')
+        throw new KayError('config-invalid', `kay: queue('${name}') was enqueued with an empty key; a key is a non-empty string`)
+
+      if (key !== undefined && !store().state)
+        throw new KayError('config-invalid', `kay: queue('${name}')'s store has no state(), so enqueue's key cannot be kept: add state() to the JobStore, or use sqliteJobs, memoryJobs or pgJobs`)
+
+      const held = await store().add({ id, queue: name, payload: stringify(payload), attempts: 0, runAt: Date.now() + delay, ...key !== undefined && { key } })
+
+      // Another job holds the key: nothing was stored, so nobody needs waking.
+      if (typeof held === 'string')
+        return held
 
       // A delayed job too: the worker looking for jobs sleeps until the next one is due, which this may precede.
       wakePoller()
       await tidy()
 
       return id
+    },
+    state: async (job: string | { id: string }) => {
+      const read = store().state
+
+      if (!read)
+        throw new KayError('config-invalid', `kay: queue('${name}')'s store has no state(), so the state of a job cannot be read: add state() to the JobStore, or use sqliteJobs, memoryJobs or pgJobs`)
+
+      const found = await read(name, typeof job === 'string' ? { key: job } : job, Date.now())
+
+      return found && {
+        id: found.id,
+        status: found.status,
+        attempts: found.attempts,
+        ...found.progress !== undefined && { progress: parse(found.progress) as Progress },
+        ...found.error !== undefined && { error: found.error },
+      }
     },
     drain: async () => {
       let ran = 0
@@ -703,7 +747,7 @@ export function queue<Payload>(name: string, handler: (payload: Payload, signal:
 
       return ids.length
     },
-  }) as Queue<Payload>
+  }) as Queue<Payload, Progress>
 
   drains.add(queued.drain)
 
@@ -729,6 +773,11 @@ async function sleep(ms: number, signal: AbortSignal, sleepers: Set<() => void>)
     sleepers.add(done)
     signal.addEventListener('abort', done)
   })
+}
+
+// Takes a queue out of what `drainQueues` runs, for a test whose queue's store is gone.
+export function forgetQueue(queued: { drain: () => Promise<number> }): void {
+  drains.delete(queued.drain)
 }
 
 // Runs every due job of every queue in this process, until none is left: `kay/test`'s `runJobs`.

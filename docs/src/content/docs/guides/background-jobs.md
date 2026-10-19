@@ -103,6 +103,16 @@ export const welcomeMails = queue('welcome-mails', sendWelcome, {
 
 The queue drops expired ones whenever you enqueue, list or remove jobs too, so a process with no worker still cleans up. `redact` gives what a failed job keeps instead of its payload, such as a mail without its body. `onFailed` still gets the whole payload, and a custom `JobStore` stores the redacted one only if its `fail` takes a third argument.
 
+To run a job once however often it is asked for, give `enqueue` a `key`. While a job with that key is waiting or running, `enqueue` stores nothing and resolves with that job's id.
+
+```ts
+await sync.enqueue({ provider: 'anilist' }, { key: 'anilist' })
+```
+
+Once the job completes, or is kept as failed, the key is free again. `await sync.state('anilist')` tells where the job stands: `{ id, status, attempts }` with `status` `'waiting'`, `'running'` or `'failed'`, and `error` after a failed run. It is `undefined` once the job completed.
+
+A job enqueued while the one with its key runs is dropped, even if its data is newer than what that run read. To run again after it, enqueue without a key, or once it completed.
+
 Jobs wait in a SQLite file shared by the server processes on one machine. Under `bun test` they stay in memory, and `site.runJobs()` from `kay/test` runs them.
 
 An idle queue looks for a job from one worker. A job another process enqueued waits 10 seconds at worst, the default `idlePoll`.
