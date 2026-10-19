@@ -514,3 +514,64 @@ describe('kay env against compose and .env.example', () => {
     expect((await checked(['--only', 'seo'])).code).toBe(0)
   })
 })
+
+describe('kay check --fix on raw environment reads', () => {
+  const config = { 'kay.config.ts': 'export default { favicon: false, env: { example: \'.env.example\' } }\n', '.env.example': '', 'tsconfig.json': '{ "extends": "kay/tsconfig.json" }\n', 'src/routes/index.kay': 'h1 Hi\n' }
+  const read = async (root: string, path: string) => Bun.file(join(root, path)).text()
+  const names = async (root: string) => (JSON.parse((await kay(['env', '--format', 'json'], root)).stdout) as { variables: { name: string, source: string, default?: unknown }[] }).variables.filter(({ source }) => source !== 'kay')
+
+  it('declares the reads in a new src/env.ts, keeps a default, rewrites the reads and imports env in sorted order', async () => {
+    const root = await project({ ...config, 'src/lib.ts': 'import { join } from \'node:path\'\nimport { x } from \'./x\'\n\nexport const a = process.env.FOO ?? \'bar\'\nexport const b = process.env[\'BAZ\']\nexport const c = Bun.env.FOO ?? "bar"\nexport const d = join(process.env.DIR ?? \'.\', \'x\')\n', 'src/x.ts': 'export const x = 1\n' })
+    const { stderr, code } = await kay(['check', '--fix'], root)
+
+    expect(code).toBe(0)
+    expect(stderr + (await kay(['check', '--fix'], root)).stdout).not.toContain('is read with no schema')
+    expect(await read(root, 'src/env.ts')).toBe('import { s } from \'kay\'\nimport { defineEnv } from \'kay/server\'\n\nexport const env = defineEnv(s.Object({\n  BAZ: s.Optional(s.String()),\n  DIR: s.String({ default: \'.\' }),\n  FOO: s.String({ default: \'bar\' }),\n}))\n')
+    expect(await read(root, 'src/lib.ts')).toBe('import { join } from \'node:path\'\nimport { env } from \'./env\'\nimport { x } from \'./x\'\n\nexport const a = env.FOO\nexport const b = env.BAZ\nexport const c = env.FOO\nexport const d = join(env.DIR, \'x\')\n')
+    expect((await names(root)).map(({ name, default: fallback }) => [name, fallback])).toEqual([['BAZ', undefined], ['DIR', '.'], ['FOO', 'bar']])
+  })
+
+  it('adds to the schema the app already has instead of making a second', async () => {
+    const root = await project({ ...config, 'src/config.ts': 'import { s } from \'kay\'\nimport { defineEnv } from \'kay/server\'\n\nexport const env = defineEnv(s.Object({\n  OLD: s.Optional(s.String()),\n}))\n', 'src/deep/lib.ts': 'export const a = process.env.FOO ?? \'bar\'\n' })
+
+    await kay(['check', '--fix'], root)
+    expect(await read(root, 'src/config.ts')).toContain('{\n  FOO: s.String({ default: \'bar\' }),\n  OLD: s.Optional(s.String()),\n}))')
+    expect(await read(root, 'src/deep/lib.ts')).toBe('import { env } from \'../config\'\n\nexport const a = env.FOO\n')
+    expect(Bun.file(join(root, 'src/env.ts')).size).toBe(0)
+  })
+
+  it('leaves the shapes it cannot rewrite safely, with their warning', async () => {
+    const root = await project({
+      ...config,
+      'src/assigned.ts': 'process.env.SET_ME = \'x\'\nexport const a = process.env.SET_ME\n',
+      'src/destructured.ts': 'const { DESTR } = process.env\nexport const b = DESTR\n',
+      'src/conflict.ts': 'export const c = process.env.TWO ?? \'a\'\nexport const d = process.env.TWO ?? \'b\'\n',
+      'src/shadow.ts': 'const env = 1\nexport const e = [env, process.env.SHADOWED]\n',
+      'src/string.ts': 'export const f = \'process.env.QUOTED\'\n',
+      'src/page.kay': 'p = 1\n',
+    })
+    const { stderr } = await kay(['check', '--fix'], root)
+
+    expect(stderr).toContain('process.env.SET_ME is read')
+    expect(stderr).toContain('process.env.DESTR is read')
+    expect(stderr).toContain('process.env.SHADOWED is read')
+    expect(stderr).toContain('process.env.QUOTED is read')
+    expect(await read(root, 'src/assigned.ts')).toBe('process.env.SET_ME = \'x\'\nexport const a = process.env.SET_ME\n')
+    expect(await read(root, 'src/shadow.ts')).toContain('process.env.SHADOWED')
+    // Two different defaults declare the variable with none, and the reads keep theirs.
+    expect(await read(root, 'src/conflict.ts')).toBe('import { env } from \'./env\'\n\nexport const c = env.TWO ?? \'a\'\nexport const d = env.TWO ?? \'b\'\n')
+    expect(await read(root, 'src/env.ts')).toContain('TWO: s.Optional(s.String()),')
+  })
+
+  it('does nothing without --fix and where a schema in another shape exists', async () => {
+    const root = await project({ ...config, 'src/lib.ts': 'export const a = process.env.FOO\n' })
+
+    await kay(['check'], root)
+    expect(await read(root, 'src/lib.ts')).toBe('export const a = process.env.FOO\n')
+
+    const other = await project({ ...config, 'src/lib.ts': 'export const a = process.env.FOO\n', 'src/schema.ts': 'import { defineEnv } from \'kay/server\'\n\nconst shape = {} as never\n\nexport const settings = defineEnv(shape)\n' })
+
+    await kay(['check', '--fix'], other)
+    expect(await read(other, 'src/lib.ts')).toBe('export const a = process.env.FOO\n')
+  })
+})

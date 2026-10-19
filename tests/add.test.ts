@@ -264,7 +264,7 @@ it('adds an extension without breaking a config it does not recognise', async ()
   expect(addExtension('import { cms, forgejo } from \'@kaynooo/kayjs-cms\'\nexport default defineConfig({ extensions: [cms({ files: forgejo() })] })\n', extension)).toContain('extensions: [cms({ files: forgejo() })] })')
   expect(addExtension('import { cms, forgejo } from \'@kaynooo/kayjs-cms\'\nexport default defineConfig({ extensions: [cms({ files: forgejo() })] })\n', extension)!.match(/cms\(/g)).toHaveLength(1)
   expect(addExtension('export default defineConfig({ extensions: list })\n', extension)).toBeUndefined()
-  expect(addExtension('export default defineConfig({ extensions: [] })\n', extension)).toBe('import { cms } from \'@kaynooo/kayjs-cms\'\nexport default defineConfig({ extensions: [cms()] })\n')
+  expect(addExtension('export default defineConfig({ extensions: [] })\n', extension)).toBe('import { cms } from \'@kaynooo/kayjs-cms\'\n\nexport default defineConfig({ extensions: [cms()] })\n')
 })
 
 it('refuses a name that is no feature, an inherited one included', async () => {

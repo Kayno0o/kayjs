@@ -67,11 +67,13 @@ export function insertImport(source: string, line: string): string {
     found.group = groupOf(source.slice(found.start, found.end), found.path)
 
   const statement = `${line}\n`
+  // The first import gets the blank line the lint wants between the imports and the code.
+  const spaced = imports.length === 0 && source !== '' && !source.startsWith('\n') ? `${statement}\n` : statement
   const path = SPECIFIER.exec(statement)?.[2] ?? ''
   const group = groupOf(statement, path)
   // A side-effect import keeps its place, so it never decides where another goes.
   const before = imports.find(found => found.group !== 6 && (found.group > group || (found.group === group && group !== 6 && compare(found.path, path) > 0)))
   const at = before?.start ?? imports.at(-1)?.end ?? 0
 
-  return `${source.slice(0, at)}${statement}${source.slice(at)}`
+  return `${source.slice(0, at)}${spaced}${source.slice(at)}`
 }

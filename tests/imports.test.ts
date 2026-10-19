@@ -23,5 +23,5 @@ it('sorts case-insensitively and by number, relative imports last, types first',
 
 it('handles a multi-line import and a file with no import', () => {
   expect(insertImport('import {\n  a,\n  b,\n} from \'a\'\nexport {}\n', 'import { z } from \'z\'')).toBe('import {\n  a,\n  b,\n} from \'a\'\nimport { z } from \'z\'\nexport {}\n')
-  expect(insertImport('export {}\n', 'import { z } from \'z\'')).toBe('import { z } from \'z\'\nexport {}\n')
+  expect(insertImport('export {}\n', 'import { z } from \'z\'')).toBe('import { z } from \'z\'\n\nexport {}\n')
 })

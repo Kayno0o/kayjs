@@ -439,6 +439,10 @@ This checks your deploy files against what the project declares. It reports an e
 
 A `process.env.X` or `Bun.env.X` read in `src` that nothing declares is a warning. `NODE_ENV` and test files are left out.
 
+`kay check --fix` declares those variables for you. It adds them to your `defineEnv` schema, or writes `src/env.ts` when you have none, turns a `?? 'default'` into the variable's `default`, and rewrites each read to `env.X` with the import.
+
+A variable is left with its warning when a read assigns it, destructures it, sits in a `.kay` file or in a file that already has an `env`. Since `defineEnv` treats an empty value as unset, an empty variable now takes the default.
+
 `--compose` can be given several times. The files are read relative to the project, and any `--compose` or `--example` replaces the `env` in `kay.config.ts` entirely.
 
 A module under `src` that does not load is reported, and nothing is then called undeclared. A variable set to an empty string counts as not set.

@@ -27,8 +27,9 @@ const TRAILING_COMMENT = /\s\/\/.*$/
 const DESTRUCTURED_ENV = /\b(?:const|let|var)\s*\{([^}]*)\}\s*=\s*(?:process\.env|Bun\.env)\b/
 const LEADING_NAME = /^\s*([a-z_]\w*)\s*(?:[:=,]|$)/i
 const LINE_BREAK = /\r?\n/
+
 // Read by kay or the runtime itself, never by a schema.
-const IGNORED_READS = new Set(['NODE_ENV'])
+export const IGNORED_READS = new Set(['NODE_ENV'])
 
 // Every string of a parsed compose file, where its `${VAR}` references are read from: a comment or a key is no reference.
 function strings(value: unknown): string[] {
@@ -128,9 +129,18 @@ async function composeAssignments(file: string, text: string, problem: (message:
   return { set, interpolated }
 }
 
+// Where a read sits in its line when it is a direct one, a destructured name having no span to replace.
+export interface RawRead {
+  name: string
+  file: string
+  line: number
+  column?: number
+  length?: number
+}
+
 // The reads of `process.env.X`, `process.env['X']`, `Bun.env.X` and a one-line `const { X } = process.env` in the project's own sources, tests apart; a read on several lines, through a variable name or `import.meta.env` is not seen, and a trailing `//` comment is dropped.
-async function rawReads(root: string): Promise<{ name: string, file: string, line: number }[]> {
-  const found: { name: string, file: string, line: number }[] = []
+export async function rawReads(root: string): Promise<RawRead[]> {
+  const found: RawRead[] = []
   const files = [...new Bun.Glob('src/**/*.{ts,tsx,js,jsx,mjs,mts,kay}').scanSync({ cwd: root })].sort().filter(file => !TEST_FILE.test(file) && !file.endsWith('.d.ts'))
 
   for (const file of files) {
@@ -139,14 +149,15 @@ async function rawReads(root: string): Promise<{ name: string, file: string, lin
         continue
 
       const row = source.replace(TRAILING_COMMENT, '')
-      const names = [...row.matchAll(RAW_READ)].map(match => (match[1] ?? match[2])!)
+      const direct = [...row.matchAll(RAW_READ)]
+      const names = direct.map(match => (match[1] ?? match[2])!)
       const destructured = DESTRUCTURED_ENV.exec(row)?.[1]
 
       if (destructured !== undefined)
         names.push(...destructured.split(',').flatMap(part => LEADING_NAME.exec(part)?.[1] ?? []))
 
-      for (const name of names)
-        found.push({ name, file: join(root, file), line: index + 1 })
+      for (const [at, name] of names.entries())
+        found.push({ name, file: join(root, file), line: index + 1, ...at < direct.length && { column: direct[at]!.index, length: direct[at]![0].length } })
     }
   }
 

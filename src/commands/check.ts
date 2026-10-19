@@ -257,8 +257,11 @@ async function checkProject(root: string, config: KayConfig, tsconfig: string, e
 
   // The app's own checks run once, after the fixes.
   // They have no lint, so a run narrowed to a group or a minor leaves them out.
-  if (only === undefined && since === undefined)
-    diagnostics.push(...await envProblems(root, config, scope), ...(await runProjectChecks(root, config)).filter(diagnostic => inScope(diagnostic, scope)))
+  if (only === undefined && since === undefined) {
+    const env = await envProblems(root, config, scope)
+
+    diagnostics.push(...fix ? await declareRawReads(root, env, format, quiet) : env, ...(await runProjectChecks(root, config)).filter(diagnostic => inScope(diagnostic, scope)))
+  }
 
   if (since !== undefined)
     diagnostics = diagnostics.filter(inMinor)
@@ -267,6 +270,29 @@ async function checkProject(root: string, config: KayConfig, tsconfig: string, e
     diagnostics = diagnostics.filter(diagnostic => isLint(diagnostic.code) && LINTS[diagnostic.code].group === only)
 
   return printProblems(diagnostics, denyWarnings, format)
+}
+
+const UNDECLARED_READ = /^process\.env\.(\w+) is read with no schema/
+
+// With `--fix`, declares the raw reads the env comparison warns of in the project's `defineEnv` schema and answers the problems left.
+async function declareRawReads(root: string, problems: CheckDiagnostic[], format: ProblemFormat, quiet: boolean): Promise<CheckDiagnostic[]> {
+  const names = new Set(problems.flatMap(problem => UNDECLARED_READ.exec(problem.message)?.[1] ?? []))
+
+  if (names.size === 0)
+    return problems
+
+  const { declareRawEnv } = await import('./env-declare')
+  const declared = await declareRawEnv(root, names)
+
+  if (declared.names.size === 0)
+    return problems
+
+  if (format === 'json')
+    console.error(`kay check: fixed ${count(declared.reads, 'problem')}`)
+  else if (!quiet)
+    done('fixed', count(declared.reads, 'problem'))
+
+  return problems.filter(problem => !declared.names.has(UNDECLARED_READ.exec(problem.message)?.[1] ?? ''))
 }
 
 // What `env` in kay.config.ts has compared: the declared variables against the compose and example files it names.
