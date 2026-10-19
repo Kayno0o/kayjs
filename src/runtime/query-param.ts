@@ -21,7 +21,7 @@ const QUERY_SCRIPT = 'script[data-kay-query]'
 // form.ts reads a number input's and a checkbox's text alike; it stays out of this module, which would pull it into every page's eager JS.
 const DECIMAL = /^\s*[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?\s*$/i
 const BOOLEAN_TEXT = new Map([['true', true], ['on', true], ['false', false]])
-const REFUSED = Symbol('refused')
+const REFUSED = /* @__PURE__ */ Symbol('refused')
 
 // A query param as the page's `query` schema reads it: its text read as the type the schema asks for, its default when left out or refused; without a rule for it, its text.
 // The server renders with it and the browser hydrates with it, so both read the same value from the same rules.

@@ -34,7 +34,7 @@ interface Fence {
   open: { kind: Kind, ref: number } | undefined
 }
 
-const FIELD_REF = Symbol('kay.fieldRef')
+const FIELD_REF = /* @__PURE__ */ Symbol('kay.fieldRef')
 // Private-use characters fencing what a helper rendered from a field, with the request's nonce, which `placeFieldMarks` turns into markers: `OPEN nonce kind ref END` and `CLOSE nonce END`.
 const OPEN = '\uE000'
 const CLOSE = '\uE002'
