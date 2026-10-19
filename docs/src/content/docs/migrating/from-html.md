@@ -24,7 +24,7 @@ It shares its translation with [`kay migrate astro`](/migrating/from-astro), so 
 ## What it writes
 
 - Tag names, `.class` and `#id` as kay's shorthand, so `<div class="flex gap-2" id="top">` becomes `#top.flex.gap-2`.
-- Classes the shorthand cannot hold, such as `py-0.5` or `md:w-[200px]`, stay in a `class="..."` attribute.
+- Classes the shorthand cannot hold, such as `md:w-[200px]`, stay in a `class="..."` attribute.
 - Attributes in parentheses, text on the element's line, and inline elements such as `<strong>` and `<a>` inside the text as `#[strong text]`.
 - The space a browser shows between two inline elements on separate lines, such as two links, kept as a space.
 - `<script>` and `<style>` with their content kept as it was.

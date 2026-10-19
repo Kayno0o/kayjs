@@ -11,7 +11,7 @@ const CLOSING_LINE = /---[ \t]*(?=\r?\n|$)/y
 const NEXT_FENCE_LINE = /---[ \t]*[a-z<]/y
 const BLANK_LINES = /(?:[ \t]*\r?\n)*/y
 const TAG_NAME = /[A-Z][\w-]*/iy
-const CLASS_NAME = /[\w\-:/@!]+/y
+const CLASS_NAME = /(?:[\w\-:/@!]|\.(?=\d))+/y
 const ID_NAME = /[\w-]+/y
 const ATTRIBUTE_NAME = /[A-Z_@:][\w\-:.@]*/iy
 const SLOT_NAME = /@[A-Z_$][\w$]*/iy

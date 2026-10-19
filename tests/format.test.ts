@@ -151,6 +151,12 @@ describe('formatKay', () => {
   })
 })
 
+describe('formatKay, decimal classes', () => {
+  it('keeps a shorthand class with a decimal in one piece', () => {
+    expect(format('div.grid.gap-1.5.p-0.5.-mt-0.5(id="a") x\n')).toBe('div.grid.gap-1.5.p-0.5.-mt-0.5(id="a") x\n')
+  })
+})
+
 describe('formatFiles', () => {
   it('lists unformatted files without touching them in check mode, and rewrites them otherwise', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'kay-fmt-'))

@@ -243,7 +243,7 @@ for product of products
 
 ### Elements
 
-- Classes: `.class` takes Tailwind names, `:`, `/`, `@` and `!` included: `div.md:flex.w-1/2.hover:underline`.
+- Classes: `.class` takes Tailwind names, `:`, `/`, `@` and `!` included: `div.md:flex.w-1/2.hover:underline`. A `.` followed by a digit stays in the class, so `div.gap-1.5.p-0.5` has the classes `gap-1.5` and `p-0.5`.
 - A class holding `.` or `[` goes in `class="..."`.
 - `class={...}` takes a string, an array or a `{ name: boolean }` object, and merges with the `.class` shorthand and with the `class` of a `{...spread}`.
 - A component gets what merges as one string, so its `class?: string` prop holds; an expression alone reaches it as written.

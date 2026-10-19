@@ -1051,3 +1051,28 @@ describe('a component\'s slots', () => {
     expect(html).not.toContain('return () => (')
   })
 })
+
+describe('shorthand classes with a decimal', () => {
+  const source = 'div.grid.gap-1.5.p-2.w-1.5.h-2.5 x\n'
+
+  it('renders one class a piece on the server', () => {
+    const { tsx, diagnostics } = compileKay(source, 'x.kay')
+
+    expect(diagnostics).toEqual([])
+    expect(tsx).toContain('grid gap-1.5 p-2 w-1.5 h-2.5')
+    expect(tsx).not.toContain('gap-1 5')
+  })
+
+  it('renders one class a piece in an island', () => {
+    const { tsx, diagnostics } = compileKay(source, 'x.kay', { output: 'dom' })
+
+    expect(diagnostics).toEqual([])
+    expect(tsx).toContain('grid gap-1.5 p-2 w-1.5 h-2.5')
+    expect(tsx).not.toContain('gap-1 5')
+  })
+
+  it('keeps a decimal class before an attribute list, text and a block expansion', () => {
+    expect(compileKay('a.p-0.5(href="/x") go\n', 'x.kay').tsx).toContain('p-0.5')
+    expect(compileKay('ul.gap-1.5: li x\n', 'x.kay').diagnostics).toEqual([])
+  })
+})

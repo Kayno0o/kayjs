@@ -152,6 +152,23 @@ describe('elements', () => {
     expect(element(file.template[0]).classes.map(span => text(file, span))).toEqual(['flex', 'md:grid', 'w-1/2', 'hover:bg-red-500'])
   })
 
+  it('keeps a dot followed by a digit inside a shorthand class', () => {
+    const classesOf = (source: string) => {
+      const file = parse(source)
+
+      expect(file.diagnostics).toEqual([])
+
+      return element(file.template[0]).classes.map(span => text(file, span))
+    }
+
+    expect(classesOf('div.grid.gap-1.5.p-2 x')).toEqual(['grid', 'gap-1.5', 'p-2'])
+    expect(classesOf('.p-0.5')).toEqual(['p-0.5'])
+    expect(classesOf('.w-1.5.h-2.5')).toEqual(['w-1.5', 'h-2.5'])
+    expect(classesOf('.-mt-0.5 x')).toEqual(['-mt-0.5'])
+    expect(classesOf('.md:py-2.5.a(href="x")')).toEqual(['md:py-2.5', 'a'])
+    expect(classesOf('div.gap-1.5: span')).toEqual(['gap-1.5'])
+  })
+
   it('nests by indentation', () => {
     const file = parse('ul\n  li one\n  li two\np after')
 
