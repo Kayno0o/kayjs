@@ -2,6 +2,8 @@
 
 ## Common tasks
 
+Every lint, with its default level and fix, is in [Lints and warnings](lints.md).
+
 ### Check the project
 
 `kay check` type-checks the project, templates included, and fails on errors; `--deny-warnings` fails on warnings too, which an app adds to its `check` script when it wants none to pile up (the one `kay new` writes is `kay check`, the CI annotating each warning on the diff):

@@ -13,6 +13,7 @@ import { partOf } from '../docs/src/sections'
 import { palette, pickTheme, scheme, THEME_SCRIPT, THEMES } from '../docs/src/theme'
 import { brokenLinks, LINK } from '../scripts/links'
 import { compileKay, formatDiagnostic } from '../src/compiler'
+import { LINTS } from '../src/compiler/lints'
 import { formatKay } from '../src/format'
 import { sendValue } from '../src/runtime/send'
 
@@ -110,6 +111,12 @@ describe('the documentation site', () => {
     }
 
     expect(long).toEqual([])
+  })
+
+  it('lists every lint in the checks reference', async () => {
+    const reference = await Bun.file(join(pagesDir, 'reference/checks.md')).text()
+
+    expect(Object.keys(LINTS).filter(name => !reference.includes(`| \`${name}\` |`))).toEqual([])
   })
 
   it('gives each card of the home page a link of its own', async () => {
