@@ -130,6 +130,11 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('analytics 
     expect(before.yes[0]).toBe(before.color)
     expect(before.radius).toBe('8px')
 
+    // A page switching its own theme after the notice opened repaints it.
+    await page.evaluate(() => document.body.style.cssText = 'background:rgb(20, 20, 20);color:rgb(240, 240, 240)')
+    expect(await looks()).toMatchObject({ background: 'rgb(20, 20, 20)', color: 'rgb(240, 240, 240)', yes: ['rgb(240, 240, 240)', 'rgb(20, 20, 20)'] })
+    await page.evaluate(() => document.body.removeAttribute('style'))
+
     await page.evaluate(() => {
       const root = document.documentElement
 
