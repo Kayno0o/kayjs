@@ -234,7 +234,7 @@ function inScope(diagnostic: CheckDiagnostic, scope: string[]): boolean {
 async function checkProject(root: string, config: KayConfig, tsconfig: string, entry: string | undefined, { denyWarnings, fix, only, since, launch, format, scope, quiet }: { denyWarnings: boolean, fix: boolean, only: LintGroup | undefined, since: string | undefined, launch: boolean, format: ProblemFormat, scope: string[], quiet: boolean }): Promise<{ failing: number, found: number }> {
   const options = { ...configCheckOptions(config), tsconfig, entry: entry ?? config.entry, launch }
   const checkScope = async () => (await checkTypes(root, options)).filter(diagnostic => inScope(diagnostic, scope))
-  let diagnostics = await checkScope()
+  let diagnostics = [...await checkScope(), ...await envProblems(root, config, scope)]
 
   // A path filter only narrows what is reported, but a run asked for one is not the whole check the entries of deleted components can be judged against.
   if (scope.length === 0)
@@ -251,7 +251,7 @@ async function checkProject(root: string, config: KayConfig, tsconfig: string, e
     else if (!quiet)
       done('fixed', count(fixed, 'problem'))
 
-    diagnostics = await checkScope()
+    diagnostics = [...await checkScope(), ...await envProblems(root, config, scope)]
   }
 
   if (since !== undefined)
@@ -261,4 +261,14 @@ async function checkProject(root: string, config: KayConfig, tsconfig: string, e
     diagnostics = diagnostics.filter(diagnostic => isLint(diagnostic.code) && LINTS[diagnostic.code].group === only)
 
   return printProblems(diagnostics, denyWarnings, format)
+}
+
+// What `env` in kay.config.ts has compared: the declared variables against the compose and example files it names.
+async function envProblems(root: string, config: KayConfig, scope: string[]): Promise<CheckDiagnostic[]> {
+  if (config.env === undefined)
+    return []
+
+  const [{ listEnv }, { compareEnv }] = await Promise.all([import('./env'), import('./env-compare')])
+
+  return (await compareEnv(root, (await listEnv(root)).variables, config.env)).filter(diagnostic => inScope(diagnostic, scope))
 }

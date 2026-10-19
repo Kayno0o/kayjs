@@ -405,6 +405,30 @@ It reads the `defineEnv` schemas in the modules under `src`, `publicEnv`, each l
 
 The modules under `src` are imported, so their top-level code runs.
 
+### Compare with the compose and example files
+
+```sh
+kay env --compose compose.prod.yaml --example .env.example
+```
+
+This checks your deploy files against what the project declares. It reports an error when:
+
+- a variable production needs is set by no service of the compose file, in `environment` or in an `env_file`
+- a variable production needs is missing from the example file, unless a compose service gives it a value
+- the example file lists a variable that no schema declares, no service sets and the compose file never reads as `${VAR}`
+
+A `process.env.X` or `Bun.env.X` read in `src` that nothing declares is a warning. `NODE_ENV` and test files are left out.
+
+`--compose` can be given several times. The command exits with 1 on an error, and `--format json` adds the problems as `findings`.
+
+To run it with `kay check`, name the files in `kay.config.ts`.
+
+```ts
+export default {
+  env: { compose: 'compose.prod.yaml', example: '.env.example' },
+}
+```
+
 ## kay i18n
 
 ```sh
@@ -538,7 +562,7 @@ Colour only goes to a terminal, and not under `NO_COLOR` or `TERM=dumb`. `FORCE_
 | `kay routes` | `{ routes, unlisted }`, each route with its `methods`, `path`, `kind` and `file` |
 | `kay i18n missing` | `{ locales }`, each locale with its missing `messages` keys and its missing `entries` by collection |
 | `kay doctor` | `{ checks }`, each with its `name`, `ok`, `message` and `fix` |
-| `kay env` | `{ variables, unread }`, each variable with its `name`, `source`, `type`, `required` and `default` |
+| `kay env` | `{ variables, unread }` (and `findings` when it compares files), each variable with its `name`, `source`, `type`, `required` and `default` |
 | `kay explain` | `{ groups, lints, errorGroups, errors }`, or for one lint its `summary` and its `wrong` and `right` examples |
 | `kay fmt` | `{ errors, warnings, problems, written, changed }` |
 | `kay migrate` | `{ written, kept, copied, notes }` |

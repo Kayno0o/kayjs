@@ -136,6 +136,8 @@ export interface KayConfig {
   // Receives every error a load, a render, a guard or an action throws, as it is logged, and the ones islands report from the browser: the place to send them to an error tracker.
   // An error met outside any request, in a scheduled or background job or an `onStop` hook, comes with `undefined` for the request.
   onError?: ((error: unknown, request: Request | undefined) => void | Promise<void>) | undefined
+  // The files `kay env` and `kay check` compare the declared variables with: a compose file or several, and the example env file (`{ compose: 'compose.prod.yaml', example: '.env.example' }`). Each variable production needs must be set by a compose service and listed in the example, and each one the example lists must be declared.
+  env?: { compose?: string | string[] | undefined, example?: string | undefined } | undefined
   // What libraries add to the app, each listed once: `extensions: [authPages()]`.
   extensions?: KayExtension[] | undefined
 }

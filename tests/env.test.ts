@@ -301,3 +301,111 @@ describe('overrideEnv', () => {
     expect(process.env.MEDIA_DIR).toBe(before)
   })
 })
+
+describe('kay env against compose and .env.example', () => {
+  const env = 'import { s } from \'kay\'\nimport { defineEnv } from \'kay/server\'\n\nexport const env = defineEnv(s.Object({\n  DATABASE_URL: s.String(),\n  SESSION_SECRET: s.Secret(),\n  DISCORD_ID: s.String({ requiredInProduction: true }),\n  MODE: s.String({ default: \'fast\' }),\n}))\n'
+  const files = {
+    'kay.config.ts': 'export default { favicon: false }\n',
+    'src/env.ts': env,
+    '.env.example': '# production\nSESSION_SECRET=\nexport DATABASE_URL="postgres://x"\nDISCORD_ID=\nPOSTGRES_PASSWORD=\n',
+    'app.env': 'DISCORD_ID=1\n',
+    'compose.yaml': 'services:\n  db:\n    image: postgres\n    environment:\n      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set it}\n  app:\n    env_file: [app.env]\n    environment:\n      SESSION_SECRET: ${SESSION_SECRET:-fallback}\n      DATABASE_URL: postgres://app:${POSTGRES_PASSWORD}@db/app\n',
+  }
+  const run = async (root: string, args: string[]) => {
+    const { stdout, stderr, code } = await kay(['env', ...args, '--format', 'json'], root)
+
+    return { code, stderr, findings: (JSON.parse(stdout) as { findings?: { file: string, line: number, column: number, code: string | null, severity: string, message: string }[] }).findings }
+  }
+
+  it('passes when compose sets each variable production needs and the example lists them', async () => {
+    const root = await project(files)
+    const { code, findings } = await run(root, ['--compose', 'compose.yaml', '--example', '.env.example'])
+
+    expect(findings).toEqual([])
+    expect(code).toBe(0)
+  })
+
+  it('names a variable no compose service sets, in the file it is missing from', async () => {
+    const root = await project({ ...files, 'app.env': '' })
+    const { code, findings } = await run(root, ['--compose', 'compose.yaml'])
+
+    expect(code).toBe(1)
+    expect(findings).toEqual([{ file: 'compose.yaml', line: 1, column: 1, severity: 'error', code: null, message: 'DISCORD_ID is required in production (src/env.ts) and no service of compose.yaml sets it' }])
+  })
+
+  it('counts a variable from any of several compose files, a bare list entry and an env_file', async () => {
+    const root = await project({ ...files, 'app.env': '', 'compose.override.yaml': 'services:\n  app:\n    environment:\n      - DISCORD_ID\n' })
+
+    expect((await run(root, ['--compose', 'compose.yaml', '--compose', 'compose.override.yaml'])).findings).toEqual([])
+  })
+
+  it('names a variable only in .env.example, and one declared but missing from it unless compose gives it a literal', async () => {
+    const root = await project({ ...files, '.env.example': 'STRAY=\nSESSION_SECRET=\nPOSTGRES_PASSWORD=\n' })
+    const { code, findings } = await run(root, ['--compose', 'compose.yaml', '--example', '.env.example'])
+    const messages = findings!.map(({ file, line, message }) => `${file}:${line} ${message}`)
+
+    expect(code).toBe(1)
+    expect(messages).toEqual([
+      '.env.example:1 STRAY is in .env.example and no schema declares it, no compose service sets it and none interpolates it',
+      '.env.example:1 DISCORD_ID is required in production (src/env.ts) and .env.example does not list it',
+    ])
+  })
+
+  it('skips the half it was not given, and with no compose file given, no variable is judged missing from it', async () => {
+    const root = await project({ ...files, 'compose.yaml': 'services: {}\n' })
+
+    expect((await run(root, ['--example', '.env.example'])).findings!.map(({ message }) => message)).toEqual(['POSTGRES_PASSWORD is in .env.example and no schema declares it'])
+    expect((await run(root, ['--compose', 'compose.yaml'])).findings).toHaveLength(3)
+  })
+
+  it('names a file that is missing or not YAML, and an env_file that does not exist', async () => {
+    const root = await project({ ...files, 'bad.yaml': 'services: [\n', 'gone.yaml': 'services:\n  app:\n    env_file: nope.env\n' })
+
+    expect((await run(root, ['--compose', 'missing.yaml'])).findings![0]!.message).toBe('missing.yaml does not exist')
+    expect((await run(root, ['--compose', 'bad.yaml'])).findings![0]!.message).toContain('bad.yaml is not valid YAML')
+    expect((await run(root, ['--compose', 'gone.yaml'])).findings!.map(({ message }) => message)).toContain('env_file nope.env of gone.yaml does not exist')
+  })
+
+  it('warns of a raw read no schema declares, and exits 0 on warnings alone', async () => {
+    const root = await project({
+      ...files,
+      'src/lib.ts': 'export const a = process.env.FOO\nexport const b = process.env[\'BAR\']\nexport const c = Bun.env.BAZ\nexport const d = process.env.NODE_ENV\nexport const e = process.env.DISCORD_ID\nexport const f = process.env.PORT\n// process.env.COMMENTED\n',
+      'src/lib.test.ts': 'export const t = process.env.IN_TEST\n',
+    })
+    const { code, findings } = await run(root, ['--compose', 'compose.yaml', '--example', '.env.example'])
+
+    expect(code).toBe(0)
+    expect(findings!.map(({ severity, file, line, message }) => `${severity} ${file}:${line} ${message.slice(0, message.indexOf(' '))}`)).toEqual(['warning src/lib.ts:1 process.env.FOO', 'warning src/lib.ts:2 process.env.BAR', 'warning src/lib.ts:3 process.env.BAZ'])
+  })
+
+  it('is unchanged with no flag and no env key in the config, and takes the files from the config', async () => {
+    const root = await project(files)
+
+    expect((await run(root, [])).findings).toBeUndefined()
+
+    const configured = await project({ ...files, 'kay.config.ts': 'export default { favicon: false, env: { compose: \'compose.yaml\', example: \'.env.example\' } }\n', 'app.env': '' })
+    const { code, findings } = await run(configured, [])
+
+    expect(code).toBe(1)
+    expect(findings).toHaveLength(1)
+  })
+
+  it('prints the findings as text and exits 1 on an error', async () => {
+    const root = await project({ ...files, 'app.env': '' })
+    const { stderr, code } = await kay(['env', '--compose', 'compose.yaml'], root)
+
+    expect(code).toBe(1)
+    expect(stderr).toContain('DISCORD_ID is required in production')
+  })
+
+  it('runs inside kay check from the config, its findings counting under --deny-warnings', async () => {
+    const root = await project({ ...files, 'kay.config.ts': 'export default { favicon: false, env: { compose: \'compose.yaml\', example: \'.env.example\' } }\n', 'tsconfig.json': '{ "extends": "kay/tsconfig.json" }\n', 'src/lib.ts': 'export const a = process.env.FOO\n', 'src/routes/index.kay': 'h1 Hi\n' })
+    const checked = async (args: string[]) => kay(['check', '--format', 'json', ...args], root)
+    const warning = JSON.parse((await checked([])).stdout) as { errors: number, warnings: number, problems: { file: string, message: string }[] }
+
+    expect(warning.problems.map(({ file, message }) => `${file} ${message.slice(0, message.indexOf(' '))}`)).toContain('src/lib.ts process.env.FOO')
+    expect((await checked([])).code).toBe(0)
+    expect((await checked(['--deny-warnings'])).code).toBe(1)
+    expect((await checked(['--only', 'seo'])).code).toBe(0)
+  })
+})

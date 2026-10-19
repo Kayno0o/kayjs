@@ -8,7 +8,8 @@ import { projectPaths } from '../project'
 import { describeEnv } from '../server/env'
 import { buildingWithoutEnv, listingEnv } from '../server/env-state'
 import { registerLoader } from '../server/loader'
-import { formatOption, printDocument, printFailure, projectRoot, withStdoutOnStderr } from './command'
+import { formatOption, printDocument, printedProblems, printFailure, printProblems, projectRoot, withStdoutOnStderr } from './command'
+import { compareEnv } from './env-compare'
 import { importApi } from './import-module'
 import { USAGES } from './usages'
 
@@ -32,7 +33,7 @@ const KAY_VARIABLES: EnvVariable[] = [
 // Every variable the project's `defineEnv` schemas, its `publicEnv` and its extensions declare, with whether each is required, in production only or always, and its default. The server entry is not run: the modules under `src` that call `defineEnv` are imported without the server's environment.
 export const env: Command = {
   usage: USAGES.env,
-  options: { format: { type: 'string' } },
+  options: { format: { type: 'string' }, compose: { type: 'string', multiple: true }, example: { type: 'string' } },
   positionals: 1,
   run: async ({ values, positionals: [path] }) => {
     const format = formatOption('env', values.format)
@@ -48,17 +49,25 @@ export const env: Command = {
     buildingWithoutEnv()
 
     try {
-      const { variables, unread } = await withStdoutOnStderr(async () => listEnv(root))
+      const { variables, unread, findings } = await withStdoutOnStderr(async () => {
+        const listed = await listEnv(root)
+        const files = values.compose !== undefined || values.example !== undefined ? { compose: Array.isArray(values.compose) ? values.compose : undefined, example: typeof values.example === 'string' ? values.example : undefined } : (await loadConfig(root)).env
+
+        return { ...listed, findings: files === undefined ? undefined : await compareEnv(root, listed.variables, files) }
+      })
 
       if (format === 'json') {
-        printDocument({ variables, unread })
+        printDocument({ variables, unread, ...findings && { findings: await printedProblems(findings) } })
 
-        return 0
+        return findings === undefined || !findings.some(({ severity }) => severity === 'error') ? 0 : 1
       }
 
       console.log(formatListing(variables) + (unread.length === 0 ? '' : `\n\n${unread.map(({ file, error }) => `Not read: ${file} (${error})`).join('\n')}`))
 
-      return 0
+      if (findings === undefined)
+        return 0
+
+      return (await printProblems(findings, false, format)).failing > 0 ? 1 : 0
     }
     catch (error) {
       printFailure('env', error, format)
