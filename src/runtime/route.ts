@@ -9,8 +9,6 @@ type SegmentParams<Segment extends string> = Segment extends `:${infer Name}?`
   ? Partial<Record<Name, Value | undefined>>
   : Segment extends `:${infer Name}` ? Record<Name, Value> : Segment extends `*${infer Name}` ? Record<Name, CatchAll> : unknown
 type ParamsOf<Pattern extends string> = Pattern extends `/${infer Head}/${infer Rest}` ? SegmentParams<Head> & ParamsOf<`/${Rest}`> : Pattern extends `/${infer Last}` ? SegmentParams<Last> : unknown
-const OPTIONAL = /\?$/
-
 type Flat<Shape> = { [Key in keyof Shape]: Shape[Key] }
 
 export interface RouteOptions {
@@ -26,14 +24,19 @@ export type RouteArgs<Pattern extends string> = string extends Pattern
     ? [options?: RouteOptions]
     : Record<never, never> extends Flat<ParamsOf<Pattern>> ? [params?: Flat<ParamsOf<Pattern>>, options?: RouteOptions] : [params: Flat<ParamsOf<Pattern>>, options?: RouteOptions]
 
+const OPTIONAL = /\?$/
+
 // One segment of a path: `/`, `?`, `#` and `%` encoded. Empty, `.` and `..` throw: the first makes another route and a browser resolves the others, even as `%2E`.
 function segment(name: string, value: unknown): string {
-  const given = typeof value === 'string' || (typeof value === 'number' && Number.isFinite(value))
-  const text = given ? String(value) : ''
+  const text = typeof value === 'string' || (typeof value === 'number' && Number.isFinite(value)) ? String(value) : ''
 
   if (text === '' || text === '.' || text === '..')
-    throw new TypeError(`route(): param "${name}" is ${typeof value === 'number' || typeof value === 'string' ? `"${text}"` : String(value)}`)
+    throw new TypeError(`route(): param "${name}" is ${typeof value === 'string' ? `"${text}"` : String(value)}`)
 
+  return encoded(name, text)
+}
+
+function encoded(name: string, text: string): string {
   try {
     return encodeURIComponent(text)
   }
@@ -75,5 +78,5 @@ export function route<const Pattern extends RoutePattern>(pattern: Pattern, ...a
     }
   }
 
-  return `/${path}${search.size > 0 ? `?${search}` : ''}${typeof options?.hash === 'string' && options.hash !== '' ? `#${encodeURIComponent(options.hash)}` : ''}`
+  return `/${path}${search.size > 0 ? `?${search}` : ''}${typeof options?.hash === 'string' && options.hash !== '' ? `#${encoded('hash', options.hash)}` : ''}`
 }

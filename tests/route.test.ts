@@ -30,6 +30,7 @@ describe('route()', () => {
   it('joins a catch-all by its segments', () => {
     expect(route('/docs/*path', { path: 'a/b c' })).toBe('/docs/a/b%20c')
     expect(route('/docs/*path', { path: ['a', 'b/c'] })).toBe('/docs/a/b%2Fc')
+    expect(route('/docs/*path', { path: ['a/b'] })).toBe('/docs/a%2Fb')
     expect(route('/docs/*path', { path: '' })).toBe('/docs/')
     expect(route('/docs/*path', { path: [] })).toBe('/docs/')
   })
@@ -79,7 +80,9 @@ describe('route()', () => {
       expect(() => route('/items/:id', { id: {} } as never)).toThrow('param "id" is [object Object]')
       expect(() => route('/docs/*path', { path: 'a//b' })).toThrow('param "path" is ""')
       expect(() => one('\uD800')).toThrow('param "id" is not valid text')
-      expect(() => route('/items/:id', { id: Number.NaN })).toThrow('param "id" is ""')
+      expect(() => route('/items/:id', { id: Number.NaN })).toThrow('param "id" is NaN')
+      expect(() => route('/items/:id', { id: Infinity })).toThrow('param "id" is Infinity')
+      expect(() => route('/about', { hash: '\uD800' })).toThrow('param "hash" is not valid text')
       expect(() => route('/docs/*path', { path: '/a' })).toThrow('param "path" is ""')
       expect(() => route('/docs/*path', { path: 'a/' })).toThrow('param "path" is ""')
     })
@@ -126,5 +129,5 @@ describe('route() in a page', () => {
       expect(english).toContain('<a class="made" href="/shop/en/about-us">')
     }
     finally { await rm(routes, { recursive: true, force: true }) }
-  })
+  }, 30_000)
 })

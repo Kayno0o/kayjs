@@ -193,6 +193,27 @@ describe('kay build --static', () => {
     expect(code.filter(text => text.includes('route(): param'))).toEqual([])
   })
 
+  it('ships route() to an island importing it, so the marker above finds it', async () => {
+    const fixture = await fixtureCopy('static')
+    const elsewhere = await mkdtemp(join(tmpdir(), 'kay-static-'))
+
+    try {
+      await Bun.write(join(fixture, 'src/components/linker.kay'), '---\nimport { route } from \'kay\'\n---\nbutton(type="button" onClick={() => location.assign(route(\'/about\', { query: { a: 1 } }))}) Go\n')
+      await Bun.write(join(fixture, 'src/routes/routed.kay'), '---\nimport Linker from \'../components/linker.kay\'\n---\nLinker\n')
+
+      expect((await exportSite(elsewhere, fixture)).code).toBe(0)
+
+      const chunks = await Array.fromAsync(new Bun.Glob('_kay/*.js').scan(elsewhere))
+      const code = await Promise.all(chunks.map(async chunk => Bun.file(join(elsewhere, chunk)).text()))
+
+      expect(code.filter(text => text.includes('route(): param'))).toHaveLength(1)
+    }
+    finally {
+      await rm(elsewhere, { recursive: true, force: true })
+      await rm(fixture, { recursive: true, force: true })
+    }
+  })
+
   it('ships no code reporting browser errors, which no server would take', async () => {
     const chunks = await Array.fromAsync(new Bun.Glob('_kay/*.js').scan(out))
     const code = await Promise.all(chunks.map(async chunk => Bun.file(join(out, chunk)).text()))

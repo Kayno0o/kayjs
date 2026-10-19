@@ -63,7 +63,7 @@ a(href={route('/todos/:id', { id })}) Open
 
 kay knows your pages' patterns, so `route('/todos/:id', {})` or `route('/nope')` is a type error that `kay check` reports, and your editor completes the patterns. You declare nothing.
 
-Each param is encoded as one segment, so a value such as `../admin` or `a/b` cannot leave it. A param that is empty, `.` or `..` throws, as a browser would walk up the path with it, and so does a catch-all string starting or ending with a `/`. An optional param (`[[page]]`, written `:page?`) can be left out, a catch-all (`[...path]`, written `*path`) takes a string or a list of segments, and a third argument adds a `query` and a `hash`:
+Each param is encoded as one segment, so a value such as `../admin` or `a/b` cannot leave it. A param that is empty, `.` or `..` throws, as a browser would walk up the path with it, and so does a catch-all string starting or ending with a `/` or holding a doubled one. An optional param (`[[page]]`, written `:page?`) can be left out, a catch-all (`[...path]`, written `*path`) takes a string or a list of segments, and a third argument adds a `query` and a `hash`:
 
 ```ts
 route('/blog/:page?', { page: 2 }, { query: { q: 'kay' }, hash: 'top' })
