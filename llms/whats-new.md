@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- kayjs-auth's `secret` is optional: left out, it derives its own key from the session's secret, so an app sets one secret, and `session()` exposes `deriveSecret(purpose)` for the same ([kayjs-auth setup](../packages/auth/llms/setup.md), [Server](server.md)).
 - `overrideEnv(env, values)` from `kay/test` gives a `defineEnv` value other variables for one test and puts them back, and `defineEnv`'s `source` argument is documented ([Testing](testing.md), [Server](server.md)).
 - kayjs-auth's `auth.sessionCookie` mints the `__Host-session` cookie an https site reads, in production when kay.config.ts `site` is https or with `{ secure: true }` ([Hardening and testing](../packages/auth/llms/hardening-and-testing.md)).
 - kayjs-ui's `attempt` and ConfirmDelete read the `ApiError` that `call()` throws as they do an action's refusal: the route's own words are toasted for a 4xx when they read as a message (not markup, a status code or a page), `refused` reads its `answer`, and `failure` stands for status 0 or a 5xx ([kayjs-ui](../packages/ui/llms/basics.md)).

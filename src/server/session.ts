@@ -137,7 +137,7 @@ export function session<Data extends object = SessionData>(options: SessionOptio
 
   const config = { name: options.cookie ?? 'session', sameSite: options.sameSite ?? 'lax', maxAge: options.maxAge === undefined ? DEFAULT_MAX_AGE : wholeSeconds(options.maxAge, 'the session maxAge'), absoluteMaxAge: options.absoluteMaxAge === undefined ? DEFAULT_ABSOLUTE_MAX_AGE : wholeSeconds(options.absoluteMaxAge, 'the session absoluteMaxAge'), browserMaxAge: options.browserMaxAge === undefined ? DEFAULT_BROWSER_MAX_AGE : wholeSeconds(options.browserMaxAge, 'the session browserMaxAge'), domain, store: options.store, keys }
 
-  return new Elysia({ name: 'kay/session', seed: config.name })
+  const plugin = new Elysia({ name: 'kay/session', seed: config.name })
     .derive({ as: 'scoped' }, ({ request }) => ({ session: new RequestSession<Data>(request, config) }))
     .onAfterHandle({ as: 'scoped' }, async (context) => {
       const cookie = await context.session.commit()
@@ -158,6 +158,15 @@ export function session<Data extends object = SessionData>(options: SessionOptio
 
       context.set.headers['set-cookie'] = [before ?? []].flat().concat(cookie)
     })
+
+  // A key for one `purpose`, such as `'kayjs-auth'`, derived from the secret with HKDF so it says nothing of the secret or of the cookie's key; text of 43 characters, a list in the same order for a list of secrets.
+  const deriveSecret = (purpose: string): string | string[] => {
+    const derived = secrets.map(secret => Buffer.from(nodeCrypto().hkdfSync('sha256', secret, '', `kay session ${purpose}`, 32)).toString('base64url'))
+
+    return Array.isArray(options.secret) ? derived : derived[0]!
+  }
+
+  return Object.assign(plugin, { deriveSecret })
 }
 
 interface SessionConfig {

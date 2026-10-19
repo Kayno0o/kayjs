@@ -18,7 +18,6 @@ export const db = new Database({ url: process.env.DATABASE_URL!, tables: [...aut
 
 export const auth = createAuth({
   sessions: session<AuthSessionData & { cart: string[] }>({ secret: process.env.SESSION_SECRET! }),
-  secret: process.env.AUTH_SECRET!,
   store: pgStore(db),
   url: 'https://example.com',
   site: 'Example',
@@ -46,7 +45,7 @@ A plain Elysia app, or one mounting the plugin by hand, uses it before the pages
 `createAuth` options:
 
 - `sessions`: the plugin kay's `session()` returns, its data type including `AuthSessionData`.
-- `secret`: at least 32 characters, from the environment, and not the session's secret: kayjs-auth cannot derive the session's keys, so the two stay apart only when the app keeps them apart. Each use gets its own key derived from it: encrypting TOTP secrets and provider tokens, and digesting where a sign-in came from. A list rotates secrets: the first writes, every one reads. After a rotation each user gets one `new-sign-in` mail, since the digest of where they sign in from changes with the secret.
+- `secret`: left out, kayjs-auth derives its own key from the session's secret (`sessions.deriveSecret('kayjs-auth')`, HKDF, so it says nothing of the session's key and a rotated list stays rotated), and one secret serves both. Pass one (at least 32 characters, from the environment, a list rotates) to keep a second secret for kayjs-auth; a session plugin that is not kay's `session()` needs it. Each use gets its own key derived from it: encrypting TOTP secrets and provider tokens, and digesting where a sign-in came from. The first writes, every one reads. After a rotation each user gets one `new-sign-in` mail, since the digest of where they sign in from changes with the secret.
 - `store`: see Stores.
 - `url`: the site's public origin, needed for OAuth callbacks and mailed links; `createAuth` throws without it when either is configured. `site`: the site's name in mails and authenticator apps, the URL's host by default.
 - `prefix`: where the OAuth routes live, `/auth` by default.

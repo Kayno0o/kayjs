@@ -109,12 +109,16 @@ function guardSession(session: Session<AuthSessionData>, refuse: () => boolean, 
 }
 
 // The plugin kay's `session()` returns, whichever data the app keeps beside kayjs-auth's.
-export interface SessionPlugin<Data extends AuthSessionData> { '~Ephemeral': { derive: { readonly session: Session<Data> } } }
+export interface SessionPlugin<Data extends AuthSessionData> {
+  '~Ephemeral': { derive: { readonly session: Session<Data> } }
+  // A key for one purpose from the session's secret, a list for a list of secrets.
+  'deriveSecret'?: (purpose: string) => string | string[]
+}
 
 export interface AuthOptions<Data extends AuthSessionData, Role extends string, Prefix extends string = '/auth', Scope extends string = never, OrgRole extends string = never> {
   sessions: SessionPlugin<Data>
-  // At least 32 characters, from the environment; each use gets its own key derived from it. A list rotates them: the first writes, every one reads.
-  secret: string | string[]
+  // At least 32 characters, from the environment; each use gets its own key derived from it. A list rotates them: the first writes, every one reads. Left out, kayjs-auth derives its own from the session's secret, so one secret serves both.
+  secret?: string | string[] | undefined
   store: AuthStore
   // The site's public origin, such as `https://example.com`: OAuth callbacks are built on it.
   url?: string | undefined
@@ -1357,6 +1361,10 @@ function pagesHandle(core: Core, options: { pages?: boolean | AuthPagesConfig | 
   }
 }
 
+function noSecret(): never {
+  throw new Error('kayjs-auth: `secret` is missing and the session plugin cannot derive one; pass a secret of at least 32 characters, or a plugin from kay\'s `session()`')
+}
+
 function createCore<Data extends AuthSessionData, Role extends string, Prefix extends string, Scope extends string, OrgRole extends string>(options: AuthOptions<Data, Role, Prefix, Scope, OrgRole>): Core {
   const prefix = options.prefix ?? '/auth'
   const oauth: Core['oauth'] = new Map()
@@ -1375,7 +1383,7 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
 
   const core: Core = {
     store: options.store,
-    keys: deriveKeys(options.secret),
+    keys: deriveKeys(options.secret ?? options.sessions.deriveSecret?.('kayjs-auth') ?? noSecret()),
     url,
     prefix,
     signInPage: options.signInPage ?? paths?.signIn ?? '/',

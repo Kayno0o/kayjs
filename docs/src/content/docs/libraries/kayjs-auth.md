@@ -32,13 +32,12 @@ import { session } from 'kay/server'
 
 export const auth = createAuth({
   sessions: session<AuthSessionData>({ secret: process.env.SESSION_SECRET! }),
-  secret: process.env.AUTH_SECRET!,
   store: memoryStore(),
   pages: true,
 })
 ```
 
-`secret` is at least 32 characters and not the session's secret.
+kayjs-auth takes its key from the session's secret, so one secret serves both. Pass `secret` (at least 32 characters) only to keep a separate one for kayjs-auth.
 
 Then declare it in `kay.config.ts`. The module loads only when the server starts, so the config never loads your database.
 
