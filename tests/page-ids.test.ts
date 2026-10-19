@@ -6,7 +6,7 @@ import { pages } from '../src/server'
 
 const FIELD = '---\nimport { uid } from \'kay\'\n\nconst { label } = props<{ label: string }>()\nconst id = uid()\n---\nlabel(for={id}) {label}\ninput(id={id})\n'
 const MENU = '---\nimport { signal, uid } from \'kay\'\n\nconst open = signal(false)\nconst id = uid()\n---\nbutton(aria-controls={id} onClick={() => open.set(o => !o)}) Menu\nul(id={id})\n'
-const PAGE = '--- server\nimport { defer } from \'kay\'\n\nconst outer = defer(new Promise<string>(resolve => setTimeout(resolve, 5, \'outer\')))\nconst inner = defer(new Promise<string>(resolve => setTimeout(resolve, 15, \'inner\')))\n--- script\nimport Field from \'../components/field.kay\'\nimport Menu from \'../components/menu.kay\'\n---\nmain\n  Field(label="Name")\n  Menu\n  // kay-allow uncaught-await\n  await outer\n    p.waiting Waiting\n  then text\n    p {text}\n    // kay-allow uncaught-await\n    await inner\n      p.waiting Waiting more\n    then more\n      p {more}\n'
+const PAGE = '--- server\nimport { defer } from \'kay\'\n\nconst outer = defer(new Promise<string>(resolve => setTimeout(resolve, 5, \'outer\')))\nconst inner = defer(new Promise<string>(resolve => setTimeout(resolve, 15, \'inner\')))\n--- script\nimport Field from \'../components/field.kay\'\nimport Menu from \'../components/menu.kay\'\n---\nmain\n  Field(label="Name")\n  Menu\n  // kay-allow uncaught-await\n  await outer\n    p.waiting Waiting\n  then text\n    p {text}\n    Field(label="Inside")\n    // kay-allow uncaught-await\n    await inner\n      p.waiting Waiting more\n    then more\n      p {more}\n      Field(label="Nested")\n'
 const ID = /\bid="([^"]+)"/g
 const AWAIT = /data-kay-await="([^"]+)"/g
 const root = process.cwd()
@@ -38,16 +38,18 @@ describe('the ids of a page rendered per request', () => {
   it('gives the same bytes on every visit, streamed blocks and the ids of components alike, so a compressed copy of it is kept', async () => {
     const [first, second] = [await read('/'), await read('/')]
 
-    expect(ids(first).length).toBe(2)
+    expect(ids(first).length).toBe(4)
+    expect(new Set(ids(first)).size).toBe(4)
+    expect(ids(first).some(id => id.includes("_0_0-"))).toBe(true)
     expect(second).toBe(first)
   })
 
-  it('numbers the blocks of a page from zero, those inside a streamed block under its id, each once in the document', async () => {
+  it('numbers the blocks of a page from zero, those inside a streamed block under its id and an underscore, each once in the document', async () => {
     const html = await read('/')
     const blocks = [...html.matchAll(AWAIT)].map(match => match[1]!)
 
-    expect(blocks).toEqual(['0', '0.0'])
-    expect(html.match(/<!--kay-await:0\.0-->/g)).toHaveLength(1)
+    expect(blocks).toEqual(['0', '0_0'])
+    expect(html.match(/<!--kay-await:0_0-->/g)).toHaveLength(1)
     expect(html).toContain('Waiting')
     expect(html).toContain('outer')
     expect(html).toContain('inner')

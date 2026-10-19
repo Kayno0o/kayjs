@@ -73,7 +73,7 @@ let deferred: Collecting | undefined
 // Ids count from zero in each render, under the id of the block it renders, so a page gives the same bytes every time it renders the same and its compressed copy is kept; they only have to differ within one document.
 export function collectDeferred<T>(render: () => T, within?: string): { result: T, deferred: PendingBlock[] } {
   const previous = deferred
-  const collecting: Collecting = { blocks: [], prefix: within === undefined ? '' : `${within}.`, next: 0 }
+  const collecting: Collecting = { blocks: [], prefix: within === undefined ? '' : `${within}_`, next: 0 }
 
   deferred = collecting
 
