@@ -48,6 +48,8 @@ export type { CookieJar } from './cookies'
 export { cookieJar } from './cookies'
 export type { Mounted } from './mount'
 export { mountComponent, readPersisted, settle, writePersisted } from './mount'
+export type { EnvOverride, EnvRestore } from './override-env'
+export { overrideEnv } from './override-env'
 export type { Found, PageReading } from './page'
 export { scratchDir } from './scratch'
 export { solveWork }

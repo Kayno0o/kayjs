@@ -246,6 +246,7 @@ it('shows why a todo was refused', async () => {
 - `jar.send(handle, request)` sends the cookies kept so far through `handle`, such as `app.handle`, keeps those the response sets and drops those it expires; `jar.header()` is the `cookie` header it sends, `''` when it holds none, and `jar.cookies` the `Bun.CookieMap`.
 - `solveWork(challenge)` from `kay/test` solves a proof-of-work challenge, such as one `workChallenge()` signs, as kay's script does, for a test posting a form field by hand, or `undefined` for text that is no challenge.
 - `scratchDir(prefix)` from `kay/test` makes a fresh directory under the project's `.kay/scratch` and resolves with its absolute path: inside the project, so a file written there imports the project's packages, and under `.kay`, which no build or check reads, so another test file building beside it never meets it.
+- `overrideEnv(env, { MEDIA_DIR: dir })` from `kay/test` gives variables of a `defineEnv` value another value, which every module reading that `env` sees though it was read at import, `undefined` unsetting an optional one, and `restore()` or a `using` puts them back; it leaves `process.env` alone, and tests running at once (`test.concurrent`) share the one `env`.
 - `scratchDir(prefix, root)` puts it under another project's `.kay/scratch`; the test removes the directory once done with it.
 
 ```ts

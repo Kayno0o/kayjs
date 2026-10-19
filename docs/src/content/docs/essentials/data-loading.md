@@ -153,6 +153,8 @@ export const env = defineEnv(s.Object({
 
 Import `env` from server code. An island never sees it.
 
+To read other values in a test, use `overrideEnv` from `kay/test` ([Testing](/guides/testing)).
+
 Give a secret that development and tests can do without, and production must have, `requiredInProduction: true`.
 
 Under `NODE_ENV=production` a missing value stops the boot, whatever the default. Anywhere else the default applies, or the variable is left out when its field is `s.Optional`.

@@ -132,6 +132,8 @@ export const env = defineEnv(s.Object({
 }))
 ```
 
+`defineEnv(schema, source)` reads `source` instead of `process.env`, for a module building its own env. A test gives a variable of `env` another value with `overrideEnv` from `kay/test` ([Testing](testing.md)).
+
 ### Let an island read a variable
 
 `publicEnv` in kay.config.ts declares the variables an island may read, such as a map key or an analytics id:

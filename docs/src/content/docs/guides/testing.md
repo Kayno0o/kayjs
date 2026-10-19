@@ -187,6 +187,8 @@ You can also run each folder's tests on their own with `KAY_ROOT=<folder> bun te
 
 A test that drives an Elysia app of its own, rather than `testSite`, keeps a browser's cookies with `cookieJar()`. `jar.send(handle, request)` sends the cookies kept so far and keeps the ones the response sets.
 
+A test gives a variable of `env` another value with `overrideEnv(env, { MEDIA_DIR: dir })`, and `restore()` puts it back. Write `using restore = overrideEnv(...)` to have it put back when the test ends, even when it fails. Every module reading that `env` sees the new value, and tests running at the same time share one `env`.
+
 `solveWork(challenge)` solves a proof-of-work challenge as kay's script does. `scratchDir(prefix)` makes a fresh directory under `.kay/scratch`, which no build or check reads.
 
 ## Islands that fail the browser build

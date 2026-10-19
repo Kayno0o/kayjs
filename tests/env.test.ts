@@ -4,6 +4,7 @@ import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { t } from 'elysia'
 import { defineEnv } from '../src/server'
+import { overrideEnv } from '../src/test'
 import { scratchDir } from './scratch'
 
 const cli = join(import.meta.dir, '../src/cli.ts')
@@ -146,4 +147,83 @@ describe('a compiled server', () => {
     expect(set.stdout.trim()).toBe('real')
     expect(set.code).toBe(0)
   }, 90_000)
+})
+
+describe('overrideEnv', () => {
+  it('gives a variable of an env already read at import another value for one test, and puts it back', async () => {
+    const { env, mediaDir } = await import('./fixtures/env-reader')
+
+    const override = overrideEnv(env, { MEDIA_DIR: '/tmp/a' })
+
+    expect(mediaDir()).toBe('/tmp/a')
+    override.restore()
+    expect(mediaDir()).toBe('media')
+    override.restore()
+    expect(mediaDir()).toBe('media')
+  })
+
+  it('restores at the end of a using block, a failing one included', async () => {
+    const { env, mediaDir } = await import('./fixtures/env-reader')
+
+    expect(() => {
+      using override = overrideEnv(env, { MEDIA_DIR: '/tmp/b' })
+
+      expect(override).toBeDefined()
+      expect(mediaDir()).toBe('/tmp/b')
+
+      throw new Error('a failing test')
+    }).toThrow('a failing test')
+    expect(mediaDir()).toBe('media')
+  })
+
+  it('nests, each restore putting back what its override replaced', async () => {
+    const { env, mediaDir } = await import('./fixtures/env-reader')
+    const outer = overrideEnv(env, { MEDIA_DIR: '/outer' })
+    const inner = overrideEnv(env, { MEDIA_DIR: '/inner' })
+
+    expect(mediaDir()).toBe('/inner')
+    inner.restore()
+    expect(mediaDir()).toBe('/outer')
+    outer.restore()
+    expect(mediaDir()).toBe('media')
+  })
+
+  it('unsets an optional variable with undefined and brings it back', async () => {
+    const { env } = await import('./fixtures/env-reader')
+    const override = overrideEnv(env, { DEBUG: undefined })
+
+    expect('DEBUG' in env).toBe(false)
+    override.restore()
+    expect(env.DEBUG).toBe(true)
+  })
+
+  it('sets a variable the env did not hold and removes it after', async () => {
+    const { env } = await import('./fixtures/env-reader')
+    const other: { EXTRA?: string } = {}
+    const override = overrideEnv(other, { EXTRA: 'x' })
+
+    expect(other.EXTRA).toBe('x')
+    override.restore()
+    expect('EXTRA' in other).toBe(false)
+    expect(env.MEDIA_DIR).toBe('media')
+  })
+
+  it('treats a hostile name as a plain variable, never reaching the prototype', () => {
+    const env: Record<string, unknown> = {}
+    const override = overrideEnv(env, JSON.parse('{"__proto__":{"polluted":true},"constructor":"x"}') as Record<string, unknown>)
+
+    expect(({} as { polluted?: boolean }).polluted).toBeUndefined()
+    override.restore()
+    expect(Object.keys(env)).toEqual([])
+  })
+
+  it('leaves process.env alone', async () => {
+    const { env } = await import('./fixtures/env-reader')
+    const before = process.env.MEDIA_DIR
+
+    using override = overrideEnv(env, { MEDIA_DIR: '/tmp/c' })
+
+    expect(override).toBeDefined()
+    expect(process.env.MEDIA_DIR).toBe(before)
+  })
 })
