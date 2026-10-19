@@ -1,4 +1,4 @@
 {
-  "products": { "gzip": 11951, "files": 2, "lazy": ["fetch-island", "forms", "live-cache", "page-swap", "reveal", "static-slots"] },
-  "table": { "gzip": 12938, "files": 2, "lazy": ["fetch-island", "forms", "live-cache", "page-swap", "reveal", "static-slots"] }
+  "products": { "gzip": 11718, "files": 2, "lazy": ["fetch-island", "forms", "live-cache", "live-props", "page-swap", "reveal", "static-slots"] },
+  "table": { "gzip": 12706, "files": 2, "lazy": ["fetch-island", "forms", "live-cache", "live-props", "page-swap", "reveal", "static-slots"] }
 }

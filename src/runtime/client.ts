@@ -3,7 +3,7 @@ import { withBase } from './base'
 import { skew } from './build'
 import { dispatch, hydrate, render } from './dom'
 import { ISLAND } from './markers'
-import { batch, flush, ownSignal, recordSignals, reportError, root, setErrorReporter } from './reactive'
+import { flush, recordSignals, reportError, root, setErrorReporter } from './reactive'
 import { freshPrefix, withIds } from './uid'
 import { decodeServerValue } from './wire'
 
@@ -16,7 +16,7 @@ interface IslandElement extends HTMLElement {
   // Set once hydrated, so the inline hydration script stops queuing its events.
   _$k?: boolean
   // Gives a hydrated island the props of the next page, which kept it.
-  _$p?: (props: object) => void
+  _$p?: ((props: object) => void) | undefined
 }
 
 // Starts loading a `visible` island this far before it scrolls into view.
@@ -169,10 +169,10 @@ async function hydrateIsland(registry: IslandRegistry, element: HTMLElement): Pr
     return
   }
 
-  let loaded: [Awaited<ReturnType<IslandRegistry[string]>>, Awaited<ReturnType<typeof staticSlots>>]
+  let loaded: [Awaited<ReturnType<IslandRegistry[string]>>, Awaited<ReturnType<typeof staticSlots>>, Awaited<ReturnType<typeof livePropsOf>>]
 
   try {
-    loaded = await Promise.all([load(), staticSlots(registry, element)])
+    loaded = await Promise.all([load(), staticSlots(registry, element), livePropsOf(element)])
   }
   catch (error) {
     // A chunk that failed to load is dropped like a missing one.
@@ -184,7 +184,7 @@ async function hydrateIsland(registry: IslandRegistry, element: HTMLElement): Pr
     throw error
   }
 
-  const [{ default: component }, slots] = loaded
+  const [{ default: component }, slots, live] = loaded
 
   // A page swap took it away while its chunk loaded: hydrated now, its effects would outlive it. One in a static slot its island hid hydrates as it shows it again.
   if (!element.isConnected) {
@@ -193,7 +193,8 @@ async function hydrateIsland(registry: IslandRegistry, element: HTMLElement): Pr
     return
   }
 
-  const [props, update] = liveProps(element.dataset.props === undefined ? {} : decodeServerValue(element.dataset.props) as Record<string, unknown>)
+  const given = element.dataset.props === undefined ? {} : decodeServerValue(element.dataset.props) as Record<string, unknown>
+  const [props, update] = live ? live(given) : [given, undefined]
 
   for (const [key, slot] of Object.entries(slots))
     Object.defineProperty(props, key, { value: slot, enumerable: true, configurable: true })
@@ -263,6 +264,11 @@ async function hydrateIsland(registry: IslandRegistry, element: HTMLElement): Pr
       console.error(error)
     }
   }
+}
+
+// Its own chunk, which only a page holding a persistent island loads: the one kind of island the next page gives other props to.
+async function livePropsOf(element: HTMLElement): Promise<typeof import('./live-props').liveProps | undefined> {
+  return element.dataset.persist === undefined ? undefined : (await import('./live-props')).liveProps
 }
 
 // The static slots a static parent gave the island, whose code only a page holding such an island loads.
@@ -356,53 +362,6 @@ async function hotSwap(registry: IslandRegistry, swap: HotSwap): Promise<boolean
     document.querySelector('script[type="module"][src]')?.setAttribute('src', withBase(swap.entry))
 
   return true
-}
-
-// Props read through a signal each, so an island marked `persist` the next page gives other props shows them, as a component inside an island does.
-function liveProps(initial: Record<string, unknown>): [props: object, update: (next: object) => void] {
-  const props = {}
-  const writes = new Map<string, (value: unknown) => void>()
-  const define = (key: string, value: unknown) => {
-    const [read, write] = ownSignal(value, { equals: sameData })
-
-    writes.set(key, write)
-    Object.defineProperty(props, key, { get: read, enumerable: true, configurable: true })
-  }
-
-  for (const [key, value] of Object.entries(initial))
-    define(key, value)
-
-  return [props, next => batch(() => {
-    for (const key of new Set([...writes.keys(), ...Object.keys(next)])) {
-      const value = (next as Record<string, unknown>)[key]
-      const write = writes.get(key)
-
-      if (write)
-        write(value)
-      else
-        define(key, value)
-    }
-  })]
-}
-
-// Whether two decoded props hold the same data, so a prop the next page gives unchanged keeps its value, and what reads it, a `linked` edit included, is left alone.
-function sameData(a: unknown, b: unknown): boolean {
-  if (Object.is(a, b))
-    return true
-
-  if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null || Object.getPrototypeOf(a) !== Object.getPrototypeOf(b))
-    return false
-
-  if (a instanceof Date)
-    return a.getTime() === (b as Date).getTime()
-
-  if (a instanceof RegExp || a instanceof URL)
-    return String(a) === String(b)
-
-  const entries = (value: object) => value instanceof Map || value instanceof Set ? [...value.entries()] : Object.entries(value)
-  const [left, right] = [entries(a), entries(b)]
-
-  return left.length === right.length && left.every(([key, value], index) => sameData(key, right[index]![0]) && sameData(value, right[index]![1]))
 }
 
 // Ends every island under `root`, `root` itself included, as a page swap takes them away.
