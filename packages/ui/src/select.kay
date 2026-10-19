@@ -36,6 +36,9 @@ function report(select: HTMLSelectElement) {
   onChange?.(choice === undefined ? '' as never : choice.value)
 }
 
+// The keys that open the list: what is picked in it then arrives as one change, so it submits at once.
+const OPENERS = new Set([' ', 'F4'])
+
 // Whether the last key went to the select since the last pointer press, and a keyboard pick still waiting for Enter or blur.
 let keyed = false
 let waiting = false
@@ -63,7 +66,7 @@ function pressed(event: KeyboardEvent & { currentTarget: HTMLSelectElement }) {
   if (event.key === 'Enter' && waiting && !event.defaultPrevented)
     submitNow(event.currentTarget)
   else if (event.key !== 'Enter')
-    keyed = true
+    keyed = !OPENERS.has(event.key) && !(event.altKey && event.key.startsWith('Arrow'))
 }
 
 function grabbed(event: PointerEvent & { currentTarget: HTMLSelectElement }) {

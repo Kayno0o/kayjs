@@ -99,7 +99,7 @@ describe('Sortable, from the keyboard', () => {
     const { handles: [, middle] } = listOf()
 
     press(middle!, 'ArrowDown')
-    await Bun.sleep(0)
+    await Bun.sleep(150)
 
     expect(said()).toBe('Moved to 3 of 3')
 
@@ -110,6 +110,31 @@ describe('Sortable, from the keyboard', () => {
 
     expect(said()).toBe('Moved to 1 of 3')
     expect(document.querySelectorAll('[data-kui-announce]').length).toBe(1)
+  })
+
+  test('says it inside the open modal dialog holding the handle, where the rest of the page is inert', async () => {
+    const dialog = document.createElement('dialog')
+
+    stage().append(dialog)
+
+    const sortable = new Sortable({ onReorder: () => undefined })
+    const handle = document.createElement('button')
+    const item = document.createElement('li')
+
+    item.append(handle)
+    dialog.append(item)
+    sortable.item(1)(item)
+    sortable.handle(1)(handle)
+
+    const other = document.createElement('li')
+
+    dialog.append(other)
+    sortable.item(2)(other)
+
+    press(handle, 'ArrowDown')
+    await Bun.sleep(150)
+
+    expect(dialog.querySelector(':scope > [data-kui-announce]')?.textContent).toBe('Moved to 2 of 2')
   })
 
   test('says nothing for a key that moves nothing', async () => {
@@ -413,7 +438,7 @@ describe('Board, from the keyboard', () => {
     const { root } = await board()
 
     press(button(root, 'Plan'), 'ArrowRight')
-    await settle()
+    await Bun.sleep(150)
 
     expect(said()).toBe('Moved to 2 of 2')
 

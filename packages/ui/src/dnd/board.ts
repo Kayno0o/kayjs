@@ -265,7 +265,7 @@ export class Board {
     if (kept === undefined)
       return
 
-    announce(wording('ui.dnd.moved', 'Moved to {position} of {count}', { position: move.index + 1, count: kept }))
+    announce(wording('ui.dnd.moved', 'Moved to {position} of {count}', { position: move.index + 1, count: kept }), this.#items.get(move.item)?.el)
 
     // A keyed list moving the item into another container remounts it, so focus goes to its new node, drawn by the time this continuation runs, as `Sortable` does for its handles.
     const item = this.#items.get(move.item)

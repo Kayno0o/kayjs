@@ -80,3 +80,26 @@ test('a pointer press after a key makes the next pick post at once', async () =>
 
   expect(posts()).toBe('1')
 })
+
+test('a pick from the list a key opened posts at once, since that change arrives with no key left to wait for', async () => {
+  const { posts, choose, key } = await filter()
+
+  await key(' ')
+  await choose('c')
+
+  expect(posts()).toBe('1')
+})
+
+test('a Select with submit still hands the page\'s own key, pointer and blur handlers their events', async () => {
+  const heard: string[] = []
+
+  mounted = await mountComponent('src/components/submitting-select.kay', { heard })
+
+  const select = mounted.root.querySelector<HTMLSelectElement>('#kind')!
+
+  select.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
+  select.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+  select.dispatchEvent(new FocusEvent('blur'))
+
+  expect(heard).toEqual(['keydown', 'pointerdown', 'blur'])
+})

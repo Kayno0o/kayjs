@@ -48,7 +48,7 @@ function moveItem(from: number, to: number): void {
   set(reordered(items(), from, to))
 
   if (field.kind === 'list')
-    announceMove(itemAt(field, from).label, to, items().length)
+    announceMove(itemAt(field, to).label, to, items().length)
 }
 
 // Alt with an arrow in any control of an item moves it, as the buttons beside it do.

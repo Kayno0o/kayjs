@@ -2,9 +2,10 @@
 import { signal } from 'kay'
 import Select from '@kaynooo/kayjs-ui/select.kay'
 
+const { heard = [] } = props<{ heard?: string[] }>()
 const posts = signal(0)
 const options = [{ value: 'a', label: 'Alpha' }, { value: 'b', label: 'Beta' }, { value: 'c', label: 'Gamma' }]
 ---
 form#filter(onSubmit={event => { event.preventDefault(); posts.set(posts() + 1) }})
-  Select#kind(name="kind" options={options} value="a" aria-label="Kind" submit)
+  Select#kind(name="kind" options={options} value="a" aria-label="Kind" submit onKeyDown={() => heard.push('keydown')} onPointerDown={() => heard.push('pointerdown')} onBlur={() => heard.push('blur')})
 output#posts {posts()}

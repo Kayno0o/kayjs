@@ -1,7 +1,7 @@
 import type { AwaitNode, ElementNode, ElseBlock, ErrorMessages, ErrorNode, ForNode, IfNode, MatchNode, NamedAttribute, Node, Span, TemplateFacts, TryNode } from './ast'
 import type { DynamicItem, Item } from './items'
 import type { CodeBuilder } from './mapping'
-import { actionOf, FIELD_ELEMENTS, keyedByPosition, marksServerIsland, serverIslandOf, UNCHECKED_TYPES } from './ast'
+import { actionOf, FIELD_ELEMENTS, keyedByPosition, marksServerIsland, serverIslandOf, UNCHECKED_TYPES, UNREQUIRABLE_TYPES } from './ast'
 import { decodeEntities } from './expression'
 import { childItems, constDeclaration, errorParagraphArguments, slotValue, soleDynamic } from './items'
 import { BEHAVIOUR, describedValue, END_MARKER, escapeStaticAttribute, escapeText, fromRoot, helperName, RAW_ELEMENTS, START_MARKER, TemplateWriter, VOID_ELEMENTS } from './markup'
@@ -389,8 +389,8 @@ export class HtmlTemplate extends TemplateWriter {
     const type = plan.attributes.find(attribute => 'name' in attribute && attribute.name === 'type')
     const describable = FIELD_ELEMENTS.has(name) && !(type?.kind === 'text' && UNCHECKED_TYPES.has(type.text.toLowerCase()))
     let ownDescribed: (() => void) | undefined
-    // A field written with its own `aria-required` keeps it whatever a component around it asks.
-    const ownRequired = plan.attributes.some(attribute => 'name' in attribute && attribute.name === 'aria-required')
+    // A field written with its own `aria-required`, or of a type whose role takes none, is left as it is whatever a component around it asks.
+    const ownRequired = plan.attributes.some(attribute => 'name' in attribute && attribute.name === 'aria-required') || (type?.kind === 'text' && UNREQUIRABLE_TYPES.has(type.text.toLowerCase()))
     const fieldDescribed = (own: (() => void) | undefined) => {
       b.add(`${helperName('fieldDescribed')}(`)
 

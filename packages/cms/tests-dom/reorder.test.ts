@@ -1,10 +1,11 @@
 import { expect, test } from 'bun:test'
 import { announceMove } from '../src/editor/reorder'
 
-test('a moved list item is said to a screen reader through one polite live region, its place counted from 1', () => {
+test('a moved list item is said to a screen reader through one polite live region, its place counted from 1', async () => {
   const said = () => document.querySelector('[data-kui-announce]')?.textContent?.trim()
 
   announceMove('Tag', 1, 3)
+  await Bun.sleep(150)
 
   expect(said()).toBe('Moved Tag to 2 of 3')
 

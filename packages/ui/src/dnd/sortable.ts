@@ -239,7 +239,7 @@ export class Sortable {
     if (kept === undefined)
       return
 
-    announce(wording('ui.dnd.moved', 'Moved to {position} of {count}', { position: to + 1, count: kept }))
+    announce(wording('ui.dnd.moved', 'Moved to {position} of {count}', { position: to + 1, count: kept }), this.#handles.get(id))
 
     // A keyed list can drop focus while it moves the item's node, so focus goes back to the handle now on the page, which the list's effects have already drawn.
     const handle = this.#handles.get(id)

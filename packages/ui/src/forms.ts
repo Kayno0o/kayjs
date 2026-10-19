@@ -72,8 +72,11 @@ function fieldsOf(links: FieldLinks): HTMLElement[] {
   return [...document.querySelectorAll<HTMLElement>(`[data-kui-field="${links.frame}"] :is(${FIELDS})`)].filter(field => field.closest('[data-kui-field]')?.getAttribute('data-kui-field') === links.frame)
 }
 
+// The input types whose role takes no `aria-required`.
+const UNREQUIRABLE = new Set(['radio', 'range', 'file', 'color'])
+
 function requireField(field: HTMLElement): void {
-  if (!field.hasAttribute('aria-required'))
+  if (!field.hasAttribute('aria-required') && !(field instanceof HTMLInputElement && UNREQUIRABLE.has(field.type)))
     field.setAttribute('aria-required', 'true')
 }
 

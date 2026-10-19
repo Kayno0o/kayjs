@@ -7,9 +7,9 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { kay } from '../src/build/plugin'
 import { mapStack } from '../src/build/sourcemap'
 import { transformKay } from '../src/build/transform'
-import { UNCHECKED_TYPES } from '../src/compiler/ast'
+import { UNCHECKED_TYPES, UNREQUIRABLE_TYPES } from '../src/compiler/ast'
 import { collectHead } from '../src/runtime/head'
-import { child, UNDESCRIBED_TYPES } from '../src/runtime/html'
+import { child, UNREQUIRABLE_TYPES as RUNTIME_UNREQUIRABLE, UNDESCRIBED_TYPES } from '../src/runtime/html'
 import { renderLocale, renderToString } from '../src/server/string'
 import { scratchDir } from './scratch'
 
@@ -92,6 +92,7 @@ describe('describeField', () => {
   // The compiler decides a written type, the runtime one an expression or a spread gives.
   it('skips the same input types on the compiled path as at render time', () => {
     expect([...UNDESCRIBED_TYPES]).toEqual([...UNCHECKED_TYPES])
+    expect([...RUNTIME_UNREQUIRABLE]).toEqual([...UNREQUIRABLE_TYPES])
   })
 
   it('hands the first described field its component renders the ids, beside its own, whether written out or spread', async () => {
@@ -101,9 +102,9 @@ describe('describeField', () => {
   })
 
   it('gives the first described field aria-required, or each field with all, unless a hidden or button field or the field itself says otherwise', async () => {
-    const html = await renderKay('---\nimport Required from \'./described-required.kay\'\n\nconst spread = { name: \'s\' }\nconst text = \'text\'\n---\nRequired(ids="hint" required={true})\n  input(type="hidden" name="x")\n  input(name="a")\n  input(name="b")\nRequired(ids="" required="all")\n  input(type="checkbox" name="c")\n  button(type="button") Pick\n  input(type={text} name="d")\n  select({...spread})\n  input(name="e" aria-required="false")\nRequired(ids="hint" required={false})\n  input(name="f")\ninput(name="outside")')
+    const html = await renderKay('---\nimport Required from \'./described-required.kay\'\n\nconst spread = { name: \'s\' }\nconst text = \'text\'\nconst radio = \'radio\'\n---\nRequired(ids="hint" required={true})\n  input(type="hidden" name="x")\n  input(name="a")\n  input(name="b")\nRequired(ids="" required="all")\n  input(type="checkbox" name="c")\n  button(type="button") Pick\n  input(type={text} name="d")\n  select({...spread})\n  input(name="e" aria-required="false")\n  input(type="radio" name="g")\n  input(type={radio} name="h")\nRequired(ids="hint" required={false})\n  input(name="f")\ninput(name="outside")')
 
-    expect(html).toBe('<label><input type="hidden" name="x"><input name="a" aria-describedby="hint" aria-required="true"><input name="b"></label><label><input type="checkbox" name="c" aria-required="true"><button type="button">Pick</button><input type="text" name="d" aria-required="true"><select name="s" aria-required="true"></select><input name="e" aria-required="false"></label><label><input name="f" aria-describedby="hint"></label><input name="outside">')
+    expect(html).toBe('<label><input type="hidden" name="x"><input name="a" aria-describedby="hint" aria-required="true"><input name="b"></label><label><input type="checkbox" name="c" aria-required="true"><button type="button">Pick</button><input type="text" name="d" aria-required="true"><select name="s" aria-required="true"></select><input name="e" aria-required="false"><input type="radio" name="g"><input type="radio" name="h"></label><label><input name="f" aria-describedby="hint"></label><input name="outside">')
   })
 
   // A signal makes the page an island, whose server render writes its fields through the same helpers.

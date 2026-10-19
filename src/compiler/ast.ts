@@ -257,6 +257,9 @@ const UNFILLED_TYPES = new Set(['password', 'file', 'hidden', 'submit', 'button'
 
 export const UNCHECKED_TYPES = new Set(['hidden', 'submit', 'button', 'reset', 'image'])
 
+// The input types whose role takes no `aria-required`, as the runtime's `UNREQUIRABLE_TYPES`.
+export const UNREQUIRABLE_TYPES = new Set(['radio', 'range', 'file', 'color'])
+
 // Only an element whose name and type are written out: the compiler then knows which field it is and how it shows its value.
 export function formFieldOf(element: ElementNode, source: string): FormField | undefined {
   if (element.component || !FIELD_ELEMENTS.has(element.name) || element.attributes.some(attribute => attribute.kind === 'spread'))
