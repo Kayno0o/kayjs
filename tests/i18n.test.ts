@@ -100,7 +100,14 @@ describe('links of a site with many routes', () => {
     }
   })
 
-  it('see a settings object changed in place no more than a new one', () => {
+  it('keep resolving links of a site whose slugs outgrow what is remembered', () => {
+    const slugs = Array.from({ length: 5000 }, (_, slug) => `/blog/post-${slug}`)
+
+    for (let round = 0; round < 2; round++)
+      expect(slugs.map(href => localizedLink(LINK_SETTINGS, href, 'en'))).toEqual(slugs.map(href => href.replace('/blog/', '/en/articles/')))
+  })
+
+  it('read each settings object by itself, a copy with other pages not taking the first one\'s', () => {
     const settings: LocaleSettings = { ...LINK_SETTINGS, pages: [...LINK_SETTINGS.pages!] }
     const before = localizedLink(settings, '/shop', 'en')
 

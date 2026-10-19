@@ -394,7 +394,23 @@ export function messagesScript(keys: Set<string>, first: boolean): string {
 
     return message === undefined ? [] : [[key, message]]
   }))
-  const payload = { ...first && { locale: state.locale, ...!state.implicit && { settings: state.settings } }, messages, ...now !== undefined && { now } }
+  const parts = [...first ? [`"locale":${escaped(state.locale)}`, ...state.implicit ? [] : [`"settings":${settingsJson(state.settings)}`]] : [], `"messages":${escaped(messages)}`, ...now !== undefined ? [`"now":${escaped(now)}`] : []]
 
-  return `<script type="application/json" data-kay-i18n>${JSON.stringify(payload).replaceAll('<', '\\u003c')}</script>`
+  return `<script type="application/json" data-kay-i18n>{${parts.join(',')}}</script>`
+}
+
+const settingsJsons = new WeakMap<LocaleSettings, string>()
+
+// The settings go to every page with islands unchanged, so they are written once.
+function settingsJson(settings: LocaleSettings): string {
+  let json = settingsJsons.get(settings)
+
+  if (json === undefined)
+    settingsJsons.set(settings, json = escaped(settings))
+
+  return json
+}
+
+function escaped(value: unknown): string {
+  return JSON.stringify(value).replaceAll('<', '\\u003c')
 }
