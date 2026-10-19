@@ -60,6 +60,8 @@ export interface MailerOptions {
   queue?: QueueOptions<Mail> & { name?: string | undefined } | undefined
   // Logs each mail's recipients in full rather than their count and domains, such as while setting up a site's mail.
   logRecipients?: boolean | undefined
+  // Names each mail's subject in the log, which says `A mail` otherwise: a subject can hold a visitor's name or an organization's.
+  logSubjects?: boolean | undefined
   // Lets a server lacking `SMTP_HOST` or `SMTP_FROM` boot anyway, each send then throwing `MailNotConfigured`, for a site whose mail can wait to be set up.
   optional?: boolean | undefined
 }
@@ -305,6 +307,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
     checkOptions(options.smtp, 'mailer({ smtp })')
   }
 
+  const described = (mail: Mail): string => options.logSubjects ? quoted(mail.subject) : 'A mail'
   const whom = (addresses: string[]): string => options.logRecipients ? addresses.join(', ') : counted(addresses)
   const configured = options.transport === undefined && delivering() === 'smtp' ? fromEnvironment(options.from, options.fromName, options.optional === true, options.smtp) : undefined
   const transport = options.transport ?? configured?.transport ?? outbox
@@ -399,11 +402,11 @@ export function mailer(options: MailerOptions = {}): Mailer {
     const accepted = delivery.accepted.length > 0 || delivery.rejected.length > 0 ? delivery.accepted : recipientsOf(mail)
 
     if (accepted.length > 0)
-      log.info(`${quoted(mail.subject)} sent to ${whom(accepted)}${delivery.response === undefined || delivery.response === '' ? '' : `: ${delivery.response}`}`)
+      log.info(`${described(mail)} sent to ${whom(accepted)}${delivery.response === undefined || delivery.response === '' ? '' : `: ${delivery.response}`}`)
 
     // Logged rather than thrown: a retry would send the mail again to those who already have it.
     if (delivery.rejected.length > 0)
-      log.warn(`${quoted(mail.subject)} was refused for ${whom(delivery.rejected)}, and sent to the others`)
+      log.warn(`${described(mail)} was refused for ${whom(delivery.rejected)}, and sent to the others`)
 
     return delivery
   }
@@ -414,7 +417,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
     keepFailed: queueOptions.keepFailed ?? FAILED_KEPT,
     redact: queueOptions.redact ?? withoutBody,
     onFailed: async (mail, error) => {
-      log.error(`${quoted(mail.subject)} to ${whom(recipientsOf(mail))} is given up after its last attempt`, error)
+      log.error(`${described(mail)} to ${whom(recipientsOf(mail))} is given up after its last attempt`, error)
       await onFailed?.(mail, error)
     },
   })
@@ -448,7 +451,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
         return await deliver(mail)
       }
       catch (error) {
-        log.error(`${quoted(mail.subject)} to ${whom(recipientsOf(mail))} was not sent`, error)
+        log.error(`${described(mail)} to ${whom(recipientsOf(mail))} was not sent`, error)
 
         // A primitive cannot be tracked, so it is thrown wrapped for the caller to recognise as logged.
         const thrown = typeof error === 'object' && error !== null ? error : new Error(String(error), { cause: error })

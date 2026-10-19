@@ -6,7 +6,7 @@ import type { UserRecord } from './store'
 export interface RequestState {
   core: Core
   session: Session<AuthSessionData>
-  // Who is asking, as rate limits count them.
+  // Who is asking as rate limits count them: a keyed digest of the address, so the attempts table holds no address.
   client: string
   // The client's address as it is, for the list of where the user is signed in.
   address: string

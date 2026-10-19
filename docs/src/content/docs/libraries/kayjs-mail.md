@@ -58,7 +58,7 @@ In production the mailer reads its settings from the environment. `SMTP_HOST` is
 
 On a port other than 465 a server not offering STARTTLS is refused, at the first mail and in a warning when the server starts. Set `SMTP_INSECURE=true` for a local Mailpit. A set `SMTP_PASS` overrides it, so a password never goes in clear.
 
-Each mail sent is logged with its subject and how many recipients it went to at which domains. Set `mailer({ logRecipients: true })` to name them in full. DKIM signing and a rate limit have variables of their own.
+Each mail sent is logged with how many recipients it went to at which domains, and not its subject, which can hold a visitor's name. Set `mailer({ logSubjects: true })` to log it, and `mailer({ logRecipients: true })` to name the recipients in full. DKIM signing and a rate limit have variables of their own.
 
 What the environment has no variable for goes in `mailer({ smtp })`, merged over the SMTP it builds: `name` (the name the client greets the server with, the sender's domain by default), `timeout` (seconds or a string such as `'30s'`, 10 seconds by default), `maxConnections` (5 by default) and `rateLimit`. An option left out keeps the default.
 

@@ -43,6 +43,12 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 - An `imageField()` or `fileField()` value must be a path or an `http(s):` address, so an entry already holding another scheme (`data:`, `javascript:`) fails its schema until edited. A `pattern` of the app's own still applies beside it.
 - kayjs-auth refuses an email holding `,`, `<`, `>` or `"`, and `createOrganization` answers `limited` past 10 a day per account (`limits: { organization }`).
 
+### Stored images are refused when unreadable, and kayjs-mail logs no subject
+
+- `files.put` refuses a JPEG, PNG, WebP, AVIF or HEIC it cannot read through with an `image-invalid` error, where it stored the file with its metadata and logged a warning: catch it in the action, or pass `keepMetadata: true` for an archive. An AVIF or HEIC now has its EXIF and XMP blanked.
+- kayjs-mail's log lines say `A mail` where they named the subject, so a search for one by subject finds nothing: `mailer({ logSubjects: true })` brings it back. `kay check` cannot recognise log reading.
+- Attempt counts in the auth tables and in a custom kayjs-ai store are keyed by a digest, not the address or user id, so a window in flight starts over once and any code reading those keys changes.
+
 ### Rendered values carry a mark
 
 - A hand-built `{ t: markup }` (an object an app or library returned as markup) no longer renders: the server takes as markup only what `html(markup)` from `kay/html` made, so wrap it, `return html('<b>x</b>')`. No lint can find the old form, as it is a plain object; its type no longer matches `JSX.Element`, so `kay check` reports it. A render copied through JSON or `structuredClone` loses its mark and renders nothing.

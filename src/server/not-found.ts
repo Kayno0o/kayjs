@@ -24,6 +24,9 @@ const MAX_HOST_LENGTH = 253
 const FUZZY_PER_SECOND = 20
 const MAX_KNOWN = 5000
 const SECOND_MS = 1000
+const HOUR_MS = 3_600_000
+// A path nobody asked for in this long is dropped with its referrers, as a made-up path can hold a name or an address.
+const MAX_AGE_MS = 90 * 24 * HOUR_MS
 
 const CONTROL_CHARACTERS = /\p{Cc}/u
 const HTML_SUFFIX = /(?:\/index)?\.html?$/
@@ -278,6 +281,22 @@ export function missingStore(path: string, closedByReload = true): MissingStore 
   const removed = db.query('DELETE FROM kay_missing WHERE path = ?')
   const removedHosts = db.query('DELETE FROM kay_missing_referrers WHERE path = ?')
 
+  const aged = db.query('DELETE FROM kay_missing WHERE last_at < ?')
+  const orphans = db.query('DELETE FROM kay_missing_referrers WHERE path NOT IN (SELECT path FROM kay_missing)')
+  let purgedAt = 0
+
+  // At most once an hour, and on opening, so a site nobody mistypes a URL of keeps nothing old and one that gets many hits pays one delete.
+  const purge = (now: number): void => {
+    if (now - purgedAt < HOUR_MS)
+      return
+
+    purgedAt = now
+    aged.run(now - MAX_AGE_MS)
+    orphans.run()
+  }
+
+  purge(Date.now())
+
   const redirects = redirectSet(db)
 
   // A reload runs the module that opened the store again, which opens its own.
@@ -286,6 +305,8 @@ export function missingStore(path: string, closedByReload = true): MissingStore 
 
   return {
     hit(path, referrer, suggest) {
+      purge(Date.now())
+
       if (!known.get(path) && count.get()!.total >= MAX_PATHS) {
         const evicted = evict.get()
 

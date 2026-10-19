@@ -87,6 +87,11 @@ describe('files', () => {
       expect(await stored(name)).not.toContain(gps)
 
     expect(await stored('photo.jpg', true)).toContain(gps)
+
+    const broken = new File([new Uint8Array([0xFF, 0xD8, 0x00, ...new TextEncoder().encode(gps)])], 'broken.jpg')
+
+    await expect(files.put(broken)).rejects.toThrow('could not read the uploaded image through')
+    expect(await files.get(await files.put(broken, { keepMetadata: true }))).toBeDefined()
   })
 })
 

@@ -25,7 +25,7 @@ createAuth({
 
 ## Limits
 
-Attempts are counted in the store, so every process shares them, per client address (read as kay's `rateLimit` reads it, through `proxy` in kay.config.ts) and per account. A plain Elysia app that kay's `pages()` does not serve passes the same setting to `createAuth` as `proxy`, `{ hops: 1 }` behind nginx, or every client counts as the proxy. `limits` overrides any of `DEFAULT_LIMITS`, each `{ max, window }` with `window` seconds or a string such as `'1h'`:
+Attempts are counted in the store, so every process shares them, per client address (kept as a keyed digest, never the address; read as kay's `rateLimit` reads it, through `proxy` in kay.config.ts) and per account. A plain Elysia app that kay's `pages()` does not serve passes the same setting to `createAuth` as `proxy`, `{ hops: 1 }` behind nginx, or every client counts as the proxy. `limits` overrides any of `DEFAULT_LIMITS`, each `{ max, window }` with `window` seconds or a string such as `'1h'`:
 
 - `signIn` 40 per client and 15 minutes. Wrong passwords count against an account twice, a success clearing both: `signInAccount` 6 per account and client, the hard stop (so a stranger's failures never lock the holder out from another address), and `signInAccountAll` 60 per account from every client, the ceiling. Past the ceiling every sign-in answers `'limited'` until the window ends, and the first one mails the holder's verified address once (`sign-in-locked`, also an event). The same counts guard `verifyEmail(token, password)`. Behind one proxy without `proxy` set, every client shares the hard stop. Passkeys and the second factor have their own limits.
 - `register` 6 per hour.

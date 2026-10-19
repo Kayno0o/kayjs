@@ -8,7 +8,7 @@ import { testSite } from 'kay/test'
 import { chatPages, partOfPage, readPage, searchPages, systemPrompt } from '../docs/src/chat-corpus'
 import { highlight } from '../docs/src/highlight'
 import { fakeAi } from '../packages/ai/src'
-import { forgetCounts } from '../packages/ai/src/limits'
+import { forgetCounts, hashed } from '../packages/ai/src/limits'
 import { takeDocsBuild } from './docs-build'
 
 interface Ask {
@@ -267,7 +267,7 @@ describe('the caps set in docs/kay.config.ts', () => {
 
   it('refuses a visitor who used the daily tokens and lets another visitor ask', async () => {
     await fresh(async (store) => {
-      await store.hit('ai:budget\naddress:203.0.113.20', DAY, TOKENS)
+      await store.hit(`ai:budget\naddress:${hashed('203.0.113.20')}`, DAY, TOKENS)
 
       await expect(asks('203.0.113.20')).rejects.toMatchObject({ status: 429 })
       expect(fakeAi.asked).toEqual([])
@@ -278,7 +278,7 @@ describe('the caps set in docs/kay.config.ts', () => {
 
   it('lets a visitor ask until the tokens used reach the budget, the answer that crosses it finishing', async () => {
     await fresh(async (store) => {
-      await store.hit('ai:budget\naddress:203.0.113.22', DAY, TOKENS - 1)
+      await store.hit(`ai:budget\naddress:${hashed('203.0.113.22')}`, DAY, TOKENS - 1)
       await asks('203.0.113.22')
       expect(fakeAi.asked).toHaveLength(1)
       await expect(asks('203.0.113.22')).rejects.toMatchObject({ status: 429 })
@@ -290,7 +290,7 @@ describe('the caps set in docs/kay.config.ts', () => {
     await fresh(async (store) => {
       await asks('203.0.113.24')
 
-      const visitor = await store.peek('ai:budget\naddress:203.0.113.24')
+      const visitor = await store.peek(`ai:budget\naddress:${hashed('203.0.113.24')}`)
       const total = await store.peek('ai:budget\ntotal')
 
       expect(visitor?.count).toBeGreaterThan(1000)

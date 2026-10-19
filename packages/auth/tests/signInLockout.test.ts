@@ -31,6 +31,22 @@ async function attempt(app: Awaited<ReturnType<typeof account>>, from: string, p
 }
 
 describe('guessing at an account', () => {
+  test('the attempts table holds a digest of the client, never its address', async () => {
+    const app = await account({})
+    const keys: string[] = []
+    const hit = app.store.attempts.hit.bind(app.store.attempts)
+
+    app.store.attempts.hit = async (key, window) => {
+      keys.push(key)
+
+      return hit(key, window)
+    }
+    await attempt(app, '10.0.0.77', WRONG)
+
+    expect(keys.length).toBeGreaterThan(0)
+    expect(keys.filter(key => key.includes('10.0.0.77'))).toEqual([])
+  })
+
   test('a client that keeps failing is stopped alone, and the right password from another still signs in', async () => {
     const app = await account({ signInAccount: { max: 3, window: 900 } })
 

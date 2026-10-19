@@ -952,6 +952,26 @@ describe('remote images', () => {
 })
 
 const GPS = 'GPS 48.8584 N 2.2945 E'
+const PIXELS = 'coded-pixels'
+const PNG_SIGNATURE = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]
+
+function box(type: string, ...parts: (Uint8Array | string | number[])[]): Uint8Array<ArrayBuffer> {
+  const payload = bytesOf(...parts)
+
+  return bytesOf(u32(payload.length + 8), type, payload)
+}
+
+// An AVIF (or HEIC) of `types.length` items, item `n + 1` holding `data[n]`, located by an `iloc` of version 0.
+function heif(types: string[], data: string[], brand = 'avif'): Uint8Array<ArrayBuffer> {
+  const infes = types.map((type, index) => box('infe', [2, 0, 0, 0], u16(index + 1), u16(0), type, 'item\0'))
+  const iinf = box('iinf', [0, 0, 0, 0], u16(types.length), ...infes)
+  const ftyp = box('ftyp', brand, u32(0), brand, 'mif1')
+  const build = (offsets: number[]) => box('meta', [0, 0, 0, 0], iinf, box('iloc', [0, 0, 0, 0], [0x44, 0x00], u16(types.length), ...data.map((item, index) => bytesOf(u16(index + 1), u16(0), u16(1), u32(offsets[index]!), u32(item.length)))))
+  const first = ftyp.length + build(data.map(() => 0)).length + 8
+  const offsets = data.map((_, index) => first + data.slice(0, index).reduce((total, item) => total + item.length, 0))
+
+  return bytesOf(ftyp, build(offsets), box('mdat', ...data))
+}
 
 function bytesOf(...parts: (Uint8Array | string | number[])[]): Uint8Array<ArrayBuffer> {
   return new Uint8Array(parts.flatMap(part => typeof part === 'string' ? [...new TextEncoder().encode(part)] : [...part]))
@@ -1063,7 +1083,7 @@ describe('stripImageMetadata', () => {
     expect(await new Bun.Image(stripped).metadata()).toEqual({ width: 1000, height: 600, format: 'png' })
   })
 
-  it('refuses a JPEG of countless tiny segments after a bounded number of them, giving it back as it came', () => {
+  it('refuses a JPEG of countless tiny segments after a bounded number of them', () => {
     const pairs = new Uint8Array(10 * 1024 * 1024).fill(0x01)
 
     for (let at = 0; at < pairs.length; at += 2)
@@ -1071,7 +1091,7 @@ describe('stripImageMetadata', () => {
 
     pairs.set([0xFF, 0xD8])
 
-    expect(warnings(() => expect(stripImageMetadata(pairs)).toBe(pairs))).toHaveLength(1)
+    expect(() => stripImageMetadata(pairs)).toThrow('more than 10000 segments')
   })
 
   it('strips a PNG of more chunks than any image holds', async () => {
@@ -1085,12 +1105,35 @@ describe('stripImageMetadata', () => {
     expect(await new Bun.Image(stripped).metadata()).toEqual({ width: 1000, height: 600, format: 'png' })
   })
 
-  it('leaves alone a format it does not read and a file it cannot follow', () => {
+  it('leaves alone a format it does not read, and refuses a file it cannot follow rather than store its metadata', () => {
     const gif = bytesOf('GIF89a', GPS)
     const broken = bytesOf([0xFF, 0xD8, 0x00], GPS)
+    const cut = bytesOf(PNG_SIGNATURE, u32(1000), 'IDAT', GPS)
 
-    expect(warnings(() => expect(stripImageMetadata(gif)).toBe(gif))).toEqual([])
-    expect(warnings(() => expect(stripImageMetadata(broken)).toBe(broken))).toEqual(['an uploaded image could not be read through, so it is stored as it came, its metadata included'])
+    expect(stripImageMetadata(gif)).toBe(gif)
+
+    for (const file of [broken, cut])
+      expect(() => stripImageMetadata(file)).toThrow('could not read the uploaded image through')
+  })
+
+  it('blanks the EXIF and XMP items of an AVIF or a HEIC in place, keeping the picture and every offset', () => {
+    const tagged = heif(['av01', 'Exif', 'mime'], [PIXELS, `\0\0\0\0Exif${GPS}`, `application/rdf+xml\0${GPS}`])
+    const stripped = stripImageMetadata(tagged)
+
+    expect(holds(tagged, GPS)).toBe(true)
+    expect(holds(stripped, GPS)).toBe(false)
+    expect(holds(stripped, 'Exif')).toBe(false)
+    expect(holds(stripped, PIXELS)).toBe(true)
+    expect(stripped.length).toBe(tagged.length)
+    expect(holds(stripImageMetadata(heif(['hvc1'], [PIXELS], 'heic')), PIXELS)).toBe(true)
+  })
+
+  it('blanks the top-level boxes of an AVIF that are no picture, and refuses a cut one', () => {
+    const base = heif(['av01'], [PIXELS])
+    const tagged = bytesOf(base, box('uuid', GPS), box('XMP ', GPS))
+
+    expect(holds(stripImageMetadata(tagged), GPS)).toBe(false)
+    expect(() => stripImageMetadata(base.subarray(0, base.length - 3))).toThrow('could not read the uploaded image through')
   })
 })
 

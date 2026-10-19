@@ -189,11 +189,12 @@ export async function archive(scan: File) {
 - Rate limits count by address in memory, or in `sqliteRates(path)`, which stores each key pseudonymised as an HMAC keyed by the session's, the app's (`secret`, `KAY_SECRET`) or the preview's secret once one is set, else by a random key kept in `<path>.key` beside the store (the server's user alone, shared by every process opening it), never in the store, so a copy of the store file alone cannot be checked against a guessed address; a backup of the whole folder holds both, so set a secret to keep the key off the disk; a window is dropped once it closed.
 - A queue keeps a waiting job's payload until it runs and a failed one's for `keepFailed`, 30 days by default from when its last attempt was due, or for good with `false`.
 - `queue.remove(id)` removes one job, and `queue.remove(match)` every waiting or failed job whose payload `match` returns true for, resolving with how many went; an app's own `JobStore` takes a function only when it has `jobs(queue)`.
+- The paths a production server counted 404s at (`data/not-found.sqlite`) are forgotten 90 days after the last visit, with their referrers, checked on opening and at most hourly; the redirects stored beside them stay.
 - `sqliteRooms` from `kay/server` keeps a room's messages 30 seconds, for the processes sharing it to read.
 - The SQLite files `sqliteStore`, `sqliteRates`, `sqliteJobs`, `sqliteRooms` and `sqliteCache` create are readable by the server's user alone.
 
 ### Stored files
 
-- `files.put` tells a JPEG, PNG or WebP by its bytes, whatever its name, and stores it with only what draws it: its pixels, colour profile and a JPEG's orientation, every other segment or chunk, EXIF, XMP, IPTC, C2PA, text and comments among them, dropped; any other format, AVIF and HEIC included, and a file it cannot read through, logged, are stored as they came.
+- `files.put` tells a JPEG, PNG, WebP, AVIF or HEIC by its bytes, whatever its name, and stores it with only what draws it: its pixels, colour profile and a JPEG's orientation, every other segment or chunk, EXIF, XMP, IPTC, C2PA, text and comments among them, dropped (an AVIF or HEIC has its non-picture items and boxes blanked in place); any other format is stored as it came, and a JPEG, PNG, WebP, AVIF or HEIC it cannot read through is refused with `image-invalid` unless `keepMetadata` is set.
 - `files.delete(key)` deletes the file, its cached copy and every variant and social card the image route made of it.
 - A photo of a person that only some visitors may see is stored with `private: true`, which only a link the page signed reaches.

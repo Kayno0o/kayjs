@@ -325,6 +325,18 @@ describe('ai({ budget })', () => {
     expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(3)
   })
 
+  it('keeps no address nor user id in a store, only a digest to count under', async () => {
+    const store = tracking()
+
+    ai({ limit: { max: 5, window: '1m', store }, budget: { tokens: 10_000, window: '1m', store } })
+    await inside(rewrittenRequest('203.0.113.1'), () => ask('a'))
+    await ask('a', { visitor: 'ann@example.com' })
+
+    expect(store.keys.size).toBeGreaterThan(1)
+    expect([...store.keys].filter(key => key.includes('203.0.113') || key.includes('ann@example.com'))).toEqual([])
+    expect([...store.keys].some(key => key.startsWith('ai:limit\naddress:'))).toBe(true)
+  })
+
   it('counts cache reads and writes as tokens, the same for every provider', async () => {
     const store = tracking()
 

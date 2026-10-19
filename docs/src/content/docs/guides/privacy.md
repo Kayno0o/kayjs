@@ -30,7 +30,8 @@ Under a `base`, `kay_flash`, `kay_locale` and `kay_preview` are set for that pat
 - **Rate limits**: counted by address in memory, or in `sqliteRates(path)` pseudonymised: each key is hashed under the app's secret once one is set, else under a random key kay keeps in a `.key` file beside the store, never in the store itself, so a copy of the store alone cannot be checked against a guessed address (a backup of the whole folder holds both, so set a secret to keep the key off the disk, and keep the `.key` file out of git). Windows are dropped once their window closes.
 - **Jobs**: a waiting job's payload until it runs, a failed one's for 30 days from when its last attempt was due, or what the queue's `keepFailed` says (7 days for kayjs-mail, without the body).
 - **Rooms**: a message 30 seconds in `sqliteRooms`.
-- **Uploads**: until the app deletes them, without the metadata a camera writes in a JPEG, PNG or WebP.
+- **Uploads**: until the app deletes them, without the metadata a camera writes in a JPEG, PNG, WebP, AVIF or HEIC.
+- **Missing pages**: the paths visitors found nothing at, in `data/not-found.sqlite`, until 90 days after the last visit.
 
 Every SQLite file kay creates is readable by the server's user alone.
 
@@ -248,11 +249,11 @@ else
 
 ## Photos
 
-`files.put` keeps only what draws a JPEG, PNG or WebP, told by its bytes whatever its name. That is its pixels, colour profile and orientation.
+`files.put` keeps only what draws a JPEG, PNG, WebP, AVIF or HEIC, told by its bytes whatever its name. That is its pixels, colour profile and orientation.
 
 The EXIF, XMP, IPTC and text a camera or phone writes, such as where and when the photo was taken, go. So does any metadata kay does not know.
 
-An AVIF or HEIC is stored as it came, and so is a file kay cannot read through, which it logs. Use `files.put(file, { keepMetadata: true })` to keep everything, for an archive that needs it.
+In an AVIF or HEIC, the EXIF and XMP are blanked where they are, so the file keeps its size. A file of those formats that kay cannot read through is refused with an error, as storing it would keep what you meant to drop. Use `files.put(file, { keepMetadata: true })` to keep everything, for an archive that needs it.
 
 Store a photo of a person that only some visitors may see with `private: true`. It is served only through a link the page signed.
 

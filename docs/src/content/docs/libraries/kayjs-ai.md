@@ -257,7 +257,7 @@ Everything a visitor types into the chat is sent to the AI provider, along with 
 - Name the provider, the purpose and the transfer in your privacy notice, where the visitor can read it before writing.
 - Return only the fields an answer needs from an action you offer as a tool, since its result goes to the provider as it is.
 
-kayjs-ai writes no log or file of the messages. It counts each visitor's asks and tokens under their user id or their address, in memory or in the store you give, until the window closes. The tab's session storage is used only when you pass `remember`.
+kayjs-ai writes no log or file of the messages. It counts each visitor's asks and tokens under a digest of their user id or their address, in memory or in the store you give, until the window closes. The tab's session storage is used only when you pass `remember`.
 
 The AI Act asks that a person be told they are talking to an AI. `Chat` and `ChatLauncher` show a line under the conversation: "You are talking to an AI. Your messages are sent to its provider to answer." Reword it for your provider with the `disclosure` prop, translate it by giving the `ai.chat.disclosure` message in your catalog, or hide it with `disclosure=""` when the page says so already. A chat you build yourself on `ask` shows its own notice.
 

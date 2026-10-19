@@ -43,7 +43,7 @@ describe('smtp', () => {
   })
 
   it('logs each mail sent with the server\'s answer, its subject\'s line breaks escaped', async () => {
-    const mail = mailer({ from: 'hello@fixture.test', transport: smtp({ host: '127.0.0.1', port: server.port, insecure: true }) })
+    const mail = mailer({ from: 'hello@fixture.test', transport: smtp({ host: '127.0.0.1', port: server.port, insecure: true }), logSubjects: true })
     const lines = await logged(async () => mail.send({ to: 'ada@example.com', cc: 'bob@example.com', subject: 'Hi\nforged line', text: 'Hello' }))
 
     expect(lines).toEqual([['info', 'kayjs-mail: "Hi\\nforged line" sent to 2 recipients at example.com: 250 queued']])

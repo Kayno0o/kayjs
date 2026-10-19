@@ -1,4 +1,5 @@
-import { kayLog } from '../runtime/log'
+import { KayError } from '../compiler/errors'
+import { isBmff, stripBmff } from './image-metadata-bmff'
 
 // What a stored photo says beyond its pixels, such as where and when it was taken and on which camera, taken out on upload. The image's look is kept: its colour profile, and a JPEG's orientation, which Bun.Image and browsers apply.
 // Each format keeps what an allow-list names, so a kind of metadata it never heard of goes too.
@@ -20,7 +21,7 @@ const ORIENTATION_TAG = 0x0112
 // Far past any real image's, so a file of tiny segments costs no more than a few of them.
 const MAX_SEGMENTS = 10_000
 
-// The image without its metadata, or the bytes as they came for a format it does not read or a file it cannot follow.
+// The image without its metadata, the bytes as they came for a format it does not read, and an error for a file of a format it reads but cannot follow, which would otherwise be stored with its metadata.
 export function stripImageMetadata(bytes: Uint8Array<ArrayBuffer>): Uint8Array<ArrayBuffer> {
   try {
     if (startsWith(bytes, JPEG))
@@ -31,17 +32,20 @@ export function stripImageMetadata(bytes: Uint8Array<ArrayBuffer>): Uint8Array<A
 
     if (isWebp(bytes))
       return stripWebp(bytes)
+
+    if (isBmff(bytes))
+      return stripBmff(bytes)
   }
   catch (error) {
-    kayLog('warn', 'an uploaded image could not be read through, so it is stored as it came, its metadata included', error)
+    throw new KayError('image-invalid', `kay: files.put() could not read the uploaded image through to take its metadata out (${error instanceof Error ? error.message : String(error)}): it is refused, and \`keepMetadata: true\` stores a file as it came`, { cause: error })
   }
 
   return bytes
 }
 
-// Whether the file is a JPEG, a PNG or a WebP, read from its first 12 bytes: the formats whose metadata is taken out.
+// Whether the file is a JPEG, a PNG, a WebP, an AVIF or a HEIC, read from its first 12 bytes: the formats whose metadata is taken out.
 export function holdsImageMetadata(head: Uint8Array): boolean {
-  return startsWith(head, JPEG) || startsWith(head, PNG) || isWebp(head)
+  return startsWith(head, JPEG) || startsWith(head, PNG) || isWebp(head) || isBmff(head)
 }
 
 function isWebp(bytes: Uint8Array): boolean {

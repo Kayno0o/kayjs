@@ -2,7 +2,7 @@ import type { MissingPath } from '../src/server/not-found'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import process from 'node:process'
-import { describe, expect, it } from 'bun:test'
+import { describe, expect, it, setSystemTime } from 'bun:test'
 import { Elysia } from 'elysia'
 import { pages } from '../src/server'
 import { devNotFound, devRedirect } from '../src/server/dev-not-found'
@@ -145,6 +145,31 @@ describe('missingStore', () => {
     second.hit('/a', undefined, never)
     expect(second.list()).toMatchObject([{ path: '/a', hits: 2 }])
     second.close()
+  })
+
+  it('forgets a path nobody asked for in 90 days, with its referrers, when it opens and at most once an hour', async () => {
+    const file = join(await scratchDir('not-found-'), 'missing.sqlite')
+    const day = 24 * 3_600_000
+    const first = missingStore(file)
+
+    setSystemTime(new Date('2026-01-01T00:00:00Z'))
+    first.hit('/old', 'x.example', never)
+    first.close()
+    setSystemTime(new Date(Date.parse('2026-01-01T00:00:00Z') + 91 * day))
+
+    const second = missingStore(file)
+
+    expect(second.list()).toEqual([])
+    second.hit('/new', 'y.example', never)
+    setSystemTime(new Date(Date.parse('2026-01-01T00:00:00Z') + 91 * day + 60_000))
+    second.hit('/other', undefined, never)
+    expect(second.list().map(row => row.path).toSorted()).toEqual(['/new', '/other'])
+    setSystemTime(new Date(Date.parse('2026-01-01T00:00:00Z') + 182 * day))
+    second.hit('/other', undefined, never)
+    expect(second.list().map(row => row.path)).toEqual(['/other'])
+    expect(second.list()[0]!.referrers).toEqual([])
+    second.close()
+    setSystemTime()
   })
 
   it('suggests once, when a path is asked for the second time', async () => {

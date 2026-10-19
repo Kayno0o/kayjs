@@ -27,7 +27,7 @@ for key of photos key={key}
 
 A key looks like `photos/1f3a9c0b2d4e6f8a0b1c.1600x1200.jpg`. An image's key holds its size, so `img` gives a stored image the same responsive variants as an imported one, without opening the file.
 
-A JPEG, PNG or WebP is stored without the metadata a camera or phone writes in it, such as where and when the photo was taken. Its colour profile and orientation stay. Use `files.put(file, { keepMetadata: true })` to store it byte for byte.
+A JPEG, PNG, WebP, AVIF or HEIC is stored without the metadata a camera or phone writes in it, such as where and when the photo was taken. Its colour profile and orientation stay. A file of those formats kay cannot read through is refused. Use `files.put(file, { keepMetadata: true })` to store it byte for byte.
 
 `/_kay/files/<key>` serves each file with its type, cached for good. Images, video, audio, PDFs and plain text are shown in place. Any other file is sent as a sandboxed download, so an HTML page never runs as the site.
 

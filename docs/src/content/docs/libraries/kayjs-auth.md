@@ -542,7 +542,7 @@ The new tables are created by `db.sync()` if you use Postgres or SQLite.
 
 ## Limits
 
-Attempts are counted in the store, so every process shares them. They are counted per client address and per account. Creating organizations is limited too, to 10 a day for each account: past that, `createOrganization` answers `limited`.
+Attempts are counted in the store, so every process shares them. They are counted per client address and per account, the address kept as a keyed digest. Creating organizations is limited too, to 10 a day for each account: past that, `createOrganization` answers `limited`.
 
 `limits` overrides any of `DEFAULT_LIMITS`, each `{ max, window }` with `window` seconds or a string such as `'1h'`.
 

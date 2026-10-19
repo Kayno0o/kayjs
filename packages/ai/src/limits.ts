@@ -1,6 +1,7 @@
 import type { Duration, RateStore } from 'kay'
 import type { AiLimit } from './errors'
 import type { Piece, Usage } from './types'
+import { createHash } from 'node:crypto'
 import process from 'node:process'
 import { logFrom } from 'kay'
 import { durationSeconds, userOf } from 'kay/library'
@@ -173,9 +174,14 @@ async function visitorKey(visitor: Settings['visitor'], { request, visitor: name
   }
 
   if (typeof user === 'string' && user !== '')
-    return `user:${user}`
+    return `user:${hashed(user)}`
 
-  return request ? `address:${rateKey(clientAddress(request, undefined))}` : undefined
+  return request ? `address:${hashed(rateKey(clientAddress(request, undefined)))}` : undefined
+}
+
+// A store shared by processes, a database say, then holds no address nor user id, only a digest to count under.
+export function hashed(text: string): string {
+  return createHash('sha256').update(text).digest('base64url').slice(0, 22)
 }
 
 function seconds(resetAt: number): number {
