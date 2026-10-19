@@ -153,15 +153,28 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the docs a
       const closed = await narrow.evaluate(() => {
         const header = document.querySelector<HTMLElement>('.kui-app-header')!
         const toggle = header.querySelector<HTMLElement>('.kui-site-nav-toggle')!
+        const end = header.querySelector<HTMLElement>('.kui-app-header-end')!
+        const overflows = () => document.documentElement.scrollWidth > window.innerWidth
 
-        return {
-          list: getComputedStyle(header.querySelector('.kui-site-nav-list')!).display,
-          toggleAtEnd: toggle.getBoundingClientRect().right > header.querySelector('.kui-app-header-end')!.getBoundingClientRect().right,
-          overflow: document.documentElement.scrollWidth > window.innerWidth,
-        }
+        const list = getComputedStyle(header.querySelector('.kui-site-nav-list')!).display
+        // The menu button comes before the end area on screen as in the tab order.
+        const beforeEnd = toggle.getBoundingClientRect().right <= end.getBoundingClientRect().left
+        const plain = overflows()
+
+        header.querySelector('.kui-app-header-brand')!.append('x'.repeat(300))
+        end.append('y'.repeat(300))
+
+        const long = overflows()
+
+        end.remove()
+
+        // With no end area the button takes the far end of the bar.
+        const atFarEnd = header.getBoundingClientRect().right - toggle.getBoundingClientRect().right < 24
+
+        return { list, beforeEnd, plain, long, atFarEnd }
       })
 
-      expect(closed).toEqual({ list: 'none', toggleAtEnd: true, overflow: false })
+      expect(closed).toEqual({ list: 'none', beforeEnd: true, plain: false, long: false, atFarEnd: true })
 
       await narrow.click('.kui-app-header .kui-site-nav-toggle')
       await narrow.waitUntil(() => document.querySelector('.kui-app-header .kui-site-nav[data-open]') !== null)

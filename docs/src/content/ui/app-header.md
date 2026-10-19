@@ -18,9 +18,11 @@ Each link takes an `icon`, as in SiteNav. Write the links `as const` so an icon'
 
 The header is sticky: it stays at the top of the page while the page scrolls. Set `sticky={false}` to let it scroll away with the page. The demo above sets it so it does not stick to this page.
 
+A sticky header covers what an anchor link scrolls to. Give the page `scroll-padding-top` of the header's height, as in `html { scroll-padding-top: 4rem }`.
+
 ## Narrow screens
 
-Below the `lg` breakpoint the links fold behind SiteNav's menu button, which closes on Escape, a click on a link or a click outside. The button sits at the end of the bar, beside the end area. `label` names the navigation and `menuLabel` the button.
+Below the `lg` breakpoint the links fold behind SiteNav's menu button, which closes on Escape, a click on a link or a click outside. The button follows the brand, in the tab order too, and the end area keeps the far end. A long brand or end area wraps instead of widening the bar. `label` names the navigation and `menuLabel` the button.
 
 ## Colors
 

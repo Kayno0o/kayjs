@@ -246,6 +246,9 @@ describe('attempt', () => {
     test('tells a code from a short message: only underscored words or digits are codes', async () => {
       expect(await said(new ApiError(403, 'ACCESS DENIED', 'ACCESS DENIED'))).toEqual(['ACCESS DENIED'])
       expect(await said(new ApiError(409, 'FULL', 'FULL'))).toEqual(['FULL'])
+      expect(await said(new ApiError(403, 'Forbidden', 'Forbidden'))).toEqual(['Forbidden'])
+      expect(await said(new ApiError(403, 'FORBIDDEN', 'FORBIDDEN'))).toEqual(['FORBIDDEN'])
+      expect(await said(new ApiError(404, '4040', '4040'))).toEqual(['Could not delete'])
       expect(await said(new ApiError(409, 'OK', { message: 'OK' }))).toEqual(['OK'])
       expect(await said(new ApiError(404, 'E_CODE_1', 'E_CODE_1'))).toEqual(['Could not delete'])
       expect(await said(new ApiError(404, '404', '404'))).toEqual(['Could not delete'])

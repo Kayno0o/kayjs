@@ -1,5 +1,5 @@
 export type { ContributionDay } from './contribution'
-export type { IconSlot, Settings } from './defaults'
+export type { IconSlot, NavLink, Settings } from './defaults'
 export { default as defaults } from './defaults'
 export type { Editing } from './editing'
 export { editing } from './editing'

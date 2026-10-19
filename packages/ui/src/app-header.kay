@@ -1,11 +1,10 @@
 ---
 import type { JSX } from 'kay'
-import type { IconProps } from 'kay/icons'
-import type { IconSlot } from './defaults'
+import type { NavLink } from './defaults'
 import SiteNav from './site-nav.kay'
 
 const { links, current, label, menuLabel, brand, end, sticky = true, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['header'], 'class' | 'children'> & {
-  links: readonly { href: string, label: string, icon?: IconSlot | IconProps | undefined }[]
+  links: readonly NavLink[]
   // The path of the page on screen, as for `SiteNav`.
   current: string
   // Names the navigation for screen readers.

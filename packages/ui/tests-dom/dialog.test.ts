@@ -1,5 +1,5 @@
 import type { Mounted } from 'kay/test'
-import { afterEach, describe, expect, test } from 'bun:test'
+import { afterEach, describe, expect, jest, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
 import { click } from './dom'
 
@@ -137,7 +137,8 @@ describe('ConfirmDelete', () => {
   })
 
   test('toasts failure and re-enables the buttons when `refused` throws on an answer it did not expect', async () => {
-    const root = await dialogs(undefined, false, { status: 409, message: 'Conflict', answer: null })
+    const spy = jest.spyOn(console, 'error').mockImplementation(() => undefined)
+    const root = await dialogs(undefined, false, { status: 409, message: 'Conflict', answer: {} })
 
     click(root.querySelector('.kui-icon-btn[aria-label="Release"]'))
     await settle()
@@ -148,6 +149,8 @@ describe('ConfirmDelete', () => {
     await settle()
 
     expect([root.querySelector('.kui-toast-message')?.textContent, shown.open, shown.querySelector('.kui-btn-danger')?.hasAttribute('disabled')]).toEqual(['Could not release', true, false])
+    expect(spy).toHaveBeenCalledTimes(1)
+    spy.mockRestore()
   })
 
   test('hands its tone to the icon trigger once a variant is given, and leaves the default look without one', async () => {

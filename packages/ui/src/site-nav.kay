@@ -1,8 +1,7 @@
 ---
 import type { JSX } from 'kay'
 import { effect, listen, signal, uid } from 'kay'
-import type { IconProps } from 'kay/icons'
-import type { IconSlot } from './defaults'
+import type { NavLink } from './defaults'
 import Icon from './icon.kay'
 import IconButton from './icon-button.kay'
 import { wording } from 'kay/words'
@@ -13,7 +12,7 @@ const { id, links, current, label, menuLabel = wording('ui.siteNav.menuLabel', '
   // The list's id, unique on the page; one is drawn when none is given.
   id?: string | undefined
   // `icon` is drawn before the label, for the reader who sees it; the label still names the link.
-  links: readonly { href: string, label: string, icon?: IconSlot | IconProps | undefined }[]
+  links: readonly NavLink[]
   // The path of the page on screen: its link is marked as the page, and a link to a section holding it as current.
   current: string
   // Names the navigation for screen readers.

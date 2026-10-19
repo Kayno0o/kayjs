@@ -18,7 +18,7 @@ For a whole header with the site's brand and an area at the far end, use [AppHea
 
 ## Icons
 
-A link takes an `icon`, a slot name or an imported icon, drawn before its label. It is decoration: the label still names the link.
+A link takes an `icon`, a slot name or an imported icon, drawn before its label. It is decoration: the label still names the link. Write the links `as const` when they hold an icon, so its name stays a slot name.
 
 ## Id
 

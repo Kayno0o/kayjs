@@ -1649,11 +1649,15 @@
   }
 
   .kui-site-nav-link {
-    @apply flex items-center gap-2 px-3 py-2 text-sm text-kui-subtext0 transition-colors hover:text-kui-text;
+    @apply block px-3 py-2 text-sm text-kui-subtext0 transition-colors hover:text-kui-text;
 
     &:where([aria-current]) {
       @apply text-kui-accent;
     }
+  }
+
+  .kui-site-nav-link:where(:has(.kui-site-nav-icon)) {
+    @apply flex items-center gap-2;
   }
 
   .kui-site-nav-icon {
@@ -1668,21 +1672,18 @@
     }
   }
 
+  /* A long brand or end area wraps inside its box rather than push the bar past the screen. */
   .kui-app-header-brand {
-    @apply flex items-center gap-2 font-kui-heading text-kui-text;
+    @apply flex min-w-0 items-center gap-2 font-kui-heading text-kui-text [overflow-wrap:anywhere];
   }
 
-  /* Last on a narrow screen, so the menu button ends the bar, beside the end area; from lg the links follow the brand. */
-  .kui-app-header-nav {
-    @apply order-last lg:order-none;
-
-    &:where(:last-child) {
-      @apply ml-auto lg:ml-0;
-    }
+  /* After the brand in the tab order and on screen, so the menu button comes before the end area; with no end area it takes the far end. */
+  .kui-app-header-nav:where(:last-child) {
+    @apply ml-auto lg:ml-0;
   }
 
   .kui-app-header-end {
-    @apply ml-auto flex items-center gap-2;
+    @apply ml-auto flex min-w-0 items-center gap-2 [overflow-wrap:anywhere];
   }
 
   .kui-pagination {
