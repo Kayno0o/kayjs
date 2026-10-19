@@ -1,6 +1,6 @@
 import type { AuthStore } from '../src/store'
 import { Database } from '@kaynooo/pg-orm'
-import { afterAll, describe, expect, test } from 'bun:test'
+import { afterAll, beforeEach, describe, expect, test } from 'bun:test'
 import { memoryStore } from '../src/memoryStore'
 import { authTables, pgStore } from '../src/pg'
 import { testApp, userRecord } from './helpers/app'
@@ -257,5 +257,89 @@ describe.each(backends)('%s: requests racing for the last', (_, make) => {
     expect(race.overlapped()).toBe(true)
     expect(answers.filter(answer => !answer.ok).every(answer => !answer.ok && answer.error === 'last-way-in')).toBe(true)
     expect((await app.store.identities.listByUser('u1')).length + (await app.store.passkeys.listByUser('u1')).length).toBeGreaterThanOrEqual(1)
+  })
+})
+
+let outage = false
+
+describe('an undo meeting a store outage', () => {
+  beforeEach(() => {
+    outage = false
+  })
+
+  const down = new Error('store down')
+
+  test('a failed put-back of the last way in is not answered as last-way-in', async () => {
+    const race = overlapping(memoryStore(), 2)
+    const store: AuthStore = { ...race.store, identities: { ...race.store.identities, create: async (...args: Parameters<typeof race.store.identities.create>) => {
+      if (outage)
+        throw down
+
+      return race.store.identities.create(...args)
+    } } }
+    const app = testApp({ store })
+    const identity = (provider: string) => ({ provider, providerId: '1', userId: 'u1', accessToken: null, refreshToken: null, tokenExpiresAt: null, createdAt: new Date() })
+
+    await app.store.users.create(userRecord({ id: 'u1' }))
+    await app.store.identities.create(identity('discord'))
+    await app.store.identities.create(identity('github'))
+
+    const ada = app.browser()
+
+    await ada.fetch('/sign-in/u1', POST)
+    race.arm()
+    outage = true
+
+    const answers = await Promise.allSettled([ada.call('unlink', 'discord', {}), ada.call('unlink', 'github', {})])
+
+    expect(race.overlapped()).toBe(true)
+    expect((await app.store.identities.listByUser('u1')).length).toBe(0)
+    expect(answers.some(answer => answer.status === 'rejected' || (answer.status === 'fulfilled' && !answer.value.ok && answer.value.error !== 'last-way-in'))).toBe(true)
+    expect(answers.every(answer => answer.status === 'fulfilled' && !answer.value.ok && answer.value.error === 'last-way-in')).toBe(false)
+  })
+
+  test('a failed put-back of the last owner is not answered as last-owner', async () => {
+    const race = overlapping(memoryStore(), 2)
+    const members = race.store.members!
+    const store: AuthStore = { ...race.store, members: { ...members, add: async (...args: Parameters<typeof members.add>) => {
+      if (outage)
+        throw down
+
+      return members.add(...args)
+    }, update: async (...args: Parameters<typeof members.update>) => {
+      if (outage && args[2].roles?.includes('owner'))
+        throw down
+
+      return members.update(...args)
+    } } }
+    const app = testApp({
+      store,
+      url: 'https://site.test',
+      site: 'Site',
+      email: EMAIL,
+      organizations: { roles: { owner: ['admin'], admin: ['member'], member: [] }, owner: 'owner', manage: 'admin', defaultRoles: ['member'], invitationPage: '/invitation' },
+    })
+    const person = async (email: string) => {
+      const browser = app.browser()
+      const { user } = await browser.callHas('user', 'register', { email, password: PASSWORD })
+
+      await app.store.users.update(user.id, { emailVerifiedAt: new Date() })
+
+      return { browser, id: user.id }
+    }
+    const ada = await person('ada@example.com')
+    const grace = await person('grace@example.com')
+    const { membership } = await ada.browser.callOk('createOrganization', { name: 'Acme' })
+    const org: string = membership.organization.id
+
+    await app.store.members!.add({ organizationId: org, userId: grace.id, roles: ['owner'], createdAt: new Date() })
+    race.arm()
+    outage = true
+
+    const answers = await Promise.allSettled([ada.browser.call('removeMember', org, grace.id), grace.browser.call('removeMember', org, ada.id)])
+
+    expect(race.overlapped()).toBe(true)
+    expect((await app.store.members!.listByOrganization(org)).length).toBe(0)
+    expect(answers.every(answer => answer.status === 'fulfilled' && !answer.value.ok && answer.value.error === 'last-owner')).toBe(false)
   })
 })

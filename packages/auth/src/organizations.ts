@@ -590,8 +590,10 @@ async function ownerKept(config: OrganizationsCore, store: Stores, organizationI
     try {
       await restore()
     }
-    catch {
-      // The member is back already, or gone with their account: nothing is left to undo.
+    catch (error) {
+      // The member is back already, or gone with their account: nothing is left to undo. Otherwise the store failed and the organization has no owner, so the error is not hidden.
+      if (await store.organizations.get(organizationId) && await lastOwner(config, store, organizationId, 0))
+        throw error
     }
   }
 

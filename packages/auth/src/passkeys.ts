@@ -184,7 +184,7 @@ export async function removePasskey(state: RequestState, id: string, proof: Proo
 
   // Two requests can each see the other way in still there: when none is left, the passkey goes back.
   if (!await hasWayIn(core, record.id)) {
-    await putBack(async () => core.store.passkeys.create(passkey))
+    await putBack(core, record.id, async () => core.store.passkeys.create(passkey))
 
     return { ok: false, error: 'last-way-in' }
   }

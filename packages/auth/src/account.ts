@@ -106,7 +106,7 @@ export async function unlink(state: RequestState, provider: string, proof: Proof
 
   // Two requests can each see the other way in still there: when none is left, the identity goes back.
   if (!await hasWayIn(state.core, record.id)) {
-    await putBack(async () => state.core.store.identities.create(identity))
+    await putBack(state.core, record.id, async () => state.core.store.identities.create(identity))
 
     return { ok: false, error: 'last-way-in' }
   }

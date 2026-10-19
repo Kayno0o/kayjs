@@ -28,10 +28,13 @@ function same(a: IdentityRecord, b: IdentityRecord): boolean {
   return a.provider === b.provider && a.providerId === b.providerId
 }
 
-// Puts a removed identity or passkey back; a request racing this one may have done so already, which leaves nothing to undo.
-export async function putBack(restore: () => unknown): Promise<void> {
+// Puts a removed identity or passkey back; a request racing this one may have done so already, which leaves nothing to undo. Any other failure is rethrown once the user is found with no way in, rather than answered as a refusal that leaves them locked out.
+export async function putBack(core: Core, userId: string, restore: () => unknown): Promise<void> {
   try {
     await restore()
   }
-  catch {}
+  catch (error) {
+    if (!await hasWayIn(core, userId))
+      throw error
+  }
 }
