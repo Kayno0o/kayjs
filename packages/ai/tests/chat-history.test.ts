@@ -114,10 +114,10 @@ test('maxChars trims the oldest turns to an app cap below the default, and the l
   expect(posted(turns, 20, 39_999)).toHaveLength(5)
 })
 
-test('shrunk lowers the cap a quarter below what a refused send held, so repeated refusals reach any cap', () => {
+test('shrunk lowers the cap half of what a refused send held, so repeated refusals reach any cap', () => {
   const sent = [user('a'.repeat(40)), assistant('b'.repeat(40)), user('c'.repeat(20))]
 
-  expect(shrunk(sent)).toBe(75)
+  expect(shrunk(sent)).toBe(50)
   expect(posted(sent, 20, shrunk(sent)).map(({ content }) => content[0])).toEqual(['c'])
-  expect(shrunk([user('')])).toBe(1)
+  expect(posted([user(''), assistant('')], 20, shrunk([user(''), assistant('')]))).toEqual([])
 })

@@ -230,7 +230,7 @@ it('shows why a todo was refused', async () => {
 - `file` is the `.kay` file relative to the project, since importing it through the preload gives its server build.
 - Props may be functions, and the component runs on a kay of its own, so a signal of the test reaches it through a callback rather than as a prop.
 - A library's settings apply as `kay.config.ts` sets them.
-- A component may `call()` or `resource()` a route of an API module, the project's or a library's: it is bundled as in the browser, knowing the module only by where it is served, so the call goes out as `fetch` (stub it in the test).
+- A component may `call()` or `resource()` a route of an API module, the project's or an extension's: it is bundled as in the browser, knowing the module only by where it is served, so the call goes out as `fetch` (stub it in the test).
 - Each mount runs the component's modules afresh, as a page load does, so module state, a persisted signal read from storage included, does not carry over from an earlier mount: set localStorage, then mount.
 - `kay/test/dom`, listed after `kay/test/preload` under `[test] preload`, registers happy-dom's DOM for every test file, with `@happy-dom/global-registrator` installed as a dev dependency.
 - It shims the popover API happy-dom lacks: `showPopover`, `hidePopover` and `togglePopover` fire `toggle` as a browser does, and `matches(':popover-open')` reads whether one is shown.

@@ -13,7 +13,7 @@ import { renderOnServer, scope } from './reactive'
 import { isRendered, html as renderedHtml } from './rendered'
 import { SLOT_END, SLOT_START } from './static-slots'
 import { countIds, withIds } from './uid'
-import { islandPrefix, pageIds } from './uid.server'
+import { islandPrefix, pageIds, withSlotIslands } from './uid.server'
 import { ACTION_PREFIX, ACTION_TYPE, encodeValue, unsendable } from './wire'
 
 // Island roots render synchronously, so a counter is enough to tell whether a component already sits inside one.
@@ -116,7 +116,7 @@ export function island<P extends object>(id: string, component: ((props: P) => J
     // Rendered here, in the parent, so an island among them is one of its own; unmarked in edit mode, as the island's own markup is.
     // A `persist` island's slots stay in the DOM across a same-URL swap, so their ids come from its key as its own do, not from the page's count.
     const ids = persist === undefined ? undefined : islandPrefix(persist)
-    const slots = withFieldMarks(undefined, () => ids === undefined ? staticSlots(own) : withIds(`${ids}s-`, () => staticSlots(own)))
+    const slots = withFieldMarks(undefined, () => ids === undefined ? staticSlots(own) : withIds(`${ids}s-`, () => withSlotIslands(`${ids}i`, () => staticSlots(own))))
     const given = slots.length === 0 ? own : withSlots(own, slots)
     const serialized = serializeProps(`${id} ${why}`, own, slots)
 

@@ -20,9 +20,9 @@ export function posted(turns: readonly Message[], keep: number, maxChars = POSTE
   return first === -1 ? [] : latest.slice(first)
 }
 
-// The cap to post under after a 413 for `sent`: a quarter less than it held, so a few refusals reach any cap and each leaves a conversation.
+// The cap to post under after a 413 for `sent`: half what it held, so a few refusals reach any cap.
 export function shrunk(sent: readonly Message[]): number {
-  return Math.max(1, Math.floor(sent.reduce((sum, { content }) => sum + content.length, 0) * 0.75))
+  return Math.floor(sent.reduce((sum, { content }) => sum + content.length, 0) / 2)
 }
 
 // What a stopped or finished conversation keeps in session storage: the text of each turn, not the tool calls, whose arguments and results may be large.

@@ -252,17 +252,18 @@ effect(() => {
 
 // What the action took as too long, learned from its 413s, so the app states `maxInputChars` once: the oldest turns go first, the last stays.
 let learned = Infinity
+const MAX_RETRIES = 5
 
-// Posts the history; a 413 shrinks what is posted below what it just was, until the action takes it or only the last message is left.
-async function call(signal: AbortSignal): Promise<ActionStream<string | Progress>> {
-  for (;;) {
+// Posts the history; a 413 halves what is posted, at most 5 times a send since each counts against the action's rate limit, until the action takes it or only the last message is left.
+async function call(abort: AbortSignal): Promise<ActionStream<string | Progress>> {
+  for (let retries = 0; ; retries++) {
     const sent = posted(history(), keep, Math.min(maxChars, learned))
 
     try {
-      return await action({ messages: sent }, { signal, refresh: false })
+      return await action({ messages: sent }, { signal: abort, refresh: false })
     }
     catch (error) {
-      if (!(error instanceof ActionError) || error.status !== 413 || sent.length < 2 || signal.aborted)
+      if (!(error instanceof ActionError) || error.status !== 413 || sent.length < 2 || retries === MAX_RETRIES || abort.aborted)
         throw error
 
       learned = shrunk(sent)

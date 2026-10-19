@@ -33,11 +33,30 @@ export function pageIds<T>(run: () => T, salt?: string): T {
   }
 }
 
+// Islands rendered inside the slots of a `persist` island, which stay in the DOM with it: they count from its prefix, not from the page's.
+let inSlots: { prefix: string, islands: number } | undefined
+
+export function withSlotIslands<T>(prefix: string, run: () => T): T {
+  const previous = inSlots
+
+  inSlots = { prefix, islands: 0 }
+
+  try {
+    return run()
+  }
+  finally {
+    inSlots = previous
+  }
+}
+
 // The prefix of the next island the server renders, written on its slot.
 // A `persist` island takes it from its key instead of its place, so the page that replaces one at the same URL, with the same token, cannot give another island the ids the kept one still holds.
 export function islandPrefix(persist?: string): string {
   if (!page)
     return freshPrefix()
+
+  if (inSlots)
+    return `${inSlots.prefix}${inSlots.islands++}-`
 
   if (persist === undefined)
     return `${page.token}-${page.islands++}-`
