@@ -25,6 +25,7 @@ import type { Tracer } from './server/trace'
 import { existsSync, realpathSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
+import { libraryMessageExtensions } from './build/libraries'
 import { KayError } from './compiler/errors'
 import { bundled, importModule } from './server/bundle'
 
@@ -449,7 +450,7 @@ export function defineConfig<Config extends KayConfig>(config: Config): Config {
 
 // `fresh` reads the file again as it is now, as `kay dev` does once it changed, rather than the module this process imported first.
 export async function loadConfig(root: string, fresh = false): Promise<KayConfig> {
-  return withSiteUrl(withExtensions(await importConfig(root, fresh)))
+  return withSiteUrl(withExtensions(withLibraryMessages(root, await importConfig(root, fresh))))
 }
 
 const SERVER_SPECIFIER = /(['"])kay\/server\1/g
@@ -535,6 +536,14 @@ function checkedConfig({ checks, env }: KayConfig): void {
     throw new KayError('config-invalid', `kay: \`env\` in ${CONFIG_FILE} is \`{ compose, example }\`, each a file name (\`compose\` may be a list of them)`)
 }
 
+// The config with the catalogs of the libraries the app installs listed before its own extensions, so those and the app's messages win key by key; one an extension of the same name already brings is left alone.
+function withLibraryMessages(root: string, config: KayConfig): KayConfig {
+  const listed = new Set((config.extensions ?? []).map(({ name }) => name))
+  const shipped = libraryMessageExtensions(root).filter(({ name }) => !listed.has(name))
+
+  return shipped.length === 0 ? config : { ...config, extensions: [...shipped, ...config.extensions ?? []] }
+}
+
 // The config with each extension's own laid under it, a later extension's over an earlier one's.
 function withExtensions<Config extends KayConfig>(config: Config): Config {
   const layers = (config.extensions ?? []).flatMap(extension => extension.config === undefined ? [] : [extension.config])
@@ -595,7 +604,7 @@ function withSiteUrl<Config extends KayConfig>(config: Config): Config {
 
 // The project's config under the options given in code; an option passed as `undefined` leaves the config's value alone rather than wiping it.
 export async function withConfig<Options extends KayConfig>(root: string, options: Options): Promise<KayConfig & Options> {
-  return mergeConfig(await importConfig(root), options)
+  return mergeConfig(withLibraryMessages(root, await importConfig(root)), options)
 }
 
 // `config` is as `kay.config.ts` writes it, so the extensions the options name lie under it rather than the file's.

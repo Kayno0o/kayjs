@@ -71,6 +71,22 @@ inBrowser('in the browser', () => {
 })
 
 inBrowser('FormField in an island', () => {
+  test('ConfirmDelete words its dialog in the French kayjs-ui ships, a prop winning over it, English on an English page', async () => {
+    const site = await shared()
+    const dialogText = async (url: string, id: string) => {
+      await using page = await site.open(url)
+
+      await page.click(`#${id} button`)
+      await page.waitFor(`#${id} dialog[open]`)
+
+      return await page.evaluate((within: string) => document.querySelector(`#${within} dialog`)!.textContent, id)
+    }
+
+    expect(await dialogText('/fr/confirm-words', 'plain')).toContain('Annuler')
+    expect(await dialogText('/fr/confirm-words', 'given')).toContain('Never mind')
+    expect(await dialogText('/confirm-words', 'plain')).toContain('Cancel')
+  }, 120_000)
+
   test('hydrates over the ids the server handed its control, then links the message once one shows', async () => {
     const site = await shared()
     const served = (await site.visit('/described')).html

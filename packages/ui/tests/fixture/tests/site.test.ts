@@ -699,6 +699,18 @@ describe('the texts a component shows by default, in the app\'s catalogs', () =>
     expect(french).toContain('aria-label="Posts"')
   })
 
+  test('read the French kayjs-ui ships on a French page with no message of the app, the app\'s own key and a prop winning over it', async () => {
+    const french = (await visit('/fr/confirm-words')).html
+    const plain = french.slice(french.indexOf('id="plain"'), french.indexOf('id="given"'))
+    const english = (await visit('/confirm-words')).html
+
+    expect(plain).toContain('aria-label="Supprimer"')
+    // The fixture words the title itself; the shipped French has the other keys.
+    expect(plain).toContain('aria-label="Supprimer cet élément ?"')
+    expect(english).toContain('aria-label="Delete"')
+    expect(english).not.toContain('Supprimer')
+  })
+
   test('send the browser the messages an island only reads after the page loaded', async () => {
     // The islands are built, so the page sends the messages its islands name in their source.
     const built = await testSite({ root: ROOT, browser: true })

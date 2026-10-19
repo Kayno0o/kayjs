@@ -2,6 +2,7 @@ import type { I18nConfig, KayExtension } from '../config'
 import type { LocaleSettings, Message, MessageTree, Translations } from '../runtime/i18n'
 import type { LocaleState } from '../runtime/locale-state'
 import type { Route } from './routes'
+import { existsSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { throughLinks } from '../build/links'
@@ -40,9 +41,20 @@ export function messagesFile(root: string, config: Pick<I18nConfig, 'messages'>,
   return join(resolve(root, config.messages ?? MESSAGES_DIR), `${locale}.ts`)
 }
 
-// The catalogs the extensions give a locale, in the order they are listed, the app's own laid over them.
+// The catalogs the extensions give a locale, in the order they are listed, the app's own laid over them: a regional locale falls back to its language's catalog.
 export function extensionMessageFiles(root: string, extensions: KayExtension[] | undefined, locale: string): string[] {
-  return (extensions ?? []).flatMap(extension => extension.messages === undefined ? [] : [join(throughLinks(root, resolve(root, extension.messages)), `${locale}.ts`)])
+  return (extensions ?? []).flatMap((extension) => {
+    if (extension.messages === undefined)
+      return []
+
+    const dir = throughLinks(root, resolve(root, extension.messages))
+    const dash = locale.indexOf('-')
+    const language = dash === -1 ? locale : locale.slice(0, dash)
+    const regional = join(dir, `${locale}.ts`)
+
+    // A regional locale such as `fr-CA` reads the catalog of its language when the extension has none of its own for the region.
+    return [language === locale || existsSync(regional) ? regional : join(dir, `${language}.ts`)]
+  })
 }
 
 // The settings the config gives, refused when they cannot serve a page: a default outside the locales, a tag no browser sends, a domain for no locale.

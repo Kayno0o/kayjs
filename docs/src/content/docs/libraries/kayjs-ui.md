@@ -114,7 +114,9 @@ export default settings
 
 ## Languages
 
-The words a component shows by default, `Close`, `Cancel`, `Loading…`, are looked up in your messages before their English. Word them once in `src/messages/<locale>.ts` under `ui`, named for the component and the prop, and every instance reads them.
+kayjs-ui comes with its French: on a French page every default text reads in French, with nothing to set up.
+
+For another language, or a different French word, use your messages. The words a component shows by default, `Close`, `Cancel`, `Loading…`, are looked up there before their English. Word them once in `src/messages/<locale>.ts` under `ui`, named for the component and the prop, and every instance reads them.
 
 ```ts
 // src/messages/fr.ts
@@ -127,7 +129,7 @@ export default defineMessages({
 })
 ```
 
-A prop you pass to one component still replaces the message for that component. The months and days a chart draws follow the page's locale too.
+Your own key wins over the French kayjs-ui ships, and a prop you pass to one component still replaces the message for that component. The months and days a chart draws follow the page's locale too.
 
 <ReadMore href="/llms/kayjs-ui">Every `ui.*` key and its English is in the full kayjs-ui reference.</ReadMore>
 

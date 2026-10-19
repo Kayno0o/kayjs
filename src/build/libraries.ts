@@ -1,3 +1,4 @@
+import type { KayExtension } from '../config'
 import { existsSync, readFileSync, realpathSync } from 'node:fs'
 import { isBuiltin } from 'node:module'
 import { dirname, join, relative, resolve, sep } from 'node:path'
@@ -38,7 +39,7 @@ interface Manifest {
   peerDependencies?: Record<string, string>
   optionalDependencies?: Record<string, string>
   exports?: unknown
-  kay?: { settings?: string }
+  kay?: { settings?: string, messages?: string }
 }
 
 // The names kay is installed under: the alias projects import it as, its own, and the one it was published as up to 0.3.
@@ -80,6 +81,21 @@ export async function findKayLibraries(root: string): Promise<KayLibrary[]> {
 
   // In the UTF-16 code unit order of their directories, so what is generated from them reads the same from one run and one machine to the next.
   return [...found.values()].sort((a, b) => a.dir < b.dir ? -1 : 1)
+}
+
+// The message catalogs the libraries the app depends on ship, as extensions listing nothing else: a library whose package.json declares `"kay": { "messages": "./src/messages" }` gives its `<locale>.ts` texts to every app that installs it, with no line in `kay.config.ts`.
+export function libraryMessageExtensions(root: string): KayExtension[] {
+  const manifest = readManifest(root)
+
+  if (!manifest)
+    return []
+
+  return dependencyNames(manifest, APP_DEPENDENCIES).flatMap((name) => {
+    const dir = packageDir(root, name)
+    const messages = dir === undefined ? undefined : readManifest(dir)?.kay?.messages
+
+    return dir === undefined || messages === undefined ? [] : [{ name, messages: join(dir, messages) }]
+  })
 }
 
 // What the app's `settings` replaces: each library's settings module, by its path under `node_modules` and its real one, and the app's module taking its place.

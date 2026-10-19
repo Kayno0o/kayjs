@@ -21,6 +21,18 @@ Ship the sources, not a build. List `kay` under `peerDependencies` and import fr
 
 The exports map gives each component a specifier: `import Button from 'my-ui/button.kay'`. Without it, a component is imported by its path in the package.
 
+## Texts in the app's languages
+
+Put the texts your components show in one folder of catalogs, one file per language, and name it in `package.json`:
+
+```json
+{
+  "kay": { "messages": "./src/messages" }
+}
+```
+
+Every app that installs your library reads those texts with no line in `kay.config.ts`. The app's own `src/messages` wins key by key. A page in `fr-CA` reads your `fr.ts` when you have no `fr-CA.ts`.
+
 ## Settings the app can replace
 
 Put what an app may change, such as theme classes, in one module. Name it under `"kay": { "settings" }` in `package.json`. It default-exports the settings, and your components import it.
