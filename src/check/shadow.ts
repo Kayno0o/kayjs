@@ -79,13 +79,15 @@ export interface ShadowOptions {
   // For a static component only islands render.
   insideIsland?: boolean
   lints?: LintLevels | undefined
+  // The types alone: the problems only `kay check` reports are left out of the diagnostics.
+  typesOnly?: boolean | undefined
   signals?: ImportedSignals
   // Where a file's shadow is written when that is not where `shadowPath` puts it: a package reached through a `node_modules` link is shadowed beside its real path, where an editor finds its tsconfig. What the shadow imports is relative to there.
   shadowOf?: ((file: string) => string) | undefined
 }
 
 // Compiles one .kay file for type checking, its route params typed when it is a page of the routes directory or of an extension's, by the matchers beside `routesDir`.
-export function compileShadow(root: string, file: string, source: string, { routesDir, mounts, insideIsland = false, lints, signals = importedSignals(file, source), shadowOf = path => shadowPath(root, path) }: ShadowOptions): { shadow: ShadowFile, diagnostics: Diagnostic[], queries: string[] | undefined } {
+export function compileShadow(root: string, file: string, source: string, { routesDir, mounts, insideIsland = false, lints, typesOnly, signals = importedSignals(file, source), shadowOf = path => shadowPath(root, path) }: ShadowOptions): { shadow: ShadowFile, diagnostics: Diagnostic[], queries: string[] | undefined } {
   const route = pageRoute(file, routesDir, mounts)
   const shadowDir = dirname(shadowOf(file))
   // rootDirs merges the shadow tree with the project at the same relative path, which a shadow written elsewhere does not keep.
@@ -107,7 +109,7 @@ export function compileShadow(root: string, file: string, source: string, { rout
     return relative(shadowDir, target)
   }
   const queries = layoutQueries(file, source, routesDir, mounts)
-  const { tsx, map, diagnostics } = compileKay(source, file, { root, params: route?.params, paramTypes: route && paramTypesOf(routesDir, shadowDir, route), outerQueries: moved ? layoutQueries(file, source, routesDir, mounts, { dir: shadowDir, of: shadowOf }) : queries, check: true, insideIsland, relocateImport, lints, importedSignals: signals })
+  const { tsx, map, diagnostics } = compileKay(source, file, { root, params: route?.params, paramTypes: route && paramTypesOf(routesDir, shadowDir, route), outerQueries: moved ? layoutQueries(file, source, routesDir, mounts, { dir: shadowDir, of: shadowOf }) : queries, check: true, typesOnly, insideIsland, relocateImport, lints, importedSignals: signals })
   // Reported as the server reports it, rather than as a type error in the shadow file.
   const unknown = Object.values(route?.matchers ?? {}).filter(matcher => matcherSource(routesDir, matcher) === undefined)
 

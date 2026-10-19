@@ -53,7 +53,7 @@ async function write(): Promise<number> {
 
     const named = entry === '' ? config.entry : entry
 
-    await writeShadowTypes(root!, { ...configCheckOptions(config), entry: named })
+    await writeShadowTypes(root!, { ...configCheckOptions(config), entry: named, typesOnly: true })
 
     if (!refused)
       process.stdout.write(`\n${ENTRY}${projectPaths(root!, { ...config, entry: named }).entry}\n`)

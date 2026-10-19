@@ -184,7 +184,7 @@ async function ownShadows(root: string, options: CheckOptions, tree: ShadowTree,
 
   for (const file of files) {
     const source = sources.get(file)!
-    const { shadow, diagnostics: compileDiagnostics } = await compileShadowCached(cacheDir, root, file, source, { routesDir, mounts, insideIsland: islandOnly.has(file), lints: options.lints })
+    const { shadow, diagnostics: compileDiagnostics } = await compileShadowCached(cacheDir, root, file, source, { routesDir, mounts, insideIsland: islandOnly.has(file), lints: options.lints, typesOnly: options.typesOnly })
 
     await tree.shadow(shadow, shadowPath(root, file))
     for (const diagnostic of compileDiagnostics)
@@ -231,7 +231,8 @@ async function libraryShadows(root: string, options: CheckOptions, own: string[]
 
   await Promise.all(files.map(async (file) => {
     const source = await Bun.file(file).text()
-    const { shadow, diagnostics: compileDiagnostics } = await compileShadowCached(cacheDir, root, file, source, { routesDir, mounts, lints: options.lints, shadowOf })
+    // What is not reached reports nothing, so only its types are made.
+    const { shadow, diagnostics: compileDiagnostics } = await compileShadowCached(cacheDir, root, file, source, { routesDir, mounts, lints: options.lints, typesOnly: options.typesOnly === true || !reached.has(file), shadowOf })
 
     await tree.shadow(shadow, shadowOf(file))
 
@@ -417,20 +418,21 @@ async function rendersAsIslandCached(cacheDir: string, file: string, source: str
 }
 
 // `compileShadow` through the build's cache of compiles. A page's params are read from its path in the routes directory holding it, an extension's or the app's, and typed by the matchers they name, so the mounts and where each matcher is found, if anywhere, are part of the key, as are the `query` types of the layouts above it, as are the signals of the modules it imports.
-async function compileShadowCached(cacheDir: string, root: string, file: string, source: string, { routesDir, mounts, insideIsland = false, lints, shadowOf }: ShadowOptions): Promise<ReturnType<typeof compileShadow>> {
+async function compileShadowCached(cacheDir: string, root: string, file: string, source: string, { routesDir, mounts, insideIsland = false, lints, typesOnly = false, shadowOf }: ShadowOptions): Promise<ReturnType<typeof compileShadow>> {
   const route = pageRoute(file, routesDir, mounts)
   const matchers = Object.values(route?.matchers ?? {}).map(matcher => matcherSource(routesDir, matcher) ?? '')
   const signals = importedSignals(file, source)
   const queries = layoutQueries(file, source, routesDir, mounts)
   const slot = cacheEntry(cacheDir, file, 'shadow', JSON.stringify([root, routesDir, mounts, insideIsland, lints ?? {}, matchers, signals, queries, shadowOf?.(file), source]))
-  const cached = await readCacheEntry<{ tsx: string, map: ReturnType<SourceMap['toJSON']>, diagnostics: Diagnostic[] }>(slot)
+  const cached = await readCacheEntry<{ tsx: string, map: ReturnType<SourceMap['toJSON']>, diagnostics: Diagnostic[], typesOnly?: boolean }>(slot)
 
-  if (cached !== undefined)
+  // An entry made for its types alone serves what wants no more, and is made again, whole, for what does.
+  if (cached !== undefined && (typesOnly || cached.typesOnly !== true))
     return { shadow: { source, file, tsx: cached.tsx, map: SourceMap.fromJSON(cached.map) }, diagnostics: cached.diagnostics, queries }
 
-  const compiled = compileShadow(root, file, source, { routesDir, mounts, insideIsland, lints, signals, shadowOf })
+  const compiled = compileShadow(root, file, source, { routesDir, mounts, insideIsland, lints, typesOnly, signals, shadowOf })
 
-  await writeCacheEntry(slot, { tsx: compiled.shadow.tsx, map: compiled.shadow.map, diagnostics: compiled.diagnostics })
+  await writeCacheEntry(slot, { tsx: compiled.shadow.tsx, map: compiled.shadow.map, diagnostics: compiled.diagnostics, ...typesOnly && { typesOnly } })
 
   return compiled
 }

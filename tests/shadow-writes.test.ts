@@ -36,4 +36,25 @@ describe('writing the shadow tree again', () => {
     expect([...after.keys()].sort()).toEqual([...before.keys()].sort())
     expect(rewritten).toEqual(['src/routes/about.kay.tsx'])
   })
+
+  it('leaves out what only `kay check` reports when asked for the types alone, and makes it again, whole, for a check', async () => {
+    const root = await scratchDir('shadow-types-only-')
+    const page = join(root, 'src/routes/index.kay')
+
+    await Promise.all([
+      Bun.write(join(root, 'tsconfig.json'), '{}\n'),
+      Bun.write(page, '---\nconst width = window.innerWidth\n---\np {width}\n'),
+    ])
+
+    const codes = (diagnostics: { code?: string | undefined }[]) => diagnostics.map(({ code }) => code)
+    const quick = await writeShadowTypes(root, { typesOnly: true })
+    const types = await Bun.file(join(root, '.kay/types/src/routes/index.kay.tsx')).text()
+
+    expect(codes(quick.diagnostics)).not.toContain('browser-only-read')
+
+    const whole = await writeShadowTypes(root)
+
+    expect(codes(whole.diagnostics)).toContain('browser-only-read')
+    expect(await Bun.file(join(root, '.kay/types/src/routes/index.kay.tsx')).text()).toBe(types)
+  })
 })

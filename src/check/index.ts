@@ -64,6 +64,8 @@ export interface CheckOptions {
   lang?: string | undefined
   // The level of each lint, over its default.
   lints?: LintLevels | undefined
+  // The tree alone is wanted, as `kay dev` writes it: the diagnostics only `kay check` reports are not looked for.
+  typesOnly?: boolean | undefined
   // What a public site's head starts from, which the `seo` lints read.
   seo?: SeoConfig | undefined
   favicon?: string | FaviconConfig | false | undefined

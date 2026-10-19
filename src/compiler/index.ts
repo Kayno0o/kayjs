@@ -46,6 +46,8 @@ export interface CompileOptions {
   twinBuild?: boolean | undefined
   // Type checking only: the level of each lint, over its default.
   lints?: LintLevels | undefined
+  // Type checking only: the types alone, for a file whose problems nothing reads, so the ones only `kay check` reports are not looked for.
+  typesOnly?: boolean | undefined
   // Renders in the browser only, as `--- client` does: set when a package the component imports cannot load on the server.
   clientOnly?: boolean | undefined
   // Type-checking a static component only islands render: its children render inline with it, so the props it passes them are not serialized.
@@ -171,14 +173,16 @@ export function compileKay(source: string, filename: string, options: CompileOpt
   if (found.syntaxError && diagnostics.length === 0)
     diagnostics.push(...coded([found.syntaxError], 'fence-syntax'))
 
+  const checked = options.check === true && options.typesOnly !== true
+
   // Type checking only, so a page still runs while it is fixed, and fails there in development naming the same fixes.
-  if (options.check && !client)
+  if (checked && !client)
     diagnostics.push(...coded(browserReads(file, island !== undefined, server?.data.map(data => data.name) ?? [], routeFile), 'browser-only-read'))
 
   // Code that did not compile may have taken reads and writes with it, so a file with an error is not searched for unread names or unwritten signals.
   const broken = diagnostics.some(diagnostic => !diagnostic.checkOnly)
 
-  if (options.check) {
+  if (checked) {
     const fenceLints = [script.fence, server?.fence].flatMap(fence => fence ? cssImportsWithoutText(fence) : [])
     // The script runs in the browser as an island's and in a component only islands render; a static one that may be promoted to an island is read by the project check, which knows whether the build promotes it.
     const browserScript = (island !== undefined || options.insideIsland === true) && !routeFile ? script.fence : undefined
