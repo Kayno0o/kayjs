@@ -70,6 +70,19 @@ describe('bearer tokens', () => {
     expect(await ada.call('tokens')).toHaveLength(1)
   })
 
+  test('cannot set up, disable or reset two-factor, even with the proof', async () => {
+    const { ada, browser, bearer } = await withToken()
+    const device = browser()
+    const post = async (method: string, ...args: unknown[]) => device.json(`/call/${method}`, { method: 'POST', headers: { ...bearer, 'content-type': 'application/json' }, body: JSON.stringify(args) })
+    const refused = { ok: false, error: 'signed-out' }
+
+    expect(await post('setUpTwoFactor', { password: PASSWORD })).toEqual(refused)
+    expect(await post('disableTwoFactor', { password: PASSWORD })).toEqual(refused)
+    expect(await post('regenerateRecoveryCodes', { password: PASSWORD })).toEqual(refused)
+    expect(await post('reprove', { password: PASSWORD })).toEqual(refused)
+    expect(await ada.call('setUpTwoFactor', { password: PASSWORD })).toMatchObject({ ok: true })
+  })
+
   test('cannot mint more tokens, nor revoke another user\'s', async () => {
     const { browser, bearer, minted } = await withToken()
     const device = browser()

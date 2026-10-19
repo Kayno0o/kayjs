@@ -102,12 +102,12 @@ export async function verifyTwoFactor(state: RequestState, code: string, signIn:
   return { ok: true, redirect: challenge.redirect }
 }
 
-// The signed-in user, once `proof` re-proves them, so a stolen session alone cannot change what protects the account.
+// The user signed in on a session (never a bearer token), once `proof` re-proves them, so a stolen session alone cannot change what protects the account.
 // With `secondFactor`, an account with 2FA on proves it with a code, password or not, since a password alone must not turn off or replace what stands behind it.
 export async function reprove(state: RequestState, proof: Proof, options: { secondFactor?: boolean } = {}): Promise<{ ok: true, record: UserRecord } | { ok: false, error: ProofFailure }> {
   const record = await state.current()
 
-  if (!record)
+  if (!record || state.via() !== 'session')
     return { ok: false, error: 'signed-out' }
 
   if ((await state.session.get('auth'))?.impersonator)
