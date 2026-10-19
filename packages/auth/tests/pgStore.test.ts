@@ -34,10 +34,10 @@ if (reachable) {
     await db.raw(`INSERT INTO "auth_bearer_token" ("id", "user_id", "label", "digest", "created_at", "oauth_client", "oauth_family") VALUES ('b1', 'u1', 'Agent', 'legacy-bearer', now(), 'c1', 'f1')`, [])
 
     expect((await store.oauth!.codes.use('legacy-code', new Date()))?.code.resource).toBeNull()
-    expect((await store.oauth!.refresh.get('legacy-refresh'))?.usedAt).toBeNull()
+    expect((await store.oauth!.refresh.get!('legacy-refresh'))?.usedAt).toBeNull()
     expect((await store.oauth!.refresh.use('legacy-refresh', new Date()))?.token.resource).toBeNull()
-    expect((await store.oauth!.refresh.get('legacy-refresh'))?.usedAt).not.toBeNull()
-    expect(await store.oauth!.refresh.get('missing')).toBeUndefined()
+    expect((await store.oauth!.refresh.get!('legacy-refresh'))?.usedAt).not.toBeNull()
+    expect(await store.oauth!.refresh.get!('missing')).toBeUndefined()
     expect((await store.bearerTokens.findByDigest('legacy-bearer'))?.oauth).toEqual({ clientId: 'c1', family: 'f1', resource: null })
   })
 

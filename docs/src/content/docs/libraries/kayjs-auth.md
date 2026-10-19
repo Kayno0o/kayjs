@@ -526,7 +526,7 @@ A whole sign-in ends 90 days after it began. One refresh token used twice ends i
 
 An agent that names a `resource` when it asks to sign in gets tokens bound to it. At the token endpoint, and when it refreshes, it may name that resource again or leave it out, and any other answers `invalid_target`. Naming more than one `resource` is `invalid_target` at both ends.
 
-A refresh refused for its resource or scope keeps its token, so the agent can try again. Signing in with a code that asked for none refuses one named at the token endpoint. Tokens issued before this keep working, bound to nothing, and a refresh of one may name a resource of your site.
+A refresh refused for its resource or scope keeps its token, so the agent can try again, with the built-in stores and any custom store that can read a refresh token without spending it (`oauth.refresh.get`). Signing in with a code that asked for none refuses one named at the token endpoint. Tokens issued before this keep working, bound to nothing, and a refresh of one may name a resource of your site.
 
 An approval given while your app declared no `scopes` asks the user again once it declares some.
 

@@ -437,7 +437,7 @@ describe('a token is bound to the resource it was asked for', () => {
     expect((await refreshWith(app, clientId, presented, { resource: 'http://localhost/other' })).body.error).toBe('invalid_target')
     expect((await refreshWith(app, clientId, presented, { resource: 'https://other.example/mcp' })).body.error).toBe('invalid_target')
     expect((await refreshWith(app, clientId, presented, { scope: 'posts:write' })).body.error).toBe('invalid_scope')
-    expect((await app.store.oauth!.refresh.get(digest(presented)))?.usedAt).toBeNull()
+    expect((await app.store.oauth!.refresh.get!(digest(presented)))?.usedAt).toBeNull()
 
     const retry = await refreshWith(app, clientId, presented, { resource: MCP })
 
@@ -454,6 +454,19 @@ describe('a token is bound to the resource it was asked for', () => {
     expect((await refreshWith(app, clientId, first.body.refresh_token as string, { resource: 'http://localhost/other' })).body.error).toBe('invalid_grant')
     expect((await refreshWith(app, clientId, second.body.refresh_token as string)).body.error).toBe('invalid_grant')
     expect(await bearerOf(app, second)).toBeUndefined()
+  })
+
+  test('a store without refresh.get refuses the same, spending the token first as before', async () => {
+    const app = server()
+
+    delete app.store.oauth!.refresh.get
+
+    const { clientId, code } = await approvedFor(app, { resource: MCP })
+    const first = await exchangeWith(app, clientId, code)
+    const presented = first.body.refresh_token as string
+
+    expect((await refreshWith(app, clientId, presented, { resource: 'http://localhost/other' })).body.error).toBe('invalid_target')
+    expect((await app.store.oauth!.refresh.use(digest(presented), new Date()))?.reused).toBe(true)
   })
 
   test('several resources are invalid_target at authorize as at the token endpoint', async () => {

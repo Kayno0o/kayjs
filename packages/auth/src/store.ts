@@ -359,8 +359,8 @@ export interface AuthStore {
     }
     refresh: {
       create: (token: OAuthRefreshRecord) => MaybePromise<void>
-      // Reads the token without spending it, so a request can be refused for what it asks before the token is used up.
-      get: (digest: string) => MaybePromise<OAuthRefreshRecord | undefined>
+      // Reads the token without spending it, so a request can be refused for what it asks before the token is used up. A store without it refuses after spending, as before.
+      get?: (digest: string) => MaybePromise<OAuthRefreshRecord | undefined>
       // As `codes.use`.
       use: (digest: string, at: Date) => MaybePromise<{ token: OAuthRefreshRecord, reused: boolean } | undefined>
       // Deletes the refresh tokens of the family and the bearer tokens issued under it.
