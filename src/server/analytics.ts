@@ -218,11 +218,12 @@ function scriptOf(options: FathomOptions | CloudflareOptions): { src: string, at
 }
 
 // What the policy needs to let the provider's script load and report: Cloudflare names script-src static.cloudflareinsights.com and connect-src cloudflareinsights.com for Web Analytics.
+// A directive given here replaces kay's own, so `'self'` is listed again to keep the site's scripts and requests; `img-src` already allows any https host.
 function cspOf(options: FathomOptions | CloudflareOptions): Record<string, string[]> {
   if (options.provider === 'fathom')
-    return { 'script-src': ['https://cdn.usefathom.com'], 'connect-src': ['https://cdn.usefathom.com'], 'img-src': ['https://cdn.usefathom.com'] }
+    return { 'script-src': ['\'self\'', 'https://cdn.usefathom.com'], 'connect-src': ['\'self\'', 'https://cdn.usefathom.com'] }
 
-  return { 'script-src': ['https://static.cloudflareinsights.com'], 'connect-src': ['https://cloudflareinsights.com'] }
+  return { 'script-src': ['\'self\'', 'https://static.cloudflareinsights.com'], 'connect-src': ['\'self\'', 'https://cloudflareinsights.com'] }
 }
 
 interface Words { text: string, agree: string, refuse: string, policy: string }

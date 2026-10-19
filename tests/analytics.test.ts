@@ -697,6 +697,8 @@ describe('Fathom and Cloudflare Web Analytics', () => {
     expect(html).toContain('data-site="ABCDEFGH"')
     expect(html).toContain('data-spa="auto"')
     expect(policy).toContain('https://cdn.usefathom.com')
+    expect(policy).toMatch(/script-src 'self' https:\/\/cdn\.usefathom\.com/)
+    expect(policy).toMatch(/connect-src 'self' https:\/\/cdn\.usefathom\.com/)
   })
 
   it('puts the Cloudflare beacon in the head, the CSP opened as Cloudflare documents', async () => {
@@ -704,7 +706,7 @@ describe('Fathom and Cloudflare Web Analytics', () => {
 
     expect(html).toContain('src="https://static.cloudflareinsights.com/beacon.min.js"')
     expect(html).toContain('data-cf-beacon="{&quot;token&quot;:&quot;tok-123&quot;}"')
-    expect(policy).toMatch(/script-src[^;]*https:\/\/static\.cloudflareinsights\.com/)
+    expect(policy).toMatch(/script-src 'self' https:\/\/static\.cloudflareinsights\.com/)
     expect(policy).toMatch(/connect-src[^;]*https:\/\/cloudflareinsights\.com/)
   })
 
