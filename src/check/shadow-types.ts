@@ -13,7 +13,7 @@ import { existsSync, realpathSync } from 'node:fs'
 import { lstat, mkdir, readdir, readlink, rm, symlink, unlink } from 'node:fs/promises'
 import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import { readCacheEntry, writeCacheEntry } from '../build/cache'
-import { findKayFiles, treeEntries, writeIfChanged } from '../build/files'
+import { findKayFiles, inWalkScope, treeEntries, writeIfChanged } from '../build/files'
 import { iconTypes } from '../build/icons'
 import { findKayLibraries, libraryOf, packageRoot, reachableLibraryFiles, throughNodeModules } from '../build/libraries'
 import { importedSignals } from '../build/signals'
@@ -75,14 +75,20 @@ export interface ShadowTypes {
   // The routes the extensions mount, and the prefixes the locales serve them under too.
   mounts: RouteMount[]
   locales: string[]
+  // What the run found the project serves, which the boot checks read again rather than scan.
+  served: ServedProject
 }
 
 // What the project serves, which links are checked against.
 export interface ServedProject {
   routes: Route[]
+  // The public folder's files, without the fallbacks `publicPaths` adds.
+  found: PublicFile[]
   publicPaths: PublicFile[]
   apiModules: ApiModule[]
   endpoints: Endpoint[]
+  // Why the endpoint files could not be scanned, which the boot checks report.
+  endpointFailure?: unknown
   settings: LocaleSettings | undefined
 }
 
@@ -100,6 +106,10 @@ interface ShadowTree {
 
 // Compiles every .kay file of the project at `root`, nested projects left to their own, to `.kay/types/<path>.kay.tsx`, the tree tsconfig `rootDirs` merges with the sources.
 export async function writeShadowTypes(projectRoot: string, options: CheckOptions = {}): Promise<ShadowTypes> {
+  return inWalkScope(async () => writeShadows(projectRoot, options))
+}
+
+async function writeShadows(projectRoot: string, options: CheckOptions): Promise<ShadowTypes> {
   const root = resolve(projectRoot)
   const routesDir = projectPaths(root, options).routes
   const tree = shadowTree(projectPaths(root).types)
@@ -134,7 +144,7 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
   // `contentChecks` writes the props check once it read the collections.
   await tree.removeStale([CONTENT_CHECK])
 
-  return { files: tree.shadows, diagnostics: [...own.diagnostics, ...libraries.diagnostics], problems, unreached: libraries.unreached, libraries: libraries.followed, programs: libraries.programs, settings: replaced.lines, exports: exported.lines, islandOnly: own.islandOnly, mounts, locales: served.settings ? localePrefixes(served.settings) : [] }
+  return { files: tree.shadows, diagnostics: [...own.diagnostics, ...libraries.diagnostics], problems, unreached: libraries.unreached, libraries: libraries.followed, programs: libraries.programs, settings: replaced.lines, exports: exported.lines, islandOnly: own.islandOnly, mounts, locales: served.settings ? localePrefixes(served.settings) : [], served }
 }
 
 function shadowTree(dir: string): ShadowTree {
@@ -378,10 +388,10 @@ async function extensionPackages(root: string, libraries: KayLibrary[], extensio
 // The pages, public files, API modules and endpoints, with the locale settings, each with the reason the server would refuse it reported.
 async function servedProject(root: string, options: CheckOptions, problems: CheckDiagnostic[], mounts: RouteMount[]): Promise<ServedProject> {
   const paths = projectPaths(root, options)
-  const [routes, found, apiModules, endpoints] = await Promise.all([scanRoutes(paths.routes, mounts), publicFiles(paths.public), apiModulesOf(root, options, problems), endpointsOf(paths.routes, mounts)])
+  const [routes, found, apiModules, { endpoints, failure }] = await Promise.all([scanRoutes(paths.routes, mounts), publicFiles(paths.public), apiModulesOf(root, options, problems), endpointsOf(paths.routes, mounts)])
   const settings = options.i18n && i18nSettings(root, options.i18n, problems)
 
-  return { routes, publicPaths: [...found, ...htmlFallbacks(found, servedPaths(routes))], apiModules, endpoints, settings }
+  return { routes, found, publicPaths: [...found, ...htmlFallbacks(found, servedPaths(routes))], apiModules, endpoints, endpointFailure: failure, settings }
 }
 
 // Each redirect whose target on the site nothing serves; what kay serves itself counts, whether or not the project turns it on.
@@ -487,12 +497,12 @@ async function compileShadowCached(cacheDir: string, root: string, file: string,
 }
 
 // The endpoint files, or none while one is misnamed: the boot checks report it.
-async function endpointsOf(routesDir: string, mounts: RouteMount[]): Promise<Endpoint[]> {
+async function endpointsOf(routesDir: string, mounts: RouteMount[]): Promise<{ endpoints: Endpoint[], failure?: unknown }> {
   try {
-    return await scanEndpoints(routesDir, mounts)
+    return { endpoints: await scanEndpoints(routesDir, mounts) }
   }
-  catch {
-    return []
+  catch (failure) {
+    return { endpoints: [], failure }
   }
 }
 

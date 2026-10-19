@@ -1,6 +1,7 @@
 import type { CheckDiagnostic, CheckOptions } from '.'
 import type { CollectionFeed } from '../content/claims'
 import type { LocaleSettings } from '../runtime/i18n'
+import type { ServedProject } from './shadow-types'
 import { join, resolve } from 'node:path'
 import { checkBudget } from '../build/budget'
 import { islandId } from '../compiler'
@@ -27,11 +28,12 @@ import { pageHeadLints } from './page-heads'
 import { queryClashes } from './queries'
 
 // What the server refuses when it boots, found by the functions it calls then, so `kay check` and the boot cannot disagree; the collections' feeds come from the process that read them.
-export async function bootProblems(root: string, options: CheckOptions, feeds: CollectionFeed[] = []): Promise<CheckDiagnostic[]> {
+// A `scanned` project, the run's own, spares scanning its routes, public files and endpoints again.
+export async function bootProblems(root: string, options: CheckOptions, feeds: CollectionFeed[] = [], scanned?: ServedProject): Promise<CheckDiagnostic[]> {
   const diagnostics: CheckDiagnostic[] = []
   const config = join(root, CONFIG_FILE)
   const { routes: routesDir, public: publicDir } = projectPaths(root, options)
-  const [routes, files] = await Promise.all([scanRoutes(routesDir, routeMounts(root, options.extensions)), publicFiles(publicDir)])
+  const [routes, files] = scanned ? [scanned.routes, scanned.found] : await Promise.all([scanRoutes(routesDir, routeMounts(root, options.extensions)), publicFiles(publicDir)])
 
   const refused = (file: string, run: () => void) => {
     try {
@@ -101,7 +103,10 @@ export async function bootProblems(root: string, options: CheckOptions, feeds: C
   refused(publicDir, () => claimPublic(served, files))
 
   try {
-    claimEndpoints(served, await scanEndpoints(routesDir, routeMounts(root, options.extensions)), root)
+    if (scanned?.endpointFailure !== undefined)
+      throw scanned.endpointFailure
+
+    claimEndpoints(served, scanned?.endpoints ?? await scanEndpoints(routesDir, routeMounts(root, options.extensions)), root)
   }
   catch (error) {
     diagnostics.push({ file: routesDir, line: 1, column: 1, message: error instanceof Error ? error.message : String(error) })

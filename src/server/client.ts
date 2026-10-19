@@ -53,6 +53,8 @@ export interface ClientManifest {
 export interface PageStyles {
   html: string
   inline: string[]
+  // What the inline rules weigh gzipped.
+  size: number
   // The stylesheets it links.
   links: string[]
 }
@@ -546,7 +548,7 @@ async function pageStyles(client: ClientBuild, base: string, texts: Map<string, 
     const linked = (url: string) => routes.get(url) ?? url
 
     if (routes.size > 0) {
-      found.set(key, { html: urls.map(url => `<link rel="stylesheet" href="${linked(url)}">`).join(''), inline: [], links: urls.map(linked) })
+      found.set(key, { html: urls.map(url => `<link rel="stylesheet" href="${linked(url)}">`).join(''), inline: [], size: 0, links: urls.map(linked) })
 
       continue
     }
@@ -559,12 +561,12 @@ async function pageStyles(client: ClientBuild, base: string, texts: Map<string, 
       // A noscript holds text for the rewriter that puts the mount point on links, so its hrefs carry it already.
       const plain = rest.map(url => `<link rel="stylesheet" href="${joinBase(base, linked(url))}">`).join('')
 
-      found.set(key, { html: `${inline.map(css => `<style>${css}</style>`).join('')}${links}${restScript}<noscript>${plain}</noscript>`, inline, links: urls.map(linked) })
+      found.set(key, { html: `${inline.map(css => `<style>${css}</style>`).join('')}${links}${restScript}<noscript>${plain}</noscript>`, inline, size, links: urls.map(linked) })
 
       continue
     }
 
-    found.set(key, { html: inline.map(css => `<style>${css}</style>`).join(''), inline, links: [] })
+    found.set(key, { html: inline.map(css => `<style>${css}</style>`).join(''), inline, size, links: [] })
   }
 
   return found

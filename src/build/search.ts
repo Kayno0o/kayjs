@@ -100,6 +100,8 @@ export async function writeSearchIndex(clientDir: string, pages: SearchPage[]): 
   }
 
   const files = new Map<string, unknown>()
+  // The shards kept whole, as printed to measure them.
+  const printed = new Map<unknown, string>()
   const manifest: SearchManifest = { dir: '', langs: {} }
   let id = 0
 
@@ -145,8 +147,11 @@ export async function writeSearchIndex(clientDir: string, pages: SearchPage[]): 
 
     // A large file of two letters is split by three, its words of two letters left in it; a file of three letters stays whole, however large, as a query knows no longer one.
     for (const [shard, entries] of byTwo) {
-      if (JSON.stringify(entries).length <= SHARD_SIZE) {
+      const text = JSON.stringify(entries)
+
+      if (text.length <= SHARD_SIZE) {
         shards.set(shard, entries)
+        printed.set(entries, text)
 
         continue
       }
@@ -168,7 +173,7 @@ export async function writeSearchIndex(clientDir: string, pages: SearchPage[]): 
     manifest.langs[lang] = id++
   }
 
-  const texts = new Map([...files].map(([name, value]) => [name, JSON.stringify(value)]))
+  const texts = new Map([...files].map(([name, value]) => [name, printed.get(value) ?? JSON.stringify(value)]))
   const hasher = new Bun.CryptoHasher('sha256')
 
   for (const [name, text] of texts)

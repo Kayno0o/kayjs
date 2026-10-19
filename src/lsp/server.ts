@@ -12,7 +12,7 @@ import { basename, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { KAY_DIR } from '../build/assets'
-import { findKayFiles, realPath } from '../build/files'
+import { findKayFiles, inWalkScope, realPath } from '../build/files'
 import { throughNodeModules } from '../build/libraries'
 import { importedSignals } from '../build/signals'
 import { configCheckOptions, configProblems, contentChecks, generatedChecks, generatedProblem, projectProblems, stopProbes, writeShadowTypes } from '../check'
@@ -336,6 +336,10 @@ export class KayLanguageServer {
 
   // Writes the shadow tree of every project holding a .kay file, and returns the shadow files that came, changed and went.
   private async writeShadows(): Promise<FileEvent[]> {
+    return inWalkScope(async () => this.writeShadowTrees())
+  }
+
+  private async writeShadowTrees(): Promise<FileEvent[]> {
     const roots = new Set((await findKayFiles(this.root, { project: true })).map(file => projectRootOf(file, this.root)))
     const changes: FileEvent[] = []
 

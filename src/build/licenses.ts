@@ -1,5 +1,6 @@
 import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from 'node:fs'
 import { dirname, join, resolve, sep } from 'node:path'
+import { scoped } from './files'
 import { installedIconSets } from './icons'
 
 // Written beside the browser build, so it reaches every host serving `/_kay/`, and carried by an executable for `--licenses`.
@@ -114,6 +115,10 @@ function installedPackage(from: string, name: string): string | undefined {
 
 // Every package the project's dependencies install, theirs included, as an executable bundled from them may carry any; its dev dependencies are left out.
 export function installedDependencies(root: string): string[] {
+  return scoped(`dependencies ${root}`, () => readInstalledDependencies(root))
+}
+
+function readInstalledDependencies(root: string): string[] {
   const found = new Set<string>()
   const visit = (from: string, names: string[]) => {
     for (const name of names) {

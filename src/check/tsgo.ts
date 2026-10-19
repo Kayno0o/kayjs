@@ -149,10 +149,12 @@ export async function typecheck(root: string, tsconfig: string, shown: string | 
   const slot = shown === undefined ? undefined : { file: join(state, 'clean.json'), key: JSON.stringify([(await Bun.file(nativeManifest()).json() as { version: string }).version, args, shown]) }
   const last = slot && await readCacheEntry<CleanRun>(slot)
 
-  if (last && await stillClean(last, shadowDir))
+  const checked = last && await stillClean(last, shadowDir)
+
+  if (checked?.clean)
     return { output: '', errors: '', code: 0 }
 
-  const generated = await contentHashes(shadowDir)
+  const generated = checked?.hashes ?? await contentHashes(shadowDir)
   const started = Date.now()
   const child = Bun.spawn([nativeExe(), ...args], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
   let stopped = false
@@ -205,7 +207,8 @@ async function contentHashes(dir: string): Promise<Record<string, string>> {
 }
 
 // A file's change time moves when it is written, replaced or linked anew, which a package manager hardlinking an older file into node_modules does while keeping its modification time.
-async function stillClean(run: CleanRun, shadowDir: string): Promise<boolean> {
+// The shadow tree's hashes come back when they were read, for the run that follows a change to use.
+async function stillClean(run: CleanRun, shadowDir: string): Promise<{ clean: boolean, hashes?: Record<string, string> }> {
   const unchanged = run.files.every((file) => {
     const stats = statSync(file, { throwIfNoEntry: false })
 
@@ -213,11 +216,12 @@ async function stillClean(run: CleanRun, shadowDir: string): Promise<boolean> {
   })
 
   if (!unchanged || run.missing.some(file => existsSync(file)))
-    return false
+    return { clean: false }
 
-  const hashes = Object.entries(await contentHashes(shadowDir))
+  const hashes = await contentHashes(shadowDir)
+  const entries = Object.entries(hashes)
 
-  return hashes.length === Object.keys(run.generated).length && hashes.every(([file, hash]) => run.generated[file] === hash)
+  return { clean: entries.length === Object.keys(run.generated).length && entries.every(([file, hash]) => run.generated[file] === hash), hashes }
 }
 
 // What tsgo printed, at its offset in the file it read.

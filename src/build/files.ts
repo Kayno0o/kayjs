@@ -1,4 +1,5 @@
 import type { Dirent } from 'node:fs'
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { readFileSync, realpathSync, statSync } from 'node:fs'
 import { mkdir, readdir, readFile, rename, rm } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
@@ -16,6 +17,7 @@ const KAY_CONFIG = 'kay.config.ts'
 const PACKAGE = 'package.json'
 
 const TYPESCRIPT = /\.[cm]?ts$/
+const ANY_NAME = /./
 const JSX = /\.jsx$/
 
 export const KAY_FILE = /\.kay$/
@@ -168,8 +170,38 @@ export async function findKayFiles(root: string, options: FindOptions = {}): Pro
   return findProjectFiles(root, KAY_FILE, options)
 }
 
+const walking = new AsyncLocalStorage<Map<string, unknown>>()
+
+// Inside a scope, each tree is walked once for every `findProjectFiles` and `findKayFiles` call in it, whatever the names they look for, and what `scoped` computes is kept.
+// A scope is one build, check, save or dev event batch: the next starts from the disk again, so a file added or removed between two is found.
+export async function inWalkScope<T>(run: () => Promise<T>): Promise<T> {
+  return walking.getStore() ? run() : walking.run(new Map(), run)
+}
+
+// What `compute` returns, once per scope under `key`, or on every call outside one.
+export function scoped<T>(key: string, compute: () => T): T {
+  const memo = walking.getStore()
+
+  if (!memo)
+    return compute()
+
+  if (!memo.has(key))
+    memo.set(key, compute())
+
+  return memo.get(key) as T
+}
+
 // Every file under `root` whose name `matches`, skipping as findKayFiles does.
-export async function findProjectFiles(root: string, matches: RegExp, { project = false, ownOnly = false, ownKayOnly = false }: FindOptions = {}): Promise<string[]> {
+export async function findProjectFiles(root: string, matches: RegExp, options: FindOptions = {}): Promise<string[]> {
+  if (!walking.getStore())
+    return walkProject(root, matches, options)
+
+  const all = scoped(`walk ${JSON.stringify([root, options.project ?? false, options.ownOnly ?? false, options.ownKayOnly ?? false])}`, async () => walkProject(root, ANY_NAME, options))
+
+  return (await all).filter(file => matches.test(basename(file)))
+}
+
+async function walkProject(root: string, matches: RegExp, { project = false, ownOnly = false, ownKayOnly = false }: FindOptions): Promise<string[]> {
   const files: string[] = []
   const walk = async (dir: string) => {
     const entries = await readable(dir, dir !== root)

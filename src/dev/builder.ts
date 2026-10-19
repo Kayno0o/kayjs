@@ -9,7 +9,7 @@ import { join, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { outputDir } from '../build/assets'
 import { bothBundles, bundleIslands, bundleStyles, clearClientOutput, readClientSources, writeClasses } from '../build/client'
-import { CSS_FILE, forgetSources, keepSources, readSource } from '../build/files'
+import { CSS_FILE, forgetSources, inWalkScope, keepSources, readSource } from '../build/files'
 import { fileWords, sourceWords } from '../build/libraries'
 import { classTokens, NAMING_FILE } from '../build/prune'
 import { inSignalsScope } from '../build/signals'
@@ -204,7 +204,7 @@ export function devBuilder(root: string, options: ClientOptions): (changed: stri
 
   return async (changed) => {
     try {
-      return await inSignalsScope(async () => build(changed))
+      return await inWalkScope(async () => inSignalsScope(async () => build(changed)))
     }
     catch (error) {
       last = undefined

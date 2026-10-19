@@ -4,12 +4,12 @@ import type { CheckDiagnostic, CheckOptions } from '.'
 import type { CollectionFeed } from '../content/claims'
 import type { ComponentUse } from '../content/server'
 import type { ContentProblem } from '../content/validate'
-import type { ShadowTypes } from './shadow-types'
+import type { ServedProject, ShadowTypes } from './shadow-types'
 import { existsSync, readFileSync, realpathSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
-import { findKayFiles, findProjectFiles, writeIfChanged } from '../build/files'
+import { findKayFiles, findProjectFiles, inWalkScope, writeIfChanged } from '../build/files'
 import { promotedChecks } from '../compiler'
 import { moduleChecks } from '../compiler/fence-checks'
 import { isLaunchLint, isLint, isLintGroup, LEVELS, lintLevel, lintLevels } from '../compiler/lints'
@@ -86,10 +86,12 @@ export function configProblems(root: string, options: CheckOptions, types: Shado
 }
 
 // The collections, the messages, what the server refuses when it boots and the lints of the project's scripts, reported after the type errors.
-export async function projectProblems(root: string, options: CheckOptions, content: ContentChecks, memory?: ProbeMemory): Promise<CheckDiagnostic[]> {
-  const [messages, boot, modules] = await Promise.all([checkMessages(root, options, memory), bootProblems(resolve(root), options, content.feeds), moduleLints(root, options)])
+export async function projectProblems(root: string, options: CheckOptions, content: ContentChecks, memory?: ProbeMemory, scanned?: ServedProject): Promise<CheckDiagnostic[]> {
+  return inWalkScope(async () => {
+    const [messages, boot, modules] = await Promise.all([checkMessages(root, options, memory), bootProblems(resolve(root), options, content.feeds, scanned), moduleLints(root, options)])
 
-  return [...content.problems, ...messages, ...boot, ...modules]
+    return [...content.problems, ...messages, ...boot, ...modules]
+  })
 }
 
 // A type error tsgo reports in `kay.config.ts` for a lint or level `lints` names that kay does not have, which kay's own message says better.

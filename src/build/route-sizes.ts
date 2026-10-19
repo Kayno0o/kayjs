@@ -92,7 +92,7 @@ export async function routeSizes(root: string, client: ClientBuild, routes: Rout
     const files = [...route.layouts, route.file]
     const own = client.pageStyles?.get(files.join('\n'))
     // Rules inlined weigh what they compress to; a head linking stylesheets, a copy or the whole one after paint, weighs those.
-    const css = own !== undefined && own.links.length === 0 ? own.inline.reduce((sum, text) => sum + Bun.gzipSync(text).length, 0) : await total(new Set(own?.links ?? files.flatMap(file => client.styles.get(file) ?? [])))
+    const css = own !== undefined && own.links.length === 0 ? own.size : await total(new Set(own?.links ?? files.flatMap(file => client.styles.get(file) ?? [])))
 
     if (pages.length > 0) {
       const each = await Promise.all(pages.map(async page => total(new Set([...page.html.matchAll(SCRIPT_URL)].map(match => match[1]!)))))

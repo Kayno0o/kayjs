@@ -13,6 +13,7 @@ import type { ShadowFile } from './shadow'
 import type { ExtensionProgram } from './shadow-types'
 import { relative, resolve, sep } from 'node:path'
 import process from 'node:process'
+import { inWalkScope } from '../build/files'
 import { formatReport } from '../compiler/frame'
 import { lintLevels } from '../compiler/lints'
 import { offsetAt, positionAt } from '../compiler/mapping'
@@ -106,15 +107,18 @@ export function configCheckOptions(config: KayConfig): CheckOptions {
 
 // Type-checks a project, .kay components included, and reports every error at the line and column the user wrote.
 export async function check(root: string, options: CheckOptions = {}): Promise<CheckDiagnostic[]> {
+  return inWalkScope(async () => runCheck(root, options))
+}
+
+async function runCheck(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
   const tsconfig = options.tsconfig ?? 'tsconfig.json'
-  const types = await writeShadowTypes(root, options)
+  // The props entries give their components are typed with the rest, so the collections are read before the type check; their probe does not wait for the shadow tree, which leaves the file it writes alone.
+  // The tsconfig includes the shadow tree, so its files are listed once the tree is written.
+  const [content, [types, shown]] = await Promise.all([contentChecks(root, options), shadowedConfig(root, tsconfig, options)])
   const { files, diagnostics, unreached, libraries, mounts, locales, programs } = types
-  // The props entries give their components are typed with the rest, so the collections are read first.
-  const content = await contentChecks(root, options)
-  const shown = await resolvedConfig(root, tsconfig)
   const projectUnused = unusedCodesOf(shown)
   // An extension whose options differ from the app's is checked apart, so its pages are typed as it is written for.
-  const [{ output, errors, code }, problems, ...apart] = await Promise.all([typecheck(root, tsconfig, shown), projectProblems(root, options, content), ...programs.map(async program => runProgram(root, program))])
+  const [{ output, errors, code }, problems, ...apart] = await Promise.all([typecheck(root, tsconfig, shown), projectProblems(root, options, content, undefined, types.served), ...programs.map(async program => runProgram(root, program))])
   const config = resolve(root, tsconfig)
   const inProgram = (file: string) => programs.some(({ dir }) => file.startsWith(dir + sep))
   const printed = parseTscOutput(output, config, root)
@@ -178,6 +182,12 @@ export async function check(root: string, options: CheckOptions = {}): Promise<C
     diagnostics.push({ file: config, line: 1, column: 1, message: `tsgo exited with code ${code} and no diagnostics` })
 
   return diagnostics
+}
+
+async function shadowedConfig(root: string, tsconfig: string, options: CheckOptions) {
+  const types = await writeShadowTypes(root, options)
+
+  return [types, await resolvedConfig(root, tsconfig)] as const
 }
 
 // One extension program's tsgo run, state kept apart from the app's and the other programs'.
