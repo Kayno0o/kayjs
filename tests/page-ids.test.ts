@@ -8,6 +8,9 @@ import { pages } from '../src/server'
 const FIELD = '---\nimport { uid } from \'kay\'\n\nconst { label } = props<{ label: string }>()\nconst id = uid()\n---\nlabel(for={id}) {label}\ninput(id={id})\n'
 const MENU = '---\nimport { signal, uid } from \'kay\'\n\nconst open = signal(false)\nconst id = uid()\n---\nbutton(aria-controls={id} onClick={() => open.set(o => !o)}) Menu\nul(id={id})\n'
 const PAGE = '--- server\nimport { defer } from \'kay\'\n\nconst outer = defer(new Promise<string>(resolve => setTimeout(resolve, 5, \'outer\')))\nconst inner = defer(new Promise<string>(resolve => setTimeout(resolve, 15, \'inner\')))\n--- script\nimport Field from \'../components/field.kay\'\nimport Menu from \'../components/menu.kay\'\n---\nmain\n  Field(label="Name")\n  Menu\n  // kay-allow uncaught-await\n  await outer\n    p.waiting Waiting\n  then text\n    p {text}\n    Field(label="Inside")\n    // kay-allow uncaught-await\n    await inner\n      p.waiting Waiting more\n    then more\n      p {more}\n      Field(label="Nested")\n'
+const SHELL = '---\nimport { signal } from \'kay\'\n\nconst open = signal(false)\n---\nsection(onClick={() => open.set(o => !o)})\n  slot\n'
+const KEPT = '--- script\nimport Field from \'../components/field.kay\'\nimport Shell from \'../components/shell.kay\'\n---\nmain\n  Shell(persist="chat")\n    Field(label="Slotted")\n'
+const OTHER = '--- script\nimport Field from \'../components/field.kay\'\nimport Menu from \'../components/menu.kay\'\nimport Shell from \'../components/shell.kay\'\n---\nmain\n  Menu\n  Field(label="Before")\n  Field(label="Before too")\n  Shell(persist="chat")\n    Field(label="Slotted")\n  Field(label="After")\n'
 const ID = /\bid="([^"]+)"/g
 const AWAIT = /data-kay-await="([^"]+)"/g
 const root = process.cwd()
@@ -93,5 +96,36 @@ describe('the prefix of a persistent island', () => {
     const [first, second] = await withPageToken('kabc', async () => pageIds(() => [islandPrefix('chat'), islandPrefix('chat')]))
 
     expect(second).not.toBe(first)
+  })
+})
+
+describe('the ids in the slots of a persistent island', () => {
+  let dir = ''
+  let app: Awaited<ReturnType<typeof pages>>
+
+  const read = async (path: string): Promise<string> => withPageToken('kabc', async () => (await app.handle(new Request(`http://localhost${path}`, { headers: { 'accept-encoding': 'identity' } }))).text())
+  const ids = (html: string) => [...html.matchAll(ID)].map(match => match[1]!)
+
+  beforeAll(async () => {
+    dir = await mkdtemp(join(root, '.kay/routes-'))
+    await Bun.write(join(dir, 'components/field.kay'), FIELD)
+    await Bun.write(join(dir, 'components/menu.kay'), MENU)
+    await Bun.write(join(dir, 'components/shell.kay'), SHELL)
+    await Bun.write(join(dir, 'routes/index.kay'), KEPT)
+    await Bun.write(join(dir, 'routes/other.kay'), OTHER)
+    app = await pages({ routes: join(dir, 'routes'), prebuilt: true })
+  })
+
+  afterAll(async () => rm(dir, { recursive: true, force: true }))
+
+  it('come from the island\'s key, so a page at the same URL with other islands and fields before it repeats none of the kept ones', async () => {
+    const [kept, other] = [await read('/'), await read('/other')]
+    const slotted = ids(kept)
+
+    expect(slotted).toHaveLength(1)
+    expect(new Set(ids(other)).size).toBe(5)
+    // Only the kept island's own slot, the same on both pages, repeats.
+    expect(ids(other).filter(id => slotted.includes(id))).toEqual(slotted)
+    expect(slotted[0]).toContain('-p')
   })
 })

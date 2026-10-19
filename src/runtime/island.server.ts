@@ -12,7 +12,7 @@ import { TITLED_ATTRIBUTE } from './markers'
 import { renderOnServer, scope } from './reactive'
 import { isRendered, html as renderedHtml } from './rendered'
 import { SLOT_END, SLOT_START } from './static-slots'
-import { countIds } from './uid'
+import { countIds, withIds } from './uid'
 import { islandPrefix, pageIds } from './uid.server'
 import { ACTION_PREFIX, ACTION_TYPE, encodeValue, unsendable } from './wire'
 
@@ -114,7 +114,9 @@ export function island<P extends object>(id: string, component: ((props: P) => J
       return browserOnly ? renderedHtml('') as unknown as JSX.Element : component!(own)
 
     // Rendered here, in the parent, so an island among them is one of its own; unmarked in edit mode, as the island's own markup is.
-    const slots = withFieldMarks(undefined, () => staticSlots(own))
+    // A `persist` island's slots stay in the DOM across a same-URL swap, so their ids come from its key as its own do, not from the page's count.
+    const ids = persist === undefined ? undefined : islandPrefix(persist)
+    const slots = withFieldMarks(undefined, () => ids === undefined ? staticSlots(own) : withIds(`${ids}s-`, () => staticSlots(own)))
     const given = slots.length === 0 ? own : withSlots(own, slots)
     const serialized = serializeProps(`${id} ${why}`, own, slots)
 
@@ -123,7 +125,7 @@ export function island<P extends object>(id: string, component: ((props: P) => J
       throw new IslandPropsError(`${id} ${why}, so it renders as an island: it is passed an action but does not type a prop as one, so the browser could not read it; import \`Action\` from 'kay' in its script, as the type of that prop`)
 
     // The browser counts the island's ids from it again as it hydrates.
-    const ids = islandPrefix(persist)
+    const prefix = ids ?? islandPrefix()
 
     depth++
 
@@ -138,13 +140,13 @@ export function island<P extends object>(id: string, component: ((props: P) => J
 
     try {
       // Detached, as in the browser, where an island reads nothing the page's components provide.
-      const { result: html, count } = browserOnly ? { result: '', count: 0 } : withFieldMarks(undefined, () => renderOnServer(() => scope(() => countIds(ids, () => child(component!(given))), true)))
+      const { result: html, count } = browserOnly ? { result: '', count: 0 } : withFieldMarks(undefined, () => renderOnServer(() => scope(() => countIds(prefix, () => child(component!(given))), true)))
       const shipped = slots.length === 0 ? '' : ` data-slots=${quotedAttribute(slotsValue(slots, html))}`
       // Marks an island whose title the page shows, so the browser leaves it alone while a later one has not hydrated.
       const titled = setsIslandTitle(mark) ? ` ${TITLED_ATTRIBUTE}` : ''
       const lazy = when === 'idle' || when === 'visible' ? ` data-hydrate="${when}"` : ''
       const chunk = rendered?.chunks?.[id]
-      const markup: Html = renderedHtml(`<slot data-component="${escapeAttribute(id)}" data-props=${quotedAttribute(serialized)}${lazy}${titled}${shipped}${browserOnly ? ' data-client' : ''}${count === 0 ? '' : ` data-uid="${escapeAttribute(ids)}"`}${persist === undefined ? '' : ` data-persist="${escapeAttribute(persist)}"`}${chunk === undefined ? '' : ` data-chunk="${escapeAttribute(chunk)}"`}>${html}</slot>`)
+      const markup: Html = renderedHtml(`<slot data-component="${escapeAttribute(id)}" data-props=${quotedAttribute(serialized)}${lazy}${titled}${shipped}${browserOnly ? ' data-client' : ''}${count === 0 ? '' : ` data-uid="${escapeAttribute(prefix)}"`}${persist === undefined ? '' : ` data-persist="${escapeAttribute(persist)}"`}${chunk === undefined ? '' : ` data-chunk="${escapeAttribute(chunk)}"`}>${html}</slot>`)
 
       return markup as unknown as JSX.Element
     }
