@@ -9,7 +9,7 @@ afterEach(() => {
   setSystemTime()
 })
 
-async function withToken(options: { scopes?: ('posts:read' | 'posts:write' | 'stats')[], expiresIn?: number } = {}) {
+async function withToken(options: { scopes?: ('posts:read' | 'posts:write' | 'stats')[], expiresIn?: number | null } = {}) {
   const app = testApp({ scopes: ['posts:read', 'posts:write', 'stats'] })
   const ada = app.browser()
 
@@ -33,7 +33,7 @@ describe('bearer tokens', () => {
     const { ada, browser, bearer, minted } = await withToken()
     const tokens = await ada.call('tokens')
 
-    expect(tokens).toEqual([{ id: minted.id, label: 'Phone', scopes: null, createdAt: expect.any(String), lastUsedAt: null, expiresAt: null, expired: false }])
+    expect(tokens).toEqual([{ id: minted.id, label: 'Phone', scopes: null, createdAt: expect.any(String), lastUsedAt: null, expiresAt: expect.any(String), expired: false }])
     expect(JSON.stringify(tokens)).not.toContain(minted.token)
 
     expect(await ada.call('revokeToken', minted.id)).toBe(true)
@@ -286,3 +286,62 @@ async function withTokenIn(store: ReturnType<typeof memoryStore>) {
 
   return { ...app, ada, minted: await ada.callOk('createToken', { password: PASSWORD }, 'Phone', {}) }
 }
+
+const DAY_MS = 24 * 60 * 60 * 1000
+
+describe('token hygiene', () => {
+  test('a minted token carries a prefix a secret scanner can match, and still reads as its user', async () => {
+    const { browser, bearer, minted, auth } = await withToken()
+    const user = (await auth.userFromToken(minted.token))!
+
+    expect(minted.token).toMatch(/^kat_[\w-]{43}$/)
+    expect(await browser().json('/me', { headers: bearer })).toMatchObject({ email: 'ada@example.com' })
+
+    const issued = await auth.issueToken(user.id, 'Display')
+
+    expect(issued.ok && issued.token).toMatch(/^kat_[\w-]{43}$/)
+  })
+
+  test('expires after 90 days by default, and never only when asked with null', async () => {
+    const { ada, browser, bearer, auth, store, minted } = await withToken()
+    const { id } = await ada.json('/me') as { id: string }
+    const [stored] = await store.bearerTokens.listByUser(id)
+
+    expect(Math.abs(stored!.expiresAt!.getTime() - (Date.now() + 90 * DAY_MS))).toBeLessThan(60_000)
+
+    const forever = await ada.callOk('createToken', { password: PASSWORD }, 'Forever', { expiresIn: null })
+    const issuedForever = await auth.issueToken(id, 'Script', { expiresIn: null })
+    const issuedDefault = await auth.issueToken(id, 'Default')
+    const byId = new Map((await store.bearerTokens.listByUser(id)).map(token => [token.id, token]))
+
+    expect(byId.get(forever.id)!.expiresAt).toBeNull()
+    expect(byId.get((issuedForever as { id: string }).id)!.expiresAt).toBeNull()
+    expect(byId.get((issuedDefault as { id: string }).id)!.expiresAt).toBeInstanceOf(Date)
+
+    setSystemTime(Date.now() + 91 * DAY_MS)
+
+    expect(await browser().json('/me', { headers: bearer })).toBe('anonymous')
+    expect(await auth.userFromToken(minted.token)).toBeNull()
+    expect(await browser().json('/me', { headers: { authorization: `Bearer ${forever.token}` } })).toMatchObject({ email: 'ada@example.com' })
+  })
+
+  test('null is the only way to skip the expiry: zero, a bad string and a negative stay refused', async () => {
+    const { ada, auth } = await withToken()
+    const { id } = await ada.json('/me') as { id: string }
+
+    for (const expiresIn of [0, -5, 'forever' as never])
+      expect(await auth.issueToken(id, 'Phone', { expiresIn })).toEqual({ ok: false, error: 'expiry' })
+  })
+
+  test('an adopted token needs 32 characters, and keeps its own form without the prefix', async () => {
+    const { ada, auth, browser } = await withToken()
+    const { id } = await ada.json('/me') as { id: string }
+    const thirtyOne = 'a'.repeat(31)
+    const thirtyTwo = 'b'.repeat(32)
+
+    expect(await auth.issueToken(id, 'Old', { token: thirtyOne })).toEqual({ ok: false, error: 'token' })
+    expect(await auth.issueToken(id, 'Old', { token: thirtyTwo })).toMatchObject({ ok: true, token: thirtyTwo })
+    expect(await browser().json('/me', { headers: { authorization: `Bearer ${thirtyTwo}` } })).toMatchObject({ email: 'ada@example.com' })
+    expect(await auth.issueToken(id, 'Old', { token: 'c'.repeat(4097) })).toEqual({ ok: false, error: 'token' })
+  })
+})

@@ -4,6 +4,12 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ## 1.55.0
 
+### kayjs-auth tokens expire by default and adopted ones need 32 characters
+
+- `createToken` and `issueToken` now expire a token after 90 days when `expiresIn` is left out; pass `expiresIn: null` for one that never does. Existing tokens keep the expiry they were made with. The account page's "Never" choice passes `null` itself. `kay check` cannot recognise the old form, so there is no lint.
+- `issueToken({ token })` refuses an adopted token under 32 characters with `'token'`, where 16 passed.
+- New tokens start with `kat_`; existing ones are untouched.
+
 ### kayjs-auth checks CAPTCHA hostnames and refuses plain-http providers at an https site
 
 - `turnstile()` and `hcaptcha()` refuse a token the provider says was made for a hostname other than `url`'s, so a site served from more than one hostname needs a `verify` of its own. Cloudflare's and hCaptcha's documented test secrets are not held to it, and a dev site at `localhost` passes. A custom `verify(token, action, { hostname })` gets the site's hostname as a third argument.

@@ -382,6 +382,18 @@ describe('the prebuilt pages', () => {
     expect(listed.find(row => row.includes('everything'))).toContain('Everything')
   })
 
+  test('a token made without a lifetime expires, and only a chosen "never" lasts for good', async () => {
+    const ada = await signedUp('expiry@example.com')
+
+    await ada.submit(create, { label: 'by-default', password: PASSWORD }, { from: '/auth/account/tokens' })
+    await ada.submit(create, { label: 'forever', days: '0', password: PASSWORD }, { from: '/auth/account/tokens' })
+
+    const listed = (await ada.visit('/auth/account/tokens')).find('[data-token]').map(row => row.text)
+
+    expect(listed.find(row => row.includes('by-default'))).toContain('Expires')
+    expect(listed.find(row => row.includes('forever'))).not.toContain('Expires')
+  })
+
   test('the data page asks for a proof before offering the download once the sign-in is old', async () => {
     const ada = await signedUp('stale@example.com')
 

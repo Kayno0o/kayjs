@@ -252,11 +252,11 @@ if (result.ok)
   console.log(result.token)
 ```
 
-`scopes` limits what the token reaches, from the `scopes` you declare in `createAuth`. `expiresIn` is seconds or a string such as `'30d'`. A token never makes another token.
+`scopes` limits what the token reaches, from the `scopes` you declare in `createAuth`. A token without `scopes` reaches everything, so give a script or a device the scopes it needs. `expiresIn` is seconds or a string such as `'30d'`; a token expires after 90 days without it, and `expiresIn: null` makes one that never does. Tokens start with `kat_`, so a secret scanner can spot one that leaks. A token never makes another token.
 
 `tokens()` lists the user's tokens and `revokeToken(id)` revokes one. A password change, a reset and `signOutEverywhere` end them all. Both need a browser session: a token cannot list or revoke tokens, nor turn on two-factor. Anything that asks for your password or a code first, such as changing two-factor, passkeys, the password or deleting the account, needs a browser session as well.
 
-For a flow you gate yourself, such as pairing a device, `auth.issueToken(userId, label)` makes a token on the server with no proof.
+For a flow you gate yourself, such as pairing a device, `auth.issueToken(userId, label)` makes a token on the server with no proof, on the same terms. Its `token` option adopts one you handed out before, at least 32 characters long.
 
 ## Your own profile fields
 

@@ -11,7 +11,14 @@ import { reprove } from './twoFactor'
 
 const LABEL_MAX_LENGTH = 64
 const BEARER = /^Bearer\s+(\S+)$/i
-const TOKEN = /^\S{16,4096}$/
+const TOKEN = /^\S{32,4096}$/
+const TOKEN_PREFIX = 'kat_'
+const DEFAULT_EXPIRY_SECONDS = 90 * 24 * 60 * 60
+
+// A prefix lets a secret scanner recognise a leaked token; the digest the store keeps covers it.
+function newToken(): string {
+  return TOKEN_PREFIX + randomToken()
+}
 
 // A bearer token as the app lists it; the token itself is shown once, when minted.
 export interface BearerToken {
@@ -28,8 +35,8 @@ export interface BearerToken {
 export interface TokenOptions<Scope extends string = string> {
   // What the token may reach, from the scopes the app declares; every one when left out.
   scopes?: Scope[] | undefined
-  // How long until it stops working, seconds or a string such as '30d'; never when left out.
-  expiresIn?: Duration | undefined
+  // How long until it stops working, seconds or a string such as '30d'; 90 days when left out, never with null.
+  expiresIn?: Duration | null | undefined
 }
 
 // The seconds a token lives, undefined for a value that is no positive duration.
@@ -55,7 +62,7 @@ function tokenProblem(core: Core, name: string, options: TokenOptions): TokenPro
   if (options.scopes && (options.scopes.length === 0 || options.scopes.some(scope => !core.scopes.has(scope))))
     return 'scope'
 
-  return options.expiresIn !== undefined && expirySeconds(options.expiresIn) === undefined ? 'expiry' : undefined
+  return options.expiresIn != null && expirySeconds(options.expiresIn) === undefined ? 'expiry' : undefined
 }
 
 async function storeToken(core: Core, userId: string, name: string, options: TokenOptions, token: string): Promise<string> {
@@ -69,7 +76,7 @@ async function storeToken(core: Core, userId: string, name: string, options: Tok
     scopes: options.scopes ? [...new Set(options.scopes)] : null,
     createdAt: new Date(),
     lastUsedAt: null,
-    expiresAt: options.expiresIn === undefined ? null : new Date(Date.now() + expirySeconds(options.expiresIn)! * 1000),
+    expiresAt: options.expiresIn === null ? null : new Date(Date.now() + (options.expiresIn === undefined ? DEFAULT_EXPIRY_SECONDS : expirySeconds(options.expiresIn)!) * 1000),
   })
 
   return id
@@ -91,7 +98,7 @@ export async function createToken(state: RequestState, proof: Proof, label: stri
   if (state.via() !== 'session')
     return { ok: false, error: 'signed-out' }
 
-  const token = randomToken()
+  const token = newToken()
   const id = await storeToken(state.core, proved.record.id, name, options, token)
 
   await notify(state, proved.record, 'token-created', name)
@@ -99,7 +106,7 @@ export async function createToken(state: RequestState, proof: Proof, label: stri
   return { ok: true, token, id }
 }
 
-// A token for `userId` with no proof, for the app to gate; `token` adopts one it handed out before, 16 to 4096 characters without whitespace, as a bearer header carries.
+// A token for `userId` with no proof, for the app to gate; `token` adopts one it handed out before, 32 to 4096 characters without whitespace, as a bearer header carries.
 export async function issueToken(core: Core, userId: string, label: string, options: TokenOptions & { token?: string | undefined } = {}): Promise<IssueTokenResult> {
   const name = label.trim()
   const problem = tokenProblem(core, name, options)
@@ -118,7 +125,7 @@ export async function issueToken(core: Core, userId: string, label: string, opti
   if (banned(record))
     return { ok: false, error: 'banned' }
 
-  const token = options.token ?? randomToken()
+  const token = options.token ?? newToken()
 
   return { ok: true, token, id: await storeToken(core, record.id, name, options, token) }
 }
