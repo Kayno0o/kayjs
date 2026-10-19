@@ -5,12 +5,6 @@ What each release of kay and its libraries adds, newest first, each feature with
 ## Unreleased
 
 - Fathom, Cloudflare and `custom` with `consent: false` show the information line and the opt-out too, kay loading their script until the visitor opts out, which `info: false` leaves to the app; `custom` loaded through kay's script under a `base` points its tracker at the right route ([Privacy](privacy.md)).
-- The lints deprecated in 1.52 go with their old forms: `deprecated-provider-url`; see [Upgrading](upgrading.md).
-- The lints deprecated in 1.52 go with their old forms: `deprecated-provider-url`, `deprecated-store-verb`; see [Upgrading](upgrading.md).
-- The lints deprecated in 1.52 go with their old forms: `deprecated-provider-url`, `deprecated-store-verb`, `deprecated-sign-in-options`; see [Upgrading](upgrading.md).
-- The lints deprecated in 1.52 go with their old forms: `deprecated-provider-url`, `deprecated-store-verb`, `deprecated-sign-in-options`, `deprecated-auth-event`; see [Upgrading](upgrading.md).
-- The lints deprecated in 1.52 go with their old forms: `deprecated-provider-url`, `deprecated-store-verb`, `deprecated-sign-in-options`, `deprecated-auth-event`, `deprecated-time-ms` (a bare number of milliseconds now throws); see [Upgrading](upgrading.md).
-- The lints deprecated in 1.52 go with their old forms: `deprecated-provider-url`, `deprecated-store-verb`, `deprecated-sign-in-options`, `deprecated-auth-event`, `deprecated-time-ms` (a bare number of milliseconds now throws), `deprecated-test-mount`; see [Upgrading](upgrading.md).
 - The lints deprecated in 1.52 go with their old forms: `deprecated-provider-url`, `deprecated-store-verb`, `deprecated-sign-in-options`, `deprecated-auth-event`, `deprecated-time-ms` (a bare number of milliseconds now throws), `deprecated-test-mount`, `deprecated-ui-prop`; see [Upgrading](upgrading.md).
 - kayjs-auth no longer counts a passkey made without user verification as a way in: `passkeys()` lists `userVerified`, see [Upgrading](upgrading.md).
 - kayjs-auth: a bearer or OAuth token can no longer create or rename an organization, send, list or revoke invitations, or accept or decline one ([kayjs-auth](../packages/auth/llms/admin-and-organizations.md)).
