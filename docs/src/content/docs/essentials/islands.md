@@ -389,6 +389,24 @@ The list starts at its bottom. When an item is added, a line grows or the list i
 
 <ReadMore href="/llms/navigation#follow-a-log">The `threshold` and `items` options.</ReadMore>
 
+## Reading an element's size
+
+A drawing that depends on an element's size, such as a road winding down a column, needs its width and height as values. `elementSize` from `kay` makes them, with no `ResizeObserver` to create and disconnect.
+
+```kay
+---
+import { elementSize } from 'kay'
+
+const column = elementSize()
+---
+.relative.h-full(ref={column.ref})
+  svg(width={column.width()} height={column.height()})
+```
+
+`width()` and `height()` read the element's content box in pixels and change as it is resized. They are 0 on the server and until the browser has measured the element. An element that appears later, inside an `if` for instance, is measured as soon as it does.
+
+<ReadMore href="/llms/islands#element-size">Keeping the element too, and what the values are before the first measure.</ReadMore>
+
 ## A page kay does not serve
 
 A page bundled by something else, such as an HTML file `Bun.serve` imports, can render `.kay` components too. List `"kay/bun"` under `[serve.static] plugins` in `bunfig.toml`, or pass `kay({ root })` from `kay/bun` to `Bun.build`. Then render one with `mount` from `kay/mount`, which returns a function that removes it.

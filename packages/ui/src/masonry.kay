@@ -1,6 +1,6 @@
 --- <Item>
 import type { JSX } from 'kay'
-import { memo, onCleanup, onMount, signal } from 'kay'
+import { elementSize, memo, onCleanup, onMount, signal } from 'kay'
 import { laneCount, masonryLayout } from './masonry'
 
 type Key = string | number
@@ -19,20 +19,20 @@ const { items, key, minWidth = 256, gap = 12, tile, class: className, style, ...
   style?: string | undefined
 }>()
 
-const width = signal(0)
+const rootSize = elementSize()
 // A height stays known once the tile leaves, so an item coming back is placed at once.
 const heights = signal<ReadonlyMap<Key, number>>(new Map())
 const keys = new WeakMap<Element, Key>()
 let root: HTMLElement | undefined
 let observer: ResizeObserver | undefined
 
-const lanes = memo(() => laneCount(width(), minWidth, gap))
+const lanes = memo(() => laneCount(rootSize.width(), minWidth, gap))
 // Until the width is known, as on the server, the tiles stay in a plain grid of the same lanes.
-const layout = memo(() => width() > 0 ? masonryLayout(items.map(item => heights().get(key(item))), lanes(), gap) : null)
+const layout = memo(() => rootSize.width() > 0 ? masonryLayout(items.map(item => heights().get(key(item))), lanes(), gap) : null)
 
 const place = (index: number) => layout()?.places[index]
 
-// One observer for the layout's width and every tile's height.
+// One observer for every tile's height.
 onMount(() => {
   observer = new ResizeObserver((entries) => {
     const next = new Map(heights())
@@ -40,15 +40,12 @@ onMount(() => {
     for (const entry of entries) {
       const id = keys.get(entry.target)
 
-      if (id === undefined)
-        width.set(entry.contentRect.width)
-      else
+      if (id !== undefined)
         next.set(id, entry.borderBoxSize?.[0]?.blockSize ?? (entry.target as HTMLElement).offsetHeight)
     }
 
     heights.set(next)
   })
-  observer.observe(root!)
 
   for (const [index, node] of [...root!.children].entries()) {
     keys.set(node, key(items[index]!))
@@ -66,7 +63,7 @@ function measure(node: HTMLElement, id: Key) {
 }
 ---
 // Tiles placed absolutely inside the layout's own box, so padding goes on a wrapper, never on the Masonry.
-.kui-masonry({...rest} ref={element => root = element} class={className} style={`--kui-masonry-min: ${minWidth}px; --kui-masonry-gap: ${gap}px; --kui-masonry-lanes: ${lanes()};${layout() ? ` height: ${layout()!.height}px;` : ''}${style ? ` ${style}` : ''}`} data-laid-out={layout() ? '' : undefined})
+.kui-masonry({...rest} ref={element => { root = element; rootSize.ref(element) }} class={className} style={`--kui-masonry-min: ${minWidth}px; --kui-masonry-gap: ${gap}px; --kui-masonry-lanes: ${lanes()};${layout() ? ` height: ${layout()!.height}px;` : ''}${style ? ` ${style}` : ''}`} data-laid-out={layout() ? '' : undefined})
   for item, index of items key={key(item)}
     .kui-masonry-item(ref={element => measure(element, key(item))} style={place(index) ? `--kui-masonry-lane: ${place(index)!.lane}; --kui-masonry-top: ${place(index)!.top}px;` : undefined} data-placed={place(index) ? '' : undefined} data-pending={place(index) && !heights().has(key(item)) ? '' : undefined})
       | {tile(item)}

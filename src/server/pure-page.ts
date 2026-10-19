@@ -41,6 +41,7 @@ export const KAY_EXPORTS: Record<string, 'free' | 'request' | 'local'> = {
   route: 'free',
   markInvalid: 'free',
   focusInvalid: 'free',
+  elementSize: 'free',
   followLog: 'free',
   guardLeave: 'free',
   shortcut: 'free',

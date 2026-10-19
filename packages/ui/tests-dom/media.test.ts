@@ -301,12 +301,14 @@ describe('Masonry and WhenVisible', () => {
   test('drops each tile into the shortest lane once the widths and heights are known', async () => {
     const root = await media()
     const masonry = root.querySelector<HTMLElement>('#masonry')!
-    const observer = Observer.made.find(made => made.observed.includes(masonry))!
     const tiles = [...masonry.querySelectorAll<HTMLElement>('.kui-masonry-item')]
+    const layout = Observer.made.find(made => made.observed.includes(masonry))!
+    const heights = Observer.made.find(made => made.observed.includes(tiles[0]!))!
 
     expect(masonry.hasAttribute('data-laid-out')).toBe(false)
 
-    observer.callback([{ target: masonry, contentRect: { width: 524 } }, ...tiles.map((tile, index) => ({ target: tile, borderBoxSize: [{ blockSize: [100, 40, 60][index] }] }))])
+    layout.callback([{ target: masonry, contentRect: { width: 524, height: 0 } }])
+    heights.callback(tiles.map((tile, index) => ({ target: tile, borderBoxSize: [{ blockSize: [100, 40, 60][index] }] })))
     await settle()
 
     expect(masonry.style.getPropertyValue('--kui-masonry-lanes')).toBe('2')
@@ -317,8 +319,8 @@ describe('Masonry and WhenVisible', () => {
   test('stops measuring a tile once it leaves', async () => {
     const root = await media()
     const masonry = root.querySelector<HTMLElement>('#masonry')!
-    const observer = Observer.made.find(made => made.observed.includes(masonry))!
     const leaving = masonry.querySelectorAll('.kui-masonry-item')[1]!
+    const observer = Observer.made.find(made => made.observed.includes(leaving))!
 
     expect(observer.observed).toContain(leaving)
 
@@ -326,7 +328,7 @@ describe('Masonry and WhenVisible', () => {
     await settle()
 
     expect(observer.observed).not.toContain(leaving)
-    expect(observer.observed).toHaveLength(3)
+    expect(observer.observed).toHaveLength(2)
   })
 
   test('asks for more once the sentinel comes into view', async () => {

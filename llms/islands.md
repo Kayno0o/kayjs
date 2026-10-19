@@ -157,6 +157,20 @@ ul(id={id} hidden={!open()})
   slot
 ```
 
+### Read an element's size
+
+`elementSize()` from `kay` gives an element's width and height as reactive values, observed for as long as the island lives:
+
+```kay
+---
+import { elementSize } from 'kay'
+
+const column = elementSize()
+---
+.relative.h-full(ref={column.ref})
+  svg(width={column.width()} height={column.height()})
+```
+
 ## Reference
 
 ### Islands
@@ -255,6 +269,13 @@ ul(id={id} hidden={!open()})
 - In production the stack arrives mapped: `kay build` keeps the browser build's source maps beside `dist`, pointed at `.kay` lines and never served, and the server maps each frame of a report with them, so `onError` reads `src/routes/cart.kay:12:7` rather than a minified chunk. A frame of a chunk with no map stays as the browser wrote it. An executable made by `kay build --compile` embeds the maps zstd-compressed and reads one when a report first needs it, and a `kay build --static` export has no server.
 - The browser sends at most 10 distinct errors per page load, leaving out another origin's scripts, whose details it hides.
 - The server takes 20 reports a minute per client, refusing another site's and any over 16 KB.
+
+### Element size
+
+- `elementSize()` from `kay`, called in an island's script, returns `{ ref, width, height }`: pass `ref` to the element as `ref={column.ref}`, and `column.width()` and `column.height()` read its content box in pixels, following every resize.
+- Both are 0 on the server and until the browser has measured the element, so the first paint of a size-dependent drawing is empty.
+- An element rendered later, as inside an `if`, is observed from then on, the one it replaces dropped; the observer goes with the island.
+- To keep the element too, a `ref` calls both: `ref={element => { box = element; size.ref(element) }}`.
 
 ### Context
 
