@@ -120,6 +120,8 @@ Kay handles this without setup. Every answer of a production server names its bu
 
 A tab with something typed in it is not reloaded under the visitor, and neither is a page that answered a form sent without JavaScript, an error page included, as the browser would ask to send it again. The next link they follow loads the new page in full instead of swapping it in. The same goes for a tab whose action call or server island was answered by the new build, once the server confirms it, as a cached answer may name an old one. An action the new build dropped reloads the tab at once.
 
+When a file fails to load but the build has not changed, as when the visitor is offline, the page still stays correct. After an action, the page loads again in full if the code that swaps pages in is missing, and an island that waits to be visible or idle hydrates at once if the code that watches for that is missing.
+
 A tab reloads once a minute at most, so a cache that keeps serving the old page cannot loop it. Static exports work the same way, with the tab reading the build off the host's page.
 
 The server's answer is believed for five seconds, so a page of cached answers costs one request. If your scripts are served from a CDN on another origin, or from a path outside `/_kay/`, the tab cannot ask for its entry file and asks for the page itself instead.

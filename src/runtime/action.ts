@@ -909,7 +909,7 @@ export async function readActionResponse<Output>(response: Response, action: str
   return (body === '' ? undefined : decodeServerValue(body)) as Output
 }
 
-// The code of `navigate()` and `refresh()`, loaded on first use; a chunk a deploy removed asks the server whether the build changed, which reloads the page, and gives undefined.
+// The code of `navigate()` and `refresh()`, loaded on first use; a chunk a deploy removed asks the server whether the build changed, which reloads the page, and gives undefined either way, for the caller to load the page whole (the same load as that reload).
 async function navigateApi(): Promise<typeof import('./navigate-api') | undefined> {
   try {
     return await import('./navigate-api')
@@ -922,12 +922,18 @@ async function navigateApi(): Promise<typeof import('./navigate-api') | undefine
 }
 
 // The page's loads again through the swap, unless the visitor or the app went elsewhere while its code loaded, as a refresh started before them would have given way to them.
+// Without the swap's code the page loads whole, so an action's effect still shows.
 async function refreshed(): Promise<void> {
   const [navigations, visits] = [navigation.navigations, navigation.visits]
   const api = await navigateApi()
 
-  if (api && navigation.navigations === navigations && navigation.visits === visits)
+  if (navigation.navigations !== navigations || navigation.visits !== visits)
+    return
+
+  if (api)
     await api.refresh()
+  else
+    location.reload()
 }
 
 // Through the swap once it took over the app's links; a site with `navigation: false` loads the page, asking the leave guards first as `navigate()` would.

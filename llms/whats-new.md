@@ -8,6 +8,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `kay check` warns (`large-public-image`) of an `img` using a public image over 256 KiB, which is sent unresized; import it from `src/` instead ([images](images.md)).
 - `kay check` points the `seo` and favicon lints of `kay.config.ts` at the key they are about (the `defineConfig` call for one that is missing), not at line 1 ([Lints](lints.md)).
 - The analytics server drops a visit to an `exclude` path too, so a tracker a browser cached for an hour counts nothing for it either ([Privacy](privacy.md)).
+- A page whose lazy runtime chunk fails to load with the build unchanged (offline, a dev server restarting) stays correct: the page an action refreshes loads in full, and an island hydrating on `visible` or `idle` hydrates at once instead of staying inert ([Production](production.md)).
 
 ## 1.56.0
 

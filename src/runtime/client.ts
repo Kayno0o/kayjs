@@ -118,7 +118,7 @@ export async function hydrateIslands(registry: IslandRegistry, root: ParentNode 
     void whenHydrating((when) => {
       when.whenVisible(element, run, true)
       when.whenIdle(run)
-    })
+    }, run)
   }
 
   for (const element of root.querySelectorAll<HTMLElement>(ISLAND)) {
@@ -129,9 +129,9 @@ export async function hydrateIslands(registry: IslandRegistry, root: ParentNode 
     const run = async () => hydrateIsland(registry, element)
 
     if (element.dataset.hydrate === 'visible')
-      void whenHydrating(when => when.whenVisible(element, run))
+      void whenHydrating(when => when.whenVisible(element, run), run)
     else if (element.dataset.hydrate === 'idle')
-      void whenHydrating(when => when.whenIdle(run))
+      void whenHydrating(when => when.whenIdle(run), run)
     else
       eager.push(run())
   }
@@ -139,18 +139,18 @@ export async function hydrateIslands(registry: IslandRegistry, root: ParentNode 
   await Promise.all(eager)
 }
 
-// Its own chunk, which only a page with an island hydrating on `visible` or `idle`, or a deferred server island, loads. One that fails to load is a missing chunk like an island's.
-async function whenHydrating(start: (when: typeof import('./hydrate-when')) => void): Promise<void> {
+// Its own chunk, which only a page with an island hydrating on `visible` or `idle`, or a deferred server island, loads. One a deploy removed asks the build, which reloads the page; one that fails with the build unchanged (offline, a dev server restarting) hydrates now, as waiting would leave the island inert.
+async function whenHydrating(start: (when: typeof import('./hydrate-when')) => void, now: () => Promise<void>): Promise<void> {
   let when: typeof import('./hydrate-when')
 
   try {
     when = await import('./hydrate-when')
   }
-  catch (error) {
-    if (await skew())
-      return
+  catch {
+    if (!await skew())
+      await now()
 
-    throw error
+    return
   }
 
   start(when)
