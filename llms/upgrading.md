@@ -15,6 +15,9 @@ A template line that starts with `pending` and nothing else is the `pending` blo
 ### A shorthand class ending in `-` takes no attribute list
 
 A `(` right after a `-` in the `.class` shorthand opens Tailwind's variable group, `.bg-(--brand)`, so `div.btn-(id="x")` reads one class where it read `btn-` and an attribute. Write the attributes after a class that does not end in `-`, or put the class in `class="..."`.
+### More kayjs-ui boxes follow `--kui-border-width`
+
+The keyline now also sizes ChipGroup's chips, IconPicker's grid, the ScatterChart plot, ImageCropper's stage, Toggle's track and Table's filter and selection bars and narrow sort buttons, which drew 1px whatever it held, so a skin that set it above `1px` sees them thicken. Nothing to change unless a skin wants them thin: no lint can recognise it.
 
 ## 1.58.0
 

@@ -184,7 +184,7 @@ export async function typecheck(root: string, tsconfig: string, shown: string | 
 }
 
 // tsgo's incremental mode does not re-check a file whose own text is unchanged when only a global declaration it reads changes, as the routes and redirects in `kay-env.d.ts` do: the build info goes when those declarations differ from the last run's.
-// A build info with no stamp beside it is kept, as one lent to a project is.
+// A build info with no stamp beside it is kept, as one lent to a project is, so the first check after an upgrade from a kay without stamps can still show a stale result.
 async function dropStaleBuildInfo(state: string, buildInfo: string, shadowDir: string): Promise<void> {
   const stampFile = Bun.file(join(state, 'declarations'))
   const names = existsSync(shadowDir) ? readdirSync(shadowDir).filter(name => APP_DECLARATIONS.test(name)).sort() : []

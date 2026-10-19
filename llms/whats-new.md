@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- kayjs-ui's keyline `--kui-border-width` also sizes chips, the icon picker's grid, the scatter plot, the image cropper's stage, toggles and the table's filter and selection bars and sort buttons ([Setup](../packages/ui/llms/setup.md)); see [Upgrading](upgrading.md).
 - `rooms()` gives `response`, a schema for the ws route that types an island `socket()`'s messages as the rooms' `Message` without a schema written for typing, and `memberOf(ws, room)`, the member a connection joined a room as ([Rooms](rooms.md)).
 - kay's analytics notice and information line take the site's look: kayjs-ui's tokens when present, else the page's colors, and `--kay-notice-*` properties restyle them ([Privacy](privacy.md)).
 - A shorthand class keeps a `.` between two digits, so `div.gap-1.5.p-0.5` reads `gap-1.5` and `p-0.5` where it split each in two, and `kay migrate astro` and `kay fmt` write such classes as shorthand ([Templates](templates.md)).

@@ -47,7 +47,7 @@ Eight colours are seeds: `canvas`, `text`, `accent`, `success`, `warning`, `info
 
 Set them on `:root` or `html`, as `@theme` does: a seed set on one element does not change the colours mixed inside it. A colour you set yourself wins over the one mixed for it. A site in one scheme writes each seed once and sets `color-scheme` on `:root` to it.
 
-`--kui-border-width` is the keyline of buttons, cards, rows, widgets, notices, avatars, toasts, dialogs, side panels, tooltips, tables, boxed sections, segmented controls, chips, toggles, chart plots and the other framed boxes. The dashed frame the image cropper draws around the crop keeps its 2px, as it has to show over any photo. It is a length: `2px`, not `2px solid red`, which it ignores. The old name, `--kui-border-card`, works until 1.61.
+`--kui-border-width` is the keyline of buttons, cards, rows, widgets, notices, avatars, toasts, dialogs, side panels, tooltips, tables, boxed sections, segmented controls, chips, toggles, chart plots and the other framed boxes. The dashed frame and the handles the image cropper draws around the crop keep their fixed borders, as they have to show over any photo. It is a length: `2px`, not `2px solid red`, which it ignores. The old name, `--kui-border-card`, works until 1.61.
 
 A few tokens shape boxes rather than colour them. A brutalist skin sets `--kui-shadow-raised` (under cards, rows, widgets and toasts), `--kui-shadow-press` (under framed buttons) and `--kui-press-travel` (how far a pressed button moves down). All three draw nothing by default.
 

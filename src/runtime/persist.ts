@@ -39,7 +39,7 @@ export const COOKIE_NAME = /^[\w!#$%&'*+.^`|~-]+$/
 // A signal kept in the query goes through `keepParam` in `./query-param` instead.
 export function keepValue<T>(key: string, storage: Exclude<PersistStorage, 'query'>, read: () => T, write: (value: T) => void, maxAge?: Duration): Persisted<T> {
   if (storage === 'cookie' && !COOKIE_NAME.test(key))
-    throw new TypeError(`kay: ${JSON.stringify(key)} cannot name a cookie; give persisted() a name of letters, digits and - _ . only`)
+    throw new TypeError(`kay: ${JSON.stringify(key)} cannot name a cookie; give persisted() a name of letters, digits and - _ .`)
 
   const seconds = maxAge === undefined ? YEAR_SECONDS : durationSeconds(maxAge, `the maxAge of persisted(${JSON.stringify(key)})`)
   const store: Store<T> = storage === 'cookie'
