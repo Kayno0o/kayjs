@@ -35,7 +35,20 @@ Every response carries a Content-Security-Policy and the headers below. Your own
 
 `security` in `kay.config.ts` changes them. `headers` merges over kay's, and a header set to `false` is not sent. `security: false` sends none of them.
 
-HSTS is not sent by default. It binds the domain to https for its whole `max-age`, which no later deploy can take back, so it is your call.
+A production site whose `site` is https also sends `Strict-Transport-Security: max-age=31536000`, so a browser that has visited once refuses plain http for a year. It does not add `includeSubDomains` or `preload`, which bind more than the site itself. Nothing is sent in development, for an http `site`, with no `site`, or with `security: false`. A proxy in front changes nothing, since browsers ignore the header over http.
+
+To turn it off, set it to `false`. To send your own value, give one:
+
+```ts
+export default defineConfig({
+  site: 'https://example.com',
+  security: {
+    headers: { 'strict-transport-security': 'max-age=63072000; includeSubDomains' },
+  },
+})
+```
+
+A static export writes no headers file, so the `nginx.conf` of the starter container sends the header. If you serve the export with another server, set it there.
 
 ## Content-Security-Policy
 

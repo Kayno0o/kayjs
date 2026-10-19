@@ -13,6 +13,8 @@ export interface SecurityOptions {
   security?: SecurityConfig | false | undefined
   prefetch?: Prefetch | undefined
   dev?: boolean | undefined
+  // The origin the site is public at: HSTS is sent when it is https.
+  site?: string | undefined
   base?: string | undefined
   offline?: KayConfig['offline'] | undefined
   lateStyles?: KayConfig['lateStyles'] | undefined
@@ -55,6 +57,9 @@ const FALLBACKS: Record<string, string[]> = {
 }
 const FETCH_DIRECTIVE = /-src(?:-elem|-attr)?$/
 
+// A year, with neither `includeSubDomains` nor `preload`, which bind more than the site itself and which no later deploy takes back.
+const HSTS = 'max-age=31536000'
+
 const HEADERS: Record<string, string> = {
   'x-content-type-options': 'nosniff',
   'referrer-policy': 'strict-origin-when-cross-origin',
@@ -79,6 +84,11 @@ export function securityHeaders(options: SecurityOptions, pages: PageSecurity[] 
     return pageHeaders.length > 0 ? withHeaders({}, pageHeaders) : undefined
 
   const headers: Record<string, string> = { ...HEADERS }
+
+  // Browsers ignore it over http, so a proxy terminating TLS needs no special case; development stays free of it so localhost is not pinned to https.
+  if (options.dev !== true && URL.parse(options.site ?? '')?.protocol === 'https:')
+    headers['strict-transport-security'] = HSTS
+
   const { csp, reports, reportOnly } = options.security ?? {}
   const base = basePath(options.base)
   const hashes = [...inlineScriptHashes({ prefetch: options.prefetch, dev: options.dev, base, offline: offlineOf(options, { dev: options.dev === true }), lateStyles: options.lateStyles }), ...(options.scripts ?? []).map(sourceHash)]

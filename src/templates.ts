@@ -618,6 +618,7 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
   root /usr/share/nginx/html;
   gzip_static on;
   gzip_vary on;
+  add_header Strict-Transport-Security "max-age=31536000" always;
 
   location /_kay/ {
     add_header Cache-Control "public, max-age=31536000, immutable";

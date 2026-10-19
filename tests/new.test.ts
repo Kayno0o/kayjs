@@ -800,8 +800,11 @@ describe('kay new', () => {
         expect({ features, ...unresolved(contents) }).toEqual({ features, paths: [], undeclared: [], unused: [], scripts: [] })
         expect({ features, changed: (await formatFiles([join(dir, 'src')], { write: false })).changed }).toEqual({ features, changed: [] })
 
-        if (variant.has('docker') && !variant.has('server'))
+        if (variant.has('docker') && !variant.has('server')) {
+          // A static export writes no headers file, so the container's nginx sends HSTS for a site published at https.
+          expect({ features, hsts: contents['nginx.conf']!.includes('add_header Strict-Transport-Security "max-age=31536000" always;') }).toEqual({ features, hsts: true })
           expect({ features, notFound: contents['nginx.conf']!.includes('error_page 404 /404.html') }).toEqual({ features, notFound: variant.has('starter') })
+        }
       }
       finally {
         await rm(join(dir, '..'), { recursive: true, force: true })

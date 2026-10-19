@@ -109,6 +109,51 @@ describe('security headers', () => {
     }
   })
 
+  it('sends a year of HSTS for a production site at https, and nothing for dev, http, no site or security: false', async () => {
+    const hsts = (options: Parameters<typeof securityHeaders>[0], pages: Parameters<typeof securityHeaders>[1] = []) => securityHeaders(options, pages)?.['strict-transport-security']
+
+    expect(hsts({ site: 'https://shop.example' })).toBe('max-age=31536000')
+    expect(hsts({ site: 'https://shop.example/docs', base: '/docs' })).toBe('max-age=31536000')
+    expect(hsts({ site: 'HTTPS://shop.example' })).toBe('max-age=31536000')
+    expect(hsts({ site: 'https://shop.example', dev: true })).toBeUndefined()
+    expect(hsts({ site: 'http://shop.example' })).toBeUndefined()
+    expect(hsts({ site: 'http://localhost:3000' })).toBeUndefined()
+    expect(hsts({})).toBeUndefined()
+    expect(hsts({ site: 'not a url' })).toBeUndefined()
+    expect(hsts({ site: 'https://shop.example', security: false })).toBeUndefined()
+    // The header is kept to the year only: no includeSubDomains, no preload.
+    expect(hsts({ site: 'https://shop.example' })).not.toMatch(/includeSubDomains|preload/i)
+  })
+
+  it('lets the app turn HSTS off or set its own value, as a page can', () => {
+    const site = 'https://shop.example'
+
+    expect(securityHeaders({ site, security: { headers: { 'strict-transport-security': false } } })!['strict-transport-security']).toBeUndefined()
+    expect(securityHeaders({ site, security: { headers: { 'Strict-Transport-Security': 'max-age=63072000; includeSubDomains' } } })!['strict-transport-security']).toBe('max-age=63072000; includeSubDomains')
+    expect(securityHeaders({ site, security: { headers: { 'strict-transport-security': 'max-age=0' } } })!['strict-transport-security']).toBe('max-age=0')
+    expect(securityHeaders({ site }, [{ headers: { 'strict-transport-security': false } }])!['strict-transport-security']).toBeUndefined()
+    expect(securityHeaders({ site }, [{ headers: { 'strict-transport-security': 'max-age=60' } }])!['strict-transport-security']).toBe('max-age=60')
+    expect(securityHeaders({ security: false }, [{ headers: { 'strict-transport-security': 'max-age=60' } }])).toEqual({ 'strict-transport-security': 'max-age=60' })
+  })
+
+  it('sends HSTS on every kind of response of a production https site, behind a proxy too', async () => {
+    const answer = async (config: { site?: string, dev?: boolean, proxy?: boolean, security?: false }, path: string, headers: Record<string, string> = {}) => {
+      const app = new Elysia().get('/api/ping', () => 'pong').get('/redirect', ({ redirect }) => redirect('/elsewhere')).use(await pages({ routes: ROUTES, prebuilt: false, ...config }))
+
+      return (await app.handle(new Request(`http://localhost${path}`, { headers }))).headers.get('strict-transport-security')
+    }
+    const https = { site: 'https://shop.example', dev: false }
+
+    for (const path of ['/about', '/api/ping', '/redirect', '/no-such-page', '/sitemap-missing'])
+      expect(await answer(https, path)).toBe('max-age=31536000')
+
+    expect(await answer({ ...https, proxy: true }, '/about', { 'x-forwarded-proto': 'http', 'x-forwarded-for': '203.0.113.9' })).toBe('max-age=31536000')
+    expect(await answer({ ...https, dev: true }, '/about')).toBeNull()
+    expect(await answer({ site: 'http://shop.example', dev: false }, '/about')).toBeNull()
+    expect(await answer({ dev: false }, '/about')).toBeNull()
+    expect(await answer({ ...https, security: false }, '/about')).toBeNull()
+  })
+
   it('adds what the islands run to the app\'s own directives, unless it removes one or sets it to none', () => {
     const islands = { 'script-src': ['\'wasm-unsafe-eval\''], 'worker-src': ['\'self\'', 'blob:'] }
     const own = securityHeaders({ islands, security: { csp: { 'script-src': ['\'self\'', 'https://cdn.example.com'], 'worker-src': false }, reportOnly: { 'worker-src': ['\'none\''] } } })!
