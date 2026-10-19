@@ -624,7 +624,7 @@ describe.concurrent('kay dev', () => {
       await stop()
       expect(childrenRunning(realpathSync(root), 'preload.ts')).toHaveLength(0)
       expect(lines.filter(line => line.includes('process building the client exited'))).toHaveLength(1)
-      expect(written.join('').match(/error: builder boom/g), written.join('')).toHaveLength(1)
+      expect(written.join('').match(/^error: builder boom$/gm), written.join('')).toHaveLength(1)
     }
     finally {
       await stop?.()
