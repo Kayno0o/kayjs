@@ -26,7 +26,7 @@ What each minor release before 1.53 broke, and what an app changed to move to it
 ### `kay new --host` is `--forge`, and `kay/test`'s `mount` is `mountComponent`
 
 - `kay new --host forgejo|github` is now `--forge`, as `kay dev --host` is an address; `--host` still works for now and warns. A script calling `kay new` renames the flag. No `deprecated` lint is possible, as a command line is no code `kay check` reads.
-- `mount(file, props)` from `kay/test` is now `mountComponent`, so it no longer shares its name with `kay/mount`'s `mount`; the old name still works for now. `kay check` reports it as `deprecated-test-mount`, and `kay check --fix` (or `kay upgrade`) renames the import.
+- `kay/test`'s `mount(file, props)` is now `mountComponent`, so it no longer shares its name with `kay/mount`'s `mount`; the old name was removed in 1.56 with its lint `deprecated-test-mount`: run `kay upgrade` on 1.55 first.
 
 ### kayjs-auth: `discordProvider({ apiBase })` is `url`
 

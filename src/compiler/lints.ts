@@ -344,15 +344,6 @@ export const LINTS = {
     wrong: 'analytics({ provider: \'fathom\', siteId: \'ABCDEFGH\', info: { text: \'Counting\' } })',
     right: 'analytics({ provider: \'fathom\', siteId: \'ABCDEFGH\', consent: false, info: { text: \'Counting\' } })',
   },
-  'deprecated-test-mount': {
-    level: 'warn',
-    group: 'deprecated',
-    since: '1.52',
-    site: true,
-    summary: '`mount` imported from `kay/test` (statically, through `await import(\'kay/test\')` or re-exported), which is `mountComponent` since 1.52, as `kay/mount` has a `mount` of its own that renders another thing: `mount` from `kay/test` still works for now. The fix imports `mountComponent` under the name the file already uses.',
-    wrong: 'import { mount, settle } from \'kay/test\'',
-    right: 'import { mountComponent, settle } from \'kay/test\'',
-  },
   'deprecated-ui-prop': {
     level: 'warn',
     group: 'deprecated',

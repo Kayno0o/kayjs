@@ -47,7 +47,7 @@ export { browse, browserPath } from './browser'
 export type { CookieJar } from './cookies'
 export { cookieJar } from './cookies'
 export type { Mounted } from './mount'
-export { mount, mountComponent, readPersisted, settle, writePersisted } from './mount'
+export { mountComponent, readPersisted, settle, writePersisted } from './mount'
 export type { Found, PageReading } from './page'
 export { scratchDir } from './scratch'
 export { solveWork }

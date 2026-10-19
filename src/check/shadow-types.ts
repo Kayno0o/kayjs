@@ -36,7 +36,6 @@ import { unguardedRoutes, unguardedTools } from './guards'
 import { islandOnlyComponents } from './island-only'
 import { mcpRoutes } from './mcp-routes'
 import { compileShadow, layoutQueries, matcherSource, pageRoute, serializeShadowSettings, SHADOW_SETTINGS, shadowPath } from './shadow'
-import { testMounts } from './test-mount'
 import { typingOptions } from './tsgo'
 
 // Imports each page of the extensions kay check reports as the app's own, so TypeScript checks them.
@@ -109,7 +108,7 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
   const libraries = await libraryShadows(root, options, own.files, tree, mounts)
 
   await tree.write('kay-env.d.ts', await environmentTypes(root, options, served))
-  problems.push(...redirectChecks(root, options, served), ...await unguardedRoutes(options, served), ...await unguardedTools(options, served), ...await mcpRoutes(options, served), ...await testMounts(root, options), ...await analyticsConsent(root, options), ...await analyticsInfo(root, options))
+  problems.push(...redirectChecks(root, options, served), ...await unguardedRoutes(options, served), ...await unguardedTools(options, served), ...await mcpRoutes(options, served), ...await analyticsConsent(root, options), ...await analyticsInfo(root, options))
   // A script rather than a module, which is what lets it declare a wildcard module.
   await tree.write('kay-assets.d.ts', ASSET_TYPES)
   await tree.write('kay-icons.d.ts', iconTypes(root))

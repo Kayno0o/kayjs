@@ -88,10 +88,6 @@ export async function mountComponent(file: string, props: Record<string, unknown
   } }
 }
 
-// What `mountComponent` was called before 1.52: `kay/mount` has a `mount` of its own, which renders another thing. `kay check` reports it as `deprecated-test-mount`.
-/** @deprecated Renamed `mountComponent`. */
-export const mount = mountComponent
-
 // The bundle shares what the test process vouched for, such as an icon the test builds, as an island shares it with the page; its own copy would vouch for nothing.
 const sharedMarks: Bun.BunPlugin = {
   name: 'kay-shared-marks',
