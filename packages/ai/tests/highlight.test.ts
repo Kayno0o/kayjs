@@ -142,6 +142,26 @@ describe('highlighting', () => {
     expect(scanFences(`${text}\`\`\`py\nb\n\`\`\``, end).blocks.map(block => block.language)).toEqual(['py'])
   })
 
+  it('keeps a list\'s indent across a resume', async () => {
+    const first = '10. item\n    ```ts\n    a\n    ```\n'
+    const second = `${first}       \`\`\`py\n       b\n       \`\`\`\n`
+    const { end, listIndent } = scanFences(first, 0)
+
+    expect(listIndent).toBe(4)
+    expect(scanFences(second, end, listIndent).blocks.map(block => block.language)).toEqual(['py'])
+    expect(scanFences(second, end).blocks).toEqual([])
+
+    const next = highlighting(async () => upper)
+
+    expect(await next(first)).toHaveLength(1)
+    expect(await next(second)).toHaveLength(1)
+  })
+
+  it('reads a list marker followed by 5 spaces and a fence as indented code', () => {
+    expect(closedFences('-     ```ts\n      a\n      ```\n')).toEqual([])
+    expect(closedFences('-    ```ts\n     a\n     ```\n')).toHaveLength(1)
+  })
+
   it('leaves the blocks plain, logging once, when the highlighter cannot be loaded', async () => {
     let loads = 0
     const next = highlighting(async () => {

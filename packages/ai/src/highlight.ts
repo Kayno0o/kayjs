@@ -35,19 +35,20 @@ const columns = (indent: string) => indent.replaceAll('\t', '    ').length
 interface Fence { source: string, language: string | undefined }
 
 // Scans a Markdown text from a line's start for the fenced blocks that have their closing fence, with where to resume: a fence still open at the end is left out, as it is still being written.
-export function scanFences(text: string, from: number): { blocks: Fence[], end: number } {
+export function scanFences(text: string, from: number, indent = 0): { blocks: Fence[], end: number, listIndent: number } {
   const blocks: Fence[] = []
   let open: { marker: string, start: number, language: string | undefined } | undefined
   let end = from
-  let listIndent = 0
+  let endIndent = indent
+  let listIndent = indent
   let at = from
 
   while (at <= text.length) {
     const next = text.indexOf('\n', at)
     const line = text.slice(at, next === -1 ? text.length : next)
     const match = FENCE.exec(line)
-    // A fence indented 4 columns or more past its container is code, not a fence.
-    const fence = match !== null && columns(match[2]!) <= 3 + listIndent ? match : null
+    // A fence indented 4 columns or more past its container is code, not a fence, and so is one after a list marker and 5 spaces or more.
+    const fence = match !== null && columns(match[2]!) <= 3 + listIndent && (match[3] === undefined || columns(match[4]!) <= 4) ? match : null
     const info = fence ? line.slice(fence[0].length) : ''
 
     if (open === undefined) {
@@ -71,6 +72,7 @@ export function scanFences(text: string, from: number): { blocks: Fence[], end: 
       blocks.push({ source: text.slice(open.start, at + line.length), language: open.language })
       open = undefined
       end = at + line.length
+      endIndent = listIndent
     }
 
     if (next === -1)
@@ -79,7 +81,7 @@ export function scanFences(text: string, from: number): { blocks: Fence[], end: 
     at = next + 1
   }
 
-  return { blocks, end }
+  return { blocks, end, listIndent: endIndent }
 }
 
 // The fenced blocks of a Markdown text that have their closing fence, as the lines they span with the language of their info string.
@@ -131,6 +133,7 @@ async function resolveOnce(resolve: () => Promise<Highlighter | undefined>): Pro
 // Reads the blocks of a reply being written that were closed since the last call, highlighted with the app's own highlighter (`markdown.highlight` in `kay.config.ts`), each with the markup the chat renders it as, to swap it for. A block is highlighted once, and each call scans only what follows the last closed block, so the text must only grow; with no highlighter, nothing is.
 export function highlighting(resolve: () => Promise<Highlighter | undefined> = configuredHighlighter): (text: string) => Promise<CodeBlock[]> {
   let resumeAt = 0
+  let resumeIndent = 0
   let highlight: Promise<Highlighter | undefined> | undefined
 
   return async (text) => {
@@ -144,9 +147,10 @@ export function highlighting(resolve: () => Promise<Highlighter | undefined> = c
     if (found === undefined)
       return []
 
-    const { blocks, end } = scanFences(text, resumeAt)
+    const { blocks, end, listIndent } = scanFences(text, resumeAt, resumeIndent)
 
     resumeAt = end
+    resumeIndent = listIndent
 
     return (await Promise.all(blocks.slice(0, MAX_BLOCKS).map(async ({ source, language }) => render(source, language, found)))).filter(block => block !== undefined)
   }
