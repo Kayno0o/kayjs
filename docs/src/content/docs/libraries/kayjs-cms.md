@@ -49,6 +49,15 @@ In edit mode, kay renders the editor at the end of every page, with the entries 
 
 Once there is a guard, every save needs it, edit mode included, as an edit cookie or link is tied to no user. With a guard, `author` names who a save is committed as, such as the signed-in user.
 
+Without `author`, the forge commits as the account behind its token, so no editor's name or email reaches git. Give `author` the real name and email only when the editors agree to appear in the history: a commit cannot be erased from it later, so a request to delete someone's data (RGPD art. 17) cannot reach their name there. A pseudonym keeps the history useful and the editor private:
+
+```ts
+author: async ({ locals }) => {
+  const user = await locals.auth.user()
+  return user && { name: `Editor ${user.id}`, email: `${user.id}@users.noreply.example.com` }
+}
+```
+
 ## Collection titles
 
 The screens title a collection with its export's name, humanized: `blogPosts` shows as "Blog posts". A collection can say its own title with the `title` option, which suits a site that is not in English:

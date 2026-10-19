@@ -71,6 +71,15 @@ describe('the API guard', () => {
     expect(await admitted(ctx)).toBe(true)
     expect(authors.get(ctx.request)).toEqual(ada)
   })
+
+  test('names no author unless the app gives one, so the forge commits as its own account', async () => {
+    configure({ guard: () => undefined })
+
+    const ctx = context('POST', '/entries/posts/hello', false)
+
+    expect(await admitted(ctx)).toBe(true)
+    expect(authors.get(ctx.request)).toBeUndefined()
+  })
 })
 
 describe('a guard loaded lazily', () => {
