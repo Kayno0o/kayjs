@@ -146,17 +146,49 @@ inBrowser('FormField in an island', () => {
 
     await using page = await site.open('/borders')
 
-    const widths = async (css: string): Promise<Record<string, number>> => page.evaluate((style: string) => {
+    // Each box with the sides it draws, in the order top, right, bottom, left; the others stay 0. A button draws its keyline in ::before.
+    const boxes: Record<string, [selector: string, sides: string]> = {
+      card: ['#card', 'trbl'],
+      head: ['#card-head', 'b'],
+      row: ['#row', 'trbl'],
+      widget: ['#widget', 'trbl'],
+      notice: ['#notice', 'trbl'],
+      avatar: ['#avatar', 'trbl'],
+      button: ['#button::before', 'trbl'],
+      sidePanel: ['#side-panel', 'l'],
+      tooltip: ['#tooltip', 'trbl'],
+      tableWrap: ['#table-wrap', 'trbl'],
+      section: ['#section', 'trbl'],
+      saveBar: ['#save-bar', 'trbl'],
+      segmented: ['#segmented', 'trbl'],
+      fileDrop: ['#file-drop', 'trbl'],
+      step: ['#step', 'trbl'],
+      chartTooltip: ['#chart-tooltip', 'trbl'],
+      chipLabel: ['#chip-label', 'trbl'],
+      iconGrid: ['#icon-grid', 'trbl'],
+      scatterPlot: ['#scatter-plot', 'trbl'],
+      cropperStage: ['#cropper-stage', 'trbl'],
+      toggle: ['#toggle', 'trbl'],
+      tableFilter: ['#table-filter', 'b'],
+      tableSelection: ['#table-selection', 'b'],
+      narrowHead: ['#narrow-head', 'b'],
+      sortButton: ['#sort-btn', 'trbl'],
+      // The page is narrower than the desktop breakpoint, where the open list is a box of its own.
+      siteNavList: ['#site-nav-list', 'trbl'],
+    }
+
+    const widths = async (css: string): Promise<Record<string, number[]>> => page.evaluate((style: string, spec: typeof boxes) => {
       document.documentElement.setAttribute('style', style)
 
-      const width = (selector: string, side = 'Top') => Number.parseFloat(getComputedStyle(document.querySelector(selector)!)[`border${side}Width` as 'borderTopWidth'])
-      // A button draws its keyline in ::before.
-      const button = Number.parseFloat(getComputedStyle(document.querySelector('#button')!, '::before').borderTopWidth)
+      return Object.fromEntries(Object.entries(spec).map(([name, [selector]]) => {
+        const [id, pseudo] = selector.split('::')
+        const computed = getComputedStyle(document.querySelector(id!)!, pseudo ? `::${pseudo}` : null)
 
-      return { card: width('#card'), head: width('#card-head', 'Bottom'), row: width('#row'), widget: width('#widget'), notice: width('#notice'), avatar: width('#avatar'), button, sidePanel: width('#side-panel', 'Left'), tooltip: width('#tooltip'), tableWrap: width('#table-wrap'), section: width('#section'), saveBar: width('#save-bar'), segmented: width('#segmented'), fileDrop: width('#file-drop'), step: width('#step'), chartTooltip: width('#chart-tooltip') }
-    }, css)
+        return [name, [computed.borderTopWidth, computed.borderRightWidth, computed.borderBottomWidth, computed.borderLeftWidth].map(Number.parseFloat)]
+      }))
+    }, css, boxes)
 
-    const all = (value: number) => Object.fromEntries(['card', 'head', 'row', 'widget', 'notice', 'avatar', 'button', 'sidePanel', 'tooltip', 'tableWrap', 'section', 'saveBar', 'segmented', 'fileDrop', 'step', 'chartTooltip'].map(name => [name, value]))
+    const all = (value: number) => Object.fromEntries(Object.entries(boxes).map(([name, [, sides]]) => [name, [...'trbl'].map(side => sides.includes(side) ? value : 0)]))
 
     expect(await widths('')).toEqual(all(1))
     expect(await widths('--kui-border-width: 2px')).toEqual(all(2))

@@ -19,3 +19,19 @@ main
   div#file-drop.kui-file-drop drop
   div#step.kui-pagination-step step
   div#chart-tooltip.kui-line-chart-tooltip chart
+  span#chip-label.kui-chip-label chip
+  ul#icon-grid.kui-icon-grid
+  div#scatter-plot.kui-scatter-chart-plot plot
+  div#cropper-stage.kui-image-cropper-stage stage
+  span#toggle.kui-toggle-track
+  div#table-filter.kui-table-filter filter
+  div#table-selection.kui-table-selection selected
+  div#narrow-table.kui-table-wrap(data-narrow="stack" style="width: 15rem")
+    table.kui-table
+      thead
+        tr#narrow-head
+          th.kui-table-head-cell
+            button#sort-btn.kui-table-sort-btn(type="button") sort
+  nav.kui-site-nav(data-open)
+    ul#site-nav-list.kui-site-nav-list
+      li.kui-site-nav-link link

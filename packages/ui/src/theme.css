@@ -58,7 +58,7 @@
   --spacing-kui-card: 0.625rem;
   --spacing-kui-inline: 0.3125rem;
   --spacing-kui-section: 0.875rem;
-  /* The keyline of every framed box, a length: buttons, cards, card rows, widgets, notices, avatars, toasts, dialogs, side panels, tooltips, tables, boxed sections, save bars, segmented controls, file drops, pagination steps, the site nav and chart tooltips, the palette and popovers. The old name --kui-border-card still sets it. A value that is no length, such as a `2px solid red` shorthand, leaves it at 1px. */
+  /* The keyline of every framed box, a length: buttons, cards, card rows, widgets, notices, avatars, toasts, dialogs, side panels, tooltips, tables, boxed sections, save bars, segmented controls, file drops, pagination steps, the site nav, chart tooltips, chips, the icon grid, the scatter plot, the crop stage, toggles, the table's filter and selection bars and sort buttons, the palette and popovers. The old name --kui-border-card still sets it. A value that is no length, such as a `2px solid red` shorthand, leaves it at 1px. */
   --kui-border-width: var(--kui-border-card);
   --kui-border-card: 1px;
   --kui-border-input: 1px;
@@ -595,7 +595,7 @@
   }
 
   .kui-chip-label {
-    @apply inline-flex items-center gap-1 border border-kui-surface2 bg-kui-surface0 px-2.5 py-1 text-xs text-kui-subtext0 transition-colors hover:text-kui-text;
+    @apply inline-flex items-center gap-1 border-solid border-(length:--kui-border-width) border-kui-surface2 bg-kui-surface0 px-2.5 py-1 text-xs text-kui-subtext0 transition-colors hover:text-kui-text;
   }
 
   :where(.kui-chip-input:checked) + .kui-chip-label {
@@ -806,7 +806,7 @@
   }
 
   .kui-icon-grid {
-    @apply grid max-h-48 grid-cols-8 gap-1 overflow-y-auto border border-kui-surface2 bg-kui-mantle p-2;
+    @apply grid max-h-48 grid-cols-8 gap-1 overflow-y-auto border-solid border-(length:--kui-border-width) border-kui-surface2 bg-kui-mantle p-2;
   }
 
   .kui-icon-grid-option {
@@ -1374,7 +1374,7 @@
 
   /* Tick labels hang outside the plot, into the margin it keeps for them. */
   .kui-scatter-chart-plot {
-    @apply relative col-start-2 mb-5 ml-8 border border-kui-surface2;
+    @apply relative col-start-2 mb-5 ml-8 border-solid border-(length:--kui-border-width) border-kui-surface2;
     height: var(--kui-scatter-chart-height, 18rem);
   }
 
@@ -1485,7 +1485,7 @@
   }
 
   .kui-image-cropper-stage {
-    @apply relative cursor-crosshair touch-none overflow-hidden border border-kui-surface2 select-none;
+    @apply relative cursor-crosshair touch-none overflow-hidden border-solid border-(length:--kui-border-width) border-kui-surface2 select-none;
   }
 
   .kui-image-cropper-image {
@@ -1781,7 +1781,7 @@
 
   /* Sticky, so it stays in view while a wide table scrolls under it. */
   .kui-table-filter {
-    @apply sticky left-0 flex items-center gap-2 border-b border-kui-surface2 px-3 py-2;
+    @apply sticky left-0 flex items-center gap-2 border-solid border-b-(length:--kui-border-width) border-kui-surface2 px-3 py-2;
   }
 
   .kui-table-filter-input {
@@ -1794,7 +1794,7 @@
 
   /* Sticky like the filter; the bulk actions sit beside the count. */
   .kui-table-selection {
-    @apply sticky left-0 flex flex-wrap items-center gap-3 border-b border-kui-surface2 px-3 py-2 text-sm;
+    @apply sticky left-0 flex flex-wrap items-center gap-3 border-solid border-b-(length:--kui-border-width) border-kui-surface2 px-3 py-2 text-sm;
   }
 
   /* The box is 1rem, so its label grows to the 1.5rem a finger needs. */
@@ -1903,7 +1903,7 @@
     }
 
     .kui-table :where(thead tr) {
-      @apply flex flex-wrap gap-2 border-b border-kui-surface2 px-3 py-2;
+      @apply flex flex-wrap gap-2 border-solid border-b-(length:--kui-border-width) border-kui-surface2 px-3 py-2;
     }
 
     .kui-table :where(thead:not(:has(.kui-table-sort-btn))) {
@@ -1919,7 +1919,7 @@
     }
 
     .kui-table-sort-btn {
-      @apply min-h-8 border border-kui-surface2 px-2 py-0.5;
+      @apply min-h-8 border-solid border-(length:--kui-border-width) border-kui-surface2 px-2 py-0.5;
     }
 
     .kui-table-row {
@@ -2042,7 +2042,7 @@
   }
 
   .kui-toggle-track {
-    @apply relative inline-flex h-5 w-9 shrink-0 items-center border border-kui-field-border bg-kui-surface0 transition-colors;
+    @apply relative inline-flex h-5 w-9 shrink-0 items-center border-solid border-(length:--kui-border-width) border-kui-field-border bg-kui-surface0 transition-colors;
 
     &::before {
       content: '';
