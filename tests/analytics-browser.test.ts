@@ -566,21 +566,83 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a notice t
   })
 
   it('asks again on the next ask, and a click\'s opener survives the automatic one', async () => {
-    await Bun.sleep(300)
-    expect(await opened.count('section[aria-labelledby]')).toBe(0)
-    expect(await opened.count('script[src$="/notice.js"]')).toBe(0)
+    // The failed fetch of the first ask has removed its script once the server saw the request and the page has no notice script left.
+    const requested = () => failures <= 0
 
+    for (let tries = 0; tries < 100 && !requested(); tries++)
+      await Bun.sleep(25)
+
+    expect(requested()).toBe(true)
+
+    await opened.waitUntil(() => document.querySelector('script[src$="/notice.js"]') === null)
+    expect(await opened.count('section[aria-labelledby]')).toBe(0)
+
+    // The click and an automatic ask come in one task, before the notice script of the click has loaded.
     await opened.evaluate(() => {
       const link = document.createElement('button')
 
       link.setAttribute('data-analytics-consent', '')
       link.id = 'settings'
       document.body.append(link)
+      link.click();
+      (window as unknown as { kayAnalytics: { ask: () => void } }).kayAnalytics.ask()
     })
-    await opened.click('#settings')
     await opened.waitFor('section[aria-labelledby] button')
 
     expect(await opened.evaluate(() => document.activeElement?.textContent)).toBe('Agree')
+    await opened.click('section[aria-labelledby] button:first-of-type')
+    await opened.waitUntil(() => document.querySelector('section[aria-labelledby]') === null)
+
+    expect(await opened.evaluate(() => document.activeElement?.id)).toBe('settings')
+  })
+})
+
+describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a tracker tag carrying a nonce, in a browser', () => {
+  let nonced: TestSite
+  let opened: TestPage
+
+  beforeAll(async () => {
+    before = process.env.NODE_ENV
+    process.env.NODE_ENV = 'production'
+    provider = fakeProvider()
+    received.length = 0
+    nonced = await testSite({
+      routes: 'tests/fixtures/navigation/src/routes',
+      browser: { path },
+      onError: () => undefined,
+      use: [new Elysia().mapResponse({ as: 'global' }, async ({ responseValue }) => {
+        if (!(responseValue instanceof Response) || !(responseValue.headers.get('content-type') ?? '').includes('text/html'))
+          return undefined
+
+        const headers = new Headers(responseValue.headers)
+
+        headers.delete('content-length')
+
+        return new Response((await responseValue.text()).replace(/<script (?=[^>]*analytics\.js)/, '<script nonce="n0nce" '), { status: responseValue.status, headers })
+      })],
+      extensions: [analytics({ provider: 'custom', script: `http://localhost:${provider.port}/script.js`, endpoint: `http://localhost:${provider.port}/collect`, consent: true })],
+    })
+    opened = await nonced.open('/')
+  }, 60_000)
+
+  afterAll(async () => {
+    await nonced?.close()
+    await provider?.stop(true)
+    restoreEnvironment(before)
+  })
+
+  it('copies the nonce to the notice and to the provider\'s script', async () => {
+    await opened.waitFor('section[aria-labelledby] button')
+
+    const nonceOf = async (selector: string) => opened.evaluate(find => document.querySelector<HTMLScriptElement>(find)?.nonce, selector)
+
+    expect(await nonceOf('script[src$="/_kay/analytics.js"]')).toBe('n0nce')
+    expect(await nonceOf('script[src$="/notice.js"]')).toBe('n0nce')
+
+    await opened.click('section[aria-labelledby] button:first-of-type')
+    await visits(1)
+
+    expect(await nonceOf('script[src$="/_kay/analytics/script.js"]')).toBe('n0nce')
   })
 })
 

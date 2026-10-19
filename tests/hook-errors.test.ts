@@ -200,21 +200,49 @@ describe('an onRequest hook that throws', () => {
     }
   })
 
-  it('still hands a route a malformed body it never reads, with the locals carried to the error page', async () => {
-    const own = await scratchDir('hook-errors-body-')
+  // The handler's source is what Elysia reads to see whether it wants the body, so the same request goes through the handler as a minifier writes it too.
+  describe.each(['as written', 'minified'])('a route handed a malformed body it never reads, %s', (form) => {
+    it('still gets it, with the locals carried to the error page', async () => {
+      const own = await scratchDir('hook-errors-body-')
 
-    try {
-      await Bun.write(join(own, 'routes/index.kay'), 'p Home\n')
+      try {
+        await Bun.write(join(own, 'routes/index.kay'), 'p Home\n')
 
-      const kay = await pages({ routes: join(own, 'routes'), prebuilt: false, dev: false, log: false })
-      const app = new Elysia().use(kay).post('/p', async ({ request }) => request.text())
-      const answer = await app.handle(new NativeRequest('http://localhost/p', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{bad' }))
+        const kay = await pages({ routes: join(own, 'routes'), prebuilt: false, dev: false, log: false })
+        const base = form === 'minified' ? new Elysia() : new Elysia().use(kay)
 
-      expect([answer.status, await answer.text()]).toEqual([200, '{bad'])
-    }
-    finally {
-      await rm(own, { recursive: true, force: true })
-    }
+        if (form === 'minified') {
+          const built = await Bun.build({
+            entrypoints: [join(import.meta.dir, '../src/server/uncaught.ts')],
+            minify: true,
+            target: 'bun',
+            outdir: join(own, 'minified'),
+            // Its imports stay the checkout's own files, so only the handler is rewritten.
+            plugins: [{
+              name: 'checkout-imports',
+              setup(build) {
+                build.onResolve({ filter: /^\./ }, ({ path, importer }) => ({ path: join(importer, '..', path.endsWith('.ts') ? path : `${path}.ts`), external: true }))
+              },
+            }],
+          })
+
+          expect(built.success).toBe(true)
+
+          const { answerUncaught } = await import(built.outputs[0]!.path) as typeof import('../src/server/uncaught')
+
+          answerUncaught(base, { dev: false, onError: undefined, page: async () => new Response('page') })
+        }
+
+        const app = base.post('/p', async ({ request }) => request.text())
+
+        const answer = await app.handle(new NativeRequest('http://localhost/p', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{bad' }))
+
+        expect([answer.status, await answer.text()]).toEqual([200, '{bad'])
+      }
+      finally {
+        await rm(own, { recursive: true, force: true })
+      }
+    })
   })
 
   it('falls back to plain text when the error page throws itself', async () => {
