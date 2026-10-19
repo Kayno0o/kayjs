@@ -118,7 +118,7 @@ export function session<Data extends object = SessionData>(options: SessionOptio
     throw new KayError('config-invalid', `kay: the session secret is the placeholder an older \`kay new\` wrote to .env.example, which anyone can read; generate one with ${GENERATE_SECRET}`)
 
   if (!options.store && process.env.NODE_ENV === 'production')
-    kayLog('warn', `a session kept in its ${options.cookie ?? 'session'} cookie alone, with no store, cannot be revoked: signing out only clears the browser's cookie, and a copy taken before stays valid until it expires; give session() a store, such as sqliteStore('data/sessions.sqlite'), to end sessions on the server`)
+    kayLog('warn', `a session kept in its ${options.cookie ?? 'session'} cookie alone, with no store, cannot be revoked by the session itself: signing out only clears the browser's cookie, and a copy taken before stays valid until it expires unless the app ends it elsewhere; give session() a store, such as sqliteStore('data/sessions.sqlite'), to end sessions on the server`)
 
   const keys = secrets.map(secret => nodeCrypto().createHash('sha256').update(secret).digest())
 
