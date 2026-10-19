@@ -3,6 +3,7 @@ import type { SizeReport } from '../build/report'
 import type { StyleUses, UnresolvedClass } from '../build/style-uses'
 import type { Node } from '../build/supports'
 import type { ServerIslandMode } from '../runtime/html'
+import type { FixedText } from './compress'
 import { rm } from 'node:fs/promises'
 import { join, relative, resolve } from 'node:path'
 import { version } from '../../package.json'
@@ -99,6 +100,8 @@ export interface ClientBuild extends Omit<ClientManifest, 'styles' | 'pages' | '
   pageStyles?: Map<string, PageStyles> | undefined
   // The text each stylesheet URL is written into heads as, for those a page may inline.
   inlineStyles?: Map<string, string> | undefined
+  // Set once the server compresses pages under no mount point: the inline stylesheets as the compression holds them, which a page's body is cut around.
+  fixedStyles?: FixedText[] | undefined
   // Without `inlineStyles` set, how many bytes each of them compresses to: a page inlines its stylesheets when together they stay under `INLINE_LIMIT`.
   inlineSizes?: Map<string, number> | undefined
   // What the browser loads for islands, when the build was asked to measure it.

@@ -12,6 +12,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - A page with an island hydrating on `visible` or `idle` preloads the code waiting for it, so those islands hydrate about one round trip sooner ([Build and start](build-and-start.md)).
 - A page with an island hydrating on `visible` or `idle`, or a deferred server island, preloads the code waiting for it, so those islands hydrate about one round trip sooner ([Build and start](build-and-start.md)).
 - A page whose lazy runtime chunk fails to load with the build unchanged (offline, a dev server restarting) stays correct: the page an action refreshes reloads (unless something was typed), and an island hydrating on `visible` or `idle` hydrates at once instead of staying inert ([Production](production.md)).
+- A page carrying inlined stylesheets whose gzip is kept is found from the pieces its render put it together from, without reading or searching its body: about 8% less main-thread time per request on a page with 110 KB inlined, and the response a hook or a test reads is unchanged.
 
 ## 1.56.0
 

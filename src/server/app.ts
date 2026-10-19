@@ -128,6 +128,8 @@ function compress(app: App, client: ClientBuild, base: string, onError: KayConfi
   // Inlined stylesheets go out as `rebaseHtml` leaves them, under the mount point.
   const fixed = client.inlineStyles && fixedTexts([...client.inlineStyles.values(), ...inlinePageStyles(client)].map(css => `<style>${rebaseCss(css, base)}</style>`))
 
+  client.fixedStyles = base === '' ? fixed : undefined
+
   // eslint-disable-next-line ts/promise-function-async -- Elysia sends an empty body when a mapResponse promise resolves to undefined
   app.mapResponse({ as: 'scoped' }, ({ request, responseValue }) => responseValue instanceof Response ? compressResponse(request, responseValue, fixed, error => reportServerError(error, request, onError)) : undefined)
 }

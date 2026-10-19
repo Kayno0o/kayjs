@@ -2055,6 +2055,49 @@ describe('compression', () => {
     }
   })
 
+  it('finds the kept gzip of a page by the pieces its render knows without reading its body, and keeps to the bytes of a page told apart by them', async () => {
+    const { compressResponse, fixedTexts, wholeResponse } = await import('../src/server/compress')
+    const a = `<style>.a{color:red}${'.x{margin:0}'.repeat(40)}</style>`
+    const b = `<style>.b{color:red}${'.x{margin:0}'.repeat(40)}</style>`
+    const fixed = fixedTexts([a, b])
+    const [textA, textB] = fixed as [typeof fixed[0], typeof fixed[0]]
+    const words = (word: string) => `<p>${`${word} `.repeat(120)}</p>`
+    // Strings between texts, with an empty one for two texts side by side and text beyond ASCII, as a page has.
+    const pages: [string, string[], typeof fixed][] = [
+      [`<head>${a}</head>${words('café')}`, ['<head>', `</head>${words('café')}`], [textA]],
+      [`${a}${b}${words('naïve')}`, ['', '', words('naïve')], [textA, textB]],
+      [`${words('日本語')}${b}`, [words('日本語'), ''], [textB]],
+      [`${a}${words('same')}${a}`, ['', words('same'), ''], [textA, textA]],
+    ]
+    const accept = { headers: { 'accept-encoding': 'gzip' } }
+
+    for (const [page, strings, texts] of pages) {
+      for (let round = 0; round < 4; round++) {
+        const response = wholeResponse(page, { headers: { 'content-type': 'text/html' } }, { strings, texts })
+        const sent = (await compressResponse(new Request('http://localhost/', accept), response, fixed))!
+
+        expect(sent.headers.get('content-encoding')).toBe('gzip')
+        expect(new TextDecoder().decode(Bun.gunzipSync(await sent.bytes()))).toBe(page)
+
+        // From the third sighting the kept copy answers, found without reading the body.
+        if (round >= 2)
+          expect(response.bodyUsed).toBe(false)
+      }
+    }
+
+    // The same page without pieces finds the copy the pieces kept, and the reverse.
+    const [page, , texts] = pages[0]!
+    const plain = wholeResponse(page, { headers: { 'content-type': 'text/html' } })
+
+    expect((await compressResponse(new Request('http://localhost/', accept), plain, fixed))!.headers.get('content-encoding')).toBe('gzip')
+    expect(plain.bodyUsed).toBe(true)
+
+    // A page with other bytes around the same text is another page.
+    const other = wholeResponse(`<head>${a}</head>${words('cafe')}`, { headers: { 'content-type': 'text/html' } }, { strings: ['<head>', `</head>${words('cafe')}`], texts })
+
+    expect(new TextDecoder().decode(Bun.gunzipSync(await (await compressResponse(new Request('http://localhost/', accept), other, fixed))!.bytes()))).toBe(`<head>${a}</head>${words('cafe')}`)
+  })
+
   it('never serves a kept gzip for a text made after a reload, as the ids of texts are not reused', async () => {
     const { compressResponse, fixedTexts, wholeResponse } = await import('../src/server/compress')
     // The same length and place, another rule.

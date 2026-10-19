@@ -257,6 +257,8 @@ async function compressWhole(bytes: Uint8Array<ArrayBuffer>, encoding: Encoding)
 export interface FixedText {
   // Tells the texts of a process apart, for the key of a page's kept copy.
   readonly id: number
+  // The text as the render writes it into a page.
+  readonly text: string
   bytes: Buffer
   head: Buffer
   // Ends on a full flush, which empties the window, so it sits between two other deflate runs of a gzip member without either reaching into it. Deflated the first time a page carries the text, at the strongest level.
@@ -276,6 +278,7 @@ export function fixedText(text: string): FixedText {
   const bytes = Buffer.from(text)
   const fixed: FixedText = {
     id: fixedTextIds++,
+    text,
     bytes,
     head: bytes.subarray(0, HEAD_BYTES),
     get deflated() {
@@ -395,23 +398,57 @@ async function gzipFound(body: Buffer, found: Found[]): Promise<{ gzip: Uint8Arr
 
 // A page's kept copy is keyed on what lies around its fixed texts, a few KB where the texts are many: the texts are told by id, as the bytes found there equal theirs.
 function splicedKey(body: Buffer, found: Found[]): { key: string, check: bigint } {
-  let hash = HASH_SEED
-  let second = HASH_SEED
+  const arounds: Uint8Array[] = []
   let cursor = 0
-  let ids = ''
 
   for (const { text, at } of found) {
-    const around = body.subarray(cursor, at)
-
-    hash = Bun.hash.xxHash3(around, hash)
-    second = BigInt(Bun.hash.wyhash(around, second))
-    ids += `${text.id}@${at},`
+    arounds.push(body.subarray(cursor, at))
     cursor = at + text.bytes.length
   }
 
-  const rest = body.subarray(cursor)
+  arounds.push(body.subarray(cursor))
 
-  return { key: `spliced${body.length}:${ids}${Bun.hash.xxHash3(rest, hash)}`, check: BigInt(Bun.hash.wyhash(rest, second)) }
+  return partsKey(arounds, found.map(({ text }) => text), body.length)
+}
+
+// The key of a body told by the bytes around its fixed texts, `arounds` one more than `texts`.
+function partsKey(arounds: Uint8Array[], texts: FixedText[], length: number): { key: string, check: bigint } {
+  let hash = HASH_SEED
+  let second = HASH_SEED
+  let at = 0
+  let ids = ''
+
+  for (const [index, text] of texts.entries()) {
+    const around = arounds[index]!
+
+    hash = Bun.hash.xxHash3(around, hash)
+    second = BigInt(Bun.hash.wyhash(around, second))
+    at += around.length
+    ids += `${text.id}@${at},`
+    at += text.bytes.length
+  }
+
+  const rest = arounds[texts.length]!
+
+  return { key: `spliced${length}:${ids}${Bun.hash.xxHash3(rest, hash)}`, check: BigInt(Bun.hash.wyhash(rest, second)) }
+}
+
+// A page's body as its render put it together: the text around each fixed text it holds, one more string than texts, and the texts themselves. The body is the strings and texts alternating, which lets a copy kept for the same page be found without reading the body.
+export interface BodyPieces {
+  strings: string[]
+  texts: FixedText[]
+}
+
+function piecesSize({ strings, texts }: BodyPieces): number {
+  return strings.reduce((total, string) => total + Buffer.byteLength(string), 0) + texts.reduce((total, text) => total + text.bytes.length, 0)
+}
+
+// The kept gzip of a body in pieces, if one is kept for its bytes, and the body's size.
+function keptPieces(pieces: BodyPieces, size: number): Uint8Array<ArrayBuffer> | undefined {
+  const { key, check } = partsKey(pieces.strings.map(string => Buffer.from(string)), pieces.texts, size)
+  const gzip = keptCopy(key, check)
+
+  return gzip && gzip.length < size * 0.9 ? gzip : undefined
 }
 
 // A part of a page cut at its holes, kept deflated only: the bytes are inflated for a browser taking no gzip, and `crc` and `shift` let the gzip trailer's crc be built without them.
@@ -575,11 +612,24 @@ const readBodies = new WeakMap<Response, Uint8Array<ArrayBuffer>>()
 // The size of each body kay made whole, so compression judges it and reads it without a stream: opening a reader on a body costs Bun about 6 µs, more than a small response costs in all.
 const wholeSizes = new WeakMap<Response, number>()
 
-// A response whose body is a string or bytes, its size known to compression.
-export function wholeResponse(body: string | Uint8Array<ArrayBuffer>, init?: ResponseInit): Response {
+// The pieces a page's body was put together from, for the responses made with them.
+const wholePieces = new WeakMap<Response, BodyPieces>()
+
+function sizeOf(body: string | Uint8Array<ArrayBuffer>, pieces: BodyPieces | undefined): number {
+  if (pieces)
+    return piecesSize(pieces)
+
+  return typeof body === 'string' ? Buffer.byteLength(body) : body.length
+}
+
+// A response whose body is a string or bytes, its size known to compression, and for a string the pieces it was put together from, if the render knows them.
+export function wholeResponse(body: string | Uint8Array<ArrayBuffer>, init?: ResponseInit, pieces?: BodyPieces): Response {
   const response = new Response(body, init)
 
-  wholeSizes.set(response, typeof body === 'string' ? Buffer.byteLength(body) : body.length)
+  wholeSizes.set(response, sizeOf(body, pieces))
+
+  if (pieces)
+    wholePieces.set(response, pieces)
 
   return response
 }
@@ -622,7 +672,10 @@ export function compressResponse(request: Request, response: Response, fixed?: F
 
   const splice = fixed !== undefined && fixed.length > 0 && HTML_TYPE.test(headers.get('content-type') ?? '') && preferredEncoding(request.headers.get('accept-encoding'), GZIP_ONLY) !== undefined ? fixed : undefined
 
-  return compressBody(response, wholeSizes.has(response) ? response : response.body, encoding, request.headers.get('accept-encoding'), splice)
+  // The pieces are the body's only while it is unread.
+  const pieces = splice && !response.bodyUsed ? wholePieces.get(response) : undefined
+
+  return compressBody(response, wholeSizes.has(response) ? response : response.body, encoding, request.headers.get('accept-encoding'), splice, pieces && { pieces, size: wholeSizes.get(response)! })
 }
 
 function varyOnEncoding(headers: Headers): void {
@@ -630,8 +683,32 @@ function varyOnEncoding(headers: Headers): void {
     headers.append('vary', 'accept-encoding')
 }
 
-async function compressBody(response: Response, source: Response | ReadableStream<Uint8Array> | Uint8Array<ArrayBuffer>, encoding: Encoding, accept: string | null, fixed?: FixedText[]): Promise<Response> {
+function compressedHeaders(headers: Headers, used: Encoding): Headers {
+  const compressed = new Headers(headers)
+  const etag = compressed.get('etag')
+
+  compressed.set('content-encoding', used)
+  compressed.delete('content-length')
+
+  // The bytes differ from the uncompressed copy's, so a strong tag no longer holds.
+  if (etag?.startsWith('"'))
+    compressed.set('etag', `W/${etag}`)
+
+  return compressed
+}
+
+async function compressBody(response: Response, source: Response | ReadableStream<Uint8Array> | Uint8Array<ArrayBuffer>, encoding: Encoding, accept: string | null, fixed?: FixedText[], pieced?: { pieces: BodyPieces, size: number }): Promise<Response> {
   const { headers, status, statusText } = response
+
+  // A page whose render knows its pieces and whose gzip is kept is answered without reading its body.
+  const kept = pieced && keptPieces(pieced.pieces, pieced.size)
+
+  if (kept) {
+    varyOnEncoding(headers)
+
+    return new Response(lateBody(kept), { status, statusText, headers: compressedHeaders(headers, 'gzip') })
+  }
+
   // From here on the body is read off the response, so every path answers a new one.
   const body: ReadBody = source instanceof ReadableStream ? await readWithinTick(source) : { whole: true, bytes: source instanceof Uint8Array ? source : await source.bytes() }
 
@@ -644,31 +721,17 @@ async function compressBody(response: Response, source: Response | ReadableStrea
 
   varyOnEncoding(headers)
 
-  const compressedHeaders = (used: Encoding) => {
-    const compressed = new Headers(headers)
-    const etag = compressed.get('etag')
-
-    compressed.set('content-encoding', used)
-    compressed.delete('content-length')
-
-    // The bytes differ from the uncompressed copy's, so a strong tag no longer holds.
-    if (etag?.startsWith('"'))
-      compressed.set('etag', `W/${etag}`)
-
-    return compressed
-  }
-
   if (!body.whole) {
     const streamed = preferredEncoding(accept, ONCE_OR_STREAMED)
 
-    return streamed ? new Response(compressedStream(body.stream, streamed), { status, statusText, headers: compressedHeaders(streamed) }) : new Response(body.stream, { status, statusText, headers })
+    return streamed ? new Response(compressedStream(body.stream, streamed), { status, statusText, headers: compressedHeaders(headers, streamed) }) : new Response(body.stream, { status, statusText, headers })
   }
 
   const spliced = fixed && await splicedGzip(body.bytes, fixed)
   const { copy, late } = spliced ? { copy: spliced.gzip, late: spliced.late } : await compressWhole(body.bytes, encoding)
   const reply = (bytes: Uint8Array<ArrayBuffer>) => late ? lateBody(bytes) : bytes
 
-  return copy.length < body.bytes.length * 0.9 ? new Response(reply(copy), { status, statusText, headers: compressedHeaders(spliced ? 'gzip' : encoding) }) : new Response(reply(body.bytes), { status, statusText, headers })
+  return copy.length < body.bytes.length * 0.9 ? new Response(reply(copy), { status, statusText, headers: compressedHeaders(headers, spliced ? 'gzip' : encoding) }) : new Response(reply(body.bytes), { status, statusText, headers })
 }
 
 // Bun writes a reply resolved after a macrotask, a zlib callback included, uncorked once its body reaches this size: each header name, value and separator goes as its own send(), some forty segments a reply (#141). `lateBody` can go once oven-sh/bun#41341 corks every write.

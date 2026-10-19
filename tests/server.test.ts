@@ -340,6 +340,10 @@ describe('pages', () => {
       expect(new TextDecoder().decode(Bun.gunzipSync(new Uint8Array(await spliced.arrayBuffer())))).toBe(plain)
       expect(brotli.headers.get('content-encoding')).toBe('br')
       expect(brotliDecompressSync(new Uint8Array(await brotli.arrayBuffer())).toString()).toBe(plain)
+
+      // Once its gzip is kept, the page is answered from it found by the pieces the render put it together from, and decodes as before.
+      for (let round = 0; round < 4; round++)
+        expect(new TextDecoder().decode(Bun.gunzipSync(new Uint8Array(await (await page('gzip')).arrayBuffer())))).toBe(plain)
     }
   })
 

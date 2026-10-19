@@ -9,7 +9,7 @@ import type { ServerIslandMode } from '../runtime/html'
 import type { Locale } from '../runtime/i18n'
 import type { QueryRules } from '../runtime/query-param'
 import type { ClientBuild, PrerenderedPage } from './client'
-import type { StoredEncoding } from './compress'
+import type { BodyPieces, FixedText, StoredEncoding } from './compress'
 import type { DevRequest } from './dev'
 import type { Flash, SuccessFlash } from './flash'
 import type { Refusal, ServedRoute } from './guards'
@@ -80,7 +80,7 @@ interface EditorModule {
 type Loaded = PromiseSettledResult<Record<string, unknown>>
 // What a render writes; a prerendered page also goes out as its file.
 type Written = string | Uint8Array<ArrayBuffer> | ReadableStream<Uint8Array>
-type Body = Written | Bun.BunFile
+type Body = Written | Pieced | Bun.BunFile
 
 // The editor's module by its file, imported before a page in edit mode renders, which does not wait.
 const editors = new Map<string, EditorModule>()
@@ -88,6 +88,11 @@ const editors = new Map<string, EditorModule>()
 // HTML under the mount point already, as `kay build` rendered it or a server island's was rebased, which goes out as it is.
 class Rebased {
   constructor(readonly body: Body) {}
+}
+
+// A page's text with the pieces it was put together from around the inline stylesheets it holds, which the compression keys its kept copy on without reading the text.
+class Pieced {
+  constructor(readonly text: string, readonly pieces: BodyPieces) {}
 }
 
 // A route's modules, layouts outermost first, then the page, with what their loads returned.
@@ -700,9 +705,10 @@ function respond(rendering: Rendering, output: Body | Rebased): Response {
   rendering.writeCookies()
   keepPersonal(rendering)
 
-  const body = output instanceof Rebased ? output.body : output
+  const unwrapped = output instanceof Rebased ? output.body : output
+  const body = unwrapped instanceof Pieced ? unwrapped.text : unwrapped
   const init = { status: rendering.status, headers: rendering.headers }
-  const response = body instanceof ReadableStream || body instanceof Blob ? new Response(body, init) : wholeResponse(body, init)
+  const response = body instanceof ReadableStream || body instanceof Blob ? new Response(body, init) : wholeResponse(body, init, unwrapped instanceof Pieced ? unwrapped.pieces : undefined)
 
   return !(output instanceof Rebased) && rendering.base !== '' && (typeof body === 'string' || body instanceof ReadableStream) ? rebaseHtml(response, rendering.base) : response
 }
@@ -762,7 +768,7 @@ async function renderFailure(error: unknown, special: SpecialPages, rendering: R
 }
 
 // Inside its layouts, reusing what their loads returned for the failed page; bare when one of them is what failed.
-async function renderSpecialPage(page: SpecialPage, rendering: Rendering, loaded: Map<string, Loaded>, client: ClientBuild, options: RenderOptions): Promise<string | ReadableStream<Uint8Array> | undefined> {
+async function renderSpecialPage(page: SpecialPage, rendering: Rendering, loaded: Map<string, Loaded>, client: ClientBuild, options: RenderOptions): Promise<string | Pieced | ReadableStream<Uint8Array> | undefined> {
   const layoutsFailed = page.layouts.some(file => loaded.get(file)?.status === 'rejected')
 
   for (const files of layoutsFailed ? [[page.file]] : [[...page.layouts, page.file], [page.file]]) {
@@ -811,7 +817,7 @@ export function withEditor(page: { editorOwn?: true | undefined }, options: Rend
 }
 
 // The last module is the page, the others its layouts, outermost first. A page with pending `await` blocks streams.
-function renderDocument(files: string[], modules: PageModule[], data: Record<string, unknown>[], client: ClientBuild, rendering: Rendering, options: RenderOptions): string | ReadableStream<Uint8Array> {
+function renderDocument(files: string[], modules: PageModule[], data: Record<string, unknown>[], client: ClientBuild, rendering: Rendering, options: RenderOptions): string | Pieced | ReadableStream<Uint8Array> {
   const rules = queryRules(chainQuery(files, modules))
 
   // A page a persisted signal's cookie shaped is told apart by it in any cache.
@@ -841,7 +847,7 @@ function noted(request: Request, entries: EntryRef[]): EntryRef[] {
   return entries
 }
 
-function documentOf(files: string[], modules: PageModule[], data: Record<string, unknown>[], client: ClientBuild, rendering: Rendering, options: RenderOptions, rules: QueryRules | undefined): string | ReadableStream<Uint8Array> {
+function documentOf(files: string[], modules: PageModule[], data: Record<string, unknown>[], client: ClientBuild, rendering: Rendering, options: RenderOptions, rules: QueryRules | undefined): string | Pieced | ReadableStream<Uint8Array> {
   const view = viewOf(modules, data)
   const chunks = islandChunks(client)
   // A prerendered page holds each server island between marks the server splits it at.
@@ -871,11 +877,17 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
   // The browser's form check words a refusal as the server does, so a page with a checked form sends the `kay.invalid.*` messages too.
   const words = checked === '' ? islands.messages : new Set([...islands.messages, ...invalidKeys()])
   const islandData = (hasIslands || (checked !== '' && words.size > 0) ? messagesScript(words, true) : '') + (hasIslands ? outcomeScript(rendering.carried()) + queryScript(rules) : '') + liveText
-  const written = `${htmlOpen(lang, head.root)}<head>${headStart(head)}${stylesheets(client, styled)}${head.html}${scripts}${islandData}${kayMetas(options, hasIslands)}${shipsEntry && client.build !== undefined ? `<meta name="${BUILD_META}" content="${client.build}">` : ''}${speculationRules(options.prefetch, options.base)}${client.navigation === true && !shipsEntry ? historyScript : ''}${options.offline ? registerScript(options.base ?? '') : ''}${options.dev ? devScripts(client, styled, options.lateStyles === true) + (options.prerendering ? '' : requestBlock(files, rendering, options.base ?? '')) : ''}</head><body>${body}`
+  const opening = `${htmlOpen(lang, head.root)}<head>${headStart(head)}`
+  const sheets = stylesheets(client, styled)
+  const closing = `${head.html}${scripts}${islandData}${kayMetas(options, hasIslands)}${shipsEntry && client.build !== undefined ? `<meta name="${BUILD_META}" content="${client.build}">` : ''}${speculationRules(options.prefetch, options.base)}${client.navigation === true && !shipsEntry ? historyScript : ''}${options.offline ? registerScript(options.base ?? '') : ''}${options.dev ? devScripts(client, styled, options.lateStyles === true) + (options.prerendering ? '' : requestBlock(files, rendering, options.base ?? '')) : ''}</head><body>${body}`
+  const written = opening + sheets + closing
   const start = marks === undefined ? written : placeFieldMarks(written, marks)
 
-  if (!streamed)
-    return `${start}</body></html>`
+  if (!streamed) {
+    const pieces = marks === undefined && !options.prerendering && (options.base ?? '') === '' ? piecesOf(client.fixedStyles, styled, sheets, opening, `${closing}</body></html>`) : undefined
+
+    return pieces ? new Pieced(`${start}</body></html>`, pieces) : `${start}</body></html>`
+  }
 
   // A deferred module would wait for the whole stream; an async one hydrates the islands already there as soon as it loads.
   return streamDocument(shipsEntry ? `${start}<script type="module" async src="${client.entry}"></script>` : start, deferred, client, shipsEntry, error => reportServerError(error, rendering.ctx.request, options.onError), { hydration: hasIslands, forms: posts ? forms : undefined, words: checked !== '', locale: hasIslands || (checked !== '' && words.size > 0), dev: options.dev })
@@ -977,6 +989,58 @@ function outcomeScript(outcome: Outcome | null): string {
   }
 
   return `<script type="application/json" ${OUTCOME_SCRIPT}>${text.replaceAll('<', '\\u003c')}</script>`
+}
+
+const STYLE_OPEN = '<style>'
+
+// The sheets of a chain cut at the fixed texts they hold, with the text cut, which the same chain keeps writing as one string.
+interface SheetSplit { sheets: string, strings: string[], texts: FixedText[] }
+
+const splitSheets = new WeakMap<FixedText[], Map<string, SheetSplit>>()
+
+function splitAtFixed(sheets: string, fixed: FixedText[]): SheetSplit {
+  const split: SheetSplit = { sheets, strings: [], texts: [] }
+  let cursor = 0
+
+  for (let at = sheets.indexOf(STYLE_OPEN); at >= 0; at = sheets.indexOf(STYLE_OPEN, at + 1)) {
+    const text = at < cursor ? undefined : fixed.find(one => sheets.startsWith(one.text, at))
+
+    if (text) {
+      split.strings.push(sheets.slice(cursor, at))
+      split.texts.push(text)
+      cursor = at + text.text.length
+    }
+  }
+
+  split.strings.push(sheets.slice(cursor))
+
+  return split
+}
+
+// A page's body in pieces around the fixed texts its stylesheets hold, or undefined when it holds none: the sheets are cut once, as a chain writes the same text every time.
+function piecesOf(fixed: FixedText[] | undefined, files: string[], sheets: string, opening: string, closing: string): BodyPieces | undefined {
+  if (!fixed || fixed.length === 0)
+    return undefined
+
+  let cached = splitSheets.get(fixed)
+
+  if (!cached)
+    splitSheets.set(fixed, cached = new Map<string, SheetSplit>())
+
+  const key = files.join('\n')
+  let split = cached.get(key)
+
+  if (split?.sheets !== sheets) {
+    split = splitAtFixed(sheets, fixed)
+    cached.set(key, split)
+  }
+
+  if (split.texts.length === 0)
+    return undefined
+
+  const { strings, texts } = split
+
+  return { strings: [`${opening}${strings[0]}`, ...strings.slice(1, -1), `${strings.at(-1)}${closing}`], texts }
 }
 
 // The stylesheets of the layouts, outermost first, then the page's.
