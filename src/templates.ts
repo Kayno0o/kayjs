@@ -612,27 +612,47 @@ RUN bun install --frozen-lockfile && bun run build
 FROM nginx:alpine
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
+# The stock image cannot send brotli, so only the gzip copies are kept; the headers the build wrote go where nginx.conf includes them from, out of the served folder.
+RUN find /usr/share/nginx/html -name '*.br' -delete && mv /usr/share/nginx/html/headers.nginx.conf /etc/nginx/kay-headers.conf && rm -f /usr/share/nginx/html/_headers
 `,
     'nginx.conf': `server {
   listen 80;
   root /usr/share/nginx/html;
+  server_tokens off;
   gzip_static on;
   gzip_vary on;
   add_header Strict-Transport-Security "max-age=31536000" always;
+  include /etc/nginx/kay-headers.conf;
 
+  # Hashed files, immutable; the search manifest and the notices keep their name between builds, so they revalidate.
   location ^~ /_kay/ {
     add_header Cache-Control "public, max-age=31536000, immutable";
     add_header Strict-Transport-Security "max-age=31536000" always;
+    include /etc/nginx/kay-headers.conf;
+  }
+
+  location = /_kay/search.json {
+    add_header Cache-Control "no-cache";
+    add_header Strict-Transport-Security "max-age=31536000" always;
+    include /etc/nginx/kay-headers.conf;
+  }
+
+  location = /_kay/THIRD-PARTY-LICENSES.txt {
+    add_header Cache-Control "no-cache";
+    add_header Strict-Transport-Security "max-age=31536000" always;
+    include /etc/nginx/kay-headers.conf;
   }
 
   location ~* \\.(?:woff2?|ttf|otf|eot)$ {
     add_header Cache-Control "public, max-age=2592000";
     add_header Strict-Transport-Security "max-age=31536000" always;
+    include /etc/nginx/kay-headers.conf;
   }
 
   location ~* \\.(?:png|jpe?g|gif|webp|avif|svg|ico|bmp)$ {
     add_header Cache-Control "public, max-age=86400";
     add_header Strict-Transport-Security "max-age=31536000" always;
+    include /etc/nginx/kay-headers.conf;
   }
 
   location / {

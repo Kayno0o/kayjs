@@ -48,7 +48,7 @@ export default defineConfig({
 })
 ```
 
-A static export writes no headers file, so the `nginx.conf` of the starter container sends the header. If you serve the export with another server, set it there. In nginx, repeat it in each `location` that has an `add_header` of its own, since nginx does not inherit the server-level ones there.
+A static export writes the other headers to `_headers` and `headers.nginx.conf` but not this one, so the `nginx.conf` of the starter container sends it. If you serve the export with another server, set it there. In nginx, repeat it in each `location` that has an `add_header` of its own, since nginx does not inherit the server-level ones there.
 
 ## Content-Security-Policy
 
@@ -116,7 +116,7 @@ export const page = {
 
 Its `csp` adds sources to the site's directives and never replaces them, so a page cannot loosen the policy by dropping one. A layout's `security` applies to every page under it, and the page's own is applied after it. `csp: false` as the whole value sends the page no policy at all.
 
-A static export has no server to send these headers, so the host sets them instead.
+A static export has no server to send these headers. It writes them to `_headers` and `headers.nginx.conf`, which the host reads, but a page's own `security` setting is not part of them.
 
 ## Cross-origin headers that block popups and embeds
 

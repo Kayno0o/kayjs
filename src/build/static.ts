@@ -24,8 +24,10 @@ import { applyPageHooks, assetFiles } from '../server/page-hook'
 import { publicFiles, servedPublicly } from '../server/public'
 import { hostedStatus } from '../server/redirects'
 import { withoutSlash } from '../server/routes'
+import { securityHeaders } from '../server/security'
 import { siteOrigin } from '../server/seo'
 import { cachedCopies, pruneCopies } from './compressed'
+import { headersFile, nginxHeaders } from './header-files'
 
 // Left in the directory a static export writes, so a later export knows it may clear it, and never clears one it did not write.
 interface App {
@@ -151,6 +153,8 @@ export async function exportStatic(project: Project, client: ClientBuild, outdir
   const base = basePath(config.base)
   const origin = config.site === undefined ? '' : siteOrigin(config.site)
 
+  written.push(...await writeHeaders(out, securityHeaders({ ...pages.securityOptions, security: config.security })))
+
   written.push(...await writeRedirects(out, config.redirects ?? {}, base, origin))
 
   written.push(...await writeLocaleRedirects(app, out, config, built.map(([path]) => path), base, origin))
@@ -232,6 +236,21 @@ function pageFiles(path: string): string[] {
   const name = decodeURIComponent(path).slice(1)
 
   return name === '' ? ['index.html'] : [`${name}.html`, join(name, 'index.html')]
+}
+
+// The headers a server would send every response, for a host to send: `_headers` for those reading one, and an nginx include.
+// A page setting its own `security` is not read here, as that would take running its module.
+async function writeHeaders(out: string, headers: Record<string, string> | undefined): Promise<string[]> {
+  const nginx = join(out, 'headers.nginx.conf')
+
+  await Bun.write(nginx, nginxHeaders(headers ?? {}))
+
+  if (!headers)
+    return [nginx]
+
+  await Bun.write(join(out, '_headers'), headersFile(headers))
+
+  return [nginx, join(out, '_headers')]
 }
 
 // A static host answers no redirect, so each one without params becomes a page sending the browser on; all of them also go to `_redirects`, which hosts such as Netlify and Cloudflare Pages read.

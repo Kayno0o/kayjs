@@ -22,7 +22,9 @@ A redirect from `kay.config.ts` without params becomes a page that sends the bro
 
 `sw.js` is written too. With `offline` on it is the worker that keeps the site for offline visitors. Without it, it is a worker that removes one an earlier deploy left, so no visitor is served a stale page.
 
-Compressible files also get a `.br` and a `.gz` copy beside them, for a server that sends them as they are, such as nginx with `gzip_static`. Asset names carry a hash, so `_kay/` can be cached forever.
+Compressible files also get a `.br` and a `.gz` copy beside them, for a server that sends them as they are, such as nginx with `gzip_static`. Asset names carry a hash, so the files of `_kay/` can be cached forever. The exceptions are `search.json` and `THIRD-PARTY-LICENSES.txt`, which keep their name from one build to the next and must be fetched again each time. A server that cannot send brotli can drop the `.br` copies.
+
+The security headers a server would send are written as `_headers`, which Netlify and Cloudflare Pages read, and as `headers.nginx.conf`, a list of `add_header` lines for nginx to `include`. A `security` setting on a single page is not read there.
 
 <ReadMore href="/llms/prerendering#static-export">Images, redirects, locales and how the output directory is cleared.</ReadMore>
 

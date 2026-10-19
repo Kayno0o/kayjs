@@ -5,6 +5,7 @@ import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
+import { headersFile, nginxHeaders } from '../src/build/header-files'
 import { joinBase } from '../src/runtime/base'
 import { pages } from '../src/server'
 import { rebaseHtml } from '../src/server/base'
@@ -316,6 +317,31 @@ describe('kay build --static', () => {
   it('turns a redirect into a page sending the browser on, and lists every one in _redirects', async () => {
     expect((await get('/old')).text).toContain('<meta http-equiv="refresh" content="0; url=/repo/about">')
     expect(await Bun.file(join(out, '_redirects')).text()).toBe('/repo/old /repo/about 301\n/repo/blog/:slug /repo/posts/:slug 301\n/repo/moved /repo/about 302\n/repo/temp /repo/about 302\n/repo/kept /repo/about 308\n')
+  })
+
+  it('writes the security headers a server would send as _headers and as an nginx include, HSTS left to nginx.conf', async () => {
+    const headers = await Bun.file(join(out, '_headers')).text()
+    const include = await Bun.file(join(out, 'headers.nginx.conf')).text()
+
+    expect(headers).toStartWith('/*\n  ')
+    expect(headers).toContain('\n  Content-Security-Policy: default-src \'self\'; ')
+    expect(headers).toContain('\n  X-Content-Type-Options: nosniff')
+    expect(headers).toContain('\n  Strict-Transport-Security: max-age=31536000')
+    expect(include).toContain('add_header Content-Security-Policy "default-src \'self\'; ')
+    expect(include).toContain('add_header X-Content-Type-Options "nosniff" always;')
+    expect(include).toContain('add_header Permissions-Policy "')
+    // The scaffold's nginx.conf sends HSTS itself, and a header sent twice is two headers.
+    expect(include).not.toContain('Strict-Transport-Security')
+    // Every line is one directive nginx reads: no quote or backslash left raw, nothing to expand.
+    expect(include.trim().split('\n').filter(line => !(/^add_header [\w-]+ "(?:[^"\\$]|\\.)*" always;$/).test(line))).toEqual([])
+  })
+
+  it('escapes the quotes of a header for nginx and leaves out one it cannot spell', () => {
+    const headers = { 'content-security-policy': 'default-src \'self\'; report-uri "x"', 'x-bad': 'a$b', 'x-multi': 'a\nb', 'strict-transport-security': 'max-age=1' }
+
+    expect(nginxHeaders(headers)).toBe('add_header Content-Security-Policy "default-src \'self\'; report-uri \\"x\\"" always;\n')
+    expect(nginxHeaders({})).toBe('# kay sends no security headers for this build.\n')
+    expect(headersFile({ 'x-frame-options': 'SAMEORIGIN' })).toBe('/*\n  X-Frame-Options: SAMEORIGIN\n')
   })
 
   it('names every page only a server could answer, and fails', async () => {

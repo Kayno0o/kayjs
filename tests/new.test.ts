@@ -6,13 +6,15 @@ import { basename, join, posix } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { parse, stringify } from 'devalue'
-import { clientDir, outputDir } from '../src/build/assets'
+import { ASSET_PREFIX, clientDir, outputDir } from '../src/build/assets'
 import { buildClient } from '../src/build/client'
+import { NOTICES_FILE } from '../src/build/licenses'
 import { check, configCheckOptions } from '../src/check'
 import { nativeExe } from '../src/compiler/native-typescript'
 import { loadConfig } from '../src/config'
 import { formatFiles } from '../src/format'
 import { createProject, detectHost, FEATURE_NAMES, PRESETS, toggle } from '../src/new'
+import { SEARCH_MANIFEST } from '../src/runtime/search'
 import { lintInProcess } from './scaffold-lint'
 
 const repo = join(import.meta.dir, '..')
@@ -811,6 +813,25 @@ describe('kay new', () => {
           const bare = nginx.match(/location [^{]*\{[^}]*\}/g)!.filter(block => block.includes('add_header') && !block.includes('Strict-Transport-Security'))
 
           expect({ features, server: nginx.split('\n  add_header Strict-Transport-Security "max-age=31536000" always;').length - 1, bare }).toEqual({ features, server: 1, bare: [] })
+
+          // The export's own headers (CSP and the rest) are included at server level and again wherever a location adds a header of its own.
+          const INCLUDE = 'include /etc/nginx/kay-headers.conf;'
+          const withoutInclude = nginx.match(/location [^{]*\{[^}]*\}/g)!.filter(block => block.includes('add_header') && !block.includes(INCLUDE))
+
+          expect({ features, server: nginx.split(`\n  ${INCLUDE}`).length - 1, withoutInclude }).toEqual({ features, server: 1, withoutInclude: [] })
+          expect({ features, tokens: nginx.includes('\n  server_tokens off;') }).toEqual({ features, tokens: true })
+
+          // The search manifest and the notices keep their name from one build to the next, so they revalidate while the hashed files stay immutable.
+          for (const path of [SEARCH_MANIFEST, `${ASSET_PREFIX}${NOTICES_FILE}`]) {
+            const block = nginx.match(new RegExp(`location = ${path.replaceAll('.', '\\.')} \\{[^}]*\\}`))?.[0]
+
+            expect({ features, path, noCache: block?.includes('add_header Cache-Control "no-cache";'), headers: block?.includes('Strict-Transport-Security') && block.includes(INCLUDE) }).toEqual({ features, path, noCache: true, headers: true })
+          }
+
+          // The stock nginx image cannot send brotli, so the copies are dropped and the include moved out of the served folder.
+          const dockerfile = contents.Dockerfile!
+
+          expect({ features, br: dockerfile.includes('-name \'*.br\' -delete'), include: dockerfile.includes('mv /usr/share/nginx/html/headers.nginx.conf /etc/nginx/kay-headers.conf') }).toEqual({ features, br: true, include: true })
           expect({ features, notFound: contents['nginx.conf']!.includes('error_page 404 /404.html') }).toEqual({ features, notFound: variant.has('starter') })
         }
       }
