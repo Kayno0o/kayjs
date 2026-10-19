@@ -22,6 +22,8 @@ export interface ClientManifest {
   build?: string
   // The chunks the entry imports statically, which the browser only discovers once the entry arrives.
   entryImports: string[]
+  // The chunk holding the code that waits for an island to be visible or idle, and what it imports, which a page with such an island preloads: the entry only discovers it once it runs.
+  hydrateWhen?: string[]
   // Each island's chunk and every chunk it imports statically, by island id.
   islands: Record<string, string[]>
   // The stylesheet of each page, layout and special page that imports any, by path relative to the root.

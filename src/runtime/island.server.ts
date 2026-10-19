@@ -23,6 +23,8 @@ let rendered: RenderedIslands | undefined
 
 export interface RenderedIslands {
   eager: Set<string>
+  // How many hydrate on `visible` or `idle`, which the entry waits for the code of before hydrating them.
+  lazy: number
   count: number
   // The file name of each island's chunk, which its markup names for the browser to import; none while the browser has its islands from the page's own registry.
   chunks?: Record<string, string> | undefined
@@ -37,12 +39,13 @@ export function islandCheckpoint(): (() => void) | undefined {
   if (!islands)
     return undefined
 
-  const { count } = islands
+  const { count, lazy } = islands
   const eager = islands.eager.size
   const messages = islands.messages.size
 
   return () => {
     islands.count = count
+    islands.lazy = lazy
     trim(islands.eager, eager)
     trim(islands.messages, messages)
   }
@@ -59,7 +62,7 @@ function trim(set: Set<string>, size: number): void {
 
 // Runs a synchronous page render and lists the islands it rendered.
 export function collectIslands<T>(render: () => T, salt?: string, chunks?: Record<string, string>): { result: T, islands: RenderedIslands } {
-  const islands: RenderedIslands = { eager: new Set(), count: 0, messages: new Set(), chunks }
+  const islands: RenderedIslands = { eager: new Set(), lazy: 0, count: 0, messages: new Set(), chunks }
 
   rendered = islands
 
@@ -134,7 +137,9 @@ export function island<P extends object>(id: string, component: ((props: P) => J
     if (rendered) {
       rendered.count++
 
-      if (when !== 'idle' && when !== 'visible')
+      if (when === 'idle' || when === 'visible')
+        rendered.lazy++
+      else
         rendered.eager.add(id)
     }
 

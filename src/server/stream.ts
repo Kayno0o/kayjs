@@ -19,7 +19,7 @@ import { workScript } from './work'
 export const SWAP_SCRIPT = 'function $kayAwait(){for(var t of document.querySelectorAll("template[data-kay-await]")){var i=t.dataset.kayAwait,w=document.createTreeWalker(document.body,128),s=null,n,a=[];while(n=w.nextNode())if(n.data=="kay-await:"+i){s=n;break}if(s){n=s.nextSibling;while(n&&!(n.nodeType==8&&n.data=="/kay-await:"+i)){a.push(n);n=n.nextSibling}self.$kayHydrate&&$kayHydrate.dispose&&a.forEach(function(x){try{x.nodeType==1&&$kayHydrate.dispose(x)}catch(e){reportError(e)}});for(var x of a)x.remove();n&&n.remove();s.replaceWith(t.content)}t.remove()}self.$kayHydrate&&$kayHydrate()}'
 export const SWAP_CALL = '$kayAwait()'
 const encoder = new TextEncoder()
-const EMPTY: Rendered = { html: '', islands: { eager: new Set(), count: 0, messages: new Set() }, deferred: [] }
+const EMPTY: Rendered = { html: '', islands: { eager: new Set(), lazy: 0, count: 0, messages: new Set() }, deferred: [] }
 
 export interface Rendered {
   html: string
