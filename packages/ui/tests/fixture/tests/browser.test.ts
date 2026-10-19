@@ -141,6 +141,31 @@ inBrowser('FormField in an island', () => {
     expect(page.errors).toEqual([])
   }, 120_000)
 
+  test('draws the keyline of every framed box at --kui-border-width, the old --kui-border-card still setting it, and 1px when a skin gives no length', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/borders')
+
+    const widths = async (css: string) => page.evaluate((style: string) => {
+      document.documentElement.setAttribute('style', style)
+
+      const width = (selector: string, side = 'Top') => Number.parseFloat(getComputedStyle(document.querySelector(selector)!)[`border${side}Width` as 'borderTopWidth'])
+      // A button draws its keyline in ::before.
+      const button = Number.parseFloat(getComputedStyle(document.querySelector('#button')!, '::before').borderTopWidth)
+
+      return { card: width('#card'), head: width('#card-head', 'Bottom'), row: width('#row'), widget: width('#widget'), notice: width('#notice'), avatar: width('#avatar'), button }
+    }, css)
+
+    const all = (value: number) => ({ card: value, head: value, row: value, widget: value, notice: value, avatar: value, button: value })
+
+    expect(await widths('')).toEqual(all(1))
+    expect(await widths('--kui-border-width: 2px')).toEqual(all(2))
+    expect(await widths('--kui-border-card: 3px')).toEqual(all(3))
+    expect(await widths('--kui-border-width: 2px solid red')).toEqual(all(1))
+    expect(await widths('--kui-border-card: 2px solid red')).toEqual(all(1))
+    expect(page.errors).toEqual([])
+  }, 120_000)
+
   test('hydrates over the ids the server handed its control, then links the message once one shows', async () => {
     const site = await shared()
     const served = (await site.visit('/described')).html

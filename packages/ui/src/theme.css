@@ -3,6 +3,13 @@
  * Tokens are `@theme default`, so the app's own `@theme` overrides them wherever it sits, and components write no utility of their own, only the classes below: a rule of the app's on one of them restyles every instance, and a utility through `class` restyles one.
  */
 
+/* A keyline is a length: a registered property keeps a skin's `2px solid red`, which is no length, from making every keyline invalid. */
+@property --kui-border-width {
+  syntax: '<length>';
+  inherits: true;
+  initial-value: 1px;
+}
+
 @theme default {
   /* Each colour is light-dark(light, dark), following the color-scheme set below. Eight are seeds a skin sets alone: canvas, text, accent, success, warning, info, error and field-border. The others derive from them with color-mix, and each stays overridable on its own. */
   --color-kui-canvas: light-dark(#faf8f4, #111111);
@@ -51,6 +58,8 @@
   --spacing-kui-card: 0.625rem;
   --spacing-kui-inline: 0.3125rem;
   --spacing-kui-section: 0.875rem;
+  /* The keyline of every framed box, a length: buttons, cards, card rows, widgets, notices, avatars, toasts, dialogs, the palette and popovers. The old name --kui-border-card still sets it. A value that is no length, such as a `2px solid red` shorthand, leaves it at 1px. */
+  --kui-border-width: var(--kui-border-card);
   --kui-border-card: 1px;
   --kui-border-input: 1px;
   --radius-kui-card: 0px;
@@ -77,11 +86,11 @@
   --kui-field-focus-shadow: none;
 
   /* A Notice's frame and weight, the compact one taking the weight too. */
-  --kui-border-notice: var(--kui-border-card);
+  --kui-border-notice: var(--kui-border-width);
   --font-weight-kui-notice: 400;
 
   /* An Avatar's ring, and the weight of the initial it falls back to. */
-  --kui-border-avatar: var(--kui-border-card);
+  --kui-border-avatar: var(--kui-border-width);
   --color-kui-avatar-ring: var(--color-kui-surface2);
   --font-weight-kui-avatar: 600;
 
@@ -137,7 +146,7 @@
     content: '';
     position: absolute;
     inset: 0;
-    border: var(--kui-border-card) solid var(--kui-shell-line);
+    border: var(--kui-border-width) solid var(--kui-shell-line);
     border-radius: inherit;
     pointer-events: none;
   }
@@ -386,7 +395,7 @@
   }
 
   .kui-card-row {
-    @apply flex items-center gap-3 border border-kui-surface2 bg-kui-surface0 p-4;
+    @apply flex items-center gap-3 border-solid border-(length:--kui-border-width) border-kui-surface2 bg-kui-surface0 p-4;
   }
 
   .kui-card-row-body {
@@ -453,7 +462,7 @@
   }
 
   .kui-command-palette {
-    @apply mx-auto mt-[10vh] mb-auto flex max-h-[min(70dvh,40rem)] w-full max-w-[min(36rem,calc(100vw-2rem))] flex-col overflow-hidden border border-kui-overlay0 bg-kui-surface0 p-0 text-kui-text;
+    @apply mx-auto mt-[10vh] mb-auto flex max-h-[min(70dvh,40rem)] w-full max-w-[min(36rem,calc(100vw-2rem))] flex-col overflow-hidden border-solid border-(length:--kui-border-width) border-kui-overlay0 bg-kui-surface0 p-0 text-kui-text;
   }
 
   .kui-command-palette-search {
@@ -644,7 +653,7 @@
   }
 
   .kui-dialog {
-    @apply m-auto flex max-h-[calc(100dvh-2rem)] w-full max-w-[min(42rem,calc(100vw-2rem))] flex-col overflow-hidden border border-kui-overlay0 bg-kui-surface0 p-0;
+    @apply m-auto flex max-h-[calc(100dvh-2rem)] w-full max-w-[min(42rem,calc(100vw-2rem))] flex-col overflow-hidden border-solid border-(length:--kui-border-width) border-kui-overlay0 bg-kui-surface0 p-0;
   }
 
   .kui-dialog-title {
@@ -1312,7 +1321,7 @@
 
   /* A native popover, anchored to its trigger through CSS anchor positioning and flipped by the browser when it would overflow. */
   .kui-popover {
-    @apply border border-kui-overlay0 bg-kui-mantle p-0 text-kui-text;
+    @apply border-solid border-(length:--kui-border-width) border-kui-overlay0 bg-kui-mantle p-0 text-kui-text;
     inset: auto;
     margin: 0.25rem 0;
     position-try-fallbacks: flip-block, flip-inline;
@@ -1951,7 +1960,7 @@
   /* --kui-toast-tone is the colour of the toast's tone, which its icon takes. */
   .kui-toast {
     --kui-toast-tone: var(--color-kui-accent);
-    @apply pointer-events-auto flex items-start gap-2 border border-kui-overlay0 bg-kui-surface0 px-3 py-2;
+    @apply pointer-events-auto flex items-start gap-2 border-solid border-(length:--kui-border-width) border-kui-overlay0 bg-kui-surface0 px-3 py-2;
 
     &:where([data-tone='danger']) {
       --kui-toast-tone: var(--color-kui-error);
@@ -2066,7 +2075,7 @@
   }
 
   .kui-widget {
-    @apply flex w-full flex-col gap-3 border border-kui-surface2 bg-kui-surface0 p-4;
+    @apply flex w-full flex-col gap-3 border-solid border-(length:--kui-border-width) border-kui-surface2 bg-kui-surface0 p-4;
   }
 
   .kui-widget-head {
@@ -2225,11 +2234,11 @@
   }
 
   .kui-card {
-    @apply flex flex-col border border-kui-surface2 bg-kui-surface0;
+    @apply flex flex-col border-solid border-(length:--kui-border-width) border-kui-surface2 bg-kui-surface0;
   }
 
   .kui-card-head {
-    @apply flex items-center gap-3 border-b border-kui-surface2 px-3 py-2;
+    @apply flex items-center gap-3 border-solid border-b-(length:--kui-border-width) border-kui-surface2 px-3 py-2;
   }
 
   /* mr-auto rather than ml-auto on what follows: a head that is all control and no title reads from the left, like the body under it. */

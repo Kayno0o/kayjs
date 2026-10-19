@@ -47,7 +47,9 @@ Eight colours are seeds: `canvas`, `text`, `accent`, `success`, `warning`, `info
 
 A colour you set yourself wins over the one mixed for it. A site in one scheme writes each seed once and sets `color-scheme` on `:root` to it.
 
-A few tokens shape boxes rather than colour them, such as `--kui-border-card` for every hairline. A brutalist skin sets `--kui-shadow-raised` (under cards, rows, widgets and toasts), `--kui-shadow-press` (under framed buttons) and `--kui-press-travel` (how far a pressed button moves down). All three draw nothing by default.
+`--kui-border-width` is the keyline of buttons, cards, rows, widgets, notices, avatars, toasts, dialogs and popovers. It is a length: `2px`, not `2px solid red`, which it ignores. The old name, `--kui-border-card`, works until 1.61.
+
+A few tokens shape boxes rather than colour them. A brutalist skin sets `--kui-shadow-raised` (under cards, rows, widgets and toasts), `--kui-shadow-press` (under framed buttons) and `--kui-press-travel` (how far a pressed button moves down). All three draw nothing by default.
 
 ### Light or dark
 

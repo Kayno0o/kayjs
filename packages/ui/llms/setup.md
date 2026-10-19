@@ -35,11 +35,12 @@ The theme's tokens are `@theme default`, so the app's `@theme` overrides any of 
 
 A few components take tokens for their box and type, for a skin restyling them without redeclaring their selector:
 
+- Keyline: `--kui-border-width`, `1px` by default, a length, sizes the border of Button, Card (and its head), CardRow, Widget, Notice, Avatar, toasts, Dialog, CommandPalette and popovers. A value that is no length, such as the shorthand `2px solid red`, leaves it at 1px; text fields and Badge take `--kui-border-input` and `--kui-border-badge`. The old name `--kui-border-card` still sets it, until 1.61.
 - Badge: `--kui-border-badge`, `--spacing-kui-badge-x`, `--spacing-kui-badge-y`, `--text-kui-badge`, `--tracking-kui-badge`, `--kui-badge-case` (`none` or `uppercase`) and `--kui-badge-font`, the text's own unless set, such as to `var(--font-mono)`, and `--kui-badge-solid-text`, the text colour of a `solid` badge (`--color-kui-on-accent` unless set); `--kui-border-stamp` for a stamp.
 - Text fields, `kui-field-input` and a FormField's controls: `--spacing-kui-field-x` and `--spacing-kui-field-y` for the inset, `--kui-field-focus-shadow` for a shadow while focused, `none` by default, such as `3px 3px 0 var(--color-kui-accent)`.
 - `--radius-kui-card`, `0px` by default, rounds the text fields and also Button, the framed IconButton, Card, CardRow, Widget, Notice, toasts, Dialog, CommandPalette and popovers, Menu included; a docked SidePanel stays square.
 - Notice: `--kui-border-notice` and `--font-weight-kui-notice`, which a compact one takes too.
-- Avatar: `--kui-border-avatar` and the colour `--color-kui-avatar-ring` for its ring, `--font-weight-kui-avatar` for the initial. The two borders follow `--kui-border-card` unless set.
+- Avatar: `--kui-border-avatar` and the colour `--color-kui-avatar-ring` for its ring, `--font-weight-kui-avatar` for the initial. The two borders follow `--kui-border-width` unless set.
 - Offset shadows and a press-down, `none` and `0px` by default: `--kui-shadow-raised` under a Card, CardRow, Widget and toast, `--kui-shadow-press` under a Button and a framed IconButton (solid or danger), which move down by `--kui-press-travel` and drop that shadow while pressed. A brutalist skin: `--kui-shadow-raised: 4px 4px 0 var(--color-kui-text)`, `--kui-shadow-press: 3px 3px 0 var(--color-kui-text)`, `--kui-press-travel: 3px`.
 
 The theme is dark unless the visitor's system asks for light. `data-theme="light"` or `data-theme="dark"` on `html` wins over both, for a site with its own switch, and on any element it themes what that element holds. A colour the app overrides with a single value stays that value in both.

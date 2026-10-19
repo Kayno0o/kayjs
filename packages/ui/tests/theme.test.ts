@@ -449,6 +449,15 @@ describe('theme.css', () => {
     expect(blockOf(theme, ':is(.kui-shell, .kui-btn, .kui-stat-badge)::before')).toContain('border-radius: inherit;')
   })
 
+  test('sizes the keyline of every framed box by --kui-border-width, a length the old --kui-border-card still sets', () => {
+    for (const selector of ['.kui-card', '.kui-card-head', '.kui-card-row', '.kui-widget', '.kui-toast', '.kui-dialog', '.kui-command-palette', '.kui-popover'])
+      expect(blockOf(theme, selector), selector).toMatch(/border(?:-b)?-\(length:--kui-border-width\)/)
+
+    expect(theme.match(/var\(--kui-border-card\)/g)).toHaveLength(1)
+    expect(theme).toContain('--kui-border-width: var(--kui-border-card);')
+    expect(theme).toMatch(/@property --kui-border-width \{\s*syntax: '<length>';/)
+  })
+
   test('draws the info toast in the info colour, the danger and success toasts in theirs', () => {
     const toast = blockOf(theme, '.kui-toast') ?? ''
 

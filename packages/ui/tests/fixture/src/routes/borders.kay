@@ -1,0 +1,12 @@
+---
+import '../app.css'
+---
+//- One of each box the keyline token sizes, written with its class whole so its rules ship.
+main
+  div#card.kui-card
+    div#card-head.kui-card-head head
+  div#row.kui-card-row row
+  div#widget.kui-widget widget
+  div#notice.kui-notice notice
+  span#avatar.kui-avatar A
+  button#button.kui-btn(type="button") button
