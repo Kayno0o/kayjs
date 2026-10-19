@@ -3,17 +3,32 @@ import { kayLog } from '../runtime/log'
 import { recordRequestError } from './dev-errors'
 import { logMessage } from './log'
 
-const reported = new WeakMap<Request, unknown[]>()
+const ELYSIA_CODES = new Set(['NOT_FOUND', 'PARSE', 'VALIDATION', 'INVALID_COOKIE_SIGNATURE', 'INVALID_FILE_TYPE'])
+
+// Elysia names the errors it means to answer itself; a hook or route that threw anything else reaches the catch-all with `UNKNOWN`, with no code from an `onRequest` hook, or with the error's own `code` (`ENOENT`, a database's), which Elysia takes for the context's.
+// An error class the app registered with `.error()` keeps its own name as the code and is left to the app.
+export function isUncaught(error: unknown, code: unknown): boolean {
+  if (code === undefined || code === 'UNKNOWN' || code === 'INTERNAL_SERVER_ERROR')
+    return true
+
+  return typeof code === 'string' && !ELYSIA_CODES.has(code) && (error as { code?: unknown } | null)?.code === code
+}
+
+const reported = new WeakMap<Request, Set<unknown>>()
 
 // Logs an error kay caught while answering `request`, under that request, and hands it to the app's `onError`, without holding the response for it.
 export function reportServerError(error: unknown, request: Request, onError: KayConfig['onError']): void {
   const seen = reported.get(request)
 
   // Reported once per request, as the catch-all for errors no route caught meets the ones a route's own handler reported already.
-  if (seen?.includes(error))
+  if (seen?.has(error))
     return
 
-  reported.set(request, [...seen ?? [], error])
+  if (seen)
+    seen.add(error)
+  else
+    reported.set(request, new Set([error]))
+
   logMessage('error', '', error, request)
   recordRequestError(error, request)
 

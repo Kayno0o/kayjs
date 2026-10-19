@@ -26,7 +26,7 @@ import { inRouteReads, LIVE_HEADER, routeProof } from './live'
 import { answeringRequest, statusOf } from './log'
 import { apiLimitWait, checkApiLimit, requestId } from './protection'
 import { sharedContext } from './render'
-import { reportServerError } from './report'
+import { isUncaught, reportServerError } from './report'
 import { requestUrl } from './request-url'
 import { apiRoutePath, withoutSlash } from './routes'
 import { VARY_COOKIE, wasReadPersonally } from './scope'
@@ -393,7 +393,7 @@ function carriedOver(set: { status?: number | string, headers: Record<string, un
 // Logs an error a route threw and hands it to `onError`, keeping its message out of a production answer, where Elysia would send it.
 // Refused input, an unknown route or a status the handler threw are answered as Elysia means them.
 function reportThrown({ request, error, code, set }: { request: Request, error: unknown, code: unknown, set: { status?: number | string, headers: Record<string, unknown> } }, options: ActionOptions): string | undefined {
-  if (code !== 'UNKNOWN' && code !== 'INTERNAL_SERVER_ERROR')
+  if (!isUncaught(error, code))
     return undefined
 
   reportServerError(error, request, options.onError)

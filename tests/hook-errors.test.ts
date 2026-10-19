@@ -8,7 +8,7 @@ import { scratchDir } from './scratch'
 
 const SECRET = 'db password=hunter2'
 const NativeRequest = Request
-const THROWN = ['error', 'string', 'rejection', 'response'] as const
+const THROWN = ['error', 'string', 'rejection', 'coded', 'response'] as const
 
 type Thrown = typeof THROWN[number]
 
@@ -20,6 +20,9 @@ async function hook({ request }: { request: Request }): Promise<void> {
 
   if (kind === 'error')
     throw new Error(SECRET)
+
+  if (kind === 'coded')
+    throw Object.assign(new Error(SECRET), { code: 'ENOENT' })
 
   if (kind === 'string')
     throw SECRET
@@ -114,7 +117,7 @@ describe('an onRequest hook that throws', () => {
         const app = await served({ dev: true, base })
 
         for (const target of TARGETS) {
-          for (const thrown of ['error', 'string', 'rejection'] as const) {
+          for (const thrown of ['error', 'string', 'rejection', 'coded'] as const) {
             const answer = await ask(app, target, thrown, base)
 
             expect(answer.status, `${target.name}, ${thrown}`).toBe(500)
@@ -177,6 +180,21 @@ describe('an onRequest hook that throws', () => {
 
     expect(await ask(app, TARGETS[1], '')).toMatchObject({ status: 200, body: 'hello' })
     expect(await ask(app, TARGETS[3], '')).toMatchObject({ status: 200, body: 'logo' })
+  })
+
+  it('leaves an error class the app registered after kay to the app\'s own handler', async () => {
+    class Custom extends Error {}
+
+    const app = new Elysia()
+      .error({ Custom })
+      .use(await pages({ routes: join(dir, 'routes'), prebuilt: false, dev: false, log: false }))
+      .get('/custom', () => {
+        throw new Custom('mine')
+      })
+      .onError(({ code }) => code === 'Custom' ? new Response('conflict', { status: 409 }) : undefined)
+    const response = await app.handle(new NativeRequest('http://localhost/custom'))
+
+    expect(response.status).toBe(409)
   })
 
   it('does not hide an error the app answers in its own onError', async () => {
