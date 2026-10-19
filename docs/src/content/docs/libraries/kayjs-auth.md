@@ -193,7 +193,7 @@ form(action={start})
 
 When the guest registers, the account keeps their id, so the app's data stays theirs. `user.guest` is `true` until then. A guest whose session ends is left in the store, and `listUsers` shows them, until they are deleted: 30 days after they were made by default, or `guests: { maxAge: '7d' }` in `createAuth`. Only a guest with no session left goes, and `onDelete` is called as for any user.
 
-An account registered and never verified goes the same way, 30 days after it was made, when `requireVerified` is on, as nobody can sign in to it. Set `email: { unverifiedMaxAge: '7d' }` to change that, or to turn it on without `requireVerified`. An account with a session, a linked provider or a role beyond `defaultRoles` stays.
+An account registered and never verified goes the same way, 30 days after it was made, when `requireVerified` is on, as nobody can sign in to it. Set `email: { unverifiedMaxAge: '7d' }` to change that, or to turn it on without `requireVerified`, where an account never verified may be in use and goes once its session ends. An account with a session, a linked provider or a role beyond `defaultRoles` stays.
 
 A guest costs nothing to make, so kayjs-auth does not name it to other libraries: kayjs-ai's limits count a guest by address, and a signed-in user by id.
 
@@ -367,7 +367,7 @@ A failed sign-in is reported after the response is sent. Your `onAuthEvent` and 
 
 With `audit: true`, the same events are kept in the store for a year. Pass `audit: { maxAge: '90d' }`, seconds or a string, to change it.
 
-Each entry keeps the address cut to its network, the first three bytes of an IPv4 address and the first three groups of an IPv6 one. Pass `audit: { ip: 'full' }` to keep the whole address. Deleting an account removes the address and browser from its entries, and fails with the account still there if the store cannot. `auth.auditLog({ before, limit })` gives the signed-in user their own, newest first. Pass the last entry of a page as `before` for the next one.
+Each entry keeps the address cut to its network, the first three bytes of an IPv4 address and the first three groups of an IPv6 one. Pass `audit: { ip: 'full' }` to keep the whole address. Deleting an account removes the address and browser from its entries, and fails if the store cannot, with the account still there unless it was the last entry, the one recording the deletion. `auth.auditLog({ before, limit })` gives the signed-in user their own, newest first. Pass the last entry of a page as `before` for the next one.
 
 `describeAuditEntry(entry, { locale })` words an entry for a person, such as `Role editor granted`, in English or French.
 

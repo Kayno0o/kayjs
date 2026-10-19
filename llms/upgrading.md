@@ -11,10 +11,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 - `GET /auth/<provider>` answers `?error=oauth` while the signed-in user has a provider link in flight, and a repeated identical start goes on with the flow in flight.
 ### kayjs-auth keeps less personal data by default
 
-- An `oauth` entry stores the provider's tokens only with `keepTokens: true`: an app calling `providerToken()` adds it to that entry, else the call answers `null`, and tokens already stored are dropped on the user's next sign-in with that provider.
+- An `oauth` entry stores the provider's tokens only with `keepTokens: true`: an app calling `providerToken()` adds it to that entry, else the call answers `null`, and tokens already stored are dropped, not revoked, on the user's next sign-in with that provider.
 - Guests are deleted 30 days after they were made, with no `guests` option, and with `requireVerified` (on by default with `email`) an account registered and never verified is deleted after 30 days too. `onDelete` runs first. Set `guests: { maxAge }` and `email: { unverifiedMaxAge }` for another age, or `unverifiedMaxAge` with `requireVerified: false` to turn it on there. A custom store adds `users.staleUnverified(createdBefore, limit)`, else those accounts are kept.
 - The audit log stores each new entry's address cut to its /24 (IPv4) or /48 (IPv6); `audit: { ip: 'full' }` keeps the whole address. Entries already stored are not changed.
-- Deleting an account now throws when the store cannot strip the audit log, the account still there to delete again, where it logged and went on. No lint can see any of these, as they are runtime behaviours of options already written.
+- Deleting an account now throws when the store cannot strip the audit log, the account still there to delete again when stripping what came before fails (the one entry recording the deletion itself is stripped last, and a failure there throws with the account gone), where it logged and went on. No lint can see any of these, as they are runtime behaviours of options already written.
 
 ### Remote images only come from public addresses
 

@@ -69,7 +69,7 @@ export async function eraseLeavingUser(state: RequestState, record: UserRecord, 
   })
 }
 
-// `afterDelete` runs once the user is gone, and what it records is forgotten after it. The audit log forgets the user before and after, and a failure of either fails the erase, so none of their data stays behind unreported.
+// `afterDelete` runs once the user is gone, and what it records is forgotten after it. The audit log forgets the user before and after, and a failure of either fails the erase, so none of their data stays behind unreported; only the first leaves the account to delete again.
 async function eraseThen(core: Core, record: UserRecord, handOver: boolean, afterDelete?: () => Promise<void>): Promise<{ ok: true } | { ok: false, error: 'last-owner' }> {
   const { store } = core
 
@@ -85,11 +85,7 @@ async function eraseThen(core: Core, record: UserRecord, handOver: boolean, afte
   await forget(core, record, pseudonym)
   await store.users.delete(record.id)
 
-  if (afterDelete) {
-    await afterDelete()
-    // What `afterDelete` recorded still names them.
-    await forget(core, record, pseudonym)
-  }
+  await afterDelete?.()
 
   // Logged, not thrown: the account is gone by then, and a retry would find nothing to delete.
   try {
@@ -98,6 +94,10 @@ async function eraseThen(core: Core, record: UserRecord, handOver: boolean, afte
   catch (error) {
     log.error('handing over a deleted user\'s organizations failed', error)
   }
+
+  // What `afterDelete` recorded still names them. The account is gone by then, so this failure is thrown for the app to see and cannot be retried.
+  if (afterDelete)
+    await forget(core, record, pseudonym)
 
   return { ok: true }
 }

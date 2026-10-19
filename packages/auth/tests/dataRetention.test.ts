@@ -39,7 +39,7 @@ describe('pruning accounts never verified', () => {
     return { ...app, deleted, start, prune }
   }
 
-  test('an address registered and never verified goes after 30 days, one verified, with a session, another role or a provider stays', async () => {
+  test('an address registered and never verified goes after 30 days, one verified, with another role or a provider stays', async () => {
     const { store, deleted, start, prune } = setup()
     const old = new Date(start - 31 * DAY_MS)
 
@@ -207,16 +207,15 @@ describe('the audit log\'s addresses', () => {
     const truncated = testApp({ audit: true })
     const full = testApp({ audit: { ip: 'full' } })
 
-    for (const { browser } of [truncated, full])
-      await browser().json('/password', { method: 'POST', headers: { 'content-type': 'application/json', 'x-forwarded-for': '203.0.113.77' }, body: JSON.stringify({ identifier: 'nobody@example.com', password: PASSWORD }) })
+    for (const { browser } of [truncated, full]) {
+      await browser().call('register', { email: 'ada@example.com', password: PASSWORD })
+      await browser().json('/password', { method: 'POST', headers: { 'content-type': 'application/json', 'x-forwarded-for': '203.0.113.77' }, body: JSON.stringify({ identifier: 'ada@example.com', password: 'a wrong password' }) })
+    }
 
-    await truncated.browser().call('register', { email: 'ada@example.com', password: PASSWORD })
-    await full.browser().call('register', { email: 'ada@example.com', password: PASSWORD })
+    const failed = async (store: AuthStore) => (await store.audit!.list({ limit: 10 })).find(entry => entry.event === 'sign-in-failed')?.ip
 
-    const ips = async (store: AuthStore) => new Set((await store.audit!.list({ limit: 10 })).map(entry => entry.ip))
-
-    expect([...await ips(truncated.store)].every(ip => ip === 'unknown' || ip.endsWith('.0'))).toBe(true)
-    expect([...await ips(full.store)]).not.toContain('203.0.113.0')
+    expect(await failed(truncated.store)).toBe('203.0.113.0')
+    expect(await failed(full.store)).toBe('203.0.113.77')
   })
 
   test('truncatedAddress keeps an IPv4 address\'s /24 and an IPv6 address\'s /48', () => {
@@ -232,7 +231,7 @@ describe('the audit log\'s addresses', () => {
 
 describe('exporting a user\'s data', () => {
   test('includes the apps they approved, the invitations and the last ban once over', async () => {
-    const { browser, store, auth } = testApp({ organizations: { roles: { owner: [], member: [] }, owner: 'owner' }, admin: 'admin' })
+    const { browser, store } = testApp({ organizations: { roles: { owner: [], member: [] }, owner: 'owner' }, admin: 'admin' })
     const ada = browser()
     const { user } = await ada.callHas('user', 'register', { email: 'ada@example.com', password: PASSWORD })
     const now = new Date()
@@ -251,7 +250,6 @@ describe('exporting a user\'s data', () => {
     expect(data.invitations.sent).toMatchObject([{ id: 'sent', email: 'grace@example.com' }])
     expect(data.invitations.received).toMatchObject([{ id: 'received', organization: { id: 'other' } }])
     expect(data.ban).toMatchObject({ reason: 'spam' })
-    expect(auth).toBeDefined()
   })
 
   test('has no ban for a user not barred', async () => {
@@ -261,5 +259,25 @@ describe('exporting a user\'s data', () => {
     await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
 
     expect((await ada.callOk('exportData')).data).toMatchObject({ ban: null, grants: [], invitations: { received: [], sent: [] } })
+  })
+})
+
+describe('erasing a user, the entry recording it', () => {
+  test('a failure stripping it fails the erase after the account is gone and the organizations were handed over', async () => {
+    const base = memoryStore()
+    let calls = 0
+    const store: AuthStore = { ...base, audit: { ...base.audit!, forget: async (userId, pseudonym) => {
+      if (++calls === 2)
+        throw new Error('audit store down')
+
+      return base.audit!.forget(userId, pseudonym)
+    } } }
+    const { browser } = testApp({ store, audit: true })
+    const ada = browser()
+    const { user } = await ada.callHas('user', 'register', { email: 'ada@example.com', password: PASSWORD })
+
+    expect(await ada.post('/call/deleteAccount', [{ password: PASSWORD }])).not.toEqual({ ok: true })
+    expect(calls).toBe(2)
+    expect(await store.users.get(user.id)).toBeUndefined()
   })
 })
