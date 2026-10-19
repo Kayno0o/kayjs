@@ -193,6 +193,31 @@ describe.each(backends)('%s: requests racing for the last', (_, make) => {
     expect(answers.filter(answer => !answer.ok).every(answer => !answer.ok && answer.error === 'last-admin')).toBe(true)
   })
 
+  test('two admins deleting their own accounts together keep one', async () => {
+    const race = overlapping(await make(), 2)
+    const app = testApp({ store: race.store, admin: 'admin' })
+    const member = async (email: string) => {
+      const browser = app.browser()
+      const { user } = await browser.callHas('user', 'register', { email, password: PASSWORD })
+
+      await app.store.users.update(user.id, { roles: ['admin'] })
+
+      return { browser, id: user.id }
+    }
+    const ada = await member('ada@example.com')
+    const grace = await member('grace@example.com')
+
+    race.arm()
+
+    const answers = await Promise.all([ada.browser.call('deleteAccount', { password: PASSWORD }), grace.browser.call('deleteAccount', { password: PASSWORD })])
+    const remaining = (await Promise.all([app.store.users.get(ada.id), app.store.users.get(grace.id)])).filter(user => user !== undefined)
+
+    expect(race.overlapped()).toBe(true)
+    expect(remaining.length).toBeGreaterThanOrEqual(1)
+    expect(remaining.every(user => user.roles.includes('admin'))).toBe(true)
+    expect(answers.filter(answer => !answer.ok).every(answer => !answer.ok && answer.error === 'last-admin')).toBe(true)
+  })
+
   test('the two last ways in, unlinked together, leave one', async () => {
     const race = overlapping(await make(), 2)
     const app = testApp({ store: race.store })

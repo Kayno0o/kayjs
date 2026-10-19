@@ -70,6 +70,35 @@ export async function lastAdmin(state: RequestState, record: UserRecord): Promis
   return await isAdmin(state, record) && !await anotherAdmin(state, record.id)
 }
 
+// Strips an admin's roles before their account is deleted, which cannot be undone: two admins deleting themselves together each see the other still there, so when none is left the roles go back. Returns `restore` for a deletion that then fails, or undefined for the last admin.
+export async function stepAside(state: RequestState, record: UserRecord): Promise<{ restore: () => Promise<void> } | undefined> {
+  const { users } = state.core.store
+  const stripped = record.roles.length > 0 && await isAdmin(state, record)
+  const restore = async () => {
+    if (!stripped)
+      return
+
+    try {
+      await users.update(record.id, { roles: record.roles })
+    }
+    catch {
+      // The account is gone: nothing is left to restore.
+    }
+  }
+
+  if (!stripped)
+    return { restore }
+
+  await users.update(record.id, { roles: [] })
+
+  if (await anotherAdmin(state, ''))
+    return { restore }
+
+  await restore()
+
+  return undefined
+}
+
 // Read a page at a time and stopped at the first admin other than `exceptId`; the total is never read, so the store need not count.
 async function anotherAdmin(state: RequestState, exceptId: string): Promise<boolean> {
   for (let offset = 0; ; offset += USER_PAGE_MAX) {

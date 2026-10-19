@@ -4,7 +4,7 @@ import type { RequestState } from './state'
 import type { UserRecord } from './store'
 import type { Proof, ProofFailure } from './twoFactor'
 import { hashPassword } from '@kaynooo/utils'
-import { lastAdmin } from './admin'
+import { lastAdmin, stepAside } from './admin'
 import { newPasswordProblem } from './breached'
 import { publicUser } from './core'
 import { eraseLeavingUser, soleOwned } from './erase'
@@ -133,10 +133,27 @@ export async function deleteAccount(state: RequestState, proof: Proof, signOut: 
   if (!proved.ok)
     return proved
 
-  const erased = await eraseLeavingUser(state, proved.record)
+  const aside = await stepAside(state, proved.record)
 
-  if (!erased.ok)
+  if (!aside)
+    return { ok: false, error: 'last-admin' }
+
+  let erased: Awaited<ReturnType<typeof eraseLeavingUser>>
+
+  try {
+    erased = await eraseLeavingUser(state, proved.record)
+  }
+  catch (error) {
+    await aside.restore()
+
+    throw error
+  }
+
+  if (!erased.ok) {
+    await aside.restore()
+
     return erased
+  }
 
   await signOut()
 

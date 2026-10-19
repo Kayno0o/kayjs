@@ -278,7 +278,7 @@ describe('revoking in bulk', () => {
 })
 
 describe('the last admin', () => {
-  test('is looked for without counting users, one page when another admin shows up', async () => {
+  test('is looked for without counting users, one page when another admin shows up, before the proof and again after the roles are stripped', async () => {
     const log = recorded()
     const app = testApp({ store: log.store, admin: 'admin' })
     const root = app.browser()
@@ -294,8 +294,9 @@ describe('the last admin', () => {
 
     const lists = log.calls.filter(call => call.name === 'users.list')
 
-    expect(lists).toHaveLength(1)
-    expect(lists[0]!.args[0]).toMatchObject({ total: false })
+    expect(lists).toHaveLength(2)
+    for (const list of lists)
+      expect(list.args[0]).toMatchObject({ total: false })
   })
 })
 
