@@ -1,0 +1,11 @@
+---
+import AppHeader from '@kaynooo/kayjs-ui/app-header.kay'
+
+const links = [{ href: '/', label: 'Home', icon: 'info' }, { href: '/data', label: '<b>Data</b>' }, { href: '/charts', label: 'Charts', icon: 'info' }] as const
+---
+AppHeader#header(links={links} current="/charts/moons" label="Main")
+  @brand
+    a#brand(href="/") Moons
+  @end
+    button#user(type="button") Ada
+AppHeader#bare(links={links} current="/" label="Bare" sticky={false})

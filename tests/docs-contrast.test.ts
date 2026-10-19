@@ -9,7 +9,7 @@ import { takeDocsBuild } from './docs-build'
 
 const CLI = resolve('src/cli.ts')
 // Home, a guide, a UI component's page with its demos and a Structure page: each layout the docs have; the chat panel is opened on the last.
-const PAGES = ['/', '/guides/api-routes', '/ui/button', '/ui/badge', '/structure/app-css']
+const PAGES = ['/', '/guides/api-routes', '/ui/button', '/ui/badge', '/ui/app-header', '/structure/app-css']
 const SCHEMES = ['light', 'dark'] as const
 
 // Without BUN_CHROME_PATH or a Chrome on the PATH, the Chromium playwright-core installed for the other browser tests.
@@ -121,5 +121,59 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the docs a
     })
 
     expect(docs).toEqual({ foot: true, toc: true })
+  }, 60_000)
+
+  // The demo scrolls with its page, so its header is moved to the top of the body, where its `sticky` is what holds it.
+  it('keeps an AppHeader at the top of the page on scroll, and folds its links behind the menu button on a narrow screen', async () => {
+    await page.goto('/ui/app-header')
+
+    const wide = await page.evaluate(() => {
+      const header = document.querySelector<HTMLElement>('.kui-app-header')!
+      const box = (selector: string) => header.querySelector(selector)!.getBoundingClientRect()
+
+      header.dataset.sticky = ''
+      document.body.prepend(header)
+      document.body.append(Object.assign(document.createElement('div'), { style: 'height: 4000px' }))
+      window.scrollTo(0, 2000)
+
+      return {
+        top: header.getBoundingClientRect().top,
+        row: box('.kui-app-header-brand').right <= box('.kui-site-nav-list').left && box('.kui-site-nav-list').right <= box('.kui-app-header-end').left,
+        folded: getComputedStyle(header.querySelector('.kui-site-nav-toggle')!).display === 'none',
+      }
+    })
+
+    expect(wide).toEqual({ top: 0, row: true, folded: true })
+
+    const narrow = await browse(origin, { path, width: 400, height: 800 })
+
+    try {
+      await narrow.goto('/ui/app-header')
+
+      const closed = await narrow.evaluate(() => {
+        const header = document.querySelector<HTMLElement>('.kui-app-header')!
+        const toggle = header.querySelector<HTMLElement>('.kui-site-nav-toggle')!
+
+        return {
+          list: getComputedStyle(header.querySelector('.kui-site-nav-list')!).display,
+          toggleAtEnd: toggle.getBoundingClientRect().right > header.querySelector('.kui-app-header-end')!.getBoundingClientRect().right,
+          overflow: document.documentElement.scrollWidth > window.innerWidth,
+        }
+      })
+
+      expect(closed).toEqual({ list: 'none', toggleAtEnd: true, overflow: false })
+
+      await narrow.click('.kui-app-header .kui-site-nav-toggle')
+      await narrow.waitUntil(() => document.querySelector('.kui-app-header .kui-site-nav[data-open]') !== null)
+
+      expect(await narrow.evaluate(() => {
+        const list = document.querySelector('.kui-app-header .kui-site-nav-list')!.getBoundingClientRect()
+
+        return { shown: list.width > 0, onScreen: list.left >= 0 && list.right <= window.innerWidth }
+      })).toEqual({ shown: true, onScreen: true })
+    }
+    finally {
+      narrow.close()
+    }
   }, 60_000)
 })

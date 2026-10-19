@@ -1,4 +1,5 @@
 ---
+import AppHeader from '@kaynooo/kayjs-ui/app-header.kay'
 import Badge from '@kaynooo/kayjs-ui/badge.kay'
 import CardRow from '@kaynooo/kayjs-ui/card-row.kay'
 import CollapsibleSection from '@kaynooo/kayjs-ui/collapsible-section.kay'
@@ -52,3 +53,11 @@ main
       | Mars
   article#site-nav
     SiteNav(id="main-links" links={[{ href: '/', label: 'Home' }, { href: '/chart', label: 'Chart' }, { href: '/charts', label: 'Charts' }, { href: '/charts/moons', label: 'Moons' }, { href: '/data', label: 'Data' }]} current="/charts/moons/" label="Main" menuLabel="Ouvrir le menu")
+  article#app-header
+    AppHeader(links={[{ href: '/', label: 'Home', icon: 'info' }, { href: '/data', label: '<b>Data</b>' }]} current="/data/" label="Site")
+      @brand
+        a(href="/") Moons
+      @end
+        a(href="/form") Sign in
+  article#app-header-bare
+    AppHeader(links={[{ href: '/', label: 'Home' }]} current="/" label="Bare" sticky={false})

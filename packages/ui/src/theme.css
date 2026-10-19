@@ -1649,11 +1649,40 @@
   }
 
   .kui-site-nav-link {
-    @apply block px-3 py-2 text-sm text-kui-subtext0 transition-colors hover:text-kui-text;
+    @apply flex items-center gap-2 px-3 py-2 text-sm text-kui-subtext0 transition-colors hover:text-kui-text;
 
     &:where([aria-current]) {
       @apply text-kui-accent;
     }
+  }
+
+  .kui-site-nav-icon {
+    @apply size-4 shrink-0;
+  }
+
+  .kui-app-header {
+    @apply flex items-center gap-4 border-b border-kui-surface2 bg-kui-canvas px-4 py-2;
+
+    &:where([data-sticky]) {
+      @apply sticky top-0 z-20;
+    }
+  }
+
+  .kui-app-header-brand {
+    @apply flex items-center gap-2 font-kui-heading text-kui-text;
+  }
+
+  /* Last on a narrow screen, so the menu button ends the bar, beside the end area; from lg the links follow the brand. */
+  .kui-app-header-nav {
+    @apply order-last lg:order-none;
+
+    &:where(:last-child) {
+      @apply ml-auto lg:ml-0;
+    }
+  }
+
+  .kui-app-header-end {
+    @apply ml-auto flex items-center gap-2;
   }
 
   .kui-pagination {

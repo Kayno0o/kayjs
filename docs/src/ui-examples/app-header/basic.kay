@@ -1,0 +1,15 @@
+---
+import AppHeader from '@kaynooo/kayjs-ui/app-header.kay'
+import Avatar from '@kaynooo/kayjs-ui/avatar.kay'
+
+const links = [
+  { href: '/', label: 'Overview', icon: 'info' },
+  { href: '/guides/tutorial', label: 'Tutorial' },
+  { href: '/ui/app-header', label: 'AppHeader' },
+] as const
+---
+AppHeader(links={links} current="/ui/app-header" label="Main" sticky={false})
+  @brand
+    strong kay
+  @end
+    Avatar(name="Ada Lovelace" label="Ada Lovelace")

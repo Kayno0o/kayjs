@@ -1,0 +1,32 @@
+---
+import type { JSX } from 'kay'
+import type { IconProps } from 'kay/icons'
+import type { IconSlot } from './defaults'
+import SiteNav from './site-nav.kay'
+
+const { links, current, label, menuLabel, brand, end, sticky = true, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['header'], 'class' | 'children'> & {
+  links: readonly { href: string, label: string, icon?: IconSlot | IconProps | undefined }[]
+  // The path of the page on screen, as for `SiteNav`.
+  current: string
+  // Names the navigation for screen readers.
+  label: string
+  // Names the button opening the links on a narrow screen.
+  menuLabel?: string | undefined
+  // At the start: a logo and the site's name, usually a link home.
+  brand?: JSX.Element
+  // At the far end: a user menu, a theme toggle.
+  end?: JSX.Element
+  // Stays at the top of the page while it scrolls; `false` lets it scroll away.
+  sticky?: boolean | undefined
+  class?: string | undefined
+}>()
+---
+// The bar across the top of an app: its brand, its main links, which fold into a menu on a narrow screen, and an area at the far end.
+header.kui-app-header({...rest} data-sticky={sticky ? '' : undefined} class={className})
+  if brand
+    .kui-app-header-brand
+      | {brand}
+  SiteNav(links={links} current={current} label={label} menuLabel={menuLabel} class="kui-app-header-nav")
+  if end
+    .kui-app-header-end
+      | {end}

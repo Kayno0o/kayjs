@@ -1,6 +1,9 @@
 ---
 import type { JSX } from 'kay'
 import { effect, listen, signal, uid } from 'kay'
+import type { IconProps } from 'kay/icons'
+import type { IconSlot } from './defaults'
+import Icon from './icon.kay'
 import IconButton from './icon-button.kay'
 import { wording } from 'kay/words'
 
@@ -9,7 +12,8 @@ const TRAILING_SLASHES = /\/+$/
 const { id, links, current, label, menuLabel = wording('ui.siteNav.menuLabel', 'Menu'), class: className, ...rest } = props<Omit<JSX.IntrinsicElements['nav'], 'id' | 'class' | 'children'> & {
   // The list's id, unique on the page; one is drawn when none is given.
   id?: string | undefined
-  links: readonly { href: string, label: string }[]
+  // `icon` is drawn before the label, for the reader who sees it; the label still names the link.
+  links: readonly { href: string, label: string, icon?: IconSlot | IconProps | undefined }[]
   // The path of the page on screen: its link is marked as the page, and a link to a section holding it as current.
   current: string
   // Names the navigation for screen readers.
@@ -64,4 +68,7 @@ nav.kui-site-nav({...rest} ref={element => nav = element} aria-label={label} dat
   ul.kui-site-nav-list(id={listId} style={`position-anchor: ${anchor}`})
     for link of links key={link.href}
       li
-        a.kui-site-nav-link(href={link.href} aria-current={marked(link.href)} onClick={() => open.set(false)}) {link.label}
+        a.kui-site-nav-link(href={link.href} aria-current={marked(link.href)} onClick={() => open.set(false)})
+          if link.icon
+            Icon(icon={link.icon} class="kui-site-nav-icon")
+          | {link.label}

@@ -7,6 +7,7 @@ import { testSite } from 'kay/test'
 const ROOT = join(import.meta.dir, '..')
 // kay check prints this line on success since kay 1.18, nothing before.
 const CLEAN = /^(?:checked with no problems in \d+ ms\n)?$/
+const KUI_CLASS = /^kui-[\w-]+/
 const site = await testSite({ root: ROOT })
 
 // Each page is fetched once, whichever tests read it.
@@ -171,6 +172,21 @@ describe('controls', () => {
 
   test('Toggle is a checkbox with the switch role, on when asked', async () => {
     expect((await attributes('/controls', '#digest input', ['type', 'role', 'checked', 'name']))).toEqual([{ type: 'checkbox', role: 'switch', checked: '', name: 'digest' }])
+  })
+})
+
+describe('layout', () => {
+  test('AppHeader is a header holding its brand, one named nav and its end area, sticky unless told not to', async () => {
+    expect((await find('/layout', '#app-header header > .kui-app-header-brand, #app-header header .kui-site-nav, #app-header header > .kui-app-header-end')).map(found => found.attributes.class?.match(KUI_CLASS)?.[0])).toEqual(['kui-app-header-brand', 'kui-site-nav', 'kui-app-header-end'])
+    expect(await attributes('/layout', '#app-header header, #app-header-bare header', ['data-sticky'])).toEqual([{ 'data-sticky': '' }, { 'data-sticky': null }])
+    expect(await attributes('/layout', '#app-header nav', ['aria-label'])).toEqual([{ 'aria-label': 'Site' }])
+    expect((await find('/layout', '#app-header-bare header .kui-app-header-brand, #app-header-bare header .kui-app-header-end'))).toEqual([])
+  })
+
+  test('AppHeader marks the current link and draws a link\'s icon beside its escaped label', async () => {
+    expect(await attributes('/layout', '#app-header .kui-site-nav-link', ['href', 'aria-current'])).toEqual([{ 'href': '/', 'aria-current': null }, { 'href': '/data', 'aria-current': 'page' }])
+    expect((await find('/layout', '#app-header .kui-site-nav-link')).map(found => found.text)).toEqual(['Home', '<b>Data</b>'])
+    expect(await attributes('/layout', '#app-header .kui-site-nav-link svg', ['aria-hidden'])).toEqual([{ 'aria-hidden': 'true' }])
   })
 })
 
