@@ -446,5 +446,5 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   answerUncaught(app, { dev: mode.dev, onError: options.onError, page: uncaught })
   agreeOnWildcards(app)
 
-  return { app, served, locale: locales.settings.defaultLocale, securityOptions }
+  return { app, served, locale: locales.settings.defaultLocale, securityOptions, routes }
 }

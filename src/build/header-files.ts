@@ -11,7 +11,7 @@ function titled(name: string): string {
 
 // The headers as a `_headers` file, which Netlify and Cloudflare Pages read, every path getting them.
 export function headersFile(headers: Record<string, string>): string {
-  const lines = Object.entries(headers).map(([name, value]) => `  ${titled(name)}: ${value}`)
+  const lines = Object.entries(headers).filter(([, value]) => !LINE_BREAK.test(value)).map(([name, value]) => `  ${titled(name)}: ${value}`)
 
   return `/*\n${lines.join('\n')}\n`
 }

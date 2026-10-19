@@ -48,7 +48,7 @@ export default defineConfig({
 })
 ```
 
-A static export writes the other headers to `_headers` and `headers.nginx.conf` but not this one, so the `nginx.conf` of the starter container sends it. If you serve the export with another server, set it there. In nginx, repeat it in each `location` that has an `add_header` of its own, since nginx does not inherit the server-level ones there.
+A static export writes it to `_headers` but not to `headers.nginx.conf`, so the `nginx.conf` of the starter container sends it itself, always with one year, whatever value you set here. If you serve the export with another server, set it there. In nginx, repeat it in each `location` that has an `add_header` of its own, since nginx does not inherit the server-level ones there.
 
 ## Content-Security-Policy
 

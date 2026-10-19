@@ -20,6 +20,7 @@ import { PRERENDERED_DIR } from '../server/client'
 import { compressPaths } from '../server/compress'
 import { localeSettings } from '../server/i18n'
 import { limiter } from '../server/limit'
+import { routesWithSecurity } from '../server/page-headers'
 import { applyPageHooks, assetFiles } from '../server/page-hook'
 import { publicFiles, servedPublicly } from '../server/public'
 import { hostedStatus } from '../server/redirects'
@@ -153,7 +154,7 @@ export async function exportStatic(project: Project, client: ClientBuild, outdir
   const base = basePath(config.base)
   const origin = config.site === undefined ? '' : siteOrigin(config.site)
 
-  written.push(...await writeHeaders(out, securityHeaders({ ...pages.securityOptions, security: config.security })))
+  written.push(...await writeHeaders(out, config, pages))
 
   written.push(...await writeRedirects(out, config.redirects ?? {}, base, origin))
 
@@ -239,18 +240,37 @@ function pageFiles(path: string): string[] {
 }
 
 // The headers a server would send every response, for a host to send: `_headers` for those reading one, and an nginx include.
-// A page setting its own `security` is not read here, as that would take running its module.
-async function writeHeaders(out: string, headers: Record<string, string> | undefined): Promise<string[]> {
+// A page's own `security` is not part of them, and neither is the CSP report endpoint, which a static site lacks.
+async function writeHeaders(out: string, config: KayConfig, pages: Awaited<ReturnType<typeof pagesApp>>): Promise<string[]> {
+  const security = config.security === false || config.security?.reports !== true ? config.security : { ...config.security, reports: undefined }
+  const headers = securityHeaders({ ...pages.securityOptions, security })
   const nginx = join(out, 'headers.nginx.conf')
+  const written = [nginx]
 
   await Bun.write(nginx, nginxHeaders(headers ?? {}))
 
   if (!headers)
-    return [nginx]
+    return written
 
-  await Bun.write(join(out, '_headers'), headersFile(headers))
+  if (config.security !== false && config.security?.reports === true)
+    kayLog('warn', 'security.reports: true sends CSP reports to an endpoint a static site lacks, so the exported headers leave it out; name a URL in reports to receive them')
 
-  return [nginx, join(out, '_headers')]
+  const own = await routesWithSecurity(pages.routes)
+
+  if (own.length > 0)
+    kayLog('warn', `${own.join(', ')} set${own.length === 1 ? 's' : ''} security on the page or a layout, which the exported headers do not carry: the site-wide policy applies to ${own.length === 1 ? 'it' : 'them'} unless the host sends other headers for the path`)
+
+  const file = join(out, '_headers')
+
+  if (existsSync(file)) {
+    kayLog('warn', 'public/_headers is kept as it is, so the security headers kay computed are not in it; they are in headers.nginx.conf')
+
+    return written
+  }
+
+  await Bun.write(file, headersFile(headers))
+
+  return [...written, file]
 }
 
 // A static host answers no redirect, so each one without params becomes a page sending the browser on; all of them also go to `_redirects`, which hosts such as Netlify and Cloudflare Pages read.

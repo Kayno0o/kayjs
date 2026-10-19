@@ -47,6 +47,17 @@ export function withPageHeaders(respond: PageResponder, options: SecurityOptions
   }
 }
 
+// The patterns of the routes whose page or layouts set `security`, which only a server answering each page can apply.
+export async function routesWithSecurity(routes: ServedRoute[]): Promise<string[]> {
+  const found = await Promise.all(routes.map(async (route) => {
+    const modules = await Promise.all(routeChain(route).files.map(async file => importModule<object>(file)))
+
+    return modules.some(module => pageSetting(module, 'security') !== undefined) ? [route.pattern] : []
+  }))
+
+  return found.flat()
+}
+
 async function routeHeaders(route: ServedRoute, options: SecurityOptions, site: Record<string, string> | undefined): Promise<RouteHeaders | undefined> {
   const modules = await Promise.all(routeChain(route).files.map(async file => importModule<object>(file)))
   const security = modules.flatMap(module => (pageSetting(module, 'security') as PageSecurity | undefined) ?? [])

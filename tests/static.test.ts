@@ -344,6 +344,46 @@ describe('kay build --static', () => {
     expect(headersFile({ 'x-frame-options': 'SAMEORIGIN' })).toBe('/*\n  X-Frame-Options: SAMEORIGIN\n')
   })
 
+  it('warns of the pages setting their own security and of CSP reports, keeps a public _headers, and writes no headers with security off', async () => {
+    const fixture = await fixtureCopy('static')
+    const elsewhere = await mkdtemp(join(tmpdir(), 'kay-static-'))
+    const config = join(fixture, 'kay.config.ts')
+    const original = await Bun.file(config).text()
+
+    try {
+      await Bun.write(join(fixture, 'src/routes/embed.kay'), '--- server\nexport const page = { security: { csp: { \'frame-src\': [\'https://video.example\'] } } }\n---\nh1 Embed\n')
+      await Bun.write(join(fixture, 'public/_headers'), '/*\n  X-Mine: yes\n')
+      await Bun.write(config, original.replace('robots:', 'security: { reports: true },\n  robots:'))
+
+      const reported = await exportSite(elsewhere, fixture)
+
+      expect(reported.errors).toContain('/embed set')
+      expect(reported.errors).toContain('security.reports: true sends CSP reports to an endpoint a static site lacks')
+      expect(reported.errors).toContain('public/_headers is kept as it is')
+      expect(reported.code).toBe(0)
+      expect(await Bun.file(join(elsewhere, '_headers')).text()).toBe('/*\n  X-Mine: yes\n')
+
+      const nginx = await Bun.file(join(elsewhere, 'headers.nginx.conf')).text()
+
+      expect(nginx).toContain('add_header Content-Security-Policy')
+      expect(nginx).not.toContain('Reporting-Endpoints')
+
+      await Bun.write(config, original.replace('robots:', 'security: false,\n  robots:'))
+      await rm(join(fixture, 'public/_headers'))
+      await rm(join(fixture, 'src/routes/embed.kay'))
+
+      const bare = await exportSite(elsewhere, fixture)
+
+      expect(bare.code).toBe(0)
+      expect(await Bun.file(join(elsewhere, 'headers.nginx.conf')).text()).toBe('# kay sends no security headers for this build.\n')
+      expect(existsSync(join(elsewhere, '_headers'))).toBe(false)
+    }
+    finally {
+      await rm(fixture, { recursive: true, force: true })
+      await rm(elsewhere, { recursive: true, force: true })
+    }
+  })
+
   it('names every page only a server could answer, and fails', async () => {
     const fixture = await fixtureCopy('static')
     const guarded = join(fixture, 'src/routes/members')
