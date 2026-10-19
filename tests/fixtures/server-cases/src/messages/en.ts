@@ -1,0 +1,3 @@
+import { defineMessages } from 'kay/i18n'
+
+export default defineMessages({ nav: { home: 'Home' } })

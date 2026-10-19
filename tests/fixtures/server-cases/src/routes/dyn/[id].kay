@@ -1,0 +1,4 @@
+--- server
+const { id } = ctx.params
+---
+h1 Item {id}

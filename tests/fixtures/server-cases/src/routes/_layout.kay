@@ -1,0 +1,11 @@
+--- server
+import { localize } from 'kay/i18n'
+
+const home = localize('/')
+const about = localize('/about')
+---
+nav
+  a.home(href={home}) Home
+  a.about(href={about}) About
+main
+  slot
