@@ -1,5 +1,6 @@
-import type { JobStore, Queue, QueueOptions } from '../src/server'
+import type { JobContext, JobStore, Queue, QueueOptions } from '../src/server'
 import { afterEach, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
+import { parse } from 'devalue'
 import { Elysia } from 'elysia'
 import { queue as makeQueue, memoryJobs, retryLater, shutdown } from '../src/server'
 import { forgetQueue } from '../src/server/queue'
@@ -11,8 +12,8 @@ let names = 0
 const made: { drain: () => Promise<number> }[] = []
 
 // Every queue made here leaves what `drainQueues` runs with its test, as its store's database goes with its file.
-function queue<Payload>(name: string, handler: (payload: Payload, signal: AbortSignal) => unknown, options?: QueueOptions<Payload>): Queue<Payload> {
-  const created = makeQueue<Payload>(name, handler, options)
+function queue<Payload, Progress = unknown>(name: string, handler: (payload: Payload, signal: AbortSignal, job: JobContext<Progress>) => unknown, options?: QueueOptions<Payload>): Queue<Payload, Progress> {
+  const created = makeQueue<Payload, Progress>(name, handler, options)
 
   made.push(created)
 
@@ -55,7 +56,7 @@ describe.each(kinds)('a queue on a $name store', ({ open }) => {
       const first = await jobs.enqueue(1, { key: 'k' })
 
       await jobs.drain()
-      expect(await jobs.state('k')).toMatchObject({ id: first, status: 'failed', error: 'boom' })
+      expect(await jobs.job('k')).toMatchObject({ id: first, status: 'failed', error: 'boom' })
 
       fail = false
 
@@ -63,9 +64,9 @@ describe.each(kinds)('a queue on a $name store', ({ open }) => {
 
       expect(second).not.toBe(first)
       expect(await jobs.drain()).toBe(1)
-      expect(await jobs.state('k')).toMatchObject({ id: first, status: 'failed' })
+      expect(await jobs.job('k')).toMatchObject({ id: first, status: 'failed' })
       await jobs.remove(first)
-      expect(await jobs.state('k')).toBeUndefined()
+      expect(await jobs.job('k')).toBeUndefined()
       errors.mockRestore()
     })
 
@@ -79,7 +80,7 @@ describe.each(kinds)('a queue on a $name store', ({ open }) => {
 
       expect(await jobs.drain()).toBe(1)
       expect(during).toEqual([id])
-      expect(await jobs.state('k')).toBeUndefined()
+      expect(await jobs.job('k')).toBeUndefined()
     })
 
     it('never skips a job without a key, and keeps keys apart per queue', async () => {
@@ -130,7 +131,7 @@ describe.each(kinds)('a queue on a $name store', ({ open }) => {
 
       for (let round = 1; round <= 10; round++) {
         expect(await jobs.drain()).toBe(1)
-        expect(await jobs.state('k')).toEqual({ id, status: 'waiting', attempts: 0 })
+        expect(await jobs.job('k')).toEqual({ id, status: 'waiting', attempts: 0 })
         // Not due before its wait.
         expect(await jobs.drain()).toBe(0)
         setSystemTime(Date.now() + 31_000)
@@ -138,7 +139,7 @@ describe.each(kinds)('a queue on a $name store', ({ open }) => {
 
       expect(await jobs.drain()).toBe(1)
       expect(runs).toBe(11)
-      expect(await jobs.state('k')).toBeUndefined()
+      expect(await jobs.job('k')).toBeUndefined()
       expect(failed).toEqual([])
       expect(errors).not.toHaveBeenCalled()
       expect(warns).not.toHaveBeenCalled()
@@ -163,7 +164,7 @@ describe.each(kinds)('a queue on a $name store', ({ open }) => {
         setSystemTime(Date.now() + 61_000)
       }
 
-      expect(await jobs.state('k')).toMatchObject({ status: 'failed', attempts: 3, error: 'real 3' })
+      expect(await jobs.job('k')).toMatchObject({ status: 'failed', attempts: 3, error: 'real 3' })
       logs.mockRestore()
       errors.mockRestore()
       warns.mockRestore()
@@ -178,7 +179,7 @@ describe.each(kinds)('a queue on a $name store', ({ open }) => {
 
       await jobs.enqueue(1, { key: 'k' })
       await jobs.drain()
-      expect(await jobs.state('k')).toMatchObject({ status: 'waiting', attempts: 1 })
+      expect(await jobs.job('k')).toMatchObject({ status: 'waiting', attempts: 1 })
       expect(warns.mock.calls.flat().join('')).toContain('release')
       warns.mockRestore()
     })
@@ -189,24 +190,165 @@ describe.each(kinds)('a queue on a $name store', ({ open }) => {
     })
   })
 
-  describe('state', () => {
+  describe('progress', () => {
+    // Writes go to the store after the handler's turn, so a handler reading them back waits for them.
+    async function seen<Progress>(jobs: Queue<number, Progress>, key: string, present: (progress: Progress | undefined) => boolean) {
+      for (let tries = 0; tries < 200; tries++) {
+        const state = await jobs.job(key)
+
+        if (present(state?.progress))
+          return state
+
+        await Bun.sleep(5)
+      }
+
+      throw new Error('progress never showed')
+    }
+
+    it('is written by the handler and read back typed, dates and maps included, while the job runs', async () => {
+      const store = await open()
+      const reads: unknown[] = []
+      const jobs = queue<number, { processed: number, total: number, since: Date }>(named(), async (_payload, _signal, job) => {
+        job.progress({ processed: 3, total: 40, since: new Date(0) })
+        reads.push((await seen(jobs, 'k', progress => progress?.processed === 3))?.progress)
+      }, { store })
+
+      await jobs.enqueue(1, { key: 'k' })
+      await jobs.drain()
+      expect(reads).toEqual([{ processed: 3, total: 40, since: new Date(0) }])
+      expect(await jobs.job('k')).toBeUndefined()
+    })
+
+    it('keeps the last value a failed job reported, and clears it for the next run of a retried job', async () => {
+      const errors = spyOn(console, 'error').mockImplementation(noop)
+      const warns = spyOn(console, 'warn').mockImplementation(noop)
+      const starts: unknown[] = []
+      const jobs = queue<number, number>(named(), async (_payload, _signal, job) => {
+        starts.push((await jobs.job('k'))?.progress)
+        job.progress(job.attempts * 10)
+        await seen(jobs, 'k', progress => progress === job.attempts * 10)
+
+        throw new Error('boom')
+      }, { store: await open(), attempts: 2, backoff: '1s' })
+
+      await jobs.enqueue(1, { key: 'k' })
+      await jobs.drain()
+      expect(await jobs.job('k')).toMatchObject({ status: 'waiting', progress: 10 })
+      setSystemTime(Date.now() + 2000)
+      await jobs.drain()
+      expect(starts).toEqual([undefined, undefined])
+      expect(await jobs.job('k')).toMatchObject({ status: 'failed', progress: 20, attempts: 2 })
+      errors.mockRestore()
+      warns.mockRestore()
+      setSystemTime()
+    })
+
+    it('writes the latest of many reports, not each one', async () => {
+      const store = await open()
+      const written: string[] = []
+      const counted: JobStore = {
+        ...store,
+        progress: async (id, until, progress) => {
+          written.push(progress)
+          await store.progress!(id, until, progress)
+        },
+      }
+      const last = queue<number, number>(named(), async (_payload, _signal, job) => {
+        for (let step = 1; step <= 500; step++)
+          job.progress(step)
+
+        await seen(last, 'k', progress => progress === 500)
+      }, { store: counted })
+
+      await last.enqueue(1, { key: 'k' })
+      await last.drain()
+      expect(written.length).toBeLessThan(10)
+      expect(parse(written.at(-1)!)).toBe(500)
+    })
+
+    it('drops a report made after the run ended, and never throws it at the handler', async () => {
+      const store = await open()
+      let late: (() => void) | undefined
+      const jobs = queue<number, number>(named(), async (_payload, _signal, job) => {
+        late = () => job.progress(99)
+        job.progress(1)
+      }, { store, attempts: 1 })
+
+      await jobs.enqueue(1, { key: 'k' })
+      await jobs.drain()
+      late!()
+      await Bun.sleep(20)
+      expect(await jobs.job('k')).toBeUndefined()
+
+      const next = await jobs.enqueue(2, { key: 'k' })
+
+      expect(await jobs.job({ id: next })).toEqual({ id: next, status: 'waiting', attempts: 0 })
+      late!()
+      await Bun.sleep(20)
+      expect(await jobs.job({ id: next })).toEqual({ id: next, status: 'waiting', attempts: 0 })
+      await jobs.drain()
+    })
+
+    it('logs a store that fails to write it and goes on running the handler', async () => {
+      const warns = spyOn(console, 'warn').mockImplementation(noop)
+      const store: JobStore = { ...(await open()), progress: async () => Promise.reject(new Error('locked')) }
+      let finished = false
+      const jobs = queue<number, number>(named(), async (_payload, _signal, job) => {
+        job.progress(1)
+        await Bun.sleep(20)
+        finished = true
+      }, { store })
+
+      await jobs.enqueue(1)
+      await jobs.drain()
+      expect(finished).toBe(true)
+      expect(warns.mock.calls.flat().join('')).toContain('locked')
+      warns.mockRestore()
+    })
+
+    it('says once that a store without progress keeps none, and runs the job', async () => {
+      const warns = spyOn(console, 'warn').mockImplementation(noop)
+      const store: JobStore = { ...(await open()), progress: undefined }
+      const jobs = queue<number, number>(named(), (_payload, _signal, job) => {
+        job.progress(1)
+        job.progress(2)
+      }, { store })
+
+      await jobs.enqueue(1)
+      await jobs.enqueue(2)
+      expect(await jobs.drain()).toBe(2)
+      expect(warns.mock.calls.filter(call => String(call[0]).includes('progress'))).toHaveLength(1)
+      warns.mockRestore()
+    })
+
+    it('hands the handler its job id and the run it is on', async () => {
+      const got: unknown[] = []
+      const jobs = queue<number>(named(), (_payload, _signal, job) => void got.push({ id: job.id, attempts: job.attempts }), { store: await open() })
+      const id = await jobs.enqueue(1)
+
+      await jobs.drain()
+      expect(got).toEqual([{ id, attempts: 1 }])
+    })
+  })
+
+  describe('job', () => {
     it('tells waiting from running, by key or by id, and nothing for a job that completed or never was', async () => {
       const store = await open()
       const seen: unknown[] = []
       const jobs = queue<number>(named(), async () => {
-        seen.push(await jobs.state('k'))
+        seen.push(await jobs.job('k'))
       }, { store })
 
-      expect(await jobs.state('k')).toBeUndefined()
+      expect(await jobs.job('k')).toBeUndefined()
 
       const id = await jobs.enqueue(1, { key: 'k' })
 
-      expect(await jobs.state('k')).toEqual({ id, status: 'waiting', attempts: 0 })
-      expect(await jobs.state({ id })).toMatchObject({ id, status: 'waiting' })
+      expect(await jobs.job('k')).toEqual({ id, status: 'waiting', attempts: 0 })
+      expect(await jobs.job({ id })).toMatchObject({ id, status: 'waiting' })
       await jobs.drain()
       expect(seen).toEqual([{ id, status: 'running', attempts: 1 }])
-      expect(await jobs.state('k')).toBeUndefined()
-      expect(await jobs.state({ id })).toBeUndefined()
+      expect(await jobs.job('k')).toBeUndefined()
+      expect(await jobs.job({ id })).toBeUndefined()
     })
 
     it('shows a job waiting for its retry with the error of its last run', async () => {
@@ -218,7 +360,7 @@ describe.each(kinds)('a queue on a $name store', ({ open }) => {
       const id = await jobs.enqueue(1, { key: 'k' })
 
       await jobs.drain()
-      expect(await jobs.state('k')).toEqual({ id, status: 'waiting', attempts: 1, error: 'nope' })
+      expect(await jobs.job('k')).toEqual({ id, status: 'waiting', attempts: 1, error: 'nope' })
       warns.mockRestore()
     })
   })
@@ -230,7 +372,7 @@ describe('a queue on a store without keys', () => {
     const jobs = queue<number>(named(), noop, { store })
 
     await expect(jobs.enqueue(1, { key: 'k' })).rejects.toThrow('state')
-    await expect(jobs.state('k')).rejects.toThrow('state')
+    await expect(jobs.job('k')).rejects.toThrow('state')
     expect(await jobs.enqueue(1)).toBeString()
     await jobs.drain()
   })

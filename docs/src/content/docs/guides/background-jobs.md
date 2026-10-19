@@ -99,6 +99,34 @@ export const downloads = queue('downloads', async (url: string) => {
 
 The job comes back after the wait, as often as the handler throws it, and is never kept as failed for it. A handler that should give up throws an error of its own, which spends attempts as ever.
 
+### Progress
+
+A handler takes the job as its third argument. `job.progress(value)` reports how far the run is, and `job(key)` on the queue reads it back while the job runs.
+
+```ts
+export const sync = queue<{ provider: string }, { processed: number, total: number }>(
+  'sync',
+  async ({ provider }, signal, job) => {
+    const items = await list(provider)
+
+    for (const [index, item] of items.entries()) {
+      await store(item, signal)
+      job.progress({ processed: index + 1, total: items.length })
+    }
+  },
+)
+```
+
+Reports go to the store in the background, the latest one winning, so reporting for every item costs little. The second type argument types the value. It is kept as the payload is, so a date or a map survives.
+
+A page learns it through an action, which decides who may see it. An island calls the action every few seconds and shows `status` and `progress`.
+
+```ts
+export const syncState = action(async () => sync.job('anilist'))
+```
+
+A failed job keeps the last value it reported. The next run of a retried job starts with none. A report made after the run ended is dropped.
+
 The handler takes an `AbortSignal` as its second argument. It aborts when the run passes `lostAfter`, and when the server stops. A handler that passes it on, to `fetch` for example, stops by itself instead of running beside the retry, so a slow mail is not sent twice. A job stopped by a shutdown is handed back without losing an attempt, and another process takes it without waiting out `lostAfter`.
 
 A failed job is kept 30 days, its payload included, or as long as `keepFailed` says. To erase a person's jobs, call `remove(match)`. It removes every waiting or failed job whose payload matches.
@@ -123,7 +151,7 @@ To run a job once however often it is asked for, give `enqueue` a `key`. While a
 await sync.enqueue({ provider: 'anilist' }, { key: 'anilist' })
 ```
 
-Once the job completes, or is kept as failed, the key is free again. `await sync.state('anilist')` tells where the job stands: `{ id, status, attempts }` with `status` `'waiting'`, `'running'` or `'failed'`, and `error` after a failed run. It is `undefined` once the job completed.
+Once the job completes, or is kept as failed, the key is free again. `await sync.job('anilist')` tells where the job stands: `{ id, status, attempts }` with `status` `'waiting'`, `'running'` or `'failed'`, and `error` after a failed run. It is `undefined` once the job completed.
 
 A job enqueued while the one with its key runs is dropped, even if its data is newer than what that run read. To run again after it, enqueue without a key, or once it completed.
 

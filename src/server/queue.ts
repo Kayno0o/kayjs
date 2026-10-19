@@ -93,8 +93,17 @@ export interface QueueOptions<Payload> {
 export interface EnqueueOptions {
   // Runs it this long from now rather than as soon as a worker can.
   delay?: Duration | undefined
-  // Names the job: while one of this queue with the key is waiting or running, enqueue keeps nothing and resolves with its id, so a sync asked for twice runs once; once it completed or failed the key is free. `state(key)` reads it back.
+  // Names the job: while one of this queue with the key is waiting or running, enqueue keeps nothing and resolves with its id, so a sync asked for twice runs once; once it completed or failed the key is free. `job(key)` reads it back.
   key?: string | undefined
+}
+
+// What a handler gets besides its payload and signal.
+export interface JobContext<Progress> {
+  id: string
+  // Runs started so far, this one included.
+  attempts: number
+  // Reports how far the run is, any value devalue keeps, for `state` to read back while it runs and after it fails; the latest report wins, written in the background, and a report after the run ended is dropped.
+  progress: (value: Progress) => void
 }
 
 // Where a job stands, as the app reads it back.
@@ -121,7 +130,7 @@ export type Queue<Payload, Progress = unknown> = Elysia & {
   // Keeps the job for a worker to run, surviving a restart; resolves with its id once stored.
   enqueue: (payload: Payload, options?: EnqueueOptions) => Promise<string>
   // The waiting or running job with that key, else the last one with it that failed, or the job of that id; undefined for one that completed or never was. Needs a store with `state`, as `sqliteJobs`, `memoryJobs` and `pgJobs` have.
-  state: (job: string | { id: string }) => Promise<JobState<Progress> | undefined>
+  job: (job: string | { id: string }) => Promise<JobState<Progress> | undefined>
   // Runs every job whose time has come, here and now, until none is left: for a test, or a script with no server.
   drain: () => Promise<number>
   failed: () => Promise<FailedJob<Payload>[]>
@@ -409,7 +418,7 @@ export function defaultJobStore(): JobStore {
 
 // A queue of jobs the server runs in the background, each surviving a restart: `enqueue` from an action, `app.use(queue)` in the server to run them.
 // A run that throws is retried later, waiting `backoff` then twice as long each time, until `attempts` runs failed: it is then kept as failed, logged and handed to `onFailed`.
-export function queue<Payload, Progress = unknown>(name: string, handler: (payload: Payload, signal: AbortSignal) => unknown, options: QueueOptions<Payload> = {}): Queue<Payload, Progress> {
+export function queue<Payload, Progress = unknown>(name: string, handler: (payload: Payload, signal: AbortSignal, job: JobContext<Progress>) => unknown, options: QueueOptions<Payload> = {}): Queue<Payload, Progress> {
   const attempts = options.attempts ?? DEFAULT_ATTEMPTS
   const backoff = durationSeconds(options.backoff ?? DEFAULT_BACKOFF, `queue('${name}')'s backoff`) * 1000
   const lostAfter = durationSeconds(options.lostAfter ?? DEFAULT_LOST_AFTER, `queue('${name}')'s lostAfter`) * 1000
@@ -481,6 +490,57 @@ export function queue<Payload, Progress = unknown>(name: string, handler: (paylo
     }
   }
 
+  let progressWarned = false
+
+  // A run's reports to the store: one write in flight at a time, the latest report waiting behind it, so a handler reporting every item costs the store a few writes.
+  // A write that fails is logged; one that lands after the hold went to another claim, or after the job completed or failed, matches no job.
+  const progressWriter = (id: string, held: number) => {
+    let latest: string | undefined
+    let writing: Promise<void> | undefined
+    let open = true
+
+    const flush = async () => {
+      while (latest !== undefined) {
+        const text = latest
+
+        latest = undefined
+
+        try {
+          await store().progress!(id, held, text)
+        }
+        catch (error) {
+          kayLog('warn', `queue('${name}') could not write a job's progress`, error)
+        }
+      }
+
+      writing = undefined
+    }
+
+    return {
+      write: (value: Progress) => {
+        if (!open)
+          return
+
+        if (!store().progress) {
+          if (!progressWarned)
+            kayLog('warn', `queue('${name}')'s store has no progress(), so what its jobs report is not kept: add progress() to the JobStore, or use sqliteJobs, memoryJobs or pgJobs`)
+
+          progressWarned = true
+
+          return
+        }
+
+        latest = stringify(value)
+        writing ??= flush()
+      },
+      // Lets the write in flight land before the job is marked, so a failed job keeps the last thing it reported.
+      settle: async () => {
+        open = false
+        await writing
+      },
+    }
+  }
+
   // A run that outlasts `lostAfter` fails and its signal aborts, so its worker takes the next job and a handler listening to the signal stops rather than run beside the retry.
   // It ends a moment before the hold does, so no other process takes the job while this one still marks how it went.
   const withinLostAfter = async (run: unknown, held: number, ended: AbortController): Promise<void> => {
@@ -541,11 +601,16 @@ export function queue<Payload, Progress = unknown>(name: string, handler: (paylo
       return true
     }
 
+    const reports = progressWriter(job.id, held)
+
     try {
-      await withinLostAfter(handler(parse(job.payload) as Payload, ended.signal), held, ended)
+      await withinLostAfter(handler(parse(job.payload) as Payload, ended.signal, { id: job.id, attempts: job.attempts, progress: reports.write }), held, ended)
+      await reports.settle()
       await store().complete(job.id)
     }
     catch (error) {
+      await reports.settle()
+
       // A run that asks for another go hands the job back for later, its attempt not counted.
       if (error instanceof RetryLater && store().release) {
         await store().release!(job.id, held, Date.now() + error.waitMs)
@@ -729,11 +794,11 @@ export function queue<Payload, Progress = unknown>(name: string, handler: (paylo
 
       return id
     },
-    state: async (job: string | { id: string }) => {
+    job: async (job: string | { id: string }) => {
       const read = store().state
 
       if (!read)
-        throw new KayError('config-invalid', `kay: queue('${name}')'s store has no state(), so the state of a job cannot be read: add state() to the JobStore, or use sqliteJobs, memoryJobs or pgJobs`)
+        throw new KayError('config-invalid', `kay: queue('${name}')'s store has no state(), so a job's state cannot be read: add state() to the JobStore, or use sqliteJobs, memoryJobs or pgJobs`)
 
       const found = await read(name, typeof job === 'string' ? { key: job } : job, Date.now())
 
