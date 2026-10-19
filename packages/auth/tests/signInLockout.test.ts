@@ -131,16 +131,39 @@ describe('guessing at an account', () => {
     expect(app.notices()).toHaveLength(0)
   })
 
-  test('a success clears the ceiling too', async () => {
-    const app = await account({ signInAccountAll: { max: 3, window: 900 } })
+  test('the holder signing in gives an attacker no fresh ceiling', async () => {
+    const app = await account({ signInAccount: { max: 10, window: 900 }, signInAccountAll: { max: 4, window: 900 } })
 
-    for (let round = 0; round < 3; round++) {
-      await attempt(app, `10.0.5.${round}a`, WRONG)
-      await attempt(app, `10.0.5.${round}b`, WRONG)
-      expect(await attempt(app, `10.0.5.${round}c`, PASSWORD)).toMatchObject({ ok: true })
+    await attempt(app, '10.0.5.1', WRONG)
+    await attempt(app, '10.0.5.2', WRONG)
+    await attempt(app, '10.0.5.3', WRONG)
+    expect(await attempt(app, '10.0.5.9', PASSWORD)).toMatchObject({ ok: true })
+
+    expect(await attempt(app, '10.0.5.4', WRONG)).toEqual({ ok: false, error: 'invalid' })
+    expect(await attempt(app, '10.0.5.5', WRONG)).toEqual({ ok: false, error: 'limited' })
+    expect(await attempt(app, '10.0.5.9', PASSWORD)).toEqual({ ok: false, error: 'limited' })
+  })
+
+  test('the lockout mail goes out once a day however often the ceiling is reached again', async () => {
+    const app = await account({ signInAccount: { max: 10, window: 900 }, signInAccountAll: { max: 2, window: 900 } })
+
+    for (let window = 0; window < 3; window++) {
+      for (let i = 1; i <= 4; i++)
+        await attempt(app, `10.0.6.${i}`, WRONG)
+
+      // The ceiling's window ends.
+      for (const key of ['sign-in-failures', 'sign-in-ceiling'])
+        await app.store.attempts.reset(`${key}:id:${app.user.id}`)
     }
 
-    expect(app.notices()).toHaveLength(0)
+    expect(app.notices()).toHaveLength(1)
+
+    await app.store.attempts.reset(`sign-in-locked-mail:${app.user.id}`)
+
+    for (let i = 1; i <= 4; i++)
+      await attempt(app, `10.0.6.${i}`, WRONG)
+
+    expect(app.notices()).toHaveLength(2)
   })
 
   test('a burst of parallel guesses from many addresses cannot pass the ceiling', async () => {

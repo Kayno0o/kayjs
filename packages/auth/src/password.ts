@@ -10,7 +10,7 @@ import { homeOf, newUserRecord, publicUser } from './core'
 import { warnHolder, welcome } from './email'
 import { eraseUser } from './erase'
 import { afterResponse, report } from './events'
-import { forgive, passwordMatches, startGuess } from './guesses'
+import { failGuess, forgive, passwordMatches, startGuess } from './guesses'
 import { validLocale } from './locale'
 import { emailProblem, normalizeEmail, normalizeUsername, PASSWORD_MAX_LENGTH, usernameProblem } from './rules'
 
@@ -249,6 +249,8 @@ export async function signInWithPassword(state: RequestState, input: PasswordSig
     return { ok: false, error: 'limited' }
 
   if (tooLong || !(await passwordMatches(record, input.password))) {
+    await failGuess(state, guess)
+
     // Off the response's path: the hooks and the audit log run for a held address only, and their time would tell it.
     if (record)
       await afterResponse('reporting a failed sign-in', async () => report(state, record, 'sign-in-failed', 'password'))

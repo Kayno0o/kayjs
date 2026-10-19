@@ -555,7 +555,9 @@ createAuth({
 })
 ```
 
-Wrong passwords are counted twice for an account. Six from one address stop that address, so a stranger who keeps guessing cannot lock the owner out from their own device. Sixty from all addresses together stop every sign-in to that account for the rest of the 15 minutes and mail its owner once, when the address is verified. A right password clears both counts. Set `limits.signInAccount` and `limits.signInAccountAll` to change them.
+Wrong passwords are counted twice for an account. Six from one address stop that address, so a stranger who keeps guessing cannot lock the owner out from their own device. Sixty from all addresses together stop every sign-in to that account for the rest of the 15 minutes and mail its owner, when the address is verified, at most once a day.
+
+A right password clears the count of the address it came from, but not the wrong guesses of the others, so the owner signing in gives a stranger no fresh sixty. Set `limits.signInAccount` and `limits.signInAccountAll` to change them.
 
 Behind a proxy, kay reads the client address through `proxy` in `kay.config.ts`. A plain Elysia app passes `proxy: { hops: 1 }` to `createAuth` instead, or every client counts as the proxy.
 

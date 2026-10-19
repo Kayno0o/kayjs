@@ -4,7 +4,8 @@ import type { RequestState } from './state'
 import type { UserRecord } from './store'
 import { comparePasswords, nanoid } from '@kaynooo/utils'
 import { banned } from './core'
-import { afterResponse, report } from './events'
+import { report } from './events'
+import { mailLockout } from './guesses'
 import { deriveKeys, digest } from './keys'
 import { spend } from './limits'
 import { notify } from './notify'
@@ -78,7 +79,7 @@ export async function challenged(state: RequestState): Promise<boolean> {
 }
 
 // Counts one sign-in guess at the second factor, per client and per account, and says whether it is past the cap.
-// Once per lockout, as for passwords: only the first guess past the account's cap mails the holder.
+// Only the first guess past the account's cap mails the holder, and at most once a day, as for passwords.
 export async function secondFactorLimited(state: RequestState, record: UserRecord): Promise<boolean> {
   const { store, limits } = state.core
 
@@ -91,7 +92,7 @@ export async function secondFactorLimited(state: RequestState, record: UserRecor
     return false
 
   if (guesses === limits.twoFactorAccount.max + 1)
-    await afterResponse('reporting a second factor lockout', async () => notify(state, record, 'sign-in-locked'))
+    await mailLockout(state, record)
 
   return true
 }

@@ -11,7 +11,7 @@ import { durationSeconds } from 'kay/library'
 import { newPasswordProblem } from './breached'
 import { admit } from './captcha'
 import { banned, homeOf } from './core'
-import { forgive, passwordMatches, startGuess } from './guesses'
+import { failGuess, forgive, passwordMatches, startGuess } from './guesses'
 import { digest, randomToken } from './keys'
 import { spend, typedKey } from './limits'
 import { log } from './log'
@@ -182,8 +182,11 @@ async function holdsPassword(state: RequestState, record: UserRecord, password: 
     return 'limited'
 
   // An account without a password is checked against a decoy, so the time does not tell it has none.
-  if (!await passwordMatches(record, password))
+  if (!await passwordMatches(record, password)) {
+    await failGuess(state, guess)
+
     return 'confirm'
+  }
 
   await forgive(state, guess)
 
