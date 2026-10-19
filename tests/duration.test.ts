@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test'
+import { LINTS } from '../src/compiler/lints'
 import { durationMs, durationSeconds, optionMs, wholeSeconds } from '../src/runtime/duration'
 import { durationWords } from '../src/runtime/duration-words'
 
@@ -36,6 +37,17 @@ describe('durations', () => {
   it('refuses what is no positive duration, naming the option', () => {
     for (const value of [0, -5, Number.NaN, Number.POSITIVE_INFINITY, '0m', '-5m', '5', '5 m', '5min', '5M', 'm', '', null, undefined])
       expect(() => durationSeconds(value, 'ttl')).toThrow(/^kay: ttl is .+; it takes a positive duration, seconds or a string such as '5m', '12h' or '30d'$/)
+  })
+})
+
+describe('the bare milliseconds of 1.52', () => {
+  // Tripwire for the release that drops deprecated-time-ms: a bare number must then throw, never fall to seconds like durationSeconds reads it.
+  it('are refused by durationMs and optionMs once deprecated-time-ms is gone', () => {
+    if ('deprecated-time-ms' in LINTS)
+      return
+
+    expect(() => durationMs(3000)).toThrow()
+    expect(() => optionMs(3000, '`every` interval')).toThrow()
   })
 })
 
