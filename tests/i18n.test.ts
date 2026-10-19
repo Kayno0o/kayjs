@@ -14,7 +14,7 @@ import { compileKay } from '../src/compiler'
 import { islandMessages } from '../src/compiler/codegen'
 import { collection } from '../src/content'
 import { ContentError } from '../src/content/validate'
-import { flattenMessages, localeName, localePath, localizedLink, textDirection, translate, untranslatedPath } from '../src/runtime/i18n'
+import { flattenMessages, localeName, localePath, localizedLink, textDirection, translate, translatedPath, untranslatedPath } from '../src/runtime/i18n'
 import { relativeTime } from '../src/runtime/i18n.server'
 import { runInLocale } from '../src/runtime/locale-state'
 import { pages } from '../src/server'
@@ -98,6 +98,15 @@ describe('links of a site with many routes', () => {
         expect(LINK_HREFS.map(href => convert(LINK_SETTINGS, href, locale)), name).toEqual(expected)
       }
     }
+  })
+
+  it('pick among patterns naming as much of a path the earliest, a repeated param keeping its first value', () => {
+    const settings: LocaleSettings = { locales: ['fr', 'en'], defaultLocale: 'fr', prefixDefault: false, paths: { '/:a': { en: '/one/:a' }, '/:b': { en: '/two/:b' }, '/x/:a': { en: '/pre/:a' }, '/:a/y': { en: '/post/:a' }, '/z/*': { en: '/zz/*' }, '/:a/:a': { en: '/dup/:a' } }, pages: ['/:a', '/x/:a', '/:a/y', '/z/*', '/:a/:a'] }
+    const hrefs = ['/q', '/x/y', '/x/q', '/q/y', '/z/a/b', '/1/2', '/', '/x']
+
+    expect(hrefs.map(href => translatedPath(settings, href, 'en'))).toEqual(['/one/q', '/pre/y', '/pre/q', '/post/q', '/zz/a/b', '/dup/1', '/', '/one/x'])
+    expect(hrefs.map(href => untranslatedPath(settings, href, 'en'))).toEqual(hrefs)
+    expect(hrefs.map(href => localizedLink(settings, href, 'en'))).toEqual(['/en/one/q', '/en/pre/y', '/en/pre/q', '/en/post/q', '/en/zz/a/b', '/en/dup/1', '/', '/en/one/x'])
   })
 
   it('keep resolving links of a site whose slugs outgrow what is remembered', () => {

@@ -328,7 +328,7 @@ function resolvedLink(settings: LocaleSettings, href: string, locale: string, cu
     return prefixedPath(settings, href, locale, currentHost)
 
   const file = segments.at(-1)?.includes('.') === true
-  const named = takenBy(compiled(settings).pages, segments, normalized(segments))
+  const named = bestMatch(compiled(settings).pages, segments, normalized(segments))?.named
 
   return named !== undefined && (!file || named === segments.length) ? localePath(settings, href, locale, currentHost) : href
 }
@@ -371,11 +371,13 @@ function repath(settings: LocaleSettings, href: string, locale: string, back: bo
   const path = end === -1 ? href : href.slice(0, end)
   const slash = path.length > 1 && path.endsWith('/')
   const segments = segmentsOf(slash ? path.slice(0, -1) : path)
-  const params: Record<string, string> = {}
-  const target = bestTranslation(compiled(settings).translations(locale, back), segments, normalized(segments), params)
+  const best = bestMatch(compiled(settings).translations(locale, back), segments, normalized(segments))
 
-  if (target === undefined)
+  if (best === undefined)
     return href
+
+  const { params } = best
+  const { target } = best.candidate
 
   const filled = target.flatMap((segment) => {
     const param = segment.startsWith(':') ? segment.slice(1).replace(OPTIONAL_MARK, '') : undefined
@@ -411,7 +413,7 @@ interface Compiled {
   translations: (locale: string, back: boolean) => Indexed
 }
 
-// Everything a settings object's patterns need, split once, as a link meets them on every render.
+// Everything a settings object's patterns need, split once, as a link meets them on every render; a settings object is read-only from its first link on.
 function compiled(settings: LocaleSettings): Compiled {
   let known = compiledSettings.get(settings)
 
@@ -457,9 +459,19 @@ function indexed(candidates: Candidate[]): Indexed {
 
   for (const entry of candidates) {
     const first = entry.segments[0]
-    const group = first === undefined || first === '*' || first.startsWith(':') ? open : byFirst.get(first) ?? byFirst.set(first, []).get(first)!
 
-    group.push(entry)
+    if (first === undefined || first === '*' || first.startsWith(':')) {
+      open.push(entry)
+
+      continue
+    }
+
+    const group = byFirst.get(first)
+
+    if (group === undefined)
+      byFirst.set(first, [entry])
+    else
+      group.push(entry)
   }
 
   return { byFirst, open }
@@ -470,46 +482,25 @@ function normalized(segments: string[]): string[] {
   return segments.map(segment => PLAIN_SEGMENT.test(segment) ? segment : pathSegment(segment))
 }
 
-// How many segments the pattern naming most of the path names outright, undefined when none takes it.
-function takenBy(index: Indexed, path: string[], spelled: string[]): number | undefined {
-  let best: number | undefined
+// The candidate naming most of the path outright, the earliest of equals, with its params gathered; undefined when none takes it.
+function bestMatch(index: Indexed, path: string[], spelled: string[]): { candidate: Candidate, named: number, params: Record<string, string> } | undefined {
+  let best: { candidate: Candidate, named: number, params: Record<string, string> } | undefined
 
-  for (const group of [path.length === 0 ? undefined : index.byFirst.get(spelled[0]!), index.open]) {
-    for (const candidate of group ?? []) {
-      const named = matchSegments(candidate.segments, 0, path, spelled, 0, undefined)
+  for (const group of [index.byFirst.get(spelled[0]!) ?? [], index.open]) {
+    for (const candidate of group) {
+      const params: Record<string, string> = {}
+      const named = matchSegments(candidate.segments, 0, path, spelled, 0, params)
 
-      if (named !== undefined && (best === undefined || named > best))
-        best = named
+      if (named !== undefined && (best === undefined || named > best.named || (named === best.named && candidate.order < best.candidate.order)))
+        best = { candidate, named, params }
     }
   }
 
   return best
 }
 
-// The target of the candidate naming most of the path, the earliest of equals, its params gathered; undefined when none takes it.
-function bestTranslation(index: Indexed, path: string[], spelled: string[], params: Record<string, string>): string[] | undefined {
-  let best: { candidate: Candidate, named: number, gathered: Record<string, string> } | undefined
-
-  for (const group of [path.length === 0 ? undefined : index.byFirst.get(spelled[0]!), index.open]) {
-    for (const candidate of group ?? []) {
-      const gathered: Record<string, string> = {}
-      const named = matchSegments(candidate.segments, 0, path, spelled, 0, gathered)
-
-      if (named !== undefined && (best === undefined || named > best.named || (named === best.named && candidate.order < best.candidate.order)))
-        best = { candidate, named, gathered }
-    }
-  }
-
-  if (best === undefined)
-    return undefined
-
-  Object.assign(params, best.gathered)
-
-  return best.candidate.target
-}
-
 // How many segments the pattern names outright when it takes the path from its segment `from` and the path's `at` on, its params gathered; undefined when it does not take it.
-function matchSegments(pattern: string[], from: number, path: string[], spelled: string[], at: number, params: Record<string, string> | undefined): number | undefined {
+function matchSegments(pattern: string[], from: number, path: string[], spelled: string[], at: number, params: Record<string, string>): number | undefined {
   let named = 0
   let place = at
 
@@ -517,20 +508,19 @@ function matchSegments(pattern: string[], from: number, path: string[], spelled:
     const head = pattern[index]!
 
     if (head === '*') {
-      if (params)
-        params['*'] = path.slice(place).join('/')
+      params['*'] = path.slice(place).join('/')
 
       return named
     }
 
     if (head.startsWith(':') && head.endsWith('?')) {
       // A failed attempt's params must not stay.
-      const attempt = params && {}
+      const attempt: Record<string, string> = {}
       const without = matchSegments(pattern, index + 1, path, spelled, place, attempt)
 
       if (without !== undefined) {
-        if (params)
-          Object.assign(params, attempt)
+        for (const name in attempt)
+          params[name] ??= attempt[name]!
 
         return named + without
       }
@@ -545,8 +535,10 @@ function matchSegments(pattern: string[], from: number, path: string[], spelled:
 
       named++
     }
-    else if (params) {
-      params[head.slice(1).replace(OPTIONAL_MARK, '')] = path[place]!
+    else {
+      const name = head.slice(1).replace(OPTIONAL_MARK, '')
+
+      params[name] ??= path[place]!
     }
 
     place++

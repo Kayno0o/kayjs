@@ -399,6 +399,7 @@ export function messagesScript(keys: Set<string>, first: boolean): string {
   return `<script type="application/json" data-kay-i18n>{${parts.join(',')}}</script>`
 }
 
+// Settings are read-only once a page has written them.
 const settingsJsons = new WeakMap<LocaleSettings, string>()
 
 // The settings go to every page with islands unchanged, so they are written once.
