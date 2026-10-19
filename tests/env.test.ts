@@ -580,7 +580,7 @@ describe('kay check --fix on raw environment reads', () => {
     expect(await read(other, 'src/lib.ts')).toBe('export const a = process.env.FOO\n')
   })
 
-  it('handles a byte order mark, two reads on a line, CRLF and an empty t schema', async () => {
+  it('leaves a byte order mark file alone, rewrites two reads on a line with CRLF, and fills a `t.Object({})` with no field', async () => {
     const root = await project({
       ...config,
       'src/bom.ts': '\uFEFFexport const a = process.env.BOMMED\n',
@@ -593,6 +593,33 @@ describe('kay check --fix on raw environment reads', () => {
     expect(await readFile(join(root, 'src/bom.ts'), 'utf8')).toBe('\uFEFFexport const a = process.env.BOMMED\n')
     expect(await read(root, 'src/two.ts')).toBe('import { env } from \'./schema\'\r\n\r\nexport const b = [env.ONE, env.TWO]\r\nexport const c = env.ONE\r\n')
     expect(await read(root, 'src/schema.ts')).toContain('t.Object({\n  ONE: t.String({ default: \'1\' }),\n  TWO: t.Optional(t.String()),\n})')
+  })
+
+  it('reads past a regular expression holding a quote, a backtick or two slashes', async () => {
+    const root = await project({
+      ...config,
+      'src/regex.ts': [
+        'export const quote = /["\']/',
+        'export const a = process.env.AFTER_QUOTE',
+        'export const tick = /`+/',
+        'export const b = process.env.AFTER_TICK',
+        'export const url = /^https?:\\/\\//, c = process.env.SAME_LINE',
+        'export const d = [/[/`]/.test(\'x\'), process.env.AFTER_CLASS]',
+        'export const e = 4 / 2 / process.env.DIVIDED',
+        'export const f = `${/`/.source}`',
+        'export const g = process.env.AFTER_TEMPLATE',
+        '',
+      ].join('\n'),
+    })
+
+    await kay(['check', '--fix'], root)
+
+    const fixed = await read(root, 'src/regex.ts')
+
+    for (const name of ['AFTER_QUOTE', 'AFTER_TICK', 'SAME_LINE', 'AFTER_CLASS', 'DIVIDED', 'AFTER_TEMPLATE'])
+      expect(fixed).toContain(`env.${name}`)
+
+    expect(fixed).not.toContain('process.env')
   })
 
   it('changes only the scoped files, and nothing during kay upgrade', async () => {

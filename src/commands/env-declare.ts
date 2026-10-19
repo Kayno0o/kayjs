@@ -27,12 +27,21 @@ const SCHEMA_PATH = /\.[mc]?ts$/
 const TEST_FILE = /\.(?:test|spec)\.[cm]?[jt]sx?$/
 const EXTENSION = /\.[mc]?[jt]s$/
 const INDENT = /\n([ \t]+)\S/
+const IDENTIFIER_CHAR = /[\w$]/
+const WHITESPACE = /\s/
+// The words after which a `/` opens a regular expression.
+const REGEX_KEYWORDS = new Set(['return', 'typeof', 'instanceof', 'in', 'of', 'new', 'delete', 'void', 'throw', 'case', 'do', 'else', 'yield', 'await'])
+// What a value ends with, after which a `/` divides.
+const VALUE_END = ')]}"'
 
-// Which characters of `text` are code, and not a string, a template's text or a comment. A regular expression holding a quote is not told apart.
+// Which characters of `text` are code, and not a string, a template's text, a comment or a regular expression.
 function codeMask(text: string): Uint8Array {
   const mask = new Uint8Array(text.length)
   // The open template literals (`) and braces ({) around the character read.
   const stack: string[] = []
+  // What the code read last, to tell a regular expression from a division: its word, else its last character, a quote standing for a string, a template or a regular expression just read.
+  let word = ''
+  let last = ''
   let index = 0
 
   while (index < text.length) {
@@ -45,10 +54,14 @@ function codeMask(text: string): Uint8Array {
       }
       else if (char === '`') {
         stack.pop()
+        word = ''
+        last = '"'
         index++
       }
       else if (char === '$' && next === '{') {
         stack.push('{')
+        word = ''
+        last = '{'
         index += 2
       }
       else {
@@ -67,18 +80,63 @@ function codeMask(text: string): Uint8Array {
         index += text[index] === '\\' ? 2 : 1
 
       index++
+      word = ''
+      last = '"'
     }
     else {
+      const regexEnd = char === '/' && startsExpression(word, last) ? regexLiteralEnd(text, index) : undefined
+
+      if (regexEnd !== undefined) {
+        index = regexEnd + 1
+        word = ''
+        last = '"'
+
+        continue
+      }
+
       if (char === '`' || char === '{')
         stack.push(char)
       else if (char === '}' && stack.at(-1) === '{')
         stack.pop()
+
+      if (IDENTIFIER_CHAR.test(char)) {
+        word = IDENTIFIER_CHAR.test(text[index - 1] ?? ' ') ? word + char : char
+      }
+      else if (!WHITESPACE.test(char)) {
+        word = ''
+        last = char
+      }
 
       mask[index++] = 1
     }
   }
 
   return mask
+}
+
+// Whether a `/` after this word or character opens a regular expression, and is no division.
+function startsExpression(word: string, last: string): boolean {
+  return word !== '' ? REGEX_KEYWORDS.has(word) : last === '' || !VALUE_END.includes(last)
+}
+
+// Where the regular expression opening at `start` closes, a `/` outside a class on the same line.
+function regexLiteralEnd(text: string, start: number): number | undefined {
+  let inClass = false
+
+  for (let index = start + 1; index < text.length && text[index] !== '\n'; index++) {
+    const char = text[index]
+
+    if (char === '\\')
+      index++
+    else if (char === '[')
+      inClass = true
+    else if (char === ']')
+      inClass = false
+    else if (char === '/' && !inClass)
+      return index
+  }
+
+  return undefined
 }
 
 // The schema file a variable is added to: the project's `export const env = defineEnv(s.Object({` when it has one, `src/env.ts` when it has no `defineEnv` at all, nothing when it declares them in another shape.

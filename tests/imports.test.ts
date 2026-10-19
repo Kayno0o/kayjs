@@ -33,3 +33,22 @@ it('goes below a shebang and directives, keeps CRLF and reads trailing comments 
   expect(insertImport('import a from \'a\' // note\nimport j from \'./j.json\' with { type: \'json\' }\n', 'import { b } from \'b\'')).toBe('import a from \'a\' // note\nimport { b } from \'b\'\nimport j from \'./j.json\' with { type: \'json\' }\n')
   expect(insertImport('import { join } from \'node:path\'\nconst meta = import.meta.dir\n', 'import { ws } from \'ws\'')).toBe('import { join } from \'node:path\'\nimport { ws } from \'ws\'\nconst meta = import.meta.dir\n')
 })
+
+it('goes below a byte order mark before a shebang or a directive', () => {
+  expect(insertImport('\uFEFF#!/usr/bin/env bun\nexport {}\n', 'import { z } from \'z\'')).toBe('\uFEFF#!/usr/bin/env bun\nimport { z } from \'z\'\n\nexport {}\n')
+  expect(insertImport('\uFEFF\'use strict\'\nexport {}\n', 'import { z } from \'z\'')).toBe('\uFEFF\'use strict\'\nimport { z } from \'z\'\n\nexport {}\n')
+  expect(insertImport('\uFEFFexport {}\n', 'import { z } from \'z\'')).toBe('\uFEFFimport { z } from \'z\'\n\nexport {}\n')
+})
+
+it('goes below a comment header, and above a comment that belongs to the code under it', () => {
+  const z = 'import { z } from \'z\''
+
+  expect(insertImport('// Copyright 2026\n// Licensed under MIT\n\nexport {}\n', z)).toBe(`// Copyright 2026\n// Licensed under MIT\n\n${z}\n\nexport {}\n`)
+  expect(insertImport('/**\n * Copyright 2026\n */\n\nexport {}\n', z)).toBe(`/**\n * Copyright 2026\n */\n\n${z}\n\nexport {}\n`)
+  expect(insertImport('#!/usr/bin/env bun\n// Copyright\n\n\'use strict\'\nexport {}\n', z)).toBe(`#!/usr/bin/env bun\n// Copyright\n\n'use strict'\n${z}\n\nexport {}\n`)
+  expect(insertImport('// Copyright\n\n// Adds one.\nexport function add() {}\n', z)).toBe(`// Copyright\n\n${z}\n\n// Adds one.\nexport function add() {}\n`)
+  expect(insertImport('// Adds one.\nexport function add() {}\n', z)).toBe(`${z}\n\n// Adds one.\nexport function add() {}\n`)
+  expect(insertImport('// @ts-nocheck\nexport {}\n', z)).toBe(`// @ts-nocheck\n${z}\n\nexport {}\n`)
+  expect(insertImport('/* eslint-disable */\r\nexport {}\r\n', z)).toBe(`/* eslint-disable */\r\n${z}\r\n\r\nexport {}\r\n`)
+  expect(insertImport('// Only a note\n', z)).toBe(`// Only a note\n${z}\n`)
+})
