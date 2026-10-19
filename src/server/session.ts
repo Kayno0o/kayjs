@@ -104,6 +104,8 @@ const SWEEP_MS = 60 * 60 * 1000
 const FILE_CHECK_MS = 5000
 
 type SqliteSessionStore = SessionStore & { deleteWhere: NonNullable<SessionStore['deleteWhere']> }
+// Whether this process was told yet that a session without a store cannot be revoked.
+let warnedNoStore = false
 const sqliteStores = new Map<string, { store: SqliteSessionStore, reopen: () => void }>()
 
 // Sessions for kay pages and plain Elysia routes alike, as `session` in the context: `ctx.locals.session` in a page, an action or a guard.
@@ -117,8 +119,10 @@ export function session<Data extends object = SessionData>(options: SessionOptio
   if (secrets.some(secret => PUBLISHED_SECRETS.has(secret)))
     throw new KayError('config-invalid', `kay: the session secret is the placeholder an older \`kay new\` wrote to .env.example, which anyone can read; generate one with ${GENERATE_SECRET}`)
 
-  if (!options.store && process.env.NODE_ENV === 'production')
+  if (!options.store && process.env.NODE_ENV === 'production' && !warnedNoStore) {
+    warnedNoStore = true
     kayLog('warn', `a session kept in its ${options.cookie ?? 'session'} cookie alone, with no store, cannot be revoked by the session itself: signing out only clears the browser's cookie, and a copy taken before stays valid until it expires unless the app ends it elsewhere; give session() a store, such as sqliteStore('data/sessions.sqlite'), to end sessions on the server`)
+  }
 
   const keys = secrets.map(secret => nodeCrypto().createHash('sha256').update(secret).digest())
 

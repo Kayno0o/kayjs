@@ -95,7 +95,7 @@ describe('sessions', () => {
     setSystemTime(Date.now())
   })
 
-  it('warns at boot in production that a session without a store cannot be revoked, and not with one or outside production', () => {
+  it('warns once at boot in production that a session without a store cannot be revoked, and not with one or outside production', () => {
     const SINK = Symbol.for('kay.log')
     const global = globalThis as { [SINK]?: unknown }
     const sink = global[SINK]
@@ -110,6 +110,7 @@ describe('sessions', () => {
       process.env.NODE_ENV = 'production'
       counter({ store: memoryStore() })
       expect(warnings).toEqual([])
+      counter({})
       counter({})
     }
     finally {

@@ -277,7 +277,7 @@ function config({ has, settings }: Setup): string {
     settings.site !== undefined && `  site: ${quote(settings.site)},`,
     server ? base !== undefined && `  base: ${base},` : `  base: process.env.SITE_BASE${base === undefined ? '' : ` ?? ${base}`},`,
     has('tailwind') && '  plugins: [tailwind],',
-    server && has('docker') && '  // The compose file binds 127.0.0.1 for a reverse proxy: with this the visitor\'s address, which rate limits count, is the one the proxy passes on and not the proxy\'s.',
+    server && has('docker') && '  // The compose file binds 127.0.0.1 for a reverse proxy: with this the visitor\'s address, which rate limits count, is the one the proxy passes on and not the proxy\'s. It trusts private-range peers, so a dev server bound to 0.0.0.0 believes a LAN client\'s X-Forwarded-For.',
     server && has('docker') && '  proxy: true,',
     settings.seo !== false && '  seo: { name: \'__NAME__\', titleTemplate: \'%s | __NAME__\', description: \'__NAME__, made with kay\' },',
     '})',
@@ -774,11 +774,12 @@ volumes:
   db:
 `,
     },
-    'src/session.ts': `import { session, sqliteStore } from 'kay/server'
+    'src/session.ts': `import process from 'node:process'
+import { session, sqliteStore } from 'kay/server'
 import { env } from './env'
 
-// The data stays on the server, so signing out ends a session for good; without a \`store\` it travels sealed in the cookie, which a copy keeps valid until it expires.
-export const sessions = session<{ name: string }>({ secret: env.SESSION_SECRET, store: sqliteStore('data/sessions.sqlite') })
+// The data stays on the server, so signing out ends a session for good, and tests keep theirs in memory; without a \`store\` it travels sealed in the cookie, which a copy keeps valid until it expires.
+export const sessions = session<{ name: string }>({ secret: env.SESSION_SECRET, store: sqliteStore(process.env.NODE_ENV === 'test' ? ':memory:' : 'data/sessions.sqlite') })
 `,
     'src/server.ts': `import { Elysia } from 'elysia'
 import { pages } from 'kay/server'

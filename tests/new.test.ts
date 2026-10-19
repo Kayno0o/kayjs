@@ -808,13 +808,13 @@ describe('kay new', () => {
 
         // The container binds 127.0.0.1 for a reverse proxy, so the visitor's address is read through it, and a session lives on the server where sign-out can revoke it.
         if (variant.has('server') && variant.has('docker'))
-          expect({ features, proxy: contents['kay.config.ts']!.includes('\n  proxy: true,') }).toEqual({ features, proxy: true })
+          expect({ features, proxy: contents['kay.config.ts']!.includes('\n  proxy: true,'), lan: contents['kay.config.ts']!.includes('private-range peers') }).toEqual({ features, proxy: true, lan: true })
 
         if (variant.has('auth')) {
           const dockerfile = contents.Dockerfile
           const compose = contents['compose.prod.yaml']
 
-          expect({ features, store: contents['src/session.ts']!.includes('store: sqliteStore(\'data/sessions.sqlite\')'), ignored: contents['.gitignore']!.split('\n').includes('data') }).toEqual({ features, store: true, ignored: true })
+          expect({ features, store: contents['src/session.ts']!.includes('store: sqliteStore(process.env.NODE_ENV === \'test\' ? \':memory:\' : \'data/sessions.sqlite\')'), ignored: contents['.gitignore']!.split('\n').includes('data') }).toEqual({ features, store: true, ignored: true })
 
           // The sessions file is written by the user the image runs as, in a folder a volume keeps across deploys.
           if (variant.has('docker')) {
