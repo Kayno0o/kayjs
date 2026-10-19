@@ -95,8 +95,8 @@ export function serveSitemap(app: Elysia, served: ServedPaths, routes: ServedRou
 
     // The parts of a sitemap past its limits, each a path of its own so no route of the app with a param is shadowed; a static export writes the ones that exist.
     for (let part = 1; part <= MAX_PARTS; part++) {
-      served.offer({ path: `/sitemap-${part}.xml`, owner: 'the sitemap', kind: 'kay', exported: async () => (await reading(undefined, error => kayLog('warn', 'the sitemap leaves a lastmod out', error)).files)[part] === undefined ? [] : [`/sitemap-${part}.xml`] })
-      app.get(`/sitemap-${part}.xml`, async ({ request }) => answer(request, part))
+      if (served.offer({ path: `/sitemap-${part}.xml`, owner: 'the sitemap', kind: 'kay', exported: async () => (await reading(undefined, error => kayLog('warn', 'the sitemap leaves a lastmod out', error)).files)[part] === undefined ? [] : [`/sitemap-${part}.xml`] }))
+        app.get(`/sitemap-${part}.xml`, async ({ request }) => answer(request, part))
     }
   }
 
