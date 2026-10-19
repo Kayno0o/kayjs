@@ -175,7 +175,9 @@ import { jobTables } from 'kay/server'
 await db.sync({ ignoreTables: [...jobTables] })
 ```
 
-Use the same `ignoreTables` in `defineConfig`. Replicas must keep their clocks within a fraction of a second of each other, as a run stops about a second before its hold ends.
+Use the same `ignoreTables` in `defineConfig`.
+
+A claim and its hold use the database's clock, so replicas need not keep their clocks in agreement.
 
 ### Your own store
 
@@ -186,15 +188,17 @@ To put the jobs, the schedule locks and the rate limit counts of the whole app i
 | Method | Does |
 | --- | --- |
 | `add(job)` | Keeps a new job |
-| `claim(queue, now, until)` | Takes the queue's next due job that no process holds, holding it until `until` |
-| `complete(id)` | Removes a job that ran |
-| `retry(id, runAt, error)` | Runs it again at `runAt` |
-| `fail(id, error)` | Keeps it as failed, out of the queue |
+| `claim(queue, now, until)` | Takes the queue's next due job that no process holds, holding it until `until`, and returns the hold it stored as `heldUntil` when it keeps time of its own |
+| `complete(id, until?)` | Removes a job that ran |
+| `retry(id, runAt, error, until?)` | Runs it again at `runAt` |
+| `fail(id, error, payload?, until?)` | Keeps it as failed, out of the queue |
 | `failed(queue)` | Lists the failed jobs |
 | `nextRunAt(queue)` | When the next job may run, so a worker sleeps until then |
 | `lock(name, slot)` | True for the first caller of that name and slot, in any process, so a schedule runs once |
 
 `purge(queue, before)`, `jobs(queue)`, `release(id, until, runAt?)`, `progress(id, until, progress)` and `state(queue, ref, now)` are optional. Without `purge`, old failed jobs are listed and removed one by one. Without `jobs`, `remove` works by id only.
+
+`complete`, `retry` and `fail` get the hold the job was claimed with as `until` and change the job only while it is still the job's, so a run that finishes after its hold ended and another process took the job changes nothing. A store that ignores `until` keeps working, without that guard. `remove` and the purge call `complete` without it.
 
 `release` gives a claimed job back with its attempt not counted, which a shutdown does, and due at `runAt` when given. It works only while `until`, the hold the job was claimed with, is still the job's. Without it, a job stopped by a shutdown is retried after its backoff.
 

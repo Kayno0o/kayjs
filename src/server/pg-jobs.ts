@@ -13,7 +13,7 @@ interface PgJobRow {
   progress: string | null
 }
 
-type PgStateRow = PgJobRow & { failed: boolean, held_until: string | null }
+type PgStateRow = PgJobRow & { failed: boolean, held: boolean }
 
 // Whatever holds a Bun SQL on Postgres: the `SQL` itself, a pg-orm `Database` (its `sql`), or a connection URL.
 export type PgJobsSource = SQL | { sql: SQL } | string
@@ -30,11 +30,11 @@ function toJob(row: PgJobRow): StoredJob {
   return { id: row.id, queue: row.queue, payload: row.payload, attempts: row.attempts, runAt: Number(row.run_at), ...row.error !== null && { error: row.error }, ...row.job_key !== null && { key: row.job_key }, ...row.progress !== null && { progress: row.progress } }
 }
 
-function statusOf(row: PgStateRow, now: number): StoredJobState['status'] {
+function statusOf(row: PgStateRow): StoredJobState['status'] {
   if (row.failed)
     return 'failed'
 
-  return row.held_until !== null && Number(row.held_until) > now ? 'running' : 'waiting'
+  return row.held ? 'running' : 'waiting'
 }
 
 // What a query resolves with, its rows typed.
@@ -71,7 +71,7 @@ export async function createJobTables(source: PgJobsSource): Promise<void> {
 
 // Jobs kept in the app's Postgres, shared by every process of every replica opening it, each job running in one of them: a claim is one `UPDATE` over a `FOR UPDATE SKIP LOCKED` pick.
 // The tables `kay_jobs` and `kay_locks` are looked for first and created only when missing, which takes a role that may create tables: with one that may not, `createJobTables` run by the owner makes them. Either way they are outside pg-orm's table definitions, so list `jobTables` in its `ignoreTables`.
-// Holds are read against the clock of the process claiming, as `sqliteJobs` does: a run stops about a second before its hold ends, so replicas' clocks must agree to well within that.
+// A hold lasts from the database's clock, whichever replica claims: replicas' clocks need not agree. A job's `runAt` stays the clock of the process that enqueued or retried it, compared with the claiming process's.
 export function pgJobs(source: PgJobsSource): JobStore {
   let sql: SQL | undefined
   let ready: Promise<SQL> | undefined
@@ -148,19 +148,19 @@ export function pgJobs(source: PgJobsSource): JobStore {
     },
     async claim(queue, now, until) {
       const db = await open()
-      const [row] = await rowsOf<PgJobRow>(db`UPDATE kay_jobs SET held_until = ${until}::bigint, progress = NULL, attempts = attempts + 1 WHERE id = (SELECT id FROM kay_jobs WHERE queue = ${queue} AND NOT failed AND run_at <= ${now}::bigint AND (held_until IS NULL OR held_until <= ${now}::bigint) ORDER BY run_at LIMIT 1 FOR UPDATE SKIP LOCKED) RETURNING id, queue, payload, attempts, run_at, error, job_key, progress`)
+      const [row] = await rowsOf<PgJobRow & { held_until: string }>(db`UPDATE kay_jobs SET held_until = (floor(extract(epoch FROM statement_timestamp()) * 1000))::bigint + ${until - now}::bigint, progress = NULL, attempts = attempts + 1 WHERE id = (SELECT id FROM kay_jobs WHERE queue = ${queue} AND NOT failed AND run_at <= ${now}::bigint AND (held_until IS NULL OR held_until <= (floor(extract(epoch FROM statement_timestamp()) * 1000))::bigint) ORDER BY run_at LIMIT 1 FOR UPDATE SKIP LOCKED) RETURNING id, queue, payload, attempts, run_at, error, job_key, progress, held_until`)
 
-      return row === undefined ? undefined : toJob(row)
+      return row === undefined ? undefined : { ...toJob(row), heldUntil: Number(row.held_until) }
     },
-    async complete(id) {
+    async complete(id, until) {
       const db = await open()
 
-      await db`DELETE FROM kay_jobs WHERE id = ${id}`
+      await db`DELETE FROM kay_jobs WHERE id = ${id} AND (${until ?? null}::bigint IS NULL OR held_until = ${until ?? null}::bigint)`
     },
-    async retry(id, runAt, error) {
+    async retry(id, runAt, error, until) {
       const db = await open()
 
-      await db`UPDATE kay_jobs SET run_at = ${runAt}::bigint, held_until = NULL, error = ${error} WHERE id = ${id}`
+      await db`UPDATE kay_jobs SET run_at = ${runAt}::bigint, held_until = NULL, error = ${error} WHERE id = ${id} AND (${until ?? null}::bigint IS NULL OR held_until = ${until ?? null}::bigint)`
     },
     async release(id, until, runAt) {
       const db = await open()
@@ -172,18 +172,18 @@ export function pgJobs(source: PgJobsSource): JobStore {
 
       await db`UPDATE kay_jobs SET progress = ${progress} WHERE id = ${id} AND held_until = ${until}::bigint`
     },
-    async state(queue, ref, now) {
+    async state(queue, ref) {
       const db = await open()
       const [row] = 'key' in ref
-        ? await rowsOf<PgStateRow>(db`SELECT id, queue, payload, attempts, run_at, error, job_key, progress, failed, held_until FROM kay_jobs WHERE queue = ${queue} AND job_key = ${ref.key} ORDER BY failed, run_at DESC LIMIT 1`)
-        : await rowsOf<PgStateRow>(db`SELECT id, queue, payload, attempts, run_at, error, job_key, progress, failed, held_until FROM kay_jobs WHERE queue = ${queue} AND id = ${ref.id}`)
+        ? await rowsOf<PgStateRow>(db`SELECT id, queue, payload, attempts, run_at, error, job_key, progress, failed, coalesce(held_until > (floor(extract(epoch FROM statement_timestamp()) * 1000))::bigint, false) AS held FROM kay_jobs WHERE queue = ${queue} AND job_key = ${ref.key} ORDER BY failed, run_at DESC LIMIT 1`)
+        : await rowsOf<PgStateRow>(db`SELECT id, queue, payload, attempts, run_at, error, job_key, progress, failed, coalesce(held_until > (floor(extract(epoch FROM statement_timestamp()) * 1000))::bigint, false) AS held FROM kay_jobs WHERE queue = ${queue} AND id = ${ref.id}`)
 
-      return row === undefined ? undefined : { ...toJob(row), status: statusOf(row, now) }
+      return row === undefined ? undefined : { ...toJob(row), status: statusOf(row) }
     },
-    async fail(id, error, payload) {
+    async fail(id, error, payload, until) {
       const db = await open()
 
-      await db`UPDATE kay_jobs SET failed = true, held_until = NULL, error = ${error}, payload = coalesce(${payload ?? null}, payload) WHERE id = ${id}`
+      await db`UPDATE kay_jobs SET failed = true, held_until = NULL, error = ${error}, payload = coalesce(${payload ?? null}, payload) WHERE id = ${id} AND (${until ?? null}::bigint IS NULL OR held_until = ${until ?? null}::bigint)`
     },
     async purge(queue, before) {
       const db = await open()

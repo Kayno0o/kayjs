@@ -1374,6 +1374,37 @@ describe('queue', () => {
       expect(await store.claim('mails', 2500, 3500)).toMatchObject({ id: 'one', attempts: 2 })
     })
 
+    it.each([
+      ['memory', 'finishes', async () => memoryJobs()],
+      ['sqlite', 'finishes', async () => sqliteJobs(await jobsPath())],
+      ['memory', 'throws', async () => memoryJobs()],
+      ['sqlite', 'throws', async () => sqliteJobs(await jobsPath())],
+    ])('lets a run that %s after its hold went to another process change nothing: %s', async (_name, outcome, open) => {
+      const store = await open()
+      const errors = spyOn(console, 'error').mockImplementation(() => undefined)
+      const warns = spyOn(console, 'warn').mockImplementation(() => undefined)
+      const late = queue('late', async () => {
+        // The hold ran out while this run stalled, and another process took the job.
+        expect(await store.claim('late', Date.now() + 10 * 60_000, Date.now() + 20 * 60_000)).toMatchObject({ attempts: 2 })
+
+        if (outcome === 'throws')
+          throw new Error('late')
+      }, { store, attempts: 2, backoff: '1m' })
+
+      try {
+        await late.enqueue('x', { key: 'k' })
+        await late.drain()
+        expect(await late.job('k')).toMatchObject({ status: 'running', attempts: 2 })
+        expect(await store.failed('late')).toEqual([])
+        expect(await store.jobs!('late')).toHaveLength(1)
+      }
+      finally {
+        errors.mockRestore()
+        warns.mockRestore()
+        await late.remove(() => true)
+      }
+    })
+
     it('completes a job whose handler finishes despite the stop', async () => {
       const store = memoryJobs()
       const { mails, app } = await stopping(store, async (signal) => {

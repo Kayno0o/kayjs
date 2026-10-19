@@ -21,6 +21,8 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `kay dev`'s builder keeps the source maps of chunks an edit left alone and no longer holds file text for class tokens: CPU per island edit goes from 1440 ms to 940 and its memory after edits from 293 MB to 265; it exits after 30 seconds without a build, so the first edit after an idle period takes about 0.4 s longer ([The dev server](dev-server.md)).
 - `kay add <library>` places the import it writes in `kay.config.ts` where the app's `perfectionist/sort-imports` rule sorts it, so the file passes `kay lint` as written ([Project](project.md)).
 - `kay check --fix` declares the raw `process.env.X` reads `kay env` warns of in the app's `defineEnv` schema (or a new `src/env.ts`), keeping a `?? 'default'` as the default and rewriting the reads to `env.X` ([Check](check-and-tools.md)).
+- A queue's run writes about its job (`complete`, `retry`, `fail`) only while the hold it was claimed with is still the job's, so one that outlived its hold no longer completes or fails the job another process runs; a `JobStore` gets the hold as a last argument and may return the one it stored in `heldUntil` ([Queues](queues.md)).
+- `pgJobs` takes holds from the database's clock, so replicas' clocks need no longer agree ([Queues](queues.md)).
 
 ## 1.58.0
 

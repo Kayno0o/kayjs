@@ -1,4 +1,4 @@
-import type { StoredJob } from '../src/server'
+import type { JobStore, StoredJob } from '../src/server'
 import { resolve } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
@@ -16,6 +16,19 @@ function job(overrides: Partial<StoredJob> = {}): StoredJob {
 
 const REQUIRED = <T>(value: T | undefined): T => value as T
 
+// Holds are read against a clock the store picks (Postgres: its own), so the cases take real time and leases long enough to stay held or short enough to wait out.
+const LONG = 60_000
+const SHORT = 250
+const SHORT_PAST = 320
+
+async function claimFor(store: JobStore, lease = LONG, queue = 'q'): Promise<StoredJob | undefined> {
+  const now = Date.now()
+
+  return store.claim(queue, now, now + lease)
+}
+
+const heldOf = (claimed: StoredJob | undefined): number => REQUIRED(claimed?.heldUntil)
+
 describe.each(kinds)('job store contract, $name', ({ open }) => {
   it('hands a due job to one claim only, and again once its hold ran out', async () => {
     const store = await open()
@@ -23,11 +36,22 @@ describe.each(kinds)('job store contract, $name', ({ open }) => {
 
     await store.add(added)
 
-    const [first, second] = await Promise.all([store.claim('q', 100, 200), store.claim('q', 100, 200)])
+    const [first, second] = await Promise.all([claimFor(store, SHORT), claimFor(store, SHORT)])
 
     expect([first, second].filter(Boolean)).toHaveLength(1)
-    expect(await store.claim('q', 150, 250)).toBeUndefined()
-    expect((await store.claim('q', 200, 300))?.attempts).toBe(2)
+    expect(await claimFor(store)).toBeUndefined()
+    await Bun.sleep(SHORT_PAST)
+    expect((await claimFor(store))?.attempts).toBe(2)
+  })
+
+  it('answers a claim with the hold it stored', async () => {
+    const store = await open()
+
+    await store.add(job())
+
+    const claimed = await claimFor(store, 5000)
+
+    expect(Math.abs(heldOf(claimed) - (Date.now() + 5000))).toBeLessThan(2000)
   })
 
   describe('key', () => {
@@ -38,12 +62,12 @@ describe.each(kinds)('job store contract, $name', ({ open }) => {
       expect(await store.add(first)).toBeUndefined()
       expect(await store.add(job({ key: 'anilist', payload: 'second' }))).toBe(first.id)
 
-      const claimed = REQUIRED(await store.claim('q', 10, 100))
+      const claimed = REQUIRED(await claimFor(store))
 
       expect(claimed.payload).toBe('first')
       expect(await store.add(job({ key: 'anilist' }))).toBe(first.id)
       await store.complete(first.id)
-      expect(await store.claim('q', 10, 100)).toBeUndefined()
+      expect(await claimFor(store)).toBeUndefined()
     })
 
     it('takes the key again once its job completed or failed', async () => {
@@ -54,14 +78,14 @@ describe.each(kinds)('job store contract, $name', ({ open }) => {
       await store.complete(first.id)
       expect(await store.add(job({ key: 'k' }))).toBeUndefined()
 
-      const second = REQUIRED(await store.claim('q', 10, 100))
+      const second = REQUIRED(await claimFor(store))
 
       await store.fail(second.id, 'boom')
 
       const third = job({ key: 'k' })
 
       expect(await store.add(third)).toBeUndefined()
-      expect((await store.claim('q', 10, 100))?.id).toBe(third.id)
+      expect((await claimFor(store))?.id).toBe(third.id)
     })
 
     it('keeps one job when many add with one key at once', async () => {
@@ -88,12 +112,13 @@ describe.each(kinds)('job store contract, $name', ({ open }) => {
       const store = await open()
       const added = job({ key: 'k' })
 
-      expect(await store.state!('q', { key: 'k' }, 0)).toBeUndefined()
+      expect(await store.state!('q', { key: 'k' }, Date.now())).toBeUndefined()
       await store.add(added)
-      expect(await store.state!('q', { key: 'k' }, 0)).toMatchObject({ id: added.id, status: 'waiting', key: 'k' })
-      await store.claim('q', 10, 100)
-      expect(await store.state!('q', { id: added.id }, 50)).toMatchObject({ status: 'running', attempts: 1 })
-      expect(await store.state!('q', { key: 'k' }, 100)).toMatchObject({ status: 'waiting' })
+      expect(await store.state!('q', { key: 'k' }, Date.now())).toMatchObject({ id: added.id, status: 'waiting', key: 'k' })
+      await claimFor(store, SHORT)
+      expect(await store.state!('q', { id: added.id }, Date.now())).toMatchObject({ status: 'running', attempts: 1 })
+      await Bun.sleep(SHORT_PAST)
+      expect(await store.state!('q', { key: 'k' }, Date.now())).toMatchObject({ status: 'waiting' })
       await store.fail(added.id, 'boom')
       expect(await store.state!('q', { key: 'k' }, 0)).toMatchObject({ status: 'failed', error: 'boom' })
       expect(await store.state!('other', { key: 'k' }, 0)).toBeUndefined()
@@ -104,7 +129,7 @@ describe.each(kinds)('job store contract, $name', ({ open }) => {
       const failed = job({ key: 'k' })
 
       await store.add(failed)
-      await store.claim('q', 10, 100)
+      await claimFor(store)
       await store.fail(failed.id, 'boom')
 
       const live = job({ key: 'k' })
@@ -124,14 +149,15 @@ describe.each(kinds)('job store contract, $name', ({ open }) => {
       const added = job({ key: 'k' })
 
       await store.add(added)
-      await store.claim('q', 10, 100)
-      await store.progress!(added.id, 100, '[1]')
-      expect((await store.state!('q', { key: 'k' }, 50))?.progress).toBe('[1]')
+      await store.progress!(added.id, heldOf(await claimFor(store)), '[1]')
+      expect((await store.state!('q', { key: 'k' }, Date.now()))?.progress).toBe('[1]')
       await store.retry(added.id, 10, 'again')
-      expect((await store.state!('q', { key: 'k' }, 50))?.progress).toBe('[1]')
-      await store.claim('q', 10, 200)
-      expect((await store.state!('q', { key: 'k' }, 50))?.progress).toBeUndefined()
-      await store.progress!(added.id, 200, '[2]')
+      expect((await store.state!('q', { key: 'k' }, Date.now()))?.progress).toBe('[1]')
+
+      const second = await claimFor(store)
+
+      expect((await store.state!('q', { key: 'k' }, Date.now()))?.progress).toBeUndefined()
+      await store.progress!(added.id, heldOf(second), '[2]')
       await store.fail(added.id, 'boom')
       expect((await store.failed('q'))[0]?.progress).toBe('[2]')
     })
@@ -141,15 +167,20 @@ describe.each(kinds)('job store contract, $name', ({ open }) => {
       const added = job({ key: 'k' })
 
       await store.add(added)
-      await store.claim('q', 10, 100)
-      await store.progress!(added.id, 999, '[stale]')
-      expect((await store.state!('q', { key: 'k' }, 50))?.progress).toBeUndefined()
-      await store.claim('q', 100, 300)
-      await store.progress!(added.id, 100, '[late]')
-      expect((await store.state!('q', { key: 'k' }, 150))?.progress).toBeUndefined()
+
+      const first = heldOf(await claimFor(store, SHORT))
+
+      await store.progress!(added.id, first + 999, '[stale]')
+      expect((await store.state!('q', { key: 'k' }, Date.now()))?.progress).toBeUndefined()
+      await Bun.sleep(SHORT_PAST)
+
+      const second = heldOf(await claimFor(store))
+
+      await store.progress!(added.id, first, '[late]')
+      expect((await store.state!('q', { key: 'k' }, Date.now()))?.progress).toBeUndefined()
       await store.complete(added.id)
-      await store.progress!(added.id, 300, '[after]')
-      expect(await store.state!('q', { key: 'k' }, 150)).toBeUndefined()
+      await store.progress!(added.id, second, '[after]')
+      expect(await store.state!('q', { key: 'k' }, Date.now())).toBeUndefined()
     })
   })
 
@@ -159,14 +190,18 @@ describe.each(kinds)('job store contract, $name', ({ open }) => {
       const added = job()
 
       await store.add(added)
-      await store.claim('q', 10, 100)
-      await store.release!(added.id, 999, 500)
-      expect(await store.claim('q', 50, 300)).toBeUndefined()
-      await store.release!(added.id, 100, 500)
-      expect(await store.claim('q', 499, 600)).toBeUndefined()
-      expect(await store.nextRunAt('q')).toBe(500)
 
-      const again = REQUIRED(await store.claim('q', 500, 600))
+      const held = heldOf(await claimFor(store))
+      const runAt = Date.now() + SHORT
+
+      await store.release!(added.id, held + 999, runAt)
+      expect(await claimFor(store)).toBeUndefined()
+      await store.release!(added.id, held, runAt)
+      expect(await claimFor(store)).toBeUndefined()
+      expect(await store.nextRunAt('q')).toBe(runAt)
+      await Bun.sleep(SHORT_PAST)
+
+      const again = REQUIRED(await claimFor(store))
 
       expect(again.attempts).toBe(1)
     })
@@ -176,9 +211,60 @@ describe.each(kinds)('job store contract, $name', ({ open }) => {
       const added = job({ runAt: 5 })
 
       await store.add(added)
-      await store.claim('q', 10, 100)
-      await store.release!(added.id, 100)
-      expect((await store.claim('q', 10, 100))?.attempts).toBe(1)
+      await store.release!(added.id, heldOf(await claimFor(store)))
+      expect((await claimFor(store))?.attempts).toBe(1)
+    })
+  })
+
+  describe('a run past its hold', () => {
+    // The first run's hold ran out and another process took the job: nothing the first writes afterwards may touch it.
+    async function taken() {
+      const store = await open()
+      const added = job({ key: 'k' })
+
+      await store.add(added)
+
+      const late = heldOf(await claimFor(store, SHORT))
+
+      await Bun.sleep(SHORT_PAST)
+
+      const current = heldOf(await claimFor(store))
+
+      return { store, added, late, current }
+    }
+
+    it('completes, retries and fails nothing of the job another process holds', async () => {
+      const { store, added, late } = await taken()
+
+      await store.complete(added.id, late)
+      await store.retry(added.id, 0, 'late', late)
+      await store.fail(added.id, 'late', '[redacted]', late)
+      expect(await store.state!('q', { id: added.id }, Date.now())).toMatchObject({ status: 'running', attempts: 2, payload: '[]' })
+      expect(await store.state!('q', { id: added.id }, Date.now())).not.toHaveProperty('error')
+      expect(await claimFor(store)).toBeUndefined()
+    })
+
+    it('lets the process holding the job complete, retry or fail it', async () => {
+      const { store, added, current } = await taken()
+
+      await store.retry(added.id, 0, 'again', current)
+      expect(await store.state!('q', { id: added.id }, Date.now())).toMatchObject({ status: 'waiting', error: 'again' })
+
+      const next = heldOf(await claimFor(store))
+
+      await store.fail(added.id, 'boom', '[redacted]', next)
+      expect(await store.failed('q')).toMatchObject([{ id: added.id, error: 'boom', payload: '[redacted]' }])
+      await store.complete(added.id, next)
+      expect(await store.failed('q')).toHaveLength(1)
+      await store.complete(added.id)
+      expect(await store.failed('q')).toEqual([])
+    })
+
+    it('completes by id whatever the hold, as remove() and the purge do', async () => {
+      const { store, added } = await taken()
+
+      await store.complete(added.id)
+      expect(await store.jobs?.('q')).toEqual([])
     })
   })
 })
@@ -242,6 +328,26 @@ pgDescribe('pgJobs', () => {
     expect(await stores[0]!.jobs!('q')).toHaveLength(1)
   })
 
+  pgIt('needs no clock agreement between replicas: a hold lasts from the database\'s time', async () => {
+    await freshPg()
+
+    const [behind, ahead] = replicas(2).map(pgJobs)
+    const added = job()
+
+    await behind!.add(added)
+
+    // The replica behind stores a hold its own clock puts 10 s before the other's, a lease that its peer's clock would take as ended.
+    const now = Date.now()
+    const claimed = await behind!.claim('q', now - 10_000, now - 5000)
+
+    expect(claimed?.id).toBe(added.id)
+    expect(Math.abs(heldOf(claimed) - (now + 5000))).toBeLessThan(2000)
+    expect(await ahead!.claim('q', now + 10_000, now + 15_000)).toBeUndefined()
+    expect(await ahead!.state!('q', { id: added.id }, now + 60_000)).toMatchObject({ status: 'running' })
+    await behind!.release!(added.id, heldOf(claimed))
+    expect((await ahead!.claim('q', now + 10_000, now + 15_000))?.id).toBe(added.id)
+  })
+
   pgIt('hands each of many due jobs to exactly one of many claimers on separate connections', async () => {
     await freshPg()
 
@@ -272,7 +378,6 @@ pgDescribe('pgJobs', () => {
 
     await store.add(old)
     await store.add(job({ runAt: 5000 }))
-    await store.claim('q', 10, 100)
     await store.fail(old.id, 'boom', '[redacted]')
     expect((await store.failed('q'))[0]?.payload).toBe('[redacted]')
     expect(await store.purge!('q', 100)).toBe(1)
