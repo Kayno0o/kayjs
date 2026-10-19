@@ -1,4 +1,5 @@
 import { resolve } from 'node:path'
+import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { testSite } from '../src/test'
 
@@ -84,6 +85,37 @@ describe('a websocket route with a body schema', () => {
 
     expect(await frames('/api/rooms', '{"__proto__":{"at":1},"type":"say","text":"hi"}', '{"type":"say","text":"hi","constructor":{"prototype":{}}}')).toEqual([echo, echo])
     expect(({} as { at?: number }).at).toBeUndefined()
+  })
+
+  it('drops a structurally invalid message for a nested schema without reaching an error hook', async () => {
+    const good = '{"type":"a","nested":{"n":1},"list":[1]}'
+    const received = await frames('/api/rooms/nested', '{"type":"b"}', '{"type":"a","nested":null,"list":[1]}', '{"type":"a","nested":{"n":1},"list":[null,1]}', '{"type":"a","nested":[],"list":{}}', good)
+
+    expect(received).toEqual([JSON.stringify({ type: 'echo', body: JSON.parse(good) })])
+    expect(await (await site.fetch('/api/rooms/errors')).json()).toBe(0)
+  })
+
+  it('logs a drop under kay dev only, naming the route and what the body refused', async () => {
+    const warn = console.warn
+    const logged: string[] = []
+
+    console.warn = (...args: unknown[]) => void logged.push(args.join(' '))
+    process.env.KAY_DEV_CODE = '0'
+
+    try {
+      await frames('/api/rooms', '{"type":"move","at":"x"}')
+      expect(logged).toHaveLength(1)
+      expect(logged[0]).toContain('/api/rooms')
+      expect(logged[0]).toContain('dropped a message')
+      delete process.env.KAY_DEV_CODE
+      logged.length = 0
+      await frames('/api/rooms', '{"type":"move","at":"x"}')
+      expect(logged).toEqual([])
+    }
+    finally {
+      console.warn = warn
+      delete process.env.KAY_DEV_CODE
+    }
   })
 
   it('leaves a route with no body alone', async () => {

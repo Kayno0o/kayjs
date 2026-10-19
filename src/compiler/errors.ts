@@ -116,7 +116,7 @@ export const ERRORS = {
   },
   'executable-failed': {
     group: 'build',
-    summary: 'A compiled executable that `kay build --compile --verify` started and that exited, or never answered its health route, with the server\'s own output.',
+    summary: 'A compiled executable that `kay build --compile --verify` started and that exited, or never answered its health route, or that `--verify-load` could not load, with its own output.',
     fix: { file: 'llms/production.md', heading: 'Check the executable starts' },
   },
   'executable-incomplete': {

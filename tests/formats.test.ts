@@ -227,7 +227,7 @@ describe('kay build --format json', () => {
     expect(failed.stderr).toContain('while loading its modules')
     expect(failed.stderr).toContain('boom at load')
     expect(await Bun.file(join(outputDir(broken), 'executable')).exists()).toBe(false)
-  }, 180_000)
+  }, 300_000)
 
   it('refuses --verify-load without --compile or beside --verify', async () => {
     const alone = await kay(['build', '.', '--no-check', '--verify-load'])

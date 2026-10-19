@@ -214,7 +214,7 @@ p {answer.last()}
 
 A `.ws()` route in an API module is a websocket. Its `body` types what a client sends, and `response` types what it receives.
 
-A message that fails `body` is dropped: the sender gets no reply, so nothing collides with the messages your island handles. A valid one arrives decoded as an HTTP body is, so `'1'` reaches `message()` as `1` for an integer.
+On the chain of an `api()` module, a message that fails `body` is dropped: the sender gets no reply, so nothing collides with the messages your island handles, and `onError` is not called. A valid one arrives decoded as an HTTP body is, so `'1'` reaches `message()` as `1` for an integer, and a key the schema does not name is stripped rather than refused. Under `kay dev` the server logs each drop. A plain `new Elysia()`, or a `.group()` or `.guard()` callback, keeps Elysia's behaviour.
 
 ```ts
 export default api().ws('/:room', {

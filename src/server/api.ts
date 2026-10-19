@@ -12,10 +12,12 @@ import type { MountedApi } from './openapi'
 import type { ApiRateLimit } from './protection'
 import type { Span } from './trace'
 import { Cookie, Elysia, ElysiaCustomStatusResponse, ElysiaFile, getSchemaValidator, StatusMap } from 'elysia'
+import { underKayDev } from '../build/assets'
 import { KayError } from '../compiler/errors'
 import { TRAILING_SLASH } from '../runtime/base'
 import { API_MOUNT } from '../runtime/live'
 import { runInLocale } from '../runtime/locale-state'
+import { kayLog } from '../runtime/log'
 import { admitCrossSite, contextLocale, crossSiteRefused, crossSiteResponse, guardsFirst, passGuards, requestState } from './actions'
 import { importModule } from './bundle'
 import { cookieJar } from './cookies'
@@ -614,9 +616,22 @@ export function api(options: ApiOptions = {}): Elysia<'', { decorator: Empty, st
   const socketRoute = instance.ws.bind(instance) as (path: string, options: SocketOptions) => unknown
 
   // `.ws()` returns the instance, so the chain goes on as it was written.
-  instance.ws = ((path: string, socketOptions: SocketOptions) => socketRoute(path, decoded(instance, socketOptions))) as typeof instance.ws
+  instance.ws = ((path: string, socketOptions: SocketOptions) => socketRoute(path, decoded(instance, path, socketOptions))) as typeof instance.ws
 
   return instance as unknown as Elysia<'', { decorator: Empty, store: Empty, derive: Empty, resolve: ApiLocals }>
+}
+
+// The first thing a schema finds wrong with a value, as text.
+function firstRefusal(validator: object, value: unknown): string {
+  try {
+    const errors = (validator as { Errors?: (value: unknown) => Iterable<{ path?: string, message?: string }> }).Errors?.(value)
+    const first: { path?: string, message?: string } | undefined = errors?.[Symbol.iterator]().next().value as { path?: string, message?: string } | undefined
+
+    return first === undefined ? 'it does not match' : `${first.path ?? ''} ${first.message ?? ''}`.trim()
+  }
+  catch {
+    return 'it does not match'
+  }
 }
 
 interface SocketOptions {
@@ -630,7 +645,7 @@ interface Definitions {
 
 // A websocket route's `body` as an HTTP route's: a message arrives cleaned and decoded, `at: '1'` as `1` for an integer, and one the schema refuses is dropped, where Elysia would send the sender a validation frame carrying the schema, which an island applying every server message reads as one of its own.
 // Elysia's validation is left out of the route and done here, with the validator Elysia would have built.
-function decoded(app: Elysia, options: SocketOptions): SocketOptions {
+function decoded(app: Elysia, path: string, options: SocketOptions): SocketOptions {
   if (options.body === undefined || options.message === undefined)
     return options
 
@@ -646,10 +661,21 @@ function decoded(app: Elysia, options: SocketOptions): SocketOptions {
     ...options,
     body: undefined,
     message(ws, raw) {
-      const cleaned = validator.Clean?.(raw) ?? raw
+      let cleaned = raw
 
-      if (validator.Check(cleaned) === false)
+      // As on the HTTP path, a structure the cleaner cannot walk is left as it came, for the check to refuse.
+      try {
+        cleaned = validator.Clean?.(raw) ?? raw
+      }
+      catch {}
+
+      if (validator.Check(cleaned) === false) {
+        // Under `kay dev` only: the sender is told nothing, so the developer is.
+        if (underKayDev())
+          kayLog('warn', `the websocket route ${withoutSlash(apiRoutePath((app as { [API_MOUNT]?: string })[API_MOUNT] ?? '', path))} dropped a message its body refused: ${firstRefusal(validator, cleaned)}`)
+
         return undefined
+      }
 
       let value = cleaned
 

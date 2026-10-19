@@ -130,7 +130,7 @@ input(bind:value={text})
 button(onClick={() => messages.send({ text: text() })}) Send
 ```
 
-A message failing the route's `body` is dropped, with no reply, and a valid one arrives decoded as an HTTP body is (`'1'` as `1` for an integer).
+On an `api()` chain only, a message failing `body` is dropped, with no reply or `onError` (logged under `kay dev`); a valid one is decoded as an HTTP body is, extra keys stripped.
 
 ## Reference
 

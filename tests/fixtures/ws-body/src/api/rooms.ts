@@ -2,6 +2,8 @@ import { s } from 'kay'
 import { api } from 'kay/server'
 
 // Echoes what the route's `body` hands `message()`, so a test reads what arrived: its coerced values and its kinds.
+let errors = 0
+
 export default api()
   .ws('/', {
     body: s.Union([
@@ -12,6 +14,19 @@ export default api()
       ws.send(JSON.stringify({ type: 'echo', body, kinds: Object.entries(body).map(([key, value]) => `${key}:${typeof value}`) }))
     },
   })
+  .ws('/nested', {
+    body: s.Object({ type: s.Literal('a'), nested: s.Object({ n: s.Integer() }), list: s.Array(s.Integer()) }),
+    // Counts what reaches an error hook, which a refused message must not.
+    error() {
+      errors++
+
+      return 'refused'
+    },
+    message(ws, body) {
+      ws.send(JSON.stringify({ type: 'echo', body }))
+    },
+  })
+  .get('/errors', () => errors)
   .ws('/plain', {
     message(ws, body) {
       ws.send(JSON.stringify({ type: 'echo', body }))

@@ -16,6 +16,9 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 ### kayjs-ui derives its palette from eight seeds
 
 - `surface0`, `surface1`, `mantle`, `fill-hover`, `fill-danger`, `subtext0`, `overlay1`, the hairlines and `accent-hi` are mixed from `canvas`, `text`, `accent` and `error` unless the skin sets them, so a skin that set a seed and left its derived colours at the old defaults now sees them follow the seed: set the derived colour too to keep it. `on-accent` is now the canvas (it was `#fff` in light and `#1a0d0b` in dark), `row-hover` derives from `text`, and `chart-3` and `chart-4` follow `info` and `warning`, so a skin that set those seeds sees them move; set them to keep the old ones. A skin that sets every colour is unchanged. No lint can recognise it.
+### a websocket route's body drops a refused message
+
+On an `api()` chain, a message failing a `.ws()` route's `body` is dropped: the sender gets no validation frame and the module's `onError` is not called, and a key the schema does not name is stripped instead of kept or refused. Remove any island code reading the validation frame. `kay check` cannot recognise the old form, so no lint is possible.
 
 ## 1.57.0
 

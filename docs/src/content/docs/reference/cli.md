@@ -127,7 +127,6 @@ Open pages refresh by themselves, an edited island is swapped in place, and a pr
 
 | Option | Effect |
 | --- | --- |
-| `--verify-load` | With `--compile`, only loads the modules of the executable, with no database or secret, for a container build stage; not with `--verify` |
 | `--entry <file>` | The server entry, when `entry` in `kay.config.ts` does not name it |
 | `--port <port>` | Sets `PORT` for the server, over the shell's and the `.env`'s |
 | `--host[=<address>]` | Listens past this machine: on `0.0.0.0`, or on the address given. Needed in a container publishing its port |
@@ -245,6 +244,7 @@ The build runs `kay check` first and keeps the last build when the check or the 
 | --- | --- |
 | `--compile <file>` | Also bundles the server and everything it serves into one executable |
 | `--verify` | With `--compile`, starts the executable and runs its health check, failing the build with the server's output |
+| `--verify-load` | With `--compile`, only loads the modules of the executable, with no database or secret, for a container build stage; not with `--verify` |
 | `--entry <file>` | The server entry to compile, and to type the check against |
 | `--static` | Also writes the whole site as static files, see [Static export](/guides/static-export) |
 | `--outdir <dir>` | Where `--static` writes, `dist` by default |
@@ -260,7 +260,7 @@ The build prints what a page with islands loads, then a table per route with its
 
 Every build writes `/_kay/THIRD-PARTY-LICENSES.txt`, with the licence of each package and icon set the browser gets. An executable prints the same notices, plus its server's packages and Bun's own notice, for `./server --licenses`. Bun links JavaScriptCore and WebCore under the LGPL-2, so the notice points to their source and says how to build with a modified copy. An icon set under the MIT licence that ships no licence text gets the standard text, under its author's name.
 
-See [Prove the executable starts](/guides/deployment#prove-the-executable-starts) for `--verify`.
+See [Prove the executable starts](/guides/deployment#prove-the-executable-starts) for `--verify` and `--verify-load`.
 
 <ReadMore href="/llms/build-and-start">Progress output, how a route's scripts are estimated, the notices for icon sets and codecs, and the build document in full.</ReadMore>
 

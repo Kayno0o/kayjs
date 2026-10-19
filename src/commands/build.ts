@@ -84,7 +84,7 @@ export const build: Command = {
     let result: BuildResult
 
     try {
-      result = await buildProject(root, await loadConfig(root), { ...options, onStage: async (stage, result) => printStage(stage, result, format, values.quiet === true, values['deny-warnings'] === true), onProgress: progress?.update })
+      result = await buildProject(root, await loadConfig(root), { ...options, onStage: async (stage, result) => printStage(stage, result, format, values.quiet === true, values['deny-warnings'] === true, values['verify-load'] === true), onProgress: progress?.update })
     }
     finally {
       progress?.stop()
@@ -127,7 +127,7 @@ export const build: Command = {
 // Each stage as it ends, so its problems come before what a later stage's code logs, and are shown though that code ends the process.
 // `denyWarnings` says in the count that the warnings fail the build.
 // `quiet` leaves the size report out, each stage still saying what it made.
-async function printStage(stage: BuildStage, result: BuildResult, format: ProblemFormat, quiet: boolean, denyWarnings: boolean): Promise<void> {
+async function printStage(stage: BuildStage, result: BuildResult, format: ProblemFormat, quiet: boolean, denyWarnings: boolean, loaded: boolean): Promise<void> {
   if (stage === 'check')
     await printProblems(result.checked, denyWarnings, format)
 
@@ -151,7 +151,7 @@ async function printStage(stage: BuildStage, result: BuildResult, format: Proble
     done('compiled', shown(result.compiled.executable), result.compiled.ms)
 
   if (stage === 'compile' && result.compiled?.verifiedMs !== undefined)
-    done('verified', 'the executable started and answered its health route', result.compiled.verifiedMs)
+    done('verified', loaded ? 'the executable loaded its modules' : 'the executable started and answered its health route', result.compiled.verifiedMs)
 }
 
 // The whole build as one document once it ends, `kay check`'s problems and counts first, then what each stage made and the stage that stopped it; what the app prints meanwhile goes to stderr.
