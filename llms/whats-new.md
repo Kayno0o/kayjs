@@ -2,6 +2,10 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
+## Unreleased
+
+- kay's analytics notice and information line take the site's look: kayjs-ui's tokens when present, else the page's colors, and `--kay-notice-*` properties restyle them ([Privacy](privacy.md)).
+
 ## 1.58.0
 
 - kayjs-auth keeps typed app data on the user: `createAuth({ user: s.Object({ ... }) })` with `onProviderProfile` returning what to store (an avatar, say), `auth.user().data` typed from the schema, and `User.providers` giving each linked provider's id; `pgStore` adds its `data` column on `db.sync()` ([kayjs-auth OAuth](../packages/auth/llms/oauth-passkeys-two-factor.md)).

@@ -134,6 +134,8 @@ The notice names the tool from your config, for example "with Plausible", so you
 
 The notice is a labelled region that Tab reaches, and kay does not move the focus to it when a page loads. When a visitor opens it from a `data-analytics-consent` control, the focus goes to its first button and returns to that control after the answer.
 
+The notice and the information line take your site's look. With kayjs-ui they use its surface, text, accent, border and radius, and follow its light and dark schemes. Without it they use the page's own background and text colors. To restyle them, set any of `--kay-notice-background`, `--kay-notice-color`, `--kay-notice-border`, `--kay-notice-radius`, `--kay-notice-shadow`, `--kay-notice-accent`, `--kay-notice-on-accent` or `--kay-notice-line` (the refuse button's border) on `:root`.
+
 It stays on screen through page swaps until the visitor chooses. With Fathom or Cloudflare, a refusal after the script loaded reloads the page so it runs no more.
 
 Give any element a `data-analytics-consent` attribute and a click on it shows the notice again, so a visitor can change their mind. Your own scripts read the answer with `window.kayAnalytics.consent()`, and a `kay:consent` event fires on `document` when it changes. An app with its own banner uses `consent` instead, below.

@@ -116,6 +116,37 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('analytics 
     expect(await page.a11y('section[aria-labelledby]')).toEqual([])
   })
 
+  it('takes kayjs-ui\'s tokens once the page has them, follows its color scheme as it changes, and an app\'s own --kay-notice-* over both', async () => {
+    const looks = async () => page.evaluate(() => {
+      const region = document.querySelector('section[aria-labelledby]')!
+      const [yes, no] = [...region.querySelectorAll('button')].map(button => getComputedStyle(button))
+      const box = getComputedStyle(region)
+
+      return { background: box.backgroundColor, color: box.color, border: box.borderTopColor, radius: box.borderTopLeftRadius, yes: [yes!.backgroundColor, yes!.color], no: no!.borderTopColor }
+    })
+    const before = await looks()
+
+    // Without kayjs-ui it reads as the page does: text on the page's background, the agree button in the text's color.
+    expect(before.yes[0]).toBe(before.color)
+    expect(before.radius).toBe('8px')
+
+    await page.evaluate(() => {
+      const root = document.documentElement
+
+      root.style.colorScheme = 'light'
+      root.style.cssText += ';--color-kui-surface0:light-dark(rgb(1, 1, 1), rgb(2, 2, 2));--color-kui-text:rgb(3, 3, 3);--color-kui-overlay0:rgb(4, 4, 4);--color-kui-accent:rgb(5, 5, 5);--color-kui-on-accent:rgb(6, 6, 6);--color-kui-field-border:rgb(7, 7, 7);--radius-kui-card:0px'
+    })
+    expect(await looks()).toEqual({ background: 'rgb(1, 1, 1)', color: 'rgb(3, 3, 3)', border: 'rgb(4, 4, 4)', radius: '0px', yes: ['rgb(5, 5, 5)', 'rgb(6, 6, 6)'], no: 'rgb(7, 7, 7)' })
+
+    await page.evaluate(() => document.documentElement.style.colorScheme = 'dark')
+    expect((await looks()).background).toBe('rgb(2, 2, 2)')
+
+    await page.evaluate(() => document.documentElement.style.cssText += ';--kay-notice-background:rgb(8, 8, 8);--kay-notice-accent:rgb(9, 9, 9)')
+    expect(await looks()).toMatchObject({ background: 'rgb(8, 8, 8)', yes: ['rgb(9, 9, 9)', 'rgb(6, 6, 6)'] })
+
+    await page.evaluate(() => document.documentElement.removeAttribute('style'))
+  })
+
   it('counts the page once they agree, then each page swap with the page it left as referrer', async () => {
     await page.click('section[aria-labelledby] button:first-of-type')
     const first = await visits(1)
