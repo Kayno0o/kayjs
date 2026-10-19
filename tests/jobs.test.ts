@@ -533,6 +533,31 @@ describe('schedule', () => {
       }
     })
 
+    it('reports no failure for a run the stop cut short by its signal', async () => {
+      const cron = fakeCron()
+      const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+      let started = false
+      const app = new Elysia().use(schedule('@hourly', async (signal) => {
+        started = true
+        await new Promise(resolve => signal.addEventListener('abort', resolve))
+
+        throw new Error('aborted')
+      })).listen(0)
+
+      try {
+        const run = cron.fired[0]!.handler()
+
+        await until(() => started)
+        await shutdown(app)
+        await run
+        expect(logged).not.toHaveBeenCalled()
+      }
+      finally {
+        logged.mockRestore()
+        cron.restore()
+      }
+    })
+
     it('refuses a timeout that is not a duration at boot, and takes false for no limit', () => {
       expect(() => schedule('@hourly', () => undefined, { timeout: 0 })).toThrow('the timeout of the schedule @hourly is 0')
       expect(() => schedule('@hourly', () => undefined, { timeout: false })).not.toThrow()
@@ -1108,6 +1133,44 @@ describe('queue', () => {
       expect(taken).toMatchObject({ queue: 'mails', attempts: 1 })
       expect(taken?.error).toBeUndefined()
       // The queue stays in the set kay/test drains, so nothing of it may be left waiting.
+      await mails.remove(() => true)
+    })
+
+    it('hands back a job whose claim resolved after the stop, without running it', async () => {
+      const store = memoryJobs()
+      const claim = store.claim.bind(store)
+      const runs: string[] = []
+      let open: (() => void) | undefined
+      let asked = false
+
+      store.claim = async (name, now, until) => {
+        if (asked)
+          return claim(name, now, until)
+
+        asked = true
+        await new Promise<void>((resolve) => {
+          open = resolve
+        })
+
+        return claim(name, now, until)
+      }
+
+      const mails = queue('mails', (payload: string) => void runs.push(payload), { store })
+
+      await mails.enqueue('digest')
+
+      const app = new Elysia().use(mails).listen(0)
+
+      await until(() => asked)
+
+      const stopped = shutdown(app)
+
+      // The stop reaches the queue after the server has closed.
+      await Bun.sleep(20)
+      open?.()
+      await stopped
+      expect(runs).toEqual([])
+      expect(await claim('mails', Date.now(), Date.now() + 60_000)).toMatchObject({ attempts: 1 })
       await mails.remove(() => true)
     })
 

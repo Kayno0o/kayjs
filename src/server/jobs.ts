@@ -5,6 +5,7 @@ import process from 'node:process'
 import { Elysia } from 'elysia'
 import { KayError } from '../compiler/errors'
 import { DURATION_TEXT, durationSeconds } from '../runtime/duration'
+import { MAX_TIMER_MS } from './config-limits'
 import { defaultJobStore } from './queue'
 import { reportBackgroundError } from './report'
 
@@ -34,8 +35,10 @@ export type EveryOptions = Omit<ScheduleOptions, 'tz'>
 // A lock slot is the minute a run is due, the finest a cron schedule goes: a run falls due at its first second, so the nearest minute names it for a process running it up to 30 s early or late, its clock skewed or its event loop busy.
 const SLOT_MS = 60_000
 const DEFAULT_TIMEOUT = 600
-// The longest a timer waits: past it, setTimeout fires at once.
-const MAX_TIMER_MS = 2 ** 31 - 1
+// How long a stop waits for a run that ignores its signal before leaving it.
+const STOP_GRACE_MS = 5000
+// Why a run's signal aborted when the server stopped, as against its timeout running out.
+const STOPPED = new Error('the server is stopping')
 // The lock names the schedules of this process hold, so two schedules alike in every way still take a lock each.
 const autoLocks = new Set<string>()
 
@@ -184,7 +187,7 @@ async function after(previous: Promise<void> | undefined, run: () => Promise<voi
 
 // One run of a schedule, taken by one process when it locks: `slotMs` is how far apart its runs fall due.
 // A boot run locks under a name of its own, so its slot, rounded to the nearest, never takes the one of the run due next.
-// A run still going after `timeout` is reported as failed and left, its signal aborted, so one that never settles blocks neither the next run nor a stop; `abort()` aborts the runs in progress, as a stop does.
+// A run still going after `timeout` is reported as failed and left, its signal aborted, so one that never settles blocks the next run no longer; `abort()` aborts the runs in progress as a stop does, which then waits for them a few seconds at most.
 function scheduledRun(label: string, slotMs: number, job: Job, options: ScheduleOptions, auto: AutoLock | undefined) {
   const timeout = options.timeout === false ? undefined : durationSeconds(options.timeout ?? DEFAULT_TIMEOUT, `the timeout of the schedule ${label}`) * 1000
   const active = new Set<AbortController>()
@@ -192,6 +195,7 @@ function scheduledRun(label: string, slotMs: number, job: Job, options: Schedule
   const run = async (boot = false) => {
     const controller = new AbortController()
     let timer: ReturnType<typeof setTimeout> | undefined
+    let grace: ReturnType<typeof setTimeout> | undefined
 
     active.add(controller)
 
@@ -201,24 +205,33 @@ function scheduledRun(label: string, slotMs: number, job: Job, options: Schedule
       if (lock !== undefined && !await (options.store ?? defaultJobStore()).lock(boot ? `${lock}:boot` : lock, Math.round(Date.now() / slotMs)))
         return
 
-      const limit = timeout === undefined
-        ? new Promise<never>(() => undefined)
-        : new Promise<never>((_, reject) => {
+      const limit = new Promise<never>((_, reject) => {
+        if (timeout !== undefined) {
           timer = setTimeout(() => {
             const error = new Error(`it ran past its timeout, ${Math.round(timeout / 1000)} s`)
 
             controller.abort(error)
             reject(error)
           }, Math.min(timeout, MAX_TIMER_MS))
+        }
+
+        // A stop waits for the run to wind down, but not past the grace, so a job ignoring its signal never holds a shutdown.
+        controller.signal.addEventListener('abort', () => {
+          if (controller.signal.reason === STOPPED)
+            grace = setTimeout(reject, Math.min(STOP_GRACE_MS, timeout ?? STOP_GRACE_MS), STOPPED)
         })
+      })
 
       await Promise.race([job(controller.signal), limit])
     }
     catch (error) {
-      await reportBackgroundError(`the job scheduled ${label} failed`, error)
+      // A run the stop cut short is no failure to report.
+      if (controller.signal.reason !== STOPPED)
+        await reportBackgroundError(`the job scheduled ${label} failed`, error)
     }
     finally {
       clearTimeout(timer)
+      clearTimeout(grace)
       active.delete(controller)
     }
   }
@@ -226,7 +239,7 @@ function scheduledRun(label: string, slotMs: number, job: Job, options: Schedule
   return Object.assign(run, {
     abort() {
       for (const controller of active)
-        controller.abort()
+        controller.abort(STOPPED)
     },
   })
 }

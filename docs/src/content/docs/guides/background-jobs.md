@@ -43,9 +43,9 @@ A cron has five fields or a nickname such as `@daily`. A cron that can never run
 
 Runs never overlap. A run that throws is logged without stopping the next.
 
-A production server (`NODE_ENV=production`) runs each schedule once across all its processes sharing the job store, with no setup: the lock is named after the schedule and the job's source. `{ lock: 'weekly-report' }` names it yourself, and `{ lock: false }` runs the job in every process. With `lock` and several jobs, each job locks as `<lock>:<its schedule>:<its place in that schedule's list>`.
+A production server (`NODE_ENV=production`) runs each schedule once across all its processes sharing the job store, with no setup: the lock is named after the schedule and the job's source, so the job store must be writable and, in a rolling deploy, old and new builds with a changed job both run. `{ lock: 'weekly-report' }` names it yourself, and `{ lock: false }` runs the job in every process. With `lock` and several jobs, each job locks as `<lock>:<its schedule>:<its place in that schedule's list>`.
 
-A run that takes longer than `timeout`, 10 minutes by default, is logged as failed and left behind, so a job that never settles blocks neither the next run nor a shutdown. The job gets an `AbortSignal` as its argument, aborted at the timeout and when the server stops; `timeout: false` sets no limit.
+A run that takes longer than `timeout`, 10 minutes by default, is logged as failed and left behind, so a job that never settles does not block the next run. A shutdown aborts the signal and waits at most 5 seconds for a run that ignores it. The job is called with the signal, so a job with an optional first parameter gets it. The job gets an `AbortSignal` as its argument, aborted at the timeout and when the server stops; `timeout: false` sets no limit.
 
 A boot run happens wherever the server starts, so also at each restart of `kay dev`.
 
@@ -81,7 +81,7 @@ The server runs it with `.use(welcomeMails)`. An action calls `await welcomeMail
 
 A job that throws is retried after a growing wait. One that runs out of attempts is kept as failed and passed to `onFailed`. So is a run outlasting `lostAfter`, 10 minutes by default, or one whose process died each time.
 
-The handler takes an `AbortSignal` as its second argument. It aborts when the run passes `lostAfter`, and when the server stops. A handler that passes it on, to `fetch` for example, stops by itself instead of running beside the retry, so a slow mail is not sent twice. A job stopped by a shutdown is handed back without losing an attempt, and another process takes it at once.
+The handler takes an `AbortSignal` as its second argument. It aborts when the run passes `lostAfter`, and when the server stops. A handler that passes it on, to `fetch` for example, stops by itself instead of running beside the retry, so a slow mail is not sent twice. A job stopped by a shutdown is handed back without losing an attempt, and another process takes it without waiting out `lostAfter`.
 
 A failed job is kept 30 days, its payload included, or as long as `keepFailed` says. To erase a person's jobs, call `remove(match)`. It removes every waiting or failed job whose payload matches.
 

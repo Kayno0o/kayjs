@@ -8,7 +8,8 @@ import { durationSeconds } from '../runtime/duration'
 
 // A check slower than this fails unless `health.timeout` says otherwise, so a hung database never hangs the probe with it.
 const DEFAULT_CHECK_TIMEOUT = 5
-const MAX_TIMER_MS = 2 ** 31 - 1
+
+export const MAX_TIMER_MS = 2 ** 31 - 1
 
 // The milliseconds a health check may take, `health.timeout` read once per use: a value that is no positive duration throws naming the option.
 export function healthTimeoutMs(config: HealthConfig | undefined): number {

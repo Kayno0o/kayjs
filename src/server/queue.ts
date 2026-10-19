@@ -9,6 +9,7 @@ import { durationSeconds } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
 import { openSqlite } from '../runtime/sqlite.server'
 import { appStore } from './app-store'
+import { MAX_TIMER_MS } from './config-limits'
 import { onReload } from './reload'
 import { reportBackgroundError } from './report'
 
@@ -103,8 +104,6 @@ const PURGE_MS = 60 * 60 * 1000
 const POLL_MS = 1000
 // The longest an idle queue waits between looks unless `idlePoll` says otherwise: a job another process enqueued waits this at worst.
 const IDLE_POLL_S = 10
-// The longest a timer waits: past it, setTimeout fires at once.
-const MAX_TIMER_MS = 2 ** 31 - 1
 // The longest a worker waits between looks at a store that keeps failing.
 const MAX_OUTAGE_MS = 60_000
 const DEFAULT_PATH = 'data/jobs.sqlite'
@@ -116,7 +115,7 @@ const drains = new Set<() => Promise<number>>()
 let defaultStore: JobStore | undefined
 
 // Jobs kept in a SQLite file: they survive restarts and deploys, and every process of the machine opening it shares them, each job running in one of them.
-// The file is created by the first job enqueued or schedule locked, so a server whose queue never gets one, an app only sending its mails say, writes nothing.
+// The file is created by the first job enqueued or schedule locked, which every schedule of a production server does, so only a development server whose queue never gets a job writes nothing.
 export function sqliteJobs(path: string): JobStore {
   let statements: ReturnType<typeof prepareJobs> | undefined
   let db: Database | undefined
@@ -393,6 +392,14 @@ export function queue<Payload>(name: string, handler: (payload: Payload, signal:
     const stopping = controller?.signal
 
     stopping?.addEventListener('abort', stop)
+
+    // A stop that came while the claim was pending never fires the listener: the job goes back untouched.
+    if (stopping?.aborted && store().release) {
+      stopping.removeEventListener('abort', stop)
+      await store().release!(job.id)
+
+      return true
+    }
 
     try {
       await withinLostAfter(handler(parse(job.payload) as Payload, ended.signal), held, ended)
