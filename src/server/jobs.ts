@@ -1,6 +1,7 @@
 import type { CronSchedule, PositiveDuration } from '../runtime/checks'
 import type { Duration } from '../runtime/duration'
 import type { JobStore } from './queue'
+import process from 'node:process'
 import { Elysia } from 'elysia'
 import { KayError } from '../compiler/errors'
 import { DURATION_TEXT, durationSeconds } from '../runtime/duration'
@@ -11,14 +12,17 @@ export interface ScheduleOptions {
   // IANA time zone the schedule reads in, such as `Europe/Paris`; the system's by default.
   tz?: string | undefined
   // Runs each time once across every process sharing the job store, the first to reach it taking it: names the lock, unique per schedule.
-  lock?: string | undefined
+  // A production server (`NODE_ENV=production`) locks every schedule by default, under a name made of its schedule and its job's source; `false` runs it in every process.
+  lock?: string | false | undefined
   // Where the lock is taken: the queues' default store unless given.
   store?: JobStore | undefined
   // Runs each job once as the server starts too, taking the lock like any run, without waiting for the first time it comes.
   boot?: boolean | undefined
+  // How long a run may take: past it, the run is logged as failed, its signal aborts and the schedule goes on without it. 10 minutes by default, `false` for no limit.
+  timeout?: Duration | false | undefined
 }
 
-type Job = () => unknown
+type Job = (signal: AbortSignal) => unknown
 type Jobs = Job | readonly Job[]
 
 // What a table's key must be: a positive length, or a cron that comes some day.
@@ -29,6 +33,41 @@ export type EveryOptions = Omit<ScheduleOptions, 'tz'>
 
 // A lock slot is the minute a run is due, the finest a cron schedule goes: a run falls due at its first second, so the nearest minute names it for a process running it up to 30 s early or late, its clock skewed or its event loop busy.
 const SLOT_MS = 60_000
+const DEFAULT_TIMEOUT = 600
+// The longest a timer waits: past it, setTimeout fires at once.
+const MAX_TIMER_MS = 2 ** 31 - 1
+// The lock names the schedules of this process hold, so two schedules alike in every way still take a lock each.
+const autoLocks = new Set<string>()
+
+// A lock name for a schedule given none: its schedule and the hash of its job's source, and for a twin its place in the order twins start, which every process of one app shares.
+function autoLock(when: string | number, job: Job) {
+  let held: string | undefined
+
+  return {
+    take() {
+      const base = `auto:${String(when)}:${Bun.hash(job.toString()).toString(36)}`
+
+      for (let twin = 1; ; twin++) {
+        held = twin === 1 ? base : `${base}#${twin}`
+
+        if (!autoLocks.has(held)) {
+          autoLocks.add(held)
+
+          return held
+        }
+      }
+    },
+    release() {
+      if (held !== undefined)
+        autoLocks.delete(held)
+
+      held = undefined
+    },
+    name: () => held,
+  }
+}
+
+type AutoLock = ReturnType<typeof autoLock>
 
 // Runs `job` on a cron schedule, such as `@hourly` or `30 2 * * MON`, or every so long, `'30s'` or `30` seconds, from when the server starts until it stops: once per process, or once across processes with `lock`, never two runs at a time.
 // A list of jobs, or a table of schedules to jobs, gives each job a schedule of its own in one plugin, a table's `tz` read by its crons alone; with `lock`, each job's lock is its schedule and its place in that schedule's list, `report:@hourly:0`.
@@ -45,18 +84,19 @@ export function schedule(first: Duration | string | Record<string, Jobs>, second
     if (typeof job !== 'function')
       throw new KayError('config-invalid', `kay: the job scheduled ${String(when)} is no function`)
 
-    const own = jobs.length > 1 && options.lock !== undefined ? { ...options, lock: `${options.lock}:${String(when)}:${place}` } : options
+    const own = jobs.length > 1 && typeof options.lock === 'string' ? { ...options, lock: `${options.lock}:${String(when)}:${place}` } : options
+    const auto = options.lock === undefined && process.env.NODE_ENV === 'production' ? autoLock(when, job) : undefined
 
     if (typeof when === 'number' || DURATION_TEXT.test(when))
-      return scheduleEvery(when as Duration, job, table ? { ...own, tz: undefined } : own)
+      return scheduleEvery(when as Duration, job, table ? { ...own, tz: undefined } : own, auto)
 
-    return scheduleCron(when, job, own)
+    return scheduleCron(when, job, own, auto)
   })
 
   return plugins.length === 1 ? plugins[0]! : plugins.reduce((app, plugin) => app.use(plugin), new Elysia())
 }
 
-function scheduleCron(cron: string, job: () => unknown, options: ScheduleOptions) {
+function scheduleCron(cron: string, job: Job, options: ScheduleOptions, auto: AutoLock | undefined) {
   const zone = options.tz === undefined ? {} : { tz: options.tz }
 
   // A typo fails the boot rather than never running.
@@ -65,13 +105,15 @@ function scheduleCron(cron: string, job: () => unknown, options: ScheduleOptions
 
   let handle: Bun.CronJob | undefined
   let running: Promise<void> | undefined
-  const run = scheduledRun(cron, SLOT_MS, job, options)
+  const run = scheduledRun(cron, SLOT_MS, job, options, auto)
 
   // Unnamed, so Elysia never takes two schedules for one plugin.
   return new Elysia()
     .onStart(() => {
       if (handle)
         return
+
+      auto?.take()
 
       // The boot run is the first, which the first scheduled run waits for: runs never overlap.
       if (options.boot === true)
@@ -85,12 +127,14 @@ function scheduleCron(cron: string, job: () => unknown, options: ScheduleOptions
     .onStop(async () => {
       handle?.stop()
       handle = undefined
+      run.abort()
       await running
+      auto?.release()
     })
 }
 
 // The next run is planned once the last settles, at the next multiple of `every` since the epoch, so processes started apart run at the same instants and one lock slot names each run.
-function scheduleEvery(every: Duration, job: () => unknown, options: ScheduleOptions) {
+function scheduleEvery(every: Duration, job: Job, options: ScheduleOptions, auto: AutoLock | undefined) {
   const ms = durationSeconds(every, `the schedule ${String(every)}`) * 1000
 
   if (options.tz !== undefined)
@@ -98,7 +142,7 @@ function scheduleEvery(every: Duration, job: () => unknown, options: ScheduleOpt
 
   let timer: Timer | undefined
   let running: Promise<void> | undefined
-  const run = scheduledRun(`every ${String(every)}`, ms, job, options)
+  const run = scheduledRun(`every ${String(every)}`, ms, job, options, auto)
 
   const plan = () => {
     const tick = async () => {
@@ -117,6 +161,7 @@ function scheduleEvery(every: Duration, job: () => unknown, options: ScheduleOpt
       if (timer)
         return
 
+      auto?.take()
       plan()
 
       if (options.boot === true)
@@ -125,7 +170,9 @@ function scheduleEvery(every: Duration, job: () => unknown, options: ScheduleOpt
     .onStop(async () => {
       clearTimeout(timer)
       timer = undefined
+      run.abort()
       await running
+      auto?.release()
     })
 }
 
@@ -137,18 +184,51 @@ async function after(previous: Promise<void> | undefined, run: () => Promise<voi
 
 // One run of a schedule, taken by one process when it locks: `slotMs` is how far apart its runs fall due.
 // A boot run locks under a name of its own, so its slot, rounded to the nearest, never takes the one of the run due next.
-function scheduledRun(label: string, slotMs: number, job: () => unknown, options: ScheduleOptions) {
-  return async (boot = false) => {
+// A run still going after `timeout` is reported as failed and left, its signal aborted, so one that never settles blocks neither the next run nor a stop; `abort()` aborts the runs in progress, as a stop does.
+function scheduledRun(label: string, slotMs: number, job: Job, options: ScheduleOptions, auto: AutoLock | undefined) {
+  const timeout = options.timeout === false ? undefined : durationSeconds(options.timeout ?? DEFAULT_TIMEOUT, `the timeout of the schedule ${label}`) * 1000
+  const active = new Set<AbortController>()
+
+  const run = async (boot = false) => {
+    const controller = new AbortController()
+    let timer: ReturnType<typeof setTimeout> | undefined
+
+    active.add(controller)
+
     try {
-      if (options.lock !== undefined && !await (options.store ?? defaultJobStore()).lock(boot ? `${options.lock}:boot` : options.lock, Math.round(Date.now() / slotMs)))
+      const lock = options.lock === false ? undefined : options.lock ?? auto?.name()
+
+      if (lock !== undefined && !await (options.store ?? defaultJobStore()).lock(boot ? `${lock}:boot` : lock, Math.round(Date.now() / slotMs)))
         return
 
-      await job()
+      const limit = timeout === undefined
+        ? new Promise<never>(() => undefined)
+        : new Promise<never>((_, reject) => {
+          timer = setTimeout(() => {
+            const error = new Error(`it ran past its timeout, ${Math.round(timeout / 1000)} s`)
+
+            controller.abort(error)
+            reject(error)
+          }, Math.min(timeout, MAX_TIMER_MS))
+        })
+
+      await Promise.race([job(controller.signal), limit])
     }
     catch (error) {
       await reportBackgroundError(`the job scheduled ${label} failed`, error)
     }
+    finally {
+      clearTimeout(timer)
+      active.delete(controller)
+    }
   }
+
+  return Object.assign(run, {
+    abort() {
+      for (const controller of active)
+        controller.abort()
+    },
+  })
 }
 
 // Starts `work` with the server, for a queue consumer or anything else that runs the whole time; on stop, its signal aborts and the server waits for it to return.

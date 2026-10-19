@@ -49,6 +49,9 @@ function fakeCron() {
   return { fired, restore: () => cron.mockRestore() }
 }
 
+const scheduleOf = schedule
+let copies = 0
+
 describe('schedule', () => {
   it('starts with the server, once, and stops with it, waiting for the run in progress', async () => {
     const cron = fakeCron()
@@ -343,6 +346,196 @@ describe('schedule', () => {
       await shutdown(first)
       await shutdown(second)
     }
+  })
+
+  describe('without a lock', () => {
+    // Two processes of one app, each building the same schedules in the same order against one store file.
+    async function twoProcesses(env: string, build: (name: string, store: ReturnType<typeof sqliteJobs>, schedule: typeof scheduleOf) => Elysia[]) {
+      const cron = fakeCron()
+      const path = await jobsPath()
+      const before = process.env.NODE_ENV ?? 'test'
+      const names = ['first', 'second']
+
+      process.env.NODE_ENV = env
+      setSystemTime(new Date('2026-01-01T12:00:00Z'))
+
+      // A copy of the module for each process, as the names the schedules of a process hold are its own.
+      const apps = (await Promise.all(names.map(async (name) => {
+        const copy = await import(`../src/server/jobs.ts?process=${name}-${++copies}`) as { schedule: typeof scheduleOf }
+
+        return build(name, sqliteJobs(path), copy.schedule)
+      }))).flat()
+
+      for (const app of apps)
+        app.listen(0)
+
+      return {
+        async fire() {
+          await Promise.all(cron.fired.map(async entry => entry.handler()))
+        },
+        async done() {
+          setSystemTime()
+          process.env.NODE_ENV = before
+          cron.restore()
+          await Promise.all(apps.map(async app => shutdown(app)))
+        },
+      }
+    }
+
+    it('runs once across the processes of a production server', async () => {
+      const runs: string[] = []
+      const world = await twoProcesses('production', (name, store, schedule) => [new Elysia().use(schedule('@hourly', () => runs.push(`${name}-report`), { store }))])
+
+      try {
+        await world.fire()
+        expect(runs).toEqual(['first-report'])
+      }
+      finally {
+        await world.done()
+      }
+    })
+
+    it('keeps jobs apart that share a schedule, a twin job included, each running once across processes', async () => {
+      const runs: string[] = []
+      const send = (kind: string, name: string) => () => runs.push(`${name}-${kind}`)
+      const world = await twoProcesses('production', (name, store, schedule) => [
+        new Elysia().use(schedule('@hourly', () => runs.push(`${name}-digest`), { store })).use(schedule('@hourly', () => runs.push(`${name}-purge`), { store })),
+        new Elysia().use(schedule('@hourly', send('a', name), { store })).use(schedule('@hourly', send('b', name), { store })),
+        new Elysia().use(schedule({ '@daily': [send('c', name), send('d', name)] }, { store })),
+      ])
+
+      try {
+        await world.fire()
+        expect(runs.map(run => run.slice(run.indexOf('-') + 1)).toSorted()).toEqual(['a', 'b', 'c', 'd', 'digest', 'purge'])
+      }
+      finally {
+        await world.done()
+      }
+    })
+
+    it('locks an every-so-long schedule and its boot run by default too', async () => {
+      const runs: string[] = []
+      const world = await twoProcesses('production', (name, store, schedule) => [new Elysia().use(schedule('30s', () => runs.push(name), { boot: true, store }))])
+
+      try {
+        await Bun.sleep(20)
+        expect(runs).toEqual(['first'])
+      }
+      finally {
+        await world.done()
+      }
+    })
+
+    it('keeps one process per schedule outside production, and with lock false', async () => {
+      const runs: string[] = []
+      const dev = await twoProcesses('development', (name, store, schedule) => [new Elysia().use(schedule('@hourly', () => runs.push(`dev-${name}`), { store }))])
+
+      try {
+        await dev.fire()
+      }
+      finally {
+        await dev.done()
+      }
+
+      const off = await twoProcesses('production', (name, store, schedule) => [new Elysia().use(schedule('@hourly', () => runs.push(`off-${name}`), { lock: false, store }))])
+
+      try {
+        await off.fire()
+        expect(runs.toSorted()).toEqual(['dev-first', 'dev-second', 'off-first', 'off-second'])
+      }
+      finally {
+        await off.done()
+      }
+    })
+
+    it('frees the lock name when the server stops, so a restart takes it again', async () => {
+      const cron = fakeCron()
+      const before = process.env.NODE_ENV ?? 'test'
+      const store = memoryJobs()
+      const names: string[] = []
+      const lock = store.lock.bind(store)
+
+      store.lock = async (name, slot) => {
+        names.push(name)
+
+        return lock(name, slot)
+      }
+
+      process.env.NODE_ENV = 'production'
+
+      try {
+        for (let boot = 0; boot < 2; boot++) {
+          const app = new Elysia().use(schedule('@hourly', () => undefined, { store })).listen(0)
+
+          await cron.fired.at(-1)!.handler()
+          await shutdown(app)
+        }
+
+        expect(new Set(names).size).toBe(1)
+      }
+      finally {
+        process.env.NODE_ENV = before
+        cron.restore()
+      }
+    })
+  })
+
+  describe('timeout', () => {
+    it('frees the schedule from a run that never settles, aborting its signal, and lets a stop through', async () => {
+      const cron = fakeCron()
+      const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+      const signals: AbortSignal[] = []
+      const app = new Elysia().use(schedule('@hourly', async (signal) => {
+        signals.push(signal)
+
+        if (signals.length === 1)
+          await new Promise(() => undefined)
+      }, { timeout: '30ms' })).listen(0)
+
+      try {
+        await cron.fired[0]!.handler()
+        expect(signals[0]!.aborted).toBe(true)
+        expect(logged.mock.calls.flat().join(' ')).toContain('it ran past its timeout')
+        await cron.fired[0]!.handler()
+        expect(signals).toHaveLength(2)
+        expect(signals[1]!.aborted).toBe(false)
+      }
+      finally {
+        await shutdown(app)
+        logged.mockRestore()
+        cron.restore()
+      }
+    })
+
+    it('aborts the signal of a run in progress as the server stops, and a stop waits no longer than the timeout', async () => {
+      const cron = fakeCron()
+      const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+      let signal: AbortSignal | undefined
+      const app = new Elysia().use(schedule('@hourly', async (given) => {
+        signal = given
+        await new Promise(() => undefined)
+      }, { timeout: '40ms' })).listen(0)
+
+      try {
+        void cron.fired[0]!.handler()
+        await until(() => signal !== undefined)
+
+        const started = Date.now()
+
+        await shutdown(app)
+        expect(signal!.aborted).toBe(true)
+        expect(Date.now() - started).toBeLessThan(2000)
+      }
+      finally {
+        logged.mockRestore()
+        cron.restore()
+      }
+    })
+
+    it('refuses a timeout that is not a duration at boot, and takes false for no limit', () => {
+      expect(() => schedule('@hourly', () => undefined, { timeout: 0 })).toThrow('the timeout of the schedule @hourly is 0')
+      expect(() => schedule('@hourly', () => undefined, { timeout: false })).not.toThrow()
+    })
   })
 
   it('keeps two schedules apart', () => {

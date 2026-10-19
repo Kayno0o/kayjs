@@ -43,7 +43,9 @@ A cron has five fields or a nickname such as `@daily`. A cron that can never run
 
 Runs never overlap. A run that throws is logged without stopping the next.
 
-With several server processes, `{ lock: 'weekly-report' }` runs the job once across all of them. With `lock` and several jobs, each job locks as `<lock>:<its schedule>:<its place in that schedule's list>`.
+A production server (`NODE_ENV=production`) runs each schedule once across all its processes sharing the job store, with no setup: the lock is named after the schedule and the job's source. `{ lock: 'weekly-report' }` names it yourself, and `{ lock: false }` runs the job in every process. With `lock` and several jobs, each job locks as `<lock>:<its schedule>:<its place in that schedule's list>`.
+
+A run that takes longer than `timeout`, 10 minutes by default, is logged as failed and left behind, so a job that never settles blocks neither the next run nor a shutdown. The job gets an `AbortSignal` as its argument, aborted at the timeout and when the server stops; `timeout: false` sets no limit.
 
 A boot run happens wherever the server starts, so also at each restart of `kay dev`.
 

@@ -181,7 +181,7 @@ Then `await welcomeMails.enqueue({ to: email })` in an action, or `enqueue(paylo
 
 ### Background jobs
 
-- `schedule(cron, job)` and `background(work)` from `kay/server` are Elysia plugins, so a job runs in the server's process, from `.listen()` to the server stopping, once per process:
+- `schedule(cron, job)` and `background(work)` from `kay/server` are Elysia plugins, so a job runs in the server's process, from `.listen()` to the server stopping, once across the processes sharing the job store in production, else once per process:
 
 ```ts
 import { Elysia } from 'elysia'
@@ -211,7 +211,8 @@ new Elysia()
 - Work that throws is logged and not started again.
 - Stopping on a signal waits for a scheduled run in progress, and for every `onStop` hook the app registers, async ones included, in turn.
 - `shutdown(app)` from `kay/server` stops a server the same way, as a test does; Elysia's own `app.stop()` does not wait for the hooks.
-- With several server processes, each runs its own schedules.
+- A production server (`NODE_ENV=production`) locks every schedule by default, named `auto:<schedule>:<hash of the job's source>` (a twin with the same schedule and source takes `#2` by start order, which every process of one app shares), so each run happens once across processes sharing the store; a dev or test server runs each schedule in every process. `lock: false` opts out.
+- A run still going after `timeout` (`'10m'` by default, `false` for none) is logged as failed and left, so it blocks neither the next run nor a stop. The job takes an `AbortSignal` that aborts at the timeout and as the server stops.
 - `schedule(cron, [jobA, jobB])` gives each job of the list that schedule, and `schedule({ '* * * * *': [jobA, jobB], '@hourly': jobC, '30s': jobD }, options)` several schedules at once, each key checked as a literal schedule is and `tz` read by the crons alone, all in one plugin: with several jobs, `lock` names each `<lock>:<its schedule>:<its place in that schedule's list>`, `report:@hourly:0`.
 - `schedule(cron, job, { boot: true })` runs the jobs once as the server starts too, taking the lock like any run, the first scheduled run waiting for it and a stop too, so a job needing a first run does not start itself by hand; it takes the lock `<lock>:boot`, and runs wherever the server starts, each restart of `kay dev`, `kay render` and `--verify` included.
 - `schedule(cron, job, { lock: 'weekly-report' })` runs each time once across every process sharing the job store (below), the first to reach it taking it; `store` names another store than the default one.
