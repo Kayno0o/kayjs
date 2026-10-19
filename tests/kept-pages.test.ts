@@ -60,8 +60,9 @@ interface Answered {
 
 // A server of its own on what the build wrote, which the requests go through in order, a group of them together: one process serves one project.
 // The warnings it logged come with the answers.
-async function servedWith(root: string, asked: (Asked | Asked[])[], options = ''): Promise<{ answers: Answered[], warnings: string }> {
-  await Bun.write(join(root, 'serve.ts'), `import { Elysia } from 'elysia'\nimport { pages } from ${JSON.stringify(join(import.meta.dir, '../src/server'))}\n\nconst app = new Elysia().use(await pages({ root: ${JSON.stringify(root)}, prebuilt: true, log: false, compress: false${options} }))\nconst answers = []\nconst ask = async ({ path, method, headers, body, wait }) => {\n  if (wait)\n    await Bun.sleep(wait)\n\n  const response = await app.handle(new Request(\`http://localhost\${path}\`, { method, headers, body }))\n\n  return { status: response.status, etag: response.headers.get('etag'), cache: response.headers.get('cache-control'), text: await response.text() }\n}\n\nfor (const group of ${JSON.stringify(asked)}) {\n  if (Array.isArray(group))\n    answers.push(...await Promise.all(group.map(ask)))\n  else\n    answers.push(await ask(group))\n}\n\nconsole.log(JSON.stringify(answers))\nprocess.exit(0)\n`)
+// `parent` is chained onto the app ahead of `pages()`, as hooks of a parent app are.
+async function servedWith(root: string, asked: (Asked | Asked[])[], options = '', parent = ''): Promise<{ answers: Answered[], warnings: string }> {
+  await Bun.write(join(root, 'serve.ts'), `import { Elysia } from 'elysia'\nimport { pages } from ${JSON.stringify(join(import.meta.dir, '../src/server'))}\n\nconst app = new Elysia()${parent}.use(await pages({ root: ${JSON.stringify(root)}, prebuilt: true, log: false, compress: false${options} }))\nconst answers = []\nconst ask = async ({ path, method, headers, body, wait }) => {\n  if (wait)\n    await Bun.sleep(wait)\n\n  const response = await app.handle(new Request(\`http://localhost\${path}\`, { method, headers, body }))\n\n  return { status: response.status, etag: response.headers.get('etag'), cache: response.headers.get('cache-control'), text: await response.text() }\n}\n\nfor (const group of ${JSON.stringify(asked)}) {\n  if (Array.isArray(group))\n    answers.push(...await Promise.all(group.map(ask)))\n  else\n    answers.push(await ask(group))\n}\n\nconsole.log(JSON.stringify(answers))\nprocess.exit(0)\n`)
 
   const child = Bun.spawn([process.execPath, join(root, 'serve.ts')], { cwd: root, stdout: 'pipe', stderr: 'pipe', env: { ...process.env, NODE_ENV: 'production' } })
   const [out, err, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
@@ -373,6 +374,16 @@ describe('a kept page after a request that can write', () => {
   it('is checked again after a write that a visit overlapped', async () => {
     const root = await guestbook()
     const [, , during, after] = await served(root, [read('/'), [post('slow.kay', 'save'), { ...read('/'), wait: 100 }], read('/')])
+
+    expect(during!.text).toContain('first<')
+    expect(after!.text).toContain('first,m1')
+  }, 120_000)
+
+  it('is checked again after a write whose answer a parent mapResponse replaced', async () => {
+    const root = await guestbook()
+    // The last visit waits, as Elysia runs afterResponse hooks once the event loop gets to them.
+    const parent = '.mapResponse({ as: \'global\' }, ({ request }) => request.method === \'POST\' ? new Response(\'replaced\') : undefined)'
+    const { answers: [, , during, after] } = await servedWith(root, [read('/'), [post('slow.kay', 'save'), { ...read('/'), wait: 100 }], { ...read('/'), wait: 50 }], '', parent)
 
     expect(during!.text).toContain('first<')
     expect(after!.text).toContain('first,m1')
