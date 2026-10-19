@@ -1,6 +1,54 @@
 # What's new, older releases
 
-What each release before 1.52.3 added, newest first, each feature with where it is documented. The newer releases are in [What's new](whats-new.md); what a release breaks is in [Upgrading](upgrading.md).
+What each release before 1.53.1 added, newest first, each feature with where it is documented. The newer releases are in [What's new](whats-new.md); what a release breaks is in [Upgrading](upgrading.md).
+
+## 1.53.0
+
+- A `resource()` reading a route whose handler reads a `live` cached key asks the route again after `invalidate`, with nothing written ([live data](api-from-islands.md#following-cached-values)).
+- A collection with `live: true` shows an `invalidate()` or a CMS edit in every open page that read it ([content](content.md#drafts)).
+- `followLog(() => list)` from `kay` keeps a log or chat list at its bottom while the reader is there and the first item showing in place when items load above ([Follow a log](navigation.md#follow-a-log)).
+- `kay fmt --from-html [file]` prints HTML, from a file or stdin, as a formatted `.kay` template through the translation `kay migrate astro` uses, and the docs site converts a pasted snippet in the browser; the translation keeps a no-break space and writes `#[` in text as `\#[` ([kay fmt](check-and-tools.md), [Template lines](templates.md#write-html-and-convert-it)).
+- `analytics()` from `kay/analytics` counts visits with Plausible, Umami, Simple Analytics or Matomo through the app's own origin, with no pasted script or CSP exception, page swaps counted, an optional consent notice and the visitor's address sent only where the provider needs it, plus Fathom, Cloudflare Web Analytics and any tracker script by `script` and `endpoint` ([Privacy](privacy.md#count-visits-through-your-own-origin)).
+- `kay migrate astro` and `kay fmt --from-html` keep the space a line break makes between two inline siblings (`#[b a] #[i b]`) and comment out a web component's `<slot>` ([kay fmt](check-and-tools.md)).
+- Redirects can be added while the site runs: `kay not-found --redirect /old --runtime` and kayjs-cms's missing pages screen write them to `data/not-found.sqlite`, which the server reads for a path no page serves; they stay on the site unless `runtimeRedirects.hosts` lists a host, and `kay check` reports a target nothing serves ([Redirects](routing.md#redirects), [kayjs-cms](../packages/cms/llms.txt)).
+- A page whose own rules weigh between half the inline limit and the limit keeps them inline instead of linking a stylesheet copy, which paints a first view sooner (`bun run bench:paint` measures it) ([Styles](styles-and-assets.md)).
+- Redirects can be added while the site runs: `kay not-found --redirect /old --runtime` and kayjs-cms's missing pages screen write them (a 307, a 308 with kayjs-cms's Permanent box) to `data/not-found.sqlite`, which the server reads for a path no page serves; they stay on the site unless `runtimeRedirects.hosts` lists a host, and `kay check` reports a target nothing serves ([Redirects](routing.md#redirects), [kayjs-cms](../packages/cms/llms.txt)).
+- A tool's input schema, and the OpenAPI document, describe `s.Integer()` and `s.Numeric()` as a number alone, and a tool's schema no longer requires a field with a `default` ([tools](api-routes.md)).
+- A stale tab believes the build the server named for 5 seconds, and a page an action post came back to as an error page (a 404, a guard's denial) carries `kay-posted` too, so a reload no longer posts it again ([a deploy under open tabs](production.md#a-deploy-under-open-tabs)).
+- kayjs-ai: `kay i18n translate` holds a reply that reorders the tags of its source, and fails a source holding a tag it cannot read without asking the model ([translating](../packages/ai/llms/translating.md)).
+- `kay check` reports an entry of a localized collection opening on a `# draft` line, as `kay i18n translate` writes one, with the `draft-entry` lint ([lints](lints.md)).
+- `kay i18n translate` writes the plural forms the locale picks between (`few`, `many`...) instead of the source's, asked through `Intl.PluralRules` ([translating](../packages/ai/llms/translating.md)).
+- `kay i18n translate` translates a long entry body in parts instead of failing on the reply cap ([translating](../packages/ai/llms/translating.md)).
+- `untranslated(schema)` from `kay/content` keeps a field out of `kay i18n translate`, whose dry run now lists the field paths of each entry ([content CMS](content-cms.md), [translating](../packages/ai/llms/translating.md)).
+- kayjs-ai: `kay i18n translate` translates the `title`, `alt`, `aria-label` and `placeholder` of a tag and still holds its other attributes ([translating](../packages/ai/llms/translating.md)).
+- `kay doctor` tries the port on `HOST` or else `localhost`, passes `PORT=0` as the system's pick, and reads a manifest again once when it is being written ([kay doctor](check-and-tools.md)).
+- `kay doctor` tries the port on `HOST` or else on every IPv4 address and both loopback ones, passes `PORT=0` as the system's pick, and reads a manifest again once when it is being written ([kay doctor](check-and-tools.md)). A dev tool Network tab lists the page a swap took from a prefetch under the page it brings.
+- A production build keeps the runtime split per island for a file that also imports `kay` as a namespace or default beside import text in a template literal or a comment, which it used to rewrite.
+- kayjs-cms: in the on-page editor, the issues of a refused save stay shown when a draft render was pending, until the next edit ([kayjs-cms](../packages/cms/llms.txt)).
+- An executable from `kay build --compile` maps an island's report and the stacks in its logs to `.kay` lines, with its maps embedded compressed, and a slow `onError` holds a queue worker for 10 seconds at most ([Build and start](build-and-start.md), [Error reporting](routing.md#error-reporting)).
+- A warm build with `--compile` no longer compiles every `.kay` file again for its embedded maps, and the stacks of a static component rendered inside an island map to `.kay` lines in an executable ([Build and start](build-and-start.md)).
+- An island passed an action without typing a prop with `Action` fails the render naming the fix, in production as in dev, instead of failing in the browser ([actions to islands](actions.md#pass-an-action-to-an-island)).
+- A static component promoted to an island and passed an action works in the browser when it types a prop with `Action`, and fails the render naming the fix when it does not ([actions to islands](actions.md#pass-an-action-to-an-island)).
+- `onError` gets the errors of `schedule`, `background` and queue jobs and `onStop` hooks, with no request, and an island's stack is mapped to `.kay` lines in production ([Error reporting](routing.md#error-reporting), [Error fallbacks](islands.md#error-fallbacks)).
+- kayjs-cms: `cms({ collections })` arranges a form (field order, rows of columns, hidden fields) and a list (columns, row actions), and the screens' parts, `createEntryForm`, `entryScreen` and `listScreen` are exported to build an entry screen of your own ([screens](../packages/cms/llms/screens.md)).
+- A page of many rules, Markdown pages included, links a copy of the stylesheet cut to the classes it names instead of every component's rules, loaded before a page swap paints ([styles](styles-and-assets.md#link-or-inline-the-stylesheets)).
+- kayjs-ai's `Chat` announces each tool call's start and end to screen readers through its polite status line, and a Stop before the first word returns the message to the field ([Chat island](../packages/ai/llms/chat.md)).
+- kayjs-ai's `Chat` names each table of a reply as a `group`, numbered when a reply has several, and escapes `tableLabel` ([Chat island](../packages/ai/llms/chat.md)).
+- A tab opened before a deploy reloads itself, the scroll kept and what was typed left alone, on the next island it fails to load; production answers carry `x-kay-build` ([a deploy under open tabs](production.md#a-deploy-under-open-tabs)).
+- kayjs-cms: a list of `imageField()` or `fileField()` takes several files dropped or picked at once, one item per file ([kayjs-cms](../packages/cms/llms.txt)).
+- `unreachable-tooltip` no longer takes an `aria-label` on a role-less `span` or `div` as a fix, and leaves an expression `tabindex` or an element whose only text is its tooltip alone ([checks](checks.md)); kayjs-ui's TooltipHost describes the element it shows for with `aria-describedby`.
+- `kay doctor` and an MCP `doctor` tool check Bun, kay and library versions, the config, the environment, the port and `.kay` in one report, with a fix beside each failure ([tools](check-and-tools.md)).
+- The dev tool's Not found tab lists the paths production found nothing at, and turns one into a redirect with a click ([dev server](dev-server.md)).
+- kayjs-cms lists those paths at `<prefix>/not-found`, with where visitors came from and a redirect line to copy ([Redirects](routing.md#redirects)).
+- The dev tool's filters update a group's count, Head's hreflang alternates have a copy button, and a copy's outcome is announced to a screen reader ([dev server](dev-server.md)).
+- `cached(key, ttl, load, { live: true })` has every open page that read the key show it afresh when `invalidate` drops it, with no socket or polling ([live data](api-from-islands.md#following-cached-values)).
+- `kay build` keeps the chunks of the last 3 builds beside the new one, so a tab opened before a deploy still finds them ([a deploy under open tabs](production.md#a-deploy-under-open-tabs)).
+- An island's markup names its chunk (`data-chunk`), so a page no longer loads a loader for every island of the app: the docs' 128 islands weigh 2 KB gzip less on every page ([Build and start](build-and-start.md)). Island markup now carries `data-chunk`, so a test matching a `<slot>` exactly changes, and markup from `renderToString` has none and hydrates nothing.
+- A page no longer loads a runtime module only other pages' islands use: the action runtime or the image variants stay with the islands importing them, and the docs' entry drops from 21.0 to 15.4 KB gzip ([Build and start](build-and-start.md)).
+
+## 1.52.3
+
+- Claude Code lists an app's MCP tools: a list or a read in the 2026-07-28 revision says how long a client keeps it, `ttlMs` and `cacheScope`, as that revision requires ([API routes](api-routes.md#mcp)).
 
 ## 1.52.2
 
