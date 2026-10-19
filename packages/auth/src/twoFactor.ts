@@ -97,7 +97,7 @@ export async function secondFactorLimited(state: RequestState, record: UserRecor
 }
 
 export async function verifyTwoFactor(state: RequestState, code: string, signIn: (record: UserRecord, method: string) => Promise<void>): Promise<TwoFactorResult> {
-  const { store, limits } = state.core
+  const { store } = state.core
   const challenge = await state.session.get('authChallenge')
   const record = challenge && challenge.expires > Date.now() ? await store.users.get(challenge.user) : undefined
 

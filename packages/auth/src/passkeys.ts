@@ -243,7 +243,7 @@ export async function twoFactorPasskeyOptions(state: RequestState): Promise<Pass
 
 // Answers a pending sign-in's second factor with a passkey, in place of an authenticator code.
 export async function verifyTwoFactorPasskey(state: RequestState, response: AuthenticationResponseJSON, signIn: (record: UserRecord, method: string) => Promise<void>): Promise<TwoFactorResult> {
-  const { store, limits } = state.core
+  const { store } = state.core
   const pending = await state.session.get('authChallenge')
   const record = pending && pending.expires > Date.now() ? await store.users.get(pending.user) : undefined
 
