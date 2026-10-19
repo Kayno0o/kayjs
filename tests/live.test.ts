@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { kay } from '../src/build/plugin'
 import { check } from '../src/check'
 import { flush, root, signal } from '../src/runtime'
-import { ApiError, call, dispatch, openSocket, readEvents, resource, socket, stream } from '../src/runtime/live'
+import { ApiError, call, dispatch, openSocket, readEvents, resource, routeUrl, socket, stream } from '../src/runtime/live'
 import { encodeValue } from '../src/runtime/wire'
 import { apiStubs, scanApi } from '../src/server/api-modules'
 import { rooms, sqliteRooms } from '../src/server/rooms'
@@ -1486,5 +1486,34 @@ describe('stream() over an async iterable', () => {
     expect(aborted?.aborted).toBe(true)
     expect(reader.status()).toBe('closed')
     expect(reader.last()).toBe(1)
+  })
+})
+
+describe('routeUrl', () => {
+  const users = { [Symbol.for('kay.api')]: '/api/users' }
+
+  it('refuses a param that is a dot segment, which would reach the parent route', () => {
+    for (const id of ['.', '..'])
+      expect(() => routeUrl(users, '/:id', { params: { id } })).toThrow(TypeError)
+  })
+
+  it('encodes a dot-like param so it stays one segment', () => {
+    expect(routeUrl(users, '/:id', { params: { id: '%2e%2e' } })).toBe('/api/users/%252e%252e')
+    expect(routeUrl(users, '/:id', { params: { id: 'a/../b' } })).toBe('/api/users/a%2F..%2Fb')
+    expect(routeUrl(users, '/:id', { params: { id: '...' } })).toBe('/api/users/...')
+  })
+
+  it('encodes each segment of a wildcard and refuses dot segments in it', () => {
+    expect(routeUrl(users, '/files/*', { params: { '*': 'a b/c%2Fd/e?f#g' } })).toBe('/api/users/files/a%20b/c%252Fd/e%3Ff%23g')
+    expect(routeUrl(users, '/files/*', { params: { '*': '' } })).toBe('/api/users/files/')
+
+    for (const rest of ['..', '.', 'a/../b', 'a/./b', '../b', 'a/..'])
+      expect(() => routeUrl(users, '/files/*', { params: { '*': rest } })).toThrow(TypeError)
+
+    expect(routeUrl(users, '/files/*', { params: { '*': '%2e%2e/b' } })).toBe('/api/users/files/%252e%252e/b')
+  })
+
+  it('rejects a call whose param is a dot segment before any fetch', async () => {
+    await expect(call(users as never, '/:id' as never, { params: { id: '..' } } as never)).rejects.toThrow(TypeError)
   })
 })

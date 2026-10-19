@@ -446,7 +446,7 @@ export function routeUrl(module: unknown, path: string, options: UrlInput = {}):
 
   const segments = path.split('/').map((segment) => {
     if (segment === '*')
-      return String(options.params?.['*'] ?? '')
+      return String(options.params?.['*'] ?? '').split('/').map(part => encodeSegment(part, path)).join('/')
 
     const param = PARAM_SEGMENT.exec(segment)?.[1]
 
@@ -458,7 +458,7 @@ export function routeUrl(module: unknown, path: string, options: UrlInput = {}):
     if (value === undefined)
       throw new TypeError(`kay: ${path} takes the param ${param}`)
 
-    return encodeURIComponent(String(value))
+    return encodeSegment(String(value), path)
   })
   const query = new URLSearchParams()
 
@@ -473,6 +473,14 @@ export function routeUrl(module: unknown, path: string, options: UrlInput = {}):
   const joined = segments.join('/')
 
   return `${mount}${joined === '/' ? '' : joined}${search}`
+}
+
+// A dot segment would be resolved by the URL parser and reach the parent route.
+function encodeSegment(value: string, path: string): string {
+  if (value === '.' || value === '..')
+    throw new TypeError(`kay: ${path} cannot take "${value}" as a param, it would reach the parent route`)
+
+  return encodeURIComponent(value)
 }
 
 // A value as a form field or a query param carries it: a Date as its ISO text, an object as JSON.
