@@ -214,6 +214,8 @@ p {answer.last()}
 
 A `.ws()` route in an API module is a websocket. Its `body` types what a client sends, and `response` types what it receives.
 
+A message that fails `body` is dropped: the sender gets no reply, so nothing collides with the messages your island handles. A valid one arrives decoded as an HTTP body is, so `'1'` reaches `message()` as `1` for an integer.
+
 ```ts
 export default api().ws('/:room', {
   body: s.Object({ text: s.String() }),

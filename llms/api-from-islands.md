@@ -130,6 +130,8 @@ input(bind:value={text})
 button(onClick={() => messages.send({ text: text() })}) Send
 ```
 
+A message failing the route's `body` is dropped, with no reply, and a valid one arrives decoded as an HTTP body is (`'1'` as `1` for an integer).
+
 ## Reference
 
 ### Calling modules from an island

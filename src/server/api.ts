@@ -11,7 +11,7 @@ import type { LoadedGuard } from './guards'
 import type { MountedApi } from './openapi'
 import type { ApiRateLimit } from './protection'
 import type { Span } from './trace'
-import { Cookie, Elysia, ElysiaCustomStatusResponse, ElysiaFile, StatusMap } from 'elysia'
+import { Cookie, Elysia, ElysiaCustomStatusResponse, ElysiaFile, getSchemaValidator, StatusMap } from 'elysia'
 import { KayError } from '../compiler/errors'
 import { TRAILING_SLASH } from '../runtime/base'
 import { API_MOUNT } from '../runtime/live'
@@ -611,5 +611,58 @@ export function api(options: ApiOptions = {}): Elysia<'', { decorator: Empty, st
   if (options.rateLimit !== undefined)
     Object.defineProperty(instance, RATE_LIMIT, { value: options.rateLimit })
 
+  const socketRoute = instance.ws.bind(instance) as (path: string, options: SocketOptions) => unknown
+
+  // `.ws()` returns the instance, so the chain goes on as it was written.
+  instance.ws = ((path: string, socketOptions: SocketOptions) => socketRoute(path, decoded(instance, socketOptions))) as typeof instance.ws
+
   return instance as unknown as Elysia<'', { decorator: Empty, store: Empty, derive: Empty, resolve: ApiLocals }>
+}
+
+interface SocketOptions {
+  body?: unknown
+  message?: (ws: unknown, message: unknown) => unknown
+}
+
+interface Definitions {
+  definitions: { typebox: never, type: never }
+}
+
+// A websocket route's `body` as an HTTP route's: a message arrives cleaned and decoded, `at: '1'` as `1` for an integer, and one the schema refuses is dropped, where Elysia would send the sender a validation frame carrying the schema, which an island applying every server message reads as one of its own.
+// Elysia's validation is left out of the route and done here, with the validator Elysia would have built.
+function decoded(app: Elysia, options: SocketOptions): SocketOptions {
+  if (options.body === undefined || options.message === undefined)
+    return options
+
+  const { definitions } = app as unknown as Definitions
+  const validator = getSchemaValidator(options.body as never, { modules: definitions.typebox, models: definitions.type, normalize: app.config.normalize })
+
+  if (validator === undefined || validator.provider === 'standard')
+    return options
+
+  const { message } = options
+
+  return {
+    ...options,
+    body: undefined,
+    message(ws, raw) {
+      const cleaned = validator.Clean?.(raw) ?? raw
+
+      if (validator.Check(cleaned) === false)
+        return undefined
+
+      let value = cleaned
+
+      try {
+        if (validator.hasTransform)
+          value = validator.Decode(cleaned)
+      }
+      catch {
+        // A transform that refuses the value is a refused message too.
+        return undefined
+      }
+
+      return message(ws, value)
+    },
+  }
 }
