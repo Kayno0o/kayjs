@@ -1,5 +1,6 @@
 import type { SQL } from 'bun'
 import type { JobStore, StoredJob, StoredJobState } from './queue'
+import { onReload } from './reload'
 
 interface PgJobRow {
   id: string
@@ -20,6 +21,10 @@ export type PgJobsSource = SQL | { sql: SQL } | string
 // What replicas starting together take turns on while one creates the tables.
 const MIGRATION_LOCK = 'kay_jobs'
 const LOST_KEY_TRIES = 3
+const INSUFFICIENT_PRIVILEGE = '42501'
+
+// The tables a store keeps its jobs and schedule locks in, for a pg-orm `ignoreTables` that keeps `db.sync()` and `pg-orm generate` from dropping them.
+export const jobTables = ['kay_jobs', 'kay_locks'] as const
 
 function toJob(row: PgJobRow): StoredJob {
   return { id: row.id, queue: row.queue, payload: row.payload, attempts: row.attempts, runAt: Number(row.run_at), ...row.error !== null && { error: row.error }, ...row.job_key !== null && { key: row.job_key }, ...row.progress !== null && { progress: row.progress } }
@@ -44,25 +49,66 @@ function connectionOf(source: PgJobsSource): SQL {
   return 'sql' in source ? source.sql : source
 }
 
-// Jobs kept in the app's Postgres, shared by every process of every replica opening it, each job running in one of them: a claim is one `UPDATE` over a `FOR UPDATE SKIP LOCKED` pick.
-// The tables `kay_jobs` and `kay_locks` create themselves the first time they are used, and a table made by an older kay gains the columns it lacks, so nothing is listed in the app's own migrations.
-// Holds are read against the clock of the process claiming, as `sqliteJobs` does, so the replicas' clocks should agree to within a few seconds.
-export function pgJobs(source: PgJobsSource): JobStore {
-  let sql: SQL | undefined
-  let ready: Promise<SQL> | undefined
-  const connect = (): SQL => sql ??= connectionOf(source)
+// Creates `kay_jobs` and `kay_locks` and their indexes unless they exist: run it as the database's owner, in a migration or a boot script, when the app connects with a role that creates nothing (the app template's `app_rw`). `pgJobs` creates them itself when its role may.
+// Replicas running it together take turns, and tables already there are left alone.
+export async function createJobTables(source: PgJobsSource): Promise<void> {
+  const db = connectionOf(source)
 
-  // One connection runs it all, so a replica creating the tables at once with another waits its turn instead of failing on a duplicate.
-  const create = async (db: SQL): Promise<SQL> => {
+  try {
     await db.begin(async (tx) => {
       await tx`SELECT pg_advisory_xact_lock(hashtext(${MIGRATION_LOCK}))`
       await tx`CREATE TABLE IF NOT EXISTS kay_jobs (id text PRIMARY KEY, queue text NOT NULL, payload text NOT NULL, attempts integer NOT NULL, run_at bigint NOT NULL, held_until bigint, failed boolean NOT NULL DEFAULT false, error text, job_key text, progress text)`
-      await tx`ALTER TABLE kay_jobs ADD COLUMN IF NOT EXISTS job_key text`
-      await tx`ALTER TABLE kay_jobs ADD COLUMN IF NOT EXISTS progress text`
       await tx`CREATE INDEX IF NOT EXISTS kay_jobs_due ON kay_jobs (queue, failed, run_at)`
       await tx`CREATE UNIQUE INDEX IF NOT EXISTS kay_jobs_key ON kay_jobs (queue, job_key) WHERE job_key IS NOT NULL AND NOT failed`
       await tx`CREATE TABLE IF NOT EXISTS kay_locks (name text NOT NULL, slot bigint NOT NULL, PRIMARY KEY (name, slot))`
     })
+  }
+  finally {
+    if (typeof source === 'string')
+      await db.close()
+  }
+}
+
+// Jobs kept in the app's Postgres, shared by every process of every replica opening it, each job running in one of them: a claim is one `UPDATE` over a `FOR UPDATE SKIP LOCKED` pick.
+// The tables `kay_jobs` and `kay_locks` are looked for first and created only when missing, which takes a role that may create tables: with one that may not, `createJobTables` run by the owner makes them. Either way they are outside pg-orm's table definitions, so list `jobTables` in its `ignoreTables`.
+// Holds are read against the clock of the process claiming, as `sqliteJobs` does: a run stops about a second before its hold ends, so replicas' clocks must agree to well within that.
+export function pgJobs(source: PgJobsSource): JobStore {
+  let sql: SQL | undefined
+  let ready: Promise<SQL> | undefined
+  const connect = (): SQL => {
+    if (sql === undefined) {
+      sql = connectionOf(source)
+
+      // A connection this store opened from a URL goes with the module that did, so a reload does not leave its pool behind.
+      if (typeof source === 'string') {
+        const opened = sql
+
+        onReload(() => {
+          void opened.close()
+          sql = undefined
+          ready = undefined
+        })
+      }
+    }
+
+    return sql
+  }
+
+  const create = async (db: SQL): Promise<SQL> => {
+    const [found] = await rowsOf<{ jobs: string | null, locks: string | null, key: string | null }>(db`SELECT to_regclass('kay_jobs')::text AS jobs, to_regclass('kay_locks')::text AS locks, to_regclass('kay_jobs_key')::text AS key`)
+
+    if (found?.jobs !== null && found?.locks !== null && found?.key !== null)
+      return db
+
+    try {
+      await createJobTables(db)
+    }
+    catch (error) {
+      if ((error as { errno?: string }).errno === INSUFFICIENT_PRIVILEGE)
+        throw new Error('kay: pgJobs needs the tables kay_jobs and kay_locks, and its role may not create them: run `await createJobTables(db)` from kay/server as the database\'s owner, in a migration or a boot script', { cause: error })
+
+      throw error
+    }
 
     return db
   }

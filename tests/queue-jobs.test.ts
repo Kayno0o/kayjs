@@ -9,6 +9,32 @@ import { cleanUpAfterFile, kinds } from './job-stores'
 cleanUpAfterFile()
 
 let names = 0
+const writeListeners = new Set<() => void>()
+
+// A store telling the cases below when one of its progress writes landed.
+function watched(store: JobStore): JobStore {
+  return {
+    ...store,
+    progress: async (id, until, progress) => {
+      await store.progress!(id, until, progress)
+
+      for (const listener of writeListeners)
+        listener()
+    },
+  }
+}
+
+async function nextWrite(): Promise<void> {
+  await new Promise<void>((resolve) => {
+    const done = () => {
+      writeListeners.delete(done)
+      resolve()
+    }
+
+    writeListeners.add(done)
+  })
+}
+
 const made: { drain: () => Promise<number> }[] = []
 
 // Every queue made here leaves what `drainQueues` runs with its test, as its store's database goes with its file.
@@ -191,22 +217,21 @@ describe.each(kinds)('a queue on a $name store', ({ open }) => {
   })
 
   describe('progress', () => {
-    // Writes go to the store after the handler's turn, so a handler reading them back waits for them.
+    // Waits for a write to reach the store rather than a clock: checks, then sleeps until the next write lands.
     async function seen<Progress>(jobs: Queue<number, Progress>, key: string, present: (progress: Progress | undefined) => boolean) {
-      for (let tries = 0; tries < 200; tries++) {
+      for (;;) {
+        const next = nextWrite()
         const state = await jobs.job(key)
 
         if (present(state?.progress))
           return state
 
-        await Bun.sleep(5)
+        await next
       }
-
-      throw new Error('progress never showed')
     }
 
     it('is written by the handler and read back typed, dates and maps included, while the job runs', async () => {
-      const store = await open()
+      const store = watched(await open())
       const reads: unknown[] = []
       const jobs = queue<number, { processed: number, total: number, since: Date }>(named(), async (_payload, _signal, job) => {
         job.progress({ processed: 3, total: 40, since: new Date(0) })
@@ -229,7 +254,7 @@ describe.each(kinds)('a queue on a $name store', ({ open }) => {
         await seen(jobs, 'k', progress => progress === job.attempts * 10)
 
         throw new Error('boom')
-      }, { store: await open(), attempts: 2, backoff: '1s' })
+      }, { store: watched(await open()), attempts: 2, backoff: '1s' })
 
       await jobs.enqueue(1, { key: 'k' })
       await jobs.drain()
@@ -244,7 +269,7 @@ describe.each(kinds)('a queue on a $name store', ({ open }) => {
     })
 
     it('writes the latest of many reports, not each one', async () => {
-      const store = await open()
+      const store = watched(await open())
       const written: string[] = []
       const counted: JobStore = {
         ...store,
@@ -267,7 +292,7 @@ describe.each(kinds)('a queue on a $name store', ({ open }) => {
     })
 
     it('drops a report made after the run ended, and never throws it at the handler', async () => {
-      const store = await open()
+      const store = watched(await open())
       let late: (() => void) | undefined
       const jobs = queue<number, number>(named(), async (_payload, _signal, job) => {
         late = () => job.progress(99)
@@ -291,7 +316,7 @@ describe.each(kinds)('a queue on a $name store', ({ open }) => {
 
     it('logs a store that fails to write it and goes on running the handler', async () => {
       const warns = spyOn(console, 'warn').mockImplementation(noop)
-      const store: JobStore = { ...(await open()), progress: async () => Promise.reject(new Error('locked')) }
+      const store: JobStore = { ...(watched(await open())), progress: async () => Promise.reject(new Error('locked')) }
       let finished = false
       const jobs = queue<number, number>(named(), async (_payload, _signal, job) => {
         job.progress(1)
@@ -306,9 +331,23 @@ describe.each(kinds)('a queue on a $name store', ({ open }) => {
       warns.mockRestore()
     })
 
+    it('logs a report devalue cannot serialize instead of throwing it at the handler, and keeps the last good one', async () => {
+      const warns = spyOn(console, 'warn').mockImplementation(noop)
+      const jobs = queue<number, unknown>(named(), async (_payload, _signal, job) => {
+        job.progress(1)
+        await seen(jobs, 'k', progress => progress === 1)
+        job.progress(() => 2)
+      }, { store: watched(await open()), attempts: 1 })
+
+      await jobs.enqueue(1, { key: 'k' })
+      expect(await jobs.drain()).toBe(1)
+      expect(warns.mock.calls.flat().join('')).toContain('serialize')
+      warns.mockRestore()
+    })
+
     it('says once that a store without progress keeps none, and runs the job', async () => {
       const warns = spyOn(console, 'warn').mockImplementation(noop)
-      const store: JobStore = { ...(await open()), progress: undefined }
+      const store: JobStore = { ...(watched(await open())), progress: undefined }
       const jobs = queue<number, number>(named(), (_payload, _signal, job) => {
         job.progress(1)
         job.progress(2)
@@ -323,7 +362,7 @@ describe.each(kinds)('a queue on a $name store', ({ open }) => {
 
     it('hands the handler its job id and the run it is on', async () => {
       const got: unknown[] = []
-      const jobs = queue<number>(named(), (_payload, _signal, job) => void got.push({ id: job.id, attempts: job.attempts }), { store: await open() })
+      const jobs = queue<number>(named(), (_payload, _signal, job) => void got.push({ id: job.id, attempts: job.attempts }), { store: watched(await open()) })
       const id = await jobs.enqueue(1)
 
       await jobs.drain()

@@ -1,4 +1,6 @@
 import type { StoredJob } from '../src/server'
+import { resolve } from 'node:path'
+import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { openSqlite } from '../src/runtime/sqlite.server'
 import { pgJobs, sqliteJobs } from '../src/server'
@@ -198,6 +200,21 @@ describe('a sqlite file made before keys and progress', () => {
     expect((await store.claim('q', 10, 100))?.id).toBe('old')
   })
 
+  it('is migrated once however many processes open it at the same time', async () => {
+    const path = await sqlitePath()
+    const old = openSqlite(path)
+
+    old.run('CREATE TABLE kay_jobs (id TEXT PRIMARY KEY, queue TEXT NOT NULL, payload TEXT NOT NULL, attempts INTEGER NOT NULL, run_at INTEGER NOT NULL, held_until INTEGER, failed INTEGER NOT NULL DEFAULT 0, error TEXT)')
+    old.close()
+
+    const script = `import { sqliteJobs } from ${JSON.stringify(resolve('src/server/index.ts'))}\nawait sqliteJobs(${JSON.stringify(path)}).add({ id: crypto.randomUUID(), queue: 'q', payload: '[]', attempts: 0, runAt: 0, key: 'k' })\n`
+    const children = Array.from({ length: 3 }, () => Bun.spawn([process.execPath, '-e', script], { stderr: 'pipe' }))
+    const exits = await Promise.all(children.map(async child => child.exited))
+
+    expect(exits).toEqual([0, 0, 0])
+    expect(await sqliteJobs(path).jobs!('q')).toHaveLength(1)
+  })
+
   it('opens twice without error', async () => {
     const path = await sqlitePath()
 
@@ -223,19 +240,6 @@ pgDescribe('pgJobs', () => {
 
     expect(await Promise.all(stores.map(async store => store.add(job({ key: 'k' }))))).toHaveLength(6)
     expect(await stores[0]!.jobs!('q')).toHaveLength(1)
-  })
-
-  pgIt('gains the columns and the key index of a table made by an older kay, keeping its jobs', async () => {
-    const sql = await freshPg()
-
-    await sql.unsafe('CREATE TABLE kay_jobs (id text PRIMARY KEY, queue text NOT NULL, payload text NOT NULL, attempts integer NOT NULL, run_at bigint NOT NULL, held_until bigint, failed boolean NOT NULL DEFAULT false, error text)')
-    await sql.unsafe('INSERT INTO kay_jobs (id, queue, payload, attempts, run_at) VALUES (\'old\', \'q\', \'[]\', 0, 0)')
-
-    const store = pgJobs(sql)
-
-    expect(await store.add(job({ key: 'k' }))).toBeUndefined()
-    expect(await store.add(job({ key: 'k' }))).toBeDefined()
-    expect((await store.claim('q', 10, 100))?.id).toBe('old')
   })
 
   pgIt('hands each of many due jobs to exactly one of many claimers on separate connections', async () => {

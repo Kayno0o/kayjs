@@ -102,7 +102,7 @@ export interface JobContext<Progress> {
   id: string
   // Runs started so far, this one included.
   attempts: number
-  // Reports how far the run is, any value devalue keeps, for `state` to read back while it runs and after it fails; the latest report wins, written in the background, and a report after the run ended is dropped.
+  // Reports how far the run is, any value devalue keeps, for `job()` to read back while it runs and after it fails; the latest report wins, written in the background, and a report after the run ended is dropped.
   progress: (value: Progress) => void
 }
 
@@ -129,7 +129,7 @@ export interface FailedJob<Payload> {
 export type Queue<Payload, Progress = unknown> = Elysia & {
   // Keeps the job for a worker to run, surviving a restart; resolves with its id once stored.
   enqueue: (payload: Payload, options?: EnqueueOptions) => Promise<string>
-  // The waiting or running job with that key, else the last one with it that failed, or the job of that id; undefined for one that completed or never was. Needs a store with `state`, as `sqliteJobs`, `memoryJobs` and `pgJobs` have.
+  // The waiting or running job with that key, else the last one with it that failed, or the job of that id; undefined for one that completed or never was. Needs a store with `state()`, as `sqliteJobs`, `memoryJobs` and `pgJobs` have.
   job: (job: string | { id: string }) => Promise<JobState<Progress> | undefined>
   // Runs every job whose time has come, here and now, until none is left: for a test, or a script with no server.
   drain: () => Promise<number>
@@ -287,8 +287,17 @@ function prepareJobs(db: Database) {
   const columns = new Set(db.query<{ name: string }, []>('PRAGMA table_info(kay_jobs)').all().map(column => column.name))
 
   for (const column of ['job_key', 'progress']) {
-    if (!columns.has(column))
+    if (columns.has(column))
+      continue
+
+    try {
       db.run(`ALTER TABLE kay_jobs ADD COLUMN ${column} TEXT`)
+    }
+    catch (error) {
+      // Another process opening the same old file added it between the look and here.
+      if (!(error instanceof Error && error.message.includes('duplicate column')))
+        throw error
+    }
   }
 
   db.run('CREATE INDEX IF NOT EXISTS kay_jobs_due ON kay_jobs (queue, failed, run_at)')
@@ -530,7 +539,15 @@ export function queue<Payload, Progress = unknown>(name: string, handler: (paylo
           return
         }
 
-        latest = stringify(value)
+        try {
+          latest = stringify(value)
+        }
+        catch (error) {
+          kayLog('warn', `queue('${name}') could not keep a job's progress, as a value devalue cannot serialize`, error)
+
+          return
+        }
+
         writing ??= flush()
       },
       // Lets the write in flight land before the job is marked, so a failed job keeps the last thing it reported.
@@ -776,7 +793,7 @@ export function queue<Payload, Progress = unknown>(name: string, handler: (paylo
       const delay = enqueueOptions.delay === undefined ? 0 : durationSeconds(enqueueOptions.delay, `queue('${name}')'s delay`) * 1000
       const { key } = enqueueOptions
 
-      if (key !== undefined && key === '')
+      if (key === '')
         throw new KayError('config-invalid', `kay: queue('${name}') was enqueued with an empty key; a key is a non-empty string`)
 
       if (key !== undefined && !store().state)

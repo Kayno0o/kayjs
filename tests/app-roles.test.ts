@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { SQL } from 'bun'
 import { afterAll, describe, expect, it } from 'bun:test'
+import { createJobTables, pgJobs } from '../src/server'
 import { APP_ROLES_SCRIPT } from '../src/templates'
 
 // A Postgres whose user may create databases and roles, as the app template's tests take: CI sets it.
@@ -168,6 +169,39 @@ describe('the app template\'s db/roles.sh', () => {
         'CREATE ROLE "intruder"',
       ])
         expect([statement, await permission(app, statement)]).toEqual([statement, '42501'])
+    }
+    finally {
+      await app.close()
+      await owner.close()
+    }
+  }, 30_000)
+
+  run('lets pgJobs run as app_rw once the owner created its tables, and says what to run when they are missing', async () => {
+    await admin!.unsafe(`DROP DATABASE IF EXISTS ${DATABASE} WITH (FORCE)`)
+    await admin!.unsafe('DROP ROLE IF EXISTS app_rw')
+    await admin!.unsafe(`CREATE DATABASE ${DATABASE}`)
+    await runScript(PASSWORD)
+
+    const owner = connect(decodeURIComponent(url!.username), decodeURIComponent(url!.password))
+    const app = connect('app_rw', PASSWORD)
+
+    try {
+      await expect(pgJobs(app).add({ id: 'a', queue: 'q', payload: '[]', attempts: 0, runAt: 0 })).rejects.toThrow('createJobTables')
+
+      // Twice, and beside a replica doing the same: the tables already there are left alone.
+      await Promise.all([createJobTables(owner), createJobTables(owner)])
+      await createJobTables(owner)
+
+      const jobs = pgJobs(app)
+
+      await jobs.add({ id: 'a', queue: 'q', payload: '[]', attempts: 0, runAt: 0, key: 'k' })
+      expect(await jobs.add({ id: 'b', queue: 'q', payload: '[]', attempts: 0, runAt: 0, key: 'k' })).toBe('a')
+      expect((await jobs.claim('q', 10, 100))?.id).toBe('a')
+      await jobs.progress!('a', 100, '[1]')
+      expect((await jobs.state!('q', { key: 'k' }, 50))?.progress).toBe('[1]')
+      expect(await jobs.lock('digest', 1)).toBe(true)
+      await jobs.complete('a')
+      expect(await permission(app, 'ALTER TABLE "kay_jobs" ADD COLUMN "x" int')).toBe('42501')
     }
     finally {
       await app.close()

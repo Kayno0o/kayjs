@@ -163,9 +163,23 @@ An idle queue looks for a job from one worker. A job another process enqueued wa
 
 Set `idlePoll: '1s'` to look every second, or `'30s'` to ask the database less often.
 
+### Postgres
+
+`pgJobs` looks for its tables `kay_jobs` and `kay_locks`, and creates them when they are missing and its role may. The app template connects with `app_rw`, which may not create tables. There the owner creates them once, in a boot script or a migration, with `await createJobTables(db)`. It is safe to run again, and from several replicas at once.
+
+pg-orm does not know these tables, so its `db.sync()` and `pg-orm generate` would plan to drop them. Tell it to leave them alone.
+
+```ts
+import { jobTables } from 'kay/server'
+
+await db.sync({ ignoreTables: [...jobTables] })
+```
+
+Use the same `ignoreTables` in `defineConfig`. Replicas must keep their clocks within a fraction of a second of each other, as a run stops about a second before its hold ends.
+
 ### Your own store
 
-`sqliteJobs` is the default store, one file shared by the processes of a machine. For replicas on several machines, `pgJobs(db)` keeps the jobs in Postgres: pass it a Bun `SQL`, a pg-orm `Database` or a connection URL, and it creates its `kay_jobs` and `kay_locks` tables on first use. To keep jobs elsewhere, Redis say, pass `store` an object of `JobStore`, from `kay/server`. Every process of the app opens it, so it must hand each job to one process only.
+`sqliteJobs` is the default store, one file shared by the processes of a machine. For replicas on several machines, `pgJobs(db)` keeps the jobs in Postgres: pass it a Bun `SQL`, a pg-orm `Database` or a connection URL. To keep jobs elsewhere, Redis say, pass `store` an object of `JobStore`, from `kay/server`. Every process of the app opens it, so it must hand each job to one process only.
 
 To put the jobs, the schedule locks and the rate limit counts of the whole app in one place, set `store` in `kay.config.ts`: `store: sqliteData('data/app.sqlite')`, or `{ jobs, rates }` with a `JobStore` and a `RateStore` of your own. A queue, a schedule or a limit naming its own `store` keeps it.
 
@@ -192,4 +206,4 @@ To put the jobs, the schedule locks and the rate limit counts of the whole app i
 export const welcomeMails = queue('welcome-mails', sendWelcome, { store: myStore })
 ```
 
-<ReadMore href="/llms/queues">Concurrency, lost jobs and how shutdown waits for runs in progress are in the full production reference.</ReadMore>
+<ReadMore href="/llms/queues">Concurrency, lost jobs and how shutdown waits for runs in progress are in the queues reference.</ReadMore>
