@@ -622,6 +622,7 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 
   location /_kay/ {
     add_header Cache-Control "public, max-age=31536000, immutable";
+    add_header Strict-Transport-Security "max-age=31536000" always;
   }
 
   location / {

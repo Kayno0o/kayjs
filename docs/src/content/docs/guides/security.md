@@ -48,7 +48,7 @@ export default defineConfig({
 })
 ```
 
-A static export writes no headers file, so the `nginx.conf` of the starter container sends the header. If you serve the export with another server, set it there.
+A static export writes no headers file, so the `nginx.conf` of the starter container sends the header. If you serve the export with another server, set it there. In nginx, repeat it in each `location` that has an `add_header` of its own, since nginx does not inherit the server-level ones there.
 
 ## Content-Security-Policy
 

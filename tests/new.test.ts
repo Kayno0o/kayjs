@@ -802,7 +802,8 @@ describe('kay new', () => {
 
         if (variant.has('docker') && !variant.has('server')) {
           // A static export writes no headers file, so the container's nginx sends HSTS for a site published at https.
-          expect({ features, hsts: contents['nginx.conf']!.includes('add_header Strict-Transport-Security "max-age=31536000" always;') }).toEqual({ features, hsts: true })
+          // nginx drops a server-level add_header from a location with its own, so the line is repeated in /_kay/.
+          expect({ features, hsts: contents['nginx.conf']!.split('add_header Strict-Transport-Security "max-age=31536000" always;').length - 1, inKay: (/location \/_kay\/ \{[^}]*Strict-Transport-Security/).test(contents['nginx.conf']!) }).toEqual({ features, hsts: 2, inKay: true })
           expect({ features, notFound: contents['nginx.conf']!.includes('error_page 404 /404.html') }).toEqual({ features, notFound: variant.has('starter') })
         }
       }

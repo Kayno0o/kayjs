@@ -220,6 +220,23 @@ describe('the headers of every kind of answer', () => {
   })
 })
 
+describe('HSTS on every kind of answer of an https site', () => {
+  it('reaches the pages, build assets, stored files, their errors and the API', async () => {
+    const dir = await fixtureCopy('answers')
+    const app = await pages({ routes: `${dir}/src/routes`, api: `${dir}/src/api`, prebuilt: false, log: false, site: 'https://shop.example', dev: false, storage: memoryFiles() })
+    const key = await files.put(new File([new Uint8Array(2000)], 'a.png', { type: 'image/png' }))
+    const html = await (await app.handle(new Request(`${ORIGIN}/`))).text()
+    const asset = (/\/_kay\/entry-[^"]+\.js/).exec(html)![0]
+    const hsts = async (path: string, init: RequestInit = {}) => (await app.handle(new Request(`${ORIGIN}${path}`, init))).headers.get('strict-transport-security')
+
+    for (const path of ['/', asset, files.url(key), '/_kay/missing.js', '/no-such-page'])
+      expect(await hsts(path)).toBe('max-age=31536000')
+
+    expect(await hsts(files.url(key), { headers: { range: 'bytes=0-9' } })).toBe('max-age=31536000')
+    expect(await hsts('/', { method: 'HEAD' })).toBe('max-age=31536000')
+  })
+})
+
 describe('the asset route\'s cache of build files', () => {
   const serve = async (dev: boolean) => {
     const dir = resolve(await scratchDir('asset-names-'))
