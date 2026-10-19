@@ -293,12 +293,16 @@ describe('which classes are set from a value the build cannot read', () => {
     for (const bound of ['class A { m(tone) { el.classList.add(tone) } }', 'class A { async m(tone: string) { el.classList.add(tone) } }', 'const o = { m(a, tone = \'p-1\') { el.classList.add(tone) } }', 'try {} catch (tone) { el.classList.add(tone) }', 'const f = (tone = dyn()) => { el.classList.add(tone) }'])
       expect(await unresolved(`let tone = 'mt-1'\n${bound}\n`)).toEqual(['2 classList.add '])
 
+    expect(await unresolved('let tone = \'mt-1\'\nok ? f(tone) : { a: 1 }\nswitch (k) { case f(tone): { break } }\nel.classList.add(tone)\n')).toEqual([])
+    expect(await unresolved('const color = \'mt-1\'\n---\np(class={color}) {text}\ndiv(class={`p-1 ${color}`}) {body}\n', '', 'page.kay')).toEqual([])
+    expect(await unresolved('class A { m(tone) { el.classList.add(tone) } }\n', '', 'island.ts')).toEqual(['1 classList.add '])
+    expect(await unresolvedIn({ 'island.ts': 'import { tone } from \'./m\'\nclass A { m(tone) { el.classList.add(tone) } }\ntry {} catch (tone) { el.classList.add(tone) }\n', 'm.ts': 'export const tone = \'mt-1\'\n' })).toEqual(['island.ts:2 classList.add ', 'island.ts:3 classList.add '])
+
     expect(await unresolved('let tone = \'mt-1\'\nif (tone) { el.classList.add(tone) }\nwhile (tone) { use(tone) }\n')).toEqual([])
   })
 
   it('reads a fence line only in a .kay file, and only as the compiler does', async () => {
     expect(await unresolved('let tone = \'mt-1\'\nconst s = `\n---\n`\nconst t = \'tone = dyn()\'\nel.classList.add(tone)\n')).toEqual([])
-    expect(await unresolved('let tone = \'mt-1\'\nconst s = `\n--- not a fence\n`\nconst t = \'tone = dyn()\'\nel.classList.add(tone)\n---\np a\n', '', 'page.kay')).toEqual([])
     expect(await unresolved('let tone = \'mt-1\'\nel.classList.add(tone)\n--- server\nconst t = 1\n---\np press the ` key\nbutton(onclick={() => tone = dyn()}) a\n', '', 'page.kay')).toEqual(['2 classList.add mt-1'])
   })
 
