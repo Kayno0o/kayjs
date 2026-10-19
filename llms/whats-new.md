@@ -32,6 +32,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - A streaming action whose own result removes the block its call was made in keeps streaming, handed to the block around it, rather than closing after its first value ([Calling API routes from islands](api-from-islands.md#streaming-actions)).
 - The `.class` shorthand takes Tailwind's brackets, variables and star variants whole: `.w-[calc(100%-2rem)]`, `.[&>svg]:size-4`, `.bg-(--brand)/50`, `.*:p-2`, and ends a class ending in a digit before a `2xl:` class, `.col-2.2xl:flex`, so `kay fmt --from-html` and `kay migrate astro` write such classes as shorthand ([Templates](templates.md)).
 - `kay fmt` moves the shorthand classes of an element into a `class="..."` inside the parentheses when they make its line longer than 120 characters, the value over several lines when it is long, and a static `class="..."` may run over lines, its words joined by single spaces ([Templates](templates.md)).
+- An `_actions.kay` is a `--- server` fence alone, with no closing `---` line, and `kay fmt` leaves a fence running to the end of the file as it is ([Actions](actions.md#declaring-an-action)).
 
 ## 1.58.0
 

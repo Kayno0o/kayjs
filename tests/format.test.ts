@@ -57,6 +57,12 @@ describe('formatKay', () => {
     ].join('\n'))
   })
 
+  it('formats a file holding only a server fence that never closes, as written', () => {
+    expect(format('--- server\nexport const a = 1\n')).toBe('--- server\nexport const a = 1\n')
+    expect(format('--- server\nexport const a = 1\n\n\n')).toBe('--- server\nexport const a = 1\n')
+    expect(format('--- server\nexport const a = 1\n---\n')).toBe('--- server\nexport const a = 1\n---\n')
+  })
+
   it('re-indents a const line with its block, a value running over several lines moving along with it', () => {
     expect(format('for p of ps\n    const total = sum({\n        a: 1,\n    })\n    li {total}\n')).toBe('for p of ps\n  const total = sum({\n      a: 1,\n  })\n  li {total}\n')
   })

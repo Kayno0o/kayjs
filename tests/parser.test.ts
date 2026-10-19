@@ -126,6 +126,16 @@ describe('fence', () => {
 
   it('reports an unclosed fence', () => {
     expect(parse('---\nconst a = 1\n').diagnostics[0]?.message).toContain('never closed')
+    expect(parse('--- script\nconst a = 1\n').diagnostics[0]?.message).toContain('never closed')
+  })
+
+  it('lets a server fence run to the end of the file, a file with no template', () => {
+    const file = parse('--- server\nexport const a = 1\n')
+
+    expect(file.diagnostics).toEqual([])
+    expect(text(file, file.server)).toBe('export const a = 1\n')
+    expect(file.template).toEqual([])
+    expect(parse('--- server\nexport const a = 1').diagnostics).toEqual([])
   })
 
   it.each([

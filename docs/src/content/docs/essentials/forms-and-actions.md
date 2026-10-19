@@ -53,16 +53,15 @@ form(action={signOut})
 
 ## Actions shared by pages and components
 
-An action that a page and a component both use lives in a file called `_actions.kay`, in a routes directory. It has a server fence and no template, and it is not a page. A page or a component imports it by path.
+An action that a page and a component both use lives in a file called `_actions.kay`, in a routes directory. It is a server fence and nothing else: no template, and no closing `---` line, because the fence runs to the end of the file. It is not a page. A page or a component imports it by path.
 
 ```kay
 --- server
-import { s } from 'kay'
+import { action, s } from 'kay'
 
 export const deleteTissue = action(s.Object({ id: s.Integer() }), async ({ id }) => {
   await removeTissue(id)
 })
----
 ```
 
 ```kay

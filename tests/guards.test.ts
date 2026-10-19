@@ -44,7 +44,8 @@ describe('requireGuards', () => {
       Bun.write(join(dir, 'routes/staff/sign-in.kay'), `--- server\n${OPEN}---\nh1 Staff sign in\n`),
       Bun.write(join(dir, 'routes/news/_layout.kay'), ACTION('subscribe', '', 'slot')),
       Bun.write(join(dir, 'routes/staff/_actions.kay'), ACTION('demote', '', '')),
-      Bun.write(join(dir, 'routes/news/_actions.kay'), ACTION('unsubscribe', '', '')),
+      // A file with no template needs no closing `---`.
+      Bun.write(join(dir, 'routes/news/_actions.kay'), ACTION('unsubscribe', '', '').replace(/---\n\n$/, '')),
       Bun.write(join(dir, 'routes/news/index.kay'), `--- server\n${OPEN}---\nh1 News\n`),
       Bun.write(join(dir, 'routes/feed.json.ts'), 'export function GET() {\n  return \'items\'\n}\n'),
       Bun.write(join(dir, 'routes/status.json.ts'), `${OPEN}\nexport function GET() {\n  return 'up'\n}\n`),

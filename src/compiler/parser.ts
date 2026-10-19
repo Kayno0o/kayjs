@@ -99,7 +99,8 @@ export function parseKay(source: string): KayFile {
 
     templateStart = closing ? closing.end : source.length
 
-    if (!closing)
+    // A server fence may run to the end of the file, as an `_actions.kay` or a page that only redirects holds no template.
+    if (!closing && kind !== 'server')
       diagnostics.push({ start: fence.index, end: fence.index + 3, code: 'fence-invalid', message: 'This fence is never closed with a `---` line' })
 
     if (!spaced || (kind !== 'script' && kind !== 'server'))

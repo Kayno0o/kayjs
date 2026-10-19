@@ -61,7 +61,8 @@ function formatFences(file: KayFile): string[] {
     out.push(...trimBlankLines(file.source.slice(body.start, body.end).split('\n')))
   }
 
-  return out.length === 0 ? out : [...out, '---']
+  // A fence running to the end of the file has no template after it and no closing line to keep.
+  return out.length === 0 || bodies.at(-1)!.end >= file.source.length ? out : [...out, '---']
 }
 
 function formatTemplate(file: KayFile): string[] {
