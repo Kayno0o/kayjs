@@ -270,6 +270,14 @@ export default defineConfig({ requireGuards: true })
 - Only the declared variables leave the server, and nothing else of the environment reaches an island: a module reading `process.env` or `defineEnv`'s values fails the browser build.
 - Reading `publicEnv` when the config declares none throws; a name it does not declare is a type error.
 
+### Files from a folder
+
+- `safePath(root, name)` from `kay/server` is the real path of the file `name` names inside `root`, relative to the working directory or absolute, or `undefined`: `safePath('media', name)`, never `join('media', name)`, for a `name` a visitor typed.
+- Symlinks are followed on both sides, so `../x`, a symlink leading out, a NUL byte, an empty name, a directory and a missing file all give `undefined`; a root that is itself a symlink works.
+- A leading slash reads as the root, never the filesystem's, and nothing is decoded: `%2e%2e` is a file of that name.
+- The check runs when it is called, so a link swapped after it is not seen; open the returned path at once, as `images.resolve` does.
+- It does not stop a hard link to a file outside the folder, which only the app creates.
+
 ### Guards
 
 - A `_guard.ts` in a routes directory runs before every page and every action in that directory and below, outermost first.

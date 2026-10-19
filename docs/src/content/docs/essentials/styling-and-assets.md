@@ -272,6 +272,16 @@ export default defineConfig({
 
 The `src` is whatever a visitor asks for. Look it up, and never join it to a directory.
 
+To serve files from a folder, use `safePath` from `kay/server`. It gives the real path of a file inside the folder, or `undefined`.
+
+```ts
+import { safePath } from 'kay/server'
+
+resolve: src => src.startsWith('/media/') ? safePath('media', src.slice(7)) : undefined,
+```
+
+A name that climbs out with `../`, a symlink that leads out of the folder, an empty name, a name with a null byte, a directory and a missing file all give `undefined`. A leading slash is read as the folder itself.
+
 ## Fonts
 
 `fonts` in `kay.config.ts` self-hosts font files, declared with `@font-face` in every page's head. List an installed Fontsource package once.
