@@ -256,7 +256,7 @@ if (result.ok)
 
 `tokens()` lists the user's tokens and `revokeToken(id)` revokes one. A password change, a reset and `signOutEverywhere` end them all. Both need a browser session: a token cannot list or revoke tokens, nor turn on two-factor. Anything that asks for your password or a code first, such as changing two-factor, passkeys, the password or deleting the account, needs a browser session as well.
 
-For a flow you gate yourself, such as pairing a device, `auth.issueToken(userId, label)` makes a token on the server with no proof, on the same terms. Its `token` option adopts one you handed out before, at least 32 characters long. An adopted token expires after 90 days too, so pass `expiresIn: null` to keep an old device working. Only `null` means never: do not forward a client's value into `expiresIn` unchecked.
+For a flow you gate yourself, such as pairing a device, `auth.issueToken(userId, label)` makes a token on the server with no proof, on the same terms. Its `token` option adopts one you handed out before, at least 32 characters long with at least 10 distinct ones. An adopted token expires after 90 days too, so pass `expiresIn: null` to keep an old device working. Only `null` means never: do not forward a client's value into `expiresIn` unchecked.
 
 ## Your own profile fields
 
