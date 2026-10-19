@@ -16,9 +16,12 @@ const links = [
   ...features.oauthServer ? [{ href: `${base}/clients`, label: t('auth.account.nav.clients') }] : [],
   { href: `${base}/data`, label: t('auth.account.nav.data') },
 ]
+// The tab on screen names the page, so a tab switch or a page swap announces where the user landed.
+const here = links.find(link => link.href.replace(/\/$/, '') === current.replace(/\/$/, ''))
+const title = here ? `${here.label} - ${t('auth.account.title')}` : t('auth.account.title')
 ---
 head
-  title {t('auth.account.title')}
+  title {title}
 .kayjs-auth.mx-auto.flex.w-full.max-w-3xl.flex-col.gap-6.px-4.py-8
   .flex.flex-wrap.items-center.justify-between.gap-4
     h1.kui-heading-section {t('auth.account.title')}

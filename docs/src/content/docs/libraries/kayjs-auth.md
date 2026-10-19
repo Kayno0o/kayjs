@@ -7,6 +7,8 @@ description: Sessions-based auth for kay apps - passwords, OAuth, mailed links, 
 
 It ships every sign-in and account page, styled with kayjs-ui, in English and French. Turn them on with one line, then replace any page or text with your own. Or write every page yourself and call it from them.
 
+Each account page is titled after its tab, such as "Security - Your account", so a screen reader announces where a page swap landed. The words come from `auth.account.nav.*` and `auth.account.title`.
+
 ## Install
 
 ```sh

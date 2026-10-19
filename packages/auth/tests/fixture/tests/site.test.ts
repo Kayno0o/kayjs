@@ -99,6 +99,13 @@ describe('the prebuilt pages', () => {
     const account = await ada.submit(register, { email: 'ada@example.com', password: PASSWORD, redirect: '/auth/account' }, { from: await ada.visit('/auth/register?redirect=%2Fauth%2Faccount') })
 
     expect(text(account, '#kayjs-auth-email')).toBe('ada@example.com')
+
+    expect(text(account, 'title')).toBe('Profile - Your account')
+
+    for (const [path, title] of [['security', 'Security'], ['sessions', 'Sessions'], ['tokens', 'Tokens'], ['data', 'Your data']] as const)
+      expect(text(await ada.visit(`/auth/account/${path}`), 'title')).toBe(`${title} - Your account`)
+
+    expect(text(await ada.visit('/auth/account/security/'), 'title')).toBe('Security - Your account')
     const left = await signOut(ada, '/')
 
     expect([left.status, left.headers.get('location')]).toEqual([303, '/'])
