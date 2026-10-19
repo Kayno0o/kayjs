@@ -12,6 +12,7 @@ export const note = action(t.Object({ text: t.String({ maxLength: 5 }) }), () =>
 
 const bumps = store.bumps
 --- script
+import Aside from '../components/aside.kay'
 import Box from '../components/box.kay'
 import Bump from '../components/bump.kay'
 ---
@@ -27,4 +28,5 @@ Box
 form(action={note})
   input(name="text")
   button.note Note
+Aside(server="defer")
 div(style="height: 3000px")

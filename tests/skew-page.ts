@@ -8,7 +8,7 @@ export async function ready(page: TestPage): Promise<void> {
   await page.waitUntil(() => document.readyState === 'complete' && '$kayHydrate' in globalThis)
 }
 
-// Makes the page fetch `count` deferred server islands, whose answers it checks for the build they name, and returns once each answered.
+// Makes the page fetch the one deferred server island of the navigation fixture's home page, which the page replaced once it answered, `count` more times under its index 0, whose answers it checks for the build they name, and returns once each answered.
 export async function askServerIslands(page: TestPage, count: number): Promise<void> {
   const pending = await page.evaluate(async (total) => {
     const slots: HTMLElement[] = []
@@ -16,7 +16,7 @@ export async function askServerIslands(page: TestPage, count: number): Promise<v
     for (let index = 0; index < total; index++) {
       const slot = document.createElement('slot')
 
-      slot.dataset.kayServer = `probe${index}`
+      slot.dataset.kayServer = '0'
       slot.setAttribute('inert', '')
       document.body.append(slot)
       slots.push(slot)
@@ -28,14 +28,15 @@ export async function askServerIslands(page: TestPage, count: number): Promise<v
       await new Promise(resolve => setTimeout(resolve, 50))
 
     const left = slots.filter(slot => slot.hasAttribute('inert')).length
+    const answered = slots.filter(slot => slot.querySelector('.aside') !== null).length
 
     for (const slot of slots)
       slot.remove()
 
-    return left
+    return left + (total - answered)
   }, count)
 
-  expect(pending, 'server islands that never answered').toBe(0)
+  expect(pending, 'server islands that never answered with the island').toBe(0)
 }
 
 // Makes the page hydrate an island whose chunk is gone, as one a deploy dropped, which asks whether the page is stale.
