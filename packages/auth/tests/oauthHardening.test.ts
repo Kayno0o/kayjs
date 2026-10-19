@@ -507,6 +507,25 @@ describe('a token is bound to the resource it was asked for', () => {
     expect((await bearerOf(app, retry))?.oauth?.resource).toBe(MCP)
   })
 
+  test('a code refused once and retried after its 60 seconds is invalid_grant', async () => {
+    const app = server()
+    const { clientId, code } = await approvedFor(app, { resource: MCP })
+
+    expect((await exchangeWith(app, clientId, code, { resource: 'http://localhost/other' })).body.error).toBe('invalid_target')
+
+    setSystemTime(Date.now() + 61 * 1000)
+
+    expect((await exchangeWith(app, clientId, code, { resource: MCP })).body.error).toBe('invalid_grant')
+  })
+
+  test('a malformed code_verifier leaves the code for the right one', async () => {
+    const app = server()
+    const { clientId, code } = await approvedFor(app)
+
+    expect((await exchangeWith(app, clientId, code, { code_verifier: 'short' })).body.error).toBe('invalid_grant')
+    expect((await exchangeWith(app, clientId, code)).status).toBe(200)
+  })
+
   test('a spent code still revokes what it issued, whatever the reuse names', async () => {
     const app = server()
     const { clientId, code } = await approvedFor(app, { resource: MCP })

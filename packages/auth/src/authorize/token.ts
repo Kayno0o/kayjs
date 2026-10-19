@@ -181,7 +181,6 @@ async function rotate(core: Core, form: URLSearchParams, root: string): Promise<
     return refused('invalid_grant', 'The refresh token was used already')
   }
 
-  // `expiresAt` is where the family ends, so a token also lapses when it sat unused for thirty days.
   if (lapsed(held) || held.clientId !== clientId)
     return refused('invalid_grant', 'The refresh token does not match this request')
 
