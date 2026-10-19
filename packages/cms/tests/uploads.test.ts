@@ -1,4 +1,6 @@
 import { expect, test } from 'bun:test'
+import { files, memoryFiles } from 'kay/server'
+import { setupStorage } from '../../../src/server/storage'
 import { configure } from '../src/settings'
 import { emptyFile, tooLarge } from '../src/upload-text'
 import { uploadBodyLimit, uploadRefusal, uploadRules } from '../src/uploads'
@@ -159,4 +161,20 @@ test('refuses a maxSize the server would not take, Bun refusing a request body o
 
   for (const maxSize of [most + 1, '128mb', '200mb', 1e12])
     expect(() => configure({ uploads: { maxSize } as never })).toThrow(/maxSize.*at most/)
+})
+
+const typeJudged = async (name: string) => (/^\S+ is ([^,;]+)/).exec((await uploadRefusal(upload(name, 'x'))) ?? '')?.[1]
+const typeServed = async (name: string) => (await files.response(await files.put(upload(name, 'x'), {}))).headers.get('content-type')?.replace(/;.*$/, '')
+
+test('judges a name as the type kay\'s file route serves it, whatever its case or extension', async () => {
+  configure({ uploads: [] })
+  setupStorage(memoryFiles(), '/nonexistent', undefined)
+
+  // A type a browser may show is served as itself, so the check cannot judge it as another.
+  for (const name of ['a.png', 'a.PNG', 'a.JpG', 'a.jpeg', 'a.webp', 'a.gif', 'a.avif', 'a.AVIF', 'a.pdf', 'a.svg', 'a.SVG', 'a.txt', 'a.mp4'])
+    expect(await typeServed(name), name).toBe(await typeJudged(name))
+
+  // Any other is a download of no type, whatever it is judged as.
+  for (const name of ['a.html', 'a.js', 'a.json', 'a.png.html'])
+    expect(await typeServed(name), name).toBe('application/octet-stream')
 })

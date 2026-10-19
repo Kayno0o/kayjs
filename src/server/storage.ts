@@ -7,6 +7,7 @@ import { KayError } from '../compiler/errors'
 import { durationSeconds } from '../runtime/duration'
 import { FILES_ROUTE } from '../runtime/image'
 import { kayLog } from '../runtime/log'
+import { typeOfName } from './file-type'
 import { imageHeader } from './image-format'
 import { holdsImageMetadata, stripImageMetadata } from './image-metadata'
 import { isPrivate, PRIVATE_DIR, writePrivate } from './private-dir'
@@ -462,7 +463,7 @@ function linkSigned(key: string, query: URLSearchParams): boolean {
 
 // The type a key's file is served with and whether a browser may show it in place, from its extension in any case; the one rule kay's route and a bucket both follow.
 function servedAs(key: string): { type: string, inline: boolean } {
-  const type = Bun.file(key.toLowerCase()).type
+  const type = typeOfName(key)
   const inline = INLINE.test(type)
 
   return { type: inline || IMAGE.test(type) ? type : 'application/octet-stream', inline }

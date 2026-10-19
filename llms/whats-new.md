@@ -20,5 +20,6 @@ What each release of kay and its libraries adds, newest first, each feature with
 - kayjs-ui `Sortable` names a bare handle after its item's text without its other controls (`Reorder Milk`, not `Reorder Milk Delete`), renames it when the text changes, and leaves an image with `alt` to name it, `mountComponent` mounts a component that `call()`s a library's API, and a numbered CMS list says the place a moved item left ([Drag and drop](../packages/ui/llms/charts-drag-and-media.md)).
 - kayjs-ai `Chat` takes `maxChars` (40,000) and learns a lower `maxInputChars` of the action's `ask` from its 413, posting less and asking again, so the app states it once ([Chat](../packages/ai/llms/chat.md)).
 - Fathom and Cloudflare keep `'self'` in the policy's `script-src` and `connect-src`; it was replaced, which blocked the site's own scripts ([Privacy](privacy.md)).
+- `kay/server` exports `typeOfName` and `holdsType`, the file route's name-to-type rule and its image and PDF signature checks, which kayjs-cms now uses to judge an upload instead of its own copies ([Files](files.md#storing-and-linking)).
 
 Releases before 1.55.1 are in [What's new, older releases](whats-new-archive.md).

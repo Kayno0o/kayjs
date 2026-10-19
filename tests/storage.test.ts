@@ -705,3 +705,14 @@ describe('a script signing a private link', () => {
     await expect(run(url(false), { KAY_SECRET: 'short' })).rejects.toThrow('KAY_SECRET is 5 characters long')
   })
 })
+
+describe('the type rules libraries share', () => {
+  it('reads a name\'s type from its extension in any case, and checks bytes against the types that have a signature', async () => {
+    const { holdsType, typeOfName } = await import('../src/server')
+
+    expect(['a.PNG', 'a.JpG', 'a.avif', 'noextension'].map(typeOfName)).toEqual(['image/png', 'image/jpeg', 'image/avif', 'application/octet-stream'])
+    expect(holdsType(new Uint8Array([0xFF, 0xD8, 0xFF, 0xE0]), 'image/jpeg')).toBe(true)
+    expect(holdsType(new Uint8Array([0xFF, 0xD8, 0xFF, 0xE0]), 'image/png')).toBe(false)
+    expect(holdsType(new Uint8Array(), 'text/csv')).toBe(true)
+  })
+})

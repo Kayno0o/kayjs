@@ -47,6 +47,8 @@ So an uploaded HTML page never runs as your site. Nor does a script or a stylesh
 
 An SVG is sent as a download too, but it keeps its type, so it still shows in an `img`. Every file also has `X-Content-Type-Options: nosniff`.
 
+A route of your own that takes uploads can judge them the way the file route does. `typeOfName(name)` from `kay/server` gives the type a name's extension stands for, in any case, and `holdsType(bytes, type)` checks that the first 4,096 bytes of a file are really a PNG, JPEG, GIF, WebP, AVIF, PDF or SVG.
+
 <ReadMore href="/llms/files#storing-and-linking">The file route's caching and ranges, and how a stored image gets its variants, are in the full files reference.</ReadMore>
 
 ## Private files

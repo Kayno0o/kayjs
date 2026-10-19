@@ -117,6 +117,13 @@ if upload.progress() !== undefined
 - A JPEG, PNG, WebP, AVIF or HEIC is stored without the EXIF, XMP, IPTC, text chunks and comments a camera or phone writes in it, such as where the photo was taken, keeping its colour profile and a JPEG's orientation; an AVIF or HEIC keeps its coded images and has its other items blanked in place. A file of those formats that cannot be read through is refused with an `image-invalid` error, not stored with its metadata; `files.put(file, { keepMetadata: true })` stores it byte for byte (see [Privacy](privacy.md)).
 - `files.list({ folder })` resolves with `{ key, modified }` for each file stored, `modified` being when it was last written when the store knows, in no order; with a `folder` (named as in `files.put`) only the files directly in it. `files.variants(keys)` resolves with a `Map` from each key to the names of the variants and social cards the image route made of it, which `files.delete` removes with the file.
 - Each throws on a key `files.put` never gives, `../` say.
+- A library or route checking an upload uses the file route's own rules, from `kay/server`: `typeOfName(name)` is the type the route reads off a name's extension in any case (`image/png` for `A.PNG`), and `holdsType(bytes, type)` says whether the first `SNIFFED_BYTES` (4096) of a file are those of that type, for PNG, JPEG, GIF, WebP, AVIF, PDF and SVG, any other type passing as named.
+
+```ts
+import { holdsType, SNIFFED_BYTES, typeOfName } from 'kay/server'
+
+const real = holdsType(await file.slice(0, SNIFFED_BYTES).bytes(), typeOfName(file.name))
+```
 
 ### Private files
 
