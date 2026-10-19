@@ -57,6 +57,10 @@ effect(() => {
   onCleanup(() => observer.disconnect())
 })
 
+// Checked at once, so a bare number throws even where the effect would return early, as on the server or under reduced motion.
+if (autoplay !== undefined)
+  durationMs(autoplay)
+
 effect(() => {
   if (!autoplay || paused() || pointed() || focused() || hidden() || offscreen() || matchMedia('(prefers-reduced-motion: reduce)').matches)
     return

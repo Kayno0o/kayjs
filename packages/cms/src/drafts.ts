@@ -22,6 +22,7 @@ export interface Refusal {
 
 // The unsaved edits of the entries a page renders, rendering the page with them shortly after each change.
 export function createDrafts({ show, delay = '150ms' }: DraftsOptions) {
+  const wait = durationMs(delay)
   const saved = new Map<string, DraftEntry>()
   // The version of each entry's file its saved state was read from, which the next save names.
   const versions = new Map<string, string | undefined>()
@@ -44,7 +45,7 @@ export function createDrafts({ show, delay = '150ms' }: DraftsOptions) {
   function schedule(): void {
     reported = false
     clearTimeout(timer)
-    timer = setTimeout(() => void render(), durationMs(delay))
+    timer = setTimeout(() => void render(), wait)
   }
 
   async function render(): Promise<void> {

@@ -29,7 +29,7 @@
   - Files dropped on the zone, picked through `zone.open()` or, with `paste`, pasted anywhere on the page outside a text field, reach `onFiles(files)`: those `accept` allows, one unless `multiple`, never an empty list. A file the browser gives no type, such as a `.csv` on Windows, passes a type in `accept`, for its receiver to judge by its name. `onReject(files)` gets the dropped or picked files left out (not pasted ones), those `accept` refuses and, without `multiple`, the matching ones beyond the first, to say why they were ignored.
   - `zone.dragging()` reads whether files hover the zone, which also carries `data-dragging`.
   - `compact` draws it as a slim row, its content from the left, to sit inline in a form rather than as a large target.
-- `Menu(label="Actions" icon="plus" items={[{ label: 'Rename', onSelect: rename }, 'separator', { label: 'Delete', icon: 'delete', danger: true, onSelect: remove }]})`:
+- `Menu(label="Actions" icon="plus" items={[{ label: 'Rename', onSelect: rename }, 'separator', { label: 'Delete', icon: 'delete', tone: 'danger', onSelect: remove }]})`:
   - An IconButton opening a `role="menu"` popover; `'separator'` draws a rule between groups, and `class` styles that button.
   - Opening focuses the first enabled entry; the arrows, Home and End move between enabled entries, an accent bar marking the one the keyboard is on, and Tab closes it.
   - An entry's `onSelect` runs once the menu has closed and focus is back on the trigger, so a dialog it opens takes focus from there.

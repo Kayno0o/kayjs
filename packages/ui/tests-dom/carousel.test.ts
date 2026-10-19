@@ -109,6 +109,10 @@ test('turns on its own, held while the pointer or the focus is on it, and stops 
   expect(turns).toEqual([])
 })
 
+test('throws on an autoplay that is a bare number, which was milliseconds', async () => {
+  await expect(carousel(5000 as never)).rejects.toThrow()
+})
+
 test('stops for good from its pause button, which a carousel without autoplay leaves out', async () => {
   const view = await carousel(AUTOPLAY)
   const pause = view.section.querySelector<HTMLButtonElement>('.kui-carousel-pause')!
