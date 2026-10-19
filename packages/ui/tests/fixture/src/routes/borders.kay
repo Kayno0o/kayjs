@@ -10,3 +10,12 @@ main
   div#notice.kui-notice notice
   span#avatar.kui-avatar A
   button#button.kui-btn(type="button") button
+  div#side-panel.kui-side-panel panel
+  div#tooltip.kui-tooltip tip
+  div#table-wrap.kui-table-wrap table
+  div#section.kui-collapsible-section(data-boxed) section
+  div#save-bar.kui-save-bar bar
+  div#segmented.kui-segmented choices
+  div#file-drop.kui-file-drop drop
+  div#step.kui-pagination-step step
+  div#chart-tooltip.kui-line-chart-tooltip chart

@@ -58,7 +58,7 @@
   --spacing-kui-card: 0.625rem;
   --spacing-kui-inline: 0.3125rem;
   --spacing-kui-section: 0.875rem;
-  /* The keyline of every framed box, a length: buttons, cards, card rows, widgets, notices, avatars, toasts, dialogs, the palette and popovers. The old name --kui-border-card still sets it. A value that is no length, such as a `2px solid red` shorthand, leaves it at 1px. */
+  /* The keyline of every framed box, a length: buttons, cards, card rows, widgets, notices, avatars, toasts, dialogs, side panels, tooltips, tables, boxed sections, save bars, segmented controls, file drops, pagination steps, the site nav and chart tooltips, the palette and popovers. The old name --kui-border-card still sets it. A value that is no length, such as a `2px solid red` shorthand, leaves it at 1px. */
   --kui-border-width: var(--kui-border-card);
   --kui-border-card: 1px;
   --kui-border-input: 1px;
@@ -416,7 +416,7 @@
 
     /* Boxed, the summary is the card's header band and the body the card's padding, so a run of sections reads as separate blocks rather than as headings in one column. */
     &:where([data-boxed]) {
-      @apply border border-kui-surface2 bg-kui-surface0;
+      @apply border-solid border-(length:--kui-border-width) border-kui-surface2 bg-kui-surface0;
     }
   }
 
@@ -685,7 +685,7 @@
   }
 
   .kui-file-drop {
-    @apply flex flex-col items-center justify-center gap-3 border border-dashed border-kui-surface2 p-6 text-center transition-colors;
+    @apply flex flex-col items-center justify-center gap-3 border-dashed border-(length:--kui-border-width) border-kui-surface2 p-6 text-center transition-colors;
 
     &:where([data-dragging]) {
       @apply border-kui-accent bg-kui-accent/10;
@@ -789,7 +789,7 @@
   }
 
   .kui-save-bar {
-    @apply sticky bottom-0 z-10 flex flex-wrap items-center gap-2 border border-kui-surface2 bg-kui-canvas px-3 py-2;
+    @apply sticky bottom-0 z-10 flex flex-wrap items-center gap-2 border-solid border-(length:--kui-border-width) border-kui-surface2 bg-kui-canvas px-3 py-2;
     padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));
   }
 
@@ -992,7 +992,7 @@
   }
 
   .kui-line-chart-tooltip {
-    @apply pointer-events-none fixed z-50 flex -translate-x-1/2 -translate-y-[calc(100%+0.75rem)] flex-col gap-0.5 border border-kui-overlay0 bg-kui-surface1 px-3 py-2 text-xs;
+    @apply pointer-events-none fixed z-50 flex -translate-x-1/2 -translate-y-[calc(100%+0.75rem)] flex-col gap-0.5 border-solid border-(length:--kui-border-width) border-kui-overlay0 bg-kui-surface1 px-3 py-2 text-xs;
   }
 
   .kui-line-chart-tooltip-label {
@@ -1442,7 +1442,7 @@
   }
 
   .kui-segmented {
-    @apply inline-flex border border-kui-surface2 bg-kui-surface0;
+    @apply inline-flex border-solid border-(length:--kui-border-width) border-kui-surface2 bg-kui-surface0;
   }
 
   /* On the options, whose own pointer cursor would cover the group's. */
@@ -1528,7 +1528,7 @@
 
   /* A modal dialog along the right edge, sliding in when it opens. */
   .kui-side-panel {
-    @apply inset-y-0 right-0 left-auto m-0 flex h-dvh max-h-dvh w-full max-w-[min(42rem,100vw)] flex-col overflow-hidden border-0 border-l border-kui-overlay0 bg-kui-surface0 p-0 text-kui-text;
+    @apply inset-y-0 right-0 left-auto m-0 flex h-dvh max-h-dvh w-full max-w-[min(42rem,100vw)] flex-col overflow-hidden border-0 border-solid border-l-(length:--kui-border-width) border-kui-overlay0 bg-kui-surface0 p-0 text-kui-text;
     transition:
       translate 0.2s ease-out,
       overlay 0.2s allow-discrete,
@@ -1656,7 +1656,7 @@
   :where(.kui-site-nav[data-open]) .kui-site-nav-list {
     position-area: block-end span-inline-end;
     position-try-fallbacks: flip-inline;
-    @apply absolute z-30 mt-2 flex min-w-56 flex-col items-stretch border border-kui-surface2 bg-kui-mantle p-2 lg:static lg:mt-0 lg:min-w-0 lg:flex-row lg:items-center lg:border-0 lg:bg-transparent lg:p-0;
+    @apply absolute z-30 mt-2 flex min-w-56 flex-col items-stretch border-solid border-(length:--kui-border-width) border-kui-surface2 bg-kui-mantle p-2 lg:static lg:mt-0 lg:min-w-0 lg:flex-row lg:items-center lg:border-0 lg:bg-transparent lg:p-0;
   }
 
   .kui-site-nav-link {
@@ -1703,7 +1703,7 @@
 
   .kui-pagination-page,
   .kui-pagination-step {
-    @apply min-w-9 border border-kui-surface2 px-3 py-1.5 text-center text-kui-subtext0 transition-colors hover:text-kui-text;
+    @apply min-w-9 border-solid border-(length:--kui-border-width) border-kui-surface2 px-3 py-1.5 text-center text-kui-subtext0 transition-colors hover:text-kui-text;
 
     &:where([aria-current='page']) {
       @apply border-kui-accent text-kui-accent;
@@ -1772,7 +1772,7 @@
   }
 
   .kui-table-wrap {
-    @apply w-full overflow-x-auto border border-kui-surface2 bg-kui-surface0;
+    @apply w-full overflow-x-auto border-solid border-(length:--kui-border-width) border-kui-surface2 bg-kui-surface0;
 
     &:where([data-narrow='stack']) {
       container: kui-table / inline-size;
@@ -2069,7 +2069,7 @@
 
   /* Anchored to whichever element TooltipHost names --kui-tooltip-anchor. */
   .kui-tooltip {
-    @apply inset-auto m-1.5 max-w-xs overflow-visible border border-kui-overlay0 bg-kui-surface1 px-2 py-1 text-kui-2xs text-kui-text;
+    @apply inset-auto m-1.5 max-w-xs overflow-visible border-solid border-(length:--kui-border-width) border-kui-overlay0 bg-kui-surface1 px-2 py-1 text-kui-2xs text-kui-text;
     position-anchor: --kui-tooltip-anchor;
     position-try-fallbacks: flip-block, flip-inline;
   }

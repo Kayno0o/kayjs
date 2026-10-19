@@ -22,6 +22,8 @@ A message whose line ends on a `// draft` comment is a draft, such as a machine 
 
 A library listed in `extensions`, such as kayjs-auth's pages, can bring its own messages. A key the app's file gives wins over the library's.
 
+A library can also ship its messages in its `package.json` under `kay.messages`, as kayjs-ui does with its French: the app needs no line for it. A page in `fr-CA` reads a library's `fr` messages when it has none for `fr-CA`.
+
 A site without `i18n` still renders a library's texts in its `lang`. A `src/messages/<lang>.ts`, when there is one, overrides them key by key.
 
 <ReadMore href="/guides/i18n#messages">Messages, plurals and formatting in the i18n guide.</ReadMore>

@@ -45,9 +45,9 @@ Colours are `--color-kui-<name>`, used as `bg-kui-<name>`, and hold `light-dark(
 
 Eight colours are seeds: `canvas`, `text`, `accent`, `success`, `warning`, `info`, `error` and `field-border`. Set those eight in your `@theme` and every other colour follows: the surfaces and greys are mixed from the canvas and the text, the hairlines are the text at an alpha, and the accent's hover is the accent shaded. A seed must read at 4.5:1 on `mantle` and `surface1`, the deepest surfaces, and `field-border` at 3:1.
 
-A colour you set yourself wins over the one mixed for it. A site in one scheme writes each seed once and sets `color-scheme` on `:root` to it.
+Set them on `:root` or `html`, as `@theme` does: a seed set on one element does not change the colours mixed inside it. A colour you set yourself wins over the one mixed for it. A site in one scheme writes each seed once and sets `color-scheme` on `:root` to it.
 
-`--kui-border-width` is the keyline of buttons, cards, rows, widgets, notices, avatars, toasts, dialogs and popovers. It is a length: `2px`, not `2px solid red`, which it ignores. The old name, `--kui-border-card`, works until 1.61.
+`--kui-border-width` is the keyline of buttons, cards, rows, widgets, notices, avatars, toasts, dialogs, side panels, tooltips, tables, boxed sections, segmented controls and the other framed boxes. It is a length: `2px`, not `2px solid red`, which it ignores. The old name, `--kui-border-card`, works until 1.61.
 
 A few tokens shape boxes rather than colour them. A brutalist skin sets `--kui-shadow-raised` (under cards, rows, widgets and toasts), `--kui-shadow-press` (under framed buttons) and `--kui-press-travel` (how far a pressed button moves down). All three draw nothing by default.
 

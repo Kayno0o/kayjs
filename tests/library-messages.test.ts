@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 import { beforeAll, describe, expect, test } from 'bun:test'
-import { loadConfig } from '../src/config'
+import { loadConfig, withConfig } from '../src/config'
 import { lookup } from '../src/runtime/i18n'
 import { implicitI18n, loadI18n } from '../src/server/i18n'
 import { scratchDir } from './scratch'
@@ -79,11 +79,36 @@ describe('a library\'s message catalog, declared in its package.json', () => {
     expect(lookup(translations.get('fr')!, 'lib.cancel')).toBe('Laisser')
   })
 
-  test('serves a site in two locales whose default has no catalog of the library\'s', async () => {
+  test('stands in for the app\'s missing fr.ts, so a site in two locales loads with no catalog for fr of its own, the default locale having none of the library\'s', async () => {
     const root = await project('export default { i18n: { locales: [\'en\', \'fr\'], defaultLocale: \'en\' } }\n', { 'src/messages/en.ts': MESSAGES('{ home: \'Home\' }') })
     const { translations } = await loadI18n(root, { locales: ['en', 'fr'], defaultLocale: 'en' }, (await loadConfig(root)).extensions)
 
     expect(lookup(translations.get('fr')!, 'lib.cancel')).toBe('Annuler')
     expect(lookup(translations.get('en')!, 'lib.cancel')).toBeUndefined()
+  })
+
+  test('is dropped when the options of withConfig give their own extensions, which replace the config\'s', async () => {
+    const { extensions } = await withConfig(sites.french!, { extensions: [{ name: 'other' }] })
+
+    expect(extensions?.map(({ name }) => name)).toEqual(['other'])
+  })
+
+  test('leaves a locale it has no catalog for to the app\'s own, then the default locale\'s', async () => {
+    const root = await project('export default {}\n', { 'src/messages/en.ts': MESSAGES('{ lib: { cancel: \'Cancel\' } }'), 'src/messages/de.ts': MESSAGES('{ lib: { title: \'Titel\' } }') })
+    const config = { locales: ['en', 'de'], defaultLocale: 'en' }
+    const { translations } = await loadI18n(root, config, (await loadConfig(root)).extensions)
+    const de = translations.get('de')!
+
+    expect(lookup(de, 'lib.title')).toBe('Titel')
+    expect(lookup(de, 'lib.cancel')).toBe('Cancel')
+  })
+
+  test('reads a regional catalog of its own over its language\'s', async () => {
+    const root = await project('export default { lang: \'fr-CA\' }\n', { 'node_modules/kay-lib/messages/fr-CA.ts': MESSAGES('{ lib: { cancel: \'Annuler (CA)\' } }') })
+    const { translations } = await implicitI18n(root, 'fr-CA', (await loadConfig(root)).extensions)
+
+    expect(lookup(translations.get('fr-CA')!, 'lib.cancel')).toBe('Annuler (CA)')
+    // A key the regional file lacks is not borrowed from fr.ts: the regional catalog stands for the region.
+    expect(lookup(translations.get('fr-CA')!, 'lib.title')).toBeUndefined()
   })
 })

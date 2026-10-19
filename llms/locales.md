@@ -190,6 +190,7 @@ export default defineMessages({
 })
 ```
 
+- A library whose package.json declares `"kay": { "messages": "./src/messages" }`, kayjs-ui for one, gives its catalogs to every app that installs it with no line in `kay.config.ts`; a regional locale such as `fr-CA` reads its language's catalog when the library has none for the region. The app's file, then an extension of the same name, win over it.
 - A library listed in `extensions` can bring catalogs of its own, `<locale>.ts` each in the directory its `messages` names (see [Extensions](component-libraries.md#extensions)).
 - Every locale reads the library's messages with the app's laid over them key by key, so `auth: { title: 'Connexion' }` in `src/messages/fr.ts` replaces that one text of the library and keeps the rest.
 - `t()` types the keys of both, and `kay check` holds each locale to the default one's keys, the library's included, so a locale the library does not translate is the app's to fill.

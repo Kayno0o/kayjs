@@ -94,7 +94,7 @@ export function libraryMessageExtensions(root: string): KayExtension[] {
     const dir = packageDir(root, name)
     const messages = dir === undefined ? undefined : readManifest(dir)?.kay?.messages
 
-    return dir === undefined || messages === undefined ? [] : [{ name, messages: join(dir, messages) }]
+    return dir === undefined || typeof messages !== 'string' ? [] : [{ name, messages: resolve(dir, messages) }]
   })
 }
 

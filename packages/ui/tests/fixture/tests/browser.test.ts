@@ -146,17 +146,17 @@ inBrowser('FormField in an island', () => {
 
     await using page = await site.open('/borders')
 
-    const widths = async (css: string) => page.evaluate((style: string) => {
+    const widths = async (css: string): Promise<Record<string, number>> => page.evaluate((style: string) => {
       document.documentElement.setAttribute('style', style)
 
       const width = (selector: string, side = 'Top') => Number.parseFloat(getComputedStyle(document.querySelector(selector)!)[`border${side}Width` as 'borderTopWidth'])
       // A button draws its keyline in ::before.
       const button = Number.parseFloat(getComputedStyle(document.querySelector('#button')!, '::before').borderTopWidth)
 
-      return { card: width('#card'), head: width('#card-head', 'Bottom'), row: width('#row'), widget: width('#widget'), notice: width('#notice'), avatar: width('#avatar'), button }
+      return { card: width('#card'), head: width('#card-head', 'Bottom'), row: width('#row'), widget: width('#widget'), notice: width('#notice'), avatar: width('#avatar'), button, sidePanel: width('#side-panel', 'Left'), tooltip: width('#tooltip'), tableWrap: width('#table-wrap'), section: width('#section'), saveBar: width('#save-bar'), segmented: width('#segmented'), fileDrop: width('#file-drop'), step: width('#step'), chartTooltip: width('#chart-tooltip') }
     }, css)
 
-    const all = (value: number) => ({ card: value, head: value, row: value, widget: value, notice: value, avatar: value, button: value })
+    const all = (value: number) => Object.fromEntries(['card', 'head', 'row', 'widget', 'notice', 'avatar', 'button', 'sidePanel', 'tooltip', 'tableWrap', 'section', 'saveBar', 'segmented', 'fileDrop', 'step', 'chartTooltip'].map(name => [name, value]))
 
     expect(await widths('')).toEqual(all(1))
     expect(await widths('--kui-border-width: 2px')).toEqual(all(2))

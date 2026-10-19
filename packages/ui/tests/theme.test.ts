@@ -275,7 +275,7 @@ describe('theme.css', () => {
         const now = colour(name, scheme, colour('canvas', scheme))
         const furthest = Math.max(...now.map((channel, index) => Math.abs(channel - was[scheme][index]!)))
 
-        expect(furthest, `${name} ${scheme === 0 ? 'light' : 'dark'}`).toBeLessThanOrEqual(name === 'on-accent' ? 12 : 10)
+        expect(furthest, `${name} ${scheme === 0 ? 'light' : 'dark'}`).toBeLessThanOrEqual(name === 'on-accent' ? 11 : 10)
       }
     }
   })
@@ -450,8 +450,8 @@ describe('theme.css', () => {
   })
 
   test('sizes the keyline of every framed box by --kui-border-width, a length the old --kui-border-card still sets', () => {
-    for (const selector of ['.kui-card', '.kui-card-head', '.kui-card-row', '.kui-widget', '.kui-toast', '.kui-dialog', '.kui-command-palette', '.kui-popover'])
-      expect(blockOf(theme, selector), selector).toMatch(/border(?:-b)?-\(length:--kui-border-width\)/)
+    for (const selector of ['.kui-card', '.kui-card-head', '.kui-card-row', '.kui-widget', '.kui-toast', '.kui-dialog', '.kui-command-palette', '.kui-popover', '.kui-side-panel', '.kui-tooltip', '.kui-table-wrap', '.kui-collapsible-section', '.kui-save-bar', '.kui-segmented', '.kui-file-drop', '.kui-pagination-step', ':where(.kui-site-nav[data-open]) .kui-site-nav-list', '.kui-line-chart-tooltip'])
+      expect(blockOf(theme, selector), selector).toMatch(/border(?:-[bl])?-\(length:--kui-border-width\)/)
 
     expect(theme.match(/var\(--kui-border-card\)/g)).toHaveLength(1)
     expect(theme).toContain('--kui-border-width: var(--kui-border-card);')

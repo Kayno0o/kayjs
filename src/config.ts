@@ -538,7 +538,7 @@ function checkedConfig({ checks, env }: KayConfig): void {
 
 // The config with the catalogs of the libraries the app installs listed before its own extensions, so those and the app's messages win key by key; one an extension of the same name already brings is left alone.
 function withLibraryMessages(root: string, config: KayConfig): KayConfig {
-  const listed = new Set((config.extensions ?? []).map(({ name }) => name))
+  const listed = new Set((config.extensions ?? []).filter(({ messages }) => messages !== undefined).map(({ name }) => name))
   const shipped = libraryMessageExtensions(root).filter(({ name }) => !listed.has(name))
 
   return shipped.length === 0 ? config : { ...config, extensions: [...shipped, ...config.extensions ?? []] }

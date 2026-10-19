@@ -43,13 +43,14 @@ export function messagesFile(root: string, config: Pick<I18nConfig, 'messages'>,
 
 // The catalogs the extensions give a locale, in the order they are listed, the app's own laid over them: a regional locale falls back to its language's catalog.
 export function extensionMessageFiles(root: string, extensions: KayExtension[] | undefined, locale: string): string[] {
+  const dash = locale.indexOf('-')
+  const language = dash === -1 ? locale : locale.slice(0, dash)
+
   return (extensions ?? []).flatMap((extension) => {
     if (extension.messages === undefined)
       return []
 
     const dir = throughLinks(root, resolve(root, extension.messages))
-    const dash = locale.indexOf('-')
-    const language = dash === -1 ? locale : locale.slice(0, dash)
     const regional = join(dir, `${locale}.ts`)
 
     // A regional locale such as `fr-CA` reads the catalog of its language when the extension has none of its own for the region.
