@@ -371,6 +371,11 @@ export function memoryStore(): AuthStore {
         create(token) {
           oauthRefresh.set(token.digest, copyOAuth(token))
         },
+        get(digest) {
+          const token = oauthRefresh.get(digest)
+
+          return token && copyOAuth(token)
+        },
         use(digest, at) {
           const token = oauthRefresh.get(digest)
 

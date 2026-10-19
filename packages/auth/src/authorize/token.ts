@@ -1,5 +1,5 @@
 import type { Core } from '../core'
-import type { OAuthGrantRecord } from '../store'
+import type { OAuthGrantRecord, OAuthRefreshRecord } from '../store'
 import type { TokenReply } from './reply'
 import { createHash, timingSafeEqual } from 'node:crypto'
 import { banned } from '../core'
@@ -113,6 +113,19 @@ async function exchangeCode(core: Core, form: URLSearchParams, root: string): Pr
   return grant ? issue(core, grant, issued.scopes, issued.family, undefined, bound.resource) : refused('invalid_grant', 'The client is not approved')
 }
 
+// What a refresh asks for: the scopes and the resource the new tokens get, or the reply refusing a scope the token lacks or a resource it is not bound to.
+function refreshAsk(form: URLSearchParams, root: string, held: OAuthRefreshRecord): { scopes: string[] | null, resource: string | null } | TokenReply {
+  const asked = form.get('scope')
+  const scopes = asked === null ? held.scopes : asked.split(WHITESPACE).filter(Boolean)
+
+  if (asked !== null && !covers(held.scopes, scopes))
+    return refused('invalid_scope', 'A refresh cannot add scopes')
+
+  const bound = boundResource(form, root, held.resource, true)
+
+  return 'status' in bound ? bound : { scopes, resource: bound.resource }
+}
+
 async function rotate(core: Core, form: URLSearchParams, root: string): Promise<TokenReply> {
   const presented = form.get('refresh_token')
   const clientId = form.get('client_id')
@@ -120,7 +133,18 @@ async function rotate(core: Core, form: URLSearchParams, root: string): Promise<
   if (presented === null || clientId === null)
     return refused('invalid_request', 'refresh_token and client_id are required')
 
-  const spent = await core.store.oauth!.refresh.use(digest(presented), new Date())
+  const key = digest(presented)
+  const peeked = await core.store.oauth!.refresh.get(key)
+
+  // A request refused for what it asks leaves a live token unspent, so a mistake once does not cost the family on the retry. A spent token goes on to `use`, which revokes the family.
+  if (peeked && peeked.usedAt === null && peeked.clientId === clientId) {
+    const asked = refreshAsk(form, root, peeked)
+
+    if ('status' in asked)
+      return asked
+  }
+
+  const spent = await core.store.oauth!.refresh.use(key, new Date())
 
   if (!spent)
     return refused('invalid_grant', 'The refresh token is not valid')
@@ -141,20 +165,14 @@ async function rotate(core: Core, form: URLSearchParams, root: string): Promise<
   if (held.scopes === null && core.scopes.size > 0)
     return refused('invalid_grant', 'The client must be approved again')
 
-  const asked = form.get('scope')
-  const scopes = asked === null ? held.scopes : asked.split(WHITESPACE).filter(Boolean)
+  const asked = refreshAsk(form, root, held)
 
-  if (asked !== null && !covers(held.scopes, scopes))
-    return refused('invalid_scope', 'A refresh cannot add scopes')
-
-  const bound = boundResource(form, root, held.resource, true)
-
-  if ('status' in bound)
-    return bound
+  if ('status' in asked)
+    return asked
 
   const grant = await liveGrant(core, held.userId, held.clientId)
 
-  return grant ? issue(core, grant, scopes, held.family, held.expiresAt, bound.resource) : refused('invalid_grant', 'The client is not approved')
+  return grant ? issue(core, grant, asked.scopes, held.family, held.expiresAt, asked.resource) : refused('invalid_grant', 'The client is not approved')
 }
 
 // The token endpoint: the authorization code grant with PKCE, and refresh tokens that rotate, a token used twice ending its family.

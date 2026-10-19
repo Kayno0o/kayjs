@@ -19,7 +19,7 @@ export const decide = action(schemas.oauthConsent, async ({ decision, ...fields 
 
 const auth = ctx.locals.auth
 const refused = ctx.failed(decide)?.data?.error
-const request: Partial<Record<typeof FIELDS[number], string>> = {}
+const request: Parameters<typeof auth.oauthAuthorize>[0] = {}
 
 for (const field of FIELDS) {
   const value = ctx.url.searchParams.get(field)
@@ -27,6 +27,11 @@ for (const field of FIELDS) {
   if (value !== null)
     request[field] = value
 }
+
+const resources = ctx.url.searchParams.getAll('resource')
+
+if (resources.length > 1)
+  request.resource = resources
 
 const outcome = refused ? undefined : await auth.oauthAuthorize(request)
 

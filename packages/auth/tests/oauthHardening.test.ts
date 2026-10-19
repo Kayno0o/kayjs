@@ -428,6 +428,51 @@ describe('a token is bound to the resource it was asked for', () => {
     expect(other.body.access_token).toBeUndefined()
   })
 
+  test('a refresh refused for its resource or scope leaves the token to retry with', async () => {
+    const app = server()
+    const { clientId, code } = await approvedFor(app, { resource: MCP })
+    const first = await exchangeWith(app, clientId, code)
+    const presented = first.body.refresh_token as string
+
+    expect((await refreshWith(app, clientId, presented, { resource: 'http://localhost/other' })).body.error).toBe('invalid_target')
+    expect((await refreshWith(app, clientId, presented, { resource: 'https://other.example/mcp' })).body.error).toBe('invalid_target')
+    expect((await refreshWith(app, clientId, presented, { scope: 'posts:write' })).body.error).toBe('invalid_scope')
+    expect((await app.store.oauth!.refresh.get(digest(presented)))?.usedAt).toBeNull()
+
+    const retry = await refreshWith(app, clientId, presented, { resource: MCP })
+
+    expect(retry.status).toBe(200)
+    expect((await bearerOf(app, retry))?.oauth?.resource).toBe(MCP)
+  })
+
+  test('a spent refresh token still revokes the family, whatever resource the reuse names', async () => {
+    const app = server()
+    const { clientId, code } = await approvedFor(app, { resource: MCP })
+    const first = await exchangeWith(app, clientId, code)
+    const second = await refreshWith(app, clientId, first.body.refresh_token as string)
+
+    expect((await refreshWith(app, clientId, first.body.refresh_token as string, { resource: 'http://localhost/other' })).body.error).toBe('invalid_grant')
+    expect((await refreshWith(app, clientId, second.body.refresh_token as string)).body.error).toBe('invalid_grant')
+    expect(await bearerOf(app, second)).toBeUndefined()
+  })
+
+  test('several resources are invalid_target at authorize as at the token endpoint', async () => {
+    const app = server()
+    const { body } = await register(app)
+    const ada = await signedIn(app)
+    const several = { ...params(body.client_id!), resource: [MCP, 'http://localhost/other'] }
+
+    const asked = await ada.call('oauthAuthorize', several) as { kind: string, url: string }
+
+    expect(asked.kind).toBe('redirect')
+    expect(new URL(asked.url).searchParams.get('error')).toBe('invalid_target')
+
+    const answer = await ada.post('/call/oauthDecide', [several, true]) as { ok: true, redirect: string }
+
+    expect(new URL(answer.redirect).searchParams.get('error')).toBe('invalid_target')
+    expect(new URL(answer.redirect).searchParams.get('code')).toBeNull()
+  })
+
   test('a refresh naming a resource of this site keeps a token that had none unbound', async () => {
     const app = server()
     const { clientId, code } = await approvedFor(app)

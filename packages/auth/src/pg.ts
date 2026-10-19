@@ -416,6 +416,11 @@ export function pgStore(db: Database): AuthStore {
         async create(token) {
           await oauthRefresh.write.insertOne({ digest: token.digest, user_id: token.userId, client_id: token.clientId, scopes: token.scopes, family: token.family, resource: token.resource ?? null, created_at: token.createdAt, expires_at: token.expiresAt, used_at: token.usedAt })
         },
+        async get(digest) {
+          const row = await oauthRefresh.read.findById(digest)
+
+          return row ? toOAuthRefresh(row) : undefined
+        },
         async use(digest, at) {
           const [spent] = await oauthRefresh.write.updateMany({ used_at: at }, e => e.and(e.eq('digest', digest), e.isNull('used_at')))
 

@@ -17,7 +17,10 @@ const WHITESPACE = /\s+/
 const IMPLIED_SCOPES = new Set(['offline_access'])
 
 // What the authorization endpoint reads off the request, as the client sent it.
-export type AuthorizeParams = Partial<Record<'client_id' | 'redirect_uri' | 'response_type' | 'code_challenge' | 'code_challenge_method' | 'scope' | 'state' | 'resource' | 'prompt', string | undefined>>
+export type AuthorizeParams = Partial<Record<'client_id' | 'redirect_uri' | 'response_type' | 'code_challenge' | 'code_challenge_method' | 'scope' | 'state' | 'prompt', string | undefined>> & {
+  // An array when the request named the parameter more than once, which is refused as it is at the token endpoint.
+  resource?: string | string[] | undefined
+}
 
 // What the consent form posts back to be checked again.
 export interface ConsentFields {
@@ -118,7 +121,10 @@ async function check(state: RequestState, params: AuthorizeParams, root: string)
   if (scopes === undefined)
     return failure(base, root, 'invalid_scope', 'A scope asked for is not one this server has')
 
-  const resource = oneOf(params.resource)
+  if (Array.isArray(params.resource) && params.resource.length > 1)
+    return failure(base, root, 'invalid_target', 'Only one resource can be asked for')
+
+  const resource = oneOf(Array.isArray(params.resource) ? params.resource[0] : params.resource)
 
   if (resource !== undefined && !sameSite(resource, root))
     return failure(base, root, 'invalid_target', 'The resource is not one of this server')
@@ -212,7 +218,7 @@ export async function authorize(state: RequestState, params: AuthorizeParams, ro
     redirectHost: new URL(checked.redirectUri).host,
     client: { id: checked.client.id, name: checked.client.name, host: checked.client.host },
     scopes: checked.scopes,
-    fields: { client_id: checked.client.id, redirect_uri: checked.redirectUri, code_challenge: checked.challenge, scope: oneOf(params.scope) ?? '', state: oneOf(params.state) ?? '', resource: oneOf(params.resource) ?? '' },
+    fields: { client_id: checked.client.id, redirect_uri: checked.redirectUri, code_challenge: checked.challenge, scope: oneOf(params.scope) ?? '', state: oneOf(params.state) ?? '', resource: checked.resource ?? '' },
   }
 }
 

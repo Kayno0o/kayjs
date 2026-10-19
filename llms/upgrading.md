@@ -11,7 +11,7 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 ### kayjs-auth OAuth tokens are bound to their resource
 
 - The OAuth server keeps the `resource` (RFC 8707) asked at authorize with the code, the bearer token and the refresh token. A token request or a refresh naming a resource other than the one asked at authorize, or (for the code exchange) any resource where none was asked, answers `invalid_target`; one that names it again or none works as before. A refresh token stored before the columns stays unbound and accepts a resource of the site.
-- With pg-orm, generate a migration for three nullable columns: `auth_oauth_code.resource`, `auth_oauth_refresh.resource` and `auth_bearer_token.oauth_resource` (no default: rows stored before them read back `null` and stay unbound and working). A custom store keeps and returns `resource` on `OAuthCodeRecord` and `OAuthRefreshRecord` and `resource` in a bearer token's `oauth`, all optional. `kay check` cannot recognise this, so there is no lint.
+- With pg-orm, generate a migration for three nullable columns: `auth_oauth_code.resource`, `auth_oauth_refresh.resource` and `auth_bearer_token.oauth_resource` (no default: rows stored before them read back `null` and stay unbound and working). A custom store keeps and returns `resource` on `OAuthCodeRecord` and `OAuthRefreshRecord` and `resource` in a bearer token's `oauth`, all optional, and gains `oauth.refresh.get(digest)`, which reads a refresh token without spending it (a refresh refused for its resource or scope leaves the token unspent). `kay check` cannot recognise this, so there is no lint.
 
 ## 1.56.0
 
