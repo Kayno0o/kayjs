@@ -34,7 +34,7 @@ import { changePassword, changeUsername, deleteAccount, unlink } from './account
 import { adminAuditLog, banUser, changeRole, changingAdmin, deleteUser, getUser, isAdmin, listUsers, unbanUser } from './admin'
 import { documentFetcher } from './authorize/clients'
 import { approvedClients, revokeClient } from './authorize/grants'
-import { protectedResourceMetadata, rootIsFixed, siteRoot } from './authorize/metadata'
+import { protectedResourceMetadata, rootIsFixed, rootUsable, siteRoot } from './authorize/metadata'
 import { authorize, decide } from './authorize/request'
 import { serveOAuthServer } from './authorize/routes'
 import { bearerRequest, bearerUser, createToken, issueToken, listTokens, revokeToken, tokenUser } from './bearer'
@@ -559,7 +559,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
 
   // The RFC 9728 metadata of the protected resource `name` served at `path`, which kay's MCP endpoint asks for; null while the OAuth server is off. It points MCP clients at the app's own authorization server.
   oauthResource(path: string, name: string): Record<string, unknown> | null {
-    if (!this.core.oauthServer)
+    if (!this.core.oauthServer || !rootUsable(this.core))
       return null
 
     const root = siteRoot(this.core, this.request)
@@ -569,7 +569,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
 
   // The origin the OAuth documents are served at, which kay's 401 pointer to them names; undefined while the OAuth server is off.
   oauthOrigin(): string | undefined {
-    return this.core.oauthServer ? new URL(siteRoot(this.core, this.request)).origin : undefined
+    return this.core.oauthServer && rootUsable(this.core) ? new URL(siteRoot(this.core, this.request)).origin : undefined
   }
 
   // Whether that origin is configured, so the documents may be cached for everyone; else it is the request's own.

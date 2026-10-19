@@ -357,6 +357,10 @@ describe('the documents', () => {
     try {
       expect((await server({ url: null }).browser().fetch('/.well-known/oauth-authorization-server', { headers: { host: 'evil.example' } })).status).toBe(500)
       expect((await server().browser().fetch('/.well-known/oauth-authorization-server')).status).toBe(200)
+
+      const unsaid = await server({ url: null }).browser().fetch('/mcp', { method: 'POST', headers: { 'content-type': 'application/json', 'host': 'evil.example' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }) })
+
+      expect(unsaid.status).not.toBe(500)
     }
     finally {
       if (before === undefined)

@@ -65,7 +65,7 @@ export default defineMessages({
       returnsTo: 'Une fois votre choix fait, vous revenez sur {host}.',
       scopes: 'Elle sera autorisée à',
       everything: 'Faire tout ce que vous pouvez faire',
-      noScopes: 'Se connecter comme vous, sans accès à vos données',
+      noScopes: 'Vous identifier, sans accès aux fonctions qui demandent une permission',
       allow: 'Autoriser',
       deny: 'Refuser',
       client: 'Cette application est inconnue de ce site : rien ne lui a été transmis.',

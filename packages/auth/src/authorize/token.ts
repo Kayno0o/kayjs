@@ -44,7 +44,7 @@ async function issue(core: Core, grant: OAuthGrantRecord, scopes: string[] | nul
 
   return {
     status: 200,
-    body: { access_token: access, token_type: 'Bearer', expires_in: ACCESS_LIFETIME, refresh_token: refresh, ...scopes !== null && { scope: scopes.join(' ') } },
+    body: { access_token: access, token_type: 'Bearer', expires_in: ACCESS_LIFETIME, refresh_token: refresh, ...scopes !== null && scopes.length > 0 && { scope: scopes.join(' ') } },
   }
 }
 

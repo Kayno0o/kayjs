@@ -1,8 +1,9 @@
 import { createHash } from 'node:crypto'
 import { afterEach, describe, expect, setSystemTime, test } from 'bun:test'
+import { Elysia } from 'elysia'
 import { memoryStore } from '../src/memoryStore'
 import { authPages } from '../src/pages'
-import { testApp } from './helpers/app'
+import { browser as browserOf, testApp } from './helpers/app'
 
 const PASSWORD = 'correct horse battery'
 const REDIRECT = 'http://127.0.0.1:33418/callback'
@@ -277,6 +278,31 @@ describe('the token endpoint', () => {
 
     expect((await app.store.bearerTokens.listByUser(id)).map(each => each.scopes)).toEqual([['posts:read']])
     expect(await ada.call('tokens')).toEqual([])
+  })
+
+  test('a client asking no scope gets a token and a refresh that reach only routes with scope false', async () => {
+    const app = server()
+    const { client_id } = await register(app)
+    const ada = await signedIn(app)
+    const first = await exchange(app, client_id, await approved(ada, client_id, { scope: '' }))
+    const api = new Elysia().use(app.auth.gate()).get('/posts', () => 'ok', { scope: 'posts:read' }).get('/health', () => 'ok', { scope: false })
+    const device = browserOf(new Elysia().use(app.app).group('/api', group => group.use(api)))
+    const get = async (path: string, access: string | number | undefined) => device.fetch(`/api${path}`, { headers: { authorization: `Bearer ${access}` } })
+
+    expect(first.status).toBe(200)
+    expect(first.body.scope).toBeUndefined()
+    expect((await get('/posts', first.body.access_token)).status).toBe(403)
+    expect((await get('/health', first.body.access_token)).status).toBe(200)
+
+    const { id } = await ada.json('/me') as { id: string }
+
+    expect((await app.store.bearerTokens.listByUser(id)).map(each => each.scopes)).toEqual([[]])
+
+    const second = await token(app, { grant_type: 'refresh_token', refresh_token: String(first.body.refresh_token), client_id })
+
+    expect(second.status).toBe(200)
+    expect((await get('/posts', second.body.access_token)).status).toBe(403)
+    expect(await ada.call('oauthClients')).toEqual([expect.objectContaining({ scopes: [] })])
   })
 
   test('refuses a wrong PKCE verifier, and the code is spent by the try', async () => {
