@@ -109,6 +109,14 @@ describe('compile errors', () => {
     expect(codes('---\nconst { a } = props<{ a: string }>()\nconst { b } = props<{ b: string }>()\n---\np {a}\n')).toContain('fence-invalid')
     expect(codes('--- client\nconst n = 1\n---\np {n}\n', 'src/routes/_layout.kay')).toContain('client-route-fence')
   })
+
+  it('refuse a server fence never closed, but in an _actions.kay, which holds no template', () => {
+    const unclosed = '--- server\nexport const a = 1\np hi\n'
+
+    expect(codes(unclosed, 'src/routes/page.kay')).toContain('fence-invalid')
+    expect(codes(unclosed, 'src/routes/_layout.kay')).toContain('fence-invalid')
+    expect(codes('--- server\nexport const a = 1\n', 'src/routes/admin/_actions.kay')).toEqual([])
+  })
 })
 
 describe('errors raised while building', () => {

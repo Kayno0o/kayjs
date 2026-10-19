@@ -27,7 +27,7 @@ const SCHEMA_PATH = /\.[mc]?ts$/
 const TEST_FILE = /\.(?:test|spec)\.[cm]?[jt]sx?$/
 const EXTENSION = /\.[mc]?[jt]s$/
 const INDENT = /\n([ \t]+)\S/
-const IDENTIFIER_CHAR = /[\w$]/
+const IDENTIFIER_CHAR = /[\p{ID_Continue}$]/u
 const WHITESPACE = /\s/
 // The words after which a `/` opens a regular expression.
 const REGEX_KEYWORDS = new Set(['return', 'typeof', 'instanceof', 'in', 'of', 'new', 'delete', 'void', 'throw', 'case', 'do', 'else', 'yield', 'await'])
@@ -104,7 +104,8 @@ function codeMask(text: string): Uint8Array {
       }
       else if (!WHITESPACE.test(char)) {
         word = ''
-        last = char
+        // `i++ / 2` divides.
+        last = (char === '+' || char === '-') && text[index - 1] === char ? ')' : char
       }
 
       mask[index++] = 1
@@ -116,7 +117,7 @@ function codeMask(text: string): Uint8Array {
 
 // Whether a `/` after this word or character opens a regular expression, and is no division.
 function startsExpression(word: string, last: string): boolean {
-  return word !== '' ? REGEX_KEYWORDS.has(word) : last === '' || !VALUE_END.includes(last)
+  return word !== '' ? REGEX_KEYWORDS.has(word) && last !== '.' : last === '' || !VALUE_END.includes(last)
 }
 
 // Where the regular expression opening at `start` closes, a `/` outside a class on the same line.

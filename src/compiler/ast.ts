@@ -465,6 +465,8 @@ export interface KayFile {
   templateStart: number
   template: Node[]
   diagnostics: Diagnostic[]
+  // A `--- server` fence that never closes, which only an `_actions.kay` may leave so: the file name is the compiler's to know.
+  unclosedServer?: Diagnostic | undefined
   // Found on first use, once icons are drawn.
   facts?: TemplateFacts | undefined
 }

@@ -75,6 +75,7 @@ export interface CompileResult {
 const WORD = /[a-z0-9]+/gi
 const LEADING_DIGIT = /^\d/
 const KAY_EXTENSION = /\.kay$/
+const ACTIONS_FILE = '_actions.kay'
 const ERROR_PAGE = '_error.kay'
 const LAYOUT = '_layout.kay'
 // Rendered by the server around or instead of a page, never inside an island.
@@ -162,6 +163,7 @@ export function compileKay(source: string, filename: string, options: CompileOpt
   const unparsed = script.unparsed !== undefined || server?.unparsed !== undefined
   const diagnostics = [
     ...coded(file.diagnostics, 'template-syntax'),
+    ...coded(file.unclosedServer !== undefined && basename(filename) !== ACTIONS_FILE ? [file.unclosedServer] : [], 'fence-invalid'),
     ...coded(script.diagnostics, 'fence-invalid'),
     ...coded(server?.diagnostics ?? [], 'fence-invalid'),
     ...coded(server ? separatePageSettings(source, server) : [], 'page-settings-invalid'),

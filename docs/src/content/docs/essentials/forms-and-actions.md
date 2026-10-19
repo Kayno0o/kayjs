@@ -82,7 +82,7 @@ An action that a page and a component both use lives in a file called `_actions.
 
 ```kay
 --- server
-import { action, s } from 'kay'
+import { s } from 'kay'
 
 export const deleteTissue = action(s.Object({ id: s.Integer() }), async ({ id }) => {
   await removeTissue(id)

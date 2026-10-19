@@ -78,6 +78,7 @@ export function parseKay(source: string): KayFile {
   let typeParameters: Span | undefined
   let client: Span | undefined
   let templateStart = 0
+  let unclosedServer: Diagnostic | undefined
 
   // Fences come first, in any order: `---` or `--- script` holds the component script, `--- client` one rendering in the browser only, `--- server` the code that runs on the server only.
   // A labeled fence line also closes the fence before it, so `--- server` code can run straight into `--- script`.
@@ -99,9 +100,14 @@ export function parseKay(source: string): KayFile {
 
     templateStart = closing ? closing.end : source.length
 
-    // A server fence may run to the end of the file, as an `_actions.kay` or a page that only redirects holds no template.
-    if (!closing && kind !== 'server')
-      diagnostics.push({ start: fence.index, end: fence.index + 3, code: 'fence-invalid', message: 'This fence is never closed with a `---` line' })
+    if (!closing) {
+      const unclosed: Diagnostic = { start: fence.index, end: fence.index + 3, code: 'fence-invalid', message: 'This fence is never closed with a `---` line' }
+
+      if (kind === 'server' && spaced && !unclosedServer)
+        unclosedServer = unclosed
+      else
+        diagnostics.push(unclosed)
+    }
 
     if (!spaced || (kind !== 'script' && kind !== 'server'))
       diagnostics.push({ start: fence.index, end: bodyStart - 1, code: 'fence-invalid', message: `Unknown fence \`${fence[0].trim()}\``, help: 'use `---` or `--- script` for the component script, `--- client` for one rendering in the browser only, or `--- server` for server code' })
@@ -126,7 +132,7 @@ export function parseKay(source: string): KayFile {
 
   const parser = new TemplateParser(source, templateStart, diagnostics)
 
-  return { source, script: fences.script, server: fences.server, typeParameters, client, templateStart, template: parser.parseTemplate(), diagnostics }
+  return { source, script: fences.script, server: fences.server, typeParameters, client, templateStart, template: parser.parseTemplate(), diagnostics, unclosedServer }
 }
 
 // The line closing a fence, past any inside a template literal or a comment, such as a markdown front matter the code holds: a `---` line, consumed, or a labeled one opening the next fence, left to it.

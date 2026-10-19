@@ -30,6 +30,7 @@ const pageBlocks = (await Promise.all([...new Bun.Glob('**/*.md').scanSync(pages
 const CARD_LINK = /ModuleCard\([^)]*\bhref="([^"]+)"/g
 const FRONTMATTER_PATH = /^path: (.+)$/m
 const FENCE = /^```[\s\S]+?^```/gm
+const CLOSED_FENCE = /\n---$/m
 const FRONTMATTER = /^---\n[\s\S]*?\n---\n/
 const BLANK_LINE = /\n\s*\n/
 const LIST_ITEM = /\n(?=\s*(?:[-*]|\d+\.) )/
@@ -48,7 +49,8 @@ describe('llms.txt', () => {
 
 describe('the documentation site\'s pages', () => {
   it.each(pageBlocks)('%s compiles cleanly and is formatted', (_name, source) => {
-    const filename = source.startsWith('--- server') ? 'src/routes/example.kay' : 'src/example.kay'
+    // A server fence left open is a file with no template, an `_actions.kay`.
+    const filename = source.startsWith('--- server') ? `src/routes/${CLOSED_FENCE.test(source) ? 'example' : '_actions'}.kay` : 'src/example.kay'
     const { diagnostics } = compileKay(source, filename)
 
     expect(diagnostics.map(diagnostic => formatDiagnostic(source, filename, diagnostic))).toEqual([])

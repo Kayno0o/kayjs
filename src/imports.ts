@@ -4,13 +4,13 @@ import { builtinModules } from 'node:module'
 // `import.meta` and `import(` are no statement; an attribute list and a trailing comment end it.
 const STATEMENT = /^import(?!\s*\()(?=[\s{*'"])(?:[^;'"]|'[^']*'|"[^"]*")*?(?:from\s*)?(?:'[^']*'|"[^"]*")(?:[ \t]*with[ \t]*\{[^}]*\})?;?[ \t]*(?:\/\/[^\n]*)?\r?\n/gm
 const SPECIFIER = /(['"])([^'"\n]*)\1(?:[ \t]*with[ \t]*\{[^}]*\})?;?[ \t]*(?:\/\/[^\n]*)?\r?\n$/
-// A shebang, the directives (`'use strict'`) and the comment header that must stay first in a file, below a byte order mark.
+// A shebang, the directives (`'use strict'`) and the comment header that must stay first in a file.
 const SHEBANG = /#!.*\r?\n/y
 const DIRECTIVE = /[ \t]*(['"])use [\w -]+\1;?[ \t]*\r?\n/y
-const COMMENT_LINE = /[ \t]*(?:\/\/[^\n]*|\/\*[\s\S]*?\*\/[ \t]*)(?:\r?\n|$)/y
+const COMMENT_LINE = /[ \t]*(?:\/\/[^\n]*|\/\*(?:[^*]|\*(?!\/))*\*\/[ \t]*)(?:\r?\n|$)/y
 const BLANK_LINE = /[ \t]*\r?\n/y
 // A comment a tool reads from the top of the file, which an import above it would put out of reach.
-const TOOL_COMMENT = /^[ \t]*(?:\/\/|\/\*+)[ \t]*(?:@ts-|eslint-|@jsx|@preserve|@license)/
+const TOOL_COMMENT = /^[ \t]*(?:\/\/\/?|\/\*+)[ \t]*(?:@ts-|eslint-|@jsx|@preserve|@license|<reference)/
 const TYPE_ONLY = /^import\s+type\b/
 const FROM = /\bfrom\s*['"]/
 const INTERNAL = /^(?:~|@)\/./
@@ -68,12 +68,11 @@ function compare(a: string, b: string): number {
   return left.length - right.length
 }
 
-// Where the first import goes in a file with none: past the byte order mark, the shebang, the directives, and the comments that head the file, those followed by a blank line or read by a tool, and not a comment on the code right under it.
+// Where the first import goes in a file with none: past the shebang, the directives, and the comments that head the file, those followed by a blank line or read by a tool, and not a comment on the code right under it.
 function prologueEnd(source: string): number {
-  let at = source.startsWith('\uFEFF') ? 1 : 0
+  SHEBANG.lastIndex = 0
 
-  SHEBANG.lastIndex = at
-  at = SHEBANG.test(source) ? SHEBANG.lastIndex : at
+  let at = SHEBANG.test(source) ? SHEBANG.lastIndex : 0
 
   while (true) {
     DIRECTIVE.lastIndex = at
@@ -127,6 +126,10 @@ function prologueEnd(source: string): number {
 
 // `source` with the import statement `line` placed where the preset's `perfectionist/sort-imports` puts it, so the file passes the app's lint with no fixer run.
 export function insertImport(source: string, line: string): string {
+  // The byte order mark stays first, and the first line below it is read as any other.
+  if (source.startsWith('\uFEFF'))
+    return `\uFEFF${insertImport(source.slice(1), line)}`
+
   const imports: Import[] = [...source.matchAll(STATEMENT)].map(match => ({ start: match.index, end: match.index + match[0].length, path: SPECIFIER.exec(match[0])?.[2] ?? '', group: -1 }))
 
   for (const found of imports)

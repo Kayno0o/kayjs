@@ -607,6 +607,10 @@ describe('kay check --fix on raw environment reads', () => {
         'export const d = [/[/`]/.test(\'x\'), process.env.AFTER_CLASS]',
         'export const e = 4 / 2 / process.env.DIVIDED',
         'export const f = `${/`/.source}`',
+        'let i = 1',
+        'export const inc = i++ / 2 + "x/", h = process.env.AFTER_INCREMENT',
+        'export const member = { in: 4 }.in / 2 / process.env.AFTER_MEMBER',
+        'export const café = 8 / 2 / process.env.AFTER_UNICODE',
         'export const g = process.env.AFTER_TEMPLATE',
         '',
       ].join('\n'),
@@ -616,7 +620,7 @@ describe('kay check --fix on raw environment reads', () => {
 
     const fixed = await read(root, 'src/regex.ts')
 
-    for (const name of ['AFTER_QUOTE', 'AFTER_TICK', 'SAME_LINE', 'AFTER_CLASS', 'DIVIDED', 'AFTER_TEMPLATE'])
+    for (const name of ['AFTER_QUOTE', 'AFTER_TICK', 'SAME_LINE', 'AFTER_CLASS', 'DIVIDED', 'AFTER_TEMPLATE', 'AFTER_INCREMENT', 'AFTER_MEMBER', 'AFTER_UNICODE'])
       expect(fixed).toContain(`env.${name}`)
 
     expect(fixed).not.toContain('process.env')

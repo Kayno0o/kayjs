@@ -52,3 +52,11 @@ it('goes below a comment header, and above a comment that belongs to the code un
   expect(insertImport('/* eslint-disable */\r\nexport {}\r\n', z)).toBe(`/* eslint-disable */\r\n${z}\r\n\r\nexport {}\r\n`)
   expect(insertImport('// Only a note\n', z)).toBe(`// Only a note\n${z}\n`)
 })
+
+it('reads a block comment sharing its line with code as code, a triple-slash directive as a tool comment, and groups after a byte order mark', () => {
+  const z = 'import { z } from \'z\''
+
+  expect(insertImport('/* a */ export const x = 1\n\nconst y = 2\n/* b */\n\nfoo()\n', z)).toBe(`${z}\n\n/* a */ export const x = 1\n\nconst y = 2\n/* b */\n\nfoo()\n`)
+  expect(insertImport('/// <reference types="bun" />\nexport {}\n', z)).toBe(`/// <reference types="bun" />\n${z}\n\nexport {}\n`)
+  expect(insertImport('\uFEFFimport { a } from \'a\'\nexport {}\n', 'import { b } from \'b\'')).toBe('\uFEFFimport { a } from \'a\'\nimport { b } from \'b\'\nexport {}\n')
+})
