@@ -25,6 +25,8 @@ const uploads = await mkdtemp(join(tmpdir(), 'kay-uploads-'))
 await Bun.write(join(uploads, 'photo.png'), Bun.file(HERO))
 // Narrower than the ladder's first width.
 await Bun.write(join(uploads, 'small.webp'), (await processImage(Bun.file(HERO), { width: 200, height: 120, fit: 'cover' })).bytes)
+// Wider than the ladder's last width.
+await Bun.write(join(uploads, 'wide.png'), encodePng(new Uint8Array(3000 * 2 * 4).fill(90), 3000, 2))
 
 const app = await pages({ routes: 'tests/fixtures/images/src/routes', prebuilt: false, images: { dirs: { '/uploads/': uploads } } })
 const html = await (await app.handle(new Request('http://localhost/'))).text()
@@ -249,6 +251,15 @@ describe('image route', () => {
 
     for (const width of [208, 320])
       expect((await get(smallAt(width))).status).toBe(400)
+  })
+
+  it('makes no variant of an image wider than the ladder at its own size, whatever the request', async () => {
+    const wideAt = (width: number) => `/_kay/image?src=${encodeURIComponent('/uploads/wide.png')}&w=${width}`
+
+    expect((await new Bun.Image(await (await get(wideAt(2560))).bytes()).metadata()).width).toBe(2560)
+
+    for (const width of [3000, 2999, 3840])
+      expect((await get(wideAt(width))).status).toBe(400)
   })
 
   it('reads nothing outside the built assets and the runtime image directories', async () => {

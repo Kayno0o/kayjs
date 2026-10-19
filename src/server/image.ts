@@ -488,7 +488,7 @@ function requestedVariant(url: URL, own: { width: number, height: number }, allo
   const most = aspect ? croppedSize(own, aspect).width : own.width
   const steps = imageWidths()
 
-  if (!Number.isInteger(width) || (width !== most && !(madeWidth(width) && width < most)))
+  if (!Number.isInteger(width) || !((madeWidth(width) && width < most) || (width === most && most <= steps.at(-1)!)))
     return `Width ${url.searchParams.get('w')} is neither one of ${steps.join(', ')} or a multiple of ${SMALL_STEP} under ${steps[0]} below the image's own, nor its own, ${most}`
 
   return { width, ...aspect && { aspect }, ...quality !== undefined && { quality } }

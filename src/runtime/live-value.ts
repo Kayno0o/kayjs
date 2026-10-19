@@ -371,7 +371,7 @@ function renewLater(delay = PROOF_LIFETIME_MS / 2): void {
     }
 
     if (renewed === 'renewed') {
-      current.reader.close()
+      current?.reader.close()
       current = undefined
       sync()
     }
