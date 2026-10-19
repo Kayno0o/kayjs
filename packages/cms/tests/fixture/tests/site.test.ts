@@ -356,19 +356,19 @@ test('a nested slug is published and deleted through its file', async () => {
 })
 
 test('a loaded entry is created and removed through its loader, a slug starting with / opening at its escaped path', async () => {
-  expect((await send('POST', 'products/lamp', { data: { name: 'Lamp' }, create: true })).answer).toEqual({ saved: true })
+  expect((await send('POST', 'products/lamp', { data: { name: 'Lamp' }, create: true })).answer).toHaveProperty('saved', true)
   expect(products.map(product => product.slug)).toEqual(['mug', 'lamp'])
   expect((await send('GET', 'products/lamp')).answer).toHaveProperty('entry.data.name', 'Lamp')
-  expect((await send('DELETE', 'products/lamp')).answer).toEqual({ saved: true })
+  expect((await send('DELETE', `products/lamp?version=${await versionOf('products/lamp')}`)).answer).toEqual({ saved: true })
   expect(products.map(product => product.slug)).toEqual(['mug'])
-  expect((await send('POST', 'products/%2Fabout', { data: { name: 'About' }, create: true })).answer).toEqual({ saved: true })
+  expect((await send('POST', 'products/%2Fabout', { data: { name: 'About' }, create: true })).answer).toHaveProperty('saved', true)
 
   try {
     expect((await site.visit('/admin/collections/products')).find('.kcms-entries a').map(link => link.attributes.href)).toContain('/admin/collections/products/%2Fabout')
     expect((await site.visit('/admin/collections/products/%2Fabout')).title()).toBe('About - Our products')
   }
   finally {
-    await send('DELETE', 'products/%2Fabout')
+    await send('DELETE', `products/%2Fabout?version=${await versionOf('products/%2Fabout')}`)
   }
 })
 
@@ -660,13 +660,13 @@ test('the hint to add a component shows in development alone, not in production 
 })
 
 test('a custom kind\'s value is validated by its schema alone on save', async () => {
-  const refused = await send('POST', 'products/mug', { data: { name: 'Mug', color: 'red' } })
+  const refused = await send('POST', 'products/mug', { data: { name: 'Mug', color: 'red' }, version: await versionOf('products/mug') })
 
   expect((refused.answer as { issues: { path: string }[] }).issues.map(issue => issue.path)).toEqual(['color'])
   expect(products[0]?.data.color).toBe('#ff0000')
-  expect((await send('POST', 'products/mug', { data: { name: 'Mug', color: '#00ff00', mood: 'calm' } })).answer).toEqual({ saved: true })
+  expect((await send('POST', 'products/mug', { data: { name: 'Mug', color: '#00ff00', mood: 'calm' }, version: await versionOf('products/mug') })).answer).toHaveProperty('saved', true)
   expect(products[0]?.data.color).toBe('#00ff00')
-  await send('POST', 'products/mug', { data: { name: 'Mug', color: '#ff0000', mood: 'calm' } })
+  await send('POST', 'products/mug', { data: { name: 'Mug', color: '#ff0000', mood: 'calm' }, version: await versionOf('products/mug') })
 })
 
 test('picking a colour in the browser sets the draft and a save writes it', async () => {

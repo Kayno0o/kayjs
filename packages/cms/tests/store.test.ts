@@ -6,8 +6,9 @@ import { join } from 'node:path'
 import { beforeEach, describe, expect, mock, spyOn, test } from 'bun:test'
 import { bodyHtml, MarkdownError } from 'kay/content'
 import { scratchDir } from 'kay/test'
-import { contentVersion, fileVersion, ForgeError, SaveConflict } from '../src/files'
+import { fileVersion, ForgeError, SaveConflict } from '../src/files'
 import { configure } from '../src/settings'
+import { contentVersion } from '../src/version'
 
 const posts: CollectionInfo = { name: 'posts', kind: 'folder', dir: 'content/posts', schema: { type: 'object', properties: { title: { type: 'string' }, draft: { type: 'boolean' } } }, components: [], localized: false, draftField: 'draft' }
 const outside: CollectionInfo = { ...posts, name: 'outside', dir: undefined }

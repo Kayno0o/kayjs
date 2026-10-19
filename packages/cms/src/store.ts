@@ -1,12 +1,13 @@
 import type { Commit, FileChange, Identity } from './files'
 import type { CollectionInfo, DraftEntry, EntryRef, Issue, ScreenCollection, StoredEntry } from './kay/contract'
 import { wording } from 'kay/words'
-import { contentVersion, fileVersion, ForgeError, SaveConflict } from './files'
+import { fileVersion, ForgeError, SaveConflict } from './files'
 import { collectionInfo, entries, entryFile, entrySource, removeEntry, saveEntry as saveLoaded } from './kay/content'
 import { log } from './log'
 import { movable, moveChanges, orderValue, sortOrdered } from './order'
 import { settings } from './settings'
 import { scriptInBody } from './unsafe'
+import { contentVersion } from './version'
 
 // `version` is the saved file's, for the next save of a folder entry to name.
 // A refusal over another save carries `conflict`, the version the file is at now, null once deleted, which a save writing over it names.

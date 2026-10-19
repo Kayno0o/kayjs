@@ -1,9 +1,9 @@
 import type { EntryFilter, EntryRef, ScreenCollection, SourceEntry } from './kay/contract'
 import { fieldsOf, humanize } from './fields'
-import { contentVersion } from './files'
 import { cellText, listColumns } from './layout'
 import { sortOrdered } from './order'
 import { screenPath } from './paths'
+import { contentVersion } from './version'
 
 const UNSAFE_ID = /[^a-z0-9]/giu
 

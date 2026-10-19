@@ -1,7 +1,7 @@
 import type { CollectionInfo, EntryFilter, SourceEntry } from '../src/kay/contract'
 import { describe, expect, it } from 'bun:test'
-import { contentVersion } from '../src/files'
 import { collectionTitle, entryPath, newEntryPath, onPagePath, PAGE_SIZE, pageOf, pageRows, problemId, rowsOf, searchRows } from '../src/listing'
+import { contentVersion } from '../src/version'
 
 const posts: CollectionInfo = {
   name: 'posts',
