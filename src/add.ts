@@ -4,14 +4,13 @@ import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { basename, dirname, join, relative } from 'node:path'
 import process from 'node:process'
 import { isDeepStrictEqual } from 'node:util'
+import { insertImport } from './imports'
 import { FEATURE_NAMES, FEATURES, originHost, projectFiles } from './new'
 
 // Files whose lines are a set: a feature adds the lines the file lacks and keeps the rest.
 const LINE_FILES = new Set(['.gitignore', '.dockerignore'])
 // Files describing the project to agents: rewritten while unedited, left alone once the author wrote in them.
 const SOFT_FILES = new Set(['AGENTS.md'])
-// A whole import statement, a multi-line one included, with its line break.
-const IMPORT_STATEMENT = /^import\b(?:[^;'"]|'[^']*'|"[^"]*")*?(?:from\s*)?(?:'[^']*'|"[^"]*");?[ \t]*\r?\n/gm
 const CALLEE = /^(\w+)\(/
 const KEY = /\bextensions\s*:/
 const CLOSED = /^\s*\]/
@@ -157,10 +156,7 @@ export function addExtension(config: string, extension: { import: string, expres
   if (extension.import === '' || (callee !== undefined && new RegExp(`import[^;]*\\b${callee}\\b[^;]*from`).test(next)))
     return next
 
-  const end = [...next.matchAll(IMPORT_STATEMENT)].at(-1)
-  const head = end === undefined ? 0 : end.index + end[0].length
-
-  return `${next.slice(0, head)}${extension.import}\n${next.slice(head)}`
+  return insertImport(next, extension.import)
 }
 
 // Merges the scripts and dependencies a feature needs into the project's package.json: a script is replaced only while it is still what `kay new` wrote for the features the project had.

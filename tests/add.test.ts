@@ -202,7 +202,7 @@ it('adds kayjs-ai as its extension alone, with no file', async () => {
 it('puts an extension first in an existing list, and refuses a config without defineConfig', () => {
   const extension = { import: 'import { cms } from \'@kaynooo/kayjs-cms\'', expression: 'cms()' }
 
-  expect(addExtension('import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({\n  lang: \'en\',\n  extensions: [other()],\n})\n', extension)).toBe('import { defineConfig } from \'kay/server\'\nimport { cms } from \'@kaynooo/kayjs-cms\'\n\nexport default defineConfig({\n  lang: \'en\',\n  extensions: [cms(), other()],\n})\n')
+  expect(addExtension('import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({\n  lang: \'en\',\n  extensions: [other()],\n})\n', extension)).toBe('import { cms } from \'@kaynooo/kayjs-cms\'\nimport { defineConfig } from \'kay/server\'\n\nexport default defineConfig({\n  lang: \'en\',\n  extensions: [cms(), other()],\n})\n')
   expect(addExtension('export default { lang: \'en\' }\n', extension)).toBeUndefined()
 })
 
@@ -259,7 +259,7 @@ it('adds an extension without breaking a config it does not recognise', async ()
   const extension = { import: 'import { cms } from \'@kaynooo/kayjs-cms\'', expression: 'cms()' }
   const multiline = 'import {\n  defineConfig,\n} from \'kay/server\'\n\nexport default defineConfig({})\n'
 
-  expect(addExtension(multiline, extension)).toBe('import {\n  defineConfig,\n} from \'kay/server\'\nimport { cms } from \'@kaynooo/kayjs-cms\'\n\nexport default defineConfig({\n  extensions: [cms()],\n})\n')
+  expect(addExtension(multiline, extension)).toBe('import { cms } from \'@kaynooo/kayjs-cms\'\nimport {\n  defineConfig,\n} from \'kay/server\'\n\nexport default defineConfig({\n  extensions: [cms()],\n})\n')
   // Configured by hand already: left as it is, and a list held in a variable is a shape it stops at.
   expect(addExtension('import { cms, forgejo } from \'@kaynooo/kayjs-cms\'\nexport default defineConfig({ extensions: [cms({ files: forgejo() })] })\n', extension)).toContain('extensions: [cms({ files: forgejo() })] })')
   expect(addExtension('import { cms, forgejo } from \'@kaynooo/kayjs-cms\'\nexport default defineConfig({ extensions: [cms({ files: forgejo() })] })\n', extension)!.match(/cms\(/g)).toHaveLength(1)

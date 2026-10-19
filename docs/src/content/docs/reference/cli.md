@@ -98,7 +98,7 @@ kay add ai
 
 Before it writes anything, it checks that each file it changes is still what `kay new` wrote. A file you changed stops it with `kay add: nothing was written` and the lines to add by hand. A file you deleted is not written back.
 
-`ai`, `mail` and `cms` add the libraries `@kaynooo/kayjs-ai`, `@kaynooo/kayjs-mail` and `@kaynooo/kayjs-cms`, and list them in the `extensions` of `kay.config.ts`. That config has to be a plain `defineConfig({ ... })`.
+`ai`, `mail` and `cms` add the libraries `@kaynooo/kayjs-ai`, `@kaynooo/kayjs-mail` and `@kaynooo/kayjs-cms`, and list them in the `extensions` of `kay.config.ts`. That config has to be a plain `defineConfig({ ... })`. The import is written in the order your lint sorts imports, so the file passes `kay lint` with no `lint:fix` after.
 
 | Option | Effect |
 | --- | --- |
