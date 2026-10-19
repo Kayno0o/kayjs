@@ -17,7 +17,7 @@ const CLASS_IN_EXPRESSION = /([!=]==\s*)?'([a-z][\w-]*)'|\b([a-z][\w-]*)(?=\s*:)
 const WHITESPACE = /\s+/
 const COLOUR_TOKEN = /(--color-kui-[\w-]+): ([^;]+);/g
 // A colour holds a light and a dark value, or names another colour that does.
-const PAIRED = /^light-dark\([^,]+, [^,]+\)$|^var\(--color-kui-[\w-]+\)$/
+const PAIRED = /^light-dark\(|^var\(--color-kui-[\w-]+\)$|^color-mix\(in (?:oklab|srgb), /
 // A rule setting color-scheme, with its selector.
 const SCHEME = /([^{}\n]*[^{}\s])\s*\{\s*color-scheme: (\w+);/g
 // A quoted class name, as a script or a component's own script writes one: `classList.add('x')`, `{ 'x': on }`.
@@ -32,9 +32,8 @@ const BUILT_CLASS = /(?<![\w-])kui-[\w-]*(?:\$\{|['"`]\s*\+)/g
 
 const HEX = /^#[\da-f]{6}$/i
 const RGB_ALPHA = /^rgb\((\d+) (\d+) (\d+) \/ ([\d.]+)\)$/
-const LIGHT_DARK = /^light-dark\(([^,]+), (.+)\)$/
 const VAR = /^var\((--color-kui-[\w-]+)\)$/
-// The grounds text and controls sit on, and what must read on them: text at 4.5:1, a field's border and the focus colour at 3:1 (RGAA 3.2, 3.3).
+const MIX_ARGUMENT = /^(\S.*?)(?: ([\d.]+)%)?$/
 const GROUNDS = ['mantle', 'canvas', 'surface0', 'surface1', 'fill-hover']
 const TEXT = ['text', 'subtext0', 'overlay1', 'accent', 'error', 'success', 'warning', 'info']
 const LINES = ['field-border', 'field-focus']
@@ -62,24 +61,119 @@ function writtenClasses(path: string, source: string): string[] {
   return [...compileKay(source, path).classes, ...plain, ...expressions].filter(Boolean)
 }
 
-const colourTokens = new Map([...theme.matchAll(COLOUR_TOKEN)].map(([, token = '', value = '']) => [token, value.trim()]))
+// The seeds a skin sets alone; every other colour derives from them.
+const SEEDS = ['canvas', 'text', 'accent', 'success', 'warning', 'info', 'error', 'field-border']
 
-// A token's colour in one scheme, as [r, g, b] over the given ground when it is translucent.
-function colour(name: string, scheme: 0 | 1, ground?: number[]): number[] {
-  const value = colourTokens.get(`--color-kui-${name}`)!
-  const named = VAR.exec(value)
+type Tokens = Map<string, string>
+
+const colourTokens: Tokens = new Map([...theme.matchAll(COLOUR_TOKEN)].map(([, token = '', value = '']) => [token, value.trim()]))
+
+// The theme's colours under a skin's own declarations, `--color-kui-name: value;`.
+function withSkin(skin: string): Tokens {
+  return new Map([...colourTokens, ...[...skin.matchAll(COLOUR_TOKEN)].map(([, token = '', value = '']) => [token, value.trim()] as const)])
+}
+
+// The arguments of a function call, split at the commas outside any parenthesis.
+function splitArguments(text: string): string[] {
+  const parts: string[] = []
+  let depth = 0
+  let start = 0
+
+  for (let at = 0; at < text.length; at++) {
+    if (text[at] === '(') {
+      depth++
+    }
+    else if (text[at] === ')') {
+      depth--
+    }
+    else if (text[at] === ',' && depth === 0) {
+      parts.push(text.slice(start, at).trim())
+      start = at + 1
+    }
+  }
+
+  return [...parts, text.slice(start).trim()]
+}
+
+const linear = (channel: number) => channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4
+const gamma = (channel: number) => channel <= 0.0031308 ? 12.92 * channel : 1.055 * channel ** (1 / 2.4) - 0.055
+const OKLAB_FROM_LMS = [[0.2104542553, 0.793617785, -0.0040720468], [1.9779984951, -2.428592205, 0.4505937099], [0.0259040371, 0.7827717662, -0.808675766]]
+
+function toOklab([r, g, b]: number[]): number[] {
+  const [lr, lg, lb] = [r!, g!, b!].map(channel => linear(channel / 255)) as [number, number, number]
+  const lms = [0.4122214708 * lr + 0.5363325363 * lg + 0.0514459929 * lb, 0.2119034982 * lr + 0.6806995451 * lg + 0.1073969566 * lb, 0.0883024619 * lr + 0.2817188376 * lg + 0.6299787005 * lb].map(Math.cbrt)
+
+  return OKLAB_FROM_LMS.map(row => row.reduce((sum, weight, index) => sum + weight * lms[index]!, 0))
+}
+
+function fromOklab([lightness, a, b]: number[]): number[] {
+  const [l, m, s] = [lightness! + 0.3963377774 * a! + 0.2158037573 * b!, lightness! - 0.1055613458 * a! - 0.0638541728 * b!, lightness! - 0.0894841775 * a! - 1.291485548 * b!].map(value => value ** 3) as [number, number, number]
+
+  return [4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s, -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s, -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s].map(channel => Math.min(255, Math.max(0, gamma(channel) * 255)))
+}
+
+interface Colour {
+  rgb: number[]
+  alpha: number
+}
+
+// The shares of a mix as percentages, the one left out taking what the other leaves, an even split when both are.
+function mixWeights(first: string | undefined, second: string | undefined): number[] {
+  if (first === undefined && second === undefined)
+    return [50, 50]
+
+  const one = first === undefined ? 100 - Number(second) : Number(first)
+
+  return [one, second === undefined ? 100 - one : Number(second)]
+}
+
+// A colour expression as one scheme draws it: what the theme writes, a seed set to a single colour included.
+function evaluate(expression: string, scheme: 0 | 1, tokens: Tokens): Colour {
+  const text = expression.trim()
+  const named = VAR.exec(text)
 
   if (named)
-    return colour(named[1]!.slice('--color-kui-'.length), scheme, ground)
+    return evaluate(tokens.get(named[1]!)!, scheme, tokens)
 
-  const side = LIGHT_DARK.exec(value)![scheme + 1]!.trim()
+  if (text.startsWith('light-dark('))
+    return evaluate(splitArguments(text.slice('light-dark('.length, -1))[scheme]!, scheme, tokens)
 
-  if (HEX.test(side))
-    return [1, 3, 5].map(at => Number.parseInt(side.slice(at, at + 2), 16))
+  if (text.startsWith('color-mix(')) {
+    const [space, ...parts] = splitArguments(text.slice('color-mix('.length, -1))
+    const [first, second] = parts.map(part => MIX_ARGUMENT.exec(part)!)
+    const weights = mixWeights(first![2], second![2])
+    const [one, two] = [evaluate(first![1]!, scheme, tokens), evaluate(second![1]!, scheme, tokens)]
+    const alpha = (one.alpha * weights[0]! + two.alpha * weights[1]!) / 100
+    // Interpolated premultiplied by alpha, as the specification has it.
+    const share = [one.alpha * weights[0]!, two.alpha * weights[1]!].map(weight => weight / (alpha * 100))
+    const channels = space === 'in oklab' ? [one, two].map(colour => toOklab(colour.rgb)) : [one.rgb, two.rgb]
+    const mixed = channels[0]!.map((value, index) => value * share[0]! + channels[1]![index]! * share[1]!)
 
-  const [, r, g, b, alpha] = RGB_ALPHA.exec(side)!.map(Number)
+    return { rgb: space === 'in oklab' ? fromOklab(mixed) : mixed, alpha }
+  }
 
-  return [r!, g!, b!].map((channel, index) => channel * alpha! + ground![index]! * (1 - alpha!))
+  if (text === 'black')
+    return { rgb: [0, 0, 0], alpha: 1 }
+
+  if (text === 'white')
+    return { rgb: [255, 255, 255], alpha: 1 }
+
+  if (text === 'transparent')
+    return { rgb: [0, 0, 0], alpha: 0 }
+
+  if (HEX.test(text))
+    return { rgb: [1, 3, 5].map(at => Number.parseInt(text.slice(at, at + 2), 16)), alpha: 1 }
+
+  const [, r, g, b, alpha] = RGB_ALPHA.exec(text)!.map(Number)
+
+  return { rgb: [r!, g!, b!], alpha: alpha! }
+}
+
+// A token's colour in one scheme, as [r, g, b] over the given ground when it is translucent.
+function colour(name: string, scheme: 0 | 1, ground?: number[], tokens: Tokens = colourTokens): number[] {
+  const { rgb, alpha } = evaluate(`var(--color-kui-${name})`, scheme, tokens)
+
+  return rgb.map((channel, index) => alpha === 1 ? channel : channel * alpha + ground![index]! * (1 - alpha))
 }
 
 function luminance(rgb: number[]): number {
@@ -99,11 +193,11 @@ function contrast(a: number[], b: number[]): number {
 }
 
 // Each pair under its minimum, as `fg on ground (scheme): ratio`.
-function failing(names: string[], least: number): string[] {
-  return ([0, 1] as const).flatMap(scheme => GROUNDS.flatMap((ground) => {
-    const under = colour(ground, scheme)
+function failing(names: string[], least: number, tokens: Tokens = colourTokens, schemes: readonly (0 | 1)[] = [0, 1]): string[] {
+  return schemes.flatMap(scheme => GROUNDS.flatMap((ground) => {
+    const under = colour(ground, scheme, undefined, tokens)
 
-    return names.map(name => [name, contrast(colour(name, scheme, under), under)] as const)
+    return names.map(name => [name, contrast(colour(name, scheme, under, tokens), under)] as const)
       .filter(([, ratio]) => ratio < least)
       .map(([name, ratio]) => `${name} on ${ground} (${scheme === 0 ? 'light' : 'dark'}): ${ratio.toFixed(2)}`)
   }))
@@ -150,6 +244,86 @@ describe('theme.css', () => {
 
       // A hovered accent button shows it is hovered.
       expect(contrast(colour('accent', scheme), colour('accent-hi', scheme))).toBeGreaterThanOrEqual(1.4)
+    }
+  })
+
+  test('derives every colour but the seeds from them, so a skin sets eight colours and not twenty', () => {
+    const own = [...colourTokens].filter(([, value]) => !value.includes('var(--color-kui-') && !value.startsWith('color-mix('))
+
+    expect(own.map(([token]) => token.slice('--color-kui-'.length)).toSorted()).toEqual([...SEEDS, 'chart-5', 'chart-6'].toSorted())
+  })
+
+  test('keeps the look the literals gave, each derived colour within a few steps of its old value in both schemes', () => {
+    // The palette before it derived: [light, dark], composited over the canvas where translucent; the accent's hover is the accent shaded.
+    const WAS: Record<string, [number[], number[]]> = {
+      'mantle': [[0xEF, 0xEC, 0xE6], [0x0D, 0x0D, 0x0D]],
+      'surface0': [[0xF4, 0xF1, 0xEC], [0x16, 0x16, 0x16]],
+      'surface1': [[0xEC, 0xE8, 0xE1], [0x1B, 0x1B, 0x1B]],
+      'surface2': [[0xE1, 0xDF, 0xDB], [0x2B, 0x2B, 0x2B]],
+      'overlay0': [[0xC5, 0xC3, 0xBF], [0x45, 0x45, 0x45]],
+      'overlay1': [[0x6D, 0x68, 0x5F], [0x8A, 0x85, 0x7D]],
+      'subtext0': [[0x62, 0x5D, 0x55], [0x9C, 0x97, 0x8E]],
+      'accent-hi': [[0x7D, 0x2A, 0x22], [0xF8, 0xC0, 0xB8]],
+      'on-accent': [[0xFF, 0xFF, 0xFF], [0x1A, 0x0D, 0x0B]],
+      'fill-hover': [[0xEC, 0xE8, 0xE1], [0x1C, 0x1C, 0x1C]],
+      'fill-danger': [[0xF8, 0xE4, 0xE1], [0x24, 0x16, 0x15]],
+      'row-hover': [[0xF0, 0xEE, 0xEA], [0x1D, 0x1D, 0x1D]],
+    }
+
+    for (const [name, was] of Object.entries(WAS)) {
+      for (const scheme of [0, 1] as const) {
+        const now = colour(name, scheme, colour('canvas', scheme))
+        const furthest = Math.max(...now.map((channel, index) => Math.abs(channel - was[scheme][index]!)))
+
+        expect(furthest, `${name} ${scheme === 0 ? 'light' : 'dark'}`).toBeLessThanOrEqual(name === 'on-accent' ? 12 : 10)
+      }
+    }
+  })
+
+  test('reads at the same contrast from a skin that sets the seeds alone, in both schemes', () => {
+    const skins = [
+      '--color-kui-canvas: light-dark(#fffdf7, #1a1814); --color-kui-text: light-dark(#26211a, #ece6d8); --color-kui-accent: light-dark(#9a3412, #fb923c); --color-kui-success: light-dark(#3f6212, #a3e635); --color-kui-warning: light-dark(#854d0e, #facc15); --color-kui-info: light-dark(#1d4ed8, #93c5fd); --color-kui-error: light-dark(#b91c1c, #fca5a5); --color-kui-field-border: light-dark(#85776a, #8a7e70);',
+      '--color-kui-canvas: light-dark(#f3f6fa, #0b1220); --color-kui-text: light-dark(#0f1b2d, #dbe4f0); --color-kui-accent: light-dark(#1d4ed8, #7aa2f7); --color-kui-success: light-dark(#166534, #86efac); --color-kui-warning: light-dark(#92400e, #fcd34d); --color-kui-info: light-dark(#0b5f78, #67e8f9); --color-kui-error: light-dark(#b91c1c, #fda4af); --color-kui-field-border: light-dark(#6b7d94, #5f7390);',
+    ]
+
+    for (const skin of skins) {
+      const tokens = withSkin(skin)
+
+      expect(failing(TEXT, 4.5, tokens), skin).toEqual([])
+      expect(failing(LINES, 3, tokens), skin).toEqual([])
+
+      for (const scheme of [0, 1] as const) {
+        for (const fill of ['accent', 'accent-hi'])
+          expect(contrast(colour('on-accent', scheme, undefined, tokens), colour(fill, scheme, undefined, tokens)), `${skin} ${fill}`).toBeGreaterThanOrEqual(4.5)
+      }
+    }
+  })
+
+  test('reads from a skin of one scheme that writes its seeds once and pins color-scheme to it', () => {
+    const tokens = withSkin('--color-kui-canvas: #ffffff; --color-kui-text: #111111; --color-kui-accent: #a21caf; --color-kui-success: #166534; --color-kui-warning: #92400e; --color-kui-info: #1d4ed8; --color-kui-error: #b91c1c; --color-kui-field-border: #767676;')
+
+    expect(failing(TEXT, 4.5, tokens, [0])).toEqual([])
+    expect(failing(LINES, 3, tokens, [0])).toEqual([])
+    expect(contrast(colour('on-accent', 0, undefined, tokens), colour('accent-hi', 0, undefined, tokens))).toBeGreaterThanOrEqual(4.5)
+  })
+
+  test('derives from whichever seeds a skin sets and keeps the default for the others', () => {
+    const tokens = withSkin('--color-kui-canvas: light-dark(#ffffff, #000000);')
+
+    expect(colour('surface0', 0, undefined, tokens)).not.toEqual(colour('surface0', 0))
+    expect(colour('surface0', 1, undefined, tokens).every(Number.isFinite)).toBe(true)
+    // Black is darker than the default canvas, so the dark surface sits between the two.
+    expect(colour('surface0', 1, undefined, tokens)[0]!).toBeLessThan(colour('surface0', 1)[0]!)
+    expect(colour('accent', 0, undefined, tokens)).toEqual(colour('accent', 0))
+  })
+
+  test('lets a token the skin sets beat what derives it, in the compiled CSS wherever the skin sits', async () => {
+    for (const where of ['after', 'before'] as const) {
+      const css = await built('@theme { --color-kui-canvas: #fff; --color-kui-surface0: red; }', where)
+
+      expect(css, where).toContain('--color-kui-surface0: red;')
+      expect(css, where).toContain('--color-kui-canvas: #fff;')
+      expect(css, where).not.toMatch(/--color-kui-surface0: color-mix/)
     }
   })
 

@@ -1,0 +1,5 @@
+---
+import '../app.css'
+---
+//- Every derived colour a test reads back is used here, as Tailwind leaves an unused theme variable out of the CSS.
+main.bg-kui-mantle.bg-kui-surface0.bg-kui-surface1.bg-kui-surface2.bg-kui-fill-danger.bg-kui-accent-hi.text-kui-overlay1.text-kui-subtext0

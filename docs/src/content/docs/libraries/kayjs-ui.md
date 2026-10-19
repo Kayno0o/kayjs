@@ -43,6 +43,10 @@ The palette button in this site's header picks a theme, from Catppuccin to Tokyo
 
 Colours are `--color-kui-<name>`, used as `bg-kui-<name>`, and hold `light-dark(light, dark)`. `--color-kui-field-border` is the solid line of text fields, buttons, toggles, carousel dots and empty stars, at 3:1 on every surface. A palette that changes the surfaces sets it to match.
 
+Eight colours are seeds: `canvas`, `text`, `accent`, `success`, `warning`, `info`, `error` and `field-border`. Set those eight in your `@theme` and every other colour follows: the surfaces and greys are mixed from the canvas and the text, the hairlines are the text at an alpha, and the accent's hover is the accent shaded. A seed must read at 4.5:1 on `mantle` and `surface1`, the deepest surfaces, and `field-border` at 3:1.
+
+A colour you set yourself wins over the one mixed for it. A site in one scheme writes each seed once and sets `color-scheme` on `:root` to it.
+
 A few tokens shape boxes rather than colour them, such as `--kui-border-card` for every hairline. A brutalist skin sets `--kui-shadow-raised` (under cards, rows, widgets and toasts), `--kui-shadow-press` (under framed buttons) and `--kui-press-travel` (how far a pressed button moves down). All three draw nothing by default.
 
 ### Light or dark

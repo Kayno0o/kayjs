@@ -9,6 +9,9 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 - A `User` has `data` (what the `user` schema keeps, `{}` without one) and `providers` (the id of each linked provider), and `Auth` has a fourth generic, the data's type, so a `User` literal in a test or a mock needs both fields and an exact `toEqual` on a returned user gains `data: {}` and `providers: {}`. Guards, gates, predicates, admin lists, `signInAsGuest`, `register` and `createUser` work with `BareUser`, a `User` without `providers`. An app's own `(user: User) =>` annotations on predicates, `authorize`, the profile's `load` and `save` and `memberOf` must become `BareUser`, which `strictFunctionTypes` enforces.
 - With pg-orm, generate a migration for the new `auth_user.data` column (jsonb, not null, default `{}`, so rows stored before it read back `{}`). A custom store keeps and returns `data` on `UserRecord` as JSON; it is optional, and a store that drops it reads as `{}`. `kay check` cannot recognise this, so there is no lint.
 - `createAuth({ secret })` is optional: left out, kayjs-auth derives its key from the session's secret. An app that keeps `secret` changes nothing; one that drops it must read the secret section of the kayjs-auth setup first, as what is sealed under the old secret no longer opens.
+### kayjs-ui derives its palette from eight seeds
+
+- `surface0`, `surface1`, `mantle`, `fill-hover`, `fill-danger`, `subtext0`, `overlay1`, the hairlines and `accent-hi` are mixed from `canvas`, `text`, `accent` and `error` unless the skin sets them, so a skin that set a seed and left its derived colours at the old defaults now sees them follow the seed: set the derived colour too to keep it. A skin that sets every colour is unchanged. No lint can recognise it.
 
 ## 1.57.0
 

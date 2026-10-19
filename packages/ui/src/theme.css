@@ -4,35 +4,38 @@
  */
 
 @theme default {
-  /* Each colour is light-dark(light, dark), following the color-scheme set below. Surfaces from the deepest to the one cards sit on, then text. surface2 and overlay0 are the hairlines, black or white at an alpha so a line holds on any surface. */
-  --color-kui-mantle: light-dark(#efece6, #0d0d0d);
+  /* Each colour is light-dark(light, dark), following the color-scheme set below. Eight are seeds a skin sets alone: canvas, text, accent, success, warning, info, error and field-border. The others derive from them with color-mix, and each stays overridable on its own. */
   --color-kui-canvas: light-dark(#faf8f4, #111111);
-  --color-kui-surface0: light-dark(#f4f1ec, #161616);
-  --color-kui-surface1: light-dark(#ece8e1, #1b1b1b);
-  --color-kui-surface2: light-dark(rgb(0 0 0 / 0.1), rgb(255 255 255 / 0.11));
-  --color-kui-overlay0: light-dark(rgb(0 0 0 / 0.22), rgb(255 255 255 / 0.22));
-  --color-kui-overlay1: light-dark(#6d685f, #8a857d);
-  --color-kui-subtext0: light-dark(#625d55, #9c978e);
-  --color-kui-muted: var(--color-kui-subtext0);
   --color-kui-text: light-dark(#1f1c18, #e0dcd4);
-
-  /* The one accent, the two statuses, and the fills state is drawn with. */
   --color-kui-accent: light-dark(#ab433a, #ec9086);
-  --color-kui-accent-hi: light-dark(#7d2a22, #f8c0b8);
-  --color-kui-on-accent: light-dark(#ffffff, #1a0d0b);
   --color-kui-success: light-dark(#4f6b2e, #b4c79b);
   --color-kui-warning: light-dark(#8a5a12, #d8b27a);
   --color-kui-info: light-dark(#2f6496, #8fb8de);
   --color-kui-error: light-dark(#ab433a, #ec9086);
-  --color-kui-fill-hover: light-dark(#ece8e1, #1c1c1c);
-  --color-kui-fill-danger: light-dark(#f8e4e1, #241615);
-  --color-kui-row-hover: light-dark(rgb(0 0 0 / 0.04), rgb(255 255 255 / 0.05));
+  --color-kui-field-border: light-dark(#8a8379, #6e6a63);
+
+  /* Surfaces from the deepest to the one cards sit on, then the text greys. surface2 and overlay0 are the hairlines, the text at an alpha so a line holds on any surface. */
+  --color-kui-mantle: color-mix(in oklab, var(--color-kui-canvas), black 4%);
+  --color-kui-surface0: color-mix(in oklab, var(--color-kui-canvas), var(--color-kui-text) 3%);
+  --color-kui-surface1: color-mix(in oklab, var(--color-kui-canvas), var(--color-kui-text) 7%);
+  --color-kui-surface2: color-mix(in srgb, var(--color-kui-text) 10%, transparent);
+  --color-kui-overlay0: color-mix(in srgb, var(--color-kui-text) 22%, transparent);
+  --color-kui-overlay1: color-mix(in oklab, var(--color-kui-text), var(--color-kui-canvas) 36%);
+  --color-kui-subtext0: color-mix(in oklab, var(--color-kui-text), var(--color-kui-canvas) 30%);
+  --color-kui-muted: var(--color-kui-subtext0);
+
+  /* The accent's hover, the text on it, and the fills state is drawn with. */
+  --color-kui-accent-hi: light-dark(color-mix(in oklab, var(--color-kui-accent), black 24%), color-mix(in oklab, var(--color-kui-accent), white 38%));
+  --color-kui-on-accent: var(--color-kui-canvas);
+  --color-kui-fill-hover: var(--color-kui-surface1);
+  --color-kui-fill-danger: color-mix(in oklab, var(--color-kui-canvas), var(--color-kui-error) 9%);
+  --color-kui-row-hover: color-mix(in srgb, var(--color-kui-text) 4.5%, transparent);
 
   /* The colours a chart series takes when it names none, in order. */
   --color-kui-chart-1: var(--color-kui-accent);
   --color-kui-chart-2: var(--color-kui-success);
-  --color-kui-chart-3: light-dark(#2f6496, #8fb8de);
-  --color-kui-chart-4: light-dark(#8a5a12, #d8b27a);
+  --color-kui-chart-3: var(--color-kui-info);
+  --color-kui-chart-4: var(--color-kui-warning);
   --color-kui-chart-5: light-dark(#6b4fa3, #b9a3de);
   --color-kui-chart-6: light-dark(#2a7d6c, #7fc8b8);
 
@@ -67,10 +70,9 @@
   --color-kui-stamp-fill-hover: var(--color-kui-fill-hover);
   --kui-border-stamp: 1px;
 
-  /* A text field's inset, its border, and its look while focused. The border, which buttons, toggles, carousel dots and empty stars draw too, is solid at 3:1 on every surface: an app changing its surfaces sets it to match, since overlay0's hairline reads under 3:1. */
+  /* A text field's inset and its look while focused. Its border, the seed above, which buttons, toggles, carousel dots and empty stars draw too, is solid at 3:1 on every surface: an app changing its canvas sets it to match, since overlay0's hairline reads under 3:1. */
   --spacing-kui-field-x: 0.5625rem;
   --spacing-kui-field-y: 0.25rem;
-  --color-kui-field-border: light-dark(#8a8379, #6e6a63);
   --color-kui-field-focus: var(--color-kui-accent);
   --kui-field-focus-shadow: none;
 

@@ -87,6 +87,60 @@ inBrowser('FormField in an island', () => {
     expect(await dialogText('/confirm-words', 'plain')).toContain('Cancel')
   }, 120_000)
 
+  test('draws the derived palette as the literals did, in both schemes, and a skin of seeds alone through the same derivation', async () => {
+    const site = await shared()
+    const WAS: Record<string, [number[], number[]]> = {
+      'mantle': [[0xEF, 0xEC, 0xE6], [0x0D, 0x0D, 0x0D]],
+      'surface0': [[0xF4, 0xF1, 0xEC], [0x16, 0x16, 0x16]],
+      'surface1': [[0xEC, 0xE8, 0xE1], [0x1B, 0x1B, 0x1B]],
+      'overlay1': [[0x6D, 0x68, 0x5F], [0x8A, 0x85, 0x7D]],
+      'subtext0': [[0x62, 0x5D, 0x55], [0x9C, 0x97, 0x8E]],
+      'accent-hi': [[0x7D, 0x2A, 0x22], [0xF8, 0xC0, 0xB8]],
+      'fill-danger': [[0xF8, 0xE4, 0xE1], [0x24, 0x16, 0x15]],
+    }
+
+    await using page = await site.open('/palette')
+
+    const read = async (scheme: string, skin: string) => page.evaluate((chosen: string, css: string) => {
+      document.documentElement.dataset.theme = chosen
+      document.documentElement.setAttribute('style', css)
+
+      return Object.fromEntries(['mantle', 'surface0', 'surface1', 'overlay1', 'subtext0', 'accent-hi', 'fill-danger', 'surface2'].map((name) => {
+        const probe = document.createElement('i')
+
+        probe.style.color = `var(--color-kui-${name})`
+        document.body.append(probe)
+
+        // Chromium reports a mix as oklab(...), which a canvas turns back into the pixel it paints.
+        const context = document.createElement('canvas').getContext('2d', { willReadFrequently: true })!
+
+        context.fillStyle = getComputedStyle(probe).color
+        context.fillRect(0, 0, 1, 1)
+        probe.remove()
+
+        return [name, [...context.getImageData(0, 0, 1, 1).data]]
+      }))
+    }, scheme, skin)
+
+    for (const [index, scheme] of ['light', 'dark'].entries()) {
+      const seen = await read(scheme, '')
+
+      for (const [name, was] of Object.entries(WAS))
+        expect(Math.max(...seen[name]!.slice(0, 3).map((channel, at) => Math.abs(channel - was[index]![at]!))), `${name} ${scheme}`).toBeLessThanOrEqual(10)
+
+      // The hairline is the text at a tenth of its opacity.
+      expect(seen.surface2![3]! / 255).toBeCloseTo(0.1, 1)
+    }
+
+    // A skin that sets the canvas alone moves the surfaces derived from it, and leaves the accent's own.
+    const light = await read('light', '--color-kui-canvas: #ffffff;')
+    const plain = await read('light', '')
+
+    expect(light.surface0).not.toEqual(plain.surface0)
+    expect(light['accent-hi']).toEqual(plain['accent-hi'])
+    expect(page.errors).toEqual([])
+  }, 120_000)
+
   test('hydrates over the ids the server handed its control, then links the message once one shows', async () => {
     const site = await shared()
     const served = (await site.visit('/described')).html
