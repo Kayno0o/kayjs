@@ -1,3 +1,4 @@
+import type { JobStore } from '../src/server'
 import { mkdirSync } from 'node:fs'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -1046,6 +1047,99 @@ describe('queue', () => {
       setSystemTime()
       logged.mockRestore()
     }
+  })
+
+  it('aborts the signal of a run at lostAfter, so a handler that listens stops before another process retries the job', async () => {
+    const logged = spyOn(console, 'warn').mockImplementation(() => undefined)
+    const events: string[] = []
+    const slow = queue('mails', async (name: string, signal: AbortSignal) => {
+      events.push(`start ${name}`)
+      await new Promise(resolve => signal.addEventListener('abort', resolve))
+      events.push(`stopped ${name}`)
+    }, { store: memoryJobs(), lostAfter: '300ms', attempts: 2 })
+
+    try {
+      await slow.enqueue('digest')
+      expect(await slow.drain()).toBe(1)
+      expect(events).toEqual(['start digest', 'stopped digest'])
+      await slow.remove(() => true)
+    }
+    finally {
+      logged.mockRestore()
+    }
+  })
+
+  describe('on shutdown', () => {
+    // A queue on a store two processes share, started like a server, its handler waiting on its signal.
+    async function stopping(store: JobStore, handler: (signal: AbortSignal) => unknown) {
+      let started = false
+      const mails = queue('mails', async (_payload: string, signal: AbortSignal) => {
+        started = true
+
+        return handler(signal)
+      }, { store, attempts: 3, backoff: '1m' })
+
+      await mails.enqueue('digest')
+
+      const app = new Elysia().use(mails).listen(0)
+
+      await until(() => started)
+
+      return { mails, app }
+    }
+
+    const aborted = async (signal: AbortSignal) => {
+      await new Promise(resolve => signal.addEventListener('abort', resolve))
+
+      throw new Error('aborted')
+    }
+
+    it.each([
+      ['memory', async () => memoryJobs()],
+      ['sqlite', async () => sqliteJobs(await jobsPath())],
+    ])('releases the job it was running, its attempt given back, for the next process to take at once: %s', async (_name, open) => {
+      const store = await open()
+      const { mails, app } = await stopping(store, aborted)
+
+      await shutdown(app)
+
+      const taken = await store.claim('mails', Date.now(), Date.now() + 60_000)
+
+      expect(taken).toMatchObject({ queue: 'mails', attempts: 1 })
+      expect(taken?.error).toBeUndefined()
+      // The queue stays in the set kay/test drains, so nothing of it may be left waiting.
+      await mails.remove(() => true)
+    })
+
+    it('completes a job whose handler finishes despite the stop', async () => {
+      const store = memoryJobs()
+      const { mails, app } = await stopping(store, async (signal) => {
+        await new Promise(resolve => signal.addEventListener('abort', resolve))
+      })
+
+      await shutdown(app)
+      expect(await store.claim('mails', Date.now(), Date.now() + 60_000)).toBeUndefined()
+      expect(await mails.failed()).toEqual([])
+    })
+
+    it('retries as before on a store with no release', async () => {
+      const logged = spyOn(console, 'warn').mockImplementation(() => undefined)
+      const store = memoryJobs()
+
+      delete (store as { release?: unknown }).release
+
+      try {
+        const { mails, app } = await stopping(store, aborted)
+
+        await shutdown(app)
+        expect(await store.claim('mails', Date.now(), Date.now() + 60_000)).toBeUndefined()
+        expect(await store.nextRunAt('mails')).toBeGreaterThan(Date.now() + 50_000)
+        await mails.remove(() => true)
+      }
+      finally {
+        logged.mockRestore()
+      }
+    })
   })
 
   it('fails a run that outlasts lostAfter, freeing its worker for the next job', async () => {

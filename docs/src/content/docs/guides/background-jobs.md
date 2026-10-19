@@ -81,6 +81,8 @@ The server runs it with `.use(welcomeMails)`. An action calls `await welcomeMail
 
 A job that throws is retried after a growing wait. One that runs out of attempts is kept as failed and passed to `onFailed`. So is a run outlasting `lostAfter`, 10 minutes by default, or one whose process died each time.
 
+The handler takes an `AbortSignal` as its second argument. It aborts when the run passes `lostAfter`, and when the server stops. A handler that passes it on, to `fetch` for example, stops by itself instead of running beside the retry, so a slow mail is not sent twice. A job stopped by a shutdown is handed back without losing an attempt, and another process takes it at once.
+
 A failed job is kept 30 days, its payload included, or as long as `keepFailed` says. To erase a person's jobs, call `remove(match)`. It removes every waiting or failed job whose payload matches.
 
 ```ts
@@ -112,7 +114,7 @@ To put the jobs, the schedule locks and the rate limit counts of the whole app i
 | `nextRunAt(queue)` | When the next job may run, so a worker sleeps until then |
 | `lock(name, slot)` | True for the first caller of that name and slot, in any process, so a schedule runs once |
 
-`purge(queue, before)` and `jobs(queue)` are optional. Without `purge`, old failed jobs are listed and removed one by one. Without `jobs`, `remove` works by id only.
+`purge(queue, before)`, `jobs(queue)` and `release(id)` are optional. `release` gives a claimed job back with its attempt not counted, which a shutdown does; without it, a job stopped by a shutdown is retried after its backoff. Without `purge`, old failed jobs are listed and removed one by one. Without `jobs`, `remove` works by id only.
 
 ```ts
 export const welcomeMails = queue('welcome-mails', sendWelcome, { store: myStore })

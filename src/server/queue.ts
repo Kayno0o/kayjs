@@ -35,6 +35,8 @@ export interface JobStore {
   complete: (id: string) => Maybe<void>
   // Runs it again at `runAt`.
   retry: (id: string, runAt: number, error: string) => Maybe<void>
+  // Gives a claimed job back untouched, its attempt not counted, for the next process to take at once: a run stopped by a shutdown. A store without it has the job retried after its backoff as any failed run.
+  release?: ((id: string) => Maybe<void>) | undefined
   // Keeps it as failed, out of the queue.
   fail: (id: string, error: string) => Maybe<void>
   // Removes the failed jobs of the queue whose time came before `before`, and resolves with how many went; a store without it has them listed with `failed` and removed one by one.
@@ -106,6 +108,8 @@ const MAX_TIMER_MS = 2 ** 31 - 1
 // The longest a worker waits between looks at a store that keeps failing.
 const MAX_OUTAGE_MS = 60_000
 const DEFAULT_PATH = 'data/jobs.sqlite'
+// Why a run's signal aborted when the server stopped, as against lostAfter running out.
+const STOPPED = new Error('the server is stopping')
 
 // What drains each queue made, for `kay/test` to run them all.
 const drains = new Set<() => Promise<number>>()
@@ -145,6 +149,9 @@ export function sqliteJobs(path: string): JobStore {
     },
     retry(id, runAt, error) {
       open(true)!.retry.run(runAt, error, id)
+    },
+    release(id) {
+      open(true)!.release.run(id)
     },
     fail(id, error) {
       open(true)!.fail.run(error, id)
@@ -188,6 +195,7 @@ function prepareJobs(db: Database) {
   const claim = db.query<JobRow, [number, string, number, number]>('UPDATE kay_jobs SET held_until = ?, attempts = attempts + 1 WHERE id = (SELECT id FROM kay_jobs WHERE queue = ? AND failed = 0 AND run_at <= ? AND (held_until IS NULL OR held_until <= ?) ORDER BY run_at LIMIT 1) RETURNING id, queue, payload, attempts, run_at, error')
   const remove = db.query('DELETE FROM kay_jobs WHERE id = ?')
   const retry = db.query('UPDATE kay_jobs SET run_at = ?, held_until = NULL, error = ? WHERE id = ?')
+  const release = db.query('UPDATE kay_jobs SET held_until = NULL, attempts = attempts - 1 WHERE id = ?')
   const fail = db.query('UPDATE kay_jobs SET failed = 1, held_until = NULL, error = ? WHERE id = ?')
   const purge = db.query('DELETE FROM kay_jobs WHERE queue = ? AND failed = 1 AND run_at < ?')
   const failed = db.query<JobRow, [string]>('SELECT id, queue, payload, attempts, run_at, error FROM kay_jobs WHERE queue = ? AND failed = 1 ORDER BY run_at')
@@ -197,7 +205,7 @@ function prepareJobs(db: Database) {
   const lock = db.query('INSERT OR IGNORE INTO kay_locks (name, slot) VALUES (?, ?)')
   const pruneLocks = db.query('DELETE FROM kay_locks WHERE name = ? AND slot < ?')
 
-  return { insert, claim, remove, retry, fail, purge, failed, all, next, lock, pruneLocks }
+  return { insert, claim, remove, retry, release, fail, purge, failed, all, next, lock, pruneLocks }
 }
 
 // Jobs kept in this process's memory, gone with it: what tests run on.
@@ -226,6 +234,14 @@ export function memoryJobs(): JobStore {
     },
     retry(id, runAt, error) {
       Object.assign(jobs.get(id) ?? {}, { runAt, error, heldUntil: undefined })
+    },
+    release(id) {
+      const job = jobs.get(id)
+
+      if (job) {
+        delete job.heldUntil
+        job.attempts--
+      }
     },
     fail(id, error) {
       Object.assign(jobs.get(id) ?? {}, { failed: true, error, heldUntil: undefined })
@@ -269,7 +285,7 @@ export function defaultJobStore(): JobStore {
 
 // A queue of jobs the server runs in the background, each surviving a restart: `enqueue` from an action, `app.use(queue)` in the server to run them.
 // A run that throws is retried later, waiting `backoff` then twice as long each time, until `attempts` runs failed: it is then kept as failed, logged and handed to `onFailed`.
-export function queue<Payload>(name: string, handler: (payload: Payload) => unknown, options: QueueOptions<Payload> = {}): Queue<Payload> {
+export function queue<Payload>(name: string, handler: (payload: Payload, signal: AbortSignal) => unknown, options: QueueOptions<Payload> = {}): Queue<Payload> {
   const attempts = options.attempts ?? DEFAULT_ATTEMPTS
   const backoff = durationSeconds(options.backoff ?? DEFAULT_BACKOFF, `queue('${name}')'s backoff`) * 1000
   const lostAfter = durationSeconds(options.lostAfter ?? DEFAULT_LOST_AFTER, `queue('${name}')'s lostAfter`) * 1000
@@ -326,14 +342,19 @@ export function queue<Payload>(name: string, handler: (payload: Payload) => unkn
     }
   }
 
-  // A run that outlasts `lostAfter` fails, so its worker takes the next job; the handler itself goes on, as nothing can stop it.
+  // A run that outlasts `lostAfter` fails and its signal aborts, so its worker takes the next job and a handler listening to the signal stops rather than run beside the retry.
   // It ends a moment before the hold does, so no other process takes the job while this one still marks how it went.
-  const withinLostAfter = async (run: unknown, held: number): Promise<void> => {
+  const withinLostAfter = async (run: unknown, held: number, ended: AbortController): Promise<void> => {
     let timer: ReturnType<typeof setTimeout> | undefined
 
     try {
       await Promise.race([run, new Promise((_, reject) => {
-        timer = setTimeout(() => reject(new Error(`it ran past lostAfter, ${Math.round(lostAfter / 1000)} s`)), Math.min(Math.max(held - Date.now() - Math.min(1000, lostAfter / 10), 0), MAX_TIMER_MS))
+        timer = setTimeout(() => {
+          const error = new Error(`it ran past lostAfter, ${Math.round(lostAfter / 1000)} s`)
+
+          ended.abort(error)
+          reject(error)
+        }, Math.min(Math.max(held - Date.now() - Math.min(1000, lostAfter / 10), 0), MAX_TIMER_MS))
       })])
     }
     finally {
@@ -367,11 +388,24 @@ export function queue<Payload>(name: string, handler: (payload: Payload) => unkn
       return true
     }
 
+    const ended = new AbortController()
+    const stop = () => ended.abort(STOPPED)
+    const stopping = controller?.signal
+
+    stopping?.addEventListener('abort', stop)
+
     try {
-      await withinLostAfter(handler(parse(job.payload) as Payload), held)
+      await withinLostAfter(handler(parse(job.payload) as Payload, ended.signal), held, ended)
       await store().complete(job.id)
     }
     catch (error) {
+      // A server stopping aborts the run: a job that gave up for it is handed back, not counted as a failed attempt.
+      if (ended.signal.reason === STOPPED && store().release) {
+        await store().release!(job.id)
+
+        return true
+      }
+
       const message = error instanceof Error ? error.message : String(error)
 
       if (job.attempts < attempts) {
@@ -388,6 +422,9 @@ export function queue<Payload>(name: string, handler: (payload: Payload) => unkn
       await store().fail(job.id, message)
       await reportBackgroundError(`a job of queue('${name}') failed ${job.attempts} times and is kept as failed`, error)
       await reportFailed(job, error)
+    }
+    finally {
+      stopping?.removeEventListener('abort', stop)
     }
 
     return true
