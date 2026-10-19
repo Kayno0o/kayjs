@@ -1,3 +1,5 @@
+import { SWAP_CALL, SWAP_SCRIPT } from '../server/stream'
+
 export interface Found {
   tag: string
   // Each attribute as the page wrote it, entities decoded; one without a value is ''.
@@ -250,9 +252,9 @@ export function sitemapUrls(xml: string): string[] {
 
 const AWAIT_TEMPLATE = '<template data-kay-await="'
 const TEMPLATE_TAG = /<(\/?)template(?=[\s>/])/gi
-const SWAP_SCRIPT_CALL = /<script>[^<]*\$kayAwait[^<]*<\/script>/g
+const SCRIPT = /<script(?:\s[^>]*)?>([^<]*)<\/script>/g
 
-// The index just past the `</template>` closing the template opened at `from`, templates of the page's own inside it counted.
+// The index just past the `</template>` closing the template opened at `from`, templates of the page's own inside it counted, or -1 for one the stream ended inside.
 function templateEnd(html: string, from: number): number {
   let depth = 0
 
@@ -265,7 +267,7 @@ function templateEnd(html: string, from: number): number {
       return html.indexOf('>', tag.index) + 1
   }
 
-  return html.length
+  return -1
 }
 
 // The page as a visitor ends up seeing it: each streamed `<template data-kay-await>` put in place of the block it answers, as the page's inline script does, and that script left out.
@@ -276,6 +278,14 @@ export function settledHtml(html: string): string {
 
   for (let start = html.indexOf(AWAIT_TEMPLATE); start !== -1; start = html.indexOf(AWAIT_TEMPLATE, at)) {
     const end = templateEnd(html, start)
+
+    if (end === -1) {
+      page += html.slice(at, start)
+      at = html.length
+
+      break
+    }
+
     const open = html.indexOf('>', start) + 1
     const close = html.lastIndexOf('</template>', end)
 
@@ -287,7 +297,7 @@ export function settledHtml(html: string): string {
   if (parts.length === 0)
     return html
 
-  page = (page + html.slice(at)).replace(SWAP_SCRIPT_CALL, '')
+  page = (page + html.slice(at)).replace(SCRIPT, (script, body: string) => body === SWAP_SCRIPT || body === SWAP_CALL ? '' : script)
 
   for (const { id, content } of parts) {
     const open = `<!--kay-await:${id}-->`

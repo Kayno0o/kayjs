@@ -2,16 +2,15 @@
 import { defer } from 'kay'
 
 const score = defer(new Promise<number>(resolve => setTimeout(resolve, 10, 42)))
-const inner = defer(Promise.resolve('inner'))
 ---
 h1 Bill
 // kay-allow uncaught-await
 await score
   p.pending Scoring
-  // kay-allow uncaught-await
-  await inner then text
-    p.inner {text}
 then value
   p.score {value}
   template
     p.kept Kept
+  // kay-allow uncaught-await
+  await score then again
+    p.again {again}

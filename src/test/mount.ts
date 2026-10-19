@@ -5,6 +5,7 @@ import { VOUCH_MODULE } from '../build/icons'
 import { kay } from '../build/plugin'
 import { loadConfig } from '../config'
 import { projectPaths } from '../project'
+import { COOKIE_NAME } from '../runtime/persist'
 import { sendValue } from '../runtime/send'
 import { decodeValue } from '../runtime/wire'
 import { apiStubs, apiTrees } from '../server/api-modules'
@@ -37,6 +38,9 @@ export function writePersisted(key: string, value: unknown): void {
 
 // A `Cookie` header value setting the cookie a `persisted(name, initial)` signal keeps its value in, for `site.as(persistedCookie('scheme', 'light'))`: the first render of a page reads it.
 export function persistedCookie(name: string, value: unknown): string {
+  if (!COOKIE_NAME.test(name))
+    throw new TypeError(`kay: ${JSON.stringify(name)} cannot name a cookie; give persistedCookie() a name of letters, digits and - _ . only`)
+
   return `${name}=${encodeURIComponent(sendValue(value))}`
 }
 
