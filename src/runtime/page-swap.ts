@@ -113,8 +113,8 @@ async function forgetFailed(key: string, page: Promise<FetchedPage>): Promise<vo
   }
 }
 
-async function fetchPage(url: URL): Promise<FetchedPage> {
-  const response = await fetch(pageKey(url), { headers: { accept: 'text/html', [NAVIGATE_HEADER]: '1' } })
+async function fetchPage(url: URL, signal?: AbortSignal): Promise<FetchedPage> {
+  const response = await fetch(pageKey(url), { headers: { accept: 'text/html', [NAVIGATE_HEADER]: '1' }, signal: signal ?? null })
   const type = response.headers.get('content-type') ?? ''
 
   const full = response.headers.has(RELOAD_HEADER) || (isSecureContext && isolated(response.headers) !== crossOriginIsolated)
@@ -141,7 +141,7 @@ function isolated(headers: Headers): boolean {
 }
 
 // The page a navigation shows: one prefetched in the last few seconds, else fetched now.
-async function pageFor(url: URL): Promise<FetchedPage> {
+async function pageFor(url: URL, signal: AbortSignal): Promise<FetchedPage> {
   const key = pageKey(url)
   const held = prefetched.get(key)
 
@@ -154,7 +154,7 @@ async function pageFor(url: URL): Promise<FetchedPage> {
     catch {}
   }
 
-  return fetchPage(url)
+  return fetchPage(url, signal)
 }
 
 // The intent's policy, with history replaced as the swap asks, and the top for a traversal to an entry that saved no position.
@@ -176,6 +176,9 @@ function policyOf(swap: Swap): Policy {
   return policy
 }
 
+// The fetch of the navigation under way, which a newer one cancels: its page would never be shown.
+let fetching: AbortController | undefined
+
 export async function go(url: URL, swap: Swap): Promise<void> {
   navigation.flush?.()
 
@@ -183,6 +186,10 @@ export async function go(url: URL, swap: Swap): Promise<void> {
     swap = { ...swap, scroll: swap.link.closest('[data-keep-scroll]') ? 'keep' : undefined, transition: !swap.link.closest('[data-no-transition]') }
 
   const token = ++navigation.current
+  const controller = new AbortController()
+
+  fetching?.abort()
+  fetching = controller
 
   // Another page only: the same one with another query, or a form sending it back to itself, is not left.
   if (url.pathname !== location.pathname)
@@ -200,10 +207,12 @@ export async function go(url: URL, swap: Swap): Promise<void> {
     let page: FetchedPage
 
     try {
-      page = await pageFor(url)
+      page = await pageFor(url, controller.signal)
     }
     catch {
-      leave(url)
+      // A fetch a newer navigation cancelled leaves nothing to load.
+      if (isCurrent())
+        leave(url)
 
       return
     }

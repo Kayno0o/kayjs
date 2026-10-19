@@ -236,6 +236,40 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     await fresh.close()
   })
 
+  it('cancels the fetch of a navigation a newer one took over, and loads nothing for it', async () => {
+    const fresh = await browser.newPage()
+
+    await fresh.goto(origin)
+    await settled(fresh)
+    await fresh.evaluate(() => {
+      const holder = window as { kayAlive?: boolean, kayAborted?: boolean }
+      const real = window.fetch.bind(window)
+
+      holder.kayAlive = true
+      // The first page hangs until the navigation fetching it is cancelled.
+      window.fetch = (async (input, init) => {
+        if (!String(input).endsWith('/later'))
+          return real(input, init)
+
+        return new Promise<Response>((_, reject) => {
+          init?.signal?.addEventListener('abort', () => {
+            holder.kayAborted = true
+            reject(new DOMException('aborted', 'AbortError'))
+          })
+        })
+      }) as typeof fetch
+      document.querySelector<HTMLAnchorElement>('a.later')!.click()
+    })
+    await settled(fresh)
+    await fresh.evaluate(() => document.querySelector<HTMLAnchorElement>('a.second')!.click())
+    await fresh.locator('h1', { hasText: 'Second' }).waitFor()
+
+    expect(await fresh.evaluate(() => (window as { kayAborted?: boolean }).kayAborted)).toBe(true)
+    expect(await fresh.evaluate(() => (window as { kayAlive?: boolean }).kayAlive)).toBe(true)
+    expect(new URL(fresh.url()).pathname).toBe('/second')
+    await fresh.close()
+  })
+
   it('loads the next page fully when the swap cannot load', async () => {
     const fresh = await browser.newPage()
 
