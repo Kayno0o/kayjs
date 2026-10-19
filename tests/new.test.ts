@@ -800,6 +800,10 @@ describe('kay new', () => {
         expect({ features, ...unresolved(contents) }).toEqual({ features, paths: [], undeclared: [], unused: [], scripts: [] })
         expect({ features, changed: (await formatFiles([join(dir, 'src')], { write: false })).changed }).toEqual({ features, changed: [] })
 
+        // The regex locations must not take `/_kay/`, whose hashed files are immutable.
+        if (variant.has('docker') && !variant.has('server'))
+          expect({ features, caching: ['location ^~ /_kay/ {', 'woff2?|ttf|otf|eot', 'max-age=2592000', 'max-age=86400'].filter(part => !contents['nginx.conf']!.includes(part)) }).toEqual({ features, caching: [] })
+
         if (variant.has('docker') && !variant.has('server')) {
           // A static export writes no headers file, so the container's nginx sends HSTS for a site published at https.
           // nginx drops a server-level add_header from a location with its own, so the line is repeated in /_kay/.

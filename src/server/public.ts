@@ -123,7 +123,7 @@ export function matchesEtag(header: string | null, etag: string): boolean {
 }
 
 // One route per file found at boot: no file system lookup per request, and no path a request could steer outside the directory.
-// Files keep their names, so what is not kept by `cache` is revalidated every time and answered with a 304 while it is unchanged.
+// Files keep their names, so unless `cache` keeps it, a file is revalidated every time and answered with a 304 while it is unchanged.
 // The body, or a 304 when the browser already holds the version the ETag names, carrying the same headers.
 // `cache` replaces the header for a file that may be kept for a while before it is asked about again.
 export function revalidated(request: Request, etag: string, body: () => BodyInit, headers: Record<string, string> = {}, cache = REVALIDATE): Response {
@@ -135,7 +135,8 @@ export function revalidated(request: Request, etag: string, body: () => BodyInit
 
 // The `cache-control` of each public file the `publicCache` setting names, the first pattern a path matches deciding; a file it leaves out is kept by its kind, a font or an image, and else revalidates, as a manifest, `robots.txt`, a script or a page must.
 export function publicCacheRules(setting: Record<string, Duration> | undefined): ((url: string) => string) {
-  const rules = Object.entries(setting ?? {}).map(([pattern, value]) => ({ glob: new Bun.Glob(pattern.replace(LEADING_SLASH, '')), control: `public, max-age=${wholeSeconds(value, `publicCache['${pattern}']`)}` }))
+  // A zero keeps the files a glob names revalidating, for an app replacing a font or an image in place.
+  const rules = Object.entries(setting ?? {}).map(([pattern, value]) => ({ glob: new Bun.Glob(pattern.replace(LEADING_SLASH, '')), control: value === 0 ? REVALIDATE : `public, max-age=${wholeSeconds(value, `publicCache['${pattern}']`)}` }))
 
   return url => rules.find(rule => rule.glob.match(url.replace(LEADING_SLASH, '')))?.control ?? defaultControl(url)
 }

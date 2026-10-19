@@ -114,7 +114,7 @@ export default {
 }
 ```
 
-Each key is a glob on the served path and each value a duration. The first glob a file matches decides, and a file none matches gets the times above. A static export copies the files, so there the host sets their headers. The `nginx.conf` of a new static site sets the same two times.
+Each key is a glob on the served path and each value a duration. The first glob a file matches decides, and a file none matches gets the times above. A value of `0` makes the files a glob names revalidate on every visit, which a font or logo replaced under the same name needs, as returning visitors would keep the old font for up to 30 days. A static export copies the files, so there the host sets their headers. The `nginx.conf` of a new static site sets the same two times.
 
 <ReadMore href="/llms/styles-and-assets">The editor backup extensions that are left out, and how a public file and a page with the same URL conflict.</ReadMore>
 

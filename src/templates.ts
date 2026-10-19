@@ -620,16 +620,16 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
   gzip_vary on;
   add_header Strict-Transport-Security "max-age=31536000" always;
 
-  location /_kay/ {
+  location ^~ /_kay/ {
     add_header Cache-Control "public, max-age=31536000, immutable";
     add_header Strict-Transport-Security "max-age=31536000" always;
   }
 
-  location ~* \\.(?:woff2?|ttf|otf)$ {
+  location ~* \\.(?:woff2?|ttf|otf|eot)$ {
     add_header Cache-Control "public, max-age=2592000";
   }
 
-  location ~* \\.(?:png|jpe?g|gif|webp|avif|svg|ico)$ {
+  location ~* \\.(?:png|jpe?g|gif|webp|avif|svg|ico|bmp)$ {
     add_header Cache-Control "public, max-age=86400";
   }
 

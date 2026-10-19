@@ -50,7 +50,7 @@ Every option is optional. The tables give each option's default. The full refere
 | `entry` | The server entry, `src/server.ts` by default. Every command reads it, and `--entry` on a command wins over it. With no file there, kay serves the pages itself |
 | `routes` | The page directory, `src/routes` by default. See [Routing](/essentials/routing) |
 | `api` | The directory of API modules, `src/api` by default. See [API routes](/guides/api-routes) |
-| `publicCache` | How long the browser keeps a public file without asking again, as globs on the served path: `{ '/fonts/**': '365d' }`. Fonts it leaves out are kept 30 days, images a day, the rest revalidates. See [Styling and assets](/essentials/styling-and-assets#public-files) |
+| `publicCache` | How long the browser keeps a public file without asking again, as globs on the served path: `{ '/fonts/**': '365d' }`. `0` revalidates. Fonts it leaves out are kept 30 days, images a day, the rest revalidates. See [Styling and assets](/essentials/styling-and-assets#public-files) |
 | `publicDir` | The directory of files served as they are at their path, `public` by default. See [Styling and assets](/essentials/styling-and-assets#public-files) |
 | `redirects` | Old paths sent to new ones with a 308, a 307 with `permanent: false`, or the 301, 302, 307 or 308 that `status` names. See [Routing](/essentials/routing) |
 | `runtimeRedirects` | The hosts besides the site's own that a redirect added while the site runs may send to: `{ hosts: ['example.org'] }`. None by default. See [Routing](/essentials/routing#find-the-old-urls-visitors-still-use) |
