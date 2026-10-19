@@ -9,7 +9,7 @@ import { takeDocsBuild } from './docs-build'
 
 const CLI = resolve('src/cli.ts')
 // Home, a guide, a UI component's page with its demos and a Structure page: each layout the docs have; the chat panel is opened on the last.
-const PAGES = ['/', '/guides/api-routes', '/ui/button', '/structure/app-css']
+const PAGES = ['/', '/guides/api-routes', '/ui/button', '/ui/badge', '/structure/app-css']
 const SCHEMES = ['light', 'dark'] as const
 
 // Without BUN_CHROME_PATH or a Chrome on the PATH, the Chromium playwright-core installed for the other browser tests.

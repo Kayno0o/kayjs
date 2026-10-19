@@ -145,12 +145,21 @@ describe('theme.css', () => {
     expect(failing(LINES, 3)).toEqual([])
 
     for (const scheme of [0, 1] as const) {
-      for (const fill of ['accent', 'accent-hi'])
+      for (const fill of ['accent', 'accent-hi', 'error', 'success', 'warning', 'info', 'subtext0'])
         expect(contrast(colour('on-accent', scheme), colour(fill, scheme))).toBeGreaterThanOrEqual(4.5)
 
       // A hovered accent button shows it is hovered.
       expect(contrast(colour('accent', scheme), colour('accent-hi', scheme))).toBeGreaterThanOrEqual(1.4)
     }
+  })
+
+  test('fills a solid badge with its tone, its text read from one token a skin can set', () => {
+    const solid = theme.slice(theme.indexOf(':where([data-solid])'))
+
+    expect(solid.slice(0, solid.indexOf('}'))).toMatch(/background-color: var\(--kui-badge-tone\);[^}]*var\(--kui-badge-solid-text, var\(--color-kui-on-accent\)\)/)
+
+    for (const [tone, colour] of [['accent', 'accent'], ['success', 'success'], ['warning', 'warning'], ['danger', 'error'], ['info', 'info']])
+      expect(theme, tone).toContain(`[data-tone='${tone}']) {\n      --kui-badge-tone: var(--color-kui-${colour});`)
   })
 
   test('draws the controls a hairline would leave under 3:1 with the field border', () => {

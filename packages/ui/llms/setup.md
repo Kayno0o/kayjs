@@ -35,7 +35,7 @@ The theme's tokens are `@theme default`, so the app's `@theme` overrides any of 
 
 A few components take tokens for their box and type, for a skin restyling them without redeclaring their selector:
 
-- Badge: `--kui-border-badge`, `--spacing-kui-badge-x`, `--spacing-kui-badge-y`, `--text-kui-badge`, `--tracking-kui-badge`, `--kui-badge-case` (`none` or `uppercase`) and `--kui-badge-font`, the text's own unless set, such as to `var(--font-mono)`; `--kui-border-stamp` for a stamp.
+- Badge: `--kui-border-badge`, `--spacing-kui-badge-x`, `--spacing-kui-badge-y`, `--text-kui-badge`, `--tracking-kui-badge`, `--kui-badge-case` (`none` or `uppercase`) and `--kui-badge-font`, the text's own unless set, such as to `var(--font-mono)`, and `--kui-badge-solid-text`, the text colour of a `solid` badge (`--color-kui-on-accent` unless set); `--kui-border-stamp` for a stamp.
 - Text fields, `kui-field-input` and a FormField's controls: `--spacing-kui-field-x` and `--spacing-kui-field-y` for the inset, `--kui-field-focus-shadow` for a shadow while focused, `none` by default, such as `3px 3px 0 var(--color-kui-accent)`.
 - `--radius-kui-card`, `0px` by default, rounds the text fields and also Button, the framed IconButton, Card, CardRow, Widget, Notice, toasts, Dialog, CommandPalette and popovers, Menu included; a docked SidePanel stays square.
 - Notice: `--kui-border-notice` and `--font-weight-kui-notice`, which a compact one takes too.

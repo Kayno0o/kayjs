@@ -223,6 +223,11 @@ describe('content', () => {
     expect((await find('/content', '#empty p')).map(found => found.text)).toEqual(['No moons', 'Add one to start'])
   })
 
+  test('Badge is filled with its tone when solid, never as a stamp, and its text stays escaped', async () => {
+    expect(await attributes('/content', '#solid, #solid-stamp .kui-badge', ['data-tone', 'data-solid'])).toEqual([{ 'data-tone': 'success', 'data-solid': '' }, { 'data-tone': 'neutral', 'data-solid': null }])
+    expect((await find('/content', '#solid')).map(found => found.text)).toEqual(['<b>Done</b>'])
+  })
+
   test('EmptyState holds an @actions block below its description, and none without one', async () => {
     expect((await find('/content', '#empty-action .kui-empty-state-actions a')).map(link => [link.attributes.href, link.text])).toEqual([['/paging', 'Build one']])
     expect(await find('/content', '#empty .kui-empty-state-actions')).toEqual([])

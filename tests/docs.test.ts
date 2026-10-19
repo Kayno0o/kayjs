@@ -273,7 +273,7 @@ describe('the documentation\'s colours', () => {
   it('reads text at 4.5:1 and field borders at 3:1 on every ground, in both schemes of every palette', () => {
     expect(failing(TEXT.flatMap(text => GROUNDS.map(ground => [text, ground] as [string, string])), 4.5)).toEqual([])
     expect(failing(GROUNDS.map(ground => ['field-border', ground]), 3)).toEqual([])
-    expect(failing([['on-accent', 'accent'], ['on-accent', 'accent-hi']], 4.5)).toEqual([])
+    expect(failing(['accent', 'accent-hi', 'error', 'success', 'warning', 'info', 'subtext0'].map(fill => ['on-accent', fill] as [string, string]), 4.5)).toEqual([])
   })
 
   it('highlights code in the palette\'s syntax colours, each at 4.5:1 on the code\'s ground', async () => {

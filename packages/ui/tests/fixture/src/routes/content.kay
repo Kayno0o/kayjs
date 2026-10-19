@@ -17,6 +17,9 @@ main
   Card#outlined(title="Orbits" level={2})
     p Elliptic
   Badge#badge Draft
+  Badge#solid(tone="success" solid label="<b>Done</b>")
+  a.group#solid-stamp(href="/data")
+    Badge(stamp solid label="Winner")
   a.group#stamped(href="/data")
     Badge(stamp label="Winner")
   EmptyState#empty(title="No moons" description="Add one to start")

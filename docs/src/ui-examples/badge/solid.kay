@@ -1,0 +1,10 @@
+---
+import Badge from '@kaynooo/kayjs-ui/badge.kay'
+---
+.flex.flex-wrap.items-center.gap-2
+  Badge(label="Draft" solid)
+  Badge(label="New" tone="accent" solid)
+  Badge(label="Live" tone="success" solid)
+  Badge(label="Expiring" tone="warning" solid)
+  Badge(label="Failed" tone="danger" solid)
+  Badge(label="Info" tone="info" solid)

@@ -2090,6 +2090,7 @@
   .kui-badge {
     @apply inline-flex items-center gap-1 border-solid border-kui-surface2 bg-kui-surface0 px-kui-badge-x py-kui-badge-y text-kui-badge tracking-kui-badge whitespace-nowrap text-kui-subtext0;
     border-width: var(--kui-border-badge);
+    --kui-badge-tone: var(--color-kui-subtext0);
     font-family: var(--kui-badge-font, inherit);
     text-transform: var(--kui-badge-case);
 
@@ -2099,23 +2100,35 @@
     }
 
     &:where([data-tone='accent']) {
+      --kui-badge-tone: var(--color-kui-accent);
       @apply border-kui-accent text-kui-accent;
     }
 
     &:where([data-tone='success']) {
+      --kui-badge-tone: var(--color-kui-success);
       @apply border-kui-success text-kui-success;
     }
 
     &:where([data-tone='warning']) {
+      --kui-badge-tone: var(--color-kui-warning);
       @apply border-kui-warning text-kui-warning;
     }
 
     &:where([data-tone='danger']) {
+      --kui-badge-tone: var(--color-kui-error);
       @apply border-kui-error text-kui-error;
     }
 
     &:where([data-tone='info']) {
+      --kui-badge-tone: var(--color-kui-info);
       @apply border-kui-info text-kui-info;
+    }
+
+    /* Filled with its tone, the text in --kui-badge-solid-text, which a skin can set. */
+    &:where([data-solid]) {
+      border-color: var(--kui-badge-tone);
+      background-color: var(--kui-badge-tone);
+      color: var(--kui-badge-solid-text, var(--color-kui-on-accent));
     }
   }
 
