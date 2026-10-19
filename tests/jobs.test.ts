@@ -1070,6 +1070,48 @@ describe('queue', () => {
     }
   })
 
+  it('keeps the redacted payload of a job given up without running, after its process died each time', async () => {
+    const store = memoryJobs()
+    const ran = jest.fn()
+    const dead = queue<{ to: string, body: string }>('dead', ran, { store, attempts: 1, redact: ({ to }) => ({ to, body: '' }), onFailed: () => undefined })
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+
+    try {
+      // One attempt already started and never marked, so the next claim is past the limit.
+      await store.add({ id: 'dead-1', queue: 'dead', payload: stringify({ to: 'ada@example.com', body: 'https://example.com/reset?token=secret' }), attempts: 1, runAt: Date.now() })
+      await dead.drain()
+      expect(ran).not.toHaveBeenCalled()
+      expect((await dead.failed()).map(job => job.payload)).toEqual([{ to: 'ada@example.com', body: '' }])
+    }
+    finally {
+      logged.mockRestore()
+    }
+  })
+
+  it('logs a purge whose store throws instead of throwing it from enqueue, failed or remove', async () => {
+    const store = memoryJobs()
+    const jobs = queue('purging', () => undefined, { store, keepFailed: '1d' })
+
+    store.purge = () => {
+      throw new Error('store locked')
+    }
+
+    const warned = spyOn(console, 'warn').mockImplementation(() => undefined)
+
+    try {
+      await jobs.enqueue('ada@example.com', { delay: '1h' })
+      expect(await jobs.failed()).toEqual([])
+      setSystemTime(Date.now() + 2 * 3_600_000)
+      expect(await jobs.remove('nothing')).toBe(0)
+      setSystemTime()
+      expect(warned.mock.calls.flat().join('\n')).toContain('could not drop its expired failed jobs')
+    }
+    finally {
+      setSystemTime()
+      warned.mockRestore()
+    }
+  })
+
   it.each(['memory', 'sqlite'])('removes a job by id, or every waiting and failed job whose payload matches, from a %s store', async (kind) => {
     const mail = queue('erase', (to: string) => {
       if (to === 'bounce@example.com')
