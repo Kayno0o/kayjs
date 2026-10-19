@@ -7,6 +7,7 @@ export async function uploaded(method: string, url: string, headers: Record<stri
 
   const request = new XMLHttpRequest()
   let sent = false
+  let answered = false
   const abort = () => request.abort()
 
   request.open(method, url)
@@ -16,13 +17,14 @@ export async function uploaded(method: string, url: string, headers: Record<stri
     request.setRequestHeader(name, value)
 
   request.upload.onload = () => sent = true
+  request.onreadystatechange = () => answered ||= request.readyState === XMLHttpRequest.HEADERS_RECEIVED
   request.upload.onprogress = event => event.lengthComputable && onProgress(event.loaded / event.total)
   signal?.addEventListener('abort', abort, { once: true })
 
   try {
     return await new Promise((resolve, reject) => {
       request.onload = () => resolve(new Response(NULL_BODY.has(request.status) ? null : request.response as Blob, { status: request.status, headers: responseHeaders(request.getAllResponseHeaders()) }))
-      request.onerror = () => reject(Object.assign(new TypeError('Failed to fetch'), { sent: sent || request.readyState >= XMLHttpRequest.HEADERS_RECEIVED }))
+      request.onerror = () => reject(Object.assign(new TypeError('Failed to fetch'), { sent: sent || answered }))
       request.ontimeout = request.onerror
       request.onabort = () => reject(signal?.reason ?? new DOMException('The upload was aborted', 'AbortError'))
       request.send(body)

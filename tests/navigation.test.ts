@@ -1132,7 +1132,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     const proxy = lossyProxy(Number(new URL(origin).port))
 
     try {
-      await fresh.goto(`http://127.0.0.1:${proxy.port}/posted`)
+      await fresh.goto(`http://127.0.0.1:${proxy.port}/posted#top`)
       await fresh.evaluate(() => {
         (window as { kayAlive?: boolean }).kayAlive = true
       })

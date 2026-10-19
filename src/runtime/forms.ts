@@ -123,13 +123,19 @@ async function send(form: HTMLFormElement, submitter: HTMLElement | null, url: U
     response = await post(url, body, form, work, delivery)
 
     // A challenge an island's call spent, or one gone stale, is refused with a fresh one: solved, the form goes again once.
-    if (response.work !== null)
+    if (response.work !== null) {
+      delivery.reached = false
       response = await post(url, body, form, await (await import('./work.client')).spendWork(action, response.work), delivery)
+    }
   }
   catch {
     // A post that reached the server has run its action, only the answer was lost: the page loads rather than the form posting again.
     if (delivery.reached) {
-      leave(new URL(location.href), true)
+      // A visitor who went elsewhere meanwhile is left there.
+      if (navigation.visits === navigated) {
+        navigation.released = true
+        location.reload()
+      }
 
       return
     }
