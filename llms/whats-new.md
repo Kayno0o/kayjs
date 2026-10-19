@@ -2,7 +2,7 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
-## Unreleased
+## 1.56.0
 
 - `kay dev` writes its types without looking for the problems only `kay check` reports, and `kay check` skips them for a library's components it does not reach: about 0.25 s of CPU less on a cold start.
 - `kay dev` no longer spends a core of its server process, about 0.45 s of CPU on a cold start, while the server waits for the first client build.

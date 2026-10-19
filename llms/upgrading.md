@@ -148,10 +148,4 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 - A page no longer loads the whole stylesheet after the paint: a class built from a value the build cannot read (`classList.add(x)`, `className = x`, `class={fromData}`) shows unstyled. A production build warns of the ones in an island's script; list the classes in your CSS with `@source inline("...")`, which kay keeps on every page. No lint can see it, as the class is a runtime value. To get the old behaviour back at once, set `lateStyles: true` in `kay.config.ts`: a page then links the whole stylesheet after its own rules again, and the build warns of nothing.
 
-## 1.53.0
-
-### `onError` may get no request
-
-- `onError(error, request)` is now typed `request: Request | undefined`, as it also receives the errors of scheduled and background jobs and `onStop` hooks. An `onError` reading `request.url` or `requestId(request)` checks for it first: `request && { path: new URL(request.url).pathname }`. `kay check` cannot recognise the old form, so there is no lint.
-
-Releases before 1.53 are in [Upgrading, older releases](upgrading-archive.md).
+Releases before 1.54 are in [Upgrading, older releases](upgrading-archive.md).

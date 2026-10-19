@@ -1,7 +1,7 @@
 {
   "name": "@kaynooo/kayjs-ui",
   "type": "module",
-  "version": "1.55.1",
+  "version": "1.56.0",
   "description": "Components for kay apps: dialogs, tables, toasts, forms and more, as .kay sources the app compiles as its own",
   "author": "Kaynooo <https://github.com/Kayno0o>",
   "license": "MIT",
@@ -51,7 +51,7 @@
     "@iconify-json/tabler": "^1.2.42",
     "chartist": "^1.5.0",
     "hls.js": "^1.7.0",
-    "kay": "~1.55.0",
+    "kay": "~1.56.0",
     "tailwindcss": "^4.3.3"
   },
   "peerDependenciesMeta": {
