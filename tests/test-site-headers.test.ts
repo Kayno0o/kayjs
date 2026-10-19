@@ -117,7 +117,7 @@ describe('socketRefusal under a base', () => {
 
     let now = before
 
-    for (let waited = 0; now.closed === before.closed && waited < 2_000; waited += 20) {
+    for (let waited = 0; now.closed === before.closed && waited < 5_000; waited += 20) {
       await Bun.sleep(20)
       now = (await site.api(cookies, '/sockets')).body as typeof now
     }

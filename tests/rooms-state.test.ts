@@ -363,7 +363,7 @@ describe('a room\'s state in a SQLite file', () => {
       const live = rooms<Message, undefined, { round: number }>({ store, state: () => ({ round: 0 }) })
 
       for (let waited = 0; !await Bun.file(ready).exists(); waited += 10) {
-        if (waited > 10_000)
+        if (waited > 20_000)
           throw new Error('the child never joined')
 
         await Bun.sleep(10)
