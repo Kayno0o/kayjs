@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, jest, test } from 'bun:test'
-import { ActionError } from 'kay'
+import { ActionError, ApiError } from 'kay'
 import { attempt, dismissToast, holdToasts, toast, toasts } from '../src/toast'
 
 function shown() {
@@ -187,5 +187,42 @@ describe('attempt', () => {
     expect(await attempt(async () => undefined, { failure: 'Could not save', success: 'Saved' })).toBe(true)
     expect(await attempt(async () => Promise.reject(new ActionError(409, '', {}, { error: 'Taken' })), { failure: 'Could not save', success: 'Saved', refused: (data: { error: string }) => data.error })).toBeUndefined()
     expect(shown()).toEqual([{ message: 'Saved', type: 'success' }, { message: 'Taken', type: 'error' }])
+  })
+
+  describe('over a call() that throws ApiError', () => {
+    const reject = (error: Error) => async () => Promise.reject(error)
+    const said = async (error: Error, refused?: (data: { reason?: string }) => string | undefined) => {
+      toasts.set([])
+      await attempt(reject(error), 'Could not delete', refused)
+
+      return shown().map(({ message }) => message)
+    }
+
+    test('toasts the route\'s own words for a refusal, as for an action\'s', async () => {
+      expect(await said(new ApiError(409, 'Still referenced', 'Still referenced'))).toEqual(['Still referenced'])
+      expect(await said(new ApiError(422, 'Name is required', { message: 'Name is required' }))).toEqual(['Name is required'])
+    })
+
+    test('falls back to `failure` when no answer came, the route says nothing, or it failed', async () => {
+      expect(await said(new ApiError(0, 'Failed to fetch'))).toEqual(['Could not delete'])
+      expect(await said(new ApiError(404, 'Not Found', ''))).toEqual(['Could not delete'])
+      expect(await said(new ApiError(400, 'Bad Request', { code: 7 }))).toEqual(['Could not delete'])
+      expect(await said(new ApiError(500, 'Boom', 'Boom'))).toEqual(['Could not delete'])
+    })
+
+    test('lets `refused` read the answer first, for any status but 0, and falls through to the words of the route when it says nothing', async () => {
+      const refused = (data: { reason?: string }) => data.reason
+
+      expect(await said(new ApiError(409, 'Conflict', { reason: 'Still referenced' }), refused)).toEqual(['Still referenced'])
+      expect(await said(new ApiError(503, 'HTTP 503', { reason: 'Busy, retry' }), refused)).toEqual(['Busy, retry'])
+      expect(await said(new ApiError(409, 'Taken', 'Taken'), refused)).toEqual(['Taken'])
+      expect(await said(new ApiError(409, 'Taken', { reason: '', message: 'Taken' }), refused)).toEqual(['Taken'])
+      expect(await said(new ApiError(0, 'Failed to fetch'), refused)).toEqual(['Could not delete'])
+    })
+
+    test('resolves to undefined, and an ActionError keeps reading as before', async () => {
+      expect(await attempt(reject(new ApiError(409, 'Taken', 'Taken')), 'Could not delete')).toBeUndefined()
+      expect(await said(new ActionError(400, '', {}, { reason: 'Still referenced' }), data => data.reason)).toEqual(['Still referenced'])
+    })
   })
 })

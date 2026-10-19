@@ -1,4 +1,4 @@
-import { ActionError, signal, untrack } from 'kay'
+import { ActionError, ApiError, signal, untrack } from 'kay'
 
 // What a toast means, in the vocabulary of every tone: a failed call is a `danger`.
 export type ToastTone = 'danger' | 'success' | 'info'
@@ -135,6 +135,9 @@ export async function attempt<T, Data = unknown>(run: () => Promise<T>, failure:
 }
 
 function refusalOf<Data>(error: unknown, refused: ((data: Data) => string | undefined) | undefined): string | undefined {
+  if (error instanceof ApiError)
+    return refusalOfApi(error, refused)
+
   if (!(error instanceof ActionError))
     return undefined
 
@@ -142,4 +145,23 @@ function refusalOf<Data>(error: unknown, refused: ((data: Data) => string | unde
   const said = error.data === undefined ? undefined : refused?.(error.data as Data)
 
   return [said, error.errors['']].find(message => message !== undefined && message !== '')
+}
+
+// A route's refusal: `refused` reads its answer, else the words the route gave, which a server fault, an answer that never came or a bare status keep to `failure`.
+function refusalOfApi<Data>(error: ApiError, refused: ((data: Data) => string | undefined) | undefined): string | undefined {
+  if (error.status === 0)
+    return undefined
+
+  const said = error.answer === undefined ? undefined : refused?.(error.answer as Data)
+
+  return [said, error.status < 500 ? answerMessage(error.answer) : undefined].find(message => message !== undefined && message !== '')
+}
+
+function answerMessage(answer: unknown): string | undefined {
+  if (typeof answer === 'string')
+    return answer
+
+  const message = typeof answer === 'object' && answer !== null && 'message' in answer ? answer.message : undefined
+
+  return typeof message === 'string' ? message : undefined
 }

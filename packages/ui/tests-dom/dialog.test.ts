@@ -11,8 +11,8 @@ afterEach(() => {
   closes = 0
 })
 
-async function dialogs(onDelete: () => Promise<void> = async () => Promise.resolve(), dirty = false) {
-  mounted = await mountComponent('src/components/dialogs.kay', { onClose: () => closes++, onDelete, dirty })
+async function dialogs(onDelete: () => Promise<void> = async () => Promise.resolve(), dirty = false, apiRefusal?: { status: number, message: string, answer?: unknown }) {
+  mounted = await mountComponent('src/components/dialogs.kay', { onClose: () => closes++, onDelete, dirty, apiRefusal })
 
   return mounted.root
 }
@@ -116,6 +116,26 @@ describe('ConfirmDelete', () => {
     expect([[...root.querySelectorAll('.kui-toast-message')].at(-1)?.textContent, root.querySelectorAll('dialog')[2]!.open]).toEqual(['Still referenced', true])
   })
 
+  // A delete made with `call()` throws ApiError, which refuses as an action does: the dialog stays open and enabled with the route's message toasted.
+  test.each([
+    { name: 'a refusal with words of its own', refusal: { status: 409, message: 'Still referenced', answer: 'Still referenced' }, trigger: 'Delete', dialog: 1, toast: 'Still referenced' },
+    { name: 'a refusal `refused` reads the answer of', refusal: { status: 409, message: 'Conflict', answer: { reason: 'In use' } }, trigger: 'Release', dialog: 14, toast: 'In use' },
+    { name: 'a network failure', refusal: { status: 0, message: 'Failed to fetch' }, trigger: 'Delete', dialog: 1, toast: 'Could not delete' },
+    { name: 'a server fault', refusal: { status: 500, message: 'Boom', answer: 'Boom' }, trigger: 'Delete', dialog: 1, toast: 'Could not delete' },
+  ])('toasts $name from an ApiError and keeps the dialog open', async ({ refusal, trigger, dialog, toast }) => {
+    const root = await dialogs(undefined, false, refusal)
+
+    click(root.querySelector(`.kui-icon-btn[aria-label="${trigger}"]`))
+    await settle()
+
+    const shown = root.querySelectorAll('dialog')[dialog]!
+
+    click(shown.querySelector('.kui-btn-danger'))
+    await settle()
+
+    expect([root.querySelector('.kui-toast-message')?.textContent, shown.open, shown.querySelector('.kui-btn-danger')?.hasAttribute('disabled')]).toEqual([toast, true, false])
+  })
+
   test('hands its tone to the icon trigger once a variant is given, and leaves the default look without one', async () => {
     const root = await dialogs()
     const look = (name: string) => {
@@ -168,7 +188,7 @@ describe('ConfirmDelete', () => {
     const armed = () => root.querySelector('.kui-confirm-delete-armed')
     const buttons = () => [...armed()?.querySelectorAll('button') ?? []].map(button => [button.textContent || button.getAttribute('aria-label'), button.disabled])
 
-    expect(root.querySelectorAll('dialog')).toHaveLength(15)
+    expect(root.querySelectorAll('dialog')).toHaveLength(16)
 
     click(trigger)
     await settle()

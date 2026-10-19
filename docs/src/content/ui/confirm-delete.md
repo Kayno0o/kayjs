@@ -36,6 +36,10 @@ If `onConfirm` throws, the dialog stays open and `failure` is toasted.
 
 A handler refusing with `ctx.fail(400, { error: 'Still in use' })` is a failure of `onConfirm`. Give `refused` a function from that data to a message, and it is toasted in place of `failure`. `failure` stays for an answer of `undefined` and for any other error.
 
+## Refusals of an API route
+
+A deletion made with `call()` throws an `ApiError` when the route refuses. It is read like a refusal of a handler: the dialog stays open and the words the route answered with are toasted for a 4xx, or `refused` reads its `answer`. A call that got no answer at all (status 0) and a 5xx toast `failure`.
+
 ## Look and cancel label
 
 `size` is `xs`, `sm`, `md` or `lg` for the icon trigger, and sizes the cancel button too when asking inline. `variant` is `solid`, `ghost` or `inline`. `cancelLabel` words the cancel button, `Cancel` by default.
