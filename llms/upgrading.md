@@ -2,6 +2,12 @@
 
 What each minor release breaks, and what an app changes to move to it. kay and its libraries share one version, so one section covers them all; a patch breaks nothing, and a minor missing here broke nothing.
 
+## 1.57.0
+
+### analytics no longer counts pages behind a guard
+
+- A page a guard covers (`requireGuards` included) carries `<meta name="kay-guarded">` and the tracker counts nothing for it, so the numbers of an app that counted `/account` or an admin area drop to what is public. An app that wants a guarded page counted has no option for it yet; no lint can recognise the old behaviour, so none ships.
+
 ## 1.56.0
 
 ### The forms deprecated in 1.52 are gone

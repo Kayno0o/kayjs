@@ -151,6 +151,8 @@ export interface RenderOptions {
   offline?: boolean | undefined
   // Whether pages load the whole stylesheet after paint, so no class lacks its rule.
   lateStyles?: boolean | undefined
+  // A page rendered without its guards, as a prerender does, still being one a guard covers.
+  guarded?: boolean | undefined
   // The `.kay` island an extension gives as `editor`, which a page in edit mode renders last.
   editor?: string | undefined
 }
@@ -183,6 +185,8 @@ interface Rendering {
   base: string
   // Rendering at build time or on revalidation, for every visitor at once.
   prerendering: boolean
+  // A guard covers the page, which the visit tracker reads from a meta to count nothing of it.
+  guarded?: boolean | undefined
   // The form post the browser came back from, if any, as the page asks for it.
   outcome: () => Outcome | null
   // Whether the route's query was read against its schema, which a special page rendered in place of the route reads again if not.
@@ -197,6 +201,7 @@ interface Rendering {
 }
 
 const CHARSET = '<meta charset="utf-8">'
+const GUARDED_META = '<meta name="kay-guarded">'
 const VIEWPORT = '<meta name="viewport" content="width=device-width, initial-scale=1">'
 // Per set of islands and per chain of layouts: few exist, and they never change for a build. The stylesheets go by their map, which a server under `kay dev` swaps whole for a stylesheet edit.
 const islandScriptsOf = perOwner<ClientBuild>()
@@ -208,6 +213,9 @@ const NOT_ASCII = /[^\x20-\x7E]/g
 // The params come resolved, each matcher's value in place of its text.
 export async function renderPage(route: ServedRoute, context: RequestContext, params: Record<string, unknown>, client: ClientBuild, options: RenderOptions = {}): Promise<Response> {
   const rendering = createRendering(context, params, options)
+
+  rendering.guarded = options.guarded ?? route.guards.length > 0
+
   const render = async () => inLiveReads(async () => withOutcome(rendering.outcome, async () => renderRoute(route, rendering, client, withEditor(route, options))))
   const { pathname, search } = rendering.ctx.url
 
@@ -879,7 +887,7 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
   const islandData = (hasIslands || (checked !== '' && words.size > 0) ? messagesScript(words, true) : '') + (hasIslands ? outcomeScript(rendering.carried()) + queryScript(rules) : '') + liveText
   const opening = `${htmlOpen(lang, head.root)}<head>${headStart(head)}`
   const sheets = stylesheets(client, styled)
-  const closing = `${head.html}${scripts}${islandData}${kayMetas(options, hasIslands)}${shipsEntry && client.build !== undefined ? `<meta name="${BUILD_META}" content="${client.build}">` : ''}${speculationRules(options.prefetch, options.base)}${client.navigation === true && !shipsEntry ? historyScript : ''}${options.offline ? registerScript(options.base ?? '') : ''}${options.dev ? devScripts(client, styled, options.lateStyles === true) + (options.prerendering ? '' : requestBlock(files, rendering, options.base ?? '')) : ''}</head><body>${body}`
+  const closing = `${head.html}${scripts}${islandData}${kayMetas(options, hasIslands)}${shipsEntry && client.build !== undefined ? `<meta name="${BUILD_META}" content="${client.build}">` : ''}${speculationRules(options.prefetch, options.base)}${rendering.guarded === true ? GUARDED_META : ''}${client.navigation === true && !shipsEntry ? historyScript : ''}${options.offline ? registerScript(options.base ?? '') : ''}${options.dev ? devScripts(client, styled, options.lateStyles === true) + (options.prerendering ? '' : requestBlock(files, rendering, options.base ?? '')) : ''}</head><body>${body}`
   const written = opening + sheets + closing
   const start = marks === undefined ? written : placeFieldMarks(written, marks)
 

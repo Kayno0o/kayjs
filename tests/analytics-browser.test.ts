@@ -523,6 +523,22 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the notice
     expect(received.slice(before).map(visit => new URL(visit.body.url).pathname)).toEqual(['/admin', '/loud'])
   })
 
+  it('counts nothing for a page carrying the guard marker, and counts again once it is gone', async () => {
+    const before = received.length
+    const swap = async (path: string) => opened.evaluate((to) => {
+      document.dispatchEvent(new CustomEvent('kay:navigate', { detail: { url: location.origin + to } }))
+    }, path)
+
+    await opened.evaluate(() => document.head.append(Object.assign(document.createElement('meta'), { name: 'kay-guarded' })))
+    await swap('/account')
+    await opened.evaluate(() => document.querySelector('meta[name=kay-guarded]')!.remove())
+    await swap('/open')
+    await visits(before + 1)
+    await Bun.sleep(300)
+
+    expect(received.slice(before).map(visit => new URL(visit.body.url).pathname)).toEqual(['/open'])
+  })
+
   it('puts the base before a policy path, and leaves an address alone', async () => {
     const other = await own.open('/plain')
     const hrefs = await other.evaluate((script) => {

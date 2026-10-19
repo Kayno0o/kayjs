@@ -29,11 +29,11 @@ export const ANALYTICS_SCRIPT = `(() => {
     return gated ? choice() !== 'yes' : choice() === 'no'
   }
 
-  // A page the app left out, or one that asks search engines to skip it is never counted.
+  // A page the app left out, one behind a guard (the server marks it) or one that asks search engines to skip it is never counted.
   function skipped(url) {
     const parts = new URL(url).pathname.slice(scope === '/' ? 0 : scope.length).split('/').filter(Boolean)
 
-    return !!document.querySelector('meta[name=robots][content*=noindex i]') || exclude.some(wanted => wanted.every((word, at) => word === '*' ? parts[at] !== undefined : word === parts[at]))
+    return !!document.querySelector('meta[name=robots][content*=noindex i],meta[name=kay-guarded]') || exclude.some(wanted => wanted.every((word, at) => word === '*' ? parts[at] !== undefined : word === parts[at]))
   }
 
   async function view(url) {

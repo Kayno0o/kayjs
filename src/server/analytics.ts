@@ -50,7 +50,7 @@ interface Common {
 // The options only the providers kay forwards visits for take: a script that counts alone has no use for them, so its interface types them `never`.
 interface Counted extends Common {
   // Pages that are never counted, as paths: `/account` leaves out the page and all under it, `*` stands for one segment (`/*/admin` for an app with locale prefixes).
-  // A page with `noindex` is left out too. Only the providers kay forwards visits for take it, not `fathom`, `cloudflare` or `custom`, whose script counts alone.
+  // A page with `noindex` or behind a guard is left out too. Only the providers kay forwards visits for take it, not `fathom`, `cloudflare` or `custom`, whose script counts alone.
   exclude?: string[] | undefined
   // Sends the page title with each visit, which names the page and so may name a person; left out, visits carry the path alone.
   titles?: boolean | undefined

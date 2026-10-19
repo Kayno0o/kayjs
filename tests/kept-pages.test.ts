@@ -671,6 +671,21 @@ describe('a kept page and the state a script declares', () => {
     }
   }, 120_000)
 
+  it('marks a prerendered page behind a guard for the analytics tracker, though it is rendered without its guards', async () => {
+    const root = await scratch({
+      'src/routes/index.kay': '--- server\nexport const page = { prerender: true }\n---\np Open\n',
+      'src/routes/account/_guard.ts': 'import { guard } from \'kay\'\n\nexport default guard(() => {})\n',
+      'src/routes/account/index.kay': '--- server\nexport const page = { prerender: true }\n---\np Account\n',
+    })
+
+    await built(root)
+
+    const pagesDir = join(outputDir(root), 'pages')
+
+    expect(await Bun.file(join(pagesDir, 'account.html')).text()).toContain('<meta name="kay-guarded">')
+    expect(await Bun.file(join(pagesDir, 'index.html')).text()).not.toContain('kay-guarded')
+  }, 120_000)
+
   it('leaves no file for a kept page that gave way or drifted, and keeps it out of the pages it lists', async () => {
     const root = await scratch({
       'src/routes/index.kay': 'p Kept home\n',

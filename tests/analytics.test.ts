@@ -35,6 +35,8 @@ beforeAll(async () => {
   process.env.NODE_ENV = 'production'
   dir = await scratchDir('analytics-')
   await Bun.write(join(dir, 'routes/index.kay'), 'h1 Home\n')
+  await Bun.write(join(dir, 'routes/account/_guard.ts'), 'import { guard } from \'kay\'\n\nexport default guard(() => {})\n')
+  await Bun.write(join(dir, 'routes/account/index.kay'), 'h1 Account\n')
   provider = Bun.serve({
     port: 0,
     async fetch(request) {
@@ -591,6 +593,21 @@ describe('pages left out', () => {
     finally {
       await mounted.close()
     }
+  })
+
+  it('marks a page a guard covers for the tracker, and no other', async () => {
+    const app = await site(plausible())
+    const guarded = await (await app.handle(new Request('http://localhost/account'))).text()
+    const home = await (await app.handle(new Request('http://localhost/'))).text()
+
+    expect(guarded).toContain('<meta name="kay-guarded">')
+    expect(home).not.toContain('kay-guarded')
+  })
+
+  it('makes the tracker skip a page carrying the guard marker', async () => {
+    const script = await (await (await site(plausible())).handle(new Request('http://localhost/_kay/analytics.js'))).text()
+
+    expect(script).toContain('meta[name=kay-guarded]')
   })
 })
 

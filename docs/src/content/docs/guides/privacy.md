@@ -142,7 +142,7 @@ If the notice fails to load, say when the visitor is offline, it is fetched agai
 
 ### Leaving pages out
 
-Pages such as an account or an admin area should not be counted. List them in `exclude`: `exclude: ['/account', '/*/admin']` leaves out `/account` and everything under it, and `*` stands for one segment, such as a locale. With locale prefixes, list `/admin` and `/*/admin`. A page that asks search engines to skip it with `noindex` is left out too. Nothing is sent for these pages.
+Pages such as an account or an admin area should not be counted. List them in `exclude`: `exclude: ['/account', '/*/admin']` leaves out `/account` and everything under it, and `*` stands for one segment, such as a locale. With locale prefixes, list `/admin` and `/*/admin`. A page that asks search engines to skip it with `noindex` is left out too, and so is a page behind a guard, with nothing to list. Nothing is sent for these pages.
 
 The server drops a visit to a listed path too, even from a browser holding an older tracker, unless a proxy takes the base off the request and that tracker does not name it.
 

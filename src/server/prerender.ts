@@ -154,7 +154,7 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
         // Guards run when the page is served, for whoever asks; the build renders what they let through.
         const reads = standInReads()
         // onError is the app's for requests it answers; the build logs what a prerendered page throws.
-        const render = async () => renderPage({ ...route, guards: [] }, { request }, matched, client, { ...renderOptions, onError: undefined, prerendering: true })
+        const render = async () => renderPage({ ...route, guards: [] }, { request }, matched, client, { ...renderOptions, onError: undefined, prerendering: true, guarded: guardedPage(route, config.requireGuards) })
         const inLocale = async () => runInLocale(stateFor(locales, copy.locale ?? locales.settings.defaultLocale, path, request), render)
         // The ids a page draws keep apart from those of the page it is swapped for, so each page has a token of its own, the same on every render and build; the body is read within it, as a stream draws its ids as it is read.
         const token = pageToken(copy.key, tokens)

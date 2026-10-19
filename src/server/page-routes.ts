@@ -98,7 +98,7 @@ async function forVisitor(render: () => Promise<Response>): Promise<Response> {
 // How a page answers one request: rendered afresh, or the copy `kay build` rendered, revalidated, with its server islands filled in.
 export function pageResponder({ client, renderOptions, prerendered, settings, transforms, pageFile, writes }: ResponderOptions): PageResponder {
   // Rendered as `kay build` renders it: without the request, for whoever its guards let through; it starts within the request, so in its locale.
-  const prerender = async (route: ServedRoute, params: Record<string, unknown>, url: URL, key: string) => hookedResponse(await renderPage({ ...route, guards: [] }, { request: new Request(`http://localhost${url.pathname}`) }, params, client, { ...renderOptions, prerendering: true }), transforms, key, localeState()?.locale ?? settings?.defaultLocale ?? '', pageFile)
+  const prerender = async (route: ServedRoute, params: Record<string, unknown>, url: URL, key: string) => hookedResponse(await renderPage({ ...route, guards: [] }, { request: new Request(`http://localhost${url.pathname}`) }, params, client, { ...renderOptions, prerendering: true, guarded: route.guards.length > 0 }), transforms, key, localeState()?.locale ?? settings?.defaultLocale ?? '', pageFile)
 
   return async (route, params, context, url) => {
     const render = async () => renderPage(route, context, params, client, renderOptions)
