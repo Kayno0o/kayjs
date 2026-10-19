@@ -164,7 +164,10 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
         fetched.push(request.method())
     })
     const hovered = page.waitForRequest(request => new URL(request.url()).pathname === '/second')
+    const prefetchLoaded = async (): Promise<boolean> => page.evaluate(() => performance.getEntriesByType('resource').some(entry => (/\/prefetch-[^/]*\.js$/).test(entry.name)))
 
+    // The default rules load nothing more at start: the prefetch code comes with the first link pointed at, which it prefetches too.
+    expect(await prefetchLoaded()).toBe(false)
     await page.hover('a.second')
     await hovered
     await page.click('a.second')
@@ -176,7 +179,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     // Fetched once, when hovered: the swap took that response rather than asking again, and the browser's own prefetch was off.
     expect(fetched).toEqual(['GET'])
     expect(await page.evaluate(() => document.querySelector('script[type="speculationrules"]'))).toBeNull()
-    expect(await page.evaluate(() => performance.getEntriesByType('resource').some(entry => (/\/prefetch-[^/]*\.js$/).test(entry.name)))).toBe(true)
+    expect(await prefetchLoaded()).toBe(true)
     expect(await page.evaluate(() => getComputedStyle(document.querySelector('h1')!).color)).toBe('rgb(1, 2, 3)')
     expect(await page.evaluate(() => document.activeElement?.tagName)).toBe('H1')
     expect(await page.textContent('button.player')).toBe('Played 2')
@@ -195,14 +198,16 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     expect(errors).toEqual([])
   })
 
-  it('loads no prefetch code on a page without speculation rules, and fetches nothing when a link is hovered', async () => {
+  // The home page with its speculation rules rewritten to another eagerness, or dropped, hovered or pressed on its second link.
+  async function prefetching(eagerness: string | undefined, act: (on: Page) => Promise<void>): Promise<{ fetched: string[], loaded: boolean }> {
     const fresh = await browser.newPage()
     const fetched: string[] = []
 
     await fresh.route(`${origin}/`, async (route) => {
       const response = await route.fetch()
+      const html = await response.text()
 
-      await route.fulfill({ response, body: (await response.text()).replace(/<script type="speculationrules">.*?<\/script>/, '') })
+      await route.fulfill({ response, body: eagerness === undefined ? html.replace(/<script type="speculationrules">.*?<\/script>/, '') : html.replace('"eagerness":"moderate"', `"eagerness":"${eagerness}"`) })
     })
     fresh.on('request', (request) => {
       if (new URL(request.url()).pathname === '/second')
@@ -211,16 +216,28 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
 
     try {
       await fresh.goto(origin)
-      await fresh.hover('a.second')
+      await act(fresh)
       await settled(fresh)
-      await Bun.sleep(400)
+      await Bun.sleep(500)
 
-      expect(fetched).toEqual([])
-      expect(await fresh.evaluate(() => performance.getEntriesByType('resource').some(entry => (/\/prefetch-[^/]*\.js$/).test(entry.name)))).toBe(false)
+      return { fetched, loaded: await fresh.evaluate(() => performance.getEntriesByType('resource').some(entry => (/\/prefetch-[^/]*\.js$/).test(entry.name))) }
     }
     finally {
       await fresh.close()
     }
+  }
+
+  it('loads no prefetch code on a page without speculation rules, and fetches nothing when a link is hovered', async () => {
+    expect(await prefetching(undefined, async on => on.hover('a.second'))).toEqual({ fetched: [], loaded: false })
+  })
+
+  it('prefetches the first link hovered under eager rules, and the first pressed under conservative ones, hovering alone fetching nothing there', async () => {
+    expect(await prefetching('eager', async on => on.hover('a.second'))).toEqual({ fetched: ['GET'], loaded: true })
+    expect(await prefetching('conservative', async on => on.hover('a.second'))).toEqual({ fetched: [], loaded: true })
+    expect(await prefetching('conservative', async (on) => {
+      await on.hover('a.second')
+      await on.mouse.down()
+    })).toEqual({ fetched: ['GET'], loaded: true })
   })
 
   it('loads the form checks once a form is used, and checks a form submitted before they loaded', async () => {

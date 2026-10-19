@@ -7,17 +7,24 @@ const HOVER_DELAY_MS = 200
 let eagerness: Eagerness = false
 let hoverTimer: ReturnType<typeof setTimeout> | undefined
 
+const handlers: Record<string, (event: Event) => void> = {}
+
 // Prefetches the links the way the server's speculation rules say, which the swap follows.
 export function startPrefetch(rules: string | null): void {
   eagerness = eagernessOf(rules)
 
-  if (eagerness === 'conservative') {
-    document.addEventListener('pointerdown', onPrefetchHint, { passive: true })
-  }
-  else if (eagerness !== false) {
-    document.addEventListener('pointerover', onHover, { passive: true })
-    document.addEventListener('focusin', onPrefetchHint)
-  }
+  if (eagerness === 'conservative')
+    handlers.pointerdown = onPrefetchHint
+  else if (eagerness !== false)
+    Object.assign(handlers, { pointerover: onHover, focusin: onPrefetchHint })
+
+  for (const [type, handler] of Object.entries(handlers))
+    document.addEventListener(type, handler, { passive: type !== 'focusin' })
+}
+
+// Handles an event heard before the listeners were there.
+export function replay(event: Event): void {
+  handlers[event.type]?.(event)
 }
 
 function eagernessOf(rules: string | null): Eagerness {
@@ -29,7 +36,7 @@ function eagernessOf(rules: string | null): Eagerness {
   }
 }
 
-function onHover(event: PointerEvent): void {
+function onHover(event: Event): void {
   clearTimeout(hoverTimer)
 
   const link = linkOf(event)

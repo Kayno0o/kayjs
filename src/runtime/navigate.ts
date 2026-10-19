@@ -14,6 +14,9 @@ let formsModule: Promise<typeof import('./forms')> | undefined
 let held: { url: URL, delta: number } | undefined
 // A traversal the guards let through, made again.
 let passing = false
+// The speculation rules the page came with, until the first pointer or focus on a link loads the code prefetching by them.
+let rules: string | null | undefined
+let prefetchModule: Promise<typeof import('./prefetch')> | undefined
 
 // Takes over the links and forms of the app; called once by the entry.
 export function startNavigation(given: NavigationHooks): void {
@@ -35,12 +38,12 @@ export function startNavigation(given: NavigationHooks): void {
     history.replaceState(historyState(), '')
   }
 
-  // The swap would never use what the browser prefetches for a full load, so it prefetches the same links itself, from code only a site with speculation rules loads.
-  const rules = document.querySelector(SPECULATION)
+  // The swap would never use what the browser prefetches for a full load, so the rules go and it prefetches the same links itself, from code loaded once a link is first pointed at.
+  const script = document.querySelector(SPECULATION)
 
-  if (rules) {
-    rules.remove()
-    void startPrefetch(rules.textContent)
+  if (script) {
+    rules = script.textContent
+    script.remove()
   }
 
   for (const element of document.head.children as HTMLCollectionOf<HeadElement>)
@@ -75,11 +78,22 @@ async function preloadSwap(): Promise<void> {
   catch {}
 }
 
-async function startPrefetch(rules: string | null): Promise<void> {
+// Loads the prefetch code on the first touch of a link, which it then handles as it would have listening, as it does each touch that came while it loaded: one that fails to load leaves the links unprefetched, each click still swapping.
+async function wakePrefetch(event: Event): Promise<void> {
   try {
-    (await import('./prefetch')).startPrefetch(rules)
+    prefetchModule ??= loadPrefetch()
+    ;(await prefetchModule).replay(event)
   }
   catch {}
+}
+
+async function loadPrefetch(): Promise<typeof import('./prefetch')> {
+  const module = await import('./prefetch')
+
+  module.startPrefetch(rules ?? null)
+  rules = undefined
+
+  return module
 }
 
 // Swaps the page in, or loads it fully when the swap cannot load: the browser keeps a module that failed as failed, so retrying is no use.
@@ -195,8 +209,12 @@ async function traverseAsked(url: URL, delta: number): Promise<void> {
 function onPointLink(event: PointerEvent): void {
   const link = linkOf(event)
 
-  if (link && followable(link))
+  if (link && followable(link)) {
     void preloadSwap()
+
+    if (rules !== undefined)
+      void wakePrefetch(event)
+  }
 }
 
 function onSubmit(event: SubmitEvent): void {
@@ -245,6 +263,9 @@ async function submit(form: HTMLFormElement, submitter: HTMLElement | null, url:
 
 // An island may render a form after the page loaded, taken once it gets focus.
 function onFormFocus(event: FocusEvent): void {
+  if (rules !== undefined && linkOf(event))
+    void wakePrefetch(event)
+
   const form = event.target instanceof Element ? event.target.closest('form') : null
 
   if (form) {
