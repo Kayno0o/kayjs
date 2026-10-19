@@ -451,6 +451,33 @@ describe('organizations', () => {
     expect(await ada.browser.call('deleteOrganization', org)).toEqual({ ok: true })
   })
 
+  test('a bearer token cannot create, update, invite, revoke, list invitations, accept or decline, a session can', async () => {
+    const { ada, org, person, browserOn, site, mails } = await setup()
+    const grace = await person('grace@example.com')
+    const { invitation } = await ada.browser.callOk('invite', org, 'grace@example.com')
+    const { invitation: spare } = await ada.browser.callOk('invite', org, 'alan@example.com')
+    const adaToken = (await ada.browser.callOk('createToken', { password: PASSWORD }, 'Script')).token
+    const graceToken = (await grace.browser.callOk('createToken', { password: PASSWORD }, 'Script')).token
+    const bearer = async (token: string, method: string, ...args: unknown[]) => browserOn(site).json(`/call/${method}`, { method: 'POST', headers: { 'authorization': `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify(args) })
+
+    mails.length = 0
+
+    expect(await bearer(graceToken, 'acceptInvitation', invitation.id)).toEqual({ ok: false, error: 'signed-out' })
+    expect(await bearer(graceToken, 'declineInvitation', invitation.id)).toBe(false)
+    expect(await bearer(graceToken, 'createOrganization', { name: 'Mine' })).toEqual({ ok: false, error: 'signed-out' })
+    expect(await bearer(adaToken, 'updateOrganization', org, { name: 'Renamed' })).toEqual({ ok: false, error: 'signed-out' })
+    expect(await bearer(adaToken, 'invite', org, 'bob@example.com')).toEqual({ ok: false, error: 'signed-out' })
+    expect(await bearer(adaToken, 'invitations', org)).toEqual({ ok: false, error: 'signed-out' })
+    expect(await bearer(adaToken, 'revokeInvitation', org, spare.id)).toEqual({ ok: false, error: 'signed-out' })
+    expect(mails).toEqual([])
+    expect(await grace.browser.call('organizations')).toEqual([])
+    expect(await bearer(graceToken, 'myInvitations')).toMatchObject([{ id: invitation.id }])
+    expect(await ada.browser.call('organization', org)).toMatchObject({ organization: { name: 'Acme' } })
+    expect(await ada.browser.call('invitations', org)).toMatchObject({ ok: true, invitations: [{}, {}] })
+    expect(await grace.browser.call('acceptInvitation', invitation.id)).toMatchObject({ ok: true })
+    expect(await ada.browser.call('revokeInvitation', org, spare.id)).toEqual({ ok: true })
+  })
+
   test('inviting needs the invitation page', async () => {
     const { ada, org } = await setup({ invitationPage: undefined })
 

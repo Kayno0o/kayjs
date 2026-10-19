@@ -154,7 +154,7 @@ export async function createOrganization(state: RequestState, input: { name: str
   const { config, store } = organizationsOf(state.core)
   const record = await state.current()
 
-  if (!record)
+  if (!record || state.via() !== 'session')
     return { ok: false, error: 'signed-out' }
 
   if (config.create && !(await config.create(publicUser(record))))
@@ -223,7 +223,7 @@ export async function getMembership(state: RequestState, ref: string): Promise<M
 
 export async function updateOrganization(state: RequestState, ref: string, patch: { name?: string | undefined, slug?: string | null | undefined }): Promise<UpdateOrganizationResult> {
   const { config, store } = organizationsOf(state.core)
-  const found = await asMember(state, ref, config.manage)
+  const found = await asMember(state, ref, config.manage, true)
 
   if (!found.ok)
     return found
@@ -361,7 +361,7 @@ export async function removeMember(state: RequestState, ref: string, userId: str
 export async function invite(state: RequestState, ref: string, email: string, roles?: string[]): Promise<InviteResult> {
   const { core } = state
   const { config, store } = organizationsOf(core)
-  const found = await asMember(state, ref, config.manage)
+  const found = await asMember(state, ref, config.manage, true)
 
   if (!found.ok)
     return found
@@ -426,7 +426,7 @@ export async function invite(state: RequestState, ref: string, email: string, ro
 // The organization's invitations still open, oldest first, for its managers; expired ones are left out.
 export async function listInvitations(state: RequestState, ref: string): Promise<{ ok: true, invitations: Invitation[] } | { ok: false, error: OrganizationFailure }> {
   const { config, store } = organizationsOf(state.core)
-  const found = await asMember(state, ref, config.manage)
+  const found = await asMember(state, ref, config.manage, true)
 
   if (!found.ok)
     return found
@@ -436,7 +436,7 @@ export async function listInvitations(state: RequestState, ref: string): Promise
 
 export async function revokeInvitation(state: RequestState, ref: string, invitationId: string): Promise<{ ok: true } | { ok: false, error: OrganizationFailure }> {
   const { config, store } = organizationsOf(state.core)
-  const found = await asMember(state, ref, config.manage)
+  const found = await asMember(state, ref, config.manage, true)
 
   if (!found.ok)
     return found
@@ -509,7 +509,7 @@ export async function acceptInvitation(state: RequestState, invitationId: string
   const { store } = organizationsOf(state.core)
   const record = await state.current()
 
-  if (!record)
+  if (!record || state.via() !== 'session')
     return { ok: false, error: 'signed-out' }
 
   const invitation = await live(store, invitationId)
@@ -545,7 +545,7 @@ export async function declineInvitation(state: RequestState, invitationId: strin
   const record = await state.current()
   const invitation = await live(store, invitationId)
 
-  if (record?.email == null || record.email === '' || record.emailVerifiedAt === null || invitation?.email !== record.email)
+  if (state.via() !== 'session' || record?.email == null || record.email === '' || record.emailVerifiedAt === null || invitation?.email !== record.email)
     return false
 
   return store.invitations.delete(invitation.id)

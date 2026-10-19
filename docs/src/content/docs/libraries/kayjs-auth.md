@@ -439,7 +439,7 @@ if (made.ok)
 - `organizations()` lists the user's memberships and `organization(ref)` gives one, by id or slug.
 - `members(ref)`, `setMemberRoles(ref, userId, roles)`, `removeMember(ref, userId)` and `leaveOrganization(ref)` manage who is in it.
 - `updateOrganization(ref, { name, slug })` renames it and `deleteOrganization(ref)` deletes it. Only owners delete.
-- Deleting an organization, changing roles and removing members need a signed-in browser session. A bearer token or an OAuth token for an API client or an AI agent cannot do them, so a leaked key cannot wipe a team.
+- Creating, renaming or deleting an organization, changing roles, removing members and everything about invitations (sending, listing, revoking, accepting, declining) need a signed-in browser session. A bearer token or an OAuth token for an API client or an AI agent cannot do them, so a leaked key cannot wipe a team.
 
 `invite(ref, email, roles?)` mails a link to `invitationPage` with `?invitation=<id>`. It needs a mailer. The page reads `invitation(id)` and posts to an action calling `acceptInvitation(id)`. Only an account verified at the invited address joins.
 
