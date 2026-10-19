@@ -1,6 +1,6 @@
 import type { Variant } from './sites'
 import { describe, expect, it } from 'bun:test'
-import { latinFontUrls, pickImage, slotWidth, splitInlineScripts, weigh } from './weigh'
+import { checkPages, latinFontUrls, pickImage, slotWidth, splitInlineScripts, weigh } from './weigh'
 
 const PHONE = { name: 'phone', width: 390, dpr: 3 }
 const DESKTOP = { name: 'desktop', width: 1280, dpr: 1 }
@@ -22,6 +22,28 @@ describe('weigh', () => {
       const [refused] = await Promise.allSettled([weigh(variant, '/')])
 
       expect(refused.status === 'rejected' && String(refused.reason)).toContain('/ answered 401')
+    }
+    finally {
+      await server.stop(true)
+    }
+  })
+})
+
+describe('checkPages', () => {
+  it('fails on a page redirecting to sign-in, naming it, its status and where it went, and passes once the session is sent', async () => {
+    const server = Bun.serve({ port: 0, fetch: (request) => {
+      if (new URL(request.url).pathname === '/' || request.headers.get('cookie') === 'session=bench')
+        return new Response('<p>ok</p>')
+
+      return Response.redirect('/login', 302)
+    } })
+    const variant = { site: { name: 'club', repo: '', astro: '', pages: ['/', '/members'], before: { label: 'Elysia', build: [], serve: [], outputs: [] } }, kind: 'astro', dir: '', devDir: '', ports: { backend: server.port, http: 0, https: 0, dev: 0, sidecar: 0 } } as Variant
+
+    try {
+      const [refused] = await Promise.allSettled([checkPages(variant, {})])
+
+      expect(refused.status === 'rejected' && String(refused.reason)).toContain('club Elysia: /members answered 302 to /login, not 200')
+      expect(await checkPages(variant, { cookie: 'session=bench' })).toBeUndefined()
     }
     finally {
       await server.stop(true)

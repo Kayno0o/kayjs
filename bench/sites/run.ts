@@ -15,7 +15,7 @@ import { development, devSection } from './dev'
 import { coldStart, load } from './load'
 import { serverMemory, startAll, stopEverything } from './serve'
 import { authOf, commitOf, KIND, label, NO_SITES, PHASE, prepare, SITES, staleInstalls, startServices, stopServices, VARIANTS, versionIn } from './sites'
-import { VIEWPORTS, weigh } from './weigh'
+import { checkPages, VIEWPORTS, weigh } from './weigh'
 
 interface Result {
   builds: BuildTime[]
@@ -120,6 +120,10 @@ try {
 
   for (const variant of producing ? VARIANTS : [])
     auth.set(variant, await authOf(variant))
+
+  // Before any page is measured, so a run never reports a sign-in page as another.
+  for (const variant of producing ? VARIANTS : [])
+    await checkPages(variant, auth.get(variant)!)
 
   for (const variant of producing ? VARIANTS : []) {
     const result = results.get(variant)!

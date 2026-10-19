@@ -2,6 +2,7 @@ import type { Variant } from './sites'
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { brotliCompressSync, constants } from 'node:zlib'
+import { label } from './sites'
 
 // What a browser downloads for one page: its HTML, stylesheets, every script it runs with island chunks and their imports, the fonts its stylesheets can load for Latin text, and its images at each viewport. Text weighs as brotli at quality 11 sends it, images and fonts as served.
 export interface Weight {
@@ -266,6 +267,18 @@ function islandChunks(variant: Variant): Map<string, string> {
   }
 
   return chunks
+}
+
+// Fails on the first of the site's pages not answering 200 to the headers its `auth` gave, as one redirecting to sign-in, which would otherwise be measured in its place.
+export async function checkPages(variant: Variant, auth: Record<string, string>): Promise<void> {
+  for (const path of variant.site.pages) {
+    const response = await fetch(`http://127.0.0.1:${variant.ports.backend}${path}`, { headers: { ...auth, accept: 'text/html' }, redirect: 'manual' })
+
+    await response.arrayBuffer()
+
+    if (response.status !== 200)
+      throw new Error(`${label(variant)}: ${path} answered ${response.status}${response.headers.has('location') ? ` to ${response.headers.get('location')}` : ''}, not 200: is its session minted by the site's \`auth\`?`)
+  }
 }
 
 // `auth` holds what the variant's site has every request carry, as a session cookie.
