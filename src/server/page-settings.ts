@@ -7,8 +7,8 @@ export function pageSetting(module: object, name: keyof PageSettings): unknown {
 
 // A setting along a route's modules, layouts outermost first and the page last: the innermost that sets it wins, so a page may undo what its layouts say.
 export function chainSetting(modules: object[], name: keyof PageSettings): unknown {
-  for (const module of modules.toReversed()) {
-    const value = pageSetting(module, name)
+  for (let index = modules.length - 1; index >= 0; index--) {
+    const value = pageSetting(modules[index]!, name)
 
     if (value !== undefined)
       return value

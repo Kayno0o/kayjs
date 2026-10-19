@@ -13,16 +13,32 @@ const rulesCache = new WeakMap<object, Map<string, FormRules | null>>()
 // The schemas of the actions a page's forms post to, for the page swap to check a form before posting it; a page whose forms post to none gets nothing.
 // Under `kay dev` the rules are read again each time, as a messages file may have changed the text a function returns.
 export function formsScript(forms: Set<Action<never, unknown>>, dev?: boolean): string {
-  const rules: Record<string, FormRules> = {}
+  const rules = new Map<string, string>()
 
   for (const action of forms) {
     const form = isAction(action) ? formRules(action, dev) : undefined
 
     if (form)
-      rules[action.url] = form
+      rules.set(action.url, `${escapeScript(JSON.stringify(action.url))}:${rulesJson(form)}`)
   }
 
-  return Object.keys(rules).length === 0 ? '' : `<script type="application/json" data-kay-forms>${JSON.stringify(rules).replaceAll('<', '\\u003c')}</script>`
+  return rules.size === 0 ? '' : `<script type="application/json" data-kay-forms>{${[...rules.values()].join(',')}}</script>`
+}
+
+// The rules as the script holds them, written once per rules object, which `formRules` keeps per schema and locale.
+const rulesJsons = new WeakMap<FormRules, string>()
+
+function rulesJson(form: FormRules): string {
+  let json = rulesJsons.get(form)
+
+  if (json === undefined)
+    rulesJsons.set(form, json = escapeScript(JSON.stringify(form)))
+
+  return json
+}
+
+function escapeScript(json: string): string {
+  return json.replaceAll('<', '\\u003c')
 }
 
 // A stand-in action, which a static site's page holds in place of one it cannot serve, has no schema to read.

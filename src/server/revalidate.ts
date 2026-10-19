@@ -8,17 +8,33 @@ import { invalidationCount, markPageStale, revalidationOf } from './stale-pages'
 // After a render that failed, the longest a page waits before the next request tries again.
 const RETRY_MS = 60_000
 
+function isOutdated(revalidation: Revalidation): boolean {
+  return revalidation.invalidatedAt > revalidation.renderedAfter && Date.now() >= revalidation.retryAt
+}
+
 // A page `invalidatePage` named since its render is rendered again before this resolves, concurrent requests waiting for the same render. One older than its `revalidate` period is rendered again in the background, every request getting the page as it was until that lands.
-export async function revalidateStale(page: ServedPage, render: () => Promise<Response>, report: (error: unknown) => void): Promise<void> {
+export function revalidateStale(page: ServedPage, render: () => Promise<Response>, report: (error: unknown) => void): Promise<void> | undefined {
   const revalidation = revalidationOf(page)
-  const outdated = () => revalidation.invalidatedAt > revalidation.renderedAfter && Date.now() >= revalidation.retryAt
 
-  // A render already running may have started before the page was named, and then lands outdated still: a second one follows it.
-  for (let attempt = 0; attempt < 2 && outdated(); attempt++)
-    await (revalidation.running ??= rerender(page, render, revalidation, report))
+  if (isOutdated(revalidation))
+    return revalidateOutdated(page, render, revalidation, report)
 
+  startIfStale(page, render, revalidation, report)
+
+  return undefined
+}
+
+function startIfStale(page: ServedPage, render: () => Promise<Response>, revalidation: Revalidation, report: (error: unknown) => void): void {
   if (!revalidation.running && Date.now() >= revalidation.staleAt)
     revalidation.running = rerender(page, render, revalidation, report)
+}
+
+async function revalidateOutdated(page: ServedPage, render: () => Promise<Response>, revalidation: Revalidation, report: (error: unknown) => void): Promise<void> {
+  // A render already running may have started before the page was named, and then lands outdated still: a second one follows it.
+  for (let attempt = 0; attempt < 2 && isOutdated(revalidation); attempt++)
+    await (revalidation.running ??= rerender(page, render, revalidation, report))
+
+  startIfStale(page, render, revalidation, report)
 }
 
 async function strengthen(page: ServedPage, html: string): Promise<void> {

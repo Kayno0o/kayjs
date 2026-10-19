@@ -149,6 +149,14 @@ export function slashSpelling(pathname: string, shape: RouterShape, trailingSlas
   if (trailingSlash === 'ignore' || pathname === '/')
     return pathname
 
+  // A path already spelled as wanted, with no catch-all directory to judge, is its own spelling.
+  if (!shape.path.endsWith('/*') && !pathname.startsWith('//')) {
+    const slashed = pathname.endsWith('/')
+
+    if (slashed === (trailingSlash === 'always') && !pathname.endsWith('//'))
+      return pathname
+  }
+
   const path = `/${pathname.replace(EDGE_SLASHES, '')}`
   const directory = shape.path.endsWith('/*') && path.split('/').length === shape.path.split('/').length - 1
 

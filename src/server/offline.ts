@@ -210,9 +210,16 @@ export interface ServiceWorkerOptions {
   publicPages: string[]
 }
 
+const registerScripts = new Map<string, string>()
+
 // What every page carries with `offline` on, registering the worker once the page has loaded.
 export function registerScript(base: string): string {
-  return `<script>if("serviceWorker"in navigator)addEventListener("load",function(){navigator.serviceWorker.register(${JSON.stringify(`${base}${SERVICE_WORKER}`)})})</script>`
+  let script = registerScripts.get(base)
+
+  if (script === undefined)
+    registerScripts.set(base, script = `<script>if("serviceWorker"in navigator)addEventListener("load",function(){navigator.serviceWorker.register(${JSON.stringify(`${base}${SERVICE_WORKER}`)})})</script>`)
+
+  return script
 }
 
 // Serves the worker at `/sw.js` under the base, unless the app already serves that path. Without `offline`, and in `kay dev`, the worker served removes itself, so one a production run or an earlier deploy left never serves a stale page.

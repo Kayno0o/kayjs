@@ -34,27 +34,42 @@ export function serveHealth(app: Elysia, lifecycle: Lifecycle, holds: () => bool
   const timeoutMs = healthTimeoutMs(config)
   let checked: { at: number, healthy: Promise<boolean> } | undefined
 
-  app.onRequest(async ({ request }) => {
+  const asked = (request: Request): boolean => {
     if (request.method !== 'GET' && request.method !== 'HEAD')
-      return undefined
+      return false
 
     const requested = requestUrl(request).pathname
 
     // A trailing slash is the same route, as Elysia routes it.
-    if ((requested !== path && requested !== `${path}/`) || !holds())
+    return (requested === path || requested === `${path}/`) && holds()
+  }
+
+  // Elysia awaits only a hook that is async, so with nothing to check the hook is not, and a request for another path costs no promise.
+  if (!config.check) {
+    app.onRequest(({ request }) => {
+      if (!asked(request))
+        return undefined
+
+      return lifecycle.draining ? wholeResponse('stopping', { status: 503, headers }) : wholeResponse('ok', { headers })
+    })
+
+    return
+  }
+
+  const { check } = config
+
+  app.onRequest(async ({ request }) => {
+    if (!asked(request))
       return undefined
 
     if (lifecycle.draining)
       return wholeResponse('stopping', { status: 503, headers })
 
-    if (!config.check)
-      return wholeResponse('ok', { headers })
-
     const now = Date.now()
 
     // Probes from a balancer and a container check may arrive many a second: the check runs once per window, and probes meanwhile share its answer.
     if (checked === undefined || now - checked.at >= HEALTH_CACHE_MS)
-      checked = { at: now, healthy: runCheck(config.check, timeoutMs, request) }
+      checked = { at: now, healthy: runCheck(check, timeoutMs, request) }
 
     return await checked.healthy ? wholeResponse('ok', { headers }) : wholeResponse('unhealthy', { status: 503, headers })
   })

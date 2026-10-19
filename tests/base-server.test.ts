@@ -16,6 +16,31 @@ describe('base on a server', () => {
     expect(html).toBe('<img srcset="/repo/a.webp 320w, /repo/b.webp 640w"><style>body { background: url("/repo/bg.png") }</style><object data="/repo/x.svg"></object>')
   })
 
+  it('rewrites whole bodies through one rewriter per base without one page leaking into the next, and streams apart', async () => {
+    const big = `<style>${'a{background:url("/bg.png")}'.repeat(10000)}</style>`
+    const small = '<style>p{background:url(/s.png)}</style><a href="/x">x</a>'
+    const expectedBig = `<style>${'a{background:url("/repo/bg.png")}'.repeat(10000)}</style>`
+
+    for (let round = 0; round < 2; round++) {
+      expect(await rebaseHtml(new Response(big), '/repo', true).text()).toBe(expectedBig)
+      expect(await rebaseHtml(new Response(small), '/repo', true).text()).toBe('<style>p{background:url(/repo/s.png)}</style><a href="/repo/x">x</a>')
+      expect(await rebaseHtml(new Response(small), '/other', true).text()).toBe('<style>p{background:url(/other/s.png)}</style><a href="/other/x">x</a>')
+    }
+
+    const stream = (text: string) => new Response(new ReadableStream({ start(controller) {
+      controller.enqueue(new TextEncoder().encode(text.slice(0, 40)))
+      queueMicrotask(() => {
+        controller.enqueue(new TextEncoder().encode(text.slice(40)))
+        controller.close()
+      })
+    } }))
+
+    const [first, second] = await Promise.all([rebaseHtml(stream(big), '/repo').text(), rebaseHtml(stream(small), '/repo').text()])
+
+    expect(first).toBe(expectedBig)
+    expect(second).toBe('<style>p{background:url(/repo/s.png)}</style><a href="/repo/x">x</a>')
+  })
+
   it('puts an SVG xlink:href under the mount point as it does an href', async () => {
     const html = await rebaseHtml(new Response('<svg><use xlink:href="/sprite.svg#a"></use></svg>'), '/repo').text()
 

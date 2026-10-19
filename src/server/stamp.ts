@@ -51,7 +51,26 @@ function stampKey(): Uint8Array {
 
 // A key for `use` derived from the session's, the app's or the preview's secret, which every replica shares, or undefined while none is set.
 export function sharedKey(use: string): Buffer | undefined {
-  return secret.from === 'process' ? undefined : nodeCrypto().createHmac('sha256', secret.key).update(`kay-key\0${use}`).digest()
+  return secret.from === 'process' ? undefined : derivedKey('kay-key', use, secret.key)
+}
+
+// Derived once per secret and use, as each is signed or sealed many a request.
+const derivedKeys = new Map<string, Buffer>()
+let derivedFrom: Uint8Array | undefined
+
+function derivedKey(kind: 'kay-key' | 'kay-seal', use: string, base: Uint8Array): Buffer {
+  if (derivedFrom !== base) {
+    derivedKeys.clear()
+    derivedFrom = base
+  }
+
+  const label = `${kind}\0${use}`
+  let key = derivedKeys.get(label)
+
+  if (!key)
+    derivedKeys.set(label, key = new Bun.CryptoHasher('sha256', base).update(label).digest())
+
+  return key
 }
 
 // A digest of `text` for a store to count under, keyed by the shared secret so a copy of the store cannot be checked against a guessed address; a plain digest while none is set.
@@ -73,7 +92,7 @@ export const STAMP_HOLE = new RegExp(`name="${STAMP_FIELD}" value="${STAMP_MARK}
 
 // `use` keeps what one feature signs from passing for another's.
 export function signText(use: string, text: string): string {
-  return nodeCrypto().createHmac('sha256', stampKey()).update(`${use}\0${text}`).digest('base64url')
+  return new Bun.CryptoHasher('sha256', stampKey()).update(`${use}\0${text}`).digest('base64url')
 }
 
 export function signedText(use: string, text: string, given: string): boolean {
@@ -81,7 +100,7 @@ export function signedText(use: string, text: string, given: string): boolean {
 }
 
 function sealKey(use: string): Buffer {
-  return nodeCrypto().createHmac('sha256', stampKey()).update(`kay-seal\0${use}`).digest()
+  return derivedKey('kay-seal', use, stampKey())
 }
 
 // AES-256-GCM under a key of its own per `use`: what it seals can be neither read nor altered without the secret.

@@ -61,6 +61,10 @@ export function child(value: unknown): string {
   if (typeof value === 'number')
     return fieldMarks.marking === undefined ? String(value) : markedText(value, String(value))
 
+  // A component's render, which holds its markup already.
+  if (typeof value === 'object' && value !== null && !Array.isArray(value))
+    return rendered(value)
+
   let markup = ''
 
   eachChild(value, (part) => {

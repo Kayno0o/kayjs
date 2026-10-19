@@ -125,7 +125,10 @@ export function pageResponder({ client, renderOptions, prerendered, settings, tr
     if (hasFlash(context.request) || handedOverFlash(context.request))
       return forVisitor(render)
 
-    await revalidateStale(page, async () => prerender(route, params, url, key), error => reportServerError(error, context.request, renderOptions.onError))
+    const revalidating = revalidateStale(page, async () => prerender(route, params, url, key), error => reportServerError(error, context.request, renderOptions.onError))
+
+    if (revalidating)
+      await revalidating
 
     // A kept page is compared with a live render after a request that wrote, the first visit after it, and after a revalidation has refreshed its copy; the rest of the time this is a comparison of two numbers.
     if (page.kept === true && (page.checkedAt ?? 0) !== writes.count && !await stillKept(copies, key, page, writes, async () => prerender(route, params, url, key)))

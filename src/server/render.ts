@@ -224,7 +224,8 @@ export async function renderPage(route: ServedRoute, context: RequestContext, pa
 }
 
 async function renderRoute(route: ServedRoute, rendering: Rendering, client: ClientBuild, options: RenderOptions): Promise<Response> {
-  const page = await loadRoute(route, rendering, client, options)
+  const loading = loadRoute(route, rendering, client, options)
+  const page = loading instanceof Promise ? await loading : loading
 
   if (page instanceof Response)
     return page
@@ -242,8 +243,12 @@ async function renderRoute(route: ServedRoute, rendering: Rendering, client: Cli
   }
 }
 
-// The response a guard refusing the request gives, if one does.
-async function refused(route: ServedRoute, rendering: Rendering, client: ClientBuild, options: RenderOptions): Promise<Response | undefined> {
+// The response a guard refusing the request gives, if one does; a route with no guard and no dev tool to tell answers at once.
+function refused(route: ServedRoute, rendering: Rendering, client: ClientBuild, options: RenderOptions): Promise<Response | undefined> | undefined {
+  return route.guards.length === 0 && !options.dev ? undefined : refusedByGuards(route, rendering, client, options)
+}
+
+async function refusedByGuards(route: ServedRoute, rendering: Rendering, client: ClientBuild, options: RenderOptions): Promise<Response | undefined> {
   // Behind a guard the answer is for whoever passed it, whatever the guard read of the request.
   if (route.guards.length > 0)
     readPersonally(rendering.ctx.request)
@@ -333,31 +338,64 @@ function refusalOutcome(error: unknown): string {
 }
 
 // Past the route's guards, its modules and their loads; a refusal or a failed load answers as the page would.
-async function loadRoute(route: ServedRoute, rendering: Rendering, client: ClientBuild, options: RenderOptions): Promise<LoadedRoute | Response> {
+// A route with no guard, whose modules are imported and load nothing, answers at once.
+function loadRoute(route: ServedRoute, rendering: Rendering, client: ClientBuild, options: RenderOptions): LoadedRoute | Response | Promise<LoadedRoute | Response> {
   if (options.dev)
     rendering.matched = route.pattern
 
   // A prerendered page is stored with its headers and served to everyone, so it carries no one render's timings.
   const timing = (options.serverTiming === true || options.dev === true) && !options.prerendering
   const guardsStarted = performance.now()
-  const refusal = await refused(route, rendering, client, options)
+  const refusing = refused(route, rendering, client, options)
+
+  return refusing === undefined ? loadChain(route, rendering, client, options, timing, undefined) : loadAfterGuards(refusing, route, rendering, client, options, timing, guardsStarted)
+}
+
+async function loadAfterGuards(refusing: Promise<Response | undefined>, route: ServedRoute, rendering: Rendering, client: ClientBuild, options: RenderOptions, timing: boolean, guardsStarted: number): Promise<LoadedRoute | Response> {
+  const refusal = await refusing
 
   if (refusal)
     return refusal
 
-  const guards = route.guards.length > 0 ? performance.now() - guardsStarted : undefined
+  return loadChain(route, rendering, client, options, timing, route.guards.length > 0 ? performance.now() - guardsStarted : undefined)
+}
+
+function loadChain(route: ServedRoute, rendering: Rendering, client: ClientBuild, options: RenderOptions, timing: boolean, guards: number | undefined): LoadedRoute | Response | Promise<LoadedRoute | Response> {
   const { files } = routeChain(route)
+  const modules = timing || options.dev ? undefined : knownModules(files, options)
+
+  if (modules === undefined || modules.some(module => module.load))
+    return loadChainAsync(route, files, rendering, client, options, timing, guards)
+
+  const loaded = new Map<string, Loaded>()
+
+  try {
+    readRouteQuery(files, modules, rendering, options)
+
+    return { files, modules, data: modules.map((_, index) => settledEmpty(files[index]!, loaded)), loaded, timings: undefined, phases: undefined }
+  }
+  catch (error) {
+    return renderFailure(error, route.special, rendering, loaded, client, options)
+  }
+}
+
+// Read once the guards let the request through, so a refused query never renders what they protect; the layouts and the page share it.
+function readRouteQuery(files: string[], modules: PageModule[], rendering: Rendering, options: RenderOptions): void {
+  const query = chainQuery(files, modules)
+
+  if (query !== undefined && !options.prerendering)
+    rendering.ctx.query = readQuery(query, rendering.ctx.url)
+}
+
+async function loadChainAsync(route: ServedRoute, files: string[], rendering: Rendering, client: ClientBuild, options: RenderOptions, timing: boolean, guards: number | undefined): Promise<LoadedRoute | Response> {
   const loaded = new Map<string, Loaded>()
 
   try {
     const importsStarted = performance.now()
     const modules = await importAll(files, options)
     const imports = performance.now() - importsStarted
-    // Read once the guards let the request through, so a refused query never renders what they protect; the layouts and the page share it.
-    const query = chainQuery(files, modules)
 
-    if (query !== undefined && !options.prerendering)
-      rendering.ctx.query = readQuery(query, rendering.ctx.url)
+    readRouteQuery(files, modules, rendering, options)
 
     const timings = timing ? Array.from<number>({ length: files.length }) : undefined
 
@@ -367,7 +405,8 @@ async function loadRoute(route: ServedRoute, rendering: Rendering, client: Clien
     }
 
     const loadsStarted = performance.now()
-    const data = await runLoads(files, modules, rendering.ctx, loaded, timings)
+    const loading = runLoads(files, modules, rendering.ctx, loaded, timings)
+    const data = loading instanceof Promise ? await loading : loading
 
     return { files, modules, data, loaded, timings, phases: timing ? { guards, imports, loads: performance.now() - loadsStarted } : undefined }
   }
@@ -377,11 +416,12 @@ async function loadRoute(route: ServedRoute, rendering: Rendering, client: Clien
 }
 
 // Every load at once, each settling into `loaded`, where one that went through already is reused; when several fail, the outermost one throws.
-async function runLoads(files: string[], modules: PageModule[], ctx: PageContext<Record<string, unknown>>, loaded: Map<string, Loaded>, timings?: number[]): Promise<Record<string, unknown>[]> {
-  // Most chains load nothing: their data is settled at once, without a promise per module.
-  if (!modules.some(module => module.load))
-    return modules.map((_, index) => settledEmpty(files[index]!, loaded))
+// Most chains load nothing: their data is settled at once, without a promise per module.
+function runLoads(files: string[], modules: PageModule[], ctx: PageContext<Record<string, unknown>>, loaded: Map<string, Loaded>, timings?: number[]): Record<string, unknown>[] | Promise<Record<string, unknown>[]> {
+  return modules.some(module => module.load) ? runLoadsAsync(files, modules, ctx, loaded, timings) : modules.map((_, index) => settledEmpty(files[index]!, loaded))
+}
 
+async function runLoadsAsync(files: string[], modules: PageModule[], ctx: PageContext<Record<string, unknown>>, loaded: Map<string, Loaded>, timings?: number[]): Promise<Record<string, unknown>[]> {
   const loads = await Promise.allSettled(modules.map(async (module, index) => {
     const prior = loaded.get(files[index]!)
 
@@ -451,11 +491,27 @@ function serverTiming(files: string[], modules: PageModule[], timings: number[],
   return [...phases, ...each, `render;dur=${render.toFixed(1)}`].join(', ')
 }
 
+// The encodings a page holds, by its `encoded` object, which a render replaces whole and never changes.
+const encodingsOf = new WeakMap<ServedPage['encoded'], { names: StoredEncoding[], available: Set<StoredEncoding> }>()
+
+function storedEncodings(encoded: ServedPage['encoded']): { names: StoredEncoding[], available: Set<StoredEncoding> } {
+  let known = encodingsOf.get(encoded)
+
+  if (!known) {
+    const names = Object.keys(encoded) as StoredEncoding[]
+
+    encodingsOf.set(encoded, known = { names, available: new Set(names) })
+  }
+
+  return known
+}
+
 // What `kay build` rendered, behind the page's guards, revalidated by its ETag.
 // `spliced` gives the page with what changes per request filled in, as its stamps, gzipped when the browser takes it.
 export async function servePrerendered(route: ServedRoute, page: ServedPage, params: Record<string, unknown>, context: RequestContext, client: ClientBuild, options: RenderOptions = {}, spliced?: () => Promise<{ body: Written, gzip: boolean }>): Promise<Response> {
   const rendering = createRendering(context, params, options)
-  const refusal = await refused(route, rendering, client, withEditor(route, options))
+  const refusing = refused(route, rendering, client, withEditor(route, options))
+  const refusal = refusing === undefined ? undefined : await refusing
 
   if (refusal)
     return refusal
@@ -480,8 +536,8 @@ export async function servePrerendered(route: ServedRoute, page: ServedPage, par
     return respond(rendering, new Rebased(body))
   }
 
-  const encodings = Object.keys(page.encoded) as StoredEncoding[]
-  const encoding = preferredEncoding(context.request.headers.get('accept-encoding'), new Set(encodings))
+  const { names: encodings, available } = storedEncodings(page.encoded)
+  const encoding = preferredEncoding(context.request.headers.get('accept-encoding'), available)
   // Each encoding is a representation of its own, with its own tag.
   const etag = encoding ? `${page.etag.slice(0, -1)}-${encoding}"` : page.etag
 
@@ -558,7 +614,7 @@ export async function renderServerIslands(route: ServedRoute, context: RequestCo
         return posts ? markup + inScope(() => formChecks(forms, options.dev, client.entry)) : markup
       }))
       const base = options.base ?? ''
-      const html = base === '' ? settled : await Promise.all(settled.map(async markup => rebaseHtml(new Response(markup, { headers: { 'content-type': 'text/html' } }), base).text()))
+      const html = base === '' ? settled : await Promise.all(settled.map(async markup => rebaseHtml(new Response(markup, { headers: { 'content-type': 'text/html' } }), base, true).text()))
 
       // Blocks the islands left out still settle, so one failing reports nothing.
       void Promise.allSettled(deferred.map(async block => block.value))
@@ -718,7 +774,7 @@ function respond(rendering: Rendering, output: Body | Rebased): Response {
   const init = { status: rendering.status, headers: rendering.headers }
   const response = body instanceof ReadableStream || body instanceof Blob ? new Response(body, init) : wholeResponse(body, init, unwrapped instanceof Pieced ? unwrapped.pieces : undefined)
 
-  return !(output instanceof Rebased) && rendering.base !== '' && (typeof body === 'string' || body instanceof ReadableStream) ? rebaseHtml(response, rendering.base) : response
+  return !(output instanceof Rebased) && rendering.base !== '' && (typeof body === 'string' || body instanceof ReadableStream) ? rebaseHtml(response, rendering.base, typeof body === 'string') : response
 }
 
 // A page whose render read the session or a cookie is for that visitor alone: no CDN may keep it, unless the page set its own caching.
@@ -778,15 +834,18 @@ async function renderFailure(error: unknown, special: SpecialPages, rendering: R
 // Inside its layouts, reusing what their loads returned for the failed page; bare when one of them is what failed.
 async function renderSpecialPage(page: SpecialPage, rendering: Rendering, loaded: Map<string, Loaded>, client: ClientBuild, options: RenderOptions): Promise<string | Pieced | ReadableStream<Uint8Array> | undefined> {
   const layoutsFailed = page.layouts.some(file => loaded.get(file)?.status === 'rejected')
+  const chains = specialChains(page)
 
-  for (const files of layoutsFailed ? [[page.file]] : [[...page.layouts, page.file], [page.file]]) {
+  for (const files of layoutsFailed ? [chains.alone] : [chains.full, chains.alone]) {
     try {
-      const modules = await importAll(files, options)
+      const modules = knownModules(files, options) ?? await importAll(files, options)
 
       if (!rendering.queryRead() && !options.prerendering)
         rendering.ctx.query = readQueryLeniently(chainQuery(files, modules), rendering.ctx.url)
 
-      return renderDocument(files, modules, await runLoads(files, modules, rendering.ctx, loaded), client, rendering, withEditor(page, options))
+      const loading = runLoads(files, modules, rendering.ctx, loaded)
+
+      return renderDocument(files, modules, loading instanceof Promise ? await loading : loading, client, rendering, withEditor(page, options))
     }
     catch (error) {
       reportServerError(error, rendering.ctx.request, options.onError)
@@ -794,6 +853,18 @@ async function renderSpecialPage(page: SpecialPage, rendering: Rendering, loaded
   }
 
   return undefined
+}
+
+// A special page's chains, one array each time it renders, so the modules cached by chain array are found again.
+const specialChainsOf = new WeakMap<SpecialPage, { full: string[], alone: string[] }>()
+
+function specialChains(page: SpecialPage): { full: string[], alone: string[] } {
+  let chains = specialChainsOf.get(page)
+
+  if (!chains)
+    specialChainsOf.set(page, chains = { full: [...page.layouts, page.file], alone: [page.file] })
+
+  return chains
 }
 
 // The head a page starts from, a page or a layout above it saying `noindex` asking search engines to leave it out; a layout or the page may still set its own `robots`.
@@ -804,8 +875,13 @@ function pageHead(modules: PageModule[], head: HeadOptions | undefined): HeadOpt
   return { ...head, defaults: [...head?.defaults ?? [], { tag: 'meta', props: { name: 'robots', content: 'noindex' } }] }
 }
 
-// Each route's modules by its chain, which `routeChain` keeps one array of, a special page's chain being new each time: a module once imported stays for the process.
+// Each route's modules by its chain, which `routeChain` and `specialChains` keep one array of: a module once imported stays for the process.
 const chainModules = new WeakMap<string[], PageModule[]>()
+
+// The modules of a chain imported before, when no editor has to be read again.
+function knownModules(files: string[], options: RenderOptions): PageModule[] | undefined {
+  return options.editor !== undefined && editing() ? undefined : chainModules.get(files)
+}
 
 async function importAll(files: string[], options: RenderOptions): Promise<PageModule[]> {
   if (options.editor !== undefined && editing())

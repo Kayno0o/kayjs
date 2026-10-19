@@ -187,8 +187,19 @@ export function queryRules(schema: unknown): QueryRules | undefined {
   return rules
 }
 
+// Written once per rules object, which `queryRules` keeps per schema.
+const queryScripts = new WeakMap<QueryRules, string>()
+
 export function queryScript(rules: QueryRules | undefined): string {
-  return rules ? `<script type="application/json" data-kay-query>${JSON.stringify(rules).replaceAll('<', '\\u003c')}</script>` : ''
+  if (!rules)
+    return ''
+
+  let script = queryScripts.get(rules)
+
+  if (script === undefined)
+    queryScripts.set(rules, script = `<script type="application/json" data-kay-query>${JSON.stringify(rules).replaceAll('<', '\\u003c')}</script>`)
+
+  return script
 }
 
 function constantsType(values: unknown[]): 'number' | 'boolean' | 'string' {

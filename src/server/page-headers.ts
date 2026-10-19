@@ -26,7 +26,10 @@ export function withPageHeaders(respond: PageResponder, options: SecurityOptions
     if (!own)
       byRoute.set(key, own = loadHeaders(byRoute, key, route, options, site))
 
-    const [response, headers] = await Promise.all([respond(route, params, context, url), own])
+    // Once loaded the headers are read at once, without a promise to wait for; the first request loads them while the page renders.
+    const [response, headers] = Bun.peek.status(own) === 'fulfilled'
+      ? [await respond(route, params, context, url), Bun.peek(own) as RouteHeaders | undefined] as const
+      : await Promise.all([respond(route, params, context, url), own])
 
     if (!headers)
       return response

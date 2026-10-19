@@ -28,8 +28,23 @@ export function basePath(value: string | undefined): string {
   return trimmed
 }
 
+// A body held whole is rewritten before `transform` returns, so one rewriter per base serves every such response; a stream's chunks arrive between other requests', so each stream gets a rewriter of its own, as the stylesheet it gathers is the rewriter's.
+const wholeRewriters = new Map<string, HTMLRewriter>()
+
 // A page's own links, assets, forms and inline styles under the mount point, as it streams out.
-export function rebaseHtml(response: Response, base: string): Response {
+export function rebaseHtml(response: Response, base: string, whole = false): Response {
+  if (!whole)
+    return rebaser(base).transform(response)
+
+  let rewriter = wholeRewriters.get(base)
+
+  if (!rewriter)
+    wholeRewriters.set(base, rewriter = rebaser(base))
+
+  return rewriter.transform(response)
+}
+
+function rebaser(base: string): HTMLRewriter {
   const withBase = (url: string) => joinBase(base, url)
   let style = ''
   const rewriter = new HTMLRewriter()
@@ -64,7 +79,7 @@ export function rebaseHtml(response: Response, base: string): Response {
     },
   })
 
-  return rewriter.transform(response)
+  return rewriter
 }
 
 export function rebaseCss(css: string, base: string): string {

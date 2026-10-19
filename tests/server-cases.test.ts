@@ -1,6 +1,9 @@
+import type { RouterShape } from '../src/server/params'
 import { beforeAll, describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
 import { pages } from '../src/server'
+import { slashSpelling } from '../src/server/params'
+import { canonicalPath, decodePath, guardUrl } from '../src/server/routes'
 
 // Pins what a page request answers (status, headers in order, body) on the paths the per-request work touches, so a change to that work shows any byte it moves.
 const routes = 'tests/fixtures/server-cases/src/routes'
@@ -58,5 +61,35 @@ describe.each(Object.entries(sites))('the page answers of a site with %s', (_nam
 
       expect(await seen(await app.handle(new Request(`http://localhost${prefix}${path}`)))).toEqual(first)
     }
+  })
+})
+
+// What the path helpers answer for plain and odd paths, so the shortcut for a plain path is the long way's answer.
+describe('the path spellings', () => {
+  const PATHS = ['/', '/a', '/a/', '/a//', '//a', '//', '/a/b/c', '/a%2Fb', '/a%40b', '/%61dmin', '/caf%C3%A9', '/a@b', '/a!b~c*d\'e(f)', '/a.b', '/a%ZZ', '/100%', '/a;b,c', '/a+b', '/a=b&c', '/$', '/a%5Cb', '/%E2%82%AC']
+  const reference = (pathname: string) => pathname.split('/').map(segment => encodeURIComponent(decodePath(segment) ?? segment)).join('/')
+
+  it('canonicalPath keeps plain text and spells the rest as the build does', () => {
+    for (const path of PATHS)
+      expect(canonicalPath(path)).toBe(reference(path))
+  })
+
+  it('guardUrl reads each path one way', () => {
+    const expected: Record<string, string> = { '/a': '/a', '//a': '/a', '/%61dmin': '/admin', '/a%2Fb': '/a%2Fb', '/a%40b': '/a@b', '/caf%C3%A9': '/caf%C3%A9', '/a%5Cb': '/a%5Cb', '/100%25': '/100%25', '/a//': '/a//' }
+
+    for (const [path, spelled] of Object.entries(expected))
+      expect(guardUrl(`http://localhost${path}`).pathname).toBe(spelled)
+  })
+
+  it('slashSpelling leaves a path spelled as wanted, and spells the others the way wanted', () => {
+    const plain = { path: '/a' } as RouterShape
+    const rest = { path: '/a/*' } as RouterShape
+
+    for (const [path, never, always] of [['/a', '/a', '/a/'], ['/a/', '/a', '/a/'], ['/a//', '/a', '/a/'], ['//a', '/a', '/a/'], ['//a//', '/a', '/a/'], ['/', '/', '/']] as const) {
+      expect([slashSpelling(path, plain, 'never'), slashSpelling(path, plain, 'always')]).toEqual([never, always])
+      expect(slashSpelling(path, plain, 'ignore')).toBe(path)
+    }
+
+    expect([slashSpelling('/a', rest, 'never'), slashSpelling('/a/', rest, 'never'), slashSpelling('/a/b', rest, 'never'), slashSpelling('/a/b/', rest, 'never')]).toEqual(['/a/', '/a/', '/a/b', '/a/b'])
   })
 })
