@@ -2,7 +2,7 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 import { freshPrefix, withIds } from './uid'
 
 // The page the server is rendering: its token keeps ids apart from those of a page swapped out around a persistent island.
-let page: { token: string, islands: number } | undefined
+let page: { token: string, islands: number, kept: Map<string, number> } | undefined
 // A token to use in place of a random one, scoped to the render it wraps, so renders running together each keep their own.
 const fixedToken = new AsyncLocalStorage<string>()
 
@@ -23,7 +23,7 @@ export function pageIds<T>(run: () => T, salt?: string): T {
   const fixed = fixedToken.getStore()
   const token = fixed === undefined ? `k${Math.random().toString(36).slice(2, 8)}` : `${fixed}${salt === undefined ? '' : `_${salt}`}`
 
-  page = { token, islands: 0 }
+  page = { token, islands: 0, kept: new Map() }
 
   try {
     return withIds(`${page.token}-`, run)
@@ -34,6 +34,17 @@ export function pageIds<T>(run: () => T, salt?: string): T {
 }
 
 // The prefix of the next island the server renders, written on its slot.
-export function islandPrefix(): string {
-  return page ? `${page.token}-${page.islands++}-` : freshPrefix()
+// A `persist` island takes it from its key instead of its place, so the page that replaces one at the same URL, with the same token, cannot give another island the ids the kept one still holds.
+export function islandPrefix(persist?: string): string {
+  if (!page)
+    return freshPrefix()
+
+  if (persist === undefined)
+    return `${page.token}-${page.islands++}-`
+
+  const seen = page.kept.get(persist) ?? 0
+
+  page.kept.set(persist, seen + 1)
+
+  return `${page.token}-p${Bun.hash(persist).toString(36)}${seen === 0 ? '' : `_${seen}`}-`
 }

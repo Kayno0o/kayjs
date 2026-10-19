@@ -123,7 +123,7 @@ export function island<P extends object>(id: string, component: ((props: P) => J
       throw new IslandPropsError(`${id} ${why}, so it renders as an island: it is passed an action but does not type a prop as one, so the browser could not read it; import \`Action\` from 'kay' in its script, as the type of that prop`)
 
     // The browser counts the island's ids from it again as it hydrates.
-    const ids = islandPrefix()
+    const ids = islandPrefix(persist)
 
     depth++
 

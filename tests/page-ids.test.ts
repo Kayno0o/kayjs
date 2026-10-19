@@ -2,6 +2,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
+import { islandPrefix, pageIds, withPageToken } from '../src/runtime/uid.server'
 import { pages } from '../src/server'
 
 const FIELD = '---\nimport { uid } from \'kay\'\n\nconst { label } = props<{ label: string }>()\nconst id = uid()\n---\nlabel(for={id}) {label}\ninput(id={id})\n'
@@ -71,5 +72,26 @@ describe('the ids of a page rendered per request', () => {
 
     for (const [index, html] of htmls.entries())
       expect(html).toBe(htmls[index % paths.length]!)
+  })
+})
+
+describe('the prefix of a persistent island', () => {
+  const render = async (before: number): Promise<{ kept: string, others: string[] }> => withPageToken('kabc', async () => pageIds(() => {
+    const others = Array.from({ length: before }, () => islandPrefix())
+
+    return { kept: islandPrefix('chat'), others: [...others, islandPrefix()] }
+  }))
+
+  it('comes from its key, not its place, so the same URL rendered with another island before it keeps it and shares it with no other', async () => {
+    const [old, next] = [await render(0), await render(2)]
+
+    expect(next.kept).toBe(old.kept)
+    expect([...next.others, ...old.others]).not.toContain(old.kept)
+  })
+
+  it('tells two islands of one key apart', async () => {
+    const [first, second] = await withPageToken('kabc', async () => pageIds(() => [islandPrefix('chat'), islandPrefix('chat')]))
+
+    expect(second).not.toBe(first)
   })
 })
