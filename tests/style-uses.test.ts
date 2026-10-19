@@ -279,6 +279,29 @@ describe('which classes are set from a value the build cannot read', () => {
     expect(await unresolved('pick(x).classList.add(pick(x).className)\n')).toEqual([])
   })
 
+  it('reads back the class of a receiver made of any expression, and keeps another receiver open', async () => {
+    expect(await unresolved('qs(`#${id}`).className = qs(`#${id}`).className + \' x\'\n')).toEqual([])
+    expect(await unresolved('list.at(-1).className = list.at(-1).className + \' x\'\n')).toEqual([])
+    expect(await unresolved('els[i + 1].className = els[i + 1].className + \' x\'\n')).toEqual([])
+    expect(await unresolved('get({ a }, "b").className = get({ a }, \'b\').className + \' x\'\n')).toEqual([])
+    expect(await unresolved('items.find(x => x.id === id).className = items.find(x => x.id === id).className + \' x\'\n')).toEqual([])
+    expect(await unresolved('els[i].className = els[j].className + \' x\'\n')).toEqual(['1 className =  x'])
+    expect(await unresolved('get({ a }).className = get({ b }).className + \' x\'\n')).toEqual(['1 className =  x'])
+  })
+
+  it('judges a name that is a parameter of a method, a catch or an arrow with a default as open', async () => {
+    for (const bound of ['class A { m(tone) { el.classList.add(tone) } }', 'class A { async m(tone: string) { el.classList.add(tone) } }', 'const o = { m(a, tone = \'p-1\') { el.classList.add(tone) } }', 'try {} catch (tone) { el.classList.add(tone) }', 'const f = (tone = dyn()) => { el.classList.add(tone) }'])
+      expect(await unresolved(`let tone = 'mt-1'\n${bound}\n`)).toEqual(['2 classList.add '])
+
+    expect(await unresolved('let tone = \'mt-1\'\nif (tone) { el.classList.add(tone) }\nwhile (tone) { use(tone) }\n')).toEqual([])
+  })
+
+  it('reads a fence line only in a .kay file, and only as the compiler does', async () => {
+    expect(await unresolved('let tone = \'mt-1\'\nconst s = `\n---\n`\nconst t = \'tone = dyn()\'\nel.classList.add(tone)\n')).toEqual([])
+    expect(await unresolved('let tone = \'mt-1\'\nconst s = `\n--- not a fence\n`\nconst t = \'tone = dyn()\'\nel.classList.add(tone)\n---\np a\n', '', 'page.kay')).toEqual([])
+    expect(await unresolved('let tone = \'mt-1\'\nel.classList.add(tone)\n--- server\nconst t = 1\n---\np press the ` key\nbutton(onclick={() => tone = dyn()}) a\n', '', 'page.kay')).toEqual(['2 classList.add mt-1'])
+  })
+
   it('ignores an assignment written in a string, a template or a comment', async () => {
     expect(await unresolved('const tone = \'mt-1\'\n// tone = dyn()\n/* tone = dyn() */\nconst note = \'tone = dyn()\'\nconst more = `tone = ${1}`\nel.classList.add(tone)\n')).toEqual([])
     expect(await unresolved('const tone = \'mt-1\'\nconst url = \'http://x\'\nconst re = /[\'"]/\ntone = dyn()\nel.classList.add(tone)\n')).toEqual(['5 classList.add mt-1'])

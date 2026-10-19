@@ -146,33 +146,17 @@ const EXTENSION = /\.\w+$/
 const ASYNC_BEFORE = /\basync\s*$/
 const TRAILING_DOT = /\??\.$/
 
-// The chain `a.b.c`, `this.a`, `a[0].b` or `a.b('x').c` a node reads, written the same whatever the spacing and `?.`, or undefined for anything else.
-function chainOf(node: Node): string | undefined {
-  if (node.type === 'Identifier')
-    return node.name
+const SPAN_KEYS = new Set(['start', 'end', 'loc', 'range', 'extra', 'optional', 'leadingComments', 'trailingComments', 'innerComments', 'comments', 'errors', 'tokens'])
+const OPTIONAL_TYPE = /^Optional\B/
 
-  if (node.type === 'ThisExpression')
-    return 'this'
-
-  if (node.type === 'MemberExpression' || node.type === 'OptionalMemberExpression') {
-    const inner = chainOf(node.object)
-
-    if (inner === undefined)
+// What a node reads as, written the same whatever the spacing, the quotes and `?.`: the receiver of `el.className = el.className + x` is told by it from another element, whatever it is made of, a call, an index or a cast.
+function chainOf(node: Node): string {
+  return JSON.stringify(node, (key, value: unknown) => {
+    if (SPAN_KEYS.has(key))
       return undefined
 
-    if (!node.computed)
-      return node.property.type === 'Identifier' ? `${inner}.${node.property.name}` : undefined
-
-    return node.property.type === 'StringLiteral' || node.property.type === 'NumericLiteral' ? `${inner}[${JSON.stringify(node.property.value)}]` : undefined
-  }
-
-  if (node.type !== 'CallExpression' && node.type !== 'OptionalCallExpression')
-    return undefined
-
-  const callee = chainOf(node.callee)
-  const args = node.arguments.map(argument => argument.type === 'StringLiteral' || argument.type === 'NumericLiteral' ? JSON.stringify(argument.value) : chainOf(argument))
-
-  return callee === undefined || args.includes(undefined) ? undefined : `${callee}(${args.join(',')})`
+    return key === 'type' && typeof value === 'string' ? value.replace(OPTIONAL_TYPE, '') : value
+  })
 }
 
 const NAME_END = /[\w$]+$/
@@ -543,7 +527,7 @@ function scopeOf(text: string, file: string | undefined, reads: Reads, component
     props,
     initializers(name) {
       if (!initialized.has(name))
-        initialized.set(name, initializersOf(text, code ??= codeOf(text), name))
+        initialized.set(name, initializersOf(text, code ??= codeOf(text, file?.endsWith('.kay') === true), name))
 
       return initialized.get(name)
     },
@@ -658,22 +642,80 @@ function functionsOf(text: string, name: string, initial: Expression[] | undefin
   return found.length === 0 ? undefined : found
 }
 
+const CONTROL_KEYWORDS = new Set(['if', 'while', 'switch', 'with', 'for', 'return', 'typeof', 'void', 'delete', 'await', 'yield', 'new', 'in', 'of', 'else', 'do', 'throw', 'case'])
+const TRAILING_WORD = /[\w$]+$/
+const BODY_OR_ARROW = /^\s*(?::[^{;=]+)?(?:\{|=>)/
+const OPENING = '([{'
+const CLOSING = ')]}'
+
+// The index of the `(` enclosing `at`, looking out through braces and brackets, or undefined at the top of the text.
+function enclosingParen(code: string, at: number): number | undefined {
+  let depth = 0
+
+  for (let i = at - 1; i >= 0; i--) {
+    if (CLOSING.includes(code[i]!)) {
+      depth++
+    }
+    else if (OPENING.includes(code[i]!)) {
+      if (depth > 0)
+        depth--
+      else if (code[i] === '(')
+        return i
+    }
+  }
+
+  return undefined
+}
+
+// The index after the `)` closing the `(` at `open`.
+function closeOf(code: string, open: number): number {
+  let depth = 0
+
+  for (let i = open; i < code.length; i++) {
+    if (OPENING.includes(code[i]!))
+      depth++
+    else if (CLOSING.includes(code[i]!) && --depth === 0)
+      return i + 1
+  }
+
+  return code.length
+}
+
+// Whether `name` is written in the parameters of a method, a function, an arrow or a `catch`: a parenthesis followed by a body or `=>`, after something that is no keyword taking a condition.
+function inParameters(code: string, name: string): boolean {
+  for (const match of code.matchAll(new RegExp(`(?<![\\w$.])${RegExp.escape(name)}(?![\\w$])`, 'g'))) {
+    const open = enclosingParen(code, match.index)
+
+    if (open === undefined)
+      continue
+
+    const word = TRAILING_WORD.exec(code.slice(0, open).trimEnd())?.[0]
+
+    if ((word === undefined || !CONTROL_KEYWORDS.has(word)) && BODY_OR_ARROW.test(code.slice(closeOf(code, open))))
+      return true
+  }
+
+  return false
+}
+
 // Whether `name` is also a parameter, a loop's variable, a destructuring target or a record some line writes into, whose values no initializer tells.
-function shadowed(text: string, name: string): boolean {
+// `code` is the text with its strings and comments blanked, where a parameter list of a method or an arrow is looked for.
+function shadowed(text: string, name: string, code?: string): boolean {
   const escaped = RegExp.escape(name)
 
-  return new RegExp(`\\b(?:const|let|var)\\s+${escaped}\\s+(?:of|in)\\b|\\bfor\\s*\\(\\s*${escaped}\\s+(?:of|in)\\b|\\bfunction\\b[^(]*\\([^)]*(?<![\\w$.])${escaped}\\b|(?<![\\w$.])${escaped}\\s*=>|\\([^()]*(?<![\\w$.])${escaped}\\b[^()]*\\)\\s*(?::[^=>{;]+)?=>|\\[[^\\]]*(?<![\\w$.])${escaped}\\b[^\\]]*\\]\\s*=(?![=>])|\\{[^{}]*(?<![\\w$.])${escaped}\\b[^{}]*\\}\\s*=(?![=>])|(?<![\\w$.])${escaped}\\s*(?:\\[[^\\]]*\\]|\\.[\\w$]+)\\s*=(?![=>])`).test(text)
+  return (code !== undefined && inParameters(code, name)) || new RegExp(`\\b(?:const|let|var)\\s+${escaped}\\s+(?:of|in)\\b|\\bfor\\s*\\(\\s*${escaped}\\s+(?:of|in)\\b|\\bfunction\\b[^(]*\\([^)]*(?<![\\w$.])${escaped}\\b|(?<![\\w$.])${escaped}\\s*=>|\\([^()]*(?<![\\w$.])${escaped}\\b[^()]*\\)\\s*(?::[^=>{;]+)?=>|\\[[^\\]]*(?<![\\w$.])${escaped}\\b[^\\]]*\\]\\s*=(?![=>])|\\{[^{}]*(?<![\\w$.])${escaped}\\b[^{}]*\\}\\s*=(?![=>])|(?<![\\w$.])${escaped}\\s*(?:\\[[^\\]]*\\]|\\.[\\w$]+)\\s*=(?![=>])`).test(text)
 }
 
 const WHITESPACE_CHAR = /\s/
 const REGEX_AFTER = /[(,=:[!&|?{};*%<>~^]$/
 const KEYWORD_BEFORE_REGEX = /\b(?:return|typeof|case|void|delete|throw|in|of)$/
 
-const FENCE = /^---.*$/gm
+// A fence line as the compiler reads it: `---` alone, or followed by a label or type parameters.
+const FENCE = /^---(?:[ \t]*$|[ \t]*[a-z<].*$)/gm
 
-// `codeOf` of a source: the scripts of a `.kay` file are masked and its template, after the last fence, is left as it is, where a quote or a backtick of the markup's text is no string.
-function codeOf(text: string): string {
-  const fences = [...text.matchAll(FENCE)]
+// `codeOf` of a source: the scripts of a `.kay` file are masked and its template, after the last fence, is left as it is, where a quote or a backtick of the markup's text is no string. Any other file has no fence, whatever a line of its strings holds.
+function codeOf(text: string, kay: boolean): string {
+  const fences = kay ? [...text.matchAll(FENCE)] : []
 
   if (fences.length === 0)
     return maskScript(text)
@@ -822,7 +864,7 @@ function initializersOf(text: string, code: string, name: string): Expression[] 
   const escaped = RegExp.escape(name)
   const declared = new RegExp(`\\b(?:const|let|var)\\s+${escaped}\\b`)
 
-  if (!declared.test(code) || shadowed(text, name))
+  if (!declared.test(code) || shadowed(text, name, code))
     return undefined
 
   const initialized = new RegExp(`\\b(?:const|let|var)\\s+${escaped}\\b\\s*(?::[^=\\n]+)?=(?![=>])\\s*`, 'g')
