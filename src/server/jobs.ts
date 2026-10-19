@@ -79,7 +79,7 @@ type AutoLock = ReturnType<typeof autoLock>
 // A run that throws is logged and the next one comes as planned; a stopping server waits for the run in progress.
 export function schedule<const Every extends Duration>(every: Every & PositiveDuration<Every>, jobs: Jobs, options?: EveryOptions): Elysia
 export function schedule<const Cron extends string>(cron: Cron & CronSchedule<Cron>, jobs: Jobs, options?: ScheduleOptions): Elysia
-export function schedule<const Table extends Record<string, Jobs>>(table: Table & { readonly [Key in keyof Table & string]: Jobs & WhenOf<Key> }, options?: ScheduleOptions): Elysia
+export function schedule<const Table extends Record<string, Jobs>>(table: Table & { readonly [Key in keyof Table & string]: WhenOf<Key> }, options?: ScheduleOptions): Elysia
 export function schedule(first: Duration | string | Record<string, Jobs>, second?: Jobs | ScheduleOptions, third?: ScheduleOptions) {
   const table = typeof first === 'object'
   const entries = table ? Object.entries(first) : [[first, second as Jobs] as const]

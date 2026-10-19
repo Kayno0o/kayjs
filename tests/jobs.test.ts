@@ -123,6 +123,21 @@ describe('schedule', () => {
     expect(typed(() => schedule('0 0 31 04 *', () => undefined))).toBe(true)
   })
 
+  it('types a table entry\'s list with a conditional spread anywhere in it', () => {
+    const typed = (_build: () => unknown) => true
+    const on = Math.random() > 2
+    const a = async (): Promise<void> => undefined
+    const b = async (): Promise<number> => 1
+
+    expect(typed(() => [
+      schedule({ '* * * * *': [...(on ? [] : [a]), b] }),
+      schedule({ '* * * * *': [...(on ? [] : [a]), a] }),
+      schedule({ '* * * * *': [b, ...(on ? [] : [a])] }),
+      schedule({ '* * * * *': [a, ...(on ? [] : [b]), a], '30s': [...(on ? [] : [b])], '@daily': a }),
+      schedule('* * * * *', [...(on ? [] : [a]), b]),
+    ])).toBe(true)
+  })
+
   it('runs a list of jobs, and a table of schedules to jobs, each on its own schedule from one plugin', async () => {
     const cron = fakeCron()
     const runs: string[] = []
