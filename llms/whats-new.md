@@ -2,6 +2,10 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
+## Unreleased
+
+- The `deprecated-api-tool` lint, which only warned while `kay upgrade` moved an app from before 1.51, is gone ([Checks](checks.md)).
+
 ## 1.55.0
 
 - A page rendered per request draws its ids (`uid()`, island prefixes, `await` block numbers) from its route and URL instead of at random, so a page that reads nothing from its visitor renders the same bytes every time and its compressed copy is kept: a 68 KB page with a deferred block and inlined styles serves 3.3k req/s at 377 us of CPU per request where it served 2.1k at 582 ([Compression](proxy-and-security.md#compression)).
