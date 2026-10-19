@@ -4,6 +4,7 @@ import type { Stop } from '../server/pure-page'
 import type { CheckDiagnostic } from './index'
 import { lintLevel } from '../compiler/lints'
 import { localizedTexts } from '../runtime/localized'
+import { configLocator } from './config-keys'
 
 // What search results show of a description before cutting it.
 export const DESCRIPTION_LENGTH = 160
@@ -47,18 +48,19 @@ export function isPublicSite(config: SiteSeo, exported = false): boolean {
 }
 
 // What kay.config.ts leaves out of a public site's head; `sources` are the project's .kay files, any of which may set an `og:image`. A missing site only counts for a static export, a server reading `SITE_URL` or `ORIGIN` at boot.
-export function configSeoLints(config: SiteSeo, file: string, sources: Iterable<string>, exported = false): CheckDiagnostic[] {
+export function configSeoLints(config: SiteSeo, file: string, sources: Iterable<string>, exported = false, configSource?: string): CheckDiagnostic[] {
   const found: CheckDiagnostic[] = []
   const report = lintReporter(config, false, found)
-  const at = { file, line: 1, column: 1 }
+  const locate = configLocator(configSource)
+  const at = (...path: string[]) => ({ file, ...locate(path) })
 
   if (exported && config.seo !== undefined && config.site === undefined)
-    report('missing-site', { ...at, message: '`seo` is set, but not the origin the site is public at', note: 'pages get no canonical link or `og:url`, and the site no sitemap or robots.txt', help: 'set `site: \'https://example.com\'`, or `SITE_URL` (or `ORIGIN`) where the site builds' })
+    report('missing-site', { ...at('site'), message: '`seo` is set, but not the origin the site is public at', note: 'pages get no canonical link or `og:url`, and the site no sitemap or robots.txt', help: 'set `site: \'https://example.com\'`, or `SITE_URL` (or `ORIGIN`) where the site builds' })
 
   const descriptions = localizedTexts(config.seo?.description)
 
   if (descriptions.length === 0)
-    report('missing-description', { ...at, message: 'The site has no description', note: 'a page setting none of its own goes without', help: 'set `seo.description` to a sentence saying what the site is' })
+    report('missing-description', { ...at('seo', 'description'), message: 'The site has no description', note: 'a page setting none of its own goes without', help: 'set `seo.description` to a sentence saying what the site is' })
 
   const record = typeof config.seo?.description === 'object' ? Object.entries(config.seo.description) : []
 
@@ -66,14 +68,14 @@ export function configSeoLints(config: SiteSeo, file: string, sources: Iterable<
     if (description.length <= DESCRIPTION_LENGTH)
       continue
 
-    report('long-description', { ...at, message: `The site description \`seo.description\`${locale === '' ? '' : ` for ${locale}`} runs ${description.length} characters`, note: `search results cut it after about ${DESCRIPTION_LENGTH}, on every page that sets none of its own`, help: 'shorten it to a sentence or two' })
+    report('long-description', { ...at('seo', 'description', ...(locale === '' ? [] : [locale])), message: `The site description \`seo.description\`${locale === '' ? '' : ` for ${locale}`} runs ${description.length} characters`, note: `search results cut it after about ${DESCRIPTION_LENGTH}, on every page that sets none of its own`, help: 'shorten it to a sentence or two' })
   }
 
   if (config.seo?.image === undefined && ![...sources].some(source => source.includes('og:image')))
-    report('missing-share-image', { ...at, message: 'No page has a share image', note: 'a link shared to a social network shows no picture', help: 'set `seo.image`, or an `og:image` per page with `shareCard()` from `kay/image`' })
+    report('missing-share-image', { ...at('seo', 'image'), message: 'No page has a share image', note: 'a link shared to a social network shows no picture', help: 'set `seo.image`, or an `og:image` per page with `shareCard()` from `kay/image`' })
 
   if (config.favicon === undefined)
-    report('default-favicon', { ...at, message: 'The site shows kay\'s mark as its favicon', help: 'set `favicon` to a square image of the site\'s own, 512 pixels or more, or a square SVG' })
+    report('default-favicon', { ...at('favicon'), message: 'The site shows kay\'s mark as its favicon', help: 'set `favicon` to a square image of the site\'s own, 512 pixels or more, or a square SVG' })
 
   return found
 }

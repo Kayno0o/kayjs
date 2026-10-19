@@ -2323,6 +2323,26 @@ describe.concurrent('kay check, unused code', () => {
     }
   })
 
+  it('points the kay.config.ts lints at the key that is set, a const value included, and at the defineConfig call for one that is missing', async () => {
+    const long = 'a'.repeat(DESCRIPTION_LENGTH + 1)
+    const root = await scratchProject({
+      'src/routes/index.kay': 'p a\n',
+      'kay.config.ts': `import { defineConfig } from 'kay/server'\n\nconst DESCRIPTION = '${long}'\n\nexport default defineConfig({\n  site: 'https://example.com',\n  seo: {\n    description: DESCRIPTION,\n  },\n})\n`,
+    })
+    const where = async (options: CheckOptions) => (await check(root, options)).map(d => [d.code, d.line, d.column])
+
+    try {
+      expect(await where({ site: 'https://example.com', seo: { description: long }, launch: true })).toEqual([['long-description', 8, 5], ['missing-share-image', 7, 3], ['default-favicon', 5, 16]])
+      await Bun.write(join(root, 'kay.config.ts'), `import { defineConfig } from 'kay/server'\n\nexport default defineConfig({\n  seo: { description: { en: '${long}', fr: 'court' } },\n  favicon: false,\n})\n`)
+      expect(await where({ seo: { description: { en: long, fr: 'court' } }, favicon: false })).toEqual([['long-description', 4, 25]])
+      await Bun.write(join(root, 'kay.config.ts'), `import { defineConfig } from 'kay/server'\n\nexport default defineConfig({\n  favicon: false,\n})\n`)
+      expect(await where({ seo: { name: 'Example' }, favicon: false })).toEqual([['missing-description', 3, 16]])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('reports a site description over the length search results show in kay.config.ts, where seo.description is set, once whichever pages inherit it', async () => {
     const root = await scratchProject({ 'src/routes/index.kay': 'p a\n' })
     const long = 'a'.repeat(DESCRIPTION_LENGTH + 1)

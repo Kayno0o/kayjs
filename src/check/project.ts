@@ -5,7 +5,7 @@ import type { CollectionFeed } from '../content/claims'
 import type { ComponentUse } from '../content/server'
 import type { ContentProblem } from '../content/validate'
 import type { ShadowTypes } from './shadow-types'
-import { existsSync, realpathSync } from 'node:fs'
+import { existsSync, readFileSync, realpathSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
@@ -68,9 +68,18 @@ export async function contentChecks(root: string, options: CheckOptions, memory?
   return { problems, feeds: content.feeds, props: props.lines }
 }
 
+function readConfigSource(root: string): string | undefined {
+  try {
+    return readFileSync(join(root, CONFIG_FILE), 'utf8')
+  }
+  catch {
+    return undefined
+  }
+}
+
 // What the shadow tree's write and the config tell, reported ahead of the type errors.
 export function configProblems(root: string, options: CheckOptions, types: ShadowTypes): CheckDiagnostic[] {
-  const seo = configSeoLints(options, join(root, CONFIG_FILE), [...types.files.values()].map(file => file.source), options.exported === true)
+  const seo = configSeoLints(options, join(root, CONFIG_FILE), [...types.files.values()].map(file => file.source), options.exported === true, readConfigSource(root))
 
   return [...types.problems, ...lintConfigProblems(root, options.lints), ...seo.filter(diagnostic => options.launch === true || !isLaunchLint(diagnostic.code))]
 }
