@@ -5,14 +5,14 @@ import { controlledValue } from './controlled-value'
 import { startRef } from './form-reset'
 import { wording } from 'kay/words'
 
-const { value, options, onChange, submit = false, emptyOption, loading = false, loadingLabel = wording('ui.select.loadingLabel', 'Loading…'), class: className, ...rest } = props<Omit<JSX.IntrinsicElements['select'], 'value' | 'options' | 'class' | 'children' | 'onChange'> & {
+const { value, options, onChange, submit = false, emptyOption, loading = false, loadingLabel = wording('ui.select.loadingLabel', 'Loading…'), class: className, onBlur, onKeyDown, onPointerDown, ...rest } = props<Omit<JSX.IntrinsicElements['select'], 'value' | 'options' | 'class' | 'children' | 'onChange'> & {
   // One of the options' values, or the empty string once there is an `emptyOption`.
   value: Value | (Empty extends string | true ? '' : never)
   // `disabled` keeps that option from being picked. A native option draws no icon, so it has none.
   options: readonly { value: Value, label: string, disabled?: boolean | undefined }[]
   // Handed the option's own value, a number for a number option, or the empty string for the `emptyOption`.
   onChange?: ((value: Value | (Empty extends string | true ? '' : never)) => void) | undefined
-  // Submits the form holding it once an option is picked, after `onChange`: a GET filter form then needs no ref to itself.
+  // Submits the form holding it once an option is picked, after `onChange`: a GET filter form then needs no ref to itself. A pick by keyboard, which some browsers report on each arrow key, waits for Enter or for the select to lose focus.
   submit?: boolean | undefined
   // A first option worth the empty string: a string is its label, `true` leaves it blank.
   emptyOption?: Empty
@@ -36,17 +36,52 @@ function report(select: HTMLSelectElement) {
   onChange?.(choice === undefined ? '' as never : choice.value)
 }
 
+// Whether the last key went to the select since the last pointer press, and a keyboard pick still waiting for Enter or blur.
+let keyed = false
+let waiting = false
+
+function submitNow(select: HTMLSelectElement) {
+  waiting = false
+  select.form?.requestSubmit()
+}
+
 function picked(select: HTMLSelectElement) {
   report(select)
 
-  if (submit)
-    select.form?.requestSubmit()
+  if (!submit)
+    return
+
+  if (keyed)
+    waiting = true
+  else
+    submitNow(select)
+}
+
+function pressed(event: KeyboardEvent & { currentTarget: HTMLSelectElement }) {
+  onKeyDown?.(event as never)
+
+  if (event.key === 'Enter' && waiting && !event.defaultPrevented)
+    submitNow(event.currentTarget)
+  else if (event.key !== 'Enter')
+    keyed = true
+}
+
+function grabbed(event: PointerEvent & { currentTarget: HTMLSelectElement }) {
+  onPointerDown?.(event as never)
+  keyed = false
+}
+
+function left(event: FocusEvent & { currentTarget: HTMLSelectElement }) {
+  onBlur?.(event as never)
+
+  if (waiting)
+    submitNow(event.currentTarget)
 }
 
 const ref = startRef<HTMLSelectElement>(element => box = element, rest.ref)
 ---
 // Each option says whether it is selected, so the right one stays chosen when the options arrive after the value.
-select.kui-field-input({...rest} ref={ref} class={className} onChange={event => picked(event.currentTarget)})
+select.kui-field-input({...rest} ref={ref} class={className} onChange={event => picked(event.currentTarget)} onKeyDown={pressed} onPointerDown={grabbed} onBlur={left})
   if emptyOption !== undefined && emptyOption !== false
     option(value="") {typeof emptyOption === 'string' ? emptyOption : ''}
   if loading

@@ -23,3 +23,5 @@ When the options come from a request, set `loading` to show a disabled row in th
 ## Submitting on pick
 
 Set `submit` on a Select inside a form to submit that form once an option is picked, after `onChange`. A GET filter form then needs no ref to itself.
+
+A pick with the mouse submits at once. Some browsers report a change on every arrow key, so a pick with the keyboard waits for Enter, or for the select to lose focus, and a person moving through the options does not post once per key.
