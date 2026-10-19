@@ -73,16 +73,17 @@ function running(): Found[] {
   return found
 }
 
-// `Bun.spawn` hands its child the environment the process started with, not what the run set since, so the id is added to each call, whatever env it passes.
+// `Bun.spawn` hands its child the environment the process started with, not what the run set since, so the id is added to each call, whatever env it passes, and a call with no env gets a copy of the environment taken when the preload first loads, as without it.
 function marked<T>(spawn: T): T {
   if (Reflect.get(spawn as object, MARK) === true)
     return spawn
 
   const call = spawn as unknown as (...args: unknown[]) => unknown
+  const started = { ...process.env }
 
   // Either `(command, options)` or `(options)` with the command inside.
   const wrapped = (first: unknown, second?: { env?: object }) => {
-    const withEnv = (options?: { env?: object }) => ({ ...options, env: { ...(options?.env ?? process.env), [MARK]: process.env[MARK] } })
+    const withEnv = (options?: { env?: object }) => ({ ...options, env: { ...(options?.env ?? started), [MARK]: process.env[MARK] } })
 
     return Array.isArray(first)
       ? call(first, withEnv(second))

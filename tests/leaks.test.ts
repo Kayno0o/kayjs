@@ -63,3 +63,16 @@ test('a process outside the run is left alone', async () => {
     unrelated.kill()
   }
 }, 30_000)
+
+test('a spawn with no env does not see a change made to process.env after the run started', async () => {
+  const { code, output } = await run(`test('env', async () => {
+    process.env.LEAKS_LATE = 'late'
+
+    const child = Bun.spawn(['sh', '-c', 'echo "[$LEAKS_LATE]"'], { stdout: 'pipe' })
+
+    console.log('seen', (await new Response(child.stdout).text()).trim())
+  })`)
+
+  expect(code).toBe(0)
+  expect(output).toContain('seen []')
+}, 30_000)
