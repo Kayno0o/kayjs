@@ -1,7 +1,7 @@
 {
   "name": "@kaynooo/kayjs-auth",
   "type": "module",
-  "version": "1.57.1",
+  "version": "1.58.0",
   "description": "Auth for kay apps on kay sessions: OAuth, passwords, two-factor, magic links and bearer tokens",
   "author": "Kaynooo <https://github.com/Kayno0o>",
   "license": "MIT",
@@ -61,7 +61,7 @@
     "@kaynooo/kayjs-ui": "workspace:~",
     "@kaynooo/pg-orm": "^7.0.0",
     "elysia": "^1.4.30",
-    "kay": "~1.57.0"
+    "kay": "~1.58.0"
   },
   "peerDependenciesMeta": {
     "@kaynooo/pg-orm": {

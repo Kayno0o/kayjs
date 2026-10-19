@@ -2,7 +2,7 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
-## Unreleased
+## 1.58.0
 
 - kayjs-auth keeps typed app data on the user: `createAuth({ user: s.Object({ ... }) })` with `onProviderProfile` returning what to store (an avatar, say), `auth.user().data` typed from the schema, and `User.providers` giving each linked provider's id; `pgStore` adds its `data` column on `db.sync()` ([kayjs-auth OAuth](../packages/auth/llms/oauth-passkeys-two-factor.md)).
 - kayjs-auth's `secret` is optional: left out, it derives its own key from the session's secret, so an app sets one secret, and `session()` exposes `deriveSecret(purpose)` for the same ([kayjs-auth setup](../packages/auth/llms/setup.md), [Server](server.md)).
