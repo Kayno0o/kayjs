@@ -1279,6 +1279,19 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 
+  it('points a bad `lints` entry at its line in kay.config.ts', async () => {
+    const root = await scratchProject({ 'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({\n  lints: {\n    \'no-such-lint\': \'deny\',\n    \'missing-alt\': \'denyy\',\n  },\n})\n' })
+
+    try {
+      const found = (await check(root, { lints: { 'no-such-lint': 'deny', 'missing-alt': 'denyy' } as unknown as CheckOptions['lints'] })).filter(d => d.file === join(root, 'kay.config.ts'))
+
+      expect(found.map(d => [d.line, d.column])).toEqual([[5, 5], [6, 5]])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('reports a lint or a level `lints` names that kay does not have once, in kay\'s words rather than also as a type error', async () => {
     const root = await scratchProject({ 'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ lints: { \'no-such-lint\': \'deny\', \'missing-alt\': \'denyy\' } })\n' })
 

@@ -17,6 +17,7 @@ import { CONFIG_FILE } from '../config'
 import { FEEDS_MARKER, PROBLEMS_MARKER, USES_MARKER } from '../content/claims'
 import { projectPaths } from '../project'
 import { bootProblems } from './boot'
+import { configLocator } from './config-keys'
 import { CONTENT_CHECK, contentPropsCheck } from './generated'
 import { browserModules } from './island-modules'
 import { FILES_MARKER, stampOf } from './loaded'
@@ -217,11 +218,14 @@ export async function checkContent(root: string, config: string | undefined, sit
   return { problems: problemsOf(root, read.marked(PROBLEMS_MARKER)), uses: read.marked(USES_MARKER) ?? [], feeds: read.marked(FEEDS_MARKER) ?? [] }
 }
 
-// A lint or a level `lints` names that kay does not have, which would otherwise pass unnoticed.
+// A lint or a level `lints` names that kay does not have, which would otherwise pass unnoticed, reported at its entry in kay.config.ts.
 function lintConfigProblems(root: string, lints: Record<string, string> = {}): CheckDiagnostic[] {
-  const at = { file: join(root, CONFIG_FILE), line: 1, column: 1 }
+  const locate = configLocator(readConfigSource(root))
+  const file = join(root, CONFIG_FILE)
 
   return Object.entries(lints).flatMap(([name, level]) => {
+    const at = { file, ...locate(['lints', name]) }
+
     if (!isLint(name) && !isLintGroup(name))
       return [{ ...at, message: `\`lints\` names \`${name}\`, which is no lint or group`, help: '`kay explain` lists them' }]
 
