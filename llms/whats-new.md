@@ -2,6 +2,10 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
+## Unreleased
+
+- `custom` analytics with `info: false` under a `base` names the base in its head tag too, so an app behind a proxy that takes the base off serves the tracker with the collect route under the base.
+
 ## 1.56.0
 
 - `kay dev` writes its types without looking for the problems only `kay check` reports, and `kay check` skips them for a library's components it does not reach: about 0.25 s of CPU less on a cold start.

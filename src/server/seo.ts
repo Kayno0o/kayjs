@@ -11,6 +11,7 @@ import { CARD, CARD_ROUTE, IMAGE_ROUTE, importedSize, RESIZABLE, VARIANTS } from
 import { localeState } from '../runtime/locale-state'
 import { localizedText } from '../runtime/localized'
 import { jsonLd } from '../runtime/seo'
+import { CUSTOM_SCRIPT_PATH } from './analytics'
 import { basePath } from './base'
 import { faviconTags, isOwnManifest, manifestPath } from './favicon'
 import { builtFonts, fontTags, prepareFonts } from './fonts'
@@ -50,7 +51,11 @@ export async function configHead(root: string, config: KayConfig, clientDir: str
   // A site linking its own icons still colours the browser around its pages.
   extra.push(...themeColorTags(config.seo?.themeColor ?? config.manifest?.themeColor))
 
-  for (const tag of config.head ?? []) {
+  const mount = basePath(config.base)
+
+  for (const given of config.head ?? []) {
+    // A custom tracker's tag in the head names the base, as a proxy that takes it off hides it from the route serving the script.
+    const tag = mount !== '' && given.tag === 'script' && given.props.src === CUSTOM_SCRIPT_PATH ? { ...given, props: { ...given.props, src: `${CUSTOM_SCRIPT_PATH}?base=${encodeURIComponent(mount)}` } } : given
     const inline = inlineText(tag)
 
     extra.push(tag)
@@ -62,7 +67,7 @@ export async function configHead(root: string, config: KayConfig, clientDir: str
   const social = config.site !== undefined || config.seo !== undefined
   const sizeOf = social ? await cardImageSizes(projectPaths(root, config).public) : undefined
 
-  return { head: seoHead(config.site, config.seo, extra, config.trailingSlash, basePath(config.base), sizeOf, appServesManifest), scripts, styles, fonts }
+  return { head: seoHead(config.site, config.seo, extra, config.trailingSlash, mount, sizeOf, appServesManifest), scripts, styles, fonts }
 }
 
 // One `theme-color` for every visitor, or one per colour scheme the browser reports.

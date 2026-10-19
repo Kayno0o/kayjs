@@ -837,6 +837,24 @@ describe('a custom provider', () => {
     }
   })
 
+  it('names the app\'s base in the tag of a custom tracker without the line, for a proxy that takes the base off', async () => {
+    const mounted = await testSite({ routes: join(dir, 'routes'), islands: false, base: '/shop', extensions: [analytics(custom({ info: false }))] })
+
+    try {
+      const home = await (await mounted.fetch('/')).text()
+      const tag = home.match(/src="(\/shop\/_kay\/analytics\/script\.js[^"]*)"/)?.[1]
+
+      expect(tag).toBe('/shop/_kay/analytics/script.js?base=%2Fshop')
+
+      const script = await mounted.fetch('/_kay/analytics/script.js?base=%2Fshop')
+
+      expect(await script.text()).toContain('fetch("/shop/_kay/analytics/collect"')
+    }
+    finally {
+      await mounted.close()
+    }
+  })
+
   it('passes what the script posts to the endpoint, the visitor\'s agent with it and no address', async () => {
     const response = await collect(await site(custom()), '{"e":"view"}', { cookie: 'session=abc' })
 
