@@ -1,0 +1,12 @@
+---
+import { slow } from '../routes/pending.kay'
+
+async function submit(event: SubmitEvent) {
+  event.preventDefault()
+  await slow({}, { refresh: false })
+}
+---
+form.island(action={slow} onSubmit={submit})
+  button Save
+  pending
+    p.saving Saving island

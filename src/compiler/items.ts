@@ -1,5 +1,5 @@
 import type * as t from '@babel/types'
-import type { AwaitNode, ConstNode, ElementNode, ErrorNode, ForNode, IfNode, MatchNode, Node, TextExpression, TryNode } from './ast'
+import type { AwaitNode, ConstNode, ElementNode, ErrorNode, ForNode, IfNode, MatchNode, Node, PendingNode, TextExpression, TryNode } from './ast'
 import type { CodeBuilder } from './mapping'
 import { parseExpression } from '@babel/parser'
 import { isHead, isSlot } from './ast'
@@ -25,6 +25,26 @@ export type DynamicItem = Exclude<Item, { kind: 'text' | 'element' | 'const' }>
 
 export function isDynamic(item: Item): item is DynamicItem {
   return item.kind !== 'text' && item.kind !== 'element' && item.kind !== 'const'
+}
+
+const pendingElements = new WeakMap<PendingNode, ElementNode>()
+
+// What a `pending` block renders: a status region always in the page, holding the block hidden until the form around it is `aria-busy`, which the runtime sets while it posts. An announcement is made of what shows in a region that was there already, and a blocked stylesheet leaves the block hidden.
+function pendingElement(node: PendingNode): ElementNode {
+  let found = pendingElements.get(node)
+
+  if (!found) {
+    const at = { start: node.start, end: node.end }
+    const tag = { start: node.start, end: node.start + 'pending'.length }
+    const element = (name: string, children: Node[], fixed?: string): ElementNode => ({ kind: 'element', ...at, tag, name, component: false, classes: [], attributes: [], children, fixed })
+    const css = 'form[aria-busy] [data-kay-pending]{display:block}'
+    const style = element('style', [{ kind: 'text', ...at, parts: [{ kind: 'chunk', ...at, text: css }] }])
+
+    found = element('div', [element('div', node.children, ' data-kay-pending hidden'), style], ' role="status"')
+    pendingElements.set(node, found)
+  }
+
+  return found
 }
 
 // Consecutive text lines join with a line break; a `head` block and `@slot` blocks render elsewhere, so they hold no place here.
@@ -80,6 +100,10 @@ export function childItems(nodes: Node[]): Item[] {
       case 'try':
       case 'error':
         items.push({ kind: node.kind, node } as Item)
+
+        break
+      case 'pending':
+        items.push({ kind: 'element', node: pendingElement(node) })
 
         break
       case 'const':

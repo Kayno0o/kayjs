@@ -92,6 +92,20 @@ While the post is refused, `error title` renders `p.error` with the message. The
 
 Anywhere else, `add.error('title')` reads the message.
 
+### Showing that a form is posting
+
+A `pending` block inside the form shows only while that form posts. No script of your own is needed, and the page gets none from it.
+
+```kay
+form(action={add})
+  input(field="title")
+  button Add
+  pending
+    p Saving...
+```
+
+The block is hidden when the page renders, after the answer, after a refused post and with JavaScript off. It sits in a status region, so a screen reader reads it once it shows. In an island, the form shows it while its `onSubmit` waits for a call. Outside a form that posts to an action, `pending` is an error.
+
 ### A component that holds the field
 
 A form field component writes the control its parent hands it as a slot. It cannot give that control an `id`, so it ties the control to its hint with `describeField` from `kay`. Call it in the component's script with the ids to add.

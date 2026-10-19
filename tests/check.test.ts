@@ -1148,6 +1148,33 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 
+  it('refuses a pending block outside a form posting to an action, and types what it holds', async () => {
+    const page = [
+      '--- server',
+      'import { t } from \'elysia\'',
+      'import { action } from \'kay\'',
+      '',
+      'export const save = action(t.Object({ code: t.String({ maxLength: 200 }) }), async () => 1)',
+      '---',
+      'form(action={save})',
+      '  button Save',
+      '  pending',
+      '    p {save.error(\'cod\')}',
+      '',
+    ].join('\n')
+    const root = await scratchProject({ 'src/routes/index.kay': page, 'src/routes/other.kay': 'p\n  pending\n    p Saving\n' })
+
+    try {
+      expect((await check(root)).map(d => [d.file.split('/').at(-1), d.line, named(d)])).toEqual([
+        ['other.kay', 2, '`pending` shows while a form posts to an action, so it sits inside one'],
+        ['index.kay', 10, 'TS2345'],
+      ])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('refuses a literal ctx.fail status, redirect target or cached ttl the server would refuse when it runs', async () => {
     const page = [
       '--- server',

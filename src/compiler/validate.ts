@@ -224,6 +224,13 @@ class Validator {
           this.error(node, `\`@${this.text(node.name)}\` must sit directly under a component, to pass it as that component's \`${this.text(node.name)}\` prop`)
 
           break
+        case 'pending':
+          if (!this.forms.has(node))
+            this.error(node, '`pending` shows while a form posts to an action, so it sits inside one', { help: 'move it into the `form(action={...})` whose post it reports on' })
+
+          this.nodes(node.children)
+
+          break
         case 'error':
           if (!this.forms.has(node))
             this.error(node, '`error` shows the message of a form posting to an action, so it sits inside one', { help: 'move it into the `form(action={...})` whose post it reports on' })

@@ -59,6 +59,8 @@ function outline(file: KayFile, nodes: Node[] = file.template): unknown[] {
         return { await: text(file, node.value), pending: outline(file, node.pending), resolved: node.resolved && { alias: text(file, node.resolved.alias), children: outline(file, node.resolved.children) }, rejected: node.rejected && { alias: text(file, node.rejected.alias), children: outline(file, node.rejected.children) } }
       case 'try':
         return { try: outline(file, node.children), rejected: node.rejected && { alias: text(file, node.rejected.alias), children: outline(file, node.rejected.children) } }
+      case 'pending':
+        return { pending: outline(file, node.children) }
       case 'slot':
         return { slot: text(file, node.name), ...(node.params && { params: text(file, node.params) }), children: outline(file, node.children) }
       case 'const':
@@ -70,6 +72,20 @@ function outline(file: KayFile, nodes: Node[] = file.template): unknown[] {
     return node
   })
 }
+
+describe('pending', () => {
+  it('holds the lines under it, and takes nothing on its own line', () => {
+    const file = parse('form(action={add})\n  pending\n    p Saving\n')
+
+    expect(outline(file)).toEqual([{ tag: 'form', attributes: ['action:{add}'], children: [{ pending: [{ tag: 'p', children: [['Saving']] }] }] }])
+    expect(file.diagnostics).toEqual([])
+    expect(parse('form(action={add})\n  pending now\n').diagnostics[0]?.message).toContain('`pending` takes nothing on its line')
+  })
+
+  it('stays an element when it is longer, as pending-note is', () => {
+    expect(outline(parse('pending-note hi\n'))).toEqual([{ tag: 'pending-note', children: [['hi']] }])
+  })
+})
 
 describe('fence', () => {
   it('splits the script from the template', () => {

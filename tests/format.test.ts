@@ -17,6 +17,10 @@ function format(source: string): string {
 }
 
 describe('formatKay', () => {
+  it('keeps a pending block as written, indenting its lines', () => {
+    expect(format('form(action={add})\n    button Add\n    pending\n        p Saving\n')).toBe('form(action={add})\n  button Add\n  pending\n    p Saving\n')
+  })
+
   it('re-indents the template two spaces a level, keeping comments and dropping the spaces after a tag, of blank lines and extra blank lines', () => {
     const source = [
       '',

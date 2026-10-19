@@ -414,7 +414,7 @@ export class HtmlTemplate extends TemplateWriter {
       b.add(')')
     }
 
-    markup.text(`<${name}`)
+    markup.text(`<${name}${element.fixed ?? ''}`)
 
     if (plan.id !== undefined)
       markup.text(` id="${escapeStaticAttribute(plan.id)}"`)

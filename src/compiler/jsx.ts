@@ -116,6 +116,10 @@ export class JsxTemplate {
           this.emitError(node)
 
           break
+        case 'pending':
+          this.emitChildren(node.children)
+
+          break
         // Passed to the component above it, or reported as misplaced.
         case 'slot':
           break

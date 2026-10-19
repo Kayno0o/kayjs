@@ -49,6 +49,18 @@ form(action={rename})
 
 A field's `error` is a text, or a function such as `error: () => t('names.required')` that kay calls in the request's locale, for the server's refusal and for the rules rendered into the page, so a visitor reads their language with or without JavaScript. A function that throws or returns no string leaves the field its default wording. A `query` or `defineEnv` schema field reads its `error` the same way.
 
+### Show that a form is posting
+
+A `pending` block inside the form shows only while that form posts, in a static page too:
+
+```kay
+form(action={subscribe})
+  input(field="email")
+  button Subscribe
+  pending
+    p Subscribing...
+```
+
 ### Show what a post returned
 
 The handler's result comes back on the next render of the page, once, through `ctx.succeeded`:
@@ -213,6 +225,7 @@ form(action={add})
 - A quoted name such as `error "first-name"` takes any field, and the name is typed from the schema.
 - A bare `error` shows the form's own message, `add.error()`, its `form` described by it.
 - One inside a `for` renders without an id and describes nothing.
+- A `pending` block inside the form shows its lines only while that form posts, with no JavaScript of your own and none added to the page: the runtime already sets `aria-busy` on a posting form, and the block is shown by CSS on it. It is hidden in the render, after the answer, after a refused post and with JavaScript off, and sits in an always-present `role="status"` region so its text is announced once shown. A style-src without `'unsafe-inline'` leaves it hidden.
 - Without an `error` line, the field is described by the element an `if add.error('title')` block shows first, or one holding `{add.error('title')}`, written outside a `for` in the file holding a form that posts to `add`, which keeps its own `id` or gets one such as `add-title-error`.
 - The form likewise is described by the element showing `add.error()`.
 - A static `aria-describedby` the template writes, such as a hint, is kept and the error's id added after it; a bound one is left as it is.

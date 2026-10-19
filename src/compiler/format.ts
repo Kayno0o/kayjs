@@ -175,6 +175,7 @@ function ownMultiLineSpans(node: Node): Span[] {
       return node.params ? [node.params] : []
     case 'try':
     case 'error':
+    case 'pending':
       return []
   }
 }

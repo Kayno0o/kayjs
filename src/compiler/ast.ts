@@ -59,6 +59,8 @@ export interface ElementNode extends Span {
   // `slot actions` or `slot row(item, i)`: the block prop it renders, and inside the brackets what it calls the block with.
   outlet?: { name: Span, args?: Span | undefined } | undefined
   children: Node[]
+  // Attributes the compiler writes itself, as HTML starting with a space: the elements a `pending` block stands for.
+  fixed?: string | undefined
 }
 
 export interface TextChunk extends Span {
@@ -167,7 +169,13 @@ export interface ErrorNode extends Span {
   name: string
 }
 
-export type Node = ElementNode | TextNode | IfNode | MatchNode | ForNode | AwaitNode | TryNode | SlotNode | ConstNode | ErrorNode
+// `pending` inside a form posting to an action: what its block holds shows only while that form posts.
+export interface PendingNode extends Span {
+  kind: 'pending'
+  children: Node[]
+}
+
+export type Node = ElementNode | TextNode | IfNode | MatchNode | ForNode | AwaitNode | TryNode | SlotNode | ConstNode | ErrorNode | PendingNode
 
 // An attribute written with a name, which a spread is not.
 export type NamedAttribute = Exclude<Attribute, { kind: 'spread' }>
@@ -491,6 +499,8 @@ export function childBlocks(node: Node): Node[][] {
       return [node.pending, node.resolved?.children ?? [], node.rejected?.children ?? []]
     case 'try':
       return [node.children, node.rejected?.children ?? []]
+    case 'pending':
+      return [node.children]
     case 'const':
     case 'error':
       return []
@@ -644,6 +654,7 @@ export function expressionSpans(nodes: readonly Node[]): Span[] {
         break
       case 'try':
       case 'error':
+      case 'pending':
         break
     }
   })

@@ -373,7 +373,7 @@ export class DomTemplate extends TemplateWriter {
     const spreads = element.attributes.some(attribute => attribute.kind === 'spread')
     const children = element.children.filter(child => child.kind !== 'slot')
     const own: Binding[] = []
-    let html = `<${name}`
+    let html = `<${name}${element.fixed ?? ''}`
     let content: string | undefined
     let contentBinding: Binding | undefined
     let selected: Span | undefined

@@ -52,6 +52,9 @@
       "include": "#try"
     },
     {
+      "include": "#pending"
+    },
+    {
       "include": "#element"
     }
   ],
@@ -328,6 +331,14 @@
     },
     "try": {
       "match": "^[ \\t]*(try)[ \\t]*$",
+      "captures": {
+        "1": {
+          "name": "keyword.control.flow.kay"
+        }
+      }
+    },
+    "pending": {
+      "match": "^[ \\t]*(pending)[ \\t]*$",
       "captures": {
         "1": {
           "name": "keyword.control.flow.kay"

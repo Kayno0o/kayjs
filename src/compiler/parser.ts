@@ -1,5 +1,5 @@
 import type * as t from '@babel/types'
-import type { Attribute, AwaitBranch, AwaitNode, ConstNode, Details, Diagnostic, ElementNode, ErrorNode, ForNode, IfBranch, IfNode, KayFile, MatchNode, Node, SlotNode, Span, TextNode, TryNode } from './ast'
+import type { Attribute, AwaitBranch, AwaitNode, ConstNode, Details, Diagnostic, ElementNode, ErrorNode, ForNode, IfBranch, IfNode, KayFile, MatchNode, Node, PendingNode, SlotNode, Span, TextNode, TryNode } from './ast'
 import { parseExpression } from '@babel/parser'
 import { Scanner } from './scanner'
 
@@ -66,7 +66,7 @@ function keyword(words: string): RegExp {
   return new RegExp(`(?:${words})(?=[ \\t]|\\r?\\n|$)`, 'y')
 }
 
-const KEYWORD = keyword('if|else[ \\t]+if|else|for|await|then|catch|try|match|when')
+const KEYWORD = keyword('if|else[ \\t]+if|else|for|await|then|catch|try|pending|match|when')
 
 export function parseKay(source: string): KayFile {
   const diagnostics: Diagnostic[] = []
@@ -253,6 +253,7 @@ class TemplateParser {
     [keyword('for'), 'f', (parser, indent, siblings) => siblings.push(parser.parseFor(indent))],
     [keyword('await'), 'a', (parser, indent, siblings) => siblings.push(parser.parseAwait(indent))],
     [keyword('try'), 't', (parser, indent, siblings) => siblings.push(parser.parseTry(indent))],
+    [keyword('pending'), 'p', (parser, indent, siblings) => siblings.push(parser.parsePending(indent))],
     [keyword('match'), 'm', (parser, indent, siblings) => siblings.push(parser.parseMatch(indent))],
     [keyword('when'), 'w', (parser, indent) => parser.skipLine(indent, { length: 4, message: '`when` sits in a `match` block', help: '`match status`, then one `when \'draft\'` line per case below it' })],
     [keyword('then|catch'), 'tc', (parser, indent, siblings, head) => parser.attachAwaitBranch(indent, siblings.at(-1), head[0] as 'then' | 'catch')],
@@ -649,6 +650,17 @@ class TemplateParser {
     const children = this.parseBlock(indent)
 
     return { kind: 'try', start, end: this.lastContentEnd(), children }
+  }
+
+  private parsePending(indent: number): PendingNode {
+    const start = this.pos
+
+    this.pos = start + 'pending'.length
+    this.expectLineEnd('`pending` takes nothing on its line', { help: 'put its block below it, indented' })
+
+    const children = this.parseBlock(indent)
+
+    return { kind: 'pending', start, end: this.lastContentEnd(), children }
   }
 
   // `then name` directly follows an `await`, and `catch error` its `then` or a `try`; both names are optional.
