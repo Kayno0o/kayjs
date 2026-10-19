@@ -125,7 +125,7 @@ describe('the offline page', () => {
 })
 
 describe('kay check on the catalogs', () => {
-  it('compares the placeholders of a library message the default locale does not word with its English, and takes auth.* and mail.* keys alone', async () => {
+  it('compares the placeholders of a library message the default locale does not word with its English, and takes auth.*, mail.* and ai.* keys alone', async () => {
     const root = await scratchDir('kay-words-check-')
     const messages = join(root, 'messages')
     const write = async (locale: string, body: string) => Bun.write(join(messages, `${locale}.ts`), `import { defineMessages } from 'kay/i18n'\n\nexport default defineMessages(${body})\n`)
@@ -138,6 +138,7 @@ describe('kay check on the catalogs', () => {
   cms: { table: { deleteMessage: 'Supprimer {title} ?' } },
   auth: { scopes: { read: 'Lire' }, other: 'Autre' },
   mail: { contact: { sent: 'Envoyé' } },
+  ai: { chat: { disclosure: 'Vous parlez à une IA {x}' }, other: 'Autre' },
 }`)
 
     const problems = (await messageProblems(process.cwd(), { locales: ['en', 'fr'], defaultLocale: 'en', messages: relative(process.cwd(), messages) })).map(problem => problem.message)
@@ -148,6 +149,7 @@ describe('kay check on the catalogs', () => {
       'gives kay.invalid.tooLong a {min}, which its English has not, so nothing fills it',
       'gives kay.invalid.tooLong without {max}, which its English has',
       'gives ui.table.filterLabel a {x}, which its English has not, so nothing fills it',
+      'gives ai.chat.disclosure a {x}, which its English has not, so nothing fills it',
     ].toSorted())
   })
 

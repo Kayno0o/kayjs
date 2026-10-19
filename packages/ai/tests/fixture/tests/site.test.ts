@@ -73,3 +73,13 @@ test('a visitor over the limit gets 429 and words from the chat action, nothing 
     ai()
   }
 })
+
+test('a chat tells the visitor they talk to an AI whose provider gets their messages, a prop words it and an empty one hides it', async () => {
+  const shown = (await site.visit('/assistant')).html
+  const line = /<p class="kai-chat-disclosure">([^<]*)<\/p>/
+
+  expect(shown.match(line)?.[1]).toBe('You are talking to an AI. Your messages are sent to its provider to answer.')
+  expect((await site.visit('/named')).html.match(line)?.[1]).toBe('Answers come from Ollama on our own server.')
+  expect((await site.visit('/quiet')).html).not.toContain('kai-chat-disclosure')
+  expect((await site.visit('/launcher/one')).html).toContain('kai-chat-disclosure')
+})

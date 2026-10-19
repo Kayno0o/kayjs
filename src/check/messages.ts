@@ -16,7 +16,7 @@ import { FILES_MARKER, loadedFiles } from './loaded'
 
 const PLACEHOLDER = /\{(\w+)\}/g
 // The keys kay and its libraries look their texts up under, which a locale may word alone: a site without them reads the English the code holds.
-const LIBRARY_KEY = /^(?:kay|ui|cms|auth|mail)\./
+const LIBRARY_KEY = /^(?:kay|ui|cms|auth|mail|ai)\./
 const SPECIAL = /[.*+?^${}()|[\]\\]/g
 
 // A message as a locale reads it, with the catalog it comes from: the app's, or an extension's the app does not translate.
@@ -203,7 +203,7 @@ async function localeCatalog(root: string, config: I18nConfig, extensions: KayEx
   return { file, source, own: [...messages.keys()], entries }
 }
 
-const LIBRARIES = new Map([['ui', 'kayjs-ui'], ['cms', 'kayjs-cms'], ['auth', 'kayjs-auth'], ['mail', 'kayjs-mail']])
+const LIBRARIES = new Map([['ui', 'kayjs-ui'], ['cms', 'kayjs-cms'], ['auth', 'kayjs-auth'], ['mail', 'kayjs-mail'], ['ai', 'kayjs-ai']])
 // `wording('ui.table.filterLabel', 'Filter'` in a library's source, the key and the English it falls back to; a key written at run time, or an English put together from parts, is not compared.
 const WORDING = /\bwording\(\s*(['"])([a-z]+\.[\w.]+)\1\s*,\s*(?:'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)")/g
 const sourcesRead = new Map<string, Promise<Map<string, string>>>()

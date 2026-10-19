@@ -246,6 +246,21 @@ If the store fails or takes more than five seconds when the limit is read, the q
 
 <ReadMore href="/llms/kayjs-ai-limits">Every option, when tokens count, and what a failing store does.</ReadMore>
 
+## Personal data and the AI notice
+
+Everything a visitor types into the chat is sent to the AI provider, along with your system prompt and, when the model calls tools, what the tools return. With Anthropic or OpenAI that text leaves the EU, since both are American companies. You are the controller and the provider is your processor, so before you open the chat:
+
+- Sign the provider's data processing agreement, and check how long it keeps what it receives under its API terms.
+- Rely on a transfer basis for the US, such as the provider's standard contractual clauses or the EU-US Data Privacy Framework. A server of your own, such as Ollama, keeps the text with you.
+- Name the provider, the purpose and the transfer in your privacy notice, where the visitor can read it before writing.
+- Return only the fields an answer needs from an action you offer as a tool, since its result goes to the provider as it is.
+
+kayjs-ai writes no log or file of the messages. It counts each visitor's asks and tokens under their user id or their address, in memory or in the store you give, until the window closes. The tab's session storage is used only when you pass `remember`.
+
+The AI Act asks that a person be told they are talking to an AI. `Chat` and `ChatLauncher` show a line under the conversation: "You are talking to an AI. Your messages are sent to its provider to answer." Reword it for your provider with the `disclosure` prop, translate it by giving the `ai.chat.disclosure` message in your catalog, or hide it with `disclosure=""` when the page says so already. A chat you build yourself on `ask` shows its own notice.
+
+<ReadMore href="/llms/kayjs-ai-personal-data">What is sent, what is kept, and how to word the notice.</ReadMore>
+
 ## Translate what is missing
 
 `kay i18n translate fr` asks the model for every message and entry that French lacks, and saves the answers as drafts. It needs `ai()` in `extensions`, and a provider set up as for `ask`.

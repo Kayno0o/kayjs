@@ -197,6 +197,13 @@
   color: var(--color-kui-muted);
 }
 
+.kai-chat-disclosure {
+  margin: 0;
+  padding: 0 0.25rem;
+  font-size: 0.75rem;
+  color: var(--color-kui-muted);
+}
+
 .kai-chat-form {
   display: flex;
   align-items: flex-end;

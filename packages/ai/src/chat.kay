@@ -3,6 +3,7 @@ import type { Action, ActionStream, Failure, JSX, SanitizeOptions } from 'kay'
 import type { CodeBlock, Message, Progress, ToolCall } from './types'
 import { ActionError, effect, onCleanup, onMount, sanitizeHtml, signal, trustHtml, untrack } from 'kay'
 import { markdownHtml } from 'kay/markdown'
+import { wording } from 'kay/words'
 import { MARK, MARKED, withoutMarker } from './marker'
 import { posted, restored, stored } from './chat-history'
 import Calls from './chat-calls.kay'
@@ -31,7 +32,7 @@ interface Turn extends Message {
   code?: CodeBlock[] | undefined
 }
 
-const { action, initial = [], label = 'Chat', placeholder = 'Write a message…', sendLabel = 'Send', stopLabel = 'Stop', retryLabel = 'Try again', thinkingLabel = 'Thinking…', stoppedLabel = 'Stopped', errorMessage = 'The reply failed.', keep = 20, tableLabel = 'Table', toolDetails = true, greeting = 'How can I help?', suggestions = [], toolLabels = {}, sendIcon, stopIcon, remember, links = 'apart', runningLabel = 'Running', doneLabel = 'Done', failedLabel = 'Failed', argumentsLabel = 'Arguments', resultLabel = 'Result', class: className } = props<{
+const { action, initial = [], label = 'Chat', placeholder = 'Write a message…', sendLabel = 'Send', stopLabel = 'Stop', retryLabel = 'Try again', thinkingLabel = 'Thinking…', stoppedLabel = 'Stopped', errorMessage = 'The reply failed.', keep = 20, tableLabel = 'Table', toolDetails = true, greeting = 'How can I help?', disclosure = wording('ai.chat.disclosure', 'You are talking to an AI. Your messages are sent to its provider to answer.'), suggestions = [], toolLabels = {}, sendIcon, stopIcon, remember, links = 'apart', runningLabel = 'Running', doneLabel = 'Done', failedLabel = 'Failed', argumentsLabel = 'Arguments', resultLabel = 'Result', class: className } = props<{
   // The page's streaming action, `action(schema, ({ messages }) => ask(messages))`, which may also `ctx.fail`; the chat posts the latest messages to it and reads the reply as it streams.
   // Returning `ask(messages, { tools }).progress()` instead streams the tool calls as well, which the chat shows before the text of their turn.
   action: Action<{ messages: Message[] }, AsyncIterable<string | Progress> | Failure<unknown>>
@@ -55,6 +56,8 @@ const { action, initial = [], label = 'Chat', placeholder = 'Write a message…'
   toolDetails?: boolean | undefined
   // Said in the empty chat above the suggestions.
   greeting?: string | undefined
+  // The line under the log telling the visitor they talk to an AI and that their messages are sent to a provider; word it for your provider or in your language, and `''` hides it when the page says so itself.
+  disclosure?: string | undefined
   // Questions offered in the empty chat; a click sends one.
   suggestions?: string[] | undefined
   // What the tools of a reply are called in the one line they fold into, by tool name such as `{ search_docs: 'Searched the docs' }`; a tool without one shows its own name, and a tool called more than once adds `x2`.
@@ -413,6 +416,8 @@ section.kai-chat(class={className} onKeyDown={escape} data-empty={history().leng
       |
       if !busy() && !takenBack() && history().at(-1)?.role === 'user'
         button.kui-btn(type="button" onClick={() => void send(true)}) {retryLabel}
+  if disclosure !== ''
+    p.kai-chat-disclosure {disclosure}
   form.kai-chat-form(onSubmit={event => { event.preventDefault(); void send() }})
     textarea.kui-field-input(ref={element => { field = element }} bind:value={draft} rows="1" aria-label={label} placeholder={placeholder} onKeyDown={keyDown})
     if busy()
