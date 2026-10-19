@@ -7,7 +7,7 @@ export const ASSET_EXTENSIONS = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'avif', 's
 export const ASSET_FILE = new RegExp(`\\.(?:${ASSET_EXTENSIONS.join('|')})$`, 'i')
 // Where the browser build and imported assets are served from, out of `clientDir`.
 export const ASSET_PREFIX = '/_kay/'
-const ASSETS_DIR = 'assets'
+export const ASSETS_DIR = 'assets'
 
 // Beside `clientDir`, never served: the browser build's source maps, pointed at `.kay` lines, for the server to map the stacks islands report.
 export const MAPS_DIR = 'maps'

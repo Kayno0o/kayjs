@@ -235,7 +235,7 @@ Pages come from the network first. A kept copy answers only when the network fai
 
 It leaves out what should never be stale. Actions, API routes and everything under `/_kay/` go to the network, and so does any request that is not a GET, goes to another site or asks for a range, as a video does. A response is kept only as a full 200, and never when it says `private` or `no-store`.
 
-Each deploy changes the worker, which takes over at once and drops the old cache. Nothing needs clearing by hand. The server warns past 100 prerendered pages, since each visitor downloads them on every deploy.
+Each deploy changes the worker, which takes over at once. It fetches again only the files and pages that changed, so editing one page does not make returning visitors download the whole site. Nothing needs clearing by hand. A font with several subsets is fetched ahead only when the pages kept use its characters. The server warns past 100 prerendered pages, since each visitor downloads them on their first visit.
 
 `kay dev` registers no worker.
 

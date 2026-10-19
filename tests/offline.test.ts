@@ -13,6 +13,7 @@ const SETTINGS = /^const KAY = (.+)$/m
 
 interface WorkerSettings {
   cache: string
+  versions: Record<string, string>
   precache: string[]
   files: string[]
   pages: string[]
@@ -84,31 +85,125 @@ describe('service worker', () => {
     expect((await worker(dev)).text).toContain('self.registration.unregister()')
   })
 
-  it('names its cache after the build, so a deploy installs a worker that drops the old one', async () => {
+  it('keeps one cache across deploys and versions each URL, so an edit changes the version of what it touched alone', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'kay-sw-'))
-    const build = async (files: string[], etag = '"a"') => {
-      for (const file of files)
-        await Bun.write(join(dir, file), file)
+    const build = async (files: Record<string, string>, etags: Record<string, string>) => {
+      for (const [file, text] of Object.entries(files))
+        await Bun.write(join(dir, file), text)
 
       const app = new Elysia()
-      const client = { dir, pages: new Map([['/', { pattern: '/', file: 'index.html', status: 200, headers: {}, etag, renderedAt: 0 }]]) } as unknown as ClientBuild
+      const client = { dir, pages: new Map(Object.entries(etags).map(([path, etag]) => [path, { pattern: path, file: 'index.html', status: 200, headers: {}, etag, renderedAt: 0 }])) } as unknown as ClientBuild
 
-      await serveServiceWorker(app, new ServedPaths(), { client, offline: true, base: '', publicPages: ['/'] })
+      await serveServiceWorker(app, new ServedPaths(), { client, offline: true, base: '', publicPages: Object.keys(etags) })
 
       return (await worker(app)).settings!
     }
 
     try {
-      const first = await build(['entry-a.js', 'app-a.css', 'assets/hero-a.png', 'entry-a.js.br'])
+      const first = await build({ 'entry.js': 'a', 'app.css': 'a', 'assets/hero-a.png': 'a', 'entry.js.br': 'a' }, { '/': '"a"', '/about': '"a"' })
 
-      expect(first.files).toEqual(['/_kay/app-a.css', '/_kay/assets/hero-a.png', '/_kay/entry-a.js'])
-      expect(first.pages).toEqual(['/'])
-      expect((await build([])).cache).toBe(first.cache)
-      expect((await build([], '"b"')).cache).not.toBe(first.cache)
-      expect((await build(['entry-b.js'])).cache).not.toBe(first.cache)
+      expect(first.files).toEqual(['/_kay/app.css', '/_kay/assets/hero-a.png', '/_kay/entry.js'])
+      expect(first.pages).toEqual(['/', '/about'])
+      expect(Object.keys(first.versions)).toEqual(['/_kay/app.css', '/_kay/assets/hero-a.png', '/_kay/entry.js', '/', '/about'])
+
+      const edited = await build({ 'entry.js': 'a' }, { '/': '"a"', '/about': '"b"' })
+
+      expect(edited.cache).toBe(first.cache)
+      expect(Object.keys(first.versions).filter(url => edited.versions[url] !== first.versions[url])).toEqual(['/about'])
+
+      const script = await build({ 'entry.js': 'b' }, { '/': '"a"', '/about': '"b"' })
+
+      expect(Object.keys(first.versions).filter(url => script.versions[url] !== first.versions[url])).toEqual(['/_kay/entry.js', '/about'])
     }
     finally {
       await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  // Installs the worker on a cache that outlives it, returning the URLs the install fetched.
+  async function install(script: string, store: Map<string, string>): Promise<string[]> {
+    const fetched: string[] = []
+    const path = (key: Request | string) => new URL(typeof key === 'string' ? key : key.url, 'http://localhost').pathname
+    const cache = {
+      match: async (key: string) => store.has(path(key)) ? new Response(store.get(path(key))) : undefined,
+      put: async (key: string, response: Response) => void store.set(path(key), await response.text()),
+      add: async (key: string) => {
+        fetched.push(key)
+        store.set(key, 'page')
+      },
+      addAll: async (keys: string[]) => {
+        for (const key of keys)
+          await cache.add(key)
+      },
+      keys: async () => [...store.keys()].map(key => ({ url: `http://localhost${key}` })),
+      delete: async (key: { url: string }) => store.delete(path(key.url)),
+    }
+    const listeners = new Map<string, (event: unknown) => void>()
+    const sandbox = { self: { addEventListener: (name: string, listener: (event: unknown) => void) => listeners.set(name, listener), skipWaiting: async () => undefined }, caches: { open: async () => cache }, location: { origin: 'http://localhost' }, Response, URL }
+    // eslint-disable-next-line no-new-func
+    const run = new Function(...Object.keys(sandbox), script) as (...globals: unknown[]) => void
+
+    run(...Object.values(sandbox))
+
+    let waited: Promise<unknown> = Promise.resolve()
+
+    listeners.get('install')!({ waitUntil: (promise: Promise<unknown>) => {
+      waited = promise
+    } })
+    await waited
+
+    return fetched
+  }
+
+  it('fetches again on an install only what changed since the last one', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kay-sw-'))
+    const store = new Map<string, string>()
+    const build = async (script: string, etags: Record<string, string>) => {
+      await Bun.write(join(dir, 'entry.js'), script)
+
+      const app = new Elysia()
+      const client = { dir, pages: new Map(Object.entries(etags).map(([path, etag]) => [path, { pattern: path, file: 'index.html', status: 200, headers: {}, etag, renderedAt: 0 }])) } as unknown as ClientBuild
+
+      await serveServiceWorker(app, new ServedPaths(), { client, offline: true, base: '', publicPages: Object.keys(etags) })
+
+      return (await worker(app)).text
+    }
+
+    try {
+      expect((await install(await build('a', { '/': '"a"', '/about': '"a"' }), store)).toSorted()).toEqual(['/', '/_kay/entry.js', '/about'])
+      expect(await install(await build('a', { '/': '"a"', '/about': '"a"' }), store)).toEqual([])
+      expect(await install(await build('a', { '/': '"a"', '/about': '"b"' }), store)).toEqual(['/about'])
+      expect(await install(await build('b', { '/': '"a"', '/about': '"b"' }), store)).toEqual(['/_kay/entry.js'])
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('keeps ahead only the font files whose characters the pages hold', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'kay-sw-'))
+    const dir = join(root, 'dist')
+    const rule = (name: string, range: string) => `@font-face{font-family:"F";src:url("/_kay/assets/${name}") format("woff2");unicode-range:${range}}`
+
+    try {
+      await Bun.write(join(dir, 'assets/f-latin-a.woff2'), 'a')
+      await Bun.write(join(dir, 'assets/f-greek-a.woff2'), 'a')
+      await Bun.write(join(dir, 'assets/f-cyrillic-a.woff2'), 'a')
+      await Bun.write(join(root, 'pages/index.html'), '<p>caf\u00E9 \u03B1</p>')
+      await Bun.write(join(root, 'fonts.json'), JSON.stringify({ css: rule('f-latin-a.woff2', 'U+0000-00FF,U+0131') + rule('f-greek-a.woff2', 'U+0370-03FF') + rule('f-cyrillic-a.woff2', 'U+04??'), preload: [] }))
+
+      const app = new Elysia()
+      const client = { dir, pages: new Map([['/', { pattern: '/', file: 'index.html', status: 200, headers: {}, etag: '"a"', renderedAt: 0 }]]) } as unknown as ClientBuild
+
+      await serveServiceWorker(app, new ServedPaths(), { client, offline: true, base: '', publicPages: ['/'] })
+
+      const { settings } = await worker(app)
+
+      expect(settings!.precache).toEqual(['/_kay/assets/f-greek-a.woff2', '/_kay/assets/f-latin-a.woff2', '/'])
+      expect(settings!.files).toContain('/_kay/assets/f-cyrillic-a.woff2')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
     }
   })
 
@@ -130,6 +225,8 @@ describe('service worker', () => {
         store.set(key, response.clone())
       },
       addAll: async () => undefined,
+      keys: async () => [...store.keys()].map(path => ({ url: `http://localhost${path}` })),
+      delete: async (key: { url: string }) => store.delete(new URL(key.url).pathname),
     }
     let up = true
     const sandbox = {

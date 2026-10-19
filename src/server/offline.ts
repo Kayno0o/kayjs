@@ -5,14 +5,16 @@ import type { I18n } from './i18n'
 import type { ServedPaths } from './served-paths'
 import { readdir } from 'node:fs/promises'
 import { join } from 'node:path'
-import { ASSET_PREFIX } from '../build/assets'
+import { ASSET_PREFIX, ASSETS_DIR } from '../build/assets'
 import { NOTICES_FILE } from '../build/licenses'
 import { escape, escapeAttribute } from '../runtime/escape'
 import { textDirection } from '../runtime/i18n'
 import { runInLocale } from '../runtime/locale-state'
 import { kayLog } from '../runtime/log'
+import { PRERENDERED_DIR } from './client'
 import { fixedReply } from './compress'
 import { PUBLIC_ENV_PATH } from './env-state'
+import { builtFonts } from './fonts'
 import { DEFAULT_LANG, stateFor } from './i18n'
 import { slashedPath } from './routes'
 import { kayWord } from './words'
@@ -22,8 +24,10 @@ export const SERVICE_WORKER = '/sw.js'
 const PRECACHED = /\.(?:js|css|woff2?|ttf)$/
 const SKIPPED = /\.(?:br|gz|map)$/
 const BACKSLASH = /\\/g
+// A rule of the fonts' stylesheet naming its file and the range of characters it holds.
+const FACE_RANGE = /url\("([^"]+)"\)[^}]*?unicode-range:([^;}]+)/g
 // Bumped whenever the worker's own code changes, so every site installs it again.
-const WORKER_VERSION = 4
+const WORKER_VERSION = 5
 // Past this many pages kept by default, the boot says to list the ones worth it.
 const MANY_PAGES = 100
 
@@ -40,17 +44,35 @@ self.addEventListener('install', (event) => {
   event.waitUntil((async () => {
     const cache = await caches.open(KAY.cache)
     const pages = new Set(KAY.pages)
+    let before = {}
 
-    await cache.addAll(KAY.precache.filter(url => !pages.has(url)))
+    try {
+      before = await (await cache.match(KAY.index)).json()
+    }
+    catch {}
+
+    // A copy stays while its version is the one recorded, so a deploy fetches only what it changed.
+    for (const request of await cache.keys()) {
+      const path = new URL(request.url).pathname
+
+      if (path !== KAY.env && path !== KAY.index && (KAY.versions[path] === undefined || (before[path] ?? '') !== KAY.versions[path]))
+        await cache.delete(request)
+    }
+
+    const have = new Set((await cache.keys()).map(request => new URL(request.url).pathname))
+    const missing = KAY.precache.filter(url => !have.has(url))
+
+    await cache.addAll(missing.filter(url => !pages.has(url) && url !== KAY.fallback))
 
     // A page that fails, such as one a guard now covers, is left out rather than failing the install.
-    for (const url of KAY.precache.filter(url => pages.has(url) || url === KAY.fallback)) {
+    for (const url of missing.filter(url => pages.has(url) || url === KAY.fallback)) {
       try {
         await cache.add(url)
       }
       catch {}
     }
 
+    await cache.put(KAY.index, new Response(JSON.stringify(KAY.versions)))
     await self.skipWaiting()
   })())
 })
@@ -194,15 +216,60 @@ export async function serveServiceWorker(app: Elysia, served: ServedPaths, optio
   app.get(SERVICE_WORKER, async ({ request }) => reply(request))
 }
 
+// A font file of a face with several subsets is kept ahead only when a character of the pages kept falls in its `unicode-range`; the others are kept as a visit loads them.
+async function unusedSubsets(client: ClientBuild, pages: (string | undefined)[]): Promise<Set<string>> {
+  const css = (await builtFonts(join(client.dir, '..')))?.css
+  const unused = new Set<string>()
+
+  if (css === undefined)
+    return unused
+
+  const dir = join(client.dir, '..', PRERENDERED_DIR)
+  const characters = new Set<number>()
+
+  try {
+    for (const file of new Set(pages)) {
+      if (file !== undefined) {
+        for (const character of await Bun.file(join(dir, file)).text())
+          characters.add(character.codePointAt(0)!)
+      }
+    }
+  }
+  catch {
+    return unused
+  }
+
+  const codes = [...characters]
+
+  for (const [, url, ranges] of css.matchAll(FACE_RANGE)) {
+    const used = ranges!.split(',').some((range) => {
+      const [low, high = low] = range.trim().slice(2).split('-')
+
+      return codes.some(code => code >= Number.parseInt(low!.replaceAll('?', '0'), 16) && code <= Number.parseInt(high!.replaceAll('?', 'F'), 16))
+    })
+
+    if (!used)
+      unused.add(decodeURIComponent(url!))
+  }
+
+  return unused
+}
+
 async function workerScript(options: ServiceWorkerOptions, offline: true | OfflineConfig): Promise<string> {
   const { base, client } = options
   const config = offline === true ? {} : offline
-  const files = (await readdir(client.dir, { recursive: true, withFileTypes: true }))
+  const found = (await readdir(client.dir, { recursive: true, withFileTypes: true }))
     // The notices file is read once in a while, online, and never worth a copy on every visitor's device.
     .filter(entry => entry.isFile() && !SKIPPED.test(entry.name) && entry.name !== NOTICES_FILE)
-    .map(entry => `${base}${ASSET_PREFIX}${join(entry.parentPath, entry.name).slice(client.dir.length + 1).replace(BACKSLASH, '/')}`)
-    .sort()
-  const pages = (config.pages ?? options.publicPages).map(path => slashedPath(`${base}${path}`, options.trailingSlash)).sort()
+    .map((entry) => {
+      const relative = join(entry.parentPath, entry.name).slice(client.dir.length + 1).replace(BACKSLASH, '/')
+
+      return { url: `${base}${ASSET_PREFIX}${relative}`, path: join(entry.parentPath, entry.name), named: relative.startsWith(`${ASSETS_DIR}/`) }
+    })
+    .toSorted((a, b) => a.url < b.url ? -1 : 1)
+  const files = found.map(file => file.url)
+  const listed = (config.pages ?? options.publicPages).map(path => ({ path, url: slashedPath(`${base}${path}`, options.trailingSlash) })).toSorted((a, b) => a.url < b.url ? -1 : 1)
+  const pages = listed.map(page => page.url)
   const rendered = config.pages?.filter(path => client.pages.get(path)?.islands !== undefined) ?? []
 
   // Pages with server islands are not kept offline by default: an island needs the server, and an offline copy would keep one visitor's render.
@@ -211,14 +278,28 @@ async function workerScript(options: ServiceWorkerOptions, offline: true | Offli
 
   // Each one is fetched on every deploy's install, by every visitor who has the worker.
   if (config.pages === undefined && pages.length > MANY_PAGES)
-    kayLog('warn', `offline keeps every prerendered page, ${pages.length} of them, which each visitor downloads on every deploy; list the ones worth reading offline in offline.pages`)
+    kayLog('warn', `offline keeps every prerendered page, ${pages.length} of them, which each visitor downloads on their first visit; list the ones worth reading offline in offline.pages`)
 
   const fallback = config.fallback === undefined ? undefined : slashedPath(`${base}${config.fallback}`, options.trailingSlash)
-  // Changes with the build, its prerendered pages and the worker, so a deploy installs a new one, which drops the old cache.
-  const version = Bun.hash(JSON.stringify([WORKER_VERSION, files, pages, fallback, [...client.pages].map(([path, page]) => [path, page.etag])])).toString(36)
+  // A page the build holds no copy of, such as a fallback the routes render, is fetched again whenever any page changed.
+  const anyPage = Bun.hash(JSON.stringify([...client.pages].map(([path, page]) => [path, page.etag]))).toString(36)
+  const pageVersion = (path: string) => client.pages.get(path)?.etag ?? anyPage
+  // A file the build names after its content keeps its URL as its version; the others, a script or a stylesheet, are hashed.
+  const versions: Record<string, string> = Object.fromEntries(await Promise.all(found.map(async file => [file.url, file.named ? '' : Bun.hash(await Bun.file(file.path).bytes()).toString(36)])))
+
+  for (const page of listed)
+    versions[page.url] = pageVersion(page.path)
+
+  if (fallback !== undefined)
+    versions[fallback] = pageVersion(config.fallback!)
+
+  const skipped = await unusedSubsets(client, [...listed.map(page => client.pages.get(page.path)?.file), ...config.fallback === undefined ? [] : [client.pages.get(config.fallback)?.file]])
   const settings = {
-    cache: `kay-${version}`,
-    precache: [...files.filter(file => PRECACHED.test(file)), ...pages, ...fallback === undefined ? [] : [fallback]],
+    // Kept across deploys: a copy is fetched again only when its version in `versions` changed, and the worker's own code changes the name.
+    cache: `kay-w${WORKER_VERSION}`,
+    index: `${base}${ASSET_PREFIX}sw-versions`,
+    versions,
+    precache: [...files.filter(file => PRECACHED.test(file) && !skipped.has(decodeURIComponent(file.slice(base.length)))), ...pages, ...fallback === undefined ? [] : [fallback]],
     files,
     pages,
     fallback,

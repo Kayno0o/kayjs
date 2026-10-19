@@ -164,7 +164,8 @@ export default defineConfig({
 - Off, nothing is added to a page: `offline: false` is off, as leaving it out is.
 - Pages are kept and matched under the path `trailingSlash` writes them at, `/menu/` with `always`, and a visit to the other form finds the same copy.
 - On its install the worker fetches the build's scripts, stylesheets and fonts, every page `pages` lists, as paths of the site, every prerendered page no guard covers without it, and the `fallback` page.
-- The server warns past 100 prerendered pages, since each visitor downloads them on every deploy.
+- The server warns past 100 prerendered pages, since each visitor downloads them on their first visit.
+- A font of several subsets is fetched ahead only when a character of the pages kept falls in its `unicode-range`; the others are kept as a visit loads them.
 - The build's other files, such as images, are kept as they are first loaded.
 - It answers the build's files from what it keeps, so islands hydrate offline.
 - A page is fetched from the network first, a kept page's copy refreshed each time, unless its response says `private` or `no-store`.
@@ -173,8 +174,9 @@ export default defineConfig({
 - Actions, API routes and every other path under `/_kay/` always go to the network, as does any request other than GET, to another site, or for a range, as a video or an audio file asks for.
 - Only a full 200 for the URL asked is kept, never one a redirect led to.
 - `/_kay/env.js` is fetched from the network first and kept for offline islands.
-- The worker's cache is named after the build and the prerendered pages, so a deploy changes `/sw.js`, which the browser checks as a page loads.
-- The new worker takes over at once, drops the old cache, and the page swap goes on fetching through it.
+- The worker lists a version for each file and page it keeps, a hash of the file or the page's etag, so a deploy changes `/sw.js`, which the browser checks as a page loads.
+- The new worker takes over at once and the page swap goes on fetching through it.
+- Its install fetches only the files and pages whose version changed, so editing one page downloads that page, not the site again; the cache is kept across deploys and dropped only when the worker's own code changes.
 - Nothing has to be cleared by hand.
 - `kay dev` adds no script, and its `/sw.js` removes a worker a production run left on the same origin.
 - Turning `offline` off does the same for visitors who had it.
