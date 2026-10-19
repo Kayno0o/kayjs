@@ -452,6 +452,29 @@ div.flex.flex-col.nope-x(class="p-4 m-2 w-4 h-4" id="a")
     expect(messages.some(message => message.line === 4)).toBe(true)
   })
 
+  it('reports and fixes a class of a static class attribute written over lines at its own line', async () => {
+    const text = '---\n---\ndiv(\n  class="\n    flex zz-a\n    w-4 h-4\n  "\n) x\n'
+    const { fixed, messages } = await lint(text)
+    const lines = text.split('\n')
+    const found = messages.filter(message => message.ruleId?.startsWith('better-tailwindcss/')).map(message => `${message.line}:${lines[message.line - 1]!.slice(message.column - 1, message.endColumn! - 1)}`)
+
+    expect(found).toContain('5:zz-a')
+    expect(found).toContain('6:w-4')
+    expect(fixed.output).toContain('size-4')
+    expect(fixed.output).toContain('div(\n  class="')
+    expect(fixed.output).toEndWith('"\n) x\n')
+  })
+
+  it('reports a class of a multi-line static class beside a shorthand at its own line, without a fix', async () => {
+    const text = '---\n---\ndiv.flex(\n  class="\n    zz-a\n    w-4\n  "\n) x\n'
+    const { fixed, messages } = await lint(text)
+    const lines = text.split('\n')
+    const found = messages.filter(message => message.ruleId?.startsWith('better-tailwindcss/')).map(message => `${message.line}:${lines[message.line - 1]!.slice(message.column - 1, message.endColumn! - 1)}`)
+
+    expect(found).toContain('5:zz-a')
+    expect(fixed.output ?? text).toBe(text)
+  })
+
   it('reports a class on a component call, and two strings of one element reading the same only once told apart', async () => {
     const text = '---\nconst { rest } = props<{ rest: Record<string, string> }>()\n---\nFoo.zz-a(class="zz-b")\ndiv.zz-c({...rest} class="zz-c")\n'
     const { messages } = await lint(text)

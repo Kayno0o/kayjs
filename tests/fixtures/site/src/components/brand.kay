@@ -5,12 +5,4 @@ import logo from '../logo.png'
 const large = signal(false)
 ---
 // kay-allow unsized-image
-img(
-  class="brand"
-  src={logo}
-  width={large() ? 64 : 16}
-  alt="Brand"
-  role="button"
-  tabindex="0"
-  onClick={() => large.set(on => !on)}
-)
+img.brand(src={logo} width={large() ? 64 : 16} alt="Brand" role="button" tabindex="0" onClick={() => large.set(on => !on)})

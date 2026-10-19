@@ -24,7 +24,9 @@ interface AttributeEdit extends Span {
 const INDENT = '  '
 // The width past which an element's tag, classes, id and attributes move their classes into a `class` attribute of their own.
 const MAX_WIDTH = 120
-const WHITESPACE_RUN = /\s+/
+// What a line holds beside its classes at most for them to move: past it the line is long for its attributes, and moving the classes would leave it as long.
+const MAX_REST = 80
+const WHITESPACE_RUN = /[ \t\r\n]+/
 const FENCE_OPEN = /^---(?:[ \t]+([a-z]+)(?:[ \t]+(<.*>))?|[ \t]*(<.*>))?[ \t]*$/
 const LEADING_SPACES = /^ */
 const CRLF = /\r\n/g
@@ -269,7 +271,7 @@ function classWrapCandidates(file: KayFile): Map<number, ElementNode[]> {
 }
 
 // Where the classes of an element make its line longer than MAX_WIDTH, they move into a `class` attribute and its attributes go one to a line, the value running over lines when it is too long for one.
-// An element is left as written when it has a `class={...}`, attributes over several lines or a quote in its classes, or when it would be too long without its classes, and only the one with the most classes on a line moves.
+// An element is left as written when it has a `class={...}`, a spread before its `class`, attributes over several lines or a quote in its classes, or when it would be too long without its classes, and only the one with the most classes on a line moves.
 function classWrapEdit(file: KayFile, candidates: ElementNode[] | undefined, offset: number, column: number, edits: AttributeEdit[]): AttributeEdit | undefined {
   const { source } = file
   const slice = (span: Span) => source.slice(span.start, span.end)
@@ -283,6 +285,12 @@ function classWrapEdit(file: KayFile, candidates: ElementNode[] | undefined, off
     if (named && named.kind !== 'static')
       continue
 
+    // The class attribute moves to the front, which a spread before it would otherwise follow.
+    const spreadAt = element.attributes.findIndex(attribute => attribute.kind === 'spread')
+
+    if (named && spreadAt !== -1 && spreadAt < element.attributes.indexOf(named))
+      continue
+
     const attributes = element.attributes.filter(attribute => attribute !== named).map(attribute => attributeText(source, attribute))
     const words = [...element.classes.map(slice), ...named?.kind === 'static' ? named.text.split(WHITESPACE_RUN).filter(Boolean) : []]
 
@@ -293,9 +301,9 @@ function classWrapEdit(file: KayFile, candidates: ElementNode[] | undefined, off
     const before = applyEdits(source.slice(offset, element.start), offset, edits)
 
     const width = column + before.length + head.length
-    const shorthand = element.classes.reduce((sum, span) => sum + span.end - span.start + 1, 0)
+    const classText = element.classes.reduce((sum, span) => sum + span.end - span.start + 1, 0) + (named?.kind === 'static' ? slice(named.value).length : 0)
 
-    if (width <= MAX_WIDTH || width - shorthand > MAX_WIDTH || (best && best.classes >= element.classes.length))
+    if (width <= MAX_WIDTH || width - classText > MAX_REST || (best && best.classes >= element.classes.length))
       continue
 
     const tag = element.tag.end > element.tag.start ? '' : element.name

@@ -522,7 +522,7 @@ kay lint --fix --cache       # ESLint, with the types it reads written first
 
 `kay lint` writes the types ESLint reads for `.kay` files, then runs the project's `keslint` with the arguments you give it. The `lint` script of a new project is `kay lint --cache`.
 
-`kay fmt` keeps the `.class` shorthand while a line fits in 120 characters. When an element's classes make its line longer, it writes them as a `class` attribute inside the parentheses, over several lines when the list is long, so a long Tailwind list reads as a block.
+`kay fmt` keeps the `.class` shorthand while a line fits in 120 characters. When an element's classes make its line longer, it writes them as a `class` attribute inside the parentheses, over several lines when the list is long, so a long Tailwind list reads as a block. A line that is long for its other attributes, not its classes, is left as written.
 
 `kay fmt --from-html` reads a file, or stdin, and prints the HTML as a template, with what it could not carry over listed on stderr. [Migrating from HTML](/migrating/from-html) shows what it writes.
 

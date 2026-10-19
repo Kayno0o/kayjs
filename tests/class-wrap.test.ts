@@ -71,6 +71,21 @@ describe('a static class over several lines', () => {
     expect(parseKay('div(title="a\nb") x\n').diagnostics.map(d => d.message)).toContain('Unclosed string')
   })
 
+  it('reports a class quote forgotten on its line at once, not at a quote many lines below', () => {
+    const file = parseKay('div(class="a b) x\np(title="t") y\n')
+
+    expect(file.diagnostics.map(d => d.message)).toContain('Unclosed string')
+    expect(file.diagnostics[0]).toMatchObject({ start: 10 })
+  })
+
+  it('reads a value that starts on its next line with a carriage return, and keeps a no-break space inside a word', () => {
+    const crlf = parseKay('div(class="\r\n  a\r\n  b\r\n") x\n')
+
+    expect(crlf.diagnostics).toEqual([])
+    expect(crlf.template[0]).toMatchObject({ attributes: [{ text: 'a b' }] })
+    expect(parseKay('div(class="\n  a\u00A0b c\n") x\n').template[0]).toMatchObject({ attributes: [{ text: 'a\u00A0b c' }] })
+  })
+
   it('keeps its lines when kay fmt runs', () => {
     const code = '  div(\n    class="\n      flex items-center\n      gap-1\n    "\n    id="a"\n  ) x\n'
 
@@ -80,10 +95,11 @@ describe('a static class over several lines', () => {
 
 describe('kay fmt on an element whose classes make its line long', () => {
   it('leaves a line of up to 120 characters in the shorthand and moves one of 121', () => {
-    const exact = `dl${classes(29)}.zz` // 2 + 29 * 4 + 3 = 121 is the first past the width, so drop a class of the 29 for 120 below
+    // The element is `dl`, 29 classes of 4 characters and the last one: 120 with `.z`, 121 with `.zz`.
+    const fits = `dl${classes(29)}.z x\n`
 
-    expect(format(`dl${classes(28)}.zz.zz x\n`)).toBe(`dl${classes(28)}.zz.zz x\n`)
-    expect(format(`${exact} x\n`)).toStartWith('dl(\n  class="')
+    expect(format(fits)).toBe(fits)
+    expect(format(`dl${classes(29)}.zz x\n`)).toStartWith('dl(\n  class="')
   })
 
   it('moves the shorthand into a class attribute inside parentheses, its value over lines when it is too long for one', () => {
@@ -93,9 +109,27 @@ describe('kay fmt on an element whose classes make its line long', () => {
   })
 
   it('keeps the value on one line when it fits, which other attributes in the head make possible', () => {
-    const href = `/${'a'.repeat(105)}`
+    const href = `/${'a'.repeat(60)}`
+    const words = Array.from({ length: 15 }, (_, index) => `c${String(index + 1).padStart(2, '0')}`).join(' ')
 
-    expect(format(`a.c01.c02(href="${href}") go\n`)).toBe(`a(\n  class="c01 c02"\n  href="${href}"\n) go\n`)
+    expect(format(`a${classes(15)}(href="${href}") go\n`)).toBe(`a(\n  class="${words}"\n  href="${href}"\n) go\n`)
+  })
+
+  it('leaves a single short class alone when the other attributes make the line long', () => {
+    const line = `img.brand(src={logo} width={large() ? 64 : 16} alt="Brand" role="button" tabindex="0" onClick={() => large.set(on => !on)})\n`
+
+    expect(line.length).toBeGreaterThan(120)
+    expect(format(line)).toBe(line)
+  })
+
+  it('moves a static class that makes the line long, and keeps the order of a spread before it', () => {
+    const list = Array.from({ length: 30 }, (_, index) => `c${String(index + 1).padStart(2, '0')}`).join(' ')
+    const before = `div.a({...props} class="${list}") x\n`
+    const after = `div.a(class="${list}" {...props}) x\n`
+
+    expect(format(before)).toBe(before)
+    expect(format(after)).toStartWith('div(\n  class="\n    a c01')
+    expect(format(after)).toEndWith('\n  "\n  {...props}\n) x\n')
   })
 
   it('leaves an element alone when its attributes alone make the line long', () => {

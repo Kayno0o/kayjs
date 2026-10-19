@@ -13,7 +13,10 @@ const NEXT_FENCE_LINE = /---[ \t]*[a-z<]/y
 const BLANK_LINES = /(?:[ \t]*\r?\n)*/y
 const TAG_NAME = /[A-Z][\w-]*/iy
 const ID_NAME = /[\w-]+/y
-const WHITESPACE_RUN = /\s+/g
+// What separates the words of a class value: not `\s`, whose non-breaking space is part of a word.
+const WHITESPACE_RUN = /[ \t\r\n]+/g
+// A `class="` that ends its line, which opens a value over several lines.
+const LINE_BREAK_AFTER = /[ \t]*\r?\n/y
 const ATTRIBUTE_NAME = /[A-Z_@:][\w\-:.@]*/iy
 const SLOT_NAME = /@[A-Z_$][\w$]*/iy
 // `slot actions`: where a component renders its `actions` block prop.
@@ -1050,8 +1053,11 @@ class TemplateParser {
 
     if (quote === '"' || quote === '\'') {
       const end = this.src.indexOf(quote, this.pos + 1)
-      // A long list of classes may run over several lines, which render as single spaces.
-      const spansLines = this.src.slice(name.start, name.end) === 'class'
+
+      // A long list of classes may run over several lines, which render as single spaces, when its opening quote ends a line: a quote forgotten on a line still reports at once.
+      LINE_BREAK_AFTER.lastIndex = this.pos + 1
+
+      const spansLines = this.src.slice(name.start, name.end) === 'class' && LINE_BREAK_AFTER.test(this.src)
 
       if (end === -1 || (end > this.scan.lineEnd(this.pos) && !spansLines)) {
         this.error(this.pos, this.pos + 1, 'Unclosed string')

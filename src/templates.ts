@@ -168,7 +168,11 @@ details.relative
   summary.flex.cursor-pointer.list-none.items-center.gap-2.text-sm.text-subtext1
     Palette.size-5.text-accent
     | Accent
-  div.absolute.right-0.mt-2.grid.grid-cols-7.gap-1.rounded.border-2.border-overlay0.bg-mantle.p-2.shadow-lg(role="radiogroup" aria-label="Accent colour")
+  div(
+    class="absolute right-0 mt-2 grid grid-cols-7 gap-1 rounded border-2 border-overlay0 bg-mantle p-2 shadow-lg"
+    role="radiogroup"
+    aria-label="Accent colour"
+  )
     for name of ACCENTS
       button.grid.size-6.place-items-center.rounded.border-2.border-overlay0.p-0(type="button" role="radio" aria-label={name} aria-checked={currentAccent() === name ? 'true' : 'false'} style={\`background-color: var(--accent-\${name})\`} onClick={() => accent.set(name)})
         if currentAccent() === name
