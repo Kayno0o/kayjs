@@ -172,7 +172,7 @@ export async function setUpTwoFactor(state: RequestState, proof: Proof): Promise
 export async function enableTwoFactor(state: RequestState, code: string): Promise<{ ok: true, recoveryCodes: string[] } | { ok: false, error: 'signed-out' | 'not-set-up' | 'enabled' | 'invalid' | 'limited' }> {
   const record = await state.current()
 
-  if (!record)
+  if (!record || state.via() !== 'session')
     return { ok: false, error: 'signed-out' }
 
   if (record.totpEnabledAt !== null)

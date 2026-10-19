@@ -249,10 +249,10 @@ export async function updateOrganization(state: RequestState, ref: string, patch
   return updated ? { ok: true, organization: publicOrganization(updated) } : { ok: false, error: 'not-found' }
 }
 
-// Owners only: every membership and invitation goes with it. Never for an admin acting as the owner, as it cannot be undone.
+// Owners only, from a session: every membership and invitation goes with it. Never for an admin acting as the owner, as it cannot be undone.
 export async function deleteOrganization(state: RequestState, ref: string): Promise<{ ok: true } | { ok: false, error: OrganizationFailure | 'impersonating' }> {
   const { config, store } = organizationsOf(state.core)
-  const found = await asMember(state, ref, config.owner)
+  const found = await asMember(state, ref, config.owner, true)
 
   if (!found.ok)
     return found
@@ -289,10 +289,10 @@ export async function listMembers(state: RequestState, ref: string): Promise<{ o
   return { ok: true, members }
 }
 
-// A manager gives only roles they hold, to a member holding none above theirs: an admin cannot make an owner, nor demote one.
+// From a session only. A manager gives only roles they hold, to a member holding none above theirs: an admin cannot make an owner, nor demote one.
 export async function setMemberRoles(state: RequestState, ref: string, userId: string, roles: string[]): Promise<MemberResult> {
   const { config, store } = organizationsOf(state.core)
-  const found = await asMember(state, ref, config.manage)
+  const found = await asMember(state, ref, config.manage, true)
 
   if (!found.ok)
     return found
@@ -321,11 +321,11 @@ export async function setMemberRoles(state: RequestState, ref: string, userId: s
   return { ok: true }
 }
 
-// The signed-in user leaves, or a manager removes a member holding no role above theirs.
+// From a session only: the signed-in user leaves, or a manager removes a member holding no role above theirs.
 export async function removeMember(state: RequestState, ref: string, userId: string): Promise<MemberResult> {
   const { config, store } = organizationsOf(state.core)
   const self = (await state.current())?.id === userId
-  const found = await asMember(state, ref, self ? undefined : config.manage)
+  const found = await asMember(state, ref, self ? undefined : config.manage, true)
 
   if (!found.ok)
     return found
@@ -526,12 +526,12 @@ export async function declineInvitation(state: RequestState, invitationId: strin
   return store.invitations.delete(invitation.id)
 }
 
-// The signed-in user's membership of the organization `ref` names, holding `role` there when given.
-async function asMember(state: RequestState, ref: string, role?: string): Promise<{ ok: true, record: UserRecord, organization: OrganizationRecord, member: MemberRecord } | { ok: false, error: OrganizationFailure }> {
+// The signed-in user's membership of the organization `ref` names, holding `role` there when given; with `session`, a bearer or OAuth token is refused as signed out.
+async function asMember(state: RequestState, ref: string, role?: string, session = false): Promise<{ ok: true, record: UserRecord, organization: OrganizationRecord, member: MemberRecord } | { ok: false, error: OrganizationFailure }> {
   const { config, store } = organizationsOf(state.core)
   const record = await state.current()
 
-  if (!record)
+  if (!record || (session && state.via() !== 'session'))
     return { ok: false, error: 'signed-out' }
 
   const organization = await findOrganization(state.core, ref)

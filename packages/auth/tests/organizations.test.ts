@@ -422,6 +422,25 @@ describe('organizations', () => {
     expect(await grace.browser.json('/guarded/acme')).toBe('denied 403')
   })
 
+  test('a bearer token cannot delete the organization, change roles or remove members, a session can', async () => {
+    const { ada, org, person, join, browserOn, site } = await setup()
+    const grace = await person('grace@example.com')
+
+    await join(ada, grace, 'grace@example.com')
+
+    const { token } = await ada.browser.callOk('createToken', { password: PASSWORD }, 'Script')
+    const device = browserOn(site)
+    const bearer = async (method: string, ...args: unknown[]) => device.json(`/call/${method}`, { method: 'POST', headers: { 'authorization': `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify(args) })
+
+    expect(await bearer('members', org)).toMatchObject({ ok: true })
+    expect(await bearer('setMemberRoles', org, grace.id, ['admin'])).toEqual({ ok: false, error: 'signed-out' })
+    expect(await bearer('removeMember', org, grace.id)).toEqual({ ok: false, error: 'signed-out' })
+    expect(await bearer('deleteOrganization', org)).toEqual({ ok: false, error: 'signed-out' })
+    expect(await ada.browser.call('members', org)).toMatchObject({ ok: true, members: [{}, { roles: ['member'] }] })
+    expect(await ada.browser.call('setMemberRoles', org, grace.id, ['admin'])).toEqual({ ok: true })
+    expect(await ada.browser.call('deleteOrganization', org)).toEqual({ ok: true })
+  })
+
   test('inviting needs the invitation page', async () => {
     const { ada, org } = await setup({ invitationPage: undefined })
 

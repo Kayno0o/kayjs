@@ -59,6 +59,17 @@ describe('bearer tokens', () => {
     expect(await lastUsed()).not.toEqual(first)
   })
 
+  test('cannot list or revoke tokens, nor turn on two-factor', async () => {
+    const { ada, browser, bearer, minted } = await withToken()
+    const device = browser()
+    const post = async (method: string, ...args: unknown[]) => device.json(`/call/${method}`, { method: 'POST', headers: { ...bearer, 'content-type': 'application/json' }, body: JSON.stringify(args) })
+
+    expect(await post('tokens')).toEqual([])
+    expect(await post('revokeToken', minted.id)).toBe(false)
+    expect(await post('enableTwoFactor', '123456')).toEqual({ ok: false, error: 'signed-out' })
+    expect(await ada.call('tokens')).toHaveLength(1)
+  })
+
   test('cannot mint more tokens, nor revoke another user\'s', async () => {
     const { browser, bearer, minted } = await withToken()
     const device = browser()
