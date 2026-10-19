@@ -1,6 +1,7 @@
 import type { BunPlugin } from 'bun'
 import type { AnyElysia } from 'elysia'
 import type { BudgetConfig } from './build/budget'
+import type { Listed as RouteListing } from './commands/routes'
 import type { LintLevels } from './compiler/lints'
 import type { Highlighter } from './content/markdown'
 import type { ByteSize } from './runtime/byte-size'
@@ -138,12 +139,34 @@ export interface KayConfig {
   onError?: ((error: unknown, request: Request | undefined) => void | Promise<void>) | undefined
   // The files `kay env` and `kay check` compare the declared variables with: a compose file or several, and the example env file (`{ compose: 'compose.prod.yaml', example: '.env.example' }`). Each variable production needs must be set by a compose service and listed in the example, and each one the example lists must be declared.
   env?: { compose?: string | string[] | undefined, example?: string | undefined } | undefined
+  // The app's own checks, which `kay check` runs with its own: each gets `{ root, routes, report }` and reports problems with `report({ level, message, file, line })`, which join kay's in every format and count toward the exit code. A check that throws, or does not finish within 30 seconds, is reported as an error and the others still run.
+  checks?: ProjectCheck[] | undefined
   // What libraries add to the app, each listed once: `extensions: [authPages()]`.
   extensions?: KayExtension[] | undefined
 }
 
 // What every page's head starts from; a layout or the page setting the same tag wins.
 // Each of `name`, `titleTemplate`, `description`, `image`, `imageAlt` and `locale` is a string, or a record of one string per locale for a site with `i18n`: `description: { en: 'The shop', fr: 'La boutique' }`. A locale the record lacks reads the default locale's.
+// A problem an app's own check reports; `level` is `'error'` unless it says `'warning'`, `file` is relative to the project and defaults to kay.config.ts, and `line` and `column` default to 1.
+export interface ProjectFinding {
+  level?: 'error' | 'warning' | undefined
+  message: string
+  file?: string | undefined
+  line?: number | undefined
+  column?: number | undefined
+  code?: string | undefined
+}
+
+export interface ProjectCheckContext {
+  // The project's directory.
+  root: string
+  // The routes the project serves, as `kay routes` lists them: read once, when a check first asks.
+  routes: () => Promise<Omit<RouteListing, 'copy'>[]>
+  report: (finding: ProjectFinding) => void
+}
+
+export type ProjectCheck = (context: ProjectCheckContext) => void | Promise<void>
+
 export interface SeoConfig {
   // The site's name: the title of a page that sets none, and `og:site_name`.
   name?: Localized | undefined

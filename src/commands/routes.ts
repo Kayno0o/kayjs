@@ -34,7 +34,7 @@ import { importApi } from './import-module'
 import { USAGES } from './usages'
 
 // One line of the listing, and the chains printed under it.
-interface Listed {
+export interface Listed {
   methods: string
   path: string
   kind: 'page' | 'action' | 'endpoint' | 'api' | 'plugin' | 'redirect' | 'feed' | 'kay'
@@ -95,7 +95,7 @@ export const routes: Command = {
   },
 }
 
-async function listRoutes(root: string): Promise<{ routes: Listed[], unlisted: string[] }> {
+export async function listRoutes(root: string): Promise<{ routes: Listed[], unlisted: string[] }> {
   const config = await loadConfig(root)
   const routes = [...await appRoutes(root, config), ...await apiRoutes(root, config), ...pluginRoutes(config), ...redirectRoutes(config), ...await feedRoutes(root, config), ...kayRoutes(root, config)]
 

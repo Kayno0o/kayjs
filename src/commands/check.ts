@@ -15,6 +15,7 @@ import { watchProject } from '../dev/sources'
 import { cacheDir } from '../project'
 import { buildingWithoutEnv } from '../server/env-state'
 import { count, done, formatOption, printFailure, printProblems, PROBLEM_FORMATS, projectRoot, takesControlCodes } from './command'
+import { runProjectChecks } from './project-checks'
 import { USAGES } from './usages'
 
 const CLI = join(import.meta.dir, '../cli.ts')
@@ -234,7 +235,7 @@ function inScope(diagnostic: CheckDiagnostic, scope: string[]): boolean {
 async function checkProject(root: string, config: KayConfig, tsconfig: string, entry: string | undefined, { denyWarnings, fix, only, since, launch, format, scope, quiet }: { denyWarnings: boolean, fix: boolean, only: LintGroup | undefined, since: string | undefined, launch: boolean, format: ProblemFormat, scope: string[], quiet: boolean }): Promise<{ failing: number, found: number }> {
   const options = { ...configCheckOptions(config), tsconfig, entry: entry ?? config.entry, launch }
   const checkScope = async () => (await checkTypes(root, options)).filter(diagnostic => inScope(diagnostic, scope))
-  let diagnostics = [...await checkScope(), ...await envProblems(root, config, scope)]
+  let diagnostics = await checkScope()
 
   // A path filter only narrows what is reported, but a run asked for one is not the whole check the entries of deleted components can be judged against.
   if (scope.length === 0)
@@ -251,8 +252,13 @@ async function checkProject(root: string, config: KayConfig, tsconfig: string, e
     else if (!quiet)
       done('fixed', count(fixed, 'problem'))
 
-    diagnostics = [...await checkScope(), ...await envProblems(root, config, scope)]
+    diagnostics = await checkScope()
   }
+
+  // The app's own checks run once, after the fixes.
+  // They have no lint, so a run narrowed to a group or a minor leaves them out.
+  if (only === undefined && since === undefined)
+    diagnostics.push(...await envProblems(root, config, scope), ...(await runProjectChecks(root, config)).filter(diagnostic => inScope(diagnostic, scope)))
 
   if (since !== undefined)
     diagnostics = diagnostics.filter(inMinor)

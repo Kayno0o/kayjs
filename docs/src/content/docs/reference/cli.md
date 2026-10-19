@@ -353,7 +353,26 @@ The first path is the project when it is a directory holding a `kay.config.ts`, 
 | `-p <tsconfig>` | Names another tsconfig, relative to the directory |
 | `--entry <file>` | The server entry whose `app` types `ctx.locals`, `src/server.ts` by default |
 
-`--since` does not go with `--only`. The exit code is the same in every format. `kay check` and its lints have their [own page](/reference/checks).
+`--since` does not go with `--only`. The exit code is the same in every format.
+
+### Your own checks
+
+List checks in `kay.config.ts` and `kay check` runs them with its own. Their problems show in the text report, in `--format json` and `github`, and in the MCP `check` tool, and they count toward the exit code and `--deny-warnings`.
+
+```ts
+export default defineConfig({
+  checks: [
+    async ({ root, report }) => {
+      if (!(await Bun.file(`${root}/compose.prod.yaml`).exists()))
+        report({ level: 'error', message: 'compose.prod.yaml is missing', file: 'compose.prod.yaml' })
+    },
+  ],
+})
+```
+
+A check gets the project's `root`, a `routes()` function that lists the routes the project serves, and `report`. `level` is `'error'` unless you give `'warning'`. `file` is relative to the project and defaults to `kay.config.ts`, and `line` and `column` default to 1.
+
+A check that throws is reported as an error, and the other checks still run. So is one that has not finished after 30 seconds. `--only` and `--since` leave your checks out. `kay check` and its lints have their [own page](/reference/checks).
 
 ## kay upgrade
 
