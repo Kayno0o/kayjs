@@ -1196,7 +1196,9 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
     },
 
     // The `Cookie` header of a new session signed in as `userId`, as `signIn` makes it, for a test or a script to send by hand; throws for a missing or banned user.
-    async sessionCookie(userId: string): Promise<string> {
+    // `secure` picks the cookie a request over https carries (`__Host-session`) or over http (`session`): by default https in production when the site's `url` is https, as kay's server reads it, else http.
+    async sessionCookie(userId: string, cookieOptions: { secure?: boolean } = {}): Promise<string> {
+      const secure = cookieOptions.secure ?? (process.env.NODE_ENV === 'production' && core.url?.startsWith('https:') === true)
       let failure: unknown
       const signer = new Elysia().use(plugin).post('/', async ({ auth }) => {
         try {
@@ -1206,7 +1208,7 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
           failure = error
         }
       })
-      const response = await signer.handle(new Request('http://localhost/', { method: 'POST' }))
+      const response = await signer.handle(new Request(secure ? 'https://localhost/' : 'http://localhost/', { method: 'POST' }))
 
       if (failure !== undefined)
         throw failure

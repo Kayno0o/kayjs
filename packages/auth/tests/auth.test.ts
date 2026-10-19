@@ -31,6 +31,51 @@ describe('createAuth', () => {
     await expect(auth.sessionCookie('nobody')).rejects.toThrow('no user nobody')
   })
 
+  test('sessionCookie mints the cookie an https request reads, from `secure` or a production site whose url is https', async () => {
+    const { auth, app, store } = testApp({ url: 'https://example.com' })
+    const read = async (cookie: string, headers: Record<string, string>) => (await app.handle(new Request('http://localhost/me', { headers: { cookie, ...headers } }))).text()
+    const proto = { 'x-forwarded-proto': 'https' }
+    const previous = process.env.NODE_ENV ?? 'test'
+
+    await store.users.create(userRecord({ id: 'u1', email: 'ada@example.com' }))
+
+    try {
+      const http = await auth.sessionCookie('u1')
+      const https = await auth.sessionCookie('u1', { secure: true })
+
+      expect(http).toStartWith('session=')
+      expect(https).toStartWith('__Host-session=')
+      expect(await read(https, proto)).toContain('u1')
+      expect(await read(http, proto)).toBe('anonymous')
+      expect(await read(https, {})).toBe('anonymous')
+      expect(await auth.sessionCookie('u1', { secure: false })).toStartWith('session=')
+
+      process.env.NODE_ENV = 'production'
+      expect(await auth.sessionCookie('u1')).toStartWith('__Host-session=')
+      expect(await auth.sessionCookie('u1', { secure: false })).toStartWith('session=')
+      expect(await read(await auth.sessionCookie('u1'), proto)).toContain('u1')
+      await expect(auth.sessionCookie('nobody', { secure: true })).rejects.toThrow('no user nobody')
+    }
+    finally {
+      process.env.NODE_ENV = previous
+    }
+  })
+
+  test('sessionCookie stays http in production when the site has no https url', async () => {
+    const { auth, store } = testApp({ url: 'http://example.com' })
+    const previous = process.env.NODE_ENV ?? 'test'
+
+    await store.users.create(userRecord({ id: 'u1', email: 'ada@example.com' }))
+    process.env.NODE_ENV = 'production'
+
+    try {
+      expect(await auth.sessionCookie('u1')).toStartWith('session=')
+    }
+    finally {
+      process.env.NODE_ENV = previous
+    }
+  })
+
   test('a visitor who never signed in reads as anonymous and gets no cookie', async () => {
     const { browser } = await seeded()
     const visitor = browser()

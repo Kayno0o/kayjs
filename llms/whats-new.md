@@ -2,6 +2,10 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
+## Unreleased
+
+- kayjs-auth's `auth.sessionCookie` mints the `__Host-session` cookie an https site reads, in production when the site's `url` is https or with `{ secure: true }` ([Hardening and testing](../packages/auth/llms/hardening-and-testing.md)).
+
 ## 1.57.1
 
 - The `AGENTS.md` that `kay new` writes tells agents to set `seo.name`, which every page title ends with, to the site's real name instead of the folder name ([Project](project.md)).
