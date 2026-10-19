@@ -132,6 +132,89 @@ describe('the script and the page', () => {
   })
 })
 
+describe('the notice, its lifetime and what a visit carries', () => {
+  const NAMED = [
+    ['plausible', { provider: 'plausible' }, 'Plausible'],
+    ['umami', { provider: 'umami', websiteId: 'w' }, 'Umami'],
+    ['simpleanalytics', { provider: 'simpleanalytics' }, 'Simple Analytics'],
+    ['matomo', { provider: 'matomo', siteId: 1, host: 'https://m.example' }, 'Matomo'],
+    ['ga4', { provider: 'ga4', measurementId: 'G-ABC123', apiSecret: 'sec_ret-1' }, 'Google Analytics'],
+    ['fathom', { provider: 'fathom', siteId: 'ABCDEFGH' }, 'Fathom'],
+    ['cloudflare', { provider: 'cloudflare', token: 'tok-123' }, 'Cloudflare Web Analytics'],
+    ['custom', { provider: 'custom', script: 'https://tracker.example/s.js', endpoint: 'https://tracker.example/collect' }, 'tracker.example'],
+  ] as const
+  const page = async (options: AnalyticsOptions) => (await (await site(options)).handle(new Request('http://localhost/'))).text()
+
+  it.each(NAMED)('%s: the notice or the information line names the provider with no wording from the app', async (_name, options, shown) => {
+    const html = await page(options)
+
+    expect(html).toContain(`with ${shown},`)
+    expect(html).toContain('Privacy policy')
+  })
+
+  it('names the provider in the information line of a counter that asks nothing, and in the notice once consent is on', async () => {
+    expect(await page(plausible())).toContain('with Plausible, without cookies that follow you. You can opt out.')
+    expect(await page(plausible({ consent: true }))).toContain('with Plausible, without cookies that follow you. Do you agree?')
+  })
+
+  it('links the policy the app names, in the notice and in the information line', async () => {
+    expect(await page(plausible({ policyUrl: '/privacy' }))).toContain('data-policy="/privacy"')
+    expect(await page(plausible({ consent: true, policyUrl: 'https://example.com/privacy' }))).toContain('data-policy="https://example.com/privacy"')
+    expect(await page(plausible())).not.toContain('data-policy')
+    expect(await page(plausible({ policyUrl: '/privacy', info: { policy: { en: 'Policy', fr: 'Politique' } } }))).toContain('Politique')
+  })
+
+  it.each(['javascript:alert(1)', '//evil.example', 'privacy', ''])('refuses the policy address %p', (policyUrl) => {
+    expect(() => analytics({ ...plausible(), policyUrl })).toThrow('policyUrl')
+  })
+
+  it('remembers an answer 180 days by default, for the information line and the notice alike, and takes up to 13 months', async () => {
+    expect(await page(plausible())).toContain('data-max-age="15552000"')
+    expect(await page(plausible({ consent: true }))).toContain('data-max-age="15552000"')
+    expect(await page(plausible({ consent: { maxAge: 3600 } }))).toContain('data-max-age="3600"')
+    expect(await page({ provider: 'fathom', siteId: 'ABCDEFGH' })).toContain('data-max-age="15552000"')
+    expect(() => analytics(plausible({ consent: { maxAge: 396 * 86_400 } }))).toThrow('maxAge')
+    expect(() => analytics(plausible({ consent: { maxAge: 0 } }))).toThrow('maxAge')
+    expect(() => analytics(plausible({ consent: { maxAge: 395 * 86_400 } }))).not.toThrow()
+  })
+
+  it('carries the excluded paths and the titles opt-in to the tracker', async () => {
+    const html = await page(plausible({ exclude: ['/account', '/*/admin'], titles: true }))
+
+    expect(html).toContain('data-exclude="[&quot;/account&quot;,&quot;/*/admin&quot;]"')
+    expect(html).toContain('data-titles')
+    expect(await page(plausible())).not.toContain('data-exclude')
+    expect(await page(plausible())).not.toContain('data-titles')
+  })
+
+  it('sends no title unless the app asked for it', async () => {
+    await send(await site(plausible()), visit())
+    await send(await site(plausible()), visit(), { cookie: 'kay_analytics=yes' })
+    expect(received).toHaveLength(2)
+    expect(JSON.stringify(received)).not.toContain('Pricing')
+    received = []
+
+    const umami: AnalyticsOptions = { provider: 'umami', websiteId: 'w', host: `http://localhost:${provider.port}` }
+
+    await send(await site(umami), visit())
+    expect((received[0]!.body as { payload: { title: string } }).payload.title).toBe('')
+    received = []
+    await send(await site({ ...umami, titles: true }), visit())
+    expect((received[0]!.body as { payload: { title: string } }).payload.title).toBe('Pricing')
+  })
+
+  it.each(['/', 'account', '', 5])('refuses the excluded path %p', (path) => {
+    expect(() => analytics({ ...plausible(), exclude: [path as string] })).toThrow('exclude')
+  })
+
+  it.each(['fathom', 'cloudflare', 'custom'] as const)('refuses exclude and titles for %s, whose own script counts the pages', (name) => {
+    const options = NAMED.find(([provider]) => provider === name)![1] as AnalyticsOptions
+
+    expect(() => analytics({ ...options, exclude: ['/account'] })).toThrow('whose own script')
+    expect(() => analytics({ ...options, titles: true })).toThrow('whose own script')
+  })
+})
+
 describe('what each provider is sent', () => {
   it('sends Plausible the visit with the visitor\'s address and agent, the campaign kept and the rest of the query dropped', async () => {
     const response = await send(await site(plausible()), visit(), { 'x-forwarded-for': '198.51.100.9' })
@@ -151,7 +234,7 @@ describe('what each provider is sent', () => {
   })
 
   it('sends Umami the visit as an event of its website, the address in the payload and none in a header', async () => {
-    await send(await site({ provider: 'umami', websiteId: 'site-id', host: `http://localhost:${provider.port}/` }), visit(), { 'x-forwarded-for': '198.51.100.9' })
+    await send(await site({ provider: 'umami', websiteId: 'site-id', host: `http://localhost:${provider.port}/`, titles: true }), visit(), { 'x-forwarded-for': '198.51.100.9' })
     const [sent] = received
 
     expect(sent!.path).toBe('/api/send')
@@ -472,7 +555,7 @@ describe('answering at once', () => {
 })
 
 describe('Matomo', () => {
-  const matomo = (more: object = {}): AnalyticsOptions => ({ provider: 'matomo', siteId: 7, host: `http://localhost:${provider.port}/`, ...more })
+  const matomo = (more: object = {}): AnalyticsOptions => ({ provider: 'matomo', siteId: 7, host: `http://localhost:${provider.port}/`, titles: true, ...more })
 
   it('is sent the visit through its tracking API, with no visitor id and no address', async () => {
     await send(await site(matomo()), visit(), { 'x-forwarded-for': '198.51.100.9' })
@@ -506,7 +589,7 @@ describe('Matomo', () => {
 })
 
 describe('Google Analytics 4', () => {
-  const ga4 = (more: object = {}): AnalyticsOptions => ({ provider: 'ga4', measurementId: 'G-ABC123', apiSecret: 'sec_ret-1', host: `http://localhost:${provider.port}/`, consent: false, ...more })
+  const ga4 = (more: object = {}): AnalyticsOptions => ({ provider: 'ga4', measurementId: 'G-ABC123', apiSecret: 'sec_ret-1', host: `http://localhost:${provider.port}/`, consent: false, titles: true, ...more })
 
   it('is sent a page_view through the Measurement Protocol, the secret in the query and no cookie asked of the browser', async () => {
     const response = await send(await site(ga4({ address: true })), visit(), { 'x-forwarded-for': '198.51.100.9' })

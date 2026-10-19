@@ -1,5 +1,6 @@
 import type { KayExtension } from '../config'
 import { KayError } from '../compiler/errors'
+import { CONSENT_MAX_AGE } from '../runtime/consent'
 import { ANALYTICS_SCRIPT } from './analytics-script'
 
 export { consent } from '../runtime/consent'
@@ -13,6 +14,10 @@ export interface AnalyticsConsent {
   text?: AnalyticsText | undefined
   agree?: AnalyticsText | undefined
   refuse?: AnalyticsText | undefined
+  // The link to the privacy policy, `Privacy policy` by default.
+  policy?: AnalyticsText | undefined
+  // How long the visitor's answer, a refusal as much as a yes, is remembered, in seconds: 180 days by default and 13 months at most, the CNIL's ceiling.
+  maxAge?: number | undefined
   // `false` shows no notice and opens none from `data-analytics-consent`: the app asks in its own UI and answers with `consent.set('yes')` from `kay/analytics`, while the server still forwards nothing without the yes.
   notice?: boolean | undefined
 }
@@ -24,6 +29,8 @@ export interface AnalyticsInfo {
   ok?: AnalyticsText | undefined
   // The button that stops the counting for this visitor.
   optOut?: AnalyticsText | undefined
+  // The link to the privacy policy, `Privacy policy` by default.
+  policy?: AnalyticsText | undefined
 }
 
 interface Common {
@@ -33,6 +40,13 @@ interface Common {
   consent?: boolean | AnalyticsConsent | undefined
   // The information line and opt-out kay shows where visits are counted without asking, `false` when the app informs and lets visitors object itself.
   info?: false | AnalyticsInfo | undefined
+  // The app's privacy policy, a path (`/privacy`) or an address, linked from the notice and the information line, which already name the provider.
+  policyUrl?: string | undefined
+  // Pages that are never counted, as paths: `/account` leaves out the page and all under it, `*` stands for one segment (`/*/admin` for an app with locale prefixes).
+  // A page with `noindex` is left out too. Only the providers kay forwards visits for take it, not `fathom`, `cloudflare` or `custom`, whose script counts alone.
+  exclude?: string[] | undefined
+  // Sends the page title with each visit, which names the page and so may name a person; left out, visits carry the path alone.
+  titles?: boolean | undefined
   // Hosts besides the one a page is served from that a visit may name, such as `www.example.com` for a site also served at `example.com`.
   hosts?: string[] | undefined
 }
@@ -126,8 +140,9 @@ const SITE_ID = /^[A-Z\d]{1,32}$/i
 const TOKEN = /^[\w-]{1,128}$/
 const MEASUREMENT_ID = /^G-[A-Z\d]{4,20}$/i
 
-const DEFAULT_TEXT = { text: 'We count visits to improve this site, without cookies that follow you. Do you agree?', agree: 'Agree', refuse: 'Refuse' }
-const DEFAULT_INFO = { text: 'We count visits to improve this site, without cookies that follow you. You can opt out.', agree: 'OK', refuse: 'Opt out' }
+const PROVIDER_NAMES: Record<string, string> = { plausible: 'Plausible', umami: 'Umami', simpleanalytics: 'Simple Analytics', matomo: 'Matomo', ga4: 'Google Analytics', fathom: 'Fathom', cloudflare: 'Cloudflare Web Analytics' }
+const LOCAL_PATH = /^\/(?!\/)/
+const MAX_CONSENT_AGE = 395 * 24 * 60 * 60
 // The providers that wait for a yes unless the app wrote `consent: false`.
 const ASKS_BY_DEFAULT: ReadonlySet<string> = new Set(['ga4', 'fathom', 'cloudflare', 'custom'])
 
@@ -146,17 +161,30 @@ export function analytics(options: AnalyticsOptions): KayExtension {
   const informs = !asking && options.info !== false && options.provider !== 'fathom' && options.provider !== 'cloudflare' && options.provider !== 'custom'
   const given = typeof options.consent === 'object' ? options.consent : {}
   const info = typeof options.info === 'object' ? options.info : {}
-  const words = asking ? noticeOf(given, DEFAULT_TEXT) : noticeOf({ text: info.text, agree: info.ok, refuse: info.optOut }, DEFAULT_INFO)
-  const gate = asking
-    ? { 'data-consent': '', 'data-texts': JSON.stringify(words), ...given.notice === false && { 'data-silent': '' } }
-    : informs && { 'data-info': '', 'data-texts': JSON.stringify(words) }
+  const name = options.provider === 'custom' ? URL.parse(options.endpoint)?.hostname ?? 'a statistics tool' : PROVIDER_NAMES[options.provider]!
+  const words = asking
+    ? noticeOf(given, { text: `We count visits to improve this site with ${name}, without cookies that follow you. Do you agree?`, agree: 'Agree', refuse: 'Refuse', policy: 'Privacy policy' })
+    : noticeOf({ text: info.text, agree: info.ok, refuse: info.optOut, policy: info.policy }, { text: `We count visits to improve this site with ${name}, without cookies that follow you. You can opt out.`, agree: 'OK', refuse: 'Opt out', policy: 'Privacy policy' })
+
+  const gate = (asking || informs) && {
+    ...asking ? { 'data-consent': '', ...given.notice === false && { 'data-silent': '' } } : { 'data-info': '' },
+    'data-texts': JSON.stringify(words),
+    'data-max-age': String(given.maxAge ?? CONSENT_MAX_AGE),
+    ...options.policyUrl !== undefined && { 'data-policy': options.policyUrl },
+  }
+  const counting = options.provider === 'fathom' || options.provider === 'cloudflare' || options.provider === 'custom'
+    ? {}
+    : {
+      ...(options.exclude?.length ?? 0) > 0 && { 'data-exclude': JSON.stringify(options.exclude) },
+      ...options.titles === true && { 'data-titles': '' },
+    }
 
   if (options.provider !== 'fathom' && options.provider !== 'cloudflare' && options.provider !== 'custom') {
     return {
       name: 'kay/analytics',
       needsServer: true,
       server: async () => (await import('./analytics-server')).analyticsServer(options),
-      config: { head: [{ tag: 'script', props: { src: ANALYTICS_SCRIPT_PATH, defer: true, ...gate } }] },
+      config: { head: [{ tag: 'script', props: { src: ANALYTICS_SCRIPT_PATH, defer: true, ...gate, ...counting } }] },
     }
   }
 
@@ -194,15 +222,18 @@ function cspOf(options: FathomOptions | CloudflareOptions): Record<string, strin
   return { 'script-src': ['https://static.cloudflareinsights.com'], 'connect-src': ['https://cloudflareinsights.com'] }
 }
 
+interface Words { text: string, agree: string, refuse: string, policy: string }
+
 // One entry per language the notice is written in, `en` alone when every text is a plain string; a text a language lacks falls back to the English default.
-function noticeOf(consent: { text?: AnalyticsText | undefined, agree?: AnalyticsText | undefined, refuse?: AnalyticsText | undefined }, defaults: { text: string, agree: string, refuse: string }): Record<string, { text: string, agree: string, refuse: string }> {
-  const given = [consent.text, consent.agree, consent.refuse].flatMap(value => typeof value === 'object' ? Object.keys(value) : [])
+function noticeOf(consent: Partial<Record<keyof Words, AnalyticsText | undefined>>, defaults: Words): Record<string, Words> {
+  const given = [consent.text, consent.agree, consent.refuse, consent.policy].flatMap(value => typeof value === 'object' ? Object.keys(value) : [])
   const read = (value: AnalyticsText | undefined, language: string, fallback: string) => typeof value === 'string' ? value : value?.[language] ?? fallback
 
   return Object.fromEntries((given.length === 0 ? ['en'] : [...new Set(given)]).map(language => [language, {
     text: read(consent.text, language, defaults.text),
     agree: read(consent.agree, language, defaults.agree),
     refuse: read(consent.refuse, language, defaults.refuse),
+    policy: read(consent.policy, language, defaults.policy),
   }]))
 }
 
@@ -223,6 +254,22 @@ function checked(options: AnalyticsOptions): void {
     if (url === null || (url.protocol !== 'https:' && url.protocol !== 'http:') || url.username !== '' || url.password !== '' || (plain && (url.search !== '' || url.hash !== '')))
       refuse(`${name} is an http or https address with no credentials${plain ? ', query or hash' : ''}; got ${JSON.stringify(value)}`)
   }
+
+  const policy = options.policyUrl
+
+  if (policy !== undefined && !(typeof policy === 'string' && (LOCAL_PATH.test(policy) || ['https:', 'http:'].includes(URL.parse(policy)?.protocol ?? ''))))
+    refuse(`policyUrl is a path starting with / or an http or https address; got ${JSON.stringify(policy)}`)
+
+  const age = typeof options.consent === 'object' ? options.consent.maxAge : undefined
+
+  if (age !== undefined && !(Number.isInteger(age) && age > 0 && age <= MAX_CONSENT_AGE))
+    refuse(`consent.maxAge is a number of seconds up to 13 months (${MAX_CONSENT_AGE}); got ${JSON.stringify(age)}`)
+
+  if (options.exclude !== undefined && (!Array.isArray(options.exclude) || options.exclude.some(path => typeof path !== 'string' || !path.startsWith('/') || path === '/')))
+    refuse(`exclude is a list of paths starting with /, such as ['/account']; got ${JSON.stringify(options.exclude)}`)
+
+  if (((options.exclude?.length ?? 0) > 0 || options.titles !== undefined) && (options.provider === 'fathom' || options.provider === 'cloudflare' || options.provider === 'custom'))
+    refuse(`takes exclude and titles for the providers kay forwards visits for, not '${options.provider}', whose own script counts the pages`)
 
   if ('host' in options && options.host !== undefined)
     address('host', options.host, true)

@@ -10,6 +10,9 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 ### HSTS is sent by default for an https site
 
 - A production site whose `site` (or `SITE_URL`, `ORIGIN`) is https now sends `Strict-Transport-Security: max-age=31536000`. For a year, a browser that visited once reaches the host over https only: a site that serves some paths over plain http, or a subdomain without TLS you reach through the same host name, breaks for those visitors. The header names no subdomain (no `includeSubDomains`) and no preload. Keep the old behaviour with `security: { headers: { 'strict-transport-security': false } }`, or send your own value there. A `strict-transport-security` you already set in `headers` wins as before. No lint, as no old code is wrong. A static export's `nginx.conf` is yours after `kay new`: add `add_header Strict-Transport-Security "max-age=31536000" always;` to it, and again in any `location` with an `add_header` of its own, as nginx does not inherit them there.
+### The analytics cookie lasts 180 days and visits carry no title
+
+- `kay_analytics` lasted a year and now lasts 180 days (`consent: { maxAge }`, 13 months at most), a refusal as long as a yes, so visitors are asked again sooner. Visits no longer carry the page title; write `titles: true` on `analytics()` to send it again. No lint, as no old code is wrong.
 
 ### Deleting an account can answer `last-owner`
 

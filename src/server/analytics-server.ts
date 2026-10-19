@@ -211,6 +211,9 @@ export function analyticsServer(options: AnalyticsOptions): AnyElysia {
       if (visit === undefined)
         return new Response(null, { status: 400 })
 
+      if (options.titles !== true)
+        visit.title = ''
+
       // A development server, a test, a visitor who has not agreed where a yes is needed (the cookie is theirs to send, so a request without it is one the notice never asked) and one who opted out are answered as a counted visit, so nothing tells them apart.
       if (process.env.NODE_ENV !== 'production' || declined(request, gated) || visit.userAgent === '')
         return new Response(null, { status: 204 })

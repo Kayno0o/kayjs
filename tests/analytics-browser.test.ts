@@ -328,3 +328,108 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a counter 
     expect(opened.errors).toEqual([])
   })
 })
+
+describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the notice across page swaps, focus, lifetime and exclusions, in a browser', () => {
+  let own: TestSite
+  let opened: TestPage
+
+  const NOTICE = 'section[aria-labelledby]'
+  const cookieAge = async () => opened.evaluate(async () => {
+    const cookie = await (window as unknown as { cookieStore: { get: (name: string) => Promise<{ expires: number } | null> } }).cookieStore.get('kay_analytics')
+
+    return cookie === null ? -1 : Math.round((cookie.expires - Date.now()) / 86_400_000)
+  })
+  const opener = async () => opened.evaluate(() => {
+    if (!document.getElementById('settings')) {
+      const link = document.createElement('button')
+
+      link.setAttribute('data-analytics-consent', '')
+      link.id = 'settings'
+      link.textContent = 'Settings'
+      document.body.prepend(link)
+    }
+  })
+
+  beforeAll(async () => {
+    before = process.env.NODE_ENV
+    process.env.NODE_ENV = 'production'
+    provider = fakeProvider()
+    received.length = 0
+    own = await testSite({
+      routes: 'tests/fixtures/navigation/src/routes',
+      browser: { path },
+      onError: () => undefined,
+      extensions: [analytics({ provider: 'plausible', domain: 'example.com', host: `http://localhost:${provider.port}`, consent: true, policyUrl: '/privacy', exclude: ['/second'] })],
+    })
+    opened = await own.open('/')
+  }, 60_000)
+
+  afterAll(async () => {
+    await own?.close()
+    await provider?.stop(true)
+    restoreEnvironment(before)
+  })
+
+  it('names the provider and links the policy', async () => {
+    await opened.waitFor(`${NOTICE} button`)
+
+    expect(await opened.text('#kay-analytics-notice')).toContain('with Plausible')
+    expect(await opened.evaluate(() => document.querySelector<HTMLAnchorElement>('#kay-analytics-notice a')?.getAttribute('href'))).toBe('/privacy')
+  })
+
+  it('keeps the notice through a page swap made before an answer, and the settings link still opens it', async () => {
+    await opened.click('a.second')
+    await opened.waitFor('h1', { text: 'Second' })
+
+    expect(await opened.count(NOTICE)).toBe(1)
+
+    await opener()
+    await opened.click(`${NOTICE} button:last-of-type`)
+    expect(await opened.count(NOTICE)).toBe(0)
+    await opened.click('#settings')
+    await opened.waitFor(`${NOTICE} button`)
+    expect(await opened.count(NOTICE)).toBe(1)
+  })
+
+  it('remembers a refusal for as long as a yes, 180 days', async () => {
+    await opened.click(`${NOTICE} button:last-of-type`)
+    expect(await opened.evaluate(() => document.cookie)).toContain('kay_analytics=no')
+    expect(await cookieAge()).toBeGreaterThanOrEqual(179)
+    expect(await cookieAge()).toBeLessThanOrEqual(180)
+    await opened.click('#settings')
+    await opened.click(`${NOTICE} button:first-of-type`)
+    expect(await cookieAge()).toBeGreaterThanOrEqual(179)
+    expect(await cookieAge()).toBeLessThanOrEqual(180)
+  })
+
+  it('moves focus to the first button when a click opens the notice, and gives it back to that control after an answer', async () => {
+    await opened.evaluate(() => document.getElementById('settings')!.focus())
+    await opened.click('#settings')
+    await opened.waitFor(`${NOTICE} button`)
+
+    expect(await opened.evaluate(() => document.activeElement?.textContent)).toBe('Agree')
+
+    await opened.press('Enter')
+
+    expect(await opened.count(NOTICE)).toBe(0)
+    expect(await opened.evaluate(() => document.activeElement?.id)).toBe('settings')
+  })
+
+  it('counts a page, and counts nothing for an excluded one', async () => {
+    const before = received.length
+
+    await opened.click('a.home')
+    await opened.waitFor('h1', { text: 'Home' })
+    await visits(before + 1)
+    await opened.click('a.second')
+    await opened.waitFor('h1', { text: 'Second' })
+    await opened.click('a.later')
+    await visits(before + 2)
+    await Bun.sleep(300)
+
+    const urls = received.slice(before).map(visit => new URL(visit.body.url).pathname)
+
+    expect(urls).toEqual(['/', '/later'])
+    expect(opened.errors).toEqual([])
+  })
+})

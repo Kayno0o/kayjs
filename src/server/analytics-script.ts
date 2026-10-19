@@ -9,11 +9,15 @@ export const ANALYTICS_SCRIPT = `(() => {
   const gated = data.consent !== undefined
   const informed = data.info !== undefined
   const silent = data.silent !== undefined
+  const titles = data.titles !== undefined
+  const maxAge = Number(data.maxAge) || 15552000
+  const exclude = data.exclude ? JSON.parse(data.exclude) : []
   const texts = data.texts ? JSON.parse(data.texts) : {}
   const load = data.load ? JSON.parse(data.load) : undefined
   let loaded = false
   let last = document.referrer
   let banner
+  let opener
 
   function choice() {
     const found = document.cookie.split('; ').find(cookie => cookie.startsWith(name + '='))
@@ -26,11 +30,22 @@ export const ANALYTICS_SCRIPT = `(() => {
     return gated ? choice() !== 'yes' : choice() === 'no'
   }
 
+  // A page the app left out, or one that asks search engines to skip it, is never counted.
+  function skipped(url) {
+    const parts = new URL(url).pathname.slice(scope === '/' ? 0 : scope.length).split('/').filter(Boolean)
+
+    return !!document.querySelector('meta[name=robots][content*=noindex]') || exclude.some(pattern => {
+      const wanted = pattern.split('/').filter(Boolean)
+
+      return wanted.every((word, at) => word === '*' ? parts[at] !== undefined : word === parts[at])
+    })
+  }
+
   async function view(url) {
-    if (blocked())
+    if (blocked() || skipped(url))
       return
 
-    const body = JSON.stringify({ u: url, r: last, t: document.title, w: screen.width + 'x' + screen.height, l: navigator.language })
+    const body = JSON.stringify({ u: url, r: last, t: titles ? document.title : '', w: screen.width + 'x' + screen.height, l: navigator.language })
 
     last = url
 
@@ -70,9 +85,12 @@ export const ANALYTICS_SCRIPT = `(() => {
 
     const before = choice()
 
-    document.cookie = name + '=' + value + '; max-age=' + (value === '' ? 0 : 31536000) + '; path=' + scope + '; samesite=lax' + (location.protocol === 'https:' ? '; secure' : '')
+    document.cookie = name + '=' + value + '; max-age=' + (value === '' ? 0 : maxAge) + '; path=' + scope + '; samesite=lax' + (location.protocol === 'https:' ? '; secure' : '')
+    const back = banner?.contains(document.activeElement) ? opener : undefined
+
     banner?.remove()
     banner = undefined
+    opener = undefined
     document.dispatchEvent(new CustomEvent('kay:consent', { detail: { consent: value } }))
 
     if (value === 'yes' && (gated ? before !== 'yes' : before === 'no'))
@@ -83,9 +101,12 @@ export const ANALYTICS_SCRIPT = `(() => {
       location.reload()
     else if (value === '')
       ask()
+
+    if (back?.isConnected)
+      back.focus()
   }
 
-  function ask() {
+  function ask(clicked) {
     if (banner || silent || !(gated || informed))
       return
 
@@ -108,16 +129,39 @@ export const ANALYTICS_SCRIPT = `(() => {
     banner.append(make('p', words.text ?? ''), button(words.agree ?? 'Agree', 'yes'), button(words.refuse ?? 'Refuse', 'no'))
     banner.firstChild.id = 'kay-analytics-notice'
     banner.firstChild.style.cssText = 'margin:0;flex:1 1 14rem'
+
+    if (words.policy && data.policy) {
+      const link = make('a', words.policy)
+
+      link.href = data.policy
+      banner.firstChild.append(' ', link)
+    }
+
+    // The element focus came from is where it goes back to once the visitor answered.
+    banner.addEventListener('focusin', event => opener ??= event.relatedTarget)
     document.body.append(banner)
+
+    if (clicked) {
+      opener = clicked
+      banner.querySelector('button').focus()
+    }
   }
 
   window.kayAnalytics = { consent: choice, decide, ask }
-  if (!load)
-    document.addEventListener('kay:navigate', event => void view(event.detail.url))
+  document.addEventListener('kay:navigate', event => {
+    // A page swap replaces the body, and the notice with it.
+    if (banner && !banner.isConnected)
+      document.body.append(banner)
+
+    if (!load)
+      void view(event.detail.url)
+  })
 
   document.addEventListener('click', event => {
-    if ((gated || informed) && event.target instanceof Element && event.target.closest('[data-analytics-consent]'))
-      ask()
+    const opening = event.target instanceof Element && event.target.closest('[data-analytics-consent]')
+
+    if ((gated || informed) && opening)
+      ask(opening)
   })
 
   if ((gated || informed) && choice() === '')

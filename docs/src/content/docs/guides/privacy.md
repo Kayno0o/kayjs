@@ -15,7 +15,7 @@ This page lists what each feature keeps, for a site's privacy notice and for the
 | `session`, `__Host-session` over https | a session the app writes to | 30 days unused, 90 at most, by default |
 | `kay_flash` | an action redirecting with a flash message | 60 seconds |
 | `kay_locale` | a visitor picking a locale | a year |
-| `kay_analytics` | the consent notice or information line of `analytics()` | a year |
+| `kay_analytics` | the consent notice or information line of `analytics()` | 180 days, or the `maxAge` you set |
 | `kay_preview` | `enterPreview()`, for an editor | an hour by default |
 | the name given to `persisted()` | a persisted signal | a year, or its `maxAge` |
 
@@ -103,13 +103,15 @@ Behind a CDN or proxy set `proxy`, or every visitor shares the proxy's address a
 ### What the tool receives
 
 - The page address without its `#` part, and from its query only `utm_*`, `ref` and `source`, so a token or an email in a link never reaches the tool.
-- The page the visitor came from, without its query, plus the title, the screen size, the language and the browser's `User-Agent`.
+- The page the visitor came from, without its query, plus the screen size, the language and the browser's `User-Agent`.
 - The visitor's address only if the tool needs it to tell visitors apart. Plausible gets it as `X-Forwarded-For` and Umami in the data it receives. Matomo with a `tokenAuth`, Google Analytics with `address: true` and a custom tracker with `address: true` get it too. Simple Analytics never gets it. Behind a CDN or proxy, set `proxy` so the address is the visitor's and not the proxy's: without it Plausible sees one visitor, and the limit below is shared by your whole site.
 - Nothing else: no cookie, no `Referer`, no `Authorization` header of the visitor.
 
 ### Asking first
 
-Google Analytics, Fathom, Cloudflare and `custom` ask by default, as if you wrote `consent: true`; for Plausible, Umami, Simple Analytics and Matomo you add it. Kay shows a notice until the visitor chooses. Nothing is counted before a yes, and the server checks that on every visit rather than trusting the page. The answer is kept in the `kay_analytics` cookie for a year, for your `base` path.
+Google Analytics, Fathom, Cloudflare and `custom` ask by default, as if you wrote `consent: true`; for Plausible, Umami, Simple Analytics and Matomo you add it. Kay shows a notice until the visitor chooses. Nothing is counted before a yes, and the server checks that on every visit rather than trusting the page. The answer is kept in the `kay_analytics` cookie for 180 days, for your `base` path. A refusal is kept as long as a yes.
+
+`consent: { maxAge }` sets another time in seconds, up to 13 months, the longest the CNIL accepts.
 
 ```ts
 analytics({
@@ -123,9 +125,19 @@ analytics({
 })
 ```
 
-The notice is a labelled region that Tab reaches, and kay never moves the focus to it. With Fathom or Cloudflare, a refusal after the script loaded reloads the page so it runs no more.
+The notice names the tool from your config, for example "with Plausible", so you write no wording for it. Add `policyUrl: '/privacy'` (a path or an address) and it links to your privacy policy; `policy` in `consent` or `info` words the link.
+
+The notice is a labelled region that Tab reaches, and kay does not move the focus to it when a page loads. When a visitor opens it from a `data-analytics-consent` control, the focus goes to its first button and returns to that control after the answer.
+
+It stays on screen through page swaps until the visitor chooses. With Fathom or Cloudflare, a refusal after the script loaded reloads the page so it runs no more.
 
 Give any element a `data-analytics-consent` attribute and a click on it shows the notice again, so a visitor can change their mind. Your own scripts read the answer with `window.kayAnalytics.consent()`, and a `kay:consent` event fires on `document` when it changes. An app with its own banner uses `consent` instead, below.
+
+### Leaving pages out
+
+Pages such as an account or an admin area should not be counted. List them in `exclude`: `exclude: ['/account', '/*/admin']` leaves out `/account` and everything under it, and `*` stands for one segment, such as a locale. A page that asks search engines to skip it with `noindex` is left out too. Nothing is sent for these pages. This works for the tools kay counts for, so not Fathom, Cloudflare or `custom`.
+
+The page title is not sent unless you write `titles: true`, since a title can name a person.
 
 ### Counting without asking
 
@@ -144,7 +156,7 @@ Not asking is lawful only where an exemption applies, and a cookieless id is not
 - The numbers are anonymous statistics for your own site, used for nothing else.
 - The tool does not reuse the data and does not follow a visitor across sites.
 - Visitors are told, and can object easily.
-- Data is kept 25 months at most, and an identifier lives 13 months at most (`kay_analytics` lasts a year).
+- Data is kept 25 months at most, and an identifier lives 13 months at most (`kay_analytics` lasts 180 days, and `maxAge` allows up to 13 months).
 - An address is truncated or dropped by the tool.
 
 This is one regulator's position. Other countries may ask for consent anyway. Plausible, Umami and Matomo get the visitor's address to tell visitors apart, so the exemption holds only if the tool drops it: run it yourself, or check its terms. Google Analytics is never exempt. The information line and the opt-out are the notice and the objection the exemption asks for, not the whole of it.

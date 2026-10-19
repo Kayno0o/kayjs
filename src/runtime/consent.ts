@@ -6,7 +6,9 @@ import { createSignal, currentServerScope } from './reactive'
 export type Consent = 'yes' | 'no' | ''
 
 const COOKIE = 'kay_analytics'
-const YEAR_SECONDS = 365 * 24 * 60 * 60
+
+// About six months, what the CNIL recommends; its ceiling is 13 months.
+export const CONSENT_MAX_AGE = 180 * 24 * 60 * 60
 
 interface Tracker {
   decide: (value: Consent) => void
@@ -50,7 +52,7 @@ function save(value: Consent): void {
 
   const path = withBase('/').replace(TRAILING_SLASH, '') || '/'
 
-  document.cookie = `${COOKIE}=${value}; max-age=${value === '' ? 0 : YEAR_SECONDS}; path=${path}; samesite=lax${location.protocol === 'https:' ? '; secure' : ''}`
+  document.cookie = `${COOKIE}=${value}; max-age=${value === '' ? 0 : CONSENT_MAX_AGE}; path=${path}; samesite=lax${location.protocol === 'https:' ? '; secure' : ''}`
   document.dispatchEvent(new CustomEvent('kay:consent', { detail: { consent: value } }))
 }
 
