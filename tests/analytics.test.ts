@@ -244,10 +244,11 @@ describe('the notice, its lifetime and what a visit carries', () => {
     expect(wrong).toHaveLength(3)
   })
 
-  it.each(['fathom', 'cloudflare', 'custom'] as const)('refuses an info object for %s, which shows no line', (name) => {
+  it.each(['fathom', 'cloudflare', 'custom'] as const)('takes an info object for %s once consent is false, and refuses it while consent asks', (name) => {
     const options = NAMED.find(([provider]) => provider === name)![1] as AnalyticsOptions
 
-    expect(() => analytics({ ...options, consent: false, info: { text: 'Counting' } })).toThrow('info')
+    expect(() => analytics({ ...options, consent: false, info: { text: 'Counting' } })).not.toThrow()
+    expect(() => analytics({ ...options, info: { text: 'Counting' } })).toThrow('info')
     expect(() => analytics({ ...options, consent: false, info: false })).not.toThrow()
   })
 
@@ -357,11 +358,15 @@ describe('consent by provider', () => {
     expect(unset).not.toContain('src="https://static.cloudflareinsights.com')
   })
 
-  it.each(ASKING)('%s counts without asking once the app wrote consent false, kay\'s script showing the opt-out only where it counts', async (name, options) => {
+  it.each(ASKING)('%s counts without asking once the app wrote consent false, kay\'s script showing the opt-out', async (_name, options) => {
     const html = await page({ ...options, consent: false })
 
     expect(html).not.toContain('data-consent')
-    expect(html.includes('data-info')).toBe(name === 'ga4')
+    expect(html).toContain('data-info')
+  })
+
+  it.each(ASKING)('%s with consent false and info false shows no line', async (_name, options) => {
+    expect(await page({ ...options, consent: false, info: false })).not.toContain('data-info')
   })
 
   it('sends a ga4 visit only after a yes when consent is left out, and with consent false whatever the cookie but an opt-out', async () => {
@@ -711,6 +716,8 @@ describe('Google Analytics 4', () => {
 })
 
 describe('Fathom and Cloudflare Web Analytics', () => {
+  const loaderOf = (html: string) => JSON.parse((/data-load="([^"]*)"/).exec(html)![1]!.replaceAll('&quot;', '"')) as { src: string, attrs: Record<string, string> }
+
   const home = async (options: AnalyticsOptions) => {
     const response = await (await site(options)).handle(new Request('http://localhost/'))
 
@@ -718,7 +725,7 @@ describe('Fathom and Cloudflare Web Analytics', () => {
   }
 
   it('puts Fathom\'s script in the head, the CSP opened for its domain', async () => {
-    const { html, policy } = await home({ provider: 'fathom', siteId: 'ABCDEFGH', consent: false })
+    const { html, policy } = await home({ provider: 'fathom', siteId: 'ABCDEFGH', consent: false, info: false })
 
     expect(html).toContain('src="https://cdn.usefathom.com/script.js"')
     expect(html).toContain('data-site="ABCDEFGH"')
@@ -729,12 +736,41 @@ describe('Fathom and Cloudflare Web Analytics', () => {
   })
 
   it('puts the Cloudflare beacon in the head, the CSP opened as Cloudflare documents', async () => {
-    const { html, policy } = await home({ provider: 'cloudflare', token: 'tok-123', consent: false })
+    const { html, policy } = await home({ provider: 'cloudflare', token: 'tok-123', consent: false, info: false })
 
     expect(html).toContain('src="https://static.cloudflareinsights.com/beacon.min.js"')
     expect(html).toContain('data-cf-beacon="{&quot;token&quot;:&quot;tok-123&quot;}"')
     expect(policy).toMatch(/script-src 'self' https:\/\/static\.cloudflareinsights\.com/)
     expect(policy).toMatch(/connect-src[^;]*https:\/\/cloudflareinsights\.com/)
+  })
+
+  it.each([
+    ['fathom', { provider: 'fathom', siteId: 'ABCDEFGH', consent: false }, 'https://cdn.usefathom.com/script.js'],
+    ['cloudflare', { provider: 'cloudflare', token: 'tok-123', consent: false }, 'https://static.cloudflareinsights.com/beacon.min.js'],
+  ] as const)('%s with consent false loads through kay\'s script, which shows the opt-out line, the CSP still open for its domain', async (_name, options, src) => {
+    const { html, policy } = await home(options)
+    const app = await site(options)
+    const tracker = await app.handle(new Request('http://localhost/_kay/analytics.js'))
+    const notice = await app.handle(new Request('http://localhost/_kay/analytics/notice.js'))
+
+    expect(html).not.toContain(`src="${src}"`)
+    expect(html).toContain('src="/_kay/analytics.js"')
+    expect(html).toContain('data-info')
+    expect(html).not.toContain('data-consent')
+    expect(loaderOf(html).src).toBe(src)
+    expect(policy).toContain(new URL(src).origin)
+    expect(tracker.status).toBe(200)
+    expect(notice.status).toBe(200)
+  })
+
+  it('words the line of a script provider with info, and names it in the default one', async () => {
+    const worded = await home({ provider: 'fathom', siteId: 'ABCDEFGH', consent: false, info: { text: 'Counted with {provider}', optOut: 'Stop' } })
+    const plain = await home({ provider: 'cloudflare', token: 'tok-123', consent: false })
+
+    expect(worded.html).toContain('Counted with Fathom')
+    expect(worded.html).toContain('Stop')
+    expect(plain.html).toContain('Cloudflare Web Analytics')
+    expect(plain.html).toContain('You can opt out.')
   })
 
   it('leaves the provider\'s script out of the page until the visitor agrees, kay\'s script loading it', async () => {
@@ -760,7 +796,45 @@ describe('a custom provider', () => {
     expect(script.headers.get('content-type')).toContain('javascript')
     expect(text).toContain('fetch("/_kay/analytics/collect"')
     expect(text).not.toContain(`localhost:${provider.port}`)
-    expect(await (await app.handle(new Request('http://localhost/'))).text()).toContain('src="/_kay/analytics/script.js"')
+    expect(await (await (await site(custom({ info: false }))).handle(new Request('http://localhost/'))).text()).toContain('src="/_kay/analytics/script.js"')
+  })
+
+  it('loads through kay\'s script with the opt-out line unless info is false, and forwards unless the visitor opted out', async () => {
+    const lined = await (await (await site(custom())).handle(new Request('http://localhost/'))).text()
+    const direct = await (await (await site(custom({ info: false }))).handle(new Request('http://localhost/'))).text()
+
+    expect(lined).toContain('data-info')
+    expect(lined).toContain('src="/_kay/analytics.js"')
+    expect(lined).not.toContain('src="/_kay/analytics/script.js"')
+    expect(lined).toContain('data-load="{&quot;src&quot;:&quot;/_kay/analytics/script.js&quot;')
+    expect(direct).not.toContain('data-info')
+    expect(direct).toContain('src="/_kay/analytics/script.js"')
+
+    const app = await site(custom())
+
+    expect((await collect(app, '{}', { cookie: 'kay_analytics=no' })).status).toBe(204)
+    expect(received).toEqual([])
+    expect((await collect(app, '{}')).status).toBe(202)
+    expect(received).toHaveLength(1)
+  })
+
+  it('names the app\'s base in the script the line loads, and serves it there', async () => {
+    const mounted = await testSite({ routes: join(dir, 'routes'), islands: false, base: '/shop', extensions: [analytics(custom())] })
+
+    try {
+      const home = await (await mounted.fetch('/')).text()
+      const script = await mounted.fetch('/_kay/analytics/script.js?base=%2Fshop')
+      const hostile = await mounted.fetch('/_kay/analytics/script.js?base=%22%2B%2Fevil')
+
+      expect(home).toContain('src="/shop/_kay/analytics.js"')
+      expect(home).toContain('data-info')
+      expect(script.status).toBe(200)
+      expect(await script.text()).toContain('fetch("/shop/_kay/analytics/collect"')
+      expect(await hostile.text()).toContain('fetch("/_kay/analytics/collect"')
+    }
+    finally {
+      await mounted.close()
+    }
   })
 
   it('passes what the script posts to the endpoint, the visitor\'s agent with it and no address', async () => {

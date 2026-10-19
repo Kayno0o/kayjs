@@ -63,7 +63,8 @@ export const ANALYTICS_SCRIPT = `(() => {
 
     const element = document.createElement('script')
 
-    element.src = load.src
+    // A proxy takes the base off before the app sees the request, so the app's own script is told it, to point the tracker at the right route.
+    element.src = load.src[0] === '/' && scope !== '/' ? scope + load.src + '?base=' + encodeURIComponent(scope) : load.src
     element.defer = true
     element.nonce = script.nonce
 

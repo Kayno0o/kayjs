@@ -79,7 +79,9 @@ export default defineConfig({
 
 Plausible, Umami (give it `websiteId`), Simple Analytics (`provider: 'simpleanalytics'`) and Matomo (`siteId` and `host`) work this way. All four set no cookie and can be run on your own server, so they count from the first page, with an information line and a way to opt out (see below). Matomo only gets the visitor's address if you give it a `tokenAuth` of a user with write access to the site, as Matomo requires; without one it sees your server's address.
 
-Fathom and Cloudflare Web Analytics are different. Like Google Analytics and `custom`, they wait for the visitor's yes unless you write `consent: false`. They take data only from their own scripts, so kay cannot send for them. `provider: 'fathom'` (`siteId`) and `provider: 'cloudflare'` (`token`) add their script to your pages and open the content security policy for their domains. Their data does not pass through your site.
+Fathom and Cloudflare Web Analytics are different. Like Google Analytics and `custom`, they wait for the visitor's yes unless you write `consent: false`. They take data only from their own scripts, so kay cannot send for them. `provider: 'fathom'` (`siteId`) and `provider: 'cloudflare'` (`token`) add their script to your pages and open the content security policy for their domains.
+
+Their data does not pass through your site. With `consent: false`, kay loads their script itself so it can honour an opt-out.
 
 For any other tracker that is a script posting to an endpoint, use `provider: 'custom'` with `script` and `endpoint`. kay serves a copy of the script from your site with the endpoint in it pointed at your site, and passes what the script posts on. The endpoint must appear in the script exactly as you write it.
 
@@ -148,7 +150,11 @@ The page title is not sent unless you write `titles: true`, since a title can na
 
 Plausible, Umami, Simple Analytics and Matomo count at once, and kay shows a short information line with an `OK` button and an `Opt out` button. Opting out writes `kay_analytics=no`, and your server then passes on nothing for that visitor, on any page. Word it with `info: { text, ok, optOut }`, each a string or one per language. If your site already informs visitors and lets them object, write `info: false`.
 
-To count Google Analytics, Fathom, Cloudflare or a custom tracker without asking, write `consent: false`. You then answer for it yourself: kay shows no notice for Fathom, Cloudflare or a custom tracker, and only the information line for Google Analytics. Wording for the information line (`info`) is refused where none is shown: for Fathom, Cloudflare and `custom`, and when `consent` asks.
+To count Google Analytics, Fathom, Cloudflare or a custom tracker without asking, write `consent: false`. You then answer for it yourself, but kay still shows the information line with an opt-out, for Google Analytics, Fathom, Cloudflare and a custom tracker alike.
+
+For Fathom, Cloudflare and `custom`, kay loads the tool's script itself, and not at all once the visitor has opted out. If they opt out after it ran, the page reloads without it. The page they opt out on was already counted by the tool's script.
+
+Write `info: false` if your own page informs and lets visitors object, and the tool's script is then added to the page as it is. Wording for the line (`info`) is refused when `consent` asks, as no line is shown then.
 
 Before 1.55 these counted every visit without asking, and `kay check` reports the ones that did not say which they want.
 
@@ -168,7 +174,7 @@ This is one regulator's position. Other countries may ask for consent anyway. Pl
 
 ### Processors, agreements and transfers
 
-Whichever tool you use, your privacy notice names it, what it is for and how long the data stays, and you sign its data processing agreement before counting a visit. Check each provider's current terms, as these change. The table is kay's cautious default: Fathom and Cloudflare call themselves cookieless, and writing `consent: false` is yours to answer for.
+Whichever tool you use, your privacy notice names it, what it is for and how long the data stays, and you sign its data processing agreement before counting a visit. Check each provider's current terms, as these change. The table is kay's cautious default: Fathom and Cloudflare call themselves cookieless, and writing `consent: false` is yours to answer for, with the line and the opt-out kay shows.
 
 | Provider | Your legal basis | Who it is | Agreement and transfer |
 | --- | --- | --- | --- |

@@ -35,8 +35,8 @@ export interface AnalyticsInfo {
 
 interface Common {
   // Waits for the visitor's yes before counting a visit, with a notice kay shows until they chose; `true` for the notice in English.
-  // Left out, `ga4`, `fathom`, `cloudflare` and `custom` ask like `true`, as they are not self-hostable cookieless counters; `consent: false` counts them without asking, which the app answers for.
-  // Left out or `false`, `plausible`, `umami`, `simpleanalytics` and `matomo` count at once and show `info`.
+  // Left out, `ga4`, `fathom`, `cloudflare` and `custom` ask like `true`, as they are not self-hostable cookieless counters; `consent: false` counts them without asking, which shows `info` and its opt-out.
+  // Left out or `false`, `plausible`, `umami`, `simpleanalytics` and `matomo` count at once and show `info`, as do the others with `consent: false`, whose own script kay then loads until the visitor opts out.
   consent?: boolean | AnalyticsConsent | undefined
   // The information line and opt-out kay shows where visits are counted without asking, `false` when the app informs and lets visitors object itself.
   info?: false | AnalyticsInfo | undefined
@@ -103,7 +103,7 @@ export interface Ga4Options extends Counted {
   address?: boolean | undefined
 }
 
-// Fathom has no API to send a visit to, so its own script is loaded: from Fathom's domain, which the CSP then allows, and after the visitor's yes when `consent` is set.
+// Fathom has no API to send a visit to, so its own script is loaded: from Fathom's domain, which the CSP then allows, and after the visitor's yes when `consent` is set, else until they opt out on the information line.
 export interface FathomOptions extends Common {
   exclude?: undefined
   titles?: undefined
@@ -114,7 +114,7 @@ export interface FathomOptions extends Common {
   spa?: 'auto' | 'history' | 'hash' | undefined
 }
 
-// Cloudflare takes its data only from its own beacon, so that script is loaded: from Cloudflare's domain, which the CSP then allows, and after the visitor's yes when `consent` is set.
+// Cloudflare takes its data only from its own beacon, so that script is loaded: from Cloudflare's domain, which the CSP then allows, and after the visitor's yes when `consent` is set, else until they opt out on the information line.
 export interface CloudflareOptions extends Common {
   exclude?: undefined
   titles?: undefined
@@ -169,7 +169,7 @@ export function analytics(options: AnalyticsOptions): KayExtension {
   checked(options)
 
   const asking = isGated(options)
-  const informs = !asking && options.info !== false && options.provider !== 'fathom' && options.provider !== 'cloudflare' && options.provider !== 'custom'
+  const informs = !asking && options.info !== false
   const given = typeof options.consent === 'object' ? options.consent : {}
   const info = typeof options.info === 'object' ? options.info : {}
   const name = options.provider === 'custom' ? URL.parse(options.endpoint)?.hostname ?? 'a statistics tool' : PROVIDER_NAMES[options.provider]!
@@ -202,16 +202,17 @@ export function analytics(options: AnalyticsOptions): KayExtension {
   }
 
   const loaded = options.provider === 'custom' ? { src: CUSTOM_SCRIPT_PATH, attrs: {} } : scriptOf(options)
-  // Without a notice the provider's script goes in the head as it is; behind one, kay's script loads it once the visitor said yes.
-  const tag = asking ? { 'src': ANALYTICS_SCRIPT_PATH, 'defer': true, ...gate, 'data-load': JSON.stringify(loaded) } : { src: loaded.src, defer: true, ...loaded.attrs }
+  // With `info: false` the provider's script goes in the head as it is; behind the notice or the information line, kay's script loads it, once the visitor said yes or until they opted out.
+  const loads = asking || informs
+  const tag = loads ? { 'src': ANALYTICS_SCRIPT_PATH, 'defer': true, ...gate, 'data-load': JSON.stringify(loaded) } : { src: loaded.src, defer: true, ...loaded.attrs }
 
   // The provider's own script needs no route of ours, except the one that shows the notice and loads it.
   return {
     name: 'kay/analytics',
     // Fathom and Cloudflare only need the notice's script, which a static export writes itself.
-    ...asking && options.provider !== 'custom' && { staticFiles: { [ANALYTICS_SCRIPT_PATH]: ANALYTICS_SCRIPT, [NOTICE_SCRIPT_PATH]: NOTICE_SCRIPT } },
+    ...loads && options.provider !== 'custom' && { staticFiles: { [ANALYTICS_SCRIPT_PATH]: ANALYTICS_SCRIPT, [NOTICE_SCRIPT_PATH]: NOTICE_SCRIPT } },
     ...options.provider === 'custom' && { needsServer: true },
-    ...(options.provider === 'custom' || asking) && { server: async () => (await import('./analytics-server')).analyticsServer(options) },
+    ...(options.provider === 'custom' || loads) && { server: async () => (await import('./analytics-server')).analyticsServer(options) },
     config: {
       head: [{ tag: 'script', props: tag }],
       ...options.provider !== 'custom' && { security: { csp: cspOf(options) } },
@@ -285,13 +286,8 @@ function checked(options: AnalyticsOptions): void {
   if (((options.exclude?.length ?? 0) > 0 || options.titles !== undefined) && (options.provider === 'fathom' || options.provider === 'cloudflare' || options.provider === 'custom'))
     refuse(`takes exclude and titles for the providers kay forwards visits for, not '${options.provider}', whose own script counts the pages`)
 
-  if (typeof options.info === 'object') {
-    if (options.provider === 'fathom' || options.provider === 'cloudflare' || options.provider === 'custom')
-      refuse(`takes no info for '${options.provider}', whose own script is loaded as it is and shows no line; use consent for a notice`)
-
-    if (isGated(options))
-      refuse('takes info for a counter that asks no one; with consent on, the notice is worded by consent, and consent: false shows the line')
-  }
+  if (typeof options.info === 'object' && isGated(options))
+    refuse('takes info for a counter that asks no one; with consent on, the notice is worded by consent, and consent: false shows the line')
 
   if ('host' in options && options.host !== undefined)
     address('host', options.host, true)

@@ -2598,12 +2598,12 @@ describe.concurrent('kay check, unused code', () => {
     }
   })
 
-  it('reports an analytics info object where no line is shown, and --fix removes it', async () => {
+  it('reports an analytics info object while consent asks, and --fix removes it', async () => {
     const root = await scratchProject({
       'src/a.ts': [
         'import { analytics } from \'kay/analytics\'',
         '',
-        'const held = { provider: \'cloudflare\', token: \'tok\', consent: false, info: { text: \'Counting\' } }',
+        'const held = { provider: \'cloudflare\', token: \'tok\', consent: true, info: { text: \'Counting\' } }',
         '',
         'export const a = analytics({ provider: \'fathom\', siteId: \'ABCDEFGH\', consent: false, info: { text: \'Counting\' }, })',
         'export const b = analytics({ provider: \'plausible\', consent: true, info: { text: \'Counting\' }, policyUrl: \'/p\' })',
@@ -2611,6 +2611,7 @@ describe.concurrent('kay check, unused code', () => {
         'export const d = analytics({ provider: \'plausible\', info: { text: \'Counting\' } })',
         'export const e = analytics({ provider: \'fathom\', siteId: \'ABCDEFGH\', consent: false, info: false })',
         'export const f = analytics(held)',
+        'export const g = analytics({ provider: \'fathom\', siteId: \'ABCDEFGH\', info: { text: \'Counting\' }, })',
         '',
       ].join('\n'),
     })
@@ -2623,10 +2624,11 @@ describe.concurrent('kay check, unused code', () => {
 
       const fixed = await Bun.file(join(root, 'src/a.ts')).text()
 
-      expect(fixed).toContain('consent: false })')
+      expect(fixed).toContain('analytics({ consent: true, provider: \'fathom\', siteId: \'ABCDEFGH\', })')
+      expect(fixed).toContain('analytics({ provider: \'fathom\', siteId: \'ABCDEFGH\', consent: false, info: { text: \'Counting\' }, })')
       expect(fixed).toContain('analytics({ provider: \'plausible\', consent: true, policyUrl: \'/p\' })')
       expect(fixed).toContain('info: { text: \'Counting\' } as const, provider: \'ga4\'')
-      expect(fixed).toContain('const held = { provider: \'cloudflare\', token: \'tok\', consent: false }')
+      expect(fixed).toContain('const held = { provider: \'cloudflare\', token: \'tok\', consent: true }')
       expect(fixed).toContain('analytics({ provider: \'plausible\', info: { text: \'Counting\' } })')
       expect((await runCheck(root)).output).not.toContain('deprecated-analytics-info')
     }

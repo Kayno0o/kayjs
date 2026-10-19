@@ -9,8 +9,6 @@ import { importsOf, walk } from './ast'
 const SOURCE_FILE = /(?<!\.d)\.tsx?$/
 const ANALYTICS_MODULE = 'kay/analytics'
 const ASKING = new Set(['ga4', 'fathom', 'cloudflare', 'custom'])
-// The providers whose own script is loaded as it is, with no information line.
-const OWN_SCRIPT = new Set(['fathom', 'cloudflare', 'custom'])
 
 interface Call {
   file: string
@@ -111,7 +109,7 @@ export async function analyticsConsent(root: string, options: CheckOptions): Pro
   return found
 }
 
-// An `info` object where no information line shows: on `fathom`, `cloudflare` or `custom`, or while `consent` asks, which 1.56 refuses at start.
+// An `info` object while `consent` asks, where the notice is worded by `consent` and no information line shows, which 1.56 refuses at start.
 export async function analyticsInfo(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
   const level = lintLevel('deprecated-analytics-info', options.lints)
 
@@ -130,7 +128,7 @@ export async function analyticsInfo(root: string, options: CheckOptions): Promis
 
     const asking = consent === undefined ? ASKING.has(name) : consent.type === 'ObjectExpression' || (consent.type === 'BooleanLiteral' && consent.value)
 
-    if (!OWN_SCRIPT.has(name) && !asking)
+    if (!asking)
       return
 
     const at = argument.properties.indexOf(info)
@@ -143,8 +141,8 @@ export async function analyticsInfo(root: string, options: CheckOptions): Promis
       file,
       ...positionAt(source, info.key.start!),
       end: info.end!,
-      message: `\`info\` words the information line, which \`analytics({ provider: '${name}' })\` does not show${OWN_SCRIPT.has(name) ? '' : ' while it asks for consent'}, so 1.56 refuses it at start`,
-      help: `remove \`info\`${OWN_SCRIPT.has(name) ? '' : ', or write `consent: false` to show the line'}`,
+      message: `\`info\` words the information line, which \`analytics({ provider: '${name}' })\` does not show while it asks for consent, so 1.56 refuses it at start`,
+      help: 'remove `info`, or write `consent: false` to show the line',
       code: 'deprecated-analytics-info',
       severity: level === 'warn' ? 'warning' : 'error',
       fixes: [{ title: 'Remove info', edits: [{ ...edit, text: '' }], safe: true }],

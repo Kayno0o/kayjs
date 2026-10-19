@@ -682,3 +682,87 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('fathom and
     }
   }, 60_000)
 })
+
+describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a script provider with consent false, in a browser', () => {
+  let before: string | undefined
+
+  beforeAll(() => {
+    before = process.env.NODE_ENV
+    process.env.NODE_ENV = 'production'
+  })
+
+  afterAll(() => {
+    restoreEnvironment(before)
+  })
+
+  it.each([
+    ['fathom', { provider: 'fathom', siteId: 'ABCDEFGH', consent: false } as const, 'script[src^="https://cdn.usefathom.com"]'],
+    ['cloudflare', { provider: 'cloudflare', token: 'abc123', consent: false } as const, 'script[src^="https://static.cloudflareinsights.com"]'],
+  ])('%s loads at once with the line, and an opt-out reloads the page without it and keeps it out', async (_name, options, selector) => {
+    const own = await testSite({ routes: 'tests/fixtures/navigation/src/routes', browser: { path }, onError: () => undefined, extensions: [analytics(options)] })
+
+    try {
+      const opened = await own.open('/')
+
+      await opened.waitFor('section[aria-labelledby] button')
+      await opened.waitFor(selector)
+
+      expect(await opened.count(selector)).toBe(1)
+
+      await opened.click('section[aria-labelledby] button:last-of-type')
+      await Bun.sleep(500)
+
+      expect(await opened.count(selector)).toBe(0)
+      expect(await opened.evaluate(() => document.cookie)).toContain('kay_analytics=no')
+      expect(await opened.count('section[aria-labelledby]')).toBe(0)
+    }
+    finally {
+      await own.close()
+    }
+  }, 60_000)
+
+  it('copies a CSP nonce to the provider\'s script and the line, and counts a custom tracker until the opt-out', async () => {
+    before = process.env.NODE_ENV
+    provider = fakeProvider()
+    received.length = 0
+
+    const nonced = await testSite({
+      routes: 'tests/fixtures/navigation/src/routes',
+      browser: { path },
+      onError: () => undefined,
+      use: [new Elysia().mapResponse({ as: 'global' }, async ({ responseValue }) => {
+        if (!(responseValue instanceof Response) || !(responseValue.headers.get('content-type') ?? '').includes('text/html'))
+          return undefined
+
+        const headers = new Headers(responseValue.headers)
+
+        headers.delete('content-length')
+
+        return new Response((await responseValue.text()).replace(/<script (?=[^>]*analytics\.js)/, '<script nonce="n0nce" '), { status: responseValue.status, headers })
+      })],
+      extensions: [analytics({ provider: 'custom', script: `http://localhost:${provider.port}/script.js`, endpoint: `http://localhost:${provider.port}/collect`, consent: false })],
+    })
+
+    try {
+      const opened = await nonced.open('/')
+
+      await opened.waitFor('section[aria-labelledby] button')
+      await visits(1)
+
+      const nonceOf = async (selector: string) => opened.evaluate(find => document.querySelector<HTMLScriptElement>(find)?.nonce, selector)
+
+      expect(await nonceOf('script[src$="/_kay/analytics/script.js"]')).toBe('n0nce')
+      expect(await nonceOf('script[src$="/notice.js"]')).toBe('n0nce')
+
+      await opened.click('section[aria-labelledby] button:last-of-type')
+      await Bun.sleep(500)
+
+      expect(await opened.count('script[src$="/_kay/analytics/script.js"]')).toBe(0)
+      expect(received).toHaveLength(1)
+    }
+    finally {
+      await nonced.close()
+      await provider.stop(true)
+    }
+  }, 60_000)
+})
