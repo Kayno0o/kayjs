@@ -382,12 +382,6 @@ export interface AuthStore {
   prune?: (limits: PruneLimits) => MaybePromise<void>
 }
 
-// A store as written before 1.52, with `members.remove` and `oauth.grants.put` in place of `members.delete` and `oauth.grants.upsert`: kayjs-auth still accepts it for now and logs a warning.
-export interface LegacyAuthStore extends Omit<AuthStore, 'members' | 'oauth'> {
-  members?: Omit<NonNullable<AuthStore['members']>, 'delete'> & { remove: (organizationId: string, userId: string) => MaybePromise<boolean> }
-  oauth?: Omit<NonNullable<AuthStore['oauth']>, 'grants'> & { grants: Omit<NonNullable<AuthStore['oauth']>['grants'], 'upsert'> & { put: (grant: OAuthGrantRecord) => MaybePromise<void> } }
-}
-
 export interface PruneLimits {
   now: Date
   // Bearer tokens expired before this go: the list shows an expired one for a while, so its owner sees why a device stopped working.

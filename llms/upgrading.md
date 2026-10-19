@@ -8,6 +8,7 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 - An app still on them runs `kay upgrade` on 1.55 first, which rewrites what it can, then moves to 1.56. These now fail or are ignored, and `kay check` no longer reports them.
 - kayjs-auth: `discordProvider({ apiBase })` is `discordProvider({ url })`; `apiBase` is ignored.
+- kayjs-auth: a custom store names `members.delete` and `oauth.grants.upsert`; one with only `members.remove` or `oauth.grants.put` fails where kayjs-auth calls the missing method.
 
 ### kayjs-auth passkeys carry `userVerified`
 

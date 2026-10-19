@@ -344,15 +344,6 @@ export const LINTS = {
     wrong: 'analytics({ provider: \'fathom\', siteId: \'ABCDEFGH\', info: { text: \'Counting\' } })',
     right: 'analytics({ provider: \'fathom\', siteId: \'ABCDEFGH\', consent: false, info: { text: \'Counting\' } })',
   },
-  'deprecated-store-verb': {
-    level: 'warn',
-    group: 'deprecated',
-    since: '1.52',
-    site: true,
-    summary: 'A custom kayjs-auth store whose `members` object has `remove` or whose `oauth.grants` has `put`, which are `delete` and `upsert` since 1.52, as every other row of the store is deleted by `delete` and written by `create` or `upsert`: the old names still work for now and log a warning. The fix renames the key, also of a method, and is not offered for a shorthand or a store giving both names. Found in the project\'s `.ts` files naming kayjs-auth, in a literal given as `store` or held in a variable of that name, beside the store\'s other parts or typed `AuthStore[\'members\']`; a store built some other way is not read: rename it by hand.',
-    wrong: 'import type { AuthStore } from \'@kaynooo/kayjs-auth\'\n\nexport const members: AuthStore[\'members\'] = { ...rest, remove: (organizationId, userId) => drop(organizationId, userId) }',
-    right: 'import type { AuthStore } from \'@kaynooo/kayjs-auth\'\n\nexport const members: AuthStore[\'members\'] = { ...rest, delete: (organizationId, userId) => drop(organizationId, userId) }',
-  },
   'deprecated-sign-in-options': {
     level: 'warn',
     group: 'deprecated',
