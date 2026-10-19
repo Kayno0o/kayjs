@@ -48,6 +48,28 @@ match status
     p Published
 ```
 
+### Draw an icon or a component chosen by a value
+
+An icon import is a record of props, so an `svg` spreading it draws whichever one a lookup, a prop or a row holds; type the lookup `Record<string, typeof Icon>` from any one of the icons:
+
+```kay
+---
+import type { Component } from 'kay'
+import Chip from '../chip.kay'
+import Flame from '~icons/tabler/flame'
+import Home from '~icons/tabler/home'
+
+const ICONS: Record<string, typeof Flame> = { home: Home, flame: Flame }
+const VIEWS: Record<string, Component<{ title: string }>> = { chip: Chip }
+const { key } = props<{ key: string }>()
+const View = VIEWS.chip!
+---
+svg.size-4({...ICONS[key]})
+View(title="Picked")
+```
+
+A component held in a value has a form too: a capitalised name as the tag, whether a prop, a script `const`, a server value or a loop item (`for Card of cards`), typed `Component<Props>` from `kay`. Choosing it by a key is a lookup into a record of components, as above; `match` does the same when each case passes different props.
+
 ### Set classes from a condition
 
 A `.class` shorthand and a `class={...}` object merge into one `class`:

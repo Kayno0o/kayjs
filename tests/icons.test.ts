@@ -129,6 +129,41 @@ describe('icons', () => {
     }
   })
 
+  it('draws an icon held in a record with an svg spreading it, and a component held in a value by its capitalised name', async () => {
+    const copy = await fixtureCopy('icons')
+
+    try {
+      await Bun.write(join(copy, 'src/chip.kay'), '---\nconst { title } = props<{ title: string }>()\n---\nb.chip {title}\n')
+      await Bun.write(join(copy, 'src/routes/chosen.kay'), [
+        '---',
+        'import type { Component } from \'kay\'',
+        'import Chip from \'../chip.kay\'',
+        'import Flame from \'~icons/tabler/flame\'',
+        'import Home from \'~icons/tabler/home\'',
+        '',
+        'const ICONS: Record<string, typeof Flame> = { home: Home, flame: Flame }',
+        'const VIEWS: Record<string, Component<{ title: string }>> = { chip: Chip }',
+        'const key = \'flame\'',
+        'const View = VIEWS.chip!',
+        '---',
+        'svg.size-4({...ICONS[key]})',
+        'View(title="Picked")',
+        '',
+      ].join('\n'))
+
+      expect(await check(copy)).toEqual([])
+
+      const app = await pages({ routes: join(copy, 'src/routes'), prebuilt: false })
+      const html = await (await app.handle(new Request('http://localhost/chosen'))).text()
+
+      expect(html).toContain('<svg')
+      expect(html).toContain('<b class="chip">Picked</b>')
+    }
+    finally {
+      await rm(copy, { recursive: true, force: true })
+    }
+  })
+
   it('warns of a set whose licence asks more than its notice, and credits its author in the notices', async () => {
     const dir = join(scratch, 'attribution')
     const set = join(dir, 'node_modules/@iconify-json/drawn')

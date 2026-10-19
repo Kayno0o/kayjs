@@ -140,6 +140,23 @@ Call `trustHtml` where the markup is used, not once for a constant kept for hour
 
 <ReadMore href="/llms/templates">How the vouching travels from the server to the browser, what the server remembers, and what a dropped value logs.</ReadMore>
 
+## Draw an icon or a component chosen by a value
+
+An icon import is a record of props. An `svg` that spreads it draws it, whichever icon a lookup, a prop or a row holds. Type the lookup `Record<string, typeof Icon>`, using any one of the icons.
+
+```kay
+---
+import Flame from '~icons/tabler/flame'
+import Home from '~icons/tabler/home'
+
+const ICONS: Record<string, typeof Flame> = { home: Home, flame: Flame }
+const { key } = props<{ key: string }>()
+---
+svg.size-4({...ICONS[key]})
+```
+
+A component held in a value is drawn by its capitalised name as the tag. The value can be a prop, a `const` in the script, a server value or a loop item. Type it `Component<Props>` from `kay`. To pick one by a key, look it up in a record of components. A `match` does the same when each case passes different props.
+
 ## Functions and rendered values
 
 A function that is not a handler is never written as an attribute, on the server or in the browser. A JSON value with a `t` string, shown as `{value}`, renders nothing, like any other object: only what a component, an element or an island rendered is markup.

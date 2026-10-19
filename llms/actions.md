@@ -106,17 +106,31 @@ async function save() {
   }
 }
 ---
-input(bind:value={title})
+input(bind:value={title} aria-invalid={add.error('title') ? 'true' : undefined})
 if add.error('title') as message
   p.error {message}
 button(onClick={save} disabled={add.pending()}) Add
 ```
 
-### Pass an action to an island
+### Pass an action to a component
 
-A page or layout with a `--- server` fence passes an action it declares or imports straight to an island prop, as it passes data: `Caller(run={greet})`, or inside an object, `Stream(actions={{ count }})`. The island calls it as if it had imported it: streams, `ActionError`, `pending()` and `error()` work as above, and the prop keeps the action's input and output types (`Action<{ name: string }, string>`).
+A page or layout with a `--- server` fence passes an action it declares or imports straight to a component prop, as it passes data: `Caller(run={greet})`, or inside an object, `Stream(actions={{ count }})`. A static component posts it with `form(action={run})`, an island calls it as if it had imported it, with streams, `ActionError`, `pending()` and `error()` as above.
 
-The island types the prop with `Action` from `kay` (`ServerAction` and `NoInputAction` count too), which has its chunk carry the code reviving it; an island passed an action without one fails the render, in production too, naming the fix, and `kay check` reports it as `island-action`; an app with no such island ships none. A promoted static component follows it too, minus the check. The action crosses as its URL, so it must be an export of a route module, declared in the page or imported from another route. `move.with({ id })` and an action no route exports fail the render, naming why; pass the plain action and the fields as the input.
+Type the prop with `Action` from `kay` (`ServerAction` counts too): `Action<never, unknown>` takes any action, `NoInputAction<unknown>` any declared without a schema, and `Action<{ name: string }, string>` keeps its input and output types. An island's prop must be typed so, which has its chunk carry the code reviving the action: without it the render fails, in production too, and `kay check` reports `island-action`; an app with no such island ships none. A promoted static component follows it too, minus the check. The action crosses as its URL, so it must be an export of a route module, declared in the page or imported from another route. `move.with({ id })` and an action no route exports fail the render; pass the plain action and the fields as the input.
+
+```kay
+---
+import type { Action, NoInputAction } from 'kay'
+
+const { signOut, run } = props<{ signOut: NoInputAction<unknown>, run: Action<never, unknown> }>()
+---
+form(action={signOut})
+  button Sign out
+form(action={run})
+  input(name="name" aria-label="Name")
+```
+
+An island takes it the same way and calls it:
 
 ```kay
 --- server
@@ -315,7 +329,7 @@ form(action={add})
 
 ### Calling from an island
 
-- An island imports the action from the page and calls it: `import { add } from '../routes/index.kay'`, then `const id = await add({ title })`.
+- An island imports the action from the page and calls it, as in [Call an action from an island](#call-an-action-from-an-island): `const id = await add({ title })`.
 - Once a call went through, the page shows what it changed, its loads run again as `refresh()` runs them, where the page swap runs: islands whose props did not change keep their state.
 - `add({ title }, { refresh: false })` leaves the page as it is.
 - `add.pending()` reads, reactively, whether a call the page made is still in flight, and `add.progress()` how much of a call carrying files the browser sent, from 0 to 1: `button(disabled={add.pending()})`.
@@ -323,7 +337,7 @@ form(action={add})
 - Two such calls over one signal failing out of order may leave the first one's value, so an island lets one move finish before the next, as `add.pending()` tells.
 - Once it went through, the refresh brings what the server kept, which a `linked` signal then takes.
 - `{ signal }` aborts a call: it rejects with the signal's reason, what `optimistic` showed goes back, and the action records no outcome.
-- The server may still have run a call aborted once sent, so the page refreshes then as after one that went through, unless `refresh: false`.
+- A call aborted once sent may still have run, so the page refreshes as after one that went through, unless `refresh: false`.
 - The call is typed, `ctx.fail` results excluded, and throws `ActionError` from `kay` with `status`, `errors` and `data` when it fails.
 - `const save = add.track()` is a handle for one component, row or button: `save.pending()` reads, reactively, only the calls made through it, where `add.pending()` reads every call of the page.
 - `await save(input, options)` takes what `add` does and resolves with `{ ok: true, data }` or, for any non-2xx answer of the server, `{ ok: false, status, errors, data }`, `errors` per field and `data` typed as `add.refused` types it, so no `try` or `ActionError` check is needed; a failure with no answer, a network error, an abort or a redirect, still throws, `pending()` clearing either way; an action with no input is called `save()`.
@@ -334,30 +348,6 @@ form(action={add})
 - A leave guard keeping the visitor on the page settles the call instead, throwing `ActionRedirect`, so `pending()` clears; a call made on a page the visitor has left since throws it too, taking them nowhere.
 - Outside a browser, as in a test, a redirect throws `ActionRedirect` from `kay` with `location`.
 - Under a `base`, a redirect to a path of the site goes under it however the action was posted or called, so `ctx.redirect('/dashboard')` lands on `/app/dashboard`, and `location` is the path under the base.
-
-```kay
----
-import { ActionError } from 'kay'
-import { add } from '../routes/index.kay'
-
-const title = signal('')
-
-async function save() {
-  try {
-    await add({ title: title() })
-    title = ''
-  }
-  catch (error) {
-    if (!(error instanceof ActionError))
-      throw error
-  }
-}
----
-input(bind:value={title} aria-invalid={add.error('title') ? 'true' : undefined})
-if add.error('title') as message
-  p.error {message}
-button(onClick={save} disabled={add.pending()}) Add
-```
 
 ### Files
 

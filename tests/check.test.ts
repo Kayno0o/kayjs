@@ -1865,6 +1865,45 @@ describe.concurrent('kay check, a redirect source is served', () => {
   })
 })
 
+describe.concurrent('kay check, an action passed as a prop', () => {
+  it('types a static component\'s prop for any action as Action<never, unknown>, and for one with no input as NoInputAction<unknown>', async () => {
+    const root = await scratchProject({
+      'src/routes/index.kay': [
+        '--- server',
+        'import { t } from \'elysia\'',
+        'import { action } from \'kay\'',
+        'import Header from \'../header.kay\'',
+        '',
+        'export const signOut = action(async (ctx) => ctx.redirect(\'/\'))',
+        'export const rename = action(t.Object({ name: t.String({ maxLength: 40 }) }), async ({ name }) => name)',
+        '---',
+        'Header(signOut={signOut} run={rename})',
+        '',
+      ].join('\n'),
+      'src/header.kay': [
+        '---',
+        'import type { Action, NoInputAction } from \'kay\'',
+        '',
+        'const { signOut, run } = props<{ signOut: NoInputAction<unknown>, run: Action<never, unknown> }>()',
+        '---',
+        'header',
+        '  form(action={signOut})',
+        '    button Sign out',
+        '  form(action={run})',
+        '    input(name="name" aria-label="Name")',
+        '',
+      ].join('\n'),
+    })
+
+    try {
+      expect(await check(root)).toEqual([])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+})
+
 describe.concurrent('kay check, URLs written out besides links', () => {
   it('checks img src, link href, a form action sent with GET and navigate() as links, and a literal segment against the matcher kay ships for its param', async () => {
     const page = [

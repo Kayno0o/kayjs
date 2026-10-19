@@ -207,7 +207,7 @@ a(href="/")
   | Home
 ```
 
-The tag is the `svg` spreading the icon, `svg({...Home} class="size-5")`, which is also how an icon held in a value, such as a prop, is drawn.
+The tag is the `svg` spreading the icon, `svg({...Home} class="size-5")`, which is also how an icon held in a value, such as a prop, is drawn ([Draw an icon or a component chosen by a value](templates.md#draw-an-icon-or-a-component-chosen-by-a-value)).
 
 - The import gives the `viewBox`, the markup inlined as `innerHTML` (a `SafeHtml`, so a spread accepts it), `aria-hidden="true"`, and a height of `1em` with the width of the icon's ratio, so it sizes to the text around it and takes its colour from `currentColor`; a class or style sizes it otherwise.
 - An icon that means something on its own, with no text beside it, takes `role="img"` and an `aria-label`.

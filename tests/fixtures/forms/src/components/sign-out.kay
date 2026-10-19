@@ -1,0 +1,10 @@
+---
+import type { Action, NoInputAction } from 'kay'
+
+const { signOut, run } = props<{ signOut: NoInputAction<unknown>, run: Action<never, unknown> }>()
+---
+header
+  form(action={signOut})
+    button Sign out
+  form(action={run})
+    input(name="name" aria-label="Name")

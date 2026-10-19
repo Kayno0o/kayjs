@@ -1,0 +1,9 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+import SignOut from '../components/sign-out.kay'
+
+export const leave = action(async ctx => ctx.redirect('/'))
+export const rename = action(t.Object({ name: t.String({ maxLength: 40 }) }), async ({ name }) => name)
+---
+SignOut(signOut={leave} run={rename})

@@ -209,9 +209,23 @@ form(action={add} onSubmit={submit})
   button(disabled={add.pending()}) Add
 ```
 
-A page with a `server` fence can also hand an action to an island as a prop, such as `Assistant(run={reply})`. The island types that prop with `Action` from `kay`, calls it as if it had imported it, and the prop keeps the action's types. The action must be exported by a page or endpoint, in this page or another one. An action fixed with `.with()` cannot be passed: pass the plain action and give the fields as its input.
+A page with a `server` fence can also hand an action to a component as a prop, such as `Assistant(run={reply})` or `Header(signOut={signOut})`. A static component renders it with `form(action={signOut})`. An island calls it as if it had imported it, and the prop keeps the action's types.
 
-An island that does not type the prop with `Action` fails the render, in production too, and the error names the fix. A static component that kay turns into an island because it passes a function to one follows the same rule.
+Type the prop with `Action` from `kay`. `Action<never, unknown>` takes any action. `NoInputAction<unknown>` takes one declared without a schema, such as a sign-out that ends in a redirect. To keep the input and output types, write them: `Action<{ name: string }, string>`.
+
+```kay
+---
+import type { NoInputAction } from 'kay'
+
+const { signOut } = props<{ signOut: NoInputAction<unknown> }>()
+---
+form(action={signOut})
+  button Sign out
+```
+
+ The action must be exported by a page or endpoint, in this page or another one. An action fixed with `.with()` cannot be passed: pass the plain action and give the fields as its input.
+
+An island that does not type the prop with an action type fails the render, in production too, and the error names the fix. A static component that kay turns into an island because it passes a function to one follows the same rule.
 
 In a `catch`, `add.refused(error)` tells a refusal from `ctx.fail` apart from any other error, and types `error.data`.
 

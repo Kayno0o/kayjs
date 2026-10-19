@@ -133,6 +133,15 @@ describe('a form posting to an action', () => {
   })
 })
 
+describe('an action passed to a static component', () => {
+  it('drives its form, whatever the action takes, through a prop typed Action<never, unknown> or NoInputAction<unknown>', async () => {
+    const { html } = await site.visit('/passed')
+
+    expect(html).toContain('<form action="/_kay/action/tests/fixtures/forms/src/routes/passed.kay/leave" method="post" enctype="multipart/form-data">')
+    expect(html).toContain('<form action="/_kay/action/tests/fixtures/forms/src/routes/passed.kay/rename" method="post" enctype="multipart/form-data">')
+  })
+})
+
 describe('the messages a refused form is described by', () => {
   const FORM = `form(action={add})
   input(name="title" aria-describedby="help")
