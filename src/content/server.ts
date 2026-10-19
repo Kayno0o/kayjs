@@ -16,6 +16,8 @@ import { localePath } from '../runtime/i18n'
 import { runInLocale } from '../runtime/locale-state'
 import { importModule } from '../server/bundle'
 import { hostLocale, stateFor } from '../server/i18n'
+import { pageEtag } from '../server/prerendered'
+import { revalidated } from '../server/public'
 import { projectSource } from '../server/source'
 import { claimFeed } from './claims'
 import { entries, registerCollections } from './edit'
@@ -164,7 +166,7 @@ function collectionFeed(collection: Collection<unknown>): CollectionFeed {
   return { collection: collection.name, path: collection.options.feed!.path, localized: collection.options.localized === true }
 }
 
-// Serves each collection's feed at its path; one stays cached for an hour in production.
+// Serves each collection's feed at its path; one stays cached for an hour in production, then revalidates by its ETag, answering 304 while unchanged.
 // A localized collection's feed lists only the entries written in its locale, linking each at its path there.
 export function serveFeeds(app: Elysia, served: ServedPaths, collections: Collection<unknown>[], origin: string | undefined, dev = false, i18n?: I18n, trailingSlash?: TrailingSlash): void {
   for (const collection of collections) {
@@ -176,29 +178,33 @@ export function serveFeeds(app: Elysia, served: ServedPaths, collections: Collec
     if (origin === undefined)
       throw feedNeedsSite(collection)
 
-    const headers = { 'content-type': `${feed.format === 'atom' ? 'application/atom+xml' : 'application/rss+xml'}; charset=utf-8`, 'cache-control': dev ? 'no-cache' : 'public, max-age=3600' }
+    const headers = { 'content-type': `${feed.format === 'atom' ? 'application/atom+xml' : 'application/rss+xml'}; charset=utf-8` }
+    const cache = dev ? 'no-cache' : 'public, max-age=3600'
 
     for (const { path, locale } of claimFeed(served, collectionFeed(collection), i18n?.settings)) {
-      const built = new Map<string, { entries: unknown[], xml: string }>()
+      const built = new Map<string, { entries: unknown[], xml: string, etag: string }>()
       // The XML built from these very entries is served again, so `item` is taken to depend on the entry alone; a collection that read its entries afresh, or a request that sees others, builds it anew.
-      const once = <Entry>(key: string, entries: Entry[], build: () => string) => {
+      const once = <Entry>(request: Request, key: string, entries: Entry[], build: () => string) => {
         const last = built.get(key)
+        let current = last
 
-        if (last && last.entries.length === entries.length && last.entries.every((entry, index) => entry === entries[index]))
-          return last.xml
+        if (!last || last.entries.length !== entries.length || !last.entries.every((entry, index) => entry === entries[index])) {
+          const xml = build()
 
-        const xml = build()
+          current = { entries, xml, etag: pageEtag(xml) }
+          built.set(key, current)
+        }
 
-        built.set(key, { entries, xml })
+        const { xml, etag } = current!
 
-        return xml
+        return revalidated(request, etag, () => xml, headers, cache)
       }
 
       app.get(path, async ({ request }) => {
         if (!i18n || collection.options.localized !== true) {
           const entries = await collection.all()
 
-          return new Response(once('', entries, () => feedXml(entries, feed, origin, '/', trailingSlash)), { headers })
+          return once(request, '', entries, () => feedXml(entries, feed, origin, '/', trailingSlash))
         }
 
         const { settings } = i18n
@@ -213,7 +219,7 @@ export function serveFeeds(app: Elysia, served: ServedPaths, collections: Collec
             return item && { ...item, path: localePath(settings, item.path, written, host) }
           } }
 
-          return new Response(once(written, entries, () => feedXml(entries, localized, host === undefined ? origin : onHost(origin, host), localePath(settings, '/', written, host), trailingSlash)), { headers })
+          return once(request, written, entries, () => feedXml(entries, localized, host === undefined ? origin : onHost(origin, host), localePath(settings, '/', written, host), trailingSlash))
         })
       })
     }

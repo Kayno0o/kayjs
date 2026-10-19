@@ -21,6 +21,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - A static export's entry is 190 bytes gzip lighter: it no longer carries the code reading the build header, which a static host never sends ([Production](production.md)).
 - `navigate()` and `refresh()` load with the first action call, redirect or live refresh that needs them, or with the app code importing them, not with every page: the entry is about 190 bytes gzip lighter on every page.
 - `health.check` runs at most once every 3 s, the probes between sharing its answer, so a balancer and a container check polling every second no longer hit the database each time ([Production](production.md#check-the-database-in-the-health-route)).
+- A collection's feed sends an ETag and answers 304 to a reader holding it ([Content](content.md#serve-an-rss-feed)).
 
 ## 1.55.1
 

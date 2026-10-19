@@ -202,6 +202,35 @@ describe('feeds', () => {
     expect(html).not.toContain('Not yet')
   })
 
+  it('send an ETag and answer 304 to a request holding it, until the entries change', async () => {
+    let titles = ['First']
+    const posts = collection({ name: 'feed-etag', load: () => titles.map(title => ({ slug: title.toLowerCase(), data: { title } })) }, { schema: t.Object({ title: t.String() }), feed: { path: '/tag.xml', title: 'Tag', item: entry => ({ title: entry.data.title, path: `/${entry.slug}`, date: new Date('2026-01-01') }) } })
+    const feeds = new Elysia()
+
+    serveFeeds(feeds, new ServedPaths(), [posts], 'https://x.example')
+
+    const ask = async (etag?: string) => feeds.handle(new Request('http://localhost/tag.xml', etag === undefined ? {} : { headers: { 'if-none-match': etag } }))
+    const first = await ask()
+    const etag = first.headers.get('etag')!
+
+    expect(etag).toMatch(/^"[a-z\d]+"$/)
+    expect(first.headers.get('cache-control')).toBe('public, max-age=3600')
+    expect(first.headers.get('content-type')).toBe('application/rss+xml; charset=utf-8')
+
+    const same = await ask(etag)
+
+    expect([same.status, await same.text(), same.headers.get('etag'), same.headers.get('cache-control')]).toEqual([304, '', etag, 'public, max-age=3600'])
+    expect((await ask('W/"other"')).status).toBe(200)
+
+    titles = ['First', 'Second']
+    posts.invalidate()
+
+    const changed = await ask(etag)
+
+    expect(changed.status).toBe(200)
+    expect(changed.headers.get('etag')).not.toBe(etag)
+  })
+
   it('build a collection\'s XML once until its entries are read afresh', async () => {
     let titles = ['First']
     let items = 0

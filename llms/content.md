@@ -289,6 +289,7 @@ article
 - `translation(entry, locale)` gives the entry of that locale paired with `entry` by slug or `translationKey`, whatever its own slug, or undefined, with no fallback: a language switcher links `entry.translations` through it.
 - Either takes a locale as last argument; outside a request `all()` gives every locale's entries and `get(slug, locale)` reads that locale's alone, with no fallback.
 - A page prerendering or listing the collection in its sitemap gets each slug once, in every locale.
+- A feed carries an ETag and answers 304 to a reader holding it, for an hour in production.
 - The feed is served once per locale, `/en/blog/rss.xml`, listing only the entries written in it, its links in that locale; with domains each host serves its own at the path.
 - `kay i18n translate <locale>` (kayjs-ai) creates the entries a locale lacks as drafts: the collection's `draft: '<field>'` field set to `true`, or a `# draft` first line in the entry's YAML when it has none.
 - An entry outside a locale folder fails `kay check` and the build.

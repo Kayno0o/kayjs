@@ -192,7 +192,7 @@ div(innerHTML={snippet})
 
 ## Feeds
 
-Give a collection a `feed` and kay serves an RSS feed at its path, built from the newest items. Set `site` in `kay.config.ts` first, because feed links are absolute.
+Give a collection a `feed` and kay serves an RSS feed at its path, built from the newest items. Set `site` in `kay.config.ts` first, because feed links are absolute. The feed carries an ETag, so a reader that already holds the current version gets a short 304 instead of the whole file.
 
 ```ts
 export const posts = collection('content/posts', {
