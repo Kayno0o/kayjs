@@ -2777,7 +2777,8 @@ describe.concurrent('kay check, unused code', () => {
 
     try {
       await printed(1, 'with no problems')
-      expect(output.split(CLEAR).length).toBe(2)
+      // The raw output rides along in a failure, which shows whether the clear is missing or the check printed over it.
+      expect({ clears: output.split(CLEAR).length - 1, output }).toMatchObject({ clears: 1 })
       expect(output.indexOf(CLEAR)).toBeLessThan(output.indexOf('with no problems'))
       await Bun.write(join(root, 'src/a.kay'), 'img(src="/a.png" width="1" height="1")\n')
       await printed(1, 'missing-alt')

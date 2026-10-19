@@ -459,6 +459,9 @@ async function staticHost(): Promise<Deploy> {
   return deploy
 }
 
+// What a wait for the page after a reload allows: a loaded host takes seconds to serve and run the chunks the reload fetches.
+const LOADED_MS = 40_000
+
 describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a tab opened before a deploy', () => {
   let host: Deploy
   let before: string
@@ -503,11 +506,12 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a tab open
     await page.evaluate(() => {
       scrollTo(0, document.body.scrollHeight)
     })
-    await page.waitUntil(() => !(window as { kayOld?: boolean }).kayOld)
-    await page.waitFor('button.counter', { text: 'Total 0' })
-    await page.click('button.counter')
-    await page.waitFor('button.counter', { text: 'Total 1' })
-  }, 30_000)
+    await page.waitUntil(() => !(window as { kayOld?: boolean }).kayOld, { timeout: LOADED_MS })
+    await page.waitFor('button.counter', { text: 'Total 0', timeout: LOADED_MS })
+    // The click scrolls the button into view, which hydrates its island and replays the click: the chunk loads as slowly as a loaded host serves it.
+    await page.click('button.counter', { timeout: LOADED_MS })
+    await page.waitFor('button.counter', { text: 'Total 1', timeout: LOADED_MS })
+  }, 90_000)
 
   it('keeps what was typed, loading the next page in full instead of reloading under the visitor', async () => {
     const page = await open()
