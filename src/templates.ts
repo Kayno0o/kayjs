@@ -627,10 +627,12 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 
   location ~* \\.(?:woff2?|ttf|otf|eot)$ {
     add_header Cache-Control "public, max-age=2592000";
+    add_header Strict-Transport-Security "max-age=31536000" always;
   }
 
   location ~* \\.(?:png|jpe?g|gif|webp|avif|svg|ico|bmp)$ {
     add_header Cache-Control "public, max-age=86400";
+    add_header Strict-Transport-Security "max-age=31536000" always;
   }
 
   location / {
