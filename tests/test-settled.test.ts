@@ -1,5 +1,6 @@
 import { afterAll, describe, expect, it } from 'bun:test'
 import { persistedCookie, testSite } from '../src/test'
+import { settledHtml } from '../src/test/page'
 
 const site = await testSite({ routes: 'tests/fixtures/settled/src/routes', islands: false })
 
@@ -44,6 +45,28 @@ describe('the settled view of a streamed page', () => {
     const page = await site.visit('/plain')
 
     expect(page.settled.html).toBe(page.html)
+  })
+})
+
+describe('settledHtml on a stream that ended early', () => {
+  const pending = (id: string) => `<!--kay-await:${id}--><p>pending ${id}</p><!--/kay-await:${id}-->`
+
+  it('swaps the blocks that arrived whole and leaves out the template the stream ended inside', () => {
+    const html = `<body>${pending('a')}${pending('b')}<template data-kay-await="a"><p>done a</p></template><template data-kay-await="b"><p>done b<template><i>kept</i>`
+
+    expect(settledHtml(html)).toBe(`<body><p>done a</p>${pending('b')}`)
+  })
+
+  it('leaves the page as it came when the only template is cut short', () => {
+    const html = `<body>${pending('a')}<template data-kay-await="a"><p>done`
+
+    expect(settledHtml(html)).toBe(html)
+  })
+
+  it('reads a template of the page\'s own inside a block, whole, before the cut', () => {
+    const html = `<body>${pending('a')}<template data-kay-await="a"><p>done</p><template><i>kept</i></template></template>`
+
+    expect(settledHtml(html)).toBe('<body><p>done</p><template><i>kept</i></template>')
   })
 })
 

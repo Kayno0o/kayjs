@@ -1,4 +1,4 @@
-import { SWAP_CALL, SWAP_SCRIPT } from '../server/stream'
+import { SWAP_CALL, SWAP_SCRIPT } from '../server/swap'
 
 export interface Found {
   tag: string

@@ -5,7 +5,7 @@ import { historyScript } from './history'
 import { hydrationScript } from './hydration'
 import { registerScript } from './offline'
 import { speculationRules } from './speculation'
-import { SWAP_CALL, SWAP_SCRIPT } from './stream'
+import { SWAP_CALL, SWAP_SCRIPT } from './swap'
 
 export interface ScriptHashOptions {
   prefetch?: Prefetch | undefined
