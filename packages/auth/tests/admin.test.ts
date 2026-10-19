@@ -243,7 +243,12 @@ describe('admin', () => {
 
   test('an admin\'s deletion whose after-delete step throws still hands the organization over and strips the audit log', async () => {
     const base = memoryStore()
-    const store: AuthStore = { ...base, invitations: { ...base.invitations!, listByEmail: async () => {
+    let strips = 0
+    const store: AuthStore = { ...base, audit: { ...base.audit!, forget: async (userId, pseudonym) => {
+      strips++
+
+      return base.audit!.forget(userId, pseudonym)
+    } }, invitations: { ...base.invitations!, listByEmail: async () => {
       throw new Error('invitation store down')
     } } }
     const { admin, ada, member, events } = await setup({
@@ -258,7 +263,10 @@ describe('admin', () => {
     await store.members!.add({ organizationId: org, userId: grace.id, roles: ['member'], createdAt: new Date() })
     events.length = 0
 
-    expect(await admin.browser.call('deleteUser', ada.id)).not.toEqual({ ok: true })
+    const answer = await admin.browser.call('deleteUser', ada.id)
+
+    expect(answer).toBe('invitation store down')
+    expect(strips).toBe(2)
     expect(await store.users.get(ada.id)).toBeUndefined()
     expect((await store.members!.listByOrganization(org)).map(found => [found.userId, found.roles])).toEqual([[grace.id, ['member', 'owner']]])
     expect(events.map(entry => entry.event)).toContain('organization-handed-over')

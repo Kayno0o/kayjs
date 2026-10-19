@@ -50,7 +50,7 @@ export async function soleOwned(core: Core, record: UserRecord): Promise<SoleOwn
 }
 
 // Deletes the user with everything kayjs-auth keeps for them. The app's records go first, so an `onDelete` that throws leaves the account in place, to delete again. The audit log keeps what happened under a new random name, without the addresses, browsers and details that lead back to the user, and the provider tokens held are revoked upstream.
-// For an account nobody leaves, as an unverified one a registration replaces or a guest past `guests.maxAge`: the address's invitations stay for whoever proves it, and no mail goes out.
+// For an account nobody leaves, as an unverified one a registration replaces or a guest past `guests.maxAge`: the address's invitations stay for whoever proves it, and no mail goes out to them, only to the new owner of an organization handed over.
 // An organization it solely owned with other members passes to its longest-standing member, as it cannot be refused.
 export async function eraseUser(core: Core, record: UserRecord): Promise<void> {
   await eraseThen(core, record, true)
