@@ -359,6 +359,8 @@ describe.concurrent('kay dev', () => {
       }
 
       expect(count()).toBe(1)
+      expect(types.loaded('kay.config.ts')).toBe(true)
+      expect(types.loaded('src/routes/other.ts')).toBe(false)
       await Bun.write(join(root, 'kay.config.ts'), config('two'))
       expect(await types.write(false, '')).toBe(0)
       expect(readShadowSettings(root).publicDir).toBe(join(root, 'one'))
@@ -435,6 +437,38 @@ describe.concurrent('kay dev', () => {
       else
         process.env.NO_COLOR = noColor
 
+      await rm(root, { recursive: true, force: true })
+    }
+  }, 60_000)
+
+  it('keeps the types process through an edit of a code file it did not load, and boots another for one it did', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
+    const loads = join(root, 'loads')
+    const shadow = join(root, '.kay/types/src/routes/index.kay.tsx')
+    const count = () => existsSync(loads) ? readFileSync(loads, 'utf8').length : 0
+
+    await Bun.write(join(root, 'src/server.ts'), 'setInterval(() => undefined, 1000)\n')
+    await Bun.write(join(root, 'src/routes/index.kay'), 'p Home\n')
+    await Bun.write(join(root, 'src/dir.ts'), 'export const dir = \'one\'\n')
+    await Bun.write(join(root, 'src/other.ts'), 'export const other = 1\n')
+    await Bun.write(join(root, 'kay.config.ts'), `import { appendFileSync } from 'node:fs'\nimport { dir } from './src/dir'\n\n// Only the process writing the types counts, as the servers load the config too.\nif (process.argv[1]?.endsWith('types.ts'))\n  appendFileSync(${JSON.stringify(loads)}, 'x')\n\nexport default { publicDir: dir }\n`)
+
+    const stop = await dev(root)
+
+    try {
+      await until(() => existsSync(join(root, '.kay/types/kay-shadow.json')) && existsSync(shadow), 20_000)
+      expect(count()).toBe(1)
+      await Bun.write(join(root, 'src/other.ts'), 'export const other = 2\n')
+      await Bun.sleep(1500)
+      await Bun.write(join(root, 'src/routes/index.kay'), 'p Second\n')
+      await until(() => readFileSync(shadow, 'utf8').includes('Second'), 20_000)
+      expect(count()).toBe(1)
+      await Bun.write(join(root, 'src/dir.ts'), 'export const dir = \'two\'\n')
+      await until(() => readShadowSettings(root).publicDir === join(root, 'two'), 20_000)
+      expect(count()).toBe(2)
+    }
+    finally {
+      await stop()
       await rm(root, { recursive: true, force: true })
     }
   }, 60_000)

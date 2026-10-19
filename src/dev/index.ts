@@ -67,6 +67,8 @@ const FIRST_TREE_WAIT_MS = 3000
 
 // The root files Bun reads as a process starts.
 const STARTUP_FILE = /^(?:\.env.*|package\.json|bunfig\.toml|tsconfig\.json)$/
+// The code files, which the process writing the types keeps running through an edit it did not load.
+const CODE_FILE = /\.[cm]?[jt]sx?$/
 // The files no type reads the contents of: a stylesheet, a markdown entry of a collection, an image, a font or any media an import takes the URL of.
 const TYPE_FREE = new RegExp(`\\.(?:css|mdx?|${ASSET_EXTENSIONS.join('|')})$`, 'i')
 // The backups Vim, Emacs and JetBrains IDEs move a source to while they write it anew.
@@ -612,7 +614,8 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     }
 
     if (!configEdited && typesRead(files)) {
-      typesFresh ||= files.length === 0 || files.some(file => !file.endsWith('.kay'))
+      // A code file the process did not load is read from disk by the write, so only the others need a new process.
+      typesFresh ||= files.length === 0 || files.some(file => !file.endsWith('.kay') && (!CODE_FILE.test(file) || typesProcess.loaded(file)))
       void writeTypes()
     }
   }

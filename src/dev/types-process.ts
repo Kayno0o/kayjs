@@ -1,7 +1,9 @@
 import type { Subprocess } from 'bun'
+import { realpathSync } from 'node:fs'
 import { join } from 'node:path'
 import process from 'node:process'
-import { ANSWER, ENTRY, WRITE } from './refuse'
+import { CONFIG_FILE } from '../config'
+import { ANSWER, ENTRY, MODULES, WRITE } from './refuse'
 
 const TYPES = join(import.meta.dir, 'types.ts')
 // How long the process writing the types waits for the next edit before it exits, so a project left alone holds no memory for it.
@@ -17,8 +19,15 @@ export class TypesProcess {
   private turn: Promise<unknown> = Promise.resolve()
   // The server entry the config named at the last write, when no `--entry` did.
   configuredEntry: string | undefined
+  // The project modules the running process loaded, as its last answer reported them.
+  private modules: Set<string> | undefined
 
   constructor(private root: string, private entry: string | undefined) {}
+
+  // Whether a change to the file, relative to the root, is one the running process loaded, which needs a new one: the config and the project's modules it imported, or any file when it has not reported them.
+  loaded(file: string): boolean {
+    return this.child === undefined || this.modules === undefined || file === CONFIG_FILE || this.modules.has(join(realpathSync(this.root), file))
+  }
 
   // Writes the tree and answers the exit code of the write. `fresh` boots a new process first, as the config or a module it imports may have changed.
   // A kept process that went since the last write is replaced and the write sent again, so no write is lost.
@@ -67,6 +76,7 @@ export class TypesProcess {
     clearTimeout(this.idle)
     this.child?.kill()
     this.child = undefined
+    this.modules = undefined
   }
 
   // The exit code the process answered, or undefined once it went before it did.
@@ -85,6 +95,9 @@ export class TypesProcess {
 
         if (line.done === true)
           break
+
+        if (line.value.startsWith(MODULES))
+          this.modules = new Set(JSON.parse(line.value.slice(MODULES.length)) as string[])
 
         if (line.value.startsWith(ENTRY))
           this.configuredEntry = line.value.slice(ENTRY.length)

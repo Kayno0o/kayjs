@@ -5,6 +5,8 @@ export const CONFIG_REFUSED = 3
 export const ANSWER = 'kay-types:'
 // The line it says before each answer: the server entry the config it wrote the tree from names, as an absolute path.
 export const ENTRY = 'kay-entry:'
+// The line it says before each answer too: the project's modules it has loaded, as a JSON array of absolute paths, which an edit to starts a new process.
+export const MODULES = 'kay-modules:'
 // The lines `kay dev` sends the process writing the types: `load` reads the config and answers whether it did not load, so the first server need not wait for the tree, and `write` writes the tree.
 export const LOAD = 'load'
 export const WRITE = 'write'
