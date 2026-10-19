@@ -1,4 +1,5 @@
 import type { I18nConfig, KayConfig } from '../src/config'
+import type { LocaleSettings } from '../src/runtime/i18n'
 import type { ScratchBuild } from './prerendered'
 import { existsSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
@@ -44,6 +45,70 @@ async function get(path: string, served: { handle: (request: Request) => Promise
 
   return { status: response.status, html: await response.text(), location: response.headers.get('location'), cookie: response.headers.get('set-cookie'), vary: response.headers.get('vary'), etag: response.headers.get('etag') }
 }
+
+// What every kind of link resolved to before the patterns were compiled once per settings object, the hrefs below in the order of `LINK_HREFS`.
+const LINK_HREFS = ['/', '/about', '/about/', '/about?x=1#top', '/about#h', '/blog', '/blog/a', '/blog/a/', '/blog/a?b#c', '/blog/cover.png', '/blog/rss.xml', '/docs', '/docs/a/b', '/docs/a/b.pdf', '/fr/about', '/en/about', '/de', '/café', '/caf%C3%A9', '/caf%c3%a9/', '/shop', '/shop/tea', '/shop/tea/', '/nowhere', '/blog/a/b', '/zz/x', '/zz/x.png', 'about', '//x.com/about', '#top', '/about.html', '/store/tea']
+const LINK_SETTINGS: LocaleSettings = { locales: ['fr', 'en', 'de'], defaultLocale: 'fr', prefixDefault: false, paths: { '/about': { fr: '/a-propos', en: '/about-us' }, '/blog/:slug': { en: '/articles/:slug', de: '/artikel/:slug' }, '/café': { en: '/coffee' }, '/shop/:cat?': { en: '/store/:cat?' } }, pages: ['/', '/about', '/blog', '/blog/:slug', '/café', '/shop/:cat?', '/docs/*', '/:lang/x'], feeds: ['/blog/rss.xml'] }
+const HOSTS = { fr: 'x.fr', en: 'x.com', de: 'x.de' }
+const LINK_VARIANTS: Record<string, LocaleSettings> = { default: LINK_SETTINGS, prefixDefault: { ...LINK_SETTINGS, prefixDefault: true }, noPaths: { ...LINK_SETTINGS, paths: undefined }, hosts: { ...LINK_SETTINGS, hosts: HOSTS }, hostsNoPaths: { ...LINK_SETTINGS, paths: undefined, hosts: HOSTS }, noPages: { ...LINK_SETTINGS, pages: undefined } }
+const LINK_EXPECTED: Record<string, string[]> = {
+  'default/fr': ['/', '/a-propos', '/a-propos/', '/a-propos?x=1#top', '/a-propos#h', '/blog', '/blog/a', '/blog/a/', '/blog/a?b#c', '/blog/cover.png', '/blog/rss.xml', '/docs', '/docs/a/b', '/docs/a/b.pdf', '/fr/about', '/en/about', '/de', '/café', '/caf%C3%A9', '/caf%c3%a9/', '/shop', '/shop/tea', '/shop/tea/', '/nowhere', '/blog/a/b', '/zz/x', '/zz/x.png', 'about', '//x.com/about', '#top', '/about.html', '/store/tea'],
+  'default/en': ['/en', '/en/about-us', '/en/about-us/', '/en/about-us?x=1#top', '/en/about-us#h', '/en/blog', '/en/articles/a', '/en/articles/a/', '/en/articles/a?b#c', '/blog/cover.png', '/en/blog/rss.xml', '/en/docs', '/en/docs/a/b', '/docs/a/b.pdf', '/fr/about', '/en/about', '/de', '/en/coffee', '/en/coffee', '/en/coffee/', '/en/store', '/en/store/tea', '/en/store/tea/', '/nowhere', '/blog/a/b', '/en/zz/x', '/zz/x.png', 'about', '//x.com/about', '#top', '/about.html', '/store/tea'],
+  'default/de': ['/de', '/de/about', '/de/about/', '/de/about?x=1#top', '/de/about#h', '/de/blog', '/de/artikel/a', '/de/artikel/a/', '/de/artikel/a?b#c', '/blog/cover.png', '/de/blog/rss.xml', '/de/docs', '/de/docs/a/b', '/docs/a/b.pdf', '/fr/about', '/en/about', '/de', '/de/café', '/de/caf%C3%A9', '/de/caf%c3%a9/', '/de/shop', '/de/shop/tea', '/de/shop/tea/', '/nowhere', '/blog/a/b', '/de/zz/x', '/zz/x.png', 'about', '//x.com/about', '#top', '/about.html', '/store/tea'],
+  'prefixDefault/fr': ['/fr', '/fr/a-propos', '/fr/a-propos/', '/fr/a-propos?x=1#top', '/fr/a-propos#h', '/fr/blog', '/fr/blog/a', '/fr/blog/a/', '/fr/blog/a?b#c', '/blog/cover.png', '/fr/blog/rss.xml', '/fr/docs', '/fr/docs/a/b', '/docs/a/b.pdf', '/fr/about', '/en/about', '/de', '/fr/café', '/fr/caf%C3%A9', '/fr/caf%c3%a9/', '/fr/shop', '/fr/shop/tea', '/fr/shop/tea/', '/nowhere', '/blog/a/b', '/fr/zz/x', '/zz/x.png', 'about', '//x.com/about', '#top', '/about.html', '/store/tea'],
+  'prefixDefault/en': ['/en', '/en/about-us', '/en/about-us/', '/en/about-us?x=1#top', '/en/about-us#h', '/en/blog', '/en/articles/a', '/en/articles/a/', '/en/articles/a?b#c', '/blog/cover.png', '/en/blog/rss.xml', '/en/docs', '/en/docs/a/b', '/docs/a/b.pdf', '/fr/about', '/en/about', '/de', '/en/coffee', '/en/coffee', '/en/coffee/', '/en/store', '/en/store/tea', '/en/store/tea/', '/nowhere', '/blog/a/b', '/en/zz/x', '/zz/x.png', 'about', '//x.com/about', '#top', '/about.html', '/store/tea'],
+  'prefixDefault/de': ['/de', '/de/about', '/de/about/', '/de/about?x=1#top', '/de/about#h', '/de/blog', '/de/artikel/a', '/de/artikel/a/', '/de/artikel/a?b#c', '/blog/cover.png', '/de/blog/rss.xml', '/de/docs', '/de/docs/a/b', '/docs/a/b.pdf', '/fr/about', '/en/about', '/de', '/de/café', '/de/caf%C3%A9', '/de/caf%c3%a9/', '/de/shop', '/de/shop/tea', '/de/shop/tea/', '/nowhere', '/blog/a/b', '/de/zz/x', '/zz/x.png', 'about', '//x.com/about', '#top', '/about.html', '/store/tea'],
+  'noPaths/fr': ['/', '/about', '/about/', '/about?x=1#top', '/about#h', '/blog', '/blog/a', '/blog/a/', '/blog/a?b#c', '/blog/cover.png', '/blog/rss.xml', '/docs', '/docs/a/b', '/docs/a/b.pdf', '/fr/about', '/en/about', '/de', '/café', '/caf%C3%A9', '/caf%c3%a9/', '/shop', '/shop/tea', '/shop/tea/', '/nowhere', '/blog/a/b', '/zz/x', '/zz/x.png', 'about', '//x.com/about', '#top', '/about.html', '/store/tea'],
+  'noPaths/en': ['/en', '/en/about', '/en/about/', '/en/about?x=1#top', '/en/about#h', '/en/blog', '/en/blog/a', '/en/blog/a/', '/en/blog/a?b#c', '/blog/cover.png', '/en/blog/rss.xml', '/en/docs', '/en/docs/a/b', '/docs/a/b.pdf', '/fr/about', '/en/about', '/de', '/en/café', '/en/caf%C3%A9', '/en/caf%c3%a9/', '/en/shop', '/en/shop/tea', '/en/shop/tea/', '/nowhere', '/blog/a/b', '/en/zz/x', '/zz/x.png', 'about', '//x.com/about', '#top', '/about.html', '/store/tea'],
+  'noPaths/de': ['/de', '/de/about', '/de/about/', '/de/about?x=1#top', '/de/about#h', '/de/blog', '/de/blog/a', '/de/blog/a/', '/de/blog/a?b#c', '/blog/cover.png', '/de/blog/rss.xml', '/de/docs', '/de/docs/a/b', '/docs/a/b.pdf', '/fr/about', '/en/about', '/de', '/de/café', '/de/caf%C3%A9', '/de/caf%c3%a9/', '/de/shop', '/de/shop/tea', '/de/shop/tea/', '/nowhere', '/blog/a/b', '/de/zz/x', '/zz/x.png', 'about', '//x.com/about', '#top', '/about.html', '/store/tea'],
+  'hosts/fr': ['//x.fr/', '//x.fr/a-propos', '//x.fr/a-propos/', '//x.fr/a-propos?x=1#top', '//x.fr/a-propos#h', '//x.fr/blog', '//x.fr/blog/a', '//x.fr/blog/a/', '//x.fr/blog/a?b#c', '/blog/cover.png', '//x.fr/blog/rss.xml', '//x.fr/docs', '//x.fr/docs/a/b', '/docs/a/b.pdf', '/fr/about', '/en/about', '/de', '//x.fr/café', '//x.fr/caf%C3%A9', '//x.fr/caf%c3%a9/', '//x.fr/shop', '//x.fr/shop/tea', '//x.fr/shop/tea/', '/nowhere', '/blog/a/b', '//x.fr/zz/x', '/zz/x.png', 'about', '//x.com/about', '#top', '/about.html', '/store/tea'],
+  'hosts/en': ['/', '/about-us', '/about-us/', '/about-us?x=1#top', '/about-us#h', '/blog', '/articles/a', '/articles/a/', '/articles/a?b#c', '/blog/cover.png', '/blog/rss.xml', '/docs', '/docs/a/b', '/docs/a/b.pdf', '/fr/about', '/en/about', '/de', '/coffee', '/coffee', '/coffee/', '/store', '/store/tea', '/store/tea/', '/nowhere', '/blog/a/b', '/zz/x', '/zz/x.png', 'about', '//x.com/about', '#top', '/about.html', '/store/tea'],
+  'hosts/de': ['//x.de/', '//x.de/about', '//x.de/about/', '//x.de/about?x=1#top', '//x.de/about#h', '//x.de/blog', '//x.de/artikel/a', '//x.de/artikel/a/', '//x.de/artikel/a?b#c', '/blog/cover.png', '//x.de/blog/rss.xml', '//x.de/docs', '//x.de/docs/a/b', '/docs/a/b.pdf', '/fr/about', '/en/about', '/de', '//x.de/café', '//x.de/caf%C3%A9', '//x.de/caf%c3%a9/', '//x.de/shop', '//x.de/shop/tea', '//x.de/shop/tea/', '/nowhere', '/blog/a/b', '//x.de/zz/x', '/zz/x.png', 'about', '//x.com/about', '#top', '/about.html', '/store/tea'],
+  'hostsNoPaths/fr': ['/', '/about', '/about/', '/about?x=1#top', '/about#h', '/blog', '/blog/a', '/blog/a/', '/blog/a?b#c', '/blog/cover.png', '/blog/rss.xml', '/docs', '/docs/a/b', '/docs/a/b.pdf', '/fr/about', '/en/about', '/de', '/café', '/caf%C3%A9', '/caf%c3%a9/', '/shop', '/shop/tea', '/shop/tea/', '/nowhere', '/blog/a/b', '/zz/x', '/zz/x.png', 'about', '//x.com/about', '#top', '/about.html', '/store/tea'],
+  'hostsNoPaths/en': ['/', '/about', '/about/', '/about?x=1#top', '/about#h', '/blog', '/blog/a', '/blog/a/', '/blog/a?b#c', '/blog/cover.png', '/blog/rss.xml', '/docs', '/docs/a/b', '/docs/a/b.pdf', '/fr/about', '/en/about', '/de', '/café', '/caf%C3%A9', '/caf%c3%a9/', '/shop', '/shop/tea', '/shop/tea/', '/nowhere', '/blog/a/b', '/zz/x', '/zz/x.png', 'about', '//x.com/about', '#top', '/about.html', '/store/tea'],
+  'hostsNoPaths/de': ['/', '/about', '/about/', '/about?x=1#top', '/about#h', '/blog', '/blog/a', '/blog/a/', '/blog/a?b#c', '/blog/cover.png', '/blog/rss.xml', '/docs', '/docs/a/b', '/docs/a/b.pdf', '/fr/about', '/en/about', '/de', '/café', '/caf%C3%A9', '/caf%c3%a9/', '/shop', '/shop/tea', '/shop/tea/', '/nowhere', '/blog/a/b', '/zz/x', '/zz/x.png', 'about', '//x.com/about', '#top', '/about.html', '/store/tea'],
+  'noPages/fr': ['/', '/about', '/about/', '/about?x=1#top', '/about#h', '/blog', '/blog/a', '/blog/a/', '/blog/a?b#c', '/blog/cover.png', '/blog/rss.xml', '/docs', '/docs/a/b', '/docs/a/b.pdf', '/fr/about', '/en/about', '/de', '/café', '/caf%C3%A9', '/caf%c3%a9/', '/shop', '/shop/tea', '/shop/tea/', '/nowhere', '/blog/a/b', '/zz/x', '/zz/x.png', 'about', '//x.com/about', '#top', '/about.html', '/store/tea'],
+  'noPages/en': ['/', '/about', '/about/', '/about?x=1#top', '/about#h', '/blog', '/blog/a', '/blog/a/', '/blog/a?b#c', '/blog/cover.png', '/en/blog/rss.xml', '/docs', '/docs/a/b', '/docs/a/b.pdf', '/fr/about', '/en/about', '/de', '/café', '/caf%C3%A9', '/caf%c3%a9/', '/shop', '/shop/tea', '/shop/tea/', '/nowhere', '/blog/a/b', '/zz/x', '/zz/x.png', 'about', '//x.com/about', '#top', '/about.html', '/store/tea'],
+  'noPages/de': ['/', '/about', '/about/', '/about?x=1#top', '/about#h', '/blog', '/blog/a', '/blog/a/', '/blog/a?b#c', '/blog/cover.png', '/de/blog/rss.xml', '/docs', '/docs/a/b', '/docs/a/b.pdf', '/fr/about', '/en/about', '/de', '/café', '/caf%C3%A9', '/caf%c3%a9/', '/shop', '/shop/tea', '/shop/tea/', '/nowhere', '/blog/a/b', '/zz/x', '/zz/x.png', 'about', '//x.com/about', '#top', '/about.html', '/store/tea'],
+}
+const PATH_EXPECTED: Record<string, string[]> = {
+  'path/fr': ['/', '/a-propos', '/a-propos/', '/a-propos?x=1#top', '/a-propos#h', '/blog', '/blog/a', '/blog/a/', '/blog/a?b#c', '/blog/cover.png', '/blog/rss.xml', '/docs', '/docs/a/b', '/docs/a/b.pdf', '/fr/about', '/en/about', '/de', '/café', '/caf%C3%A9', '/caf%c3%a9/', '/shop', '/shop/tea', '/shop/tea/', '/nowhere', '/blog/a/b', '/zz/x', '/zz/x.png', 'about', '//x.com/about', '#top', '/about.html', '/store/tea'],
+  'back/fr': ['/', '/about', '/about/', '/about?x=1#top', '/about#h', '/blog', '/blog/a', '/blog/a/', '/blog/a?b#c', '/blog/cover.png', '/blog/rss.xml', '/docs', '/docs/a/b', '/docs/a/b.pdf', '/fr/about', '/en/about', '/de', '/café', '/caf%C3%A9', '/caf%c3%a9/', '/shop', '/shop/tea', '/shop/tea/', '/nowhere', '/blog/a/b', '/zz/x', '/zz/x.png', 'about', '//x.com/about', '#top', '/about.html', '/store/tea'],
+  'path/en': ['/en', '/en/about-us', '/en/about-us/', '/en/about-us?x=1#top', '/en/about-us#h', '/en/blog', '/en/articles/a', '/en/articles/a/', '/en/articles/a?b#c', '/en/articles/cover.png', '/en/articles/rss.xml', '/en/docs', '/en/docs/a/b', '/en/docs/a/b.pdf', '/en/fr/about', '/en/en/about', '/en/de', '/en/coffee', '/en/coffee', '/en/coffee/', '/en/store', '/en/store/tea', '/en/store/tea/', '/en/nowhere', '/en/blog/a/b', '/en/zz/x', '/en/zz/x.png', '/enabout', '/en//x.com/about', '/en#top', '/en/about.html', '/en/store/tea'],
+  'back/en': ['/', '/about', '/about/', '/about?x=1#top', '/about#h', '/blog', '/blog/a', '/blog/a/', '/blog/a?b#c', '/blog/cover.png', '/blog/rss.xml', '/docs', '/docs/a/b', '/docs/a/b.pdf', '/fr/about', '/en/about', '/de', '/café', '/caf%C3%A9', '/caf%c3%a9/', '/shop', '/shop/tea', '/shop/tea/', '/nowhere', '/blog/a/b', '/zz/x', '/zz/x.png', 'about', '//x.com/about', '#top', '/about.html', '/shop/tea'],
+  'path/de': ['/de', '/de/about', '/de/about/', '/de/about?x=1#top', '/de/about#h', '/de/blog', '/de/artikel/a', '/de/artikel/a/', '/de/artikel/a?b#c', '/de/artikel/cover.png', '/de/artikel/rss.xml', '/de/docs', '/de/docs/a/b', '/de/docs/a/b.pdf', '/de/fr/about', '/de/en/about', '/de/de', '/de/café', '/de/caf%C3%A9', '/de/caf%c3%a9/', '/de/shop', '/de/shop/tea', '/de/shop/tea/', '/de/nowhere', '/de/blog/a/b', '/de/zz/x', '/de/zz/x.png', '/deabout', '/de//x.com/about', '/de#top', '/de/about.html', '/de/store/tea'],
+  'back/de': ['/', '/about', '/about/', '/about?x=1#top', '/about#h', '/blog', '/blog/a', '/blog/a/', '/blog/a?b#c', '/blog/cover.png', '/blog/rss.xml', '/docs', '/docs/a/b', '/docs/a/b.pdf', '/fr/about', '/en/about', '/de', '/café', '/caf%C3%A9', '/caf%c3%a9/', '/shop', '/shop/tea', '/shop/tea/', '/nowhere', '/blog/a/b', '/zz/x', '/zz/x.png', 'about', '//x.com/about', '#top', '/about.html', '/store/tea'],
+}
+
+describe('links of a site with many routes', () => {
+  it('resolve to the href they always did, whatever the locale, host, prefix, param, file, query, encoding or feed', () => {
+    for (const [name, expected] of Object.entries(LINK_EXPECTED)) {
+      const [variant = '', locale = ''] = name.split('/')
+
+      expect(LINK_HREFS.map(href => localizedLink(LINK_VARIANTS[variant]!, href, locale, 'x.com')), name).toEqual(expected)
+    }
+  })
+
+  it('translate a path to and from a locale as they always did, again on the same settings', () => {
+    for (let round = 0; round < 2; round++) {
+      for (const [name, expected] of Object.entries(PATH_EXPECTED)) {
+        const [kind = '', locale = ''] = name.split('/')
+        const convert = kind === 'path' ? localePath : untranslatedPath
+
+        expect(LINK_HREFS.map(href => convert(LINK_SETTINGS, href, locale)), name).toEqual(expected)
+      }
+    }
+  })
+
+  it('see a settings object changed in place no more than a new one', () => {
+    const settings: LocaleSettings = { ...LINK_SETTINGS, pages: [...LINK_SETTINGS.pages!] }
+    const before = localizedLink(settings, '/shop', 'en')
+
+    expect(before).toBe('/en/store')
+    expect(localizedLink({ ...settings, pages: ['/'] }, '/shop', 'en')).toBe('/shop')
+    expect(localizedLink(settings, '/shop', 'en')).toBe(before)
+  })
+})
 
 describe('locale prefixes', () => {
   it('serve the default locale unprefixed and every other under its prefix', async () => {
