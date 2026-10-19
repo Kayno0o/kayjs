@@ -54,15 +54,15 @@ function nginxCpuSeconds(nginx: Subprocess): number {
   return workers.reduce((sum, pid) => sum + cpuSeconds(pid), 0)
 }
 
-// `CONCURRENCY` clients requesting `path` through nginx over keepalive HTTP/1.1 as browsers ask, brotli accepted.
-export async function load(variant: Variant, path: string, server: Subprocess, nginx: Subprocess): Promise<Load> {
+// `CONCURRENCY` clients requesting `path` through nginx over keepalive HTTP/1.1 as browsers ask, brotli accepted, with the headers the site's `auth` gave.
+export async function load(variant: Variant, path: string, server: Subprocess, nginx: Subprocess, auth: Record<string, string> = {}): Promise<Load> {
   const url = `http://127.0.0.1:${variant.ports.http}${path}`
   const latencies: number[] = []
   const clients = async (until: number, record: boolean) => {
     await Promise.all(Array.from({ length: CONCURRENCY }, async () => {
       while (performance.now() < until) {
         const started = performance.now()
-        const response = await fetch(url, { headers: { 'accept': 'text/html,text/css,*/*', 'accept-encoding': 'br, gzip' }, decompress: false })
+        const response = await fetch(url, { headers: { ...auth, 'accept': 'text/html,text/css,*/*', 'accept-encoding': 'br, gzip' }, decompress: false })
 
         await response.arrayBuffer()
 

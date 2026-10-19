@@ -62,12 +62,28 @@ const COLLECT = `(async () => {
   }
 })()`
 
-// `RUNS` cold loads of a page through nginx over HTTP/2, each in a fresh context, medians kept. Requests to any other host, as a map frame or analytics, are aborted.
-export async function vitals(browser: Browser, variant: Variant, path: string, profile: Profile): Promise<Vitals> {
+// The headers the site's `auth` gave as a browser context takes them: its cookie header as the cookies of `origin`, so the page's own requests and scripts see them, the rest sent with every request.
+export function browserAuth(auth: Record<string, string>, origin: string): { cookies: { name: string, value: string, url: string }[], headers: Record<string, string> } {
+  const headers = Object.fromEntries(Object.entries(auth).filter(([name]) => name.toLowerCase() !== 'cookie'))
+  const cookies = Object.entries(auth).filter(([name]) => name.toLowerCase() === 'cookie').flatMap(([, value]) => value.split(';')).map(pair => pair.trim()).filter(pair => pair.includes('=')).map((pair) => {
+    const equals = pair.indexOf('=')
+
+    return { name: pair.slice(0, equals), value: pair.slice(equals + 1), url: origin }
+  })
+
+  return { cookies, headers }
+}
+
+// `RUNS` cold loads of a page through nginx over HTTP/2, each in a fresh context carrying what the site's `auth` gave, medians kept. Requests to any other host, as a map frame or analytics, are aborted.
+export async function vitals(browser: Browser, variant: Variant, path: string, profile: Profile, auth: Record<string, string> = {}): Promise<Vitals> {
   const runs: Vitals[] = []
+  const origin = `https://localhost:${variant.ports.https}`
+  const { cookies, headers } = browserAuth(auth, origin)
 
   for (let run = 0; run < RUNS; run++) {
-    const context = await browser.newContext({ ignoreHTTPSErrors: true, viewport: profile.viewport, deviceScaleFactor: profile.dpr, isMobile: profile.mobile, hasTouch: profile.mobile })
+    const context = await browser.newContext({ ignoreHTTPSErrors: true, viewport: profile.viewport, deviceScaleFactor: profile.dpr, isMobile: profile.mobile, hasTouch: profile.mobile, extraHTTPHeaders: headers })
+
+    await context.addCookies(cookies)
     const page = await context.newPage()
     const session = await context.newCDPSession(page)
 
@@ -77,7 +93,7 @@ export async function vitals(browser: Browser, variant: Variant, path: string, p
     await session.send('Network.setCacheDisabled', { cacheDisabled: true })
     await session.send('Network.emulateNetworkConditions', { offline: false, latency: profile.latency, downloadThroughput: profile.down, uploadThroughput: profile.up })
     await session.send('Emulation.setCPUThrottlingRate', { rate: profile.cpu })
-    await page.goto(`https://localhost:${variant.ports.https}${path}`, { waitUntil: 'load' })
+    await page.goto(`${origin}${path}`, { waitUntil: 'load' })
     runs.push(await page.evaluate<Vitals>(COLLECT))
     await context.close()
   }

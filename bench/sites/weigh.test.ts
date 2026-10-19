@@ -1,9 +1,33 @@
+import type { Variant } from './sites'
 import { describe, expect, it } from 'bun:test'
-import { latinFontUrls, pickImage, slotWidth, splitInlineScripts } from './weigh'
+import { latinFontUrls, pickImage, slotWidth, splitInlineScripts, weigh } from './weigh'
 
 const PHONE = { name: 'phone', width: 390, dpr: 3 }
 const DESKTOP = { name: 'desktop', width: 1280, dpr: 1 }
 const SRCSET = '/a?w=320 320w, /a?w=640 640w, /a?w=960 960w, /a?w=1280 1280w'
+
+describe('weigh', () => {
+  it('sends what the site\'s auth gave with the page and every file it links', async () => {
+    const page = '<link rel="stylesheet" href="/app.css"><script src="/app.js"></script>'
+    const server = Bun.serve({ port: 0, fetch: (request) => {
+      if (request.headers.get('cookie') !== 'session=bench')
+        return new Response(null, { status: 401 })
+
+      return new Response(new URL(request.url).pathname === '/' ? page : 'a{}')
+    } })
+    const variant = { site: { name: 'club', repo: '', astro: '', pages: [] }, kind: 'astro', dir: '', devDir: '', ports: { backend: server.port, http: 0, https: 0, dev: 0, sidecar: 0 } } as Variant
+
+    try {
+      expect((await weigh(variant, '/', { cookie: 'session=bench' })).jsFiles).toBe(1)
+      const [refused] = await Promise.allSettled([weigh(variant, '/')])
+
+      expect(refused.status === 'rejected' && String(refused.reason)).toContain('/ answered 401')
+    }
+    finally {
+      await server.stop(true)
+    }
+  })
+})
 
 describe('slotWidth', () => {
   it('takes the first entry whose media condition holds', () => {

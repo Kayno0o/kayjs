@@ -15,7 +15,7 @@ export interface BuildTime {
 export interface Footprint {
   lines: number | undefined
   testLines: number | undefined
-  // What production runs: Astro's dist and production dependencies, kay's one executable.
+  // What production runs: Astro's dist, or what a side before kay ships, and its production dependencies; kay's one executable.
   deploy: number
 }
 
@@ -24,7 +24,15 @@ const OUTPUTS = ['dist', '.astro', 'node_modules/.astro', 'node_modules/.vite', 
 
 // `kay build` checks the project as `kay check` does first; `astro build` checks nothing, so kay is timed without the check too.
 export function buildCommands(variant: Variant): string[][] {
-  return variant.kind === 'astro' ? [[...BUNX, 'astro', 'build']] : [[...BUNX, 'kay', 'build'], [...BUNX, 'kay', 'build', '--no-check']]
+  if (variant.kind === 'kay')
+    return [[...BUNX, 'kay', 'build'], [...BUNX, 'kay', 'build', '--no-check']]
+
+  return [variant.site.before?.build ?? [...BUNX, 'astro', 'build']]
+}
+
+// A command as the results show it, without the Bun running a package's bin.
+export function shown(command: string[]): string {
+  return (BUNX.every((part, index) => command[index] === part) ? command.slice(BUNX.length) : command).join(' ')
 }
 
 export interface CleanBuild {
@@ -54,14 +62,14 @@ export async function timeClean({ command, cwd, env = {}, outputs, builds = BUIL
 
     const usage = proc.resourceUsage()!
 
-    runs.push({ command: command.slice(BUNX.length).join(' '), wall: (performance.now() - started) / 1000, cpu: Number(usage.cpuTime.total) / 1e6, rss: usage.maxRSS })
+    runs.push({ command: shown(command), wall: (performance.now() - started) / 1000, cpu: Number(usage.cpuTime.total) / 1e6, rss: usage.maxRSS })
   }
 
   return { command: runs[0]!.command, wall: median(runs.map(r => r.wall)), cpu: median(runs.map(r => r.cpu)), rss: median(runs.map(r => r.rss)) }
 }
 
 export async function timeBuild(variant: Variant, command: string[]): Promise<BuildTime> {
-  const time = await timeClean({ command, cwd: variant.dir, env: envOf(variant), outputs: OUTPUTS })
+  const time = await timeClean({ command, cwd: variant.dir, env: envOf(variant), outputs: variant.site.before?.outputs ?? OUTPUTS })
 
   // The servers run what the last build left, the executable included.
   if (variant.kind === 'kay')
@@ -91,11 +99,17 @@ export function footprint(variant: Variant): Footprint {
   if (variant.kind === 'kay')
     return { lines: cloc([join(variant.dir, 'src'), ...configs]), testLines: existsSync(tests) ? cloc([tests]) : 0, deploy: statSync(join(variant.dir, 'server')).size }
 
+  const before = variant.site.before
+  const sources = (before?.sources ?? ['src']).map(path => join(variant.dir, path)).filter(path => existsSync(path))
+  const shipped = before?.deploy ?? before?.outputs ?? ['dist']
   const prod = `${variant.dir}-prod`
 
   rmSync(prod, { recursive: true, force: true })
   cpSync(variant.dir, prod, { recursive: true, filter: source => !source.slice(variant.dir.length).includes('/node_modules') })
   run([process.execPath, 'install', '--production', '--ignore-scripts'], prod)
 
-  return { lines: cloc([join(variant.dir, 'src'), ...configs]), testLines: 0, deploy: size(join(prod, 'node_modules')) + size(join(variant.dir, 'dist')) }
+  // A side without production dependencies installs no node_modules.
+  const modules = join(prod, 'node_modules')
+
+  return { lines: cloc([...sources, ...configs]), testLines: before !== undefined && existsSync(tests) ? cloc([tests]) : 0, deploy: (existsSync(modules) ? size(modules) : 0) + shipped.map(path => join(variant.dir, path)).filter(path => existsSync(path)).reduce((sum, path) => sum + size(path), 0) }
 }

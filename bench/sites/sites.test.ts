@@ -3,7 +3,8 @@ import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
-import { envOf, staleWarning, wantedSource } from './sites'
+import { buildCommands, shown } from './build'
+import { authOf, BUNX, envOf, label, staleWarning, wantedSource } from './sites'
 
 describe('wantedSource', () => {
   it('names a checkout as it reads now, a registry version with its version, and any specifier as it is', () => {
@@ -31,6 +32,31 @@ describe('envOf', () => {
   })
 })
 
+describe('a side before kay', () => {
+  const before = { label: 'Elysia + Solid', build: [process.execPath, 'scripts/build-client.ts'], serve: [process.execPath, 'index.ts'], outputs: ['dist'] }
+  const variant = (site: Partial<Site>, kind: Variant['kind']): Variant => ({ site: { name: 'club', repo: '', astro: '', pages: [], ...site }, kind, dir: '', devDir: '', ports: { backend: 47201, http: 0, https: 0, dev: 0, sidecar: 0 } })
+
+  it('is named by its label, an Astro side and the kay side as before', () => {
+    expect(label(variant({ before }, 'astro'))).toBe('club Elysia + Solid')
+    expect(label(variant({ before }, 'kay'))).toBe('club kay')
+    expect(label(variant({}, 'astro'))).toBe('club astro')
+  })
+
+  it('builds with its own command, shown as it runs, and an Astro side still with astro build', () => {
+    expect(buildCommands(variant({ before }, 'astro'))).toEqual([before.build])
+    expect(buildCommands(variant({}, 'astro'))).toEqual([[...BUNX, 'astro', 'build']])
+    expect(shown(before.build)).toBe(`${process.execPath} scripts/build-client.ts`)
+    expect(shown([...BUNX, 'kay', 'build'])).toBe('kay build')
+  })
+
+  it('carries what the site\'s auth mints for each side, none without one', async () => {
+    const auth = async (v: Variant) => ({ cookie: `session=${v.kind}-${v.ports.backend}` })
+
+    expect(await authOf(variant({ auth }, 'kay'))).toEqual({ cookie: 'session=kay-47201' })
+    expect(await authOf(variant({}, 'kay'))).toEqual({})
+  })
+})
+
 describe('SITES', () => {
   // Loads `sites.ts` in a child under a config of `source`, printing its sites and whether the loading flag outlived the load.
   function load(source: string): { code: number | null, out: string } {
@@ -53,6 +79,10 @@ describe('SITES', () => {
 
   it('loads a config importing another checkout\'s copy of sites.ts, which reads none itself', () => {
     expect(load(`import { SITES } from './other/sites'\n\nexport default [{ name: \`bakery \${SITES.length}\`, repo: '.', astro: '', pages: [] }]\n`)).toEqual({ code: 0, out: 'bakery 0 false' })
+  })
+
+  it('refuses a dev phase for a side before kay, which has no Astro dev server', () => {
+    expect(load(`export default [{ name: 'club', repo: '.', astro: '', pages: [], before: { label: 'Elysia', build: [], serve: [], outputs: [] }, dev: { page: '/' } }]\n`).out).toContain('club: the dev phase runs Astro')
   })
 
   it('clears the loading flag when the config throws', () => {

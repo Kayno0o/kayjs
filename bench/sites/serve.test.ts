@@ -4,7 +4,7 @@ import { existsSync, mkdtempSync, realpathSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
-import { cpuTicks, ensureFree, isRunning, killAll, memory, parentOf, processesIn, processTree, serverMemory, stopEverything, stopServer, tracked, treeCpu, treeMemory } from './serve'
+import { cpuTicks, ensureFree, isRunning, killAll, memory, parentOf, processesIn, processTree, serverMemory, startServer, stopEverything, stopServer, tracked, treeCpu, treeMemory, waitReady } from './serve'
 
 // Burns 200 ms of CPU, however busy the machine.
 const BURN = 'while (process.cpuUsage().user < 200_000);'
@@ -199,6 +199,30 @@ describe('stopServer', () => {
     await stopServer(variantIn(dir), server)
 
     expect(existsSync(`/proc/${sidecar}`)).toBe(false)
+  })
+})
+
+describe('startServer', () => {
+  it('serves a side before kay with its own command, ready once the page its site names answers', async () => {
+    const dir = realpathSync(mkdtempSync(join(tmpdir(), 'kay-bench-before-')))
+    // Taken by the system, then let go, so the server gets a port nothing holds.
+    const probe = Bun.serve({ port: 0, fetch: () => new Response() })
+    const port = probe.port!
+
+    await probe.stop(true)
+
+    // The home page needs a session, the sign-in does not.
+    const serve = [process.execPath, '-e', 'Bun.serve({ hostname: process.env.HOST, port: Number(process.env.PORT), fetch: request => new Response(null, { status: new URL(request.url).pathname === "/login" ? 200 : 401 }) })']
+    const variant: Variant = { ...variantIn(dir), site: { name: 'club', repo: '', astro: '', pages: [], ready: '/login', before: { label: 'Elysia', build: [], serve, outputs: [] } }, ports: { backend: port, http: 0, https: 0, dev: 0, sidecar: 0 } }
+    const server = await startServer(variant)
+
+    try {
+      expect(await waitReady(variant, server)).toBeGreaterThan(0)
+      expect((await fetch(`http://127.0.0.1:${port}/`)).status).toBe(401)
+    }
+    finally {
+      await stopServer(variant, server)
+    }
   })
 })
 

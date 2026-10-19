@@ -1,7 +1,11 @@
 import type { Site } from './sites'
+import { createHmac } from 'node:crypto'
 import { join } from 'node:path'
 
-// Copy to sites.config.ts (gitignored) or pass `--config <file>`: each entry is a site that ran on Astro, then moved to kay in the same repository.
+// What a Set-Cookie header says after the cookie itself, which a request does not send.
+const COOKIE_ATTRIBUTES = /;.*/s
+
+// Copy to sites.config.ts (gitignored) or pass `--config <file>`: each entry is a site that ran on Astro, or on a stack `before` names, then moved to kay in the same repository.
 export default [
   {
     name: 'bakery',
@@ -52,4 +56,40 @@ export default [
       },
     },
   },
+  {
+    name: 'club',
+    repo: '../../../club',
+    // The commit that last ran before kay, here a Bun server with its own client build rather than Astro.
+    astro: 'b7c8d9e',
+    pages: ['/', '/members', '/login'],
+    before: {
+      label: 'Elysia + Solid',
+      build: [process.execPath, 'scripts/build-client.ts'],
+      serve: [process.execPath, '--preload', './web/preload.ts', 'index.ts'],
+      outputs: ['dist'],
+      // Production runs the sources themselves besides the client build.
+      deploy: ['dist', 'index.ts', 'api', 'web'],
+      sources: ['index.ts', 'api', 'web'],
+    },
+    // Every page but the sign-in needs a session, so readiness waits on that one.
+    ready: '/login',
+    // Each side's session, minted with that side's own secret; a sign-in against the server, which answers by then, works as well.
+    auth: async (variant) => {
+      if (variant.kind === 'kay') {
+        const response = await fetch(`http://127.0.0.1:${variant.ports.backend}/login`, { method: 'POST', body: new URLSearchParams({ email: 'bench@club.example', password: 'bench' }), redirect: 'manual' })
+
+        return { cookie: response.headers.getSetCookie().map(cookie => cookie.replace(COOKIE_ATTRIBUTES, '')).join('; ') }
+      }
+
+      return { cookie: `token=${signedToken('bench-secret')}` }
+    },
+  },
 ] satisfies Site[]
+
+// The JWT the old side signs its sessions with, for a member that exists in its database.
+function signedToken(secret: string): string {
+  const part = (value: object) => Buffer.from(JSON.stringify(value)).toString('base64url')
+  const unsigned = `${part({ alg: 'HS256', typ: 'JWT' })}.${part({ sub: '1', exp: Math.floor(Date.now() / 1000) + 3600 })}`
+
+  return `${unsigned}.${createHmac('sha256', secret).update(unsigned).digest('base64url')}`
+}

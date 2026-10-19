@@ -14,7 +14,7 @@ import { buildCommands, footprint, timeBuild } from './build'
 import { development, devSection } from './dev'
 import { coldStart, load } from './load'
 import { serverMemory, startAll, stopEverything } from './serve'
-import { commitOf, KIND, label, NO_SITES, PHASE, prepare, SITES, staleInstalls, startServices, stopServices, VARIANTS, versionIn } from './sites'
+import { authOf, commitOf, KIND, label, NO_SITES, PHASE, prepare, SITES, staleInstalls, startServices, stopServices, VARIANTS, versionIn } from './sites'
 import { VIEWPORTS, weigh } from './weigh'
 
 interface Result {
@@ -34,10 +34,10 @@ const STOP_MS = 10_000
 const average = (values: number[]) => values.reduce((sum, value) => sum + value, 0) / values.length
 const megabytes = (bytes: number) => `${(bytes / MB).toFixed(0)} MB`
 
-// The site's own stylesheet, the largest a page links, none when its pages carry theirs.
-async function stylesheet(variant: Variant): Promise<string[]> {
-  const html = await (await fetch(`http://127.0.0.1:${variant.ports.backend}/`)).text()
-  const sizes = await Promise.all([...html.matchAll(STYLESHEET)].map(async ([, href]) => ({ href: href!, size: (await (await fetch(`http://127.0.0.1:${variant.ports.backend}${href}`)).arrayBuffer()).byteLength })))
+// The site's own stylesheet, the largest the home page links, none when its pages carry theirs.
+async function stylesheet(variant: Variant, auth: Record<string, string>): Promise<string[]> {
+  const html = await (await fetch(`http://127.0.0.1:${variant.ports.backend}/`, { headers: auth })).text()
+  const sizes = await Promise.all([...html.matchAll(STYLESHEET)].map(async ([, href]) => ({ href: href!, size: (await (await fetch(`http://127.0.0.1:${variant.ports.backend}${href}`, { headers: auth })).arrayBuffer()).byteLength })))
 
   return sizes.toSorted((a, b) => b.size - a.size).slice(0, 1).map(({ href }) => href)
 }
@@ -115,15 +115,22 @@ catch (error) {
 }
 
 try {
+  // Minted once every server answers, as a sign-in the site's `auth` makes may need its own server.
+  const auth = new Map<Variant, Record<string, string>>()
+
+  for (const variant of producing ? VARIANTS : [])
+    auth.set(variant, await authOf(variant))
+
   for (const variant of producing ? VARIANTS : []) {
     const result = results.get(variant)!
     const server = lab!.servers.get(variant)!
+    const headers = auth.get(variant)!
 
     console.error(`weight and load: ${label(variant)}`)
     for (const path of variant.site.pages)
-      result.weights.push(await weigh(variant, path))
-    for (const path of [...variant.site.loaded ?? variant.site.pages.slice(0, 2), ...await stylesheet(variant)])
-      result.loads.push(await load(variant, path, server, lab!.nginx))
+      result.weights.push(await weigh(variant, path, headers))
+    for (const path of [...variant.site.loaded ?? variant.site.pages.slice(0, 2), ...await stylesheet(variant, headers)])
+      result.loads.push(await load(variant, path, server, lab!.nginx, headers))
     result.memory = serverMemory(server.pid)
   }
 
@@ -132,7 +139,7 @@ try {
       console.error(`browser ${profile.name}: ${label(variant)}`)
       results.get(variant)!.vitals[profile.name] = []
       for (const path of variant.site.pages)
-        results.get(variant)!.vitals[profile.name]!.push(await vitals(browser, variant, path, profile))
+        results.get(variant)!.vitals[profile.name]!.push(await vitals(browser, variant, path, profile, auth.get(variant)))
     }
   }
 
@@ -148,7 +155,7 @@ try {
     `${cpus()[0]?.model ?? 'unknown CPU'}, ${cpus().length} threads`,
     `Bun ${Bun.version}, Chromium ${browser.version()} headless, ${nginxVersion()}`,
     ...await Promise.all(SITES.filter(site => VARIANTS.some(variant => variant.site === site)).map(async (site) => {
-      const sides = await Promise.all(VARIANTS.filter(variant => variant.site === site).map(async variant => variant.kind === 'astro' ? `Astro at ${commitOf(variant)}` : `kay ${await versionIn(producing ? variant.dir : variant.devDir, 'kay')} at ${commitOf(variant)}`))
+      const sides = await Promise.all(VARIANTS.filter(variant => variant.site === site).map(async variant => variant.kind === 'astro' ? `${variant.site.before?.label ?? 'Astro'} at ${commitOf(variant)}` : `kay ${await versionIn(producing ? variant.dir : variant.devDir, 'kay')} at ${commitOf(variant)}`))
 
       return `${site.name}: ${sides.join(', ')}`
     })),
@@ -157,7 +164,7 @@ try {
   const production = !producing
     ? []
     : [
-      'Each site as it last ran on Astro, then on kay, built and served as it deploys: Astro\'s standalone server under Bun, kay\'s one executable, both behind an nginx set up for production (HTTP/2 over TLS, brotli and gzip at level 6). kay is the version each site pins, not this checkout. Reproduce with `bun run bench:sites`, the sites listed in a config as `bench/sites/sites.config.example.ts` shows, given nginx with the brotli module (`NGINX_MODULES` if not under /usr/lib/nginx/modules), openssl, playwright-core\'s Chromium, and cloc for the line counts.',
+      'Each site as it last ran on Astro, or on what it ran before kay, then on kay, built and served as it deploys: Astro\'s standalone server under Bun or the server the site ran before, kay\'s one executable, both behind an nginx set up for production (HTTP/2 over TLS, brotli and gzip at level 6). kay is the version each site pins, not this checkout. Reproduce with `bun run bench:sites`, the sites listed in a config as `bench/sites/sites.config.example.ts` shows, given nginx with the brotli module (`NGINX_MODULES` if not under /usr/lib/nginx/modules), openssl, playwright-core\'s Chromium, and cloc for the line counts.',
       '',
       '## What a page downloads',
       '',
@@ -188,7 +195,7 @@ try {
       '',
       '## Server',
       '',
-      `Cold start is from spawning the server to its first 200 on the home page, median of 7. Under load, 32 clients request one URL through nginx for 5 s over keepalive HTTP/1.1, accepting brotli; CPU is per request, of the site's server and of nginx, which compresses what the server sent uncompressed. The client is Bun's fetch, which tops out near 40,000 requests a second. Memory is proportional (PSS), counting once the pages processes share; its peak is resident (RSS).${VARIANTS.some(variant => variant.site.sidecar?.[variant.kind] !== undefined) ? ' A server with a sidecar, as an API its pages fetch from, counts with it: cold start waits for both to answer, memory and CPU are their sums.' : ''}`,
+      `Cold start is from spawning the server to its first 200 on the home page, or the page a site whose home page needs a session names, median of 7. Under load, 32 clients request one URL through nginx for 5 s over keepalive HTTP/1.1, accepting brotli; CPU is per request, of the site's server and of nginx, which compresses what the server sent uncompressed. The client is Bun's fetch, which tops out near 40,000 requests a second. Memory is proportional (PSS), counting once the pages processes share; its peak is resident (RSS).${VARIANTS.some(variant => variant.site.sidecar?.[variant.kind] !== undefined) ? ' A server with a sidecar, as an API its pages fetch from, counts with it: cold start waits for both to answer, memory and CPU are their sums.' : ''}`,
       '',
       table(header, [
         row('cold start', result => `${milliseconds(result.cold.ms)} ms`),
@@ -200,14 +207,14 @@ try {
       '',
       '## Build and code',
       '',
-      'Clean builds, median of 3. `kay build` runs `kay check` first, which `astro build` has no equivalent of. Lines are cloc\'s code lines of `src` and the config files.',
+      'Clean builds, median of 3. `kay build` runs `kay check` first, which `astro build` has no equivalent of. Lines are cloc\'s code lines of `src`, or the sources a side before kay names, and the config files.',
       '',
       table(['', 'command', 'wall (s)', 'CPU (s)', 'peak memory'], VARIANTS.flatMap(variant => results.get(variant)!.builds.map(build => [label(variant), `\`${build.command}\``, build.wall.toFixed(2), build.cpu.toFixed(1), megabytes(build.rss)]))),
       '',
       table(header, [
         row('lines of code', result => String(result.footprint.lines ?? '-')),
         row('lines of tests', result => String(result.footprint.testLines ?? '-')),
-        row('deployed', (result, variant) => `${megabytes(result.footprint.deploy)} ${variant.kind === 'astro' ? '(dist and production node_modules)' : '(one executable)'}`),
+        row('deployed', (result, variant) => `${megabytes(result.footprint.deploy)} (${deployed(variant)})`),
       ]),
       '',
     ]
@@ -226,6 +233,14 @@ try {
 finally {
   await browser.close()
   await lab?.stop()
+}
+
+// What a side's deployed size counts.
+function deployed(variant: Variant): string {
+  if (variant.kind === 'kay')
+    return 'one executable'
+
+  return variant.site.before === undefined ? 'dist and production node_modules' : 'what it ships and production node_modules'
 }
 
 // nginx prints its version on stderr.

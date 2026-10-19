@@ -8,10 +8,16 @@ export interface Site {
   name: string
   // Its git repository, absolute or relative to the config file.
   repo: string
-  // The commit that last ran on Astro, and the ref measured on kay, HEAD unless set or `KAY_REF` names another.
+  // The commit that last ran before kay, on Astro unless `before` says otherwise, and the ref measured on kay, HEAD unless set or `KAY_REF` names another.
   astro: string
   kay?: string
   pages: string[]
+  // The side before kay when it was not Astro: how it builds, serves and deploys, and what the results call it. Every `astro` key of this entry (`sidecar`, `patch`, `prepare`, `KIND=astro`) means that side.
+  before?: Before
+  // The page readiness waits on for a 200, the home page unless set, as when it needs a session.
+  ready?: string
+  // Headers every request the bench makes carries, as a session cookie, minted once the variant's server answers on its backend port; none unless set.
+  auth?: (variant: Variant) => Record<string, string> | Promise<Record<string, string>>
   // The pages put under load, besides the largest stylesheet the home page links; the first two pages unless set.
   loaded?: string[]
   // What the site reads from the environment when it builds and serves, the same on both sides unless it depends on the variant, as a database or a sidecar's port does.
@@ -44,6 +50,21 @@ export interface TextEdit {
   text: string
 }
 
+export interface Before {
+  // What the results call this side, as `Elysia + Solid`.
+  label: string
+  // Builds the side as it deploys, in its directory, `[process.execPath, 'scripts/build.ts']` say.
+  build: string[]
+  // Starts its server as production does, reading `HOST` and `PORT`.
+  serve: string[]
+  // What a build writes, relative to the side, removed before each build so every one is clean.
+  outputs: string[]
+  // What production ships besides its production dependencies, `outputs` unless set.
+  deploy?: string[]
+  // What its lines of code are counted in, besides the config files, `src` unless set.
+  sources?: string[]
+}
+
 export interface Sidecar {
   command: (variant: Variant) => string[]
   paths: string[]
@@ -51,6 +72,7 @@ export interface Sidecar {
 
 export interface Variant {
   site: Site
+  // `astro` is the side before kay, Astro unless the site's `before` says otherwise.
   kind: 'astro' | 'kay'
   dir: string
   // The copy the dev phase runs and edits, apart from the production build.
@@ -77,7 +99,7 @@ export const WORK = join(process.env.XDG_CACHE_HOME ?? join(homedir(), '.cache')
 export const SITES: Site[] = existsSync(CONFIG) && !Reflect.has(globalThis, LOADING) ? await sitesOf(CONFIG) : []
 export const NO_SITES = `no sites to measure: write ${CONFIG} after ${EXAMPLE}, or pass --config <file>`
 
-// `KIND=kay` measures the kay side only, keeping the Astro figures of an earlier run; the ports stay those of a full run.
+// `KIND=kay` measures the kay side only, keeping the figures of an earlier run for the side before it, `KIND=astro` that side only; the ports stay those of a full run.
 export const KIND = oneOf('KIND', ['astro', 'kay'] as const)
 // `PHASE=prod` measures the production builds only, `PHASE=dev` the dev servers only, of the sites naming what to edit.
 export const PHASE = oneOf('PHASE', ['prod', 'dev'] as const)
@@ -111,7 +133,12 @@ async function sitesOf(config: string): Promise<Site[]> {
   Object.assign(globalThis, { [LOADING]: true })
 
   try {
-    return ((await import(config)) as { default: Site[] }).default.map(site => ({ ...site, repo: resolve(dirname(config), site.repo) }))
+    return ((await import(config)) as { default: Site[] }).default.map((site) => {
+      if (site.before !== undefined && site.dev !== undefined)
+        throw new Error(`${site.name}: the dev phase runs Astro's dev server, which a side before kay named by \`before\` has not`)
+
+      return { ...site, repo: resolve(dirname(config), site.repo) }
+    })
   }
   finally {
     Reflect.deleteProperty(globalThis, LOADING)
@@ -238,6 +265,9 @@ export async function prepare() {
 
       const file = Bun.file(join(dir, 'package.json'))
       const manifest = await file.json() as Manifest
+
+      // A side before kay may have no dependencies at all.
+      manifest.dependencies ??= {}
       const pinned = manifest.dependencies.kay
 
       if (variant.kind === 'astro')
@@ -322,6 +352,12 @@ export async function kayIn(dir: string): Promise<string> {
   return `kay ${await versionIn(dir, 'kay')}${await source.exists() ? `, ${await source.text()}` : ''}${stale.has(dir) ? ` (reused by SKIP_PREPARE: ${stale.get(dir)})` : ''}`
 }
 
+// The site and its side: kay, astro, or the label of the site's side before kay.
 export function label(variant: Variant): string {
-  return `${variant.site.name} ${variant.kind}`
+  return `${variant.site.name} ${variant.kind === 'kay' ? 'kay' : variant.site.before?.label ?? 'astro'}`
+}
+
+// The headers every request to a variant carries, which its site's `auth` mints once its server answers, and none without one.
+export async function authOf(variant: Variant): Promise<Record<string, string>> {
+  return await variant.site.auth?.(variant) ?? {}
 }

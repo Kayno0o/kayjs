@@ -268,9 +268,10 @@ function islandChunks(variant: Variant): Map<string, string> {
   return chunks
 }
 
-export async function weigh(variant: Variant, path: string): Promise<Weight> {
+// `auth` holds what the variant's site has every request carry, as a session cookie.
+export async function weigh(variant: Variant, path: string, auth: Record<string, string> = {}): Promise<Weight> {
   const get = async (url: string): Promise<Uint8Array<ArrayBuffer>> => {
-    const response = await fetch(`http://127.0.0.1:${variant.ports.backend}${url}`, { headers: { accept: 'text/html,image/avif,image/webp,*/*' } })
+    const response = await fetch(`http://127.0.0.1:${variant.ports.backend}${url}`, { headers: { ...auth, accept: 'text/html,image/avif,image/webp,*/*' } })
 
     if (!response.ok)
       throw new Error(`${variant.dir}: ${url} answered ${response.status}`)

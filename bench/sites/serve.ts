@@ -99,13 +99,13 @@ export async function ensureFree(port: number, what: string): Promise<void> {
   throw new Error(`${what}: something already answers on port ${port}, a server an interrupted run left? Stop it, then run again`)
 }
 
-// A variant's server as production runs it: Astro's standalone entry under Bun (its image aliases node to bun), kay's compiled executable.
+// A variant's server as production runs it: Astro's standalone entry under Bun (its image aliases node to bun), what a side before kay names, kay's compiled executable.
 export async function startServer(variant: Variant): Promise<Subprocess> {
   await ensureFree(variant.ports.backend, variant.dir)
   // Written over from its start, the log would keep the end of a longer one before it.
   rmSync(serverLog(variant), { force: true })
 
-  const server = variant.kind === 'astro' ? [process.execPath, 'dist/server/entry.mjs'] : ['./server']
+  const server = variant.kind === 'kay' ? ['./server'] : variant.site.before?.serve ?? [process.execPath, 'dist/server/entry.mjs']
   const sidecar = variant.site.sidecar?.[variant.kind]
 
   if (sidecar !== undefined)
@@ -145,7 +145,7 @@ async function untilReaped(pids: number[]): Promise<void> {
   }
 }
 
-// Milliseconds until the server answers its home page with a 200, and its sidecar answers at all, as a page may render while the sidecar it fetches from still starts; what it printed on stderr if it exits or never does.
+// Milliseconds until the server answers its home page, or the page its site names, with a 200, and its sidecar answers at all, as a page may render while the sidecar it fetches from still starts; what it printed on stderr if it exits or never does.
 export async function waitReady(variant: Variant, server: Subprocess): Promise<number> {
   const started = performance.now()
   const sidecar = variant.site.sidecar?.[variant.kind]
@@ -158,7 +158,7 @@ export async function waitReady(variant: Variant, server: Subprocess): Promise<n
         sidecarUp = true
       }
 
-      const response = await fetch(`http://127.0.0.1:${variant.ports.backend}/`)
+      const response = await fetch(`http://127.0.0.1:${variant.ports.backend}${variant.site.ready ?? '/'}`)
 
       await response.arrayBuffer()
 
