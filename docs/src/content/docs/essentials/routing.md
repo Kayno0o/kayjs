@@ -48,6 +48,30 @@ When two pages match a URL, a fixed name wins over a param, and a param wins ove
 
 </Callout>
 
+## Linking to a page with params
+
+A link to `/todos/42` written as a string is not checked against your pages once the id is a variable. `route()` builds it from the page's pattern instead:
+
+```kay
+---
+import { route } from 'kay'
+
+const { id } = props
+---
+a(href={route('/todos/:id', { id })}) Open
+```
+
+kay knows your pages' patterns, so `route('/todos/:id', {})` or `route('/nope')` is a type error that `kay check` reports, and your editor completes the patterns. You declare nothing.
+
+Each param is encoded as one segment, so a value such as `../admin` or `a/b` cannot leave it. An optional param (`[[page]]`, written `:page?`) can be left out, a catch-all (`[...path]`, written `*path`) takes a string or a list of segments, and a third argument adds a `query` and a `hash`:
+
+```ts
+route('/blog/:page?', { page: 2 }, { query: { q: 'kay' }, hash: 'top' })
+// '/blog/2?q=kay#top'
+```
+
+`route()` returns the path the way you would write it in an `href`. Your `base`, the locale of the page and its translated paths are added the way they are to any other link, so you never write them, and `redirect()`, `navigate()` and `localize()` take the result too. It costs a few hundred bytes in an island that uses it and nothing in one that does not.
+
 ## Layouts
 
 A `_layout.kay` wraps every page in its folder and below. It renders the page at `slot`.

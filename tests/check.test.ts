@@ -1710,6 +1710,31 @@ describe.concurrent('kay check, what the server refuses at boot', () => {
     finally { await rm(root, { recursive: true, force: true }) }
   })
 
+  it('types route() from the pages: their params, an optional one and a catch-all, and reports what no page has', async () => {
+    const root = await scratchProject({
+      'src/routes/index.kay': '---\nimport { route } from \'kay\'\n---\na(href={route(\'/\')}) home\na(href={route(\'/todos/:id\', { id: 1 })}) one\na(href={route(\'/blog/:page?\')}) blog\na(href={route(\'/blog/:page?\', { page: 2 }, { query: { q: \'a\' } })}) next\na(href={route(\'/docs/*path\', { path: [\'a\', \'b\'] })}) docs\na(href={route(\'/items/:id\', { id: 3 })}) item\n',
+      'src/routes/todos/[id].kay': 'p todo\n',
+      'src/routes/blog/[[page]].kay': 'p blog\n',
+      'src/routes/docs/[...path].kay': 'p docs\n',
+      'src/routes/items/[id=integer].kay': 'p item\n',
+      'src/lib.ts': 'import { route } from \'kay\'\n\nexport const unknown = route(\'/nope\')\nexport const missing = route(\'/todos/:id\', {})\nexport const extra = route(\'/todos/:id\', { id: 1, other: 2 })\nexport const none = route(\'/blog/:page?\', { id: 1 })\nexport const plain = route(\'/todos/:id\')\nexport const catchAll = route(\'/docs/*path\', {})\nexport const fine = route(\'/todos/:id\', { id: 7 }, { hash: \'x\' })\n',
+    })
+
+    try {
+      const diagnostics = await check(root)
+
+      expect(diagnostics.map(d => [d.file, d.line, d.code])).toEqual([
+        [join(root, 'src/lib.ts'), 3, 'TS2345'],
+        [join(root, 'src/lib.ts'), 4, 'TS2741'],
+        [join(root, 'src/lib.ts'), 5, 'TS2353'],
+        [join(root, 'src/lib.ts'), 6, 'TS2353'],
+        [join(root, 'src/lib.ts'), 7, 'TS2554'],
+        [join(root, 'src/lib.ts'), 8, 'TS2741'],
+      ])
+    }
+    finally { await rm(root, { recursive: true, force: true }) }
+  })
+
   it('types links to endpoint files and what their GET returns, and reports one a public file serves too', async () => {
     const root = await scratchProject({
       'src/routes/index.kay': 'a(href="/llms.txt") llms\na(href="/feeds/first.json") feed\na(href="/feeds/first.xml") none\n',

@@ -25,6 +25,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - kayjs-ui `Segmented` takes number option values, and `onChange` hears the option's own type ([Tables, navigation and layout](../packages/ui/llms/tables-navigation-and-layout.md)).
 - The metric-matched font fallback also covers Roboto (a sans) and fits Noto Serif (a serif), so on Android and on a Linux machine without Arial-compatible fonts it loads instead of leaving the text to shift as the font swaps in ([Fonts](sitemap-search-fonts.md#fonts)); the page's inline `<style>` grows by about 200 bytes (40 gzipped) per serif family and about 60 bytes (16 gzipped) per sans family, which only lists Roboto beside Arial.
 - The link check counts the source of a `redirects` entry, in the config or added while the site runs, as served, so a link, `ctx.redirect`, a guard's `redirect` or `navigate()` to it passes ([Checks](checks.md)).
+- `route('/todos/:id', { id })` from `kay` builds the path of a page from its pattern, typed from the file routes (an unknown pattern or a missing param is a type error `kay check` reports), params encoded, with `query` and `hash` options, and the result goes through `base`, locales and translated paths as a literal `href` does ([Routing](routing.md#link-to-a-page-with-params)).
 
 ## 1.57.1
 

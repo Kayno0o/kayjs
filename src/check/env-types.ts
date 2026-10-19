@@ -21,6 +21,7 @@ import { ROBOTS, SITEMAP } from '../server/site-paths'
 import { matcherSource, shadowPath } from './shadow'
 
 const PARAM_SEGMENT = /:([^/]+)/g
+const CATCH_ALL = /\/\*$/
 // A redirect's `:name` segment, whole.
 const REDIRECT_PARAM = /(?<=\/):[^/]+(?=\/|$)/g
 
@@ -102,11 +103,14 @@ export async function environmentTypes(root: string, options: CheckOptions, serv
   // An endpoint with params is linked to as a template: `/feeds/${string}.json`.
   const endpointPaths = endpoints.map(endpoint => endpoint.params.length === 0 ? JSON.stringify(endpoint.pattern) : `\`${endpoint.pattern.replace(PARAM_SEGMENT, () => `\${string}`)}${endpoint.suffix ?? ''}\``)
 
-  return environment(reachable, [...publicPaths.map(file => file.url), ...kayPaths(options)], apiMounts, texts, config, app, content, servers, [...endpointPaths, LOCALE_MANIFESTS])
+  // What `route()` takes: each page as its file names it, a catch-all as `*name`.
+  const named = [...new Set(routes.map(route => route.catchAll === undefined ? route.pattern : route.pattern.replace(CATCH_ALL, `/*${route.catchAll}`)))]
+
+  return environment(reachable, [...publicPaths.map(file => file.url), ...kayPaths(options)], apiMounts, texts, config, app, content, servers, [...endpointPaths, LOCALE_MANIFESTS], named)
 }
 
 // Declares the check-only helpers generated code calls, and the routes and public files links are checked against.
-function environment(patterns: string[], files: string[], api: { mount: string, module: string }[], i18n?: { locales: string[], prefixes: string[], messages: string[] }, config?: string, app?: string, content?: string, servers = false, endpoints: string[] = []): string {
+function environment(patterns: string[], files: string[], api: { mount: string, module: string }[], i18n?: { locales: string[], prefixes: string[], messages: string[] }, config?: string, app?: string, content?: string, servers = false, endpoints: string[] = [], named: string[] = []): string {
   const routes = patterns.length > 0 ? patterns.map(routeTuple).join(' | ') : 'never'
   // The collections' feeds are served as files are, a localized one's under each locale's prefix too.
   const feed = content === undefined ? undefined : `FeedPathsOf<typeof import(${importSpecifier(content)})>`
@@ -116,6 +120,7 @@ function environment(patterns: string[], files: string[], api: { mount: string, 
   // The app's catalog laid over its extensions', key by key.
   const messages = i18n?.messages.length === 0 ? '{}' : i18n?.messages.map(file => `typeof import(${importSpecifier(file)}).default`).reduce((under, over) => `MergeMessages<${under}, ${over}>`)
   const locales = i18n ? `, locales: ${i18n.locales.map(locale => JSON.stringify(locale)).join(' | ')}, messages: ${messages}` : ''
+  const pageNames = named.length > 0 ? `, patterns: ${named.map(pattern => JSON.stringify(pattern)).join(' | ')}` : ''
   const modules = api.length > 0 ? `, api: ${apiTree(api)}` : ''
   const publicEnv = config === undefined ? '' : `, publicEnv: PublicEnvOf<typeof import(${importSpecifier(config)}).default>`
   const inferred = [
@@ -129,7 +134,7 @@ function environment(patterns: string[], files: string[], api: { mount: string, 
     ...(i18n?.messages.length ?? 0) > 1 ? ['import type { MergeMessages } from \'kay/i18n\''] : [],
     '',
     'declare module \'kay\' {',
-    `  interface Register { routes: ${routes}, files: ${paths}${locales}${modules}${publicEnv} }`,
+    `  interface Register { routes: ${routes}, files: ${paths}${locales}${pageNames}${modules}${publicEnv} }`,
     ...inferred.length === 0 ? [] : [`  interface Inferred { ${inferred.join(', ')} }`],
     '}',
     '',

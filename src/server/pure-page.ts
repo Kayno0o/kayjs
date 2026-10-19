@@ -38,6 +38,7 @@ export const KAY_EXPORTS: Record<string, 'free' | 'request' | 'local'> = {
   trustHtml: 'free',
   withBase: 'free',
   localPath: 'free',
+  route: 'free',
   markInvalid: 'free',
   focusInvalid: 'free',
   followLog: 'free',

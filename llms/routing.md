@@ -33,6 +33,26 @@ h1 Results for {q}
 p Page {current ?? 1}
 ```
 
+### Link to a page with params
+
+`route(pattern, params, options?)` from `kay` builds the path of a page, its params encoded:
+
+```kay
+---
+import { route } from 'kay'
+
+const { id } = props
+---
+a(href={route('/todos/:id', { id })}) Open
+a(href={route('/blog/:page?', { page: 2 }, { query: { q: 'kay' }, hash: 'top' })}) Next
+```
+
+- The patterns are the pages' own, as `kay check` registers them, so an unknown pattern, a missing param or an unknown one is a type error, in `.kay` and `.ts` files alike; with no `kay check` run yet, any string goes.
+- A page with no param takes `route('/about', { query })` or `route('/about')`. `[[page]]` is `:page?` and may be left out, `[...path]` is `*path` and takes a string, `'a/b'`, or an array of segments, an empty one giving `/docs/`. The matcher of `[id=integer]` is not checked: a param is a `string | number`.
+- Each param is encoded as one segment: `/`, `?`, `#` and `%` are escaped, `.` and `..` become `%2E` forms, so a value never leaves its segment. An empty, `null` or `undefined` required param throws a `TypeError`. `query` takes strings, numbers and booleans, an array repeating its key, `undefined` and `null` left out.
+- The result is the path as a literal `href` is written, so a link in a page or an island, `localize()`, `redirect()` and `navigate()` take it as a literal: `base`, the page's locale and its translated paths are put on by kay as they are on any link, and `trailingSlash` is the redirect's as for a literal.
+- It is a few hundred bytes gzipped in an island importing it and nothing in one that does not.
+
 ### Redirect, deny or 404 from a page
 
 `ctx.redirect`, `ctx.notFound()` and `ctx.deny` stop rendering, and `localPath` keeps a `?next=` param on this site:
