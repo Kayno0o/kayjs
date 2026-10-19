@@ -21,8 +21,26 @@ export interface BrowserOptions {
   lenient?: boolean | undefined
   // The colour scheme the page is asked for from its first load, `prefers-color-scheme` and `matchMedia` alike.
   colorScheme?: 'light' | 'dark' | undefined
-  // Cookies the page's first load carries, for a site's origin, such as a session's.
-  cookies?: { name: string, value: string }[] | undefined
+  // Cookies the page's first load carries, for a site's origin, such as a session's: a `Cookie` header string, as `auth.sessionCookie` returns, or a list.
+  cookies?: string | { name: string, value: string }[] | undefined
+}
+
+// A `Cookie` header, `name=value; other=value`, as a list; a value keeps any `=` after the first.
+export function cookiePairs(cookies: BrowserOptions['cookies']): { name: string, value: string }[] {
+  if (typeof cookies !== 'string')
+    return cookies ?? []
+
+  const pairs: { name: string, value: string }[] = []
+
+  for (const piece of cookies.split(';')) {
+    const at = piece.indexOf('=')
+    const name = piece.slice(0, Math.max(at, 0)).trim()
+
+    if (name !== '')
+      pairs.push({ name, value: piece.slice(at + 1).trim() })
+  }
+
+  return pairs
 }
 
 export interface WaitOptions {
@@ -460,7 +478,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
     // Pages share one browser, whose cookies and storage outlive a page. Named one by one, as `all` takes Chrome 2 to 5 s a page, the rest under a millisecond.
     await live(async () => view.cdp('Storage.clearDataForOrigin', { origin, storageTypes: STORAGE_TYPES }))
 
-    for (const { name, value } of options.cookies ?? [])
+    for (const { name, value } of cookiePairs(options.cookies))
       await live(async () => view.cdp('Network.setCookie', { name, value, url: origin, path: '/' }))
 
     try {

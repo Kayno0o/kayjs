@@ -33,18 +33,19 @@ To build a site, read [Build a site](llms/site.md) first: one page walking throu
 - [Navigation and pages kay does not serve](llms/navigation.md): in-place page navigation, islands kept across pages, forms posting in place, going to a page from code, `.kay` components on a page kay does not serve
 - [Pages and routing](llms/routing.md): file-based routes, params, layouts, the server fence and `ctx`
 - [Endpoint files, redirects, rewrites, base path](llms/routing-endpoints-and-base.md): `llms.txt.ts` exporting `GET`, `redirects`, `rewrite`, `base`
-- [Prerendering and static export](llms/prerendering.md): prerendered pages and their params, revalidation, server islands, exporting the site as static files
+- [Prerendering and static export](llms/prerendering.md): prerendered pages and their params, revalidation, server islands, static export
 - [Content collections](llms/content.md): Markdown, JSON and YAML collections read against a schema, entries as pages, pagination, feeds
 - [Loaded collections, preview mode and the CMS editor](llms/content-cms.md): loaders for a CMS or a database, preview mode for drafts, the edit mode of kayjs-cms
 - [Locales](llms/locales.md): i18n: locale prefixes, typed messages, number and date formatting, redirecting a visitor to their locale
 - [Caching and streaming](llms/rendering.md): caching rendered pages and data, streaming deferred values with `await` blocks, `renderToString` for mails and feeds
 - [Actions](llms/actions.md): form posts that work without JavaScript and calls from islands, typed by a schema: validation errors, files, redirects
 - [Protecting actions and limiting requests](llms/action-protection.md): cross-site posts, guards on actions, rate limits, body limit
-- [Stored files](llms/files.md): `files` keeps uploads on disk or in an S3 bucket, links them from pages, resizes stored images, signs links to private files, and islands read upload progress
+- [Stored files](llms/files.md): `files` keeps uploads on disk or in S3, links them from pages, resizes stored images, signs links to private files, upload progress in islands
 - [Locals, sessions and guards](llms/server.md): per-request `ctx.locals`, cookie sessions and their stores, a typed `defineEnv`, `_guard.ts` route guards
 - [API routes](llms/api-routes.md): Elysia modules under `src/api/`, CORS, OpenAPI, and the MCP endpoint
 - [Calling API routes from islands, event streams, live values and rooms](llms/api-from-islands.md): reading routes typed from islands, server-sent events, `live()` values every open page follows, websockets and rooms
-- [Testing](llms/testing.md): `kay/test`: rendering pages and posting actions in `bun test`, browser tests
+- [Testing](llms/testing.md): `kay/test`, pages and actions in `bun test`
+- [Testing in a browser](llms/testing-browser.md): `site.open`, headless Chrome
 - [Checks and lints](llms/checks.md): what `kay check` verifies, ESLint on `.kay` files
 - [Lints and warnings](llms/lints.md): every lint at its default level, how to change a level, allow one, or apply its fix
 - [Errors](llms/errors.md): the codes of the errors that are no lint, and where each fix is documented
@@ -53,10 +54,10 @@ To build a site, read [Build a site](llms/site.md) first: one page walking throu
 - [The dev tool](llms/dev-tool.md): its tabs and the problems it lists
 - [Building and starting](llms/build-and-start.md): `kay build`, one executable, a static export, `kay start`
 - [Check, inspect and tool commands](llms/check-and-tools.md): `kay check`, `kay render <url>` printing what a page renders without a server, `kay screenshot <path>` shooting a page of `kay dev`, `kay routes`, `kay env`, `kay doctor`, `kay upgrade`, `kay explain`, `kay fmt` (`--from-html` turns HTML into a template), `kay lsp`, and `kay mcp`, serving kay's tools and these guides to an agent, and `kay/compiler`, compiling a `.kay` source from a tool
-- [Running in production](llms/production.md): request logs, tracing and Server-Timing, health checks and graceful shutdown, cron and background jobs
-- [Proxies, security headers and compression](llms/proxy-and-security.md): running behind a proxy, security headers and CSP, compression
-- [Upgrading](llms/upgrading.md): what each recent minor release of kay and its libraries breaks, and what an app changes to move to it
+- [Running in production](llms/production.md): request logs, tracing, health checks, graceful shutdown, cron and background jobs
+- [Proxies, security headers and compression](llms/proxy-and-security.md): a proxy, security headers and CSP, compression
+- [Upgrading](llms/upgrading.md): what each recent minor breaks, and what an app changes
 - [Upgrading, older releases](llms/upgrading-archive.md): the same for the minors before 1.45
-- [What's new](llms/whats-new.md): what each recent release adds, newest first, each feature with the doc covering it
+- [What's new](llms/whats-new.md): what each recent release adds, newest first
 - [What's new, older releases](llms/whats-new-archive.md): the same for the releases before 1.46
 - [Privacy and personal data](llms/privacy.md): the cookies and data kay keeps and for how long, erasing a person, analytics through your origin, photo metadata

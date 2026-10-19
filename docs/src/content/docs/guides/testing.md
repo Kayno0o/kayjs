@@ -246,6 +246,12 @@ await page.view.screenshot()
 await page.view.cdp('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true })
 ```
 
+A page behind a session opens signed in with `cookies`, a `Cookie` header string such as `auth.sessionCookie(userId)` returns, or a list of `{ name, value }`.
+
+```ts
+const page = await site.open('/account', { cookies: await auth.sessionCookie(user.id) })
+```
+
 `browse(url)` from `kay/test` opens the same page for a server that is already running, such as one the test started itself.
 
 ### Checking accessibility
