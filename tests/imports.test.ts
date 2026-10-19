@@ -25,3 +25,11 @@ it('handles a multi-line import and a file with no import', () => {
   expect(insertImport('import {\n  a,\n  b,\n} from \'a\'\nexport {}\n', 'import { z } from \'z\'')).toBe('import {\n  a,\n  b,\n} from \'a\'\nimport { z } from \'z\'\nexport {}\n')
   expect(insertImport('export {}\n', 'import { z } from \'z\'')).toBe('import { z } from \'z\'\n\nexport {}\n')
 })
+
+it('goes below a shebang and directives, keeps CRLF and reads trailing comments and attributes', () => {
+  expect(insertImport('#!/usr/bin/env bun\nexport {}\n', 'import { z } from \'z\'')).toBe('#!/usr/bin/env bun\nimport { z } from \'z\'\n\nexport {}\n')
+  expect(insertImport('\'use strict\'\nexport {}\n', 'import { z } from \'z\'')).toBe('\'use strict\'\nimport { z } from \'z\'\n\nexport {}\n')
+  expect(insertImport('import { a } from \'a\'\r\n\r\nexport {}\r\n', 'import { b } from \'b\'')).toBe('import { a } from \'a\'\r\nimport { b } from \'b\'\r\n\r\nexport {}\r\n')
+  expect(insertImport('import a from \'a\' // note\nimport j from \'./j.json\' with { type: \'json\' }\n', 'import { b } from \'b\'')).toBe('import a from \'a\' // note\nimport { b } from \'b\'\nimport j from \'./j.json\' with { type: \'json\' }\n')
+  expect(insertImport('import { join } from \'node:path\'\nconst meta = import.meta.dir\n', 'import { ws } from \'ws\'')).toBe('import { join } from \'node:path\'\nimport { ws } from \'ws\'\nconst meta = import.meta.dir\n')
+})

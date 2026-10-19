@@ -9,7 +9,7 @@ import process from 'node:process'
 import { realPath } from '../build/files'
 import { pruneCheckCache } from '../build/transform'
 import { applySafeFixes, check as checkTypes, configCheckOptions } from '../check'
-import { isLint, isLintGroup, LINT_GROUPS, LINTS } from '../compiler/lints'
+import { isLint, isLintGroup, LINT_GROUPS, LINTS, UPGRADE_FROM } from '../compiler/lints'
 import { CONFIG_FILE, loadConfig } from '../config'
 import { watchProject } from '../dev/sources'
 import { cacheDir } from '../project'
@@ -260,7 +260,7 @@ async function checkProject(root: string, config: KayConfig, tsconfig: string, e
   if (only === undefined && since === undefined) {
     const env = await envProblems(root, config, scope)
 
-    diagnostics.push(...fix ? await declareRawReads(root, env, format, quiet) : env, ...(await runProjectChecks(root, config)).filter(diagnostic => inScope(diagnostic, scope)))
+    diagnostics.push(...fix && process.env[UPGRADE_FROM] === undefined ? await declareRawReads(root, env, format, quiet) : env, ...(await runProjectChecks(root, config)).filter(diagnostic => inScope(diagnostic, scope)))
   }
 
   if (since !== undefined)
@@ -274,7 +274,7 @@ async function checkProject(root: string, config: KayConfig, tsconfig: string, e
 
 const UNDECLARED_READ = /^process\.env\.(\w+) is read with no schema/
 
-// With `--fix`, declares the raw reads the env comparison warns of in the project's `defineEnv` schema and answers the problems left.
+// With `--fix`, and outside `kay upgrade`, which rewrites no source but what a deprecation names, declares the raw reads the env comparison warns of in the project's `defineEnv` schema and answers the problems left.
 async function declareRawReads(root: string, problems: CheckDiagnostic[], format: ProblemFormat, quiet: boolean): Promise<CheckDiagnostic[]> {
   const names = new Set(problems.flatMap(problem => UNDECLARED_READ.exec(problem.message)?.[1] ?? []))
 
@@ -282,7 +282,7 @@ async function declareRawReads(root: string, problems: CheckDiagnostic[], format
     return problems
 
   const { declareRawEnv } = await import('./env-declare')
-  const declared = await declareRawEnv(root, names)
+  const declared = await declareRawEnv(root, names, new Set(problems.map(problem => problem.file)))
 
   if (declared.names.size === 0)
     return problems

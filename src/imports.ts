@@ -1,13 +1,17 @@
 import { builtinModules } from 'node:module'
 
 // A whole import statement, a multi-line one included, with its line break.
-const STATEMENT = /^import\b(?:[^;'"]|'[^']*'|"[^"]*")*?(?:from\s*)?(?:'[^']*'|"[^"]*");?[ \t]*\r?\n/gm
-const SPECIFIER = /(['"])([^'"]*)\1;?[ \t]*\r?\n$/
+// `import.meta` and `import(` are no statement; an attribute list and a trailing comment end it.
+const STATEMENT = /^import(?!\s*\()(?=[\s{*'"])(?:[^;'"]|'[^']*'|"[^"]*")*?(?:from\s*)?(?:'[^']*'|"[^"]*")(?:[ \t]*with[ \t]*\{[^}]*\})?;?[ \t]*(?:\/\/[^\n]*)?\r?\n/gm
+const SPECIFIER = /(['"])([^'"\n]*)\1(?:[ \t]*with[ \t]*\{[^}]*\})?;?[ \t]*(?:\/\/[^\n]*)?\r?\n$/
+// A shebang and the directives (`'use strict'`) that must stay first in a file.
+const PROLOGUE = /^(?:#!.*\r?\n)?(?:[ \t]*(['"])use [\w -]+\1;?[ \t]*\r?\n)*/
 const TYPE_ONLY = /^import\s+type\b/
 const FROM = /\bfrom\s*['"]/
 const INTERNAL = /^(?:~|@)\/./
 const CHUNK = /\d+|\D+/g
-const BUILTINS = new Set(builtinModules)
+// Bun's list adds its own modules and a few packages, which the lint reads as external.
+const BUILTINS = new Set(builtinModules.filter(name => !name.startsWith('bun') && name !== 'ws' && name !== 'undici'))
 
 interface Import {
   start: number
@@ -66,14 +70,23 @@ export function insertImport(source: string, line: string): string {
   for (const found of imports)
     found.group = groupOf(source.slice(found.start, found.end), found.path)
 
-  const statement = `${line}\n`
-  // The first import gets the blank line the lint wants between the imports and the code.
-  const spaced = imports.length === 0 && source !== '' && !source.startsWith('\n') ? `${statement}\n` : statement
+  const eol = source.includes('\r\n') ? '\r\n' : '\n'
+  const statement = `${line}${eol}`
   const path = SPECIFIER.exec(statement)?.[2] ?? ''
   const group = groupOf(statement, path)
   // A side-effect import keeps its place, so it never decides where another goes.
   const before = imports.find(found => found.group !== 6 && (found.group > group || (found.group === group && group !== 6 && compare(found.path, path) > 0)))
-  const at = before?.start ?? imports.at(-1)?.end ?? 0
+  const last = imports.at(-1)
 
-  return `${source.slice(0, at)}${spaced}${source.slice(at)}`
+  if (before !== undefined || last !== undefined) {
+    const at = before?.start ?? last!.end
+
+    return `${source.slice(0, at)}${statement}${source.slice(at)}`
+  }
+
+  // The first import goes below a shebang and directives, and gets the blank line the lint wants between the imports and the code.
+  const at = PROLOGUE.exec(source)![0].length
+  const rest = source.slice(at)
+
+  return `${source.slice(0, at)}${statement}${rest === '' || rest.startsWith('\n') || rest.startsWith('\r\n') ? '' : eol}${rest}`
 }

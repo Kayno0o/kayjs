@@ -22,23 +22,63 @@ const FALLBACK = /^\s*\?\?\s*(?:'([^'\\\n]*)'|"([^"'\\\n]*)")(?=\s*(?:[;,)\]}]|\
 const ASSIGNED = /^\s*(?:\?\?|\|\||&&|\*\*|<<|>>>|>>|[-+*/%&|^])?=(?![=>])/
 const DELETED = /\bdelete\s+$/
 const ENV_NAME = /(?<![.\w$])env(?![\w$])/
+const RAW_START = /^(?:process\.env|Bun\.env)/
 const SCHEMA_PATH = /\.[mc]?ts$/
 const TEST_FILE = /\.(?:test|spec)\.[cm]?[jt]sx?$/
 const EXTENSION = /\.[mc]?[jt]s$/
 const INDENT = /\n([ \t]+)\S/
 
-// Whether an odd number of unescaped `quote` precedes the end of `text`, so what follows sits inside a string.
-function insideString(text: string, quote: string): boolean {
-  let open = false
+// Which characters of `text` are code, and not a string, a template's text or a comment. A regular expression holding a quote is not told apart.
+function codeMask(text: string): Uint8Array {
+  const mask = new Uint8Array(text.length)
+  // The open template literals (`) and braces ({) around the character read.
+  const stack: string[] = []
+  let index = 0
 
-  for (let index = 0; index < text.length; index++) {
-    if (text[index] === '\\')
+  while (index < text.length) {
+    const char = text[index]!
+    const next = text[index + 1]
+
+    if (stack.at(-1) === '`') {
+      if (char === '\\') {
+        index += 2
+      }
+      else if (char === '`') {
+        stack.pop()
+        index++
+      }
+      else if (char === '$' && next === '{') {
+        stack.push('{')
+        index += 2
+      }
+      else {
+        index++
+      }
+    }
+    else if (char === '/' && (next === '/' || next === '*')) {
+      const end = next === '/' ? text.indexOf('\n', index) : text.indexOf('*/', index + 2)
+
+      index = end === -1 ? text.length : end + 1
+    }
+    else if (char === '\'' || char === '"') {
       index++
-    else if (text[index] === quote)
-      open = !open
+
+      while (index < text.length && text[index] !== char && text[index] !== '\n')
+        index += text[index] === '\\' ? 2 : 1
+
+      index++
+    }
+    else {
+      if (char === '`' || char === '{')
+        stack.push(char)
+      else if (char === '}' && stack.at(-1) === '{')
+        stack.pop()
+
+      mask[index++] = 1
+    }
   }
 
-  return open
+  return mask
 }
 
 // The schema file a variable is added to: the project's `export const env = defineEnv(s.Object({` when it has one, `src/env.ts` when it has no `defineEnv` at all, nothing when it declares them in another shape.
@@ -66,8 +106,8 @@ function field(prefix: string, name: string, fallback: string | undefined): stri
   return `${name}: ${fallback === undefined ? `${prefix}.Optional(${prefix}.String())` : `${prefix}.String({ default: '${fallback}' })`}`
 }
 
-// Declares the variables `process.env.X` is read for with no schema, in the schema file of the project, and rewrites their reads to `env.X`, a `?? 'default'` becoming the variable's default. A variable is left alone, its warning with it, when any of its reads is in a shape this cannot rewrite safely: assigned or deleted, destructured, in a `.kay` file or a file with an `env` of its own, inside a string, or in the schema file itself. Answers the variables declared and the reads rewritten.
-export async function declareRawEnv(root: string, undeclared: ReadonlySet<string>): Promise<{ names: Set<string>, reads: number }> {
+// Declares the variables `process.env.X` is read for with no schema, in the schema file of the project, and rewrites their reads to `env.X`, a `?? 'default'` becoming the variable's default. `files` are the only files it may change: a variable with a read outside them is left alone, as is one whose read is assigned or deleted, destructured, in a `.kay` file or a file with an `env` of its own, inside a string, a template or a comment, or in the schema file itself. Answers the variables declared and the reads rewritten.
+export async function declareRawEnv(root: string, undeclared: ReadonlySet<string>, files: ReadonlySet<string>): Promise<{ names: Set<string>, reads: number }> {
   const reads = (await rawReads(root)).filter(({ name }) => undeclared.has(name) && !IGNORED_READS.has(name))
   const names = new Set<string>()
   const schema = reads.length === 0 ? undefined : await schemaFile(root)
@@ -75,33 +115,38 @@ export async function declareRawEnv(root: string, undeclared: ReadonlySet<string
   if (schema === undefined)
     return { names, reads: 0 }
 
-  const texts = new Map<string, string>()
+  const sources = new Map<string, { text: string, lines: string[], starts: number[], mask: Uint8Array }>()
 
-  for (const file of new Set(reads.map(read => read.file)))
-    texts.set(file, await readFile(file, 'utf8'))
+  for (const file of new Set(reads.map(read => read.file))) {
+    const text = await readFile(file, 'utf8')
+    const lines = text.split('\n')
+    let start = 0
 
-  const byName = Map.groupBy(reads, read => read.name)
+    sources.set(file, { text, lines, starts: lines.map((line) => {
+      const at = start
+
+      start += line.length + 1
+
+      return at
+    }), mask: codeMask(text) })
+  }
+
   const found = new Map<string, Candidate[]>()
 
-  for (const [name, group] of byName) {
+  for (const [name, group] of Map.groupBy(reads, read => read.name)) {
     const candidates: Candidate[] = []
 
     for (const { file, line, column, length } of group) {
-      const text = texts.get(file)!
-      const lines = text.split('\n')
+      const { text, lines, starts, mask } = sources.get(file)!
       const row = lines[line - 1]!
-      const before = row.slice(0, column)
-      const tail = row.slice((column ?? 0) + (length ?? 0))
-      const ok = column !== undefined && length !== undefined && file !== schema.file && EXTENSION.test(file) && !ENV_NAME.test(text) && !ASSIGNED.test(tail) && !DELETED.test(before) && !insideString(before, '\'') && !insideString(before, '"')
+      const start = starts[line - 1]! + (column ?? 0)
+      // A read whose span is not where the scan saw it, such as after a byte order mark, is not touched.
+      const ok = column !== undefined && length !== undefined && files.has(file) && file !== schema.file && EXTENSION.test(file) && !(name in Object.prototype) && RAW_START.test(row.slice(column)) && mask[start] === 1 && !ENV_NAME.test(text) && !ASSIGNED.test(row.slice(column + length)) && !DELETED.test(row.slice(0, column))
 
-      if (!ok) {
-        candidates.length = 0
-
+      if (!ok)
         break
-      }
 
-      const start = lines.slice(0, line - 1).reduce((sum, previous) => sum + previous.length + 1, 0) + column
-      const fallback = FALLBACK.exec(tail)
+      const fallback = FALLBACK.exec(row.slice(column + length))
       const value = fallback?.[1] ?? fallback?.[2]
 
       candidates.push({ file, edit: { start, end: start + length, text: `env.${name}` }, fallback: fallback === null || value === undefined ? undefined : { value, end: start + length + fallback[0].length } })
@@ -128,23 +173,24 @@ export async function declareRawEnv(root: string, undeclared: ReadonlySet<string
       edits.set(file, [...edits.get(file) ?? [], value === undefined || fallback === undefined ? edit : { ...edit, end: fallback.end }])
   }
 
-  for (const [file, list] of edits) {
-    const target = relative(dirname(file), schema.file).replace(EXTENSION, '')
-    const source = list.toSorted((a, b) => b.start - a.start).reduce((text, edit) => text.slice(0, edit.start) + edit.text + text.slice(edit.end), texts.get(file)!)
-
-    await writeFile(file, insertImport(source, `import { env } from '${target.startsWith('.') ? target : `./${target}`}'`))
-  }
-
+  // The schema goes first, so a failed write leaves no file importing what is not there.
   if (schema.existing === undefined) {
     await writeFile(schema.file, `import { s } from 'kay'\nimport { defineEnv } from 'kay/server'\n\nexport const env = defineEnv(s.Object({\n${fields.map(line => `  ${line},\n`).join('')}}))\n`)
   }
   else {
     const text = await readFile(schema.file, 'utf8')
     const { at } = schema.existing
+    const eol = text.includes('\r\n') ? '\r\n' : '\n'
     const indent = INDENT.exec(text.slice(at))?.[1] ?? '  '
-    const added = fields.map(line => `\n${indent}${line},`).join('')
 
-    await writeFile(schema.file, `${text.slice(0, at)}${added}${text[at] === '}' ? '\n' : ''}${text.slice(at)}`)
+    await writeFile(schema.file, `${text.slice(0, at)}${fields.map(line => `${eol}${indent}${line},`).join('')}${text[at] === '}' ? eol : ''}${text.slice(at)}`)
+  }
+
+  for (const [file, list] of edits) {
+    const target = relative(dirname(file), schema.file).replace(EXTENSION, '')
+    const source = list.toSorted((a, b) => b.start - a.start).reduce((text, edit) => text.slice(0, edit.start) + edit.text + text.slice(edit.end), sources.get(file)!.text)
+
+    await writeFile(file, insertImport(source, `import { env } from '${target.startsWith('.') ? target : `./${target}`}'`))
   }
 
   return { names, reads: [...edits.values()].reduce((sum, list) => sum + list.length, 0) }

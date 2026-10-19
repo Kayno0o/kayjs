@@ -98,7 +98,7 @@ kay add ai
 
 Before it writes anything, it checks that each file it changes is still what `kay new` wrote. A file you changed stops it with `kay add: nothing was written` and the lines to add by hand. A file you deleted is not written back.
 
-`ai`, `mail` and `cms` add the libraries `@kaynooo/kayjs-ai`, `@kaynooo/kayjs-mail` and `@kaynooo/kayjs-cms`, and list them in the `extensions` of `kay.config.ts`. That config has to be a plain `defineConfig({ ... })`. The import is written in the order your lint sorts imports, so the file passes `kay lint` with no `lint:fix` after.
+`ai`, `mail` and `cms` add the libraries `@kaynooo/kayjs-ai`, `@kaynooo/kayjs-mail` and `@kaynooo/kayjs-cms`, and list them in the `extensions` of `kay.config.ts`. That config has to be a plain `defineConfig({ ... })`. The import is written where your lint sorts imports, so a file with sorted imports passes `kay lint` with no `lint:fix` after.
 
 | Option | Effect |
 | --- | --- |
@@ -347,7 +347,7 @@ The first path is the project when it is a directory holding a `kay.config.ts`, 
 | --- | --- |
 | `--deny-warnings` | Fails on warnings too, not only on errors |
 | `--watch` | Checks again on every change to the project |
-| `--fix` | Applies the fixes that change nothing else, then reports what is left |
+| `--fix` | Applies the fixes that change nothing else, then reports what is left. With `env` in `kay.config.ts` it also declares raw `process.env` reads |
 | `--only <group>` | Reports one group's lints alone, such as `seo`, as an audit |
 | `--since <minor>` | Reports, and with `--fix` fixes, the `deprecated` lints that came in that minor, such as `1.46` |
 | `--format text\|github\|json` | `github` prints each problem as a workflow command, `json` as one document on stdout |
@@ -441,7 +441,7 @@ A `process.env.X` or `Bun.env.X` read in `src` that nothing declares is a warnin
 
 `kay check --fix` declares those variables for you. It adds them to your `defineEnv` schema, or writes `src/env.ts` when you have none, turns a `?? 'default'` into the variable's `default`, and rewrites each read to `env.X` with the import.
 
-A variable is left with its warning when a read assigns it, destructures it, sits in a `.kay` file or in a file that already has an `env`. Since `defineEnv` treats an empty value as unset, an empty variable now takes the default.
+A variable is left with its warning when a read assigns it, destructures it, sits in a `.kay` file or in a file that already has an `env`. Two things change. An empty value now takes the default, as `defineEnv` treats it as unset. And the files you read from now import the schema, which reads and checks the environment as it loads. `kay upgrade` does not do this.
 
 `--compose` can be given several times. The files are read relative to the project, and any `--compose` or `--example` replaces the `env` in `kay.config.ts` entirely.
 

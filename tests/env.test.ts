@@ -1,4 +1,4 @@
-import { rm, stat } from 'node:fs/promises'
+import { readFile, rm, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, it, setDefaultTimeout } from 'bun:test'
@@ -525,7 +525,8 @@ describe('kay check --fix on raw environment reads', () => {
     const { stderr, code } = await kay(['check', '--fix'], root)
 
     expect(code).toBe(0)
-    expect(stderr + (await kay(['check', '--fix'], root)).stdout).not.toContain('is read with no schema')
+    expect(stderr).not.toContain('is read with no schema')
+    expect((await kay(['check'], root)).stderr).not.toContain('is read with no schema')
     expect(await read(root, 'src/env.ts')).toBe('import { s } from \'kay\'\nimport { defineEnv } from \'kay/server\'\n\nexport const env = defineEnv(s.Object({\n  BAZ: s.Optional(s.String()),\n  DIR: s.String({ default: \'.\' }),\n  FOO: s.String({ default: \'bar\' }),\n}))\n')
     expect(await read(root, 'src/lib.ts')).toBe('import { join } from \'node:path\'\nimport { env } from \'./env\'\nimport { x } from \'./x\'\n\nexport const a = env.FOO\nexport const b = env.BAZ\nexport const c = env.FOO\nexport const d = join(env.DIR, \'x\')\n')
     expect((await names(root)).map(({ name, default: fallback }) => [name, fallback])).toEqual([['BAZ', undefined], ['DIR', '.'], ['FOO', 'bar']])
@@ -548,7 +549,8 @@ describe('kay check --fix on raw environment reads', () => {
       'src/conflict.ts': 'export const c = process.env.TWO ?? \'a\'\nexport const d = process.env.TWO ?? \'b\'\n',
       'src/shadow.ts': 'const env = 1\nexport const e = [env, process.env.SHADOWED]\n',
       'src/string.ts': 'export const f = \'process.env.QUOTED\'\n',
-      'src/page.kay': 'p = 1\n',
+      'src/page.kay': '---\nconst key = process.env.IN_KAY\n---\np = key\n',
+      'src/template.ts': 'export const h = `process.env.IN_TEXT ${process.env.IN_EXPR}`\nexport const own = process.env.hasOwnProperty(\'x\')\n',
     })
     const { stderr } = await kay(['check', '--fix'], root)
 
@@ -556,6 +558,9 @@ describe('kay check --fix on raw environment reads', () => {
     expect(stderr).toContain('process.env.DESTR is read')
     expect(stderr).toContain('process.env.SHADOWED is read')
     expect(stderr).toContain('process.env.QUOTED is read')
+    expect(await read(root, 'src/page.kay')).toContain('process.env.IN_KAY')
+    expect(await read(root, 'src/template.ts')).toContain('`process.env.IN_TEXT ${env.IN_EXPR}`')
+    expect(await read(root, 'src/template.ts')).toContain('process.env.hasOwnProperty')
     expect(await read(root, 'src/assigned.ts')).toBe('process.env.SET_ME = \'x\'\nexport const a = process.env.SET_ME\n')
     expect(await read(root, 'src/shadow.ts')).toContain('process.env.SHADOWED')
     // Two different defaults declare the variable with none, and the reads keep theirs.
@@ -573,5 +578,34 @@ describe('kay check --fix on raw environment reads', () => {
 
     await kay(['check', '--fix'], other)
     expect(await read(other, 'src/lib.ts')).toBe('export const a = process.env.FOO\n')
+  })
+
+  it('handles a byte order mark, two reads on a line, CRLF and an empty t schema', async () => {
+    const root = await project({
+      ...config,
+      'src/bom.ts': '\uFEFFexport const a = process.env.BOMMED\n',
+      'src/two.ts': 'export const b = [process.env.ONE ?? \'1\', process.env.TWO]\r\nexport const c = process.env.ONE ?? \'1\'\r\n',
+      'src/schema.ts': 'import { t } from \'elysia\'\nimport { defineEnv } from \'kay/server\'\n\nexport const env = defineEnv(t.Object({}))\n',
+    })
+    const { stderr } = await kay(['check', '--fix'], root)
+
+    expect(stderr).toContain('process.env.BOMMED is read')
+    expect(await readFile(join(root, 'src/bom.ts'), 'utf8')).toBe('\uFEFFexport const a = process.env.BOMMED\n')
+    expect(await read(root, 'src/two.ts')).toBe('import { env } from \'./schema\'\r\n\r\nexport const b = [env.ONE, env.TWO]\r\nexport const c = env.ONE\r\n')
+    expect(await read(root, 'src/schema.ts')).toContain('t.Object({\n  ONE: t.String({ default: \'1\' }),\n  TWO: t.Optional(t.String()),\n})')
+  })
+
+  it('changes only the scoped files, and nothing during kay upgrade', async () => {
+    const files = { ...config, 'src/a.ts': 'export const a = process.env.SHARED\n', 'src/b.ts': 'export const b = process.env.SHARED\n' }
+    const root = await project(files)
+
+    await kay(['check', '--fix', 'src/a.ts'], root)
+    expect(await read(root, 'src/a.ts')).toContain('process.env.SHARED')
+    expect(await read(root, 'src/b.ts')).toContain('process.env.SHARED')
+
+    const upgrading = await project(files)
+
+    await kay(['check', '--fix'], upgrading, { KAY_UPGRADE_FROM: '1.0.0' })
+    expect(await read(upgrading, 'src/a.ts')).toContain('process.env.SHARED')
   })
 })
