@@ -647,8 +647,8 @@ function callable(url: () => string): { call: (input: never, options?: CallOptio
     let streaming = false
     // Started before the caller goes on, so a navigation it starts next supersedes the refresh rather than the other way round; a site with `navigation: false` shows a call's effects itself.
     const refreshPage = () => {
-      if (options?.refresh !== false && !left())
-        void navigation.refresh?.()
+      if (options?.refresh !== false && !left() && navigation.hooks)
+        void refreshed()
     }
 
     try {
@@ -909,13 +909,28 @@ export async function readActionResponse<Output>(response: Response, action: str
   return (body === '' ? undefined : decodeServerValue(body)) as Output
 }
 
+// The page's loads again through the swap, whose code loads on the first call; a chunk a deploy removed means the page is stale, so it is loaded whole.
+async function refreshed(): Promise<void> {
+  const navigations = navigation.navigations
+
+  try {
+    const api = await import('./navigate-api')
+
+    if (navigation.navigations === navigations)
+      await api.refresh()
+  }
+  catch {
+    location.reload()
+  }
+}
+
 // Through the swap once it took over the app's links; a site with `navigation: false` loads the page, asking the leave guards first as `navigate()` would.
 // Whether the page went, or a leave guard kept the visitor on it.
 async function goTo(target: string): Promise<boolean> {
-  if (navigation.navigate) {
+  if (navigation.hooks) {
     const [before, released] = [navigation.current, navigation.released]
 
-    await navigation.navigate(target)
+    await (await import('./navigate-api')).navigate(target)
 
     return navigation.current !== before || (!released && navigation.released)
   }

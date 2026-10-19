@@ -312,8 +312,8 @@ async function load(): Promise<void> {
 
     due.clear()
 
-    if (navigation.refresh)
-      await navigation.refresh()
+    if (navigation.hooks)
+      await (await import('./navigate-api')).refresh()
     else if (!dirtyGuard())
       location.reload()
   }

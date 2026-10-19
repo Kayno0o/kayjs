@@ -1,23 +1,10 @@
-import type { CheckedHref } from './checks'
 import type { HeadElement, HistoryState, NavigationHooks, Swap } from './navigation'
-import { withBase, withoutBase } from './base'
-import { busyForms, dirtyGuard, dropScrollSave, historyState, leave, mayLeave, nativeSubmits, navigation, onScroll, pageKey, prefetched, restoreScroll, saveScroll, submitNatively, swappable, swappedActionUrl, takeFormCheck, takeFormChecks } from './navigation'
+import { withoutBase } from './base'
+import { busyForms, dirtyGuard, dropScrollSave, historyState, leave, mayLeave, nativeSubmits, navigation, onScroll, pageKey, restoreScroll, saveScroll, submitNatively, swappable, swappedActionUrl, takeFormCheck, takeFormChecks } from './navigation'
 
 // Swaps pages in place: a link or a form of the app fetches the next page from the server and puts it in this one, islands marked `persist` kept alive.
 // Everything here runs in the browser only, started by the entry; without JavaScript links and forms load pages as they always did.
 // This part only listens: the swap itself, in `./page-swap`, loads once a visitor points at a link or calls `navigate`, and form posting, in `./forms`, once a form takes focus or is submitted, so a page nobody leaves never fetches them.
-
-export interface NavigateOptions {
-  // Replaces the current history entry instead of adding one.
-  replace?: boolean | undefined
-  // `'keep'` leaves the window scrolled where it is instead of going to the top, `'top'` goes to the top as a query change does not.
-  scroll?: 'top' | 'keep' | undefined
-  // `false` swaps without a view transition, whatever the stylesheets opt in to.
-  transition?: boolean | undefined
-}
-
-// Query params to set on the current page, a null, undefined or empty one dropped.
-export type QueryChanges = Readonly<Record<string, string | number | null | undefined>>
 
 type Eagerness = 'conservative' | 'moderate' | 'eager' | false
 
@@ -38,8 +25,6 @@ export function startNavigation(given: NavigationHooks): void {
     return
 
   navigation.hooks = given
-  navigation.navigate = navigate
-  navigation.refresh = refresh
   eagerness = speculationEagerness()
 
   navigation.shown = pageKey(new URL(location.href))
@@ -83,61 +68,6 @@ export function startNavigation(given: NavigationHooks): void {
   }
 }
 
-// The current page with `query` merged into its own, keeping the scroll and the focus as `refresh()` does: a filter or a sort picked in place.
-export async function navigate(to: { query: QueryChanges }, options?: NavigateOptions): Promise<void>
-// Goes to a page as following a link does: one of the app's swapped in place, under the site's mount point as a link is, another site's loaded. A literal path is checked as a link's is.
-// Last, so a path no page serves is reported against it.
-export async function navigate<const Href extends string>(href: Href & CheckedHref<Href>, options?: NavigateOptions): Promise<void>
-export async function navigate(to: string | { query: QueryChanges }, options: NavigateOptions = {}): Promise<void> {
-  if (typeof document === 'undefined')
-    return
-
-  navigation.flush?.()
-
-  // A query change keeps the path and the other params, and leaves the hash out.
-  const url = new URL(typeof to === 'string' ? withBase(to) : location.pathname + location.search, location.href)
-
-  // A `javascript:` URL, as one read from a query param could be, would run in the page; a `data:` one browsers refuse to load, and `vbscript:` is gone.
-  if (url.protocol === 'javascript:')
-    throw new TypeError('kay: navigate() refuses javascript:')
-
-  if (typeof to !== 'string') {
-    for (const [name, value] of Object.entries(to.query)) {
-      if (value == null || value === '')
-        url.searchParams.delete(name)
-      else
-        url.searchParams.set(name, String(value))
-    }
-  }
-
-  if (!await mayLeave(url))
-    return
-
-  if (!navigation.hooks || !swappable(url)) {
-    leave(url)
-
-    return
-  }
-
-  await follow(url, typeof to === 'string' ? { ...options, intent: 'visit' } : { ...options, intent: 'query', focused: document.activeElement })
-}
-
-// Runs the page's loads again and shows what they return, keeping scroll, focus and every island whose props did not change.
-export async function refresh(): Promise<void> {
-  if (typeof document === 'undefined')
-    return
-
-  if (!navigation.hooks) {
-    navigation.released = true
-    location.reload()
-
-    return
-  }
-
-  prefetched.clear()
-  await follow(new URL(location.href), { intent: 'refresh', focused: document.activeElement })
-}
-
 async function loadSwap(): Promise<typeof import('./page-swap')> {
   return swapModule ??= import('./page-swap')
 }
@@ -155,7 +85,7 @@ async function preloadSwap(): Promise<void> {
 }
 
 // Swaps the page in, or loads it fully when the swap cannot load: the browser keeps a module that failed as failed, so retrying is no use.
-async function follow(url: URL, swap: Swap): Promise<void> {
+export async function follow(url: URL, swap: Swap): Promise<void> {
   if (navigation.stale && (swap.intent === 'visit' || swap.intent === 'traverse')) {
     leave(url, swap.intent === 'traverse')
 

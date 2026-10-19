@@ -1,4 +1,5 @@
 import type { Action, Failure, NoInputAction } from '../src/runtime'
+import type { NavigationHooks } from '../src/runtime/navigation'
 import { afterAll, beforeAll, describe, expect, it, jest, spyOn } from 'bun:test'
 import { stringify } from 'devalue'
 import { batch, debounced, effect, every, flush, linked, listen, memo, onCleanup, onMount, root, selection, signal, untrack, watch } from '../src/runtime'
@@ -807,7 +808,9 @@ describe('optimistic changes', () => {
     }
 
     // As `startNavigation` registers it.
-    navigation.refresh = refreshed
+    navigation.hooks = {} as NavigationHooks
+    const api = await import('../src/runtime/navigate-api')
+    const refreshing = spyOn(api, 'refresh').mockImplementation(refreshed)
 
     try {
       await aborted({})
@@ -818,7 +821,8 @@ describe('optimistic changes', () => {
       expect(refreshed).toHaveBeenCalledTimes(1)
     }
     finally {
-      delete navigation.refresh
+      delete navigation.hooks
+      refreshing.mockRestore()
       fetched.mockRestore()
     }
   })

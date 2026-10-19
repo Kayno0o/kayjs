@@ -65,13 +65,13 @@ const HASH = /#.*/
 const SCROLL_SAVE_MS = 150
 const LEAVE_MESSAGE = 'This page has unsaved changes. Leave it anyway?'
 
-// `hooks`, `navigate` and `refresh` are set once the swap took over the app's links, which an action call then shows its effects through.
+// `hooks` are set once the swap took over the app's links, which an action call then shows its effects through.
 // `shown` is the page shown, by URL without its hash, since going back to an entry of the same page only scrolls; `at` the place of its entry; `page` how many other pages were shown since, which an action call's outcome belongs to one of; `current` the latest swap started, which an earlier one gives way to; `visits` how many swaps to another path started, unset before the first, which an answer the page awaited reads to tell whether the visitor went elsewhere meanwhile.
 // `released` lets a full load kay starts itself through `beforeunload`, as one the guards were asked about or one that is no leave.
 export const navigation: {
   hooks?: NavigationHooks
-  navigate?: (href: string) => Promise<void>
-  refresh?: () => Promise<void>
+  // How many times the app called `navigate`, which a refresh waiting for its code to load gives way to.
+  navigations?: number
   shown: string
   at: number
   page: number
