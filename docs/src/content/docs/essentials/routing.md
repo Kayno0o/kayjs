@@ -144,7 +144,7 @@ export const page = { keep: true }
 
 When the page cannot be kept, `kay build` warns with the file and line. Set the `unkept-page` lint to `deny` in `kay.config.ts` to fail the build instead. A page that is not kept is rendered for each request. Guards run on every request either way, and development renders every page afresh.
 
-A page that shows data another module changes between requests is caught as the app runs. The server then renders it for each request and warns once with its name. `prerender: false` says so up front. Only a request one of your routes answers can trigger this check, such as an action or an API write. Analytics beats, error reports and requests to paths that do not exist never do.
+A page that shows data another module changes between requests is caught as the app runs. The server then renders it for each request and warns once with its name. `prerender: false` says so up front. Only a request one of your routes answers can trigger this check, such as an action or an API write. Kay's own routes, such as analytics beats and error reports, and requests to paths that do not exist never do. A request to one of your routes does, even if a guard then refuses it.
 
 A page with params lists the ones to build. Pass a content collection to build one page per entry.
 

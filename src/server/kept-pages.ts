@@ -1,9 +1,11 @@
 import type { Elysia } from 'elysia'
 import type { ServedPage } from './render'
+import { LIVE_ROUTE } from '../runtime/live-value'
 import { kayLog } from '../runtime/log'
 import { withPageToken } from '../runtime/uid.server'
 import { ANALYTICS_PATH, CUSTOM_COLLECT_PATH } from './analytics'
 import { ERROR_REPORTS } from './errors'
+import { pathOf } from './log'
 import { pageEtag, pageToken } from './prerendered'
 import { CSP_REPORTS } from './violations'
 
@@ -12,34 +14,40 @@ export interface Writes {
   count: number
 }
 
-// The requests counted as started, to count their end once.
-const started = new WeakSet<Request>()
+// What kay answers itself and no app code ever sees: the page-view and custom analytics beats, the browser's error and violation reports and the live values' event stream.
+const KAY_ROUTES = [ANALYTICS_PATH, CUSTOM_COLLECT_PATH, ERROR_REPORTS, CSP_REPORTS, LIVE_ROUTE]
+const SLASH = 47
 
-const TRAILING_SLASHES = /\/+$/
-// What kay answers itself and no app code ever sees: the page-view and custom analytics beats, the browser's error reports and the policy's violation reports.
-const REPORTS = new Set([ANALYTICS_PATH, CUSTOM_COLLECT_PATH, ERROR_REPORTS, CSP_REPORTS])
+// A path without its trailing slashes, found by a scan rather than a pattern, as a hostile path may be mostly slashes.
+function withoutTrailingSlashes(path: string): string {
+  let end = path.length
 
-// A request that is not a GET, a HEAD or an OPTIONS can change what a page renders, an action as much as a route of the app, once a route answers it: one to no route, and kay's own reports, write nothing, so no visitor can force a page to render again by sending them.
-// Counted when its route is reached and when it ends (`countWritesEnd`), so a visit between the two is checked again; called before any route is added, as a hook reaches only the routes added after it.
-export function countWrites(app: Elysia): Writes {
+  while (end > 1 && path.charCodeAt(end - 1) === SLASH)
+    end--
+
+  return path.slice(0, end)
+}
+
+// A request that is not a GET, a HEAD or an OPTIONS can change what a page renders, an action as much as a route of the app, once a route answers it: one to no route, and kay's own routes in `own` (the MCP endpoint among them, whose tool calls reach the app's actions and count there), write nothing, so no visitor can force a page to render again by sending them.
+// Counted when its route is matched and again as its response is made, so a visit between the two is checked once more, and the visit that follows the response sees the finished write; a route matched is counted whatever its guards then answer.
+// The end count is a `mapResponse`, which every answer goes through and which leaves it as it is, as no `afterHandle` or `onError` of the pages app may change how an API module answers; called before any route is added, as a hook reaches only the routes added after it.
+export function countWrites(app: Elysia, own: string[] = []): Writes {
   const writes: Writes = { count: 0 }
+  const kay = new Set([...KAY_ROUTES, ...own])
+  const started = new WeakSet<Request>()
 
   app.onTransform({ as: 'global' }, ({ request }) => {
-    if (request.method !== 'GET' && request.method !== 'HEAD' && request.method !== 'OPTIONS' && !REPORTS.has(new URL(request.url).pathname.replace(TRAILING_SLASHES, ''))) {
+    if (request.method !== 'GET' && request.method !== 'HEAD' && request.method !== 'OPTIONS' && !kay.has(withoutTrailingSlashes(pathOf(request.url)))) {
       started.add(request)
       writes.count++
     }
   })
-
-  return writes
-}
-
-// Registered after the routes' own hooks, so the count has moved by the time the response is out and the visit that follows it is checked once.
-export function countWritesEnd(app: Elysia, writes: Writes): void {
-  app.onAfterResponse({ as: 'global' }, ({ request }) => {
+  app.mapResponse({ as: 'global' }, ({ request }) => {
     if (started.delete(request))
       writes.count++
   })
+
+  return writes
 }
 
 // Whether a kept page still renders as the build kept it, rendered live once per write however many visits wait for it.

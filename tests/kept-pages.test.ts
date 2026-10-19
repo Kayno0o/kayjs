@@ -47,6 +47,8 @@ interface Asked {
   method?: string
   headers?: Record<string, string>
   body?: string
+  // Milliseconds before the request is sent, to land in the middle of another of its group.
+  wait?: number
 }
 
 interface Answered {
@@ -59,7 +61,7 @@ interface Answered {
 // A server of its own on what the build wrote, which the requests go through in order, a group of them together: one process serves one project.
 // The warnings it logged come with the answers.
 async function servedWith(root: string, asked: (Asked | Asked[])[], options = ''): Promise<{ answers: Answered[], warnings: string }> {
-  await Bun.write(join(root, 'serve.ts'), `import { Elysia } from 'elysia'\nimport { pages } from ${JSON.stringify(join(import.meta.dir, '../src/server'))}\n\nconst app = new Elysia().use(await pages({ root: ${JSON.stringify(root)}, prebuilt: true, log: false, compress: false${options} }))\nconst answers = []\nconst ask = async ({ path, method, headers, body }) => {\n  const response = await app.handle(new Request(\`http://localhost\${path}\`, { method, headers, body }))\n\n  return { status: response.status, etag: response.headers.get('etag'), cache: response.headers.get('cache-control'), text: await response.text() }\n}\n\nfor (const group of ${JSON.stringify(asked)}) {\n  if (Array.isArray(group))\n    answers.push(...await Promise.all(group.map(ask)))\n  else\n    answers.push(await ask(group))\n}\n\nconsole.log(JSON.stringify(answers))\nprocess.exit(0)\n`)
+  await Bun.write(join(root, 'serve.ts'), `import { Elysia } from 'elysia'\nimport { pages } from ${JSON.stringify(join(import.meta.dir, '../src/server'))}\n\nconst app = new Elysia().use(await pages({ root: ${JSON.stringify(root)}, prebuilt: true, log: false, compress: false${options} }))\nconst answers = []\nconst ask = async ({ path, method, headers, body, wait }) => {\n  if (wait)\n    await Bun.sleep(wait)\n\n  const response = await app.handle(new Request(\`http://localhost\${path}\`, { method, headers, body }))\n\n  return { status: response.status, etag: response.headers.get('etag'), cache: response.headers.get('cache-control'), text: await response.text() }\n}\n\nfor (const group of ${JSON.stringify(asked)}) {\n  if (Array.isArray(group))\n    answers.push(...await Promise.all(group.map(ask)))\n  else\n    answers.push(await ask(group))\n}\n\nconsole.log(JSON.stringify(answers))\nprocess.exit(0)\n`)
 
   const child = Bun.spawn([process.execPath, join(root, 'serve.ts')], { cwd: root, stdout: 'pipe', stderr: 'pipe', env: { ...process.env, NODE_ENV: 'production' } })
   const [out, err, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
@@ -234,6 +236,7 @@ const GUESTBOOK: Record<string, string> = {
   'src/routes/asked.kay': '--- server\nimport { asked } from \'../guestbook\'\n\nexport const page = { prerender: true }\n---\np {asked()}\n',
   'src/routes/add.kay': '--- server\nimport { s } from \'kay\'\nimport { add } from \'../guestbook\'\n\nexport const save = action(s.Object({}), async () => {\n  add()\n})\n---\nform(action={save}) button Add\n',
   'src/routes/invalidate.kay': '--- server\nimport { s } from \'kay\'\nimport { invalidatePage } from \'kay/cache\'\nimport { add } from \'../guestbook\'\n\nexport const save = action(s.Object({}), async () => {\n  add()\n  invalidatePage(\'/\')\n})\n---\nform(action={save}) button Invalidate\n',
+  'src/routes/slow.kay': '--- server\nimport { s } from \'kay\'\nimport { add } from \'../guestbook\'\n\nexport const save = action(s.Object({}), async () => {\n  await Bun.sleep(300)\n  add()\n})\n---\nform(action={save}) button Slow\n',
   'src/routes/fail.kay': '--- server\nimport { s } from \'kay\'\nimport { add } from \'../guestbook\'\n\nexport const save = action(s.Object({}), async () => {\n  add()\n\n  throw new Error(\'boom\')\n})\n---\nform(action={save}) button Fail\n',
   'src/routes/calls.json.ts': 'import { counts } from \'../guestbook\'\n\nexport function GET(): Response {\n  return Response.json(counts)\n}\n',
   'src/routes/private/_guard.ts': 'import { guard } from \'kay\'\n\nexport default guard(({ request, deny }) => {\n  if (!request.headers.has(\'x-pass\'))\n    deny(403)\n})\n',
@@ -365,6 +368,21 @@ describe('a kept page after a request that can write', () => {
 
     expect(answers.filter((_, at) => at % 10 === 9 && at < rounds * 10).every(answer => answer.status === 200)).toBe(true)
     expect(counts.stable).toBe(0)
+  }, 120_000)
+
+  it('is checked again after a write that a visit overlapped', async () => {
+    const root = await guestbook()
+    const [, , during, after] = await served(root, [read('/'), [post('slow.kay', 'save'), { ...read('/'), wait: 100 }], read('/')])
+
+    expect(during!.text).toContain('first<')
+    expect(after!.text).toContain('first,m1')
+  }, 120_000)
+
+  it('is not rechecked after kay\'s live values stream, whatever the slashes', async () => {
+    const root = await guestbook()
+    const answers = await served(root, [noise('/_kay/live'), noise('/_kay/live/'), noise(`/_kay/live${'/'.repeat(20_000)}`), read('/about'), read('/calls.json')])
+
+    expect((JSON.parse(answers.at(-1)!.text) as Tally).stable).toBe(0)
   }, 120_000)
 
   it('is rechecked after an API write', async () => {
