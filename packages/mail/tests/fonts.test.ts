@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test'
+import { html } from 'kay/html'
 import defaults from '../src/defaults'
 import { msoFonts, windowsStack } from '../src/mso'
 
@@ -18,7 +19,7 @@ describe('windowsStack', () => {
 
 describe('msoFonts', () => {
   it('gives Outlook for Windows a conditional style with fonts it has for the default settings', () => {
-    expect(msoFonts(defaults.font, defaults.mono)).toEqual({ t: '<!--[if mso]><style>body,table,td,th,p,a,span,h1,h2,h3{font-family:\'Segoe UI\', Arial, sans-serif!important}.km-mono{font-family:Consolas, \'Courier New\', monospace!important}</style><![endif]-->' })
+    expect(msoFonts(defaults.font, defaults.mono)).toEqual(html('<!--[if mso]><style>body,table,td,th,p,a,span,h1,h2,h3{font-family:\'Segoe UI\', Arial, sans-serif!important}.km-mono{font-family:Consolas, \'Courier New\', monospace!important}</style><![endif]-->'))
   })
 
   it('follows a custom font and mono setting', () => {

@@ -20,6 +20,7 @@ import { editableEntry, editMarks, placeFieldMarks, withFieldMarks } from '../sr
 import { child, loop } from '../src/runtime/html'
 import { navigation } from '../src/runtime/navigation'
 import { editing, previewing } from '../src/runtime/preview'
+import { html as renderedHtml } from '../src/runtime/rendered'
 import { editedEntry, editRequested, enterPreview, pages, previewUrl } from '../src/server'
 import { entryUrls } from '../src/server/entry-urls'
 import { inPreview, previewRequested, requestDrafts } from '../src/server/preview'
@@ -116,9 +117,9 @@ describe('loaded collections', () => {
     expect(notes.dir).toBeUndefined()
     expect(notes.name).toBe('notes-compiled')
     expect(first).toMatchObject({ slug: 'a', data: { title: 'First' }, headings: [], words: 3, readingTime: 1, file: 'notes-compiled/a' })
-    expect(String((first!.Content as () => { t: string })().t)).toBe('<p>From the CMS</p>')
+    expect(String((first!.Content as unknown as () => { t: string })().t)).toBe('<p>From the CMS</p>')
     expect(second!.headings).toEqual([{ depth: 1, id: 'intro', text: 'Intro' }])
-    expect((second!.Content as () => { t: string })().t).toContain('<strong>bold</strong>')
+    expect((second!.Content as unknown as () => { t: string })().t).toContain('<strong>bold</strong>')
     expect((await notes.get('b'))?.data.title).toBe('Second')
   })
 
@@ -1017,7 +1018,7 @@ describe('preview mode', () => {
   it('marks a number once, a body around what it holds, and nothing written into a tag some other way or rendered by an island', () => {
     inPreview(() => {
       const marks = editMarks()!
-      const entry = editableEntry(marks, 'news', { slug: 'a', data: { title: 'T', count: 3, at: new Date(0) }, Content: () => ({ t: '<p>x</p>' }) })
+      const entry = editableEntry(marks, 'news', { slug: 'a', data: { title: 'T', count: 3, at: new Date(0) }, Content: () => renderedHtml('<p>x</p>') })
       const html = withFieldMarks(marks, () => `<div>${child(entry.data.title)}</div><div>${child(entry.data.count)} ${child(3)}</div><a title="${child(entry.data.title)}">${withFieldMarks(undefined, () => child(entry.data.title))}</a><section>${child(entry.Content())}</section>`)
 
       expect(entry.data.at).toBeInstanceOf(Date)
@@ -1028,7 +1029,7 @@ describe('preview mode', () => {
   it('marks a number only rendered right after its field is read, nothing else read or rendered between', () => {
     inPreview(() => {
       const marks = editMarks()!
-      const entry = editableEntry(marks, 'news', { slug: 'a', data: { rating: 3, order: 1, label: 'L', tags: ['a', 'b', 'c'] }, Content: () => ({ t: '' }) })
+      const entry = editableEntry(marks, 'news', { slug: 'a', data: { rating: 3, order: 1, label: 'L', tags: ['a', 'b', 'c'] }, Content: () => renderedHtml('') })
       const html = withFieldMarks(marks, () => {
         const shown = entry.data.rating >= 3 ? child(entry.data.tags.length) : ''
         const order = entry.data.order
@@ -1043,7 +1044,7 @@ describe('preview mode', () => {
   it('marks a text rendered after the field read it, never a blank one, one already rendered, or a field\'s own private-use characters', () => {
     inPreview(() => {
       const marks = editMarks()!
-      const entry = editableEntry(marks, 'news', { slug: 'a', data: { title: 'Same', subtitle: 'Same', note: '', icon: '\uE002\uE000f0\uE001' }, Content: () => ({ t: '' }) })
+      const entry = editableEntry(marks, 'news', { slug: 'a', data: { title: 'Same', subtitle: 'Same', note: '', icon: '\uE002\uE000f0\uE001' }, Content: () => renderedHtml('') })
       const html = withFieldMarks(marks, () => {
         const { note, title, subtitle, icon } = entry.data
 
@@ -1057,7 +1058,7 @@ describe('preview mode', () => {
   it('marks a text once per render of its field, however often it was read', () => {
     inPreview(() => {
       const marks = editMarks()!
-      const entry = editableEntry(marks, 'news', { slug: 'a', data: { title: 'Same' }, Content: () => ({ t: '' }) })
+      const entry = editableEntry(marks, 'news', { slug: 'a', data: { title: 'Same' }, Content: () => renderedHtml('') })
       const html = withFieldMarks(marks, () => {
         const read = [entry.data.title, entry.data.title]
 
@@ -1076,7 +1077,7 @@ describe('preview mode', () => {
 
       inPreview(() => {
         const marks = editMarks()!
-        const entry = editableEntry(marks, 'news', { slug: 'a', data: { rows: Array.from({ length: count }, (_, index) => `Row ${index}`) }, Content: () => ({ t: '' }) })
+        const entry = editableEntry(marks, 'news', { slug: 'a', data: { rows: Array.from({ length: count }, (_, index) => `Row ${index}`) }, Content: () => renderedHtml('') })
         const html = withFieldMarks(marks, () => `<title>Rows</title><ul>${loop(entry.data.rows, row => `<li>Row: ${child(row)}</li>`)}</ul>`)
         // eslint-disable-next-line ts/unbound-method -- called back on its string below
         const slice = String.prototype.slice

@@ -3,6 +3,7 @@
 
 import type { Truthy } from './checks'
 import type { FieldSchema } from './form'
+import type { Html } from './rendered'
 import { isAction } from './action'
 import { NON_ROOT_TRAILING_SLASH } from './base'
 import { fieldDescription, fieldRequired } from './described'
@@ -17,6 +18,7 @@ import { localeState } from './locale-state'
 import { kayLog } from './log'
 import { FAILED } from './markers'
 import { currentServerScope, scope } from './reactive'
+import { isRendered, html as renderedHtml } from './rendered'
 import { ISLAND_PARAM } from './server-islands'
 import { failedIds, idMark } from './uid'
 import { safeUrl } from './url'
@@ -25,11 +27,10 @@ import { attributeName, attributeValue, classText, eachChild, elementName, handl
 export { escape, escapeAttribute } from './escape'
 export { head } from './head'
 export { memo, untrack } from './reactive'
-export { componentClass, merge, omit, spreadAttributes } from './values'
+export { html, isRendered } from './rendered'
 
-export interface Html {
-  t: string
-}
+export type { Html } from './rendered'
+export { componentClass, merge, omit, spreadAttributes } from './values'
 
 // Leads the markup of a `try` block the server rendered its `catch` block for.
 export const FAILED_MARKER = `<!--${FAILED}-->`
@@ -82,13 +83,14 @@ export function raw(value: unknown): string {
 }
 
 function rendered(value: object): string {
-  const { t } = value as { t?: unknown }
-
-  return typeof t === 'string' ? t : ''
+  return isRendered(value) ? value.t : ''
 }
 
 // ` name="value"`, ` name` for `true`, nothing for `null`, `undefined` and `false`; an ARIA state takes a boolean as `"true"` or `"false"`.
 export function attribute(name: string, value: unknown): string {
+  if (typeof value === 'function')
+    return ''
+
   const given = attributeValue(name, value)
 
   if (given === false)
@@ -200,8 +202,8 @@ export function element(tag: string, sources: readonly object[], content?: () =>
         continue
       }
 
-      // Handlers and refs only an island attaches, and a name that is no attribute's.
-      if (value == null || name === 'ref' || handlerName(name) || !attributeName(name))
+      // Handlers and refs only an island attaches, a name that is no attribute's, and a function that is no `class` or `style`, which has no attribute form.
+      if (value == null || name === 'ref' || handlerName(name) || !attributeName(name) || (typeof value === 'function' && name !== 'class' && name !== 'style'))
         continue
 
       if (name === 'value')
@@ -234,12 +236,12 @@ export function element(tag: string, sources: readonly object[], content?: () =>
   }
 
   if (isVoid)
-    return { t: `${markup}>` }
+    return renderedHtml(`${markup}>`)
 
   if (tag === 'select' && selected !== undefined && inner !== undefined)
     inner = selectOptions(selected, inner)
 
-  return { t: `${markup}>${inner ?? ''}</${tag}>` }
+  return renderedHtml(`${markup}>${inner ?? ''}</${tag}>`)
 }
 
 // A component tag read off a prop or through a call: a string names an element, a function is the component.
@@ -356,7 +358,7 @@ export function serverIsland<P>(fn: (props: P) => unknown, props: P, mode: Serve
   // The copy a deferred island shows until the browser fetches its own has its size, inert and with nothing it could post, as what it holds is from the build.
   const placeholder = mode === 'defer' ? `<slot data-kay-server="${index}" inert>${html.replace(POSTING_TAG, tag => tag.replace(POSTING_ATTRIBUTE, ''))}</slot>${noscript == null ? '' : `<noscript><a href="?${ISLAND_PARAM}" rel="nofollow">${child(noscript)}</a></noscript>`}` : ''
 
-  return { t: `<!--kay-server:${index}-->${placeholder}<!--/kay-server:${index}-->` }
+  return renderedHtml(`<!--kay-server:${index}-->${placeholder}<!--/kay-server:${index}-->`)
 }
 
 // A `try` block: what it renders, or once that throws, its `catch` block, the error reported. The marker tells an island hydrating to keep that markup as it came, since the error stayed on the server.

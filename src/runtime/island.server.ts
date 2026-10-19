@@ -1,6 +1,6 @@
 import type { IslandComponent, IslandOptions } from './checks'
-import type { Html } from './html'
 import type { JSX } from './jsx'
+import type { Html } from './rendered'
 import { isAction } from './action'
 import { escapeAttribute, quotedAttribute } from './escape'
 import { withFieldMarks } from './fields'
@@ -10,6 +10,7 @@ import { noteLives } from './live-value'
 import { localeState } from './locale-state'
 import { TITLED_ATTRIBUTE } from './markers'
 import { renderOnServer, scope } from './reactive'
+import { isRendered, html as renderedHtml } from './rendered'
 import { SLOT_END, SLOT_START } from './static-slots'
 import { countIds } from './uid'
 import { islandPrefix, pageIds } from './uid.server'
@@ -110,7 +111,7 @@ export function island<P extends object>(id: string, component: ((props: P) => J
     noteLives(lives)
 
     if (depth > 0)
-      return browserOnly ? { t: '' } as unknown as JSX.Element : component!(own)
+      return browserOnly ? renderedHtml('') as unknown as JSX.Element : component!(own)
 
     // Rendered here, in the parent, so an island among them is one of its own; unmarked in edit mode, as the island's own markup is.
     const slots = withFieldMarks(undefined, () => staticSlots(own))
@@ -143,7 +144,7 @@ export function island<P extends object>(id: string, component: ((props: P) => J
       const titled = setsIslandTitle(mark) ? ` ${TITLED_ATTRIBUTE}` : ''
       const lazy = when === 'idle' || when === 'visible' ? ` data-hydrate="${when}"` : ''
       const chunk = rendered?.chunks?.[id]
-      const markup: Html = { t: `<slot data-component="${escapeAttribute(id)}" data-props=${quotedAttribute(serialized)}${lazy}${titled}${shipped}${browserOnly ? ' data-client' : ''}${count === 0 ? '' : ` data-uid="${escapeAttribute(ids)}"`}${persist === undefined ? '' : ` data-persist="${escapeAttribute(persist)}"`}${chunk === undefined ? '' : ` data-chunk="${escapeAttribute(chunk)}"`}>${html}</slot>` }
+      const markup: Html = renderedHtml(`<slot data-component="${escapeAttribute(id)}" data-props=${quotedAttribute(serialized)}${lazy}${titled}${shipped}${browserOnly ? ' data-client' : ''}${count === 0 ? '' : ` data-uid="${escapeAttribute(ids)}"`}${persist === undefined ? '' : ` data-persist="${escapeAttribute(persist)}"`}${chunk === undefined ? '' : ` data-chunk="${escapeAttribute(chunk)}"`}>${html}</slot>`)
 
       return markup as unknown as JSX.Element
     }
@@ -198,7 +199,7 @@ function staticSlots(props: object): [key: string, markup: string][] {
 }
 
 function holdsMarkup(value: unknown): boolean {
-  return Array.isArray(value) ? value.some(holdsMarkup) : typeof value === 'object' && value !== null && typeof (value as Partial<Html>).t === 'string'
+  return Array.isArray(value) ? value.some(holdsMarkup) : typeof value === 'object' && value !== null && isRendered(value)
 }
 
 // The props the island renders with, each static slot its markup between the markers the browser finds it by.
@@ -206,7 +207,7 @@ function withSlots<P extends object>(props: P, slots: [string, string][]): P {
   const given = Object.defineProperties({}, Object.getOwnPropertyDescriptors(props)) as P
 
   for (const [index, [key, markup]] of slots.entries())
-    Object.defineProperty(given, key, { value: { t: `<!--${SLOT_START}${index}-->${markup}<!--${SLOT_END}-->` }, enumerable: true, configurable: true })
+    Object.defineProperty(given, key, { value: renderedHtml(`<!--${SLOT_START}${index}-->${markup}<!--${SLOT_END}-->`), enumerable: true, configurable: true })
 
   return given
 }

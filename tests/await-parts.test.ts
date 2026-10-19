@@ -4,6 +4,7 @@ import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { Await } from '../src/runtime/await.server'
+import { html } from '../src/runtime/rendered'
 import { readSnapshots } from '../src/runtime/snapshots'
 import { pages, renderToString } from '../src/server'
 import { PART_MS, streamDocument } from '../src/server/stream'
@@ -43,7 +44,7 @@ async function streamed(blocks: PendingBlock[], cancelAfter?: (chunk: string) =>
 }
 
 function block(value: PendingBlock['value'], options: { failed?: boolean } = {}): PendingBlock {
-  return { id: 'b', value, ready: (part: string) => ({ t: `<p>${part}</p>` }), failed: options.failed === true ? error => ({ t: `<p class="failed">${(error as Error).message}</p>` }) : undefined }
+  return { id: 'b', value, ready: (part: string) => html(`<p>${part}</p>`), failed: options.failed === true ? error => html(`<p class="failed">${(error as Error).message}</p>`) : undefined }
 }
 
 async function* parts(values: string[], gapMs: number, fail?: Error): AsyncGenerator<string> {
@@ -112,7 +113,7 @@ describe('an await block given an async iterable', () => {
       throw new Error('No getter')
     } })
 
-    expect(Await({ value: odd, ready: () => ({ t: '<p>plain</p>' }) })).toEqual({ t: '<p>plain</p>' })
+    expect(Await({ value: odd, ready: () => html('<p>plain</p>') })).toEqual(html('<p>plain</p>'))
   })
 
   it('removes the pending block of an iterable that ends with no value', async () => {
@@ -168,7 +169,7 @@ describe('an await block given an async iterable', () => {
 
     const broken: PendingBlock = { id: 'b', value: endless(), ready: () => {
       throw new Error('Bug')
-    }, failed: () => ({ t: '<p class="failed">Shown</p>' }) }
+    }, failed: () => html('<p class="failed">Shown</p>') }
     const { page, reported } = await streamed([broken])
 
     expect(templatesOf(page, 'b')).toEqual([''])

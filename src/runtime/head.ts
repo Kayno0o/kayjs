@@ -373,7 +373,7 @@ function attributesOf(props: Record<string, unknown>): Map<string, string | true
   const attributes = new Map<string, string | true>()
 
   for (const [name, value] of Object.entries(props)) {
-    if (name === 'children' || name === 'ref' || handlerName(name) || !attributeName(name) || value == null || value === false)
+    if (name === 'children' || name === 'ref' || handlerName(name) || !attributeName(name) || value == null || value === false || typeof value === 'function')
       continue
 
     attributes.set(name.toLowerCase(), value === true ? true : safeUrl(name, String(value)))

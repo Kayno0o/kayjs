@@ -140,6 +140,10 @@ Call `trustHtml` where the markup is used, not once for a constant kept for hour
 
 <ReadMore href="/llms/templates">How the vouching travels from the server to the browser, what the server remembers, and what a dropped value logs.</ReadMore>
 
+## Functions and rendered values
+
+A function that is not a handler is never written as an attribute, on the server or in the browser. A JSON value with a `t` string, shown as `{value}`, is text like any other: only what a component, an element or an island rendered is markup.
+
 ## Fallback when something throws
 
 A `try` block renders its `catch` block when what it renders throws. One broken widget then does not take the page down.

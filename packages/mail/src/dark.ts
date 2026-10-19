@@ -1,4 +1,5 @@
 import type { JSX } from 'kay'
+import { html } from 'kay/html'
 import type { Palette, Settings } from './defaults'
 
 type Triple = [number, number, number]
@@ -151,5 +152,5 @@ function darkStyleOf(settings: Settings): JSX.Element {
   const palette = darkPalette(settings)
   const rules = (selector: (className: string) => string) => RULES.map(([className, declarations]) => `${selector(className)}{${declarations(palette).map(declaration => `${declaration}!important`).join(';')}}`).join('')
 
-  return { t: `<style>:root{color-scheme:light dark;supported-color-schemes:light dark}@media (prefers-color-scheme:dark){${rules(className => `.${className}`)}}${rules(className => `[data-ogsc] .${className},[data-ogsb] .${className}`)}</style>` }
+  return html(`<style>:root{color-scheme:light dark;supported-color-schemes:light dark}@media (prefers-color-scheme:dark){${rules(className => `.${className}`)}}${rules(className => `[data-ogsc] .${className},[data-ogsb] .${className}`)}</style>`)
 }

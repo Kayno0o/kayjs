@@ -10,7 +10,7 @@ import { SUBJECT } from './names'
 // The attribute an image's `src` or a select's `selected` value is written as.
 const WRITTEN_AS = { image: 'src', selected: 'value' } as const
 // The `kay/html` helpers static server output calls, each imported under a `Kay` name.
-const HTML_HELPERS = ['attempt', 'attribute', 'child', 'className', 'component', 'componentClass', 'currentPage', 'dynamic', 'element', 'errorParagraph', 'fieldDescribed', 'formConstraints', 'head', 'imageAttributes', 'localHref', 'loop', 'memo', 'merge', 'nonEmptyAttribute', 'omit', 'raw', 'refillOptions', 'selectOptions', 'serverIsland', 'show', 'spreadAttributes', 'style', 'untrack']
+const HTML_HELPERS = ['attempt', 'attribute', 'child', 'className', 'component', 'componentClass', 'currentPage', 'dynamic', 'element', 'errorParagraph', 'fieldDescribed', 'formConstraints', 'head', 'html', 'imageAttributes', 'localHref', 'loop', 'memo', 'merge', 'nonEmptyAttribute', 'omit', 'raw', 'refillOptions', 'selectOptions', 'serverIsland', 'show', 'spreadAttributes', 'style', 'untrack']
 
 export function htmlHelperImport(): string {
   return `import { ${HTML_HELPERS.map(helper => `${helper} as ${helperName(helper)}`).join(', ')} } from 'kay/html'\n`
@@ -84,9 +84,8 @@ export class HtmlTemplate extends TemplateWriter {
 
   // A rendered value, which a component returns and a prop carries.
   value(nodes: Node[]): void {
-    this.b.add('({ t: ')
+    this.b.add(helperName('html'))
     this.markup(nodes)
-    this.b.add(' })')
   }
 
   private children(nodes: Node[], markup: Markup, raw: boolean, inElement: boolean): void {

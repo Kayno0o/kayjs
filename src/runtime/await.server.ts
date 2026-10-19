@@ -1,9 +1,10 @@
 import type { AwaitProps } from './checks'
-import type { Html } from './html'
 import type { JSX } from './jsx'
+import type { Html } from './rendered'
 import { child } from './html'
 import { insideIsland } from './island.server'
 import { getOwner, runWithOwner } from './reactive'
+import { html } from './rendered'
 import { isSnapshots } from './snapshots'
 
 // A block whose value was still pending when the page rendered, streamed in once it settles, or as each part of an async iterable comes.
@@ -105,7 +106,7 @@ export function Await<T>(props: AwaitProps<T>): JSX.Element {
   deferred = undefined
 
   try {
-    const markup: Html = { t: `<!--kay-await:${id}-->${child(props.pending?.())}<!--/kay-await:${id}-->` }
+    const markup: Html = html(`<!--kay-await:${id}-->${child(props.pending?.())}<!--/kay-await:${id}-->`)
 
     return markup
   }

@@ -9,6 +9,7 @@ import { t } from 'elysia'
 import { JSON_FILE } from '../build/files'
 import { KayError } from '../compiler/errors'
 import { kayLog } from '../runtime/log'
+import { html } from '../runtime/rendered'
 import { isDraft } from './drafts'
 import { contentPlace, entryFiles, entrySlug, markdownOf, parseEntry, slugOf, STAMP_SETTLED_MS } from './load'
 import { compileMarkdown, MarkdownError, splitFrontmatter } from './markdown'
@@ -766,7 +767,7 @@ function draftOf(collection: Collection<unknown>, entry: Omit<SourceEntry, 'draf
   if (draft === undefined)
     return false
 
-  const read: Entry<unknown> = { slug: entry.slug, locale: entry.locale, data, headings: [], words: 0, readingTime: 0, Content: () => ({ t: '' }), file: entry.path ?? entry.slug }
+  const read: Entry<unknown> = { slug: entry.slug, locale: entry.locale, data, headings: [], words: 0, readingTime: 0, Content: () => html(''), file: entry.path ?? entry.slug }
 
   return isDraft(draft as ((entry: Entry<unknown>) => boolean) | string, read)
 }

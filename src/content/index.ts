@@ -1,8 +1,8 @@
 import type { Static, TSchema } from 'elysia'
 import type { CacheStore } from '../runtime/cache'
 import type { Duration } from '../runtime/duration'
-import type { Html } from '../runtime/html'
 import type { Component } from '../runtime/jsx'
+import type { Html } from '../runtime/rendered'
 import type { FeedOptions } from './feed'
 import type { RawEntry } from './load'
 import type { Heading, Highlighter, Segment } from './markdown'
@@ -11,7 +11,7 @@ import { KayError } from '../compiler/errors'
 import { cached, invalidate, noteLive, noteRead, onKeysInvalidated } from '../runtime/cache'
 import { durationSeconds } from '../runtime/duration'
 import { editableEntries } from '../runtime/fields'
-import { child, localLinks } from '../runtime/html'
+import { child, html, localLinks } from '../runtime/html'
 import { localeState } from '../runtime/locale-state'
 import { previewing, previewState } from '../runtime/preview'
 import { isDraft } from './drafts'
@@ -475,5 +475,5 @@ function render(segments: Segment[], components: Record<string, Component<never>
     markup += child(component(props))
   }
 
-  return { t: markup }
+  return html(markup)
 }

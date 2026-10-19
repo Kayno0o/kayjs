@@ -13,6 +13,7 @@ import { contentMode, contentPlace, loadEntries, manifestFile, setContentMode, s
 import { compileMarkdown, MarkdownError } from '../src/content/markdown'
 import { serveFeeds, writeContentManifests } from '../src/content/server'
 import { sanitizeHtml } from '../src/runtime'
+import { html } from '../src/runtime/rendered'
 import { pages, shutdown } from '../src/server'
 import { ServedPaths } from '../src/server/served-paths'
 import { scratchBuild } from './prerendered'
@@ -225,7 +226,7 @@ describe('feeds', () => {
   })
 
   it('write Atom, escaping what they carry', () => {
-    const xml = feedXml([{ slug: 'a', data: {}, headings: [], words: 0, readingTime: 0, Content: () => ({ t: '' }), file: 'a.md' }], { path: '/feed.xml', title: 'Fish & chips', format: 'atom', item: () => ({ title: 'A <b>bold</b> move', path: '/a', date: new Date('2026-01-02') }) }, 'https://x.example')
+    const xml = feedXml([{ slug: 'a', data: {}, headings: [], words: 0, readingTime: 0, Content: () => html(''), file: 'a.md' }], { path: '/feed.xml', title: 'Fish & chips', format: 'atom', item: () => ({ title: 'A <b>bold</b> move', path: '/a', date: new Date('2026-01-02') }) }, 'https://x.example')
 
     expect(xml).toContain('<feed xmlns="http://www.w3.org/2005/Atom">')
     expect(xml).toContain('<title>Fish &amp; chips</title>')
@@ -233,7 +234,7 @@ describe('feeds', () => {
   })
 
   describe('write links as trailingSlash writes the canonical URL', () => {
-    const entry = { slug: 'a', data: {}, headings: [], words: 0, readingTime: 0, Content: () => ({ t: '' }), file: 'a.md' }
+    const entry = { slug: 'a', data: {}, headings: [], words: 0, readingTime: 0, Content: () => html(''), file: 'a.md' }
     const feed = (format: 'rss' | 'atom') => ({ path: '/feed.xml', title: 'T', format, item: () => ({ title: 'A', path: '/blog/a', date: new Date('2026-01-02') }) })
 
     it.each(['rss', 'atom'] as const)('under always, in %s and under a base, a localized home too', (format) => {

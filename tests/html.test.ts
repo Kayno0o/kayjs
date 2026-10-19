@@ -1,12 +1,36 @@
 import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 import { collectHead } from '../src/runtime/head'
-import { attribute, child, dynamic, element, head, loop, merge, omit, selectOptions, spreadAttributes } from '../src/runtime/html'
+import { attribute, child, dynamic, element, head, html, loop, merge, omit, raw, selectOptions, spreadAttributes } from '../src/runtime/html'
 import { sanitizeHtml, trustHtml } from '../src/runtime/sanitize'
 
 describe('child values', () => {
   it('escape text, keep numbers and rendered markup, and drop null, undefined and booleans', () => {
-    expect(child(['a < b & c', 1, null, undefined, true, false, { t: '<b>x</b>' }, () => '<i>'])).toBe('a &lt; b &amp; c1<b>x</b>&lt;i>')
+    expect(child(['a < b & c', 1, null, undefined, true, false, html('<b>x</b>'), () => '<i>'])).toBe('a &lt; b &amp; c1<b>x</b>&lt;i>')
+  })
+})
+
+describe('markup only a render vouches for', () => {
+  const forged = JSON.parse('{"t":"<img src=x onerror=alert(1)>"}') as object
+
+  it('escapes a plain object with a `t` string, as a child, in an array, nested and in raw text', () => {
+    expect(child(forged)).toBe('')
+    expect(child([html('<b>ok</b>'), [forged, [html('<i>deep</i>')]], forged])).toBe('<b>ok</b><i>deep</i>')
+    expect(element('div', [], () => child(forged)).t).toBe('<div></div>')
+    expect(element('div', [{ children: forged }]).t).toBe('<div></div>')
+    expect(raw([forged, html('<b>'), 'a</script>'])).toBe('<b>a<\\/script>')
+  })
+
+  it('does not trust a render copied through JSON or a spread of a plain object', () => {
+    expect(child(JSON.parse(JSON.stringify(html('<b>x</b>'))))).toBe('')
+    expect(child({ t: '<b>x</b>' })).toBe('')
+    expect(child({ ...html('<b>x</b>') })).toBe('<b>x</b>')
+  })
+
+  it('keeps what a component, an element and a dynamic tag render as markup', () => {
+    expect(child(element('p', [{ title: 'a' }], () => 'x'))).toBe('<p title="a">x</p>')
+    expect(child(dynamic('b', {}))).toBe('<b></b>')
+    expect(child(forged)).not.toContain('<img')
   })
 })
 
@@ -25,6 +49,17 @@ describe('element', () => {
   it('leaves out handlers, refs and empty values', () => {
     expect(element('button', [{ onClick: Number, ref: String, disabled: true, hidden: false, title: null, value: '' }]).t).toBe('<button disabled value></button>')
     expect(element('details', [{ open: true, ontoggle: 'x()' }]).t).toBe('<details open></details>')
+  })
+
+  it('leaves out a function that is no class or style, as the browser does, spread or not', () => {
+    const secret = 'token'
+    const format = () => `${secret}x`
+
+    expect(element('div', [{ format, title: 'a' }]).t).toBe('<div title="a"></div>')
+    expect(element('div', [spreadAttributes({ format, 'data-x': format, 'title': 'a' })]).t).toBe('<div title="a"></div>')
+    expect(attribute('data-format', format)).toBe('')
+    expect(element('input', [{ 'value': format, 'aria-describedby': format }]).t).not.toContain('token')
+    expect((dynamic('div', { format }) as { t: string }).t).toBe('<div></div>')
   })
 
   it('leaves out a handler in any case, and a name HTML would read as several attributes', () => {
@@ -117,6 +152,15 @@ describe('head', () => {
     expect(island.html).toBe('<meta name="kay-title" content="{&quot;template&quot;:&quot;%s | Site&quot;,&quot;fallback&quot;:&quot;Site&quot;}"><title>Room | Site</title>')
     expect(plain.html).toBe('<title>Room | Site</title>')
     expect(bare.html).toBe('<title>Room</title>')
+  })
+
+  it('leaves a function prop out of a tag and of the root attributes', () => {
+    const format = () => 'secret'
+    const { head: rendered } = collectHead(() => head([{ tag: 'meta', props: { name: 'x', content: 'a', format } }, { tag: 'html', props: { 'lang': 'fr', format, 'data-x': format } }]))
+
+    expect(rendered.html).toBe('<meta name="x" content="a">')
+    expect(rendered.root).not.toContain('secret')
+    expect(rendered.root).not.toContain('=>')
   })
 
   it('gathers the stylesheets and inline styles apart, for the component stylesheets to follow them', () => {

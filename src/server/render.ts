@@ -27,7 +27,7 @@ import { collectForms, OUTCOME_SCRIPT } from '../runtime/action'
 import { escapeAttribute } from '../runtime/escape'
 import { editMarks, placeFieldMarks, withFieldMarks } from '../runtime/fields'
 import { collectHead } from '../runtime/head'
-import { child, component, newServerIslands, withServerIslands } from '../runtime/html'
+import { child, component, html, newServerIslands, withServerIslands } from '../runtime/html'
 import { localePath, textDirection } from '../runtime/i18n'
 import { DEFAULT_MAX_DENSITY, RESOLVED_META } from '../runtime/image'
 import { localeState } from '../runtime/locale-state'
@@ -846,7 +846,7 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
   const file = marks === undefined ? undefined : options.editor
   const editor = file === undefined ? undefined : editors.get(file)
   // The editor renders once the page did, given each entry the page read, kept alive by the page swap, which hands it the next page's.
-  const shown = marks === undefined || editor === undefined ? view : () => ({ t: child(view()) + child(editor.default({ entries: noted(rendering.ctx.request, [...marks.entries.values()]), persist: true })) })
+  const shown = marks === undefined || editor === undefined ? view : () => html(child(view()) + child(editor.default({ entries: noted(rendering.ctx.request, [...marks.entries.values()]), persist: true })))
   // Its stylesheet comes last, after the page's.
   const styled = file === undefined || editor === undefined ? files : [...files, file]
   const { result: { result: { html: body, islands, deferred }, head }, forms } = withFieldMarks(marks, () => collectForms(() => collectHead(() => scan ? withServerIslands(scan, () => renderStatic(shown, undefined, chunks)) : renderStatic(shown, undefined, chunks), pageHead(modules, options.head?.(rendering.ctx.url, rendering.status)))))

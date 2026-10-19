@@ -1,8 +1,9 @@
 import type { JSX } from 'kay'
+import { html } from 'kay/html'
 
-// Markup only Outlook for Windows reads, inside a conditional comment. kay templates drop comments, but the server writes a `{ t }` value into the markup as it is.
+// Markup only Outlook for Windows reads, inside a conditional comment. kay templates drop comments, but the server writes what `html()` from `kay/html` made into the markup as it is.
 export function mso(markup: string, condition = 'mso'): JSX.Element {
-  return { t: `<!--[if ${condition}]>${markup}<![endif]-->` }
+  return html(`<!--[if ${condition}]>${markup}<![endif]-->`)
 }
 
 // A fixed-width table around content held to `width` by `max-width`, which Outlook ignores.

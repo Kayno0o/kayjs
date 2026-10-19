@@ -17,6 +17,7 @@ import { island } from '../src/runtime/island.server'
 import { navigation } from '../src/runtime/navigation'
 import { pageData } from '../src/runtime/page-data'
 import { createSignal } from '../src/runtime/reactive'
+import { html as rendered } from '../src/runtime/rendered'
 import { checkForm } from '../src/runtime/validate'
 import { encodeValue } from '../src/runtime/wire'
 import { servePages } from '../src/server/app'
@@ -174,7 +175,7 @@ describe('page swap, on the server', () => {
   })
 
   it('marks an island kept across navigations, under its component or a key of its own', () => {
-    const Player = island('player.kay', () => ({ t: '<button>Play</button>' }))
+    const Player = island('player.kay', () => rendered('<button>Play</button>'))
 
     expect(child(Player({ persist: true }))).toContain('<slot data-component="player.kay" data-props="[{}]" data-persist="player.kay">')
     expect(child(Player({ persist: 'radio' }))).toContain('data-persist="radio"')
@@ -182,7 +183,7 @@ describe('page swap, on the server', () => {
   })
 
   it('marks a kept island that hydrates when idle or visible with both', () => {
-    const Player = island('player.kay', () => ({ t: '<button>Play</button>' }))
+    const Player = island('player.kay', () => rendered('<button>Play</button>'))
 
     expect(child(Player({ persist: true, hydrate: 'idle' }))).toContain('data-props="[{}]" data-hydrate="idle" data-persist="player.kay">')
     expect(child(Player({ persist: 'radio', hydrate: 'visible' }))).toContain('data-hydrate="visible" data-persist="radio"')

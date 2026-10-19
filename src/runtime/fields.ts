@@ -1,4 +1,5 @@
 import { previewState } from './preview'
+import { html } from './rendered'
 
 // Edit mode's field markers: what an entry's data gives while a page renders for an editor tells which markup renders which field, and the page is marked for the CMS once whole.
 // Outside edit mode no entry is wrapped and no helper marks anything, so the markup is the same byte for byte.
@@ -115,7 +116,7 @@ export function editableEntry<E extends Editable>(marks: FieldMarks, collection:
     Content: () => {
       const rendered = Content() as { t: string }
 
-      return fieldMarks.marking === undefined ? rendered : { t: fenced(fieldMarks.marking, 'body', body, rendered.t) }
+      return fieldMarks.marking === undefined ? rendered : html(fenced(fieldMarks.marking, 'body', body, rendered.t))
     },
   }
 

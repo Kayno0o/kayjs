@@ -243,6 +243,7 @@ for product of products
 - `bind:value={signal}` on `input`, `textarea` and `select`, and `bind:checked={signal}` on a checkbox, read and write a signal both ways.
 - On `type="number"` and `type="range"` the signal holds a `number`, and keeps its last one while the input is empty.
 - `ref={el => ...}` receives the DOM element.
+- A function prop that is no handler, `class` or `style` (a slot or a formatter passed to a plain element) writes no attribute on the server either, as in the browser. Only what a component, an element or an island rendered counts as markup in `{}`: an object with a `t` string from JSON, such as a database column, is rendered as text.
 - `innerHTML` renders its value as markup, unescaped, and so does an `iframe`'s `srcdoc`.
 - Written out, `innerHTML="<b>hi</b>"` or `innerHTML={'<b>hi</b>'}`, it is the app's own.
 - Bound to a computed string, a template literal with values in it included, `kay check` and the editor report it unless the value is a `SafeHtml`, which `sanitizeHtml(markup)` and `trustHtml(markup)` from `kay` return.
