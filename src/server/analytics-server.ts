@@ -216,8 +216,10 @@ export function analyticsServer(options: AnalyticsOptions): AnyElysia {
       if (options.titles !== true)
         visit.title = ''
 
+      const excluded = skippedPath(options.exclude, visit.page.pathname, baseOf(request, visit.scope))
+
       // A development server, a test, a visitor who has not agreed where a yes is needed (the cookie is theirs to send, so a request without it is one the notice never asked) and one who opted out are answered as a counted visit, so nothing tells them apart.
-      if (process.env.NODE_ENV !== 'production' || declined(request, gated) || visit.userAgent === '')
+      if (process.env.NODE_ENV !== 'production' || declined(request, gated) || visit.userAgent === '' || excluded)
         return new Response(null, { status: 204 })
 
       const address = options.provider === 'ga4' || needsAddress(options) ? clientAddress(request, server) : ''
@@ -227,6 +229,24 @@ export function analyticsServer(options: AnalyticsOptions): AnyElysia {
 
       return new Response(null, { status: 204, headers: { 'cache-control': 'no-store' } })
     }, { parse: 'none' })
+}
+
+// The mount point the visit's page is under: what the request path has before the tracker's route, else the one the tracker names, a proxy having taken it off the request.
+function baseOf(request: Request, named: string): string {
+  const path = new URL(request.url).pathname
+  const stripped = path.endsWith(ANALYTICS_PATH) ? path.slice(0, -ANALYTICS_PATH.length) : ''
+
+  return stripped === '' ? named : stripped
+}
+
+// Whether `exclude` leaves out the page, matched as the tracker does so a tracker cached from before still counts nothing it should not: `/account` covers the page and all under it, `*` stands for one segment.
+function skippedPath(exclude: string[] | undefined, pathname: string, base: string): boolean {
+  if (exclude === undefined || exclude.length === 0)
+    return false
+
+  const parts = (pathname.startsWith(`${base}/`) ? pathname.slice(base.length) : pathname).split('/').filter(Boolean)
+
+  return exclude.some(pattern => pattern.split('/').filter(Boolean).every((word, at) => word === '*' ? parts[at] !== undefined : word === parts[at]))
 }
 
 // Passes a visit on in the background, the visitor's answer not waiting for the provider; past 200 waiting at once, a visit is dropped rather than queued.
@@ -337,7 +357,7 @@ function declined(request: Request, gated: boolean): boolean {
 }
 
 // The visit a browser reported, or undefined when anything is off: the page must be one of this site's own, so the route forwards for no other host.
-function readVisit(text: string, request: Request, hosts: ReadonlySet<string>): Omit<Visit, 'address'> | undefined {
+function readVisit(text: string, request: Request, hosts: ReadonlySet<string>): (Omit<Visit, 'address'> & { scope: string }) | undefined {
   let body: Record<string, unknown>
 
   try {
@@ -350,7 +370,7 @@ function readVisit(text: string, request: Request, hosts: ReadonlySet<string>): 
   if (typeof body !== 'object' || body === null || Array.isArray(body))
     return undefined
 
-  const { u, r, t, w, l } = body
+  const { u, r, t, w, l, s } = body
   const page = typeof u === 'string' && u.length <= MAX_URL_LENGTH ? URL.parse(u) : null
 
   if (page === null || (page.protocol !== 'https:' && page.protocol !== 'http:') || page.username !== '' || page.password !== '')
@@ -362,7 +382,7 @@ function readVisit(text: string, request: Request, hosts: ReadonlySet<string>): 
     return undefined
   }
 
-  if ([r, t, w, l].some(value => value !== undefined && typeof value !== 'string'))
+  if ([r, t, w, l, s].some(value => value !== undefined && typeof value !== 'string'))
     return undefined
 
   const referrer = typeof r === 'string' && r.length <= MAX_URL_LENGTH ? URL.parse(r) : null
@@ -378,6 +398,7 @@ function readVisit(text: string, request: Request, hosts: ReadonlySet<string>): 
     screen: typeof w === 'string' && SCREEN.test(w) ? w : undefined,
     language: typeof l === 'string' && LANGUAGE.test(l) ? l : undefined,
     userAgent: (request.headers.get('user-agent') ?? '').replace(CONTROL_CHARACTERS, ' ').trim().slice(0, MAX_USER_AGENT_LENGTH),
+    scope: typeof s === 'string' && BASE_PATH.test(s) ? s : '',
   }
 }
 

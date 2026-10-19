@@ -29,7 +29,7 @@ export const ANALYTICS_SCRIPT = `(() => {
     return gated ? choice() !== 'yes' : choice() === 'no'
   }
 
-  // A page the app left out, or one that asks search engines to skip it, is never counted.
+  // A page the app left out, or one that asks search engines to skip it is never counted.
   function skipped(url) {
     const parts = new URL(url).pathname.slice(scope === '/' ? 0 : scope.length).split('/').filter(Boolean)
 
@@ -40,7 +40,7 @@ export const ANALYTICS_SCRIPT = `(() => {
     if (blocked() || skipped(url))
       return
 
-    const body = JSON.stringify({ u: url, r: last, t: titles ? document.title : '', w: screen.width + 'x' + screen.height, l: navigator.language })
+    const body = JSON.stringify({ u: url, s: scope === '/' ? '' : scope, r: last, t: titles ? document.title : '', w: screen.width + 'x' + screen.height, l: navigator.language })
 
     last = url
 

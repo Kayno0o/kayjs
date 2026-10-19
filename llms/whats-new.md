@@ -7,6 +7,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `custom` analytics with `info: false` under a `base` names the base in its head tag too, so an app behind a proxy that takes the base off serves the tracker with the collect route under the base.
 - `kay check` warns (`large-public-image`) of an `img` using a public image over 256 KiB, which is sent unresized; import it from `src/` instead ([images](images.md)).
 - `kay check` points the `seo` and favicon lints of `kay.config.ts` at the key they are about (the `defineConfig` call for one that is missing), not at line 1 ([Lints](lints.md)).
+- The analytics server drops a visit to an `exclude` path too, so a tracker a browser cached for an hour counts nothing for it either ([Privacy](privacy.md)).
 
 ## 1.56.0
 

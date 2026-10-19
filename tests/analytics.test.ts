@@ -556,6 +556,42 @@ describe('hostile requests', () => {
   })
 })
 
+describe('pages left out', () => {
+  it('drops a visit to an excluded path on the server, whatever tracker sent it', async () => {
+    const app = await site(plausible({ exclude: ['/account', '/*/admin'] }))
+
+    for (const u of ['http://localhost/account', 'http://localhost/account/billing/', 'http://localhost/fr/admin/users'])
+      expect((await send(app, visit({ u }))).status).toBe(204)
+
+    expect(received).toHaveLength(0)
+
+    await send(app, visit({ u: 'http://localhost/accounts' }))
+    await send(app, visit({ u: 'http://localhost/admin' }))
+    expect(received.map(request => (request.body as { url: string }).url)).toEqual(['http://localhost/accounts', 'http://localhost/admin'])
+  })
+
+  it('reads the base off the request, or from the tracker when a proxy took it off', async () => {
+    const app = await site(plausible({ exclude: ['/account'] }))
+    const mounted = await testSite({ routes: join(dir, 'routes'), islands: false, base: '/shop', extensions: [analytics(plausible({ exclude: ['/account'] }))], proxy: { hops: 1 } })
+
+    try {
+      await send(app, visit({ u: 'http://localhost/shop/account', s: '/shop' }))
+      await send(app, visit({ u: 'http://localhost/shop/account', s: '"/evil' }))
+
+      const post = async (u: string) => mounted.fetch('/_kay/analytics', { method: 'POST', body: JSON.stringify(visit({ u, s: '/shop' })), headers: { 'user-agent': CHROME, 'x-forwarded-for': '198.51.100.30' } })
+
+      await post('http://localhost/shop/account/billing')
+      await post('http://localhost/shop/pricing')
+      await forwardsSettled()
+
+      expect(received.map(request => new URL((request.body as { url: string }).url).pathname)).toEqual(['/shop/account', '/shop/pricing'])
+    }
+    finally {
+      await mounted.close()
+    }
+  })
+})
+
 describe('under a base and a trailing slash', () => {
   it('serves the tracker, the page tag and the post under the base', async () => {
     const mounted = await testSite({ routes: join(dir, 'routes'), islands: false, base: '/shop', trailingSlash: 'always', extensions: [analytics(plausible({ consent: true }))], proxy: { hops: 1 } })
