@@ -19,7 +19,7 @@ import { USAGES } from './usages'
 // With `--compile`, also bundles the server and all of it into one executable; with `--static`, writes the whole site to `--outdir`, `dist` by default, for a host with no server. `--no-check` builds without checking, `--no-cache` without what earlier builds left in `.kay/cache`.
 export const build: Command = {
   usage: USAGES.build,
-  options: { 'compile': { type: 'string' }, 'verify': { type: 'boolean' }, 'entry': { type: 'string' }, 'static': { type: 'boolean' }, 'outdir': { type: 'string' }, 'no-check': { type: 'boolean' }, 'no-cache': { type: 'boolean' }, 'analyze': { type: 'boolean' }, 'deny-warnings': { type: 'boolean' }, 'project': { type: 'string', short: 'p' }, 'format': { type: 'string' }, 'quiet': { type: 'boolean' } },
+  options: { 'compile': { type: 'string' }, 'verify': { type: 'boolean' }, 'verify-load': { type: 'boolean' }, 'entry': { type: 'string' }, 'static': { type: 'boolean' }, 'outdir': { type: 'string' }, 'no-check': { type: 'boolean' }, 'no-cache': { type: 'boolean' }, 'analyze': { type: 'boolean' }, 'deny-warnings': { type: 'boolean' }, 'project': { type: 'string', short: 'p' }, 'format': { type: 'string' }, 'quiet': { type: 'boolean' } },
   positionals: 1,
   run: async ({ values, positionals }, refuseUsage) => {
     const { compile, outdir, project: tsconfig } = values
@@ -47,6 +47,12 @@ export const build: Command = {
     if (values.verify === true && typeof compile !== 'string')
       return refuse('--verify starts the executable --compile writes, so it goes with --compile')
 
+    if (values['verify-load'] === true && typeof compile !== 'string')
+      return refuse('--verify-load loads the modules of the executable --compile writes, so it goes with --compile')
+
+    if (values.verify === true && values['verify-load'] === true)
+      return refuse('--verify starts the executable and --verify-load only loads its modules; pick one')
+
     if (exported && typeof compile === 'string')
       return refuse('--static writes files for a host with no server, and --compile a server; pick one')
 
@@ -63,7 +69,7 @@ export const build: Command = {
     const options: BuildOptions = {
       check: checking && { tsconfig: typeof tsconfig === 'string' ? tsconfig : undefined, entry },
       exportTo: exported ? resolve(typeof outdir === 'string' ? outdir : join(root, 'dist')) : undefined,
-      compile: typeof compile === 'string' ? { outfile: resolve(compile), entry, verify: values.verify === true } : undefined,
+      compile: typeof compile === 'string' ? { outfile: resolve(compile), entry, verify: values['verify-load'] === true ? 'load' : values.verify === true } : undefined,
       fresh: values['no-cache'] === true,
       analyze: values.analyze === true,
       denyWarnings: values['deny-warnings'] === true,

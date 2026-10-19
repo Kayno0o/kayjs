@@ -50,18 +50,7 @@ export async function verifyExecutable(executable: string, root: string, health:
   const printed = capture(server)
   const running = () => server.exitCode === null && server.signalCode === null
   const live = new Set<Bun.Subprocess>([server])
-  const interrupts = Object.entries(INTERRUPTS).map(([signal, code]) => ({
-    signal: signal as keyof typeof INTERRUPTS,
-    handler: () => {
-      for (const child of live)
-        signalGroup(child, 'SIGKILL')
-
-      process.exit(code)
-    },
-  }))
-
-  for (const { signal, handler } of interrupts)
-    process.on(signal, handler)
+  const release = onInterrupt(live)
 
   try {
     const url = `http://127.0.0.1:${port}${health === false ? '/' : health?.path ?? HEALTH_PATH}`
@@ -124,8 +113,7 @@ export async function verifyExecutable(executable: string, root: string, health:
     }
   }
   finally {
-    for (const { signal, handler } of interrupts)
-      process.off(signal, handler)
+    release()
 
     for (const child of live)
       await stop(child)
@@ -134,6 +122,68 @@ export async function verifyExecutable(executable: string, root: string, health:
   }
 
   return performance.now() - started
+}
+
+export interface LoadOptions {
+  timeoutMs?: number
+}
+
+// Runs the executable as `--load`, which loads every module it carries as the server would and exits before the server entry runs, with the variables the build has: a database or a secret the entry needs is not asked for, as the server is never started.
+// A module that fails to load, or a load that takes longer than 30 s, fails with the executable's own output.
+export async function loadExecutable(executable: string, root: string, options: LoadOptions = {}): Promise<number> {
+  const { timeoutMs = START_TIMEOUT_MS } = options
+  const started = performance.now()
+  const child = Bun.spawn([executable, '--load'], { cwd: root, env: { ...process.env, NODE_ENV: 'production' }, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe', detached: true })
+  const printed = capture(child)
+  const release = onInterrupt(new Set([child]))
+  let timer: ReturnType<typeof setTimeout> | undefined
+
+  try {
+    const timeout = new Promise<'timeout'>((resolve) => {
+      timer = setTimeout(resolve, timeoutMs, 'timeout')
+    })
+
+    if (await Promise.race([child.exited, timeout]) === 'timeout') {
+      await stop(child)
+
+      throw new KayError('executable-failed', `kay: the executable did not finish loading its modules within ${timeoutMs / 1000} s\n${tail(await printed.text())}`.trimEnd())
+    }
+
+    if (child.exitCode !== 0) {
+      const how = child.signalCode === null ? `exited with code ${child.exitCode}` : `was killed by ${child.signalCode}`
+
+      throw new KayError('executable-failed', `kay: the executable ${how} while loading its modules\n${tail(await printed.text())}`.trimEnd())
+    }
+  }
+  finally {
+    clearTimeout(timer)
+    release()
+    await stop(child)
+    await printed.close()
+  }
+
+  return performance.now() - started
+}
+
+// Kills the groups of `live` and exits as the signal would when the build is interrupted; the function it gives back takes the handlers off.
+function onInterrupt(live: Set<Bun.Subprocess>): () => void {
+  const interrupts = Object.entries(INTERRUPTS).map(([signal, code]) => ({
+    signal: signal as keyof typeof INTERRUPTS,
+    handler: () => {
+      for (const child of live)
+        signalGroup(child, 'SIGKILL')
+
+      process.exit(code)
+    },
+  }))
+
+  for (const { signal, handler } of interrupts)
+    process.on(signal, handler)
+
+  return () => {
+    for (const { signal, handler } of interrupts)
+      process.off(signal, handler)
+  }
 }
 
 // What the server prints, which a grandchild it left running may keep the pipes open on after it exits: the reader gives up OUTPUT_GRACE_MS after the server is gone, with what it got.

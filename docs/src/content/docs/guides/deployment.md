@@ -52,6 +52,14 @@ The build fails with the last 40 lines the server wrote when the server exits ea
 
 The check runs your server entry, so whatever it needs at startup, such as a database URL, has to be in the build's environment. That is why it is off by default. Add it to the CI step that builds your image.
 
+A Dockerfile build stage has neither a database nor your secrets. There, use `--verify-load`:
+
+```sh
+kay build --compile server --verify-load
+```
+
+It runs `./server --load`, which loads every module the executable carries and stops before your server entry runs. A variable your `defineEnv` needs in production is not asked for, so it fails only the code that reads it. A module that cannot load fails the build with the executable's output, as `--verify` does. It cannot catch what your server entry does at startup, so keep `--verify` where the real environment is.
+
 With `health: false`, any answer on the port counts and `--health` is not run.
 
 <ReadMore href="/llms/production#check-the-executable-starts">The exact failure conditions, the process group and the Linux socket check are in the full production reference.</ReadMore>

@@ -3,7 +3,7 @@ import { join, relative } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { outputDir } from '../src/build/assets'
-import { holdsRunning, verifyExecutable } from '../src/build/verify'
+import { holdsRunning, loadExecutable, verifyExecutable } from '../src/build/verify'
 import { LINT_GROUPS, LINTS } from '../src/compiler/lints'
 import { scratchDir } from './scratch'
 
@@ -27,7 +27,11 @@ async function project(files: Record<string, string>): Promise<string> {
 }
 
 async function kay(args: string[], cwd = process.cwd()) {
-  const child = Bun.spawn([process.execPath, cli, ...args], { cwd, stdout: 'pipe', stderr: 'pipe' })
+  return kayWith(args, process.env, cwd)
+}
+
+async function kayWith(args: string[], env: Record<string, string | undefined>, cwd = process.cwd()) {
+  const child = Bun.spawn([process.execPath, cli, ...args], { cwd, env, stdout: 'pipe', stderr: 'pipe' })
   const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
 
   return { stdout, stderr, code }
@@ -190,6 +194,51 @@ describe('kay build --format json', () => {
     expect(alone.stderr).toContain('--verify starts the executable --compile writes')
   }, 120_000)
 
+  it('loads the modules of the executable under --verify-load with no database or secret, and fails the build with the output of one that cannot load', async () => {
+    // The entry asks for a secret and a database as an app's does, and leaves a marker where it runs: --verify-load must reach neither.
+    const entry = 'import { writeFileSync } from \'node:fs\'\nimport { Elysia } from \'elysia\'\nimport { defineEnv, pages } from \'kay/server\'\nimport { s } from \'kay\'\n\nwriteFileSync(\'entry-ran\', \'yes\')\ndefineEnv(s.Object({ KAY_TEST_SECRET: s.String({ requiredInProduction: true }) }))\nnew Elysia().use(await pages()).listen(Number(process.env.PORT))\n'
+    // An API module reading the same secret at the top of its module, which loads before the entry does.
+    const secret = 'import { s } from \'kay\'\nimport { api, defineEnv } from \'kay/server\'\n\ndefineEnv(s.Object({ KAY_TEST_SECRET: s.String({ requiredInProduction: true }) }))\n\nexport default api().get(\'/\', () => \'ok\')\n'
+    const files = { 'kay.config.ts': 'export default { favicon: false }\n', 'src/routes/index.kay': 'p Home\n', 'src/api/secret.ts': secret, 'src/server.ts': entry }
+    const working = await project(files)
+    const env = { ...process.env }
+
+    delete env.KAY_TEST_SECRET
+
+    const verified = await kayWith(['build', working, '--no-check', '--compile', join(working, 'server'), '--verify-load', '--format', 'json'], env)
+
+    expect(verified.code, verified.stderr).toBe(0)
+    expect(document<{ compiled: { verifiedMs: number } }>(verified.stdout).compiled.verifiedMs).toBeGreaterThan(0)
+    expect(await Bun.file(join(working, 'entry-ran')).exists()).toBe(false)
+    expect(await Bun.file(join(outputDir(working), 'executable')).exists()).toBe(true)
+
+    // The same executable under --verify starts the entry, which the missing secret stops.
+    const started = await kayWith(['build', working, '--no-check', '--compile', join(working, 'server'), '--verify'], env)
+
+    expect(started.code).toBe(1)
+    expect(started.stderr).toContain('KAY_TEST_SECRET')
+
+    // A module that only fails inside the executable, as one loading a file the bundle does not carry does.
+    const broken = await project({ ...files, 'src/api/gone.ts': 'import { api } from \'kay/server\'\n\nif (import.meta.dir.startsWith(\'/$bunfs\'))\n  throw new Error(\'boom at load\')\n\nexport default api().get(\'/\', () => \'ok\')\n' })
+    const failed = await kayWith(['build', broken, '--no-check', '--compile', join(broken, 'server'), '--verify-load'], env)
+
+    expect(failed.code).toBe(1)
+    expect(failed.stderr).toContain('the executable exited with code')
+    expect(failed.stderr).toContain('while loading its modules')
+    expect(failed.stderr).toContain('boom at load')
+    expect(await Bun.file(join(outputDir(broken), 'executable')).exists()).toBe(false)
+  }, 180_000)
+
+  it('refuses --verify-load without --compile or beside --verify', async () => {
+    const alone = await kay(['build', '.', '--no-check', '--verify-load'])
+    const both = await kay(['build', '.', '--no-check', '--compile', 'server', '--verify', '--verify-load'])
+
+    expect(alone.code).toBe(1)
+    expect(alone.stderr).toContain('--verify-load loads the modules of the executable --compile writes, so it goes with --compile')
+    expect(both.code).toBe(1)
+    expect(both.stderr).toContain('pick one')
+  })
+
   describe('verifying an executable', () => {
     // A script run as the executable would be.
     async function executable(script: string): Promise<{ file: string, root: string }> {
@@ -203,6 +252,20 @@ describe('kay build --format json', () => {
     }
 
     const serving = (status: number) => `#!/usr/bin/env bun\nBun.serve({ hostname: '127.0.0.1', port: Number(process.env.PORT), fetch: () => new Response('', { status: ${status} }) })\nif (process.argv[2] === '--health') process.exit(0)\n`
+
+    it('loads an executable that exits 0 when run as --load, and fails with its output when it exits otherwise', async () => {
+      const passing = await executable('#!/usr/bin/env bun\nif (process.argv[2] !== \'--load\') process.exit(3)\n')
+      const failing = await executable('#!/usr/bin/env bun\nconsole.error(\'cannot find module gone\')\nprocess.exit(1)\n')
+
+      expect(await loadExecutable(passing.file, passing.root)).toBeGreaterThan(0)
+      await expect(loadExecutable(failing.file, failing.root)).rejects.toThrow(/exited with code 1 while loading its modules\ncannot find module gone/)
+    })
+
+    it('gives up on a load that never ends, naming what it printed', async () => {
+      const hanging = await executable('#!/usr/bin/env bun\nconsole.log(\'loading\')\nawait new Promise(() => setInterval(() => {}, 1000))\n')
+
+      await expect(loadExecutable(hanging.file, hanging.root, { timeoutMs: 1500 })).rejects.toThrow(/did not finish loading its modules within 1.5 s\nloading/)
+    })
 
     it('verifies a server that reads HOST from the build\'s environment, which it pins to loopback', async () => {
       const reading = await executable('#!/usr/bin/env bun\nBun.serve({ hostname: process.env.HOST, port: Number(process.env.PORT), fetch: () => new Response(\'ok\') })\nif (process.argv[2] === \'--health\') process.exit(0)\n')

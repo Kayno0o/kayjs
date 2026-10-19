@@ -127,6 +127,7 @@ Open pages refresh by themselves, an edited island is swapped in place, and a pr
 
 | Option | Effect |
 | --- | --- |
+| `--verify-load` | With `--compile`, only loads the modules of the executable, with no database or secret, for a container build stage; not with `--verify` |
 | `--entry <file>` | The server entry, when `entry` in `kay.config.ts` does not name it |
 | `--port <port>` | Sets `PORT` for the server, over the shell's and the `.env`'s |
 | `--host[=<address>]` | Listens past this machine: on `0.0.0.0`, or on the address given. Needed in a container publishing its port |

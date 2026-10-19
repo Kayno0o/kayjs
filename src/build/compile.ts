@@ -113,7 +113,7 @@ export async function compileServer(project: Project, options: CompileOptions): 
   await Bun.write(generated, [
     `import { join } from 'node:path'`,
     `import process from 'node:process'`,
-    `import { probeHealth, registerBundle } from 'kay/internal/server'`,
+    `import { buildingWithoutEnv, probeHealth, registerBundle } from 'kay/internal/server'`,
     // An embedded file, read only for `--licenses`, so the server keeps none of it in memory.
     `import notices from ${JSON.stringify(notices)} with { type: 'file' }`,
     '',
@@ -125,6 +125,12 @@ export async function compileServer(project: Project, options: CompileOptions): 
     // For code reading it off `node:process`, as kay does, which the build's `define` leaves alone.
     'Bun.env.NODE_ENV = \'production\'',
     '',
+    // `--load` loads every module and stops before the server entry, which is where a database or a secret is asked for: a variable missing fails the code reading it, not the module declaring it, as under `kay build`.
+    'const loading = process.argv.includes(\'--load\')',
+    '',
+    'if (loading)',
+    '  buildingWithoutEnv()',
+    '',
     existsSync(configFile) ? `const { default: config } = await import(${JSON.stringify(configFile)})` : 'const config = {}',
     '',
     // Asks the server running beside it, rather than starting one, before any module of the app loads: a container's health check runs it every few seconds.
@@ -132,6 +138,9 @@ export async function compileServer(project: Project, options: CompileOptions): 
     '  process.exit(await probeHealth(config.health))',
     '',
     ...modules.map((file, index) => `const module${index} = await import(${JSON.stringify(file)})`),
+    '',
+    'if (loading)',
+    '  process.exit(0)',
     '',
     'registerBundle({',
     `  root: ${JSON.stringify(root)},`,

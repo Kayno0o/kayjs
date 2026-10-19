@@ -47,7 +47,7 @@ import { writeSearchIndex } from './search'
 import { inSignalsScope } from './signals'
 import { exportStatic, refuseStaticConfig } from './static'
 import { pruneCompileCache } from './transform'
-import { verifyExecutable } from './verify'
+import { loadExecutable, verifyExecutable } from './verify'
 import { warnServerClasses } from './warn-classes'
 
 const JSON_EXTENSION = /\.json$/
@@ -72,7 +72,7 @@ export interface BuildOptions {
   exportTo?: string | undefined
   // Bundles the server, `entry` or the project's own, and all of it into one executable.
   // `verify` then starts it as a deploy would and waits for its health route, failing the stage with the server's own output.
-  compile?: { outfile: string, entry?: string | undefined, verify?: boolean | undefined } | undefined
+  compile?: { outfile: string, entry?: string | undefined, verify?: boolean | 'load' | undefined } | undefined
   // Empties `.kay/cache` first, so nothing an earlier build left there is read; the chunks kept for open tabs and the last build's sizes stay.
   fresh?: boolean | undefined
   // Breaks the size report down by module.
@@ -276,7 +276,9 @@ async function runBuild(root: string, config: KayConfig, options: BuildOptions):
 
       result.compiled = { executable, ms: performance.now() - stage }
 
-      if (options.compile.verify)
+      if (options.compile.verify === 'load')
+        result.compiled.verifiedMs = await loadExecutable(executable, root)
+      else if (options.compile.verify)
         result.compiled.verifiedMs = await verifyExecutable(executable, root, project.config.health)
 
       // Written once the executable runs, so `kay start` never runs one that failed its verify.
