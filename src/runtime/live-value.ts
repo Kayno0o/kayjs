@@ -400,6 +400,8 @@ function sync(): void {
     return
   }
 
+  followVisibility()
+
   if (document.hidden)
     return
 
@@ -439,8 +441,14 @@ function sync(): void {
   reader.start()
 }
 
-// A hidden tab holds no connection and renews no proof; shown again, it opens one that starts with every value as it is then.
-if (typeof document !== 'undefined') {
+let followingVisibility = false
+
+// A hidden tab holds no connection and renews no proof; shown again, it opens one that starts with every value as it is then. Installed by the first sync, so a bundle that never reads a live value keeps none of this module.
+function followVisibility(): void {
+  if (followingVisibility)
+    return
+
+  followingVisibility = true
   document.addEventListener('visibilitychange', () => {
     if (document.hidden)
       release()
