@@ -84,6 +84,30 @@ afterAll(async () => {
   await rm(out, { recursive: true, force: true })
 })
 
+const INLINE_ELEMENT = /<(script|style)(?:\s[^>]*)?>([^<]+)<\/\1>/g
+
+// The inline scripts and styles of every page of an export that its `_headers` policy lets through neither by their hash nor by `'unsafe-inline'`, which a browser ignores beside a hash, and the number of inline elements it checked.
+async function uncoveredInline(dir: string): Promise<{ uncovered: string[], checked: number }> {
+  const policy = (await Bun.file(join(dir, '_headers')).text()).match(/Content-Security-Policy: (.+)/)![1]!
+  const directives = new Map(policy.split(';').map(part => part.trim().split(' ')).map(([name, ...sources]) => [name!, sources]))
+  const uncovered: string[] = []
+  let checked = 0
+
+  for (const page of await Array.fromAsync(new Bun.Glob('**/*.html').scan({ cwd: dir }))) {
+    for (const [, tag, body] of (await Bun.file(join(dir, page)).text()).matchAll(INLINE_ELEMENT)) {
+      const hash = `'sha256-${new Bun.CryptoHasher('sha256').update(body!).digest('base64')}'`
+      const sources = directives.get(tag === 'script' ? 'script-src' : 'style-src') ?? directives.get('default-src')!
+
+      checked++
+
+      if (!sources.includes(hash) && !(sources.includes('\'unsafe-inline\'') && !sources.some(source => source.startsWith('\'sha256-'))))
+        uncovered.push(`${page}: ${tag} ${hash} is in none of ${sources.join(' ')}`)
+    }
+  }
+
+  return { uncovered, checked }
+}
+
 describe('kay build --static', () => {
   it('writes every page, linked under the mount point, as a plain file server finds it', async () => {
     const home = await get('/')
@@ -335,6 +359,37 @@ describe('kay build --static', () => {
     expect(include).not.toContain('Strict-Transport-Security')
     // Every line is one directive nginx reads: no quote or backslash left raw, nothing to expand.
     expect(include.trim().split('\n').filter(line => !(/^add_header [\w-]+ "(?:[^"\\$]|\\.)*" always;$/).test(line))).toEqual([])
+  })
+
+  it('covers every inline script and style of every exported page with a hash of the exported CSP', async () => {
+    const { uncovered, checked } = await uncoveredInline(out)
+
+    expect(checked).toBeGreaterThan(3)
+    expect(uncovered).toEqual([])
+  })
+
+  it('covers the inline scripts and styles of a site without a base, its styles inlined', async () => {
+    const fixture = await fixtureCopy('static')
+    const elsewhere = await mkdtemp(join(tmpdir(), 'kay-static-'))
+
+    try {
+      const config = join(fixture, 'kay.config.ts')
+
+      await Bun.write(config, (await Bun.file(config).text()).replace('  base: \'/repo\',\n', '').replace('  inlineStyles: false,\n', ''))
+
+      const { code, errors } = await exportSite(elsewhere, fixture)
+      const { uncovered, checked } = await uncoveredInline(elsewhere)
+
+      expect(errors).not.toContain('error')
+      expect(code).toBe(0)
+      expect(await Bun.file(join(elsewhere, 'index.html')).text()).toContain('<style')
+      expect(checked).toBeGreaterThan(3)
+      expect(uncovered).toEqual([])
+    }
+    finally {
+      await rm(fixture, { recursive: true, force: true })
+      await rm(elsewhere, { recursive: true, force: true })
+    }
   })
 
   it('escapes the quotes of a header for nginx and leaves out one it cannot spell', () => {
