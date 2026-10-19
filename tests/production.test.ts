@@ -938,6 +938,21 @@ console.log(JSON.stringify(store.hit('203.0.113.7', 60_000).count))
     }
   })
 
+  it('replaces a key file holding no key, once', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kay-rates-'))
+    const path = join(dir, 'rates.sqlite')
+
+    try {
+      await Bun.write(`${path}.key`, 'short')
+      await sqliteRates(path).hit('a', 60_000)
+      expect((await Bun.file(`${path}.key`).text()).length).toBe(43)
+      expect((await readdir(dir)).filter(name => name.includes('.key'))).toEqual(['rates.sqlite.key'])
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
   it('makes no key file while the app\'s secret is set', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'kay-rates-'))
     const script = `import { sqliteRates } from ${JSON.stringify(join(import.meta.dir, '../src/server/protection.ts'))}

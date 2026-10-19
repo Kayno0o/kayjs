@@ -164,7 +164,11 @@ function ratesKeyFile(path: string): Buffer {
 
       return key.length === RATES_KEY_BYTES ? key : undefined
     }
-    catch {
+    catch (error) {
+      // A file another user owns is no key to replace silently.
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT')
+        throw error
+
       return undefined
     }
   }
@@ -176,21 +180,24 @@ function ratesKeyFile(path: string): Buffer {
   const key = Buffer.from(crypto.getRandomValues(new Uint8Array(RATES_KEY_BYTES)))
   const temp = `${file}.${process.pid}.${crypto.randomUUID()}`
 
-  writeFileSync(temp, key.toString('base64url'), { mode: 0o600 })
-
   try {
+    writeFileSync(temp, key.toString('base64url'), { mode: 0o600 })
     // A hard link fails when another process won the race, where a rename would replace its key.
     linkSync(temp, file)
 
     return key
   }
-  catch {
-    // A file that is there but unreadable as a key is replaced; one another process just made is read.
+  catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'EEXIST')
+      throw error
+
+    // A file holding no key is replaced; one another process just made is read.
     const won = read()
 
     if (won)
       return won
 
+    kayLog('warn', `kay: ${file} held no rate-limit key and was replaced`)
     renameSync(temp, file)
 
     return key
@@ -208,6 +215,8 @@ export function sqliteRates(path: string): RateStore {
   db.run('CREATE TABLE IF NOT EXISTS kay_rates (key TEXT PRIMARY KEY, count INTEGER NOT NULL, reset_at INTEGER NOT NULL)')
   // The sweep deletes by `reset_at`, so an index keeps it off a scan of every key.
   db.run('CREATE INDEX IF NOT EXISTS kay_rates_reset ON kay_rates (reset_at)')
+
+  db.run('DROP TABLE IF EXISTS kay_rates_salt')
 
   // Read on the first key hashed without a secret, so an app with one never makes the file.
   let ownKey: Buffer | undefined
