@@ -26,6 +26,38 @@ describe('publicCache', () => {
     expect(['/a/x', '/b/x', '/c/x', '/d/x'].map(rules)).toEqual(['public, max-age=1', 'public, max-age=2', 'public, max-age=1', 'public, max-age=120'])
   })
 
+  it('keeps a font for 30 days and an image for a day with no setting, and revalidates the rest', async () => {
+    const app = await appWith({ dev: false })
+
+    expect((await fetchFrom(app, '/fonts/a.woff2')).headers.get('cache-control')).toBe('public, max-age=2592000')
+    expect((await fetchFrom(app, '/img/logo.png')).headers.get('cache-control')).toBe('public, max-age=86400')
+    expect((await fetchFrom(app, '/notes.txt')).headers.get('cache-control')).toBe('public, max-age=0, must-revalidate')
+  })
+
+  it('keeps the default by kind through a 304, under a base and with a setting for another path', async () => {
+    const app = await appWith({ dev: false, base: '/docs', publicCache: { '/other/**': '1d' } })
+    const first = await fetchFrom(app, '/fonts/a.woff2')
+    const again = await fetchFrom(app, '/fonts/a.woff2', { 'if-none-match': first.headers.get('etag')! })
+
+    expect(again.status).toBe(304)
+    expect(again.headers.get('cache-control')).toBe('public, max-age=2592000')
+  })
+
+  it('revalidates a public font or image in development, so an edit shows at once', async () => {
+    const app = await appWith({ dev: true })
+
+    expect((await fetchFrom(app, '/fonts/a.woff2')).headers.get('cache-control')).toBe('public, max-age=0, must-revalidate')
+    expect((await fetchFrom(app, '/img/logo.png')).headers.get('cache-control')).toBe('public, max-age=0, must-revalidate')
+  })
+
+  it('decides by the extension, whatever its case, and never keeps what must stay fresh', () => {
+    const rules = publicCacheRules(undefined)
+    const revalidate = 'public, max-age=0, must-revalidate'
+
+    expect(['/A.PNG', '/x/f.WOFF2', '/favicon.ico', '/a.b.svg'].map(rules)).toEqual(['public, max-age=86400', 'public, max-age=2592000', 'public, max-age=86400', 'public, max-age=86400'])
+    expect(['/sw.js', '/robots.txt', '/manifest.webmanifest', '/site.json', '/png', '/a.png.html', '/a.css', '/.well-known/x'].map(rules).every(control => control === revalidate)).toBe(true)
+  })
+
   const publicCache: KayConfig['publicCache'] = { '/fonts/**': '365d', '**/*.png': '1d', '/img/*': '1h' }
 
   it('gives a public file the cache of the first pattern its path matches, and keeps revalidating the others', async () => {

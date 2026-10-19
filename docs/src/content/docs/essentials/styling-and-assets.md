@@ -104,7 +104,9 @@ An HTML file is also served without its `.html`, as a static host does. `public/
 
 Dotfiles, `.env` files and editor backups are neither served nor exported. `.well-known/` is the one dotfile folder that is served. A static export keeps `.htaccess` and `.nojekyll`, which the host reads.
 
-A public file keeps its name when its content changes, so the browser asks the server about it on every visit and gets a 304 while it is unchanged. For files that rarely change, such as fonts, set `publicCache` in `kay.config.ts` to have the browser keep them for a while without asking:
+A public file keeps its name when its content changes, so the browser cannot know when to fetch it again. Kay lets it keep a font for 30 days and an image for a day without asking, so a logo replaced in place shows within a day of the deploy. Everything else, such as `robots.txt`, a manifest or a script, is checked on every visit and answered with a 304 while it is unchanged. `kay dev` always checks, so an edit shows at once.
+
+To choose other times, set `publicCache` in `kay.config.ts`:
 
 ```ts
 export default {
@@ -112,7 +114,7 @@ export default {
 }
 ```
 
-Each key is a glob on the served path and each value a duration. The first glob a file matches decides, and a file none matches keeps revalidating. `kay dev` ignores it, so an edit shows at once. A static export copies the files, so there the host sets their headers.
+Each key is a glob on the served path and each value a duration. The first glob a file matches decides, and a file none matches gets the times above. A static export copies the files, so there the host sets their headers. The `nginx.conf` of a new static site sets the same two times.
 
 <ReadMore href="/llms/styles-and-assets">The editor backup extensions that are left out, and how a public file and a page with the same URL conflict.</ReadMore>
 

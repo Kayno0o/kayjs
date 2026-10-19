@@ -21,6 +21,11 @@ const LEFT_BEHIND = /\.env(?:\..*)?$|\.(?:bak|old|orig|swp|tmp)$|~$/i
 const HOST_FILES = new Set(['.htaccess', '.nojekyll'])
 const INDEX = '/index.html'
 const LEADING_SLASH = /^\//
+// The kinds of public file that rarely change, kept without asking again unless `publicCache` says otherwise: a font for 30 days, an image for a day, so one replaced in place shows within a day of the deploy.
+const FONT = /\.(?:woff2?|ttf|otf|eot)$/i
+const IMAGE = /\.(?:png|jpe?g|gif|webp|avif|svg|ico|bmp)$/i
+const FONT_CONTROL = `public, max-age=${30 * 86_400}`
+const IMAGE_CONTROL = 'public, max-age=86400'
 
 export interface PublicFile {
   path: string
@@ -118,7 +123,7 @@ export function matchesEtag(header: string | null, etag: string): boolean {
 }
 
 // One route per file found at boot: no file system lookup per request, and no path a request could steer outside the directory.
-// Files keep their names, so browsers revalidate them every time and get a 304 while they are unchanged.
+// Files keep their names, so what is not kept by `cache` is revalidated every time and answered with a 304 while it is unchanged.
 // The body, or a 304 when the browser already holds the version the ETag names, carrying the same headers.
 // `cache` replaces the header for a file that may be kept for a while before it is asked about again.
 export function revalidated(request: Request, etag: string, body: () => BodyInit, headers: Record<string, string> = {}, cache = REVALIDATE): Response {
@@ -128,11 +133,18 @@ export function revalidated(request: Request, etag: string, body: () => BodyInit
   return new Response(body(), { headers: { ...headers, etag, 'cache-control': cache } })
 }
 
-// The `cache-control` of each public file the `publicCache` setting names, the first pattern a path matches deciding; a file it leaves out keeps revalidating.
+// The `cache-control` of each public file the `publicCache` setting names, the first pattern a path matches deciding; a file it leaves out is kept by its kind, a font or an image, and else revalidates, as a manifest, `robots.txt`, a script or a page must.
 export function publicCacheRules(setting: Record<string, Duration> | undefined): ((url: string) => string) {
   const rules = Object.entries(setting ?? {}).map(([pattern, value]) => ({ glob: new Bun.Glob(pattern.replace(LEADING_SLASH, '')), control: `public, max-age=${wholeSeconds(value, `publicCache['${pattern}']`)}` }))
 
-  return url => rules.find(rule => rule.glob.match(url.replace(LEADING_SLASH, '')))?.control ?? REVALIDATE
+  return url => rules.find(rule => rule.glob.match(url.replace(LEADING_SLASH, '')))?.control ?? defaultControl(url)
+}
+
+function defaultControl(url: string): string {
+  if (FONT.test(url))
+    return FONT_CONTROL
+
+  return IMAGE.test(url) ? IMAGE_CONTROL : REVALIDATE
 }
 
 // Registered once every path is claimed, so a path an HTML file was only offered and something claimed since is not served twice.

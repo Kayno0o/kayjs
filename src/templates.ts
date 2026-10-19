@@ -625,6 +625,14 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
     add_header Strict-Transport-Security "max-age=31536000" always;
   }
 
+  location ~* \\.(?:woff2?|ttf|otf)$ {
+    add_header Cache-Control "public, max-age=2592000";
+  }
+
+  location ~* \\.(?:png|jpe?g|gif|webp|avif|svg|ico)$ {
+    add_header Cache-Control "public, max-age=86400";
+  }
+
   location / {
     try_files $uri $uri.html $uri/index.html =404;
   }${has('starter') ? '\n\n  error_page 404 /404.html;' : ''}
