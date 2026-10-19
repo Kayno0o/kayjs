@@ -1001,7 +1001,7 @@ function stylesheets(client: ClientBuild, files: string[]): string {
   })
 }
 
-// Preloads every chunk the page's eager islands need, so the browser fetches them alongside the entry instead of one round trip after another. A streamed page loads the entry after its first part instead.
+// Preloads every chunk the page's eager islands need, and the code waiting for a `visible` or `idle` one when it holds any, so the browser fetches them alongside the entry instead of one round trip after another. A streamed page loads the entry after its first part instead.
 // A page without islands needs no hydration script, only the entry swapping pages.
 function islandScripts(client: ClientBuild, islands: Set<string>, streamed: boolean, hydration: boolean, lazy: boolean): string {
   return islandScriptsOf(client, `${streamed}\n${hydration}\n${lazy}\n${[...islands].sort().join('\n')}`, () => {

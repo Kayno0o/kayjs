@@ -75,7 +75,7 @@ describe('a page whose navigate-api chunk fails to load with the build unchanged
   let assigned: Mock<typeof location.assign>
 
   const answer = (response: Response) => {
-    fetched = spyOn(globalThis, 'fetch').mockImplementation((async () => response) as unknown as typeof fetch)
+    fetched = spyOn(globalThis, 'fetch').mockImplementation((async () => response.clone()) as unknown as typeof fetch)
     reloaded = spyOn(location, 'reload').mockImplementation(() => undefined)
     assigned = spyOn(location, 'assign').mockImplementation(() => undefined)
     // As `startNavigation` registers it.
@@ -118,6 +118,21 @@ describe('a page whose navigate-api chunk fails to load with the build unchanged
     await settle()
 
     expect(reloaded).not.toHaveBeenCalled()
+    expect(navigation.stale).toBe(true)
+  })
+
+  it('reloads once a minute at most, so a chunk missing for good cannot loop the page', async () => {
+    answer(new Response(stringify('ok')))
+    behave('navigate-api', 'fail')
+
+    const call = actionStub('/_kay/action/test/refresh') as unknown as (input: object) => Promise<unknown>
+
+    await call({})
+    await settle()
+    await call({})
+    await settle()
+
+    expect(reloaded).toHaveBeenCalledTimes(1)
     expect(navigation.stale).toBe(true)
   })
 
