@@ -1,7 +1,9 @@
+import type { Static } from 'elysia'
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { t as elysiaSchema } from 'elysia'
+import { TypeCompiler } from 'elysia/type-system'
 import { s } from 'kay'
 import { scratchDir } from './scratch'
 
@@ -51,5 +53,23 @@ describe('s from kay', () => {
     expect(secretSchema).toThrow('s.Secret() builds a schema on the server')
 
     expect(schema).toThrow('kay: s.String() builds a schema on the server, and kay\'s `s` is not in the browser; keep schemas in a module only the server imports')
+  })
+
+  it('builds an enum over a record\'s keys, typed as their union', () => {
+    const TOPICS = { billing: 'Billing', support: 'Support' }
+    const topic = s.UnionKeys(TOPICS, { error: 'Pick a topic' })
+    const check = TypeCompiler.Compile(topic)
+    // `bun run check` fails when the keys are typed as plain strings, or a widened record stays assignable.
+    const typed: Static<typeof topic> = 'billing'
+    // @ts-expect-error -- not a key of the record
+    const other: Static<typeof topic> = 'sales'
+
+    expect(topic.enum).toEqual(['billing', 'support'])
+    expect(topic.error).toBe('Pick a topic')
+    expect(check.Check('support')).toBe(true)
+    expect(check.Check('sales')).toBe(false)
+    expect(check.Check('toString')).toBe(false)
+    expect([typed as string, other as string]).toEqual(['billing', 'sales'])
+    expect(() => s.UnionKeys({})).toThrow('kay: s.UnionKeys() takes a record with at least one key')
   })
 })

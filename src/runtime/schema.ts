@@ -7,5 +7,15 @@ function Secret(options: Parameters<Builder['String']>[0] = {}): ReturnType<Buil
   return schema.String({ ...options, minLength: Math.max(32, (options as { minLength?: number }).minLength ?? 0), requiredInProduction: true, secret: true })
 }
 
-// Elysia's schema builder, re-exported so an action's schema needs no import of its own, with `Secret` for `defineEnv`.
-export const s: Builder & { Secret: typeof Secret } = { ...schema, Secret }
+// A `UnionEnum` of a record's keys, typed as their union, for a `select` whose options come from a record of labels.
+function UnionKeys<const Keyed extends object>(record: Keyed, options?: Parameters<Builder['UnionEnum']>[1]): ReturnType<typeof schema.UnionEnum<[keyof Keyed & string, ...(keyof Keyed & string)[]]>> {
+  const keys = Object.keys(record)
+
+  if (keys.length === 0)
+    throw new Error('kay: s.UnionKeys() takes a record with at least one key')
+
+  return schema.UnionEnum(keys as [keyof Keyed & string, ...(keyof Keyed & string)[]], options)
+}
+
+// Elysia's schema builder, re-exported so an action's schema needs no import of its own, with `Secret` for `defineEnv` and `UnionKeys`.
+export const s: Builder & { Secret: typeof Secret, UnionKeys: typeof UnionKeys } = { ...schema, Secret, UnionKeys }

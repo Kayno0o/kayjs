@@ -169,6 +169,7 @@ form(action={add})
 
 - `form(action={add})` posts without JavaScript.
 - Inside it, `input(field="title")`, on an `input`, `textarea` or `select`, renders `name="title"` plus the constraints the browser checks without JavaScript that the schema gives `title`: `required` where the server would refuse the field left blank (never for a boolean, so a checkbox stays optional, nor a list), `minlength`, `maxlength`, `pattern` (matched anywhere, as the schema matches it, and left out when the browser could not read it), `min`, `max` and `type="email"`, each unless the template writes it.
+- `s.UnionKeys(TOPICS)` is a `UnionEnum` of a record's keys, typed as their union with no cast, for a `select(field="topic")` whose options come from `Object.entries(TOPICS)`.
 - `field` takes written text, never both `field` and `name`, and only inside such a form.
 - `kay check` verifies every `field` and `name` against the schema.
 - Once kay's script runs it sets `novalidate` on every form posting to an action and checks the form against the schema itself, so the schema's `error` messages show rather than the browser's, then the constraints the template wrote itself.
@@ -257,11 +258,4 @@ form(action={add})
 
 ### Files
 
-- `s.File()` or `s.Files()` in the schema, `input(type="file" name="avatar")` in the form, and the handler gets a `File`, which `files.put` stores (see [Stored files](files.md)).
-- Forms posting to an action are sent as `multipart/form-data` unless they set `enctype`.
-- A file input left empty counts as no file, so `s.Optional(s.File())` works.
-- An island passes a `File` or `Blob` anywhere in its input, nested ones included: `await upload({ avatar: input.files[0] })`.
-- On a top-level field, `s.File({ type: 'image/png' })` checks the file's bytes, not its name or declared type.
-- A file it refuses fails like any field, under its name in `errors` with the schema's `error` option when set.
-- A nested file is checked against the type it declares only.
-- A post sends 1 MB at most unless the action raises its `bodyLimit`, see below, which a form taking files usually does.
+- What an action takes of a file, `s.File()`, `s.Files()`, the form encoding and the body limit, is in [Stored files](files.md#files-posted-to-an-action).

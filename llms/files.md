@@ -173,3 +173,14 @@ input(type="file" aria-label="Photo" onChange={send})
 if upload.progress() !== undefined
   progress(value={upload.progress()})
 ```
+
+### Files posted to an action
+
+- `s.File()` or `s.Files()` in the schema, `input(type="file" name="avatar")` in the form, and the handler gets a `File`, which `files.put` stores.
+- Forms posting to an action are sent as `multipart/form-data` unless they set `enctype`.
+- A file input left empty counts as no file, so `s.Optional(s.File())` works.
+- An island passes a `File` or `Blob` anywhere in its input, nested ones included: `await upload({ avatar: input.files[0] })`.
+- On a top-level field, `s.File({ type: 'image/png' })` checks the file's bytes, not its name or declared type.
+- A file it refuses fails like any field, under its name in `errors` with the schema's `error` option when set.
+- A nested file is checked against the type it declares only.
+- A post sends 1 MB at most unless the action raises its `bodyLimit` (see [Protecting actions](action-protection.md)), which a form taking files usually does.

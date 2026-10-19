@@ -34,6 +34,31 @@ A field's `error` is a text, or a function such as `error: () => t('titles.requi
 
 Text reaches the schema trimmed, and an optional field left blank counts as left out.
 
+## A choice among a record's keys
+
+A `select` often takes its options from a record that maps each value to a label. `s.UnionKeys(record)` is the schema for the value the visitor picks: only the record's keys pass, and the handler gets them typed as the union of the keys, with no cast.
+
+```kay
+--- server
+import { s } from 'kay'
+import { sendMessage } from '../mail'
+
+const TOPICS = { billing: 'Billing', support: 'Support' }
+const choices = Object.entries(TOPICS).map(([value, label]) => ({ value, label }))
+
+export const contact = action(s.Object({ topic: s.UnionKeys(TOPICS) }), async ({ topic }) => {
+  await sendMessage(topic)
+})
+---
+form(action={contact})
+  select(field="topic")
+    for choice of choices
+      option(value={choice.value}) {choice.label}
+  button Send
+```
+
+Adding a key to the record adds the option and the accepted value together. A record with no key is refused when the server starts.
+
 ## An action with no input
 
 An action that takes nothing, such as a sign-out, leaves the schema out and gives its handler alone. The handler gets the context.
