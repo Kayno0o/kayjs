@@ -44,6 +44,8 @@ await attempt(() => publish({ id }), 'Could not publish', (data: { error: string
 
 A call to an API route made with `call()` throws `ApiError`, which `attempt` reads too: `refused` gets its `answer`, else the words the route gave (the text it answered or the `message` of its JSON) are toasted for a 4xx when they read as a message (one line of at most 200 characters, not markup nor a code such as `NOT_FOUND` or `404`; `ACCESS DENIED` is a message), `refused` is called only for a JSON object answer, and one that throws counts as saying nothing and is logged with `console.error`, and `failure` stands for status 0 (no answer came), a 5xx or an answer with no words: `await attempt(() => call(notes, '/:id', { method: 'delete', params: { id } }), 'Could not delete')`.
 
+`messageOf(error, fallback)` is the same reading for a page that shows the message where it is, not as a toast: the route's words of an `ApiError` or an action's refusal when they read as a message, else `fallback` (status 0, a 5xx, any other error): `catch (error) { notice = messageOf(error, 'Could not load') }`.
+
 A toast stays for six seconds, an error for ten, or until its close button is pressed, named by `dismissLabel` on Toaster. Screen readers hear each one from a status region kept in the page, an error from an alert region. Its clock stops while the pointer rests on the toasts or focus is inside them, and goes on with the time it had left once both are gone. Alt and `t` (`hotkey` on Toaster, `null` for none) moves focus to the toasts on screen, where Escape dismisses the focused one. Toaster is a manual popover in the top layer, so toasts show above an open dialog.
 
 ### Dialog, ConfirmDelete

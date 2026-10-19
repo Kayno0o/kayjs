@@ -72,7 +72,7 @@ TooltipHost
 
 ## Using a component
 
-Import each component by its `.kay` path. Types, `toast`, `attempt`, `editing` and `infiniteList` come from the package itself.
+Import each component by its `.kay` path. Types, `toast`, `attempt`, `messageOf`, `editing` and `infiniteList` come from the package itself.
 
 ```kay
 ---

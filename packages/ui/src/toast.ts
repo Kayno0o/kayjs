@@ -135,6 +135,11 @@ export async function attempt<T, Data = unknown>(run: () => Promise<T>, failure:
   }
 }
 
+// The message of a call that failed, for a page that shows it where it is and not as a toast: what `attempt` would toast for a route's refusal or an action's, else `fallback`, which status 0, a 5xx and any other error get.
+export function messageOf(error: unknown, fallback: string): string {
+  return refusalOf(error, undefined) ?? fallback
+}
+
 function refusalOf<Data>(error: unknown, refused: ((data: Data) => string | undefined) | undefined): string | undefined {
   if (error instanceof ApiError)
     return refusalOfApi(error, refused)

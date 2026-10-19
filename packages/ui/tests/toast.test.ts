@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, jest, test } from 'bun:test'
 import { ActionError, ApiError } from 'kay'
-import { attempt, dismissToast, holdToasts, toast, toasts } from '../src/toast'
+import { attempt, dismissToast, holdToasts, messageOf, toast, toasts } from '../src/toast'
 
 function shown() {
   return toasts().map(({ message, type }) => ({ message, type }))
@@ -272,5 +272,23 @@ describe('attempt', () => {
       expect(await attempt(reject(new ApiError(409, 'Taken', 'Taken')), 'Could not delete')).toBeUndefined()
       expect(await said(new ActionError(400, '', {}, { reason: 'Still referenced' }), data => data.reason)).toEqual(['Still referenced'])
     })
+  })
+})
+
+describe('messageOf', () => {
+  test('reads the words of a route\'s refusal as `attempt` does, else the fallback', () => {
+    expect(messageOf(new ApiError(409, 'Taken', { message: 'Name taken' }), 'Could not save')).toBe('Name taken')
+    expect(messageOf(new ApiError(403, 'ACCESS DENIED', 'ACCESS DENIED'), 'Could not save')).toBe('ACCESS DENIED')
+    expect(messageOf(new ApiError(0, 'Failed to fetch'), 'Could not save')).toBe('Could not save')
+    expect(messageOf(new ApiError(500, 'Boom', 'Boom'), 'Could not save')).toBe('Could not save')
+    expect(messageOf(new ApiError(404, 'NOT_FOUND', 'NOT_FOUND'), 'Could not save')).toBe('Could not save')
+    expect(messageOf(new ApiError(502, 'x', '<html></html>'), 'Could not save')).toBe('Could not save')
+  })
+
+  test('reads an action\'s schema refusal, and gives the fallback for any other throw', () => {
+    expect(messageOf(new ActionError(429, '', { '': 'Too many tries' }), 'Could not save')).toBe('Too many tries')
+    expect(messageOf(new Error('secret internals'), 'Could not save')).toBe('Could not save')
+    expect(messageOf(undefined, 'Could not save')).toBe('Could not save')
+    expect(messageOf('<script>', 'Could not save')).toBe('Could not save')
   })
 })
