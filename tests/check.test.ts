@@ -1821,7 +1821,7 @@ describe.concurrent('kay check, a redirect source is served', () => {
       'a(href="/old") source',
       'a(href="/old/") source with a slash',
       'a(href="/old?tab=1#top") source with a query',
-      'a(href="/legacy/anything") param source',
+      'a(href="/legacy/Not_A_Slug") param source, which a slug matcher would refuse',
       'a(href="/docs/a/b") catch-all source',
       'a(href="/later") source added while the site runs',
       'a(href="/nowhere") not a source',
@@ -1834,7 +1834,7 @@ describe.concurrent('kay check, a redirect source is served', () => {
   }
   const redirects = { '/old': '/', '/legacy/:slug': '/', '/docs/*': '/' }
   const left = [['index.kay', 12, '/nowhere'], ['index.kay', 13, '/en/old'], ['jump.kay', 11, '/missing'], ['_guard.ts', 8, '/absent']]
-  const sources = [['index.kay', 4, '/old'], ['index.kay', 6, '/old'], ['index.kay', 7, '/old/'], ['index.kay', 8, '/old'], ['index.kay', 9, '/legacy/anything'], ['index.kay', 10, '/docs/a/b'], ['index.kay', 11, '/later'], ['jump.kay', 5, '/old'], ['jump.kay', 8, '/legacy/x'], ['_guard.ts', 5, '/old']]
+  const sources = [['index.kay', 4, '/old'], ['index.kay', 6, '/old'], ['index.kay', 7, '/old/'], ['index.kay', 8, '/old'], ['index.kay', 9, '/legacy/Not_A_Slug'], ['index.kay', 10, '/docs/a/b'], ['index.kay', 11, '/later'], ['jump.kay', 5, '/old'], ['jump.kay', 8, '/legacy/x'], ['_guard.ts', 5, '/old']]
 
   it('counts a source in a link, ctx.redirect, a guard and navigate(), a param or a catch-all one too, and still fails a path that is none', async () => {
     const root = await scratchProject(files)
@@ -1847,6 +1847,21 @@ describe.concurrent('kay check, a redirect source is served', () => {
     }
     finally {
       await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('counts a source of / with no page of it, and a source written with a trailing slash', async () => {
+    const files = { 'src/routes/other.kay': 'a(href="/") home\na(href="/trail") bare\na(href="/trail/") slashed\na(href="/nope") none\n' }
+    const root = await scratchProject(files)
+    const bare = await scratchProject(files)
+
+    try {
+      expect(unserved(await check(root, { redirects: { '/': '/other', '/trail/': '/other' } }))).toEqual([['other.kay', 4, '/nope']])
+      expect(unserved(await check(bare))).toEqual([['other.kay', 1, '/'], ['other.kay', 2, '/trail'], ['other.kay', 3, '/trail/'], ['other.kay', 4, '/nope']])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+      await rm(bare, { recursive: true, force: true })
     }
   })
 

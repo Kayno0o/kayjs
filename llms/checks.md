@@ -38,7 +38,7 @@ kay lint --cache
 - A `form` is excepted when it posts with another `method` than GET, which a POST route may serve.
 - Paths under `/_kay/`, such as resized images, are not checked.
 - kay's own sitemap, robots.txt, favicons and health route count as served.
-- The source of a `redirects` entry in `kay.config.ts`, or one added while the site runs, counts as served, as written whatever the locale: `:param` sources take any segment, a final `*` the rest.
+- The source of a `redirects` entry in `kay.config.ts`, or one added while the site runs, counts as served, as written whatever the locale: `:param` sources take any segment, a final `*` the rest, though `/docs/*` leaves `/docs` itself unserved, as a catch-all page does. A redirect added while the site runs counts only while `data/not-found.sqlite` is present, so a link meant to hold on every machine and in CI wants an entry in `redirects`.
 - A segment written out where a param checked by a matcher kay ships goes, `/posts/abc` for `posts/[id=integer]`, must be one the matcher takes.
 - A path may be spelled as written or percent-encoded, `/café` or `/caf%C3%A9`.
 - A catch-all such as `docs/[...path]`, or an app route such as `/files/*`, is reached with a trailing slash, `/docs/`, never as `/docs`.

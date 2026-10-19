@@ -226,7 +226,7 @@ export default defineConfig({
 
 A redirect answers 308, or 307 with `permanent: false`. `status` names another: 301 or 302 for clients and crawlers that expect them.
 
-A link to the old path is valid too: `kay check` counts the source of a redirect as a page, so `a(href="/old")` passes.
+A link to the old path is valid too: `kay check` counts the source of a redirect as a page, so `a(href="/old")` passes. A source ending in `*`, such as `/docs/*`, does not make `/docs` itself count. A redirect added while the site runs counts only while `data/not-found.sqlite` is there, so for a link that must pass everywhere, such as in CI, add the redirect to `redirects`.
 
 ### Find the old URLs visitors still use
 
