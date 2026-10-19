@@ -1,9 +1,12 @@
+import { cp, rm } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 import { eagerJs, lazyChunks } from './eager-js'
 
 const ROOT = resolve(import.meta.dir, '..')
-const APP = join(ROOT, 'bench/apps/kay')
+// A copy at a path of its own, as bench/markup.test.ts and `bench:check:kay` build the bench app in place at the same time; the same path every run, as Bun hashes chunk names from it, with bench/shared beside it for the app's relative imports.
+const COPY = join(ROOT, '.kay/scratch/bench-weight/bench')
+const APP = join(COPY, 'apps/kay')
 const DIST = join(APP, '.kay/client/dist')
 const BASELINE = join(ROOT, 'bench/weight.json')
 // The gzip bytes a page may grow by before the baseline is raised, for the few bytes a chunk name or path moves the output by.
@@ -18,6 +21,10 @@ const PAGES: Record<string, string> = { products: 'components/counter.kay', tabl
 
 describe('the bench app\'s JS', () => {
   it('weighs no more, in bytes and in files, than the recorded baseline for each page', async () => {
+    await rm(COPY, { recursive: true, force: true })
+    await cp(join(ROOT, 'bench/apps/kay'), APP, { recursive: true, filter: source => !source.endsWith('/.kay') })
+    await cp(join(ROOT, 'bench/shared'), join(COPY, 'shared'), { recursive: true })
+
     const build = Bun.spawn([process.execPath, join(ROOT, 'src/cli.ts'), 'build', APP, '--no-check', '--quiet'], { cwd: ROOT, stdout: 'pipe', stderr: 'pipe' })
     const [errors, code] = await Promise.all([new Response(build.stderr).text(), build.exited])
 
