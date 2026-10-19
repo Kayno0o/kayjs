@@ -296,6 +296,14 @@ import { pages } from 'kay/server'
 export const app = new Elysia().use(await pages()).listen({ port: Number(process.env.PORT ?? 3000), ...process.env.HOST !== undefined && { hostname: process.env.HOST } })
 `
 
+// Actions are pinned to a commit with the release it is, so a moved tag cannot change what a workflow runs; each SHA is the commit its tag names in the action's repository.
+const CHECKOUT = '11d5960a326750d5838078e36cf38b85af677262 # v4.4.0'
+const SETUP_BUN_V1 = 'f4d14e03ff726c06358e5557344e1da148b56cf7 # v1.2.2'
+const SETUP_BUN_V2 = '0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0'
+const UPLOAD_PAGES_ARTIFACT = '56afc609e74202658d3ffba0e8f6dda462b719fa # v3.0.1'
+const DEPLOY_PAGES = 'd6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4.0.5'
+const GH_PAGES = '373f7f263a76c20808c831209c920827a82a2847 # v3.9.3'
+
 // The Forgejo runner image carries neither unzip nor git, which GitHub's hosted runners do.
 function workflowSetup(host: Host): string {
   return `${host === 'forgejo'
@@ -304,10 +312,10 @@ function workflowSetup(host: Host): string {
 
 `
     : ''}      - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@${CHECKOUT}
 
       - name: Setup Bun
-        uses: oven-sh/setup-bun@${host === 'forgejo' ? 'v1' : 'v2'}
+        uses: oven-sh/setup-bun@${host === 'forgejo' ? SETUP_BUN_V1 : SETUP_BUN_V2}
         with:
           bun-version: ${Bun.version}
 
@@ -325,6 +333,9 @@ function testWorkflow({ has, host, runner }: Setup): string {
 on:
   push:
   pull_request:
+
+permissions:
+  contents: read
 
 jobs:
   test:
@@ -413,15 +424,15 @@ ${workflowSetup(host)}`,
     github
       ? `      # Set Pages to deploy from GitHub Actions in the repository's settings; a site named <owner>.github.io is served from the root, so empty SITE_BASE.
       - name: Upload the site
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@${UPLOAD_PAGES_ARTIFACT}
         with:
           path: dist
 
       - name: Publish to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4`
+        uses: actions/deploy-pages@${DEPLOY_PAGES}`
       : `      - name: Publish to the gitea-pages branch
-        uses: peaceiris/actions-gh-pages@v3
+        uses: peaceiris/actions-gh-pages@${GH_PAGES}
         with:
           github_token: \${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./dist
@@ -620,16 +631,18 @@ function staticContainerFiles(setup: Setup): Record<string, string> {
     'Dockerfile': `FROM oven/bun:${Bun.version} AS build
 WORKDIR /app
 COPY . .
-RUN bun install --frozen-lockfile && bun run build
+# The stock nginx image cannot send brotli, so only the gzip copies are kept; the headers the build wrote go where nginx.conf includes them from, out of the served folder.
+RUN bun install --frozen-lockfile && bun run build && find dist -name '*.br' -delete && mv dist/headers.nginx.conf kay-headers.conf && rm -f dist/_headers
 
-FROM nginx:alpine
+# The unprivileged build runs as a user of its own and listens on 8080, so the container needs no root nor a port below 1024.
+FROM nginxinc/nginx-unprivileged:1.31-alpine
 COPY --from=build /app/dist /usr/share/nginx/html
+COPY --from=build /app/kay-headers.conf /etc/nginx/kay-headers.conf
 COPY nginx.conf /etc/nginx/conf.d/default.conf
-# The stock image cannot send brotli, so only the gzip copies are kept; the headers the build wrote go where nginx.conf includes them from, out of the served folder.
-RUN find /usr/share/nginx/html -name '*.br' -delete && mv /usr/share/nginx/html/headers.nginx.conf /etc/nginx/kay-headers.conf && rm -f /usr/share/nginx/html/_headers
+EXPOSE 8080
 `,
     'nginx.conf': `server {
-  listen 80;
+  listen 8080;
   root /usr/share/nginx/html;
   server_tokens off;
   gzip_static on;

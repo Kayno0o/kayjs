@@ -59,6 +59,8 @@ In a terminal with none of these options, `kay new` asks for a preset, then for 
 
 Without `--forge`, `kay new` reads the `origin` remote. A remote on github.com gets a GitHub Actions workflow in `.github/workflows`. Any other remote, or none, gets a Forgejo workflow in `.forgejo/workflows`.
 
+The workflow can read the repository and nothing more, except a Pages workflow, which gets the permission it publishes with. Each action it uses is pinned to the commit of a release, with the version in a comment.
+
 Every project gets an `AGENTS.md` for coding agents. It points them at kay's docs for the installed version and names the checks the project's scripts run.
 
 ### Features
@@ -72,7 +74,7 @@ Every project gets an `AGENTS.md` for coding agents. It points them at kay's doc
 | `eslint` | ESLint through `@kaynooo/eslint`, `.kay` fences and template expressions included | server, site, app |
 | `tests` | `bun test` through `kay/test`, with a first test | server, site, app |
 | `ci` | A Forgejo or GitHub workflow checking, linting and testing the server, or publishing the static site to Pages | server, site, app |
-| `docker` | A `Dockerfile` and `compose.prod.yaml` running the executable, or nginx serving the static site | server, site, app |
+| `docker` | A `Dockerfile` and `compose.prod.yaml` running the executable, or nginx serving the static site as an unprivileged user on port 8080 | server, site, app |
 | `auth` | Sessions, a sign-in, members in SQLite through pg-orm and a guarded `/account`; needs `server` | app |
 | `postgres` | The members in Postgres instead of SQLite, with a compose stack for development; needs `auth` | none |
 | `ws` | An API module over a websocket, with an island counting the visitors online; needs `server` | app |

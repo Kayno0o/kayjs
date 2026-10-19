@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- A new app's CI workflow reads the repository alone and pins its actions to a release's commit, and a static site's `Dockerfile` serves it with `nginxinc/nginx-unprivileged` on port 8080 instead of root nginx on 80, see [Project setup](project.md#project-setup).
 - The build's warning about classes set from a value it cannot read is quieter: a class read back from `this.el` or a call result, an object inside an array given to `cn`, and an assignment written in a string or a comment are read, and a name both imported and declared locally is judged by both ([Styles and assets](styles-and-assets.md)).
 - Small server gaps closed: card answers send `nosniff`, `compress` covers `ttf`, `otf` and ndjson, a download's `Content-Disposition` escapes a quote or non-ASCII key, a page sending the browser on has `lang`, a failed route-settings load is retried, `/_kay/csp` ignores reports about another `site`, a `docker` scaffold without `starter` brings a `_404.kay` its nginx names, `kay check` stops a hung tsgo after 5 minutes, and `publicEnv` refuses a `TOKEN` or `API_KEY` name, see [Upgrading](upgrading.md).
 - `call()` and the test harness refuse a `.` or `..` param, or a `*` segment of either, with a `TypeError`, and `stream()`, `socket()` and `resource()` fail their request, instead of reaching the parent route; each segment of a `*` is encoded, so pass it decoded ([API from islands](api-from-islands.md)).

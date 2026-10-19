@@ -25,6 +25,10 @@ jobs:
         with:
           fetch-depth: 0
 
+      # Only a commit of main is published, so a tag pushed on another branch never reaches the registry.
+      - name: Check the tag is on main
+        run: git merge-base --is-ancestor "$GITHUB_SHA" origin/main || { echo "$GITHUB_SHA is not on main, nothing is published"; exit 1; }
+
       # actions/cache archives with GNU tar's --posix, which the image's BusyBox tar refuses, so the cache was never saved.
       - name: Install GNU tar
         run: apk info -e tar >/dev/null || apk add --no-cache tar

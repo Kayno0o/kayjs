@@ -305,12 +305,14 @@ describe('kay command line', () => {
       const pages = await Bun.file(join(root, 'site/.github/workflows/pages.yml')).text()
 
       expect(test).toContain('runs-on: ubuntu-latest')
-      expect(test).toContain('uses: oven-sh/setup-bun@v2')
+      expect(test).toContain('uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0')
+      expect(test).toContain('\npermissions:\n  contents: read\n')
       expect(test).toContain('run: bun run check --format github')
       expect(test).toContain('- 5432:5432')
       expect(test).toContain('DATABASE_URL: postgres://app:app@localhost:5432/app_test')
       expect(test).not.toContain('apt-get')
-      expect(pages).toContain('uses: actions/deploy-pages@v4')
+      expect(pages).toContain('uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4.0.5')
+      expect(pages).toContain('\npermissions:\n  contents: read\n  pages: write\n  id-token: write\n')
       expect(pages).toContain('SITE_BASE: /${{ github.event.repository.name }}')
       expect(pages).not.toContain('gitea-pages')
 
@@ -590,6 +592,7 @@ describe('kay new', () => {
       expect(files).not.toContain('src/server.ts')
       expect(manifest.scripts.build).toBe('kay build --static')
       expect(await Bun.file(join(dir, '.forgejo/workflows/pages.yml')).text()).toContain('SITE_BASE: /${{ github.repository }}')
+      expect(await Bun.file(join(dir, '.forgejo/workflows/pages.yml')).text()).toContain('uses: peaceiris/actions-gh-pages@373f7f263a76c20808c831209c920827a82a2847 # v3.9.3')
       // Tested before it builds, which checks it, and linted after.
       expect(await Bun.file(join(dir, '.forgejo/workflows/pages.yml')).text()).toMatch(/run: bun run test\n\n {6}- name: Build the site\n/)
       expect(await Bun.file(join(dir, '.forgejo/workflows/pages.yml')).text()).toMatch(/run: bun run build\n\n {6}- name: Lint\n {8}run: bun run lint\n/)
@@ -847,7 +850,9 @@ describe('kay new', () => {
           // The stock nginx image cannot send brotli, so the copies are dropped and the include moved out of the served folder.
           const dockerfile = contents.Dockerfile!
 
-          expect({ features, br: dockerfile.includes('-name \'*.br\' -delete'), include: dockerfile.includes('mv /usr/share/nginx/html/headers.nginx.conf /etc/nginx/kay-headers.conf') }).toEqual({ features, br: true, include: true })
+          expect({ features, br: dockerfile.includes('-name \'*.br\' -delete'), include: dockerfile.includes('COPY --from=build /app/kay-headers.conf /etc/nginx/kay-headers.conf') }).toEqual({ features, br: true, include: true })
+          // The container runs unprivileged: the image that does, on a port above 1024.
+          expect({ features, image: (/^FROM nginxinc\/nginx-unprivileged:\d/m).test(dockerfile), port: nginx.includes('listen 8080;') }).toEqual({ features, image: true, port: true })
           // The 404 page the export writes comes from a `_404.kay`, which the starter or the container brings.
           expect({ features, notFound: nginx.includes('error_page 404 /404.html'), page: 'src/routes/_404.kay' in contents }).toEqual({ features, notFound: true, page: true })
         }

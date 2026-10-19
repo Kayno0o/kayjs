@@ -6,6 +6,9 @@ on:
     - cron: '17 5 * * *'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 # Pinned so the cache step and bun agree on one folder, whatever HOME the runner image sets.
 env:
   BUN_INSTALL_CACHE_DIR: /tmp/bun-cache
