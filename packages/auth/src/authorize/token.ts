@@ -137,7 +137,7 @@ async function rotate(core: Core, form: URLSearchParams, root: string): Promise<
   const peeked = await core.store.oauth!.refresh.get(key)
 
   // A request refused for what it asks leaves a live token unspent, so a mistake once does not cost the family on the retry. A spent token goes on to `use`, which revokes the family.
-  if (peeked && peeked.usedAt === null && peeked.clientId === clientId) {
+  if (peeked && peeked.usedAt === null && peeked.clientId === clientId && peeked.expiresAt > new Date()) {
     const asked = refreshAsk(form, root, peeked)
 
     if ('status' in asked)

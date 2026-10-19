@@ -172,6 +172,10 @@ describe('signing in', () => {
 
     expect((await site().visit('/auth/account/clients')).html).not.toContain('Claude Code')
     expect((await site().visit(authorize)).html).toContain('Claude Code')
+
+    const several = await site().visit(`${authorize}&resource=http%3A%2F%2Flocalhost%2Fmcp&resource=http%3A%2F%2Flocalhost%2Fother`)
+
+    expect(new URL(several.headers.get('location')!).searchParams.get('error')).toBe('invalid_target')
   })
 })
 

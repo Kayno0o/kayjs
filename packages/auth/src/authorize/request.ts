@@ -121,10 +121,12 @@ async function check(state: RequestState, params: AuthorizeParams, root: string)
   if (scopes === undefined)
     return failure(base, root, 'invalid_scope', 'A scope asked for is not one this server has')
 
-  if (Array.isArray(params.resource) && params.resource.length > 1)
+  const asked = [params.resource].flat()
+
+  if (asked.length > 1)
     return failure(base, root, 'invalid_target', 'Only one resource can be asked for')
 
-  const resource = oneOf(Array.isArray(params.resource) ? params.resource[0] : params.resource)
+  const resource = oneOf(asked[0])
 
   if (resource !== undefined && !sameSite(resource, root))
     return failure(base, root, 'invalid_target', 'The resource is not one of this server')

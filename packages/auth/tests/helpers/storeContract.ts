@@ -504,6 +504,20 @@ export function storeContract(name: string, fresh: () => Promise<AuthStore>) {
         expect(await oauth.grants.get('u2', 'c1')).toBeUndefined()
       })
 
+      test('a refresh token is read without being spent', async () => {
+        const oauth = store.oauth!
+
+        await store.users.create(userRecord({ id: 'u1' }))
+        await oauth.refresh.create(refresh('rt'))
+
+        expect(await oauth.refresh.get('rt')).toMatchObject(refresh('rt'))
+        expect(await oauth.refresh.get('missing')).toBeUndefined()
+
+        await oauth.refresh.use('rt', new Date('2026-02-01T00:00:00Z'))
+
+        expect((await oauth.refresh.get('rt'))?.usedAt).toEqual(new Date('2026-02-01T00:00:00Z'))
+      })
+
       test('an empty scope list is kept as an empty list, apart from null, which is every scope', async () => {
         const oauth = store.oauth!
 
