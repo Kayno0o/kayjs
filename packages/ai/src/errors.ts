@@ -17,6 +17,8 @@ export type AiErrorKind
     | 'protocol'
   // The visitor or the chat is over a limit or budget set in `ai()`: `retryAfter` is the seconds until its window closes, `limit` which one.
     | 'limited'
+  // The messages are longer than the `maxInputChars` of `ask`: nothing was sent to the provider.
+    | 'too-long'
 
 // Which limit refused an ask: `asks` is `limit`, `budget` the visitor's tokens, `total` the tokens of all visitors.
 export type AiLimit = 'asks' | 'budget' | 'total'
@@ -56,6 +58,9 @@ export class AiError extends Error {
     this.retryAfter = retryAfter
     this.partial = partial
     this.limit = limit
+
+    if (kind === 'too-long')
+      Object.defineProperty(this, REFUSED, { value: { status: 413, retryAfter: undefined, message: 'That conversation is too long; shorten it or start a new one' } })
 
     if (kind === 'limited') {
       Object.defineProperty(this, REFUSED, { value: { status: 429, retryAfter, message: `${VISITOR_WORDS[limit ?? 'asks']}; try again${retryAfter === undefined ? ' later' : ` in ${retryAfter} s`}` } })

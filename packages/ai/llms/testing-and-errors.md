@@ -39,9 +39,10 @@ it('asks for the summary', async () => {
 | `timeout` | the provider did not answer, or stopped sending mid-reply, for longer than the `timeout` of `ask` |
 | `cut` | the stream ended before the provider said it was done |
 | `limited` | a limit or budget set in `ai()` refused the ask: `retryAfter` and `limit` (`asks`, `budget`, `total`), see [limits](limits.md) |
+| `too-long` | the messages are over the `maxInputChars` of `ask` (50,000 characters): nothing was sent, an action answers 413 |
 | `protocol` | an event that is not JSON of the provider's API, or a server answering JSON instead of streaming |
 
-Messages name the provider and what it said, with the key hidden if the provider echoes it. Redirects are refused (`network`), so a key never follows one to another origin. Nothing retries: a caller wanting to waits `retryAfter` and asks again. An action letting the error out answers 500 and logs it, except a `limited` one, which answers 429 with `Retry-After`; catch it to answer the visitor in words.
+Messages name the provider and what it said, with the key hidden if the provider echoes it. Redirects are refused (`network`), so a key never follows one to another origin. Nothing retries: a caller wanting to waits `retryAfter` and asks again. An action letting the error out answers 500 and logs it, except a `limited` one, which answers 429 with `Retry-After`, and a `too-long` one, which answers 413; catch it to answer the visitor in words.
 
 ## Providers by hand
 

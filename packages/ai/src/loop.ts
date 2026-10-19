@@ -1,5 +1,5 @@
 import type { LibraryTool } from 'kay/library'
-import type { Piece, Provider, ProviderMessage, ProviderRequest, ToolCall, ToolOutcome, ToolUse, Usage } from './types'
+import type { Confirm, Piece, Provider, ProviderMessage, ProviderRequest, ToolCall, ToolOutcome, ToolUse, Usage } from './types'
 import { logFrom } from 'kay'
 import { MAX_ARGUMENTS, MAX_CALLS_PER_STEP, MAX_STREAMED_CALLS } from './tool-limits'
 
@@ -58,13 +58,17 @@ function textOf(result: Awaited<ReturnType<LibraryTool['call']>>): string {
   return clip(JSON.stringify(result.structuredContent), MAX_RESULT)
 }
 
-async function run(tools: Map<string, LibraryTool>, use: ToolUse, input: Record<string, unknown>, request: Request): Promise<Ran> {
+async function run(tools: Map<string, LibraryTool>, use: ToolUse, input: Record<string, unknown>, request: Request, confirm: Confirm | undefined): Promise<Ran> {
   const tool = tools.get(use.name)
 
   if (!tool)
     return failed(`There is no tool named ${JSON.stringify(clip(use.name, MAX_NAME))}; the tools are ${[...tools.keys()].join(', ')}`)
 
   try {
+    // A confirmation that throws fails the call like a tool that throws.
+    if (confirm && await confirm({ name: use.name, input, request }) !== true)
+      return failed('The visitor has not confirmed this call, so it did not run; ask them, then call it again')
+
     const result = await tool.call(input, request)
 
     return { status: result.isError === true ? 'failed' : 'done', result: textOf(result) }
@@ -81,7 +85,7 @@ const USAGE_FIELDS = ['inputTokens', 'outputTokens', 'cacheReadTokens', 'cacheWr
 
 // Asks the provider, answers the tools the model calls as the visitor, and asks again with their results until the model answers in text or `maxSteps` requests were made.
 // Text of one step is separated from the next by a blank line, and the token counts are the sum of the steps.
-export async function* converse(provider: Provider, base: ProviderRequest, offered: Offered[], maxSteps: number, request: Request, signal: AbortSignal): AsyncGenerator<Piece> {
+export async function* converse(provider: Provider, base: ProviderRequest, offered: Offered[], maxSteps: number, request: Request, signal: AbortSignal, confirm?: Confirm): AsyncGenerator<Piece> {
   const tools = new Map(offered.map(({ name, tool }) => [name, tool]))
   const specs = offered.map(({ name, description, inputSchema }) => ({ name, description, inputSchema }))
   const messages: ProviderMessage[] = [...base.messages]
@@ -177,7 +181,7 @@ export async function* converse(provider: Provider, base: ProviderRequest, offer
       else if ('problem' in parsed)
         ran = failed(parsed.problem)
       else
-        ran = await run(tools, use, parsed.input, request)
+        ran = await run(tools, use, parsed.input, request, confirm)
 
       // A visitor who left while the action ran gets no further call and no further request.
       if (signal.aborted)

@@ -401,3 +401,71 @@ describe('a visitor leaving mid-loop', () => {
     expect(text).not.toContain('private detail')
   })
 })
+
+describe('confirm', () => {
+  const request = new Request('http://localhost/')
+  const base = { messages: [{ role: 'user' as const, content: 'go' }], system: undefined, model: 'fake', maxTokens: 10, temperature: undefined, timeouts: { connect: 5000, idle: 5000 } }
+
+  function run(confirm: Parameters<typeof converse>[6], call: () => Promise<{ content: { type: 'text', text: string }[] }>) {
+    const tool = { name: 'book', description: 'Books', inputSchema: {}, call }
+
+    return createReply(signal => converse(fakeAi, base, [{ name: 'book', description: 'Books', inputSchema: {}, tool }], 5, request, signal, confirm), [])
+  }
+
+  it('runs a call only when confirm answers true, handing it the name, the arguments and the request', async () => {
+    const seen: unknown[] = []
+    let ran = 0
+
+    fakeAi.reply({ calls: [{ name: 'book', input: { slot: 'ten' } }] })
+    fakeAi.reply('done')
+
+    await run((call) => {
+      seen.push(call)
+
+      return true
+    }, async () => {
+      ran++
+
+      return { content: [{ type: 'text', text: 'ok' }] }
+    })
+
+    expect(ran).toBe(1)
+    expect(seen).toEqual([{ name: 'book', input: { slot: 'ten' }, request }])
+  })
+
+  it('tells the model the visitor has not confirmed, and runs nothing, for false and anything but true', async () => {
+    for (const confirm of [() => false, () => 'yes' as unknown as boolean]) {
+      let ran = 0
+
+      fakeAi.clear()
+      fakeAi.reply({ calls: [{ name: 'book' }] })
+      fakeAi.reply((asked: Asked) => JSON.stringify(asked.messages.at(-1)!.results))
+
+      const text = await run(confirm, async () => {
+        ran++
+
+        return { content: [] }
+      })
+
+      expect(ran).toBe(0)
+      expect(text).toContain('has not confirmed')
+      expect(text).toContain('"failed":true')
+    }
+  })
+
+  it('runs nothing when confirm throws', async () => {
+    let ran = 0
+
+    fakeAi.reply({ calls: [{ name: 'book' }] })
+    fakeAi.reply((asked: Asked) => JSON.stringify(asked.messages.at(-1)!.results))
+
+    const text = await run(async () => Promise.reject(new Error('down')), async () => {
+      ran++
+
+      return { content: [] }
+    })
+
+    expect(ran).toBe(0)
+    expect(text).toContain('"failed":true')
+  })
+})

@@ -190,6 +190,8 @@ A call that goes wrong is not an exception. The model is told what failed, such 
 
 A model can be talked into things by the text it reads, a visitor's message say. Offer only actions whose worst call you can accept from that visitor, and keep destructive ones out of `tools`.
 
+To make a call wait for the visitor's yes, pass `confirm`: `ask(messages, { tools, confirm: ({ name, input, request }) => ... })`. It runs before each call, and only `true` lets the call run. Otherwise the model is told the visitor has not confirmed it, and can ask them first. You decide what counts as a yes, such as a token your page issued after a button, or a read tool answering `true` at once. `Chat` has no confirm button of its own.
+
 The visitor leaving stops the loop. A tool already running finishes, but nothing more is called.
 
 `ask` with tools must run while kay answers a request, in a page, an action or a handler, because the tools run as that visitor. A background job has none.
@@ -206,7 +208,7 @@ You can also read `reply.progress()` yourself. It gives the text so far and ever
 
 ## Limit what visitors spend
 
-A public chat lets anyone run up your bill. Set a limit and a token budget in `kay.config.ts`.
+A public chat lets anyone run up your bill, so in production kay limits it even when you set nothing: each visitor may ask 20 questions every 10 minutes and use 100,000 tokens a day. Set your own limit and token budget in `kay.config.ts`, or write `limit: false` or `budget: false` to lift one when something else counts, such as a gateway in front of the app. Development and tests have no default.
 
 ```ts
 import { ai } from '@kaynooo/kayjs-ai'
@@ -219,6 +221,8 @@ export default defineConfig({
   })],
 })
 ```
+
+Those defaults count in memory and set no `total`, so give `budget` a `total` to cap what many accounts spend together.
 
 `limit` caps how many questions one visitor asks in a window. `budget.tokens` caps the tokens the answers to one visitor may use, and `budget.total` the tokens used for everyone. `ask` reads these on its own, so nothing changes where you call it.
 
@@ -235,6 +239,8 @@ Tokens are added when a reply ends, with the count the provider reports. A reply
 While a reply runs, it holds its worst case against the budget: its input plus `maxTokens`. So questions started at the same moment cannot all slip through. A visitor close to the budget cannot start a second reply until the first ends. Other servers sharing a `store` do not see these holds.
 
 Over a limit, the reply fails with an `AiError` of kind `limited`, when you `await` it or first read it. It has `retryAfter`, the seconds until the window closes, and `limit`, which says whether it was `asks`, `budget` or `total`. Nothing is sent to the provider. An action that lets it out answers 429 with a `Retry-After` header, as its own `rateLimit` would, and the chat shows `Too many questions; try again in 12 s`. Set `messages.rateLimit` on the action to word it yourself.
+
+`ask` also refuses a conversation that is too long. The messages together may hold 50,000 characters by default, and `maxInputChars` changes that (`Infinity` lifts it). Past it the reply fails with kind `too-long` before anything is sent, and an action answers 413. Still bound `content` and `maxItems` in your action's schema.
 
 If the store fails or takes more than five seconds when the limit is read, the question is refused with kind `unavailable`, so a broken store never leaves the chat unlimited. If it fails when the tokens are added, the answer still goes out and the failure is logged.
 
@@ -275,7 +281,7 @@ A run that stops half way leaves whole files. Run it again to translate what is 
 
 ## Errors
 
-A failure throws an `AiError` with a `kind`: `auth`, `rate-limited`, `unavailable`, `invalid`, `network`, `timeout`, `cut`, `protocol` or `limited`. A rate limit has `retryAfter` in seconds. A reply cut halfway has `partial`, the text that came. Nothing is retried for you.
+A failure throws an `AiError` with a `kind`: `auth`, `rate-limited`, `unavailable`, `invalid`, `network`, `timeout`, `cut`, `protocol`, `limited` or `too-long`. A rate limit has `retryAfter` in seconds. A reply cut halfway has `partial`, the text that came. Nothing is retried for you.
 
 ## Test it
 

@@ -80,6 +80,16 @@ export interface Provider {
 // Any action exported by a page module, whatever its input and honeypot.
 export type ToolAction = Action<never, unknown>
 
+// A tool call waiting for `confirm`'s yes: the tool's name, the arguments the model gave and the request being answered.
+export interface ToolRequest {
+  name: string
+  input: Record<string, unknown>
+  request: Request
+}
+
+// Answers whether the visitor agreed to a call; only `true` lets it run.
+export type Confirm = (call: ToolRequest) => boolean | Promise<boolean>
+
 export interface AskOptions {
   system?: string | undefined
   // The model for this reply, `AI_MODEL` when left out.
@@ -99,6 +109,10 @@ export interface AskOptions {
   tools?: readonly ToolAction[] | undefined
   // The provider requests the tool loop may make, 5 by default; a reply still wanting tools after the last ends with `finish` `steps`.
   maxSteps?: number | undefined
+  // Asked before each tool call runs, with its name, arguments and the request: only `true` lets it run, anything else tells the model the visitor has not confirmed it so it asks them first, and a throw fails the call like a tool that throws. A write the visitor must agree to, such as a booking, is checked here; a read answers `true`.
+  confirm?: Confirm | undefined
+  // The most characters the messages may hold together, 50,000 by default (the system prompt is not counted); a conversation past it fails the reply with a `too-long` error, 413 in an action, before the provider is called. `Infinity` lifts it.
+  maxInputChars?: number | undefined
   // Asks this provider instead of the one the environment names, such as `openai({ baseUrl })`.
   provider?: Provider | undefined
 }

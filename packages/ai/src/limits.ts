@@ -1,6 +1,7 @@
 import type { Duration, RateStore } from 'kay'
 import type { AiLimit } from './errors'
 import type { Piece, Usage } from './types'
+import process from 'node:process'
 import { logFrom } from 'kay'
 import { durationSeconds, userOf } from 'kay/library'
 import { clientAddress, memoryRates, rateKey } from 'kay/server'
@@ -10,6 +11,9 @@ const TOTAL = 'ai:budget\ntotal'
 const SLOT = Symbol.for('kayjs-ai.limits')
 const CHARS_PER_TOKEN = 4
 const log = logFrom('kayjs-ai')
+// What a production app gets when it sets neither: a public chat is paid for by whoever runs it, so it is never unlimited by omission. `false` opts out.
+const DEFAULT_LIMIT: LimitOptions = { max: 20, window: '10m' }
+const DEFAULT_BUDGET: BudgetOptions = { tokens: 100_000, window: '1d' }
 // How long a store may take to answer before the ask is refused as `unavailable`, or the count given up on.
 let storeTimeoutMs = 5000
 
@@ -31,8 +35,10 @@ export interface BudgetOptions {
 }
 
 export interface AiOptions {
-  limit?: LimitOptions | undefined
-  budget?: BudgetOptions | undefined
+  // In production 20 asks per visitor every 10 minutes unless set; `false` lifts it.
+  limit?: LimitOptions | false | undefined
+  // In production 100,000 tokens per visitor every day unless set, with no total; `false` lifts it.
+  budget?: BudgetOptions | false | undefined
   // Who a signed-in visitor is, such as their id: counted in place of their address, and in place of the user a library such as kayjs-auth names. Left out, that user counts, else the address.
   visitor?: ((request: Request) => string | undefined | Promise<string | undefined>) | undefined
 }
@@ -74,11 +80,16 @@ function nothing(): void {
 function slot(): Slot {
   const holder = globalThis as { [SLOT]?: Slot }
 
-  return holder[SLOT] ??= { settings: { limit: undefined, budget: undefined, visitor: undefined }, memories: new Map(), held: new Map() }
+  if (!holder[SLOT]) {
+    const memories = new Map<string, RateStore>()
+
+    holder[SLOT] = { settings: settingsOf({}, memories), memories, held: new Map() }
+  }
+
+  return holder[SLOT]
 }
 
-function memoryFor(name: string): RateStore {
-  const { memories } = slot()
+function memoryFor(memories: Map<string, RateStore>, name: string): RateStore {
   let store = memories.get(name)
 
   if (!store)
@@ -94,26 +105,34 @@ function wholeNumber(value: unknown, what: string): number {
   return value as number
 }
 
-// Called by `ai()`, which the app's config runs again on every reload: the settings are replaced, the memory counts kept.
-export function configureLimits({ limit, budget, visitor }: AiOptions): void {
+// The settings an app's options give, the production defaults filling what it left out.
+function settingsOf({ limit, budget, visitor }: AiOptions, memories: Map<string, RateStore>): Settings {
   const settings: Settings = { limit: undefined, budget: undefined, visitor }
+  const production = process.env.NODE_ENV === 'production'
+  const chosenLimit = limit ?? (production ? DEFAULT_LIMIT : undefined)
+  const chosenBudget = budget ?? (production ? DEFAULT_BUDGET : undefined)
 
-  if (limit)
-    settings.limit = { max: wholeNumber(limit.max, 'ai({ limit }).max'), ms: durationSeconds(limit.window, 'ai({ limit }).window', 'kayjs-ai') * 1000, store: limit.store ?? memoryFor('limit') }
+  if (chosenLimit !== undefined && chosenLimit !== false)
+    settings.limit = { max: wholeNumber(chosenLimit.max, 'ai({ limit }).max'), ms: durationSeconds(chosenLimit.window, 'ai({ limit }).window', 'kayjs-ai') * 1000, store: chosenLimit.store ?? memoryFor(memories, 'limit') }
 
-  if (budget) {
-    if (budget.store !== undefined && budget.store.peek === undefined)
+  if (chosenBudget !== undefined && chosenBudget !== false) {
+    if (chosenBudget.store !== undefined && chosenBudget.store.peek === undefined)
       throw new TypeError('kayjs-ai: ai({ budget }).store has no peek(key), which the budget reads before an ask without counting it; add it or use memoryRates() or sqliteRates()')
 
     settings.budget = {
-      tokens: wholeNumber(budget.tokens, 'ai({ budget }).tokens'),
-      total: budget.total === undefined ? undefined : wholeNumber(budget.total, 'ai({ budget }).total'),
-      ms: durationSeconds(budget.window, 'ai({ budget }).window', 'kayjs-ai') * 1000,
-      store: budget.store ?? memoryFor('budget'),
+      tokens: wholeNumber(chosenBudget.tokens, 'ai({ budget }).tokens'),
+      total: chosenBudget.total === undefined ? undefined : wholeNumber(chosenBudget.total, 'ai({ budget }).total'),
+      ms: durationSeconds(chosenBudget.window, 'ai({ budget }).window', 'kayjs-ai') * 1000,
+      store: chosenBudget.store ?? memoryFor(memories, 'budget'),
     }
   }
 
-  slot().settings = settings
+  return settings
+}
+
+// Called by `ai()`, which the app's config runs again on every reload: the settings are replaced, the memory counts kept.
+export function configureLimits(options: AiOptions): void {
+  slot().settings = settingsOf(options, slot().memories)
 }
 
 // Forgets the counts kept in memory: for a test.

@@ -29,6 +29,14 @@ p Assistant
 - A provider that reports no token count for a step leaves it out of the sum.
 - With `ai({ budget })` the tokens of every step count, and the reply holds `maxTokens` times `maxSteps` against the budget while it runs ([limits](limits.md)).
 
+## Confirming a call
+
+`ask(messages, { tools, confirm })` calls `confirm({ name, input, request })` before each call runs, `name` being the tool's (`book_slot`): only `true` lets it through. Anything else, such as `false`, runs nothing and tells the model `The visitor has not confirmed this call, so it did not run; ask them, then call it again`; a throw fails the call like a tool that throws. A read answers `true`, a write checks what the visitor agreed to, such as a token the page issued after a button, or that their last message says yes. There is no confirm button in `Chat`: the app decides what confirmation is.
+
+```ts
+ask(messages, { tools: [findSlot, bookSlot], confirm: ({ name, request }) => name === 'find_slot' || request.headers.get('x-confirmed') === 'yes' })
+```
+
 ## What the model is told when a call goes wrong
 
 Every failure is a result with `failed` set, in words the model can correct from, never an exception, so the loop goes on:

@@ -20,6 +20,9 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 - A server with no `cms({ guard })` used to let an edit link or cookie save, publish, delete and upload with no user; it now answers 403 to each and warns at boot. Set `cms({ guard })` to let editors write (`kay dev` keeps working without one; any other server, `NODE_ENV` unset included, counts as production). An edit cookie also reads only the entries the pages it rendered read, so an app that called the cms API for another collection with one signs in through the guard. No lint, as the guard is a runtime setting.
 
+### kayjs-ai limits a public chat by default
+
+- In production `ask` now counts each visitor against 20 asks per 10 minutes and 100,000 tokens a day when `ai({ limit, budget })` sets neither, also in an app that never calls `ai()`, and refuses messages past 50,000 characters with a `too-long` error. An app that wants more writes its own `limit` / `budget` / `maxInputChars`, and one that counts elsewhere writes `limit: false` / `budget: false`. No lint can see it, as the old code is still valid.
 ### Deleting an account can answer `last-owner`
 
 - kayjs-auth's `deleteAccount` and `deleteUser` (`DeleteResult`) now answer `{ ok: false, error: 'last-owner' }` for the only owner of an organization with other members. An app that maps their errors exhaustively adds a case for it; the built-in pages already do. No lint can see it, as the result is a runtime value.

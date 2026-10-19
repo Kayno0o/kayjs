@@ -2,12 +2,14 @@ import type { Offered } from './loop'
 import type { AskOptions, Message, Reply, Timeouts, ToolAction } from './types'
 import { actionTool, currentRequest, durationSeconds } from 'kay/library'
 import { choose } from './config'
+import { AiError } from './errors'
 import { guarded } from './limits'
 import { converse } from './loop'
 import { createReply } from './reply'
 
 const DEFAULT_MAX_TOKENS = 4096
 const DEFAULT_MAX_STEPS = 5
+const DEFAULT_MAX_INPUT_CHARS = 50_000
 const DEFAULT_CONNECT_TIMEOUT = '30s'
 const DEFAULT_IDLE_TIMEOUT = '60s'
 const ROLES = new Set(['user', 'assistant'])
@@ -36,6 +38,15 @@ function timeoutsOf(timeout: AskOptions['timeout']): Timeouts {
   return {
     connect: Math.min(MAX_TIMER_MS, Math.ceil(durationSeconds(connect, 'ask({ timeout }).connect', 'kayjs-ai') * 1000)),
     idle: Math.min(MAX_TIMER_MS, Math.ceil(durationSeconds(idle, 'ask({ timeout }).idle', 'kayjs-ai') * 1000)),
+  }
+}
+
+// A reply that fails on its first read, as a refused ask does, so an action letting it out answers the visitor.
+function tooLong(chars: number, max: number): AsyncIterable<never> {
+  return {
+    [Symbol.asyncIterator]: () => ({
+      next: async () => Promise.reject(new AiError('too-long', `the messages hold ${chars} characters, past the ${max} that maxInputChars allows`)),
+    }),
   }
 }
 
@@ -74,8 +85,17 @@ export function ask(prompt: string | Message[], options: AskOptions = {}): Reply
   const answering = currentRequest()
   const maxTokens = options.maxTokens ?? DEFAULT_MAX_TOKENS
   const request = { messages, system: options.system, model, maxTokens, temperature: options.temperature, cache: options.cache, timeouts: timeoutsOf(options.timeout) }
-  const asker = { request: answering, visitor: options.visitor, chars: messages.reduce((sum, message) => sum + message.content.length, options.system?.length ?? 0), maxTokens }
+  const messageChars = messages.reduce((sum, message) => sum + message.content.length, 0)
+  const maxInputChars = options.maxInputChars ?? DEFAULT_MAX_INPUT_CHARS
+
+  if (typeof maxInputChars !== 'number' || !(maxInputChars >= 1))
+    throw new TypeError('kayjs-ai: maxInputChars is a number of characters of 1 or more')
+
+  const asker = { request: answering, visitor: options.visitor, chars: messageChars + (options.system?.length ?? 0), maxTokens }
   const signals = [answering?.signal, options.signal]
+
+  if (messageChars > maxInputChars)
+    return createReply(() => tooLong(messageChars, maxInputChars), signals)
 
   if (options.tools === undefined || options.tools.length === 0)
     return createReply(signal => guarded(() => provider.stream(request, signal), asker, signal), signals)
@@ -91,5 +111,5 @@ export function ask(prompt: string | Message[], options: AskOptions = {}): Reply
     throw new Error('kayjs-ai: tools run as the visitor, so ask() with tools needs the request being answered; call it from a page, an action or a handler kay is answering')
 
   // Every step may use `maxTokens`, which is what the budget holds for the reply while it runs.
-  return createReply(signal => guarded(() => converse(provider, request, offered, maxSteps, answering, signal), { ...asker, maxTokens: maxTokens * maxSteps }, signal), signals)
+  return createReply(signal => guarded(() => converse(provider, request, offered, maxSteps, answering, signal, options.confirm), { ...asker, maxTokens: maxTokens * maxSteps }, signal), signals)
 }

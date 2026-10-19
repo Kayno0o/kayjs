@@ -13,7 +13,7 @@
 - No model id is built in: set `AI_MODEL` (required in production) or pass `{ model }`.
 - A failure is an `AiError` with a `kind`; nothing retries by itself. A rate limit carries `retryAfter` in seconds. A reply cut by `maxTokens` still resolves as text: read `await reply.finish` (`length`) to tell.
 - A chat for a site is `Chat` from `@kaynooo/kayjs-ai/chat.kay`, given the streaming action by the page (`Chat(action={reply})`), styled by kayjs-ui's `theme.css`: see the chat topic. `ChatLauncher` from `@kaynooo/kayjs-ai/chat-launcher.kay` is the same chat behind a button at the bottom right of every page, put once in the root layout, loading the chat on its first open.
-- A public chat sets `ai({ limit, budget })` in `kay.config.ts`: asks and tokens per visitor (the user `visitor` names, else the one kayjs-auth names, else the address) and in total, refused with a `limited` error, 429 and `Retry-After` in an action. Without it `ask` is unlimited.
+- `ai({ limit, budget })` in `kay.config.ts` sets asks and tokens per visitor (the user `visitor` names, else the one kayjs-auth names, else the address) and in total, refused with a `limited` error, 429 and `Retry-After` in an action. In production, unset, a visitor gets 20 asks per 10 minutes and 100,000 tokens a day; `limit: false` / `budget: false` lifts one. Messages past `maxInputChars` (50,000) fail with `too-long` (413), and `confirm` gates each tool call.
 - `kay i18n translate <locale>` (added by `ai()`) writes a locale's missing messages and localized entries as drafts, a text kept only when it keeps every `{placeholder}`, a string field of a `customField` kind left as it is; `--dry-run` lists and estimates the tokens, [translating](llms/translating.md).
 
 ## Setup

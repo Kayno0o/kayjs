@@ -584,3 +584,80 @@ describe('ai() with nothing set', () => {
     await ask('b', { visitor: 'v' })
   })
 })
+
+describe('the production defaults', () => {
+  const was = process.env.NODE_ENV ?? 'test'
+  // Production names no provider of its own, so these asks go to the fake.
+  const own = (options: { visitor: string }) => ask('a', { ...options, provider: fakeAi })
+
+  afterEach(() => {
+    process.env.NODE_ENV = was
+  })
+
+  it('limits a visitor to 20 asks every 10 minutes and 100,000 tokens a day when ai() sets neither', async () => {
+    process.env.NODE_ENV = 'production'
+    ai()
+
+    for (let count = 0; count < 20; count++)
+      await own({ visitor: 'v' })
+
+    const refused = await failure(own({ visitor: 'v' }))
+
+    expect(refused.limit).toBe('asks')
+    expect(refused.retryAfter).toBeLessThanOrEqual(600)
+
+    fakeAi.reply({ text: usedBy(100_000) })
+    await own({ visitor: 'big' })
+
+    expect((await failure(own({ visitor: 'big' }))).limit).toBe('budget')
+  })
+
+  it('limits an app that never called ai()', async () => {
+    process.env.NODE_ENV = 'production'
+    delete (globalThis as Record<symbol, unknown>)[Symbol.for('kayjs-ai.limits')]
+
+    for (let count = 0; count < 20; count++)
+      await own({ visitor: 'v' })
+
+    expect((await failure(own({ visitor: 'v' }))).limit).toBe('asks')
+  })
+
+  it('keeps what the app set, and false lifts one default', async () => {
+    process.env.NODE_ENV = 'production'
+    ai({ limit: { max: 1, window: '1m' }, budget: false })
+    await own({ visitor: 'v' })
+    expect((await failure(own({ visitor: 'v' }))).limit).toBe('asks')
+
+    ai({ limit: false, budget: false })
+
+    for (let count = 0; count < 25; count++)
+      await own({ visitor: 'free' })
+  })
+
+  it('leaves development and tests unlimited', async () => {
+    for (const env of ['development', 'test']) {
+      process.env.NODE_ENV = env
+      ai()
+
+      for (let count = 0; count < 25; count++)
+        await own({ visitor: env })
+    }
+  })
+})
+
+describe('maxInputChars', () => {
+  it('fails the reply with a too-long error, 413 in an action, before the provider is called', async () => {
+    const refused = await failure(ask([{ role: 'user', content: 'x'.repeat(50_001) }]))
+
+    expect(refused.kind).toBe('too-long')
+    expect((refused as unknown as Record<symbol, { status: number }>)[REFUSED]!.status).toBe(413)
+    expect(fakeAi.asked).toHaveLength(0)
+  })
+
+  it('counts every message but not the system prompt, takes a cap of its own and lets Infinity lift it', async () => {
+    await ask([{ role: 'user', content: 'x'.repeat(50_000) }], { system: 'y'.repeat(10_000) })
+    expect((await failure(ask([{ role: 'user', content: 'x'.repeat(30) }, { role: 'assistant', content: 'y'.repeat(30) }], { maxInputChars: 59 }))).kind).toBe('too-long')
+    await ask([{ role: 'user', content: 'x'.repeat(200_000) }], { maxInputChars: Infinity })
+    expect(() => ask('a', { maxInputChars: 0 })).toThrow(TypeError)
+  })
+})
