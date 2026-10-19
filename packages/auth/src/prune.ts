@@ -37,7 +37,7 @@ function staleKept(core: Core): boolean {
   return core.store.users.staleGuests !== undefined || (core.unverifiedMaxAge !== undefined && core.store.users.staleUnverified !== undefined)
 }
 
-// Guests older than `guests.maxAge` whose sessions ended, and with `requireVerified` the accounts registered and never verified for `email.unverifiedMaxAge`, go as any deleted user does, `onDelete` first. One whose `onDelete` fails stays, to be tried again the next run.
+// Guests older than `guests.maxAge` whose sessions ended, and with `requireVerified` the accounts registered and never verified for `email.unverifiedMaxAge`, go as any deleted user does, `onDelete` first. One whose `onDelete` fails stays, to be tried again the next run, and the run goes on past it and past any that is kept.
 async function pruneStale(core: Core, now: number, kind: 'guest' | 'unverified'): Promise<void> {
   const maxAge = kind === 'guest' ? core.guestMaxAge : core.unverifiedMaxAge
   const list = kind === 'guest' ? core.store.users.staleGuests : core.store.users.staleUnverified
@@ -45,25 +45,34 @@ async function pruneStale(core: Core, now: number, kind: 'guest' | 'unverified')
   if (maxAge === undefined || !list)
     return
 
+  // The listing is oldest first and cannot skip, so what a run keeps (a role beyond the default ones, a failed `onDelete`) is listed again each batch: the batch grows by that many and the kept ones are left out, to reach the accounts behind them.
+  const kept = new Set<string>()
+
   try {
     for (let batch = 0; batch < STALE_BATCHES_PER_RUN; batch++) {
-      const stale = await list(new Date(now - maxAge * 1000), STALE_PER_BATCH)
-      let deleted = 0
+      const size = STALE_PER_BATCH + kept.size
+      const listed = await list(new Date(now - maxAge * 1000), size)
 
-      for (const account of stale) {
+      for (const account of listed) {
+        if (kept.has(account.id))
+          continue
+
         try {
           if (await stillStale(core, account.id, kind)) {
             await eraseUser(core, account)
-            deleted++
+
+            continue
           }
         }
         catch (error) {
           log.error(`deleting a stale ${kind} failed`, error)
         }
+
+        kept.add(account.id)
       }
 
-      // A short list is the end of them, and a batch deleting none would only come back as it was.
-      if (stale.length < STALE_PER_BATCH || deleted === 0)
+      // A short list is the end of them.
+      if (listed.length < size)
         return
     }
   }

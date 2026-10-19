@@ -1,9 +1,11 @@
 import type { Duration } from 'kay'
 import type { AuthStore } from '../src/store'
+import { Database } from '@kaynooo/pg-orm'
 import { afterEach, describe, expect, setSystemTime, spyOn, test } from 'bun:test'
 import { truncatedAddress } from '../src/address'
 import { memoryStore } from '../src/memoryStore'
 import { discordProvider } from '../src/oauth/providers'
+import { authTables, pgStore } from '../src/pg'
 import { PRUNE_EVERY_MS } from '../src/prune'
 import { testApp, userRecord } from './helpers/app'
 
@@ -57,6 +59,30 @@ describe('pruning accounts never verified', () => {
 
     for (const id of ['young', 'verified', 'linked', 'nomail'])
       expect(await store.users.get(id)).toBeDefined()
+  })
+
+  describe.each([
+    ['memoryStore', async () => memoryStore()],
+    ['pgStore on SQLite', async () => {
+      const db = new Database({ url: 'sqlite://:memory:', tables: [...authTables] })
+
+      await db.sync({ allowDestructive: true })
+
+      return pgStore(db)
+    }],
+  ] as [string, () => Promise<AuthStore>][])('%s', (_, make) => {
+    test('a run goes past more than a batch of kept accounts to the one behind them', async () => {
+      const { store, deleted, start, prune } = setup({ store: await make() })
+
+      for (let i = 0; i < 520; i++)
+        await store.users.create(userRecord({ id: `admin-${i}`, email: `admin-${i}@example.com`, roles: ['admin'], createdAt: new Date(start - 400 * DAY_MS + i) }))
+
+      await store.users.create(userRecord({ id: 'squat', email: 'squat@example.com', createdAt: new Date(start - 31 * DAY_MS) }))
+      await prune(PRUNE_EVERY_MS)
+
+      expect(deleted).toEqual(['squat'])
+      expect(await store.users.get('admin-0')).toBeDefined()
+    })
   })
 
   test('is off without requireVerified unless set, and takes the age that is set', async () => {
