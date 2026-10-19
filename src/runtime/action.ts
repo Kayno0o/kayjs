@@ -28,8 +28,10 @@ export interface Caller {
   arrivals: number | undefined
 }
 
-// Type only: what the handler returns, failures included, so a page can type `ctx.failed(action)`.
+// Type only: what the handler returns on success, so a prop typed with it takes a handler that can also `ctx.fail`.
 declare const RESULT: unique symbol
+// Type only: what the handler passes to `ctx.fail`, so a page can type `ctx.failed(action)`.
+declare const FAILED: unique symbol
 // Type only: the honeypot field an action's forms render, which `kay check` then takes as one of their fields.
 declare const HONEYPOT: unique symbol
 const UNSAFE_URL_CHARACTERS = /[^\w/.-]/g
@@ -198,8 +200,8 @@ export type Answer<Output> = Output extends AsyncIterable<infer Value> ? ActionS
 // What a plain form post reads back: the last value of an async iterable, which is undefined when it gave none.
 export type Final<Output> = Output extends AsyncIterable<infer Value> ? Value | undefined : Output
 
-// Unknown for an action of any output, so any action passes where `Action<never, unknown>` is expected.
-export type FailureData<Output> = unknown extends Output ? unknown : Output extends Failure<infer Data> ? Data : never
+// Unknown for an action of any output, so any action passes where `Action<never, unknown>` is expected, and for one whose output names no `Failure`, so a handler that can `ctx.fail` passes where only its success output is typed.
+export type FailureData<Output> = unknown extends Output ? unknown : [Extract<Output, Failure<unknown>>] extends [never] ? unknown : Output extends Failure<infer Data> ? Data : never
 
 // What a page reads back through `ctx.failed(action)` after a plain form post failed.
 export interface FormFailure<Input, Data, Honeypot extends string = never> {
@@ -215,7 +217,10 @@ export interface FormFailure<Input, Data, Honeypot extends string = never> {
 // Read off the phantom directly: `infer Output` through `Action` drops the `undefined` of a handler ending without a return.
 export type ResultOf<Target> = Target extends { readonly [RESULT]?: infer Output } ? Output : never
 
-export type FailureOf<Target> = Target extends Action<infer Input, unknown> ? FormFailure<Input, FailureData<ResultOf<Target>>, Extract<HoneypotOf<Target>, string>> : never
+// What the handler passes to `ctx.fail`, read off its phantom for the same reason.
+export type FailuresOf<Target> = Target extends { readonly [FAILED]?: infer Data } ? Data : never
+
+export type FailureOf<Target> = Target extends Action<infer Input, unknown> ? FormFailure<Input, FailuresOf<Target>, Extract<HoneypotOf<Target>, string>> : never
 
 // What a page reads back through `ctx.succeeded(action)` after a plain form post succeeded.
 export interface FormSuccess<Output> {
@@ -285,7 +290,8 @@ export interface Action<Input, Output, Honeypot extends string = never> {
   refused(error: unknown): error is ActionError<FailureData<Output>>
   readonly url: string
   readonly [ACTION]: true
-  readonly [RESULT]?: Output
+  readonly [RESULT]?: Success<Output>
+  readonly [FAILED]?: FailureData<Output>
   // Taking the field rather than giving it, so an action with a honeypot still passes where any action is expected.
   [HONEYPOT]?: (field: Honeypot) => void
 }

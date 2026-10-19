@@ -1,6 +1,6 @@
 import type { AnyElysia } from 'elysia'
 import type { ClientOptions } from '../build/client'
-import type { Action, ActionError, ActionProtection, FailureData, ResultOf, Settles, Success } from '../runtime/action'
+import type { Action, ActionError, ActionProtection, FailuresOf, ResultOf, Settles, Success } from '../runtime/action'
 import type { Duration } from '../runtime/duration'
 import type { ApiAnswer, ApiRequest, CallMethod, CallPath, EventReader, NodeAt, Optional, SocketOf, SocketOptions, SocketPath, StreamMethod, StreamOf, StreamOptions, StreamPath, StreamStatus } from '../runtime/live'
 import type { PagesOptions } from '../server/app'
@@ -105,7 +105,7 @@ export interface TestSite {
   // A handler returning an async iterable gives every value once the stream ended, and throws when it failed.
   call: <Target extends Action<never, unknown>>(action: Target, ...call: CallArguments<Target>) => Promise<Tested<ResultOf<Target>>>
   // A call expected to be refused, as `call` makes it: the `ActionError` with its status, errors and typed data; one that went through fails the test, and any other error is thrown.
-  refusal: <Target extends Action<never, unknown>>(action: Target, input: InputOf<Target> | FormData, init?: VisitInit & { from?: string }) => Promise<ActionError<FailureData<ResultOf<Target>>>>
+  refusal: <Target extends Action<never, unknown>>(action: Target, input: InputOf<Target> | FormData, init?: VisitInit & { from?: string }) => Promise<ActionError<FailuresOf<Target>>>
   // The site's MCP endpoint, as an agent calls it: `mcp: true` serves it. Calls carry the cookies so far and the headers given, such as an `Authorization` bearer token.
   mcp: {
     // The tools `tools/list` gives.
@@ -604,7 +604,7 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
         catch (error) {
           // `Target` only bounds the action, so its own `refused` types the data as unknown.
           if (action.refused(error))
-            return error as ActionError<FailureData<ResultOf<typeof action>>>
+            return error as ActionError<FailuresOf<typeof action>>
 
           throw error
         }
