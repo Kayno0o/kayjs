@@ -252,6 +252,244 @@ describe('effects', () => {
   })
 })
 
+describe('the dependency graph', () => {
+  it('drops a source an effect stops reading, and picks up one it starts reading', () => {
+    const flag = signal(true)
+    const left = signal(0)
+    const right = signal(0)
+    const seen: number[] = []
+
+    const dispose = root((dispose) => {
+      renderEffect(() => void seen.push(flag() ? left() : right()))
+
+      return dispose
+    })
+
+    right.set(1)
+    flush()
+    expect(seen).toEqual([0])
+    flag.set(false)
+    flush()
+    left.set(5)
+    flush()
+    expect(seen).toEqual([0, 1])
+    right.set(2)
+    flush()
+    expect(seen).toEqual([0, 1, 2])
+    flag.set(true)
+    flush()
+    right.set(3)
+    flush()
+    expect(seen).toEqual([0, 1, 2, 5])
+    dispose()
+  })
+
+  it('runs once per change for a source read several times in one run, in any order', () => {
+    const a = signal(0)
+    const b = signal(0)
+    const reads = signal(1)
+    let runs = 0
+
+    const dispose = root((dispose) => {
+      renderEffect(() => {
+        runs++
+        a()
+        b()
+
+        for (let index = 0; index < reads(); index++) {
+          b()
+          a()
+        }
+      })
+
+      return dispose
+    })
+
+    a.set(1)
+    flush()
+    b.set(1)
+    flush()
+    reads.set(3)
+    flush()
+    a.set(2)
+    flush()
+    expect(runs).toBe(5)
+    dispose()
+  })
+
+  it('does not run again for a write made before it reads that source', () => {
+    const trigger = signal(0)
+    const out = signal(0)
+    let runs = 0
+
+    const dispose = root((dispose) => {
+      renderEffect(() => {
+        trigger()
+        runs++
+        out.set(runs)
+        out()
+      })
+
+      return dispose
+    })
+
+    trigger.set(1)
+    flush()
+    trigger.set(2)
+    flush()
+    expect(runs).toBe(3)
+    dispose()
+  })
+
+  it('runs again for a write made after it read that source', () => {
+    const trigger = signal(0)
+    const out = signal(0)
+    const seen: number[] = []
+
+    const dispose = root((dispose) => {
+      renderEffect(() => {
+        trigger()
+        seen.push(out())
+
+        if (out() < trigger())
+          out.set(out() + 1)
+      })
+
+      return dispose
+    })
+
+    trigger.set(2)
+    flush()
+    expect(seen).toEqual([0, 0, 1, 2])
+    dispose()
+  })
+
+  it('keeps a memo a running effect reads again clean for that effect', () => {
+    const count = signal(1)
+    const parity = memo(() => count() % 2)
+    const seen: number[] = []
+
+    const dispose = root((dispose) => {
+      renderEffect(() => void seen.push(parity()))
+
+      return dispose
+    })
+
+    count.set(2)
+    flush()
+    count.set(4)
+    flush()
+    count.set(5)
+    flush()
+    expect(seen).toEqual([1, 0, 1])
+    dispose()
+  })
+
+  it('runs the effects of one signal in the order they were made, and a diamond once with no glitch', () => {
+    const base = signal(1)
+    const double = memo(() => base() * 2)
+    const triple = memo(() => base() * 3)
+    const log: string[] = []
+
+    const dispose = root((dispose) => {
+      renderEffect(() => void log.push(`first ${base()}`))
+      renderEffect(() => void log.push(`sum ${double() + triple()}`))
+      renderEffect(() => void log.push(`last ${base()}`))
+
+      return dispose
+    })
+
+    base.set(2)
+    flush()
+    base.set(3)
+    flush()
+    expect(log).toEqual(['first 1', 'sum 5', 'last 1', 'first 2', 'sum 10', 'last 2', 'first 3', 'sum 15', 'last 3'])
+    dispose()
+  })
+
+  it('skips an effect disposed by one that ran before it in the same flush', () => {
+    const count = signal(0)
+    const log: string[] = []
+    let stop = () => {}
+
+    const dispose = root((dispose) => {
+      renderEffect(() => {
+        if (count() > 0)
+          stop()
+      })
+      stop = root((inner) => {
+        renderEffect(() => void log.push(`inner ${count()}`))
+
+        return inner
+      })
+
+      return dispose
+    })
+
+    count.set(1)
+    flush()
+    count.set(2)
+    flush()
+    expect(log).toEqual(['inner 0'])
+    dispose()
+  })
+
+  it('keeps a memo with no observers right, as it is read after its effects are gone', () => {
+    const count = signal(1)
+    let computed = 0
+    const double = memo(() => {
+      computed++
+
+      return count() * 2
+    })
+    let runs = 0
+
+    const dispose = root((dispose) => {
+      renderEffect(() => void (double(), runs++))
+
+      return dispose
+    })
+
+    dispose()
+    count.set(2)
+    flush()
+    expect(runs).toBe(1)
+    expect(double()).toBe(4)
+    expect(double()).toBe(4)
+    expect(computed).toBe(2)
+    count.set(3)
+    expect(double()).toBe(6)
+    expect(computed).toBe(3)
+  })
+
+  it('lets a signal with many observers drop and regain them', () => {
+    const shared = signal(0)
+    const on = signal(true)
+    const counts = [0, 0, 0, 0]
+
+    const dispose = root((dispose) => {
+      counts.forEach((_, index) => renderEffect(() => {
+        if (index === 2 && !on())
+          return
+
+        shared()
+        counts[index]!++
+      }))
+
+      return dispose
+    })
+
+    shared.set(1)
+    flush()
+    on.set(false)
+    flush()
+    shared.set(2)
+    flush()
+    expect(counts).toEqual([3, 3, 2, 3])
+    dispose()
+  })
+})
+
 describe('whenHydrated', () => {
   it('runs every function deferred until the islands hydrated, one throwing included', () => {
     const error = spyOn(console, 'error').mockImplementation(() => undefined)
