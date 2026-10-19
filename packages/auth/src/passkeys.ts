@@ -13,7 +13,7 @@ import { notify } from './notify'
 import { endOtherSessions } from './sessions'
 import { plainName } from './text'
 import { reprove, secondFactorLimited } from './twoFactor'
-import { hasWayIn, putBack } from './wayIn'
+import { countsAsWayIn, hasWayIn, putBack } from './wayIn'
 import { generateAuthenticationOptions, generateRegistrationOptions, verifyAuthenticationResponse, verifyRegistrationResponse } from './webauthn'
 
 const CHALLENGE_MAX_AGE_MS = 5 * 60 * 1000
@@ -47,6 +47,8 @@ export interface Passkey {
   // Whether it syncs between devices, as one in a password manager does.
   multiDevice: boolean
   backedUp: boolean
+  // Whether it has proved user verification, as signing in requires. One that has not, such as one made before passkeys always asked for it, is no way in: replace it by adding a new passkey and removing this one.
+  userVerified: boolean
   createdAt: Date
   lastUsedAt: Date | null
 }
@@ -128,6 +130,7 @@ export async function registerPasskey(state: RequestState, response: Registratio
     transports: credential.transports ?? [],
     multiDevice: credentialDeviceType === 'multiDevice',
     backedUp: credentialBackedUp,
+    userVerified: true,
     createdAt: new Date(),
     lastUsedAt: null,
   }
@@ -172,15 +175,15 @@ export async function removePasskey(state: RequestState, id: string, proof: Proo
   if (!passkey)
     return { ok: false, error: 'not-found' }
 
-  const magicLink = core.email !== undefined && record.emailVerifiedAt !== null
+  const removed = { passkey }
 
-  if (passkeys.length === 1 && record.passwordHash === null && !magicLink && (await core.store.identities.listByUser(record.id)).length === 0)
+  if (countsAsWayIn(removed) && !await hasWayIn(core, record.id, removed))
     return { ok: false, error: 'last-way-in' }
 
   await core.store.passkeys.delete(record.id, id)
 
   // Two requests can each see the other way in still there: when none is left, the passkey goes back.
-  if (!await hasWayIn(core, record.id)) {
+  if (countsAsWayIn(removed) && !await hasWayIn(core, record.id)) {
     await putBack(async () => core.store.passkeys.create(passkey))
 
     return { ok: false, error: 'last-way-in' }
@@ -355,7 +358,7 @@ async function check(core: Core, passkey: PasskeyRecord, response: Authenticatio
     if (!verified)
       return false
 
-    await core.store.passkeys.update(passkey.id, { counter: authenticationInfo.newCounter, backedUp: authenticationInfo.credentialBackedUp, lastUsedAt: new Date() })
+    await core.store.passkeys.update(passkey.id, { counter: authenticationInfo.newCounter, backedUp: authenticationInfo.credentialBackedUp, userVerified: passkey.userVerified || authenticationInfo.userVerified, lastUsedAt: new Date() })
 
     return true
   }
@@ -381,5 +384,5 @@ function deviceName(userAgent: string): string {
 }
 
 function publicPasskey(passkey: PasskeyRecord): Passkey {
-  return { id: passkey.id, name: passkey.name, multiDevice: passkey.multiDevice, backedUp: passkey.backedUp, createdAt: passkey.createdAt, lastUsedAt: passkey.lastUsedAt }
+  return { id: passkey.id, name: passkey.name, multiDevice: passkey.multiDevice, backedUp: passkey.backedUp, userVerified: passkey.userVerified, createdAt: passkey.createdAt, lastUsedAt: passkey.lastUsedAt }
 }

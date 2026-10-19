@@ -3,6 +3,11 @@
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
 ## 1.55.1
+## Unreleased
+
+- kayjs-auth no longer counts a passkey made without user verification as a way in: `passkeys()` lists `userVerified`, see [Upgrading](upgrading.md).
+
+## 1.55.0
 
 - The `deprecated-api-tool` lint, which only warned while `kay upgrade` moved an app from before 1.51, is gone ([Checks](checks.md)).
 - An `_error.kay` drawn for a hook that threw reads the locals your `derive` added before it threw.

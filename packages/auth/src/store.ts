@@ -153,6 +153,8 @@ export interface PasskeyRecord {
   // Whether it syncs between devices, as one in a password manager does.
   multiDevice: boolean
   backedUp: boolean
+  // Whether it has proved user verification, which signing in requires: a passkey made without it is no way in.
+  userVerified: boolean
   createdAt: Date
   lastUsedAt: Date | null
 }
@@ -267,7 +269,7 @@ export interface AuthStore {
     get: (id: string) => MaybePromise<PasskeyRecord | undefined>
     // Oldest first.
     listByUser: (userId: string) => MaybePromise<PasskeyRecord[]>
-    update: (id: string, patch: Partial<Pick<PasskeyRecord, 'name' | 'counter' | 'backedUp' | 'lastUsedAt'>>) => MaybePromise<void>
+    update: (id: string, patch: Partial<Pick<PasskeyRecord, 'name' | 'counter' | 'backedUp' | 'userVerified' | 'lastUsedAt'>>) => MaybePromise<void>
     // Deletes the user's passkey with that id; false when they have none.
     delete: (userId: string, id: string) => MaybePromise<boolean>
   }

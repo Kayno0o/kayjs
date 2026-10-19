@@ -218,7 +218,7 @@ export function storeContract(name: string, fresh: () => Promise<AuthStore>) {
     })
 
     test('passkeys are got, listed by user oldest first, updated, unique, and deleted by their owner only', async () => {
-      const passkey = (id: string, createdAt: string) => ({ id, userId: 'u1', name: 'Phone', publicKey: 'pk', counter: 0, transports: ['internal'], multiDevice: true, backedUp: false, createdAt: new Date(createdAt), lastUsedAt: null })
+      const passkey = (id: string, createdAt: string) => ({ id, userId: 'u1', name: 'Phone', publicKey: 'pk', counter: 0, transports: ['internal'], multiDevice: true, backedUp: false, userVerified: true, createdAt: new Date(createdAt), lastUsedAt: null })
 
       await store.users.create(userRecord({ id: 'u1' }))
       await store.passkeys.create(passkey('p2', '2026-01-02T00:00:00Z'))
@@ -311,7 +311,7 @@ export function storeContract(name: string, fresh: () => Promise<AuthStore>) {
       await store.recoveryCodes.replace('u1', ['a'])
       await store.bearerTokens.create({ id: 't1', userId: 'u1', label: 'Phone', digest: 'd1', scopes: null, createdAt: new Date(), lastUsedAt: null, expiresAt: null })
       await store.sessions.create({ id: 's1', userId: 'u1', version: 0, userAgent: '', ip: '', createdAt: new Date(), lastSeenAt: new Date(), maxAge: null })
-      await store.passkeys.create({ id: 'p1', userId: 'u1', name: 'Phone', publicKey: 'pk', counter: 0, transports: [], multiDevice: false, backedUp: false, createdAt: new Date(), lastUsedAt: null })
+      await store.passkeys.create({ id: 'p1', userId: 'u1', name: 'Phone', publicKey: 'pk', counter: 0, transports: [], multiDevice: false, backedUp: false, userVerified: true, createdAt: new Date(), lastUsedAt: null })
 
       await store.users.delete('u1')
 

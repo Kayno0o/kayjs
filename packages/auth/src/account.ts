@@ -99,9 +99,7 @@ export async function unlink(state: RequestState, provider: string, proof: Proof
   if (!identity)
     return { ok: false, error: 'not-linked' }
 
-  const magicLink = state.core.email !== undefined && record.emailVerifiedAt !== null
-
-  if (record.passwordHash === null && identities.length === 1 && !magicLink && (await state.core.store.passkeys.listByUser(record.id)).length === 0)
+  if (!await hasWayIn(state.core, record.id, { identity }))
     return { ok: false, error: 'last-way-in' }
 
   await state.core.store.identities.delete(identity.provider, identity.providerId)

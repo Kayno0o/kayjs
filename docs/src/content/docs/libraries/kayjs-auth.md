@@ -291,6 +291,8 @@ A page of your own calls `auth.profile(locale)` and `auth.saveProfile(values)`. 
 
 `passkeys: { rpName, userVerification }` in `createAuth` sets the name the authenticator shows, `site` by default, and whether answering a second factor with a passkey requires a PIN or a biometric: `'required'`, `'preferred'` (the default) or `'discouraged'`. Adding a passkey, signing in with one and re-proving always require it.
 
+A passkey stored before adding one always asked for it may have been made without it, and could never sign in: `passkeys()` lists each with `userVerified`, and one with `false` does not count as a way in, so it cannot be what keeps a user from removing their last password or provider. A sign-in or a re-proof with it proves it; otherwise add a new passkey and remove the old one.
+
 ## Passkeys in an island
 
 An island asks for a passkey with `@kaynooo/kayjs-auth/browser`. It calls the browser's own WebAuthn methods and ships no library.

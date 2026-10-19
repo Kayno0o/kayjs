@@ -220,7 +220,7 @@ describe.each(backends)('%s: requests racing for the last', (_, make) => {
 
     await app.store.users.create(userRecord({ id: 'u1' }))
     await app.store.identities.create({ provider: 'discord', providerId: '1', userId: 'u1', accessToken: null, refreshToken: null, tokenExpiresAt: null, createdAt: new Date() })
-    await app.store.passkeys.create({ id: 'key', userId: 'u1', name: 'Laptop', publicKey: 'k', counter: 0, transports: [], multiDevice: false, backedUp: false, createdAt: new Date(), lastUsedAt: null })
+    await app.store.passkeys.create({ id: 'key', userId: 'u1', name: 'Laptop', publicKey: 'k', counter: 0, transports: [], multiDevice: false, backedUp: false, userVerified: true, createdAt: new Date(), lastUsedAt: null })
 
     const ada = app.browser()
 

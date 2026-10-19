@@ -283,6 +283,43 @@ describe('a passkey as second factor and as proof', () => {
     expect(await ada.call('removePasskey', device.credentials[0]!.id, { passkey: await device.get(options) })).toEqual({ ok: false, error: 'last-way-in' })
   })
 
+  test('a passkey that never proved user verification is no way in, and is listed as such', async () => {
+    const app = await setup()
+    const ada = await registered(app)
+    const { device } = await addPasskey(ada)
+    const user = await app.store.users.findByEmail('ada@example.com')
+    const id = device.credentials[0]!.id
+
+    await app.store.users.update(user!.id, { passwordHash: null })
+    await app.store.identities.create({ provider: 'discord', providerId: '1', userId: user!.id, accessToken: null, refreshToken: null, tokenExpiresAt: null, createdAt: new Date() })
+    await app.store.passkeys.update(id, { userVerified: false })
+
+    expect(await ada.call('passkeys')).toMatchObject([{ userVerified: false }])
+    expect(await ada.call('unlink', 'discord', {})).toEqual({ ok: false, error: 'last-way-in' })
+    expect(await ada.call('removePasskey', id, {})).toEqual({ ok: true })
+    expect(await ada.call('unlink', 'discord', {})).toEqual({ ok: false, error: 'last-way-in' })
+  })
+
+  test('a user-verified sign-in proves a stored passkey, which then counts as a way in', async () => {
+    const app = await setup()
+    const ada = await registered(app)
+    const { device } = await addPasskey(ada)
+    const user = await app.store.users.findByEmail('ada@example.com')
+    const id = device.credentials[0]!.id
+
+    await app.store.users.update(user!.id, { passwordHash: null })
+    await app.store.passkeys.update(id, { userVerified: false })
+
+    const { options } = await ada.callOk('passkeyProofOptions')
+
+    expect(await ada.call('reprove', { passkey: await device.get(options) })).toEqual({ ok: true })
+    expect(await ada.call('passkeys')).toMatchObject([{ userVerified: true }])
+
+    const again = await ada.callOk('passkeyProofOptions')
+
+    expect(await ada.call('removePasskey', id, { passkey: await device.get(again.options) })).toEqual({ ok: false, error: 'last-way-in' })
+  })
+
   test('a passkey is renamed by its owner only', async () => {
     const app = await setup()
     const ada = await registered(app)

@@ -88,6 +88,8 @@ export const AuthPasskeys = defineTable('auth_passkey', t => ({
   transports: t.array(t.text()).notNull(),
   multi_device: t.bool().notNull(),
   backed_up: t.bool().notNull(),
+  // Passkeys stored before this column are unproven until one sign-in with user verification.
+  user_verified: t.bool().notNull().default(false),
   created_at: t.timestamptz().notNull(),
   last_used_at: t.timestamptz().nullable(),
 })).withIndexes([{ columns: ['user_id'] }])
@@ -292,12 +294,12 @@ export function pgStore(db: Database): AuthStore {
     },
     passkeys: {
       async create(passkey) {
-        await passkeys.write.insertOne({ id: passkey.id, user_id: passkey.userId, name: passkey.name, public_key: passkey.publicKey, counter: BigInt(passkey.counter), transports: passkey.transports, multi_device: passkey.multiDevice, backed_up: passkey.backedUp, created_at: passkey.createdAt, last_used_at: passkey.lastUsedAt })
+        await passkeys.write.insertOne({ id: passkey.id, user_id: passkey.userId, name: passkey.name, public_key: passkey.publicKey, counter: BigInt(passkey.counter), transports: passkey.transports, multi_device: passkey.multiDevice, backed_up: passkey.backedUp, user_verified: passkey.userVerified, created_at: passkey.createdAt, last_used_at: passkey.lastUsedAt })
       },
       get: async id => toPasskey(await passkeys.read.findById(id)),
       listByUser: async userId => (await passkeys.read.findMany(q => q.where({ user_id: userId }).orderBy('created_at', 'asc'))).map(row => toPasskey(row)!),
       async update(id, patch) {
-        await passkeys.write.updateById(id, withoutUndefined({ name: patch.name, counter: patch.counter === undefined ? undefined : BigInt(patch.counter), backed_up: patch.backedUp, last_used_at: patch.lastUsedAt }))
+        await passkeys.write.updateById(id, withoutUndefined({ name: patch.name, counter: patch.counter === undefined ? undefined : BigInt(patch.counter), backed_up: patch.backedUp, user_verified: patch.userVerified, last_used_at: patch.lastUsedAt }))
       },
       delete: async (userId, id) => await passkeys.write.deleteOne({ id, user_id: userId }) !== null,
     },
@@ -653,7 +655,7 @@ function toAudit(row: InferEntity<typeof AuthAudit>): AuditRecord {
 }
 
 function toPasskey(row: InferEntity<typeof AuthPasskeys> | null): PasskeyRecord | undefined {
-  return row ? { id: row.id, userId: row.user_id, name: row.name, publicKey: row.public_key, counter: Number(row.counter), transports: row.transports, multiDevice: row.multi_device, backedUp: row.backed_up, createdAt: row.created_at, lastUsedAt: row.last_used_at } : undefined
+  return row ? { id: row.id, userId: row.user_id, name: row.name, publicKey: row.public_key, counter: Number(row.counter), transports: row.transports, multiDevice: row.multi_device, backedUp: row.backed_up, userVerified: row.user_verified, createdAt: row.created_at, lastUsedAt: row.last_used_at } : undefined
 }
 
 // pg-orm refuses an `undefined` value, so a patch names only the fields it changes.
