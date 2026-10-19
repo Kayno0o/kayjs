@@ -175,6 +175,8 @@ Before 1.52 the fields sat in the input, or a `redirect` came as an argument of 
 
 With a mailer, it signs no one in until the address is verified. It answers a held address as a free one and mails its holder instead.
 
+To keep the time the same too, your `onSignUp` hook, and the `onDelete` of an unverified account that a new registration replaces, run after the response is sent. `register` may return before they have finished.
+
 Set `email: { requireVerified: false }` to sign in at once. It answers `'taken'` for a held address, which tells anyone which addresses have an account.
 
 ### Guests

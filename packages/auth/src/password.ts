@@ -112,7 +112,7 @@ export async function register(state: RequestState, input: RegisterInput): Promi
     return answerHeld(state, holder, input.password)
 
   if (holder)
-    await eraseUser(state.core, holder)
+    await replaceUnclaimed(state, holder)
 
   const current = await state.current()
   const guest = current?.guest && state.via() === 'session' ? current : undefined
@@ -141,9 +141,15 @@ export async function register(state: RequestState, input: RegisterInput): Promi
 
   const user = publicUser(record)
 
-  // A guest's records exist already.
-  if (!guest)
-    await state.core.onSignUp?.(user, undefined)
+  // A guest's records exist already. Where registering signs no one in, the app's hook runs off the response's path, as a held address runs none and its time would tell.
+  if (!guest && state.core.onSignUp) {
+    const { onSignUp } = state.core
+
+    if (requireVerified)
+      await afterResponse('onSignUp', async () => onSignUp(user, undefined))
+    else
+      await onSignUp(user, undefined)
+  }
 
   // This browser may verify the address without signing in, as with `requireVerified` it cannot.
   await state.session.set('authRegistered', record.id)
@@ -215,6 +221,18 @@ export async function createUser(core: Core, input: CreateUserInput): Promise<Cr
   await core.onSignUp?.(user, undefined)
 
   return { ok: true, user }
+}
+
+// Frees the address and the name at once and erases the account, `onDelete` included, off the response's path where registering signs no one in: a held address erases nothing, and the time the hook takes would tell it was unverified.
+async function replaceUnclaimed(state: RequestState, holder: UserRecord): Promise<void> {
+  if (!state.core.email?.requireVerified) {
+    await eraseUser(state.core, holder)
+
+    return
+  }
+
+  await state.core.store.users.update(holder.id, { email: null, username: null })
+  await afterResponse('erasing the account a registration replaced', async () => eraseUser(state.core, holder))
 }
 
 // Spends the time hashing a new password takes, so a held address answers no faster than a free one, and leaves this session as a new account's, which `sendVerification` answers alike, mailing no one.

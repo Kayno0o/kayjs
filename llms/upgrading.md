@@ -18,6 +18,9 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 ### analytics refuses an `info` object where nothing shows it
 
 - `analytics()` throws at start for `info: { ... }` on Fathom, Cloudflare or `custom`, or when `consent` asks (Google Analytics, Fathom, Cloudflare and `custom` ask unless `consent: false`); it did nothing there. Remove it, or write `consent: false` on Google Analytics to show the line; `info: false` stays valid. `deprecated-analytics-info` finds it and `kay upgrade` removes it.
+### kayjs-auth runs `onSignUp` after the response under `requireVerified`
+
+- `register` with `requireVerified` (on by default once `email` is set) returns before `onSignUp` has finished, and before the `onDelete` of an unverified account it replaces, so a free address answers as fast as a held one. An app that reads what `onSignUp` wrote right after `register` returns waits for it another way, or sets `email: { requireVerified: false }`, where it still runs before the response.
 
 ## 1.55.0
 

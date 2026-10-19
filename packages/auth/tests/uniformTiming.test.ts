@@ -189,6 +189,41 @@ describe('registering an address that is held', () => {
   })
 })
 
+describe('registering under requireVerified', () => {
+  test('does not wait on onSignUp or on the erase of a replaced unverified account, held address or free', async () => {
+    const slow = gate()
+    let armed = false
+    const ran: string[] = []
+    const app = testApp({ url: 'https://site.test', email: { mailer: { send: () => undefined }, links: LINKS }, onSignUp: async (user) => {
+      if (armed) {
+        await slow.closed
+        ran.push(`signed-up:${user.email}`)
+      }
+    }, onDelete: async (user) => {
+      if (armed) {
+        await slow.closed
+        ran.push(`deleted:${user.email}`)
+      }
+    } })
+
+    await app.browser().call('register', { email: 'ada@example.com', password: PASSWORD })
+    await app.browser().call('register', { email: 'grace@example.com', password: PASSWORD })
+    await app.store.users.update((await app.store.users.findByEmail('grace@example.com'))!.id, { emailVerifiedAt: new Date() })
+    armed = true
+
+    for (const email of ['grace@example.com', 'ada@example.com', 'bob@example.com'])
+      expect(await finishes(app.browser().call('register', { email, password: PASSWORD }))).toBe('done')
+
+    expect(ran).toEqual([])
+    slow.open()
+    await Bun.sleep(50)
+
+    expect(ran.toSorted()).toEqual(['deleted:ada@example.com', 'signed-up:ada@example.com', 'signed-up:bob@example.com'])
+    expect((await app.store.users.findByEmail('ada@example.com'))?.id).toBeDefined()
+    expect((await app.store.users.findByEmail('bob@example.com'))?.id).toBeDefined()
+  })
+})
+
 describe('mail requests', () => {
   for (const method of ['requestPasswordReset', 'requestMagicLink'] as const) {
     test(`${method} does not wait on the mailer for a held address, and parks a code for a free one alike`, async () => {
