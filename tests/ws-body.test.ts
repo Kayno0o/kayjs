@@ -130,4 +130,15 @@ describe('a websocket route with a body schema', () => {
   it('leaves a route with no body alone', async () => {
     expect(await frames('/api/rooms/plain', '{"anything":"1"}')).toEqual([JSON.stringify({ type: 'echo', body: { anything: '1' } })])
   })
+
+  it('sends and publishes through a route whose response is a room\'s, nothing checked against it, and types the client\'s messages', async () => {
+    const socket = site.socket(rooms, '/typed')
+
+    socket.send({ text: 'hi' })
+
+    const first: { type: 'said', text: string } = await socket.next()
+    const second: { type: 'said', text: string } = await socket.next()
+
+    expect([first, second]).toEqual([{ type: 'said', text: 'HI' }, { type: 'said', text: 'hi' }])
+  })
 })

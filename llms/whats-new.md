@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- `rooms()` gives `response`, a schema for the ws route that types an island `socket()`'s messages as the rooms' `Message` without a schema written for typing, and `memberOf(ws, room)`, the member a connection joined a room as ([Rooms](rooms.md)).
 - kay's analytics notice and information line take the site's look: kayjs-ui's tokens when present, else the page's colors, and `--kay-notice-*` properties restyle them ([Privacy](privacy.md)).
 - A shorthand class keeps a `.` between two digits, so `div.gap-1.5.p-0.5` reads `gap-1.5` and `p-0.5` where it split each in two, and `kay migrate astro` and `kay fmt` write such classes as shorthand ([Templates](templates.md)).
 - A `kay/test` visit has `page.settled`, the page as the visitor ends up seeing it, each streamed `await` block's last part swapped in place ([Testing](testing.md#reading-a-page)).

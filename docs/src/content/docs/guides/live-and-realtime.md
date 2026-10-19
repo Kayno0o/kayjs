@@ -256,16 +256,19 @@ Rooms group a module's connections, such as a game's players or a document's edi
 import { s } from 'kay'
 import { api, rooms } from 'kay/server'
 
-const chats = rooms<{ text: string }, string>()
+const chats = rooms<{ from: string, text: string }, string>()
 
 export default api()
   .ws('/:room', {
     body: s.Object({ text: s.String() }),
+    response: chats.response,
     open(ws) {
       chats.join(ws, ws.data.params.room, ws.data.user.name)
     },
     message(ws, { text }) {
-      chats.publish(ws.data.params.room, { text })
+      const room = ws.data.params.room
+
+      chats.publish(room, { from: chats.memberOf(ws, room)!, text })
     },
     close(ws) {
       chats.leave(ws)
@@ -273,9 +276,11 @@ export default api()
   })
 ```
 
-`join(ws, room, member)` puts a connection in a room, and `member` is how it is listed. `leave(ws)` takes it out of every room, as `close` does. `members(room)` lists who is in a room.
+`join(ws, room, member)` puts a connection in a room, and `member` is how it is listed. `leave(ws)` takes it out of every room, as `close` does. `members(room)` lists who is in a room, and `memberOf(ws, room)` gives the member one connection joined as, so a handler knows who sent a message.
 
 `publish(room, message)` sends to everyone in the room. Pass `{ except: ws }` to skip the sender.
+
+Rooms know the type of what they send, so `response: chats.response` hands it to the route. An island's `socket()` then receives typed messages, and you do not write the same union again as a schema, or cast what `last()` gives. The schema accepts any message and checks nothing.
 
 A room no one is in is gone. Rooms live in the memory of one process by default. To reach every process of the machine, give `rooms` `sqliteRooms(path)`. A message reaches the other processes as soon as the file changes. The `poll` option, `'250ms'` by default, is how often a process also looks, in case the folder cannot be watched.
 

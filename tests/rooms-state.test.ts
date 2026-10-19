@@ -1,8 +1,12 @@
+import type { SocketOf } from '../src/runtime/live'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Database } from 'bun:sqlite'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
+import { TypeCompiler } from 'elysia/type-system'
+import { s } from '../src/runtime'
+import { api } from '../src/server/api'
 import { memoryRooms, rooms, sqliteRooms } from '../src/server/rooms'
 
 interface State { round: number, scores: Record<string, number>, at?: Date }
@@ -403,5 +407,58 @@ describe('a room\'s state in a SQLite file', () => {
     finally {
       store.close()
     }
+  })
+})
+
+describe('which member a connection joined as', () => {
+  it('reads the member a connection joined each room as, undefined for a room it is not in or a join with none', () => {
+    const live = rooms<Message, { name: string }>()
+    const lobby = rooms<Message>()
+    const [ada, bob] = [connection(), connection()]
+
+    live.join(ada, 'hall', { name: 'ada' })
+    live.join(ada, 'attic', { name: 'ada the second' })
+    lobby.join(bob, 'hall')
+    expect(live.memberOf(ada, 'hall')).toEqual({ name: 'ada' })
+    expect(live.memberOf(ada, 'attic')).toEqual({ name: 'ada the second' })
+    expect(live.memberOf(ada, 'cellar')).toBeUndefined()
+    expect(live.memberOf(bob, 'hall')).toBeUndefined()
+    expect(lobby.memberOf(bob, 'hall')).toBeUndefined()
+    live.join(ada, 'hall', { name: 'ada again' })
+    expect(live.memberOf(ada, 'hall')).toEqual({ name: 'ada again' })
+    live.leave(ada, 'hall')
+    expect(live.memberOf(ada, 'hall')).toBeUndefined()
+    expect(live.memberOf(ada, 'attic')).toEqual({ name: 'ada the second' })
+    live.leave(ada)
+    expect(live.memberOf(ada, 'attic')).toBeUndefined()
+  })
+
+  it('reads a member that is null, a number or a falsy value as it was joined', () => {
+    const live = rooms<Message, number | null>({ store: sqliteRooms(':memory:') })
+    const ada = connection()
+
+    live.join(ada, 'a', 0)
+    live.join(ada, 'b', null)
+    expect(live.memberOf(ada, 'a')).toBe(0)
+    expect(live.memberOf(ada, 'b')).toBeNull()
+  })
+})
+
+type Same<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false
+
+describe('a room\'s response schema', () => {
+  const live = rooms<Message, string>()
+  const check = TypeCompiler.Compile(live.response)
+  const chat = api().ws('/:room', { body: s.Object({ text: s.String() }), response: live.response, message: () => undefined })
+  const untyped = api().ws('/:room', { body: s.Object({ text: s.String() }), message: () => undefined })
+
+  it('types an island socket\'s messages as the rooms send them, and accepts anything at runtime', () => {
+    const typed: Same<Parameters<Parameters<SocketOf<typeof chat, '/:room'>['on']>[0]>[0], Message> = true
+    const loose: Same<Parameters<Parameters<SocketOf<typeof untyped, '/:room'>['on']>[0]>[0], Message> = false
+
+    expect([typed, loose]).toEqual([true, false])
+    expect([chat, untyped]).toHaveLength(2)
+    expect(check.Check({ type: 'said', text: 'x' })).toBe(true)
+    expect(check.Check(7)).toBe(true)
   })
 })

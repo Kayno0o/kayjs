@@ -156,6 +156,7 @@ button(onClick={() => messages.send({ text: text() })}) Send
 - `socket(module, path, options)` opens one of the module's websocket routes, the path written as the module writes it, `params` and `query` filling it in, all typed from the route.
 - `send` takes the route's `body`, `last()` reads the last message reactively, typed from its `response`, `on(listener)` gets each one and returns what stops it, and `status()` is `connecting`, `open` or `closed`.
 - Messages travel as Elysia sends them, as JSON.
+- A route sending through `rooms()` takes `response: chats.response` to type `last()` and `on()` as the rooms' `Message` ([Rooms](rooms.md)); without a `response` they are `unknown`.
 - What is sent before the connection opens goes once it does, the last 100 messages kept while it is down; after `close()` nothing is.
 - A connection that drops reconnects, waiting longer each time up to 30 seconds, less up to half of that at random so the clients a restart dropped come back apart, and not while the tab is hidden or offline, unless the server closed it with code 1000; a visible tab the browser calls offline still tries each minute, as `navigator.onLine` can be wrong, and the clients a network coming back wakes together reconnect up to half a second apart.
 - `close()` closes it for good.

@@ -1,8 +1,9 @@
 import { s } from 'kay'
-import { api } from 'kay/server'
+import { api, rooms } from 'kay/server'
 
 // Echoes what the route's `body` hands `message()`, so a test reads what arrived: its coerced values and its kinds.
 let errors = 0
+const typed = rooms<{ type: 'said', text: string }>()
 
 export default api()
   .ws('/', {
@@ -36,6 +37,20 @@ export default api()
   .ws('/plain', {
     message(ws, body) {
       ws.send(JSON.stringify({ type: 'echo', body }))
+    },
+  })
+  .ws('/typed', {
+    body: s.Object({ text: s.String() }),
+    response: typed.response,
+    open(ws) {
+      typed.join(ws, 'only')
+    },
+    message(ws, { text }) {
+      ws.send({ type: 'said', text: text.toUpperCase() })
+      typed.publish('only', { type: 'said', text })
+    },
+    close(ws) {
+      typed.leave(ws)
     },
   })
   .post('/h', ({ body }) => body, { body: s.Object({ at: s.Integer() }) })

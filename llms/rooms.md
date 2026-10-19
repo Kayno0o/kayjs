@@ -10,16 +10,19 @@
 import { s } from 'kay'
 import { api, rooms } from 'kay/server'
 
-const chats = rooms<{ text: string }, string>()
+const chats = rooms<{ from: string, text: string }, string>()
 
 export default api()
   .ws('/:room', {
     body: s.Object({ text: s.String() }),
+    response: chats.response,
     open(ws) {
       chats.join(ws, ws.data.params.room, ws.data.user.name)
     },
     message(ws, { text }) {
-      chats.publish(ws.data.params.room, { text })
+      const room = ws.data.params.room
+
+      chats.publish(room, { from: chats.memberOf(ws, room)!, text })
     },
     close(ws) {
       chats.leave(ws)
@@ -97,7 +100,7 @@ export default api()
 - `rooms<Message, Member, State>(options)` from `kay/server` keeps rooms of connections, `Message` what is sent to them, `Member` what each is listed as and `State` what the room remembers.
 - `join(ws, room, member)` puts a connection in a room, joining again replacing its member.
 - `leave(ws, room)` takes it out, and `leave(ws)` out of every room, as `close` does.
-- `members(room)` lists the members, and `roomsOf(ws)` the rooms a connection is in.
+- `members(room)` lists the members, `roomsOf(ws)` the rooms a connection is in, and `memberOf(ws, room)` the member it joined `room` as, `undefined` for a room it is not in or a join with no member: who sent the message a handler is acting on.
 - A room no one is in is gone.
 - `rooms({ state: () => initial, snapshot: (state, room) => message })` keeps a state per room, `State` required once it is typed: `state(room)` reads it, `initial()` while no `update` made another, passed through JSON as a stored state is, and `update(room, state => next)` replaces it with what the function returns, resolving with the new state.
 - Each `update` reads the latest state, one at a time, with `sqliteRooms` across every process sharing the file, so two updates never overwrite each other; its function runs in that turn, so it is quick and reads only its argument. Nothing is sent: publish the change, or `snapshot`'s message, as `publish(room, message)`.
@@ -109,6 +112,7 @@ export default api()
 - A custom `RoomStore` gives `state(room)` and `update(room, change)` to keep states, both on JSON text, else `rooms({ state })` throws.
 - `publish(room, message, { except, to })` sends a message to everyone in the room, but the connection `except` names, such as the sender, or only to the connections joined as the member `to` names, such as a game's host, compared as JSON.
 - It goes out as Elysia sends one, a string as it is and anything else as JSON, not checked against the route's `response`.
+- `response: chats.response` on the ws route types the messages an island's `socket()` receives (`last()`, `on()`) as the rooms' `Message`, so the union is written once, in `rooms<Message>()`; it accepts any message and checks nothing. A ws route with a `body` and no `response` types them `unknown`, which a cast then papers over.
 - `coalesce(read, { wait })` gives a function sending a room one snapshot `read(room)` makes when it goes, however many times it is called within `wait`, a duration, `'50ms'` by default: a burst of moves sends the board once, as it stands.
 - `dispatch(message, handlers)` from `kay` calls the handler a message's `type` names with the message, typed to that variant, and gives what it returns.
 - The handlers cover every type, as the compiler checks, and a type none names, such as one a newer server sends, throws.

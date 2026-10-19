@@ -2,6 +2,7 @@ import type { FSWatcher } from 'node:fs'
 import type { DurationText } from '../runtime/duration'
 import { watch } from 'node:fs'
 import { basename, dirname } from 'node:path'
+import { t } from 'elysia'
 import { optionMs } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
 import { openSqlite } from '../runtime/sqlite.server'
@@ -60,6 +61,10 @@ export interface Rooms<Message, Member = undefined, State = undefined> {
   leave: (ws: RoomConnection, room?: string) => void
   // The rooms a connection of this process is in.
   roomsOf: (ws: RoomConnection) => string[]
+  // The member this process's connection joined a room as, undefined for one that is not in it or joined with none.
+  memberOf: (ws: RoomConnection, room: string) => Member | undefined
+  // A `response` schema for the ws routes of these rooms: it takes any message and types it as `Message`, so an island's `socket()` gets typed messages without a schema written for typing only. Nothing is checked against it.
+  response: ReturnType<typeof t.Unsafe<Message>>
   // The members of a room, in every process sharing the store; a room no one is in is gone, and lists none.
   members: (room: string) => Member[]
   // The room's state, the `state` option's initial one while no `update` made another. A room's state is gone when its last member leaves.
@@ -137,6 +142,12 @@ export function rooms<Message, Member = undefined, State = undefined>(...[option
   }
 
   return {
+    response: t.Unsafe<Message>(t.Any()),
+    memberOf(ws, room) {
+      const written = local.get(room)?.get(idOf(ws.raw))?.member
+
+      return written === undefined || written === NO_MEMBER ? undefined : JSON.parse(written) as Member
+    },
     join(ws, room, ...[member]) {
       const id = idOf(ws.raw)
       const written = member === undefined ? NO_MEMBER : JSON.stringify(member)
