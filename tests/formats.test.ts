@@ -347,7 +347,7 @@ describe('kay build --format json', () => {
     }, 30_000)
 
     it('names the signal that killed a server which had answered', async () => {
-      const killed = await executable(`#!/bin/sh\n[ "$1" = "--health" ] && exit 0\nbun -e 'Bun.serve({ hostname: "127.0.0.1", port: Number(process.env.PORT), fetch: () => new Response("") }); await Bun.sleep(100); process.kill(process.ppid, "SIGKILL")' &\nwait\n`)
+      const killed = await executable(`#!/bin/sh\n[ "$1" = "--health" ] && exit 0\nbun -e 'Bun.serve({ hostname: "127.0.0.1", port: Number(process.env.PORT), fetch: () => new Response("") }); await Bun.sleep(100); process.kill(process.ppid, "SIGKILL"); process.exit()' &\nwait\n`)
 
       await expect(verifyExecutable(killed.file, killed.root, undefined)).rejects.toThrow(/killed by SIGKILL/)
     }, 30_000)
