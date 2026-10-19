@@ -47,9 +47,9 @@ The screens live at `/admin`. Set `prefix` to move them, to `/` if the site is o
 
 In edit mode, kay renders the editor at the end of every page, with the entries the page read. The "Edit on page" links on the screens put an editor the guard admitted in edit mode. The editor's "Stop editing" button leaves it.
 
-An edit cookie or link is tied to no user, so it reads only the collections the pages it showed in edit mode read, never a customer or order collection the page does not render.
+An edit cookie or link is tied to no user, so it reads only the entries the pages it showed in edit mode read, never a customer or order collection the page does not render. A signed-in editor the guard admits reads any entry. The list of those entries lives in the server's memory, so after a restart, or on another replica, load the page again.
 
-Once there is a guard, every save needs it, edit mode included. Without one, saving from an edit link works under `kay dev` only: a production server refuses every save, publish, delete and upload from an edit cookie or link, and warns at boot to set `cms({ guard })`. With a guard, `author` names who a save is committed as, such as the signed-in user.
+Once there is a guard, every save needs it, edit mode included. Without one, saving from an edit link works under `kay dev` only: any other server refuses every save, publish, delete and upload from an edit cookie or link, and warns at boot to set `cms({ guard })`. With a guard, `author` names who a save is committed as, such as the signed-in user.
 
 Without `author`, the forge commits as the account behind its token, so no editor's name or email reaches git. Give `author` the real name and email only when the editors agree to appear in the history: a commit cannot be erased from it later, so a request to delete someone's data (RGPD art. 17) cannot reach their name there. A pseudonym keeps the history useful and the editor private:
 

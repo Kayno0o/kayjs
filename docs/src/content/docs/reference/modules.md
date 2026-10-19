@@ -66,7 +66,7 @@ Types include `Component`, `Signal`, `Guard`, `Duration`, `PageContext`, `Endpoi
 | `rooms`, `memoryRooms`, `sqliteRooms` | Websocket rooms |
 | `enterPreview`, `exitPreview`, `previewUrl` | Preview mode for drafts, edit mode with `{ edit: true }` |
 | `editRequested` | Whether a request is in edit mode |
-| `editedCollections` | The collections the pages rendered in edit mode for a request's cookie read |
+| `editedEntry` | Whether a page rendered in edit mode for a request's cookie read an entry |
 | `renderToString` | Renders a component to a string, for mails and feeds |
 | `renderLocale` | The locale `renderToString` renders in: the one given, the request's, else the site's default |
 | `processImage`, `imageSize` | Resize or measure an image |

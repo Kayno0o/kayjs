@@ -20,7 +20,7 @@ import { editableEntry, editMarks, placeFieldMarks, withFieldMarks } from '../sr
 import { child, loop } from '../src/runtime/html'
 import { navigation } from '../src/runtime/navigation'
 import { editing, previewing } from '../src/runtime/preview'
-import { editedCollections, editRequested, enterPreview, pages, previewUrl } from '../src/server'
+import { editedEntry, editRequested, enterPreview, pages, previewUrl } from '../src/server'
 import { entryUrls } from '../src/server/entry-urls'
 import { inPreview, previewRequested, requestDrafts } from '../src/server/preview'
 import { extensionEditor } from '../src/server/routes'
@@ -921,27 +921,28 @@ describe('preview mode', () => {
     expect(inPreview(() => [previewing(), editing()])).toEqual([true, false])
   })
 
-  it('lets an edit cookie read only the collections the pages it rendered in edit mode read', async () => {
+  it('lets an edit cookie read only the entries the pages it rendered in edit mode read', async () => {
     // A second no other test's cookie was made in.
     setSystemTime(new Date(Date.now() + 10 * 60_000))
 
     const edit = await previewCookie(previewUrl('/news', { edit: true }))
-    const asked = (cookie: string) => editedCollections(new Request('http://localhost/', { headers: { cookie } }))
+    const asked = (cookie: string, slug = 'launch') => editedEntry(new Request('http://localhost/', { headers: { cookie } }), 'news', slug)
 
-    expect([...asked(edit)]).toEqual([])
+    expect(asked(edit)).toBe(false)
     await get('/marks/launch', edit)
-    expect([...asked(edit)]).toEqual(['news'])
+    expect(asked(edit)).toBe(true)
+    expect(asked(edit, 'roadmap')).toBe(false)
     setSystemTime(new Date(Date.now() + 2000))
 
     const other = await previewCookie(previewUrl('/news', { edit: true }))
 
     // Another cookie, a preview one and none at all share nothing of it.
-    expect([...asked(other)]).toEqual([])
-    expect([...asked(await previewCookie(previewUrl('/news')))]).toEqual([])
-    expect([...editedCollections(new Request('http://localhost/'))]).toEqual([])
+    expect(asked(other)).toBe(false)
+    expect(asked(await previewCookie(previewUrl('/news')))).toBe(false)
+    expect(editedEntry(new Request('http://localhost/'), 'news', 'launch')).toBe(false)
 
     setSystemTime(new Date(Date.now() + 2 * 60 * 60_000))
-    expect([...asked(edit)]).toEqual([])
+    expect(asked(edit)).toBe(false)
   })
 
   it('marks in edit mode the markup each field and body renders, the same page byte for byte outside it', async () => {

@@ -46,10 +46,14 @@ describe('cms()', () => {
     expect(typeof dev === 'function' && dev()).toBeTruthy()
   })
 
-  test('warns a production server without a guard, naming cms({ guard }), and no other', () => {
+  test('warns a server outside kay dev without a guard, naming cms({ guard }), and no other', () => {
     const warned = spyOn(console, 'warn').mockImplementation(() => undefined)
-    const boot = (production: boolean, options: Parameters<typeof cms>[0]): string[] => {
-      process.env.NODE_ENV = production ? 'production' : 'development'
+    const boot = (underDev: boolean, options: Parameters<typeof cms>[0]): string[] => {
+      if (underDev)
+        process.env.KAY_DEV_CODE = '0'
+      else
+        delete process.env.KAY_DEV_CODE
+
       warned.mockClear()
 
       const { server } = cms({ files: workingTree(), ...options })
@@ -61,9 +65,9 @@ describe('cms()', () => {
     }
 
     try {
-      expect(boot(true, {})).toEqual([expect.stringContaining('no cms({ guard })')])
-      expect(boot(true, { guard: () => undefined })).toEqual([])
-      expect(boot(false, {})).toEqual([])
+      expect(boot(false, {})).toEqual([expect.stringContaining('no cms({ guard })')])
+      expect(boot(false, { guard: () => undefined })).toEqual([])
+      expect(boot(true, {})).toEqual([])
     }
     finally {
       warned.mockRestore()
@@ -99,7 +103,7 @@ describe('the dev tool\'s CMS tab', () => {
 
 describe('cms() missing field kinds', () => {
   test('warns once the server starts for a custom kind the project has no component for', async () => {
-    const { server } = cms({ files: workingTree() })
+    const { server } = cms({ files: workingTree(), guard: () => undefined })
     const { registerCollections } = await import('../../../src/content/edit')
     const { setContentPlace } = await import('../../../src/content/load')
     const config = await import('./fixture/src/content.config') as Record<string, unknown>

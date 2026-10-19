@@ -49,11 +49,11 @@ const MAX_EDIT_SESSIONS = 1000
 
 interface EditSession {
   until: number
-  collections: Set<string>
+  entries: Set<string>
 }
 
 let settings: PreviewSettings | undefined
-// The collections the pages rendered in edit mode read, by the edit cookie they were rendered for.
+// The entries the pages rendered in edit mode read, by the edit cookie they were rendered for.
 const editSessions = new Map<string, EditSession>()
 const store = new AsyncLocalStorage<PreviewState>()
 const pendingDrafts = new Map<string, Map<string, EntryDraft[]>>()
@@ -183,7 +183,7 @@ function editCookie(request: Request): string | undefined {
   return previewRequested(request) !== 'edit' ? undefined : requestCookies(request).get(PREVIEW_COOKIE) ?? undefined
 }
 
-// Remembers the collections the page just rendered in edit mode read, for the edit cookie of its request; the editor opens those entries, and `editedCollections` lets an API serve no others.
+// Remembers the entries the page just rendered in edit mode read, for the edit cookie of its request: the editor opens those, and `editedEntry` lets an API serve no others.
 export function noteEditedEntries(request: Request, entries: Iterable<EntryRef>): void {
   const cookie = editCookie(request)
 
@@ -192,7 +192,11 @@ export function noteEditedEntries(request: Request, entries: Iterable<EntryRef>)
 
   let session = editSessions.get(cookie)
 
-  if (!session) {
+  if (session) {
+    // Used last, so a full registry drops the cookie nobody uses.
+    editSessions.delete(cookie)
+  }
+  else {
     const now = Date.now() / 1000
 
     for (const [key, each] of editSessions) {
@@ -203,20 +207,25 @@ export function noteEditedEntries(request: Request, entries: Iterable<EntryRef>)
     while (editSessions.size >= MAX_EDIT_SESSIONS)
       editSessions.delete(editSessions.keys().next().value!)
 
-    session = { until: Number(cookie.slice(0, cookie.indexOf('.'))), collections: new Set() }
-    editSessions.set(cookie, session)
+    session = { until: Number(cookie.slice(0, cookie.indexOf('.'))), entries: new Set() }
   }
 
-  for (const { collection } of entries)
-    session.collections.add(collection)
+  editSessions.set(cookie, session)
+
+  for (const { collection, slug } of entries)
+    session.entries.add(entryKey(collection, slug))
 }
 
-// The collections, by the name the content config exports them under, that the pages rendered in edit mode for this request's cookie read: empty outside edit mode. A CMS's API serves an edit cookie no entry of another collection, since the cookie is tied to no user.
-export function editedCollections(request: Request): ReadonlySet<string> {
+function entryKey(collection: string, slug: string): string {
+  return `${collection}\0${slug}`
+}
+
+// Whether a page rendered in edit mode for this request's cookie read the entry, its collection by the name the content config exports it under, whatever its locale: false outside edit mode. A CMS's API serves an edit cookie no other entry, since the cookie is tied to no user.
+export function editedEntry(request: Request, collection: string, slug: string): boolean {
   const cookie = editCookie(request)
   const session = cookie === undefined ? undefined : editSessions.get(cookie)
 
-  return session && session.until > Date.now() / 1000 ? session.collections : new Set()
+  return session !== undefined && session.until > Date.now() / 1000 && session.entries.has(entryKey(collection, slug))
 }
 
 // Whether the request is in edit mode, for a CMS's API module or guard to let in the editor alone outside a page's render, where `editing()` tells.
