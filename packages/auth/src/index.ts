@@ -8,7 +8,7 @@ export type { AuthorizeOutcome, AuthorizeParams, ConsentFields } from './authori
 export type { BearerToken, CreateTokenResult, IssueTokenResult, TokenOptions } from './bearer'
 export { pwnedPassword } from './breached'
 export { hcaptcha, hcaptchaWidget, proofOfWork, turnstile, turnstileWidget } from './captcha'
-export type { CaptchaAction, CaptchaCheck, CaptchaOptions, CaptchaRules, CaptchaWidget, ProofOfWorkCaptcha, ProofOfWorkOptions } from './captcha'
+export type { CaptchaAction, CaptchaCheck, CaptchaContext, CaptchaOptions, CaptchaRules, CaptchaWidget, ProofOfWorkCaptcha, ProofOfWorkOptions } from './captcha'
 export * from './decide'
 export type { Device } from './device'
 export type { ChangeEmailResult, CodedLink, CodeMode, CodeResult, EmailOptions, LinkResult, MailRequestResult, ResetPasswordResult, VerifyEmailResult } from './email'

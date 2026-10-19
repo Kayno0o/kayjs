@@ -194,13 +194,17 @@ export async function requestPasswordReset(state: RequestState, email: string, c
 
 // Sets the password the link was sent for and ends every other session the user held.
 export async function resetPassword(state: RequestState, token: string, password: string): Promise<ResetPasswordResult> {
+  // Counted before the breached-password service is asked, so forged links cannot make the server call it without end.
+  if (await spend(state.core.store, `link:${state.client}`, state.core.limits.link))
+    return { ok: false, error: 'limited' }
+
   const problem = await newPasswordProblem(state.core, password)
 
   // Checked before the token is spent, so a refused password leaves the link usable.
   if (problem !== undefined)
     return { ok: false, errors: { password: problem } }
 
-  const spent = await spendLink(state, token, 'reset-password')
+  const spent = await spendLink(state, token, 'reset-password', true)
 
   if (!spent.ok)
     return spent
@@ -387,12 +391,8 @@ async function spendCode(state: RequestState, type: CodeType, code: string) {
     if (await core.store.attempts.hit(`email-code-miss:${pending.nonce}`, core.email!.expires[type]) < CODE_MISSES)
       return { ok: false, error: 'invalid' } as const
 
+    // Only this session's pending code is dropped: the holder's live code may be one another session asked for, and it is unreachable from here anyway, since its digest binds that session's nonce.
     await state.session.unset('authEmailCode')
-
-    const holder = await core.store.users.findByEmail(pending.email)
-
-    if (holder)
-      await core.store.tokens.deleteForUser(holder.id, type)
 
     return { ok: false, error: 'expired' } as const
   }
@@ -511,10 +511,10 @@ async function issue(state: RequestState, record: UserRecord, type: LinkType, em
 }
 
 // The token's user, once the token is spent; a link for an address the account no longer has is spent for nothing.
-async function spendLink(state: RequestState, token: string, type: LinkType) {
+async function spendLink(state: RequestState, token: string, type: LinkType, counted = false) {
   const { store, limits } = state.core
 
-  if (await spend(store, `link:${state.client}`, limits.link))
+  if (!counted && await spend(store, `link:${state.client}`, limits.link))
     return { ok: false, error: 'limited' } as const
 
   const spent = await store.tokens.consume(digest(type === 'magic-link' ? unmarked(token) : token), type)

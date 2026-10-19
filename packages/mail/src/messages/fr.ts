@@ -89,7 +89,7 @@ export default defineMessages({
       },
       'sign-in-locked': {
         subject: 'Connexion suspendue sur {site}',
-        lead: 'Trop de mots de passe incorrects ont été essayés sur votre compte {site} : la connexion est suspendue pour un moment.',
+        lead: 'Trop de mots de passe ou de codes incorrects ont été essayés sur votre compte {site} : la connexion est suspendue pour un moment.',
         ending: 'Si ce n\'était pas vous, réinitialisez votre mot de passe et vérifiez votre compte sans attendre.',
       },
       'password-changed': {

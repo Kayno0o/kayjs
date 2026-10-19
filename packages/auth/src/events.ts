@@ -23,7 +23,7 @@ export interface EventFields {
   // `method` is how: `password`, `register`, `reset-password`, `magic-link`, `email-code`, `passkey`, `guest`, `app` (the app called `auth.signIn`), `oauth` with the `provider`, or `unknown`.
   'signed-in': { method: string, provider?: string }
   'signed-out': Record<never, never>
-  // `method` is the attempt that failed: `password`, `passkey` or `two-factor`.
+  // `method` is the attempt that failed: `password`, `passkey`, `two-factor` or `oauth`.
   'sign-in-failed': { method: string }
   'role-granted': { role: string }
   'role-revoked': { role: string }

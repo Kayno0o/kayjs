@@ -5,6 +5,7 @@ import type { Proof, ProofFailure } from '../twoFactor'
 import type { OAuthTokens } from './types'
 import { localPath } from 'kay'
 import { homeOf, newUserRecord, publicUser, sameText } from '../core'
+import { report } from '../events'
 import { randomToken } from '../keys'
 import { log } from '../log'
 import { notify } from '../notify'
@@ -12,7 +13,7 @@ import { normalizeEmail, normalizeUsername, usernameProblem } from '../rules'
 import { chooseRemember } from '../sessions'
 import { reprove } from '../twoFactor'
 import { OAuthExchangeError } from './client'
-import { createPkcePair } from './pkce'
+import { challengeOf, createPkcePair } from './pkce'
 
 const FLOW_MAX_AGE_MS = 10 * 60 * 1000
 
@@ -39,7 +40,15 @@ export async function startOAuth(state: RequestState, provider: string, options:
   if (!state.core.oauth.has(provider))
     return undefined
 
-  const url = await leave(state, provider, options.redirect, null)
+  const live = await liveFlow(state)
+
+  // A provider link in flight is the signed-in user's own, proved by `linkProvider`: a GET, which any page can make the browser send, never replaces it.
+  if (live && live.link !== null && live.link !== '')
+    return { error: 'oauth' }
+
+  // The same sign-in asked for again, by a double click, a prefetch or a page loading the link, goes on with the one in flight rather than breaking it.
+  const resume = live && live.provider === provider && live.redirect === localPath(options.redirect, homeOf(state.core)) ? live : undefined
+  const url = await leave(state, provider, options.redirect, null, resume)
 
   if (typeof url === 'string')
     await chooseRemember(state, options.remember)
@@ -66,12 +75,19 @@ export async function startLink(state: RequestState, provider: string, proof: Pr
   return typeof url === 'string' ? { ok: true, url } : { ok: false, error: 'unavailable' }
 }
 
+// The flow this session has in progress, unless it ran out.
+async function liveFlow(state: RequestState): Promise<OAuthFlow | undefined> {
+  const flow = await state.session.get('authOAuth')
+
+  return flow && flow.expires > Date.now() ? flow : undefined
+}
+
 // Parks the flow in the session and answers where the browser goes to meet the provider.
-async function leave(state: RequestState, provider: string, redirect: string | undefined, link: string | null): Promise<string | { error: 'unavailable' }> {
+async function leave(state: RequestState, provider: string, redirect: string | undefined, link: string | null, resume?: OAuthFlow): Promise<string | { error: 'unavailable' }> {
   const entry = state.core.oauth.get(provider)!
-  const pkce = await createPkcePair()
-  const flowState = randomToken()
-  const nonce = randomToken()
+  const pkce = resume ? { verifier: resume.verifier, challenge: await challengeOf(resume.verifier) } : await createPkcePair()
+  const flowState = resume?.state ?? randomToken()
+  const nonce = resume?.nonce ?? randomToken()
   let url: string
 
   try {
@@ -84,6 +100,9 @@ async function leave(state: RequestState, provider: string, redirect: string | u
 
     throw error
   }
+
+  if (resume)
+    return url
 
   await state.session.set('authOAuth', { provider, state: flowState, verifier: pkce.verifier, nonce, redirect: localPath(redirect, homeOf(state.core)), link, expires: Date.now() + FLOW_MAX_AGE_MS })
 
@@ -117,8 +136,11 @@ export async function finishOAuth(state: RequestState, provider: string, query: 
     profile = { ...await entry.client.readUser(tokens, { nonce: flow.nonce, callback: callbackParams(query) }), provider }
   }
   catch (error) {
-    if (error instanceof OAuthExchangeError)
+    if (error instanceof OAuthExchangeError) {
+      log.warn(`the ${provider} sign-in failed: ${error.message}`)
+
       return { error: error.status >= 500 ? 'unavailable' : 'oauth' }
+    }
 
     throw error
   }
@@ -139,8 +161,11 @@ export async function finishOAuth(state: RequestState, provider: string, query: 
     if (current?.id !== flow.link)
       return { error: 'signed-out' }
 
-    if (identity && identity.userId !== current.id)
+    if (identity && identity.userId !== current.id) {
+      await report(state, current, 'sign-in-failed', 'oauth')
+
       return { error: 'taken' }
+    }
 
     await saveIdentity(core, identity, current.id, profile, tokens)
     const linked = await adoptEmail(core, current, profile)
@@ -179,6 +204,9 @@ export async function finishOAuth(state: RequestState, provider: string, query: 
   await heardProfile(core, record, profile)
 
   const done = await state.complete(record, flow.redirect, `oauth:${provider}`)
+
+  if (!done.ok)
+    await report(state, record, 'sign-in-failed', 'oauth')
 
   return done.ok ? { redirect: done.redirect } : { error: done.error }
 }

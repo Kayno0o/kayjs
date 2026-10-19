@@ -20,9 +20,14 @@ export type CaptchaRules = Partial<Record<CaptchaAction, 'always' | number | fal
 // A third party's check, or kay's proof of work: `proofOfWork()`, the default.
 export type CaptchaOptions = CaptchaCheck | ProofOfWorkCaptcha
 
+export interface CaptchaContext {
+  hostname?: string | undefined
+}
+
 export interface CaptchaCheck {
   // Checks the token the page's widget posted: `turnstile(secret)` and `hcaptcha(secret)` are presets, any function works.
-  verify: (token: string, action: CaptchaAction) => boolean | Promise<boolean>
+  // `context.hostname` is the site's own, from `url`, for a check to compare with the hostname the provider says the widget ran on.
+  verify: (token: string, action: CaptchaAction, context?: CaptchaContext) => boolean | Promise<boolean>
   // Every request asks always by default, a guest sign-in as registering does.
   on?: CaptchaRules | undefined
   // The widget the prebuilt pages show where one is needed: `turnstileWidget(siteKey)` or `hcaptchaWidget(siteKey)`.
@@ -78,7 +83,7 @@ export function proofOfWork(options: ProofOfWorkOptions = {}): ProofOfWorkCaptch
 
 // Cloudflare Turnstile's server check; the widget posts its token as `cf-turnstile-response`.
 export function turnstile(secret: string): CaptchaCheck['verify'] {
-  return async token => siteverify(TURNSTILE_URL, secret, token)
+  return async (token, action, context) => siteverify(TURNSTILE_URL, secret, token, action, context)
 }
 
 export function turnstileWidget(siteKey: string): CaptchaWidget {
@@ -87,7 +92,7 @@ export function turnstileWidget(siteKey: string): CaptchaWidget {
 
 // hCaptcha's server check; the widget posts its token as `h-captcha-response`.
 export function hcaptcha(secret: string): CaptchaCheck['verify'] {
-  return async token => siteverify(HCAPTCHA_URL, secret, token)
+  return async (token, _action, context) => siteverify(HCAPTCHA_URL, secret, token, undefined, context)
 }
 
 export function hcaptchaWidget(siteKey: string): CaptchaWidget {
@@ -157,7 +162,7 @@ export async function admit(state: RequestState, action: CaptchaAction, token: s
     return 'captcha'
 
   try {
-    return await captcha.verify(token, action) ? undefined : 'captcha'
+    return await captcha.verify(token, action, { hostname: core.url === undefined ? undefined : new URL(core.url).hostname }) ? undefined : 'captcha'
   }
   catch (error) {
     log.error(`checking a CAPTCHA for ${action} failed`, error)
@@ -166,11 +171,20 @@ export async function admit(state: RequestState, action: CaptchaAction, token: s
   }
 }
 
-async function siteverify(url: string, secret: string, token: string): Promise<boolean> {
+// A token minted for another site's widget, or another form, is no proof for this one: the answer's hostname and, where the widget set one, its action must match. An answer without an action is taken, as a widget need not set one.
+async function siteverify(url: string, secret: string, token: string, action: CaptchaAction | undefined, context: CaptchaContext | undefined): Promise<boolean> {
   const response = await fetch(url, { method: 'POST', body: new URLSearchParams({ secret, response: token }), signal: AbortSignal.timeout(TIMEOUT_MS) })
 
   if (!response.ok)
     throw new Error(`${url} answered ${response.status}`)
 
-  return (await response.json() as { success?: unknown }).success === true
+  const answer = await response.json() as { success?: unknown, hostname?: unknown, action?: unknown }
+
+  if (answer.success !== true)
+    return false
+
+  if (context?.hostname !== undefined && (typeof answer.hostname !== 'string' || answer.hostname.toLowerCase() !== context.hostname.toLowerCase()))
+    return false
+
+  return action === undefined || typeof answer.action !== 'string' || answer.action === '' || answer.action === action
 }

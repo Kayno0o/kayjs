@@ -30,10 +30,24 @@ export class OAuthExchangeError extends Error {
   }
 }
 
+// A site served over https sends codes and tokens to https endpoints only, whatever NODE_ENV says.
+function requireSecureEndpoints(endpoints: OAuthEndpoints, provider: string): void {
+  const urls = { authorizeUrl: endpoints.authorizeUrl, tokenUrl: endpoints.tokenUrl, userUrl: endpoints.userUrl, jwksUrl: endpoints.openId?.jwksUrl }
+
+  for (const [name, url] of Object.entries(urls)) {
+    if (url !== undefined && new URL(url).protocol !== 'https:')
+      throw new Error(`kayjs-auth: the ${provider} provider's ${name} ${url} is not https, which a site at https refuses`)
+  }
+}
+
 /** A configured OAuth client bound to one provider and one app's credentials. */
 export function createOAuthClient<Raw = unknown, User = unknown>(provider: OAuthProvider<Raw, User>, config: OAuthClientConfig) {
   let discovered: Promise<OAuthEndpoints> | undefined
+  const secure = new URL(config.redirectUri).protocol === 'https:'
   const keySets = new Map<string, JWTVerifyGetKey>()
+
+  if (secure)
+    requireSecureEndpoints(provider, provider.name)
 
   // Discovered once; a failure is tried again on the next use rather than kept.
   const endpoints = async (): Promise<OAuthEndpoints> => {
@@ -43,7 +57,12 @@ export function createOAuthClient<Raw = unknown, User = unknown>(provider: OAuth
     discovered ??= provider.discover()
 
     try {
-      return { ...provider, ...await discovered }
+      const found = { ...provider, ...await discovered }
+
+      if (secure)
+        requireSecureEndpoints(found, provider.name)
+
+      return found
     }
     catch (error) {
       discovered = undefined

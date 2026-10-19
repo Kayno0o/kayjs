@@ -434,13 +434,13 @@ describe('https issuers in production', () => {
     expect(() => oidcProvider({ issuer: 'http://idp.test' })).not.toThrow()
   })
 
-  test('a discovery document naming an http endpoint is a provider unavailable in production, and fine in development', async () => {
+  test('a discovery document naming an http endpoint is a provider unavailable in production, and refused at an https site in development too', async () => {
     const issuer = 'https://id.example.test'
 
     for (const field of ['authorization_endpoint', 'token_endpoint', 'userinfo_endpoint', 'jwks_uri']) {
       const doc = { issuer, authorization_endpoint: `${issuer}/auth`, token_endpoint: `${issuer}/token`, userinfo_endpoint: `${issuer}/userinfo`, jwks_uri: `${issuer}/certs`, [field]: `http://evil.test/${field}` }
 
-      for (const [env, expected] of [['development', false], ['production', true]] as const) {
+      for (const [env, expected] of [['development', true], ['production', true]] as const) {
         process.env.NODE_ENV = env
         provider(issuer, { token: `${issuer}/token`, jwks: `${issuer}/certs`, discovery: { url: `${issuer}/.well-known/openid-configuration`, doc } }, {})
 

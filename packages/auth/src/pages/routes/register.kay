@@ -66,7 +66,7 @@ Panel(title={t('auth.register.title')})
           input(name="remember" type="checkbox")
           span {t('auth.remember')}
       if features.captcha && captcha.shown
-        Captcha(widget={features.captcha} challenge={captcha.challenge})
+        Captcha(widget={features.captcha} challenge={captcha.challenge} action="register")
       if error
         Message(text={error})
       Button(type="submit" tone="accent" label={t('auth.register.submit')})

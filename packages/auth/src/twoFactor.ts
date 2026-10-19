@@ -4,7 +4,7 @@ import type { RequestState } from './state'
 import type { UserRecord } from './store'
 import { comparePasswords, nanoid } from '@kaynooo/utils'
 import { banned } from './core'
-import { report } from './events'
+import { afterResponse, report } from './events'
 import { deriveKeys, digest } from './keys'
 import { spend } from './limits'
 import { notify } from './notify'
@@ -86,8 +86,18 @@ export async function verifyTwoFactor(state: RequestState, code: string, signIn:
     return { ok: false, error: 'expired' }
 
   // Six digits with three live at a time make about one guess in 333,000: the attempt budget is what makes the factor strong.
-  if (await spend(store, `two-factor:${state.client}`, limits.twoFactor) || await spend(store, `two-factor:${record.id}`, limits.twoFactorAccount))
+  if (await spend(store, `two-factor:${state.client}`, limits.twoFactor))
     return { ok: false, error: 'limited' }
+
+  const guesses = await store.attempts.hit(`two-factor:${record.id}`, limits.twoFactorAccount.window)
+
+  if (guesses > limits.twoFactorAccount.max) {
+    // Once per lockout, as for passwords: only the first guess past the cap mails the holder.
+    if (guesses === limits.twoFactorAccount.max + 1)
+      await afterResponse('reporting a second factor lockout', async () => notify(state, record, 'sign-in-locked'))
+
+    return { ok: false, error: 'limited' }
+  }
 
   if (!(await spendSecondFactor(state, record, code))) {
     await report(state, record, 'sign-in-failed', 'two-factor')

@@ -6,7 +6,7 @@
 
 - `signed-in`, `method` how: `password`, `register`, `reset-password`, `magic-link`, `email-code`, `oauth` with the `provider`, `passkey`, `guest`, or `app` for `auth.signIn`. A sign-in through the second factor is heard once it is answered, with its first factor.
 - `signed-out`.
-- `sign-in-failed`, for an account that exists only: `method` `password`, `two-factor` or `passkey`.
+- `sign-in-failed`, for an account that exists only: `method` `password`, `two-factor`, `passkey` or `oauth`.
 - An admin's doing, `actor` the admin: `role-granted` and `role-revoked`, `role`; `banned`, `reason` when given; `unbanned`; `impersonation-started` and `impersonation-ended`.
 - In an organization, `organizationId`: `organization-created` and `organization-deleted`; `member-joined` and `member-roles-changed`, with the `roles` given; `member-left`; `member-removed`. A manager's doing names them as `actor`.
 - `oauth-client-approved` (first approval of an app, or more scopes) and `oauth-client-revoked`, `client` the app's name.

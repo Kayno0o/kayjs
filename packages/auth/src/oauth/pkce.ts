@@ -10,7 +10,11 @@ export interface PkcePair {
 /** Generates a PKCE verifier/challenge pair (RFC 7636, S256): keep `verifier` server-side, send `challenge` on authorize, replay `verifier` to `exchangeCode`. */
 export async function createPkcePair(): Promise<PkcePair> {
   const verifier = nanoid(64)
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))
 
-  return { verifier, challenge: Buffer.from(digest).toString('base64url'), method: 'S256' }
+  return { verifier, challenge: await challengeOf(verifier), method: 'S256' }
+}
+
+/** The S256 challenge of a verifier, to send the same one again for a flow in progress. */
+export async function challengeOf(verifier: string): Promise<string> {
+  return Buffer.from(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))).toString('base64url')
 }

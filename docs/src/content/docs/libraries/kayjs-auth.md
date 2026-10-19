@@ -328,7 +328,7 @@ form(action={register})
   button Create the account
 ```
 
-A proof of work costs a bot CPU rather than proving a human. A site bots target anyway sets Turnstile or hCaptcha as `captcha` instead. `captcha: false` turns it off.
+A proof of work costs a bot CPU rather than proving a human. A site bots target anyway sets Turnstile or hCaptcha as `captcha` instead; their tokens count only when the provider says they were made for your site's hostname, and for Turnstile the form they were shown on. `captcha: false` turns it off.
 
 The proof needs kay's script in the browser. A client without it sets Turnstile or hCaptcha too, such as a plain Elysia app's own pages, a mobile app, or a form with `navigation: false` and no island.
 
@@ -466,7 +466,11 @@ createAuth({
 a(href="/auth/discord?redirect=/account" data-no-prefetch) Sign in with Discord
 ```
 
+Opening that link again while a sign-in is under way goes on with it, and never cancels a provider being linked to an account.
+
 Every preset takes `scopes` and `params`, extra parameters for the authorize URL. A provider a server can host takes its base `url`: `githubProvider({ url: 'https://git.example.com' })` for GitHub Enterprise Server, `gitlabProvider({ url })`, `discordProvider({ url })`. A trailing slash is dropped and a path kept, and production refuses an `http://` one. Discord's earlier `apiBase` works as `url` and logs a warning.
+
+A site whose `url` is https refuses a provider on plain http in every environment, and the endpoints a provider's discovery document names too.
 
 GitHub hides the email of a user who keeps it private. With `githubProvider({ scopes: ['read:user', 'user:email'] })` the primary verified address is read off `/user/emails`, so that user signs up with an email all the same. An unverified or non-primary address is never taken, and when GitHub fails to answer the profile's public email is used.
 

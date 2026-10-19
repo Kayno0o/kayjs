@@ -293,15 +293,18 @@ describe('coming back from the provider', () => {
     expect((await visitor.fetch('/auth/discord/callback')).headers.get('location')).toBe('/login?error=oauth')
   })
 
-  test('starting a sign-in again replaces the pending flow: the earlier state no longer works', async () => {
+  test('starting the same sign-in again goes on with the pending flow, and one to another place replaces it', async () => {
     providers({ 1: { id: '1', username: 'ada' } })
     const { browser } = setup()
     const visitor = browser()
     const first = new URL((await visitor.fetch('/auth/discord')).headers.get('location')!).searchParams.get('state')!
-    const second = new URL((await visitor.fetch('/auth/discord')).headers.get('location')!).searchParams.get('state')!
+    const again = new URL((await visitor.fetch('/auth/discord')).headers.get('location')!).searchParams.get('state')!
+    const elsewhere = new URL((await visitor.fetch('/auth/discord?redirect=/account')).headers.get('location')!).searchParams.get('state')!
 
+    expect(again).toBe(first)
+    expect(elsewhere).not.toBe(first)
     expect((await visitor.fetch(`/auth/discord/callback?code=code-1&state=${first}`)).headers.get('location')).toBe('/login?error=oauth')
-    expect((await visitor.fetch(`/auth/discord/callback?code=code-1&state=${second}`)).headers.get('location')).toBe('/')
+    expect((await visitor.fetch(`/auth/discord/callback?code=code-1&state=${elsewhere}`)).headers.get('location')).toBe('/account')
   })
 
   test('a flow older than ten minutes is refused', async () => {

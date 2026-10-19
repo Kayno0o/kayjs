@@ -94,7 +94,7 @@ Panel(title={t('auth.signIn.title')})
         input(name="remember" type="checkbox")
         span {t('auth.remember')}
     if features.captcha && captchaSignIn.shown
-      Captcha(widget={features.captcha} challenge={captchaSignIn.challenge})
+      Captcha(widget={features.captcha} challenge={captchaSignIn.challenge} action="sign-in")
     if signInError
       Message(text={signInError})
     Button(type="submit" tone="accent" label={t('auth.signIn.submit')})
@@ -115,7 +115,7 @@ Panel(title={t('auth.signIn.title')})
           input(name="remember" type="checkbox")
           span {t('auth.remember')}
       if features.captcha && captchaMagic.shown
-        Captcha(widget={features.captcha} challenge={captchaMagic.challenge})
+        Captcha(widget={features.captcha} challenge={captchaMagic.challenge} action="magic-link")
       if mailError
         Message(text={mailError})
       Button(type="submit" label={codes === 'link' ? t('auth.signIn.magic') : t('auth.signIn.magicCode')})

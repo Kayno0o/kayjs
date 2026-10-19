@@ -1,8 +1,8 @@
 ---
-import type { CaptchaWidget } from '../../captcha'
+import type { CaptchaAction, CaptchaWidget } from '../../captcha'
 import { t } from 'kay/i18n'
 
-const { widget, challenge = null } = props<{ widget: CaptchaWidget | 'proof-of-work', challenge?: string | null }>()
+const { widget, challenge = null, action } = props<{ widget: CaptchaWidget | 'proof-of-work', challenge?: string | null, action: CaptchaAction }>()
 ---
 // Kay's script solves the challenge while the form is filled in and posts the solution in this field's place; without JavaScript it posts empty.
 if widget === 'proof-of-work'
@@ -11,6 +11,6 @@ if widget === 'proof-of-work'
     noscript
       p.text-sm {t('auth.errors.captchaScript')}
 else
-  // The provider's script fills the element and adds the field its token posts as.
-  div(class={widget.class} data-sitekey={widget.siteKey})
+  // The provider's script fills the element and adds the field its token posts as; Turnstile hands the action back, which the check compares.
+  div(class={widget.class} data-sitekey={widget.siteKey} data-action={action})
   script(src={widget.script} async defer)

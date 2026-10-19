@@ -90,7 +90,7 @@ export default defineMessages({
       },
       'sign-in-locked': {
         subject: 'Sign-in locked on {site}',
-        lead: 'Too many wrong passwords were tried on your {site} account, so signing in to it is paused for a while.',
+        lead: 'Too many wrong passwords or codes were tried on your {site} account, so signing in to it is paused for a while.',
         ending: 'If this was not you, reset your password and check your account at once.',
       },
       'password-changed': {
