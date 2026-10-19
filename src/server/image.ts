@@ -6,7 +6,7 @@ import type { LoadedGuard } from './guards'
 import type { RemoteImages } from './remote'
 import type { HeaderCopies } from './security'
 import { existsSync } from 'node:fs'
-import { readdir, rm, stat, utimes } from 'node:fs/promises'
+import { readdir, rename, rm, stat, utimes } from 'node:fs/promises'
 import { basename, extname, join, normalize, resolve, sep } from 'node:path'
 import { ASSET_PREFIX } from '../build/assets'
 import { countCache } from '../build/cache'
@@ -51,6 +51,7 @@ export const VARIANTS_DIR = 'images'
 // A variant made on request that nothing wrote for this long is dropped, and the next request for it draws it again: the folder holds a version of each image per size, so one whose source changed or went away would stay for good.
 export const VARIANT_KEEP_MS = 30 * 24 * 3_600_000
 const PRUNE_EVERY_MS = 24 * 3_600_000
+const TOUCH_AFTER_MS = 24 * 3_600_000
 const ASSETS_PATH = `${ASSET_PREFIX}assets/`
 const IMMUTABLE = 'public, max-age=31536000, immutable'
 const TEXT = { 'content-type': 'text/plain; charset=utf-8' }
@@ -434,17 +435,20 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
   }
 }
 
-// Whether a cached variant exists, marking it as just used so the prune that may run meanwhile leaves it, and a request finding it gone writes it again.
+// Whether a cached variant exists, marking it as used when its time is over a day old so the prune leaves it; a cache that cannot be written still answers from what it holds.
 async function touched(file: string): Promise<boolean> {
   try {
+    if (Date.now() - (await stat(file)).mtimeMs < TOUCH_AFTER_MS)
+      return true
+
     const now = new Date()
 
     await utimes(file, now, now)
 
     return true
   }
-  catch {
-    return false
+  catch (error) {
+    return (error as { code?: unknown }).code !== 'ENOENT' && await Bun.file(file).exists()
   }
 }
 
@@ -460,10 +464,19 @@ export async function pruneVariants(dir: string, keepMs: number): Promise<number
     const file = join(dir, name)
 
     try {
-      // Read again just before removing, so a variant a request touched since the first read stays.
-      if ((await stat(file)).mtimeMs < oldest && (await stat(file)).mtimeMs < oldest) {
-        await rm(file, { force: true })
-        removed++
+      if ((await stat(file)).mtimeMs < oldest) {
+        // Moved aside before the last look, so a request touching it meanwhile either finds it gone and writes it again, or has it put back.
+        const aside = `${file}.pruning`
+
+        await rename(file, aside)
+
+        if ((await stat(aside)).mtimeMs < oldest) {
+          await rm(aside, { force: true })
+          removed++
+        }
+        else {
+          await rename(aside, file)
+        }
       }
     }
     catch {
