@@ -572,16 +572,12 @@ function track(source: Source): void {
   }
 
   // Read already in this run, out of order.
-  if (cursor > 0 && source.observers?.has(listener) && sources.lastIndexOf(source, cursor - 1) >= 0)
+  if (source.observers?.has(listener) && readBy(listener, source))
     return
 
   // The order changed: what the last run read from here on is read afresh, so what stays subscribed is what this run read.
   if (cursor < sources.length)
     truncate(listener, cursor)
-
-  // Read again in this run: the sources up to here are all this run's.
-  if (source.observers?.has(listener))
-    return
 
   source.observers ??= new Set()
   source.observers.add(listener)
@@ -597,11 +593,8 @@ function truncate(node: Computation, from: number): void {
   node.sources.length = from
 }
 
-// Whether `node` is not running, or has read `source` already in this run: a running one will read what it has not yet as it goes.
-function reads(node: Computation, source: Source): boolean {
-  if (node.cursor < 0)
-    return true
-
+// Whether `node` has read `source` in its run so far.
+function readBy(node: Computation, source: Source): boolean {
   const index = node.sources.indexOf(source)
 
   return index >= 0 && index < node.cursor
@@ -613,7 +606,8 @@ function mark(source: Source, state: typeof CHECK | typeof DIRTY, direct = false
     return
 
   for (const observer of source.observers) {
-    if (!reads(observer, source))
+    // A running one that has not read the source yet will read it as it goes.
+    if (observer.cursor >= 0 && !readBy(observer, source))
       continue
 
     if (direct)
