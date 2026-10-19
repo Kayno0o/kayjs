@@ -375,6 +375,7 @@ function scrolled() {
   pinned = log !== undefined && log.scrollHeight - log.scrollTop - log.clientHeight < PINNED_PX
 }
 ---
+// The inline icons follow Tabler Icons and Feather (MIT), whose notices are in THIRD-PARTY-NOTICES.md.
 section.kai-chat(class={className} onKeyDown={escape} data-empty={history().length === 0 && !busy()} ref={element => element.addEventListener('kai-chat-new', reset)})
   if history().length === 0 && !busy()
     .kai-chat-empty

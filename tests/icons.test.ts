@@ -148,4 +148,32 @@ describe('icons', () => {
     // Tabler's MIT asks nothing past its notice.
     expect(iconSetWarnings(FIXTURE)).toEqual([])
   })
+
+  it('writes the MIT text under the author\'s copyright line for a set whose package ships none', async () => {
+    const set = join(scratch, 'mit-set/node_modules/@iconify-json/plain')
+    const info = { prefix: 'plain', name: 'Plain Icons', author: { name: 'Ada Lovelace' }, license: { title: 'MIT', spdx: 'MIT' } }
+
+    await Bun.write(join(set, 'package.json'), JSON.stringify({ name: '@iconify-json/plain', version: '1.0.0', license: 'MIT' }))
+    await Bun.write(join(set, 'info.json'), JSON.stringify(info))
+
+    const notices = thirdPartyNotices([set])
+
+    expect(notices).toContain('MIT License\n\nCopyright (c) Ada Lovelace\n\nPermission is hereby granted, free of charge')
+    expect(notices).not.toContain('it comes under MIT')
+
+    const tabler = thirdPartyNotices([join(import.meta.dir, '../node_modules/@iconify-json/tabler')])
+
+    expect(tabler).toContain('Copyright (c) Paweł Kuna')
+    expect(tabler).toContain('THE SOFTWARE IS PROVIDED "AS IS"')
+  })
+
+  it('adds Bun\'s notice and the LGPL pointer to an executable\'s notices only', () => {
+    expect(thirdPartyNotices([])).not.toContain('oven-sh/webkit')
+
+    const notices = thirdPartyNotices([], { executable: true })
+
+    expect(notices).toContain(`Bun ${Bun.version} (MIT)`)
+    expect(notices).toContain('https://github.com/oven-sh/webkit')
+    expect(notices).toContain('JavaScriptCore')
+  })
 })

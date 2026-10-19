@@ -31,6 +31,7 @@ const { icon, closeIcon, sendIcon, stopIcon, newIcon, expandIcon, collapseIcon, 
   class?: string | undefined
 }>()
 ---
+// The inline icons follow Tabler Icons and Feather (MIT), whose notices are in THIRD-PARTY-NOTICES.md.
 // The panel keeps its state across page swaps, and the chat inside hydrates, and so loads, when the panel is first shown.
 Panel(persist label={chat.label} openLabel={openLabel} closeLabel={closeLabel} newLabel={newLabel} expandLabel={expandLabel} collapseLabel={collapseLabel} class={className})
   @icon

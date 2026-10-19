@@ -11,6 +11,25 @@ const LICENSE_FILE = /^(?:licen[cs]e|copying|notice)(?:[.-][\w.-]*)?$/i
 const NOTICE_ENOUGH = new Set(['MIT', 'ISC', 'Apache-2.0', 'BSD-2-Clause', 'BSD-3-Clause', '0BSD', 'CC0-1.0', 'Unlicense', 'OFL-1.1', 'MPL-2.0'])
 const LICENSES_DIR = 'LICENSES'
 const RULE = '='.repeat(80)
+const MIT_TERMS = 'Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.'
+
+// The standard MIT text under a holder's copyright line, for an icon set whose package ships none.
+function mitText(holder: string): string {
+  return `MIT License\n\nCopyright (c) ${holder}\n\n${MIT_TERMS}`
+}
+
+// What an executable carries that no package of the project holds: the Bun runtime it embeds, which statically links JavaScriptCore and WebCore under the LGPL-2.
+// The source of those libraries and a way to link a changed copy are what the LGPL asks to be offered.
+function bunNotice(version: string): string {
+  return [
+    `Bun ${version} (MIT), the runtime this executable embeds`,
+    '',
+    'Bun is under the MIT licence, https://github.com/oven-sh/bun/blob/main/LICENSE.md, which also lists the licences of what it links.',
+    'It statically links JavaScriptCore and the WebCore files of WebKit, which are under the GNU Lesser General Public License, version 2 (https://www.gnu.org/licenses/old-licenses/lgpl-2.0.txt).',
+    'The source Bun builds them from is the oven-sh/webkit repository, https://github.com/oven-sh/webkit, and the source of Bun itself is https://github.com/oven-sh/bun.',
+    'To replace the LGPL parts with a modified copy: get both repositories at the revisions of this Bun version, change JavaScriptCore or WebCore as the LGPL allows, build Bun from them as its contributing guide, https://bun.sh/docs/project/contributing, describes, then build this application with that Bun: `bun build --compile` on its source gives an executable linked with your copy.',
+  ].join('\n')
+}
 
 // What a package's wasm compiles in, whose licences its own files do not carry: keyed by package and exact version, as a bump may change the codecs, and a test fails when the installed version leaves the map.
 // @jsquash/avif 2.1.1: packages/avif/codec/Makefile of jSquash (https://github.com/jamsinclair/jSquash/blob/da47a2be3b302beb5a5ae164a2ab7aa21a041d90/packages/avif/codec/Makefile, a commit of its main, as it has no tags) builds its decoder, the one wasm of it kay ships, from libavif v1.0.1 with libaom v3.7.0, and holds the string "AOMedia Project AV1 Decoder v3.7.0". kay's own encoder (codecs/avif) is kay's code: its codecs' texts are in kay's LICENSES/ and NOTICE.
@@ -176,8 +195,16 @@ function bundledTexts(name: string, version: string | undefined): string[] {
   return (version === undefined ? undefined : BUNDLED_LICENCES[name]?.[version])?.map(({ codec, files }) => [`Compiled into it: ${codec}`, ...files.map(file => readFileSync(join(BUNDLED_DIR, file), 'utf8').trim())].join('\n\n')) ?? []
 }
 
+// What stands for the licence text of a package that ships none: the standard MIT text for an icon set under it, naming its author, else a line saying so.
+function unwrittenLicence(license: string, name: string, icons: IconSetInfo | undefined): string {
+  if (icons?.license?.spdx === 'MIT' && icons.author?.name !== undefined)
+    return `Its package holds no licence file; this is the MIT licence it comes under, as ${icons.name ?? name} states it.\n\n${mitText(icons.author.name)}`
+
+  return `Its package holds no licence file; it comes under ${license}.`
+}
+
 // The text of a notices file: each package by name and version with its licence, packages sharing one licence text listed together above it.
-export function thirdPartyNotices(packages: Iterable<string>): string {
+export function thirdPartyNotices(packages: Iterable<string>, options: { executable?: boolean } = {}): string {
   const groups = new Map<string, string[]>()
   const seen = new Set<string>()
 
@@ -202,12 +229,13 @@ export function thirdPartyNotices(packages: Iterable<string>): string {
     if (icons?.name !== undefined)
       lines.push(`  ${icons.name}${icons.author?.name === undefined ? '' : ` by ${icons.author.name}`}${icons.author?.url === undefined ? '' : `, ${icons.author.url}`}${icons.license?.url === undefined ? '' : `, licence at ${icons.license.url}`}`)
 
-    const key = text === '' ? `Its package holds no licence file; it comes under ${license}.` : text
+    // An icon set under the MIT licence that ships no text: the standard text, with the copyright line its metadata gives.
+    const key = text === '' ? unwrittenLicence(license, manifest.name, icons) : text
 
     groups.set(key, [...groups.get(key) ?? [], lines.join('\n')])
   }
 
-  const sections = [...groups].map(([text, names]) => [...names.sort(), '', text].join('\n')).sort()
+  const sections = [...[...groups].map(([text, names]) => [...names.sort(), '', text].join('\n')).sort(), ...options.executable ? [bunNotice(Bun.version)] : []]
 
   return [`Third-party software this build carries, each under the licence that follows its name.`, ...sections].join(`\n\n${RULE}\n\n`).concat('\n')
 }

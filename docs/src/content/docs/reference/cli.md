@@ -255,7 +255,7 @@ The build runs `kay check` first and keeps the last build when the check or the 
 
 The build prints what a page with islands loads, then a table per route with its sizes. [What a page weighs](/guides/performance#what-a-page-weighs) explains the report and `budget` limits it.
 
-Every build writes `/_kay/THIRD-PARTY-LICENSES.txt`, with the licence of each package and icon set the browser gets. An executable prints the same notices, plus its server's packages, for `./server --licenses`.
+Every build writes `/_kay/THIRD-PARTY-LICENSES.txt`, with the licence of each package and icon set the browser gets. An executable prints the same notices, plus its server's packages and Bun's own notice, for `./server --licenses`. Bun links JavaScriptCore and WebCore under the LGPL-2, so the notice points to their source and says how to build with a modified copy. An icon set under the MIT licence that ships no licence text gets the standard text, under its author's name.
 
 See [Prove the executable starts](/guides/deployment#prove-the-executable-starts) for `--verify`.
 

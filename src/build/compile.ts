@@ -109,7 +109,7 @@ export async function compileServer(project: Project, options: CompileOptions): 
 
   const notices = join(paths.compile, NOTICES_FILE)
 
-  await Bun.write(notices, thirdPartyNotices([...installedDependencies(root), ...options.packages ?? []]))
+  await Bun.write(notices, thirdPartyNotices([...installedDependencies(root), ...options.packages ?? []], { executable: true }))
   await Bun.write(generated, [
     `import { join } from 'node:path'`,
     `import process from 'node:process'`,
