@@ -25,7 +25,11 @@ describe('the bench app\'s JS', () => {
     await cp(join(ROOT, 'bench/apps/kay'), APP, { recursive: true, filter: source => !source.endsWith('/.kay') })
     await cp(join(ROOT, 'bench/shared'), join(COPY, 'shared'), { recursive: true })
 
-    const build = Bun.spawn([process.execPath, join(ROOT, 'src/cli.ts'), 'build', APP, '--no-check', '--quiet'], { cwd: ROOT, stdout: 'pipe', stderr: 'pipe' })
+    // Without the parallel run's worker id, which would move the build to .kay/client-<id>.
+    const env = { ...process.env }
+
+    delete env.BUN_TEST_WORKER_ID
+    const build = Bun.spawn([process.execPath, join(ROOT, 'src/cli.ts'), 'build', APP, '--no-check', '--quiet'], { cwd: ROOT, env, stdout: 'pipe', stderr: 'pipe' })
     const [errors, code] = await Promise.all([new Response(build.stderr).text(), build.exited])
 
     expect(code, errors).toBe(0)
