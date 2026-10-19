@@ -31,7 +31,11 @@ A line is `tag.class#id(attributes) text`, every part optional. A line starting 
   input(type="text" disabled)
 ```
 
-A class keeps a `.` between two digits, so `div.gap-1.5.p-0.5` has the classes `gap-1.5` and `p-0.5`.
+A class takes Tailwind's names whole: `md:hover:underline`, `w-1/2`, `gap-1.5`, `w-[calc(100%-2rem)]`, `[&>svg]:size-4`, `bg-(--brand)/50` and `*:p-2`. Inside a `[...]` or a `-(...)` nothing ends the class, so a `#`, a `.` or a `,` there is part of the value, but the group closes before any space: write a space in a Tailwind value as `_`.
+
+```kay
+.grid.grid-cols-[1fr_2fr].gap-1.5.[&>svg]:size-4.bg-(--brand).2xl:grid-cols-3
+```
 
 Attributes sit in one pair of parentheses, separated by spaces. A value is a quoted string or `{expression}`. A bare name is a boolean attribute.
 

@@ -160,10 +160,10 @@ describe('kay fmt --from-html', () => {
   })
 
   it('writes the tag shorthand, id and classes it holds, and keeps class="..." for the rest', () => {
-    const { code } = htmlToKay('<div id="a" class="flex w-1/2 py-0.5 md:w-[200px] hover:bg-x"><a href="/x" class="b">go</a></div>')
+    const { code } = htmlToKay('<div id="a" class="flex w-1/2 py-0.5 md:w-[200px] hover:bg-x a=b"><a href="/x" class="b">go</a></div>')
 
     expect(htmlToKay('<div class="hidden 2xl:block">x</div>').code).toBe('.hidden.2xl:block x\n')
-    expect(code).toBe('#a.flex.w-1/2.py-0.5.hover:bg-x(class="md:w-[200px]")\n  a.b(href="/x") go\n')
+    expect(code).toBe('#a.flex.w-1/2.py-0.5.md:w-[200px].hover:bg-x(class="a=b")\n  a.b(href="/x") go\n')
   })
 
   it('keeps the slot and key attributes of HTML and a script as the page wrote it', () => {

@@ -1,5 +1,6 @@
 import type * as t from '@babel/types'
 import { parseExpression } from '@babel/parser'
+import { isClassToken } from '../compiler/class-name'
 import { eachNode } from '../compiler/each-node'
 
 // The translation of markup into a kay template, which `kay migrate astro` and `kay fmt --from-html` share: the markup is read as JSX, which Astro's is and HTML is made to be.
@@ -24,7 +25,6 @@ const WHITESPACE = /\s+/
 const HTML_SPACE = /[ \t\n\r\f]+/g
 const HTML_EDGE_SPACE = /^[ \t\n\r\f]+|[ \t\n\r\f]+$/g
 
-const CLASS_TOKEN = /^(?:[\w\-:/@!]|(?<=\d)\.(?=\d))+$/
 const ID_TOKEN = /^[\w-]+$/
 const UPPERCASE_START = /^[A-Z]/
 const COMMENT_END = /\*\//g
@@ -485,7 +485,7 @@ class Translator {
       if (value?.type === 'StringLiteral') {
         if (target === 'class') {
           for (const token of value.value.split(WHITESPACE).filter(Boolean)) {
-            if (CLASS_TOKEN.test(token))
+            if (isClassToken(token))
               shorthand.push(`.${token}`)
             else
               attributes.push(`class="${token}"`)

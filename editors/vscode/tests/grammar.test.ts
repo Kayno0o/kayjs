@@ -128,6 +128,24 @@ describe('kay grammar', () => {
     ])
   })
 
+  it('reads Tailwind brackets, variables, star variants and decimals as one class', () => {
+    const classes = '.w-[calc(100%-2rem)].[&>svg]:size-4.[&_svg:not([class*=\'size-\'])]:p-1.bg-(--brand)/50.*:p-2.gap-1.5.2xl:flex'
+
+    expect(tokenize(`div${classes}(id="a") x`)[0]).toEqual([
+      'div: entity.name.tag.kay',
+      `${classes}: entity.other.attribute-name.class.kay`,
+      '(: punctuation.definition.attributes.begin.kay',
+      'id: entity.other.attribute-name.kay',
+      '=: punctuation.separator.key-value.kay',
+      '"a": string.quoted.double.kay',
+      '): punctuation.definition.attributes.end.kay',
+      'x: meta.element.kay',
+    ])
+    expect(tokenize(`${classes} x`)[0]).toEqual([`${classes}: entity.other.attribute-name.class.kay`, 'x: meta.element.kay'])
+    expect(tokenize(`error${classes} title`)[0]).toEqual(['error: keyword.control.error.kay', `${classes}: entity.other.attribute-name.class.kay`, 'title: variable.other.field.kay'])
+    expect(tokenize(`p see #[a${classes} go] now`).flat()).toContain(`${classes}: entity.other.attribute-name.class.kay`)
+  })
+
   it('reads control flow, slots, comments and piped text', () => {
     const lines = tokenize([
       'for todo, i of todos key={todo.id}',

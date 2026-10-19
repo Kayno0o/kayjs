@@ -89,7 +89,7 @@ const { items, open } = Astro.props
     expect(code).toBe(`---
 const { items, open } = props<Record<string, unknown>>()
 ---
-#main.card.md:flex.w-1/2(class="[&>p]:mt-2")
+#main.card.md:flex.w-1/2.[&>p]:mt-2
   if open
     p(class={['note', { open }]}) Open
   if items.length > 0

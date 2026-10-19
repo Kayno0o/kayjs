@@ -1,6 +1,7 @@
 import type * as t from '@babel/types'
 import type { Attribute, AwaitBranch, AwaitNode, ConstNode, Details, Diagnostic, ElementNode, ErrorNode, ForNode, IfBranch, IfNode, KayFile, MatchNode, Node, PendingNode, SlotNode, Span, TextNode, TryNode } from './ast'
 import { parseExpression } from '@babel/parser'
+import { scanClassName } from './class-name'
 import { Scanner } from './scanner'
 
 // `--- server`, `--- client`, `--- script`, or `--- <T extends Row>` making the component generic, its type parameters in the third or fourth group: `--- client <T>` takes both.
@@ -11,7 +12,6 @@ const CLOSING_LINE = /---[ \t]*(?=\r?\n|$)/y
 const NEXT_FENCE_LINE = /---[ \t]*[a-z<]/y
 const BLANK_LINES = /(?:[ \t]*\r?\n)*/y
 const TAG_NAME = /[A-Z][\w-]*/iy
-const CLASS_NAME = /(?:[\w\-:/@!]|(?<=\d)\.(?=\d))+/y
 const ID_NAME = /[\w-]+/y
 const ATTRIBUTE_NAME = /[A-Z_@:][\w\-:.@]*/iy
 const SLOT_NAME = /@[A-Z_$][\w$]*/iy
@@ -744,18 +744,17 @@ class TemplateParser {
     this.pos += 'error'.length
 
     while (this.src[this.pos] === '.') {
-      CLASS_NAME.lastIndex = this.pos + 1
-      const match = CLASS_NAME.exec(this.src)
+      const end = this.readClassName()
 
-      if (!match) {
+      if (end === undefined) {
         this.error(this.pos, this.pos + 1, 'Expected a class name after `.`')
         this.pos++
 
         break
       }
 
-      classes.push({ start: this.pos + 1, end: this.pos + 1 + match[0].length })
-      this.pos += 1 + match[0].length
+      classes.push({ start: this.pos + 1, end })
+      this.pos = end
     }
 
     this.skipSpaces()
@@ -932,25 +931,28 @@ class TemplateParser {
       if (char !== '.' && char !== '#')
         return
 
-      const pattern = char === '.' ? CLASS_NAME : ID_NAME
+      let end: number | undefined
 
-      pattern.lastIndex = this.pos + 1
-      const match = pattern.exec(this.src)
+      if (char === '.') {
+        end = this.readClassName()
+      }
+      else {
+        ID_NAME.lastIndex = this.pos + 1
+        end = ID_NAME.test(this.src) ? ID_NAME.lastIndex : undefined
+      }
 
-      if (!match) {
+      if (end === undefined) {
         this.error(this.pos, this.pos + 1, char === '.' ? 'Expected a class name after `.`' : 'Expected an id after `#`')
         this.pos++
 
         return
       }
 
-      let value = match[0]
-
       // A colon followed by a space ends the shorthand and opens block expansion (`li: a`); `md:flex` keeps it.
-      if (char === '.' && value.endsWith(':') && (this.src[this.pos + 1 + value.length] === ' ' || this.atLineEnd(this.pos + 1 + value.length)))
-        value = value.slice(0, -1)
+      if (char === '.' && this.src[end - 1] === ':' && (this.src[end] === ' ' || this.atLineEnd(end)))
+        end--
 
-      const span = { start: this.pos + 1, end: this.pos + 1 + value.length }
+      const span = { start: this.pos + 1, end }
 
       if (char === '.') {
         element.classes.push(span)
@@ -964,6 +966,17 @@ class TemplateParser {
 
       this.pos = span.end
     }
+  }
+
+  // The end of the class named after the `.` at the cursor, or undefined when none follows it.
+  private readClassName(): number | undefined {
+    const start = this.pos + 1
+    const { end, unclosed } = scanClassName(this.src, start)
+
+    if (unclosed)
+      this.error(unclosed.at, unclosed.at + 1, `Unclosed \`${unclosed.group}\` in a class`, { help: 'close the group before any space: a space inside a Tailwind value is written `_`' })
+
+    return end > start ? end : undefined
   }
 
   private parseAttributes(element: ElementNode) {

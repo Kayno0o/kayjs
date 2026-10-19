@@ -30,6 +30,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `add.settled()` on an action, and on a `track()` handle, resolves once no call is in flight, whichever way they went, so an island that fired writes without awaiting them waits for them there, with no list of promises of its own ([Actions](actions-from-islands.md#calling-from-an-island)).
 - `refusalMessage(error, fallback)` from `kay` gives the message to show for a caught `call()` error: the route's when it answered, else the fallback, with no `instanceof ApiError` check ([Calling API routes from islands](api-from-islands.md#call-a-route-from-an-event-handler)).
 - A streaming action whose own result removes the block its call was made in keeps streaming, handed to the block around it, rather than closing after its first value ([Calling API routes from islands](api-from-islands.md#streaming-actions)).
+- The `.class` shorthand takes Tailwind's brackets, variables and star variants whole: `.w-[calc(100%-2rem)]`, `.[&>svg]:size-4`, `.bg-(--brand)/50`, `.*:p-2`, and ends a class ending in a digit before a `2xl:` class, `.col-2.2xl:flex`, so `kay fmt --from-html` and `kay migrate astro` write such classes as shorthand ([Templates](templates.md)).
 
 ## 1.58.0
 
