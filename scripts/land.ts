@@ -28,8 +28,8 @@ const READERS: [RegExp, string[]][] = [
   // Greps every tracked file for the private forge domain.
   [/^/, ['tests/public-repo.test.ts']],
 ]
-// Half the host's cores, as CI runs them, so a landing leaves the machine to the rest.
-const WORKERS = '--parallel=6'
+// Half the host's cores, as CI runs them, so a landing leaves the machine to the rest; fewer with KAY_LAND_WORKERS, for a session short of memory beside other test runs.
+const WORKERS = `--parallel=${Number(process.env.KAY_LAND_WORKERS) || 6}`
 // How long a step may run before it counts as hung and is killed with every process it started: the whole suite takes minutes, a test stuck on a killed browser or child took hours.
 const STEP_LIMIT_MS = Number(process.env.KAY_LAND_STEP_LIMIT_MS) || 30 * 60_000
 // How long the output of a step that ended may stay open, as a process it started outside its group can hold it.
