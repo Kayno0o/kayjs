@@ -1,12 +1,15 @@
 import { rm, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
-import { afterAll, describe, expect, it } from 'bun:test'
+import { afterAll, describe, expect, it, setDefaultTimeout } from 'bun:test'
 import { t } from 'elysia'
 import { s } from '../src/runtime/schema'
 import { defineEnv } from '../src/server'
 import { overrideEnv } from '../src/test'
 import { scratchDir } from './scratch'
+
+// Many cases spawn the CLI, which a loaded host runs slowly.
+setDefaultTimeout(30_000)
 
 const cli = join(import.meta.dir, '../src/cli.ts')
 const dirs: string[] = []
