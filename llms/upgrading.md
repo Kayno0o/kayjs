@@ -18,6 +18,9 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 ### Rendered values carry a mark
 
 - A hand-built `{ t: markup }` (an object an app or library returned as markup) no longer renders: the server takes as markup only what `html(markup)` from `kay/html` made, so wrap it, `return html('<b>x</b>')`. No lint can find the old form, as it is a plain object; its type no longer matches `JSX.Element`, so `kay check` reports it. A render copied through JSON or `structuredClone` loses its mark and renders nothing.
+### An API response failing its schema answers 500
+
+- A route whose `response` schema its own answer fails now answers 500 (and is logged and handed to `onError`) instead of 422, so a test asserting 422 there changes to 500; refused input stays 422. No lint, as nothing in the code is wrong but the answer it gets.
 
 ### Remote images only come from public addresses
 

@@ -29,6 +29,12 @@ const LASTMOD_BATCH = 16
 
 // What one sitemap file may hold, by the protocol: 50,000 URLs and 50 MB uncompressed.
 export const SITEMAP_LIMITS = { urls: 50_000, bytes: 50 * 1024 * 1024 }
+let activeLimits = SITEMAP_LIMITS
+
+// For tests, which split a sitemap of a few dozen pages; not for apps. No argument restores the protocol's limits.
+export function setSitemapLimits(limits = activeLimits): void {
+  activeLimits = limits
+}
 // How many parts a sitemap served in several files may have, 5 million URLs.
 const MAX_PARTS = 100
 // Long enough for crawlers, short enough that a new post shows up the same hour without a restart.
@@ -57,7 +63,7 @@ export function serveSitemap(app: Elysia, served: ServedPaths, routes: ServedRou
     if (options.dev || !sitemap || Date.now() - sitemap.at > CACHE_MS) {
       const publicOrigin = settings?.hosts && locale !== undefined ? `https://${settings.hosts[locale]}${options.base ?? ''}` : origin
 
-      cached.set(locale, sitemap = { files: sitemapFiles(routes, origin, options.trailingSlash, settings, locale, report, publicOrigin), replies: new Map(), at: Date.now() })
+      cached.set(locale, sitemap = { files: sitemapFiles(routes, origin, options.trailingSlash, settings, locale, report, publicOrigin, options.base), replies: new Map(), at: Date.now() })
     }
 
     return sitemap
@@ -112,7 +118,7 @@ export function serveSitemap(app: Elysia, served: ServedPaths, routes: ServedRou
         let body = written.get(locale)
 
         if (body === undefined)
-          written.set(locale, body = robotsTxt(rules, settings?.hosts ? `https://${settings.hosts[locale!]}` : origin, settings, locale, options.base))
+          written.set(locale, body = robotsTxt(rules, settings?.hosts ? `https://${settings.hosts[locale!]}${options.base ?? ''}` : origin, settings, locale, options.base))
 
         return new Response(body, { headers: { 'content-type': 'text/plain; charset=utf-8' } })
       })
@@ -186,7 +192,7 @@ function urlset(urls: string[], settings: LocaleSettings | undefined): string {
 }
 
 // The `<url>` elements in groups that each fit a sitemap file, always at least one.
-export function sitemapParts(urls: string[], settings: LocaleSettings | undefined, limits = SITEMAP_LIMITS): string[][] {
+export function sitemapParts(urls: string[], settings: LocaleSettings | undefined, limits = activeLimits): string[][] {
   const frame = Buffer.byteLength(urlset([], settings))
   const parts: string[][] = []
   let part: string[] = []
@@ -211,8 +217,8 @@ export function sitemapParts(urls: string[], settings: LocaleSettings | undefine
 }
 
 // The documents of the sitemap: its one file, or, past the protocol's limits, an index followed by its parts, which `prefix` (the public origin with the mount point) locates.
-export async function sitemapFiles(routes: ServedRoute[], origin: string, trailingSlash: TrailingSlash | undefined, settings: LocaleSettings | undefined, only: string | undefined, report: (error: unknown) => void, prefix: string, limits = SITEMAP_LIMITS): Promise<string[]> {
-  const parts = sitemapParts(await sitemapUrls(routes, origin, trailingSlash, settings, only, report), settings, limits)
+export async function sitemapFiles(routes: ServedRoute[], origin: string, trailingSlash: TrailingSlash | undefined, settings: LocaleSettings | undefined, only: string | undefined, report: (error: unknown) => void, prefix: string, base = '', limits = activeLimits): Promise<string[]> {
+  const parts = sitemapParts(await sitemapUrls(routes, origin, trailingSlash, settings, only, report, base), settings, limits)
 
   if (parts.length > MAX_PARTS) {
     report(new KayError('page-settings-invalid', `kay: the sitemap needs ${parts.length} files, and kay serves ${MAX_PARTS}; the URLs past them are left out`))
@@ -235,7 +241,7 @@ export async function sitemapXml(routes: ServedRoute[], origin: string, trailing
 // Every page a crawler can reach: a page without params unless it opts out, a page with params for the ones its `sitemap` or `prerender` export lists.
 // A page behind a guard is left out unless its `sitemap` export puts it in.
 // In a site of several locales, each copy of a page lists every other, `x-default` the default locale's; `only` keeps the copies of one locale, a domain's.
-async function sitemapUrls(routes: ServedRoute[], origin: string, trailingSlash: TrailingSlash | undefined, settings: LocaleSettings | undefined, only: string | undefined, report: (error: unknown) => void = () => undefined): Promise<string[]> {
+async function sitemapUrls(routes: ServedRoute[], origin: string, trailingSlash: TrailingSlash | undefined, settings: LocaleSettings | undefined, only: string | undefined, report: (error: unknown) => void = () => undefined, base = ''): Promise<string[]> {
   const lists = await Promise.all(routes.map(async (route) => {
     const file = relative(process.cwd(), route.file)
     const modules = await Promise.all(routeChain(route).files.map(async each => importModule<object>(each)))
@@ -281,7 +287,7 @@ async function sitemapUrls(routes: ServedRoute[], origin: string, trailingSlash:
     return prerender === undefined ? [] : listed(await listedParams(route, file, 'prerender', prerender, settings))
   }))
 
-  const absolute = (copy: LocaleCopy) => escape(`${copy.host === undefined ? origin : `https://${copy.host}`}${slashedPath(copy.path, trailingSlash)}`)
+  const absolute = (copy: LocaleCopy) => escape(`${copy.host === undefined ? origin : `https://${copy.host}${base}`}${slashedPath(copy.path, trailingSlash)}`)
   const urls = routes.flatMap((route, index) => lists[index]!.flatMap(({ params, modified }) => {
     const copies = localeCopies(settings, pathOf(route, params)).filter(copy => listedIn(params, copy.locale, settings))
     const fallback = copies.find(copy => copy.locale === settings?.defaultLocale)

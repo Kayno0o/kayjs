@@ -3,11 +3,13 @@ import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { pages } from '../src/server'
-import { SITEMAP_LIMITS, sitemapParts } from '../src/server/sitemap'
+import { setSitemapLimits, SITEMAP_LIMITS, sitemapParts } from '../src/server/sitemap'
 import { fixtureCopy } from './scratch'
 
 const CLI = resolve('src/cli.ts')
-const MANY = SITEMAP_LIMITS.urls + 1
+// The limits are lowered so a few dozen pages split.
+const LIMIT = 20
+const MANY = LIMIT + 10
 const PAGE = `--- server\nexport const page = { sitemap: Array.from({ length: ${MANY} }, (_, number) => ({ n: String(number) })) }\n---\nh1 Many\n`
 const COUNT = /<url>/g
 const LOCS = /<sitemap><loc>([^<]+)<\/loc><\/sitemap>/g
@@ -17,7 +19,7 @@ const errors: unknown[][] = []
 
 const apps = new Map<string, ReturnType<typeof pages>>()
 
-// A site is built once per set of options, as each build lists 50,001 URLs.
+// A site is built once per set of options.
 async function app(options: Parameters<typeof pages>[0] = {}) {
   const key = JSON.stringify(options)
 
@@ -38,11 +40,13 @@ async function read(served: Awaited<ReturnType<typeof app>>, path: string, host 
 }
 
 beforeAll(async () => {
+  setSitemapLimits({ urls: LIMIT, bytes: SITEMAP_LIMITS.bytes })
   root = await fixtureCopy('site-output')
   await Bun.write(join(root, 'src/routes/many/[n].kay'), PAGE)
 })
 
 afterAll(async () => {
+  setSitemapLimits()
   const { rm } = await import('node:fs/promises')
 
   await rm(root, { recursive: true, force: true })
@@ -71,7 +75,7 @@ describe('sitemapParts', () => {
   })
 })
 
-describe('a sitemap past 50,000 URLs', () => {
+describe('a sitemap past its limits', () => {
   it('is an index of parts that each stay within the limit and together hold every URL once', async () => {
     const served = await app()
     const index = await read(served, '/sitemap.xml')
@@ -87,7 +91,7 @@ describe('a sitemap past 50,000 URLs', () => {
     const others = (await read(served, '/about')).status
 
     expect(first.type).toContain('application/xml')
-    expect(listed[0]).toBe(SITEMAP_LIMITS.urls)
+    expect(listed[0]).toBe(LIMIT)
     expect(listed[0]! + listed[1]!).toBeGreaterThanOrEqual(MANY)
     expect(first.text).toContain('<loc>https://x.example/many/0</loc>')
     expect(second.text).toContain(`<loc>https://x.example/many/${MANY - 1}</loc>`)
@@ -128,6 +132,17 @@ describe('a sitemap past 50,000 URLs', () => {
     expect([...english.text.matchAll(LOCS)].map(match => match[1])).toEqual(['https://x.com/sitemap-1.xml', 'https://x.com/sitemap-2.xml'])
     expect([...french.text.matchAll(LOCS)].map(match => match[1])).toEqual(['https://x.fr/sitemap-1.xml', 'https://x.fr/sitemap-2.xml'])
     expect((await read(served, '/sitemap-1.xml', 'x.com')).text).not.toContain('<loc>https://x.fr')
+  })
+
+  it('agrees on the base in the parts, the URLs and robots.txt of a site by domain', async () => {
+    const served = await app({ site: 'https://x.fr', base: '/docs', i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', domains: { fr: 'x.fr', en: 'x.com' }, messages: join(root, 'src/messages') } })
+    const index = await read(served, '/sitemap.xml', 'x.com')
+    const robots = await read(served, '/robots.txt', 'x.com')
+
+    expect([...index.text.matchAll(LOCS)].map(match => match[1])).toEqual(['https://x.com/docs/sitemap-1.xml', 'https://x.com/docs/sitemap-2.xml'])
+    expect((await read(served, '/sitemap-1.xml', 'x.com')).text).toContain('<loc>https://x.com/docs/')
+    expect((await read(served, '/sitemap-1.xml', 'x.com')).text).not.toContain('<loc>https://x.com/many')
+    expect(robots.text).toContain('Sitemap: https://x.com/docs/sitemap.xml')
   })
 
   it('is one plain sitemap again for the same site under the limit', async () => {
@@ -176,7 +191,12 @@ describe('a static export', () => {
 
     await Bun.write(join(copy, 'src/routes/many/[n].kay'), `--- server\nconst list = Array.from({ length: ${MANY} }, (_, number) => ({ n: String(number) }))\n\nexport const page = { prerender: list, sitemap: list }\n---\nh1 Many\n`)
 
-    const child = Bun.spawn([process.execPath, CLI, 'build', copy, '--no-check', '--static', '--outdir', out], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, NODE_ENV: 'development' } })
+    // The build runs in a process of its own, which a preload gives the lowered limits.
+    const preload = join(copy, 'limits.ts')
+
+    await Bun.write(preload, `import { setSitemapLimits } from '${resolve('src/server/sitemap')}'\n\nsetSitemapLimits({ urls: ${LIMIT}, bytes: ${SITEMAP_LIMITS.bytes} })\n`)
+
+    const child = Bun.spawn([process.execPath, '--preload', resolve(preload), CLI, 'build', copy, '--no-check', '--static', '--outdir', out], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, NODE_ENV: 'development' } })
     const [stderr, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
 
     expect(stderr).toBe('')
