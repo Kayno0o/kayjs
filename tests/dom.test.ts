@@ -1947,6 +1947,32 @@ describe('match blocks', () => {
   })
 })
 
+describe('if blocks with and without a name for the value', () => {
+  const mountAliased = site({
+    'main.kay': '---\nimport { signal } from \'kay\'\n\nconst n = signal(1)\nconst on = signal(true)\n---\nbutton#next(onClick={() => n.set(n() + 1)}) next\nbutton#off(onClick={() => on.set(false)}) off\nif n() > 100 as big\n  p.big {String(big)}\nelse if n() as count\n  p.named(class={[\'row\', \'row\', \'1\', { on: on() }]}) {count}\nelse\n  p.none none\nif n() > 1\n  p.free(class={[\'a\', \'b\', \'a\']}) free\nelse\n  p.base base\n',
+  })
+
+  it('follows the value of a named branch while it stays, and a free branch with no value at all', async () => {
+    const { root, dispose } = await mountAliased()
+
+    try {
+      expect(root.querySelector('p.named')!.textContent).toBe('1')
+      expect(root.querySelector('p.named')!.className).toBe('1 named row on')
+      expect(root.querySelector('p.base')!.textContent).toBe('base')
+      root.querySelector<HTMLButtonElement>('#next')!.click()
+      await settle()
+      expect(root.querySelector('p.named')!.textContent).toBe('2')
+      expect(root.querySelector('p.free')!.className).toBe('free a b')
+      root.querySelector<HTMLButtonElement>('#off')!.click()
+      await settle()
+      expect(root.querySelector('p.named')!.className).toBe('1 named row')
+    }
+    finally {
+      await dispose()
+    }
+  })
+})
+
 describe('bind:checked and bind:value on a select', () => {
   const mountBound = site({ 'main.kay': '---\nimport { signal } from \'kay\'\nconst on = signal(false)\nconst choice = signal(\'a\')\n---\ninput#box(type="checkbox" bind:checked={on})\nselect#pick(bind:value={choice})\n  option(value="a") A\n  option(value="b") B\np#out {on() ? \'on\' : \'off\'} {choice()}\n' })
 
