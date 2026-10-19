@@ -40,6 +40,34 @@ describe('health.timeout', () => {
     }
   })
 
+  it('runs the check once for the probes of a few seconds, and again after', async () => {
+    let calls = 0
+    let healthy = true
+    const app = await pages({ routes: ROUTES, prebuilt: false, health: { check: () => {
+      calls += 1
+
+      return healthy
+    } } })
+    const status = async () => (await app.handle(new Request('http://localhost/_kay/health'))).status
+    const now = spyOn(Date, 'now')
+    const start = Date.now()
+
+    try {
+      now.mockReturnValue(start)
+      expect(await Promise.all([status(), status(), status()])).toEqual([200, 200, 200])
+      healthy = false
+      now.mockReturnValue(start + 2900)
+      expect(await status()).toBe(200)
+      expect(calls).toBe(1)
+      now.mockReturnValue(start + 3000)
+      expect(await status()).toBe(503)
+      expect(calls).toBe(2)
+    }
+    finally {
+      now.mockRestore()
+    }
+  })
+
   it('is 5 seconds when unset, and refused when it is no positive duration', async () => {
     for (const timeout of [0, -1, '5 s', Number.NaN, '30d'])
       await expect(pages({ routes: ROUTES, prebuilt: false, health: { timeout } as never })).rejects.toThrow('health.timeout is')
@@ -55,14 +83,15 @@ describe('health.timeout', () => {
   })
 
   it('makes the probe wait as long as the check may', async () => {
-    const server = new Elysia().use(await pages({ routes: ROUTES, prebuilt: false, health: { path: '/up', check: slow(200), timeout: '1s' } })).listen(0)
+    const serve = async () => new Elysia().use(await pages({ routes: ROUTES, prebuilt: false, health: { path: '/up', check: slow(200), timeout: '1s' } })).listen(0)
+    const [patient, hurried] = [await serve(), await serve()]
 
     try {
-      expect(await probeHealth({ path: '/up', timeout: '1s' }, String(server.server!.port))).toBe(0)
-      expect(await probeHealth({ path: '/up', timeout: '50ms' }, String(server.server!.port))).toBe(1)
+      expect(await probeHealth({ path: '/up', timeout: '1s' }, String(patient.server!.port))).toBe(0)
+      expect(await probeHealth({ path: '/up', timeout: '50ms' }, String(hurried.server!.port))).toBe(1)
     }
     finally {
-      await server.stop(true)
+      await Promise.all([patient.stop(true), hurried.stop(true)])
     }
   })
 

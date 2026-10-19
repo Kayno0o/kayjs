@@ -140,6 +140,8 @@ export default defineConfig({
 })
 ```
 
+The check runs at most once every three seconds, however often the route is polled, and the probes in between get its last answer.
+
 On SIGTERM, SIGINT or SIGHUP the server stops taking connections and lets open requests finish. It then runs the `onStop` hooks and exits. Requests still open after `shutdownTimeout`, 10 seconds by default, are closed.
 
 ## Logs and tracing

@@ -12,6 +12,7 @@ import { requestUrl } from './request-url'
 
 export const HEALTH_PATH = '/_kay/health'
 const DEFAULT_SHUTDOWN_TIMEOUT = 10
+const HEALTH_CACHE_MS = 3000
 
 // Set on `globalThis` while a server watches its parent, so the watch `kay render` preloads, for a server nothing else stops, leaves it the stop.
 const PARENT_WATCHED = Symbol.for('kay.parentWatched')
@@ -31,6 +32,7 @@ export function serveHealth(app: Elysia, lifecycle: Lifecycle, holds: () => bool
   const headers = { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' }
   const path = config.path ?? HEALTH_PATH
   const timeoutMs = healthTimeoutMs(config)
+  let checked: { at: number, healthy: Promise<boolean> } | undefined
 
   app.onRequest(async ({ request }) => {
     if (request.method !== 'GET' && request.method !== 'HEAD')
@@ -45,18 +47,28 @@ export function serveHealth(app: Elysia, lifecycle: Lifecycle, holds: () => bool
     if (lifecycle.draining)
       return wholeResponse('stopping', { status: 503, headers })
 
-    try {
-      if (config.check && await withTimeout(config.check(), timeoutMs) === false)
-        return wholeResponse('unhealthy', { status: 503, headers })
-    }
-    catch (error) {
-      logMessage('error', 'the health check failed', error, request)
+    if (!config.check)
+      return wholeResponse('ok', { headers })
 
-      return wholeResponse('unhealthy', { status: 503, headers })
-    }
+    const now = Date.now()
 
-    return wholeResponse('ok', { headers })
+    // Probes from a balancer and a container check may arrive many a second: the check runs once per window, and probes meanwhile share its answer.
+    if (checked === undefined || now - checked.at >= HEALTH_CACHE_MS)
+      checked = { at: now, healthy: runCheck(config.check, timeoutMs, request) }
+
+    return await checked.healthy ? wholeResponse('ok', { headers }) : wholeResponse('unhealthy', { status: 503, headers })
   })
+}
+
+async function runCheck(check: NonNullable<HealthConfig['check']>, timeoutMs: number, request: Request): Promise<boolean> {
+  try {
+    return await withTimeout(check(), timeoutMs) !== false
+  }
+  catch (error) {
+    logMessage('error', 'the health check failed', error, request)
+
+    return false
+  }
 }
 
 // On SIGTERM, SIGINT or SIGHUP, or once the `kay start` or `kay render` running it is gone, the server stops taking connections, lets the open requests and streams finish, runs the app's `onStop` hooks, then the process exits.

@@ -43,7 +43,7 @@ export default defineConfig({
 
 ### Check the database in the health route
 
-`health` moves the route and adds a check, which answers 503 when it returns `false`, throws or takes over 5 s, which `timeout` changes (`health: { timeout: '10s' }`, seconds or a duration such as `'250ms'`, which `./server --health` and the build's check of the executable wait for too, though the Dockerfile `kay new` writes cuts a probe off at 6 s: raise its `--timeout` with it):
+`health` moves the route and adds a check, which answers 503 when it returns `false`, throws or takes over 5 s, and runs at most once every 3 s, probes between sharing its answer, which `timeout` changes (`health: { timeout: '10s' }`, seconds or a duration such as `'250ms'`, which `./server --health` and the build's check of the executable wait for too, though the Dockerfile `kay new` writes cuts a probe off at 6 s: raise its `--timeout` with it):
 
 ```ts
 import { defineConfig } from 'kay/server'
