@@ -46,8 +46,9 @@ function check(wanted: string | number | null) {
   const active = root?.ownerDocument.activeElement
   const focused = all.find(radio => radio === active)
 
-  for (const radio of all)
-    radio.checked = wanted !== null && radio.value === String(wanted)
+  // Radios follow the options in order, so the option is found by place, not by its text.
+  for (const [index, radio] of all.entries())
+    radio.checked = wanted !== null && options[index]?.value === wanted
 
   if (focused && !focused.checked)
     all.find(radio => radio.checked)?.focus()
@@ -81,12 +82,7 @@ async function change(next: string | number | null) {
 
 const ref = startRef<HTMLElement>(element => root = element, rest.ref)
 
-// The radios hold text, so the option an input stands for is found again to hear its own type.
-const started = () => {
-  const text = radios().find(radio => radio.defaultChecked)?.value
-
-  return options.find(option => String(option.value) === text)?.value ?? null
-}
+const started = () => options[radios().findIndex(radio => radio.defaultChecked)]?.value ?? null
 
 // A reset puts the radios back on their defaults, which the app's `onChange` then hears of, `null` for a group that started with none picked.
 // One meeting a change under way waits for it.

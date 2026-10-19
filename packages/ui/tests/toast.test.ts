@@ -220,6 +220,26 @@ describe('attempt', () => {
       expect(await said(new ApiError(0, 'Failed to fetch'), refused)).toEqual(['Could not delete'])
     })
 
+    test('keeps what does not read as a message to `failure`: markup, a status code, several lines, a page of text', async () => {
+      const proxy = '<html><body><h1>413 Request Entity Too Large</h1></body></html>'
+
+      expect(await said(new ApiError(413, proxy, proxy))).toEqual(['Could not delete'])
+      expect(await said(new ApiError(404, 'NOT_FOUND', 'NOT_FOUND'))).toEqual(['Could not delete'])
+      expect(await said(new ApiError(400, 'a\nb', 'a\nb'))).toEqual(['Could not delete'])
+      expect(await said(new ApiError(422, 'x'.repeat(201), 'x'.repeat(201)))).toEqual(['Could not delete'])
+      expect(await said(new ApiError(422, 'x'.repeat(200), { message: 'x'.repeat(200) }))).toEqual(['x'.repeat(200)])
+    })
+
+    test('calls `refused` only for an answer that is an object, and survives one that throws', async () => {
+      const refused = (data: { reason?: string }) => data.reason!.toUpperCase()
+
+      expect(await said(new ApiError(409, 'Conflict', null), refused)).toEqual(['Could not delete'])
+      expect(await said(new ApiError(409, 'Conflict', ''), refused)).toEqual(['Could not delete'])
+      expect(await said(new ApiError(409, 'Conflict', new Blob(['x'])), refused)).toEqual(['Could not delete'])
+      expect(await said(new ApiError(409, 'Taken', { message: 'Taken' }), refused)).toEqual(['Taken'])
+      expect(await attempt(reject(new ApiError(409, 'Conflict', {})), 'Could not delete', refused)).toBeUndefined()
+    })
+
     test('resolves to undefined, and an ActionError keeps reading as before', async () => {
       expect(await attempt(reject(new ApiError(409, 'Taken', 'Taken')), 'Could not delete')).toBeUndefined()
       expect(await said(new ActionError(400, '', {}, { reason: 'Still referenced' }), data => data.reason)).toEqual(['Still referenced'])

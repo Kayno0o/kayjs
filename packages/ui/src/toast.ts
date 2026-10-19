@@ -116,6 +116,7 @@ export type Attempted<T> = T extends void ? true : T
 
 // Runs a change the page waits on, resolving to what `run` returned, or to `undefined` once a refused call has toasted instead of throwing.
 // What is toasted: the message `refused` reads from the data the action's handler passed to `ctx.fail`, else a refusal of the whole call such as a limit, else `failure`.
+// A call made with `call()` throws `ApiError`, read the same way: `refused` gets the route's JSON answer, else the words of a 4xx that read as a message, else `failure`, which status 0 and a 5xx always get.
 export async function attempt<T, Data = unknown>(run: () => Promise<T>, failure: string | AttemptOptions<Data>, refused?: (data: Data) => string | undefined): Promise<Attempted<T> | undefined> {
   const options = typeof failure === 'string' ? { failure, refused } : failure
 
@@ -142,7 +143,7 @@ function refusalOf<Data>(error: unknown, refused: ((data: Data) => string | unde
     return undefined
 
   // A schema refusal carries no handler data for `refused` to read.
-  const said = error.data === undefined ? undefined : refused?.(error.data as Data)
+  const said = error.data === undefined ? undefined : readRefused(refused, error.data as Data)
 
   return [said, error.errors['']].find(message => message !== undefined && message !== '')
 }
@@ -152,16 +153,33 @@ function refusalOfApi<Data>(error: ApiError, refused: ((data: Data) => string | 
   if (error.status === 0)
     return undefined
 
-  const said = error.answer === undefined ? undefined : refused?.(error.answer as Data)
+  // An answer that is text, null or a Blob has no fields for `refused` to read.
+  const said = typeof error.answer === 'object' && error.answer !== null && !(error.answer instanceof Blob) ? readRefused(refused, error.answer as Data) : undefined
 
   return [said, error.status < 500 ? answerMessage(error.answer) : undefined].find(message => message !== undefined && message !== '')
 }
 
+// A `refused` that throws on data it did not expect says nothing, so `failure` is toasted and the caller is not left waiting.
+function readRefused<Data>(refused: ((data: Data) => string | undefined) | undefined, data: Data): string | undefined {
+  try {
+    return refused?.(data)
+  }
+  catch {
+    return undefined
+  }
+}
+
+const MAX_WORDS = 200
+const CODE = /^[A-Z0-9_ -]+$/
+
+// The words of a route's answer, as `refusal()` in kay's runtime reads them, kept only when they read as a message: not markup from a proxy, a status code, several lines or a page.
 function answerMessage(answer: unknown): string | undefined {
-  if (typeof answer === 'string')
-    return answer
+  const text = typeof answer === 'object' && answer !== null && 'message' in answer ? answer.message : answer
 
-  const message = typeof answer === 'object' && answer !== null && 'message' in answer ? answer.message : undefined
+  if (typeof text !== 'string')
+    return undefined
 
-  return typeof message === 'string' ? message : undefined
+  const words = text.trim()
+
+  return words === '' || words.length > MAX_WORDS || words.startsWith('<') || words.includes('\n') || CODE.test(words) ? undefined : words
 }

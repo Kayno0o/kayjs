@@ -4,13 +4,14 @@ import Segmented from '@kaynooo/kayjs-ui/segmented.kay'
 
 // A Segmented over numbers, its choice kept in a signal of the page as an app would, and a second one the parent may set to none.
 // `onChange` is told each pick by the group's own type, which the typed handlers below prove to the check.
-const { onChange } = props<{ onChange: (name: string, value: number | null) => unknown }>()
+const { onChange } = props<{ onChange: (name: string, value: number | string | null) => unknown }>()
 
 const sizes = [{ value: 0, label: 'None' }, { value: 10, label: '10' }, { value: 25, label: '25' }] as const
 const size = signal<0 | 10 | 25>(10)
 // Groups whose parent keeps one value, to see a refused change put back and a reset to none.
 const fixed = 10 as 0 | 10 | 25
 const none = null as 0 | 10 | 25 | null
+const mixed: readonly { value: 1 | '1', label: string }[] = [{ value: 1, label: 'Number' }, { value: '1', label: 'Text' }]
 const held = signal<0 | 10 | 25 | null>(0)
 ---
 form#form
@@ -18,6 +19,7 @@ form#form
   Segmented(label="Held" name="held" options={sizes} value={held()} onChange={(value: 0 | 10 | 25 | null) => { held.set(value); return onChange('held', value) }})
   Segmented(label="Fixed" name="fixed" options={sizes} value={fixed} onChange={(value: 0 | 10 | 25) => onChange('fixed', value)})
   Segmented(label="Sort" name="sort" options={sizes} value={none} onChange={(value: 0 | 10 | 25 | null) => onChange('sort', value)})
+  Segmented(label="Mixed" name="mixed" options={mixed} value={1 as 1 | '1'} onChange={(value: 1 | '1') => onChange('mixed', value)})
   button#none(type="button" onClick={() => held.set(null)}) None
   button#reset(type="reset") Reset
   p#state {JSON.stringify({ size: size(), held: held() })}

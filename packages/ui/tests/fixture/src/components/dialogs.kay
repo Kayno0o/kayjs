@@ -44,7 +44,7 @@ ConfirmDelete(message="Tone?" failure="Could not" onConfirm={onDelete} tone="neu
 ConfirmDelete(message="Tone?" failure="Could not" onConfirm={onDelete} tone="neutral" variant="solid" class="n-solid")
 ConfirmDelete(message="Tone?" failure="Could not" onConfirm={onDelete} tone="neutral" variant="ghost" class="n-ghost")
 ConfirmDelete(message="Tone?" failure="Could not" onConfirm={onDelete} trigger="button" variant="ghost" class="n-button")
-ConfirmDelete(message="Release it?" failure="Could not release" onConfirm={removeByApi} label="Release" refused={(data: { reason?: string }) => data.reason} class="release")
+ConfirmDelete(message="Release it?" failure="Could not release" onConfirm={removeByApi} label="Release" refused={(data: { reason: string }) => data.reason.toUpperCase()} class="release")
 Toaster
 button#open-bare(onClick={() => bareOpen.set(true)}) Open bare
 Dialog#bare(open={bareOpen()} title="Bare" onOpenChange={() => bareOpen.set(false)})

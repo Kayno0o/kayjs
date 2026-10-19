@@ -9,12 +9,12 @@ afterEach(() => {
   mounted?.unmount()
 })
 
-type Told = [name: string, value: number | null]
+type Told = [name: string, value: number | string | null]
 
-async function open(answer: (name: string, value: number | null) => unknown = () => undefined) {
+async function open(answer: (name: string, value: number | string | null) => unknown = () => undefined) {
   const told: Told[] = []
 
-  mounted = await mountComponent('src/components/segmented-number.kay', { onChange: (name: string, value: number | null) => {
+  mounted = await mountComponent('src/components/segmented-number.kay', { onChange: (name: string, value: number | string | null) => {
     told.push([name, value])
 
     return answer(name, value)
@@ -99,4 +99,18 @@ test('puts the previous number back when the change is refused, and holds the gr
   await settle()
 
   expect(checked('fixed')).toBe('10')
+})
+
+test('tells a number from the same text apart, by the option\'s place', async () => {
+  const { root, told, checked } = await open()
+  const radios = () => [...root.querySelectorAll<HTMLInputElement>('input[name="mixed"]')].map(radio => radio.checked)
+
+  expect(radios()).toEqual([true, false])
+
+  click(root.querySelectorAll('input[name="mixed"]')[1] ?? null)
+  await settle()
+  click(root.querySelector('#reset'))
+  await settle()
+
+  expect([told, radios(), checked('mixed')]).toEqual([[['mixed', '1'], ['mixed', 1]], [true, false], '1'])
 })

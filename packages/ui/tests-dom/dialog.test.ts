@@ -119,7 +119,7 @@ describe('ConfirmDelete', () => {
   // A delete made with `call()` throws ApiError, which refuses as an action does: the dialog stays open and enabled with the route's message toasted.
   test.each([
     { name: 'a refusal with words of its own', refusal: { status: 409, message: 'Still referenced', answer: 'Still referenced' }, trigger: 'Delete', dialog: 1, toast: 'Still referenced' },
-    { name: 'a refusal `refused` reads the answer of', refusal: { status: 409, message: 'Conflict', answer: { reason: 'In use' } }, trigger: 'Release', dialog: 14, toast: 'In use' },
+    { name: 'a refusal `refused` reads the answer of', refusal: { status: 409, message: 'Conflict', answer: { reason: 'In use' } }, trigger: 'Release', dialog: 14, toast: 'IN USE' },
     { name: 'a network failure', refusal: { status: 0, message: 'Failed to fetch' }, trigger: 'Delete', dialog: 1, toast: 'Could not delete' },
     { name: 'a server fault', refusal: { status: 500, message: 'Boom', answer: 'Boom' }, trigger: 'Delete', dialog: 1, toast: 'Could not delete' },
   ])('toasts $name from an ApiError and keeps the dialog open', async ({ refusal, trigger, dialog, toast }) => {
@@ -134,6 +134,20 @@ describe('ConfirmDelete', () => {
     await settle()
 
     expect([root.querySelector('.kui-toast-message')?.textContent, shown.open, shown.querySelector('.kui-btn-danger')?.hasAttribute('disabled')]).toEqual([toast, true, false])
+  })
+
+  test('toasts failure and re-enables the buttons when `refused` throws on an answer it did not expect', async () => {
+    const root = await dialogs(undefined, false, { status: 409, message: 'Conflict', answer: null })
+
+    click(root.querySelector('.kui-icon-btn[aria-label="Release"]'))
+    await settle()
+
+    const shown = root.querySelectorAll('dialog')[14]!
+
+    click(shown.querySelector('.kui-btn-danger'))
+    await settle()
+
+    expect([root.querySelector('.kui-toast-message')?.textContent, shown.open, shown.querySelector('.kui-btn-danger')?.hasAttribute('disabled')]).toEqual(['Could not release', true, false])
   })
 
   test('hands its tone to the icon trigger once a variant is given, and leaves the default look without one', async () => {

@@ -38,7 +38,7 @@ A handler refusing with `ctx.fail(400, { error: 'Still in use' })` is a failure 
 
 ## Refusals of an API route
 
-A deletion made with `call()` throws an `ApiError` when the route refuses. It is read like a refusal of a handler: the dialog stays open and the words the route answered with are toasted for a 4xx, or `refused` reads its `answer`. A call that got no answer at all (status 0) and a 5xx toast `failure`.
+A deletion made with `call()` throws an `ApiError` when the route refuses. It is read like a refusal of a handler: the dialog stays open and the words the route answered with are toasted for a 4xx when they read as a message (a proxy's HTML page or a bare code does not), or `refused` reads its JSON `answer`. A call that got no answer at all (status 0) and a 5xx toast `failure`.
 
 ## Look and cancel label
 
