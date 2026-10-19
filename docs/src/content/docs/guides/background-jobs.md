@@ -85,6 +85,20 @@ The server runs it with `.use(welcomeMails)`. An action calls `await welcomeMail
 
 A job that throws is retried after a growing wait. One that runs out of attempts is kept as failed and passed to `onFailed`. So is a run outlasting `lostAfter`, 10 minutes by default, or one whose process died each time.
 
+Some failures are nobody's fault: a full disk, a service asking you to slow down. To try again later without spending an attempt, throw `retryLater` with how long to wait.
+
+```ts
+import { queue, retryLater } from 'kay/server'
+
+export const downloads = queue('downloads', async (url: string) => {
+  if (await diskIsFull())
+    throw retryLater('30s')
+  await download(url)
+}, { attempts: 3 })
+```
+
+The job comes back after the wait, as often as the handler throws it, and is never kept as failed for it. A handler that should give up throws an error of its own, which spends attempts as ever.
+
 The handler takes an `AbortSignal` as its second argument. It aborts when the run passes `lostAfter`, and when the server stops. A handler that passes it on, to `fetch` for example, stops by itself instead of running beside the retry, so a slow mail is not sent twice. A job stopped by a shutdown is handed back without losing an attempt, and another process takes it without waiting out `lostAfter`.
 
 A failed job is kept 30 days, its payload included, or as long as `keepFailed` says. To erase a person's jobs, call `remove(match)`. It removes every waiting or failed job whose payload matches.

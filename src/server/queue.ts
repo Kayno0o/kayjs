@@ -145,6 +145,22 @@ const DEFAULT_PATH = 'data/jobs.sqlite'
 // Why a run's signal aborted when the server stopped, as against lostAfter running out.
 const STOPPED = new Error('the server is stopping')
 
+class RetryLater extends Error {
+  readonly waitMs: number
+
+  constructor(waitMs: number, reason: string) {
+    super(reason)
+    this.name = 'RetryLater'
+    this.waitMs = waitMs
+  }
+}
+
+// Thrown from a handler to run the job again after `wait` without spending an attempt, for a failure that is nobody's fault, a full disk or a service asked to slow down: `throw retryLater('30s')`.
+// It repeats for as long as the handler throws it, so a handler that should give up throws an error of its own, which spends attempts as ever; a store without `release` spends one here too.
+export function retryLater(wait: Duration, reason = 'it asked to run again later'): Error {
+  return new RetryLater(durationSeconds(wait, 'retryLater\'s wait') * 1000, reason)
+}
+
 // What drains each queue made, for `kay/test` to run them all.
 const drains = new Set<() => Promise<number>>()
 let defaultStore: JobStore | undefined
@@ -530,6 +546,16 @@ export function queue<Payload, Progress = unknown>(name: string, handler: (paylo
       await store().complete(job.id)
     }
     catch (error) {
+      // A run that asks for another go hands the job back for later, its attempt not counted.
+      if (error instanceof RetryLater && store().release) {
+        await store().release!(job.id, held, Date.now() + error.waitMs)
+        // The worker looking for jobs may sleep past the time this one is due.
+        wakePoller()
+        kayLog('info', `a job of queue('${name}') asked to run again in ${Math.round(error.waitMs / 1000)} s, without spending an attempt: ${error.message}`)
+
+        return true
+      }
+
       // A server stopping aborts the run: a job that gave up for it is handed back, not counted as a failed attempt.
       if (ended.signal.reason === STOPPED && store().release) {
         await store().release!(job.id, held)
@@ -538,6 +564,9 @@ export function queue<Payload, Progress = unknown>(name: string, handler: (paylo
       }
 
       const message = error instanceof Error ? error.message : String(error)
+
+      if (error instanceof RetryLater)
+        kayLog('warn', `a job of queue('${name}') asked to run again later, but its store has no release(), so the run counts as failed`)
 
       if (job.attempts < attempts) {
         const wait = backoff * 2 ** (job.attempts - 1)

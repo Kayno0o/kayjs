@@ -39,7 +39,7 @@ export { editedEntry, editRequested, enterPreview, exitPreview, previewUrl } fro
 export type { ApiRateLimit, RateLimiter } from './protection'
 export { clientAddress, memoryRates, rateKey, rateLimit, requestId, sqliteRates } from './protection'
 export type { EnqueueOptions, FailedJob, JobState, JobStore, Queue, QueueOptions, StoredJob, StoredJobState } from './queue'
-export { memoryJobs, queue, sqliteJobs } from './queue'
+export { memoryJobs, queue, retryLater, sqliteJobs } from './queue'
 export type { CoalesceOptions, RoomConnection, RoomRecipients, Rooms, RoomsOptions, RoomStore } from './rooms'
 export { memoryRooms, rooms, sqliteRooms } from './rooms'
 export type { Route } from './routes'
