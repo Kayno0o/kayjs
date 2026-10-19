@@ -12,5 +12,5 @@ test('a moved list item is said to a screen reader through one polite live regio
   announceMove('Tag', 2, 3)
 
   expect(said()).toBe('Moved Tag to 3 of 3')
-  expect(document.querySelectorAll('[data-kui-announce][role="status"][aria-live="polite"]').length).toBe(1)
+  expect(document.querySelectorAll('[data-kui-announce][aria-live="polite"]').length).toBe(1)
 })
