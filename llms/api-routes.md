@@ -129,6 +129,7 @@ export default api()
 
 - A handler, guard or hook that throws is logged and handed to `onError`, answering 500 with `Internal Server Error` in production, its message in development.
 - A module's own `onError` answering it comes first.
+- A response that fails its route's `response` schema is the route's bug, not the caller's: it answers 500 (`Internal Server Error` in production, the schema error in development), is logged and handed to `onError`, even when the module's own `onError` answers it. Refused input stays 422.
 - Refused input or a thrown `status()` keeps Elysia's answer, unlogged.
 - A route answering a plain object or array holding a bigint, as a database's bigint ids are, gives JSON with each written as its digits, `{"id":"9007199254740993"}`, where `JSON.stringify` would throw.
 - `resource()` types such a field as a `string`.

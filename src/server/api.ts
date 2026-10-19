@@ -179,8 +179,12 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
 
           return value instanceof Response ? carriedOver(set, value, cors !== undefined && owner === instance) : jsonReply(value, set)
         })
-        .onError(({ request, error, set }) => {
+        .onError(({ request, error, code, set }) => {
           const span = spans.get(request)
+
+          // A response failing its own schema is the route's mistake, not the caller's: reported here, before the module's own `onError` may answer it.
+          if (isResponseMismatch(error, code))
+            reportServerError(error, request, options.onError)
 
           // Input refused before the guards ran gets the headers too, so the calling page can read why.
           if (cors)
@@ -390,16 +394,29 @@ function carriedOver(set: { status?: number | string, headers: Record<string, un
   return Object.keys(set.headers).length > 0 && response === given ? undefined : response
 }
 
+// Elysia answers a response that fails its schema as validation (422), a client error for what is the route's own bug.
+function isResponseMismatch(error: unknown, code: unknown): boolean {
+  return code === 'VALIDATION' && (error as { type?: unknown } | null)?.type === 'response'
+}
+
 // Logs an error a route threw and hands it to `onError`, keeping its message out of a production answer, where Elysia would send it.
 // Refused input, an unknown route or a status the handler threw are answered as Elysia means them.
 function reportThrown({ request, error, code, set }: { request: Request, error: unknown, code: unknown, set: { status?: number | string, headers: Record<string, unknown> } }, options: ActionOptions): string | undefined {
-  if (!isUncaught(error, code))
+  const mismatch = isResponseMismatch(error, code)
+
+  if (!mismatch && !isUncaught(error, code))
     return undefined
 
   reportServerError(error, request, options.onError)
 
-  if (options.dev)
-    return undefined
+  if (options.dev) {
+    if (!mismatch)
+      return undefined
+
+    set.status = 500
+
+    return (error as Error).message
+  }
 
   set.status = 500
   set.headers['content-type'] = TEXT['content-type']

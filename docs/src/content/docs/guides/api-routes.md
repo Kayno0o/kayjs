@@ -37,6 +37,8 @@ A browser asking for a page gets your `_error.kay`, or kay's own error page, and
 
 A module's own `onError` that answers the error comes first. A body its schema refuses, or a thrown `status()`, keeps the answer Elysia gives, unlogged.
 
+A response that does not match the route's `response` schema is a bug in the route, so it answers 500 like a throw: logged, handed to `onError`, with `Internal Server Error` in production and the schema error in development. Input the schema refuses stays 422.
+
 Answer a plain object, an array or a `Response`. A class instance without its own `toString`, or a `Map`, such as an ORM row returned as is, is logged with its class name and answered as an error, not sent as `[object Object]`. The same goes for one passed to `status()`.
 
 ## Calling a route from an event handler

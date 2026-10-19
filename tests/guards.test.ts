@@ -199,7 +199,7 @@ describe('input a guarded route\'s schema refuses', () => {
     const before = (globalThis as { guardRuns?: number }).guardRuns ?? 0
     const counted = await app.handle(new Request('http://localhost/api/counted'))
 
-    expect(counted.status).toBe(422)
+    expect(counted.status).toBe(500)
     expect((globalThis as { guardRuns?: number }).guardRuns).toBe(before + 1)
   })
 
