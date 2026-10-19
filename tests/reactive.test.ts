@@ -502,6 +502,36 @@ describe('the dependency graph', () => {
     dispose()
   })
 
+  it('tracks what the outer run reads after an effect ran again inside its own run', () => {
+    const a = signal(0)
+    const before = signal(0)
+    const after = signal(0)
+    const log: string[] = []
+
+    const dispose = root((dispose) => {
+      renderEffect(() => {
+        log.push(`run ${a()}`)
+
+        if (a() === 0) {
+          before()
+          batch(() => a.set(1))
+          after()
+        }
+      })
+
+      return dispose
+    })
+
+    // The inner run read neither, so what the outer read before it is gone and what it read after it stays.
+    before.set(1)
+    flush()
+    expect(log).toEqual(['run 0', 'run 1'])
+    after.set(1)
+    flush()
+    expect(log).toEqual(['run 0', 'run 1', 'run 1'])
+    dispose()
+  })
+
   it('keeps the sources after a source read again out of order', () => {
     const a = signal(0)
     const b = signal(0)
