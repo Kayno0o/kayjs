@@ -39,7 +39,7 @@ import { proofOfWork, signWork } from '../server/work'
 import { browse } from './browser'
 import { cookieJar, withKept } from './cookies'
 import { NativeFetch, NativeFormData, NativeHeaders, NativeRequest, NativeURL, NativeWebSocket, withNatives } from './natives'
-import { readPage, sitemapUrls } from './page'
+import { readPage, settledHtml, sitemapUrls } from './page'
 import { testRoot } from './root'
 
 export type { A11yViolation, BrowserOptions, TestPage, WaitForOptions, WaitOptions } from './browser'
@@ -74,6 +74,8 @@ export interface Visit extends PageReading {
   status: number
   headers: Headers
   html: string
+  // The page as the visitor ends up seeing it: each streamed `await` block replaced by its last part, read as the page is, and its `html` without the templates and the swap script.
+  settled: PageReading & { html: string }
 }
 
 export interface VisitInit {
@@ -378,7 +380,22 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
       // A page streamed after its shell renders on as it is read.
       const html = await withNatives(async () => current.text())
 
-      return { url: path, status: current.status, headers: current.headers, html, ...readPage(html) }
+      let settled: Visit['settled'] | undefined
+
+      return {
+        url: path,
+        status: current.status,
+        headers: current.headers,
+        html,
+        ...readPage(html),
+        get settled() {
+          const text = settledHtml(html)
+
+          settled ??= { ...readPage(text), html: text }
+
+          return settled
+        },
+      }
     }
 
     const call: TestSite['call'] = async (action, ...[input, init = {}]) => {

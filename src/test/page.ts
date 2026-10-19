@@ -247,3 +247,60 @@ export function readPage(html: string): PageReading {
 export function sitemapUrls(xml: string): string[] {
   return [...xml.matchAll(LOC)].map(([, url]) => decode(url!.trim()))
 }
+
+const AWAIT_TEMPLATE = '<template data-kay-await="'
+const TEMPLATE_TAG = /<(\/?)template(?=[\s>/])/gi
+const SWAP_SCRIPT_CALL = /<script>[^<]*\$kayAwait[^<]*<\/script>/g
+
+// The index just past the `</template>` closing the template opened at `from`, templates of the page's own inside it counted.
+function templateEnd(html: string, from: number): number {
+  let depth = 0
+
+  TEMPLATE_TAG.lastIndex = from
+
+  for (let tag = TEMPLATE_TAG.exec(html); tag !== null; tag = TEMPLATE_TAG.exec(html)) {
+    depth += tag[1] === '' ? 1 : -1
+
+    if (depth === 0)
+      return html.indexOf('>', tag.index) + 1
+  }
+
+  return html.length
+}
+
+// The page as a visitor ends up seeing it: each streamed `<template data-kay-await>` put in place of the block it answers, as the page's inline script does, and that script left out.
+export function settledHtml(html: string): string {
+  const parts: { id: string, content: string }[] = []
+  let page = ''
+  let at = 0
+
+  for (let start = html.indexOf(AWAIT_TEMPLATE); start !== -1; start = html.indexOf(AWAIT_TEMPLATE, at)) {
+    const end = templateEnd(html, start)
+    const open = html.indexOf('>', start) + 1
+    const close = html.lastIndexOf('</template>', end)
+
+    parts.push({ id: html.slice(start + AWAIT_TEMPLATE.length, html.indexOf('"', start + AWAIT_TEMPLATE.length)), content: html.slice(open, Math.max(open, close)) })
+    page += html.slice(at, start)
+    at = end
+  }
+
+  if (parts.length === 0)
+    return html
+
+  page = (page + html.slice(at)).replace(SWAP_SCRIPT_CALL, '')
+
+  for (const { id, content } of parts) {
+    const open = `<!--kay-await:${id}-->`
+    const from = page.indexOf(open)
+
+    if (from === -1)
+      continue
+
+    const close = `<!--/kay-await:${id}-->`
+    const to = page.indexOf(close, from)
+
+    page = page.slice(0, from) + content + (to === -1 ? '' : page.slice(to + close.length))
+  }
+
+  return page
+}

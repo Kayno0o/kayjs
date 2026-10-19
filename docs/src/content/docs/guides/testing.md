@@ -29,6 +29,8 @@ it('lists the books', async () => {
 
 The page also has `meta(key)`, `canonical()`, `jsonLd()` and `links()`. `find(selector)` returns `{ tag, attributes, text, html }` for each match. `text(selector)` gives the text a visitor reads in the first match, or in the whole body.
 
+A page whose `await` blocks stream holds the pending markup and, after it, the templates that replace it, so `text()` reads the pending text. `page.settled` is the page as the visitor ends up seeing it, each block swapped for its last part, with the same `title()`, `find()` and `text()` and an `html` without the templates: `expect(page.settled.text('main')).not.toContain('Loading')`. No browser is needed.
+
 Assert on text through these, not on `page.html`. An island's markup holds hydration markers inside an interpolated text, so `Thanks, {name}!` is not one string there.
 
 `site.sitemap()` resolves with the URLs `/sitemap.xml` lists. Pass another path for a sitemap served elsewhere. It fails when the path does not answer 200.
