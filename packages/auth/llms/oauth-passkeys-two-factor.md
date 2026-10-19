@@ -34,7 +34,7 @@ a(href="/auth/discord?redirect=/account" data-no-prefetch) Sign in with Discord
 
 ## Passkeys
 
-Passkeys are made for `url`'s host and checked against its origin: `passkeys: { rpId, origins }` widens them to a parent domain, or lists every origin the pages are served from. `passkeys: { rpName }` is the name the authenticator shows, `site` by default. `passkeys: { userVerification }` (`'required'`, `'preferred'` by default, or `'discouraged'`) is how hard adding a passkey and answering a second factor with one ask for a PIN or a biometric; `'required'` also refuses a passkey made or used without it. Signing in with a passkey and re-proving always require it, as a passkey alone is two factors. Each method below gives the options for the browser, kept as a challenge in the session that works once, for five minutes.
+Passkeys are made for `url`'s host and checked against its origin: `passkeys: { rpId, origins }` widens them to a parent domain, or lists every origin the pages are served from. `passkeys: { rpName }` is the name the authenticator shows, `site` by default. `passkeys: { userVerification }` (`'required'`, `'preferred'` by default, or `'discouraged'`) is how hard answering a second factor with a passkey asks for a PIN or a biometric; `'required'` also refuses an answer given without it. Adding a passkey, signing in with one and re-proving always require it, as a passkey alone is two factors, so a passkey made without it never exists to count as a way in. Each method below gives the options for the browser, kept as a challenge in the session that works once, for five minutes.
 
 ```ts
 import { passkeyAttestation } from '@kaynooo/kayjs-auth'

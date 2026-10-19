@@ -78,8 +78,8 @@ export async function passkeyRegistrationOptions(state: RequestState, proof: Pro
     userID: Buffer.from(record.id),
     attestationType: 'none',
     excludeCredentials: (await state.core.store.passkeys.listByUser(record.id)).map(passkey => ({ id: passkey.id, transports: passkey.transports })),
-    // Kept on the authenticator, so it signs in without a name typed first.
-    authenticatorSelection: { residentKey: 'required', userVerification: relying.userVerification },
+    // Kept on the authenticator, so it signs in without a name typed first. Signing in requires user verification, so a passkey made without it would count as a way in and never open.
+    authenticatorSelection: { residentKey: 'required', userVerification: 'required' },
   })
 
   await park(state, 'register', options.challenge, record.id)
@@ -104,7 +104,7 @@ export async function registerPasskey(state: RequestState, response: Registratio
   let verified: Awaited<ReturnType<typeof verifyRegistrationResponse>>
 
   try {
-    verified = await verifyRegistrationResponse({ response, expectedChallenge: challenge, expectedOrigin: relying.origins, expectedRPID: relying.id, requireUserVerification: relying.userVerification === 'required' })
+    verified = await verifyRegistrationResponse({ response, expectedChallenge: challenge, expectedOrigin: relying.origins, expectedRPID: relying.id, requireUserVerification: true })
   }
   catch {
     return { ok: false, error: 'invalid' }

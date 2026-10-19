@@ -272,17 +272,21 @@ describe('passkey options', () => {
     expect((await plain.callOk('passkeyRegistrationOptions', { password: PASSWORD })).options.rp.name).toBe('Site')
   })
 
-  test('userVerification asks registering and the second factor for it, and sign-in and re-proof always require it', async () => {
+  test('registering, sign-in and re-proof always require user verification, whatever userVerification says', async () => {
     for (const level of ['required', 'preferred', 'discouraged'] as const) {
       const app = await setup({ userVerification: level })
       const ada = await registered(app)
       const { options } = await ada.callOk('passkeyRegistrationOptions', { password: PASSWORD })
 
-      expect(options.authenticatorSelection?.userVerification).toBe(level)
+      expect(options.authenticatorSelection?.userVerification).toBe('required')
       expect((await app.browser().call('passkeySignInOptions')).userVerification).toBe('required')
     }
 
-    expect((await (await registered(await setup())).callOk('passkeyRegistrationOptions', { password: PASSWORD })).options.authenticatorSelection?.userVerification).toBe('preferred')
+    const lax = await registered(await setup({ userVerification: 'discouraged' }))
+    const registration = await lax.callOk('passkeyRegistrationOptions', { password: PASSWORD })
+
+    expect(await lax.call('registerPasskey', await authenticator().create(registration.options, { userVerified: false }))).toEqual({ ok: false, error: 'invalid' })
+    expect(await lax.call('passkeys')).toEqual([])
   })
 
   test('required refuses a passkey made without user verification and a second factor answered without it', async () => {

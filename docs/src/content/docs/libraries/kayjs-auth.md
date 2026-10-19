@@ -281,7 +281,7 @@ A page of your own calls `auth.profile(locale)` and `auth.saveProfile(values)`. 
 
 ## Passkeys in `createAuth`
 
-`passkeys: { rpName, userVerification }` in `createAuth` sets the name the authenticator shows, `site` by default, and whether adding a passkey and answering a second factor with one require a PIN or a biometric: `'required'`, `'preferred'` (the default) or `'discouraged'`. Signing in with a passkey and re-proving always require it.
+`passkeys: { rpName, userVerification }` in `createAuth` sets the name the authenticator shows, `site` by default, and whether answering a second factor with a passkey requires a PIN or a biometric: `'required'`, `'preferred'` (the default) or `'discouraged'`. Adding a passkey, signing in with one and re-proving always require it.
 
 ## Passkeys in an island
 
