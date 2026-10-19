@@ -200,6 +200,23 @@ describe('an onRequest hook that throws', () => {
     }
   })
 
+  it('still hands a route a malformed body it never reads, with the locals carried to the error page', async () => {
+    const own = await scratchDir('hook-errors-body-')
+
+    try {
+      await Bun.write(join(own, 'routes/index.kay'), 'p Home\n')
+
+      const kay = await pages({ routes: join(own, 'routes'), prebuilt: false, dev: false, log: false })
+      const app = new Elysia().use(kay).post('/p', async ({ request }) => request.text())
+      const answer = await app.handle(new NativeRequest('http://localhost/p', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{bad' }))
+
+      expect([answer.status, await answer.text()]).toEqual([200, '{bad'])
+    }
+    finally {
+      await rm(own, { recursive: true, force: true })
+    }
+  })
+
   it('falls back to plain text when the error page throws itself', async () => {
     const own = await scratchDir('hook-errors-broken-')
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
