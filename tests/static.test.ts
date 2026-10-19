@@ -185,6 +185,14 @@ describe('kay build --static', () => {
     expect(code.filter(text => text.includes('data-kay-query'))).toEqual([])
   })
 
+  it('ships none of route() to a site not importing it', async () => {
+    const chunks = await Array.fromAsync(new Bun.Glob('_kay/*.js').scan(out))
+    const code = await Promise.all(chunks.map(async chunk => Bun.file(join(out, chunk)).text()))
+
+    expect(code.some(text => text.includes('<button>Count'))).toBe(true)
+    expect(code.filter(text => text.includes('route(): param'))).toEqual([])
+  })
+
   it('ships no code reporting browser errors, which no server would take', async () => {
     const chunks = await Array.fromAsync(new Bun.Glob('_kay/*.js').scan(out))
     const code = await Promise.all(chunks.map(async chunk => Bun.file(join(out, chunk)).text()))

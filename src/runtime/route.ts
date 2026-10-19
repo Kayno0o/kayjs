@@ -9,6 +9,8 @@ type SegmentParams<Segment extends string> = Segment extends `:${infer Name}?`
   ? Partial<Record<Name, Value | undefined>>
   : Segment extends `:${infer Name}` ? Record<Name, Value> : Segment extends `*${infer Name}` ? Record<Name, CatchAll> : unknown
 type ParamsOf<Pattern extends string> = Pattern extends `/${infer Head}/${infer Rest}` ? SegmentParams<Head> & ParamsOf<`/${Rest}`> : Pattern extends `/${infer Last}` ? SegmentParams<Last> : unknown
+const OPTIONAL = /\?$/
+
 type Flat<Shape> = { [Key in keyof Shape]: Shape[Key] }
 
 export interface RouteOptions {
@@ -24,62 +26,54 @@ export type RouteArgs<Pattern extends string> = string extends Pattern
     ? [options?: RouteOptions]
     : Record<never, never> extends Flat<ParamsOf<Pattern>> ? [params?: Flat<ParamsOf<Pattern>>, options?: RouteOptions] : [params: Flat<ParamsOf<Pattern>>, options?: RouteOptions]
 
-const DOT_SEGMENT = /^\.{1,2}$/
-
-// One segment as a path holds it: `/`, `?`, `#` and `%` encoded, and `.` and `..` too, which a browser would resolve away.
+// One segment of a path: `/`, `?`, `#` and `%` encoded. Empty, `.` and `..` throw: the first makes another route and a browser resolves the others, even as `%2E`.
 function segment(name: string, value: unknown): string {
-  if (typeof value !== 'string' && typeof value !== 'number')
-    throw new TypeError(`route(): the param "${name}" is ${value === undefined || value === null ? String(value) : typeof value}, not a string or a number`)
+  const given = typeof value === 'string' || (typeof value === 'number' && Number.isFinite(value))
+  const text = given ? String(value) : ''
 
-  const text = String(value)
+  if (text === '' || text === '.' || text === '..')
+    throw new TypeError(`route(): param "${name}" is ${typeof value === 'number' || typeof value === 'string' ? `"${text}"` : String(value)}`)
 
-  if (text === '')
-    throw new TypeError(`route(): the param "${name}" is empty`)
-
-  return DOT_SEGMENT.test(text) ? text.replaceAll('.', '%2E') : encodeURIComponent(text)
+  try {
+    return encodeURIComponent(text)
+  }
+  catch {
+    throw new TypeError(`route(): param "${name}" is not valid text`)
+  }
 }
 
 // The path of a page for its params, encoded, as a literal `href` would write it: the mount point and the locale are put on it as they are on any link of the site.
 export function route<const Pattern extends RoutePattern>(pattern: Pattern, ...args: RouteArgs<Pattern>): string {
-  const rest = args as unknown[]
-  const parameterized = pattern.split('/').some(part => part.startsWith(':') || part.startsWith('*'))
-  const params = (parameterized ? rest[0] : undefined) as Record<string, unknown> | undefined ?? {}
-  const options = (parameterized ? rest[1] : rest[0]) as RouteOptions | undefined
-  const parts: string[] = []
+  const parts = pattern.split('/').slice(1)
+  const parameterized = parts.some(part => part[0] === ':' || part[0] === '*')
+  const [first, second] = args as unknown as [Record<string, unknown> | undefined, RouteOptions | undefined]
+  const params = parameterized ? first ?? {} : {}
+  const options = parameterized ? second : second ?? first
+  const path = parts.flatMap((part) => {
+    const name = part.slice(1).replace(OPTIONAL, '')
 
-  for (const part of pattern.split('/').slice(1)) {
-    if (part.startsWith('*')) {
-      const name = part.slice(1)
+    if (part[0] === '*') {
       const value = params[name]
-      const segments: unknown[] = typeof value === 'string' ? value.split('/') : [value].flat()
 
       // An empty catch-all is the directory's own path, `/docs/`.
-      parts.push(...segments.length === 0 || (segments.length === 1 && segments[0] === '') ? [''] : segments.map(each => segment(name, each)))
-    }
-    else if (part.startsWith(':')) {
-      const optional = part.endsWith('?')
-      const name = part.slice(1, optional ? -1 : undefined)
+      const each: unknown[] = typeof value === 'string' ? value.split('/') : [value].flat()
 
-      if (!optional || params[name] !== undefined)
-        parts.push(segment(name, params[name]))
+      return each.length === 0 || (each.length === 1 && each[0] === '') ? [''] : each.map(one => segment(name, one))
     }
-    else {
-      parts.push(part)
-    }
-  }
 
-  const path = `/${parts.join('/')}`
+    if (part[0] !== ':')
+      return [part]
+
+    return part.endsWith('?') && params[name] === undefined ? [] : [segment(name, params[name])]
+  }).join('/')
   const search = new URLSearchParams()
 
   for (const [key, value] of Object.entries(options?.query ?? {})) {
-    for (const each of Array.isArray(value) ? value : [value]) {
+    for (const each of [value].flat()) {
       if (each !== undefined && each !== null)
         search.append(key, String(each))
     }
   }
 
-  const query = search.size > 0 ? `?${search}` : ''
-  const hash = options?.hash === undefined || options.hash === '' ? '' : `#${encodeURIComponent(options.hash)}`
-
-  return path + query + hash
+  return `/${path}${search.size > 0 ? `?${search}` : ''}${typeof options?.hash === 'string' && options.hash !== '' ? `#${encodeURIComponent(options.hash)}` : ''}`
 }

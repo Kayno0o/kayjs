@@ -1713,6 +1713,7 @@ describe.concurrent('kay check, what the server refuses at boot', () => {
   it('types route() from the pages: their params, an optional one and a catch-all, and reports what no page has', async () => {
     const root = await scratchProject({
       'src/routes/index.kay': '---\nimport { route } from \'kay\'\n---\na(href={route(\'/\')}) home\na(href={route(\'/todos/:id\', { id: 1 })}) one\na(href={route(\'/blog/:page?\')}) blog\na(href={route(\'/blog/:page?\', { page: 2 }, { query: { q: \'a\' } })}) next\na(href={route(\'/docs/*path\', { path: [\'a\', \'b\'] })}) docs\na(href={route(\'/items/:id\', { id: 3 })}) item\n',
+      'src/routes/bad.kay': '---\nimport { route } from \'kay\'\n---\na(href={route(\'/todos/:id\', {})}) missing\n',
       'src/routes/todos/[id].kay': 'p todo\n',
       'src/routes/blog/[[page]].kay': 'p blog\n',
       'src/routes/docs/[...path].kay': 'p docs\n',
@@ -1724,6 +1725,7 @@ describe.concurrent('kay check, what the server refuses at boot', () => {
       const diagnostics = await check(root)
 
       expect(diagnostics.map(d => [d.file, d.line, d.code])).toEqual([
+        [join(root, 'src/routes/bad.kay'), 4, 'TS2741'],
         [join(root, 'src/lib.ts'), 3, 'TS2345'],
         [join(root, 'src/lib.ts'), 4, 'TS2741'],
         [join(root, 'src/lib.ts'), 5, 'TS2353'],

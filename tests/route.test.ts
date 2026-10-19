@@ -34,6 +34,11 @@ describe('route()', () => {
     expect(route('/docs/*path', { path: [] })).toBe('/docs/')
   })
 
+  it('reads the options of a page with no param after the params the loose typing asks for', () => {
+    expect((route as (...args: unknown[]) => string)('/about', undefined, { query: { a: 1 } })).toBe('/about?a=1')
+    expect(route('/about', { query: { a: 1 } })).toBe('/about?a=1')
+  })
+
   it('adds a query and a hash', () => {
     expect(route('/search', { query: { q: 'a b', tag: ['x', 'y'], skip: undefined, none: null, done: true, page: 2 }, hash: 'top' })).toBe('/search?q=a+b&tag=x&tag=y&done=true&page=2#top')
     expect(route('/todos/:id', { id: 1 }, { query: { done: false }, hash: 'a b' })).toBe('/todos/1?done=false#a%20b')
@@ -54,12 +59,12 @@ describe('route()', () => {
       expect(one('a b')).toBe('/items/a%20b')
     })
 
-    it('cannot walk up the path as a dot segment', () => {
-      expect(one('..')).toBe('/items/%2E%2E')
-      expect(one('.')).toBe('/items/%2E')
+    it('cannot walk up the path as a dot segment, which a browser resolves even as %2E', () => {
+      expect(() => one('..')).toThrow('param "id" is ".."')
+      expect(() => one('.')).toThrow('param "id" is "."')
       expect(one('...')).toBe('/items/...')
-      expect(route('/docs/*path', { path: '../etc' })).toBe('/docs/%2E%2E/etc')
-      expect(route('/docs/*path', { path: ['..'] })).toBe('/docs/%2E%2E')
+      expect(() => route('/docs/*path', { path: '../etc' })).toThrow('param "path" is ".."')
+      expect(() => route('/docs/*path', { path: ['..'] })).toThrow('param "path" is ".."')
     })
 
     it('is written in unicode as percent-encoded UTF-8', () => {
@@ -68,12 +73,15 @@ describe('route()', () => {
     })
 
     it('refuses what would make another route', () => {
-      expect(() => one('')).toThrow('the param "id" is empty')
-      expect(() => route('/items/:id', {} as never)).toThrow('the param "id" is undefined')
-      expect(() => route('/items/:id', { id: null } as never)).toThrow('the param "id" is null')
-      expect(() => route('/items/:id', { id: {} } as never)).toThrow('is object')
-      expect(() => route('/docs/*path', { path: 'a//b' })).toThrow('the param "path" is empty')
-      expect(() => one('\uD800')).toThrow(URIError)
+      expect(() => one('')).toThrow('param "id" is ""')
+      expect(() => route('/items/:id', {} as never)).toThrow('param "id" is undefined')
+      expect(() => route('/items/:id', { id: null } as never)).toThrow('param "id" is null')
+      expect(() => route('/items/:id', { id: {} } as never)).toThrow('param "id" is [object Object]')
+      expect(() => route('/docs/*path', { path: 'a//b' })).toThrow('param "path" is ""')
+      expect(() => one('\uD800')).toThrow('param "id" is not valid text')
+      expect(() => route('/items/:id', { id: Number.NaN })).toThrow('param "id" is ""')
+      expect(() => route('/docs/*path', { path: '/a' })).toThrow('param "path" is ""')
+      expect(() => route('/docs/*path', { path: 'a/' })).toThrow('param "path" is ""')
     })
   })
 })

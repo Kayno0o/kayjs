@@ -36,6 +36,7 @@ Inside a `.kay` file, `signal`, `memo`, `effect`, `onMount`, `onCleanup`, `props
 | `guardLeave` | Warns before leaving a page with unsaved changes |
 | `resource`, `call`, `socket`, `stream`, `dispatch` | Typed reads and calls of API routes, websockets and event streams from islands; `call` throws `ApiError`, which has the route's `status`, 0 when no answer came, and its `answer`. See [API routes](/guides/api-routes) |
 | `publicEnv` | The variables `publicEnv` in the config exposed to islands |
+| `route` | The path of a page from its pattern and params, typed from your pages and encoded. See [Routing](/essentials/routing#linking-to-a-page-with-params) |
 | `localPath`, `withBase` | A path with the locale prefix or the `base` applied |
 | `sanitizeHtml`, `trustHtml` | Clean untrusted HTML, its options typed `SanitizeOptions`, or mark HTML as safe to render, which a spread's `innerHTML` requires |
 | `uid` | A unique id that matches between server and browser |
