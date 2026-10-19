@@ -38,9 +38,10 @@ To build a site, read [Build a site](llms/site.md) first: one page walking throu
 - [Loaded collections, preview mode and the CMS editor](llms/content-cms.md): loaders for a CMS or a database, preview mode for drafts, the edit mode of kayjs-cms
 - [Locales](llms/locales.md): i18n: locale prefixes, typed messages, number and date formatting, redirecting a visitor to their locale
 - [Caching and streaming](llms/rendering.md): caching rendered pages and data, streaming deferred values with `await` blocks, `renderToString` for mails and feeds
-- [Actions](llms/actions.md): form posts that work without JavaScript and calls from islands, typed by a schema: validation errors, files, redirects
+- [Actions](llms/actions.md): form posts that work without JavaScript, typed by a schema: validation errors, files, redirects
+- [Calling actions from islands](llms/actions-from-islands.md): `pending()`, `track()`, streaming answers, optimistic changes, actions as props
 - [Protecting actions and limiting requests](llms/action-protection.md): cross-site posts, guards on actions, rate limits, body limit
-- [Stored files](llms/files.md): `files` keeps uploads on disk or in S3, links them from pages, resizes stored images, signs links to private files, upload progress in islands
+- [Stored files](llms/files.md): `files` keeps uploads on disk or in S3, links them from pages, resizes images, signs private links, upload progress
 - [Locals, sessions and guards](llms/server.md): per-request `ctx.locals`, cookie sessions and their stores, a typed `defineEnv`, `_guard.ts` route guards
 - [API routes](llms/api-routes.md): Elysia modules under `src/api/`, CORS, OpenAPI, and the MCP endpoint
 - [Calling API routes from islands, event streams, live values and websockets](llms/api-from-islands.md): reading routes typed from islands, server-sent events, `live()` values every open page follows, websockets
@@ -54,7 +55,7 @@ To build a site, read [Build a site](llms/site.md) first: one page walking throu
 - [The dev server](llms/dev-server.md): `kay dev` and its error page
 - [The dev tool](llms/dev-tool.md): its tabs and the problems it lists
 - [Building and starting](llms/build-and-start.md): `kay build`, one executable, a static export, `kay start`
-- [Check, inspect and tool commands](llms/check-and-tools.md): `kay check`, `kay render <url>` printing what a page renders without a server, `kay screenshot <path>` shooting a page of `kay dev`, `kay routes`, `kay env`, `kay doctor`, `kay upgrade`, `kay explain`, `kay fmt` (`--from-html` turns HTML into a template), `kay lsp`, `kay mcp` (kay's tools and guides for an agent), `kay/compiler`
+- [Check, inspect and tool commands](llms/check-and-tools.md): `kay check`, `kay render <url>` printing what a page renders without a server, `kay screenshot <path>` shooting a page of `kay dev`, `kay routes`, `kay env`, `kay doctor`, `kay upgrade`, `kay explain`, `kay fmt`, `kay lsp`, `kay mcp`, `kay/compiler`
 - [Running in production](llms/production.md): request logs, tracing, health checks, graceful shutdown, cron and background jobs
 - [Queues](llms/queues.md): jobs surviving a restart: stores, retries
 - [Proxies, security headers and compression](llms/proxy-and-security.md): a proxy, security headers and CSP, compression

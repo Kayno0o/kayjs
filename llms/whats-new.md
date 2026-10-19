@@ -25,6 +25,9 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `sqliteCache` creates its file on the first value stored or invalidation published instead of in every process loading the module naming it, and `invalidate` still reaches what it kept after a restart ([Rendering](rendering.md#caching)).
 - `pgJobs` takes holds from the database's clock, so replicas' clocks need no longer agree ([Queues](queues.md)).
 - `kay/pg-orm` exports `jobTables`, the job queue's `kay_jobs` and `kay_locks` as pg-orm definitions: an app lists them in `new Database({ tables })` and its own migrations create them, instead of `ignoreTables` plus `createJobTables(db)`; pg-orm is an optional peer of kay ([Queues](queues.md)).
+- `add.settled()` on an action, and on a `track()` handle, resolves once no call is in flight, whichever way they went, so an island that fired writes without awaiting them waits for them there, with no list of promises of its own ([Actions](actions-from-islands.md#calling-from-an-island)).
+- `refusalMessage(error, fallback)` from `kay` gives the message to show for a caught `call()` error: the route's when it answered, else the fallback, with no `instanceof ApiError` check ([Calling API routes from islands](api-from-islands.md#call-a-route-from-an-event-handler)).
+- A streaming action whose own result removes the block its call was made in keeps streaming, handed to the block around it, rather than closing after its first value ([Calling API routes from islands](api-from-islands.md#streaming-actions)).
 
 ## 1.58.0
 

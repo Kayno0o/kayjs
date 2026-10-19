@@ -43,7 +43,7 @@ export default guard(async ({ request, headers, deny }) => {
 })
 ```
 
-`add.track()` gives the component its own `pending()` and an outcome with no `try`, see [Calling from an island](actions.md#calling-from-an-island).
+`add.track()` gives the component its own `pending()` and an outcome with no `try`, see [Calling from an island](actions-from-islands.md#calling-from-an-island).
 
 ## Reference
 

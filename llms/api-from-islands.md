@@ -179,6 +179,8 @@ button(onClick={() => messages.send({ text: text() })}) Send
 - A param is encoded as one path segment, each segment of a `*` too, and an empty param or a param or a `*` segment that is `.` or `..` is refused with a `TypeError` (thrown by `call()`, by `stream()` and `socket()` at the call or at `start()`, and failing the request of `resource()`), as it would reach the collection or the parent route. A `*` may be empty. Pass a `*` value decoded.
 - A file or a `Blob` the route answers arrives as a `Blob`, or as text when its type is text, and a `Response` it builds is typed `unknown`, read as JSON, text or a `Blob` by its content type.
 - A refusal throws `ApiError` from `kay` with `status`, `message` and `answer`, its text when its JSON does not parse, `HTTP 503` when it says nothing; status 0 when no answer came or it was cut off.
+- `refusalMessage(error, fallback)` from `kay` is the text to show for a caught error: an `ApiError`'s `message` when the route answered, else `fallback` (status 0, whose message is the browser's, or an error that is no `ApiError`), so no `instanceof ApiError` check is needed: `error.set(refusalMessage(e, 'Sync failed.'))`.
+- A frequent write that should not refresh the page can be an action called with `{ refresh: false }` rather than a route, see [Calling from an island](actions-from-islands.md#calling-from-an-island).
 - `signal` aborts the call, which rejects with the signal's reason, while the answer is read too.
 - A body holding a `File` or a `Blob`, or a `FormData`, goes as a multipart form, its other fields as text, a Date as its ISO text, an object as JSON and null left out, as in a `query`.
 - `progress: sent => ...` gets how much of it went, from 0 to 1.

@@ -60,6 +60,10 @@ button(onClick={() => call(notes, '/', { method: 'post', body: { title: title() 
 
 A refusal throws an `ApiError` with its `status` and `message`. Its status is 0 when no answer came.
 
+To show a refusal, `refusalMessage(error, 'Try again')` from `kay` gives the route's message, or the fallback when no answer came or the error is something else. It saves the `instanceof ApiError` check.
+
+For a write from an island that should not reload the page, an [action](/essentials/forms-and-actions#calling-an-action-from-an-island) called with `{ refresh: false }` does the same, and brings a schema and a rate limit of its own.
+
 Pass `signal` to abort a call. A body holding a `File` goes as a multipart form, and `progress: sent => ...` reports how much of it went, from 0 to 1.
 
 To keep a page current from a route, see [Live data and realtime](/guides/live-and-realtime).

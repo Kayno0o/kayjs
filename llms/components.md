@@ -191,7 +191,7 @@ ul
 - Defaults go in the destructuring. A default applies only to an `undefined` prop (`null` stays `null`), and runs only then, once per component, the first time the prop is read.
 - Props stay reactive: the compiler turns each destructured name into a live read.
 - Props are read-only.
-- A prop holding an action is typed `Action<never, unknown>`, or `NoInputAction<unknown>` for one without input; see [Pass an action to a component](actions.md#pass-an-action-to-a-component).
+- A prop holding an action is typed `Action<never, unknown>`, or `NoInputAction<unknown>` for one without input; see [Pass an action to a component](actions-from-islands.md#pass-an-action-to-a-component).
 - A prop holding a component is typed `Component<Props>` from `kay` and drawn by its capitalised name, one holding an icon with `svg({...icon})`; see [Draw an icon or a component chosen by a value](templates.md#draw-an-icon-or-a-component-chosen-by-a-value).
 - A page has no props: its data comes from its `--- server` fence.
 - A prop is a plain name in the template, `{title}`, not `{title()}`, unless its type is a signal.

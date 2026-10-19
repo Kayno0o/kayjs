@@ -263,6 +263,8 @@ export interface TrackedCall<Input, Result> {
   (form: FormData, options?: CallOptions): Promise<Result>
   // Whether a call made through this handle is still in flight, read reactively.
   readonly pending: () => boolean
+  // Resolves once no call made through this handle is in flight, whichever way they went; never rejects.
+  readonly settled: () => Promise<void>
 }
 
 // Called from the browser it posts its input and resolves with the handler's result; `form(action={...})` posts to `url`.
@@ -272,6 +274,8 @@ export interface Action<Input, Output, Honeypot extends string = never> {
   (form: FormData, options?: CallOptions): Promise<Answer<Success<Output>>>
   // Whether a call this page made is still in flight, read reactively: `button(disabled={add.pending()})`.
   readonly pending: () => boolean
+  // Resolves once no call of this action is in flight, whichever way they went, so an island that did not await its writes can wait for them: `await add.settled()`. A stream counts until it ends. Never rejects.
+  readonly settled: () => Promise<void>
   // A handle for the calls of one island, one row or one button: `const save = add.track()`, then `await save(input)` resolves with `{ ok, data }` or the refusal, and `save.pending()` reads only its own calls.
   readonly track: () => TrackedCall<Input, CallResult<Answer<Success<Output>>, FailureData<Output>>>
   // How much of the last call carrying files the browser sent, from 0 to 1, while it uploads; undefined otherwise: `progress(value={upload.progress()})`.
@@ -629,7 +633,11 @@ function callable(url: () => string): { call: (input: never, options?: CallOptio
   const [inFlight, setInFlight, flying] = lazySignal(0)
   const [last, setLast] = lazySignal<{ page: number, outcome: Outcome | null } | undefined>(undefined)
   const [progress, setProgress] = lazySignal<number | undefined>(undefined)
-  const shift = (by: number) => setInFlight(flying() + by)
+  const idle = whenIdle()
+  const shift = (by: number) => {
+    setInFlight(flying() + by)
+    idle.check(flying())
+  }
   const called = (page: number, outcome: Outcome | null) => setLast({ page, outcome })
   const outcome = () => {
     let found = requestOutcome?.()
@@ -720,6 +728,7 @@ function callable(url: () => string): { call: (input: never, options?: CallOptio
     call,
     reads: {
       pending: read(() => inFlight() > 0),
+      settled: read(async () => idle.wait(flying())),
       progress: read(progress),
       failed: read(failed),
       succeeded: read(() => {
@@ -811,7 +820,11 @@ function onStreamEnd(data: unknown, then: (status: StreamStatus) => void): boole
 // A handle with a pending count of its own over `call`, whose refusals of this action it answers as results.
 function tracked(call: (input: never, options?: CallOptions) => Promise<unknown>, url: () => string): TrackedCall<never, unknown> {
   const [inFlight, setInFlight] = ownSignal(0)
-  const shift = (by: number) => setInFlight(untrack(inFlight) + by)
+  const idle = whenIdle()
+  const shift = (by: number) => {
+    setInFlight(untrack(inFlight) + by)
+    idle.check(untrack(inFlight))
+  }
 
   const run = async (input: unknown, options?: CallOptions) => {
     let streaming = false
@@ -837,7 +850,27 @@ function tracked(call: (input: never, options?: CallOptions) => Promise<unknown>
     }
   }
 
-  return Object.assign(run, { pending: () => inFlight() > 0 })
+  return Object.assign(run, { pending: () => inFlight() > 0, settled: async () => idle.wait(untrack(inFlight)) })
+}
+
+// What `settled()` waits on: callers resolved as the count of calls in flight reaches 0.
+function whenIdle(): { wait: (count: number) => Promise<void>, check: (count: number) => void } {
+  let waiting: (() => void)[] = []
+
+  return {
+    wait: async count => count === 0 ? undefined : new Promise<void>(resolve => void waiting.push(resolve)),
+    check: (count) => {
+      if (count !== 0 || waiting.length === 0)
+        return
+
+      const resolving = waiting
+
+      waiting = []
+
+      for (const resolve of resolving)
+        resolve()
+    },
+  }
 }
 
 async function post<Output>(url: string, input: unknown, onProgress: (sent: number) => void, signal: AbortSignal | undefined, onSent: () => void, left: () => boolean, caller: Caller): Promise<Output> {

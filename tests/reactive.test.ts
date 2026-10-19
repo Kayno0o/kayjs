@@ -1217,6 +1217,81 @@ describe('a tracked action call', () => {
     }
   })
 
+  it('settles once no call is in flight, whichever way they went, for a handle and for the action', async () => {
+    const releases: ((response: Response) => void)[] = []
+    const fetched = answering(async () => new Promise<Response>(resolve => releases.push(resolve)))
+
+    try {
+      const call = saved.track()
+      const settled: string[] = []
+
+      // Nothing in flight settles at once.
+      await call.settled()
+      await saved.settled()
+
+      const first = call({ id: 1 })
+      const second = saved({ id: 2 })
+
+      void (async () => {
+        await call.settled()
+        settled.push('handle')
+      })()
+      void (async () => {
+        await saved.settled()
+        settled.push('action')
+      })()
+      await Bun.sleep(0)
+      expect(settled).toEqual([])
+      releases[0]!(new Response(stringify('a')))
+      await first
+      await Bun.sleep(0)
+      // The handle holds only its own calls, the action every call of the page.
+      expect(settled).toEqual(['handle'])
+      releases[1]!(fail(500, { errors: { '': 'Broke' } }))
+      await expect(second).rejects.toBeInstanceOf(ActionError)
+      await saved.settled()
+      expect(settled).toEqual(['handle', 'action'])
+    }
+    finally {
+      fetched.mockRestore()
+    }
+  })
+
+  it('settles after a call the island never awaited, one started while it waited, and a network failure', async () => {
+    const releases: ((response: Response | Error) => void)[] = []
+    const fetched = spyOn(globalThis, 'fetch').mockImplementation((async () => new Promise<Response>((resolve, reject) => releases.push(answer => answer instanceof Error ? reject(answer) : resolve(answer)))) as unknown as typeof fetch)
+
+    try {
+      const swallow = async (call: Promise<unknown>) => {
+        try {
+          await call
+        }
+        catch {}
+      }
+
+      void swallow(saved({ id: 1 }))
+
+      let done = false
+      const waiting = (async () => {
+        await saved.settled()
+        done = true
+      })()
+
+      releases[0]!(new Response(stringify('a')))
+      // A write started before the first one ended keeps the wait going.
+      void swallow(saved({ id: 2 }))
+      await Bun.sleep(5)
+      expect(done).toBe(false)
+      releases[1]!(new TypeError('offline'))
+      await waiting
+      expect(done).toBe(true)
+      expect(saved.pending()).toBe(false)
+    }
+    finally {
+      fetched.mockRestore()
+    }
+  })
+
   it('answers a refusal as a result, with its status, field errors and the data ctx.fail passed, and does not throw', async () => {
     const fetched = answering(request => request === 0 ? fail(409, { errors: { id: 'Taken' }, data: { reason: 'locked' } }) : fail(422, { errors: { id: 'Bad id' } }))
 

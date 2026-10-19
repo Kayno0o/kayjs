@@ -8,7 +8,7 @@ import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { kay } from '../src/build/plugin'
 import { check } from '../src/check'
 import { flush, root, signal } from '../src/runtime'
-import { ApiError, call, dispatch, openSocket, readEvents, resource, routeUrl, socket, stream } from '../src/runtime/live'
+import { ApiError, call, dispatch, openSocket, readEvents, refusalMessage, resource, routeUrl, socket, stream } from '../src/runtime/live'
 import { encodeValue } from '../src/runtime/wire'
 import { apiStubs, scanApi } from '../src/server/api-modules'
 import { rooms, sqliteRooms } from '../src/server/rooms'
@@ -851,6 +851,27 @@ describe('call()', () => {
 
     served.mockImplementationOnce((async () => Promise.reject(new TypeError('Failed to fetch'))) as unknown as typeof fetch)
     await expect(call(notes, '/')).rejects.toMatchObject({ name: 'ApiError', status: 0, message: 'Failed to fetch' })
+  })
+
+  it('gives a refusal\'s message to show, and a fallback when no answer came or the error is no ApiError', async () => {
+    const shown = async (promise: Promise<unknown>) => {
+      try {
+        await promise
+      }
+      catch (error) {
+        return refusalMessage(error, 'Try again')
+      }
+
+      return undefined
+    }
+
+    expect(await shown(call(notes, '/:id', { method: 'patch', params: { id: 404 }, body: { title: 'x' } }))).toBe('No such note')
+
+    served.mockImplementationOnce((async () => Promise.reject(new TypeError('Failed to fetch'))) as unknown as typeof fetch)
+    expect(await shown(call(notes, '/'))).toBe('Try again')
+    expect(refusalMessage(new Error('boom'), 'Try again')).toBe('Try again')
+    expect(refusalMessage(undefined, 'Try again')).toBe('Try again')
+    expect(refusalMessage(new ApiError(503, 'HTTP 503'), 'Try again')).toBe('HTTP 503')
   })
 
   it('aborts a call with its signal, which rejects with the signal\'s reason', async () => {

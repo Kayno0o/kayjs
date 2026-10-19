@@ -237,6 +237,8 @@ If the server received a form kay posted without reloading the page but its answ
 
 Once a call goes through, the page's loads run again, so its list is up to date. `add({ title }, { refresh: false })` leaves the page as it is.
 
+So an action suits a frequent write from an island, a vote or an undo, as well as an API route does: pass `{ refresh: false }`, and keep the schema, guards and rate limit an action brings. `add.track()` below answers a refusal as a result, with no `try`.
+
 ### Showing a change before the server answers
 
 `optimistic` writes your signals at once. If the call fails, they go back to what they held.
@@ -339,6 +341,8 @@ The values travel in the form's action URL. A visitor can change them as they co
 `add.pending()` is true while any call to `add` is running, so a row of buttons calling one action would all spin together.
 
 `add.track()` gives a handle for one component. Its `pending()` reads only the calls made through it. A call resolves with how it went, instead of throwing when the server refuses it.
+
+To wait for writes you did not await, `await add.settled()` resolves once no call to `add` is running, and `removing.settled()` once none made through the handle is. It resolves whichever way the calls went, and never throws.
 
 ```kay
 ---
