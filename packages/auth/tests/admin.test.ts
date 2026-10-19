@@ -265,7 +265,7 @@ describe('admin', () => {
 
     const answer = await admin.browser.call('deleteUser', ada.id)
 
-    expect(answer).toBe('invitation store down')
+    expect(answer as unknown).toBe('invitation store down')
     expect(strips).toBe(2)
     expect(await store.users.get(ada.id)).toBeUndefined()
     expect((await store.members!.listByOrganization(org)).map(found => [found.userId, found.roles])).toEqual([[grace.id, ['member', 'owner']]])
