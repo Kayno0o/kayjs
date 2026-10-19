@@ -140,9 +140,9 @@ If the notice fails to load, say when the visitor is offline, it is fetched agai
 
 ### Leaving pages out
 
-Pages such as an account or an admin area should not be counted. List them in `exclude`: `exclude: ['/account', '/*/admin']` leaves out `/account` and everything under it, and `*` stands for one segment, such as a locale. With locale prefixes, list `/admin` and `/*/admin`. A page that asks search engines to skip it with `noindex` is left out too. Nothing is sent for these pages. This works for the tools kay counts for, so not Fathom, Cloudflare or `custom`.
+Pages such as an account or an admin area should not be counted. List them in `exclude`: `exclude: ['/account', '/*/admin']` leaves out `/account` and everything under it, and `*` stands for one segment, such as a locale. With locale prefixes, list `/admin` and `/*/admin`. A page that asks search engines to skip it with `noindex` is left out too. Nothing is sent for these pages. This works for the tools kay counts for, so not Fathom, Cloudflare or `custom`, where `exclude` is a type error.
 
-The page title is not sent unless you write `titles: true`, since a title can name a person.
+The page title is not sent unless you write `titles: true`, since a title can name a person. Like `exclude`, it is a type error for Fathom, Cloudflare and `custom`.
 
 ### Counting without asking
 

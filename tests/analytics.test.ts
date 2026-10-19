@@ -220,14 +220,28 @@ describe('the notice, its lifetime and what a visit carries', () => {
   })
 
   it.each(['/', 'account', '', 5])('refuses the excluded path %p', (path) => {
-    expect(() => analytics({ ...plausible(), exclude: [path as string] })).toThrow('exclude')
+    expect(() => analytics(plausible({ exclude: [path] }))).toThrow('exclude')
   })
 
   it.each(['fathom', 'cloudflare', 'custom'] as const)('refuses exclude and titles for %s, whose own script counts the pages', (name) => {
     const options = NAMED.find(([provider]) => provider === name)![1] as AnalyticsOptions
 
-    expect(() => analytics({ ...options, exclude: ['/account'] })).toThrow('whose own script')
-    expect(() => analytics({ ...options, titles: true })).toThrow('whose own script')
+    // The types refuse both already; this is the run time of an app whose types were not checked.
+    expect(() => analytics({ ...options, exclude: ['/account'] } as AnalyticsOptions)).toThrow('whose own script')
+    expect(() => analytics({ ...options, titles: true } as AnalyticsOptions)).toThrow('whose own script')
+  })
+
+  it('types exclude and titles as errors for the providers whose own script counts the pages', () => {
+    const wrong: AnalyticsOptions[] = [
+      // @ts-expect-error exclude is for the providers kay forwards visits for
+      { provider: 'fathom', siteId: 'ABCDEFGH', exclude: ['/account'] },
+      // @ts-expect-error titles is for the providers kay forwards visits for
+      { provider: 'cloudflare', token: 'abc', titles: true },
+      // @ts-expect-error exclude is for the providers kay forwards visits for
+      { provider: 'custom', script: 'https://t.example/s.js', endpoint: 'https://t.example/c', exclude: [] },
+    ]
+
+    expect(wrong).toHaveLength(3)
   })
 })
 

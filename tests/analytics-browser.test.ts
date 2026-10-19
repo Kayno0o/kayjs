@@ -270,6 +270,53 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the consen
   })
 })
 
+describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the consent signal before the tracker has loaded, in a browser', () => {
+  let own: TestSite
+  let opened: TestPage
+
+  beforeAll(async () => {
+    before = process.env.NODE_ENV
+    process.env.NODE_ENV = 'production'
+    provider = fakeProvider()
+    received.length = 0
+    own = await testSite({
+      routes: 'tests/fixtures/analytics-consent/src/routes',
+      browser: { path },
+      onError: () => undefined,
+      extensions: [analytics({ provider: 'plausible', domain: 'example.com', host: `http://localhost:${provider.port}`, consent: { notice: false, maxAge: 1234 } })],
+    })
+    opened = await own.open('/')
+  }, 60_000)
+
+  afterAll(async () => {
+    await own?.close()
+    await provider?.stop(true)
+    restoreEnvironment(before)
+  })
+
+  it('writes the cookie with the app\'s maxAge', async () => {
+    await opened.waitFor('p.state', { text: 'asking' })
+
+    const written = await opened.evaluate(() => {
+      delete (window as unknown as { kayAnalytics?: unknown }).kayAnalytics
+
+      const writes: string[] = []
+      const descriptor = Object.getOwnPropertyDescriptor(Document.prototype, 'cookie')!
+
+      Object.defineProperty(document, 'cookie', { configurable: true, get: (): string => descriptor.get!.call(document) as string, set: (value: string) => {
+        writes.push(value)
+        descriptor.set!.call(document, value)
+      } })
+      document.querySelector<HTMLButtonElement>('button.yes')!.click()
+
+      return writes
+    })
+
+    expect(written).toHaveLength(1)
+    expect(written[0]).toContain('kay_analytics=yes; max-age=1234;')
+  })
+})
+
 describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a counter that asks no one, in a browser', () => {
   let open: TestSite
   let opened: TestPage

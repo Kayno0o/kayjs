@@ -51,8 +51,10 @@ function save(value: Consent): void {
   }
 
   const path = withBase('/').replace(TRAILING_SLASH, '') || '/'
+  // The tracker's own script carries the app's `consent.maxAge`.
+  const maxAge = Number(document.querySelector<HTMLElement>('script[data-max-age]')?.dataset.maxAge) || CONSENT_MAX_AGE
 
-  document.cookie = `${COOKIE}=${value}; max-age=${value === '' ? 0 : CONSENT_MAX_AGE}; path=${path}; samesite=lax${location.protocol === 'https:' ? '; secure' : ''}`
+  document.cookie = `${COOKIE}=${value}; max-age=${value === '' ? 0 : maxAge}; path=${path}; samesite=lax${location.protocol === 'https:' ? '; secure' : ''}`
   document.dispatchEvent(new CustomEvent('kay:consent', { detail: { consent: value } }))
 }
 

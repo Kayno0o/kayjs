@@ -42,16 +42,20 @@ interface Common {
   info?: false | AnalyticsInfo | undefined
   // The app's privacy policy, a path written without the `base` (`/privacy`) or an address, linked from the notice and the information line, which already name the provider.
   policyUrl?: string | undefined
+  // Hosts besides the one a page is served from that a visit may name, such as `www.example.com` for a site also served at `example.com`.
+  hosts?: string[] | undefined
+}
+
+// The options only the providers kay forwards visits for take: a script that counts alone has no use for them, so its interface types them `never`.
+interface Counted extends Common {
   // Pages that are never counted, as paths: `/account` leaves out the page and all under it, `*` stands for one segment (`/*/admin` for an app with locale prefixes).
   // A page with `noindex` is left out too. Only the providers kay forwards visits for take it, not `fathom`, `cloudflare` or `custom`, whose script counts alone.
   exclude?: string[] | undefined
   // Sends the page title with each visit, which names the page and so may name a person; left out, visits carry the path alone.
   titles?: boolean | undefined
-  // Hosts besides the one a page is served from that a visit may name, such as `www.example.com` for a site also served at `example.com`.
-  hosts?: string[] | undefined
 }
 
-export interface PlausibleOptions extends Common {
+export interface PlausibleOptions extends Counted {
   provider: 'plausible'
   // The site as it is named in Plausible; the host of the visited page when left out.
   domain?: string | undefined
@@ -59,7 +63,7 @@ export interface PlausibleOptions extends Common {
   host?: string | undefined
 }
 
-export interface UmamiOptions extends Common {
+export interface UmamiOptions extends Counted {
   provider: 'umami'
   // The website's id in Umami.
   websiteId: string
@@ -67,7 +71,7 @@ export interface UmamiOptions extends Common {
   host?: string | undefined
 }
 
-export interface SimpleAnalyticsOptions extends Common {
+export interface SimpleAnalyticsOptions extends Counted {
   provider: 'simpleanalytics'
   // The site as it is named in Simple Analytics; the host of the visited page when left out.
   hostname?: string | undefined
@@ -75,7 +79,7 @@ export interface SimpleAnalyticsOptions extends Common {
   host?: string | undefined
 }
 
-export interface MatomoOptions extends Common {
+export interface MatomoOptions extends Counted {
   provider: 'matomo'
   // The site's id in Matomo.
   siteId: string | number
@@ -87,7 +91,7 @@ export interface MatomoOptions extends Common {
 
 // Google Analytics 4 through its Measurement Protocol, sent from the server: no Google script, cookie or CSP exception.
 // The visitor's client id is made on the server from a salt that changes every day, so nothing is stored in the browser, and a visitor is told apart for a day at most.
-export interface Ga4Options extends Common {
+export interface Ga4Options extends Counted {
   provider: 'ga4'
   // The web data stream's measurement id, `G-XXXXXXXXXX`.
   measurementId: string
@@ -101,6 +105,8 @@ export interface Ga4Options extends Common {
 
 // Fathom has no API to send a visit to, so its own script is loaded: from Fathom's domain, which the CSP then allows, and after the visitor's yes when `consent` is set.
 export interface FathomOptions extends Common {
+  exclude?: never
+  titles?: never
   provider: 'fathom'
   // The site's id in Fathom, such as `ABCDEFGH`.
   siteId: string
@@ -110,6 +116,8 @@ export interface FathomOptions extends Common {
 
 // Cloudflare takes its data only from its own beacon, so that script is loaded: from Cloudflare's domain, which the CSP then allows, and after the visitor's yes when `consent` is set.
 export interface CloudflareOptions extends Common {
+  exclude?: never
+  titles?: never
   provider: 'cloudflare'
   // The token of the site in Cloudflare Web Analytics.
   token: string
@@ -117,6 +125,8 @@ export interface CloudflareOptions extends Common {
 
 // Any other tracker that is a script posting to an endpoint: kay serves the script from the app with the endpoint's address in it pointed at the app, and forwards what the script posts.
 export interface CustomOptions extends Common {
+  exclude?: never
+  titles?: never
   provider: 'custom'
   // The tracker's script, `https://tracker.example/script.js`.
   script: string

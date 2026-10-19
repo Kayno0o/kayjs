@@ -11,6 +11,9 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 ### kayjs-auth organization changes need a session
 
 - `createOrganization`, `updateOrganization`, `invite`, `invitations`, `revokeInvitation`, `acceptInvitation` and `declineInvitation` answer `signed-out` (`declineInvitation` false) to a bearer or OAuth token, as `deleteOrganization` and `setMemberRoles` already did: call them from the user's session, not an API key. Reading calls still accept a token. `kay check` cannot recognise this, so there is no lint.
+### analytics `exclude` and `titles` are type errors for Fathom, Cloudflare and `custom`
+
+- `analytics({ provider: 'fathom' | 'cloudflare' | 'custom', exclude, titles })` is a type error in `kay check` and the editor; the server already refused it at start, so no running app changes. Remove the option. No lint ships, as `kay check` reports the type error itself.
 
 ## 1.55.0
 
