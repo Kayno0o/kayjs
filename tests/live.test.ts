@@ -1145,7 +1145,7 @@ describe('rooms', () => {
 
     // Two stores on one file stand for two processes.
     function processes(name: string) {
-      const stores = [sqliteRooms(join(dir, `${name}.sqlite`), { poll: 5 }), sqliteRooms(join(dir, `${name}.sqlite`), { poll: 5 })] as const
+      const stores = [sqliteRooms(join(dir, `${name}.sqlite`), { poll: '5ms' }), sqliteRooms(join(dir, `${name}.sqlite`), { poll: '5ms' })] as const
 
       return { stores, first: rooms<{ text: string }, string>({ store: stores[0] }), second: rooms<{ text: string }, string>({ store: stores[1] }), close: () => {
         for (const store of stores) {
@@ -1154,22 +1154,22 @@ describe('rooms', () => {
       } }
     }
 
-    it('reads coalesce\'s wait and sqliteRooms\'s poll as durations, or as milliseconds when bare', async () => {
+    it('reads coalesce\'s wait and sqliteRooms\'s poll as durations, and refuses a bare number', async () => {
       const bare = rooms<{ text: string }>({ store: sqliteRooms(join(dir, 'durations.sqlite'), { poll: '5ms' }) })
       const room = rooms<{ text: string }>()
       const ada = connection()
       let reads = 0
       const send = room.coalesce(() => ({ text: String(++reads) }), { wait: '20ms' })
-      const legacy = room.coalesce(() => ({ text: 'legacy' }), { wait: 20 })
 
       room.join(ada, 'hall')
       send('hall')
       send('hall')
       send('hall')
-      legacy('hall')
-      await until(() => ada.received.length === 2)
+      await until(() => ada.received.length === 1)
       expect(ada.received).toContain('{"text":"1"}')
       expect(bare.members('hall')).toEqual([])
+      expect(() => room.coalesce(() => ({ text: '' }), { wait: 20 as never })).toThrow('coalesce` wait is 20')
+      expect(() => sqliteRooms(join(dir, 'bare.sqlite'), { poll: 5 as never })).toThrow('sqliteRooms` poll is 5')
       expect(() => room.coalesce(() => ({ text: '' }), { wait: 'soon' as never })).toThrow('coalesce` wait is \'soon\'')
       expect(() => sqliteRooms(join(dir, 'bad.sqlite'), { poll: '0ms' })).toThrow('sqliteRooms` poll')
     })
@@ -1305,7 +1305,7 @@ describe('rooms', () => {
       old.run('CREATE TABLE kay_room_messages (id INTEGER PRIMARY KEY AUTOINCREMENT, room TEXT NOT NULL, text TEXT NOT NULL, process TEXT NOT NULL, skipped TEXT, recipient TEXT, at INTEGER NOT NULL)')
       old.close()
 
-      const store = sqliteRooms(path, { poll: 5 })
+      const store = sqliteRooms(path, { poll: '5ms' })
       const room = rooms<{ text: string }, string>({ store })
       const ada = connection()
       const file = new Database(path)
@@ -1359,7 +1359,7 @@ describe('rooms', () => {
 
     it('prunes old messages and silent processes when a process only publishes, at most once per heartbeat', () => {
       const path = join(dir, 'publish-only.sqlite')
-      const store = sqliteRooms(path, { poll: 5 })
+      const store = sqliteRooms(path, { poll: '5ms' })
       const file = new Database(path)
       const count = (table: string) => file.query<{ n: number }, []>(`SELECT count(*) AS n FROM ${table}`).get()!.n
       const old = () => {
@@ -1388,7 +1388,7 @@ describe('rooms', () => {
 
     it('stores and delivers a message even when the prune after it fails', () => {
       const path = join(dir, 'prune-fails.sqlite')
-      const store = sqliteRooms(path, { poll: 5 })
+      const store = sqliteRooms(path, { poll: '5ms' })
       const file = new Database(path)
       const heard: string[] = []
       const logged = spyOn(console, 'error').mockImplementation(() => undefined)

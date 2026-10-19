@@ -1,5 +1,5 @@
+import type { DurationText } from '../src/runtime/duration'
 import { describe, expect, it } from 'bun:test'
-import { LINTS } from '../src/compiler/lints'
 import { durationMs, durationSeconds, optionMs, wholeSeconds } from '../src/runtime/duration'
 import { durationWords } from '../src/runtime/duration-words'
 
@@ -13,20 +13,20 @@ describe('durations', () => {
     expect(durationSeconds('300ms', 'ttl')).toBe(0.3)
   })
 
-  it('gives milliseconds to an option that took them: a bare number as it is, a string as a duration', () => {
-    expect([300, '300ms', '3s', '1.5m', '2h'].map(value => durationMs(value))).toEqual([300, 300, 3000, 90_000, 7_200_000])
-    expect([300, '250ms', '2s'].map(value => optionMs(value, 'wait'))).toEqual([300, 250, 2000])
-    expect(Number.isNaN(durationMs('soon'))).toBe(true)
+  it('gives milliseconds to an option that takes them, from a duration string', () => {
+    expect(['300ms', '3s', '1.5m', '2h'].map(value => durationMs(value as DurationText))).toEqual([300, 3000, 90_000, 7_200_000])
+    expect(['250ms', '2s'].map(value => optionMs(value as DurationText, 'wait'))).toEqual([250, 2000])
+    expect(Number.isNaN(durationMs('soon' as DurationText))).toBe(true)
   })
 
   it('refuses a string that is no duration for an option taking milliseconds, naming it', () => {
-    for (const value of ['soon', '0ms', '-5s', '5', '5 ms', ''])
+    for (const value of ['soon', '0ms', '-5s', '5', '5 ms', ''] as DurationText[])
       expect(() => optionMs(value, 'wait', 'kayjs-cms')).toThrow(/^kayjs-cms: wait is '.*'; it takes a positive duration/)
   })
 
   it('keeps the seconds of a fractional minute, hour or day exact, as headers carry them', () => {
     expect(['8.7m', '17.1m', '2.3h', '34.3m'].map(value => durationSeconds(value, 'ttl'))).toEqual([522, 1026, 8280, 2058])
-    expect(['1001ms', '1.1s', '8.7m'].map(value => optionMs(value, 'wait'))).toEqual([1001, 1100, 522_000])
+    expect((['1001ms', '1.1s', '8.7m'] as DurationText[]).map(value => optionMs(value, 'wait'))).toEqual([1001, 1100, 522_000])
   })
 
   it('rounds up to whole seconds for a header or a cookie, so a sub-second duration is never 0 nor fractional', () => {
@@ -40,14 +40,12 @@ describe('durations', () => {
   })
 })
 
-describe('the bare milliseconds of 1.52', () => {
-  // Tripwire for the release that drops deprecated-time-ms: a bare number must then throw, never fall to seconds like durationSeconds reads it.
-  it('are refused by durationMs and optionMs once deprecated-time-ms is gone', () => {
-    if ('deprecated-time-ms' in LINTS)
-      return
-
-    expect(() => durationMs(3000)).toThrow()
-    expect(() => optionMs(3000, '`every` interval')).toThrow()
+describe('a bare number where milliseconds were taken', () => {
+  // Never read as seconds, as durationSeconds does: an unfixed `every(3000, ...)` must not turn into 3000 seconds.
+  it('is refused by durationMs and optionMs', () => {
+    expect(() => durationMs(3000 as never)).toThrow('takes its unit')
+    expect(() => optionMs(3000 as never, '`every` interval')).toThrow('`every` interval is 3000')
+    expect(() => optionMs(3000 as never, 'forgejo timeout', 'kayjs-cms')).toThrow('kayjs-cms: forgejo timeout is 3000')
   })
 })
 

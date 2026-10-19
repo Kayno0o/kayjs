@@ -105,20 +105,21 @@ describe('forgejo', () => {
     const hanging = async (_input: string | URL | Request, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
       init?.signal?.addEventListener('abort', () => reject(init.signal?.reason))
     })
-    const saver = forgejo({ url: 'https://git.example.com', repo: 'me/site', token: 't0k', timeout: 50, fetch: hanging as typeof fetch })
+    const saver = forgejo({ url: 'https://git.example.com', repo: 'me/site', token: 't0k', timeout: '50ms', fetch: hanging as typeof fetch })
     const failure = saver.save({ ...change, repoPath: 'a.md', text: 'a' })
 
     await expect(failure).rejects.toBeInstanceOf(ForgeError)
     await expect(failure).rejects.toThrow('Forgejo did not answer within 0.05 s')
   })
 
-  test('reads the timeout as a duration, and refuses one that is none', async () => {
+  test('reads the timeout as a duration, and refuses one that is none or a bare number', async () => {
     const hanging = async (_input: string | URL | Request, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
       init?.signal?.addEventListener('abort', () => reject(init.signal?.reason))
     })
     const saver = forgejo({ url: 'https://git.example.com', repo: 'me/site', token: 't0k', timeout: '50ms', fetch: hanging as typeof fetch })
 
     await expect(saver.save({ ...change, repoPath: 'a.md', text: 'a' })).rejects.toThrow('Forgejo did not answer within 0.05 s')
+    expect(() => forgejo({ url: 'u', repo: 'r', token: 't', timeout: 50 as never })).toThrow('kayjs-cms: forgejo timeout is 50')
     expect(() => forgejo({ url: 'u', repo: 'r', token: 't', timeout: 'soon' as never })).toThrow('kayjs-cms: forgejo timeout is \'soon\'')
   })
 
@@ -157,7 +158,7 @@ describe('forgejo', () => {
       void input
     })
     // Each request is under the timeout, both together over it.
-    const saver = forgejo({ url: 'https://git.example.com', repo: 'me/site', token: 't0k', timeout: 60, fetch: slow as typeof fetch })
+    const saver = forgejo({ url: 'https://git.example.com', repo: 'me/site', token: 't0k', timeout: '60ms', fetch: slow as typeof fetch })
 
     await expect(saver.save({ ...change, repoPath: 'a.md', text: 'a' })).rejects.toThrow('Forgejo did not answer within 0.06 s: the save may still have gone through, so check the repository before saving again')
   })
@@ -206,7 +207,7 @@ describe('forgejo timeout', () => {
 
       return posting ? Response.json({ message: 'conflict' }, { status: 409 }) : Response.json({ sha: 'f00d' })
     }
-    const saver = forgejo({ url: 'https://git.example.com', repo: 'me/site', token: 't0k', timeout: 60, fetch: request as typeof fetch })
+    const saver = forgejo({ url: 'https://git.example.com', repo: 'me/site', token: 't0k', timeout: '60ms', fetch: request as typeof fetch })
 
     await expect(saver.save({ ...change, repoPath: 'a.md', text: 'mine', base: 'f00d' })).rejects.toMatchObject({ current: 'f00d' })
   })

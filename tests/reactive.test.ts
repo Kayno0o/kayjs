@@ -985,7 +985,7 @@ describe('every', () => {
       const active = signal(false)
       let runs = 0
       const dispose = root((dispose) => {
-        every(100, () => runs++, { while: active })
+        every('100ms', () => runs++, { while: active })
 
         return dispose
       })
@@ -1022,7 +1022,7 @@ describe('every', () => {
       const active = signal(true)
       let runs = 0
       const dispose = root((dispose) => {
-        every(100, () => runs++, { while: active, immediate: true })
+        every('100ms', () => runs++, { while: active, immediate: true })
 
         return dispose
       })
@@ -1053,7 +1053,7 @@ describe('every', () => {
     try {
       let runs = 0
 
-      renderOnServer(() => every(100, () => runs++))
+      renderOnServer(() => every('100ms', () => runs++))
       flush()
       jest.advanceTimersByTime(250)
       expect([runs, jest.getTimerCount()]).toEqual([0, 0])
@@ -1071,7 +1071,7 @@ describe('every', () => {
       let finish: (() => void) | undefined
       let started = 0
       const dispose = root((dispose) => {
-        every(100, async () => {
+        every('100ms', async () => {
           started++
           count.set(count() + 1)
           await new Promise<void>((resolve) => {
@@ -1246,7 +1246,7 @@ function withTab(): void {
 describe('durations as delays', () => {
   withTab()
 
-  it('takes every and debounced delays as duration strings, a bare number staying milliseconds', async () => {
+  it('takes every and debounced delays as duration strings, and refuses a bare number', async () => {
     jest.useFakeTimers()
 
     try {
@@ -1273,6 +1273,7 @@ describe('durations as delays', () => {
       expect(settled()).toBe('b')
       stop()
       dispose()
+      expect(() => root(() => debounced(typed, 300 as never))).toThrow('a duration here takes its unit')
     }
     finally {
       jest.useRealTimers()
@@ -1339,7 +1340,7 @@ describe('debounced', () => {
 
     try {
       const typed = signal('a')
-      const { settled, dispose } = root(dispose => ({ settled: debounced(typed, 300), dispose }))
+      const { settled, dispose } = root(dispose => ({ settled: debounced(typed, '300ms'), dispose }))
 
       expect(settled()).toBe('a')
 
@@ -1365,7 +1366,7 @@ describe('debounced', () => {
 
     try {
       const typed = signal('a')
-      const { settled, dispose } = root(dispose => ({ settled: debounced(typed, 300), dispose }))
+      const { settled, dispose } = root(dispose => ({ settled: debounced(typed, '300ms'), dispose }))
       const seen: string[] = []
 
       root(() => watch(settled, next => seen.push(next)))
@@ -1394,7 +1395,7 @@ describe('debounced', () => {
 
     try {
       const typed = signal('a')
-      const settled = renderOnServer(() => debounced(typed, 300))
+      const settled = renderOnServer(() => debounced(typed, '300ms'))
 
       typed.set('b')
       flush()

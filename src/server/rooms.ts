@@ -1,4 +1,4 @@
-import type { Duration } from '../runtime/duration'
+import type { DurationText } from '../runtime/duration'
 import { optionMs } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
 import { openSqlite } from '../runtime/sqlite.server'
@@ -38,8 +38,8 @@ export interface RoomsOptions {
 }
 
 export interface CoalesceOptions {
-  // How long changes are gathered before the one snapshot goes, `'50ms'` by default; a bare number is milliseconds for now, `deprecated-time-ms` rewrites it.
-  wait?: Duration | undefined
+  // How long changes are gathered before the one snapshot goes, `'50ms'` by default.
+  wait?: DurationText | undefined
 }
 
 export interface Rooms<Message, Member = undefined> {
@@ -57,14 +57,14 @@ export interface Rooms<Message, Member = undefined> {
   coalesce: (read: (room: string) => Message, options?: CoalesceOptions) => (room: string) => void
 }
 
-const DEFAULT_WAIT = 50
+const DEFAULT_WAIT = '50ms'
 // How a connection joined without a member is written, apart from one joined as `null`, which is JSON.
 const NO_MEMBER = ''
 // How often a process says it is alive, and how long after its last word its members stop counting.
 const HEARTBEAT = 2_000
 const EXPIRY = 10_000
 // How often a process reads the messages others wrote, and how long they are kept.
-const POLL = 25
+const POLL = '25ms'
 const KEPT = 30_000
 
 // Rooms of websocket connections, typed by what they send: join one in `open`, leave in `close`, and publish to it from anywhere.
@@ -198,9 +198,9 @@ export function memoryRooms(): RoomStore {
   }
 }
 
-// Rooms kept in a SQLite file every process of the machine opening it shares: a message published in one reaches the members connected to the others, within `poll`, `'25ms'` by default; a bare number is milliseconds for now, `deprecated-time-ms` rewrites it.
+// Rooms kept in a SQLite file every process of the machine opening it shares: a message published in one reaches the members connected to the others, within `poll`, `'25ms'` by default; a bare number throws.
 // A process that stops without leaving, such as one that crashed, has its members dropped once it has not been heard from for 10 seconds; one that was only stalled that long writes its members back once it runs again.
-export function sqliteRooms(path: string, { poll = POLL }: { poll?: Duration } = {}): RoomStore {
+export function sqliteRooms(path: string, { poll = POLL }: { poll?: DurationText } = {}): RoomStore {
   const pollMs = optionMs(poll, '`sqliteRooms` poll')
   const db = openSqlite(path)
   const self = crypto.randomUUID()

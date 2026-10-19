@@ -29,21 +29,21 @@ export function wholeSeconds(value: unknown, what: string, owner = 'kay'): numbe
   return Math.ceil(durationSeconds(value, what, owner))
 }
 
-// The milliseconds an option that took them before 1.52 stands for: a bare number is still milliseconds there, for three minors, and a string is a duration.
-// No check on the value, as a timer takes whatever it gets; it only reads the text.
-export function durationMs(value: number | string): number {
-  if (typeof value === 'number')
-    return value
+// The milliseconds a duration written with its unit stands for, `'250ms'` or `'3s'`; a bare number throws, as it would read as seconds elsewhere and as milliseconds here before 1.56.
+// No check on the text, as a timer takes whatever it gets; a text that is no duration is NaN.
+export function durationMs(value: DurationText): number {
+  if (typeof value !== 'string')
+    throw new Error(`kay: a duration here takes its unit, such as '3s' or '250ms', not ${String(value)}`)
 
   const text = DURATION_TEXT.exec(value)
 
   return text ? Math.round(text[2] === 'ms' ? Number(text[1]) : inSeconds(Number(text[1]), text[2]!) * 1000) : Number.NaN
 }
 
-// The same for a server or library option: a bare number is milliseconds as before, a string must be a positive duration or it throws naming the option.
-export function optionMs(value: number | string, what: string, owner = 'kay'): number {
-  if (typeof value === 'number')
-    return value
+// The same for a server or library option: a bare number throws naming the option, and a string must be a positive duration or it throws too.
+export function optionMs(value: DurationText, what: string, owner = 'kay'): number {
+  if (typeof value !== 'string')
+    throw new Error(`${owner}: ${what} is ${String(value)}; it takes a duration with its unit, such as '3s' or '250ms'`)
 
   durationSeconds(value, what, owner)
 

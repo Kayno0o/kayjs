@@ -8,7 +8,7 @@ description: One image at a time sliding in, with arrows and dots, for a marketi
 
 ## Autoplay and ratio
 
-`autoplay` turns the slide that often, a duration such as `'5s'` or `'800ms'` (a bare number is milliseconds for now, and `kay check --fix` rewrites `autoplay={5000}` to `autoplay="5s"`). It pauses while the pointer or the focus is on the carousel, and never runs for a visitor asking for reduced motion. A pause button after the controls stops it for good, until pressed again; `pauseLabel` and `playLabel` name it. `ratio` sets the slides' aspect ratio.
+`autoplay` turns the slide that often, a duration such as `'5s'` or `'800ms'`. It pauses while the pointer or the focus is on the carousel, and never runs for a visitor asking for reduced motion. A pause button after the controls stops it for good, until pressed again; `pauseLabel` and `playLabel` name it. `ratio` sets the slides' aspect ratio.
 
 <Demo name="carousel/autoplay" />
 

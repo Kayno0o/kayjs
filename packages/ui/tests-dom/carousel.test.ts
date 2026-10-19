@@ -1,4 +1,4 @@
-import type { Duration } from 'kay'
+import type { DurationText } from 'kay'
 import type { Mounted } from 'kay/test'
 import { afterEach, expect, test } from 'bun:test'
 import { mountComponent } from 'kay/test'
@@ -6,6 +6,7 @@ import { click, clock } from './dom'
 
 // How often the carousel turns on its own in these tests, and the fake time covering two turns.
 const AUTOPLAY_MS = 40
+const AUTOPLAY = `${AUTOPLAY_MS}ms` as const
 const TWO_TURNS_MS = 100
 
 let mounted: Mounted | undefined
@@ -19,7 +20,7 @@ afterEach(() => {
 })
 
 // Mounting waits on real timers, so a carousel is mounted before the clock is faked: its own interval would run in real time. A pointer resting on it then leaving makes it set the interval again, on the fake clock.
-async function carousel(autoplay?: Duration) {
+async function carousel(autoplay?: DurationText) {
   mounted = await mountComponent('src/components/carousel.kay', { autoplay, onIndexChange: (index: number) => turns.push(index) })
 
   const { root } = mounted
@@ -72,15 +73,8 @@ test('follows a slide its parent passes', async () => {
   expect([view.shown(), view.current(), turns]).toEqual([['Slide 3 of 3'], 2, []])
 })
 
-test('reads autoplay as a duration, the same turn as the milliseconds it says', async () => {
-  await carousel(`${AUTOPLAY_MS}ms`)
-  await clock.elapse(TWO_TURNS_MS)
-
-  expect(turns.slice(0, 2)).toEqual([1, 2])
-})
-
 test('turns on its own, held while the pointer or the focus is on it, and stops once gone', async () => {
-  const view = await carousel(AUTOPLAY_MS)
+  const view = await carousel(AUTOPLAY)
 
   await clock.elapse(TWO_TURNS_MS)
 
@@ -116,7 +110,7 @@ test('turns on its own, held while the pointer or the focus is on it, and stops 
 })
 
 test('stops for good from its pause button, which a carousel without autoplay leaves out', async () => {
-  const view = await carousel(AUTOPLAY_MS)
+  const view = await carousel(AUTOPLAY)
   const pause = view.section.querySelector<HTMLButtonElement>('.kui-carousel-pause')!
 
   expect(pause.getAttribute('aria-label')).toBe('Pause')
@@ -152,7 +146,7 @@ test('never turns on its own for a visitor asking for reduced motion', async () 
   window.matchMedia = (query: string) => ({ ...media.call(window, query), matches: query.includes('reduce') })
 
   try {
-    await carousel(AUTOPLAY_MS)
+    await carousel(AUTOPLAY)
     await clock.elapse(TWO_TURNS_MS)
 
     expect(turns).toEqual([])
@@ -169,7 +163,7 @@ test('starts paused in a tab mounted hidden, and turns once it shows', async () 
   Object.defineProperty(document, 'hidden', { configurable: true, get: () => isHidden })
 
   try {
-    await carousel(AUTOPLAY_MS)
+    await carousel(AUTOPLAY)
     await clock.elapse(TWO_TURNS_MS)
 
     expect(turns).toEqual([])
@@ -206,7 +200,7 @@ test('holds its autoplay while scrolled out of view, and turns again once back',
   } as unknown as typeof IntersectionObserver
 
   try {
-    await carousel(AUTOPLAY_MS)
+    await carousel(AUTOPLAY)
     callbacks.at(-1)!([{ isIntersecting: false }])
     await clock.settle()
     await clock.elapse(TWO_TURNS_MS)

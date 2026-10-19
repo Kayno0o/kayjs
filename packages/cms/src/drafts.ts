@@ -1,4 +1,4 @@
-import type { Duration } from 'kay'
+import type { DurationText } from 'kay'
 import type { DraftEntry, DraftResult, EntryRef, Issue } from './kay/contract'
 import type { FieldPath } from './markers'
 import { durationMs, signal } from 'kay'
@@ -8,8 +8,8 @@ import { valueAt, withValueAt } from './paths'
 export interface DraftsOptions {
   // Renders the page with these entries in place of the saved ones: kay's `showDraft`.
   show: (entries: DraftEntry[]) => Promise<DraftResult>
-  // How long typing pauses before the page renders again, `'150ms'` by default; a bare number is milliseconds for now, `deprecated-time-ms` rewrites it.
-  delay?: Duration | undefined
+  // How long typing pauses before the page renders again, `'150ms'` by default.
+  delay?: DurationText | undefined
 }
 
 export type Drafts = ReturnType<typeof createDrafts>
@@ -21,7 +21,7 @@ export interface Refusal {
 }
 
 // The unsaved edits of the entries a page renders, rendering the page with them shortly after each change.
-export function createDrafts({ show, delay = 150 }: DraftsOptions) {
+export function createDrafts({ show, delay = '150ms' }: DraftsOptions) {
   const saved = new Map<string, DraftEntry>()
   // The version of each entry's file its saved state was read from, which the next save names.
   const versions = new Map<string, string | undefined>()

@@ -1,10 +1,10 @@
 ---
 import Carousel from '@kaynooo/kayjs-ui/carousel.kay'
-import type { Duration } from 'kay'
+import type { DurationText } from 'kay'
 import { signal } from 'kay'
 
 // The test reads back each turn, and sets how often the carousel turns on its own; `#jump` passes it another slide, as a parent would.
-const { onIndexChange, autoplay } = props<{ onIndexChange: (index: number) => void, autoplay?: Duration }>()
+const { onIndexChange, autoplay } = props<{ onIndexChange: (index: number) => void, autoplay?: DurationText }>()
 
 const slides = ['a', 'b', 'c'].map(name => ({ src: `/${name}.png`, alt: name }))
 const index = signal(0)

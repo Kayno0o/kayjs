@@ -1,4 +1,4 @@
-import type { Duration } from 'kay'
+import type { DurationText } from 'kay'
 import type { DraftEntry, DraftResult } from '../src/kay/contract'
 import { describe, expect, it } from 'bun:test'
 import { createDrafts } from '../src/drafts'
@@ -6,7 +6,7 @@ import { BODY } from '../src/markers'
 
 const post: DraftEntry = { collection: 'posts', slug: 'hello', data: { title: 'Hello', tags: ['a'] }, body: '# Hello' }
 
-function setup(answer: (entries: DraftEntry[]) => Promise<DraftResult> = async () => ({}), delay: Duration = 5) {
+function setup(answer: (entries: DraftEntry[]) => Promise<DraftResult> = async () => ({}), delay: DurationText = '5ms') {
   const calls: DraftEntry[][] = []
   const drafts = createDrafts({
     delay,
@@ -25,12 +25,13 @@ function setup(answer: (entries: DraftEntry[]) => Promise<DraftResult> = async (
 const settled = async () => Bun.sleep(20)
 
 describe('createDrafts', () => {
-  it('reads the delay as a duration', async () => {
+  it('reads the delay as a duration, and refuses a bare number', async () => {
     const { drafts, calls } = setup(undefined, '5ms')
 
     drafts.set(post, 'title', 'Hel')
     await settled()
     expect(calls).toHaveLength(1)
+    expect(() => setup(undefined, 5 as never).drafts.set(post, 'title', 'Hel')).toThrow('takes its unit')
   })
 
   it('renders the page once typing pauses, with every changed entry', async () => {

@@ -38,7 +38,7 @@ function server(answer: (body: Sent['body'], count: number) => unknown, wait = 2
 }
 
 function opened() {
-  const drafts = createDrafts({ show: async () => ({}), delay: 1000 })
+  const drafts = createDrafts({ show: async () => ({}), delay: '1s' })
 
   drafts.open(post, 'v1')
 
