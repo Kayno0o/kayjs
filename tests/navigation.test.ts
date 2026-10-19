@@ -33,7 +33,7 @@ async function listeningPort(child: Bun.Subprocess<'ignore', 'pipe', 'pipe'>): P
 }
 
 // Forwards to the fixture, the answer to the first action post cut off by closing the connection short of the body it promised once the server has run it.
-function lossyProxy(target: number) {
+function lossyProxy(target: number, mode: 'cut-answer' | 'reset-request' = 'cut-answer') {
   let cut = false
 
   const listener = Bun.listen<{ upstream?: Bun.Socket, pending: Uint8Array[], drop: boolean }>({
@@ -69,6 +69,12 @@ function lossyProxy(target: number) {
           upstream.write(chunk)
       },
       data(client, chunk) {
+        if (mode === 'reset-request' && new TextDecoder().decode(chunk.subarray(0, 24)).startsWith('POST /_kay/action')) {
+          client.terminate()
+
+          return
+        }
+
         if (!cut && new TextDecoder().decode(chunk.subarray(0, 24)).startsWith('POST /_kay/action')) {
           cut = true
           client.data.drop = true
@@ -1148,6 +1154,41 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
       await fresh.close()
     }
   })
+
+  for (const how of ['refused', 'reset-request'] as const) {
+    it(`posts a form natively when the swap's post never reached the server: ${how === 'refused' ? 'a refused connection' : 'an upload cut before its body went out'}`, async () => {
+      const fresh = await browser.newPage()
+      const proxy = lossyProxy(Number(new URL(origin).port), 'reset-request')
+      const documents: string[] = []
+
+      fresh.on('request', (request) => {
+        if (request.resourceType() === 'document')
+          documents.push(request.method())
+      })
+
+      try {
+        await fresh.goto(`http://127.0.0.1:${proxy.port}/posted`)
+        await fresh.evaluate(() => {
+          (window as { kayAlive?: boolean }).kayAlive = true
+        })
+
+        if (how === 'refused')
+          proxy.stop()
+        else
+          await fresh.setInputFiles('form.upload input', { name: 'big.bin', mimeType: 'application/octet-stream', buffer: Buffer.alloc(4 * 1024 * 1024) })
+
+        await fresh.click(how === 'refused' ? 'form.count button' : 'form.upload button')
+        await fresh.waitForFunction(() => (window as { kayAlive?: boolean }).kayAlive === undefined)
+        await settled(fresh)
+
+        expect(documents).toEqual(['GET', 'POST'])
+      }
+      finally {
+        proxy.stop()
+        await fresh.close()
+      }
+    })
+  }
 
   it('leaves a form to the browser when form posting cannot load', async () => {
     const fresh = await browser.newPage()
