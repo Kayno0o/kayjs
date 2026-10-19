@@ -129,6 +129,8 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   // The types are written beside the restarts, one run at a time and one more once it ends when changes came meanwhile.
   let typesWriting: Promise<void> | undefined
   let typesAgain = false
+  // The code files edited while a write ran, whose module the process may have loaded by then.
+  const editedWhileWriting: string[] = []
   // The process writing them is kept between writes; only a change to something but `.kay` sources boots a new one, as the config or a module it imports may be what changed.
   const typesProcess = new TypesProcess(root, options.entry)
   let typesFresh = true
@@ -159,6 +161,11 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
         typesFresh = false
         configRefused ||= await regenerateTypes(root, { ...options, config: typesConfig }, options.refuseConfig === true && !startedTypes, typesProcess, fresh)
         startedTypes = true
+
+        if (editedWhileWriting.splice(0).some(file => typesProcess.loaded(file))) {
+          typesFresh = true
+          typesAgain = true
+        }
       }
 
       typesWriting = undefined
@@ -616,6 +623,11 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     if (!configEdited && typesRead(files)) {
       // A code file the process did not load is read from disk by the write, so only the others need a new process.
       typesFresh ||= files.length === 0 || files.some(file => !file.endsWith('.kay') && (!CODE_FILE.test(file) || typesProcess.loaded(file)))
+
+      // A write in flight may load a module this edit touched, which its answer reports: checked once it ends.
+      if (typesWriting !== undefined)
+        editedWhileWriting.push(...files.filter(file => CODE_FILE.test(file)))
+
       void writeTypes()
     }
   }

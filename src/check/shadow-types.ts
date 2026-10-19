@@ -414,10 +414,8 @@ interface ShadowEntry {
   typesOnly?: boolean
 }
 
-// The cache entries this process read or made, by file: a long-lived process (the types one, the editor's) answers an unchanged component without reading its entry again, as the key holds the source.
-const memory = new Map<string, { key: bigint, value: unknown }>()
-// Held by hash, as a key carries the whole source.
-const stamp = (slot: CacheSlot) => Bun.hash.wyhash(slot.key)
+// The cache entries this process read or made, by file: a long-lived process (the types one, the editor's) answers an unchanged component without reading its entry again, as the key hashes the source.
+const memory = new Map<string, { key: string, value: unknown }>()
 const maps = new WeakMap<ShadowEntry, SourceMap>()
 
 function mapOf(entry: ShadowEntry): SourceMap {
@@ -434,7 +432,7 @@ function mapOf(entry: ShadowEntry): SourceMap {
 async function remembered<Value>(slot: CacheSlot, read: () => Promise<Value | undefined>): Promise<Value | undefined> {
   const held = memory.get(slot.file)
 
-  if (held?.key === stamp(slot))
+  if (held?.key === slot.key)
     return held.value as Value
 
   const value = await read()
@@ -442,7 +440,7 @@ async function remembered<Value>(slot: CacheSlot, read: () => Promise<Value | un
   if (value === undefined)
     memory.delete(slot.file)
   else
-    memory.set(slot.file, { key: stamp(slot), value })
+    memory.set(slot.file, { key: slot.key, value })
 
   return value
 }
@@ -458,7 +456,7 @@ async function rendersAsIslandCached(cacheDir: string, file: string, source: str
 
   const island = rendersAsIsland(source, signals)
 
-  memory.set(slot.file, { key: stamp(slot), value: island })
+  memory.set(slot.file, { key: slot.key, value: island })
   await writeCacheEntry(slot, island)
 
   return island
@@ -482,7 +480,7 @@ async function compileShadowCached(cacheDir: string, root: string, file: string,
   const entry: ShadowEntry = { tsx: compiled.shadow.tsx, map: compiled.shadow.map.toJSON(), diagnostics: compiled.diagnostics, ...typesOnly && { typesOnly } }
 
   maps.set(entry, compiled.shadow.map)
-  memory.set(slot.file, { key: stamp(slot), value: entry })
+  memory.set(slot.file, { key: slot.key, value: entry })
   await writeCacheEntry(slot, entry)
 
   return compiled
