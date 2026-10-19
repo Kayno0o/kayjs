@@ -11,7 +11,7 @@ const WRONG = 'wrong password!'
 const LINKS = { 'verify-email': '/verify', 'reset-password': '/reset', 'magic-link': '/magic', 'change-email': '/confirm-email' }
 
 interface Row {
-  key: keyof Limits
+  key: keyof typeof DEFAULT_LIMITS
   // Said when the limiter is reached from more than one action.
   action?: string
   // What the limiter counts: the account or address typed, or the client address.
@@ -291,13 +291,12 @@ const rows: Row[] = [
 ]
 
 // Walked in the file of the feature they guard, where the rest of that feature's behaviour is.
-const elsewhere: Partial<Record<keyof Limits, string>> = {
+const elsewhere: Partial<Record<keyof typeof DEFAULT_LIMITS, string>> = {
   export: 'pages.test.ts',
   signInAccountAll: 'signInLockout.test.ts',
   invite: 'organizations.test.ts',
   inviteAddress: 'organizations.test.ts',
   oauthRegister: 'oauthHardening.test.ts',
-  oauthRegisterAll: 'oauthHardening.test.ts',
   oauthToken: 'oauthHardening.test.ts',
   oauthDocument: 'oauthHardening.test.ts',
 }

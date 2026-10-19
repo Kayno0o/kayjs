@@ -98,6 +98,7 @@ describe('admin', () => {
     expect(await admin.browser.call('banUser', ada.id)).toEqual({ ok: false, error: 'stale' })
     expect(await admin.browser.call('unbanUser', ada.id)).toEqual({ ok: false, error: 'stale' })
     expect(await admin.browser.call('deleteUser', ada.id)).toEqual({ ok: false, error: 'stale' })
+    expect(await admin.browser.call('impersonate', ada.id)).toEqual({ ok: false, error: 'stale' })
     expect(await admin.browser.call('getUser', ada.id)).toMatchObject({ ok: true })
 
     expect(await admin.browser.call('reprove', { password: PASSWORD })).toEqual({ ok: true })

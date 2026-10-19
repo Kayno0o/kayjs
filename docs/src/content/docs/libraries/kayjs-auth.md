@@ -386,7 +386,7 @@ if (found.ok) {
 - `grantRole(id, role)` and `revokeRole(id, role)` take a role your `roles` option declares. If two admins revoke each other's role at the same moment, at least one stays an admin, and a revoke that would have left none is undone and answers `last-admin`.
 - `banUser(id, { reason, until })` bars the user from signing in and signs them out everywhere. `until` leaves it for good when left out. `unbanUser(id)` lifts it. An admin cannot ban themselves or another admin.
 - `deleteUser(id)` deletes the user as `deleteAccount` does, so it answers `last-owner` for the only owner of an organization with other members.
-- `impersonate(id)` signs the admin in as the user. `impersonator()` gives the admin, to show a banner, and `stopImpersonating()` signs back in as themselves.
+- `impersonate(id)` signs the admin in as the user, within ten minutes of their own sign-in or re-proof; later it answers `stale`. `impersonator()` gives the admin, to show a banner, and `stopImpersonating()` signs back in as themselves.
 - `adminAuditLog({ userId, before, limit })` reads everyone's audit log, or one user's.
 
 Changing a user needs a sign-in or `reprove()` under ten minutes old. Otherwise the method answers `'stale'`. Reading users takes no such proof.
@@ -516,7 +516,11 @@ createAuth({
 })
 ```
 
-The agents can only ask for the scopes you declare. The new tables are created by `db.sync()` if you use Postgres or SQLite.
+The agents can only ask for the scopes you declare. An agent that asks for none is given no scope, so its token reaches only routes marked `scope: false`. Name the scopes such an agent gets with `oauthServer: { defaultScopes: ['notes:read'] }`.
+
+In production, set `site` in `kay.config.ts` or `url` in `createAuth`: the OAuth server names itself from it, and answers an error without one, as a Host header could name it otherwise. Registrations are limited per address; `limits: { oauthRegisterAll }` adds a ceiling on all addresses together.
+
+The new tables are created by `db.sync()` if you use Postgres or SQLite.
 
 ## Limits
 

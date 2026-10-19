@@ -52,7 +52,7 @@ export async function actingAdmin(state: RequestState): Promise<UserRecord | nul
 }
 
 // The admin changing a user, who must have signed in or re-proved lately, so a session left open or stolen grants, bans and deletes no one.
-async function changingAdmin(state: RequestState): Promise<{ ok: true, actor: UserRecord } | { ok: false, error: 'forbidden' | 'stale' }> {
+export async function changingAdmin(state: RequestState): Promise<{ ok: true, actor: UserRecord } | { ok: false, error: 'forbidden' | 'stale' }> {
   const actor = await actingAdmin(state)
 
   if (!actor)

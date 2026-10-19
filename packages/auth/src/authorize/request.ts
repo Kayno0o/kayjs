@@ -71,7 +71,7 @@ function together(held: readonly string[] | null, wanted: readonly string[] | nu
   return held === null ? [...wanted] : [...new Set([...held, ...wanted])]
 }
 
-// The scopes a request asks for, null for every one; undefined when it asks for one the app does not declare.
+// The scopes a request asks for, null for every one (an app declaring none); undefined when it asks for one the app does not declare.
 export function requestedScopes(core: Core, scope: string | undefined): string[] | null | undefined {
   // An app declaring no scopes gives its tokens every one, whatever a client asks for.
   if (core.scopes.size === 0)
@@ -79,8 +79,9 @@ export function requestedScopes(core: Core, scope: string | undefined): string[]
 
   const asked = (scope ?? '').split(WHITESPACE).filter(each => each !== '' && !IMPLIED_SCOPES.has(each))
 
+  // A client asking for no scope is given the app's default ones, none unless it names some.
   if (asked.length === 0)
-    return [...core.scopes]
+    return [...core.oauthServer?.defaultScopes ?? []]
 
   return asked.every(each => core.scopes.has(each)) ? [...new Set(asked)] : undefined
 }

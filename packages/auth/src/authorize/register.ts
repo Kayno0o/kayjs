@@ -8,7 +8,9 @@ import { validRedirectUris } from './uris'
 
 // Dynamic client registration (RFC 7591): a public client names its redirect URIs and is given an ID, with no secret to keep.
 export async function registerClient(core: Core, address: string, document: unknown): Promise<TokenReply> {
-  if (await spend(core.store, `oauth-register:${address}`, core.limits.oauthRegister) || await spend(core.store, 'oauth-register:all', core.limits.oauthRegisterAll))
+  const all = core.limits.oauthRegisterAll
+
+  if (await spend(core.store, `oauth-register:${address}`, core.limits.oauthRegister) || (all !== undefined && await spend(core.store, 'oauth-register:all', all)))
     return refused('invalid_client_metadata', 'Too many registrations', 429)
 
   if (typeof document !== 'object' || document === null || Array.isArray(document))

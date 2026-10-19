@@ -13,6 +13,9 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 ### The analytics cookie lasts 180 days and visits carry no title
 
 - `kay_analytics` lasted a year and now lasts 180 days (`consent: { maxAge }`, 13 months at most), a refusal as long as a yes, so visitors are asked again sooner. Visits no longer carry the page title; write `titles: true` on `analytics()` to send it again. No lint, as no old code is wrong.
+### The OAuth server grants no scope when none is asked
+
+- kayjs-auth's OAuth server gave a client that asked for no `scope` every scope the app declares; it now gives `oauthServer: { defaultScopes }`, else none, so an MCP client relying on that name the scopes it needs (`scope` in its request) or the app sets `defaultScopes`. In production the OAuth server needs `site` in kay.config.ts or `url` in `createAuth` (it answers 500 without, as the Host header named the issuer), `impersonate` answers `stale` past ten minutes after sign-in, and `limits.oauthRegisterAll` has no default (set it to keep a ceiling on all addresses). No lint can see these, as they are behaviors with no old form in the code.
 
 ### Deleting an account can answer `last-owner`
 

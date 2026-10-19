@@ -8,9 +8,14 @@ const TRAILING_SLASH = /\/$/
 // Shared by every document and endpoint a client reads before it has a token, which a page of another site may ask for.
 export const OPEN_HEADERS = { 'access-control-allow-origin': '*', 'access-control-allow-methods': 'GET, POST, OPTIONS', 'access-control-allow-headers': 'content-type, authorization, mcp-protocol-version' }
 
-// Where the app is served, mount point included: the `site` and `base` kay.config.ts sets, else the `url` of `createAuth`, else the request's origin.
+// Where the app is served, mount point included: the `site` and `base` kay.config.ts sets, else the `url` of `createAuth`, else the request's origin outside production, where the Host header would name the issuer.
 export function siteRoot(core: Core, request: Request): string {
-  return (configuredSite()?.origin ?? core.url ?? new URL(request.url).origin).replace(TRAILING_SLASH, '')
+  const fixed = configuredSite()?.origin ?? core.url
+
+  if (fixed === undefined && process.env.NODE_ENV === 'production')
+    throw new Error('kayjs-auth: the OAuth server needs the site\'s origin in production: set `site` in kay.config.ts or `url` in createAuth, as the Host header cannot name the issuer')
+
+  return (fixed ?? new URL(request.url).origin).replace(TRAILING_SLASH, '')
 }
 
 // The endpoints of the OAuth server, under the site's root.

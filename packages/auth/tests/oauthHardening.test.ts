@@ -217,7 +217,7 @@ async function token(app: Server, form: Record<string, string>) {
 }
 
 describe('the limits', () => {
-  test('registration answers 429 past the limit of an address, and past the one of all addresses together', async () => {
+  test('registration answers 429 past the limit of an address, and past the one of all addresses together when the app sets it', async () => {
     const byAddress = server({ limits: { oauthRegister: { max: 2, window: 3600 } } })
 
     expect([(await register(byAddress)).status, (await register(byAddress)).status, (await register(byAddress)).status]).toEqual([201, 201, 429])
@@ -225,6 +225,13 @@ describe('the limits', () => {
     const all = server({ limits: { oauthRegisterAll: { max: 2, window: 3600 } } })
 
     expect([(await register(all)).status, (await register(all)).status, (await register(all)).status]).toEqual([201, 201, 429])
+  })
+
+  test('registration has no budget shared by all addresses unless the app sets one', async () => {
+    const app = server({ limits: { oauthRegister: { max: 600, window: 3600 } } })
+
+    for (let n = 0; n < 501; n++)
+      expect((await register(app)).status).toBe(201)
   })
 
   test('the token endpoint answers 429 past its limit', async () => {
@@ -340,6 +347,23 @@ describe('the documents', () => {
 
     expect((await fixed.browser().fetch('/.well-known/oauth-authorization-server')).headers.get('cache-control')).toBe('public, max-age=300')
     expect((await guessed.browser().fetch('/.well-known/oauth-authorization-server')).headers.get('cache-control')).toBe('private, max-age=300')
+  })
+
+  test('never take the issuer from the Host header in production', async () => {
+    const before = process.env.NODE_ENV
+
+    process.env.NODE_ENV = 'production'
+
+    try {
+      expect((await server({ url: null }).browser().fetch('/.well-known/oauth-authorization-server', { headers: { host: 'evil.example' } })).status).toBe(500)
+      expect((await server().browser().fetch('/.well-known/oauth-authorization-server')).status).toBe(200)
+    }
+    finally {
+      if (before === undefined)
+        delete process.env.NODE_ENV
+      else
+        process.env.NODE_ENV = before
+    }
   })
 })
 

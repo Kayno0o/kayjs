@@ -65,6 +65,7 @@ export default defineMessages({
       returnsTo: 'After you decide, you go back to {host}.',
       scopes: 'It will be allowed to',
       everything: 'Do everything you can do',
+      noScopes: 'Sign in as you, with no access to your data',
       allow: 'Allow',
       deny: 'Deny',
       client: 'This app is not known to this site, so nothing was shared with it.',

@@ -14,7 +14,7 @@ afterEach(() => {
   setSystemTime()
 })
 
-function server(options: { documents?: Record<string, unknown>, scopes?: ('posts:read' | 'posts:write')[], store?: ReturnType<typeof memoryStore> } = {}) {
+function server(options: { documents?: Record<string, unknown>, scopes?: ('posts:read' | 'posts:write')[], defaultScopes?: ('posts:read' | 'posts:write')[], store?: ReturnType<typeof memoryStore> } = {}) {
   const fetched: string[] = []
   const app = testApp({
     url: 'http://localhost',
@@ -22,6 +22,7 @@ function server(options: { documents?: Record<string, unknown>, scopes?: ('posts
     scopes: options.scopes ?? ['posts:read', 'posts:write'],
     ...options.store && { store: options.store },
     oauthServer: {
+      ...options.defaultScopes && { defaultScopes: options.defaultScopes },
       fetch: async (url) => {
         fetched.push(url)
 
@@ -143,6 +144,25 @@ describe('the authorization request', () => {
       expect(url.searchParams.get('state')).toBe('abc')
       expect(url.searchParams.get('iss')).toBe('http://localhost')
     }
+  })
+
+  test('a client asking for no scope gets none, or the app\'s default ones, never every scope', async () => {
+    const bare = server()
+    const { client_id } = await register(bare)
+    const ada = await signedIn(bare)
+
+    expect(await ada.call('oauthAuthorize', params(client_id, { scope: '' }))).toMatchObject({ kind: 'consent', scopes: [] })
+    expect(await ada.call('oauthAuthorize', params(client_id, { scope: 'offline_access' }))).toMatchObject({ kind: 'consent', scopes: [] })
+
+    const withDefault = server({ defaultScopes: ['posts:read'] })
+    const other = await register(withDefault)
+    const grace = await signedIn(withDefault)
+
+    expect(await grace.call('oauthAuthorize', params(other.client_id, { scope: '' }))).toMatchObject({ kind: 'consent', scopes: ['posts:read'] })
+  })
+
+  test('a default scope the app does not declare is refused at startup', () => {
+    expect(() => testApp({ url: 'http://localhost', pages: authPages(), scopes: ['posts:read'], oauthServer: { defaultScopes: ['posts:write'] } } as never)).toThrow('defaultScopes')
   })
 
   test('shows the consent page once, then skips it until the client asks for more scopes', async () => {

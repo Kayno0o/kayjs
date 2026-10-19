@@ -44,8 +44,6 @@ export const DEFAULT_LIMITS = {
   export: { max: 6, window: HOUR },
   // Registering a client writes a row for anyone who asks, and reading a client's metadata document makes a request for them.
   oauthRegister: { max: 20, window: HOUR },
-  // Every client registered and never approved is a row kept for a day, so all addresses together are bounded too.
-  oauthRegisterAll: { max: 500, window: DAY },
   oauthDocument: { max: 30, window: 15 * MINUTE },
   // Loose, as a client refreshes its token for every user behind one address; a wrong code or refresh token is hopeless to guess.
   oauthToken: { max: 300, window: 15 * MINUTE },
@@ -53,7 +51,8 @@ export const DEFAULT_LIMITS = {
   link: { max: 40, window: HOUR },
 } satisfies Record<string, Limit>
 
-export type Limits = Record<keyof typeof DEFAULT_LIMITS, Limit>
+// `oauthRegisterAll` has no default: one address cannot use up a budget every other client shares, so it is a ceiling an app chooses to add on all addresses together.
+export type Limits = Record<keyof typeof DEFAULT_LIMITS, Limit> & { oauthRegisterAll?: Limit }
 
 // A limit as the app writes it: the window seconds or a string such as '15m'.
 export interface LimitOption {

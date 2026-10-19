@@ -1,5 +1,5 @@
 import type { Duration, RateStore } from 'kay'
-import type { Limits } from './limits'
+import type { DEFAULT_LIMITS } from './limits'
 import type { RequestState } from './state'
 import { verifyWork, workChallenge } from 'kay/server'
 import { spend } from './limits'
@@ -54,7 +54,7 @@ export interface CaptchaWidget {
 }
 
 // Each request's client limit, whose attempt count a threshold reads.
-const COUNTED: Record<CaptchaAction, { key: string, limit: keyof Limits }> = {
+const COUNTED: Record<CaptchaAction, { key: string, limit: keyof typeof DEFAULT_LIMITS }> = {
   'register': { key: 'register', limit: 'register' },
   'guest': { key: 'register', limit: 'register' },
   'sign-in': { key: 'sign-in-client', limit: 'signIn' },

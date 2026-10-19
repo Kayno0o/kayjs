@@ -54,6 +54,8 @@ Panel(title={t('auth.consent.title')})
     ul.list-disc.pl-5
       if outcome.scopes === null
         li {t('auth.consent.everything')}
+      else if outcome.scopes.length === 0
+        li {t('auth.consent.noScopes')}
       else
         for scope of outcome.scopes key={scope}
           li {scopeLabel(scope)}

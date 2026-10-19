@@ -31,7 +31,7 @@ import { Elysia } from 'elysia'
 import { durationSeconds, nameUser, READ_METHODS, stoppers, underKayDev } from 'kay/library'
 import { clientAddress, crossSiteRefused, crossSiteResponse, rateKey } from 'kay/server'
 import { changePassword, changeUsername, deleteAccount, unlink } from './account'
-import { actingAdmin, adminAuditLog, banUser, changeRole, deleteUser, getUser, isAdmin, listUsers, unbanUser } from './admin'
+import { adminAuditLog, banUser, changeRole, changingAdmin, deleteUser, getUser, isAdmin, listUsers, unbanUser } from './admin'
 import { documentFetcher } from './authorize/clients'
 import { approvedClients, revokeClient } from './authorize/grants'
 import { protectedResourceMetadata, rootIsFixed, siteRoot } from './authorize/metadata'
@@ -183,7 +183,7 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   // The proxies in front, read as kay.config.ts's `proxy` is, for a plain Elysia app that kay's `pages()` does not serve; a kay app sets it in kay.config.ts instead.
   proxy?: KayConfig['proxy'] | undefined
   // MCP clients sign in to the app by OAuth, on by default with `pages` and a store keeping it (`memoryStore` and `pgStore` do): kayjs-auth serves the discovery documents, the authorization and token endpoints and the consent page, and the tokens it issues are bearer tokens. `false` turns it off; `fetch` reads the metadata document a client names by its URL, over the public internet only unless the app's own says otherwise.
-  oauthServer?: boolean | { fetch?: ((url: string) => Promise<Response>) | undefined } | undefined
+  oauthServer?: boolean | { fetch?: ((url: string) => Promise<Response>) | undefined, defaultScopes?: readonly Scope[] | undefined } | undefined
   // Replaces the default decision, which reads a string as a role and runs a predicate; use it with `decide` for grants on single records.
   authorize?: ((user: User | null, requirement: AuthRequirement<Role>, level: Level, ctx: PolicyContext) => Promise<boolean>) | undefined
 }
@@ -812,13 +812,15 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     return adminAuditLog(this[STATE], query)
   }
 
-  // Signs this browser in as `userId`, the admin's own sign-in kept for `stopImpersonating`. Nothing that takes a proof works meanwhile, and another admin cannot be impersonated.
-  async impersonate(userId: string): Promise<{ ok: true } | { ok: false, error: AdminFailure | 'self' | 'admin' | 'banned' }> {
-    const actor = await actingAdmin(this[STATE])
+  // Signs this browser in as `userId`, the admin's own sign-in kept for `stopImpersonating`; 'stale' unless the admin signed in or re-proved lately. Nothing that takes a proof works meanwhile, and another admin cannot be impersonated.
+  async impersonate(userId: string): Promise<{ ok: true } | { ok: false, error: AdminFailure | 'stale' | 'self' | 'admin' | 'banned' }> {
+    const acting = await changingAdmin(this[STATE])
     const own = await this.session.get('auth')
 
-    if (!actor || !own)
-      return { ok: false, error: 'forbidden' }
+    if (!acting.ok || !own)
+      return { ok: false, error: acting.ok ? 'forbidden' : acting.error }
+
+    const { actor } = acting
 
     const record = await this.core.store.users.get(userId)
 
@@ -1447,7 +1449,7 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
   return core
 }
 
-function oauthServerOf(options: { oauthServer?: boolean | { fetch?: ((url: string) => Promise<Response>) | undefined } | undefined, store: AuthStore | LegacyAuthStore }, pages: Core['pages']): Core['oauthServer'] {
+function oauthServerOf(options: { oauthServer?: boolean | { fetch?: ((url: string) => Promise<Response>) | undefined, defaultScopes?: readonly string[] | undefined } | undefined, scopes?: readonly string[] | undefined, store: AuthStore | LegacyAuthStore }, pages: Core['pages']): Core['oauthServer'] {
   const wanted = options.oauthServer
 
   if (wanted === false || (wanted === undefined && !(pages && options.store.oauth)))
@@ -1456,7 +1458,12 @@ function oauthServerOf(options: { oauthServer?: boolean | { fetch?: ((url: strin
   if (!pages || !options.store.oauth)
     throw new Error('kayjs-auth: `oauthServer` needs the prebuilt `pages`, for its consent page, and a store with `oauth`, as `memoryStore` and `pgStore` have')
 
-  return { fetchDocument: documentFetcher(typeof wanted === 'object' ? wanted.fetch : undefined), documents: new Map() }
+  const defaultScopes = typeof wanted === 'object' ? [...new Set(wanted.defaultScopes)] : []
+
+  if (defaultScopes.some(scope => !options.scopes?.includes(scope)))
+    throw new Error('kayjs-auth: `oauthServer.defaultScopes` names a scope that `scopes` does not declare')
+
+  return { fetchDocument: documentFetcher(typeof wanted === 'object' ? wanted.fetch : undefined), documents: new Map(), defaultScopes }
 }
 
 function breachedCheck(option: boolean | ((password: string) => boolean | Promise<boolean>) | undefined): ((password: string) => boolean | Promise<boolean>) | undefined {
