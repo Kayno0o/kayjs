@@ -63,7 +63,7 @@ Types include `Component`, `Signal`, `Guard`, `Duration`, `PageContext`, `Endpoi
 | `workChallenge`, `verifyWork` | Proof of work in a form field your own code checks |
 | `requestId` | The id of a request, on its log lines and its `X-Request-Id` header |
 | `schedule`, `background` | Jobs on a cron or every so long, and background work, in the server's process |
-| `queue`, `memoryJobs`, `sqliteJobs` | Durable jobs with retries |
+| `queue`, `memoryJobs`, `sqliteJobs`, `pgJobs` | Durable jobs with retries |
 | `rooms`, `memoryRooms`, `sqliteRooms` | Websocket rooms |
 | `enterPreview`, `exitPreview`, `previewUrl` | Preview mode for drafts, edit mode with `{ edit: true }` |
 | `editRequested` | Whether a request is in edit mode |

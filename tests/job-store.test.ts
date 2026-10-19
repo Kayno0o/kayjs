@@ -2,14 +2,72 @@ import type { JobStore, StoredJob } from '../src/server'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import process from 'node:process'
+import { SQL } from 'bun'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { openSqlite } from '../src/runtime/sqlite.server'
-import { memoryJobs, sqliteJobs } from '../src/server'
+import { memoryJobs, pgJobs, sqliteJobs } from '../src/server'
+
+// A Postgres whose user may create databases, as the app template's tests take: CI sets it.
+const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL ?? ''
+const url = TEST_DATABASE_URL === '' ? undefined : new URL(TEST_DATABASE_URL)
+const DATABASE = `kay_job_store_${process.pid}`
+// Without a database the Postgres cases skip, and CI, which sets CI, fails instead.
+const pgIt = it.skipIf(url === undefined && (process.env.CI ?? '') === '')
+const pgDescribe = describe.skipIf(url === undefined && (process.env.CI ?? '') === '')
+let databaseUrl: string | undefined
+let shared: SQL | undefined
+const clients: SQL[] = []
+
+// A database of its own, so another test file's Postgres cases never share its tables.
+async function postgres(): Promise<{ sql: SQL, url: string }> {
+  if (databaseUrl === undefined) {
+    const admin = new SQL(Object.assign(new URL(url!.href), { pathname: '/postgres' }).href)
+
+    await admin.unsafe(`DROP DATABASE IF EXISTS ${DATABASE} WITH (FORCE)`)
+    await admin.unsafe(`CREATE DATABASE ${DATABASE}`)
+    await admin.close()
+    databaseUrl = Object.assign(new URL(url!.href), { pathname: `/${DATABASE}` }).href
+  }
+
+  shared ??= new SQL(databaseUrl, { max: 3 })
+  clients.push(shared)
+
+  return { sql: shared, url: databaseUrl }
+}
+
+// Separate connections, as replicas of an app have.
+function replicas(count: number): SQL[] {
+  return Array.from({ length: count }, () => {
+    const sql = new SQL(databaseUrl!, { max: 2 })
+
+    clients.push(sql)
+
+    return sql
+  })
+}
+
+// Tables dropped first, so each case starts on an empty store.
+async function freshPg(): Promise<SQL> {
+  const { sql } = await postgres()
+
+  await sql.unsafe('DROP TABLE IF EXISTS kay_jobs, kay_locks')
+
+  return sql
+}
 
 const dirs: string[] = []
 
 afterAll(async () => {
   await Promise.all(dirs.map(async dir => rm(dir, { recursive: true, force: true })))
+  await Promise.all(clients.map(async client => client.close()))
+
+  if (databaseUrl !== undefined) {
+    const admin = new SQL(Object.assign(new URL(url!.href), { pathname: '/postgres' }).href)
+
+    await admin.unsafe(`DROP DATABASE IF EXISTS ${DATABASE} WITH (FORCE)`)
+    await admin.close()
+  }
 })
 
 async function sqlitePath(): Promise<string> {
@@ -26,6 +84,7 @@ interface Kind { name: string, open: () => Promise<JobStore> }
 export const kinds: Kind[] = [
   { name: 'memory', open: async () => memoryJobs() },
   { name: 'sqlite', open: async () => sqliteJobs(await sqlitePath()) },
+  ...url === undefined && (process.env.CI ?? '') === '' ? [] : [{ name: 'postgres', open: async () => pgJobs(await freshPg()) }],
 ]
 
 let ids = 0
@@ -225,5 +284,75 @@ describe('a sqlite file made before keys and progress', () => {
 
     await sqliteJobs(path).add(job())
     expect(await sqliteJobs(path).add(job({ key: 'k' }))).toBeUndefined()
+  })
+})
+
+pgDescribe('pgJobs', () => {
+  pgIt('takes a Bun SQL, a pg-orm style { sql } or a URL', async () => {
+    const sql = await freshPg()
+    const { url: target } = await postgres()
+
+    expect(await pgJobs(sql).add(job())).toBeUndefined()
+    expect(await pgJobs({ sql }).jobs!('q')).toHaveLength(1)
+    expect(await pgJobs(target).jobs!('q')).toHaveLength(1)
+  })
+
+  pgIt('creates its tables when replicas open it at once', async () => {
+    await freshPg()
+
+    const stores = replicas(6).map(pgJobs)
+
+    expect(await Promise.all(stores.map(async store => store.add(job({ key: 'k' }))))).toHaveLength(6)
+    expect(await stores[0]!.jobs!('q')).toHaveLength(1)
+  })
+
+  pgIt('gains the columns and the key index of a table made by an older kay, keeping its jobs', async () => {
+    const sql = await freshPg()
+
+    await sql.unsafe('CREATE TABLE kay_jobs (id text PRIMARY KEY, queue text NOT NULL, payload text NOT NULL, attempts integer NOT NULL, run_at bigint NOT NULL, held_until bigint, failed boolean NOT NULL DEFAULT false, error text)')
+    await sql.unsafe('INSERT INTO kay_jobs (id, queue, payload, attempts, run_at) VALUES (\'old\', \'q\', \'[]\', 0, 0)')
+
+    const store = pgJobs(sql)
+
+    expect(await store.add(job({ key: 'k' }))).toBeUndefined()
+    expect(await store.add(job({ key: 'k' }))).toBeDefined()
+    expect((await store.claim('q', 10, 100))?.id).toBe('old')
+  })
+
+  pgIt('hands each of many due jobs to exactly one of many claimers on separate connections', async () => {
+    await freshPg()
+
+    const stores = replicas(4).map(pgJobs)
+
+    await Promise.all(Array.from({ length: 20 }, async (_, index) => stores[0]!.add(job({ runAt: index }))))
+
+    const claimed = await Promise.all(Array.from({ length: 60 }, async (_, index) => stores[index % 4]!.claim('q', 1000, 2000)))
+    const ids = claimed.filter(Boolean).map(claim => claim!.id)
+
+    expect(ids).toHaveLength(20)
+    expect(new Set(ids).size).toBe(20)
+  })
+
+  pgIt('lets one process take a schedule slot, however many ask at once', async () => {
+    await postgres()
+
+    const stores = replicas(4).map(pgJobs)
+    const won = await Promise.all(stores.map(async store => store.lock('digest', 7)))
+
+    expect(won.filter(Boolean)).toHaveLength(1)
+    expect(await stores[0]!.lock('digest', 8)).toBe(true)
+  })
+
+  pgIt('drops expired failed jobs and counts them', async () => {
+    const store = pgJobs(await freshPg())
+    const old = job({ runAt: 1 })
+
+    await store.add(old)
+    await store.add(job({ runAt: 5000 }))
+    await store.claim('q', 10, 100)
+    await store.fail(old.id, 'boom', '[redacted]')
+    expect((await store.failed('q'))[0]?.payload).toBe('[redacted]')
+    expect(await store.purge!('q', 100)).toBe(1)
+    expect(await store.failed('q')).toEqual([])
   })
 })
