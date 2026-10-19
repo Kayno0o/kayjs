@@ -367,7 +367,9 @@ A failed sign-in is reported after the response is sent. Your `onAuthEvent` and 
 
 With `audit: true`, the same events are kept in the store for a year. Pass `audit: { maxAge: '90d' }`, seconds or a string, to change it.
 
-Each entry keeps the address cut to its network, the first three bytes of an IPv4 address and the first three groups of an IPv6 one. Pass `audit: { ip: 'full' }` to keep the whole address. Deleting an account removes the address and browser from its entries, and fails if the store cannot, with the account still there unless it was the last entry, the one recording the deletion. `auth.auditLog({ before, limit })` gives the signed-in user their own, newest first. Pass the last entry of a page as `before` for the next one.
+Each entry keeps the address cut to its network, the first three bytes of an IPv4 address and the first three groups of an IPv6 one. Pass `audit: { ip: 'full' }` to keep the whole address.
+
+Deleting an account removes the address and browser from its entries, and fails if the store cannot, with the account still there unless it was the last entry, the one recording the deletion. `auth.auditLog({ before, limit })` gives the signed-in user their own, newest first. Pass the last entry of a page as `before` for the next one.
 
 `describeAuditEntry(entry, { locale })` words an entry for a person, such as `Role editor granted`, in English or French.
 
