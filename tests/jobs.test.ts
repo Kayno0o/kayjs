@@ -1398,17 +1398,21 @@ describe('queue', () => {
       const store = await open()
       const errors = spyOn(console, 'error').mockImplementation(() => undefined)
       const warns = spyOn(console, 'warn').mockImplementation(() => undefined)
+      const failed = jest.fn()
       const late = queue('late', async () => {
         // The hold ran out while this run stalled, and another process took the job.
         expect(await store.claim('late', Date.now() + 10 * 60_000, Date.now() + 20 * 60_000)).toMatchObject({ attempts: 2 })
 
         if (outcome === 'throws')
           throw new Error('late')
-      }, { store, attempts: 2, backoff: '1m' })
+      }, { store, attempts: 2, backoff: '1m', onFailed: failed })
 
       try {
         await late.enqueue('x', { key: 'k' })
         await late.drain()
+        expect(errors).not.toHaveBeenCalled()
+        expect(warns).not.toHaveBeenCalled()
+        expect(failed).not.toHaveBeenCalled()
         expect(await late.job('k')).toMatchObject({ status: 'running', attempts: 2 })
         expect(await store.failed('late')).toEqual([])
         expect(await store.jobs!('late')).toHaveLength(1)

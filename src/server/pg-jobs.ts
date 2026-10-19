@@ -160,7 +160,7 @@ export function pgJobs(source: PgJobsSource): JobStore {
     async retry(id, runAt, error, until) {
       const db = await open()
 
-      await db`UPDATE kay_jobs SET run_at = ${runAt}::bigint, held_until = NULL, error = ${error} WHERE id = ${id} AND (${until ?? null}::bigint IS NULL OR held_until = ${until ?? null}::bigint)`
+      return (await rowsOf<{ id: string }>(db`UPDATE kay_jobs SET run_at = ${runAt}::bigint, held_until = NULL, error = ${error} WHERE id = ${id} AND (${until ?? null}::bigint IS NULL OR held_until = ${until ?? null}::bigint) RETURNING id`)).length === 1
     },
     async release(id, until, runAt) {
       const db = await open()
@@ -183,7 +183,7 @@ export function pgJobs(source: PgJobsSource): JobStore {
     async fail(id, error, payload, until) {
       const db = await open()
 
-      await db`UPDATE kay_jobs SET failed = true, held_until = NULL, error = ${error}, payload = coalesce(${payload ?? null}, payload) WHERE id = ${id} AND (${until ?? null}::bigint IS NULL OR held_until = ${until ?? null}::bigint)`
+      return (await rowsOf<{ id: string }>(db`UPDATE kay_jobs SET failed = true, held_until = NULL, error = ${error}, payload = coalesce(${payload ?? null}, payload) WHERE id = ${id} AND (${until ?? null}::bigint IS NULL OR held_until = ${until ?? null}::bigint) RETURNING id`)).length === 1
     },
     async purge(queue, before) {
       const db = await open()

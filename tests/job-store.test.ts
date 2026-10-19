@@ -240,8 +240,8 @@ describe.each(kinds)('job store contract, $name', ({ open }) => {
       const { store, added, late } = await taken()
 
       await store.complete(added.id, late)
-      await store.retry(added.id, 0, 'late', late)
-      await store.fail(added.id, 'late', '[redacted]', late)
+      expect(await store.retry(added.id, 0, 'late', late)).toBe(false)
+      expect(await store.fail(added.id, 'late', '[redacted]', late)).toBe(false)
       expect(await store.state!('q', { id: added.id }, Date.now())).toMatchObject({ status: 'running', attempts: 2, payload: '[]' })
       expect(await store.state!('q', { id: added.id }, Date.now())).not.toHaveProperty('error')
       expect(await claimFor(store)).toBeUndefined()
@@ -250,12 +250,12 @@ describe.each(kinds)('job store contract, $name', ({ open }) => {
     it('lets the process holding the job complete, retry or fail it', async () => {
       const { store, added, current } = await taken()
 
-      await store.retry(added.id, 0, 'again', current)
+      expect(await store.retry(added.id, 0, 'again', current)).not.toBe(false)
       expect(await store.state!('q', { id: added.id }, Date.now())).toMatchObject({ status: 'waiting', error: 'again' })
 
       const next = heldOf(await claimFor(store))
 
-      await store.fail(added.id, 'boom', '[redacted]', next)
+      expect(await store.fail(added.id, 'boom', '[redacted]', next)).not.toBe(false)
       expect(await store.failed('q')).toMatchObject([{ id: added.id, error: 'boom', payload: '[redacted]' }])
       await store.complete(added.id, next)
       expect(await store.failed('q')).toHaveLength(1)

@@ -49,8 +49,8 @@ export interface JobStore {
   claim: (queue: string, now: number, until: number) => Maybe<StoredJob | undefined>
   // Removes it. With the hold `until` it was claimed with, only while that hold is still the job's, so a run that finishes late never completes the job another process holds; without it, whatever the hold.
   complete: (id: string, until?: number) => Maybe<void>
-  // Runs it again at `runAt`, only while the hold `until` is still the job's when it is given.
-  retry: (id: string, runAt: number, error: string, until?: number) => Maybe<void>
+  // Runs it again at `runAt`, only while the hold `until` is still the job's when it is given. Resolves with `false` when the write did not apply, the hold being another's, so the run reports nothing; a store resolving with nothing counts as having applied it.
+  retry: (id: string, runAt: number, error: string, until?: number) => Maybe<boolean | void>
   // Gives a job back untouched, its attempt not counted, for the next process to take: a run stopped by a shutdown. Only while the hold `until` it was claimed with is still the job's, so a late release never clears another process's claim. A store without it has the job retried after its backoff as any failed run.
   // With `runAt`, the job is due then rather than at once: a run that wants another go later without spending an attempt.
   release?: ((id: string, until: number, runAt?: number) => Maybe<void>) | undefined
@@ -59,7 +59,8 @@ export interface JobStore {
   // The waiting or running job of the queue with that key or id, else its last failed one, `now` telling a held job from one whose hold ran out; undefined for a job that completed.
   state?: ((queue: string, ref: { key: string } | { id: string }, now: number) => Maybe<StoredJobState | undefined>) | undefined
   // Keeps it as failed, out of the queue, with `payload` in place of the stored one when the queue redacts what it keeps; a store ignoring it keeps the payload whole. Only while the hold `until` is still the job's when it is given.
-  fail: (id: string, error: string, payload?: string, until?: number) => Maybe<void>
+  // Resolves with `false` when the hold was another's and nothing was written, as `retry` does.
+  fail: (id: string, error: string, payload?: string, until?: number) => Maybe<boolean | void>
   // Removes the failed jobs of the queue whose time came before `before`, and resolves with how many went; a store without it has them listed with `failed` and removed one by one.
   purge?: ((queue: string, before: number) => Maybe<number>) | undefined
   failed: (queue: string) => Maybe<StoredJob[]>
@@ -224,7 +225,7 @@ export function sqliteJobs(path: string): JobStore {
       open(true)!.remove.run(id, until ?? null, until ?? null)
     },
     retry(id, runAt, error, until) {
-      open(true)!.retry.run(runAt, error, id, until ?? null, until ?? null)
+      return open(true)!.retry.run(runAt, error, id, until ?? null, until ?? null).changes === 1
     },
     release(id, until, runAt) {
       open(true)!.release.run(runAt ?? null, id, until)
@@ -243,7 +244,7 @@ export function sqliteJobs(path: string): JobStore {
       return row ? { ...toJob(row), status: statusOf(row.failed === 1, row.held_until ?? 0, now) } : undefined
     },
     fail(id, error, payload, until) {
-      open(true)!.fail.run(error, payload ?? null, id, until ?? null, until ?? null)
+      return open(true)!.fail.run(error, payload ?? null, id, until ?? null, until ?? null).changes === 1
     },
     purge(queue, before) {
       return open(false)?.purge.run(queue, before).changes ?? 0
@@ -370,8 +371,12 @@ export function memoryJobs(): JobStore {
     retry(id, runAt, error, until) {
       const job = jobs.get(id)
 
-      if (holds(job, until))
-        Object.assign(job, { runAt, error, heldUntil: undefined })
+      if (!holds(job, until))
+        return false
+
+      Object.assign(job, { runAt, error, heldUntil: undefined })
+
+      return true
     },
     release(id, until, runAt) {
       const job = jobs.get(id)
@@ -399,8 +404,12 @@ export function memoryJobs(): JobStore {
     fail(id, error, payload, until) {
       const job = jobs.get(id)
 
-      if (holds(job, until))
-        Object.assign(job, { failed: true, error, heldUntil: undefined, ...payload !== undefined && { payload } })
+      if (!holds(job, until))
+        return false
+
+      Object.assign(job, { failed: true, error, heldUntil: undefined, ...payload !== undefined && { payload } })
+
+      return true
     },
     purge(queue, before) {
       const purged = [...jobs.values()].filter(job => job.queue === queue && job.failed && job.runAt < before)
@@ -614,9 +623,10 @@ export function queue<Payload, Progress = unknown>(name: string, handler: (paylo
     if (job.attempts > attempts) {
       const message = `it was taken ${job.attempts - 1} times, as many as its ${attempts} attempts, its last run never finishing`
 
-      await store().fail(job.id, message, redacted(job), held)
-      kayLog('error', `a job of queue('${name}') is kept as failed without running: ${message}`)
-      await reportFailed(job, new Error(message))
+      if (await store().fail(job.id, message, redacted(job), held) !== false) {
+        kayLog('error', `a job of queue('${name}') is kept as failed without running: ${message}`)
+        await reportFailed(job, new Error(message))
+      }
 
       return true
     }
@@ -670,17 +680,20 @@ export function queue<Payload, Progress = unknown>(name: string, handler: (paylo
       if (job.attempts < attempts) {
         const wait = backoff * 2 ** (job.attempts - 1)
 
-        await store().retry(job.id, Date.now() + wait, message, held)
-        // The worker looking for jobs may sleep past the time this one is due.
-        wakePoller()
-        kayLog('warn', `a job of queue('${name}') failed, attempt ${job.attempts} of ${attempts}, and runs again in ${Math.round(wait / 1000)} s: ${message}`)
+        // A run whose hold went to another process writes nothing and reports nothing: the job is that process's now.
+        if (await store().retry(job.id, Date.now() + wait, message, held) !== false) {
+          // The worker looking for jobs may sleep past the time this one is due.
+          wakePoller()
+          kayLog('warn', `a job of queue('${name}') failed, attempt ${job.attempts} of ${attempts}, and runs again in ${Math.round(wait / 1000)} s: ${message}`)
+        }
 
         return true
       }
 
-      await store().fail(job.id, message, redacted(job), held)
-      await reportBackgroundError(`a job of queue('${name}') failed ${job.attempts} times and is kept as failed`, error)
-      await reportFailed(job, error)
+      if (await store().fail(job.id, message, redacted(job), held) !== false) {
+        await reportBackgroundError(`a job of queue('${name}') failed ${job.attempts} times and is kept as failed`, error)
+        await reportFailed(job, error)
+      }
     }
     finally {
       stopping?.removeEventListener('abort', stop)
