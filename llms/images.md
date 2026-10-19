@@ -153,6 +153,7 @@ img(src={hero} sizes="(min-width: 60rem) 50vw, 100vw" alt="The workshop")
 - Images added at runtime another way are resized too from a directory listed by the URL path the app serves it at: `images: { dirs: { '/uploads/': 'data/uploads' } }` in `kay.config.ts`, relative to the root, or to where an executable runs.
 - Give their size, `image(post.photo, { width: post.photoWidth, height: post.photoHeight })`, for the variants; without it the image keeps its `src` alone.
 - Each variant is made once per version of the file and revalidated by its ETag, since an upload can change in place; one over 50 megapixels is refused with 413 from its header alone.
+- The variants the route draws on request, for runtime, stored and remote images, are kept in `.kay/cache/images`; the server removes those nothing wrote for 30 days as it starts and once a day, and the next request draws one again.
 - A variant the server cannot write, its cache directory full or read-only, is the server's error, a 500 its error log reports, rather than the 415 of a file kay cannot resize.
 - kay does not serve the originals: the app does.
 - Images the app looks up its own way, such as by a database id, behind a session: `images.resolve: (src, ctx) => mediaPath(src)` gives the file of a `src` nothing above names, a path relative to the root, or undefined for a 404, and `images.guard: guard(ctx => { if (!ctx.locals.session.get('userId')) ctx.deny(401) })` runs before it, as a page guard does.

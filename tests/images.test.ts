@@ -1,5 +1,5 @@
 import type { AvifResult, AvifTask } from '../src/server/avif-worker'
-import { mkdtemp, readdir, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, readdir, rm, utimes } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
@@ -13,7 +13,7 @@ import { logSink, setLogSink } from '../src/runtime/log'
 import { imageSize, pages, processImage } from '../src/server'
 import { AVIF_ENCODER, AVIF_SPEED, AVIF_WORKER_SOURCE, encodeAvif, setAvifTaskTimeout } from '../src/server/avif'
 import { coverImage } from '../src/server/crop'
-import { avifQuality, drawing, serveImages, variantLevel, variantName, writeImageVariants } from '../src/server/image'
+import { avifQuality, drawing, pruneVariants, serveImages, VARIANT_KEEP_MS, variantLevel, variantName, writeImageVariants } from '../src/server/image'
 import { stripImageMetadata } from '../src/server/image-metadata'
 import { decodePng, encodePng } from '../src/server/png'
 import { remoteAllowed, remoteImages, remotePatterns } from '../src/server/remote'
@@ -1161,5 +1161,55 @@ describe('variantLevel', () => {
     expect(variantLevel({ width: 320, quality: 100 }, 'avif', 60, 90)).toBe(100)
     expect(variantLevel({ width: 320, quality: 5 }, 'avif', 80, 50)).toBe(1)
     expect(variantLevel('card', 'webp', 80, 50)).toBe(80)
+  })
+})
+
+describe('pruneVariants', () => {
+  async function cacheWith(): Promise<string> {
+    const dir = await scratchDir('image-prune-')
+    const day = 24 * 3_600_000
+    const aged = async (name: string, days: number) => {
+      await Bun.write(join(dir, name), 'x')
+      await utimes(join(dir, name), new Date(Date.now() - days * day), new Date(Date.now() - days * day))
+    }
+
+    await aged('old-640.webp', 40)
+    await aged('older-640.avif', 400)
+    await aged('fresh-640.webp', 2)
+    await mkdir(join(dir, 'remote'))
+    await Bun.write(join(dir, 'remote/kept.bin'), 'x')
+    await utimes(join(dir, 'remote'), new Date(0), new Date(0))
+
+    return dir
+  }
+
+  it('removes the files nothing wrote for the time given, and leaves younger ones and folders alone', async () => {
+    const dir = await cacheWith()
+
+    expect(await pruneVariants(dir, VARIANT_KEEP_MS)).toBe(2)
+    expect((await readdir(dir)).toSorted()).toEqual(['fresh-640.webp', 'remote'])
+    expect(await Bun.file(join(dir, 'remote/kept.bin')).exists()).toBe(true)
+    expect(await pruneVariants(dir, VARIANT_KEEP_MS)).toBe(0)
+    expect(await pruneVariants(join(dir, 'missing'), VARIANT_KEEP_MS)).toBe(0)
+  })
+
+  it('runs as the server starts', async () => {
+    const dir = await cacheWith()
+    const app = new Elysia()
+
+    serveImages(app, { clientDir: dir, cacheDir: dir })
+    app.listen(0)
+
+    try {
+      for (let waited = 0; await Bun.file(join(dir, 'old-640.webp')).exists(); waited += 20) {
+        expect(waited).toBeLessThan(3000)
+        await Bun.sleep(20)
+      }
+
+      expect(await Bun.file(join(dir, 'fresh-640.webp')).exists()).toBe(true)
+    }
+    finally {
+      await app.stop(true)
+    }
   })
 })

@@ -13,6 +13,7 @@ import { countCache } from '../build/cache'
 import { writeAtomically } from '../build/files'
 import { KayError } from '../compiler/errors'
 import { aspectKey, CARD, croppedSize, cutOrBelow, DEFAULT_ASPECTS, DEFAULT_MAX_DENSITY, FILES_ROUTE, IMAGE_ROUTE, imageWidths, parseAspect, QUALITY_STEP, recordVariants, requestedRemoteVariants, requestedVariants, RESIZABLE, setAspects, setImageWidths, setMaxDensity, setRemoteImages, setResolvedImages, SMALL_STEP, validQuality, variantHeight, variantSuffix } from '../runtime/image'
+import { kayLog } from '../runtime/log'
 import { inLocale, passGuards } from './actions'
 import { AVIF_ENCODER, AVIF_SPEED, DEFAULT_AVIF_QUALITY, encodeAvif } from './avif'
 import { coverImage } from './crop'
@@ -47,6 +48,9 @@ export interface ImageRouteOptions {
 }
 
 export const VARIANTS_DIR = 'images'
+// A variant made on request that nothing wrote for this long is dropped, and the next request for it draws it again: the folder holds a version of each image per size, so one whose source changed or went away would stay for good.
+export const VARIANT_KEEP_MS = 30 * 24 * 3_600_000
+const PRUNE_EVERY_MS = 24 * 3_600_000
 const ASSETS_PATH = `${ASSET_PREFIX}assets/`
 const IMMUTABLE = 'public, max-age=31536000, immutable'
 const TEXT = { 'content-type': 'text/plain; charset=utf-8' }
@@ -220,6 +224,28 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
   const negotiatedImmutable = headerCopies({ 'cache-control': IMMUTABLE, 'vary': 'accept' }, options.security)
   const revalidatedAs = headerCopies({}, options.security)
   const negotiatedRevalidated = headerCopies({ vary: 'accept' }, options.security)
+
+  let pruning: ReturnType<typeof setInterval> | undefined
+
+  const prune = async () => {
+    try {
+      // The files the maps point at may be among those gone.
+      if (await pruneVariants(options.cacheDir, VARIANT_KEEP_MS) > 0) {
+        answered.clear()
+        importedVariants.clear()
+      }
+    }
+    catch (error) {
+      kayLog('warn', `the variants made on request cannot be pruned in ${options.cacheDir}: ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+
+  app.onStart(() => {
+    void prune()
+    pruning = setInterval(() => void prune(), PRUNE_EVERY_MS)
+    pruning.unref()
+  })
+  app.onStop(() => clearInterval(pruning))
 
   app.get(IMAGE_ROUTE, async (context) => {
     const { request, server, set } = context
@@ -406,6 +432,31 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
 
     return new Response(file, { headers: ownHeaders(set, headers) })
   }
+}
+
+// Removes the files of `dir`, not its folders, that nothing wrote for `keepMs`; returns how many went.
+export async function pruneVariants(dir: string, keepMs: number): Promise<number> {
+  if (!existsSync(dir))
+    return 0
+
+  const oldest = Date.now() - keepMs
+  let removed = 0
+
+  await Promise.all((await readdir(dir, { withFileTypes: true })).filter(entry => entry.isFile()).map(async ({ name }) => {
+    const file = join(dir, name)
+
+    try {
+      if ((await stat(file)).mtimeMs < oldest) {
+        await rm(file, { force: true })
+        removed++
+      }
+    }
+    catch {
+      // Gone already, or taken by another process.
+    }
+  }))
+
+  return removed
 }
 
 // The variant a request asks for, or why it is refused: a width of the ladder or a multiple of `SMALL_STEP` below it, narrower than the image's own, or its own, cut or not to an allowed aspect ratio, or the share card.

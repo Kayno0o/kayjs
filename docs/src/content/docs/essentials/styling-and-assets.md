@@ -232,6 +232,8 @@ Without the size the image keeps its `src` alone.
 
 ### Images from another host
 
+The variants the server draws on request are kept in `.kay/cache/images`. It removes the ones nothing wrote for 30 days, at start and once a day, and draws one again if it is asked for later.
+
 An image on a CMS or a CDN is resized too, once its host is in `images.remote`. Each entry is an origin, and its host can start with `*.` for any subdomain. A download is cut off past 25 MB and given up on after 10 s; `remoteMaxSize` and `remoteTimeout` change them.
 
 ```ts
