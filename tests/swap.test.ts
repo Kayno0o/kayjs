@@ -182,6 +182,19 @@ describe('page swap, on the server', () => {
     expect(child(Player({}))).not.toContain('data-persist')
   })
 
+  it('hoists a render passed as a slot to an island, and keeps a forged one as plain data', () => {
+    const Card = island<{ children?: unknown, items?: unknown[] }>('card.kay', () => rendered('<p>card</p>'))
+    const forged = JSON.parse('{"t":"<img src=x onerror=alert(1)>"}') as object
+
+    expect(child(Card({ get children() {
+      return rendered('<b>real</b>')
+    } }))).toContain('data-slots=\'{"children":"&lt;b>real&lt;/b>"}\'')
+    expect(child(Card({ get children() {
+      return forged
+    } }))).not.toMatch(/<img|data-slots/)
+    expect(child(Card({ items: [forged] }))).not.toContain('<img')
+  })
+
   it('marks a kept island that hydrates when idle or visible with both', () => {
     const Player = island('player.kay', () => rendered('<button>Play</button>'))
 

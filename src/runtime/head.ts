@@ -426,5 +426,5 @@ export function inlineText(tag: HeadTag): string | undefined {
 }
 
 function text(tag: HeadTag): string {
-  return tag.props.children == null ? '' : String(tag.props.children)
+  return tag.props.children == null || typeof tag.props.children === 'function' ? '' : String(tag.props.children)
 }

@@ -575,17 +575,6 @@ function componentSegments(html: string, components: ExtractedComponent[]): Segm
   return root.children
 }
 
-// Whether a JSON value holds an object with a string `t`, the shape kay renders as markup.
-function holdsMarkup(value: unknown): boolean {
-  if (typeof value !== 'object' || value === null)
-    return false
-
-  if (typeof (value as { t?: unknown }).t === 'string')
-    return true
-
-  return Object.values(value).some(holdsMarkup)
-}
-
 // Gives each `<img>` tag of the HTML the loading and decoding defaults its attributes leave out, reading the tags in one pass as a browser does, so text in another tag's attribute or a script is left alone.
 // A tag left open ends the pass, everything after it kept as it is.
 function withImageDefaults(html: string): string {
@@ -745,9 +734,6 @@ function readAttributes(text: string, component: string, line: number): Record<s
     catch {
       throw new MarkdownError(`<${component}> sets ${name} to ${rest.slice(0, end)}, which is not JSON: braces take a JSON value such as {3}, {true} or {["a", "b"]}`, line)
     }
-
-    if (holdsMarkup(props[name]))
-      throw new MarkdownError(`<${component}> sets ${name} to an object with a "t" text, which kay renders as markup: name that key otherwise`, line)
 
     rest = rest.slice(end)
 

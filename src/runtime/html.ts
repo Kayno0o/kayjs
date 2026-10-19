@@ -1,5 +1,5 @@
 // What pages, layouts and static components render to on the server: markup built as strings, with no reactive runtime.
-// A rendered value is `{ t: markup }`: what a component or an island rendered goes into its parent's markup as it is.
+// A rendered value is `{ t: markup }` made by `html()`: what a component or an island rendered goes into its parent's markup as it is.
 
 import type { Truthy } from './checks'
 import type { FieldSchema } from './form'

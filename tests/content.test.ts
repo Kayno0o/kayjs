@@ -323,15 +323,13 @@ describe('compiling Markdown', () => {
 
   it.each([
     ['innerHTML', '<Callout innerHTML="<script>alert(1)</script>" />\n', { line: 1, message: '<Callout> sets innerHTML, which would put its text on the page as markup: write what it wraps between its tags' }],
-    ['markup in a JSON object', '<Callout title={{"t":"<script>alert(1)</script>"}} />\n', undefined],
-    ['markup in a JSON list', '<Callout items={[{"t":"<b>x</b>"}]} />\n', undefined],
   ])('refuses an attribute that would put its text on the page as markup: %s', async (_name, source, shape) => {
     const compiled = expect(compileMarkdown(source, 1)).rejects
 
-    await (shape ? compiled.toMatchObject(shape) : compiled.toBeInstanceOf(MarkdownError))
+    await compiled.toMatchObject(shape)
   })
 
-  it('keeps a JSON attribute holding no markup', async () => {
+  it('keeps a JSON attribute with a `t` key as plain data', async () => {
     expect((await compileMarkdown('<Callout items={[{"t":1}]} />\n', 1)).segments).toContainEqual({ component: 'Callout', props: { items: [{ t: 1 }] }, children: [], line: 1 })
   })
 
