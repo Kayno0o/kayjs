@@ -7,6 +7,7 @@ import { durationSeconds } from 'kay/library'
 import { banned, TOUCH_EVERY_MS } from './core'
 import { digest, randomToken } from './keys'
 import { notify } from './notify'
+import { plainName } from './text'
 import { reprove } from './twoFactor'
 
 const LABEL_MAX_LENGTH = 64
@@ -94,7 +95,7 @@ async function storeToken(core: Core, userId: string, name: string, options: Tok
 
 // A token for a device or an API client of the signed-in user, minted from a session only, never from another token.
 export async function createToken(state: RequestState, proof: Proof, label: string, options: TokenOptions = {}): Promise<CreateTokenResult> {
-  const name = label.trim()
+  const name = plainName(label)
   const problem = tokenProblem(state.core, name, options)
 
   if (problem)
@@ -118,7 +119,7 @@ export async function createToken(state: RequestState, proof: Proof, label: stri
 
 // A token for `userId` with no proof, for the app to gate; `token` adopts one it handed out before, 32 to 4096 characters without whitespace, as a bearer header carries.
 export async function issueToken(core: Core, userId: string, label: string, options: TokenOptions & { token?: string | undefined } = {}): Promise<IssueTokenResult> {
-  const name = label.trim()
+  const name = plainName(label)
   const problem = tokenProblem(core, name, options)
 
   if (problem)

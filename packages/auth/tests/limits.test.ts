@@ -294,6 +294,7 @@ const rows: Row[] = [
 const elsewhere: Partial<Record<keyof typeof DEFAULT_LIMITS, string>> = {
   export: 'pages.test.ts',
   signInAccountAll: 'signInLockout.test.ts',
+  organization: 'organizations.test.ts',
   invite: 'organizations.test.ts',
   inviteAddress: 'organizations.test.ts',
   oauthRegister: 'oauthHardening.test.ts',

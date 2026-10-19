@@ -8,7 +8,7 @@ import { afterEach, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { t } from 'elysia'
 import { TypeCompiler } from 'elysia/type-system'
 import { readClientSources } from '../src/build/client'
-import { collection, collectionInfo, collections, customField, entries, entryFile, entrySource, removeEntry, saveEntry } from '../src/content'
+import { collection, collectionInfo, collections, customField, entries, entryFile, entrySource, fileField, imageField, removeEntry, saveEntry } from '../src/content'
 import { entryIssues, registerCollections, registerEditSite } from '../src/content/edit'
 import { contentPlace, parseEntry, setContentPlace } from '../src/content/load'
 import { MarkdownError } from '../src/content/markdown'
@@ -212,6 +212,24 @@ describe('the collections a CMS edits', () => {
     expect((await pagesCollection.all()).map(page => page.slug)).toEqual(['home', 'about', 'contact'])
     expect((await collections()).find(each => each.name === 'pages')).toMatchObject({ orderField: 'order' })
     expect((await collections()).find(each => each.name === 'articles')).not.toHaveProperty('orderField')
+  })
+
+  it('image and file fields take a path or an http(s) address and refuse any other scheme', () => {
+    for (const field of [imageField(), fileField()]) {
+      const check = TypeCompiler.Compile(field)
+
+      for (const value of ['', '/files/a.png', 'a/b.png', '//cdn.example.com/a.png', 'https://example.com/a.png', 'http://example.com/a.png', 'HTTPS://example.com/a.png', 'my file.png'])
+        expect(check.Check(value)).toBe(true)
+
+      for (const value of ['javascript:alert(1)', 'data:text/html,x', 'JavaScript:alert(1)', ' javascript:alert(1)', 'java\tscript:alert(1)', 'vbscript:x', 'file:///etc/passwd', 'ftp://example.com/a'])
+        expect(check.Check(value)).toBe(false)
+    }
+
+    const own = TypeCompiler.Compile(imageField({ pattern: '\\.png$' }))
+
+    expect(own.Check('/a.png')).toBe(true)
+    expect(own.Check('/a.jpg')).toBe(false)
+    expect(own.Check('javascript:alert(1).png')).toBe(false)
   })
 
   it('reports a custom field kind in the schema beside the schema it wraps, so saves validate by it alone', () => {

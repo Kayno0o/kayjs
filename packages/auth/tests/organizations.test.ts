@@ -113,6 +113,16 @@ describe('organizations', () => {
     expect(await grace.browser.call('members', org)).toEqual({ ok: false, error: 'not-found' })
   })
 
+  test('creating organizations is rate limited per account', async () => {
+    const { person } = await setup()
+    const grace = await person('grace@example.com')
+
+    for (let made = 0; made < 10; made++)
+      expect(await grace.browser.call('createOrganization', { name: `Org ${made}` })).toMatchObject({ ok: true })
+
+    expect(await grace.browser.call('createOrganization', { name: 'One more' })).toEqual({ ok: false, error: 'limited' })
+  })
+
   test('`create` limits who may create one', async () => {
     const { person } = await setup({ create: 'admin' })
     const grace = await person('grace@example.com')

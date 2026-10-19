@@ -1,7 +1,7 @@
 import type { Finish, Piece, Provider, ProviderMessage } from './types'
 import { AiError } from './errors'
 import { json, postEvents } from './http'
-import { MAX_ARGUMENTS, MAX_STREAMED_CALLS } from './tool-limits'
+import { MAX_ARGUMENTS, MAX_NAME_LENGTH, MAX_STREAMED_CALLS } from './tool-limits'
 
 export interface AnthropicOptions {
   apiKey: string
@@ -118,7 +118,7 @@ export function anthropic({ apiKey, baseUrl = ANTHROPIC_URL, model }: AnthropicO
             const block = event.content_block as { type?: unknown, id?: unknown, name?: unknown } | undefined
 
             if (block?.type === 'tool_use' && typeof event.index === 'number' && calls.size < MAX_STREAMED_CALLS)
-              calls.set(event.index, { id: typeof block.id === 'string' ? block.id : '', name: typeof block.name === 'string' ? block.name : '', arguments: '' })
+              calls.set(event.index, { id: typeof block.id === 'string' ? block.id : '', name: typeof block.name === 'string' ? block.name.slice(0, MAX_NAME_LENGTH + 1) : '', arguments: '' })
 
             break
           }

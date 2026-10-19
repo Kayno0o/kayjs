@@ -6,7 +6,8 @@ import { failure, schemas } from '../forms'
 import Button from '@kaynooo/kayjs-ui/button.kay'
 
 // Visitors reach this page before signing in, so none of the app's guards run here, whatever they check: one asking for a session would keep everyone out.
-export const page = { guards: false }
+// The link's token sits in the address, which no Referer header may carry to another site.
+export const page = { guards: false, security: { headers: { 'referrer-policy': 'no-referrer' } } }
 
 // The link only shows this button, so a mail scanner opening it spends nothing.
 export const spend = action(schemas.token, async ({ token }, ctx) => {

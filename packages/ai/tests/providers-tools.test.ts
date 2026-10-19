@@ -139,6 +139,20 @@ describe('OpenAI tool calls', () => {
     expect(uses.find(use => use.id === 'big')!.arguments.length).toBeGreaterThan(65_536)
   })
 
+  it('stops growing a streamed tool name past its cap', async () => {
+    const piece = 'n'.repeat(200)
+    const server = serve(() => stream(openaiToolEvents(
+      { tool_calls: [{ index: 0, id: 'long', function: { name: piece, arguments: '{}' } }] },
+      { tool_calls: [{ index: 0, function: { name: piece } }] },
+      { tool_calls: [{ index: 0, function: { name: piece } }] },
+      { tool_calls: [{ index: 0, function: { name: piece } }] },
+    )).response)
+    const uses = (await collect(openai({ baseUrl: server.url, model: 'm' }).stream(BASE, new AbortController().signal))).flatMap(piece => 'toolUse' in piece ? [piece.toolUse] : [])
+
+    expect(uses[0]!.name.length).toBeLessThan(800)
+    expect(uses[0]!.name.length).toBeGreaterThan(256)
+  })
+
   it('runs the loop against the server: the call, the action as the visitor, and the result sent back', async () => {
     const server = serve((_request, seen) => {
       const first = (seen.body.messages as { role: string }[]).every(message => message.role !== 'tool')

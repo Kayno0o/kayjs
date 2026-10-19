@@ -40,6 +40,8 @@ export const DEFAULT_LIMITS = {
   // Each invitation mails an inbox someone else owns, with the organization's name in it: neither one manager nor many may flood one.
   invite: { max: 30, window: HOUR },
   inviteAddress: { max: 5, window: DAY },
+  // Each organization is a row and a slug nobody else can take, so one account may not mint them without end.
+  organization: { max: 10, window: DAY },
   // An export walks every table the app's onExport reads, so asking for one again and again is not free.
   export: { max: 6, window: HOUR },
   // Registering a client writes a row for anyone who asks, and reading a client's metadata document makes a request for them.

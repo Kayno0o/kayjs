@@ -125,7 +125,7 @@ A file added while `kay dev` runs is picked up on the next reload. `customField`
 
 ## Files and images
 
-An image or file field (`imageField()`, `fileField()` from `kay/content`) takes a file dropped or picked. It is stored through kay's [file storage](/guides/file-storage), and the field keeps the path that serves it. The path stays behind a collapsed Path control under the preview, for an editor who would rather type one.
+An image or file field (`imageField()`, `fileField()` from `kay/content`) takes a file dropped or picked. It is stored through kay's [file storage](/guides/file-storage), and the field keeps the path that serves it. The path stays behind a collapsed Path control under the preview, for an editor who would rather type one. It takes a path or an `http:` or `https:` address, and refuses any other scheme such as `javascript:` or `data:`.
 
 A list of them, such as `s.Array(imageField())`, has a zone of its own that takes several files at once: each is uploaded in turn and added as a new item, in the order given, and a file the server refuses is reported while the others still land.
 
@@ -209,7 +209,7 @@ kayjs-cms calls them through `saveEntry` and `removeEntry` from `kay/content`, a
 
 ## Where files are saved
 
-A folder entry is a file, and `files` says where it goes. `forgejo()` commits it. `workingTree()` writes it in place, which is the default under `kay dev`.
+A folder entry is a file, and `files` says where it goes. `forgejo()` commits it. `workingTree()` writes it in place, which is the default under `kay dev`. The token travels with every request, so `forgejo()` throws for a plain `http:` address unless it is `localhost`, `127.0.0.1` or `[::1]`.
 
 A production server refuses to boot on the working tree, as the next deploy would drop its saves. Name `workingTree()` yourself where the files outlive a deploy.
 

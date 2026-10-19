@@ -37,6 +37,12 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 - Guests are deleted 30 days after they were made, with no `guests` option, and with `requireVerified` (on by default with `email`) an account registered and never verified is deleted after 30 days too. `onDelete` runs first. Set `guests: { maxAge }` and `email: { unverifiedMaxAge }` for another age, or `unverifiedMaxAge` with `requireVerified: false` to turn it on there. A custom store adds `users.staleUnverified(createdBefore, limit)`, else those accounts are kept.
 - The audit log stores each new entry's address cut to its /24 (IPv4) or /48 (IPv6); `audit: { ip: 'full' }` keeps the whole address. Entries already stored are not changed.
 - Deleting an account now throws when the store cannot strip the audit log, the account still there to delete again when stripping what came before fails (the one entry recording the deletion itself is stripped last, and a failure there throws with the account gone), where it logged and went on. No lint can see any of these, as they are runtime behaviours of options already written.
+### kayjs-cms refuses a plain-http forge and non-web image paths
+
+- `forgejo({ url })` throws for an `http:` address other than `localhost`, `127.x.x.x` or `[::1]`: serve the forge over https. `kay check` cannot recognise the old form, as the address is often a variable.
+- An `imageField()` or `fileField()` value must be a path or an `http(s):` address, so an entry already holding another scheme (`data:`, `javascript:`) fails its schema until edited. A `pattern` of the app's own still applies beside it.
+- kayjs-auth refuses an email holding `,`, `<`, `>` or `"`, and `createOrganization` answers `limited` past 10 a day per account (`limits: { organization }`).
+
 ### Rendered values carry a mark
 
 - A hand-built `{ t: markup }` (an object an app or library returned as markup) no longer renders: the server takes as markup only what `html(markup)` from `kay/html` made, so wrap it, `return html('<b>x</b>')`. No lint can find the old form, as it is a plain object; its type no longer matches `JSX.Element`, so `kay check` reports it. A render copied through JSON or `structuredClone` loses its mark and renders nothing.

@@ -7,8 +7,8 @@ export const USERNAME_MIN_LENGTH = 2
 export const USERNAME_MAX_LENGTH = 32
 const EMAIL_MAX_LENGTH = 254
 
-// Loose on purpose: an address delivers or it does not, and a strict pattern refuses real addresses far more often than it catches a typo.
-const EMAIL = /^[^\s@]+@[^\s@][^\s.@]*\.[^\s@]+$/
+// Loose on purpose, but a comma, an angle bracket or a quote never belongs to an address a mailer is handed: an address delivers or it does not, and a strict pattern refuses real addresses far more often than it catches a typo.
+const EMAIL = /^[^\s@,<>"]+@[^\s@,<>"][^\s.@,<>"]*\.[^\s@,<>"]+$/
 // Letters and digits in any script, with spaces, dots, hyphens and underscores inside only.
 const USERNAME = /^[\p{L}\p{N}](?:[\p{L}\p{N} ._-]*[\p{L}\p{N}])?$/u
 const WHITESPACE = /\s+/g

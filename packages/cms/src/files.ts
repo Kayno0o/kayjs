@@ -135,9 +135,21 @@ function commitOperation(text: string | undefined, sha: string | undefined): 'de
   return sha === undefined ? 'create' : 'update'
 }
 
+const LOOPBACK = /^(?:localhost|127(?:\.\d{1,3}){3}|\[::1\])$/
+
+// The token travels in every request, so a plain http: address is refused unless it is this machine's.
+function requireSecure(url: string): void {
+  const parsed = URL.parse(url)
+
+  if (parsed === null || (parsed.protocol !== 'https:' && !(parsed.protocol === 'http:' && LOOPBACK.test(parsed.hostname))))
+    throw new Error(`kayjs-cms: forgejo url is '${url}', which must be https:, or http: on localhost`)
+}
+
 // Commits each change through Forgejo's contents API, so the site rebuilds from git and every edit has history.
 export function forgejo({ url, repo, branch, token, timeout: wait = 15_000, fetch: request = fetch }: ForgejoOptions): FileSaver {
   const timeout = optionMs(wait, 'forgejo timeout', 'kayjs-cms')
+
+  requireSecure(url)
   const api = `${url.replace(TRAILING_SLASHES, '')}/api/v1/repos/${repo}`
   const headers = { 'authorization': `token ${token}`, 'content-type': 'application/json', 'accept': 'application/json' }
 

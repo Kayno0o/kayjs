@@ -103,7 +103,7 @@ export interface Invitation<Role extends string = string> {
 // `not-found` for an organization the user is no member of, so its existence does not leak; `forbidden` for a member whose roles do not reach.
 export type OrganizationFailure = 'signed-out' | 'not-found' | 'forbidden'
 
-export type CreateOrganizationResult<Role extends string = string> = { ok: true, membership: Membership<Role> } | { ok: false, error: 'signed-out' | 'forbidden' | 'invalid-name' | 'invalid-slug' | 'slug-taken' }
+export type CreateOrganizationResult<Role extends string = string> = { ok: true, membership: Membership<Role> } | { ok: false, error: 'signed-out' | 'forbidden' | 'invalid-name' | 'invalid-slug' | 'slug-taken' | 'limited' }
 
 export type UpdateOrganizationResult = { ok: true, organization: Organization } | { ok: false, error: OrganizationFailure | 'invalid-name' | 'invalid-slug' | 'slug-taken' }
 
@@ -159,6 +159,9 @@ export async function createOrganization(state: RequestState, input: { name: str
 
   if (config.create && !(await config.create(publicUser(record))))
     return { ok: false, error: 'forbidden' }
+
+  if (await spend(state.core.store, `organization:${record.id}`, state.core.limits.organization))
+    return { ok: false, error: 'limited' }
 
   const name = input.name.trim()
   const slug = slugOf(input.slug)

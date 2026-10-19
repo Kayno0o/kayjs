@@ -175,14 +175,24 @@ export function reference(collection: string, options?: StringOptions): ReturnTy
   return t.String({ ...options, 'x-kay': { kind: 'reference', collection } })
 }
 
+// A path or an http(s) address: any other scheme, `javascript:` or `data:` say, would run or load as the field's value, and browsers ignore control characters inside a scheme.
+const WEB_ONLY = String.raw`(?:[\u0000-\u0020]*[Hh][Tt][Tt][Pp][Ss]?:|(?![\u0000-\u0020]*[A-Za-z][\u0000-\u001fA-Za-z0-9+.-]*:))`
+
+// The options with the web-only rule added to any pattern of the app's own.
+function webOnly(options: StringOptions): NonNullable<StringOptions> {
+  const own = options?.pattern
+
+  return { ...options, pattern: own === undefined ? `^${WEB_ONLY}` : `^(?=${WEB_ONLY})(?=[\\s\\S]*?(?:${own}))` }
+}
+
 // A string field holding the path the site serves an image at, an upload's `files.url(key)` say, which a CMS edits by uploading or picking one.
 export function imageField(options?: StringOptions): ReturnType<typeof t.String> {
-  return t.String({ ...options, 'x-kay': { kind: 'image' } })
+  return t.String({ ...webOnly(options), 'x-kay': { kind: 'image' } })
 }
 
 // A string field holding the path the site serves a file at, an upload's `files.url(key)` say, which a CMS edits by uploading or picking one.
 export function fileField(options?: StringOptions): ReturnType<typeof t.String> {
-  return t.String({ ...options, 'x-kay': { kind: 'file' } })
+  return t.String({ ...webOnly(options), 'x-kay': { kind: 'file' } })
 }
 
 // A string field holding Markdown, which a CMS edits as it edits a body.

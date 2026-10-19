@@ -52,6 +52,14 @@ async function passkeySignIn(browser: Browser, device: ReturnType<typeof authent
 }
 
 describe('registering passkeys', () => {
+  test('a name loses its control and direction characters', async () => {
+    const app = await setup()
+    const ada = await registered(app)
+    const { added } = await addPasskey(ada, authenticator(), ' Ph\none\u202E\u0000 ')
+
+    expect(added.passkey.name).toBe('Phone')
+  })
+
   test('a signed-in user adds a passkey kept on the authenticator, named as they choose, and is mailed', async () => {
     const app = await setup()
     const ada = await registered(app)

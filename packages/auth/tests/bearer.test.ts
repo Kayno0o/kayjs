@@ -100,6 +100,11 @@ describe('bearer tokens', () => {
 
     expect(await ada.call('createToken', { password: 'wrong password!' }, 'Laptop')).toEqual({ ok: false, error: 'proof' })
     expect(await ada.call('createToken', { password: PASSWORD }, '  ')).toEqual({ ok: false, error: 'label' })
+    expect(await ada.call('createToken', { password: PASSWORD }, '\n\u202E\u0007')).toEqual({ ok: false, error: 'label' })
+
+    const minted = await ada.callOk('createToken', { password: PASSWORD }, 'Lap\ntop\u202E\u0000')
+
+    expect((await ada.call('tokens') as { id: string, label: string }[]).find(token => token.id === minted.id)?.label).toBe('Laptop')
   })
 
   test('pass a gate, and a websocket handshake can check one', async () => {

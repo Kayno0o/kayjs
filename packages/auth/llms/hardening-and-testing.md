@@ -31,6 +31,7 @@ Attempts are counted in the store, so every process shares them, per client addr
 - `register` 6 per hour.
 - `resend`, `forgot` and `magicLink` 12 per client and 3 per account per hour (`resendAccount`, `forgotAccount` and `magicLinkAccount`, the last two counted per address); `emailChange` 12 and `emailChangeAccount` 5.
 - `invite` 30 per manager per hour, `inviteAddress` 5 per invited address per day.
+- `organization` 10 per account per day, for `createOrganization`.
 - `export` 6 per account per hour, for `exportData()` and `GET <prefix>/export`.
 - `twoFactor` 30 and `twoFactorAccount` 8 per 15 minutes, for signing in and for turning the factor on; the first sign-in guess past `twoFactorAccount` mails the holder the `sign-in-locked` notice, once per lockout; `reprove` 6 per 15 minutes; `link` 40 per hour; `emailCode` 30 per client and `emailCodeAccount` 10 per address per 15 minutes.
 

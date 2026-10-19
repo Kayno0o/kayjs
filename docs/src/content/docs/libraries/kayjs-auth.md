@@ -107,6 +107,8 @@ p Hello {user.email}
 
 With no prebuilt pages, `requireUser({ redirect: '/login' })` names your sign-in page. A bearer token limited to scopes is refused with a 403 unless `requireUser({ scope })` names one it holds.
 
+The prebuilt pages that open from a mailed link, to reset a password, verify an address, sign in by link or confirm a new address, send `Referrer-Policy: no-referrer`. The token in the address never reaches another site through a link or an image on the page. An address with a comma, an angle bracket or a double quote in it is refused as an email.
+
 For a link of your own, `signInUrl()` is the sign-in page leading back to the current page, and `signInUrl('/pricing')` to another path of the site. A path that is not of the site leads home.
 
 A sign-out button is a form posting to `/auth/sign-out`, with no action of yours. Its `redirect` field says where to go next, a path of the site, `/` by default. A link signs no one out, and a post from another site is refused.
@@ -253,6 +255,8 @@ if (result.ok)
 ```
 
 `scopes` limits what the token reaches, from the `scopes` you declare in `createAuth`. A token without `scopes` reaches everything, so give a script or a device the scopes it needs. `expiresIn` is seconds or a string such as `'30d'`; a token expires after 90 days without it, and `expiresIn: null` makes one that never does. Tokens start with `kat_`, so a secret scanner can spot one that leaks. A token never makes another token.
+
+Control characters are removed from a token's label and from a passkey's name.
 
 `tokens()` lists the user's tokens and `revokeToken(id)` revokes one. A password change, a reset and `signOutEverywhere` end them all. Both need a browser session: a token cannot list or revoke tokens, nor turn on two-factor. Anything that asks for your password or a code first, such as changing two-factor, passkeys, the password or deleting the account, needs a browser session as well.
 
@@ -538,7 +542,7 @@ The new tables are created by `db.sync()` if you use Postgres or SQLite.
 
 ## Limits
 
-Attempts are counted in the store, so every process shares them. They are counted per client address and per account.
+Attempts are counted in the store, so every process shares them. They are counted per client address and per account. Creating organizations is limited too, to 10 a day for each account: past that, `createOrganization` answers `limited`.
 
 `limits` overrides any of `DEFAULT_LIMITS`, each `{ max, window }` with `window` seconds or a string such as `'1h'`.
 

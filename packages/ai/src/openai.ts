@@ -2,7 +2,7 @@ import type { ServerEvent } from './http'
 import type { Finish, Piece, Provider, ProviderMessage, ProviderRequest } from './types'
 import { AiError } from './errors'
 import { json, postEvents } from './http'
-import { MAX_ARGUMENTS, MAX_STREAMED_CALLS } from './tool-limits'
+import { MAX_ARGUMENTS, MAX_NAME_LENGTH, MAX_STREAMED_CALLS } from './tool-limits'
 
 export interface OpenAiOptions {
   // The server's API root, `https://api.openai.com/v1` by default; Ollama is `http://localhost:11434/v1`.
@@ -189,7 +189,7 @@ export function openai({ baseUrl = OPENAI_URL, apiKey, model }: OpenAiOptions = 
             if (typeof piece.id === 'string' && piece.id !== '')
               call.id = piece.id
 
-            if (typeof piece.function?.name === 'string')
+            if (typeof piece.function?.name === 'string' && call.name.length <= MAX_NAME_LENGTH)
               call.name += piece.function.name
 
             // Past the cap the arguments stop growing, and the loop answers them as too long.

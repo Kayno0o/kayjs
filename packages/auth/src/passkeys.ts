@@ -11,6 +11,7 @@ import { report } from './events'
 import { spend } from './limits'
 import { notify } from './notify'
 import { endOtherSessions } from './sessions'
+import { plainName } from './text'
 import { reprove, secondFactorLimited } from './twoFactor'
 import { hasWayIn, putBack } from './wayIn'
 import { generateAuthenticationOptions, generateRegistrationOptions, verifyAuthenticationResponse, verifyRegistrationResponse } from './webauthn'
@@ -364,7 +365,7 @@ async function check(core: Core, passkey: PasskeyRecord, response: Authenticatio
 }
 
 function cleanName(name: string | undefined): string | undefined {
-  const cleaned = name?.trim().slice(0, NAME_MAX_LENGTH)
+  const cleaned = typeof name === 'string' ? plainName(name).slice(0, NAME_MAX_LENGTH) : undefined
 
   return cleaned === undefined || cleaned === '' ? undefined : cleaned
 }

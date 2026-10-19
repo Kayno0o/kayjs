@@ -16,6 +16,10 @@ describe('rules', () => {
     expect(emailProblem('ada@localhost')).toBe('invalid')
     expect(emailProblem('ада@example.com')).toBeUndefined()
     expect(emailProblem('аlice@example.com')).toBe('invalid')
+    expect(emailProblem('ada@example.com,eve@example.com')).toBe('invalid')
+    expect(emailProblem('Ada <ada@example.com>')).toBe('invalid')
+    expect(emailProblem('"ada"@example.com')).toBe('invalid')
+    expect(emailProblem('ada@exa>mple.com')).toBe('invalid')
   })
 
   test('passwords are 10 to 128 characters', () => {

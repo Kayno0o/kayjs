@@ -122,6 +122,18 @@ describe('forgejo', () => {
     expect(() => forgejo({ url: 'u', repo: 'r', token: 't', timeout: 'soon' as never })).toThrow('kayjs-cms: forgejo timeout is \'soon\'')
   })
 
+  test('refuses a plain http address outside localhost, since the token travels in every request', () => {
+    const make = (url: string) => () => forgejo({ url, repo: 'me/site', token: 't0k' })
+
+    expect(make('http://git.example.com')).toThrow('kayjs-cms: forgejo url is \'http://git.example.com\'')
+    expect(make('git.example.com')).toThrow('kayjs-cms: forgejo url')
+    expect(make('ftp://git.example.com')).toThrow('kayjs-cms: forgejo url')
+    expect(make('http://localhost:3000')).not.toThrow()
+    expect(make('http://127.0.0.1:3000')).not.toThrow()
+    expect(make('http://[::1]:3000')).not.toThrow()
+    expect(make('https://git.example.com')).not.toThrow()
+  })
+
   test('throws a proxy\'s plain-text refusal as it came, cut to its first 200 characters', async () => {
     const { saver } = forge({}, new Response('Bad gateway', { status: 502 }))
 
