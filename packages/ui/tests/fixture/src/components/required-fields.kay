@@ -1,0 +1,14 @@
+---
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+---
+FormField(label="Title" required)
+  input#title(name="title")
+FormField(label="Subtitle")
+  input#subtitle(name="subtitle")
+FormField(label="Slug" required)
+  input#slug(name="slug" aria-required="false")
+FormField(label="Access" group required)
+  input#read(name="access" type="checkbox")
+  input#write(name="access" type="checkbox")
+  FormField(label="Code")
+    input#code(name="code")

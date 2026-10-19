@@ -23,7 +23,7 @@ const { label, name, issue, hint, required = false, group = false, compact = fal
 const refused = formIssues.use()
 const reports = () => !compact || name !== undefined || issue !== undefined
 const messages = () => [name === undefined ? undefined : refused?.()[name], issue].filter(message => message !== undefined)
-const links = fieldLinks(group, hint !== undefined && hint !== '', messages)
+const links = fieldLinks(group, hint !== undefined && hint !== '', messages, required)
 ---
 // The control, as children, takes the `kui-field-input` look with no class of its own.
 // The hint and the messages sit outside the label, so the control is named by its label alone; the action too, since a button inside a label would take the label from the control.

@@ -51,3 +51,22 @@ test('a group\'s message leaves the field of a FormField nested in it alone', as
 
   expect(marks('code')).toEqual([null, null])
 })
+
+test('a required field\'s control is announced as required, the star beside its label being hidden from a screen reader', async () => {
+  mounted = await mountComponent('src/components/required-fields.kay', {})
+  await settle()
+
+  const required = (id: string) => mounted!.root.querySelector(`#${id}`)!.getAttribute('aria-required')
+
+  expect([required('title'), required('subtitle'), required('slug')]).toEqual(['true', null, 'false'])
+  expect(mounted.root.querySelector('.kui-form-field-required')?.getAttribute('aria-hidden')).toBe('true')
+})
+
+test('each field of a required group is announced as required, a FormField nested in it left alone', async () => {
+  mounted = await mountComponent('src/components/required-fields.kay', {})
+  await settle()
+
+  const required = (id: string) => mounted!.root.querySelector(`#${id}`)!.getAttribute('aria-required')
+
+  expect([required('read'), required('write'), required('code')]).toEqual(['true', 'true', null])
+})

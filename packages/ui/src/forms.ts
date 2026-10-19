@@ -21,9 +21,10 @@ export interface FieldLinks {
 }
 
 // A FormField's ids, and the link from its control to its hint and messages: kept in the control's `aria-describedby` beside the page's own ids, and `aria-invalid` while a message shows.
+// A required field's control, each field of a group, takes `aria-required` unless the page set one, since the star beside the label is hidden from a screen reader.
 // A group has no control of its own: while a message shows, each field in it is marked invalid and described by the message, so `focusInvalid` reaches the group's first field.
 // The control is the page's own markup: the server hands it the ids as it renders, and inside an island the browser keeps the link as the messages change; drawn here rather than in the component, which stays static on a page of its own.
-export function fieldLinks(group: boolean, hint: boolean, messages: () => readonly unknown[]): FieldLinks {
+export function fieldLinks(group: boolean, hint: boolean, messages: () => readonly unknown[], required = false): FieldLinks {
   const links: FieldLinks = { frame: uid(), hint: uid(), issues: uid(), described: () => [hint ? links.hint : undefined, messages().length > 0 ? links.issues : undefined].filter(id => id !== undefined) }
 
   // A static page renders the field outside any island, where nothing drops the effect as an island's server render does.
@@ -36,7 +37,7 @@ export function fieldLinks(group: boolean, hint: boolean, messages: () => readon
   if (group) {
     const marked = new Set<HTMLElement>()
 
-    effect(() => markGroup(links, messages().length > 0, marked))
+    effect(() => markGroup(links, messages().length > 0, marked, required))
 
     return links
   }
@@ -57,15 +58,33 @@ export function fieldLinks(group: boolean, hint: boolean, messages: () => readon
     else
       control.removeAttribute('aria-describedby')
 
+    if (required)
+      requireField(control)
+
     markInvalid(control, links, invalid)
   })
 
   return links
 }
 
+// The fields of the group itself, those of a FormField nested in it left to that one.
+function fieldsOf(links: FieldLinks): HTMLElement[] {
+  return [...document.querySelectorAll<HTMLElement>(`[data-kui-field="${links.frame}"] :is(${FIELDS})`)].filter(field => field.closest('[data-kui-field]')?.getAttribute('data-kui-field') === links.frame)
+}
+
+function requireField(field: HTMLElement): void {
+  if (!field.hasAttribute('aria-required'))
+    field.setAttribute('aria-required', 'true')
+}
+
 // The fields the group marked, which it clears once its message does; `markInvalid` leaves one the page or a refused post still marks.
-function markGroup(links: FieldLinks, shown: boolean, marked: Set<HTMLElement>): void {
-  const fields = shown ? [...document.querySelectorAll<HTMLElement>(`[data-kui-field="${links.frame}"] :is(${FIELDS})`)].filter(field => field.closest('[data-kui-field]')?.getAttribute('data-kui-field') === links.frame) : [...marked]
+function markGroup(links: FieldLinks, shown: boolean, marked: Set<HTMLElement>, required: boolean): void {
+  if (required) {
+    for (const field of fieldsOf(links))
+      requireField(field)
+  }
+
+  const fields = shown ? fieldsOf(links) : [...marked]
 
   for (const field of fields) {
     const own = (field.getAttribute('aria-describedby') ?? '').split(SPACES).filter(id => id !== '' && id !== links.issues)
