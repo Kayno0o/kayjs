@@ -36,8 +36,8 @@ export interface JobStore {
   complete: (id: string) => Maybe<void>
   // Runs it again at `runAt`.
   retry: (id: string, runAt: number, error: string) => Maybe<void>
-  // Gives a claimed job back untouched, its attempt not counted, for the next process to take at once: a run stopped by a shutdown. A store without it has the job retried after its backoff as any failed run.
-  release?: ((id: string) => Maybe<void>) | undefined
+  // Gives a job back untouched, its attempt not counted, for the next process to take: a run stopped by a shutdown. Only while the hold `until` it was claimed with is still the job's, so a late release never clears another process's claim. A store without it has the job retried after its backoff as any failed run.
+  release?: ((id: string, until: number) => Maybe<void>) | undefined
   // Keeps it as failed, out of the queue.
   fail: (id: string, error: string) => Maybe<void>
   // Removes the failed jobs of the queue whose time came before `before`, and resolves with how many went; a store without it has them listed with `failed` and removed one by one.
@@ -149,8 +149,8 @@ export function sqliteJobs(path: string): JobStore {
     retry(id, runAt, error) {
       open(true)!.retry.run(runAt, error, id)
     },
-    release(id) {
-      open(true)!.release.run(id)
+    release(id, until) {
+      open(true)!.release.run(id, until)
     },
     fail(id, error) {
       open(true)!.fail.run(error, id)
@@ -194,7 +194,7 @@ function prepareJobs(db: Database) {
   const claim = db.query<JobRow, [number, string, number, number]>('UPDATE kay_jobs SET held_until = ?, attempts = attempts + 1 WHERE id = (SELECT id FROM kay_jobs WHERE queue = ? AND failed = 0 AND run_at <= ? AND (held_until IS NULL OR held_until <= ?) ORDER BY run_at LIMIT 1) RETURNING id, queue, payload, attempts, run_at, error')
   const remove = db.query('DELETE FROM kay_jobs WHERE id = ?')
   const retry = db.query('UPDATE kay_jobs SET run_at = ?, held_until = NULL, error = ? WHERE id = ?')
-  const release = db.query('UPDATE kay_jobs SET held_until = NULL, attempts = attempts - 1 WHERE id = ?')
+  const release = db.query('UPDATE kay_jobs SET held_until = NULL, attempts = attempts - 1 WHERE id = ? AND held_until = ?')
   const fail = db.query('UPDATE kay_jobs SET failed = 1, held_until = NULL, error = ? WHERE id = ?')
   const purge = db.query('DELETE FROM kay_jobs WHERE queue = ? AND failed = 1 AND run_at < ?')
   const failed = db.query<JobRow, [string]>('SELECT id, queue, payload, attempts, run_at, error FROM kay_jobs WHERE queue = ? AND failed = 1 ORDER BY run_at')
@@ -234,10 +234,10 @@ export function memoryJobs(): JobStore {
     retry(id, runAt, error) {
       Object.assign(jobs.get(id) ?? {}, { runAt, error, heldUntil: undefined })
     },
-    release(id) {
+    release(id, until) {
       const job = jobs.get(id)
 
-      if (job) {
+      if (job?.heldUntil === until) {
         delete job.heldUntil
         job.attempts--
       }
@@ -396,7 +396,7 @@ export function queue<Payload>(name: string, handler: (payload: Payload, signal:
     // A stop that came while the claim was pending never fires the listener: the job goes back untouched.
     if (stopping?.aborted && store().release) {
       stopping.removeEventListener('abort', stop)
-      await store().release!(job.id)
+      await store().release!(job.id, held)
 
       return true
     }
@@ -408,7 +408,7 @@ export function queue<Payload>(name: string, handler: (payload: Payload, signal:
     catch (error) {
       // A server stopping aborts the run: a job that gave up for it is handed back, not counted as a failed attempt.
       if (ended.signal.reason === STOPPED && store().release) {
-        await store().release!(job.id)
+        await store().release!(job.id, held)
 
         return true
       }

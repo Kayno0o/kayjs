@@ -5,6 +5,7 @@ import process from 'node:process'
 import { Elysia } from 'elysia'
 import { KayError } from '../compiler/errors'
 import { DURATION_TEXT, durationSeconds } from '../runtime/duration'
+import { kayLog } from '../runtime/log'
 import { MAX_TIMER_MS } from './config-limits'
 import { defaultJobStore } from './queue'
 import { reportBackgroundError } from './report'
@@ -37,6 +38,7 @@ const SLOT_MS = 60_000
 const DEFAULT_TIMEOUT = 600
 // How long a stop waits for a run that ignores its signal before leaving it.
 const STOP_GRACE_MS = 5000
+let warnedAutoLock = false
 // Why a run's signal aborted when the server stopped, as against its timeout running out.
 const STOPPED = new Error('the server is stopping')
 // The lock names the schedules of this process hold, so two schedules alike in every way still take a lock each.
@@ -188,6 +190,24 @@ async function after(previous: Promise<void> | undefined, run: () => Promise<voi
 // One run of a schedule, taken by one process when it locks: `slotMs` is how far apart its runs fall due.
 // A boot run locks under a name of its own, so its slot, rounded to the nearest, never takes the one of the run due next.
 // A run still going after `timeout` is reported as failed and left, its signal aborted, so one that never settles blocks the next run no longer; `abort()` aborts the runs in progress as a stop does, which then waits for them a few seconds at most.
+// Takes the lock of a run. A lock the app did not name that its store cannot give, a `data/` not writable say, is warned about once and the run goes on unlocked, as it did before schedules locked themselves; an app's own lock skips the run.
+async function taken(lock: string, boot: boolean, slotMs: number, options: ScheduleOptions, implicit: boolean): Promise<boolean> {
+  try {
+    return await (options.store ?? defaultJobStore()).lock(boot ? `${lock}:boot` : lock, Math.round(Date.now() / slotMs))
+  }
+  catch (error) {
+    if (!implicit)
+      throw error
+
+    if (!warnedAutoLock) {
+      warnedAutoLock = true
+      kayLog('warn', 'a schedule could not take its default lock, so it runs in every process; make the job store writable, or name `lock` or pass `lock: false` to the schedule', error)
+    }
+
+    return true
+  }
+}
+
 function scheduledRun(label: string, slotMs: number, job: Job, options: ScheduleOptions, auto: AutoLock | undefined) {
   const timeout = options.timeout === false ? undefined : durationSeconds(options.timeout ?? DEFAULT_TIMEOUT, `the timeout of the schedule ${label}`) * 1000
   const active = new Set<AbortController>()
@@ -202,7 +222,7 @@ function scheduledRun(label: string, slotMs: number, job: Job, options: Schedule
     try {
       const lock = options.lock === false ? undefined : options.lock ?? auto?.name()
 
-      if (lock !== undefined && !await (options.store ?? defaultJobStore()).lock(boot ? `${lock}:boot` : lock, Math.round(Date.now() / slotMs)))
+      if (lock !== undefined && !await taken(lock, boot, slotMs, options, options.lock === undefined))
         return
 
       const limit = new Promise<never>((_, reject) => {

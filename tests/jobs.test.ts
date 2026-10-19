@@ -449,6 +449,41 @@ describe('schedule', () => {
       }
     })
 
+    it('warns once and runs unlocked when the default lock cannot be taken, where a lock the app named skips the run', async () => {
+      const cron = fakeCron()
+      const warned = spyOn(console, 'warn').mockImplementation(() => undefined)
+      const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+      const before = process.env.NODE_ENV ?? 'test'
+      const store = memoryJobs()
+      const runs: string[] = []
+
+      store.lock = async () => {
+        throw new Error('unable to open database file')
+      }
+
+      process.env.NODE_ENV = 'production'
+      // A copy of the module, so the once-per-process warning is not spent by another test.
+      const { schedule: fresh } = await import(`../src/server/jobs.ts?process=warn-${++copies}`) as { schedule: typeof scheduleOf }
+      const app = new Elysia().use(fresh('@hourly', () => runs.push('default'), { store })).use(fresh('@daily', () => runs.push('named'), { store, lock: 'report' })).listen(0)
+
+      try {
+        await cron.fired[0]!.handler()
+        await cron.fired[0]!.handler()
+        await cron.fired[1]!.handler()
+        expect(runs).toEqual(['default', 'default'])
+        expect(warned.mock.calls.flat().join(' ')).toContain('`lock`')
+        expect(warned).toHaveBeenCalledTimes(1)
+        expect(logged).toHaveBeenCalledTimes(1)
+      }
+      finally {
+        process.env.NODE_ENV = before
+        await shutdown(app)
+        warned.mockRestore()
+        logged.mockRestore()
+        cron.restore()
+      }
+    })
+
     it('frees the lock name when the server stops, so a restart takes it again', async () => {
       const cron = fakeCron()
       const before = process.env.NODE_ENV ?? 'test'
@@ -1172,6 +1207,22 @@ describe('queue', () => {
       expect(runs).toEqual([])
       expect(await claim('mails', Date.now(), Date.now() + 60_000)).toMatchObject({ attempts: 1 })
       await mails.remove(() => true)
+    })
+
+    it.each([
+      ['memory', async () => memoryJobs()],
+      ['sqlite', async () => sqliteJobs(await jobsPath())],
+    ])('lets a late release clear nothing of another process\'s claim: %s', async (_name, open) => {
+      const store = await open()
+
+      await store.add({ id: 'one', queue: 'mails', payload: '"x"', attempts: 0, runAt: 0 })
+      expect(await store.claim('mails', 1000, 2000)).toMatchObject({ id: 'one', attempts: 1 })
+      // Its hold ran out and another process took the job.
+      expect(await store.claim('mails', 2000, 3000)).toMatchObject({ id: 'one', attempts: 2 })
+      await store.release!('one', 2000)
+      expect(await store.claim('mails', 2500, 3500)).toBeUndefined()
+      await store.release!('one', 3000)
+      expect(await store.claim('mails', 2500, 3500)).toMatchObject({ id: 'one', attempts: 2 })
     })
 
     it('completes a job whose handler finishes despite the stop', async () => {

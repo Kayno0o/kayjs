@@ -43,7 +43,7 @@ A cron has five fields or a nickname such as `@daily`. A cron that can never run
 
 Runs never overlap. A run that throws is logged without stopping the next.
 
-A production server (`NODE_ENV=production`) runs each schedule once across all its processes sharing the job store, with no setup: the lock is named after the schedule and the job's source, so the job store must be writable.
+A production server (`NODE_ENV=production`) runs each schedule once across all its processes sharing the job store, with no setup: the lock is named after the schedule and the job's source, so the job store should be writable. If it cannot give that lock, kay logs one warning and runs the job in every process, where a `lock` you named skips the run.
 
 In a rolling deploy, old and new builds with a changed job both run, as their locks differ. `{ lock: 'weekly-report' }` names it yourself, and `{ lock: false }` runs the job in every process. With `lock` and several jobs, each job locks as `<lock>:<its schedule>:<its place in that schedule's list>`.
 
@@ -118,7 +118,7 @@ To put the jobs, the schedule locks and the rate limit counts of the whole app i
 | `nextRunAt(queue)` | When the next job may run, so a worker sleeps until then |
 | `lock(name, slot)` | True for the first caller of that name and slot, in any process, so a schedule runs once |
 
-`purge(queue, before)`, `jobs(queue)` and `release(id)` are optional. `release` gives a claimed job back with its attempt not counted, which a shutdown does; without it, a job stopped by a shutdown is retried after its backoff. Without `purge`, old failed jobs are listed and removed one by one. Without `jobs`, `remove` works by id only.
+`purge(queue, before)`, `jobs(queue)` and `release(id, until)` are optional. `release` gives a claimed job back with its attempt not counted, which a shutdown does, only while `until`, the hold it was claimed with, is still the job's; without it, a job stopped by a shutdown is retried after its backoff. Without `purge`, old failed jobs are listed and removed one by one. Without `jobs`, `remove` works by id only.
 
 ```ts
 export const welcomeMails = queue('welcome-mails', sendWelcome, { store: myStore })
