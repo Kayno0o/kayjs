@@ -12,7 +12,7 @@
 - In an organization, `organizationId`: `organization-created` and `organization-deleted`; `member-joined` and `member-roles-changed`, with the `roles` given; `member-left`; `member-removed`. A manager's doing names them as `actor`.
 - `oauth-client-approved` (first approval of an app, or more scopes) and `oauth-client-revoked`, `client` the app's name.
 
-`onEvent(event, user, detail, context)` is the form before 1.52, with the parts of the fields packed in a string (`oauth:<provider>`, `<orgId> <role> <role>`): it still works for now, logs a warning, and `kay check` reports it as `deprecated-auth-event`. The audit log keeps the same string as an entry's `detail`.
+The audit log keeps the fields packed in a string as an entry's `detail` (`oauth:<provider>`, `<orgId> <role> <role>`).
 
 `context` is `{ ip, userAgent, actor }`, `actor` the user who acted when it was not the one it happened to, such as an admin. While an admin acts as a user, every event names the admin as `actor`, in the audit log too: an organization created or a member removed, a sign-out everywhere.
 

@@ -369,8 +369,6 @@ createAuth({
 
 It gets one object: `event`, `user`, `context` and the fields of that event, such as the `method` of a sign-in, the `role` of a role granted or the `organizationId` of an organization's. `context` is `{ ip, userAgent, actor }`. `actor` is the admin when an admin did it.
 
-Before 1.52 this was `onEvent(event, user, detail, context)`, with the fields packed in the `detail` string. It still works for now and `kay check` reports it.
-
 A failed sign-in is reported after the response is sent. Your `onAuthEvent` and the audit log can be slow without telling anyone which addresses have an account.
 
 With `audit: true`, the same events are kept in the store for a year. Pass `audit: { maxAge: '90d' }`, seconds or a string, to change it.

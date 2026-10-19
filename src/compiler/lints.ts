@@ -344,14 +344,6 @@ export const LINTS = {
     wrong: 'analytics({ provider: \'fathom\', siteId: \'ABCDEFGH\', info: { text: \'Counting\' } })',
     right: 'analytics({ provider: \'fathom\', siteId: \'ABCDEFGH\', consent: false, info: { text: \'Counting\' } })',
   },
-  'deprecated-auth-event': {
-    level: 'warn',
-    group: 'deprecated',
-    since: '1.52',
-    summary: '`createAuth({ onEvent })` of kayjs-auth, which is `onAuthEvent` since 1.52: it gets one object, `{ event, user, context, ...fields }`, with the parts of the old `detail` string as fields (`role`, `method`, `provider`, `organizationId`, `roles`), where `onEvent` got four arguments. `onEvent` still works for now and logs a warning. No fix is offered, as the handler\'s parameters change with the name. Found in `.kay` fences and `.ts` modules.',
-    wrong: '--- server\nimport { createAuth } from \'@kaynooo/kayjs-auth\'\n\nexport const auth = createAuth({ onEvent: (event, user, detail) => log(event, user.id, detail) })\n---\np x',
-    right: '--- server\nimport { createAuth } from \'@kaynooo/kayjs-auth\'\n\nexport const auth = createAuth({ onAuthEvent: ({ event, user, ...fields }) => log(event, user.id, fields) })\n---\np x',
-  },
   'deprecated-time-ms': {
     level: 'warn',
     group: 'deprecated',

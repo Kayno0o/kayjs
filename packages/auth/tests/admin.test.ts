@@ -1,5 +1,5 @@
 import type { User } from '../src/auth'
-import type { AuthEvent, AuthEventInfo, EventContext } from '../src/events'
+import type { AuthEvent, AuthEventInfo } from '../src/events'
 import type { Mail } from '../src/mail'
 import type { AuthStore } from '../src/store'
 import { afterEach, describe, expect, setSystemTime, test } from 'bun:test'
@@ -14,13 +14,9 @@ afterEach(() => {
 })
 
 async function setup(options: Parameters<typeof testApp>[0] = {}) {
-  const events: { event: AuthEvent, user: User, detail: string | undefined, context: EventContext }[] = []
   const heard: AuthEventInfo[] = []
   const app = testApp({
     admin: 'admin',
-    onEvent: (event, user, detail, context) => {
-      events.push({ event, user, detail, context })
-    },
     onAuthEvent: (info) => {
       heard.push(info)
     },
@@ -43,17 +39,14 @@ async function setup(options: Parameters<typeof testApp>[0] = {}) {
   }
   const admin = await member('root@example.com', ['admin'])
   const ada = await member('ada@example.com')
-  // Who did what to whom, among the admin's events.
-  const said = () => events.filter(entry => ADMIN_EVENTS.has(entry.event)).map(entry => [entry.event, entry.user.email, entry.detail, entry.context.actor?.email])
-
-  // The same events as `onAuthEvent` hears them: the event, its fields and who acted.
+  // Who did what to whom among the admin's events: the event, its fields and who acted.
   const told = () => heard.filter(info => ADMIN_EVENTS.has(info.event)).map((info) => {
     const { event, user, context, ...fields } = info
 
     return [event, user.email, fields, context.actor?.email]
   })
 
-  return { ...app, events, heard, said, told, member, admin, ada }
+  return { ...app, heard, told, member, admin, ada }
 }
 
 describe('admin', () => {
@@ -124,7 +117,7 @@ describe('admin', () => {
   })
 
   test('a role granted or revoked counts on the user\'s next request; only declared roles are given', async () => {
-    const { admin, ada, said, told } = await setup()
+    const { admin, ada, told } = await setup()
 
     expect(await admin.browser.post('/call/grantRole', [ada.id, 'owner'])).toEqual({ ok: false, error: 'unknown-role' })
     expect(await admin.browser.call('grantRole', 'missing', 'editor')).toEqual({ ok: false, error: 'not-found' })
@@ -136,12 +129,11 @@ describe('admin', () => {
     await admin.browser.call('revokeRole', ada.id, 'editor')
 
     expect(await ada.browser.json('/me')).toMatchObject({ roles: [] })
-    expect(said()).toEqual([['role-granted', 'ada@example.com', 'editor', 'root@example.com'], ['role-revoked', 'ada@example.com', 'editor', 'root@example.com']])
     expect(told()).toEqual([['role-granted', 'ada@example.com', { role: 'editor' }, 'root@example.com'], ['role-revoked', 'ada@example.com', { role: 'editor' }, 'root@example.com']])
   })
 
   test('a ban signs the user out everywhere, devices included, and refuses their sign-ins until lifted', async () => {
-    const { admin, ada, browser, said, told, store } = await setup()
+    const { admin, ada, browser, told, store } = await setup()
     const { token } = await ada.browser.callOk('createToken', { password: PASSWORD }, 'Phone')
 
     expect(await admin.browser.post('/ban', { id: ada.id, reason: ' spam ' })).toMatchObject({ ok: true, user: { ban: { reason: 'spam', until: null } } })
@@ -153,7 +145,6 @@ describe('admin', () => {
 
     expect(await admin.browser.call('unbanUser', ada.id)).toMatchObject({ ok: true, user: { ban: null } })
     expect(await browser().post('/password', { identifier: 'ada@example.com', password: PASSWORD })).toMatchObject({ ok: true })
-    expect(said()).toEqual([['banned', 'ada@example.com', 'spam', 'root@example.com'], ['unbanned', 'ada@example.com', undefined, 'root@example.com']])
     expect(told()).toEqual([['banned', 'ada@example.com', { reason: 'spam' }, 'root@example.com'], ['unbanned', 'ada@example.com', {}, 'root@example.com']])
   })
 
@@ -212,7 +203,7 @@ describe('admin', () => {
 
   test('an admin deletes a sole owner whose organization has members, handing it to its longest-standing member who is told', async () => {
     const mails: Mail[] = []
-    const { admin, ada, member, store, events, heard } = await setup({
+    const { admin, ada, member, store, heard } = await setup({
       audit: true,
       url: 'https://site.test',
       site: 'Site',
@@ -229,13 +220,12 @@ describe('admin', () => {
 
     await store.members!.add({ organizationId: org, userId: grace.id, roles: ['member'], createdAt: new Date() })
     mails.length = 0
-    events.length = 0
+    heard.length = 0
 
     expect(await admin.browser.call('deleteUser', ada.id)).toEqual({ ok: true })
     expect(await store.users.get(ada.id)).toBeUndefined()
     expect((await store.members!.listByOrganization(org)).map(found => [found.userId, found.roles])).toEqual([[grace.id, ['member', 'owner']]])
-    expect(events.filter(entry => entry.event === 'organization-handed-over').map(entry => [entry.user.email, entry.detail, entry.context.actor])).toEqual([['grace@example.com', org, null]])
-    expect(heard.filter(info => info.event === 'organization-handed-over').map(info => 'organizationId' in info && info.organizationId)).toEqual([org])
+    expect(heard.filter(info => info.event === 'organization-handed-over').map(info => [info.user.email, 'organizationId' in info && info.organizationId, info.context.actor])).toEqual([['grace@example.com', org, null]])
     expect(mails.map(mail => [mail.kind, mail.to, mail.detail])).toEqual([['account-deleted', 'ada@example.com', undefined], ['organization-handed-over', 'grace@example.com', 'Acme']])
     expect(mails[1]!.text).toContain('Acme')
     expect((await store.audit!.list({ userId: grace.id, limit: 20 })).map(entry => [entry.event, entry.detail, entry.ip])).toContainEqual(['organization-handed-over', org, ''])
@@ -251,7 +241,7 @@ describe('admin', () => {
     } }, invitations: { ...base.invitations!, listByEmail: async () => {
       throw new Error('invitation store down')
     } } }
-    const { admin, ada, member, events } = await setup({
+    const { admin, ada, member, heard } = await setup({
       store,
       audit: true,
       organizations: { roles: { owner: ['member'], member: [] }, owner: 'owner', defaultRoles: ['member'], invitationPage: '/invitation' },
@@ -261,7 +251,7 @@ describe('admin', () => {
     const org = membership.organization.id
 
     await store.members!.add({ organizationId: org, userId: grace.id, roles: ['member'], createdAt: new Date() })
-    events.length = 0
+    heard.length = 0
 
     const answer = await admin.browser.call('deleteUser', ada.id)
 
@@ -269,7 +259,7 @@ describe('admin', () => {
     expect(strips).toBe(2)
     expect(await store.users.get(ada.id)).toBeUndefined()
     expect((await store.members!.listByOrganization(org)).map(found => [found.userId, found.roles])).toEqual([[grace.id, ['member', 'owner']]])
-    expect(events.map(entry => entry.event)).toContain('organization-handed-over')
+    expect(heard.map(info => info.event)).toContain('organization-handed-over')
     expect(await store.audit!.list({ userId: ada.id, limit: 20 })).toEqual([])
   })
 
@@ -286,7 +276,7 @@ describe('admin', () => {
   test('deleting a user removes them, tells the app, mails them and logs the admin as the actor', async () => {
     const deleted: User[] = []
     const mails: Mail[] = []
-    const { admin, ada, store, said, browser } = await setup({
+    const { admin, ada, store, told, browser } = await setup({
       audit: true,
       url: 'https://site.test',
       email: { mailer: { send: (mail: Mail) => void mails.push(mail) }, links: { 'verify-email': '/v', 'reset-password': '/r', 'magic-link': '/m', 'change-email': '/c' }, requireVerified: false },
@@ -302,7 +292,7 @@ describe('admin', () => {
     expect(await store.users.get(ada.id)).toBeUndefined()
     expect(deleted.map(user => user.email)).toEqual(['ada@example.com'])
     expect(mails.map(mail => [mail.kind, mail.to])).toEqual([['account-deleted', 'ada@example.com']])
-    expect(said()).toEqual([['account-deleted', 'ada@example.com', undefined, 'root@example.com']])
+    expect(told()).toEqual([['account-deleted', 'ada@example.com', {}, 'root@example.com']])
     expect(await ada.browser.json('/me')).toBe('anonymous')
     expect(await browser().post('/password', { identifier: 'ada@example.com', password: PASSWORD })).toEqual({ ok: false, error: 'invalid' })
 
@@ -333,7 +323,7 @@ describe('admin', () => {
   })
 
   test('impersonating signs the admin in as the user with no proof to give, and stopping signs them back in as themselves', async () => {
-    const { admin, ada, said, told, store } = await setup()
+    const { admin, ada, told, store } = await setup()
 
     expect(await admin.browser.call('impersonate', ada.id)).toEqual({ ok: true })
     expect(await admin.browser.json('/me')).toMatchObject({ email: 'ada@example.com' })
@@ -348,7 +338,6 @@ describe('admin', () => {
     expect(await admin.browser.call('impersonator')).toBeFalsy()
     expect(await admin.browser.call('stopImpersonating')).toBe(false)
     expect(await store.sessions.listByUser(ada.id)).toHaveLength(1)
-    expect(said()).toEqual([['impersonation-started', 'ada@example.com', undefined, 'root@example.com'], ['impersonation-ended', 'ada@example.com', undefined, 'root@example.com']])
     expect(told()).toEqual([['impersonation-started', 'ada@example.com', {}, 'root@example.com'], ['impersonation-ended', 'ada@example.com', {}, 'root@example.com']])
   })
 
@@ -375,7 +364,7 @@ describe('admin', () => {
   })
 
   test('signing out while impersonating ends the admin\'s own sign-in too', async () => {
-    const { admin, ada, store, said } = await setup()
+    const { admin, ada, store, told } = await setup()
 
     await admin.browser.call('impersonate', ada.id)
     await admin.browser.fetch('/sign-out', { method: 'POST' })
@@ -383,7 +372,7 @@ describe('admin', () => {
     expect(await admin.browser.json('/me')).toBe('anonymous')
     expect(await store.sessions.listByUser(admin.id)).toEqual([])
     expect(await store.sessions.listByUser(ada.id)).toHaveLength(1)
-    expect(said().at(-1)).toEqual(['impersonation-ended', 'ada@example.com', undefined, 'root@example.com'])
+    expect(told().at(-1)).toEqual(['impersonation-ended', 'ada@example.com', {}, 'root@example.com'])
   })
 
   test('the audit log of everyone, or of one user, with who acted', async () => {

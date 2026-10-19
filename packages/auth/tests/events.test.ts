@@ -1,5 +1,4 @@
-import type { User } from '../src/auth'
-import type { AuthEvent, AuthEventInfo, EventContext } from '../src/events'
+import type { AuthEvent, AuthEventInfo } from '../src/events'
 import { afterEach, describe, expect, setSystemTime, test } from 'bun:test'
 import { eventFields } from '../src/events'
 import { totpCode, totpStep } from '../src/totp'
@@ -15,95 +14,20 @@ afterEach(() => {
 })
 
 function setup(options: Parameters<typeof testApp>[0] = {}) {
-  const events: { event: AuthEvent, user: User, detail: string | undefined, context: EventContext }[] = []
+  const events: AuthEventInfo[] = []
   const app = testApp({
-    onEvent: (event, user, detail, context) => {
-      events.push({ event, user, detail, context })
+    onAuthEvent: (info) => {
+      events.push(info)
     },
     ...options,
   })
-  // Sign-ins, sign-outs and failures only, without the mails' events.
-  const said = () => events.filter(entry => ACTIVITY.has(entry.event)).map(entry => [entry.event, entry.detail])
 
-  return { ...app, events, said }
+  return { ...app, events }
 }
 
 function from(address: string, body: unknown) {
   return { method: 'POST', headers: { 'content-type': 'application/json', 'x-forwarded-for': address, 'user-agent': 'Firefox' }, body: JSON.stringify(body) }
 }
-
-describe('events', () => {
-  test('sign-ins say how, sign-outs and failed sign-ins of a known account are heard, with where they came from', async () => {
-    const { browser, said, events } = setup()
-
-    await browser().call('register', { email: 'ada@example.com', password: PASSWORD })
-    await browser().json('/password', from('10.0.0.1', { identifier: 'ada@example.com', password: 'wrong password' }))
-    // No account: nobody to tell.
-    await browser().json('/password', from('10.0.0.1', { identifier: 'bob@example.com', password: PASSWORD }))
-
-    const ada = browser()
-
-    await ada.json('/password', from('10.0.0.2', { identifier: 'ada@example.com', password: PASSWORD }))
-    await ada.fetch('/sign-out', { method: 'POST' })
-
-    expect(said()).toEqual([['signed-in', 'register'], ['sign-in-failed', 'password'], ['signed-in', 'password'], ['signed-out', undefined]])
-    expect(events.find(entry => entry.event === 'sign-in-failed')).toMatchObject({ user: { email: 'ada@example.com' }, context: { ip: '10.0.0.1', userAgent: 'Firefox', actor: null } })
-  })
-
-  test('a sign-in through the second factor says its first, and a wrong code is a failed sign-in', async () => {
-    const { browser, said, store } = setup()
-    const ada = browser()
-
-    await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
-    const { setup: totp } = await ada.callOk('setUpTwoFactor', { password: PASSWORD })
-
-    await ada.call('enableTwoFactor', await totpCode(totp.secret, totpStep()))
-    await store.users.update((await store.users.findByEmail('ada@example.com'))!.id, { totpLastStep: 0 })
-
-    const phone = browser()
-
-    await phone.post('/password', { identifier: 'ada@example.com', password: PASSWORD })
-    await phone.call('verifyTwoFactor', '000000')
-    await phone.call('verifyTwoFactor', await totpCode(totp.secret, totpStep()))
-
-    expect(said().slice(-2)).toEqual([['sign-in-failed', 'two-factor'], ['signed-in', 'password']])
-  })
-
-  test('signing out everywhere says whether this session stayed', async () => {
-    const { browser, events } = setup()
-    const ada = browser()
-
-    await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
-    await ada.fetch('/sign-out-everywhere?keep=1', { method: 'POST' })
-    await ada.fetch('/sign-out-everywhere', { method: 'POST' })
-
-    expect(events.filter(entry => entry.event === 'signed-out-everywhere').map(entry => [entry.event, entry.detail])).toEqual([['signed-out-everywhere', 'this-one-kept'], ['signed-out-everywhere', undefined]])
-  })
-
-  test('an onEvent that throws is logged through the app\'s log setting, and the sign-in goes on', async () => {
-    const { browser } = testApp({
-      onEvent: () => {
-        throw new Error('down')
-      },
-    })
-    const ada = browser()
-    const logged: unknown[][] = []
-    const global = globalThis as { [LOG_SINK]?: unknown }
-    const sink = global[LOG_SINK]
-
-    global[LOG_SINK] = (...args: unknown[]) => logged.push(args)
-
-    try {
-      await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
-    }
-    finally {
-      global[LOG_SINK] = sink
-    }
-
-    expect(await ada.json('/me')).toMatchObject({ email: 'ada@example.com' })
-    expect(logged).toContainEqual(['error', expect.stringMatching(/^onEvent failed for /), expect.objectContaining({ message: 'down' }), undefined, 'kayjs-auth'])
-  })
-})
 
 describe('onAuthEvent', () => {
   function listen(options: Parameters<typeof testApp>[0] = {}) {
@@ -143,11 +67,8 @@ describe('onAuthEvent', () => {
     expect(heard.find(info => info.event === 'sign-in-failed')).toMatchObject({ user: { email: 'ada@example.com' }, context: { ip: '10.0.0.1', userAgent: 'Firefox', actor: null } })
   })
 
-  test('hears a failed second factor, and runs beside onEvent, each told once per event', async () => {
-    const legacy: string[] = []
-    const { browser, said, store } = listen({ onEvent: (event, _user, detail) => {
-      legacy.push(`${event} ${detail}`)
-    } })
+  test('hears a failed second factor', async () => {
+    const { browser, said, store } = listen()
     const ada = browser()
 
     await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
@@ -162,17 +83,12 @@ describe('onAuthEvent', () => {
     await phone.call('verifyTwoFactor', '000000')
 
     expect(said().at(-1)).toEqual(['sign-in-failed', { method: 'two-factor' }])
-    expect(legacy.filter(line => line.startsWith('sign-in-failed'))).toEqual(['sign-in-failed two-factor'])
   })
 
-  test('an onAuthEvent that throws is logged, and neither the sign-in nor onEvent stops', async () => {
-    const legacy: string[] = []
+  test('an onAuthEvent that throws is logged, and the sign-in goes on', async () => {
     const { browser } = testApp({
       onAuthEvent: () => {
         throw new Error('down')
-      },
-      onEvent: (event) => {
-        legacy.push(event)
       },
     })
     const ada = browser()
@@ -190,26 +106,7 @@ describe('onAuthEvent', () => {
     }
 
     expect(await ada.json('/me')).toMatchObject({ email: 'ada@example.com' })
-    expect(legacy).toContain('signed-in')
     expect(logged).toContainEqual(['error', expect.stringMatching(/^onAuthEvent failed for /), expect.objectContaining({ message: 'down' }), undefined, 'kayjs-auth'])
-  })
-
-  test('warns once, when createAuth is given the onEvent it replaces', () => {
-    const logged: unknown[][] = []
-    const global = globalThis as { [LOG_SINK]?: unknown }
-    const sink = global[LOG_SINK]
-
-    global[LOG_SINK] = (...args: unknown[]) => logged.push(args)
-
-    try {
-      testApp({ onEvent: () => undefined })
-      testApp({ onAuthEvent: () => undefined })
-    }
-    finally {
-      global[LOG_SINK] = sink
-    }
-
-    expect(logged.filter(args => args[0] === 'warn' && String(args[1]).includes('onEvent'))).toHaveLength(1)
   })
 
   test('reads the fields of every kind of event off its detail', () => {
@@ -348,7 +245,7 @@ describe('the audit log', () => {
 })
 
 describe('impersonation', () => {
-  test('what an admin does as a user names the admin as the actor, to `onEvent` and in the audit log', async () => {
+  test('what an admin does as a user names the admin as the actor, to `onAuthEvent` and in the audit log', async () => {
     const { browser, store, events } = setup({ admin: 'admin', audit: true, organizations: { roles: { owner: ['admin'], admin: ['member'], member: [] }, owner: 'owner', manage: 'admin' } })
     const ada = browser()
     const root = browser()

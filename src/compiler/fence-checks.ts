@@ -287,50 +287,10 @@ function propertyKey(property: t.ObjectProperty | t.ObjectMethod): string | unde
   return property.key.type === 'StringLiteral' ? property.key.value : undefined
 }
 
-const SIGN_IN_CALL = /\bcreateAuth\b/
-
-// A `createAuth({ onEvent })`, which is `onAuthEvent` since 1.52.
-export function staleAuthCalls(fence: ParsedFence): Diagnostic[] {
-  if (!SIGN_IN_CALL.test(fence.code))
-    return []
-
-  const diagnostics: Diagnostic[] = []
-
-  eachNode(fence.ast.program, (node) => {
-    const hook = node.type === 'CallExpression' ? staleEventHook(node) : undefined
-
-    if (hook) {
-      diagnostics.push({
-        ...fence.shift(hook),
-        code: 'deprecated-auth-event',
-        message: '`onEvent` of `createAuth` is `onAuthEvent` since 1.52, which gets one object instead of four arguments',
-        help: 'write `onAuthEvent: ({ event, user, context, ...fields }) => ...`: the parts of the old `detail` are fields of the object, such as `role`, `method`, `provider` or `organizationId`',
-        checkOnly: true,
-      })
-    }
-  })
-
-  return diagnostics
-}
-
-// The `onEvent` key of the options object a `createAuth(...)` call is given.
-function staleEventHook(call: t.CallExpression): t.Node | undefined {
-  const { callee } = call
-  const named = callee.type === 'Identifier' ? callee.name === 'createAuth' : callee.type === 'MemberExpression' && !callee.computed && callee.property.type === 'Identifier' && callee.property.name === 'createAuth'
-  const options = call.arguments[0]
-
-  if (!named || options?.type !== 'ObjectExpression')
-    return undefined
-
-  const found = options.properties.find((property): property is t.ObjectProperty | t.ObjectMethod => property.type !== 'SpreadElement' && propertyKey(property) === 'onEvent')
-
-  return found?.key
-}
-
 // The checks a plain module takes, parsed only when one of them may find something.
 // A module the browser bundle reaches (`browser`) is checked for the names the browser's entries lack as well.
 export function moduleChecks(source: string, browser = false): Diagnostic[] {
-  if (!CSS_BINDING.test(source) && !(browser && source.includes('kay/cache')) && !SIGN_IN_CALL.test(source))
+  if (!CSS_BINDING.test(source) && !(browser && source.includes('kay/cache')))
     return []
 
   const whole = { start: 0, end: source.length }
@@ -349,5 +309,5 @@ export function moduleChecks(source: string, browser = false): Diagnostic[] {
 }
 
 function checksOf(module: ParsedFence, browser: boolean): Diagnostic[] {
-  return [...cssImportsWithoutText(module), ...staleAuthCalls(module), ...browser ? serverOnlyImports(module) : []]
+  return [...cssImportsWithoutText(module), ...browser ? serverOnlyImports(module) : []]
 }

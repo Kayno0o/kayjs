@@ -1,7 +1,7 @@
 import type { OAuthClient } from './authorize/clients'
 import type { CaptchaOptions } from './captcha'
 import type { EmailCore, PendingCode } from './email'
-import type { AuthEvent, AuthEventInfo, EventContext } from './events'
+import type { AuthEventInfo } from './events'
 import type { Keys } from './keys'
 import type { Limits } from './limits'
 import type { createOAuthClient } from './oauth/client'
@@ -126,7 +126,6 @@ export interface Core {
   unverifiedMaxAge?: number | undefined
   onExport?: ((user: User) => unknown) | undefined
   onAuthEvent?: ((info: AuthEventInfo) => void | Promise<void>) | undefined
-  onEvent?: ((event: AuthEvent, user: User, detail: string | undefined, context: EventContext) => void | Promise<void>) | undefined
   organizations?: OrganizationsCore | undefined
   // Kept with the `audit` option: entries live `maxAge` seconds.
   audit?: { maxAge: number, prunedAt: number, ip: 'full' | 'truncated' } | undefined

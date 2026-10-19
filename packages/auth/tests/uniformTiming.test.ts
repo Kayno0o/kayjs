@@ -47,24 +47,22 @@ function from(address: string, body: unknown) {
 }
 
 describe('sign-in answers in the same time for a held address and a free one', () => {
-  for (const hook of ['onAuthEvent', 'onEvent'] as const) {
-    test(`a failed password sign-in does not wait for ${hook}, held address or not`, async () => {
-      const slow = gate()
-      let armed = false
-      const app = testApp({ [hook]: async () => {
-        if (armed)
-          await slow.closed
-      } })
+  test('a failed password sign-in does not wait for onAuthEvent, held address or not', async () => {
+    const slow = gate()
+    let armed = false
+    const app = testApp({ onAuthEvent: async () => {
+      if (armed)
+        await slow.closed
+    } })
 
-      await app.browser().call('register', { email: 'ada@example.com', password: PASSWORD })
-      armed = true
+    await app.browser().call('register', { email: 'ada@example.com', password: PASSWORD })
+    armed = true
 
-      for (const identifier of ['ada@example.com', 'nobody@example.com'])
-        expect(await finishes(app.browser().json('/password', from('10.0.0.1', { identifier, password: WRONG })))).toBe('done')
+    for (const identifier of ['ada@example.com', 'nobody@example.com'])
+      expect(await finishes(app.browser().json('/password', from('10.0.0.1', { identifier, password: WRONG })))).toBe('done')
 
-      slow.open()
-    })
-  }
+    slow.open()
+  })
 
   test('a failed password sign-in does not wait for the audit log write, held address or not', async () => {
     const app = testApp({ audit: true })
@@ -87,7 +85,7 @@ describe('sign-in answers in the same time for a held address and a free one', (
 
   test('the event of a failed sign-in is still reported once the request is over', async () => {
     const heard: string[] = []
-    const app = testApp({ audit: true, onEvent: (event) => {
+    const app = testApp({ audit: true, onAuthEvent: ({ event }) => {
       heard.push(event)
     } })
 

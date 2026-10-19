@@ -55,7 +55,7 @@ What each minor release before 1.53 broke, and what an app changed to move to it
 
 ### kayjs-auth: `onEvent` is `onAuthEvent`, with one object
 
-- `createAuth({ onEvent: (event, user, detail, context) => ... })` is now `onAuthEvent: ({ event, user, context, ...fields }) => ...`: the `detail` string is gone for fields typed per event (`method` and `provider` of a `signed-in`, `role`, `reason`, `organizationId` and `roles`, `client`, `provider`, `name`, `email`, `keptThisOne`). `onEvent` still works for now and logs a warning, and when both are given each hears every event. `kay check` reports it as `deprecated-auth-event`; no fix is offered, as the handler's parameters change with the name, so rewrite it by hand. The audit log is unchanged, its entries keep their `detail`.
+- `createAuth({ onEvent: (event, user, detail, context) => ... })` is now `onAuthEvent: ({ event, user, context, ...fields }) => ...`: the `detail` string is gone for fields typed per event (`method` and `provider` of a `signed-in`, `role`, `reason`, `organizationId` and `roles`, `client`, `provider`, `name`, `email`, `keptThisOne`). `onEvent` was removed in 1.56 with its lint `deprecated-auth-event`: rewrite the handler by hand on 1.55 first, as its parameters change with the name. The audit log is unchanged, its entries keep their `detail`.
 
 ### kayjs-auth: `authPages` reads `prefix` and `home` from `createAuth`
 

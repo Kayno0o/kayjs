@@ -145,23 +145,6 @@ describe('css-import-without-text', () => {
   })
 })
 
-describe('deprecated-auth-event', () => {
-  const page = (options: string) => `--- server\nimport { createAuth } from '@kaynooo/kayjs-auth'\n\nexport const auth = createAuth(${options})\n---\np x`
-
-  it('reports the onEvent of createAuth, offering no fix, whether a function or a method', () => {
-    expect(lints(page('{ onEvent: (event, user, detail) => log(event, user, detail) }'))).toEqual([{ code: 'deprecated-auth-event', severity: 'warning', at: 'onEvent' }])
-    expect(lints(page('{ onEvent(event) { log(event) } }'))).toEqual([{ code: 'deprecated-auth-event', severity: 'warning', at: 'onEvent' }])
-    expect(compileKay(page('{ onEvent: log }'), 'list.kay', { check: true }).diagnostics.flatMap(d => d.fixes ?? [])).toEqual([])
-    expect(moduleChecks('export const auth = lib.createAuth({ onEvent: log })\n').map(d => d.code)).toEqual(['deprecated-auth-event'])
-  })
-
-  it('leaves onAuthEvent, an onEvent of another call and options held in a variable', () => {
-    expect(lints(page('{ onAuthEvent: ({ event }) => log(event) }'))).toEqual([])
-    expect(lints(`--- server\nconst other = make({ onEvent: log })\n---\np {other}`)).toEqual([])
-    expect(lints(page('options'))).toEqual([])
-  })
-})
-
 describe('the checks that read a module', () => {
   it('leaves a fence or module declaring a name twice to the type check, which reports it', () => {
     const twice = 'import theme from \'./theme.css\'\nconst a = 1\nconst a = 2\n'

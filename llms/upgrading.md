@@ -10,6 +10,7 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 - kayjs-auth: `discordProvider({ apiBase })` is `discordProvider({ url })`; `apiBase` is ignored.
 - kayjs-auth: a custom store names `members.delete` and `oauth.grants.upsert`; one with only `members.remove` or `oauth.grants.put` fails where kayjs-auth calls the missing method.
 - kayjs-auth: `redirect`, `remember` and `captcha` go in the trailing options object of `signInWithPassword` and `register`, and `requestMagicLink` and `signInWithPasskey` take `redirect` there, not as an argument of its own; in the input or as a positional argument they are ignored, so a captcha is not sent and a redirect leads home.
+- kayjs-auth: `createAuth({ onEvent })` is `onAuthEvent`, which gets one object, `{ event, user, context, ...fields }`; `onEvent` is never called.
 
 ### kayjs-auth passkeys carry `userVerified`
 

@@ -203,7 +203,7 @@ describe('scoped and expiring tokens', () => {
 describe('issuing a token from the server', () => {
   test('mints one for a user with no proof and no mail or event, which a device then signs in with', async () => {
     const events: string[] = []
-    const app = testApp({ onEvent: event => void events.push(event) })
+    const app = testApp({ onAuthEvent: ({ event }) => void events.push(event) })
     const { user } = await app.browser().callHas('user', 'register', { email: 'ada@example.com', password: PASSWORD })
 
     events.length = 0

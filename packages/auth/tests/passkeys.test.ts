@@ -1,4 +1,4 @@
-import type { AuthEvent } from '../src/events'
+import type { AuthEventInfo } from '../src/events'
 import type { Proof } from '../src/twoFactor'
 import { afterEach, describe, expect, setSystemTime, test } from 'bun:test'
 import { totpCode, totpStep } from '../src/totp'
@@ -13,14 +13,14 @@ afterEach(() => {
 })
 
 async function setup(passkeys?: NonNullable<Parameters<typeof testApp>[0]>['passkeys'], extra: Parameters<typeof testApp>[0] = {}) {
-  const events: { event: AuthEvent, detail: string | undefined }[] = []
+  const events: AuthEventInfo[] = []
   const app = testApp({
     url: 'https://site.test',
     site: 'Site',
     ...passkeys && { passkeys },
     ...extra,
-    onEvent: (event, _user, detail) => {
-      events.push({ event, detail })
+    onAuthEvent: (info) => {
+      events.push(info)
     },
   })
 
@@ -72,7 +72,7 @@ describe('registering passkeys', () => {
 
     expect(added).toMatchObject({ ok: true, passkey: { name: 'Phone', multiDevice: true, backedUp: true, lastUsedAt: null } })
     expect(await ada.call('passkeys')).toMatchObject([{ id: device.credentials[0]!.id, name: 'Phone' }])
-    expect(app.events.at(-1)).toEqual({ event: 'passkey-added', detail: 'Phone' })
+    expect(app.events.at(-1)).toMatchObject({ event: 'passkey-added', name: 'Phone' })
 
     const second = await ada.callOk('passkeyRegistrationOptions', { password: PASSWORD })
 
@@ -267,7 +267,7 @@ describe('a passkey as second factor and as proof', () => {
 
     expect(await ada.call('removePasskey', id, { passkey: await device.get(again.options) })).toEqual({ ok: true })
     expect(await ada.call('passkeys')).toEqual([])
-    expect(app.events.at(-1)).toEqual({ event: 'passkey-removed', detail: 'Laptop' })
+    expect(app.events.at(-1)).toMatchObject({ event: 'passkey-removed', name: 'Laptop' })
   })
 
   test('the last passkey of an account with no other way in stays', async () => {

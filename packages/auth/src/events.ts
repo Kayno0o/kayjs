@@ -13,7 +13,7 @@ const OAUTH_PREFIX = 'oauth:'
 // The audit log is pruned of what outlived its age at most this often.
 const AUDIT_PAGE_MAX = 200
 
-// What happens to an account without changing what protects it, handed to `onEvent` but never mailed. An admin's doing, a role or a ban, or a manager's in an organization, names them in the context's `actor`.
+// What happens to an account without changing what protects it, handed to `onAuthEvent` but never mailed. An admin's doing, a role or a ban, or a manager's in an organization, names them in the context's `actor`.
 // An organization event's detail is its id, then the roles given for `member-joined` and `member-roles-changed`.
 export type ActivityEvent = 'signed-in' | 'signed-out' | 'sign-in-failed' | 'role-granted' | 'role-revoked' | 'banned' | 'unbanned' | 'impersonation-started' | 'impersonation-ended' | 'organization-created' | 'organization-deleted' | 'member-joined' | 'member-left' | 'member-removed' | 'member-roles-changed' | 'oauth-client-approved' | 'oauth-client-revoked'
 
@@ -145,7 +145,7 @@ export async function impersonatorOf(state: RequestState): Promise<string | unde
   return state.via() === 'bearer' ? undefined : (await state.session.get('auth'))?.impersonator?.user
 }
 
-// Hands `event` to the app's `onAuthEvent` and `onEvent` and to the audit log when it is kept. A failure is logged, not thrown: what happened is done by then.
+// Hands `event` to the app's `onAuthEvent` and to the audit log when it is kept. A failure is logged, not thrown: what happened is done by then.
 // While an admin acts as a user, whatever happens is the admin's doing, named as the actor.
 export async function report(state: RequestState, record: UserRecord, event: AuthEvent, detail?: string, by?: UserRecord): Promise<void> {
   const impersonator = await impersonatorOf(state)
@@ -164,13 +164,6 @@ export async function reportFrom(core: Core, where: { address: string, userAgent
   }
   catch (error) {
     log.error(`onAuthEvent failed for ${event}`, error)
-  }
-
-  try {
-    await core.onEvent?.(event, user, detail, context)
-  }
-  catch (error) {
-    log.error(`onEvent failed for ${event}`, error)
   }
 
   if (!core.audit)

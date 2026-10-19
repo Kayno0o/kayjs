@@ -1,5 +1,5 @@
 import type { EmailCore } from '../src/email'
-import type { AuthEvent } from '../src/events'
+import type { AuthEvent, AuthEventInfo } from '../src/events'
 import type { Mail } from '../src/mail'
 import { describe, expect, jest, spyOn, test } from 'bun:test'
 import { log } from '../src/log'
@@ -13,13 +13,13 @@ const LINKS = { 'verify-email': '/v', 'reset-password': '/r', 'magic-link': '/m'
 // A verified user, and every mail and event from then on.
 async function verified() {
   const mails: Mail[] = []
-  const events: { event: AuthEvent, detail: string | undefined }[] = []
+  const events: AuthEventInfo[] = []
   const app = testApp({
     url: 'https://site.test',
     site: 'Site',
     email: { mailer: { send: mail => void mails.push(mail) }, links: LINKS, requireVerified: false },
-    onEvent: (event, _user, detail) => {
-      events.push({ event, detail })
+    onAuthEvent: (info) => {
+      events.push(info)
     },
   })
   const ada = app.browser()
@@ -96,7 +96,7 @@ describe('changes to what protects the account', () => {
     await ada.call('deleteAccount', { password: PASSWORD })
 
     expect(notices()).toEqual(['token-created', 'account-deleted'])
-    expect(events.find(entry => entry.event === 'token-created')?.detail).toBe('Phone')
+    expect(events.find(entry => entry.event === 'token-created')).toMatchObject({ name: 'Phone' })
   })
 
   test('signing out everywhere, so the owner hears of it after a scare as of a password change', async () => {
@@ -105,13 +105,13 @@ describe('changes to what protects the account', () => {
     await ada.fetch('/sign-out-everywhere?keep=1', { method: 'POST' })
 
     expect(notices()).toEqual(['signed-out-everywhere'])
-    expect(events.at(-1)).toEqual({ event: 'signed-out-everywhere', detail: 'this-one-kept' })
+    expect(events.at(-1)).toMatchObject({ event: 'signed-out-everywhere', keptThisOne: true })
   })
 
   test('an unverified address is never mailed a notice, though the app still hears of it', async () => {
     const mails: Mail[] = []
     const events: AuthEvent[] = []
-    const { browser } = testApp({ url: 'https://site.test', email: { mailer: { send: mail => void mails.push(mail) }, links: LINKS, requireVerified: false }, onEvent: event => void events.push(event) })
+    const { browser } = testApp({ url: 'https://site.test', email: { mailer: { send: mail => void mails.push(mail) }, links: LINKS, requireVerified: false }, onAuthEvent: ({ event }) => void events.push(event) })
     const ada = browser()
 
     await ada.call('register', { email: 'ada@example.com', password: PASSWORD })

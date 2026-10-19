@@ -1,5 +1,4 @@
 import type { Duration, GuardContext } from 'kay'
-import type { User } from '../src/auth'
 import type { AuthEvent, AuthEventInfo } from '../src/events'
 import type { Mail } from '../src/mail'
 import type { TestBrowser } from './helpers/app'
@@ -16,7 +15,6 @@ afterEach(() => {
 
 async function setup(options: { invitationPage?: string | undefined, create?: 'admin', invitationMaxAge?: Duration } = {}, extra: { onDelete?: () => Promise<void> } = {}) {
   const mails: Mail[] = []
-  const events: [AuthEvent, string | null, string | undefined, string | undefined][] = []
   // What `onAuthEvent` hears of the same events: the event, who it happened to, its fields and who acted.
   const heard: [AuthEvent, string | null, object, string | undefined][] = []
   const app = testApp({
@@ -40,10 +38,6 @@ async function setup(options: { invitationPage?: string | undefined, create?: 'a
       ...options,
     },
     ...extra,
-    onEvent: (event, user: User, detail, context) => {
-      if (ORG_EVENTS.has(event))
-        events.push([event, user.email, detail, context.actor?.email ?? undefined])
-    },
     onAuthEvent: ({ event, user, context, ...fields }: AuthEventInfo) => {
       if (ORG_EVENTS.has(event))
         heard.push([event, user.email, fields, context.actor?.email ?? undefined])
@@ -91,7 +85,7 @@ async function setup(options: { invitationPage?: string | undefined, create?: 'a
     return to.browser.call('acceptInvitation', invitation.id)
   }
 
-  return { ...app, site, mails, events, heard, person, ada, org, join }
+  return { ...app, site, mails, heard, person, ada, org, join }
 }
 
 describe('organizations', () => {
@@ -179,7 +173,7 @@ describe('organizations', () => {
   })
 
   test('the invited user sees their invitations, accepts one, and joins with its roles', async () => {
-    const { ada, org, person, store, events, heard } = await setup()
+    const { ada, org, person, store, heard } = await setup()
     const grace = await person('grace@example.com')
     const { invitation } = await ada.browser.callOk('invite', org, 'grace@example.com', ['admin'])
 
@@ -190,7 +184,6 @@ describe('organizations', () => {
     expect(await ada.browser.call('invite', org, 'grace@example.com')).toEqual({ ok: false, error: 'member' })
     expect((await ada.browser.callOk('members', org)).members).toMatchObject([{ user: { email: 'ada@example.com' }, roles: ['owner'] }, { user: { id: grace.id }, roles: ['admin'] }])
     expect(await store.members!.get(org, grace.id)).toMatchObject({ roles: ['admin'] })
-    expect(events.at(-1)).toEqual(['member-joined', 'grace@example.com', `${org} admin`, undefined])
     expect(heard.at(-1)).toEqual(['member-joined', 'grace@example.com', { organizationId: org, roles: ['admin'] }, undefined])
   })
 
@@ -231,7 +224,7 @@ describe('organizations', () => {
   })
 
   test('a manager gives only roles they hold, to members holding none above theirs, and the last owner stays', async () => {
-    const { ada, org, person, join, events, heard } = await setup()
+    const { ada, org, person, join, heard } = await setup()
     const grace = await person('grace@example.com')
     const alan = await person('alan@example.com')
 
@@ -253,13 +246,6 @@ describe('organizations', () => {
     expect(await ada.browser.call('leaveOrganization', org)).toEqual({ ok: true })
     expect(await grace.browser.call('removeMember', org, grace.id)).toEqual({ ok: false, error: 'last-owner' })
 
-    expect(events.filter(([event]) => event !== 'member-joined')).toEqual([
-      ['organization-created', 'ada@example.com', org, undefined],
-      ['member-roles-changed', 'alan@example.com', `${org} admin`, 'grace@example.com'],
-      ['member-removed', 'alan@example.com', org, 'grace@example.com'],
-      ['member-roles-changed', 'grace@example.com', `${org} owner`, 'ada@example.com'],
-      ['member-left', 'ada@example.com', org, undefined],
-    ])
     expect(heard.filter(([event]) => event !== 'member-joined')).toEqual([
       ['organization-created', 'ada@example.com', { organizationId: org }, undefined],
       ['member-roles-changed', 'alan@example.com', { organizationId: org, roles: ['admin'] }, 'grace@example.com'],
