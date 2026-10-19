@@ -27,7 +27,7 @@ import { hookedResponse } from './page-hook'
 import { matchedParams, positionalParams, slashSpelling } from './params'
 import { inPreview, previewRequested, requestDrafts } from './preview'
 import { requestId } from './protection'
-import { hasFlash, renderPage, renderUnmatched, servePrerendered, sharedContext, withEditor } from './render'
+import { hasFlash, renderPage, renderUncaught, renderUnmatched, servePrerendered, sharedContext, withEditor } from './render'
 import { reportServerError } from './report'
 import { requestUrl } from './request-url'
 import { revalidateStale } from './revalidate'
@@ -178,7 +178,8 @@ export interface PageRoutes {
 }
 
 // A route per path the router serves, then one answering what none of them does, each in the locale its prefix or its host names.
-export function servePageRoutes(app: Elysia, { table, served: claims, matchers, i18n, locales, client, renderOptions, trailingSlash, fallback, respond }: PageRoutes): void {
+// Returns how an error thrown before any page was chosen is answered, in the locale the request names.
+export function servePageRoutes(app: Elysia, { table, served: claims, matchers, i18n, locales, client, renderOptions, trailingSlash, fallback, respond }: PageRoutes): (error: unknown, context: RequestContext) => Promise<Response> {
   const settings = i18n?.settings
   const inImplicitLocale = async (url: URL, request: Request, run: () => Promise<Response>) => runInLocale(stateFor(locales, locales.settings.defaultLocale, url.pathname, request), run)
 
@@ -266,19 +267,16 @@ export function servePageRoutes(app: Elysia, { table, served: claims, matchers, 
     })
   }
 
-  // Every route above wins over this one, so it only answers what no page serves.
-  if (!(fallback.notFound ?? fallback.error))
-    return
-
-  const unmatched = async (context: RequestContext) => {
+  // A path no page serves, or an error met before one was chosen, rendered by the routes directory's own special pages in the locale the path or the visitor names.
+  const inFallbackLocale = async (context: RequestContext, render: () => Promise<Response>) => {
     const url = requestUrl(context.request)
 
     if (!i18n || !settings)
-      return inImplicitLocale(url, context.request, async () => renderUnmatched(fallback, context, client, renderOptions))
+      return inImplicitLocale(url, context.request, render)
 
     const { locale, path } = splitLocale(settings, url.pathname)
     const answering = locale ?? (settings.hosts ? hostLocale(settings, context.request) : preferredLocale(settings, context.request))
-    const response = await runInLocale(stateFor(i18n, answering, untranslatedPath(settings, path, answering), context.request), async () => renderUnmatched(fallback, context, client, renderOptions))
+    const response = await runInLocale(stateFor(i18n, answering, untranslatedPath(settings, path, answering), context.request), render)
 
     // A path with no locale of its own is answered in the visitor's, which a shared cache must tell apart.
     if (locale === undefined && !settings.hosts)
@@ -287,9 +285,19 @@ export function servePageRoutes(app: Elysia, { table, served: claims, matchers, 
     return response
   }
 
+  const uncaught = async (error: unknown, context: RequestContext) => inFallbackLocale(context, async () => renderUncaught(error, fallback, context, client, renderOptions))
+
+  // Every route above wins over this one, so it only answers what no page serves.
+  if (!(fallback.notFound ?? fallback.error))
+    return uncaught
+
+  const unmatched = async (context: RequestContext) => inFallbackLocale(context, async () => renderUnmatched(fallback, context, client, renderOptions))
+
   app.get('/*', async (given) => {
     pageRequested(given.request)
 
     return carryContext(given.set, await unmatched(sharedContext(given.request, () => ({ ...given }))))
   })
+
+  return uncaught
 }

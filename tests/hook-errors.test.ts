@@ -178,6 +178,53 @@ describe('an onRequest hook that throws', () => {
     }
   })
 
+  it('falls back to plain text when the error page throws itself', async () => {
+    const own = await scratchDir('hook-errors-broken-')
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+
+    try {
+      await Promise.all([
+        Bun.write(join(own, 'routes/index.kay'), 'p Home\n'),
+        Bun.write(join(own, 'routes/_error.kay'), '--- server\nthrow new Error(\'error page broke\')\n---\nh1 Oops\n'),
+      ])
+      const app = new Elysia().onRequest(hook).use(await pages({ routes: join(own, 'routes'), prebuilt: false, dev: false, log: false }))
+      const page = await ask(app, TARGETS[0], 'error')
+
+      expect(page).toMatchObject({ status: 500, body: 'Internal Server Error', type: expect.stringContaining('text/plain') })
+    }
+    finally {
+      logged.mockRestore()
+      await rm(own, { recursive: true, force: true })
+    }
+  })
+
+  it('draws the error page of an app with locales, in the locale the path names', async () => {
+    const own = await scratchDir('hook-errors-i18n-')
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+
+    try {
+      await Promise.all([
+        Bun.write(join(own, 'routes/index.kay'), 'p Home\n'),
+        Bun.write(join(own, 'routes/_error.kay'), '--- server\nimport { t } from \'kay/i18n\'\n\nconst home = t(\'nav.home\')\nconst { status } = ctx.error\n---\nh1 Oops {status} {home}\n'),
+      ])
+      const i18n = { locales: ['fr', 'en'], defaultLocale: 'fr', messages: join(process.cwd(), 'tests/fixtures/i18n/src/messages') }
+      const app = new Elysia().onRequest(hook).use(await pages({ routes: join(own, 'routes'), prebuilt: false, dev: false, log: false, i18n }))
+
+      for (const [path, heading] of [['/', 'Oops 500 Accueil'], ['/en', 'Oops 500 Home']] as const) {
+        const page = await app.handle(new NativeRequest(`http://localhost${path}`, { headers: { 'accept': 'text/html', 'x-throw': 'error' } }))
+        const body = await page.text()
+
+        expect(page.status, path).toBe(500)
+        expect(body, path).toContain(`<h1>${heading}</h1>`)
+        expect(body, path).not.toContain('hunter2')
+      }
+    }
+    finally {
+      logged.mockRestore()
+      await rm(own, { recursive: true, force: true })
+    }
+  })
+
   it('keeps the security headers on the answer', async () => {
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
 
