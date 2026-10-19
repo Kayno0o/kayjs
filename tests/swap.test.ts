@@ -193,6 +193,7 @@ describe('page swap, on the server', () => {
       return forged
     } }))).not.toMatch(/<img|data-slots/)
     expect(child(Card({ items: [forged] }))).not.toContain('<img')
+    expect(() => child(Card({ items: [rendered('<b>x</b>')] }))).toThrow('its `items` prop holds rendered markup')
   })
 
   it('marks a kept island that hydrates when idle or visible with both', () => {

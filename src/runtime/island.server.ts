@@ -247,6 +247,9 @@ function serializeProps(what: string, props: object, slots: [string, string][]):
         throw new IslandPropsError(`${what}, so it renders as an island: its \`${key}\` prop is ${reason ?? `a ${typeof value}`} and cannot reach the browser; pass it from a component of its own, which then renders as an island in its place`)
     }
 
+    if (holdsMarkup(value))
+      throw new IslandPropsError(`${what}, so it renders as an island: its \`${key}\` prop holds rendered markup, which cannot reach the browser as a prop; pass markup to an island as its children or as a slot written between its tags`)
+
     plain[key] = value
   }
 
