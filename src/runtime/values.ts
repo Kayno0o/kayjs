@@ -111,25 +111,6 @@ export function flattenClasses(list: readonly unknown[], result: Record<string, 
   return result
 }
 
-// The text of a list of plain strings, each class once in the order met, or undefined when it holds more than strings or a name an object would sort ahead as an array index.
-function stringClasses(list: readonly unknown[]): string | undefined {
-  for (const item of list) {
-    if (typeof item === 'string' ? item === '__proto__' || (item.charCodeAt(0) >= 48 && item.charCodeAt(0) <= 57) : item != null && typeof item !== 'boolean')
-      return undefined
-  }
-
-  let result = ''
-
-  for (let at = 0; at < list.length; at++) {
-    const item = list[at]
-
-    if (typeof item === 'string' && item !== '' && item !== 'undefined' && list.indexOf(item) === at)
-      result += result ? ` ${item}` : item
-  }
-
-  return result
-}
-
 // A `class` value: a string, or an array or object of classes, an object's keys kept when their value is truthy.
 export function classText(value: unknown): string {
   if (typeof value === 'number')
@@ -140,11 +121,6 @@ export function classText(value: unknown): string {
 
   if (typeof value === 'string')
     return value
-
-  const quick = Array.isArray(value) ? stringClasses(value) : undefined
-
-  if (quick !== undefined)
-    return quick
 
   const classes = Array.isArray(value) ? flattenClasses(value, {}) : value as Record<string, unknown>
   let result = ''
