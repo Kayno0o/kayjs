@@ -45,6 +45,8 @@ export interface RedirectSet {
   find: (from: string) => RuntimeRedirect | undefined
   // Those with a `:name` or a final `*`.
   patterns: () => RuntimeRedirect[]
+  // Every redirect held in memory, read again only when the file changed, for the lookup a missing path makes.
+  snapshot: () => { exact: ReadonlyMap<string, RuntimeRedirect>, patterns: readonly RuntimeRedirect[] }
   add: (from: string, to: string, status: RedirectStatus | undefined, rules: RuntimeRules) => RuntimeRedirect
   remove: (from: string) => boolean
 }
@@ -185,6 +187,9 @@ export function redirectSet(db: Database): RedirectSet {
   const count = db.query<{ total: number }, []>('SELECT COUNT(*) AS total FROM kay_redirects')
   const insert = db.query('INSERT INTO kay_redirects (path, target, status, pattern, added_at) VALUES (?1, ?2, ?3, ?4, ?5) ON CONFLICT (path) DO UPDATE SET target = ?2, status = ?3, pattern = ?4, added_at = ?5')
   const removed = db.query<{ path: string }, [string]>('DELETE FROM kay_redirects WHERE path = ? RETURNING path')
+  // Changes when another connection commits, which is how an editor's `kay not-found` adding a redirect reaches a running server; this connection's own writes reset the copy.
+  const version = db.query<{ data_version: number }, []>('PRAGMA data_version')
+  let held: { at: number, exact: Map<string, RuntimeRedirect>, patterns: RuntimeRedirect[] } | undefined
 
   const set: RedirectSet = {
     list: () => all.all().map(entry),
@@ -194,6 +199,17 @@ export function redirectSet(db: Database): RedirectSet {
       return row ? entry(row) : undefined
     },
     patterns: () => some.all().map(entry),
+    snapshot() {
+      const at = version.get()!.data_version
+
+      if (held?.at !== at) {
+        const rows = all.all().map(entry)
+
+        held = { at, exact: new Map(rows.map(row => [row.from, row])), patterns: rows.filter(row => isPattern(row.from)).sort((a, b) => b.from.length - a.from.length || (a.from < b.from ? -1 : 1)) }
+      }
+
+      return held
+    },
     add(rawFrom, rawTo, status = 307, rules) {
       // Checked and written in one write transaction, so two editors adding at once cannot make a loop between them.
       const write = db.transaction(() => {
@@ -215,9 +231,15 @@ export function redirectSet(db: Database): RedirectSet {
         return { from: key, to, status, addedAt }
       })
 
+      held = undefined
+
       return write.immediate()
     },
-    remove: from => removed.get(from) !== null,
+    remove(from) {
+      held = undefined
+
+      return removed.get(from) !== null
+    },
   }
 
   return set
@@ -268,7 +290,8 @@ function matcherOf(from: string): Matcher {
 // Where an asked path goes, as `location`, when a redirect of the set answers it: an exact row first, then the first `:param` or `*` row it matches. Undefined when none does or the answer would leave where the rules allow, or send the visitor back to the path they asked.
 export function answerFor(set: RedirectSet, asked: string, search: string, hosts: readonly string[]): { location: string, status: RedirectStatus } | undefined {
   const path = plainPath(asked)
-  const exact = set.find(path)
+  const { exact: byPath, patterns } = set.snapshot()
+  const exact = byPath.get(path)
   let location: string | undefined
   let found = exact
 
@@ -276,7 +299,7 @@ export function answerFor(set: RedirectSet, asked: string, search: string, hosts
     location = redirectLocation(exact.to, search)
   }
   else {
-    for (const row of set.patterns()) {
+    for (const row of patterns) {
       const matcher = matcherOf(row.from)
       const match = matcher.pattern?.exec(path)
 
@@ -304,7 +327,7 @@ export function answerFor(set: RedirectSet, asked: string, search: string, hosts
 
   // Two editors adding opposite redirects at once: the pair sends a visitor round, so neither answers.
   if (location.startsWith('/')) {
-    const back = set.find(plainPath(location))
+    const back = byPath.get(plainPath(location))
 
     if (back && !isPattern(back.from) && plainPath(back.to) === path)
       return undefined

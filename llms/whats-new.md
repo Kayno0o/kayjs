@@ -23,6 +23,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `health.check` runs at most once every 3 s, the probes between sharing its answer, so a balancer and a container check polling every second no longer hit the database each time ([Production](production.md#check-the-database-in-the-health-route)).
 - A collection's feed sends an ETag and answers 304 to a reader holding it ([Content](content.md#serve-an-rss-feed)).
 - A link followed while an earlier visit's page is still loading cancels that fetch, so a slow page no longer keeps downloading behind the one shown ([Navigation](navigation.md)).
+- A 404 costs the server less: the missing paths are written to `data/not-found.sqlite` in one transaction a second instead of four statements per request, and the runtime redirects are answered from memory that follows the file ([Routing](routing-endpoints-and-base.md)).
 
 ## 1.55.1
 

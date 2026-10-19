@@ -25,6 +25,10 @@ const FUZZY_PER_SECOND = 20
 const MAX_KNOWN = 5000
 const SECOND_MS = 1000
 const HOUR_MS = 3_600_000
+// Hits wait this long in memory, then reach the file in one transaction, so a flood of missing paths costs the event loop one write, not four per request.
+const FLUSH_MS = 1000
+// The most distinct paths held back, past which the next one writes them all at once.
+const MAX_PENDING = 256
 // A path nobody asked for in this long is dropped with its referrers, as a made-up path can hold a name or an address.
 const MAX_AGE_MS = 90 * 24 * HOUR_MS
 
@@ -65,6 +69,31 @@ export interface MissingStore {
   // The redirects an editor added, which share the file.
   redirects: RedirectSet
   close: () => void
+}
+
+// What a store holds back of a path: its hits since the last write, when they came, and the hosts they came from.
+interface Pending {
+  hits: number
+  firstAt: number
+  lastAt: number
+  referrers: Map<string, number>
+  suggest: (path: string) => Suggestion | undefined
+}
+
+// The writers of the stores open now, for the process to run as it exits and for a read of the file to run first.
+const writers = new Set<() => void>()
+let exitHooked = false
+
+// Writes whatever the open stores hold back, so a read of their file sees every hit.
+export function flushStores(): void {
+  for (const write of writers) {
+    try {
+      write()
+    }
+    catch {
+      // A store that cannot write fails its next hit, which tells of it.
+    }
+  }
 }
 
 // The path as it is counted: no trailing slash, so `/a` and `/a/` are one; undefined for one not worth keeping, a scanner's, too long, or not a path a visitor typed.
@@ -268,13 +297,13 @@ export function missingStore(path: string, closedByReload = true): MissingStore 
   db.run('CREATE TABLE IF NOT EXISTS kay_missing (path TEXT PRIMARY KEY, hits INTEGER NOT NULL, first_at INTEGER NOT NULL, last_at INTEGER NOT NULL, target TEXT, reason TEXT)')
   db.run('CREATE TABLE IF NOT EXISTS kay_missing_referrers (path TEXT NOT NULL, host TEXT NOT NULL, hits INTEGER NOT NULL, PRIMARY KEY (path, host))')
 
-  const bump = db.query<{ hits: number, target: string | null }, [string, number]>('INSERT INTO kay_missing (path, hits, first_at, last_at) VALUES (?1, 1, ?2, ?2) ON CONFLICT (path) DO UPDATE SET hits = hits + 1, last_at = ?2 RETURNING hits, target')
+  const bump = db.query<{ hits: number, target: string | null }, [string, number, number, number]>('INSERT INTO kay_missing (path, hits, first_at, last_at) VALUES (?1, ?4, ?2, ?3) ON CONFLICT (path) DO UPDATE SET hits = hits + ?4, last_at = ?3 RETURNING hits, target')
   const count = db.query<{ total: number }, []>('SELECT COUNT(*) AS total FROM kay_missing')
   const known = db.query<{ hits: number }, [string]>('SELECT hits FROM kay_missing WHERE path = ?')
   const evict = db.query<{ path: string }, []>('DELETE FROM kay_missing WHERE path = (SELECT path FROM kay_missing ORDER BY hits, last_at LIMIT 1) RETURNING path')
   const referrers = db.query<{ total: number }, [string]>('SELECT COUNT(*) AS total FROM kay_missing_referrers WHERE path = ?')
   const hasReferrer = db.query<{ hits: number }, [string, string]>('SELECT hits FROM kay_missing_referrers WHERE path = ? AND host = ?')
-  const addReferrer = db.query('INSERT INTO kay_missing_referrers (path, host, hits) VALUES (?1, ?2, 1) ON CONFLICT (path, host) DO UPDATE SET hits = hits + 1')
+  const addReferrer = db.query('INSERT INTO kay_missing_referrers (path, host, hits) VALUES (?1, ?2, ?3) ON CONFLICT (path, host) DO UPDATE SET hits = hits + ?3')
   const suggested = db.query('UPDATE kay_missing SET target = ?2, reason = ?3 WHERE path = ?1')
   const rows = db.query<{ path: string, hits: number, first_at: number, last_at: number, target: string | null, reason: string | null }, []>('SELECT path, hits, first_at, last_at, target, reason FROM kay_missing ORDER BY hits DESC, last_at DESC')
   const hosts = db.query<{ path: string, host: string, hits: number }, []>('SELECT path, host, hits FROM kay_missing_referrers ORDER BY hits DESC, host')
@@ -299,14 +328,13 @@ export function missingStore(path: string, closedByReload = true): MissingStore 
 
   const redirects = redirectSet(db)
 
-  // A reload runs the module that opened the store again, which opens its own.
-  if (closedByReload)
-    onReload(() => db.close())
+  const pending = new Map<string, Pending>()
+  let timer: Timer | undefined
+  // A write that failed in the background, which the next hit throws for the caller to tell of.
+  let failure: unknown
 
-  return {
-    hit(path, referrer, suggest) {
-      purge(Date.now())
-
+  const record = db.transaction((batch: [string, Pending][]) => {
+    for (const [path, { hits: seen, firstAt, lastAt, referrers: hosts, suggest }] of batch) {
       if (!known.get(path) && count.get()!.total >= MAX_PATHS) {
         const evicted = evict.get()
 
@@ -314,20 +342,110 @@ export function missingStore(path: string, closedByReload = true): MissingStore 
           removedHosts.run(evicted.path)
       }
 
-      const { hits, target } = bump.get(path, Date.now())!
+      const { hits, target } = bump.get(path, firstAt, lastAt, seen)!
 
       // A single hit may be a typo or a scanner's guess, so only a path asked for twice is worth the matching.
-      if (hits === 2 && target === null) {
+      if (hits >= 2 && hits - seen < 2 && target === null) {
         const found = suggest(path)
 
         if (found)
           suggested.run(path, found.target, found.reason)
       }
 
-      if (referrer !== undefined && (hasReferrer.get(path, referrer) || referrers.get(path)!.total < MAX_REFERRERS))
-        addReferrer.run(path, referrer)
+      for (const [host, more] of hosts) {
+        if (hasReferrer.get(path, host) || referrers.get(path)!.total < MAX_REFERRERS)
+          addReferrer.run(path, host, more)
+      }
+    }
+  })
+
+  const flush = (): void => {
+    clearTimeout(timer)
+    timer = undefined
+
+    if (pending.size === 0)
+      return
+
+    const batch = [...pending]
+
+    pending.clear()
+    purge(Date.now())
+    record(batch)
+  }
+
+  writers.add(flush)
+
+  if (!exitHooked) {
+    exitHooked = true
+    process.on('exit', flushStores)
+  }
+
+  const settle = (): void => {
+    writers.delete(flush)
+
+    try {
+      flush()
+    }
+    catch {
+      // The file goes away with its connection, the held hits with it.
+    }
+
+    db.close()
+  }
+
+  // A reload runs the module that opened the store again, which opens its own.
+  if (closedByReload)
+    onReload(settle)
+
+  return {
+    hit(path, referrer, suggest) {
+      if (failure !== undefined) {
+        const error = failure
+
+        failure = undefined
+        pending.clear()
+
+        throw error
+      }
+
+      const now = Date.now()
+      const held = pending.get(path)
+
+      if (held) {
+        held.hits += 1
+        held.lastAt = now
+        held.suggest = suggest
+      }
+      else {
+        pending.set(path, { hits: 1, firstAt: now, lastAt: now, referrers: new Map(), suggest })
+      }
+
+      const hosts = pending.get(path)!.referrers
+
+      if (referrer !== undefined && (hosts.has(referrer) || hosts.size < MAX_REFERRERS))
+        hosts.set(referrer, (hosts.get(referrer) ?? 0) + 1)
+
+      if (pending.size >= MAX_PENDING) {
+        flush()
+      }
+      else if (timer === undefined) {
+        timer = setTimeout(() => {
+          timer = undefined
+
+          try {
+            flush()
+          }
+          catch (error) {
+            failure = error
+          }
+        }, FLUSH_MS)
+
+        timer.unref()
+      }
     },
     list() {
+      flush()
+
       const byPath = new Map<string, MissingPath['referrers']>()
 
       for (const { path, host, hits } of hosts.all())
@@ -336,11 +454,12 @@ export function missingStore(path: string, closedByReload = true): MissingStore 
       return rows.all().map(row => ({ path: row.path, hits: row.hits, firstAt: row.first_at, lastAt: row.last_at, target: row.target ?? undefined, reason: (row.reason ?? undefined) as Reason | undefined, referrers: byPath.get(row.path) ?? [] }))
     },
     forget(path) {
+      flush()
       removed.run(path)
       removedHosts.run(path)
     },
     redirects,
-    close: () => db.close(),
+    close: settle,
   }
 }
 
@@ -464,6 +583,8 @@ export function unansweredPaths(file?: string): MissingPath[] {
 
   if (!existsSync(file))
     return []
+
+  flushStores()
 
   const store = missingStore(file)
 

@@ -6,7 +6,7 @@ import { describe, expect, it, setSystemTime } from 'bun:test'
 import { Elysia } from 'elysia'
 import { pages } from '../src/server'
 import { devNotFound, devRedirect } from '../src/server/dev-not-found'
-import { answeredBy, countedPath, countMissing, knowRedirects, missingPaths, missingStore, pageRequested, referrerHost, suggester, unansweredPaths } from '../src/server/not-found'
+import { answeredBy, countedPath, countMissing, flushStores, knowRedirects, missingPaths, missingStore, pageRequested, referrerHost, suggester, unansweredPaths } from '../src/server/not-found'
 import { withRedirect } from '../src/server/not-found-config'
 import { readRuntimeRedirects } from '../src/server/runtime-redirects'
 import { scratchDir } from './scratch'
@@ -182,12 +182,36 @@ describe('missingStore', () => {
     }
 
     store.hit('/old', undefined, suggest)
+    expect(store.list()).toHaveLength(1)
     expect(asked).toBe(0)
+    // Held back, the second and third hit reach the file together and still count as the second being asked.
     store.hit('/old', undefined, suggest)
     store.hit('/old', undefined, suggest)
+    expect(store.list()[0]).toMatchObject({ hits: 3, target: '/new', reason: 'slug' })
     expect(asked).toBe(1)
-    expect(store.list()[0]).toMatchObject({ target: '/new', reason: 'slug' })
     store.close()
+  })
+
+  it('holds hits back for a second, then writes them in one go, for a reader of the file, a read of the store and the end of the process', async () => {
+    const file = join(await scratchDir('not-found-'), 'missing.sqlite')
+    const store = missingStore(file)
+    const reader = missingStore(file)
+
+    store.hit('/a', 'x.example', never)
+    store.hit('/a', 'x.example', never)
+    store.hit('/a', undefined, never)
+    store.hit('/b', undefined, never)
+    expect(reader.list()).toEqual([])
+
+    flushStores()
+    expect(reader.list().map(({ path, hits, referrers }) => ({ path, hits, referrers }))).toEqual([{ path: '/a', hits: 3, referrers: [{ host: 'x.example', hits: 2 }] }, { path: '/b', hits: 1, referrers: [] }])
+    store.hit('/c', undefined, never)
+    await Bun.sleep(1200)
+    expect(reader.list().map(row => row.path)).toContain('/c')
+    store.hit('/d', undefined, never)
+    store.close()
+    expect(reader.list().map(row => row.path)).toContain('/d')
+    reader.close()
   })
 
   it('stays bounded under a flood of distinct paths, keeping the paths hit again', async () => {

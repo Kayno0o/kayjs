@@ -350,6 +350,24 @@ describe('the store on disk', () => {
     expect(runtimeRedirects(file).map(row => row.from)).toEqual(['/rt-w-a'])
   })
 
+  it('answers from memory yet follows what another connection adds or removes, and what its own does', async () => {
+    const file = join(await scratchDir('runtime-redirects-'), 'data/not-found.sqlite')
+    const [served, editor] = [redirectSet(openSqlite(file)), redirectSet(openSqlite(file))]
+    const asked = (path: string) => answerFor(served, path, '', [])?.location
+
+    expect(asked('/rt-m-a')).toBeUndefined()
+    editor.add('/rt-m-a', '/new', undefined, rules)
+    editor.add('/rt-m/:x', '/dir/:x', undefined, rules)
+    expect(asked('/rt-m-a')).toBe('/new')
+    expect(asked('/rt-m/b')).toBe('/dir/b')
+    editor.remove('/rt-m-a')
+    expect(asked('/rt-m-a')).toBeUndefined()
+    served.add('/rt-m-c', '/other', undefined, rules)
+    expect(asked('/rt-m-c')).toBe('/other')
+    served.remove('/rt-m-c')
+    expect(asked('/rt-m-c')).toBeUndefined()
+  })
+
   // Root writes through any mode, as in CI.
   it.skipIf(process.getuid?.() === 0)('throws what the store says for a data folder nobody can write, apart from a refusal', async () => {
     const root = await scratchDir('runtime-redirects-')
