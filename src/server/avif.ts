@@ -11,11 +11,18 @@ export const AVIF_WORKER_SOURCE = fileURLToPath(new URL('./avif-worker.ts', impo
 const WORKER_URL = new URL(import.meta.url.startsWith('file:///$bunfs/') ? './avif-worker.js' : './avif-worker.ts', import.meta.url)
 // A worker with nothing to encode this long is stopped, giving back the memory libavif holds.
 const IDLE_MS = 30_000
+// A task with no answer after this long is taken for hung: its worker is stopped, so it does not hold a slot of the request limiter for good.
+let taskMs = 120_000
+
+// How long one encode or decode may take, for a test to hang a task in milliseconds.
+export function setAvifTaskTimeout(ms: number): void {
+  taskMs = ms
+}
 
 interface Encoder {
   // Bun's, which the DOM types the project also loads leave without `ref` and `unref`.
   worker: Worker & Pick<Bun.Worker, 'ref' | 'unref'>
-  tasks: Map<number, { resolve: (bytes: Uint8Array) => void, reject: (error: Error) => void }>
+  tasks: Map<number, { resolve: (bytes: Uint8Array) => void, reject: (error: Error) => void, timer: Timer }>
   idle?: Timer
 }
 
@@ -48,7 +55,11 @@ async function run(task: (id: number) => AvifTask, bytes: Uint8Array): Promise<U
   encoder.worker.ref()
 
   return new Promise((resolve, reject) => {
-    encoder.tasks.set(id, { resolve, reject })
+    const timer = setTimeout(failEncoder, taskMs, encoder, `no answer in ${taskMs} ms`)
+
+    // A pending timer on a worker unreferenced for being idle would keep a build alive; the worker is referenced while a task is out.
+    timer.unref()
+    encoder.tasks.set(id, { resolve, reject, timer })
     encoder.worker.postMessage(task(id), [bytes.buffer])
   })
 }
@@ -60,6 +71,7 @@ function startEncoder(): Encoder {
     const task = encoder.tasks.get(data.id)
 
     encoder.tasks.delete(data.id)
+    clearTimeout(task?.timer)
 
     if ('error' in data)
       task?.reject(new Error(`kay: AVIF coding failed: ${data.error}`))
@@ -74,16 +86,23 @@ function startEncoder(): Encoder {
     }
   }
 
-  encoder.worker.onerror = (event) => {
-    for (const task of encoder.tasks.values())
-      task.reject(new Error(`kay: the AVIF encoder stopped: ${event.message}`))
-
-    stopEncoder(encoder)
-  }
+  encoder.worker.onerror = event => failEncoder(encoder, event.message)
 
   encoders.push(encoder)
 
   return encoder
+}
+
+// Stops the worker and rejects every task it held, the one that hung and those queued behind it.
+function failEncoder(encoder: Encoder, reason: string): void {
+  stopEncoder(encoder)
+
+  for (const task of encoder.tasks.values()) {
+    clearTimeout(task.timer)
+    task.reject(new Error(`kay: the AVIF encoder stopped: ${reason}`))
+  }
+
+  encoder.tasks.clear()
 }
 
 function stopEncoder(encoder: Encoder): void {

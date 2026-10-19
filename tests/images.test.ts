@@ -11,7 +11,7 @@ import { testWorker } from '../src/build/assets'
 import { cappedSizes, DEFAULT_ASPECTS, image, imageUrl, recordVariants, registerImage, setAspects, setMaxDensity, setRemoteImages, shareCard, shareImage } from '../src/runtime/image'
 import { logSink, setLogSink } from '../src/runtime/log'
 import { imageSize, pages, processImage } from '../src/server'
-import { AVIF_ENCODER, AVIF_SPEED, AVIF_WORKER_SOURCE, encodeAvif } from '../src/server/avif'
+import { AVIF_ENCODER, AVIF_SPEED, AVIF_WORKER_SOURCE, decodeAvif as decodeAvifOnWorker, encodeAvif, setAvifTaskTimeout } from '../src/server/avif'
 import { coverImage } from '../src/server/crop'
 import { avifQuality, drawing, serveImages, variantLevel, variantName, writeImageVariants } from '../src/server/image'
 import { stripImageMetadata } from '../src/server/image-metadata'
@@ -452,6 +452,28 @@ describe('AVIF', () => {
     expect(Buffer.from(wasm).includes(`AOMedia Project AV1 Encoder v${version}`)).toBe(true)
     // This build's sizes, within 1% of @jsquash/avif 2.1.1's 1441 and 3706 B; libavif 1.4 left to pick tune IQ writes 822 B at quality 30.
     expect([(await encodeAvif(new Bun.Image(png), 30)).length, (await encodeAvif(new Bun.Image(png), 50)).length]).toEqual([1434, 3702])
+  })
+
+  it('stops a worker whose task does not answer in time, frees the limiter slots it held and encodes the next task on a new worker', async () => {
+    const png = encodePng(new Uint8Array(32 * 16 * 4).fill(200), 32, 16)
+
+    // A worker cannot start and answer within a millisecond, which stands for a decode that never answers.
+    setAvifTaskTimeout(1)
+
+    try {
+      const hung = await Promise.allSettled([
+        ...Array.from({ length: 6 }, async () => drawing(async () => encodeAvif(new Bun.Image(png), 50))),
+        drawing(async () => decodeAvifOnWorker(new Uint8Array(64), { width: 32, height: 16 })),
+      ])
+
+      expect(hung.every(result => result.status === 'rejected')).toBe(true)
+      expect(hung.every(result => result.status === 'rejected' && String(result.reason).includes('the AVIF encoder stopped: no answer in 1 ms'))).toBe(true)
+    }
+    finally {
+      setAvifTaskTimeout(120_000)
+    }
+
+    expect(isAvif(await drawing(async () => encodeAvif(new Bun.Image(png), 50)))).toBe(true)
   })
 
   it('fails the task a trap in the encoder stopped, with its message, and encodes the next on a new instance', async () => {
